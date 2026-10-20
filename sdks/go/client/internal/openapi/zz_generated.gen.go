@@ -148435,8 +148435,9 @@ type GetApiCheckupResponse struct {
 			Payload       map[string]interface{} `json:"payload"`
 			SchemaVersion int                    `json:"schemaVersion"`
 			Switches      *struct {
-				Hostname bool `json:"hostname"`
-				Optional bool `json:"optional"`
+				Hostname           bool  `json:"hostname"`
+				Optional           bool  `json:"optional"`
+				UpgradeDiagnostics *bool `json:"upgradeDiagnostics,omitempty"`
 			} `json:"switches,omitempty"`
 		} `json:"usageReport"`
 	}
@@ -178793,8 +178794,9 @@ func ParseGetApiCheckupResponse(rsp *http.Response) (*GetApiCheckupResponse, err
 				Payload       map[string]interface{} `json:"payload"`
 				SchemaVersion int                    `json:"schemaVersion"`
 				Switches      *struct {
-					Hostname bool `json:"hostname"`
-					Optional bool `json:"optional"`
+					Hostname           bool  `json:"hostname"`
+					Optional           bool  `json:"optional"`
+					UpgradeDiagnostics *bool `json:"upgradeDiagnostics,omitempty"`
 				} `json:"switches,omitempty"`
 			} `json:"usageReport"`
 		}

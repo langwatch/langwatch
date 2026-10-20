@@ -78622,6 +78622,9 @@
                             },
                             "hostname": {
                               "type": "boolean"
+                            },
+                            "upgradeDiagnostics": {
+                              "type": "boolean"
                             }
                           },
                           "required": [
