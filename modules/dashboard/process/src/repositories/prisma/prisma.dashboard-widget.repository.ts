@@ -13,6 +13,7 @@ import {
   DASHBOARD_WIDGET_DEFINITION_VERSION,
   dashboardWidgetDefinitionSchema,
 } from "@langwatch/analytics-contract/dashboard-widget-definition";
+import { DashboardNotFoundError } from "@langwatch/dashboard-contract";
 import { PrismaRepository } from "@langwatch/prisma-client";
 import type {
   DashboardWidget as DashboardWidgetRecord,
@@ -218,7 +219,8 @@ export class PrismaDashboardWidgetRepository
   /**
    * Adds a widget to a dashboard at the next free row; row computation and
    * write share one transaction so concurrent assignments can't overlap.
-   * @throws {DashboardWidgetNotFoundError} when the dashboard/widget isn't in this project (IDOR).
+   * @throws {DashboardNotFoundError} when the dashboard isn't this project's Dashboards board (IDOR).
+   * @throws {DashboardWidgetNotFoundError} when the widget isn't in this project (IDOR).
    */
   async assignToDashboard({
     id,
@@ -231,7 +233,7 @@ export class PrismaDashboardWidgetRepository
   }): Promise<DashboardWidgetRow> {
     await this.transaction(async (tx) => {
       if (!(await ownsBoard(tx, { dashboardId, projectId }))) {
-        throw new DashboardWidgetNotFoundError();
+        throw new DashboardNotFoundError(projectId);
       }
       // The next free row on the target board (gridRow is shared between the authoring grid
       // and the board's grid: accepted prototype coupling).

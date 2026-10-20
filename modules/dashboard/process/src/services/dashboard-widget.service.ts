@@ -111,7 +111,7 @@ export class DashboardWidgetService {
     const { viewer: _viewer, ...fields } = input;
     await this.#assertEnabled(fields);
     await this.#visibleRow(input);
-    await this.#assertBoardWritable(input);
+    await this.#assertBoardWritable(input, () => new DashboardNotFoundError(input.projectId));
     return this.#present(await this.#repository.assignToDashboard(fields));
   }
 
@@ -174,9 +174,10 @@ export class DashboardWidgetService {
   /** A board the viewer cannot see is not found; the organization's, shown here, is read-only. */
   async #assertBoardWritable(
     input: { projectId: string; dashboardId: string } & Viewed,
+    notFound: () => Error = () => new DashboardWidgetNotFoundError(),
   ): Promise<void> {
     const found = await this.#boards.findReadable(input);
-    if (!found) throw new DashboardWidgetNotFoundError();
+    if (!found) throw notFound();
     if (found.standing === "guest") throw new DashboardReadOnlyHereError(input.projectId);
   }
 

@@ -156,9 +156,42 @@ describe("given a Reports board and a Dashboards board holding a widget", () => 
         refused: { status: refused.status, code: refused.json?.code },
         placed: { status: placed.status, dashboardId: placed.json?.dashboardId },
       }).toEqual({
-        refused: { status: 404, code: "dashboard_widget_not_found" },
+        refused: { status: 404, code: "dashboard_not_found" },
         placed: { status: 200, dashboardId: board.id },
       });
+    });
+  });
+
+  describe("when an API key creates a Dashboards board", () => {
+    /** @scenario "AC199l Split: the public API reads Dashboards boards apart from the Reports boards" */
+    it("answers 201 with the board, lists it and takes a widget on it", async () => {
+      const { widget, send } = await projectWithBothBoards();
+
+      const created = await send("boards", BOARDS, { method: "POST", body: { name: "Fresh" } });
+      const boardId = created.json?.id;
+      const placed = await send("widgets", `${WIDGETS}/${widget.id}/dashboard`, {
+        method: "POST",
+        body: { dashboardId: boardId },
+      });
+
+      expect({
+        created: { status: created.status, name: created.json?.name },
+        placed: { status: placed.status, dashboardId: placed.json?.dashboardId },
+      }).toEqual({
+        created: { status: 201, name: "Fresh" },
+        placed: { status: 200, dashboardId: boardId },
+      });
+    });
+
+    /** @scenario "AC199l Split: the public API reads Dashboards boards apart from the Reports boards" */
+    it("deletes it, then answers it as not found", async () => {
+      const { send } = await projectWithBothBoards();
+      const created = await send("boards", BOARDS, { method: "POST", body: { name: "Gone" } });
+
+      const deleted = await send("boards", `${BOARDS}/${created.json?.id}`, { method: "DELETE" });
+      const read = await send("boards", `${BOARDS}/${created.json?.id}`);
+
+      expect({ deleted: deleted.status, read: read.status }).toEqual({ deleted: 200, read: 404 });
     });
   });
 });

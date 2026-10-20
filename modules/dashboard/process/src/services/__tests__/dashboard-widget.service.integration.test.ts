@@ -219,7 +219,7 @@ describe.skipIf(!databaseUrl)("dashboard widget service (integration)", () => {
             projectId: project.id,
             dashboardId: foreign.id,
           }),
-        ).rejects.toMatchObject({ code: "dashboard_widget_not_found" });
+        ).rejects.toMatchObject({ code: "dashboard_not_found" });
 
         const read = await service.getById({
           id: widget.id,

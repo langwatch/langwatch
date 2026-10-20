@@ -1,6 +1,6 @@
 /**
  * The addresses, methods and permissions the Dashboards boards REST family publishes:
- * `/api/v1/projects/:projectId/analytics/boards`, read-only.
+ * `/api/v1/projects/:projectId/analytics/boards`.
  * @vitest-environment node
  */
 import { describe, expect, it } from "vitest";
@@ -12,7 +12,7 @@ describe("given the Dashboards boards REST family", () => {
 
   describe("when its routes are read", () => {
     /** @scenario "AC199l Split: the public API reads Dashboards boards apart from the Reports boards" */
-    it("publishes a list and a read, literally, each asking analytics:view", () => {
+    it("publishes a list, a read, a create and a delete, literally, each asking its permission", () => {
       expect({
         namespace: declaration.namespace,
         addressing: declaration.addressing,
@@ -39,6 +39,18 @@ describe("given the Dashboards boards REST family", () => {
             "/api/v1/projects/:projectId/analytics/boards/:boardId",
             "getApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId",
             "analytics:view",
+          ],
+          [
+            "post",
+            "/api/v1/projects/:projectId/analytics/boards",
+            "postApiV1ProjectsByProjectIdAnalyticsBoards",
+            "analytics:create",
+          ],
+          [
+            "delete",
+            "/api/v1/projects/:projectId/analytics/boards/:boardId",
+            "deleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId",
+            "analytics:delete",
           ],
         ],
       });

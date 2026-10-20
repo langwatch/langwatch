@@ -1,6 +1,6 @@
 /**
- * The Dashboards area's boards under `/api/v1/projects/:projectId/analytics/boards`, read-only:
- * the boards a dashboard widget can be added to. Analytics Reports boards stay on
+ * The Dashboards area's boards under `/api/v1/projects/:projectId/analytics/boards`: read,
+ * create and delete the boards a dashboard widget can be added to. Analytics Reports boards stay on
  * `/api/v1/dashboards` (dashboards-v2.feature AC199).
  */
 import {
@@ -17,6 +17,7 @@ import {
   boardProjectParamsSchema,
   boardResourceSchema,
   DashboardApi,
+  dashboardRestNameSchema,
   type Dashboard,
 } from "@langwatch/dashboard-contract";
 import type { z } from "zod";
@@ -119,5 +120,68 @@ export const boardRest = defineRestRouter(DashboardApi)
     const links = await app.getBoardLinks({ projectId, dashboardIds: [board.id] });
 
     return boardResource(board, links[board.id] ?? "");
+  })
+
+  .post(
+    "/api/v1/projects/:projectId/analytics/boards",
+    "postApiV1ProjectsByProjectIdAnalyticsBoards",
+  )
+  .withAudit("boards.create")
+  .withSharedPath(PROJECT_ANALYTICS)
+  .withParams(boardProjectParamsSchema)
+  .withInput(dashboardRestNameSchema)
+  .withPermission("analytics:create")
+  .withOutput(boardResourceSchema)
+  .withStatus(201)
+  .withDocs({
+    summary: "Create a Dashboards board",
+    description:
+      "Creates an empty board in the Dashboards area. Pass its id to the dashboard widget's add-to-dashboard endpoint to place a widget on it. A board made by POST /api/dashboards belongs to Analytics Reports and cannot hold dashboard widgets.",
+    tags: BOARD_TAGS,
+    responses: {
+      ...canonicalBaseResponses,
+      201: { description: "The board was created" },
+    },
+  })
+  .handle(async ({ app, input, scope, actor }) => {
+    const projectId = scope.id;
+    const board = await app.createBoard({
+      projectId,
+      name: input.name,
+      ...(actor?.type === "user" ? { createdById: actor.id } : {}),
+    });
+    const links = await app.getBoardLinks({ projectId, dashboardIds: [board.id] });
+
+    return boardResource(board, links[board.id] ?? "");
+  })
+
+  .delete(
+    "/api/v1/projects/:projectId/analytics/boards/:boardId",
+    "deleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId",
+  )
+  .withAudit("boards.delete")
+  .withSharedPath(PROJECT_ANALYTICS)
+  .withParams(boardParamsSchema)
+  .withPermission("analytics:delete")
+  .withOutput(boardResourceSchema)
+  .withDocs({
+    summary: "Delete a Dashboards board",
+    description:
+      "Deletes a board of the Dashboards area. Its widgets stay saved and become unplaced. A board saved in another project, or one only Analytics Reports holds, is reported as not found.",
+    tags: BOARD_TAGS,
+    responses: {
+      ...canonicalBaseResponses,
+      ...boardNotFoundResponse,
+      200: { description: "The board was deleted" },
+    },
+  })
+  .handle(async ({ app, input, scope, actor }) => {
+    const board = await app.deleteBoard({
+      projectId: scope.id,
+      dashboardId: input.boardId,
+      ...viewerOfActor({ actor }),
+    });
+
+    return boardResource(board, "");
   })
   .build();
