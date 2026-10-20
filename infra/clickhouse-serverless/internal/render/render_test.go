@@ -230,6 +230,43 @@ func TestRenderAll_LimitsContainsMergeTreeSettings(t *testing.T) {
 	}
 }
 
+func TestRenderAll_UpgradePinsHold25_10Behaviour(t *testing.T) {
+	dir := t.TempDir()
+	input := testInput()
+	computed := config.ComputeFromResources(input.CPU, input.RAMBytes, input)
+
+	if err := render.RenderAll(testLogger(), input, computed, dir); err != nil {
+		t.Fatalf("RenderAll: %v", err)
+	}
+
+	files := map[string][]string{
+		"config.d/limits.yaml": {
+			"propagate_types_serialization_versions_to_nested_types: 0",
+			"escape_index_filenames: 0",
+			"serialization_info_version: basic",
+			"string_serialization_version: single_stream",
+			"patch_parts_version: v1",
+			"asynchronous_metrics_key_values_mode: legacy_names",
+		},
+		"users.d/profiles.yaml": {
+			`compatibility: "25.10"`,
+			"deduplicate_insert: backward_compatible_choice",
+		},
+	}
+
+	for file, checks := range files {
+		data, err := os.ReadFile(filepath.Join(dir, file))
+		if err != nil {
+			t.Fatalf("read %s: %v", file, err)
+		}
+		for _, check := range checks {
+			if !strings.Contains(string(data), check) {
+				t.Errorf("%s missing %q", file, check)
+			}
+		}
+	}
+}
+
 func TestRenderAll_SystemLogsTTL(t *testing.T) {
 	dir := t.TempDir()
 	input := testInput()

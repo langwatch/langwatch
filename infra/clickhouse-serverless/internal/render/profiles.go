@@ -24,6 +24,15 @@ func renderProfiles(c *config.Computed, usersD string) error {
 		"http_receive_timeout":               c.HTTPReceiveTimeout,
 		"http_send_timeout":                  c.HTTPSendTimeout,
 		"tcp_keep_alive_timeout":             c.TCPKeepAliveTimeout,
+
+		// Query-level defaults as of 25.10. Among the ones 26.4 to 26.8
+		// change: an unquoted JSON integer into DateTime64 is read as Unix
+		// seconds instead of ticks (ClickHouse #108091), so an epoch-ms
+		// timestamp lands at 9999-12-31. Settings set above still win.
+		"compatibility": "25.10",
+		// 26.2 turns insert deduplication on for async inserts and
+		// materialized views (#95970), which would change the ingest path.
+		"deduplicate_insert": "backward_compatible_choice",
 	}
 
 	// Query limits — only include non-zero values.

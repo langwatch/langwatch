@@ -1,4 +1,4 @@
-ARG CLICKHOUSE_VERSION=25.10.2.65
+ARG CLICKHOUSE_VERSION=26.8.31.2
 
 # Stage 1: Build Go config generator
 FROM golang:1.27.3-alpine AS builder
