@@ -30,6 +30,11 @@ on:
   schedule:
     - cron: "0 1 * * *"
   workflow_dispatch:
+  # TEMPORARY, removed before merge: workflow_dispatch cannot start a workflow
+  # that is not yet on the default branch, so this is the pre-merge trial run.
+  push:
+    branches: [feat/nightly-suite]
+    paths: [.github/workflows/nightly.yml]
 
 permissions:
   contents: read
