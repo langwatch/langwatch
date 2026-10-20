@@ -38,12 +38,9 @@ import type {
   IssuedLicenseRepository,
 } from "../repositories/issued-license.repository.ts";
 import { resolveLicenseTerms } from "../rules/issued-license-row.rules.ts";
-import {
-  issuedLicenseView,
-  listQueryOf,
-  statusOfIssuedLicense,
-} from "../rules/issued-license.rules.ts";
+import { issuedLicenseView, statusOfIssuedLicense } from "../rules/issued-license.rules.ts";
 import type { ContractBudgets } from "./contract-budget.service.ts";
+import { IssuedLicenseListService } from "./issued-license-list.service.ts";
 import { IssuedLicenseWriterService } from "./issued-license-writer.service.ts";
 
 interface LicenseRegistryOptions {
@@ -69,9 +66,11 @@ export class LicenseRegistryService {
   }
 
   private readonly writer: IssuedLicenseWriterService;
+  private readonly lists: IssuedLicenseListService;
 
   private constructor(private readonly options: LicenseRegistryOptions) {
     this.writer = IssuedLicenseWriterService.create(options);
+    this.lists = IssuedLicenseListService.create(options);
   }
 
   /** Signs a new license for a customer and records it. */
@@ -384,9 +383,8 @@ export class LicenseRegistryService {
   async list(
     input: { page: number; pageSize: number; search?: string } & IssuedLicenseFilters,
   ): Promise<IssuedLicensePage> {
-    const query = listQueryOf({ ...input, now: this.options.now() });
-    const { rows, total } = await this.options.repository.listAll(query);
-    return { licenses: rows.map((row) => this.toView(row)), total };
+    const { rows, total, counts } = await this.lists.list(input);
+    return { licenses: rows.map((row) => this.toView(row)), total, counts };
   }
 
   private async resolveCustomer(customer: LicenseCustomer): Promise<IssuedLicenseCustomerRecord> {

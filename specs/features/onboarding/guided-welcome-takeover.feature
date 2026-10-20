@@ -299,11 +299,15 @@ Feature: Guided welcome flow and takeover screens
     Then the organization records that the provider was skipped
     And I land on the first pick's page
 
+  # Skip anyway skips the provider step only. The tour is app UI and needs no
+  # model, so the landing still shows the product; Langy asks for a model after
+  # it, inline in the panel (specs/langy/langy-inline-model-setup.feature).
   @integration
-  Scenario: Skip anyway skips the tour as well
+  Scenario: Skip anyway leaves the tour to run
     When the provider skip is recorded
-    Then the organization records the tour as skipped in the same call
-    And the provider skipped and tour skipped events both reach the onboarding event hook
+    Then the organization records the provider skip and nothing else
+    And the tour is not recorded as skipped, so the landing still runs it
+    And only the provider skipped event reaches the onboarding event hook
 
   # ============================================================================
   # Self-hosted
@@ -393,9 +397,9 @@ Feature: Guided welcome flow and takeover screens
     Then I am asked "Are you sure sure?"
     When I confirm with "Skip anyway"
     Then I land on my personal home with the Langy panel open
-    And the panel asks for the model the provider step would have connected
+    And below the tour card Langy asks for the model the provider step would have connected
     And no offer is shown there, because the coding path is the one being guided
-    And the skip is recorded on my organization
+    And the skip is recorded on my organization, with the tour not skipped
 
   @e2e
   Scenario: With the flag off the classic wizard is unchanged
