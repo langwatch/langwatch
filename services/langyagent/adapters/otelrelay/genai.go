@@ -414,7 +414,7 @@ func (g *genAICall) forwardSpan() {
 
 // recordFailure states on the span why the call failed: the error's own type
 // and the account cause the proxy classified. Provider prose can quote a key
-// back in shapes nobody enumerated, so the only message recorded is the
+// back in shapes no list covers, so the only message recorded is the
 // gateway's own governance message. status is 0 for an in-stream error.
 func (g *genAICall) recordFailure(span ptrace.Span, body []byte, status int) {
 	attrs := span.Attributes()

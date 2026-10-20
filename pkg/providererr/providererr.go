@@ -12,9 +12,13 @@ import (
 
 // GatewayAccountExhaustedMessage replaces the provider's own message on an
 // account-exhaustion error the AI gateway forwards, so a governed user is sent
-// to their admin rather than to a billing page they do not own. Readers past
-// the gateway recognize the exhaustion by this exact message.
+// to their admin rather than to a billing page they do not own.
 const GatewayAccountExhaustedMessage = "Your organization's AI gateway access is exhausted. Contact your LangWatch admin."
+
+// GatewayAccountExhaustedCode is the error.code the gateway sets beside that
+// message when the provider gave none. Readers classify on the code; the
+// message match below only covers gateways released before the code existed.
+const GatewayAccountExhaustedCode = "provider_account_exhausted"
 
 // AccountExhausted reports whether a provider error is a terminal account-level
 // exhaustion (credit, quota, billing), never a rate limit or a 5xx. Keyed on
@@ -25,7 +29,8 @@ func AccountExhausted(status int, body []byte) bool {
 	if status >= http.StatusInternalServerError {
 		return false
 	}
-	if gjson.GetBytes(body, "error.code").String() == "insufficient_quota" ||
+	code := gjson.GetBytes(body, "error.code").String()
+	if code == "insufficient_quota" || code == GatewayAccountExhaustedCode ||
 		gjson.GetBytes(body, "error.type").String() == "insufficient_quota" {
 		return true
 	}

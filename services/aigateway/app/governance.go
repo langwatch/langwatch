@@ -14,8 +14,8 @@ import (
 // accountExhaustionMessage is the message shown to a governed user when an
 // upstream provider account is exhausted (credit/quota/billing). It avoids
 // credit/billing wording so wrapper clients (e.g. Claude Code) render it
-// verbatim instead of overlaying their own billing UI. Shared through
-// providererr so readers past the gateway still classify the exhaustion.
+// verbatim instead of overlaying their own billing UI. The rewrite also sets
+// error.code, which is what readers past the gateway classify on.
 const accountExhaustionMessage = providererr.GatewayAccountExhaustedMessage
 
 // applyGovernanceMessage rewrites the human-facing message of a terminal
@@ -38,6 +38,9 @@ func applyGovernanceMessage(resp *domain.Response, err error) (*domain.Response,
 	if errors.As(err, &ue) && isAccountExhaustionError(ue) {
 		ue.Message = accountExhaustionMessage
 		ue.Body = rewriteErrorMessage(ue.Body, accountExhaustionMessage)
+		if ue.ErrorCode == "" {
+			ue.ErrorCode = providererr.GatewayAccountExhaustedCode
+		}
 	}
 	return resp, err
 }
@@ -71,6 +74,13 @@ func rewriteErrorMessage(body []byte, msg string) []byte {
 	out, err := sjson.SetBytes(body, "error.message", msg)
 	if err != nil {
 		return body
+	}
+	// Readers past the gateway classify on this code, never on the sentence.
+	// A provider's own code (OpenAI's insufficient_quota) is kept.
+	if gjson.GetBytes(out, "error.code").String() == "" {
+		if coded, err := sjson.SetBytes(out, "error.code", providererr.GatewayAccountExhaustedCode); err == nil {
+			out = coded
+		}
 	}
 	return out
 }

@@ -63,6 +63,7 @@ func TestMessagesStream_ProviderRejectionAtOpenKeepsItsStatus(t *testing.T) {
 	assert.Equal(t, "error", gjson.GetBytes(body, "type").String())
 	assert.Equal(t, "invalid_request_error", gjson.GetBytes(body, "error.type").String())
 	assert.Equal(t, providererr.GatewayAccountExhaustedMessage, gjson.GetBytes(body, "error.message").String())
+	assert.Equal(t, providererr.GatewayAccountExhaustedCode, gjson.GetBytes(body, "error.code").String())
 	assert.True(t, providererr.AccountExhausted(rec.Code, body),
 		"a reader past the gateway must still classify the spent balance")
 }
