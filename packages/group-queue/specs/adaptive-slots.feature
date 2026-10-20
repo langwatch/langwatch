@@ -4,14 +4,23 @@ Feature: A consumer's slots follow its load
   So that a small pod's idle CPU is used and a loaded pod backs off before it stalls
 
   The configured concurrency (GLOBAL_QUEUE_CONCURRENCY, 100 by default) is the floor: a consumer
-  starts there and never runs fewer. Once a second it looks at its own process: with every slot
-  taken and the event loop under 85% busy, the jobs are waiting on ClickHouse and Redis, so the
-  count grows by a quarter up to the ceiling (1000 by default, the queue policy's
-  adaptiveSlotsCeiling overrides it). Above 95% loop or 80% of the heap limit it shrinks by a fifth.
+  starts there and never runs fewer. Slots adapt only up to a ceiling the deployment raises
+  through the queue policy's adaptiveSlotsCeiling; by default the ceiling is the configured
+  concurrency, so the count stays fixed (Alex, 2026-10-20). With a raised ceiling, once a second
+  the consumer looks at its own process: with every slot taken and the event loop under 85% busy,
+  the jobs are waiting on ClickHouse and Redis, so the count grows by a quarter up to the ceiling.
+  Above 95% loop or 80% of the heap limit it shrinks by a fifth.
 
   @integration
-  Scenario: A consumer whose jobs wait on IO grows its slots up to its ceiling
-    Given a consumer configured for two jobs at once with a ceiling of four
+  Scenario: By default a consumer's slots stay at its configured concurrency
+    Given a consumer configured for two jobs at once with no ceiling raised
+    And a backlog of jobs that each wait on IO
+    When every slot stays taken while the event loop is idle
+    Then it never runs more than two jobs at once
+
+  @integration
+  Scenario: A consumer whose jobs wait on IO grows its slots up to a raised ceiling
+    Given a consumer configured for two jobs at once with a ceiling raised to four
     And a backlog of jobs that each wait on IO
     When every slot stays taken while the event loop is idle
     Then the consumer comes to run four jobs at once

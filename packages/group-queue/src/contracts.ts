@@ -96,7 +96,7 @@ export interface GroupQueueGroupBatching<Payload> {
 
 export interface GroupQueuePolicy {
   globalConcurrency?: number;
-  /** Most slots a consumer adapts up to; at or below `globalConcurrency` the count stays fixed. */
+  /** Most slots a consumer adapts up to; absent or at most `globalConcurrency`, slots are fixed. */
   adaptiveSlotsCeiling?: number;
   drainTimeoutMs?: number;
   tenantConcurrencyCap?: number;

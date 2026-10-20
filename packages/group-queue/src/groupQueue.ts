@@ -251,8 +251,6 @@ export const GROUP_QUEUE_CONFIG = {
    * GLOBAL_QUEUE_CONCURRENCY raises it; a bench reached 1,474 jobs/s at 1,000.
    */
   defaultGlobalConcurrency: 100,
-  /** Most slots a consumer grows to while its jobs wait on IO with the event loop idle. */
-  adaptiveSlotsCeiling: 1000,
   /** TTL for the active key (safety net for crashes), in seconds */
   activeTtlSec: 300,
   /** BRPOP timeout in seconds (fallback polling interval) */
@@ -634,10 +632,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     );
     this.adaptiveSlots = new AdaptiveSlots({
       floor: this.globalConcurrency,
-      ceiling: Math.max(
-        this.globalConcurrency,
-        options?.policy?.adaptiveSlotsCeiling ?? GROUP_QUEUE_CONFIG.adaptiveSlotsCeiling,
-      ),
+      ceiling: Math.max(this.globalConcurrency, options?.policy?.adaptiveSlotsCeiling ?? 0),
       busy: () => this.processingQueue.running() + this.processingQueue.length(),
       onChange: (slots) => {
         this.processingQueue.concurrency = slots;
