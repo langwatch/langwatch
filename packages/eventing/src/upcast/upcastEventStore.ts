@@ -86,6 +86,17 @@ class UpcastingEventStore<EventType extends Event> implements EventStore<EventTy
     };
   }
 
+  get getEventsPaged(): EventStore<EventType>["getEventsPaged"] {
+    const paged = this.store.getEventsPaged?.bind(this.store);
+    if (!paged) return undefined;
+    return async (request) => {
+      const merged = await this.#merged(request.aggregateType, (aggregateType) =>
+        paged({ ...request, aggregateType }),
+      );
+      return merged.slice(0, request.limit);
+    };
+  }
+
   async countEventsBefore(
     request: Parameters<EventStore<EventType>["countEventsBefore"]>[0],
   ): Promise<number> {

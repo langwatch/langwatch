@@ -427,6 +427,45 @@ export class EventingClickHouseEventRepository implements EventRepository {
     limit: number;
     occurredAtFromMs?: number;
   }): Promise<EventRecord[]> {
+    const { upToTimestamp, upToEventId, ...page } = request;
+    return this.readPage({
+      ...page,
+      upTo: { timestamp: upToTimestamp, eventId: upToEventId },
+      failure: "Failed to get paged event records up to event from ClickHouse",
+    });
+  }
+
+  /**
+   * Cursor-paginated `getEventRecords`: one aggregate's whole history a page at a time, so a
+   * rebuild of a huge aggregate never holds every EventPayload blob at once.
+   */
+  async getEventRecordsPaged(request: {
+    tenantId: string;
+    aggregateType: string;
+    aggregateId: string;
+    after: { timestamp: number; eventId: string } | undefined;
+    limit: number;
+    occurredAtFromMs?: number;
+  }): Promise<EventRecord[]> {
+    return this.readPage({
+      ...request,
+      failure: "Failed to get paged event records from ClickHouse",
+    });
+  }
+
+  private async readPage({
+    failure,
+    ...request
+  }: {
+    tenantId: string;
+    aggregateType: string;
+    aggregateId: string;
+    upTo?: { timestamp: number; eventId: string };
+    after: { timestamp: number; eventId: string } | undefined;
+    limit: number;
+    occurredAtFromMs?: number;
+    failure: string;
+  }): Promise<EventRecord[]> {
     const { tenantId, aggregateType, aggregateId } = request;
     try {
       const client = await this.getClient(tenantId);
@@ -441,35 +480,34 @@ export class EventingClickHouseEventRepository implements EventRepository {
       const rows = await result.json<EventLogRow>();
       return mapEventLogRows({ rows, tenantId, aggregateType, aggregateId });
     } catch (error) {
-      this.logger.warn(
-        { ...request, aggregateId: String(aggregateId), error },
-        "Failed to get paged event records up to event from ClickHouse",
-      );
+      this.logger.warn({ ...request, aggregateId: String(aggregateId), error }, failure);
       throw error;
     }
   }
 
-  /** Query + params for {@link getEventRecordsUpToPaged}. */
+  /** One page's query + params: {@link getEventRecordsUpToPaged}, {@link getEventRecordsPaged}. */
   private buildPagedQuery(request: {
     tenantId: string;
     aggregateType: string;
     aggregateId: string;
-    upToTimestamp: number;
-    upToEventId: string;
+    upTo?: { timestamp: number; eventId: string };
     after: { timestamp: number; eventId: string } | undefined;
     limit: number;
     occurredAtFromMs?: number;
   }): { query: string; query_params: Record<string, unknown>; declaresFullScan: boolean } {
-    const {
-      tenantId,
-      aggregateType,
-      aggregateId,
-      upToTimestamp,
-      upToEventId,
-      after,
-      limit,
-      occurredAtFromMs,
-    } = request;
+    const { tenantId, aggregateType, aggregateId, upTo, after, limit, occurredAtFromMs } = request;
+    if (!Number.isSafeInteger(limit) || limit < 1) {
+      throw new RangeError(`A page of event records needs a positive integer limit, got ${limit}`);
+    }
+    const upToClause = upTo
+      ? `AND (
+            EventTimestamp < {upToTimestamp:UInt64}
+            OR (
+              EventTimestamp = {upToTimestamp:UInt64}
+              AND EventId <= {upToEventId:String}
+            )
+          )`
+      : "";
     const afterClause = after
       ? `AND (
             EventTimestamp > {afterTimestamp:UInt64}
@@ -481,6 +519,8 @@ export class EventingClickHouseEventRepository implements EventRepository {
       : "";
     // The cursor and the upper bound are both on EventTimestamp, which is NOT
     // the partition key — so neither prunes. Only EventOccurredAt does.
+    // Nor is it the sort key, so each page scans the aggregate's rows to find its top `limit`.
+    // Lifting the lazy-read cap to the page size reads EventPayload for those rows only.
     const hasLowerBound = typeof occurredAtFromMs === "number" && occurredAtFromMs > 0;
     const occurredAtFilter = hasLowerBound
       ? "AND (EventOccurredAt = 0 OR EventOccurredAt >= {occurredAtFromMs:UInt64})"
@@ -494,23 +534,17 @@ export class EventingClickHouseEventRepository implements EventRepository {
           AND AggregateType = {aggregateType:String}
           AND AggregateId = {aggregateId:String}
           ${occurredAtFilter}
-          AND (
-            EventTimestamp < {upToTimestamp:UInt64}
-            OR (
-              EventTimestamp = {upToTimestamp:UInt64}
-              AND EventId <= {upToEventId:String}
-            )
-          )
+          ${upToClause}
           ${afterClause}
         ORDER BY EventTimestamp ASC, EventId ASC
         LIMIT {limit:UInt32}
+        SETTINGS query_plan_max_limit_for_lazy_materialization = ${limit}
       `,
       query_params: {
         tenantId,
         aggregateType,
         aggregateId: String(aggregateId),
-        upToTimestamp,
-        upToEventId,
+        ...(upTo ? { upToTimestamp: upTo.timestamp, upToEventId: upTo.eventId } : {}),
         ...(hasLowerBound ? { occurredAtFromMs } : {}),
         ...(after ? { afterTimestamp: after.timestamp, afterEventId: after.eventId } : {}),
         limit,

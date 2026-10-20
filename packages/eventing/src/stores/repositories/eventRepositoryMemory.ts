@@ -177,16 +177,42 @@ export class EventRepositoryMemory implements EventRepository {
     limit: number;
     occurredAtFromMs?: number;
   }): Promise<EventRecord[]> {
-    const {
-      tenantId,
-      aggregateType,
-      aggregateId,
-      upToTimestamp,
-      upToEventId,
-      after,
-      limit,
-      occurredAtFromMs,
-    } = request;
+    const { upToTimestamp, upToEventId, ...page } = request;
+    return this.pageOfRecords({
+      ...page,
+      upTo: { timestamp: upToTimestamp, eventId: upToEventId },
+    });
+  }
+
+  async getEventRecordsPaged(request: {
+    tenantId: string;
+    aggregateType: string;
+    aggregateId: string;
+    after: { timestamp: number; eventId: string } | undefined;
+    limit: number;
+    occurredAtFromMs?: number;
+  }): Promise<EventRecord[]> {
+    return this.pageOfRecords(request);
+  }
+
+  /** One `(EventTimestamp, EventId)`-ordered page after the cursor, up to `upTo` when given. */
+  private pageOfRecords({
+    tenantId,
+    aggregateType,
+    aggregateId,
+    upTo,
+    after,
+    limit,
+    occurredAtFromMs,
+  }: {
+    tenantId: string;
+    aggregateType: string;
+    aggregateId: string;
+    upTo?: { timestamp: number; eventId: string };
+    after: { timestamp: number; eventId: string } | undefined;
+    limit: number;
+    occurredAtFromMs?: number;
+  }): EventRecord[] {
     const key = `${tenantId}:${aggregateType}:${String(aggregateId)}`;
     const records = this.eventsByKey.get(key) ?? [];
 
@@ -200,8 +226,9 @@ export class EventRepositoryMemory implements EventRepository {
       record.EventOccurredAt >= occurredAtFromMs;
 
     const withinUpperBound = (record: EventRecord): boolean =>
-      record.EventTimestamp < upToTimestamp ||
-      (record.EventTimestamp === upToTimestamp && record.EventId <= upToEventId);
+      upTo === undefined ||
+      record.EventTimestamp < upTo.timestamp ||
+      (record.EventTimestamp === upTo.timestamp && record.EventId <= upTo.eventId);
 
     // Strict cursor: only records ordered AFTER (after.timestamp, after.eventId).
     const afterCursor = (record: EventRecord): boolean => {

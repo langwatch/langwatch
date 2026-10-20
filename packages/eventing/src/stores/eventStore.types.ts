@@ -135,6 +135,20 @@ export interface ReadOnlyEventStore<EventType extends Event = Event> {
   }): Promise<readonly EventType[]>;
 
   /**
+   * Cursor-paginated variant of getEvents: an aggregate's whole history a page at a time.
+   * Optional: callers must check presence and fall back to getEvents.
+   */
+  getEventsPaged?(request: {
+    aggregateId: string;
+    context: EventStoreReadContext<EventType>;
+    aggregateType: AggregateType;
+    /** occurredAt (ms) of the triggering event, lower-bounding time-local aggregates' scans. */
+    anchorOccurredAtMs?: number;
+    after: { timestamp: number; eventId: string } | undefined;
+    limit: number;
+  }): Promise<readonly EventType[]>;
+
+  /**
    * Counts events before a given event; should use efficient COUNT with indexes for
    * performance. Validates tenantId for security.
    */

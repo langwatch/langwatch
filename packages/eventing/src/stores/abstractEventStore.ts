@@ -455,6 +455,68 @@ export abstract class AbstractEventStore<
     );
   }
 
+  async getEventsPaged(request: {
+    aggregateId: string;
+    context: EventStoreReadContext<EventType>;
+    aggregateType: AggregateType;
+    anchorOccurredAtMs?: number;
+    after: { timestamp: number; eventId: string } | undefined;
+    limit: number;
+  }): Promise<readonly EventType[]> {
+    const { aggregateId, context, aggregateType, anchorOccurredAtMs, after, limit } = request;
+    const label = `${this.constructor.name}.getEventsPaged`;
+    EventUtils.validateTenantId(context, label);
+
+    if (this.hasMissingAggregateId(aggregateId)) {
+      this.logWarning(
+        label,
+        { tenantId: context.tenantId, aggregateType },
+        "Skipped event_log read for an empty aggregateId (would scan the whole empty-id key range); returning no events",
+      );
+      return [];
+    }
+
+    const pagedRead = this.repository.getEventRecordsPaged;
+    if (!pagedRead) {
+      throw new Error(
+        `${this.constructor.name}: the event repository does not implement getEventRecordsPaged; a paginated rebuild cannot be served`,
+      );
+    }
+
+    return this.instrument(
+      label,
+      {
+        "aggregate.id": String(aggregateId),
+        "tenant.id": context.tenantId,
+        "aggregate.type": aggregateType,
+        "page.limit": limit,
+      },
+      async () => {
+        try {
+          const records = await pagedRead.call(this.repository, {
+            tenantId: context.tenantId,
+            aggregateType,
+            aggregateId,
+            after,
+            limit,
+            occurredAtFromMs: rehydrationLowerBoundMs(aggregateType, anchorOccurredAtMs),
+          });
+          const events = records.map((record) => recordToEvent<EventType>(record, aggregateId));
+          // Not deduped per page, as in getEventsUpToPaged: the caller's cross-page set does it
+          // without feeding a stale cursor.
+          return this.postProcessEvents(events);
+        } catch (error) {
+          this.logError(
+            label,
+            { aggregateId: String(aggregateId), tenantId: context.tenantId, aggregateType, limit },
+            error,
+          );
+          throw error;
+        }
+      },
+    );
+  }
+
   async countEventsBefore({
     aggregateId,
     context,

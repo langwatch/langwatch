@@ -156,6 +156,46 @@ function appliedTokensOf(event: Event): string[] {
   return token === event.id ? [event.id] : [event.id, token];
 }
 
+/** What a history read accounted for: every applied token it carried, and its latest occurredAt. */
+class HistoryAccount {
+  private readonly accounted = new Set<string>();
+  private maxOccurredAt = 0;
+
+  static empty(): HistoryAccount {
+    return new HistoryAccount();
+  }
+
+  add(event: Event): void {
+    // An applied token is accounted for by an event carrying it as its id or as its idempotency
+    // key: the read returns one event per key, which need not be the one this fold applied.
+    for (const token of appliedTokensOf(event)) this.accounted.add(token);
+    this.maxOccurredAt = Math.max(this.maxOccurredAt, event.occurredAt ?? 0);
+  }
+
+  /** Missing applied ids or a missing occurred-at frontier; null when the read is complete. */
+  gap({
+    delivered,
+    loadedAppliedIds,
+    stateFrontierOccurredAtMs,
+  }: {
+    delivered: readonly Event[];
+    loadedAppliedIds: readonly string[];
+    stateFrontierOccurredAtMs: number;
+  }): HistoryReadGap | null {
+    const accounted = new Set(this.accounted);
+    let maxOccurredAt = this.maxOccurredAt;
+    for (const e of delivered) {
+      for (const token of appliedTokensOf(e)) accounted.add(token);
+      maxOccurredAt = Math.max(maxOccurredAt, e.occurredAt ?? 0);
+    }
+    const missingAppliedIds = loadedAppliedIds.filter((id) => !accounted.has(id));
+    const isFrontierMissing =
+      stateFrontierOccurredAtMs > 0 && maxOccurredAt < stateFrontierOccurredAtMs;
+    if (missingAppliedIds.length === 0 && !isFrontierMissing) return null;
+    return { missingAppliedIds, isFrontierMissing };
+  }
+}
+
 function applyUnseenEvents<State, E extends Event>({
   projection,
   events,
@@ -813,6 +853,18 @@ export class FoldProjectionExecutor {
     // the log can account for the key, and the rebuild retries until it does.
     const missedToken = appliedTokenOf(missed);
     const redeliversAppliedKey = missedToken !== missed.id && appliedEventIds.includes(missedToken);
+    // Paged for an order-insensitive fold, as the store-miss re-fold is: a huge aggregate's
+    // whole history in one read is what runs a rebuild out of memory.
+    if (projection.eventLoaderPaged && projection.options?.refoldOnOutOfOrder === false) {
+      return this.streamRebuild({
+        projection,
+        missed,
+        context,
+        delivered: redeliversAppliedKey ? [] : [missed],
+        loadedAppliedIds: appliedEventIds,
+        stateFrontierOccurredAtMs: typeof frontier === "number" ? frontier : 0,
+      });
+    }
     const { history, gap } = await this.readHistoryUntilComplete({
       projection,
       delivered: redeliversAppliedKey ? [] : [missed],
@@ -954,6 +1006,114 @@ export class FoldProjectionExecutor {
   }
 
   /**
+   * {@link rebuild} over the paged whole-history loader: one page held at a time, deduped across
+   * pages by applied token, with the same completeness fences. Order-insensitive folds only.
+   */
+  private async streamRebuild<State, E extends Event>({
+    projection,
+    missed,
+    context,
+    delivered,
+    loadedAppliedIds,
+    stateFrontierOccurredAtMs,
+  }: {
+    projection: FoldProjectionDefinition<State, E>;
+    missed: E;
+    context: ProjectionStoreContext;
+    delivered: readonly E[];
+    loadedAppliedIds: readonly string[];
+    stateFrontierOccurredAtMs: number;
+  }): Promise<State> {
+    const consumes = projectionConsumes<E, Event>(projection);
+    let folded = await this.streamHistory({ projection, missed, context, consumes });
+    let gap = folded.read.gap({ delivered, loadedAppliedIds, stateFrontierOccurredAtMs });
+    for (const delayMs of this.refoldHistoryRetryDelaysMs) {
+      if (!gap) break;
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+      folded = await this.streamHistory({ projection, missed, context, consumes });
+      gap = folded.read.gap({ delivered, loadedAppliedIds, stateFrontierOccurredAtMs });
+    }
+    if (gap) {
+      throw new Error(
+        `Rebuild of ${projection.name} for aggregate ${context.aggregateId} read an incomplete history; retrying`,
+      );
+    }
+    let { state } = folded;
+    const applied = [...folded.applied];
+    const missedToken = appliedTokenOf(missed);
+    if (!folded.seen.has(missedToken) && consumes(missed)) {
+      state = projection.apply(state, missed);
+      applied.push(missedToken);
+    }
+    await projection.store.store(
+      state,
+      withAppliedEventIds(context, mergeAppliedEventIds({ previous: [], applied })),
+    );
+    logger.info(
+      {
+        projection: projection.name,
+        aggregateId: context.aggregateId,
+        tenantId: context.tenantId,
+        missedEventId: missed.id,
+        rebuiltEventCount: applied.length,
+        streamed: true,
+      },
+      "Rebuilt the aggregate for a missed hand-off",
+    );
+    return state;
+  }
+
+  /** Folds the whole history from init, a page at a time, accounting for what it read. */
+  private async streamHistory<State, E extends Event>({
+    projection,
+    missed,
+    context,
+    consumes,
+  }: {
+    projection: FoldProjectionDefinition<State, E>;
+    missed: E;
+    context: ProjectionStoreContext;
+    consumes: (event: Event) => boolean;
+  }): Promise<{ state: State; applied: string[]; seen: Set<string>; read: HistoryAccount }> {
+    // Bounds a non-advancing cursor, as the streaming store-miss re-fold does.
+    const MAX_PAGES = 100_000;
+    const read = HistoryAccount.empty();
+    const seen = new Set<string>();
+    const applied: string[] = [];
+    let state = projection.init();
+    let after: { timestamp: number; eventId: string } | undefined;
+    for (let pageCount = 1; ; pageCount++) {
+      if (pageCount > MAX_PAGES) {
+        throw new Error(
+          `streamRebuild exceeded ${MAX_PAGES} pages for aggregate ${context.aggregateId}; possible non-advancing cursor`,
+        );
+      }
+      // Caller guards eventLoaderPaged is set.
+      const page = await projection.eventLoaderPaged!({
+        tenantId: context.tenantId,
+        aggregateId: context.aggregateId,
+        occurredAtMs: missed.occurredAt,
+        after,
+        limit: this.refoldPageSize,
+      });
+      if (page.length === 0) break;
+      for (const event of page) {
+        read.add(event);
+        const token = appliedTokenOf(event);
+        if (seen.has(token)) continue;
+        seen.add(token);
+        if (!consumes(event)) continue;
+        state = projection.apply(state, event as E);
+        applied.push(token);
+      }
+      const last = page[page.length - 1]!;
+      after = { timestamp: last.createdAt, eventId: last.id };
+      if (page.length < this.refoldPageSize) break;
+    }
+    return { state, applied, seen, read };
+  }
+
+  /**
    * Reads the aggregate's history, re-reading on a short backoff while a fence still
    * reports a gap (see `historyReadGap`). Returns the last read with the gap that
    * stands after retries, null once the read covers everything the loaded state holds.
@@ -1017,27 +1177,9 @@ export class FoldProjectionExecutor {
     loadedAppliedIds: readonly string[];
     stateFrontierOccurredAtMs: number;
   }): HistoryReadGap | null {
-    // An applied token is accounted for by an event carrying it as its id or
-    // as its idempotency key: the read returns one event per key, which need
-    // not be the one this fold applied.
-    const accounted = new Set<string>();
-    for (const e of [...history, ...delivered]) {
-      for (const token of appliedTokensOf(e)) accounted.add(token);
-    }
-    const missingAppliedIds = loadedAppliedIds.filter((id) => !accounted.has(id));
-
-    let maxOccurredAt = 0;
-    for (const e of history) {
-      maxOccurredAt = Math.max(maxOccurredAt, e.occurredAt ?? 0);
-    }
-    for (const e of delivered) {
-      maxOccurredAt = Math.max(maxOccurredAt, e.occurredAt ?? 0);
-    }
-    const isFrontierMissing =
-      stateFrontierOccurredAtMs > 0 && maxOccurredAt < stateFrontierOccurredAtMs;
-
-    if (missingAppliedIds.length === 0 && !isFrontierMissing) return null;
-    return { missingAppliedIds, isFrontierMissing };
+    const read = HistoryAccount.empty();
+    for (const e of history) read.add(e);
+    return read.gap({ delivered, loadedAppliedIds, stateFrontierOccurredAtMs });
   }
 
   /**

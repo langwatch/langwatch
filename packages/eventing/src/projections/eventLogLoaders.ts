@@ -12,8 +12,8 @@ export interface AggregateEventLog<Stored extends Event = Event> {
 }
 
 /**
- * Wires a fold's history loaders (out-of-order re-fold, store-miss re-fold and its paged
- * variant) over one aggregate type's event log, leaving any loader the fold already carries.
+ * Wires a fold's history loaders (out-of-order re-fold, store-miss re-fold, and the paged
+ * variants of both) over one aggregate type's event log, leaving any loader the fold carries.
  */
 export function wireFoldEventLoaders<Stored extends Event>({
   fold,
@@ -21,7 +21,7 @@ export function wireFoldEventLoaders<Stored extends Event>({
 }: {
   fold: Pick<
     FoldProjectionDefinition<unknown>,
-    "eventLoader" | "eventLoaderUpTo" | "eventLoaderUpToPaged"
+    "eventLoader" | "eventLoaderUpTo" | "eventLoaderUpToPaged" | "eventLoaderPaged"
   >;
   log: AggregateEventLog<Stored>;
 }): void {
@@ -47,6 +47,20 @@ export function wireFoldEventLoaders<Stored extends Event>({
         context: { tenantId: createTenantId(ctx.tenantId) },
         aggregateType,
         upToEvent: ctx.upToEvent as Stored,
+        after: ctx.after,
+        limit: ctx.limit,
+      })),
+    ];
+  }
+  // The whole history a page at a time, for a hand-off rebuild of an order-insensitive fold.
+  const getEventsPaged = eventStore.getEventsPaged?.bind(eventStore);
+  if (!fold.eventLoaderPaged && getEventsPaged) {
+    fold.eventLoaderPaged = async (ctx) => [
+      ...(await getEventsPaged({
+        aggregateId: ctx.aggregateId,
+        context: { tenantId: createTenantId(ctx.tenantId) },
+        aggregateType,
+        anchorOccurredAtMs: ctx.occurredAtMs,
         after: ctx.after,
         limit: ctx.limit,
       })),

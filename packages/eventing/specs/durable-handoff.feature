@@ -40,6 +40,22 @@ Feature: Durable hand-off from an append to its lanes
     And the fold's state equals a full replay of the log
 
   @unit
+  Scenario: An order-insensitive fold that missed an event is rebuilt from its log a page at a time
+    Given an order-insensitive fold that folded the events either side of one it missed
+    And its event log is longer than one page
+    When the aggregate is rebuilt
+    Then the history is read a page at a time and never in one read
+    And the fold's state equals a full replay of the log
+    And an event read on two pages is folded once
+
+  @unit
+  Scenario: A paged rebuild that reads an incomplete history retries and then refuses
+    Given an order-insensitive fold whose stored state applied an event the log does not return yet
+    When the aggregate is rebuilt
+    Then the paged read is retried
+    And the rebuild refuses the incomplete history and leaves the job to retry
+
+  @unit
   Scenario: A state projection that missed an event is rebuilt from the aggregate's log
     Given a state projection that applied the events either side of one it missed
     When the hand-off outbox drains
