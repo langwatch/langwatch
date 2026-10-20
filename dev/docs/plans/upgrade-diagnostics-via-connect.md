@@ -52,8 +52,8 @@ only. Decision 3 added the bounded per-step tail.
 
 - Run every string through `redactSecrets` / `redactValue`
   (`packages/upgrade/src/runner/run-log.ts:42-46`) before the bundle is built.
-  `last_error` is stored **unredacted** today (`upgrade-runner.ts:658` stores
-  `error.message`), so this is not optional.
+  Before this change `last_error` was stored unredacted (the runner stored
+  `error.message`); it is now redacted when written (decision 6).
 - Additionally replace every value of the process's declared secret handles
   (`packages/secrets/src/redact.ts`, the `redactOutput` approach in
   `stepping/prisma-tool.ts:56`).

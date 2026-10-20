@@ -1,8 +1,9 @@
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
-import type {
-  OpsUpgradeDiagnosticsAvailability,
-  OpsUpgradeDiagnosticsReceipt,
-  UpgradeDiagnosticsBundle,
+import {
+  type OpsUpgradeDiagnosticsAvailability,
+  type OpsUpgradeDiagnosticsReceipt,
+  type UpgradeDiagnosticsBundle,
+  UpgradeStepNotFailedError,
 } from "@langwatch/ops-contract";
 import { nowInstant } from "@langwatch/time";
 
@@ -63,14 +64,18 @@ export class UpgradeDiagnosticsService {
 
   /**
    * Sends the bundle an operator reviewed, so LangWatch gets what they saw. It is redacted and
-   * fitted again on the way out, and its step must be in the ledger (`upgrade_not_found`).
+   * fitted again on the way out. Its step must be in the ledger (`upgrade_not_found`) and
+   * failed (`upgrade_step_not_failed`).
    */
   async sendReviewed({
     bundle,
   }: {
     bundle: UpgradeDiagnosticsBundle;
   }): Promise<OpsUpgradeDiagnosticsReceipt> {
-    await this.deps.ledger.getStep({ id: bundle.step.id });
+    const step = await this.deps.ledger.getStep({ id: bundle.step.id });
+    if (step.status !== "failed") {
+      throw new UpgradeStepNotFailedError({ stepId: step.id, status: step.status });
+    }
     return this.deps.licensing.sendUpgradeDiagnostics({
       trigger: "operator",
       bundle: resealedDiagnosticsOf(bundle),

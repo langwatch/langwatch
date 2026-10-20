@@ -42,6 +42,7 @@ function setup({
   const ledger = MemoryUpgradeLedgerRepository.create({
     reader: createApiFixture<UpgradeReader>({
       getStep: async ({ id }) => {
+        if (id === "ops:done") return { ...stepOf({ id, status: "done" }), targets: [] };
         if (id !== "ops:backfill") return MemoryUpgradeLedgerRepository.create().getStep({ id });
         return { ...stepOf({ id, status: "failed", lastError: "boom" }), targets: [] };
       },
@@ -184,6 +185,18 @@ describe("UpgradeDiagnosticsService", () => {
         });
 
         expect(sent[0]?.bundle.step.lastError).not.toContain("hunter2");
+      });
+
+      it("sends nothing for a step that is not failed", async () => {
+        const { service, sent } = setup();
+        const reviewed = await service.getBundle({ id: "ops:backfill" });
+
+        await expect(
+          service.sendReviewed({
+            bundle: { ...reviewed, step: { ...reviewed.step, id: "ops:done" } },
+          }),
+        ).rejects.toMatchObject({ code: "upgrade_step_not_failed" });
+        expect(sent).toEqual([]);
       });
 
       it("sends nothing for a step the ledger does not know", async () => {

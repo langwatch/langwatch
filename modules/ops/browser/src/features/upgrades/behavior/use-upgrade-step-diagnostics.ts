@@ -52,7 +52,8 @@ export function useUpgradeStepDiagnostics({ stepId }: { stepId: string }) {
       anchor.href = url;
       anchor.download = diagnosticsFileName(stepId);
       anchor.click();
-      URL.revokeObjectURL(url);
+      // Revoked on a later task, once the browser has started reading the file.
+      setTimeout(() => URL.revokeObjectURL(url), 0);
     }),
     /** Opens the preview; sending happens only from it, and sends the bundle it shows. */
     review: whenRead((text, bundle) => setPreview({ text, bundle })),

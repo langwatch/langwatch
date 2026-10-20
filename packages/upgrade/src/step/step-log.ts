@@ -67,11 +67,11 @@ export class StepLogTail implements MigrationStepLog {
   }
 
   info(message: string, fields: Record<string, unknown> = {}): void {
-    this.keep({ level: "info", message, fields, forward: true });
+    this.keep({ level: "info", message, fields, shouldForward: true });
   }
 
   warn(message: string, fields: Record<string, unknown> = {}): void {
-    this.keep({ level: "warn", message, fields, forward: true });
+    this.keep({ level: "warn", message, fields, shouldForward: true });
   }
 
   /** Keeps a line the caller already logged its own way, without forwarding it again. */
@@ -80,7 +80,7 @@ export class StepLogTail implements MigrationStepLog {
     message: string;
     fields?: Record<string, unknown>;
   }): void {
-    this.keep({ ...line, fields: line.fields ?? {}, forward: false });
+    this.keep({ ...line, fields: line.fields ?? {}, shouldForward: false });
   }
 
   /** The attempt's last lines, oldest first. */
@@ -92,14 +92,14 @@ export class StepLogTail implements MigrationStepLog {
     level,
     message,
     fields,
-    forward,
+    shouldForward,
   }: {
     level: "info" | "warn";
     message: string;
     fields: Record<string, unknown>;
-    forward: boolean;
+    shouldForward: boolean;
   }): void {
-    if (forward) this.options.forward(level, message, fields);
+    if (shouldForward) this.options.forward(level, message, fields);
     const extra = Object.keys(fields).length > 0 ? ` ${safeJson(fields)}` : "";
     const line = `${this.options.now()} ${level} ${message}${extra}`;
     this.lines.push(ledgerText({ text: line, redact: this.options.redact }));
