@@ -2098,9 +2098,10 @@ func writeError(logger *zap.Logger, w http.ResponseWriter, ctx context.Context, 
 // caller went away. Unnamed, it would be written and logged as an unhandled
 // internal error, a platform fault on the line operators page on. A handled
 // error or a forwarded provider answer already says what happened and is
-// left alone.
+// left alone. Both cancels must hold: a handler can raise a Canceled of its
+// own while the request is still live, and that one is ours.
 func abandonedOnClientCancel(ctx context.Context, err error) error {
-	if !errors.Is(err, context.Canceled) {
+	if !errors.Is(err, context.Canceled) || !errors.Is(ctx.Err(), context.Canceled) {
 		return err
 	}
 	var e herr.E

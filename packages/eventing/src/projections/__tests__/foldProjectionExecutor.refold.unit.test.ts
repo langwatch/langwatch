@@ -368,6 +368,27 @@ describe("FoldProjectionExecutor out-of-order re-fold", () => {
         });
       });
 
+      describe("when the delivery is a redelivery of an event the history already holds", () => {
+        it("replays the event log's copy and drops the redelivery", async () => {
+          vi.useRealTimers();
+          const strictExecutor = new FoldProjectionExecutor({
+            refoldHistoryRetryDelaysMs: [],
+          });
+          const checkpointEvent = eventAt(CHECKPOINT_MS);
+          const earlier = eventAt(2_000);
+          const logCopy = { ...eventAt(4_000), id: "evt-log-copy", idempotencyKey: "span-key" };
+          const redelivery = { ...eventAt(3_000), id: "evt-redelivery", idempotencyKey: "span-key" };
+          const { fold } = makeAppliedFold({
+            historyReads: [[earlier, logCopy, checkpointEvent]],
+            appliedEventIds: [earlier.id, checkpointEvent.id],
+          });
+
+          const result = await strictExecutor.execute(fold, redelivery, context);
+
+          expect(result.sequence).toEqual([2_000, 4_000, CHECKPOINT_MS]);
+        });
+      });
+
       describe("when a folded event carries an idempotency key", () => {
         /** @scenario "A commit records each folded event under its idempotency key" */
         it("commits the key, not the id, in the applied set", async () => {

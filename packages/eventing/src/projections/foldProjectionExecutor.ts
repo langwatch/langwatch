@@ -821,10 +821,11 @@ export class FoldProjectionExecutor {
       );
     }
     const consumes = projectionConsumes<E, Event>(projection);
-    const seen = new Set(history.map((event) => event.id));
+    // By applied token: a redelivery under a new id is the event the log kept.
+    const seen = new Set(history.map(appliedTokenOf));
     const combined = [
       ...history.filter(consumes),
-      ...(seen.has(missed.id) || !consumes(missed) ? [] : [missed]),
+      ...(seen.has(appliedTokenOf(missed)) || !consumes(missed) ? [] : [missed]),
     ].toSorted((a, b) => compareFoldEvents(projection, a, b));
     let state = projection.init();
     for (const event of combined) {
@@ -906,8 +907,11 @@ export class FoldProjectionExecutor {
       return null;
     }
 
-    const seen = new Set(history.map((e) => e.id));
-    const missing = delivered.filter((e) => !seen.has(e.id));
+    // By applied token, so a redelivery under a new id defers to the log's copy.
+    const seen = new Set(history.map(appliedTokenOf));
+    const missing = uniqueByAppliedToken(delivered.toSorted(compareArrival)).filter(
+      (e) => !seen.has(appliedTokenOf(e)),
+    );
     const combined = [...(history as E[]), ...missing].toSorted((a, b) =>
       compareFoldEvents(projection, a, b),
     );
@@ -1134,8 +1138,11 @@ export class FoldProjectionExecutor {
     // Merge delivered events the history read missed back into the fold's
     // declared order before folding — a tail append could let an event that
     // belongs in the middle overwrite last-write-wins fields.
-    const seen = new Set(history.map((e) => e.id));
-    const missing = delivered.filter((e) => !seen.has(e.id));
+    // By applied token, so a redelivery under a new id defers to the log's copy.
+    const seen = new Set(history.map(appliedTokenOf));
+    const missing = uniqueByAppliedToken(delivered.toSorted(compareArrival)).filter(
+      (e) => !seen.has(appliedTokenOf(e)),
+    );
     const combined = [...(history as E[]), ...missing].toSorted((a, b) =>
       compareFoldEvents(projection, a, b),
     );
