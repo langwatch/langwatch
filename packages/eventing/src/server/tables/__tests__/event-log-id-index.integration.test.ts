@@ -200,6 +200,7 @@ beforeAll(async () => {
           "${CLICKHOUSE_ENGINE_AGGREGATING:-AggregatingMergeTree()}",
           "AggregatingMergeTree()",
         )
+        .replaceAll("${CLICKHOUSE_STORAGE_POLICY_SETTING}", "")
         .replace(/;\s*$/, ""),
     });
   }
