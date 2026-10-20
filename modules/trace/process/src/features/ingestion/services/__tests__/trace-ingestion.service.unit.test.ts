@@ -21,13 +21,12 @@ import {
 } from "../../../../repositories/trace-span-dedup.repository.ts";
 import { TraceEdgeMediaPayloadService } from "../../../media/services/trace-edge-media-payload.service.ts";
 import { TraceEdgeMediaTelemetryService } from "../../../media/services/trace-edge-media-telemetry.service.ts";
+import { type CodingAgentIngestFilter, TraceIngestionService } from "../trace-ingestion.service.ts";
 import {
-  type CodingAgentIngestFilter,
   type RecordSpanOutcome,
   TraceIngressCommand,
   TraceIngressPayload,
-  TraceIngestionService,
-} from "../trace-ingestion.service.ts";
+} from "../trace-span-collection.service.ts";
 
 /** Each span of a batched hand-off goes through `record`, so one spy sees both paths. */
 class TestTraceIngressCommand extends TraceIngressCommand {

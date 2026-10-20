@@ -34,11 +34,8 @@ import { TraceAnalyticsRollupMapProjection } from "../../../../eventing/trace-ro
 import { TraceSummaryFoldProjection } from "../../../../eventing/trace-summary.projection.ts";
 import { RedisTraceSpanDedupRepository } from "../../../../repositories/redis/redis.trace-span-dedup.repository.ts";
 import { TraceCanonicalisationService } from "../../../derivation/services/trace-canonicalisation.service.ts";
-import {
-  type RecordSpanOutcome,
-  TraceIngressCommand,
-  TraceIngestionService,
-} from "../trace-ingestion.service.ts";
+import { TraceIngestionService } from "../trace-ingestion.service.ts";
+import { type RecordSpanOutcome, TraceIngressCommand } from "../trace-span-collection.service.ts";
 
 const redisUrl = process.env.LANGWATCH_TEST_REDIS_URL;
 const TENANT_ID = "claude-otel-test-project";

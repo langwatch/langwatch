@@ -262,10 +262,12 @@ import { TraceIngestCredentialService } from "../features/ingestion/services/tra
 import { TraceIngestSourceBillingService } from "../features/ingestion/services/trace-ingest-source-billing.service.ts";
 import {
   TraceIngestionService,
-  TraceIngressCommand,
   type CodingAgentIngestFilter,
-  type RecordSpanOutcome,
 } from "../features/ingestion/services/trace-ingestion.service.ts";
+import {
+  TraceIngressCommand,
+  type RecordSpanOutcome,
+} from "../features/ingestion/services/trace-span-collection.service.ts";
 import type {
   ResolveTraceSpansBatchFn,
   ResolveTraceSpansFn,
