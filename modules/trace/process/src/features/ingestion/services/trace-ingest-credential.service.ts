@@ -8,7 +8,7 @@ import type { ApiKeyApi, ResolvedApiKeyCredential } from "@langwatch/api-key-con
 import { ApiKeyPermissionDeniedError } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { HandledError } from "@langwatch/handled-error";
-import { createLogger, type Logger } from "@langwatch/observability";
+import { createLogger, createWarnThrottle, type Logger } from "@langwatch/observability";
 import type { OtlpIngestCredential, OtlpIngestCredentialInput } from "@langwatch/otlp/door";
 
 import type { CollectorCredential } from "../../../transport/collector.rest.ts";
@@ -25,6 +25,12 @@ type TraceIngestApiKeys = Pick<ApiKeyApi, "findResolvedToken" | "markUsed">;
 /** The one permission an ingestion key is measured against. */
 const INGEST_PERMISSION = "traces:create" as const;
 
+/**
+ * One ceiling-refusal line per key per window. A misconfigured exporter retries
+ * its refused batch many times a second, and every retry is the same fact.
+ */
+const CEILING_REFUSAL_LOG_WINDOW_MS = 5 * 60_000;
+
 /** A resolved ingestion credential and the clock stamp it earns once its body is accepted. */
 type TraceIngestResolution = Readonly<{
   resolved: ResolvedApiKeyCredential;
@@ -37,7 +43,9 @@ type TraceIngestCredentialOptions = Readonly<{
   apiKeys: TraceIngestApiKeys;
   authz: Pick<AuthzApi, "hasApiKeyPermission">;
   sourceBilling: Pick<TraceIngestSourceBillingService, "receiverPolicies">;
-  logger?: Pick<Logger, "error"> | undefined;
+  logger?: Pick<Logger, "warn"> | undefined;
+  /** The clock the refusal log samples against. */
+  now?: (() => number) | undefined;
 }>;
 
 export class TraceIngestCredentialService {
@@ -51,15 +59,18 @@ export class TraceIngestCredentialService {
   #apiKeys: TraceIngestApiKeys;
   #authz: Pick<AuthzApi, "hasApiKeyPermission">;
   #sourceBilling: Pick<TraceIngestSourceBillingService, "receiverPolicies">;
-  #logger: Pick<Logger, "error">;
+  #logger: Pick<Logger, "warn">;
+  #now: () => number;
+  #refusalLog = createWarnThrottle(CEILING_REFUSAL_LOG_WINDOW_MS);
 
   private constructor(
-    options: TraceIngestCredentialOptions & Readonly<{ logger: Pick<Logger, "error"> }>,
+    options: TraceIngestCredentialOptions & Readonly<{ logger: Pick<Logger, "warn"> }>,
   ) {
     this.#apiKeys = options.apiKeys;
     this.#authz = options.authz;
     this.#sourceBilling = options.sourceBilling;
     this.#logger = options.logger;
+    this.#now = options.now ?? Date.now;
   }
 
   /** The collector's credential; a refusal is thrown for the door to render. */
@@ -144,16 +155,24 @@ export class TraceIngestCredentialService {
     };
   }
 
+  /** The sender's own key configuration: a customer fault, logged as a warning, sampled per key. */
   #ceilingRefusal(resolved: Extract<ResolvedApiKeyCredential, { type: "apiKey" }>): HandledError {
-    this.#logger.error(
-      {
-        apiKeyId: resolved.apiKeyId,
-        userId: resolved.userId ?? null,
-        projectId: resolved.project.id,
-        permission: INGEST_PERMISSION,
-      },
-      "API key ceiling denial",
-    );
+    const suppressedRefusals = this.#refusalLog.claim({
+      key: resolved.apiKeyId,
+      now: this.#now(),
+    });
+    if (suppressedRefusals !== undefined) {
+      this.#logger.warn(
+        {
+          apiKeyId: resolved.apiKeyId,
+          userId: resolved.userId ?? null,
+          projectId: resolved.project.id,
+          permission: INGEST_PERMISSION,
+          suppressedRefusals,
+        },
+        "API key ceiling denial",
+      );
+    }
     return new ApiKeyPermissionDeniedError(INGEST_PERMISSION);
   }
 }

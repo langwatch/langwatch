@@ -40,6 +40,12 @@ recordProvider(input: OnboardingCallerInput & Readonly<{ provider: string; model
 recordProviderSkipped(input: OnboardingCallerInput): Promise<GuidedOnboardingState>;
 ```
 
+#### `recordProviderPromptDismissed`
+
+```typescript
+recordProviderPromptDismissed(input: OnboardingCallerInput): Promise<GuidedOnboardingState>;
+```
+
 #### `recordVirtualKeyReveal`
 
 ```typescript
@@ -125,11 +131,11 @@ Permission `project:view`. Hidden from the OpenAPI document. Declared at `src/tr
 Answers at `/api/onboarding/guided/paths/:path/complete`, `/api/v1/onboarding/guided/paths/:path/complete`; also, undocumented, `/api/onboarding/2026-08-07/guided/paths/:path/complete`, `/api/v1/onboarding/2026-08-07/guided/paths/:path/complete`, `/api/onboarding/latest/guided/paths/:path/complete`, `/api/v1/onboarding/latest/guided/paths/:path/complete`.
 
 ```typescript
-// Params: guidedPathRestParamsSchema, ../contract/src/onboarding-schemas.ts:131
+// Params: guidedPathRestParamsSchema, ../contract/src/onboarding-schemas.ts:133
 interface Params {
   path: string;
 }
-// Body: guidedPathCompleteRestInputSchema, ../contract/src/onboarding-schemas.ts:139
+// Body: guidedPathCompleteRestInputSchema, ../contract/src/onboarding-schemas.ts:141
 type Body = Record<string, unknown>;
 type Response = z.infer<typeof guidedStateOutputSchema>; // ../contract/src/onboarding.trpc.ts:64
 ```
@@ -138,7 +144,7 @@ type Response = z.infer<typeof guidedStateOutputSchema>; // ../contract/src/onbo
 
 ### `integrationsChecks`
 
-Contract `../contract/src/onboarding.trpc.ts:183`, router `src/transport/integrations-checks.trpc.ts:22`.
+Contract `../contract/src/onboarding.trpc.ts:187`, router `src/transport/integrations-checks.trpc.ts:22`.
 
 | Procedure                           | Kind  | Gate                        | Input  | Output                          |
 | ----------------------------------- | ----- | --------------------------- | ------ | ------------------------------- |
@@ -146,7 +152,7 @@ Contract `../contract/src/onboarding.trpc.ts:183`, router `src/transport/integra
 
 ```typescript
 // integrationsChecks.getCheckStatus
-// Input: inline, ../contract/src/onboarding.trpc.ts:185
+// Input: inline, ../contract/src/onboarding.trpc.ts:189
 interface Input {
   projectId: string;
 }
@@ -157,19 +163,20 @@ type Output = z.infer<typeof integrationsCheckStatusSchema>; // ../contract/src/
 
 Contract `../contract/src/onboarding.trpc.ts:127`, router `src/transport/onboarding.trpc.ts:28`.
 
-| Procedure                           | Kind     | Gate                                                                                                                                                           | Input                                         | Output                                |
-| ----------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- | ------------------------------------- |
-| `onboarding.getGuidedState`         | query    | Service-authorized: organization:view; guided-onboarding state is the organization's own; the app authorizes the exact organizationId before any read or write | `organizationIdInputSchema`                   | `guidedStateWithVariantOutputSchema`  |
-| `onboarding.recordPaths`            | mutation | Service-authorized: organization:view; guided-onboarding state is the organization's own; the app authorizes the exact organizationId before any read or write | `recordPathsInputSchema`                      | `guidedStateOutputSchema`             |
-| `onboarding.recordProvider`         | mutation | Service-authorized: organization:view; guided-onboarding state is the organization's own; the app authorizes the exact organizationId before any read or write | `recordProviderInputSchema`                   | `guidedStateOutputSchema`             |
-| `onboarding.recordProviderSkipped`  | mutation | Service-authorized: organization:view; guided-onboarding state is the organization's own; the app authorizes the exact organizationId before any read or write | `organizationIdInputSchema`                   | `guidedStateOutputSchema`             |
-| `onboarding.recordVirtualKeyReveal` | mutation | Service-authorized: organization:view; guided-onboarding state is the organization's own; the app authorizes the exact organizationId before any read or write | `recordVirtualKeyRevealInputSchema`           | `guidedStateOutputSchema`             |
-| `onboarding.recordTour`             | mutation | Service-authorized: organization:view; guided-onboarding state is the organization's own; the app authorizes the exact organizationId before any read or write | `recordTourInputSchema`                       | `guidedStateOutputSchema`             |
-| `onboarding.beginPath`              | mutation | Service-authorized: organization:view; guided-onboarding state is the organization's own; the app authorizes the exact organizationId before any read or write | `guidedPathInputSchema`                       | `guidedStateWithInstanceOutputSchema` |
-| `onboarding.completePath`           | mutation | Service-authorized: organization:view; guided-onboarding state is the organization's own; the app authorizes the exact organizationId before any read or write | `guidedPathInputSchema`                       | `guidedStateOutputSchema`             |
-| `onboarding.attachConversation`     | mutation | Service-authorized: organization:view; guided-onboarding state is the organization's own; the app authorizes the exact organizationId before any read or write | `attachConversationInputSchema`               | `guidedStateOutputSchema`             |
-| `onboarding.initializeOrganization` | mutation | No permission: onboarding runs before the user belongs to any organization                                                                                     | `onboardingInitializeOrganizationInputSchema` | `organizationInitializedSchema`       |
-| `onboarding.setIntegrationMethod`   | mutation | No permission: onboarding runs before the user belongs to any organization                                                                                     | `setIntegrationMethodInputSchema`             | `onboardingWriteAckSchema`            |
+| Procedure                                  | Kind     | Gate                                                                                                                                                           | Input                                         | Output                                |
+| ------------------------------------------ | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- | ------------------------------------- |
+| `onboarding.getGuidedState`                | query    | Service-authorized: organization:view; guided-onboarding state is the organization's own; the app authorizes the exact organizationId before any read or write | `organizationIdInputSchema`                   | `guidedStateWithVariantOutputSchema`  |
+| `onboarding.recordPaths`                   | mutation | Service-authorized: organization:view; guided-onboarding state is the organization's own; the app authorizes the exact organizationId before any read or write | `recordPathsInputSchema`                      | `guidedStateOutputSchema`             |
+| `onboarding.recordProvider`                | mutation | Service-authorized: organization:view; guided-onboarding state is the organization's own; the app authorizes the exact organizationId before any read or write | `recordProviderInputSchema`                   | `guidedStateOutputSchema`             |
+| `onboarding.recordProviderSkipped`         | mutation | Service-authorized: organization:view; guided-onboarding state is the organization's own; the app authorizes the exact organizationId before any read or write | `organizationIdInputSchema`                   | `guidedStateOutputSchema`             |
+| `onboarding.recordProviderPromptDismissed` | mutation | Service-authorized: organization:view; guided-onboarding state is the organization's own; the app authorizes the exact organizationId before any read or write | `organizationIdInputSchema`                   | `guidedStateOutputSchema`             |
+| `onboarding.recordVirtualKeyReveal`        | mutation | Service-authorized: organization:view; guided-onboarding state is the organization's own; the app authorizes the exact organizationId before any read or write | `recordVirtualKeyRevealInputSchema`           | `guidedStateOutputSchema`             |
+| `onboarding.recordTour`                    | mutation | Service-authorized: organization:view; guided-onboarding state is the organization's own; the app authorizes the exact organizationId before any read or write | `recordTourInputSchema`                       | `guidedStateOutputSchema`             |
+| `onboarding.beginPath`                     | mutation | Service-authorized: organization:view; guided-onboarding state is the organization's own; the app authorizes the exact organizationId before any read or write | `guidedPathInputSchema`                       | `guidedStateWithInstanceOutputSchema` |
+| `onboarding.completePath`                  | mutation | Service-authorized: organization:view; guided-onboarding state is the organization's own; the app authorizes the exact organizationId before any read or write | `guidedPathInputSchema`                       | `guidedStateOutputSchema`             |
+| `onboarding.attachConversation`            | mutation | Service-authorized: organization:view; guided-onboarding state is the organization's own; the app authorizes the exact organizationId before any read or write | `attachConversationInputSchema`               | `guidedStateOutputSchema`             |
+| `onboarding.initializeOrganization`        | mutation | No permission: onboarding runs before the user belongs to any organization                                                                                     | `onboardingInitializeOrganizationInputSchema` | `organizationInitializedSchema`       |
+| `onboarding.setIntegrationMethod`          | mutation | No permission: onboarding runs before the user belongs to any organization                                                                                     | `setIntegrationMethodInputSchema`             | `onboardingWriteAckSchema`            |
 
 ```typescript
 // onboarding.getGuidedState
@@ -197,6 +204,10 @@ interface Input {
 type Output = z.infer<typeof guidedStateOutputSchema>; // ../contract/src/onboarding.trpc.ts:64
 
 // onboarding.recordProviderSkipped
+type Input = z.infer<typeof organizationIdInputSchema>; // ../contract/src/onboarding.trpc.ts:21
+type Output = z.infer<typeof guidedStateOutputSchema>; // ../contract/src/onboarding.trpc.ts:64
+
+// onboarding.recordProviderPromptDismissed
 type Input = z.infer<typeof organizationIdInputSchema>; // ../contract/src/onboarding.trpc.ts:21
 type Output = z.infer<typeof guidedStateOutputSchema>; // ../contract/src/onboarding.trpc.ts:64
 
@@ -270,11 +281,12 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `guided_onboarding_lifecycle` (aggregate `guided_onboarding`)
 
-Declared at `src/eventing/guided-onboarding-lifecycle.pipeline.ts:30`. Events: `guidedOnboardingRecordedEventSchema`.
+Declared at `src/eventing/guided-onboarding-lifecycle.pipeline.ts:39`. Events: `guidedOnboardingRecordedEventSchema`, `onboardingVariantAssignedEventSchema`.
 
-| Kind    | Name                     | Handles | Declared at                                               |
-| ------- | ------------------------ | ------- | --------------------------------------------------------- |
-| command | `recordGuidedOnboarding` | –       | `src/eventing/guided-onboarding-lifecycle.pipeline.ts:35` |
+| Kind    | Name                              | Handles | Declared at                                               |
+| ------- | --------------------------------- | ------- | --------------------------------------------------------- |
+| command | `recordGuidedOnboarding`          | –       | `src/eventing/guided-onboarding-lifecycle.pipeline.ts:44` |
+| command | `recordOnboardingVariantAssigned` | –       | `src/eventing/guided-onboarding-lifecycle.pipeline.ts:45` |
 
 ## Configuration
 

@@ -33,6 +33,7 @@ describe("TraceProcessingRuntimeAdapter", () => {
         peers,
         repositories: MemoryTraceRepositories.create(),
         canonicalisation: TraceCanonicalisationService.create(),
+        spool: createApiFixture<TraceProcessingPipelineInput["spool"]>(),
         commands: createApiFixture<TraceProcessingPipelineInput["commands"]>(),
         findSummary: async () => null,
         recordTrackedEvent: async () => undefined,

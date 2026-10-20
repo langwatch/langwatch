@@ -373,12 +373,23 @@ Feature: Guided onboarding tour
     When the host mounts
     Then nothing is queued
 
-  @unit
-  Scenario: a skipped provider means no tour
+  # Skipping the provider skips only the provider. The tour needs no model, so
+  # it still shows the product; Langy asks for a model once it ends, inline in
+  # the panel (specs/langy/langy-inline-model-setup.feature).
+  @unit @integration
+  Scenario: a skipped provider still runs the tour
     Given the user clicked "Skip anyway" on the provider screen
     When the host mounts on the landing
+    Then the tour runs as it does with a provider connected
+    When the tour ends
+    Then the kickoff is queued with the tour's own status
+
+  @unit @integration
+  Scenario: a landing after the model prompt was put off does nothing
+    Given the user skipped the provider and pressed "Later" on Langy's model prompt
+    When the host mounts on a later landing
     Then no tour runs
-    And the kickoff is queued with the tour status "skipped", so Langy opens with the no-worries line
+    And the panel is not opened and nothing is queued
 
   @unit
   Scenario: a kickoff owed right away waits for Langy to announce the page's scope
