@@ -390,12 +390,9 @@ export const createSuiteRunner = ({
     const pending = unfinished.delete(job);
     const seconds = (now() - startedAt) / 1000;
     secondsOf.set(job.pkg.name, (secondsOf.get(job.pkg.name) ?? 0) + seconds);
-    if (!live && !pending) return;
-    if (!live) {
-      log(`::group::${title} (${Math.round(seconds)}s)`);
-      write(Buffer.concat(chunks));
-    }
-    log("::endgroup::");
+    if (live) log("::endgroup::");
+    else if (pending)
+      printGroup({ log, write, header: `${title} (${Math.round(seconds)}s)`, chunks });
   };
   const run = (job: SuiteJob): Promise<number> =>
     new Promise((settle) => {
@@ -408,29 +405,58 @@ export const createSuiteRunner = ({
         report(job, title, chunks, startedAt);
         settle(status);
       });
-      const failToStart = (error: unknown) => {
-        const line = `could not start pnpm run ${job.script}: ${String(error)}`;
-        if (live) log(line);
-        else chunks.push(Buffer.from(`${line}\n`));
-        finish(1);
-      };
-      const started = startSafely(() => start(job));
-      if ("error" in started) return failToStart(started.error);
-      const { child } = started;
-      collectOutput(child, chunks);
-      child.on("error", failToStart);
-      child.on("close", (code: number | null) => finish(code ?? 1));
+      const say = (line: string) => (live ? log(line) : chunks.push(Buffer.from(`${line}\n`)));
+      watchScript({ job, start, chunks, say, finish });
     });
   /** What the scripts still running have printed so far, for a cancelled run. */
   const flushUnfinished = () => {
     for (const [job, { title, chunks }] of unfinished) {
       unfinished.delete(job);
-      log(`::group::${title} (unfinished)`);
-      write(Buffer.concat(chunks));
-      log("::endgroup::");
+      printGroup({ log, write, header: `${title} (unfinished)`, chunks });
     }
   };
   return { run, flushUnfinished, secondsOf };
+};
+
+const printGroup = ({
+  log,
+  write,
+  header,
+  chunks,
+}: {
+  log: (line: string) => void;
+  write: (output: Buffer) => void;
+  header: string;
+  chunks: Buffer[];
+}) => {
+  log(`::group::${header}`);
+  write(Buffer.concat(chunks));
+  log("::endgroup::");
+};
+
+/** Starts a job's script and settles `finish` with its exit code, saying why if it never ran. */
+const watchScript = ({
+  job,
+  start,
+  chunks,
+  say,
+  finish,
+}: {
+  job: SuiteJob;
+  start: (job: SuiteJob) => ScriptProcess;
+  chunks: Buffer[];
+  say: (line: string) => unknown;
+  finish: (status: number) => void;
+}) => {
+  const failToStart = (error: unknown) => {
+    say(`could not start pnpm run ${job.script}: ${String(error)}`);
+    finish(1);
+  };
+  const started = startSafely(() => start(job));
+  if ("error" in started) return failToStart(started.error);
+  collectOutput(started.child, chunks);
+  started.child.on("error", failToStart);
+  started.child.on("close", (code: number | null) => finish(code ?? 1));
 };
 
 /** Calls `fn` the first time only: a process can report an error and then close. */
