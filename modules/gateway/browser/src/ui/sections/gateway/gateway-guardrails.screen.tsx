@@ -27,6 +27,7 @@ import { type FormEvent, type RefObject, useEffect, useId, useRef, useState } fr
 import { api } from "../../../behavior/gateway-api.ts";
 import { useShowErrorToast } from "../../../behavior/gateway-feedback.ts";
 import { useOrganizationTeamProject } from "../../../behavior/gateway-session.ts";
+import { useCloseGatewayDrawer } from "../../../behavior/use-close-gateway-drawer.ts";
 import { useGatewayHost } from "../../../model/gateway-host.ts";
 import { Link } from "../../../ui/elements/gateway-link.tsx";
 import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
@@ -342,11 +343,13 @@ function GuardrailsTable({
 /** The guardrail editor, opened by address; `drawer.guardrailId` names the one to edit. */
 export function GuardrailDrawer({
   guardrailId,
-  onClose,
+  onClose: callerClose,
 }: {
   guardrailId?: string;
-  onClose: () => void;
+  /** Absent when a link opened the drawer. */
+  onClose?: () => void;
 }) {
+  const onClose = useCloseGatewayDrawer(callerClose);
   const showErrorToast = useShowErrorToast();
   const utils = api.useUtils();
   const { project } = useOrganizationTeamProject();

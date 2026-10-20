@@ -90,7 +90,6 @@ import {
   gqJobsDedupedTotal,
   gqJobsDelayedTotal,
   gqJobsExhaustedTotal,
-  gqJobsNonRetryableTotal,
   gqJobsRetriedTotal,
   gqJobsStagedTotal,
   gqReadyScoreImplausibleTotal,
@@ -98,6 +97,7 @@ import {
   gqRetryBackoffMilliseconds,
   gqRetryEncodeFailuresTotal,
   recordDroppedJob,
+  recordNonRetryableJob,
 } from "./metrics.ts";
 import { GroupQueueMetricsCollector } from "./metricsCollector.ts";
 import {
@@ -1981,7 +1981,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     span.setAttribute("error.message", error.message);
 
     if (!isRetryable) {
-      gqJobsNonRetryableTotal.inc(routingLabels);
+      recordNonRetryableJob({ labels: routingLabels, error });
       this.logger.error(
         {
           queueName: this.queueName,

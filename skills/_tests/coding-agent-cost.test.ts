@@ -103,4 +103,29 @@ describe("the coding-agent-cost skill", () => {
       expect(oneProject).not.toContain("--project");
     });
   });
+
+  describe("given a window with no coding-session rows", () => {
+    /** @scenario "The coding-agent-cost skill checks an empty window before reporting" */
+    it("looks up the newest session event in any window and states its age", () => {
+      const rendered = costSkill();
+      expect(rendered).toContain("max(TimeUnixMs) AS newest");
+      expect(rendered).toContain(
+        "adding `AND TenantId = '<id>'` when the report covers one project",
+      );
+      expect(rendered).toContain("If the report window has no `model_call` rows");
+      expect(rendered).toContain(
+        "no Claude Code model call is stored for the report's scope (one project, or the whole team), so there is no cost data",
+      );
+      expect(rendered).toContain("events = 0");
+      expect(rendered).toContain("the newest Claude Code event is from <time>, <age> ago");
+    });
+
+    /** @scenario "The coding-agent-cost skill names the Claude Code telemetry setup" */
+    it("names the Claude Code OTLP environment and the project API key", () => {
+      const rendered = costSkill();
+      expect(rendered).toContain("CLAUDE_CODE_ENABLE_TELEMETRY");
+      expect(rendered).toContain("OTEL_EXPORTER_OTLP_ENDPOINT");
+      expect(rendered).toContain("OTEL_EXPORTER_OTLP_HEADERS");
+    });
+  });
 });
