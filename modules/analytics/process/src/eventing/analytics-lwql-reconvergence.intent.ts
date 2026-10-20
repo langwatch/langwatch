@@ -158,6 +158,28 @@ async function convergeStore({
   }
 }
 
+/** How long the check waits on the shared clock before it treats Redis as down. */
+export const LWQL_UNCONFIRMED_CLOCK_TIMEOUT_MS = 2_000;
+
+/**
+ * The Redis client queues commands while offline and retries without end, so a down Redis would
+ * stall the check; past the timeout the call fails like any other Redis error.
+ */
+async function withinClockTimeout<T>(call: Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`no answer within ${LWQL_UNCONFIRMED_CLOCK_TIMEOUT_MS} ms`)),
+      LWQL_UNCONFIRMED_CLOCK_TIMEOUT_MS,
+    );
+  });
+  try {
+    return await Promise.race([call, timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** A shared run of unconfirmed checks, open since its first failure; closed alerts at once. */
 type LwqlUnconfirmedRun =
   | { readonly open: false }
@@ -181,7 +203,7 @@ async function readUnconfirmedRun({
     return { open: false };
   }
   try {
-    return { open: true, since: await unconfirmedSince.mark(at) };
+    return { open: true, since: await withinClockTimeout(unconfirmedSince.mark(at)) };
   } catch (markError) {
     logger.warn(
       { error: clickHouseErrorSummary(markError) },
@@ -193,7 +215,7 @@ async function readUnconfirmedRun({
 
 /** A failed clear leaves the run to expire; the alert then fires early, never late. */
 async function endUnconfirmedRun(unconfirmedSince: LwqlUnconfirmedSinceRepository) {
-  await unconfirmedSince.clear().catch((error: unknown) => {
+  await withinClockTimeout(unconfirmedSince.clear()).catch((error: unknown) => {
     logger.warn(
       { error: clickHouseErrorSummary(error) },
       "lwql could not clear the unconfirmed-collection clock",

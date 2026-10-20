@@ -5,6 +5,7 @@ import type * as Observability from "@langwatch/observability";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { LwqlAppOwnedDrift } from "../../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
+import type { LwqlUnconfirmedSinceRepository } from "../../repositories/langwatch-ql-unconfirmed-since.repository.ts";
 import { MemoryLwqlUnconfirmedSinceRepository } from "../../repositories/memory/memory.langwatch-ql-unconfirmed-since.repository.ts";
 import {
   collectionUnconfirmedError,
@@ -14,6 +15,7 @@ import type { LwqlAccessModelOwner } from "../../rules/langwatch-ql-config-store
 import {
   LWQL_RECONVERGENCE_PROCESS_NAME,
   LWQL_UNCONFIRMED_ALERT_AFTER_MS,
+  LWQL_UNCONFIRMED_CLOCK_TIMEOUT_MS,
   runLwqlReconvergence,
 } from "../analytics-lwql-reconvergence.intent.ts";
 import { buildLwqlReconvergence } from "../analytics-lwql-reconvergence.pipeline.ts";
@@ -154,6 +156,38 @@ function fleet({ workers }: { workers: number }) {
     return logCalls.filter((call) => call.level === "error").map((call) => call.message);
   };
   return { world, alertsOfNextCheck };
+}
+
+/** A clock whose calls never answer. */
+function silentRedis(): LwqlUnconfirmedSinceRepository {
+  return Object.assign(MemoryLwqlUnconfirmedSinceRepository.create(), {
+    mark: () => new Promise<number>(() => undefined),
+    clear: () => new Promise<void>(() => undefined),
+  });
+}
+
+/** One check over `drift` and a clock that never answers, run on fake timers. */
+async function checkWithSilentRedis(drift: LwqlAppOwnedDrift, convergeFails: boolean) {
+  vi.useFakeTimers();
+  try {
+    const done = runLwqlReconvergence({
+      probe: () => Promise.resolve("config_store"),
+      converge: () => Promise.resolve(),
+      findDrift: () => Promise.resolve(drift),
+      convergeAppOwned: () => (convergeFails ? Promise.reject(unconfirmed()) : Promise.resolve()),
+      fillKeyMap: () => Promise.resolve(),
+      unconfirmedSince: silentRedis(),
+      now: () => FIRST_SLOT,
+    })(wakeOnce);
+    let settled = false;
+    void done.then(() => (settled = true));
+    await vi.advanceTimersByTimeAsync(LWQL_UNCONFIRMED_CLOCK_TIMEOUT_MS - 1);
+    expect(settled).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    await done;
+  } finally {
+    vi.useRealTimers();
+  }
 }
 
 beforeEach(() => {
@@ -395,6 +429,30 @@ describe("given a check over the app-owned objects", () => {
 
       for (let slot = 0; slot < 3; slot++) expect(await alertsOfNextCheck()).toEqual([]);
       expect(await alertsOfNextCheck()).toEqual([ALERT]);
+    });
+
+    describe("when Redis does not answer, as its offline queue does while it is down", () => {
+      /** @scenario "A collection that stays unconfirmed alerts 15 minutes after the first failed check" */
+      it("gives up on reading the clock after the timeout and alerts at once", async () => {
+        await checkWithSilentRedis(staleEngineTable, true);
+
+        expect(
+          logCalls.filter((call) => call.level === "error").map((call) => call.message),
+        ).toEqual([ALERT]);
+      });
+
+      /** @scenario "A collection that stays unconfirmed alerts 15 minutes after the first failed check" */
+      it("gives up on clearing the clock after the timeout and ends the check without an alert", async () => {
+        await checkWithSilentRedis(staleEngineTable, false);
+
+        expect(logCalls.filter((call) => call.level === "error")).toEqual([]);
+        expect(logCalls).toContainEqual(
+          expect.objectContaining({
+            level: "warn",
+            message: "lwql could not clear the unconfirmed-collection clock",
+          }),
+        );
+      });
     });
   });
 
