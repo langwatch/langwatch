@@ -35,6 +35,9 @@ function withoutCredentials(target: string): string {
   return query === -1 ? withoutUserinfo : withoutUserinfo.slice(0, query);
 }
 
+/** Redis 7 introduced script flags; Valkey 7.2 and later report a compatible `redis_version`. */
+const MINIMUM_REDIS_MAJOR = 7;
+
 export class RedisReadinessService {
   private readonly logger: RedisLogger | undefined;
 
@@ -57,9 +60,10 @@ export class RedisReadinessService {
     const safeTarget = withoutCredentials(target);
 
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let serverInfo: string;
     try {
-      await Promise.race([
-        connection.ping(),
+      serverInfo = await Promise.race([
+        connection.ping().then(() => connection.info("server")),
         new Promise<never>((_, reject) => {
           timer = setTimeout(
             () => reject(new Error(`PING timeout after ${timeoutMs}ms`)),
@@ -67,7 +71,6 @@ export class RedisReadinessService {
           );
         }),
       ]);
-      this.logger?.info({ target: safeTarget }, "redis ready");
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger?.error(
@@ -83,5 +86,29 @@ export class RedisReadinessService {
       // timeout after a successful ping, delaying every short-lived process.
       if (timer) clearTimeout(timer);
     }
+    this.refuseUnsupportedVersion({ serverInfo, target: safeTarget });
+    this.logger?.info({ target: safeTarget }, "redis ready");
+  }
+
+  /** Queue scripts declare Redis 7 script flags, which older servers reject (record §9). */
+  private refuseUnsupportedVersion({
+    serverInfo,
+    target,
+  }: {
+    serverInfo: string;
+    target: string;
+  }): void {
+    const found = /^redis_version:(\d+)\.(\d+)\S*/m.exec(serverInfo);
+    if (!found) {
+      this.logger?.warn({ target }, "redis did not report its version; 7.0 or later is required");
+      return;
+    }
+    if (Number(found[1]) >= MINIMUM_REDIS_MAJOR) return;
+    const version = found[0].slice("redis_version:".length);
+    const message =
+      `Redis ${version} is older than the minimum, Redis ${MINIMUM_REDIS_MAJOR}.0 ` +
+      `(or Valkey 7.2): the queue's Lua scripts need Redis 7 script flags. Upgrade the server at ${target}.`;
+    this.logger?.error({ target, version }, message);
+    throw new Error(message);
   }
 }

@@ -53,7 +53,9 @@ class NullQueuePayloadDecoder implements QueuePayloadDecoder {
 
 // ── Lua Scripts ──────────────────────────────────────────────────────
 
+// First lines declare Redis 7 flags as the queue's own scripts do (ARCHITECTURE.md §9).
 const UNBLOCK_LUA =
+  "#!lua flags=allow-oom\n" +
   TTL_HELPER_LUA +
   PARK_HELPER_LUA +
   `
@@ -115,7 +117,7 @@ end
 return wasBlocked
 `;
 
-const DRAIN_GROUP_LUA = `
+const DRAIN_GROUP_LUA = `#!lua flags=allow-oom
 local jobsKey         = KEYS[1]
 local dataKey         = KEYS[2]
 local activeKey       = KEYS[3]
@@ -173,7 +175,7 @@ return totalDropped
 
 // Re-arm or drop the pending-reconcile single-flight marker while the caller holds it.
 // GET-then-act is safe only inside a script.
-const RECONCILE_MARKER_TTL_LUA = `
+const RECONCILE_MARKER_TTL_LUA = `#!lua flags=allow-oom
 local markerKey  = KEYS[1]
 local holderToken = ARGV[1]
 local ttlMs       = tonumber(ARGV[2])
@@ -186,7 +188,7 @@ return redis.call("PEXPIRE", markerKey, ttlMs)
 // Write reconciled counter only while this pass holds the marker. Check and
 // write must be one step to prevent stale writes.
 /** Exported for testing against real script and Redis. */
-export const RECONCILE_WRITE_LUA = `
+export const RECONCILE_WRITE_LUA = `#!lua
 local markerKey  = KEYS[1]
 local counterKey = KEYS[2]
 local driftKey   = KEYS[3]
@@ -206,7 +208,7 @@ return 1
 // group can be staged again in between; re-reading inside the script is what
 // stops a live group being dropped on the strength of a stale observation.
 // Losing a group from this index would hide its jobs from every later pass.
-const PENDING_INDEX_PRUNE_LUA = `
+const PENDING_INDEX_PRUNE_LUA = `#!lua flags=allow-oom
 local indexKey = KEYS[1]
 local pruned = 0
 for i = 1, #ARGV, 2 do

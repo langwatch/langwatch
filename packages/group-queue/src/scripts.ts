@@ -728,7 +728,10 @@ local function gqSettledReadyScore(jobsKey, dispatchAfter, nowMs, settleWindowMs
 end
 `;
 
+// Every script's first line declares Redis 7 flags (ARCHITECTURE.md §9): `#!lua` is refused whole
+// at the memory cap, `allow-oom` marks a script that frees memory or must run to drain.
 const STAGE_LUA =
+  "#!lua\n" +
   SETTLE_HELPER_LUA +
   PENDING_INDEX_HELPER_LUA +
   BLOB_LEASE_HELPER_LUA +
@@ -877,6 +880,7 @@ return {1, ""}
 `;
 
 const STAGE_BATCH_LUA =
+  "#!lua\n" +
   SETTLE_HELPER_LUA +
   PENDING_INDEX_HELPER_LUA +
   BLOB_LEASE_HELPER_LUA +
@@ -1059,6 +1063,7 @@ return {newStagedCount, orphanedValues, outcomes}
 `;
 
 const DISPATCH_BATCH_LUA =
+  "#!lua flags=allow-oom\n" +
   PENDING_INDEX_HELPER_LUA +
   TTL_HELPER_LUA +
   PARK_HELPER_LUA +
@@ -1492,6 +1497,7 @@ return {results, overrideDispatched, recoveredTotal}
  * slot. Stops at a job-count or byte cap; an oversized job stays staged, never dropped.
  */
 const DRAIN_GROUP_LUA =
+  "#!lua flags=allow-oom\n" +
   PAYLOAD_SIZE_HELPER_LUA +
   CLAIMED_RECORD_HELPER_LUA +
   `
@@ -1576,6 +1582,7 @@ return results
 // so this eval asks them all again and deletes only a group that is still in no dispatch
 // set and still stale: one staged or parked since discovery keeps its jobs.
 const DELETE_STRANDED_GROUP_LUA =
+  "#!lua flags=allow-oom\n" +
   TTL_HELPER_LUA +
   `
 local jobsKey    = KEYS[1]
@@ -1599,6 +1606,7 @@ return 1
 `;
 
 const COMPLETE_LUA =
+  "#!lua flags=allow-oom\n" +
   TTL_HELPER_LUA +
   PARK_HELPER_LUA +
   WATER_LEVEL_HELPER_LUA +
@@ -1722,6 +1730,7 @@ return 1
 `;
 
 const REFRESH_LUA =
+  "#!lua flags=allow-oom\n" +
   TTL_HELPER_LUA +
   CLAIMED_RECORD_HELPER_LUA +
   `
@@ -1773,6 +1782,7 @@ return 0
 `;
 
 const RESTAGE_AND_BLOCK_LUA =
+  "#!lua flags=allow-oom\n" +
   PENDING_INDEX_HELPER_LUA +
   BLOB_LEASE_HELPER_LUA +
   ROUTING_META_HELPER_LUA +
@@ -1874,6 +1884,7 @@ return 1
  * `alive` nor `retired`. Requires WORKER_LIVENESS_TTL_SECONDS to expire first.
  */
 const CLAIM_GUARD_LUA =
+  "#!lua\n" +
   CLAIM_MARKER_HELPER_LUA +
   `
 local deaths, observed = gqRecordClaimMarker(KEYS[1], ARGV[1], ARGV[2], ARGV[3], tonumber(ARGV[4]), ARGV[5] or "")
@@ -1888,12 +1899,14 @@ return { deaths, observed }
  * erasing that group's accrued death count. Same fix as a Redlock release.
  */
 const RELEASE_CLAIM_LUA =
+  "#!lua flags=allow-oom\n" +
   CLAIM_MARKER_HELPER_LUA +
   `
 return gqReleaseClaimMarker(KEYS[1], ARGV[1], ARGV[2] or "")
 `;
 
 const RETRY_RESTAGE_LUA =
+  "#!lua\n" +
   PENDING_INDEX_HELPER_LUA +
   BLOB_LEASE_HELPER_LUA +
   TTL_HELPER_LUA +
@@ -2229,6 +2242,7 @@ function answeredOne(result: PromiseSettledResult<unknown>): PromiseSettledResul
 }
 
 const REGISTER_PREFLIGHT_TARGETS_LUA =
+  "#!lua\n" +
   PREFLIGHT_GROUP_STATE_LUA +
   `
 local targetKey = KEYS[1]
@@ -2278,6 +2292,7 @@ const registerPreflightTargetsScript = new CachedLuaScript(REGISTER_PREFLIGHT_TA
  * had). A larger set returns `{-1}` untouched, so no call ever walks more than `maxGroups`.
  */
 const INSPECT_PREFLIGHT_PAGE_LUA =
+  "#!lua flags=no-writes\n" +
   PREFLIGHT_GROUP_STATE_LUA +
   `
 local targetKey = KEYS[1]
@@ -2343,6 +2358,7 @@ const inspectPreflightPageScript = new CachedLuaScript(INSPECT_PREFLIGHT_PAGE_LU
 
 /** One slice of a list's live groups: their waiting and running jobs; settled groups leave. */
 const COUNT_LISTED_OUTSTANDING_LUA =
+  "#!lua flags=allow-oom\n" +
   SETTLED_TARGET_HELPER_LUA +
   `
 local liveKey = KEYS[1]

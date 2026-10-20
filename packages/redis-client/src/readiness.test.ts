@@ -4,8 +4,13 @@ import { describe, expect, it, vi } from "vitest";
 import { RedisReadinessService } from "./readiness.ts";
 import type { RedisConnection } from "./types.ts";
 
-function connectionThat(ping: () => Promise<unknown>): RedisConnection {
-  return redisDouble({ ping });
+const REDIS_7_INFO = "# Server\r\nredis_version:7.4.2\r\nredis_mode:standalone\r\n";
+
+function connectionThat(
+  ping: () => Promise<unknown>,
+  serverInfo: string = REDIS_7_INFO,
+): RedisConnection {
+  return redisDouble({ ping, info: () => Promise.resolve(serverInfo) });
 }
 
 function createLoggerSpy() {
@@ -151,6 +156,42 @@ describe("RedisReadinessService", () => {
       } finally {
         vi.useRealTimers();
       }
+    });
+  });
+
+  describe("given a server older than Redis 7", () => {
+    /** @scenario "A Redis older than 7.0 is refused at start" */
+    it("rejects naming the version found and the minimum", async () => {
+      const logger = createLoggerSpy();
+      const redis6 = "# Server\r\nredis_version:6.2.14\r\nredis_mode:standalone\r\n";
+
+      await expect(
+        new RedisReadinessService({ logger }).ping({
+          connection: connectionThat(() => Promise.resolve("PONG"), redis6),
+          target: "redis://redis.internal:6379",
+        }),
+      ).rejects.toThrow(/Redis 6\.2\.14 is older than the minimum, Redis 7\.0 \(or Valkey 7\.2\)/);
+
+      expect(logger.info).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given Valkey 8, which reports a Redis 7.2 compatible version", () => {
+    /** @scenario "Valkey 7.2 or later is accepted at start" */
+    it("resolves and reports the server ready", async () => {
+      const logger = createLoggerSpy();
+      const valkey8 =
+        "# Server\r\nredis_version:7.2.4\r\nserver_name:valkey\r\nvalkey_version:8.1.10\r\n";
+
+      await new RedisReadinessService({ logger }).ping({
+        connection: connectionThat(() => Promise.resolve("PONG"), valkey8),
+        target: "redis://valkey.internal:6379",
+      });
+
+      expect(logger.info).toHaveBeenCalledWith(
+        { target: "redis://valkey.internal:6379" },
+        "redis ready",
+      );
     });
   });
 });
