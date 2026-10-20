@@ -1,4 +1,4 @@
-import type { LangyStreamEntry } from "@langwatch/langy-contract";
+import type { LangyMessagePart, LangyStreamEntry } from "@langwatch/langy-contract";
 
 /** The tool call that puts the code access card up (ADR-129). */
 const CODE_ACCESS_TOOL = "code_access";
@@ -16,9 +16,10 @@ const CODE_ACCESS_LINE =
 
 /**
  * The same line for a settled turn read back as message parts (REST result path), where the
- * code access card is a `tool-code_access` part rather than a stream entry.
+ * code access card is a `tool-code_access` part rather than a stream entry. Pending question
+ * and permission cards never reach it: a turn waiting on one has not completed.
  */
-export function langyEmptyTurnLineFromParts(parts: readonly { type?: unknown }[]): string {
+export function langyEmptyTurnLineFromParts(parts: readonly LangyMessagePart[]): string {
   return parts.some((part) => part.type === `tool-${CODE_ACCESS_TOOL}`)
     ? CODE_ACCESS_LINE
     : LANGY_EMPTY_TURN_FALLBACK;

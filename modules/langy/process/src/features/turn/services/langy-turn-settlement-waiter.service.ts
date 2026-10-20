@@ -11,7 +11,6 @@ import {
 
 import type { LangyTokenBufferRepository } from "../../../repositories/langy-token-buffer.repository.ts";
 import { turnMessageId } from "../../../rules/langy-conversation-shape.rules.ts";
-import { langyEmptyTurnLineFromParts } from "../../../rules/langy-empty-turn.rules.ts";
 
 /** The turn-state projection, read for a caller who may see the conversation. */
 export type LangyTurnSettlementReader = {
@@ -65,9 +64,7 @@ export class LangyTurnSettlementWaiterService {
         return {
           succeeded: true,
           outcome: turn.Status,
-          text:
-            extractLangyTextFromParts(turn.AnswerParts) ||
-            langyEmptyTurnLineFromParts(turn.AnswerParts),
+          text: extractLangyTextFromParts(turn.AnswerParts),
           messageId: turnMessageId(turn.TurnId),
           parts: turn.AnswerParts,
           error: null,

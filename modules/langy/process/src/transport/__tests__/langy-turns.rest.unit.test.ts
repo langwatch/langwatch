@@ -109,6 +109,35 @@ describe("given a project key starting a Langy turn", () => {
     });
   });
 
+  describe("when the waited turn completes on a card with no prose", () => {
+    /** @scenario "A turn that ends on a card says what the card is waiting for" */
+    it("answers the reply with the line naming the card", async () => {
+      const api = buildApi({
+        settle: async () => ({
+          kind: "settled",
+          settlement: {
+            succeeded: true,
+            outcome: "completed",
+            text: "",
+            messageId: "message-1",
+            parts: [{ type: "tool-code_access" }],
+            error: null,
+          },
+        }),
+      });
+
+      const response = await api.post(TURN, { prefer: "wait=30" });
+
+      expect(await response.json()).toMatchObject({
+        status: "completed",
+        reply: {
+          role: "assistant",
+          text: "I'm waiting for you to say how I should reach your code, on the card above.",
+        },
+      });
+    });
+  });
+
   describe("when the waited turn fails", () => {
     /** @scenario "A failed turn settles the wait as a domain outcome, not a transport refusal" */
     it("answers 200 carrying the failed status and error with no reply", async () => {
