@@ -102,6 +102,7 @@ import { LoggingAnalyticsTripwireService } from "../services/analytics-tripwire.
 import { AnalyticsService as AnalyticsServiceClass } from "../services/analytics.service.ts";
 import { DashboardWidgetAccessService } from "../services/dashboard-widget-access.service.ts";
 import { FilterService } from "../services/filter.service.ts";
+import { LangWatchQLAggregateScopeService } from "../services/langwatch-ql-aggregate-scope.service.ts";
 import { LangWatchQLBoundsService } from "../services/langwatch-ql-bounds.service.ts";
 import {
   LangWatchQLConnectionService,
@@ -523,12 +524,14 @@ export class AnalyticsModule
   #widgetAccess: DashboardWidgetAccessService;
   #hydration: LangWatchQLHydrationService;
   #queryScope: LangWatchQLQueryScopeService;
+  #aggregateScope: LangWatchQLAggregateScopeService;
   #protections: WorkbenchProtectionsService;
   #validationReport: LangWatchQLValidationReportService;
 
   private constructor(dependencies: AnalyticsAppDependencies, publicBaseUrl: string | undefined) {
     this.#dependencies = dependencies;
     this.#queryScope = LangWatchQLQueryScopeService.create(dependencies);
+    this.#aggregateScope = LangWatchQLAggregateScopeService.create(dependencies);
     this.#protections = WorkbenchProtectionsService.create(dependencies);
     this.#validationReport = LangWatchQLValidationReportService.create({
       langWatchQL: dependencies.langWatchQL,
@@ -787,9 +790,28 @@ export class AnalyticsModule
   /**
    * Runs one submitted statement exactly as it was written, counted against the
    * project's window first so an over-limit caller never reaches the engine.
+   *
+   * On an aggregate the route's proof names the members: the statement runs under their keys,
+   * each read from where its grant opens, and is still counted once, against the aggregate.
    */
-  async executeLangWatchQL(input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult> {
-    await this.#dependencies.lwqlBounds.assertQueryWithinBounds({ projectId: input.project.id });
+  async executeLangWatchQL(
+    input: LangWatchQLExecuteInput & Readonly<{ authorization?: Authorization }>,
+  ): Promise<LangWatchQLQueryResult> {
+    const { authorization, project, ...run } = input;
+    const aggregate = authorization
+      ? await this.#aggregateScope.resolve({ authorization })
+      : undefined;
+    await this.#dependencies.lwqlBounds.assertQueryWithinBounds({ projectId: project.id });
+
+    if (aggregate) {
+      // A judged column is charged to one project, so an aggregate's statement may call none.
+      return this.#dependencies.langWatchQL.executeForProjects({
+        ...run,
+        projects: aggregate.projects,
+        memberWindows: aggregate.memberWindows,
+        isInstantEvalsEnabled: false,
+      });
+    }
 
     // Resolved before the engine validates, because whether an eval function
     // may be called is part of that verdict — and only for a statement that
@@ -798,7 +820,7 @@ export class AnalyticsModule
       statementMightCallEvalFunction(input.sql) &&
       (await this.#isInstantEvalsEnabled(input.project.id));
 
-    return this.#dependencies.langWatchQL.execute({ ...input, isInstantEvalsEnabled });
+    return this.#dependencies.langWatchQL.execute({ project, ...run, isInstantEvalsEnabled });
   }
 
   /**
@@ -932,10 +954,12 @@ export class AnalyticsModule
   resolveProtections(input: {
     userId: string;
     projectId: string;
+    authorization?: Authorization;
   }): Promise<LangWatchQLProtections> {
     return this.#protections.resolveMemberProtections({
       userId: input.userId,
       projectId: input.projectId,
+      ...(input.authorization ? { authorization: input.authorization } : {}),
     });
   }
 
@@ -988,10 +1012,15 @@ export class AnalyticsModule
    * same project peer the rollout gate reads — never a raw Prisma client in this App.
    * Refuses with `project_not_found` when the project no longer exists.
    */
-  resolveRunCaller(input: { userId: string; projectId: string }): Promise<LangWatchQLRunCaller> {
+  resolveRunCaller(input: {
+    userId: string;
+    projectId: string;
+    authorization?: Authorization;
+  }): Promise<LangWatchQLRunCaller> {
     return this.#protections.resolveRunCaller({
       userId: input.userId,
       projectId: input.projectId,
+      ...(input.authorization ? { authorization: input.authorization } : {}),
     });
   }
 

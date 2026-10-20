@@ -8,7 +8,11 @@ import type {
  * their grants unlock (AuthZ), and captured content from the SAME resolved data-privacy policy the
  * trace stack redacts by, so a chart never disagrees with the traces.
  */
-import type { RestCredentialPrincipal } from "@langwatch/authorization";
+import {
+  projectIdsReadBy,
+  type Authorization,
+  type RestCredentialPrincipal,
+} from "@langwatch/authorization";
 import type { AuthzApi, AuthzScopeRef } from "@langwatch/authz-contract";
 import {
   isContentVisible,
@@ -46,7 +50,7 @@ export type WorkbenchProtectionsDependencies = Readonly<{
     | "hasPermission"
     | "hasApiKeyPermission"
   >;
-  dataPrivacy: Pick<DataPrivacyApi, "getResolvedForProject">;
+  dataPrivacy: Pick<DataPrivacyApi, "getResolvedForProject" | "getResolvedForProjects">;
   projects: Pick<ProjectApi, "findById">;
 }>;
 
@@ -70,6 +74,8 @@ export class WorkbenchProtectionsService {
   async resolveMemberProtections(input: {
     userId: string;
     projectId: string;
+    /** The read's proof: the policy is the strictest across it and `projectId` (ADR-177 d9). */
+    authorization?: Authorization;
   }): Promise<LangWatchQLProtections> {
     const { authz } = this.dependencies;
     const { userId, projectId } = input;
@@ -84,7 +90,11 @@ export class WorkbenchProtectionsService {
     ]);
     const canSeeCosts = holdsCostView(catalogue);
 
-    const policy = await this.policyFor(projectId);
+    const policy = await this.policyFor(
+      input.authorization
+        ? [...new Set([projectId, ...projectIdsReadBy(input.authorization, "analytics:view")])]
+        : [projectId],
+    );
     if (!policy) {
       return { canSeeCosts, canSeeCapturedInput: false, canSeeCapturedOutput: false, catalogue };
     }
@@ -117,6 +127,7 @@ export class WorkbenchProtectionsService {
   async resolveRunCaller(input: {
     userId: string;
     projectId: string;
+    authorization?: Authorization;
   }): Promise<LangWatchQLRunCaller> {
     const project = await this.dependencies.projects.findById(input.projectId);
     if (!project) {
@@ -206,7 +217,7 @@ export class WorkbenchProtectionsService {
     catalogue: LangWatchQLCatalogueAccess;
   }): Promise<LangWatchQLProtections> {
     const canSeeCosts = holdsCostView(catalogue);
-    const policy = await this.policyFor(projectId);
+    const policy = await this.policyFor([projectId]);
     if (!policy) {
       return { canSeeCosts, canSeeCapturedInput: false, canSeeCapturedOutput: false, catalogue };
     }
@@ -272,12 +283,19 @@ export class WorkbenchProtectionsService {
   }
 
   /** The resolved policy, or none when resolution failed -- which hides captured content. */
-  private async policyFor(projectId: string): Promise<ResolvedDataPrivacy | undefined> {
+  /** One project's policy, or the strictest across several (an aggregate and its members). */
+  private async policyFor(projectIds: readonly string[]): Promise<ResolvedDataPrivacy | undefined> {
+    const [projectId] = projectIds;
     try {
-      return await this.dependencies.dataPrivacy.getResolvedForProject({ projectId });
+      if (projectIds.length > 1) {
+        return await this.dependencies.dataPrivacy.getResolvedForProjects({ projectIds });
+      }
+      return projectId === undefined
+        ? undefined
+        : await this.dependencies.dataPrivacy.getResolvedForProject({ projectId });
     } catch (error) {
       logger.error(
-        { error, projectId },
+        { error, projectIds },
         "data-privacy policy resolution failed; hiding captured content (fail-closed)",
       );
       return undefined;
