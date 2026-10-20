@@ -1,10 +1,8 @@
-import type { Protections, Span } from "@langwatch/trace-contract";
 /**
- * When a viewer cannot see a span's input or output, the attributes that carry it are replaced
- * whole, and only real copies of the hidden content are scrubbed out of the rest. An empty
- * message part or a shape word ("user", "text") no longer blanks every other attribute.
- * @see modules/trace/specs/trace-viewer-protection.feature
+ * Attributes carrying hidden input or output are replaced whole; only real copies of hidden
+ * content are scrubbed from the rest. @see modules/trace/specs/trace-viewer-protection.feature
  */
+import type { Protections, Span } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -163,6 +161,16 @@ describe("given dave cannot see the input of a span", () => {
       );
 
       expect(at(params, "notes.ja")).toBe("[REDACTED]");
+    });
+
+    /** @scenario "Hidden input copied into another attribute is still scrubbed" */
+    it("redacts a short hidden name followed by an attached Korean particle", () => {
+      const params = protect(
+        chatSpan({ notes: { ko: "김철수님께 환불 요청" } }, "김철수"),
+        inputHiddenFromDave,
+      );
+
+      expect(at(params, "notes.ko")).toBe("[REDACTED]");
     });
   });
 });

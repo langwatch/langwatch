@@ -125,13 +125,14 @@ const STRUCTURAL_KEYS: ReadonlySet<string> = new Set(["role", "type"]);
  */
 const MIN_CONTAINED_REDACTION_LENGTH = 8;
 
-/** Scripts written without spaces between words; no word boundary exists inside them. */
-const UNSPACED_SCRIPTS =
-  "\\p{sc=Han}\\p{sc=Hiragana}\\p{sc=Katakana}\\p{sc=Thai}\\p{sc=Lao}\\p{sc=Khmer}\\p{sc=Myanmar}";
-const UNSPACED_SCRIPT_CHAR = new RegExp(`[${UNSPACED_SCRIPTS}]`, "u");
-
-/** A word character that separates words: letters and digits of spaced scripts, and `_`. */
-const SPACED_WORD_CHAR = `[[\\p{L}\\p{N}_]--[${UNSPACED_SCRIPTS}]]`;
+/**
+ * Scripts whose words are cut by spaces and punctuation alone. Elsewhere (Han, kana, Thai, Hangul
+ * with its attached particles, Arabic with its attached prefixes) a word boundary says nothing.
+ */
+const WORD_BOUNDARY_SCRIPTS = "\\p{sc=Latin}\\p{sc=Greek}\\p{sc=Cyrillic}";
+const WORD_CHAR = `[${WORD_BOUNDARY_SCRIPTS}\\p{N}_]`;
+/** A string whose letters all come from the word-boundary scripts. */
+const BOUNDARY_SCRIPT_ONLY = new RegExp(`^(?:[${WORD_BOUNDARY_SCRIPTS}]|\\P{L})+$`, "u");
 
 function isStructuralValue(key: string, value: unknown): boolean {
   return STRUCTURAL_KEYS.has(key) && typeof value === "string" && SPAN_IO_SHAPE_LITERALS.has(value);
@@ -201,18 +202,16 @@ function matchersFor(redactions: Set<string>): RedactionMatchers {
 
   const matchers: RedactionMatchers = { long: [], short: [] };
   for (const redaction of redactions) {
-    // A short string in an unspaced script has no word boundary, so it matches anywhere.
+    // Only a short string in a word-boundary script is matched as a whole word.
     if (
       redaction.length >= MIN_CONTAINED_REDACTION_LENGTH ||
-      UNSPACED_SCRIPT_CHAR.test(redaction)
+      !BOUNDARY_SCRIPT_ONLY.test(redaction)
     ) {
       matchers.long.push(redaction);
       continue;
     }
     const escaped = redaction.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    matchers.short.push(
-      new RegExp(`(?<!${SPACED_WORD_CHAR})${escaped}(?!${SPACED_WORD_CHAR})`, "v"),
-    );
+    matchers.short.push(new RegExp(`(?<!${WORD_CHAR})${escaped}(?!${WORD_CHAR})`, "u"));
   }
   matchersByRedactions.set(redactions, matchers);
 

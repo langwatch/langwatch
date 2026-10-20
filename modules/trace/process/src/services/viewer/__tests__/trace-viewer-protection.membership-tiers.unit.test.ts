@@ -1,3 +1,8 @@
+/**
+ * Content-visibility membership is the permission engine's own answer: a role on the organization,
+ * team or project counts, as it does for opening the trace. Runs the real engine over grants.
+ * @see modules/trace/specs/trace-viewer-protection.feature
+ */
 import {
   type AuthzApi,
   AuthzEngine,
@@ -13,12 +18,6 @@ import {
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import type { ProjectApi, ProjectWithTeam } from "@langwatch/project-contract";
 import { createTestLogger } from "@langwatch/test-harness";
-/**
- * Project membership for content visibility is the permission engine's own answer, so a role
- * held on the organization, the team or the project itself all count, exactly as they do for
- * opening the trace. The engine here is the real one, run over the grants each case names.
- * @see modules/trace/specs/trace-viewer-protection.feature
- */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
