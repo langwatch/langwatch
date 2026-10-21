@@ -677,10 +677,9 @@ export interface TraceApi extends TraceOtlpIngestApi {
     protections?: Protections;
   }): { sql: string; params: Record<string, unknown> } | null;
   /**
-   * A legacy `filters` document compiled to parameterized ClickHouse conditions
-   * over `trace_summaries ts`. Trace owns the grammar because it owns the tables.
-   * `fenced` writes the side-table subqueries for a statement read through a proof's fence
-   * (ADR-177), which names no tenant of its own.
+   * A legacy `filters` document compiled to parameterized ClickHouse conditions over
+   * `trace_summaries ts`; Trace owns the grammar because it owns the tables. `fenced` writes
+   * side-table subqueries for a statement read through a proof's fence (ADR-177).
    */
   translateLegacyFilters(input: {
     filters: Readonly<Record<string, unknown>>;

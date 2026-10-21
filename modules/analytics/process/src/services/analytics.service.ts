@@ -203,7 +203,7 @@ type AnalyticsServiceDeps = {
   authz: Pick<AuthzApi, "authorizeInternal">;
   tripwire?: LoggingAnalyticsTripwireService;
   /** The most members one aggregate read may span; LangWatchQL's cap when unset. */
-  maxMembers?: number;
+  maxMembers?: number | undefined;
 };
 
 /** A cost-gated read's proof, refused when forged or expired before any read. */
@@ -365,10 +365,9 @@ export class AnalyticsService {
   }
 
   /**
-   * One read behind the share of every project it reads (ADR-177 v4.15): the own project's slot
-   * and one per member, so an aggregate's chart costs each member the work it does there. The
-   * slots are taken in one sorted order, so two reads never each hold what the other waits for.
-   * A read spanning more members than the cap is refused before it queues.
+   * One read behind the share of every project it reads (ADR-177 v4.15), taken in one sorted
+   * order so two reads never each hold what the other waits for. A read spanning more members
+   * than the cap is refused before it queues.
    */
   private async runAcrossTenants<T>({
     authorization,

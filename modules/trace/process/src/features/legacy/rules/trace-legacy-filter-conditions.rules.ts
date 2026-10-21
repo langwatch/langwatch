@@ -3,7 +3,7 @@ import {
   type AnalyticsFilterValue as FilterParam,
   type FilterField,
 } from "@langwatch/analytics-contract";
-import { tenantSet } from "@langwatch/clickhouse-client";
+import { tenantSet } from "@langwatch/clickhouse-markers";
 import {
   customMetadataKeyCondition,
   customMetadataValueCondition,

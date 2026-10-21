@@ -431,9 +431,7 @@ export class AnalyticsModule
         telemetry: new StatementBoundTelemetry(),
         overloadErrorFactory: new OverloadedRefusal(),
       }),
-      ...(setup.config.langwatchQl.aggregateMaxMembers === undefined
-        ? {}
-        : { maxMembers: setup.config.langwatchQl.aggregateMaxMembers }),
+      maxMembers: setup.config.langwatchQl.aggregateMaxMembers,
       tripwire: LoggingAnalyticsTripwireService.create({
         isEnabled: (projectId) =>
           setup.dependencies.featureFlags.isEnabled(ANALYTICS_READ_TRIPWIRE_FLAG, {

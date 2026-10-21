@@ -663,6 +663,8 @@ function CustomGraphForm({
   const addNewGraph = analyticsApi.graphs.create.useMutation();
   const updateGraphById = analyticsApi.graphs.updateById.useMutation();
   const host = useAnalyticsHost();
+  // A write the shell refuses (an aggregate, ADR-177, or no grant) offers no button.
+  const canSave = host.hasPermission(customId ? "analytics:update" : "analytics:create");
   const showErrorToast = useShowErrorToast();
   const project = host.project();
   const trpc = analyticsApi.useUtils();
@@ -923,10 +925,7 @@ function CustomGraphForm({
         >
           Cancel
         </Button>
-        {/* A write the shell refuses (an aggregate, ADR-177, or no grant) offers no button. */}
-        {!host.hasPermission(
-          customId ? "analytics:update" : "analytics:create",
-        ) ? null : customId ? (
+        {canSave && customId && (
           <Button
             colorPalette="orange"
             onClick={updateGraph}
@@ -937,7 +936,8 @@ function CustomGraphForm({
           >
             Update
           </Button>
-        ) : (
+        )}
+        {canSave && !customId && (
           <Button
             colorPalette="orange"
             loading={addNewGraph.isPending}
