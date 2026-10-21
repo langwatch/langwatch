@@ -63,11 +63,11 @@ set to 1 by haven); each simulator's delete endpoint empties it.
 Three more are there only when the worktree asked for them (`haven up
 +design-system +mail-room +docs`) — developer tools rather than parts of the product:
 
-| Hostname                                   | Service                                                       |
-| ------------------------------------------ | ------------------------------------------------------------- |
-| `design-system.<slug>.langwatch.localhost` | The design system's Storybook                                 |
-| `mail-room.<slug>.langwatch.localhost`     | The mail studio — every message previewed                     |
-| `app.<slug>.langwatch.localhost/docs/`     | The docs site, built and served by haven (`+docs`)            |
+| Hostname                                   | Service                                            |
+| ------------------------------------------ | -------------------------------------------------- |
+| `design-system.<slug>.langwatch.localhost` | The design system's Storybook                      |
+| `mail-room.<slug>.langwatch.localhost`     | The mail studio — every message previewed          |
+| `app.<slug>.langwatch.localhost/docs/`     | The docs site, built and served by haven (`+docs`) |
 
 The docs lane builds `apps/docs` with `--base-path /docs` (skipped when its content check
 finds the last build current) and serves it natively from Go. With the lane on,

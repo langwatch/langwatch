@@ -177,8 +177,8 @@ after(async () => {
   app?.server.close();
 });
 
-describe("the app front", () => {
-  it("serves the prefixed build with its static-host contract", async () => {
+void describe("the app front", () => {
+  void it("serves the prefixed build with its static-host contract", async () => {
     const bare = await get(`${front.origin}${base}`);
     assert.equal(bare.status, 301);
     assert.equal(bare.headers.get("location"), `${base}/`);
@@ -209,7 +209,7 @@ describe("the app front", () => {
     assert.doesNotMatch(missingAsset.headers.get("content-type") ?? "", /text\/html/);
   });
 
-  it("keeps authored media, srcset and video addresses under the mount", async () => {
+  void it("keeps authored media, srcset and video addresses under the mount", async () => {
     for (const slug of MEDIA_PAGES) {
       const html = await (await get(`${front.origin}${base}/${slug}`)).text();
       const escaped = rootAddresses({ html }).filter((address) => !address.startsWith(`${base}/`));
@@ -224,7 +224,7 @@ describe("the app front", () => {
     );
   });
 
-  it("keeps discovery files canonical to production", async () => {
+  void it("keeps discovery files canonical to production", async () => {
     const sitemap = await (await get(`${front.origin}${base}/sitemap.xml`)).text();
     assert.ok(sitemap.includes(`<loc>${PRODUCTION}/</loc>`));
     assert.ok(!sitemap.includes(`${base}/`), "the sitemap names production, never the mount");
@@ -232,7 +232,7 @@ describe("the app front", () => {
     assert.ok(llms.includes(`${PRODUCTION}/`) && !llms.includes(`localhost${base}`));
   });
 
-  it("redirects docs.json sources under the mount, keeping the query", async () => {
+  void it("redirects docs.json sources under the mount, keeping the query", async () => {
     const redirects = JSON.parse(readFileSync(path.join(outDir, "redirects.json"), "utf8"));
     const [source, destination] =
       Object.entries(redirects).find(([from, to]) => !/[:*]/.test(from) && to.startsWith("/")) ??
@@ -245,7 +245,7 @@ describe("the app front", () => {
     assert.match(location, /from=smoke/);
   });
 
-  it("serves a service worker scoped to the mount whose precache stays under it", async () => {
+  void it("serves a service worker scoped to the mount whose precache stays under it", async () => {
     const worker = await get(`${front.origin}${base}/sw.js`);
     assert.equal(worker.status, 200);
     const source = await worker.text();
@@ -254,7 +254,7 @@ describe("the app front", () => {
     for (const entry of precache) assert.ok(entry.startsWith(`${base}/`), entry);
   });
 
-  it("hands every other path to the app unchanged", async () => {
+  void it("hands every other path to the app unchanged", async () => {
     const post = await get(`${front.origin}/api/trpc/x?batch=1`, { method: "POST", body: "{}" });
     assert.equal(await post.text(), "app:POST:/api/trpc/x:{}");
     assert.equal(app.seen.at(-1).url, "/api/trpc/x?batch=1");
@@ -263,7 +263,7 @@ describe("the app front", () => {
     assert.match(await root.text(), /App home/);
   });
 
-  it("streams server-sent events as they are written", async () => {
+  void it("streams server-sent events as they are written", async () => {
     const started = Date.now();
     const response = await get(`${front.origin}/api/stream`);
     const reader = response.body.getReader();
@@ -273,13 +273,13 @@ describe("the app front", () => {
     await reader.cancel();
   });
 
-  it("passes websocket upgrades through", async () => {
+  void it("passes websocket upgrades through", async () => {
     assert.match(await upgradeAndEcho({ origin: front.origin }), /^HTTP\/1\.1 101/);
   });
 });
 
-describe("in a browser on the app front", () => {
-  it("loads every asset under the mount and navigates within it", async () => {
+void describe("in a browser on the app front", () => {
+  void it("loads every asset under the mount and navigates within it", async () => {
     const context = await browser.newContext();
     const page = await context.newPage();
     const failures = [];
@@ -309,7 +309,7 @@ describe("in a browser on the app front", () => {
     await context.close();
   });
 
-  it("keeps the docs worker and an old app worker apart", async () => {
+  void it("keeps the docs worker and an old app worker apart", async () => {
     const context = await browser.newContext();
     const page = await context.newPage();
     await page.goto(`${front.origin}/`);
@@ -340,8 +340,8 @@ describe("in a browser on the app front", () => {
   });
 });
 
-describe("the docs alone", () => {
-  it("sends the root to the docs and answers nothing else outside the mount", async () => {
+void describe("the docs alone", () => {
+  void it("sends the root to the docs and answers nothing else outside the mount", async () => {
     const root = await get(`${alone.origin}/`);
     assert.equal(root.status, 302);
     assert.equal(root.headers.get("location"), `${base}/`);
@@ -350,7 +350,7 @@ describe("the docs alone", () => {
     assert.match(await api.text(), new RegExp(`served under ${base}/`));
   });
 
-  it("serves pages, exports and the worker under the mount", async () => {
+  void it("serves pages, exports and the worker under the mount", async () => {
     for (const [address, type] of [
       [`${base}/`, /text\/html/],
       [`${base}/introduction`, /text\/html/],
