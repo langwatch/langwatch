@@ -84,7 +84,7 @@ jobs:
       # otherwise use whatever the runner image ships — so the next image bump
       # would red every docs PR with nothing in the repo having changed. 24 is
       # what .github/actions/setup-pnpm-node pins for the sibling job.
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v6
         with:
           node-version: "24.22.1"
 
@@ -257,7 +257,7 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     steps:
-      - uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2
+      - uses: re-actors/alls-green@b5b5b37504aa4183270bd3d855c52a67f212be35 # v1.3.0
         with:
           jobs: ${{ toJSON(needs) }}
           allowed-skips: check_links, check_structure, check_prose, check_generated_files
