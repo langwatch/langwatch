@@ -60,6 +60,8 @@ interface InstallReport {
   endpoint: string;
   ingestion_token: string;
   token_prefix: string;
+  /** Whether this run minted a fresh key or reused the one already cached or pinned. */
+  key_action: "minted" | "reused";
   /** Where the telemetry lands: a pinned team project, or the personal one. */
   scope: "project" | "personal";
   /** The pinned project's slug or id, when the scope is a project. */
@@ -163,6 +165,7 @@ async function runInstall(
     endpoint,
     ingestion_token: token,
     token_prefix: prefix ?? token.slice(0, 12),
+    key_action: minted ? "minted" : "reused",
     scope,
     destination_project: projectLabel,
     env_block: envBlock,
@@ -297,7 +300,10 @@ function buildEnvBlock(tool: SupportedTool, endpoint: string, token: string): st
 }
 
 function renderHumanReport(report: InstallReport): void {
-  process.stdout.write(`${chalk.green("✓")} Minted ingestion key for ${chalk.bold(report.tool)}\n`);
+  const keyVerb = report.key_action === "minted" ? "Minted a new" : "Reused the existing";
+  process.stdout.write(
+    `${chalk.green("✓")} ${keyVerb} ingestion key for ${chalk.bold(report.tool)}\n`,
+  );
   process.stdout.write(`  endpoint: ${report.endpoint}\n`);
   process.stdout.write(`  token:    ${report.ingestion_token}\n`);
 
@@ -319,7 +325,17 @@ function renderHumanReport(report: InstallReport): void {
   }
 
   renderCodexTurnHarvest(report);
+  renderSessionHooks(report);
 
+  process.stdout.write("\nAdd to your shell rc (or run in this shell):\n");
+  for (const line of report.env_block) {
+    process.stdout.write(`  ${line}\n`);
+  }
+
+  renderToolInstallationNotes(report);
+}
+
+function renderSessionHooks(report: InstallReport): void {
   if (report.session_hooks_action === "not_ours") {
     const displayPath = report.session_hooks_path ?? "";
     const notice = hookFileNotOursNotice({ displayPath, command: "copilot" });
@@ -332,13 +348,6 @@ function renderHumanReport(report: InstallReport): void {
     const what = report.tool === "opencode" ? "session plugin" : "session hooks";
     process.stdout.write(`${chalk.green("✓")} ${report.session_hooks_path} ${what} ${hooksVerb}\n`);
   }
-
-  process.stdout.write("\nAdd to your shell rc (or run in this shell):\n");
-  for (const line of report.env_block) {
-    process.stdout.write(`  ${line}\n`);
-  }
-
-  renderToolInstallationNotes(report);
 }
 
 function renderCodexTurnHarvest(report: InstallReport): void {
