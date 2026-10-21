@@ -97,8 +97,10 @@ const markdownRenders = "[`<>&]" +
 	`|\S[^\n]*\n *(?:=+|-+) *(?:\n|$)` +
 	`|\S {2,}\n[ \t]*\S`
 
+var markdownRendersRe = regexp.MustCompile(markdownRenders)
+
 func validMarkdown(output string) FormatVerdict {
-	if regexp.MustCompile(markdownRenders).MatchString(output) {
+	if markdownRendersRe.MatchString(output) {
 		return FormatVerdict{Passed: true}
 	}
 	return FormatVerdict{Unscored: true, Details: "No markdown elements found. Text should contain markdown formatting like headers (#), bold (**), lists, etc."}

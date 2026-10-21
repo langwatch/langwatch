@@ -112,8 +112,8 @@ func RagasRubricsPrompt() RagasPrompt {
 // RagasSQLEquivalencePrompt is LLMSQLEquivalence's prompt.
 func RagasSQLEquivalencePrompt() RagasPrompt {
 	return RagasPrompt{ragasHeadSQLEquivalence, "EquivalenceOutput", []ragasProp{
-		{name: "response_query_explaination", kind: ragasString},
-		{name: "reference_query_explaination", kind: ragasString},
+		{name: "response_query_explaination", kind: ragasString},  //nolint:misspell // ragas 0.4.3 spells its JSON key this way
+		{name: "reference_query_explaination", kind: ragasString}, //nolint:misspell // ragas 0.4.3 spells its JSON key this way
 		{name: "equivalence", kind: ragasBool},
 	}}
 }

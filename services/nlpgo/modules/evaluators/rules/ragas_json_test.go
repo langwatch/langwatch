@@ -36,7 +36,7 @@ func TestRagasParsingIsAsLenientAsLangchainAndPydantic(t *testing.T) {
 	_, err = rubrics.Parse(`{"feedback": "ok", "score": 4.5}`)
 	require.Error(t, err)
 
-	parsed, err = RagasSQLEquivalencePrompt().Parse(`{"response_query_explaination": "a", "reference_query_explaination": "b", "equivalence": "yes"}`)
+	parsed, err = RagasSQLEquivalencePrompt().Parse(`{"response_query_explaination": "a", "reference_query_explaination": "b", "equivalence": "yes"}`) //nolint:misspell // ragas spells it so
 	require.NoError(t, err)
 	assert.Contains(t, string(parsed), `"equivalence":true`)
 }

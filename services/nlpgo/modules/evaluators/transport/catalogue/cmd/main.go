@@ -1,5 +1,6 @@
-// Command catalogue writes evaluators.generated.ts from the Go evaluator
-// definitions: `go generate ./services/nlpgo/modules/evaluators/transport/catalogue`.
+// Command catalogue writes evaluators.generated.ts, unformatted, from the Go
+// evaluator definitions. `go generate ./nlpgo/modules/evaluators/transport/catalogue`
+// in services/ runs it and then oxfmt.
 package main
 
 import (
