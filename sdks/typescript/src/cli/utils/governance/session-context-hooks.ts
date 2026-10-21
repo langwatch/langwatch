@@ -14,6 +14,7 @@ import {
 import {
   type HookedTool,
   type HooksTarget,
+  ownedHookFileToolForCommand,
   SESSION_CONTEXT_AGENTS,
 } from "./session-context-agents";
 
@@ -101,6 +102,31 @@ export function installSessionContextHooks({
 
   writeAppSettingsFile({ filePath: target.path, settings: document });
   return { action: existedBefore ? "updated" : "created", ...target };
+}
+
+/** Where the wrapper for `command` writes a hook file of ours, or null when it writes none. */
+export function ownedHookFileTargetFor({ command }: { command: string }): HooksTarget | null {
+  const tool = ownedHookFileToolForCommand(command);
+  return tool ? sessionContextHooksTarget(tool) : null;
+}
+
+/**
+ * Writes the hook file of the agent `command` launches, when that file is ours
+ * alone (Copilot). Null when there is none or the write failed: best-effort,
+ * because the exports it rides beside are the wiring that matters.
+ */
+export function assertOwnedHookFileFor({
+  command,
+}: {
+  command: string;
+}): SessionContextHooksInstallResult | null {
+  const tool = ownedHookFileToolForCommand(command);
+  if (!tool) return null;
+  try {
+    return installSessionContextHooks({ tool });
+  } catch {
+    return null;
+  }
 }
 
 /**

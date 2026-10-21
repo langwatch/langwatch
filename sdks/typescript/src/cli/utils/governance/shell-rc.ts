@@ -26,7 +26,12 @@ import {
 import { ensureLangwatchClaudePlugin, readClaudePluginState } from "./claude-plugin";
 import { assertCodexAgentGuidance } from "./codex-agents-md";
 import { type GovernanceConfig, saveConfig } from "./config";
-import { installSessionContextHooks, removeSessionContextHooks } from "./session-context-hooks";
+import {
+  assertOwnedHookFileFor,
+  installSessionContextHooks,
+  ownedHookFileTargetFor,
+  removeSessionContextHooks,
+} from "./session-context-hooks";
 
 /**
  * Tools whose Path B telemetry persists as a scoped shell function. It
@@ -307,9 +312,9 @@ export async function askPersistChoice({
 }
 
 /**
- * What the persist offer asks. Claude gets its own sentence: saying yes
- * both saves the env block and installs the session-context plugin, so
- * consent must name both and what the plugin's hooks record.
+ * What the persist offer asks. A yes that also installs a hook (Claude's
+ * plugin, Copilot's hook file) gets a sentence naming it and what its hooks
+ * record, since a bare Enter is consent to everything the question says.
  */
 function persistQuestion({ tool, targetHint }: { tool: string; targetHint: string }): string {
   if (tool === "claude") {
@@ -317,6 +322,14 @@ function persistQuestion({ tool, targetHint }: { tool: string; targetHint: strin
       `Set up LangWatch capture for ${tool}? This saves the telemetry env vars to ` +
       `${targetHint} and installs the LangWatch Claude Code plugin, whose session ` +
       `hooks record the repository and branch each session works on.`
+    );
+  }
+  const hookFile = ownedHookFileTargetFor({ command: tool });
+  if (hookFile) {
+    return (
+      `Install env vars to ${targetHint} and the LangWatch hook file ${hookFile.displayPath}, ` +
+      `whose hooks record the repository and branch each session works on, so that next ` +
+      `time the plain \`${tool}\` command keeps capturing telemetry data?`
     );
   }
   return `Install env vars to ${targetHint} so that next time the plain \`${tool}\` command keeps capturing telemetry data?`;
@@ -412,6 +425,9 @@ export async function maybeOfferIngestionShellRcPersist({
   // stale wrapper for a different endpoint doesn't suppress installing this one.
   const requiredKeys = [vars.OTEL_EXPORTER_OTLP_ENDPOINT].filter(Boolean) as string[];
   if (rcHasLangwatchBlock({ shell, requiredKeys, markers })) {
+    // Same grant as the function: a device that said yes before the wrapper
+    // wrote the agent's own hook file gets it now, without asking again.
+    assertOwnedSessionHookFile({ tool });
     return;
   }
   const target = rcPath(shell);
@@ -425,6 +441,7 @@ export async function maybeOfferIngestionShellRcPersist({
   try {
     const wrote = persistBlockToRc(shell, buildScopedToolFunction(tool, vars, shell), markers);
     console.log(chalk.green(`  ✓ Installed a scoped \`${tool}\` telemetry wrapper in ${wrote}`));
+    assertOwnedSessionHookFile({ tool });
   } catch (err) {
     console.log(chalk.yellow(`  ! Couldn't write to ${target}: ${(err as Error).message}`));
   }
@@ -589,6 +606,21 @@ function installRawSessionContextHooks(): void {
     // Best-effort, the same way the telemetry refresh treats them.
     void 0;
   }
+}
+
+/**
+ * Writes the hook file the launched agent loads from a folder of ours alone
+ * (Copilot), so its sessions report their repository and branch. Driven by the
+ * per-agent table; idempotent, quiet unless it changed something, never fatal.
+ */
+export function assertOwnedSessionHookFile({ tool }: { tool: string }): void {
+  const hooks = assertOwnedHookFileFor({ command: tool });
+  if (!hooks || hooks.action === "unchanged") return;
+  console.log(
+    chalk.green(
+      `  ✓ Installed ${hooks.displayPath}, whose hooks report each session's repository and branch`,
+    ),
+  );
 }
 
 function recordNeverChoice(cfg: GovernanceConfig): void {

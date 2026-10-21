@@ -6,7 +6,8 @@
 #   sdks/typescript/src/cli/commands/ingestion/git-context.ts          (what git says about the session's directory)
 #   sdks/typescript/src/cli/commands/ingestion/hook-state.ts           (the per-session fingerprint store)
 #   sdks/typescript/src/cli/commands/ingestion/install.ts              (each tool's seam wired at install)
-#   sdks/typescript/src/cli/utils/governance/session-context-hooks.ts  (the Claude Code and Codex hook files)
+#   sdks/typescript/src/cli/utils/governance/session-context-hooks.ts  (the Claude Code, Codex and Copilot hook files)
+#   sdks/typescript/src/cli/utils/governance/shell-rc.ts               (the wrapper's persist offer, which writes the Copilot hook file)
 #   sdks/typescript/src/cli/utils/governance/opencode-plugin.ts        (the opencode plugin file)
 #   sdks/typescript/src/cli/utils/governance/telemetry-targets.ts      (logout removal)
 #
@@ -598,6 +599,34 @@ Rule: Copilot reports through one hook file LangWatch owns
     When the copilot ingestion install runs and logout then removes the telemetry targets
     Then the user's hook file is unchanged throughout
     And the LangWatch hook file is gone after logout
+
+  # A user who only ever runs `langwatch copilot` or `langwatch code` never runs
+  # the install, so the wrapper's offer to keep capturing writes the file too.
+  # Its question names the file, because a bare Enter is a yes.
+  @unit
+  Scenario: Starting Copilot through the wrapper writes the LangWatch hook file
+    Given a Copilot hooks folder without the LangWatch file
+    When the user says yes to the offer `langwatch copilot` or `langwatch code` makes to keep capturing
+    Then the question named the LangWatch hook file before the answer
+    And the LangWatch hook file runs the hook command for copilot on sessionStart and agentStop
+
+  @unit
+  Scenario: Declining the wrapper's offer writes no Copilot hook file
+    Given a Copilot hooks folder without the LangWatch file
+    When the user answers no to the offer the copilot wrapper makes to keep capturing
+    Then no LangWatch hook file is written
+
+  @unit
+  Scenario: A device that persisted Copilot capture earlier still gets the hook file
+    Given a scoped copilot function persisted before the wrapper wrote the hook file
+    When the wrapper re-asserts that device's telemetry wiring
+    Then the LangWatch hook file is written without asking again
+
+  @unit
+  Scenario: A login re-asserts the Copilot hook file where Copilot capture is persisted
+    Given a scoped copilot function persisted for this login and no LangWatch hook file
+    When a new login refreshes the telemetry wiring
+    Then the LangWatch hook file is written
 
   @unit
   Scenario: The copilot record declares the copilot agent and the span session id
