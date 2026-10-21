@@ -519,3 +519,69 @@ Patterns (all Presidio recognisers we request, with scores and boosting); `PIIAn
 | D14 | Rollout switch | **Decided:** Python stays the production path; Go only behind an explicit flag (haven `+go-evaluators` in dev; chart values default off; nlpgo mounts `/go/evaluators` only with its secret) |
 | D15 | `valid_format` python and sql modes | **Decided:** best-effort Go parsers measured against the recorded fixtures; a mode short of parity keeps the evaluator on Python |
 | D16 | `lingua/language_detection` | **Decided:** Fork C: vendored lingua-go v1.4.0 in `third_party/`, flat models generated at build time and embedded behind the `lingua_models` tag, Rust tokeniser regex; 1e-15 parity, ~7 MB anonymous RSS (measurements: the lingua research notes) |
+| D17 | Where evaluators run in production | Proposed: in place in a shared nlpgo Deployment, SaaS and self-hosted alike; no Lambda for evaluators (§13) |
+| D18 | Language for new code blocks | Open: Starlark in place is the recommendation; Python stays on the per-project Lambda (§13.3) |
+
+## 13. Production shape
+
+### 13.1 Why evaluators no longer need Lambda
+
+SaaS runs langevals as one Lambda per evaluator (`infra/docker/Dockerfile.langevals.lambda`, one
+`uv` extra each; `langevals/server.py:413`). Lambda was there for Python's reasons: each
+evaluator's heavy dependencies in its own image, and scaling to zero. The 6 MB synchronous body
+cap it brought is why evaluation payloads are staged through S3 (`langevals.channel.ts:1-4`).
+None of that holds on Go:
+
+- No tenant-written code runs. `valid_format`'s python mode only parses (`gpython` parser,
+  `ExecMode` is the grammar, nothing executes); user regexes go through Go's linear-time
+  `regexp`; Presidio's fixed patterns use `regexp2` with a 10 s match timeout.
+- No model files to ship separately: lingua's models are embedded in the binary (~7 MB
+  anonymous RSS), and there is no torch or spaCy.
+- Outbound calls already go through the SSRF guards: judges and embeddings through the
+  in-process gateway's customer-endpoint rules, vendors through `ssrf.SafeDialer`.
+- Every call is bounded: 270 s deadline, 64 in flight globally and 8 per project, 16 MiB body,
+  panics recovered. Topic clustering, which sits outside the per-project limits, now refuses
+  more than 5,000 traces (about 100 MB of distances; the app sends at most 2,000).
+
+So evaluators run in place in nlpgo, behind the internal secret and the NetworkPolicy (§5.1).
+Ideally as their own Deployment of the same image, so a burst of judges cannot starve workflow
+runs. That needs the `--only` switch D6 plans for clustering (`--only topics`), which is not
+built yet; `--only evaluators` would be its second value. The S3 staging for
+evaluations goes with Lambda; clustering keeps it for bodies over 32 MB (§5.4).
+
+What stays on Python: Presidio's PERSON and LOCATION entities, which need its NER model
+(`NLPGO_PII_ANALYZER_URL`), and data-privacy's trace redaction, which calls Presidio through
+`LANGEVALS_ENDPOINT` (`presidio-redaction.service.ts:71`). One small in-cluster Presidio
+service covers both until they are replaced.
+
+### 13.2 Code blocks stay isolated
+
+Code blocks are the one place tenants run their own code. Today nlpgo runs them as a CPython
+subprocess (`codeblock.go`): an env allowlist, a fresh temp dir, its own process group and a
+600 s timeout, but no memory limit, no seccomp or namespaces, and full network (blocks are given
+`requests` and `httpx` on purpose). In SaaS the real boundary is the per-project Lambda
+(`langwatch_nlp-<projectId>`, 2048 MB, VPC rules on egress; `nlp-lambda-config.rules.ts`).
+That stays. Self-hosted runs every project's blocks in the shared nlp pod, which is fine for a
+single trusted tenant and should be documented as such.
+
+### 13.3 A sandboxed language for new code blocks
+
+A language that runs in place, safely, would remove the Lambda cold start for new blocks.
+Candidates that embed in Go:
+
+| Option | Per call | Isolation | Close to today's Python |
+|---|---|---|---|
+| Starlark (`go.starlark.net`, already in `services/go.mod`) | microseconds to start; slower than CPython per step | No file, network or env access unless given; step limit and cancel; no memory cap of its own | Python syntax, dicts, lists, strings; no classes, `try`, `while` or imports |
+| goja (JavaScript in Go) | about 1 ms per runtime, pooled | Interrupt for time; no memory cap | A different language |
+| QuickJS compiled to wasm under wazero | milliseconds with a module cache | Strongest in place: hard memory cap, fuel or timeout, no host access | A different language |
+| Pydantic Monty under wazero | microseconds native, more in wasm | Hard memory cap through wasm | Python subset; young |
+| CEL / expr | nanoseconds | Not Turing-complete, cost limits | Expressions only |
+
+Recommendation: Starlark. It reads like Python, it is already a dependency, and it has hard step
+limits and no outside access unless the host grants it. HTTP, JSON and the LangWatch client become
+host functions, with HTTP going through `pkg/ssrf`. If a provable memory cap is required,
+QuickJS under wazero is the stronger sandbox, but blocks would be JavaScript.
+
+Migration: a block gets a language field. Existing blocks stay `python` and keep running where
+they run today. New blocks default to Starlark and run in place. Python blocks are deprecated
+once their count is low, and the per-project Lambda fleet is retired with the last one.
