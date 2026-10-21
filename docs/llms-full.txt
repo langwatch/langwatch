@@ -64563,7 +64563,7 @@ How much trace data each profile can take, for agent traces of about 4 spans eac
 | Profile | Accepts (spans per second) | Processes (spans per second) | Traces per second | Spans per day | Spans per month | ClickHouse disk per day | Redis memory limit |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `size-minimal.yaml` | ~500 | ~60 | ~15 | ~5M | ~155M | ~5 GB | 256Mi |
-| `size-dev.yaml` | ~500 | ~250 | ~60 | ~21M | ~650M | ~21 GB | 768Mi |
+| `size-dev.yaml` | ~500 | ~200 | ~50 | ~17M | ~520M | ~17 GB | 768Mi |
 | `size-prod.yaml` | ~2,000 | ~500 | ~125 | ~43M | ~1.3B | ~43 GB | 3Gi |
 
 - Traces, per day, per month and disk follow the processing rate, which is what the install can keep up with all day.
@@ -64582,7 +64582,7 @@ To process more than a profile's rate, add worker replicas. Every 100 spans per 
 | Redis | 0.12 core, up to 1 core in total |
 | PostgreSQL | 0.03 core |
 
-Redis needs about 2.5 MiB of memory limit for each span per second. It uses up to half of its limit and keeps the rest free for snapshots. The queue for bursts lives in Redis, so give it more room if you expect long bursts above the processing rate. To accept more, add app replicas: each core takes about 500 spans per second.
+Redis needs about 2.5 MiB of memory limit for each span per second; the table rounds up to leave room for bursts. It uses up to half of its limit and keeps the rest free for snapshots. The queue for bursts lives in Redis, so give it more room if you expect long bursts above the processing rate. To accept more, add app replicas: each core takes about 500 spans per second.
 
 Each project gets a fair share of the workers, so one busy project can't slow down the others. To give a single project more, raise `LANGWATCH_DISPATCH_TENANT_CAP` in `workers.extraEnvs` (default `50`). Setting it to `0` turns the limit off and lets one project take every worker.
 
