@@ -49,6 +49,7 @@ export const experimentV3LegacyRest = defineRestRouter(ExperimentV3RestApi)
   .withAddressing("v1-in-path", { generation: "v3" })
 
   .post("/:evaluationSlug/run", "postApiEvaluationsV3BySlugRun")
+  .keepsRecords()
   .withParams(evaluationSlugParamsSchema)
   .withRawBody("text", { mediaType: "application/json", mismatch: "accepted" })
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
@@ -108,6 +109,7 @@ export const experimentV3LegacyRest = defineRestRouter(ExperimentV3RestApi)
   )
 
   .put("/:evaluationSlug/workbench-state", "putApiEvaluationsV3BySlugWorkbenchState")
+  .keepsRecords()
   .withParams(evaluationSlugParamsSchema)
   .withInput(saveWorkbenchStateBodySchema)
   .withPermission("experiments:update")
@@ -136,6 +138,7 @@ export const experimentV3LegacyRest = defineRestRouter(ExperimentV3RestApi)
     "/:evaluationSlug/versions/:version/restore",
     "postApiEvaluationsV3BySlugVersionsByVersionRestore",
   )
+  .keepsRecords()
   .withParams(evaluationSlugVersionParamsSchema)
   .withPermission("experiments:update")
   .withAudit("experiments.restoreWorkbenchVersion")
@@ -162,6 +165,7 @@ export const experimentWorkbenchRunLegacyRest = defineRestRouter(ExperimentV3Res
   .withCredential("browser")
 
   .post("/execute", "executeEvaluationsV3Experiment")
+  .keepsRecords()
   .withInput(executionRequestSchema)
   .withPermission("evaluations:manage", { at: "route", param: "projectId" })
   .withoutAudit("run, not a change")
@@ -172,6 +176,7 @@ export const experimentWorkbenchRunLegacyRest = defineRestRouter(ExperimentV3Res
   )
 
   .post("/abort", "abortEvaluationsV3ExperimentRun")
+  .keepsRecords()
   .withInput(abortExperimentRunRequestSchema)
   .withPermission("evaluations:manage", { at: "route", param: "projectId" })
   .withoutAudit("run, not a change")
