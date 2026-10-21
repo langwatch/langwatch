@@ -6217,7 +6217,10 @@ function registerIngestCaptureCommands(ingestCmd: Command): void {
         "Declare the repository and branch this coding-agent session is working on. Run it from inside the checkout after you switch repository, branch or worktree.",
       )
       .option("--session-id <id>", "declare for this session instead of resolving the live one")
-      .option("--agent <tool>", "the agent the session belongs to: claude-code, codex or opencode"),
+      .option(
+        "--agent <tool>",
+        "the agent the session belongs to: claude-code, codex, opencode or copilot",
+      ),
   ).action(async (options: { sessionId?: string; agent?: string }) => {
     try {
       const { contextCommand } = await import("./commands/ingestion/context.js");

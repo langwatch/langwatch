@@ -28,6 +28,10 @@ import {
   parseTraceparent,
   sessionContextFingerprint,
 } from "@/cli/utils/governance/session-context";
+import {
+  type SessionContextAgent,
+  sessionContextAgentFor,
+} from "@/cli/utils/governance/session-context-agents";
 import { drainSessionContextSpool } from "@/cli/utils/governance/session-context-spool";
 import { buildSdkIdentityHeaders } from "@/internal/api/request-headers";
 import { LANGWATCH_SDK_VERSION } from "@/internal/constants";
@@ -37,26 +41,14 @@ import { langwatchFetch } from "@/internal/http/langwatchFetch";
 import { type GitRunner, readSessionContext, runGitCommand } from "./git-context";
 import { parseHookInput, readStdin } from "./hook-input";
 
-/**
- * What each accepted tool argument means: the agent, plus the environment
- * variables it publishes. The payload's `cwd` beats `projectDirVar`, which
- * stays pinned to the launch directory.
- */
-const TOOLS: Record<string, { agent: string; sessionIdVar?: string; projectDirVar?: string }> = {
-  claude_code: {
-    agent: "claude_code",
-    sessionIdVar: "CLAUDE_CODE_SESSION_ID",
-    projectDirVar: "CLAUDE_PROJECT_DIR",
-  },
-  codex: { agent: "codex" },
-  opencode: { agent: "opencode" },
-};
-
 /** How long the collector has to accept the record before we give up on it. */
 const POST_TIMEOUT_MS = 3_000;
 
 export interface HookCommandOptions {
-  /** The agent the hook is running for: `claude-code`, `codex` or `opencode`. */
+  /**
+   * The agent the hook is running for: `claude-code`, `codex`, `opencode` or
+   * `copilot`, one row of the session context agent table.
+   */
   tool: string;
   env?: NodeJS.ProcessEnv;
   /** Reads the hook payload. Defaults to draining this process's stdin. */
@@ -77,7 +69,7 @@ export interface HookCommandOptions {
    * no login; defaults to the real healer.
    */
   healRevokedKey?: (params: {
-    agent: string;
+    sourceType: string;
     rejectedToken: string | undefined;
   }) => Promise<HealOutcome>;
 }
@@ -159,18 +151,21 @@ async function runHook({
   readCliConfig: () => CliTelemetryConfig;
   healRevokedKey: NonNullable<HookCommandOptions["healRevokedKey"]>;
 }): Promise<void> {
-  const spec = TOOLS[tool.trim().toLowerCase().replace(/-/g, "_")];
+  const spec = sessionContextAgentFor(tool);
   if (!spec) {
     debug({ message: `no hook for tool '${tool}'`, env });
     return;
   }
   const agent = spec.agent;
+  // Which personal key this run posts with: the agent's own, or for an agent
+  // with more than one surface, the one of the surface that ran the hook.
+  const sourceType = spec.keySourceType(env);
 
   // Checked before stdin is read and before any git work: an agent with no
   // telemetry configured is the common case, and it must cost nothing but this
   // lookup. Reading first would spend the stdin deadline on a pipe the seam
   // may never close, for a payload nothing was ever going to be sent from.
-  const target = resolveTarget({ env, agent, readCliConfig });
+  const target = resolveTarget({ env, sourceType, readCliConfig });
   if (!target) {
     debug({
       message: "no telemetry target in the environment or the CLI config",
@@ -212,7 +207,7 @@ async function runHook({
   // personal key is re-minted, rewired and retried, with the user told to
   // restart the agent (which still holds the old key); a pinned key just reports.
   let liveTarget = target;
-  if (own.httpStatus === 401 && claimHealWindow({ stateDir, agent, now })) {
+  if (own.httpStatus === 401 && claimHealWindow({ stateDir, sourceType, now })) {
     // A pinned key is not this device's to replace: minting a personal one in
     // its place would move the session's telemetry into another project
     // without saying so. The healer declines a pinned tool for that same
@@ -227,6 +222,7 @@ async function runHook({
     } else {
       await healOrReport({
         agent,
+        sourceType,
         env,
         target,
         own,
@@ -256,6 +252,7 @@ async function runHook({
  */
 async function healOrReport({
   agent,
+  sourceType,
   env,
   target,
   own,
@@ -264,6 +261,8 @@ async function healOrReport({
   adoptHealed,
 }: {
   agent: string;
+  /** The source type the rejected personal key is cached under. */
+  sourceType: string;
   env: NodeJS.ProcessEnv;
   target: TelemetryTarget;
   own: OwnContextOutcome;
@@ -272,7 +271,7 @@ async function healOrReport({
   adoptHealed: (target: TelemetryTarget) => void;
 }): Promise<void> {
   const outcome = await healRevokedKey({
-    agent,
+    sourceType,
     rejectedToken: bearerOf(target.headers),
   }).catch((error: Error) => {
     debug({ message: `heal failed: ${error.message}`, env });
@@ -282,7 +281,7 @@ async function healOrReport({
   // without touching the platform, so holding the window would cost nothing
   // to repeat and would silence the next 401 that this device CAN repair.
   if (outcome.status === "declined") {
-    releaseHealWindow({ stateDir, agent });
+    releaseHealWindow({ stateDir, sourceType });
   }
   if (outcome.status === "healed") {
     const healed: TelemetryTarget = { ...outcome.target, source: "personal" };
@@ -324,25 +323,29 @@ const SIGNED_OUT_NOTICE =
 /** How long one heal attempt stands before the hook tries again. */
 const HEAL_THROTTLE_MS = 10 * 60 * 1000;
 
-function healStateFile({ stateDir, agent }: { stateDir: string; agent: string }): string {
-  return path.join(stateDir, `heal-${agent}.json`);
+/**
+ * One heal window per cached key, so the two Copilot surfaces each repair
+ * their own; for every single-surface agent the source type is its agent id.
+ */
+function healStateFile({ stateDir, sourceType }: { stateDir: string; sourceType: string }): string {
+  return path.join(stateDir, `heal-${sourceType}.json`);
 }
 
 /**
- * Take this agent's heal window, or report another attempt holds it, via an
+ * Take this key's heal window, or report another attempt holds it, via an
  * exclusive create so two sessions reading the same 401 can't both re-mint.
  * A stale claim is replaced through its own exclusive takeover marker.
  */
 function claimHealWindow({
   stateDir,
-  agent,
+  sourceType,
   now,
 }: {
   stateDir: string;
-  agent: string;
+  sourceType: string;
   now: () => number;
 }): boolean {
-  const file = healStateFile({ stateDir, agent });
+  const file = healStateFile({ stateDir, sourceType });
   const marker = `${file}.takeover`;
   const claim = JSON.stringify({ attemptedAt: now() });
   const write = (at: string): "claimed" | "taken" | "unwritable" => {
@@ -409,9 +412,15 @@ function standingClaimIsFresh({ file, now }: { file: string; now: () => number }
 }
 
 /** Hand the window back, for an outcome that never reached the platform. */
-function releaseHealWindow({ stateDir, agent }: { stateDir: string; agent: string }): void {
+function releaseHealWindow({
+  stateDir,
+  sourceType,
+}: {
+  stateDir: string;
+  sourceType: string;
+}): void {
   try {
-    fs.rmSync(healStateFile({ stateDir, agent }), { force: true });
+    fs.rmSync(healStateFile({ stateDir, sourceType }), { force: true });
   } catch {
     // A claim we cannot clear stands for the window, costing one repair.
     void 0;
@@ -453,7 +462,7 @@ async function postOwnSessionContext({
   claudeRegistryDir,
   target,
 }: {
-  spec: (typeof TOOLS)[string];
+  spec: SessionContextAgent;
   agent: string;
   sessionId: string;
   input: ReturnType<typeof parseHookInput>;
@@ -570,11 +579,15 @@ interface OwnContextOutcome {
  */
 export function resolveTarget({
   env,
-  agent,
+  sourceType,
   readCliConfig,
 }: {
   env: NodeJS.ProcessEnv;
-  agent: string;
+  /**
+   * The source type the personal key is cached under. The pin is keyed by
+   * the tool slug, read off this through the same table.
+   */
+  sourceType: string;
   readCliConfig: () => CliTelemetryConfig;
 }): TelemetryTarget | null {
   const fromEnv = resolveLogsEndpoint(env);
@@ -593,7 +606,7 @@ export function resolveTarget({
   // endpoint with it) while it stands -- an explicit choice of where this
   // tool's data goes. `installTelemetryWiring` picks the same credential for
   // the env block, so the record posted here and exported traces land together.
-  const pinned = config.tool_project_keys?.[TOOL_BY_SOURCE_TYPE[agent] ?? agent];
+  const pinned = config.tool_project_keys?.[TOOL_BY_SOURCE_TYPE[sourceType] ?? sourceType];
   const pinnedSecret = pinned?.secret?.trim();
   if (pinnedSecret) {
     const pinnedEndpoint = logsEndpointUnder(pinned?.endpoint ?? controlPlane);
@@ -608,7 +621,7 @@ export function resolveTarget({
   }
 
   const endpoint = logsEndpointUnder(controlPlane);
-  const secret = config.default_personal_ingest_keys?.[agent]?.secret?.trim();
+  const secret = config.default_personal_ingest_keys?.[sourceType]?.secret?.trim();
   if (!endpoint || !secret) return null;
 
   return {

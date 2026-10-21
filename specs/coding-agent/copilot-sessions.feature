@@ -95,19 +95,19 @@ Rule: One row per conversation, every number from the model calls
 
 Rule: The session context links a Copilot session to its pull request
 
-  @integration @unimplemented
+  @unit
   Scenario: A Copilot session context sets the row's repository and branch
     Given a Copilot session row keyed by its conversation id
     When a session context record for the same id declares the agent "copilot"
     Then the row shows the repository host, owner, name and branch
 
-  @integration @unimplemented
+  @unit
   Scenario: A Copilot session on a branch with an open pull request is listed on it
     Given a Copilot session whose branch has an open pull request
     When the session maps to pull requests
     Then the pull request lists the session
 
-  @integration @unimplemented
+  @unit
   Scenario: A repository switch during a Copilot session follows the Claude Code rule
     Given a Copilot session that reports one repository and then another
     When both session context records are folded

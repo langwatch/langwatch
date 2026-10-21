@@ -122,6 +122,7 @@ describe("Governance receiver policy", () => {
 
   /** @scenario Foreign OTLP traffic on a copilot_vscode key is dropped at the receiver */
   /** @scenario "VS Code policy excludes inherited telemetry" */
+  /** @scenario "Copilot Chat's copilot-chat scope counts as Copilot's own on a copilot_vscode key" */
   it.each(["traces", "metrics"] as const)(
     "filters foreign VS Code %s scopes and removes empty groups",
     (signal) => {
@@ -157,6 +158,29 @@ describe("Governance receiver policy", () => {
         "copilot-chat",
       ]);
       expect(signal === "traces" ? request.resourceSpans : request.resourceMetrics).toHaveLength(1);
+    },
+  );
+
+  /** @scenario "Copilot Chat's copilot-chat scope counts as Copilot's own on a copilot_vscode key" */
+  it.each(["copilot_cli", "copilot_app"])(
+    "applies no scope filter on a %s key, so a copilot-chat span is kept",
+    (sourceType) => {
+      const policy = buildIngestKeyReceiverPolicies({ ...identity, sourceType }, true).traces;
+      const request: OtlpReceiverRequest = {
+        resourceSpans: [
+          { scopeSpans: [{ scope: { name: "copilot-chat" } }, { scope: { name: "custom" } }] },
+        ],
+      };
+
+      expect(policy.allowedTraceScopeNames).toBeUndefined();
+      expect(
+        applyOtlpReceiverPolicy({ request, signal: "traces", apiKeyId: "key", policy })
+          .droppedScopes,
+      ).toBe(0);
+      expect(request.resourceSpans?.[0]?.scopeSpans?.map((scope) => scope?.scope?.name)).toEqual([
+        "copilot-chat",
+        "custom",
+      ]);
     },
   );
 

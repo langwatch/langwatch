@@ -28,6 +28,7 @@ import {
   sessionContextFingerprint,
   sessionTitleFromPrompt,
 } from "@/cli/utils/governance/session-context";
+import { sessionContextAgentFor } from "@/cli/utils/governance/session-context-agents";
 import { writeSpooledDeclaration } from "@/cli/utils/governance/session-context-spool";
 import { LANGWATCH_SDK_VERSION } from "@/internal/constants";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
@@ -143,9 +144,11 @@ async function declare({
     return;
   }
 
+  // The same key the agent's own hook posts with, read off the same table, so
+  // a declaration and the hook land in the same project.
   const target = resolveTarget({
     env,
-    agent: session.agent,
+    sourceType: sessionContextAgentFor(session.agent)?.keySourceType(env) ?? session.agent,
     readCliConfig,
   });
   if (!target) {
