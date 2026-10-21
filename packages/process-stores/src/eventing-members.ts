@@ -32,6 +32,7 @@ import {
   EventingClickHouseReplayEventSource,
   OtelProcessRetentionMetricsAdapter,
   PrismaProcessStore,
+  type EventingClickHouseClient,
   type EventingClickHouseClientResolver,
   type EventLogRetentionPolicyLookup,
 } from "@langwatch/eventing/server";
@@ -297,6 +298,24 @@ function eventingReadSeat(eventLog: EventingEventLogMembers): EventReadSeat {
   });
 }
 
+/** Eventing's query request in the routed member's own vocabulary. */
+function routedEventingQuery({
+  tenantId,
+  request,
+}: {
+  tenantId: string;
+  request: Parameters<EventingClickHouseClient["query"]>[0];
+}): Parameters<ClickHouseQueryClient["query"]>[0] {
+  return {
+    tenantId,
+    sql: request.query,
+    ...(request.query_params === undefined ? {} : { params: request.query_params }),
+    ...(request.SKIP_COLD_SCAN_CHECK === true ? { SKIP_COLD_SCAN_CHECK: true } : {}),
+    ...(request.tenantIds === undefined ? {} : { tenantIds: request.tenantIds }),
+    ...(request.clickhouse_settings === undefined ? {} : { settings: request.clickhouse_settings }),
+  };
+}
+
 /**
  * Adapts the routed process member to Eventing's tenant-resolved client. The
  * read runs where the caller names its row type — the only point at which this
@@ -311,13 +330,7 @@ function eventingClickHouseResolver(
         Promise.resolve({
           json: <Row>() =>
             clickhouse
-              .query<Row>({
-                tenantId,
-                sql: request.query,
-                ...(request.query_params === undefined ? {} : { params: request.query_params }),
-                ...(request.SKIP_COLD_SCAN_CHECK === true ? { SKIP_COLD_SCAN_CHECK: true } : {}),
-                ...(request.tenantIds === undefined ? {} : { tenantIds: request.tenantIds }),
-              })
+              .query<Row>(routedEventingQuery({ tenantId, request }))
               .then((result) => result.rows),
         }),
       insert: (request) =>

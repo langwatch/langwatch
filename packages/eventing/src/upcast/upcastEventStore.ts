@@ -78,23 +78,15 @@ class UpcastingEventStore<EventType extends Event> implements EventStore<EventTy
   get getEventsUpToPaged(): EventStore<EventType>["getEventsUpToPaged"] {
     const paged = this.store.getEventsUpToPaged?.bind(this.store);
     if (!paged) return undefined;
-    return async (request) => {
-      const merged = await this.#merged(request.aggregateType, (aggregateType) =>
-        paged({ ...request, aggregateType }),
-      );
-      return merged.slice(0, request.limit);
-    };
+    return (request) =>
+      this.#page(request, (aggregateType) => paged({ ...request, aggregateType }));
   }
 
   get getEventsPaged(): EventStore<EventType>["getEventsPaged"] {
     const paged = this.store.getEventsPaged?.bind(this.store);
     if (!paged) return undefined;
-    return async (request) => {
-      const merged = await this.#merged(request.aggregateType, (aggregateType) =>
-        paged({ ...request, aggregateType }),
-      );
-      return merged.slice(0, request.limit);
-    };
+    return (request) =>
+      this.#page(request, (aggregateType) => paged({ ...request, aggregateType }));
   }
 
   async countEventsBefore(
@@ -112,6 +104,20 @@ class UpcastingEventStore<EventType extends Event> implements EventStore<EventTy
   #aggregateTypes(aggregateType: string): string[] {
     const own = this.upcaster.upcasts?.aggregateType;
     return aggregateType === own ? [own, ...this.upcaster.formerAggregateTypes] : [aggregateType];
+  }
+
+  /**
+   * One raw page, never deduped: a paged caller reads a short page as the end of the history and
+   * dedupes across pages itself. Several types' pages interleave in log order, cut to the limit.
+   */
+  async #page(
+    request: { aggregateType: string; limit: number },
+    read: (aggregateType: string) => Promise<readonly EventType[]>,
+  ): Promise<readonly EventType[]> {
+    const types = this.#aggregateTypes(request.aggregateType);
+    const reads = await Promise.all(types.map(read));
+    const events = reads.flat().map((stored) => this.#current(stored));
+    return types.length > 1 ? events.toSorted(logOrder).slice(0, request.limit) : events;
   }
 
   async #merged(

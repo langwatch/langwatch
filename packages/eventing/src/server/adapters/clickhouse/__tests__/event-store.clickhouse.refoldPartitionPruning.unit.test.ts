@@ -60,6 +60,7 @@ const lastCall = () =>
   queryMock.mock.calls.at(-1)![0] as {
     query: string;
     query_params: Record<string, unknown>;
+    clickhouse_settings?: Record<string, number>;
   };
 
 describe("re-fold reads prune partitions — unpaged, time-local aggregate", () => {
@@ -125,17 +126,19 @@ describe("re-fold reads prune partitions — paged, time-local aggregate", () =>
     expect(lastCall().query).toContain("EventOccurredAt = 0 OR");
   });
 
-  /** @scenario An order-insensitive fold that missed an event is rebuilt from its log a page at a time */
+  /** @scenario A page of an aggregate's history reads payloads only for its own rows */
   it("reads each page's payloads lazily, for that page's rows only", async () => {
     await store.getEventsUpToPaged?.(pagedRequest);
 
-    expect(lastCall().query).toContain("query_plan_max_limit_for_lazy_materialization = 100");
+    expect(lastCall().clickhouse_settings).toEqual({
+      query_plan_max_limit_for_lazy_materialization: 100,
+    });
   });
 });
 
 describe("rebuild reads prune partitions: paged whole history", () => {
   describe("given a time-local aggregate", () => {
-    /** @scenario An order-insensitive fold that missed an event is rebuilt from its log a page at a time */
+    /** @scenario A page of an aggregate's history reads payloads only for its own rows */
     it("bounds every page on the triggering event, with no upper bound", async () => {
       await store.getEventsPaged?.({
         aggregateId: "trace-1",
@@ -152,12 +155,14 @@ describe("rebuild reads prune partitions: paged whole history", () => {
       expect(lastCall().query).toContain("LIMIT {limit:UInt32}");
       expect(lastCall().query_params.afterEventId).toBe("event-0");
       // Payloads are read lazily for the page's own rows, not for every row the page scans.
-      expect(lastCall().query).toContain("query_plan_max_limit_for_lazy_materialization = 100");
+      expect(lastCall().clickhouse_settings).toEqual({
+        query_plan_max_limit_for_lazy_materialization: 100,
+      });
     });
   });
 
   describe("given a long-lived aggregate type", () => {
-    /** @scenario An order-insensitive fold that missed an event is rebuilt from its log a page at a time */
+    /** @scenario A page of an aggregate's history reads payloads only for its own rows */
     it("leaves the scan unbounded but still pages it", async () => {
       await store.getEventsPaged?.({
         aggregateId: "global-1",

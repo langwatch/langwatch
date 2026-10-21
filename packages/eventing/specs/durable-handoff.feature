@@ -49,6 +49,14 @@ Feature: Durable hand-off from an append to its lanes
     And an event read on two pages is folded once
 
   @unit
+  Scenario: A page of an aggregate's history reads payloads only for its own rows
+    Given an aggregate's history read a page at a time
+    When a page is read
+    Then its event payloads are read only for the rows the page returns
+    And a time-local aggregate's page keeps the partition lower bound around the triggering event
+    And a page limit that is not a positive integer is refused before any query runs
+
+  @unit
   Scenario: A paged rebuild that reads an incomplete history retries and then refuses
     Given an order-insensitive fold whose stored state applied an event the log does not return yet
     When the aggregate is rebuilt

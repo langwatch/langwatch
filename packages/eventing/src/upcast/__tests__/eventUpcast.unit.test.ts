@@ -20,6 +20,7 @@ import type {
 } from "../../replay/replayEventSource.ts";
 import { testEventSchema } from "../../services/__tests__/testHelpers.ts";
 import { EventStoreMemory } from "../../stores/eventStoreMemory.ts";
+import { EventRepositoryMemory } from "../../stores/repositories/eventRepositoryMemory.ts";
 import { EventUpcaster, type UpcastDeclaration } from "../eventUpcast.ts";
 import { EventUpcastReader } from "../eventUpcastReader.ts";
 import { upcastEventStore } from "../upcastEventStore.ts";
@@ -303,6 +304,59 @@ describe("an upcast declared on the owning pipeline", () => {
         ["e1", CURRENT, "entitlement_organization"],
         ["e2", CURRENT, "entitlement_organization"],
       ]);
+    });
+
+    /** @scenario An order-insensitive fold that missed an event is rebuilt from its log a page at a time */
+    it("keeps a page's raw length, so a duplicate row cannot end a paged read early", async () => {
+      // ClickHouse's event_log can return one EventId twice in a page (a retried insert); the
+      // memory twin drops duplicates on insert, so the repository here repeats a page's first row.
+      const repository = EventRepositoryMemory.createForTesting();
+      const duplicating = new Proxy(repository, {
+        get(target, prop, receiver) {
+          if (prop !== "getEventRecordsPaged") return Reflect.get(target, prop, receiver);
+          return async (request: Parameters<typeof target.getEventRecordsPaged>[0]) => {
+            const page = await target.getEventRecordsPaged({
+              ...request,
+              limit: request.limit - 1,
+            });
+            return page.length === 0 ? page : [page[0]!, ...page];
+          };
+        },
+      });
+      const store = EventStoreMemory.createForTesting(duplicating);
+      const context = { tenantId: TENANT };
+      const other = (id: string, createdAt: number) =>
+        stored({ id, type: CURRENT, aggregateType: "other_aggregate", createdAt });
+      await store.storeEvents(
+        [other("a1", 1), other("a2", 2), other("a3", 3), other("a4", 4)],
+        context,
+        "other_aggregate",
+      );
+      const definition = entitlementPipeline();
+      const upcasting = upcastEventStore({
+        store,
+        upcaster: EventUpcaster.of(definition.upcasts),
+        parseEvent: definition.parseEvent,
+      });
+
+      const seen = new Set<string>();
+      let after: { timestamp: number; eventId: string } | undefined;
+      for (;;) {
+        const page = await upcasting.getEventsPaged!({
+          aggregateId: "organization-1",
+          context,
+          aggregateType: "other_aggregate",
+          after,
+          limit: 2,
+        });
+        if (page.length === 0) break;
+        for (const event of page) seen.add(event.id);
+        const last = page[page.length - 1]!;
+        after = { timestamp: last.createdAt, eventId: last.id };
+        if (page.length < 2) break;
+      }
+
+      expect(seen).toEqual(new Set(["a1", "a2", "a3", "a4"]));
     });
 
     /** @scenario "A payload transform reshapes the stored data before the current schema parses it" */

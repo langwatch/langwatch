@@ -125,9 +125,9 @@ describe("rebuilding a fold's aggregate for a missed hand-off", () => {
         const strict = new FoldProjectionExecutor({ refoldHistoryRetryDelaysMs: [] });
         await strict.execute(fold, original, context);
 
-        await expect(strict.rebuild(fold, redelivery, context)).rejects.toThrow(
-          "read an incomplete history; retrying",
-        );
+        await expect(strict.rebuild(fold, redelivery, context)).rejects.toMatchObject({
+          code: "fold_rebuild_incomplete_history",
+        });
         expect(current()?.state.seen).toEqual([original.id]);
       });
     });
@@ -209,9 +209,9 @@ describe("rebuilding a fold's aggregate for a missed hand-off", () => {
         const retrying = new FoldProjectionExecutor({ refoldHistoryRetryDelaysMs: [0] });
         await retrying.execute(fold, first, context);
 
-        await expect(retrying.rebuild(fold, missed, context)).rejects.toThrow(
-          "read an incomplete history; retrying",
-        );
+        await expect(retrying.rebuild(fold, missed, context)).rejects.toMatchObject({
+          code: "fold_rebuild_incomplete_history",
+        });
         expect(pages.filter((page) => page.after === undefined)).toHaveLength(2);
         expect(current()?.state.seen).toEqual([first.id]);
       });

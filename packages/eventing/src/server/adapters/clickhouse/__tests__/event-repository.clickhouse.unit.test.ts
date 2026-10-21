@@ -197,7 +197,7 @@ describe("EventRepositoryClickHouse read projections", () => {
     upToEventId: "evt",
   };
 
-  describe("given the three reads that rehydrate an event record", () => {
+  describe("given the four reads that rehydrate an event record", () => {
     describe("when any of them runs", () => {
       it("projects every column the record mapper reads", async () => {
         const client = createMockClient({});
@@ -214,8 +214,15 @@ describe("EventRepositoryClickHouse read projections", () => {
           after: undefined,
           limit: 10,
         });
+        await repository.getEventRecordsPaged({
+          tenantId: "tenant",
+          aggregateType: "trace",
+          aggregateId: "id",
+          after: undefined,
+          limit: 10,
+        });
 
-        for (let call = 0; call < 3; call++) {
+        for (let call = 0; call < 4; call++) {
           expect(queryOf({ client, call })).toContain(EVENT_LOG_SELECT_COLUMNS);
         }
       });
@@ -241,6 +248,34 @@ describe("EventRepositoryClickHouse read projections", () => {
         expect(plain?.EventVersion).toBe("2025-12-14");
         expect(upTo?.EventVersion).toBe("2025-12-14");
         expect(paged?.EventVersion).toBe("2025-12-14");
+      });
+    });
+  });
+});
+
+describe("EventRepositoryClickHouse paged reads", () => {
+  const history = {
+    tenantId: "tenant",
+    aggregateType: "trace",
+    aggregateId: "id",
+    after: undefined,
+  };
+  const upTo = { ...history, upToTimestamp: 1700000000001, upToEventId: "evt" };
+
+  describe.each([0, -1, 1.5])("given a page limit of %s", (limit) => {
+    describe("when either paged read runs", () => {
+      /** @scenario A page of an aggregate's history reads payloads only for its own rows */
+      it("refuses the limit before any query runs", async () => {
+        const client = createMockClient({});
+        const repository = repositoryFor(client);
+
+        await expect(repository.getEventRecordsPaged({ ...history, limit })).rejects.toThrow(
+          RangeError,
+        );
+        await expect(repository.getEventRecordsUpToPaged({ ...upTo, limit })).rejects.toThrow(
+          RangeError,
+        );
+        expect(client.query).not.toHaveBeenCalled();
       });
     });
   });

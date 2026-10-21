@@ -474,6 +474,9 @@ export class EventingClickHouseEventRepository implements EventRepository {
         query,
         query_params,
         format: "JSONEachRow",
+        // `event_log` is not sorted in page order, so a page scans the aggregate's rows for its
+        // top `limit`; lifting the lazy-read cap to the page size reads only their payloads.
+        clickhouse_settings: { query_plan_max_limit_for_lazy_materialization: request.limit },
         // Unbounded, as in `getEventRecords`: a long-lived aggregate's history by its key.
         ...(declaresFullScan ? { SKIP_COLD_SCAN_CHECK: true as const } : {}),
       });
@@ -519,8 +522,6 @@ export class EventingClickHouseEventRepository implements EventRepository {
       : "";
     // The cursor and the upper bound are both on EventTimestamp, which is NOT
     // the partition key — so neither prunes. Only EventOccurredAt does.
-    // Nor is it the sort key, so each page scans the aggregate's rows to find its top `limit`.
-    // Lifting the lazy-read cap to the page size reads EventPayload for those rows only.
     const hasLowerBound = typeof occurredAtFromMs === "number" && occurredAtFromMs > 0;
     const occurredAtFilter = hasLowerBound
       ? "AND (EventOccurredAt = 0 OR EventOccurredAt >= {occurredAtFromMs:UInt64})"
@@ -538,7 +539,6 @@ export class EventingClickHouseEventRepository implements EventRepository {
           ${afterClause}
         ORDER BY EventTimestamp ASC, EventId ASC
         LIMIT {limit:UInt32}
-        SETTINGS query_plan_max_limit_for_lazy_materialization = ${limit}
       `,
       query_params: {
         tenantId,
