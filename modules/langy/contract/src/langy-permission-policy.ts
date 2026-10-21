@@ -61,7 +61,7 @@ const ACTION_EXCLUSIONS: Record<string, string> = {
 /**
  * Fully excluded families: secrets (reading = obtaining), agentCache (stores
  * sessions), langy (recursive authority), ops (platform surgery), featureFlags
- * (release machinery, not tenant data).
+ * (release machinery, not tenant data), braids (a person's decision, ADR-183).
  */
 const FULLY_EXCLUDED_FAMILIES: Record<string, string> = {
   secrets: "reading a stored credential is obtaining it; there is no safe read",
@@ -75,6 +75,9 @@ const FULLY_EXCLUDED_FAMILIES: Record<string, string> = {
   featureFlags:
     "enrols a project or organization in a LangWatch rollout experiment, " +
     "which is release machinery rather than a tenant capability",
+  braids:
+    "shares a project's spans into another project's traces, a person's " +
+    "decision made in the screen; an agent never braids (ADR-183 §2)",
 };
 
 /**

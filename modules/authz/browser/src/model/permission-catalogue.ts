@@ -19,6 +19,8 @@ export type AuthzAction = (typeof AUTHZ_ACTIONS)[keyof typeof AUTHZ_ACTIONS];
  */
 export const ORDERED_RESOURCES = [
   "traces",
+  // Sharing matching spans into another project's traces; manage is its only action (ADR-183 §2).
+  "braids",
   "cost",
   "scenarios",
   "annotations",
@@ -61,9 +63,12 @@ const VIEW_ONLY: readonly AuthzResource[] = [
 
 const VIEW_AND_MANAGE: readonly AuthzResource[] = ["secrets", "experiments"];
 
+const MANAGE_ONLY: readonly AuthzResource[] = ["braids"];
+
 /** Which actions the editor offers for one resource. */
 export function validActionsForResource(resource: AuthzResource): AuthzAction[] {
   if (VIEW_ONLY.includes(resource)) return [AUTHZ_ACTIONS.VIEW];
+  if (MANAGE_ONLY.includes(resource)) return [AUTHZ_ACTIONS.MANAGE];
   if (resource === "traces") return [AUTHZ_ACTIONS.VIEW, AUTHZ_ACTIONS.SHARE];
   if (VIEW_AND_MANAGE.includes(resource)) return [AUTHZ_ACTIONS.VIEW, AUTHZ_ACTIONS.MANAGE];
   return [

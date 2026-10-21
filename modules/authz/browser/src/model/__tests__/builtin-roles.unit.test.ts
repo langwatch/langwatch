@@ -3,7 +3,11 @@
  * invariant: nothing engine grants is hidden, nothing appears that engine won't.
  */
 
-import { builtinRoleGrants, roleKeyForTeamRole } from "@langwatch/authz-contract";
+import {
+  builtinRoleGrants,
+  permissionsConferred,
+  roleKeyForTeamRole,
+} from "@langwatch/authz-contract";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -161,5 +165,28 @@ describe("the built-in roles", () => {
       expect(peopleHoldingBuiltinRole({ bindings, teamRole: "VIEWER" })).toBe(1);
       expect(peopleHoldingBuiltinRole({ bindings, teamRole: "MEMBER" })).toBe(0);
     });
+  });
+});
+
+describe("who may braid (ADR-183 §2)", () => {
+  it("is the admin role, never member or viewer", () => {
+    expect(builtinRoleGrants({ role: "admin", permission: "braids:manage" })).toBe(true);
+    expect(builtinRoleGrants({ role: "member", permission: "braids:manage" })).toBe(false);
+    expect(builtinRoleGrants({ role: "viewer", permission: "braids:manage" })).toBe(false);
+  });
+
+  it("is every organisation admin, and no organisation member", () => {
+    const conferred = ({ role }: { role: "ADMIN" | "MEMBER" }) =>
+      permissionsConferred({ role, scopeType: "ORGANIZATION", customPermissions: [] });
+    expect(conferred({ role: "ADMIN" })).toContain("braids:manage");
+    expect(conferred({ role: "MEMBER" })).not.toContain("braids:manage");
+  });
+
+  it("is conferred by a team or project admin binding", () => {
+    for (const scopeType of ["TEAM", "PROJECT"] as const) {
+      expect(permissionsConferred({ role: "ADMIN", scopeType, customPermissions: [] })).toContain(
+        "braids:manage",
+      );
+    }
   });
 });
