@@ -152,6 +152,14 @@ test_plain_number_in_a_values_file_is_bytes() {
     -f "$overlays/size-prod.yaml" -f "$override_file"
 }
 
+# @scenario "A numeric zero ceiling is an explicit override"
+test_numeric_zero_override_is_kept() {
+  local override_file
+  override_file=$(values_file override-zero override 0)
+  expect_maxmemory "override 0 from a file" 0 \
+    -f "$overlays/size-prod.yaml" -f "$override_file"
+}
+
 # @scenario "A memory value the chart cannot read is refused"
 test_unreadable_value_is_refused() {
   expect_failure "unparseable limit" "is not a size" \
@@ -180,6 +188,7 @@ test_prod_and_ha_give_redis_three_gibibytes
 test_both_command_forms_carry_the_ceiling
 test_explicit_override_wins
 test_plain_number_in_a_values_file_is_bytes
+test_numeric_zero_override_is_kept
 test_unreadable_value_is_refused
 test_no_limit_means_no_ceiling
 

@@ -2339,10 +2339,12 @@ envFrom:
 {{/* Redis --maxmemory in bytes: redis.master.maxmemory when set, else half of
      redis.master.resources.limits.memory, so a snapshot's copied pages still
      fit under the container limit. Renders nothing with no limit and no
-     override. Accepts bytes, k/M/G/T and Ki/Mi/Gi/Ti. A values file hands
-     numbers over as floats, so they are printed as whole bytes first. */}}
+     override; a numeric 0 still counts as set. Accepts bytes, k/M/G/T, Ki/Mi/Gi/Ti.
+     A values file hands numbers over as floats, printed as whole bytes. */}}
 {{- define "langwatch.redisMaxmemory" -}}
-{{- $override := .Values.redis.master.maxmemory | default "" -}}
+{{- $override := "" -}}
+{{- if hasKey .Values.redis.master "maxmemory" -}}{{- $override = .Values.redis.master.maxmemory -}}{{- end -}}
+{{- if kindIs "invalid" $override -}}{{- $override = "" -}}{{- end -}}
 {{- if kindIs "float64" $override -}}{{- $override = printf "%.0f" $override -}}{{- end -}}
 {{- $override = toString $override -}}
 {{- $limit := dig "limits" "memory" "" (.Values.redis.master.resources | default dict) -}}
