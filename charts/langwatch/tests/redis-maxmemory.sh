@@ -92,14 +92,20 @@ test_ceiling_is_half_of_the_limit() {
 
 # @scenario "Production and HA profiles give Redis three gibibytes"
 test_prod_and_ha_give_redis_three_gibibytes() {
-  local profile block limits
+  local profile block limits requests
   for profile in size-prod size-ha; do
     block=$(render_redis -f "$overlays/$profile.yaml")
     limits=$(printf '%s\n' "$block" | awk '/limits:/ { n = 3 } n > 0 { printf "%s", $0; n-- }' | tr -d ' ')
+    requests=$(printf '%s\n' "$block" | awk '/requests:/ && !seen++ { n = 3 } n > 0 { printf "%s", $0; n-- }' | tr -d ' ')
     if [ "$limits" = 'limits:cpu:1memory:3Gi' ]; then
       echo "ok   [$profile] limits 1 CPU / 3Gi"
     else
       fail "$profile" "limits were $limits"
+    fi
+    if [ "$requests" = 'requests:cpu:500mmemory:1Gi' ]; then
+      echo "ok   [$profile] requests 500m CPU / 1Gi"
+    else
+      fail "$profile" "requests were $requests"
     fi
   done
 }
