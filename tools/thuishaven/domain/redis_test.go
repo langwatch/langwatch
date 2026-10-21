@@ -3,7 +3,7 @@ package domain
 import "testing"
 
 // Which formula `haven up` starts when nothing answers on the Redis port.
-// @scenario "Valkey is offered first for the shared Redis, and an installed Redis still counts"
+// @scenario "Starting the shared Redis adopts the brew-started formula, else the installed one, valkey first"
 func TestChooseRedisFormula(t *testing.T) {
 	cases := []struct {
 		name      string
@@ -42,6 +42,8 @@ func TestStartedRedisFormulaReadsBrewServicesList(t *testing.T) {
 
 // Valkey reports a redis_version for compatibility, so the health line must
 // look at server_name first or every Valkey reads as Redis 7.2.
+// @scenario "The Redis health line names the server that answered"
+// @scenario "The Redis health line names the server that answered"
 func TestRedisServerNameTellsValkeyFromRedis(t *testing.T) {
 	valkey := map[string]string{"server_name": "valkey", "valkey_version": "9.1.2", "redis_version": "7.2.4"}
 	if got := RedisServerName(valkey); got != "valkey 9.1.2" {
@@ -65,7 +67,8 @@ func TestValkeyServerCountsAsTheSharedRedisInTheFootprint(t *testing.T) {
 
 // The prerequisite offers valkey first, so a non-interactive run on a fresh
 // machine installs it, and an installed redis still satisfies the entry.
-// @scenario "Valkey is offered first for the shared Redis, and an installed Redis still counts"
+// @scenario "Valkey is offered first for the shared Redis"
+// @scenario "An installed Redis still satisfies the Redis entry"
 func TestRedisPrereqPrefersValkeyAndKeepsAnInstalledRedis(t *testing.T) {
 	p, ok := LookupPrereq("redis")
 	if !ok {

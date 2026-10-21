@@ -89,9 +89,9 @@ func chooseFormula(ctx context.Context) string {
 	return domain.ChooseRedisFormula(installed, started)
 }
 
-// cli is the client binary haven talks to the server with: valkey-cli or
+// CLI is the client binary haven talks to the server with: valkey-cli or
 // redis-cli, whichever is on PATH. Either speaks to either server.
-func cli() string {
+func CLI() string {
 	for _, name := range domain.RedisCLIs {
 		if _, err := exec.LookPath(name); err == nil {
 			return name
@@ -103,7 +103,7 @@ func cli() string {
 // command runs one client command against the configured port.
 func (s *Server) command(ctx context.Context, args ...string) *exec.Cmd {
 	//nolint:gosec // every argument is a constant or a number from haven's own config
-	return exec.CommandContext(ctx, cli(), append([]string{"-h", "127.0.0.1", "-p", fmt.Sprint(s.port)}, args...)...)
+	return exec.CommandContext(ctx, CLI(), append([]string{"-h", "127.0.0.1", "-p", fmt.Sprint(s.port)}, args...)...)
 }
 
 // applyMemoryCap sets maxmemory on the running server so a leaky stack fails
@@ -184,7 +184,7 @@ func (s *Server) Health(ctx context.Context) (bool, string) {
 	if !s.ping(ctx) {
 		formula := s.formula
 		if formula == "" {
-			formula = domain.DefaultRedisFormula
+			formula = chooseFormula(ctx)
 		}
 		return false, fmt.Sprintf("not answering on :%d (brew services info %s)", s.port, formula)
 	}
