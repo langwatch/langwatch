@@ -844,7 +844,7 @@ Run by the tasks process, before serve.
 
 | Task                                   | Class                                  | Declared at                                                 |
 | -------------------------------------- | -------------------------------------- | ----------------------------------------------------------- |
-| `model-registry-sync`                  | `ModelRegistrySyncTask`                | `src/tasks/model-registry-sync.task.ts:488`                 |
+| `model-registry-sync`                  | `ModelRegistrySyncTask`                | `src/tasks/model-registry-sync.task.ts:489`                 |
 | `model-provider-migrate-custom-models` | `ModelProviderCustomModelsMigrateTask` | `src/tasks/model-provider-custom-models-migrate.task.ts:62` |
 
 ## Configuration
