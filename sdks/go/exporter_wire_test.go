@@ -1,4 +1,4 @@
-package otlp
+package langwatch
 
 import (
 	"compress/gzip"
@@ -15,11 +15,9 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	collectortrace "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	"google.golang.org/protobuf/proto"
-
-	langwatch "github.com/langwatch/langwatch/sdks/go"
 )
 
-// protobufReceiver decodes OTLP/protobuf trace exports.
+// protobufReceiver stands in for LangWatch's /api/otel/v1/traces route.
 type protobufReceiver struct {
 	t        *testing.T
 	mu       sync.Mutex
@@ -43,7 +41,6 @@ func (r *protobufReceiver) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-
 	r.mu.Lock()
 	r.headers = append(r.headers, req.Header.Clone())
 	r.requests = append(r.requests, &msg)
@@ -52,43 +49,48 @@ func (r *protobufReceiver) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func TestNewExporter_SendsOTLPProtobufWithLangWatchHeaders(t *testing.T) {
+func exportOneSpan(t *testing.T) *protobufReceiver {
+	t.Helper()
 	rec := &protobufReceiver{t: t}
 	srv := httptest.NewServer(rec)
-	defer srv.Close()
+	t.Cleanup(srv.Close)
 
-	exporter, err := NewDefaultExporter(context.Background(),
-		langwatch.WithAPIKey("sk-lw-test"),
-		langwatch.WithProjectID("project-1"),
-		langwatch.WithEndpoint(srv.URL),
-	)
+	exporter, err := NewExporter(context.Background(), WithAPIKey("sk-lw-test"), WithEndpoint(srv.URL))
 	require.NoError(t, err)
-
 	require.NoError(t, exporter.ExportSpans(context.Background(), []sdktrace.ReadOnlySpan{
-		tracetest.SpanStub{Name: "GET /api"}.Snapshot(),
 		tracetest.SpanStub{Name: "llm.chat"}.Snapshot(),
 	}))
 	require.NoError(t, exporter.Shutdown(context.Background()))
-
 	require.Len(t, rec.requests, 1)
-	h := rec.headers[0]
-	assert.Equal(t, "application/x-protobuf", h.Get("Content-Type"))
-	assert.Equal(t, "Bearer sk-lw-test", h.Get("Authorization"))
-	assert.Equal(t, "project-1", h.Get("X-Project-Id"))
-	assert.Equal(t, "langwatch-sdk-go", h.Get("X-Langwatch-Sdk-Name"))
+	return rec
+}
 
+// @scenario "The Go SDK sends gzipped protobuf by default"
+func TestNewExporter_SendsGzippedProtobufByDefault(t *testing.T) {
+	t.Setenv("OTEL_EXPORTER_OTLP_COMPRESSION", "")
+	t.Setenv("OTEL_EXPORTER_OTLP_TRACES_COMPRESSION", "")
+
+	rec := exportOneSpan(t)
+
+	assert.Equal(t, "application/x-protobuf", rec.headers[0].Get("Content-Type"))
+	assert.Equal(t, "gzip", rec.headers[0].Get("Content-Encoding"))
 	spans := rec.requests[0].GetResourceSpans()[0].GetScopeSpans()[0].GetSpans()
-	require.Len(t, spans, 1, "the default preset still filters HTTP spans")
+	require.Len(t, spans, 1)
 	assert.Equal(t, "llm.chat", spans[0].GetName())
 }
 
-func TestNewExporter_DoesNotMutateCallerOptions(t *testing.T) {
-	opts := make([]langwatch.ExporterOption, 1, 2)
-	opts[0] = langwatch.WithEndpoint("https://example.test")
-	tail := opts[:2]
+// @scenario "The Go SDK leaves compression to the OTel variables when they are set"
+func TestNewExporter_LeavesCompressionToTheOTelVariables(t *testing.T) {
+	for _, name := range []string{"OTEL_EXPORTER_OTLP_COMPRESSION", "OTEL_EXPORTER_OTLP_TRACES_COMPRESSION"} {
+		t.Run(name, func(t *testing.T) {
+			t.Setenv("OTEL_EXPORTER_OTLP_COMPRESSION", "")
+			t.Setenv("OTEL_EXPORTER_OTLP_TRACES_COMPRESSION", "")
+			t.Setenv(name, "none")
 
-	exporter, err := NewExporter(context.Background(), opts...)
-	require.NoError(t, err)
-	require.NoError(t, exporter.Shutdown(context.Background()))
-	assert.Nil(t, tail[1], "the caller's spare capacity is left untouched")
+			rec := exportOneSpan(t)
+
+			assert.Equal(t, "application/x-protobuf", rec.headers[0].Get("Content-Type"))
+			assert.Empty(t, rec.headers[0].Get("Content-Encoding"))
+		})
+	}
 }

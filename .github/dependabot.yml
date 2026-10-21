@@ -316,23 +316,6 @@ updates:
           - "patch"
 
   - package-ecosystem: "gomod"
-    directory: "/sdks/go/exporter/otlp"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    open-pull-requests-limit: 50
-    cooldown:
-      default-days: 8
-    groups:
-      minor-and-patch:
-        applies-to: version-updates
-        patterns:
-          - "*"
-        update-types:
-          - "minor"
-          - "patch"
-
-  - package-ecosystem: "gomod"
     directory: "/sdks/go/e2e"
     schedule:
       interval: "weekly"

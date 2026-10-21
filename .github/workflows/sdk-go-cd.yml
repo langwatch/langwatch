@@ -49,7 +49,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
-        # sdks/go is the only release-please component, but the SDK is thirteen Go
+        # sdks/go is the only release-please component, but the SDK is twelve Go
         # modules. Each one is resolved by the proxy from its OWN <subdir>/vX.Y.Z
         # tag, so releasing the core alone leaves `go get
         # .../instrumentation/openai` — which the README tells people to run —

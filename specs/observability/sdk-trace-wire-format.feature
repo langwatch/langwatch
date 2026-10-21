@@ -24,12 +24,13 @@ Feature: SDKs send traces as gzipped OTLP/protobuf by default
 
   @unit
   Scenario: The Go SDK sends gzipped protobuf by default
+    Given no OTEL_EXPORTER_OTLP compression variable is set
     When the Go SDK exports a batch of spans with its default exporter
     Then the request has Content-Type "application/x-protobuf" and Content-Encoding "gzip"
     And the body decodes as an OTLP ExportTraceServiceRequest
 
   @unit
-  Scenario: The Go SDK sends uncompressed protobuf when compression is turned off
-    Given the exporter is built with compression turned off
-    When the Go SDK exports a batch of spans
+  Scenario: The Go SDK leaves compression to the OTel variables when they are set
+    Given OTEL_EXPORTER_OTLP_TRACES_COMPRESSION is set to "none"
+    When the Go SDK exports a batch of spans with its default exporter
     Then the request carries an uncompressed protobuf body
