@@ -345,6 +345,10 @@ jobs:
       - uses: ./.github/actions/prepare-generated-files
       - name: Generated READMEs are current
         run: pnpm check:readmes
+      - name: The evaluator catalogue is current
+        run: |
+          (cd services && go generate ./nlpgo/modules/evaluators/transport/catalogue)
+          git diff --exit-code -- modules/evaluator/contract/src/evaluators.generated.ts
 
   # The single required status check. Every job above is `if:`-gated and so
   # cannot be required directly — a skipped job never reports, and branch

@@ -3,6 +3,9 @@
 package catalogue
 
 //go:generate go run ./cmd -out ../../../../../../modules/evaluator/contract/src/evaluators.generated.ts
+// oxfmt skips *.generated.* files by config, so it formats this one through
+// stdin under a plain name.
+//go:generate sh -c "cd ../../../../../../modules/evaluator/contract/src && ../../../../node_modules/.bin/oxfmt --stdin-filepath=evaluators.ts < evaluators.generated.ts > evaluators.generated.ts.tmp && mv evaluators.generated.ts.tmp evaluators.generated.ts"
 
 import (
 	"fmt"
@@ -11,7 +14,6 @@ import (
 	"strconv"
 	"strings"
 	"unicode/utf16"
-	"unicode/utf8"
 
 	"github.com/langwatch/langwatch/services/nlpgo/modules/evaluators/rules"
 )
@@ -22,11 +24,8 @@ type (
 	jsRaw      string // a number, a boolean or undefined
 	jsTemplate string // a template literal
 	jsArray    []any
-	jsObject   struct {
-		props []jsProp
-		hard  bool // broken whatever its width, as a multi-line source object
-	}
-	jsProp struct {
+	jsObject   []jsProp
+	jsProp     struct {
 		key   string
 		value any
 	}
@@ -39,22 +38,19 @@ type (
 
 func z(method string, args ...any) zodCall { return zodCall{method: method, args: args} }
 
-// Render lays out evaluators.generated.ts from the definitions, as oxfmt does
-// at 100 columns.
+// Render writes evaluators.generated.ts from the definitions as plain
+// TypeScript, which go generate then formats with oxfmt.
 func Render(definitions []rules.Definition) []byte {
-	schemas := &jsObject{hard: true}
-	entries := &jsObject{hard: true}
+	var schemas, entries jsObject
 	for i := range definitions {
 		definition := &definitions[i]
 		defaults := reflect.ValueOf(definition.DefaultSettings)
-		settings := &jsObject{props: []jsProp{{"settings", settingsSchema(defaults)}}}
-		schemas.props = append(schemas.props, jsProp{definition.Slug, zodChain{z("object", settings)}})
-		entries.props = append(entries.props, jsProp{definition.Slug, entry(definition, defaults)})
+		settings := jsObject{{"settings", settingsSchema(defaults)}}
+		schemas = append(schemas, jsProp{definition.Slug, zodChain{z("object", settings)}})
+		entries = append(entries, jsProp{definition.Slug, entry(definition, defaults)})
 	}
-	var p printer
-	schemaDoc := concat(text("const evaluatorsSchemaDefinition = "), p.node(zodChain{z("object", schemas)}), text(";"))
-	entriesDoc := concat(text("} = "), p.node(entries), text(";"))
-	return []byte(fileHead + layout(schemaDoc, 100) + fileMiddle + layout(entriesDoc, 100) + "\n")
+	schemaSource := "const evaluatorsSchemaDefinition = " + source(zodChain{z("object", schemas)}, false) + ";"
+	return []byte(fileHead + schemaSource + fileMiddle + "} = " + source(entries, true) + ";\n")
 }
 
 // settingsSchema is langevals' settings_to_zod.
@@ -65,10 +61,10 @@ func settingsSchema(defaults reflect.Value) zodChain {
 	return zodChain{z("object", fieldsSchema(defaults))}
 }
 
-func fieldsSchema(value reflect.Value) *jsObject {
-	object := &jsObject{}
+func fieldsSchema(value reflect.Value) jsObject {
+	var object jsObject
 	for _, field := range rules.SettingsFields(value.Type()) {
-		object.props = append(object.props, jsProp{field.Name, fieldSchema(field, value.FieldByIndex(field.Index))})
+		object = append(object, jsProp{field.Name, fieldSchema(field, value.FieldByIndex(field.Index))})
 	}
 	return object
 }
@@ -85,7 +81,7 @@ func fieldSchema(field rules.SettingsField, value reflect.Value) zodChain {
 		chain = append(chain, z("describe", jsString(strings.ReplaceAll(field.Description, "\n", ". "))))
 	}
 	if withDefault {
-		chain = append(chain, z("default", jsValue(value, false)))
+		chain = append(chain, z("default", jsValue(value)))
 	}
 	return chain
 }
@@ -139,25 +135,24 @@ func literalsSchema(kind reflect.Kind, enum []string) zodChain {
 	return zodChain{z("union", literals)}
 }
 
-// jsValue is a default as json.dumps writes it; hard objects are the ones
-// json.dumps(indent=6) spreads over lines.
-func jsValue(v reflect.Value, hard bool) any {
+// jsValue is a default as json.dumps writes it.
+func jsValue(v reflect.Value) any {
 	switch v.Kind() {
 	case reflect.Pointer:
 		if v.IsNil() {
 			return jsRaw("undefined")
 		}
-		return jsValue(v.Elem(), hard)
+		return jsValue(v.Elem())
 	case reflect.Slice:
 		items := make(jsArray, v.Len())
 		for i := range items {
-			items[i] = jsValue(v.Index(i), hard)
+			items[i] = jsValue(v.Index(i))
 		}
 		return items
 	case reflect.Struct:
-		object := &jsObject{hard: hard}
+		var object jsObject
 		for _, field := range rules.SettingsFields(v.Type()) {
-			object.props = append(object.props, jsProp{field.Name, jsValue(v.FieldByIndex(field.Index), hard)})
+			object = append(object, jsProp{field.Name, jsValue(v.FieldByIndex(field.Index))})
 		}
 		return object
 	default:
@@ -186,25 +181,25 @@ func jsScalar(v reflect.Value) any {
 }
 
 // entry is one AVAILABLE_EVALUATORS value, as generate_definitions writes it.
-func entry(definition *rules.Definition, defaults reflect.Value) *jsObject {
-	settings := &jsObject{hard: true}
+func entry(definition *rules.Definition, defaults reflect.Value) jsObject {
+	var settings jsObject
 	for _, field := range rules.SettingsFields(defaults.Type()) {
 		var description any = jsRaw("undefined")
 		if field.Described {
 			description = jsString(field.Description)
 		}
-		settings.props = append(settings.props, jsProp{field.Name, &jsObject{hard: true, props: []jsProp{
+		settings = append(settings, jsProp{field.Name, jsObject{
 			{"description", description},
-			{"default", jsValue(defaults.FieldByIndex(field.Index), true)},
-		}}})
+			{"default", jsValue(defaults.FieldByIndex(field.Index))},
+		}})
 	}
-	result := &jsObject{hard: true}
+	var result jsObject
 	for _, described := range []jsProp{{"score", definition.Result.Score}, {"passed", definition.Result.Passed}, {"label", definition.Result.Label}} {
 		if description := described.value.(string); description != "" {
-			result.props = append(result.props, jsProp{described.key, &jsObject{hard: true, props: []jsProp{{"description", jsString(description)}}}})
+			result = append(result, jsProp{described.key, jsObject{{"description", jsString(description)}}})
 		}
 	}
-	return &jsObject{hard: true, props: []jsProp{
+	return jsObject{
 		{"name", jsTemplate(definition.Name)},
 		{"description", jsTemplate(definition.Description)},
 		{"category", jsString(definition.Category)},
@@ -215,7 +210,7 @@ func entry(definition *rules.Definition, defaults reflect.Value) *jsObject {
 		{"settings", settings},
 		{"envVars", stringArray(definition.EnvVars)},
 		{"result", result},
-	}}
+	}
 }
 
 func stringArray(values []string) jsArray {
@@ -226,208 +221,56 @@ func stringArray(values []string) jsArray {
 	return items
 }
 
-// printer turns catalogue values into layout documents the way prettier's
-// estree printer does, for the shapes the catalogue uses.
-type printer struct{}
-
-func (p printer) node(value any) *doc {
-	switch v := value.(type) {
-	case jsString:
-		return text(quoteJS(string(v)))
-	case jsRaw:
-		return text(string(v))
-	case jsTemplate:
-		lines := strings.Split(string(v), "\n")
-		docs := make([]*doc, len(lines))
-		for i, segment := range lines {
-			docs[i] = text(segment)
-		}
-		return concat(text("`"), join(literalline, docs), text("`"))
-	case jsArray:
-		return p.array(v)
-	case *jsObject:
-		return p.object(v)
-	case zodChain:
-		return p.chain(v)
-	default:
-		panic(fmt.Sprintf("catalogue: no layout for %T", value))
-	}
-}
-
-func (p printer) nodes(values []any) []*doc {
-	docs := make([]*doc, len(values))
-	for i, value := range values {
-		docs[i] = p.node(value)
-	}
-	return docs
-}
-
-func (p printer) array(items jsArray) *doc {
-	if len(items) == 0 {
-		return text("[]")
-	}
-	elements := join(concat(text(","), line), p.nodes(items))
-	return group(concat(text("["), indent(concat(softline, elements, ifBreak(text(","), nil))), softline, text("]")), breaksArray(items))
-}
-
-// breaksArray is prettier's rule: two or more objects of two or more keys
-// each always break.
-func breaksArray(items jsArray) bool {
-	for _, item := range items {
-		if object, ok := item.(*jsObject); !ok || len(object.props) < 2 {
-			return false
-		}
-	}
-	return len(items) > 1
-}
-
-func (p printer) object(object *jsObject) *doc {
-	if len(object.props) == 0 {
-		return text("{}")
-	}
-	props := make([]*doc, len(object.props))
-	for i, prop := range object.props {
-		props[i] = p.property(prop)
-	}
-	members := join(concat(text(","), line), props)
-	return group(concat(text("{"), indent(concat(line, members, ifBreak(text(","), nil))), line, text("}")), object.hard)
-}
-
 var identifier = regexp.MustCompile(`^[A-Za-z_$][A-Za-z0-9_$]*$`)
 
-// property is prettier's assignment layout: a string value under a key of
-// five or more characters breaks after the colon; anything else stays on it.
-func (p printer) property(prop jsProp) *doc {
-	key := prop.key
-	if !identifier.MatchString(key) {
-		key = quoteJS(key)
-	}
-	value := p.node(prop.value)
-	if _, isString := prop.value.(jsString); isString && utf8.RuneCountInString(key) >= 5 {
-		return group(concat(text(key+":"), group(indent(concat(line, value)), false)), false)
-	}
-	return group(concat(text(key+": "), value), false)
-}
-
-// chain is prettier's member chain: one call stays on its line; more print
-// on one line when they fit, else one call per line.
-func (p printer) chain(chain zodChain) *doc {
-	calls := make([]*doc, len(chain))
-	for i, call := range chain {
-		calls[i] = concat(text("."+call.method), p.arguments(call.args))
-	}
-	oneLine := concat(append([]*doc{text("z")}, calls...)...)
-	if len(chain) == 1 {
-		return group(oneLine, false)
-	}
-	expanded := concat(text("z"), indent(group(concat(hardline, join(hardline, calls)), false)))
-	if (len(chain) > 2 && !simpleArguments(chain)) || anyWillBreak(calls[:len(calls)-1]) {
-		return group(expanded, false)
-	}
-	if willBreak(oneLine) {
-		return concat(breakParent, conditionalGroup(oneLine, expanded))
-	}
-	return conditionalGroup(oneLine, expanded)
-}
-
-// arguments is prettier's call arguments: a last object or array argument
-// hugs the parentheses when the rest fits.
-func (p printer) arguments(args []any) *doc {
-	if len(args) == 0 {
-		return text("()")
-	}
-	docs := p.nodes(args)
-	last := len(args) - 1
-	if !huggable(args[last]) || (last > 0 && reflect.TypeOf(args[last-1]) == reflect.TypeOf(args[last])) {
-		return group(concat(text("("), indent(concat(softline, join(concat(text(","), line), docs))), ifBreak(text(","), nil), softline, text(")")), false)
-	}
-	allFlat := concat(text("("), join(text(", "), docs), text(")"))
-	hugged := concat(text("("), join(text(", "), append(docs[:last:last], group(docs[last], true))), text(")"))
-	allBroken := group(concat(text("("), indent(concat(line, join(concat(text(","), line), docs))), text(","), line, text(")")), true)
-	if anyWillBreak(docs) {
-		return concat(breakParent, conditionalGroup(allFlat, hugged, allBroken))
-	}
-	return conditionalGroup(allFlat, hugged, allBroken)
-}
-
-func huggable(arg any) bool {
-	switch v := arg.(type) {
-	case *jsObject:
-		return len(v.props) > 0
-	case jsArray:
-		return len(v) > 0
-	}
-	return false
-}
-
-func anyWillBreak(docs []*doc) bool {
-	for _, d := range docs {
-		if willBreak(d) {
-			return true
-		}
-	}
-	return false
-}
-
-// simpleArguments is whether every call's arguments are simple, as
-// prettier's member chain asks before keeping a long chain on one line.
-func simpleArguments(chain zodChain) bool {
-	for _, call := range chain {
-		if !allSimple(call.args, 0) {
-			return false
-		}
-	}
-	return true
-}
-
-// simpleCalls is prettier's isSimpleCallArgument for a chain used as an
-// argument: its calls may take no more arguments than the depth.
-func simpleCalls(chain zodChain, depth int) bool {
-	for _, call := range chain {
-		if len(call.args) > depth || !allSimple(call.args, depth+1) {
-			return false
-		}
-	}
-	return true
-}
-
-func isSimple(value any, depth int) bool {
+// source writes a value as TypeScript for oxfmt to lay out.
+func source(value any, expanded bool) string {
 	switch v := value.(type) {
-	case jsString, jsRaw:
-		return true
+	case jsString:
+		return `"` + escapeJSON(string(v)) + `"`
+	case jsRaw:
+		return string(v)
 	case jsTemplate:
-		return !strings.Contains(string(v), "\n")
+		return "`" + string(v) + "`"
 	case jsArray:
-		return allSimple(v, depth+1)
-	case *jsObject:
-		values := make([]any, len(v.props))
-		for i, prop := range v.props {
-			values[i] = prop.value
-		}
-		return allSimple(values, depth+1)
+		return "[" + sources(v, expanded) + "]"
+	case jsObject:
+		return objectSource(v, expanded)
 	case zodChain:
-		return simpleCalls(v, depth)
-	}
-	return false
-}
-
-func allSimple(values []any, depth int) bool {
-	for _, value := range values {
-		if !isSimple(value, depth) {
-			return false
+		chain := "z"
+		for _, call := range v {
+			chain += "." + call.method + "(" + sources(call.args, expanded) + ")"
 		}
+		return chain
+	default:
+		panic(fmt.Sprintf("catalogue: no TypeScript for %T", value))
 	}
-	return true
 }
 
-// quoteJS writes s as json.dumps does (ASCII only), then in the quotes
-// prettier prefers: double, unless the text holds more of them than singles.
-func quoteJS(s string) string {
-	raw := escapeJSON(s)
-	if strings.Count(raw, `"`) <= strings.Count(raw, "'") {
-		return `"` + raw + `"`
+// objectSource opens an expanded object's first key on a new line, which
+// oxfmt keeps expanded, as json.dumps(indent=6) wrote the
+// AVAILABLE_EVALUATORS table. Other objects stay on one line.
+func objectSource(object jsObject, expanded bool) string {
+	props := make([]string, len(object))
+	for i, prop := range object {
+		key := prop.key
+		if !identifier.MatchString(key) {
+			key = source(jsString(key), expanded)
+		}
+		props[i] = key + ": " + source(prop.value, expanded)
 	}
-	return singleQuoted(raw)
+	if expanded {
+		return "{\n" + strings.Join(props, ",\n") + "\n}"
+	}
+	return "{ " + strings.Join(props, ", ") + " }"
+}
+
+func sources(values []any, expanded bool) string {
+	written := make([]string, len(values))
+	for i, value := range values {
+		written[i] = source(value, expanded)
+	}
+	return strings.Join(written, ", ")
 }
 
 // escapeJSON is json.dumps' string body with ensure_ascii.
@@ -448,24 +291,4 @@ func escapeJSON(s string) string {
 		}
 	}
 	return escaped.String()
-}
-
-// singleQuoted is prettier's makeString into single quotes.
-func singleQuoted(raw string) string {
-	var single strings.Builder
-	for i := 0; i < len(raw); i++ {
-		switch {
-		case raw[i] == '\\' && raw[i+1] == '"':
-			single.WriteByte('"')
-			i++
-		case raw[i] == '\\':
-			single.WriteString(raw[i : i+2])
-			i++
-		case raw[i] == '\'':
-			single.WriteString(`\'`)
-		default:
-			single.WriteByte(raw[i])
-		}
-	}
-	return "'" + single.String() + "'"
 }

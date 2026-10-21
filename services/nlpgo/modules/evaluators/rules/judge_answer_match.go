@@ -83,7 +83,7 @@ func pySplitLines(text string) []string {
 	start := 0
 	for i := 0; i < len(runes); i++ {
 		switch runes[i] {
-		case '\n', '\v', '\f', '\x1c', '\x1d', '\x1e', '\u0085', ' ', ' ':
+		case '\n', '\v', '\f', '\x1c', '\x1d', '\x1e', '\u0085', '\u2028', '\u2029':
 		case '\r':
 			lines = append(lines, string(runes[start:i]))
 			if i+1 < len(runes) && runes[i+1] == '\n' {

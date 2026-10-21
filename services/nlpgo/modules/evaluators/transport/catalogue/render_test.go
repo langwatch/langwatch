@@ -3,6 +3,8 @@ package catalogue_test
 import (
 	"bytes"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"regexp"
 	"testing"
 
@@ -13,16 +15,29 @@ import (
 	"github.com/langwatch/langwatch/services/nlpgo/modules/evaluators/transport/catalogue"
 )
 
-const committedCatalogue = "../../../../../../modules/evaluator/contract/src/evaluators.generated.ts"
+const (
+	contractSource     = "../../../../../../modules/evaluator/contract/src"
+	committedCatalogue = contractSource + "/evaluators.generated.ts"
+	oxfmt              = "../../../../../../node_modules/.bin/oxfmt"
+)
 
 // @scenario "The generated catalogue matches the one langevals generated"
 func TestRenderMatchesTheCommittedCatalogue(t *testing.T) {
+	if _, err := os.Stat(oxfmt); err != nil {
+		t.Skipf("oxfmt is not installed at %s (pnpm install); go-ci's generated job checks the catalogue", oxfmt)
+	}
 	committed, err := os.ReadFile(committedCatalogue)
 	require.NoError(t, err)
 
-	rendered := catalogue.Render(rules.Definitions())
+	binary, err := filepath.Abs(oxfmt)
+	require.NoError(t, err)
+	format := exec.Command(binary, "--stdin-filepath=evaluators.ts")
+	format.Dir = contractSource
+	format.Stdin = bytes.NewReader(catalogue.Render(rules.Definitions()))
+	formatted, err := format.Output()
+	require.NoError(t, err)
 
-	if !bytes.Equal(rendered, committed) {
+	if !bytes.Equal(formatted, committed) {
 		t.Fatalf("rendered catalogue differs from %s; run go generate and diff", committedCatalogue)
 	}
 }

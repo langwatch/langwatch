@@ -40,5 +40,5 @@ sdks/python/examples
 # Nx cache and workspace data are machine-local
 .nx
 **/.nx
-# Generated lingua models (243 MB); the image does not embed them yet.
+# Generated lingua models (243 MB): the nlp image generates its own copy.
 services/third_party/lingua-go/models.bin
