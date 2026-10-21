@@ -32,11 +32,8 @@ describe("the identifier backfill migration", () => {
   });
 
   describe("when the backfill holds a user", () => {
-    function holding(report: Extract<IdentityBackfillOutcome, { status: "migrated" }>["report"]) {
-      const migrateUser = vi.fn(async (): Promise<IdentityBackfillOutcome> => ({
-        status: "migrated",
-        report,
-      }));
+    function holding(outcome: Extract<IdentityBackfillOutcome, { status: "migrated" }>) {
+      const migrateUser = vi.fn(async (): Promise<IdentityBackfillOutcome> => outcome);
       return IdentityIdentifierBackfillMigrationService.create({
         latch: MemoryIdentityLatchRepository.create(MemoryIdentityStore.create()),
         backfill: { migrateUser },
@@ -46,7 +43,10 @@ describe("the identifier backfill migration", () => {
 
     /** @scenario "The identifier backfill holds an unproven account on the person and a disagreeing proof on the proof" */
     it("holds an unproven account on the person", async () => {
-      const outcome = await holding({ kind: "unproven_account" }).migrateTenant({
+      const outcome = await holding({
+        status: "migrated",
+        report: { kind: "unproven_account" },
+      }).migrateTenant({
         tenantId: "user_sam",
       });
 
@@ -59,7 +59,10 @@ describe("the identifier backfill migration", () => {
 
     /** @scenario "The identifier backfill holds an unproven account on the person and a disagreeing proof on the proof" */
     it("leaves a disagreeing proof on the default reason", async () => {
-      const outcome = await holding({ kind: "parity", diffs: [] }).migrateTenant({
+      const outcome = await holding({
+        status: "migrated",
+        report: { kind: "parity", diffs: [] },
+      }).migrateTenant({
         tenantId: "user_kim",
       });
 
