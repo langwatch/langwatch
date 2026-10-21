@@ -97,6 +97,36 @@ describe("HttpDoublewordModelChannel", () => {
     });
   });
 
+  describe("when a 200 answer carries no data list", () => {
+    it("answers unavailable as malformed instead of an empty list", async () => {
+      const channel = HttpDoublewordModelChannel.create({
+        request: vi.fn<typeof fetch>(async () => new Response(JSON.stringify({ total_count: 3 }))),
+      });
+
+      expect(await channel.fetchModels({ apiKey: "platform-key" })).toMatchObject({
+        outcome: "unavailable",
+        reason: "malformed_body",
+      });
+    });
+  });
+
+  describe("when the pages carry no total_count", () => {
+    it("keeps reading while a page comes back full", async () => {
+      const pages = [{ data: Array.from({ length: 100 }, () => FLASH) }, { data: [EMBEDDING] }];
+      let answered = 0;
+      const request = vi.fn<typeof fetch>(
+        async () => new Response(JSON.stringify(pages[answered++])),
+      );
+      const channel = HttpDoublewordModelChannel.create({ request });
+
+      const list = await channel.fetchModels({ apiKey: "platform-key" });
+
+      expect(request).toHaveBeenCalledTimes(2);
+      expect(list).toMatchObject({ outcome: "fetched" });
+      expect(list.outcome === "fetched" && list.models).toHaveLength(101);
+    });
+  });
+
   describe("when the body is not a models page", () => {
     it("answers unavailable as malformed", async () => {
       const channel = HttpDoublewordModelChannel.create({

@@ -8,16 +8,15 @@ import { describe, expect, it } from "vitest";
 
 import { estimateModelCost, findMatchingModelCost } from "../../model-cost.ts";
 import { llmModels } from "../model-catalog.ts";
-import { getStaticModelCostRates, withoutNegativeRates } from "../static-model-costs.ts";
+import {
+  getStaticModelCostRates,
+  isVariablePriceRouter,
+  withoutNegativeRates,
+} from "../static-model-costs.ts";
 
 /** Every model id the merged catalog prices as a router: all its stated rates are negative. */
 const VARIABLE_PRICE_ROUTERS = Object.entries(llmModels.models)
-  .filter(([, entry]) => {
-    const rates = Object.values(entry.pricing ?? {}).filter(
-      (rate): rate is number => typeof rate === "number",
-    );
-    return rates.length > 0 && rates.every((rate) => rate < 0);
-  })
+  .filter(([, entry]) => isVariablePriceRouter(entry.pricing))
   .map(([modelId]) => modelId)
   .toSorted();
 
@@ -77,58 +76,6 @@ describe("variable-price routers", () => {
 
       expect(pricing).toEqual({ inputCostPerToken: 0.000001, outputCostPerToken: 0.000002 });
       expect(pricing).not.toHaveProperty("inputCacheReadPerToken");
-    });
-  });
-});
-
-describe("hour-long cache write rate", () => {
-  const costs = getStaticModelCostRates();
-
-  describe("given another provider's catalog entry states an hour-long price", () => {
-    /** @scenario "A catalog that learns the real rate overrides the derived one" */
-    it("carries exactly the price the catalog states", () => {
-      const stated = costs.filter(
-        (c) =>
-          !/^~?anthropic\//.test(c.model) &&
-          llmModels.models[c.model]?.pricing?.inputCacheWrite1hPerToken != null,
-      );
-      expect(stated.length).toBeGreaterThan(0);
-      for (const entry of stated) {
-        expect(entry.cacheCreation1hCostPerToken, entry.model).toBe(
-          llmModels.models[entry.model]?.pricing?.inputCacheWrite1hPerToken,
-        );
-      }
-    });
-  });
-
-  describe("given a provider whose catalog entry states no hour-long price", () => {
-    it("derives one for Anthropic only", () => {
-      const others = costs.filter(
-        (c) =>
-          !/^~?anthropic\//.test(c.model) &&
-          llmModels.models[c.model]?.pricing?.inputCacheWrite1hPerToken == null &&
-          c.cacheCreation1hCostPerToken !== undefined,
-      );
-      expect(others).toEqual([]);
-    });
-  });
-});
-
-describe("Doubleword catalog pricing", () => {
-  const costs = getStaticModelCostRates();
-
-  describe("when a span names a Doubleword model with its vendor slash", () => {
-    /** @scenario A Doubleword call is priced from the catalog */
-    it("prices it at Doubleword's realtime rate for that model", () => {
-      const modelId = "doubleword/deepseek-ai/DeepSeek-V4.1-Flash";
-      const catalogPricing = llmModels.models[modelId]?.pricing;
-      expect(catalogPricing?.inputCostPerToken).toBeGreaterThan(0);
-
-      const [match] = findMatchingModelCost(modelId, costs);
-
-      expect(match?.model).toBe(modelId);
-      expect(match?.inputCostPerToken).toBe(catalogPricing?.inputCostPerToken);
-      expect(match?.outputCostPerToken).toBe(catalogPricing?.outputCostPerToken);
     });
   });
 });

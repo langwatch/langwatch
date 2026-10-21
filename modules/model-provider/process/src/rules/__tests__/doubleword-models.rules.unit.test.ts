@@ -1,4 +1,5 @@
 import type { LLMModelEntry } from "@langwatch/model-provider-contract";
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -7,6 +8,8 @@ import {
   resolveDoublewordEntries,
   type DoublewordModel,
 } from "../doubleword-models.rules.ts";
+
+const NOW = Temporal.Instant.from("2026-10-21T00:00:00Z");
 
 // Shapes lifted from the live admin models endpoint on 2026-10-08.
 const FLASH: DoublewordModel = {
@@ -98,7 +101,7 @@ const EMBEDDING: DoublewordModel = {
 describe("mapDoublewordModel", () => {
   /** @scenario The catalog sync prices a Doubleword model from its realtime tariff */
   it("prices a chat model from its realtime tariff, not the batch one", () => {
-    const entry = mapDoublewordModel(FLASH)!;
+    const entry = mapDoublewordModel({ model: FLASH, now: NOW })!;
     expect(entry.id).toBe("doubleword/deepseek-ai/DeepSeek-V4.1-Flash");
     expect(entry.provider).toBe("doubleword");
     expect(entry.name).toBe("Doubleword: DeepSeek V4.1 Flash");
@@ -110,14 +113,14 @@ describe("mapDoublewordModel", () => {
   });
 
   it("derives cache rates from the input rate and the multipliers", () => {
-    const { pricing } = mapDoublewordModel(FLASH)!;
+    const { pricing } = mapDoublewordModel({ model: FLASH, now: NOW })!;
     expect(pricing.inputCacheReadPerToken).toBeCloseTo(0.00000015 * 0.02, 15);
     expect(pricing.inputCacheWritePerToken).toBeCloseTo(0.00000015 * 1.25, 15);
     expect(pricing.inputCacheWrite1hPerToken).toBeCloseTo(0.00000015 * 2, 15);
   });
 
   it("carries no cache rates when cache pricing is disabled", () => {
-    const entry = mapDoublewordModel(VISION_NO_CACHE)!;
+    const entry = mapDoublewordModel({ model: VISION_NO_CACHE, now: NOW })!;
     expect(entry.pricing.inputCacheReadPerToken).toBeUndefined();
     expect(entry.pricing.inputCacheWritePerToken).toBeUndefined();
     expect(entry.supportsImageInput).toBe(true);
@@ -125,7 +128,7 @@ describe("mapDoublewordModel", () => {
   });
 
   it("leaves out a batch-only model, which the gateway cannot call", () => {
-    expect(mapDoublewordModel(BATCH_ONLY)).toBeUndefined();
+    expect(mapDoublewordModel({ model: BATCH_ONLY, now: NOW })).toBeUndefined();
   });
 
   it("leaves out a realtime tariff that has expired", () => {
@@ -136,11 +139,29 @@ describe("mapDoublewordModel", () => {
         valid_until: "2026-01-01T00:00:00Z",
       })),
     };
-    expect(mapDoublewordModel(expired)).toBeUndefined();
+    expect(mapDoublewordModel({ model: expired, now: NOW })).toBeUndefined();
+  });
+
+  it("keeps a realtime tariff whose window is still open", () => {
+    const bounded: DoublewordModel = {
+      ...VISION_NO_CACHE,
+      tariffs: VISION_NO_CACHE.tariffs!.map((t) => ({
+        ...t,
+        valid_until: "2027-01-01T00:00:00Z",
+      })),
+    };
+    expect(mapDoublewordModel({ model: bounded, now: NOW })).toBeDefined();
+  });
+
+  it("offers the reasoning control on a model that advertises reasoning", () => {
+    const entry = mapDoublewordModel({ model: FLASH, now: NOW })!;
+    expect(entry.supportedParameters).toContain("reasoning");
+    const plain = mapDoublewordModel({ model: { ...FLASH, capabilities: [] }, now: NOW })!;
+    expect(plain.supportedParameters).not.toContain("reasoning");
   });
 
   it("maps an embedding model", () => {
-    const entry = mapDoublewordModel(EMBEDDING)!;
+    const entry = mapDoublewordModel({ model: EMBEDDING, now: NOW })!;
     expect(entry.mode).toBe("embedding");
     expect(entry.modality).toBe("text->embeddings");
     expect(entry.supportedParameters).toEqual([]);
@@ -150,19 +171,30 @@ describe("mapDoublewordModel", () => {
 
 describe("mapDoublewordModels", () => {
   it("skips excluded ids so overlay corrections win", () => {
-    const entries = mapDoublewordModels(
-      [FLASH, VISION_NO_CACHE, BATCH_ONLY],
-      new Set(["doubleword/tencent/Hy3-FP8"]),
-    );
+    const entries = mapDoublewordModels({
+      models: [FLASH, VISION_NO_CACHE, BATCH_ONLY],
+      excludeIds: new Set(["doubleword/tencent/Hy3-FP8"]),
+      now: NOW,
+    });
     expect(entries.map((e) => e.id)).toEqual(["doubleword/deepseek-ai/DeepSeek-V4.1-Flash"]);
   });
 });
 
 describe("resolveDoublewordEntries", () => {
   const previousModels: Record<string, LLMModelEntry> = {
-    "doubleword/kept/Model": { ...mapDoublewordModel(FLASH)!, id: "doubleword/kept/Model" },
-    "doubleword/overlaid/Model": { ...mapDoublewordModel(FLASH)!, id: "doubleword/overlaid/Model" },
-    "openai/gpt-5": { ...mapDoublewordModel(FLASH)!, id: "openai/gpt-5", provider: "openai" },
+    "doubleword/kept/Model": {
+      ...mapDoublewordModel({ model: FLASH, now: NOW })!,
+      id: "doubleword/kept/Model",
+    },
+    "doubleword/overlaid/Model": {
+      ...mapDoublewordModel({ model: FLASH, now: NOW })!,
+      id: "doubleword/overlaid/Model",
+    },
+    "openai/gpt-5": {
+      ...mapDoublewordModel({ model: FLASH, now: NOW })!,
+      id: "openai/gpt-5",
+      provider: "openai",
+    },
   };
 
   describe("when this run read Doubleword's model list", () => {
@@ -171,6 +203,7 @@ describe("resolveDoublewordEntries", () => {
         fetched: [FLASH, BATCH_ONLY],
         previousModels,
         excludeIds: new Set(),
+        now: NOW,
       });
       expect(entries.map((e) => e.id)).toEqual(["doubleword/deepseek-ai/DeepSeek-V4.1-Flash"]);
     });
@@ -183,6 +216,7 @@ describe("resolveDoublewordEntries", () => {
         fetched: [BATCH_ONLY],
         previousModels,
         excludeIds: new Set(["doubleword/overlaid/Model"]),
+        now: NOW,
       });
       expect(entries.map((e) => e.id)).toEqual(["doubleword/kept/Model"]);
     });
@@ -195,6 +229,7 @@ describe("resolveDoublewordEntries", () => {
         fetched: undefined,
         previousModels,
         excludeIds: new Set(["doubleword/overlaid/Model"]),
+        now: NOW,
       });
       expect(entries.map((e) => e.id)).toEqual(["doubleword/kept/Model"]);
     });

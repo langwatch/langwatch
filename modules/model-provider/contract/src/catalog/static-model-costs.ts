@@ -56,6 +56,14 @@ export function withoutNegativeRates(pricing: LLMModelPricing): Partial<LLMModel
   );
 }
 
+/** A router: the catalog states at least one rate for it and every stated rate is negative. */
+export function isVariablePriceRouter(pricing: LLMModelPricing | undefined): boolean {
+  const rates = Object.values(pricing ?? {}).filter(
+    (rate): rate is number => typeof rate === "number",
+  );
+  return rates.length > 0 && rates.every((rate) => rate < 0);
+}
+
 let cachedRates: readonly ModelCostRate[] | null = null;
 
 export function getStaticModelCostRates(): readonly ModelCostRate[] {

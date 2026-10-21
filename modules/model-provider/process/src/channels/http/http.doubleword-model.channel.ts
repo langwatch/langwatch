@@ -15,7 +15,7 @@ const PAGE_SIZE = 100;
 const MAX_PAGES = 50;
 
 const modelsPageSchema = z.object({
-  data: z.array(z.unknown()).optional(),
+  data: z.array(z.unknown()),
   total_count: z.number().optional(),
 });
 
@@ -38,7 +38,7 @@ export class HttpDoublewordModelChannel extends DoublewordModelChannel {
     return new HttpDoublewordModelChannel(request);
   }
 
-  /** Reads every page until `total_count` is reached, a page comes back empty, or `MAX_PAGES`. */
+  /** Reads pages until `total_count` is reached, or a short page without it, or `MAX_PAGES`. */
   async fetchModels({ apiKey }: { apiKey: string }): Promise<DoublewordModelList> {
     const models: DoublewordModel[] = [];
     let received = 0;
@@ -65,11 +65,12 @@ export class HttpDoublewordModelChannel extends DoublewordModelChannel {
       if (!page.success) {
         return { outcome: "unavailable", reason: "malformed_body", detail: page.error.message };
       }
-      const data = page.data.data ?? [];
+      const data = page.data.data;
       received += data.length;
       models.push(...pickWellFormedModels(data));
-      const total = page.data.total_count ?? received;
-      if (data.length === 0 || received >= total) break;
+      const total = page.data.total_count;
+      const lastPage = total === undefined ? data.length < PAGE_SIZE : received >= total;
+      if (data.length === 0 || lastPage) break;
     }
     return { outcome: "fetched", models };
   }

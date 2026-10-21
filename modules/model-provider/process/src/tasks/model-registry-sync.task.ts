@@ -273,6 +273,7 @@ async function mergeDoublewordModels({
     fetched,
     previousModels: readPreviousModels(),
     excludeIds,
+    now: nowInstant(),
   });
   for (const entry of entries) transformedModels[entry.id] = entry;
   logger.info(

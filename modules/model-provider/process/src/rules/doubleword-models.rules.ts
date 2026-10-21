@@ -1,4 +1,5 @@
 import type { LLMModelEntry, LLMModelPricing } from "@langwatch/model-provider-contract";
+import { type Instant, Temporal } from "@langwatch/time";
 import { z } from "zod";
 
 /**
@@ -65,10 +66,27 @@ function parsePrice(value: string | null | undefined): number {
   return parseFloat(value) || 0;
 }
 
-/** The active realtime tariff, or undefined when the model is batch-only. */
-function pickRealtimeTariff(model: DoublewordModel): DoublewordTariff | undefined {
+/** Whether a tariff's window is still open at `now`; an unreadable end date counts as closed. */
+function isOpenAt({ tariff, now }: { tariff: DoublewordTariff; now: Instant }): boolean {
+  if (!tariff.valid_until) return true;
+  try {
+    return Temporal.Instant.compare(Temporal.Instant.from(tariff.valid_until), now) > 0;
+  } catch {
+    return false;
+  }
+}
+
+/** The active realtime tariff open at `now`, or undefined when the model is batch-only. */
+function pickRealtimeTariff({
+  model,
+  now,
+}: {
+  model: DoublewordModel;
+  now: Instant;
+}): DoublewordTariff | undefined {
   return model.tariffs?.find(
-    (tariff) => tariff.api_key_purpose === "realtime" && tariff.is_active && !tariff.valid_until,
+    (tariff) =>
+      tariff.api_key_purpose === "realtime" && tariff.is_active && isOpenAt({ tariff, now }),
   );
 }
 
@@ -113,14 +131,24 @@ function modalityOf({
  * Maps one Doubleword model to a catalog entry, or undefined when the model
  * has no realtime price or is a type the catalog does not cover.
  */
-export function mapDoublewordModel(model: DoublewordModel): LLMModelEntry | undefined {
-  const tariff = pickRealtimeTariff(model);
+export function mapDoublewordModel({
+  model,
+  now,
+}: {
+  model: DoublewordModel;
+  now: Instant;
+}): LLMModelEntry | undefined {
+  const tariff = pickRealtimeTariff({ model, now });
   if (!tariff) return undefined;
 
   const type = model.model_type.toUpperCase();
   if (type !== "CHAT" && type !== "EMBEDDINGS") return undefined;
   const isEmbedding = type === "EMBEDDINGS";
-  const supportsImageInput = !isEmbedding && (model.capabilities ?? []).includes("vision");
+  const capabilities = model.capabilities ?? [];
+  const supportsImageInput = !isEmbedding && capabilities.includes("vision");
+  const chatParameters = capabilities.includes("reasoning")
+    ? [...CHAT_PARAMETERS, "reasoning"]
+    : CHAT_PARAMETERS;
 
   return {
     id: `${DOUBLEWORD_PROVIDER}/${model.model_name}`,
@@ -129,7 +157,7 @@ export function mapDoublewordModel(model: DoublewordModel): LLMModelEntry | unde
     pricing: mapPricing(tariff, model.cache_pricing),
     contextLength: model.metadata?.context_window ?? 0,
     maxCompletionTokens: null,
-    supportedParameters: isEmbedding ? [] : CHAT_PARAMETERS,
+    supportedParameters: isEmbedding ? [] : chatParameters,
     defaultParameters: null,
     modality: modalityOf({ isEmbedding, supportsImageInput }),
     mode: isEmbedding ? "embedding" : "chat",
@@ -142,13 +170,18 @@ export function mapDoublewordModel(model: DoublewordModel): LLMModelEntry | unde
 }
 
 /** Maps every Doubleword model the gateway can call, skipping `excludeIds`. */
-export function mapDoublewordModels(
-  models: readonly DoublewordModel[],
-  excludeIds: ReadonlySet<string> = new Set(),
-): LLMModelEntry[] {
+export function mapDoublewordModels({
+  models,
+  excludeIds = new Set(),
+  now,
+}: {
+  models: readonly DoublewordModel[];
+  excludeIds?: ReadonlySet<string>;
+  now: Instant;
+}): LLMModelEntry[] {
   const entries: LLMModelEntry[] = [];
   for (const model of models) {
-    const entry = mapDoublewordModel(model);
+    const entry = mapDoublewordModel({ model, now });
     if (entry && !excludeIds.has(entry.id)) entries.push(entry);
   }
   return entries;
@@ -163,12 +196,14 @@ export function resolveDoublewordEntries({
   fetched,
   previousModels,
   excludeIds,
+  now,
 }: {
   fetched: readonly DoublewordModel[] | undefined;
   previousModels: Record<string, LLMModelEntry>;
   excludeIds: ReadonlySet<string>;
+  now: Instant;
 }): LLMModelEntry[] {
-  const mapped = fetched ? mapDoublewordModels(fetched, excludeIds) : [];
+  const mapped = fetched ? mapDoublewordModels({ models: fetched, excludeIds, now }) : [];
   if (mapped.length > 0) return mapped;
   return Object.values(previousModels).filter(
     (model) => model.provider === DOUBLEWORD_PROVIDER && !excludeIds.has(model.id),

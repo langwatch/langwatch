@@ -1,4 +1,4 @@
-import { llmModels } from "@langwatch/model-provider-contract";
+import { isVariablePriceRouter, llmModels } from "@langwatch/model-provider-contract";
 import { describe, expect, it } from "vitest";
 
 import { spendUsageSchema, type SpendUsage } from "../features/spend/gateway-spend.schemas.ts";
@@ -100,12 +100,7 @@ describe("findSpendRatingFaults", () => {
 
 /** Every model id the catalog prices as a router: all its stated rates are negative. */
 const VARIABLE_PRICE_ROUTERS = Object.entries(llmModels.models)
-  .filter(([, entry]) => {
-    const rates = Object.values(entry.pricing ?? {}).filter(
-      (rate): rate is number => typeof rate === "number",
-    );
-    return rates.length > 0 && rates.every((rate) => rate < 0);
-  })
+  .filter(([, entry]) => isVariablePriceRouter(entry.pricing))
   .map(([modelId]) => modelId)
   .toSorted();
 

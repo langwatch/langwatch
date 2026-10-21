@@ -287,6 +287,8 @@ describe("redactSecretsInText, beyond the known-vendor list", () => {
       ["hyphens between long random parts", "acme_Zk3fQ9xLm2Tv-7Rb1Yw8Hd4Ns-6Jc0Pg5Ue-Xa2Bq9"],
       ["short random groups with no word among them", "acme_x7Kq2-Lm9Tv-4Rb1Y-w8Hd4-Ns6Jc-0Pg5U"],
       ["short random groups behind one word", "acme_Prod-x7Kq2-Lm9Tv-4Rb1Y-w8Hd4-Ns6Jc-0Pg5U"],
+      ["mixed-case groups behind one letters-only part", "acme_xkqplz-Tv9Qm2-4Rb1Yw-Hd4Ns6"],
+      ["single-case groups behind one letters-only part", "acme_xkqplz-TV9QM2-4RB1YW-hd4ns6"],
       ["a standard base64 body", "acme_Nemo-Super-12+B/A12B-Zk3fQ9xLm2Tv7Rb1"],
     ])("still redacts %s", (_label, key) => {
       const { text } = redactSecretsInText({ text: `token ${key} sent` });
