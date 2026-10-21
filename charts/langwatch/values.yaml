@@ -498,6 +498,8 @@ app:
     #                                                                                days, r180 after 180, r365 after
     #                                                                                365, r730 after 730
     #   evaluation-inputs/r-indefinite/  evaluation inputs             no            none (kept for ever)
+    #   upgrade-diagnostics/             licensing, LangWatch Cloud    no            expire after 30 days
+    #                                    only (received bundles)
     #
     # S3 and compatible stores accept oversized writes. Azure needs you to
     # confirm the rules below exist (today the trace spool refuses until then;

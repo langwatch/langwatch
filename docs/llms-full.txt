@@ -64213,6 +64213,7 @@ Create one rule per row. Each rule matches the prefix and expires objects after 
 | `group-queue/` | Group-queue S3 tier | No | Expire after 7 days |
 | `evaluation-inputs/r<days>/` | Evaluation inputs | No | One rule per retention class: `r90` after 90 days, `r180` after 180, `r365` after 365, `r730` after 730 |
 | `evaluation-inputs/r-indefinite/` | Evaluation inputs | No | None. Kept for ever |
+| `upgrade-diagnostics/` | Received upgrade diagnostics, on LangWatch Cloud only. A self-hosted install never writes under this prefix | No | Expire after 30 days |
 
 Prefixes are matched from the start of the key, so each one is the first segment of the object key. Existing prefixes are unchanged: if you already hold rules for the three older ones, they keep working.
 
@@ -64577,17 +64578,73 @@ helm install langwatch langwatch/langwatch \
 
 Both production overlays turn off the local-filesystem volume for stored objects, because more than one replica cannot share it. Set `app.dataplane.enabled: true` with an S3 or Azure Blob bucket, or stored objects (audio, images and documents) land on the pods' ephemeral disk and are lost on restart. Both commands also need the Secrets from [Provide the Secrets](/self-hosting/deployment/kubernetes-helm#1-provide-the-secrets), or `--set autogen.enabled=true` for a test install.
 
+## Throughput by size
+
+How much trace data each profile can take. Each profile accepts spans faster than it processes them: a burst above the processing rate waits in a queue and is worked through once traffic drops.
+
+| Profile | Accepts (spans per second) | Processes (spans per second) | Spans per day | Spans per month | ClickHouse disk per day | Redis memory limit |
+| --- | --- | --- | --- | --- | --- | --- |
+| `size-minimal.yaml` | ~250 | ~50 | ~4M | ~130M | ~4 GB | 128Mi |
+| `size-dev.yaml` | ~600 | ~200 | ~17M | ~520M | ~17 GB | 512Mi |
+| `size-prod.yaml` | ~2,500 | ~700 | ~60M | ~1.8B | ~60 GB | 3Gi |
+| `size-ha.yaml` | ~2,500 | ~800 | ~70M | ~2.1B | ~70 GB | 3Gi |
+
+- These rates are for traffic from many projects. One project on its own processes about 60 spans per second under the default per-project limit: if most of your traffic comes from one project, [raise the limit](#per-project-limit).
+- Per day, per month and disk follow the processing rate, which is what the install keeps up with all day.
+- Treat these as ceilings and plan to run at about 70% of them. Long prompts and completions lower them.
+- Per day and per month assume the same rate around the clock. Size for your busiest hour.
+- Disk is an estimate at about 1 KB per span. `size-prod.yaml` gives ClickHouse 100Gi, which fills in under two days at full rate: give it more storage or turn on [cold storage](#clickhouse-cold-storage-s3).
+- `size-dev.yaml` ships Redis at 256Mi. Raise `redis.master.resources.limits.memory` to 512Mi to reach its rate.
+- `size-minimal.yaml` is held back by ClickHouse memory. Setting `clickhouse.memory` to 2Gi roughly doubles its processing rate.
+
+### Changing `size-prod.yaml`
+
+What `size-prod.yaml` processes with one setting changed:
+
+| Change | Processes (spans per second) |
+| --- | --- |
+| None | ~700 |
+| `workers.replicaCount: 4` | ~800: Redis CPU is then the limit |
+| `clickhouse.cpu: 2`, `clickhouse.memory: 4Gi` | ~200 |
+| Valkey instead of Redis | ~700, with about 10% less CPU on the queue |
+| All traffic from one project | ~60 for that project, under the default per-project limit |
+
+Each worker replica processes about 350 spans per second on about one core, however high its CPU limit, so to process more, add replicas rather than CPU. More replicas raise the rate until Redis reaches 1 CPU, at about 800 spans per second. Every 100 spans per second needs about:
+
+| Component | CPU |
+| --- | --- |
+| LangWatch Workers | 0.3 core |
+| LangWatch App | 0.15 core |
+| ClickHouse | 0.16 core |
+| Redis | 0.12 core, up to 1 core in total |
+| PostgreSQL | 0.03 core |
+
+Redis needs about 2.5 MiB of memory limit for each span per second; the table rounds up to leave room for bursts. It uses up to half of its limit and keeps the rest free for snapshots.
+
+The queue for bursts lives in Redis too. Each waiting span takes about 8 KB, so a minute at 500 spans per second above the processing rate needs about 240 MiB more.
+
+To accept more, add app replicas (each core takes about 700 spans per second) and give Redis up to 1 CPU.
+
+### Per-project limit
+
+Each project gets a fair share of the workers, so one busy project can't slow down the others.
+
+To give a single project more, raise `LANGWATCH_DISPATCH_TENANT_CAP` in `workers.extraEnvs`: the number of traces one project can have in progress at once (default `50`). At the default, one project on its own processes about 60 spans per second. Setting it to `0` turns the limit off and lets one project take every worker.
+
 ## Scaling Guidelines
 
 ### What to scale first
 
-| Bottleneck                             | Component to Scale | How                                               |
-| -------------------------------------- | ------------------ | ------------------------------------------------- |
-| Trace ingestion is slow, queue backlog | LangWatch Workers  | Increase `workers.replicaCount`                   |
-| UI is slow, many concurrent users      | LangWatch App      | Increase `app.replicaCount`                       |
-| ClickHouse queries are slow            | ClickHouse         | Increase `clickhouse.cpu` and `clickhouse.memory` |
-| Evaluations are slow                   | LangEvals          | Increase `langevals.replicaCount`                 |
-| Topic clustering is slow               | LangEvals          | Increase `langevals.replicaCount`                 |
+| Bottleneck                                          | Component to Scale | How                                                                  |
+| --------------------------------------------------- | ------------------ | -------------------------------------------------------------------- |
+| Redis refuses writes (`OOM command not allowed`) or restarts with `OOMKilled` | Redis | Raise `redis.master.resources.limits.memory` (about 2.5 MiB per span/s, see [Throughput by Size](#throughput-by-size)) |
+| Redis CPU near its limit                            | Redis              | Raise `redis.master.resources.limits.cpu`, up to 1                   |
+| Trace ingestion is slow, each worker near one core | LangWatch Workers | Increase `workers.replicaCount` (about 350 spans per second each) |
+| One project falls behind while others keep up       | LangWatch Workers  | Raise `LANGWATCH_DISPATCH_TENANT_CAP` in `workers.extraEnvs` (default `50`) |
+| UI is slow, many concurrent users                   | LangWatch App      | Increase `app.replicaCount`                                          |
+| ClickHouse queries are slow, trace summaries lag    | ClickHouse         | Increase `clickhouse.cpu` and `clickhouse.memory`                    |
+| Evaluations are slow                                | LangEvals          | Increase `langevals.replicaCount`                                    |
+| Topic clustering is slow                            | LangEvals          | Increase `langevals.replicaCount`                                    |
 
 ### Horizontal Pod Autoscaler (HPA)
 
@@ -64637,6 +64694,16 @@ spec:
 
 - Minimal storage: job queue, cache and sessions
 - 1-5 GB is sufficient
+
+## Redis or Valkey
+
+The chart runs Redis by default. To run Valkey instead, add `-f examples/overlays/redis-valkey.yaml`. Both take the same load. Valkey uses about 10% less CPU, which helps only when Redis CPU is the limit.
+
+<Warning>
+  Choose Valkey when you first install. Valkey can't read the data Redis has saved, so switching an existing install means starting Redis empty: let the workers finish their queued jobs first, and expect everyone to sign in again.
+</Warning>
+
+For an external server, use Redis 7.0 or later, or Valkey 7.2 or later.
 
 ## Cloud Instance Recommendations
 
@@ -65107,7 +65174,7 @@ For a month with hosted usage, LangWatch emails a statement to your billing cont
 title: "Data and telemetry: every outbound connection of a self-hosted install"
 description: "Every connection a self-hosted install can open to LangWatch and to third parties, what each one carries, and the switch that stops it"
 sidebarTitle: Data and telemetry
-keywords: telemetry, usage report, usage statistics, self-hosted, privacy, opt out, DISABLE_USAGE_STATS, license sync, checkup, egress, outbound connections, firewall, managed models, instant evals, air-gapped, LANGWATCH_CONNECT_DISABLED
+keywords: telemetry, usage report, upgrade diagnostics, usage statistics, self-hosted, privacy, opt out, DISABLE_USAGE_STATS, license sync, checkup, egress, outbound connections, firewall, managed models, instant evals, air-gapped, LANGWATCH_CONNECT_DISABLED
 ---
 
 A self-hosted install sends LangWatch one usage report a day, and a licensed install with hosted services also syncs its license once a day. Both carry counts and metadata. Neither carries a trace, a prompt, a dataset row, an evaluation input or output, a project name, a user name, an email address, an IP address or a key.
@@ -65135,6 +65202,7 @@ The chart ships a NetworkPolicy for the Langy agent only, and the AI Gateway's N
 | `app.langwatch.ai/api/track_usage` | Workers | Daily at 12:00 UTC, when no license on the install names a hosted service | The usage report: counts, timestamps, the release, optional email domains and hostname. No content | `DISABLE_USAGE_STATS=true` |
 | `connect.langwatch.ai/v1/stats` | Workers | The same report, sent here instead once a license names a hosted service | The same report | `DISABLE_USAGE_STATS=true` |
 | `connect.langwatch.ai/v1/license/sync` | Workers daily; App on demand from the License page | For organizations whose license names a hosted service | The license token, the instance id, the release, and the member and lite member counts | `LANGWATCH_CONNECT_DISABLED=true` |
+| `connect.langwatch.ai/v1/upgrade-diagnostics` | Workers, on the hourly upgrade check after a step fails; App when an admin presses **Send to LangWatch** | The install has a license and an upgrade step failed. The hourly check sends when the [upgrade diagnostics](#upgrade-diagnostics) switch is on; an admin can send from the step either way | One failed step's [diagnostics](#upgrade-diagnostics), with secrets masked. Its error, report and log lines are what the step wrote, and can quote what it was processing | Automatic sends only: switch **Upgrade diagnostics** off on **Settings, Checkup**, or `DISABLE_UPGRADE_DIAGNOSTICS_AUTO_SEND=true`. Both automatic and admin sends: `LANGWATCH_CONNECT_DISABLED=true` |
 | `connect.langwatch.ai/v1/license/activate` | App | An admin redeems an activation code on the License page | The activation code and the instance id | Paste a license instead, or `LANGWATCH_CONNECT_DISABLED=true` |
 | `gateway.langwatch.ai/v1/instant-evals/classify` | App, Workers | The license names [Instant Evals](#instant-evals), no admin switched it off, and Instant Evals run or a sentence typed in trace search is routed | Content: the text being judged and the questions | Switch it off on **Settings, Connect**, or `LANGWATCH_CONNECT_DISABLED=true` |
 | `gateway.langwatch.ai/v1` | AI Gateway | The license names [managed models](#managed-models), no admin switched it off, and a virtual-key request names a `langwatch/` model | Content: the full model request and response | Switch it off on **Settings, Connect**, or `LANGWATCH_CONNECT_DISABLED=true` |
@@ -65246,15 +65314,30 @@ langwatch doctor --format json
 
 The CLI needs a project API key of the install, either from `langwatch login` or in `LANGWATCH_API_KEY`, with `LANGWATCH_ENDPOINT` pointing at your install.
 
-## The three switches
+## Upgrade diagnostics
+
+When a background upgrade step fails, it is almost always a problem on our side. The step's page in **Ops, Upgrades** can copy or download the step's diagnostics, and, on an install with a license, send them to the LangWatch team.
+
+A bundle holds one step: its id, kind, mode, release, status and attempt count, its last error, its checkpoint report, each target's error, the last lines it logged, the release, chart version and install method, and the instance id.
+
+Every string has passwords in URLs and secret-named values masked, and every value the install holds as a store URL removed. Values a validation error quotes are dropped, every string is cut at 4 KB, and the bundle stays under 64 KB.
+
+The bundle reads only the step's ledger records, the deployment facts above and the instance id, not traces, table rows, user records or environment variables. Its error, report and log lines are what the step itself wrote, after the masking above, so they can still name something such as a project id. **Send to LangWatch** shows the exact bundle before it is sent, and sends that bundle.
+
+On an install with a license, the hourly upgrade check sends the bundle of each newly failed step by itself, once per failure, and the alert email says so. Switch **Upgrade diagnostics** off on **Settings, Checkup**, or set `DISABLE_UPGRADE_DIAGNOSTICS_AUTO_SEND=true`, and a bundle is sent only when an admin presses **Send to LangWatch**. Without a license, or with `LANGWATCH_CONNECT_DISABLED=true`, the install sends no bundle, and the step's page offers the download to email to support@langwatch.ai.
+
+LangWatch keeps a received bundle for 30 days, in the EU (Frankfurt), and then deletes it.
+
+## The switches
 
 | Switch | Where | What it stops |
 |---|---|---|
 | `DISABLE_USAGE_STATS=true` | Environment, or `app.telemetry.usage.enabled: false` in the chart | The usage report as a whole. No report leaves the install |
 | Usage counts and onboarding dates | **Settings, Checkup** | The optional category: usage counts, onboarding dates, email domains, model provider names. The report keeps the release, the counts of organizations and projects, and the sign-in method |
 | Hostname | **Settings, Checkup** | The `hostname` field alone. It names your own network, so it has a switch of its own |
+| Upgrade diagnostics | **Settings, Checkup**, or `DISABLE_UPGRADE_DIAGNOSTICS_AUTO_SEND=true` | The automatic sending of a failed upgrade step's [diagnostics](#upgrade-diagnostics). It is not part of the usage report, and an admin can still send them from the step |
 
-`LANGWATCH_CONNECT_DISABLED=true` is a fourth switch, for an audit that has to prove absence rather than derive it from the license. With it set the install opens no connection to LangWatch for any reason, see [To LangWatch](#to-langwatch).
+`LANGWATCH_CONNECT_DISABLED=true` is one more switch, for an audit that has to prove absence rather than derive it from the license. With it set the install opens no connection to LangWatch for any reason, see [To LangWatch](#to-langwatch).
 
 The switches on the Checkup page are stored in the install's own database, so they hold across restarts, upgrades and every browser. Organization management rights are needed to change them; every member can read the report.
 
