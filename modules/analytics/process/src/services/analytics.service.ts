@@ -20,10 +20,12 @@ import {
   type AnalyticsEvaluationRollupAppendBatchInput,
   type AnalyticsEvaluationRollupAppendInput,
   type AnalyticsEvaluationUpsertInput,
+  LangWatchQLTooManyMembersError,
 } from "@langwatch/analytics-contract";
 import {
   type Authorization,
   internalActor,
+  type ProofBearingPermission,
   projectIdsReadBy,
   readScopeKeyOf,
   usableAuthorization,
@@ -48,6 +50,7 @@ import type {
   AnalyticsTimeseriesQuery,
 } from "../repositories/analytics.repository.ts";
 import type { LoggingAnalyticsTripwireService } from "./analytics-tripwire.service.ts";
+import { LWQL_TENANT_CAPABILITY_MAX_PROJECTS } from "./langwatch-ql-capability.service.ts";
 
 const MINUTES_PER_DAY = 24 * 60;
 const MAX_TIMESERIES_BUCKETS = 1000;
@@ -199,6 +202,8 @@ type AnalyticsServiceDeps = {
   /** Mints the own-project proof a series asked without one reads under. */
   authz: Pick<AuthzApi, "authorizeInternal">;
   tripwire?: LoggingAnalyticsTripwireService;
+  /** The most members one aggregate read may span; LangWatchQL's cap when unset. */
+  maxMembers?: number;
 };
 
 /** A cost-gated read's proof, refused when forged or expired before any read. */
@@ -216,6 +221,7 @@ export class AnalyticsService {
   private readonly tenantLimiter: TenantStatementLimiter;
   private readonly authz: Pick<AuthzApi, "authorizeInternal">;
   private readonly tripwire?: LoggingAnalyticsTripwireService;
+  private readonly maxMembers: number;
   private readonly cache = new Map<string, CacheEntry>();
 
   private constructor(deps: AnalyticsServiceDeps) {
@@ -224,6 +230,7 @@ export class AnalyticsService {
     this.tenantLimiter = deps.tenantLimiter;
     this.authz = deps.authz;
     this.tripwire = deps.tripwire;
+    this.maxMembers = deps.maxMembers ?? LWQL_TENANT_CAPABILITY_MAX_PROJECTS;
   }
 
   private readonly tracer = trace.getTracer("langwatch.analytics.service");
@@ -347,12 +354,43 @@ export class AnalyticsService {
     return result;
   }
 
-  /** A dashboard queues its panels behind its tenant's share rather than running them at once. */
+  /** A dashboard queues its panels behind its tenants' shares rather than running them at once. */
   private limitedTimeseries(query: AnalyticsTimeseriesQuery): Promise<AnalyticsTimeseriesResult> {
-    return this.tenantLimiter.run({
-      tenantId: query.input.projectId,
+    return this.runAcrossTenants({
+      authorization: query.authorization,
+      permission: "analytics:view",
+      projectId: query.input.projectId,
       task: () => this.repository.runTimeseries(query),
     });
+  }
+
+  /**
+   * One read behind the share of every project it reads (ADR-177 v4.15): the own project's slot
+   * and one per member, so an aggregate's chart costs each member the work it does there. The
+   * slots are taken in one sorted order, so two reads never each hold what the other waits for.
+   * A read spanning more members than the cap is refused before it queues.
+   */
+  private async runAcrossTenants<T>({
+    authorization,
+    permission,
+    projectId,
+    task,
+  }: {
+    authorization: Authorization;
+    permission: ProofBearingPermission;
+    projectId: string;
+    task: () => Promise<T>;
+  }): Promise<T> {
+    const tenants = projectIdsReadBy(authorization, permission);
+    const memberCount = tenants.filter((tenantId) => tenantId !== projectId).length;
+    if (memberCount > this.maxMembers) {
+      throw new LangWatchQLTooManyMembersError({ memberCount, maxMembers: this.maxMembers });
+    }
+    const queued = tenants.reduceRight<() => Promise<T>>(
+      (next, tenantId) => () => this.tenantLimiter.run({ tenantId, task: next }),
+      task,
+    );
+    return queued();
   }
 
   async getFeedbacks(
@@ -453,8 +491,10 @@ export class AnalyticsService {
 
     return context.with(activeContext, async () => {
       try {
-        const result = await this.tenantLimiter.run({
-          tenantId: parsed.projectId,
+        const result = await this.runAcrossTenants({
+          authorization: parsed.authorization,
+          permission: "cost:view",
+          projectId: parsed.projectId,
           task: () => this.repository.findTopDocuments(parsed),
         });
         span.setAttribute("document.count", result.topDocuments.length);

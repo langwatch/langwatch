@@ -205,6 +205,54 @@ describe("AnalyticsService", () => {
     expect(run.mock.calls.map(([call]) => call.tenantId)).toEqual(["project-1", "project-1"]);
   });
 
+  describe("given an aggregate whose proof opens two members", () => {
+    const aggregateProof = (permission: "analytics:view" | "cost:view" = "analytics:view") =>
+      analyticsProof({
+        projectId: "project-1",
+        permission,
+        shared: [
+          { projectId: "member-b", from: 0 },
+          { projectId: "member-a", from: 0 },
+        ],
+      });
+
+    /** @scenario "A chart on the aggregate waits for each member's share" */
+    it("takes the aggregate's slot and each member's, in one sorted order", async () => {
+      const limiter = tenantLimiter({ maxConcurrent: 1 });
+      const run = vi.spyOn(limiter, "run");
+      const service = createService(new RecordingRepository(), limiter);
+
+      await service.getTimeseries(input(), { authorization: aggregateProof() });
+      await service.getTopUsedDocuments(
+        { projectId: "project-1", startDate: 0, endDate: 1 },
+        { authorization: aggregateProof("cost:view") },
+      );
+
+      const order = ["member-a", "member-b", "project-1"];
+      expect(run.mock.calls.map(([call]) => call.tenantId)).toEqual([...order, ...order]);
+    });
+
+    /** @scenario "A chart on an aggregate with too many members is refused before any read" */
+    it("refuses a read over more members than the cap before it queues", async () => {
+      const repository = new RecordingRepository();
+      const limiter = tenantLimiter();
+      const run = vi.spyOn(limiter, "run");
+      const service = AnalyticsService.create({
+        repository,
+        evaluationRepository: NullAnalyticsEvaluationRepository.create(),
+        authz: analyticsTestAuthz(),
+        tenantLimiter: limiter,
+        maxMembers: 1,
+      });
+
+      await expect(
+        service.getTimeseries(input(), { authorization: aggregateProof() }),
+      ).rejects.toMatchObject({ code: "lwql_too_many_members" });
+      expect(run).not.toHaveBeenCalled();
+      expect(repository.queries).toHaveLength(0);
+    });
+  });
+
   /** @scenario "Unsafe query shapes use the legacy trace table" */
   it("falls back to the legacy table for a trace-id scoped query", async () => {
     const repository = new RecordingRepository();
