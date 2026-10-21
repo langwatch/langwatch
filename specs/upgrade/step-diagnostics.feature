@@ -35,6 +35,12 @@ Feature: The ledger keeps a redacted error and log for each step
     Then the step's log tail holds the start line, both lines and the failure line, redacted
 
   @unit
+  Scenario: A step's log line is redacted before it reaches the worker's own log
+    Given a step that logs a line whose message and fields name a secret
+    When the line is forwarded to the worker's log
+    Then neither the message nor any field, nested or an error, carries the secret
+
+  @unit
   Scenario: A step's log tail keeps only the last lines of an attempt
     Given a background step that logs 500 lines in one attempt
     When the attempt ends

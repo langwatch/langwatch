@@ -30,15 +30,15 @@ One bundle per step, built on the install. A manual send shows it in a preview f
 that previewed bundle. An automatic send shows nothing first and keeps no copy on the install; the
 step page shows the bundle as it stands now:
 
-| Field                                                     | Source                                                                                                          |
-| --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| step id, kind, mode, release, status, attempt, updated at | ledger step row                                                                                                 |
-| `lastError`                                               | step `last_error` (`packages/upgrade/src/ledger-tables.ts`)                                                     |
-| step `report`                                             | step `report` JSONB (its targets and counts)                                                                    |
-| target errors                                             | target rows' `last_error`                                                                                       |
-| step log tail                                             | the step's own `log_tail` column: the last 200 lines of its latest attempt, redacted when written              |
-| image release, chart version, install method              | ops config facts already in the usage report                                                                    |
-| instance id                                               | `InstanceIdentityService` (licensing)                                                                           |
+| Field                                                     | Source                                                                                            |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| step id, kind, mode, release, status, attempt, updated at | ledger step row                                                                                   |
+| `lastError`                                               | step `last_error` (`packages/upgrade/src/ledger-tables.ts`)                                       |
+| step `report`                                             | step `report` JSONB (its targets and counts)                                                      |
+| target errors                                             | target rows' `last_error`                                                                         |
+| step log tail                                             | the step's own `log_tail` column: the last 200 lines of its latest attempt, redacted when written |
+| image release, chart version, install method              | ops config facts already in the usage report                                                      |
+| instance id                                               | `InstanceIdentityService` (licensing)                                                             |
 
 Nothing outside the ledger is read, with two named exceptions: the ops config facts (release,
 chart version, install method) and the instance id above. The error, report and log lines are what

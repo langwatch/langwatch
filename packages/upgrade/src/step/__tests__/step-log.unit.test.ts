@@ -25,6 +25,33 @@ describe("StepLogTail", () => {
     });
   });
 
+  describe("when a line names a secret in its message and in every kind of field", () => {
+    /** @scenario "A step's log line is redacted before it reaches the worker's own log" */
+    it("forwards the message and each field masked", () => {
+      const forwarded: { message: string; fields: Record<string, unknown> }[] = [];
+      const log = StepLogTail.create({
+        redact: ledgerRedactor({ secretValues: ["opensesame-held"] }),
+        forward: (_level, message, fields) => void forwarded.push({ message, fields }),
+      });
+
+      log.warn("connecting with password=opensesame", {
+        note: "password=opensesame",
+        hosts: ["db opensesame-held", 3],
+        nested: { inner: { dsn: "postgres://app:opensesame@db:5432/app" } },
+        cause: new Error("refused opensesame-held"),
+        attempts: 2,
+      });
+
+      expect(forwarded).toHaveLength(1);
+      expect(JSON.stringify(forwarded)).not.toContain("opensesame");
+      expect(forwarded[0]?.fields).toMatchObject({
+        hosts: ["db ***", 3],
+        cause: "refused ***",
+        attempts: 2,
+      });
+    });
+  });
+
   describe("when a line was already logged by the caller", () => {
     it("keeps it without forwarding it again", () => {
       const forwarded: string[] = [];

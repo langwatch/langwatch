@@ -84,7 +84,7 @@ describe("Cloud admin upgrade diagnostics", () => {
           opened.push(url);
         },
       };
-      return { opener: {}, location, close: () => undefined } as unknown as Window;
+      return { opener: {}, location, close: () => undefined } as Window;
     });
   });
   afterEach(() => vi.restoreAllMocks());

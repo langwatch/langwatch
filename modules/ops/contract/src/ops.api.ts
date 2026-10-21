@@ -723,7 +723,7 @@ export interface OpsApi {
   /** The step's redacted diagnostics; refuses with `upgrade_not_found` like `getUpgradeStep`. */
   getUpgradeStepDiagnostics(input: OpsUpgradeIdInput): Promise<UpgradeDiagnosticsBundle>;
   getUpgradeDiagnosticsAvailability(): Promise<OpsUpgradeDiagnosticsAvailability>;
-  /** Sends the bundle the operator reviewed to LangWatch over Connect, as the operator who asked. */
+  /** Sends the bundle the operator reviewed to LangWatch over Connect, as the asking operator. */
   sendUpgradeStepDiagnostics(
     input: OpsUpgradeSendDiagnosticsInput,
   ): Promise<OpsUpgradeDiagnosticsReceipt>;

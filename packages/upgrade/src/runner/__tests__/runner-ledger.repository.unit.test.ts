@@ -1,4 +1,7 @@
-/** The runner's step writes mask what the run knows is a secret. Spec: specs/upgrade/step-diagnostics.feature */
+/**
+ * The runner's step writes mask what the run knows is a secret.
+ * Spec: specs/upgrade/step-diagnostics.feature
+ */
 import { describe, expect, it } from "vitest";
 
 import type { UpgradePostgres } from "../../ports.ts";

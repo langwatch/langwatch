@@ -1029,9 +1029,13 @@ describe("BackgroundStepsService diagnostics", () => {
     it("keeps the start line, both lines and the failure line, redacted, and forwards them", async () => {
       const ledger = new MemoryBackgroundLedger();
       const forwarded: string[] = [];
+      const forwardedFields: Record<string, unknown>[] = [];
       const service = serviceOver({
         ledger,
-        log: (_level, message, fields) => void forwarded.push(`${message} ${String(fields.step)}`),
+        log: (_level, message, fields) => {
+          forwarded.push(`${message} ${String(fields.step)}`);
+          forwardedFields.push(fields);
+        },
         run: async ({ log }) => {
           log.info("read page", { afterId: "project_1" });
           log.warn("skipped an agent", { token: "x", note: "password=opensesame" });
@@ -1050,6 +1054,7 @@ describe("BackgroundStepsService diagnostics", () => {
       ]);
       expect(tail.join("\n")).not.toContain("opensesame");
       expect(forwarded).toContain(`read page ${STEP}`);
+      expect(JSON.stringify(forwardedFields)).not.toContain("opensesame");
     });
   });
 });

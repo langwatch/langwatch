@@ -16,7 +16,7 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", ".."
 
 /**
  * A ceiling, not a target. Lower it when earned; never raise it without saying why.
- * 1,710: main is 1,699 in CI (1,690 + 9 built SDK files), the hooks contract adds 1, 10 spare.
+ * 1,710: main is 1,699 in CI (1,690 + 9 built SDK files), hooks adds 1, upgrade diagnostics 2.
  * The count depends on `pnpm ensure:built`: https://github.com/langwatch/langwatch/issues/8795
  */
 const CEILING = 1_710;

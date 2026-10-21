@@ -22,11 +22,17 @@ export function InstanceDiagnostics({ instanceRowId }: { instanceRowId: string }
   const { download, downloadingId } = useUpgradeDiagnosticsDownload();
   const rows = reports.data ?? [];
 
+  if (reports.error) {
+    return (
+      <Card title="Diagnostics" titleLevel={3} padding="md">
+        <HandledErrorAlert error={reports.error} fallbackTitle="Couldn't load the diagnostics" />
+      </Card>
+    );
+  }
+
   return (
     <Card title="Diagnostics" titleLevel={3} padding={rows.length === 0 ? "md" : "none"}>
-      {reports.error ? (
-        <HandledErrorAlert error={reports.error} fallbackTitle="Couldn't load the diagnostics" />
-      ) : rows.length === 0 ? (
+      {rows.length === 0 ? (
         <NoDataInfoBlock size="line" title={emptyTitle({ loading: reports.isLoading })} />
       ) : (
         <ListTable variant="embedded" density="compact" scroll="x" scrollLabel="Diagnostics table">
