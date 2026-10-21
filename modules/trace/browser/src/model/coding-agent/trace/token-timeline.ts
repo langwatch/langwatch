@@ -64,7 +64,8 @@ export function findCacheRebuilds(entries: TranscriptEntry[]): CacheRebuildEvent
   for (const entry of entries) {
     if (entry.kind !== "model_call") continue;
     callIndex++;
-    const contextTokens = entry.cacheReadTokens + entry.cacheCreationTokens;
+    // Input arrives disjoint from the cache, so the three are the whole prompt sent.
+    const contextTokens = entry.inputTokens + entry.cacheReadTokens + entry.cacheCreationTokens;
 
     if (
       callIndex > 0 &&

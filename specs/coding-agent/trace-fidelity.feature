@@ -309,13 +309,16 @@ Feature: Coding Agent Trace Fidelity (Path B direct OTLP)
   # A coding-agent turn re-sends its whole conversation on every model call, so
   # the trace's summed cache reads run into the millions while the number a
   # reader means by "how big is my context" is a single call's worth. The two
-  # are different questions and the trace carries both.
+  # are different questions and the trace carries both. A call's context is the
+  # whole prompt it sent: the part read from the cache, the part written to it
+  # and the part sent fresh. Every agent's input count reaches the trace as the
+  # fresh part only, so adding the three counts each token once.
 
   @unit
   Scenario: The context a trace started from is lifted onto the trace summary
-    Given a trace whose first model call already carried cached and freshly written input
+    Given a trace whose first model call read part of its prompt from the cache, wrote part to it and sent the rest fresh
     When the trace summary is computed
-    Then the trace summary attributes carry that call's context size
+    Then the trace summary attributes carry that call's whole prompt as its context size
     And the value is that one call's context, not the sum across the trace's calls
 
   @unit
@@ -325,10 +328,23 @@ Feature: Coding Agent Trace Fidelity (Path B direct OTLP)
     Then the context size comes from the earliest-starting model call
 
   @unit
-  Scenario: A trace whose calls report no cache carries no context size
-    Given a trace whose model calls report no cached or written input
+  Scenario: A trace whose calls use no cache carries its input as its context size
+    Given a trace whose model calls report fresh input but no cached or written input
+    When the trace summary is computed
+    Then the context size is the first call's input
+
+  @unit
+  Scenario: A trace whose calls report no input carries no context size
+    Given a trace whose model calls report no fresh, cached or written input
     When the trace summary is computed
     Then the trace summary attributes carry no context size
+
+  @unit
+  Scenario: A cache rebuild is measured against the whole prompt the call before it sent
+    Given a session's model call that sent most of its prompt fresh
+    And the next call wrote about as much to the cache
+    When the usage chart looks for cache rebuilds
+    Then it flags the next call as a rebuild of the context the first call sent
 
   @unit
   Scenario: Context size is shown in the trace list next to tokens
