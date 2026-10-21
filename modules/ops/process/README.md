@@ -2380,12 +2380,12 @@ type Output = z.infer<typeof opsUpgradeStepDetailSchema>; // ../contract/src/fea
 
 // ops.upgrade.getDiagnostics
 type Input = z.infer<typeof opsUpgradeIdInputSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:320
-type Output = z.infer<typeof upgradeDiagnosticsBundleSchema>; // ../contract/src/features/migrations/ops-upgrade-diagnostics.ts:68
+type Output = z.infer<typeof upgradeDiagnosticsBundleSchema>; // ../contract/src/features/migrations/ops-upgrade-diagnostics.ts:82
 
 // ops.upgrade.diagnosticsAvailability
 // Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:415
 type Input = unknown;
-// Output: opsUpgradeDiagnosticsAvailabilitySchema, ../contract/src/features/migrations/ops-upgrade-diagnostics.ts:82
+// Output: opsUpgradeDiagnosticsAvailabilitySchema, ../contract/src/features/migrations/ops-upgrade-diagnostics.ts:96
 interface Output {
   available: boolean;
   reason: "connect_disabled" | "no_licence" | null;
@@ -2394,7 +2394,7 @@ interface Output {
 
 // ops.upgrade.sendDiagnostics
 type Input = z.infer<typeof opsUpgradeSendDiagnosticsInputSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:331
-// Output: opsUpgradeDiagnosticsReceiptSchema, ../contract/src/features/migrations/ops-upgrade-diagnostics.ts:96
+// Output: opsUpgradeDiagnosticsReceiptSchema, ../contract/src/features/migrations/ops-upgrade-diagnostics.ts:110
 interface Output {
   reportId: string;
   receivedAt: string;
