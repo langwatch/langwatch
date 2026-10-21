@@ -70,7 +70,7 @@ A shell function applies the variables to that one tool only, so no other progra
 
 ## Which agents report their pull requests
 
-Claude Code and Codex report the repository and branch after `langwatch instrument`, which is what joins a session to a pull request. For Gemini CLI, opencode and GitHub Copilot, the command wires the telemetry only, so their sessions show cost and tokens on [the sessions list](/coding-agents/sessions) but are not joined to a pull request.
+Claude Code and Codex report the repository and branch after `langwatch instrument`, which is what joins a session to a pull request. For Gemini CLI, opencode, GitHub Copilot and GitHub Copilot in VS Code (`code`), the command wires the telemetry only, so their sessions show cost and tokens on [the sessions list](/coding-agents/sessions) but are not joined to a pull request.
 
 ## Why the agent must start inside the repository
 
@@ -94,7 +94,7 @@ On a detached `HEAD` the session reports the repository but no branch, so it map
 
 ## What you see in LangWatch
 
-Open **Pull requests** at [/me/pull-requests](https://app.langwatch.ai/me/pull-requests). Each session sends one record with these attributes, and again whenever one of them changes:
+Open **Pull requests** in the sidebar of your personal workspace. Each session sends one record with these attributes, and again whenever one of them changes:
 
 | Attribute               | Value                                             |
 | ----------------------- | ------------------------------------------------- |
@@ -104,20 +104,20 @@ Open **Pull requests** at [/me/pull-requests](https://app.langwatch.ai/me/pull-r
 | `vcs.ref.head.name`     | The current branch                                |
 | `vcs.worktree.name`     | The worktree folder name, for a linked worktree   |
 
-For each branch a session reported, LangWatch asks GitHub for every pull request in that repository whose head is `<owner>:<branch>`, open, closed or merged. The [pull requests page](/coding-agents/pull-requests) explains the columns and the per-contributor breakdown.
+For each branch a session reported, LangWatch asks GitHub for every pull request in that repository whose head is `<owner>:<branch>`, open, closed or merged. A pull request opened from a fork against another repository does not show: the lookup uses the repository that `origin` names. The [pull requests page](/coding-agents/pull-requests) explains the columns and the per-contributor breakdown.
 
 ## What content is captured, and how to turn it off
 
-By default the wiring captures the conversation as well as the token counts, because the content is what makes a session worth reading. Each variable below is one `langwatch instrument` sets. Remove it from the file in the table above, then restart the agent, and the cost and token counts keep flowing without that content.
+By default the wiring captures the conversation as well as the token counts, because the content is what makes a session worth reading. Each variable below is one `langwatch instrument` sets. Remove it from the file in the table above (for Gemini CLI, GitHub Copilot and `code`, edit the shell function for that tool in your rc file), then restart the agent, and the cost and token counts keep flowing without that content.
 
 | Tool                 | Variable or setting                                   | What it captures                                             |
 | -------------------- | ----------------------------------------------------- | ------------------------------------------------------------ |
 | Claude Code          | `OTEL_LOG_USER_PROMPTS=1`                             | Your prompts                                                 |
 | Claude Code          | `OTEL_LOG_TOOL_DETAILS=1`, `OTEL_LOG_TOOL_CONTENT=1`  | Tool inputs and outputs                                      |
 | Claude Code          | `OTEL_LOG_RAW_API_BODIES=1`                           | Request and response bodies, including the response text     |
-| Codex                | The `notify` block in `~/.codex/config.toml`          | The conversation, read from the transcript after each turn   |
+| Codex                | The `notify` block in `~/.codex/config.toml`          | The conversation, read from the transcript after each turn. The same program reports the repository and branch, so removing it also stops the pull request join. |
 | Gemini CLI           | `GEMINI_TELEMETRY_LOG_PROMPTS=true`                   | Your prompts                                                 |
-| GitHub Copilot       | `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=true` | Prompts and responses                                    |
+| GitHub Copilot, `code` | `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=true` | Prompts and responses                                    |
 
 Running `langwatch instrument` again writes these variables back. To drop content for everyone in the organization at ingestion instead, see [Privacy](/coding-agents/privacy).
 
