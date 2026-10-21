@@ -10,6 +10,13 @@ import type { SpanDetail } from "@langwatch/trace-contract";
  */
 import { describe, expect, it } from "vitest";
 
+import {
+  deserializeStoredAttributes,
+  mapNormalizedSpanToFullRecordSpan,
+  mapStoredSpanRow,
+  type StoredSpanRow,
+} from "../../rules/trace-full-record.rules.ts";
+
 function spanDetail(fields: Partial<SpanDetail>): SpanDetail {
   return {
     spanId: "span",
@@ -729,8 +736,83 @@ describe("buildCodingAgentTranscript for non-claude agents", () => {
 
       expect(transcript.entries.filter((entry) => entry.kind === "user_prompt")).toHaveLength(1);
     });
+
+    /** @scenario "A Copilot tool run read back from storage shows in the terminal" */
+    it("shows a tool run the trace read handed over with its attributes nested", () => {
+      const stored = mapNormalizedSpanToFullRecordSpan(
+        mapStoredSpanRow(storedCopilotBashRow, deserializeStoredAttributes(storedBashAttributes)),
+      );
+
+      const transcript = buildCodingAgentTranscript({
+        spans: [
+          spanDetail({
+            spanId: stored.span_id,
+            name: stored.name,
+            startTimeMs: stored.timestamps.started_at,
+            endTimeMs: stored.timestamps.finished_at,
+            params: stored.params,
+            input: JSON.stringify(stored.input?.value),
+            output: JSON.stringify(stored.output?.value),
+          }),
+        ],
+        logs: [],
+      });
+
+      expect(transcript.entries.find((entry) => entry.kind === "tool")).toMatchObject({
+        name: "bash",
+        input: { command: "ls -1A | wc -l" },
+        output: JSON.stringify("3\n<shellId: 0 completed with exit code 0>"),
+      });
+      expect(transcript.totals.toolCalls).toBe(1);
+    });
   });
 });
+
+/** A Copilot CLI 1.0.100 `bash` run as stored, its long tool description cut. */
+const storedBashAttributes: Record<string, string> = {
+  "gen_ai.operation.name": "execute_tool",
+  "gen_ai.conversation.id": "2bda48ad-d509-44c3-be96-fb2aa6069347",
+  "gen_ai.tool.name": "bash",
+  "gen_ai.tool.call.id": "call_IdIS5PovvcmArXAfIRoLtaTL",
+  "gen_ai.tool.type": "function",
+  "gen_ai.provider.name": "github",
+  "gen_ai.tool.description": "Runs a Bash command.",
+  "gen_ai.tool.call.arguments":
+    '{"command":"ls -1A | wc -l","description":"Count entries in the current folder"}',
+  "github.copilot.tool.parameters.command": "ls -1A | wc -l",
+  "process.executable.name": "bash",
+  "process.executable.path": "/bin/bash",
+  "process.exit.code": "0",
+  "gen_ai.tool.call.result": "3\n<shellId: 0 completed with exit code 0>",
+  "langwatch.span.type": "tool",
+};
+
+const storedCopilotBashRow: StoredSpanRow = {
+  SpanId: "6a7bb4c9d898ce72",
+  TraceId: "3d5ecc7456e7d8d8f085a176f77f5d43",
+  TenantId: "project_1",
+  ParentSpanId: "6b941f1e57176033",
+  ParentTraceId: null,
+  ParentIsRemote: null,
+  Sampled: true,
+  StartTimeMs: 1_792_605_026_257,
+  EndTimeMs: 1_792_605_026_328,
+  DurationMs: 71,
+  SpanName: "execute_tool bash bash",
+  SpanKind: 1,
+  ResourceAttributes: { "service.name": "copilot-cli", "langwatch.source": "copilot_cli" },
+  SpanAttributes: storedBashAttributes,
+  StatusCode: 0,
+  StatusMessage: null,
+  ScopeName: "github.copilot",
+  ScopeVersion: null,
+  Events_Timestamp: null,
+  Events_Name: null,
+  Events_Attributes: null,
+  Links_TraceId: null,
+  Links_SpanId: null,
+  Links_Attributes: null,
+};
 
 describe("buildCodingAgentTranscript for codex 0.146 sessions", () => {
   const codexToolResultLog = ({

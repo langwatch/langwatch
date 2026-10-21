@@ -10,6 +10,7 @@ import type {
   CodingAgentSignal,
   TokenType,
 } from "./coding-agent-definition.ts";
+import { pickString } from "./coding-agent-span.ts";
 import { CODING_AGENT_REGISTRY } from "./index.ts";
 
 /** Detect agent from record name (reliable signal), not scope (varies by vendor). */
@@ -521,10 +522,11 @@ export function parseMcpToolName(
   return { server, tool };
 }
 
+/** Flat keys at ingest; nested by their dots once the trace read hands a span over. */
 function pickFirstString(attrs: Record<string, unknown>, keys: string[]): string | null {
   for (const key of keys) {
-    const value = attrs[key];
-    if (typeof value === "string" && value.length > 0) return value;
+    const value = pickString(attrs, key);
+    if (value !== null) return value;
   }
   return null;
 }

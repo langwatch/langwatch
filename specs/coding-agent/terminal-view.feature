@@ -78,6 +78,15 @@ Feature: Coding agent terminal view
     And the model's reasoning is not shown as its reply
     And a prompt a log event already reported is shown once
 
+  # The trace read nests a stored span's dotted attribute keys by their dots,
+  # so `gen_ai.tool.name` reaches the transcript as `gen_ai: { tool: { name } }`.
+
+  @unit
+  Scenario: A Copilot tool run read back from storage shows in the terminal
+    Given a stored Copilot execute_tool span that names its tool, arguments and result in GenAI attributes
+    When the trace read hands it to the transcript with those attributes nested by their dots
+    Then the Terminal tab shows the tool run with its name, what it ran and its result
+
   # The system prompt is the context the user pays for on every call - CLAUDE.md,
   # MCP tool definitions, skills. It rides the first request body of the session.
 
