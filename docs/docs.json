@@ -901,6 +901,7 @@
             "group": "See Your Usage",
             "pages": [
               "coding-agents/sessions",
+              "coding-agents/measure-pull-requests",
               "coding-agents/pull-requests",
               "coding-agents/usage-analytics",
               "coding-agents/repository-and-pr-attribution"
