@@ -256,6 +256,7 @@ export class CodingAgentPersonalPullRequestReadService {
     const rows = this.dependencies.usage.groupedRows({
       sessions: attached,
       costProjects,
+      costUnknown: this.dependencies.usage.costUnknownSessions(attribution.modelTotals),
       nonBillableAgents,
       projects,
     });

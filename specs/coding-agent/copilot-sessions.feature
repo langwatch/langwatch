@@ -136,6 +136,20 @@ Rule: Pull-request cost keeps AI units apart from dollars
     Then its tokens appear and its cost reads as unknown, not zero
 
   @unit
+  Scenario: A pull request whose only model has no price shows an unknown cost, not zero
+    Given a pull request fed only by a Copilot session on a model with no price
+    When the pull request cost is shown
+    Then the row, the session and the pull request total read as unknown, not zero
+    And the personal pull request row and a branch with no pull request read as unknown too
+
+  @unit
+  Scenario: A pull request with priced and unpriced sessions totals the priced share
+    Given a pull request fed by a priced session and a session on a model with no price
+    When the pull request cost is shown
+    Then the total is the priced session's cost
+    And the unpriced session's own cost reads as unknown
+
+  @unit
   Scenario: A model an older session also ran reads as not fully known
     Given a pull request fed by a Copilot session with per-model figures for a model
     And an older Copilot session on the same model with no per-model figures

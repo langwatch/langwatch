@@ -21,6 +21,7 @@ import {
   TestTraceSessions,
   branchSession,
   pullRequest,
+  session,
 } from "../../../../__tests__/fixtures/coding-agent.fixture.ts";
 import { CodingAgentFeatureService } from "../../../../services/coding-agent.service.ts";
 
@@ -230,6 +231,104 @@ describe("Copilot pull-request cost", () => {
           tokensKnown: true,
           aiUnits: 5,
         });
+      });
+    });
+  });
+
+  describe("given a pull request fed only by a Copilot session on a model with no price", () => {
+    const unpricedOnly = {
+      sessionId: "copilot-unpriced",
+      agent: "copilot",
+      gitBranch: "feature",
+      models: [UNPRICED_MODEL],
+      startedAtMs: TEST_NOW_MS - 2 * DAY,
+      inputTokens: 13,
+      outputTokens: 50,
+      costUsd: 0,
+      usageByModel: [
+        modelUsage({ model: UNPRICED_MODEL, inputTokens: 13, outputTokens: 50, priced: false }),
+      ],
+    };
+
+    describe("when the pull request cost is shown", () => {
+      /** @scenario "A pull request whose only model has no price shows an unknown cost, not zero" */
+      it("reads the row, the session and the total cost as unknown", async () => {
+        const sessions = new TestSessions();
+        sessions.branchRows = [branchSession(unpricedOnly)];
+
+        const detail = await serviceWith({ sessions }).getPullRequestDetail(query);
+
+        expect(detail.totals).toMatchObject({
+          inputTokens: 13,
+          costUsd: null,
+          billedCostUsd: null,
+          nonBilledCostUsd: null,
+        });
+        expect(detail.contributors[0]).toMatchObject({ totalTokens: 63, costUsd: null });
+        expect(detail.sessions[0]?.costUsd).toBeNull();
+      });
+
+      /** @scenario "A pull request whose only model has no price shows an unknown cost, not zero" */
+      it("reads the personal pull request row and a branch rollup as unknown", async () => {
+        const personalRow = (over: { sessionId: string; gitBranch: string }) =>
+          session({
+            ...unpricedOnly,
+            ...over,
+            tenantId: "project-1",
+            repositoryHost: "github.com",
+            repositoryOwner: "acme",
+            repositoryName: "widgets",
+          });
+        const sessions = new TestSessions();
+        sessions.branchRows = [branchSession(unpricedOnly)];
+        sessions.recentRowsByTenant.set("project-1", [
+          personalRow({ sessionId: unpricedOnly.sessionId, gitBranch: "feature" }),
+          personalRow({ sessionId: "copilot-no-pull-request", gitBranch: "spike" }),
+        ]);
+
+        const personal = await serviceWith({ sessions }).getForPersonalProject({
+          projectId: "project-1",
+          permittedProjectIds: query.permittedProjectIds,
+          costProjectIds: query.costProjectIds,
+          projects: query.projects,
+        });
+
+        expect(personal.rows.find((row) => row.prNumber === query.prNumber)).toMatchObject({
+          totalTokens: 63,
+          costUsd: null,
+        });
+        expect(personal.unlinked.find((row) => row.headBranch === "spike")).toMatchObject({
+          totalTokens: 63,
+          costUsd: null,
+          billedCostUsd: null,
+        });
+      });
+    });
+
+    describe("when a priced session feeds the same pull request", () => {
+      /** @scenario "A pull request with priced and unpriced sessions totals the priced share" */
+      it("totals the priced session's cost and reads the unpriced one as unknown", async () => {
+        const sessions = new TestSessions();
+        sessions.branchRows = [
+          branchSession(unpricedOnly),
+          branchSession({
+            sessionId: "claude-priced",
+            agent: "claude_code",
+            gitBranch: "feature",
+            models: ["claude-opus-5"],
+            startedAtMs: TEST_NOW_MS - 3 * DAY,
+            inputTokens: 10,
+            costUsd: 1.5,
+          }),
+        ];
+
+        const detail = await serviceWith({ sessions }).getPullRequestDetail(query);
+
+        expect(detail.totals.costUsd).toBeCloseTo(1.5, 9);
+        expect(detail.contributors.find((row) => row.agent === "copilot")?.costUsd).toBeNull();
+        expect(
+          detail.sessions.find((each) => each.sessionId === "copilot-unpriced")?.costUsd,
+        ).toBeNull();
       });
     });
   });

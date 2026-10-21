@@ -177,7 +177,13 @@ export class CodingAgentPullRequestReadService {
           ...this.dependencies.usage.contributorFor(session.tenantId, query.projects),
           agent: session.agent,
           totalTokens: this.dependencies.usage.tokenTotal(session),
-          costUsd: costProjects.has(session.tenantId) ? session.costUsd : null,
+          costUsd: this.dependencies.usage.isSessionPriced({
+            session,
+            costProjects,
+            costUnknown: gathered.costUnknown,
+          })
+            ? session.costUsd
+            : null,
           title: session.title === "" ? null : session.title,
         })),
     });
@@ -197,6 +203,7 @@ export class CodingAgentPullRequestReadService {
     sessions: CodingAgentSessionBranchRecord[];
     rows: CodingAgentUsageRow[];
     modelBreakdown: CodingAgentModelUsage[];
+    costUnknown: ReadonlySet<string>;
   }> {
     const target = await this.dependencies.github.findByNumber({
       organizationId: query.organizationId,
@@ -212,12 +219,12 @@ export class CodingAgentPullRequestReadService {
     }
 
     if (query.permittedProjectIds.length === 0) {
-      return { target, sessions: [], rows: [], modelBreakdown: [] };
+      return { target, sessions: [], rows: [], modelBreakdown: [], costUnknown: new Set() };
     }
 
     const [repositoryOwner, repositoryName] = target.repositoryFullName.split("/");
     if (!repositoryOwner || !repositoryName) {
-      return { target, sessions: [], rows: [], modelBreakdown: [] };
+      return { target, sessions: [], rows: [], modelBreakdown: [], costUnknown: new Set() };
     }
 
     return this.attributedToTarget({ query, target, repositoryOwner, repositoryName });
@@ -239,6 +246,7 @@ export class CodingAgentPullRequestReadService {
     sessions: CodingAgentSessionBranchRecord[];
     rows: CodingAgentUsageRow[];
     modelBreakdown: CodingAgentModelUsage[];
+    costUnknown: ReadonlySet<string>;
   }> {
     const toMs = this.dependencies.clock.nowMs();
     const candidates = await this.dependencies.candidates.findCandidates({
@@ -283,6 +291,7 @@ export class CodingAgentPullRequestReadService {
     });
     const attached = attribution.sessions;
     const costProjects = new Set(query.costProjectIds);
+    const costUnknown = this.dependencies.usage.costUnknownSessions(attribution.modelTotals);
     const nonBillableAgents = await this.dependencies.candidates.nonBillableAgents(
       query.organizationId,
       attached.map((session) => session.agent),
@@ -294,6 +303,7 @@ export class CodingAgentPullRequestReadService {
       rows: this.dependencies.usage.groupedRows({
         sessions: attached,
         costProjects,
+        costUnknown,
         nonBillableAgents,
         projects: query.projects,
       }),
@@ -302,6 +312,7 @@ export class CodingAgentPullRequestReadService {
         attribution.modelTotals,
         costProjects,
       ),
+      costUnknown,
     };
   }
 }

@@ -4,6 +4,7 @@ import type {
 } from "@langwatch/coding-agent-contract";
 
 import type { SessionModelTotalsRow } from "../../../repositories/coding-agent-session-event.repository.ts";
+import { isCostUnknown } from "../../../rules/coding-agent-pull-request.rules.ts";
 
 export type CodingAgentUsageRow = {
   projectId: string;
@@ -162,21 +163,53 @@ export class CodingAgentPullRequestUsageService {
     }
   }
 
+  /** Whether the read may show a session's cost: its project is priced and a price was known. */
+  isSessionPriced({
+    session,
+    costProjects,
+    costUnknown,
+  }: {
+    session: CodingAgentSessionBranchRecord;
+    costProjects: ReadonlySet<string>;
+    costUnknown: ReadonlySet<string>;
+  }): boolean {
+    const pricedProject = costProjects.has(session.tenantId);
+    const knownPrice = !costUnknown.has(sessionKeyOf(session));
+    return pricedProject && knownPrice;
+  }
+
+  /** The sessions whose every model total on the pull request had no price: cost unknown. */
+  costUnknownSessions(totals: readonly PullRequestModelTotalsRow[]): ReadonlySet<string> {
+    const usageBySession = new Map<string, PullRequestModelTotalsRow[]>();
+    for (const total of totals) {
+      const sessionKey = sessionKeyOf(total);
+      usageBySession.set(sessionKey, [...(usageBySession.get(sessionKey) ?? []), total]);
+    }
+
+    return new Set(
+      [...usageBySession]
+        .filter(([, usage]) => isCostUnknown(usage))
+        .map(([sessionKey]) => sessionKey),
+    );
+  }
+
   groupedRows({
     sessions,
     costProjects,
+    costUnknown,
     nonBillableAgents,
     projects,
   }: {
     sessions: readonly CodingAgentSessionBranchRecord[];
     costProjects: ReadonlySet<string>;
+    costUnknown: ReadonlySet<string>;
     nonBillableAgents: ReadonlySet<string>;
     projects: Record<string, CodingAgentContributorProject>;
   }): CodingAgentUsageRow[] {
     const grouped = new Map<string, CodingAgentUsageRow & { modelSet: Set<string> }>();
     for (const session of sessions) {
       const key = `${session.tenantId}\0${session.agent}`;
-      const priced = costProjects.has(session.tenantId);
+      const priced = this.isSessionPriced({ session, costProjects, costUnknown });
       const nonBilled = nonBillableAgents.has(session.agent);
       const row = grouped.get(key);
       if (!row) {
@@ -386,6 +419,10 @@ function emptyModelUsage(model: string): CodingAgentModelUsage {
     tokensKnown: true,
     aiUnits: 0,
   };
+}
+
+function sessionKeyOf(session: { tenantId: string; sessionId: string }): string {
+  return `${session.tenantId}\0${session.sessionId}`;
 }
 
 function billedShareOf(costUsd: number, applies: boolean): number {
