@@ -2,53 +2,31 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import {
   AuthorizedClickHouse,
-  ClickHouseQueryClient,
-  type QueryDriver,
-  TenantGuard,
+  type ClickHouseQueryClient,
   type TenantScopedReader,
 } from "@langwatch/clickhouse-client";
+import { type VendorStatements, vendorQueryClient } from "@langwatch/clickhouse-client/testing";
 
 import { analyticsProof } from "../../../__tests__/analytics-proof.fixture.ts";
+import { ANALYTICS_ID_INDEXES } from "../../clickhouse.analytics-id-indexes.database.ts";
 
-/** One ClickHouse for every tenant, or the client each tenant resolves to. */
-type ClientSource = ClickHouseClient | ((tenantId: string) => Promise<ClickHouseClient | null>);
+/** The suite's connection, with Analytics' id indexes declared as production declares them. */
+export function clickHouseQueryClientOver(vendor: VendorStatements): ClickHouseQueryClient {
+  return vendorQueryClient({ vendor, indexes: ANALYTICS_ID_INDEXES });
+}
 
-export function clickHouseQueryClientOver(source: ClientSource): ClickHouseQueryClient {
-  const clientFor = async (tenantId: string): Promise<ClickHouseClient> => {
-    const client = typeof source === "function" ? await source(tenantId) : source;
-    if (!client) throw new Error(`ClickHouse client unavailable for ${tenantId}`);
-    return client;
+/** A connection opened on first use, so a suite that never reads never resolves one. */
+export function deferredVendor(open: () => Promise<ClickHouseClient | null>): VendorStatements {
+  const client = async (): Promise<ClickHouseClient> => {
+    const opened = await open();
+    if (!opened) throw new Error("ClickHouse client unavailable");
+    return opened;
   };
-  const driver: QueryDriver = {
-    async execute(request) {
-      const client = await clientFor(request.tenantId);
-      const result = await client.query({
-        query: request.sql,
-        format: "JSONEachRow",
-        ...(request.params === undefined ? {} : { query_params: request.params }),
-        ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
-      });
-      return { rows: await result.json() };
-    },
-    async insert(request) {
-      const client = await clientFor(request.tenantId);
-      await client.insert({
-        table: request.table,
-        values: request.rows,
-        format: "JSONEachRow",
-        ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
-      });
-    },
-    async command(request) {
-      const client = await clientFor(request.tenantId);
-      await client.command({
-        query: request.sql,
-        ...(request.params === undefined ? {} : { query_params: request.params }),
-        ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
-      });
-    },
+  return {
+    query: async (params) => (await client()).query(params),
+    insert: async (params) => (await client()).insert(params),
+    command: async (params) => (await client()).command(params),
   };
-  return new ClickHouseQueryClient({ tenantGuard: new TenantGuard(), driver });
 }
 
 /**

@@ -17,7 +17,10 @@ import { describe, expect, it, vi } from "vitest";
 import { AnalyticsService } from "../../services/analytics.service.ts";
 import { NullAnalyticsEvaluationRepository } from "../analytics-persistence.repository.ts";
 import { AnalyticsRepository, type AnalyticsTimeseriesQuery } from "../analytics.repository.ts";
-import { clickHouseQueryClientOver } from "../clickhouse/__tests__/support/clickhouse-query-client.support.ts";
+import {
+  clickHouseQueryClientOver,
+  deferredVendor,
+} from "../clickhouse/__tests__/support/clickhouse-query-client.support.ts";
 import { ClickHouseAnalyticsEvaluationRepository } from "../clickhouse/clickhouse.analytics-persistence.repository.ts";
 import { pickAnalyticsTable } from "../clickhouse/clickhouse.analytics-route-table.mapper.ts";
 import { ClickHouseAnalyticsRepository } from "../clickhouse/clickhouse.analytics.repository.ts";
@@ -43,7 +46,9 @@ const serviceOver = (options: {
 }): AnalyticsService =>
   AnalyticsService.create({
     repository: ClickHouseAnalyticsRepository.create({
-      clickhouse: clickHouseQueryClientOver(options.resolveClient),
+      clickhouse: clickHouseQueryClientOver(
+        deferredVendor(() => options.resolveClient("project-1")),
+      ),
     }),
     evaluationRepository: options.clickhouseEnabled
       ? ClickHouseAnalyticsEvaluationRepository.create({
