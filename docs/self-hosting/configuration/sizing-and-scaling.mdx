@@ -247,6 +247,10 @@ spec:
 
 The chart runs Redis by default. To run Valkey instead, add `-f examples/overlays/redis-valkey.yaml`. Both take the same load. Valkey uses about 10% less CPU, which helps only when Redis CPU is the limit.
 
+<Warning>
+  Choose Valkey when you first install. Valkey can't read the data Redis has saved, so switching an existing install means starting Redis empty: let the workers finish their queued jobs first, and expect everyone to sign in again.
+</Warning>
+
 For an external server, use Redis 7.0 or later, or Valkey 7.2 or later.
 
 ## Cloud Instance Recommendations
