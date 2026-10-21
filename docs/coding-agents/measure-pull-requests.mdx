@@ -80,7 +80,7 @@ The repository comes from git, run in the session's working directory. At the st
 - `git branch --show-current` for the branch;
 - `git rev-parse --git-dir` and `--git-common-dir` to tell a linked worktree from the main checkout.
 
-Codex reads the same values through its `notify` program after each turn. The working directory is the one the agent reports at start, so a `cd` inside a shell command does not change it. [Repository and PR attribution](/coding-agents/repository-and-pr-attribution) explains both reporting channels and their limits.
+The working directory is the one the agent itself reports. A `cd` inside a shell command does not change it. In Claude Code, a checkout switch made by the agent does change it. Codex reads the values through its `notify` program after each turn, from the directory where the session started. [Repository and PR attribution](/coding-agents/repository-and-pr-attribution) explains both reporting channels and their limits.
 
 A Claude Code session reports no repository in each of these cases:
 
