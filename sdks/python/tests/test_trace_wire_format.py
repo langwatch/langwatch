@@ -8,7 +8,6 @@ import threading
 from collections.abc import Iterator
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import ClassVar
-from unittest.mock import patch
 
 import pytest
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
@@ -50,38 +49,46 @@ def receiver() -> Iterator[tuple[str, list[tuple[dict[str, str], bytes]]]]:
     server.server_close()
 
 
-# @scenario The Python SDK sends gzipped protobuf by default
-def test_exporter_sends_gzipped_protobuf_by_default(monkeypatch, receiver) -> None:
-    for name in COMPRESSION_VARIABLES:
-        monkeypatch.delenv(name, raising=False)
-    endpoint, received = receiver
+def export_one_span(endpoint: str, received: list) -> tuple[dict[str, str], bytes]:
     Client.reset_for_testing()
     provider = TracerProvider()
-
     Client(api_key="test-key", endpoint_url=endpoint, tracer_provider=provider)
     provider.get_tracer("wire-test").start_span("python.llm.chat").end()
     assert provider.force_flush()
     Client.reset_for_testing()
-
     assert len(received) == 1
-    headers, body = received[0]
+    return received[0]
+
+
+def span_names(body: bytes) -> list[str]:
+    request = ExportTraceServiceRequest()
+    request.ParseFromString(body)
+    return [span.name for span in request.resource_spans[0].scope_spans[0].spans]
+
+
+# @scenario The Python SDK sends gzipped protobuf by default
+def test_exporter_sends_gzipped_protobuf_by_default(monkeypatch, receiver) -> None:
+    for name in COMPRESSION_VARIABLES:
+        monkeypatch.delenv(name, raising=False)
+
+    headers, body = export_one_span(*receiver)
+
     assert headers["Content-Type"] == "application/x-protobuf"
     assert headers["Content-Encoding"] == "gzip"
-    request = ExportTraceServiceRequest()
-    request.ParseFromString(gzip.decompress(body))
-    spans = request.resource_spans[0].scope_spans[0].spans
-    assert [span.name for span in spans] == ["python.llm.chat"]
+    assert span_names(gzip.decompress(body)) == ["python.llm.chat"]
 
 
 # @scenario The Python SDK leaves compression to the OTel variables when they are set
 @pytest.mark.parametrize("name", COMPRESSION_VARIABLES)
-def test_exporter_defers_to_the_compression_variables(monkeypatch, name) -> None:
+def test_exporter_defers_to_the_compression_variables(
+    monkeypatch, receiver, name
+) -> None:
     for other in COMPRESSION_VARIABLES:
         monkeypatch.delenv(other, raising=False)
     monkeypatch.setenv(name, "none")
-    Client.reset_for_testing()
 
-    with patch("langwatch.client.OTLPSpanExporter") as exporter:
-        Client(api_key="test-key")
+    headers, body = export_one_span(*receiver)
 
-    assert exporter.call_args.kwargs["compression"] is None
+    assert headers["Content-Type"] == "application/x-protobuf"
+    assert "Content-Encoding" not in headers
+    assert span_names(body) == ["python.llm.chat"]
