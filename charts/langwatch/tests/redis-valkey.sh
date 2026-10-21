@@ -33,7 +33,7 @@ image_of() {
 
 # The server command and both probes, with the image line removed.
 behaviour_of() {
-  printf '%s' "$1" | grep -E 'command:|redis-cli|redis-server'
+  printf '%s' "$1" | grep -E 'command:|redis-cli|redis-server' || true
 }
 
 # @scenario "The overlay runs the chart-managed Redis as Valkey"
