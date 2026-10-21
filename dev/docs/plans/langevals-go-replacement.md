@@ -6,6 +6,7 @@ the gateway's two-pile tracing; PII behind a pluggable analyser; the process-hal
 other choice below is a recommendation until the decisions in §12 are taken.
 
 Companions:
+
 - Ragas source of truth: `dev/docs/plans/langevals-go/ragas-0.4.3-reference.md`, rendered by
   running ragas 0.4.3, covering all 13 `ragas/*` evaluators.
 - Specs: `specs/evaluators/go-evaluator-runtime.feature`, `specs/evaluators/ragas-go-parity.feature`,
@@ -16,44 +17,44 @@ Companions:
 Every finding was checked against the code; blockers were re-verified by hand. "§" references
 point at the section of this plan that resolves each one.
 
-| # | Sev | Finding | Evidence | Fix |
-|---|---|---|---|---|
-| 1 | blocker | nlpgo's `/go/*` has no inbound auth; the plan sends provider credentials and a project API key over it, and without Lambda the "URL secrecy + SG" posture is gone | `services/nlpgo/adapters/httpapi/router.go:52-80`; `specs/nlp-go/_shared/contract.md:73,240`; no NetworkPolicy in `charts/langwatch/templates/langwatch_nlp/` | §5.1 |
-| 2 | blocker | Customer trace routing is last-writer-wins per project id: a request pairing B's id with A's key re-points `registry[B]`, and B's queued spans export under A's key into A's project | `pkg/customertracebridge/registry.go:59,72-74`, `transport.go:110,211`; ingest trusts the token (`otlp-ingest.rest.ts:218`) | §6.1 |
-| 3 | blocker | The new feature files enforce no scenario, so the parity checker fails them | `check-feature-parity.ts:1743,1884-1894` | §10 |
-| 4 | blocker | 13 `ragas/*` evaluators exist, the plan had 9 (context_precision, context_recall, context_f1 are non-LLM string distance; response_context_precision is two LLM metrics) | `services/langevals/evaluators/ragas/langevals_ragas/`; `evaluators.generated.ts` | §8.3 |
-| 5 | blocker | The TS evaluator catalogue and its Zod settings schemas are generated from Python; nothing regenerates them once Python goes | `services/langevals/scripts/generate_evaluators_ts.py` → `modules/evaluator/contract/src/evaluators.generated.ts` and ~15 consumers | §7 |
-| 6 | major | nlpgo's multi-tenant `otelsetup` wipes attributes on keyless spans (`stub.Attributes = nil`) and sends keyed spans to the customer, so the ops pile would get nothing and the customer duplicates | `pkg/otelsetup/tenant_router.go:236`; `services/nlpgo/deps.go:68` | §6.2 |
-| 7 | major | The bridge cannot build "evaluation parent + judge children": `BeginSpan` names every span `gen_ai.<type>` and parents to the inbound traceparent; the probe-drop heuristic drops tool-only judge answers; no causality depth, so an evaluation trace can re-trigger monitors | `emitter.go:237-259,427-431`; `evaluation-trigger.subscriber.ts:178-201`; precedent `workflow-evaluation.service.ts:37-44` | §6.1 |
-| 8 | major | `ForbiddenInternalSpanAttrs` is a gen_ai denylist; evaluation `details`, labels and provider errors quote entry text | `gatewaytracer/internal_span.go:21` | §6.2 |
-| 9 | major | Tracing adds 1 + N billable `SPAN_RECEIVED` units per evaluation; today evaluator spend reaches only `EvaluationCost`, no gateway budget | `billable-events-meter.projection.ts:88-94`; `evaluation-execution-receipt.service.ts:63-74` | §6.3 |
-| 10 | major | `BlockLocalHTTPCalls` defaults off; `pkg/ssrf` classifies but does not dial; Azure's endpoint is tenant-supplied; a shared in-cluster pod widens the blast radius | `services/nlpgo/config.go:23`; `values.yaml:1165`; `azure-safety-credentials.service.ts:34` | §5.3 |
-| 11 | major | nlpgo caps every body at 32 MiB; clustering allows 180 MB; the chart gives nlpgo 1Gi shared with the studio; (revised: TS pages at most 2,000 traces, so the distance matrix is 16 MB and real bodies stay under ~64 MB) | `pkg/config/server.go:28`; `router.go:65`; `values.yaml:1193` | §5.4, §8.6 |
-| 12 | major | Moving clustering reverses a recorded ruling (clustering stays Python) and "~200 lines" understates ~1,100 lines of Python | `specs/nlp-go/_shared/contract.md:22`; `specs/nlp-go/topic-clustering.feature`; `python-removal.feature:56` | §8.6 |
-| 13 | major | PII must return Presidio's anonymised text too, not just findings; a non-processed status leaves the text unredacted | `presidio-redaction.service.ts` (`clearingOf` reads `raw_response.anonymized`) | §9 |
-| 14 | major | A Go `google-dlp` analyser duplicates data-privacy's DLP; `connect` needs licensing, which lives in TS (a TS→Go→TS cycle); `presidio` has nothing to call after deletion | `pii-redaction-policy.service.ts:117`; `http.google-dlp.channel.ts`; `InstantEvalConnectJudgeService` | §9 |
-| 15 | major | PII scores: Presidio boosts context with spaCy lemmas (+0.35, floor 0.4), phone starts at 0.4, spaCy NER is a flat 0.85; model and DLP scores are on other scales; `min_threshold` 0.5 flips | `pii_detection.py`; Presidio recognisers | §9 |
-| 16 | major | Replay parity with byte-identical prompts is deterministic, so tolerances hide bugs; live runs need a tolerance measured from Python's own spread; replay needs full request/response pairs incl. repairs, `n=3` and embeddings | reference §2, §5 | §8.3 |
-| 17 | major | Ragas asks with the schema in the prompt (no structured output); the langevals judges force a tool call; "byte-identical" holds for the user message only; the token-limit skip counts with `litellm.encode` per model | reference §1, §5 | §8.2, §8.3 |
-| 18 | major | The Go module name `evaluation` / `EvaluationApi` collides with the TS module and token; the TS module owns the boundary | `modules/catalogue.json:95`; `evaluation.api.ts:121`; ARCHITECTURE.md §3.3 | §3 |
-| 19 | major | The module would import nlpgo's hexagonal `adapters/` and `aigateway/domain`; raw clients must cross only at channel construction | ARCHITECTURE.md §3.2 | §3.2 |
-| 20 | major | Config and secrets: declarations belong in the contract; a secret is never a config field; Go has no `Secret.load` | ARCHITECTURE.md §6; `pkg/config.Hydrate` | §3.3 |
-| 21 | major | No error codes; Go's equivalent of a handled error is `pkg/herr` | ARCHITECTURE.md §3.1, §12; nlpgo `router.go:147` | §3.4 |
-| 22 | major | Services are not one per entity (`JudgeService` is a procedure); the analyser choice had two homes | ARCHITECTURE.md §3.2 | §3.1 |
-| 23 | major | The published `langevals` PyPI library (+ `langevals-core`, six extras, pytest plugin, notebooks, docs site) dies with the directory | `services/langevals/pyproject.toml`; `langevals-publish-pypi.yml`; release-please | §11, §12 |
-| 24 | major | The npx CLI runs langevals through uv; compose, haven, helm, CI (incl. a required check), e2e and visualdiff all start it | `apps/server/src/services/langevals.ts`, `venvs.ts`; `infra/compose.yml`; `langevals-ci.yml:183` | §11 |
-| 25 | major | The evaluation module has no config to reach nlpgo; `LANGWATCH_NLP_SERVICE` is model-provider's leaf with an unresolved shared-fact note | `workflow.app.ts:508-509` | §4 |
-| 26 | major | Rollout had no per-evaluator switch, shadow mode, dashboards or rollback | plan §Order | §4 |
-| 27 | major | Missing error paths in specs: unknown slug, bad settings, provider 5xx vs rate limit, deadline, over the project limit, failed trace export, analyser failure, oversized text, NaN, divide by zero | specs | §10 |
-| 28 | major | Scenarios bound to Python tests unbind on deletion; one TS test reads `select_best_compare.py` directly | `check-feature-parity.ts:280,2061`; `comparison-config-form.judge-prompt-parity.unit.test.ts:34` | §10, §11 |
-| 29 | minor | The ruling sat in §1 while the plan listed it as open; "one package per slot" ignored the grammar's tier folders | ARCHITECTURE.md; `feature-layout-policy.mjs:75-85` | done: moved to §3.2 |
-| 30 | minor | Vocabulary: "members", `New(Setup)` bags, `catalogue.go` vs `modules/catalogue.json`, `{module}` path param, `/go/langevals` naming a deleted service, "live" suffix | ARCHITECTURE.md §5, §8 | §3 |
-| 31 | minor | Go lint runs misspell with `locale: US`; initialisms want `PII`, `LLM` | `.golangci.yml:100-104` | §3 |
-| 32 | minor | Embeddings get the install's fallback keys from TS itself (`prepareEnvKeys`); Vertex's `GOOGLE_APPLICATION_CREDENTIALS` is the only Python-only fallback | `legacy-model-provider.rules.ts:239-243,271`; `litellm_patch.py:503-508` | §5.2 |
-| 33 | minor | Retries and deadlines: TS retries once on 5xx and aborts at 5 min; Python ignores `Idempotency-Key` | `langevals-evaluator.service.ts:141-143`; `evaluation.app.ts:226-227` | §5.5 |
-| 34 | minor | `image_support.py` and `tool_calls.py` (multimodal and tool-call inputs to judges) were missing | `langevals_core/` | §8.2 |
-| 35 | minor | Deprecated `langevals/pairwise_compare`; hidden `aws/comprehend_pii_detection`, `google_cloud/dlp_pii_detection`; TS-only `langwatch/api_keys_and_secrets_detection` | `pairwise_compare.py:156`; `evaluator-catalogue.rules.ts:19-20` | §8.1 |
-| 36 | minor | Record edits implied but not listed: §3.3 staging line, §1 table (`services/piimodel`), §3.5 availability row, contract.md posture | ARCHITECTURE.md | §11 |
+| #   | Sev     | Finding                                                                                                                                                                                                                                                                       | Evidence                                                                                                                                                      | Fix                 |
+| --- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| 1   | blocker | nlpgo's `/go/*` has no inbound auth; the plan sends provider credentials and a project API key over it, and without Lambda the "URL secrecy + SG" posture is gone                                                                                                             | `services/nlpgo/adapters/httpapi/router.go:52-80`; `specs/nlp-go/_shared/contract.md:73,240`; no NetworkPolicy in `charts/langwatch/templates/langwatch_nlp/` | §5.1                |
+| 2   | blocker | Customer trace routing is last-writer-wins per project id: a request pairing B's id with A's key re-points `registry[B]`, and B's queued spans export under A's key into A's project                                                                                          | `pkg/customertracebridge/registry.go:59,72-74`, `transport.go:110,211`; ingest trusts the token (`otlp-ingest.rest.ts:218`)                                   | §6.1                |
+| 3   | blocker | The new feature files enforce no scenario, so the parity checker fails them                                                                                                                                                                                                   | `check-feature-parity.ts:1743,1884-1894`                                                                                                                      | §10                 |
+| 4   | blocker | 13 `ragas/*` evaluators exist, the plan had 9 (context_precision, context_recall, context_f1 are non-LLM string distance; response_context_precision is two LLM metrics)                                                                                                      | `services/langevals/evaluators/ragas/langevals_ragas/`; `evaluators.generated.ts`                                                                             | §8.3                |
+| 5   | blocker | The TS evaluator catalogue and its Zod settings schemas are generated from Python; nothing regenerates them once Python goes                                                                                                                                                  | `services/langevals/scripts/generate_evaluators_ts.py` → `modules/evaluator/contract/src/evaluators.generated.ts` and ~15 consumers                           | §7                  |
+| 6   | major   | nlpgo's multi-tenant `otelsetup` wipes attributes on keyless spans (`stub.Attributes = nil`) and sends keyed spans to the customer, so the ops pile would get nothing and the customer duplicates                                                                             | `pkg/otelsetup/tenant_router.go:236`; `services/nlpgo/deps.go:68`                                                                                             | §6.2                |
+| 7   | major   | The bridge cannot build "evaluation parent + judge children": `BeginSpan` names every span `gen_ai.<type>` and parents to the inbound traceparent; the probe-drop heuristic drops tool-only judge answers; no causality depth, so an evaluation trace can re-trigger monitors | `emitter.go:237-259,427-431`; `evaluation-trigger.subscriber.ts:178-201`; precedent `workflow-evaluation.service.ts:37-44`                                    | §6.1                |
+| 8   | major   | `ForbiddenInternalSpanAttrs` is a gen_ai denylist; evaluation `details`, labels and provider errors quote entry text                                                                                                                                                          | `gatewaytracer/internal_span.go:21`                                                                                                                           | §6.2                |
+| 9   | major   | Tracing adds 1 + N billable `SPAN_RECEIVED` units per evaluation; today evaluator spend reaches only `EvaluationCost`, no gateway budget                                                                                                                                      | `billable-events-meter.projection.ts:88-94`; `evaluation-execution-receipt.service.ts:63-74`                                                                  | §6.3                |
+| 10  | major   | `BlockLocalHTTPCalls` defaults off; `pkg/ssrf` classifies but does not dial; Azure's endpoint is tenant-supplied; a shared in-cluster pod widens the blast radius                                                                                                             | `services/nlpgo/config.go:23`; `values.yaml:1165`; `azure-safety-credentials.service.ts:34`                                                                   | §5.3                |
+| 11  | major   | nlpgo caps every body at 32 MiB; clustering allows 180 MB; the chart gives nlpgo 1Gi shared with the studio; (revised: TS pages at most 2,000 traces, so the distance matrix is 16 MB and real bodies stay under ~64 MB)                                                      | `pkg/config/server.go:28`; `router.go:65`; `values.yaml:1193`                                                                                                 | §5.4, §8.6          |
+| 12  | major   | Moving clustering reverses a recorded ruling (clustering stays Python) and "~200 lines" understates ~1,100 lines of Python                                                                                                                                                    | `specs/nlp-go/_shared/contract.md:22`; `specs/nlp-go/topic-clustering.feature`; `python-removal.feature:56`                                                   | §8.6                |
+| 13  | major   | PII must return Presidio's anonymised text too, not just findings; a non-processed status leaves the text unredacted                                                                                                                                                          | `presidio-redaction.service.ts` (`clearingOf` reads `raw_response.anonymized`)                                                                                | §9                  |
+| 14  | major   | A Go `google-dlp` analyser duplicates data-privacy's DLP; `connect` needs licensing, which lives in TS (a TS→Go→TS cycle); `presidio` has nothing to call after deletion                                                                                                      | `pii-redaction-policy.service.ts:117`; `http.google-dlp.channel.ts`; `InstantEvalConnectJudgeService`                                                         | §9                  |
+| 15  | major   | PII scores: Presidio boosts context with spaCy lemmas (+0.35, floor 0.4), phone starts at 0.4, spaCy NER is a flat 0.85; model and DLP scores are on other scales; `min_threshold` 0.5 flips                                                                                  | `pii_detection.py`; Presidio recognisers                                                                                                                      | §9                  |
+| 16  | major   | Replay parity with byte-identical prompts is deterministic, so tolerances hide bugs; live runs need a tolerance measured from Python's own spread; replay needs full request/response pairs incl. repairs, `n=3` and embeddings                                               | reference §2, §5                                                                                                                                              | §8.3                |
+| 17  | major   | Ragas asks with the schema in the prompt (no structured output); the langevals judges force a tool call; "byte-identical" holds for the user message only; the token-limit skip counts with `litellm.encode` per model                                                        | reference §1, §5                                                                                                                                              | §8.2, §8.3          |
+| 18  | major   | The Go module name `evaluation` / `EvaluationApi` collides with the TS module and token; the TS module owns the boundary                                                                                                                                                      | `modules/catalogue.json:95`; `evaluation.api.ts:121`; ARCHITECTURE.md §3.3                                                                                    | §3                  |
+| 19  | major   | The module would import nlpgo's hexagonal `adapters/` and `aigateway/domain`; raw clients must cross only at channel construction                                                                                                                                             | ARCHITECTURE.md §3.2                                                                                                                                          | §3.2                |
+| 20  | major   | Config and secrets: declarations belong in the contract; a secret is never a config field; Go has no `Secret.load`                                                                                                                                                            | ARCHITECTURE.md §6; `pkg/config.Hydrate`                                                                                                                      | §3.3                |
+| 21  | major   | No error codes; Go's equivalent of a handled error is `pkg/herr`                                                                                                                                                                                                              | ARCHITECTURE.md §3.1, §12; nlpgo `router.go:147`                                                                                                              | §3.4                |
+| 22  | major   | Services are not one per entity (`JudgeService` is a procedure); the analyser choice had two homes                                                                                                                                                                            | ARCHITECTURE.md §3.2                                                                                                                                          | §3.1                |
+| 23  | major   | The published `langevals` PyPI library (+ `langevals-core`, six extras, pytest plugin, notebooks, docs site) dies with the directory                                                                                                                                          | `services/langevals/pyproject.toml`; `langevals-publish-pypi.yml`; release-please                                                                             | §11, §12            |
+| 24  | major   | The npx CLI runs langevals through uv; compose, haven, helm, CI (incl. a required check), e2e and visualdiff all start it                                                                                                                                                     | `apps/server/src/services/langevals.ts`, `venvs.ts`; `infra/compose.yml`; `langevals-ci.yml:183`                                                              | §11                 |
+| 25  | major   | The evaluation module has no config to reach nlpgo; `LANGWATCH_NLP_SERVICE` is model-provider's leaf with an unresolved shared-fact note                                                                                                                                      | `workflow.app.ts:508-509`                                                                                                                                     | §4                  |
+| 26  | major   | Rollout had no per-evaluator switch, shadow mode, dashboards or rollback                                                                                                                                                                                                      | plan §Order                                                                                                                                                   | §4                  |
+| 27  | major   | Missing error paths in specs: unknown slug, bad settings, provider 5xx vs rate limit, deadline, over the project limit, failed trace export, analyser failure, oversized text, NaN, divide by zero                                                                            | specs                                                                                                                                                         | §10                 |
+| 28  | major   | Scenarios bound to Python tests unbind on deletion; one TS test reads `select_best_compare.py` directly                                                                                                                                                                       | `check-feature-parity.ts:280,2061`; `comparison-config-form.judge-prompt-parity.unit.test.ts:34`                                                              | §10, §11            |
+| 29  | minor   | The ruling sat in §1 while the plan listed it as open; "one package per slot" ignored the grammar's tier folders                                                                                                                                                              | ARCHITECTURE.md; `feature-layout-policy.mjs:75-85`                                                                                                            | done: moved to §3.2 |
+| 30  | minor   | Vocabulary: "members", `New(Setup)` bags, `catalogue.go` vs `modules/catalogue.json`, `{module}` path param, `/go/langevals` naming a deleted service, "live" suffix                                                                                                          | ARCHITECTURE.md §5, §8                                                                                                                                        | §3                  |
+| 31  | minor   | Go lint runs misspell with `locale: US`; initialisms want `PII`, `LLM`                                                                                                                                                                                                        | `.golangci.yml:100-104`                                                                                                                                       | §3                  |
+| 32  | minor   | Embeddings get the install's fallback keys from TS itself (`prepareEnvKeys`); Vertex's `GOOGLE_APPLICATION_CREDENTIALS` is the only Python-only fallback                                                                                                                      | `legacy-model-provider.rules.ts:239-243,271`; `litellm_patch.py:503-508`                                                                                      | §5.2                |
+| 33  | minor   | Retries and deadlines: TS retries once on 5xx and aborts at 5 min; Python ignores `Idempotency-Key`                                                                                                                                                                           | `langevals-evaluator.service.ts:141-143`; `evaluation.app.ts:226-227`                                                                                         | §5.5                |
+| 34  | minor   | `image_support.py` and `tool_calls.py` (multimodal and tool-call inputs to judges) were missing                                                                                                                                                                               | `langevals_core/`                                                                                                                                             | §8.2                |
+| 35  | minor   | Deprecated `langevals/pairwise_compare`; hidden `aws/comprehend_pii_detection`, `google_cloud/dlp_pii_detection`; TS-only `langwatch/api_keys_and_secrets_detection`                                                                                                          | `pairwise_compare.py:156`; `evaluator-catalogue.rules.ts:19-20`                                                                                               | §8.1                |
+| 36  | minor   | Record edits implied but not listed: §3.3 staging line, §1 table (`services/piimodel`), §3.5 availability row, contract.md posture                                                                                                                                            | ARCHITECTURE.md                                                                                                                                               | §11                 |
 
 ## 2. What stays true
 
@@ -146,15 +147,15 @@ services/nlpgo/modules/evaluators/
 `LangevalsChannel` maps each to a `HandledError`. The wire is internal, so `herr`'s nested
 `error` body is acceptable here.
 
-| Code | Status | When |
-|---|---|---|
-| `evaluator_not_found` | 404 | unknown `{family}/{evaluator}` |
-| `evaluator_settings_invalid` | 400 | settings fail the definition's schema |
-| `evaluation_payload_too_large` | 413 | over the per-route cap |
-| `tenant_missing` | 400 | no project id header |
-| `unauthorized` | 401 | internal bearer secret missing or wrong (§5.1) |
-| `evaluation_busy` | 429 + `retryAfterMs` | fair share full after the bounded wait |
-| `pii_analyzer_unavailable` | 200, result `error` | analyser timeout or 5xx; TS falls back to the essential floor |
+| Code                           | Status               | When                                                          |
+| ------------------------------ | -------------------- | ------------------------------------------------------------- |
+| `evaluator_not_found`          | 404                  | unknown `{family}/{evaluator}`                                |
+| `evaluator_settings_invalid`   | 400                  | settings fail the definition's schema                         |
+| `evaluation_payload_too_large` | 413                  | over the per-route cap                                        |
+| `tenant_missing`               | 400                  | no project id header                                          |
+| `unauthorized`                 | 401                  | internal bearer secret missing or wrong (§5.1)                |
+| `evaluation_busy`              | 429 + `retryAfterMs` | fair share full after the bounded wait                        |
+| `pii_analyzer_unavailable`     | 200, result `error`  | analyser timeout or 5xx; TS falls back to the essential floor |
 
 A provider failure after a provider call is never a 5xx: the entry is `status: "error"` with the
 cost accrued so far (§5.5).
@@ -238,7 +239,7 @@ limit, at most 2 jobs per pod, an 11-minute deadline under TS's 12 (decision D6)
 shared package (options, so the gateway is untouched):
 
 1. **Route by fingerprint, not project id.** Stamp `langwatch.route_key = projectID + ":" +
-   sha256(key)[:12]` on each span and register under that key. A mismatched pair can then only ever
+sha256(key)[:12]` on each span and register under that key. A mismatched pair can then only ever
    write into the key's own project, and concurrent keys for one project never overwrite each other.
 2. **No key, no customer span.** Never call `Begin`; never delete a registry entry for a keyless
    request.
@@ -284,16 +285,16 @@ parity-tested against it). The docs generator's fetch of
 
 ### 8.1 Inventory
 
-| Family | Evaluators | Kind |
-|---|---|---|
-| `langevals/` pure | exact_match, basic, competitor_blocklist, valid_format | rules; SQL validation needs a Go SQL parser for sqlglot |
-| `langevals/` embeddings | sentiment, similarity | `Embed` + cosine |
-| `langevals/` judges | llm_boolean, llm_score, llm_category, llm_answer_match, competitor_llm, competitor_llm_function_call, off_topic, query_resolution, select_best_compare, pairwise_compare (deprecated, decision D11) | judge loop, forced tool call |
-| `ragas/` non-LLM | bleu_score, rouge_score, context_precision, context_recall, context_f1 | rules, exact |
-| `ragas/` LLM | faithfulness, factual_correctness, response_context_recall, response_context_precision, response_relevancy, summarization_score, rubrics_based_scoring, sql_query_equivalence | ragas loop, JSON in prompt |
-| vendors | openai/moderation, azure/content_safety, azure/jailbreak, azure/prompt_injection | http channels |
-| language | lingua/language_detection | `lingua-go` |
-| PII | presidio/pii_detection | §9 |
+| Family                  | Evaluators                                                                                                                                                                                          | Kind                                                    |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| `langevals/` pure       | exact_match, basic, competitor_blocklist, valid_format                                                                                                                                              | rules; SQL validation needs a Go SQL parser for sqlglot |
+| `langevals/` embeddings | sentiment, similarity                                                                                                                                                                               | `Embed` + cosine                                        |
+| `langevals/` judges     | llm_boolean, llm_score, llm_category, llm_answer_match, competitor_llm, competitor_llm_function_call, off_topic, query_resolution, select_best_compare, pairwise_compare (deprecated, decision D11) | judge loop, forced tool call                            |
+| `ragas/` non-LLM        | bleu_score, rouge_score, context_precision, context_recall, context_f1                                                                                                                              | rules, exact                                            |
+| `ragas/` LLM            | faithfulness, factual_correctness, response_context_recall, response_context_precision, response_relevancy, summarization_score, rubrics_based_scoring, sql_query_equivalence                       | ragas loop, JSON in prompt                              |
+| vendors                 | openai/moderation, azure/content_safety, azure/jailbreak, azure/prompt_injection                                                                                                                    | http channels                                           |
+| language                | lingua/language_detection                                                                                                                                                                           | `lingua-go`                                             |
+| PII                     | presidio/pii_detection                                                                                                                                                                              | §9                                                      |
 
 Not ported: `aws/comprehend_pii_detection` and `google_cloud/dlp_pii_detection` (hidden, never
 generated). `langwatch/api_keys_and_secrets_detection` is TS-native and unaffected.
@@ -402,14 +403,14 @@ type AnalyzeResult struct {
   nlpgo), `POST /v1/analyze` behind a Bearer key; its own chart entry; ONNX Runtime is
   linux/amd64-tested, so arm64 needs its own validation. Candidates:
 
-| Model | Licence | Notes |
-|---|---|---|
-| A permissive BERT/DeBERTa PER/LOC token classifier | check per model | Runs in hugot as-is; lowest-risk spaCy replacement |
-| knowledgator/gliner-pii-base | Apache-2.0 | 197 MB UINT8 ONNX; ~200 lines of GLiNER span decoding in Go |
-| OpenAI Privacy Filter | Apache-2.0 | 1.5B MoE, no LOCATION label, weak real-world recall in one vendor benchmark |
-| LiquidAI LFM2.5-Encoder-350M-PII | LFM1.0, terms unverified | Multilingual, strong claimed F1 |
-| Piiranha | CC-BY-NC-ND | Not usable |
-| Perplexity PII-Tracer | check | 0.6B, 13 languages, on-device focus; too large to embed, fine as a `remote` analyser an operator runs |
+| Model                                              | Licence                  | Notes                                                                                                 |
+| -------------------------------------------------- | ------------------------ | ----------------------------------------------------------------------------------------------------- |
+| A permissive BERT/DeBERTa PER/LOC token classifier | check per model          | Runs in hugot as-is; lowest-risk spaCy replacement                                                    |
+| knowledgator/gliner-pii-base                       | Apache-2.0               | 197 MB UINT8 ONNX; ~200 lines of GLiNER span decoding in Go                                           |
+| OpenAI Privacy Filter                              | Apache-2.0               | 1.5B MoE, no LOCATION label, weak real-world recall in one vendor benchmark                           |
+| LiquidAI LFM2.5-Encoder-350M-PII                   | LFM1.0, terms unverified | Multilingual, strong claimed F1                                                                       |
+| Piiranha                                           | CC-BY-NC-ND              | Not usable                                                                                            |
+| Perplexity PII-Tracer                              | check                    | 0.6B, 13 languages, on-device focus; too large to embed, fine as a `remote` analyser an operator runs |
 
 - **Data residency**: `connect` and a SaaS-hosted `remote` send trace text to LangWatch; per-org
   opt-in, DPA coverage and region pinning are part of the connect decision.
@@ -417,7 +418,7 @@ type AnalyzeResult struct {
 ## 10. Specs and tests
 
 - Every scenario carries its intended level now (`@unit @unimplemented`, `@integration
-  @unimplemented`) and the three files sit in `LEGACY_INERT` under the "planned, not yet built"
+@unimplemented`) and the three files sit in `LEGACY_INERT` under the "planned, not yet built"
   block; each file leaves the list with its first binding.
 - Steps are declarative: no env var names, package names or file paths in steps.
 - Existing specs rebind to Go before their Python tests are deleted:
@@ -438,6 +439,7 @@ Each phase ends green on its own: scoped Go lint and tests, the parity checker, 
 flips it names. Nothing flips without replay parity.
 
 **Phase 0: decisions and groundwork**
+
 1. Take the decisions in §12.
 2. Record the parity fixtures from Python for every evaluator (ragas, judges, vendors, clustering,
    Presidio on a labelled PII sample), with full request/response pairs.
@@ -446,6 +448,7 @@ flips it names. Nothing flips without replay parity.
    Vertex fallback reliance.
 
 **Phase 1: skeleton and security** (flips `langevals/exact_match`)
+
 1. `modules/evaluators` with contract, config, errors, transport, `EvaluationService`, fair share,
    deadline, ops tracer with allowlist and canary test.
 2. Internal bearer auth on the rpc transport + TS `Secret.load`; NetworkPolicy; safe dialer moved to `pkg/`.
@@ -477,6 +480,7 @@ Patterns (all Presidio recognisers we request, with scores and boosting); `PIIAn
 `services/piimodel` with the chosen model; parity against recorded Presidio answers; flip.
 
 **Phase 7: deletion**
+
 - Code: `services/langevals` (evaluators, core, server, scripts, notebooks, docs site,
   ts-integration), `pyproject.toml` workspace entry, ADR-145 note, `python-uv-workspace.feature`.
 - Library: final `langevals` release marked deprecated (decision D1), `langevals-publish-pypi.yml`,
@@ -501,26 +505,26 @@ Patterns (all Presidio recognisers we request, with scores and boosting); `PIIAn
 
 ## 12. Decisions
 
-| # | Decision | Recommendation |
-|---|---|---|
-| D1 | The `langevals` PyPI library | **Decided:** final release marked deprecated pointing at LangWatch evaluations; archive |
-| D2 | Inbound auth on `/go/evaluators/*` | **Decided:** the Go services' internal RPC auth (langyagent's bearer secret + `pkg/rpc`), plus NetworkPolicy |
-| D3 | Trace credential | **Decided:** short-lived ingest-only token minted by TS per evaluation; fingerprint routing either way |
-| D4 | Do evaluation spans count as billable spans? | No; exempt origin `evaluation` |
-| D5 | Move the studio from `TenantRouter` onto the bridge | Yes, after phase 1, so nlpgo has one customer pile |
-| D6 | Clustering | **Decided:** ported last (phase 5), superseding the ruling, in its own nlpgo Deployment with S3 staging kept for large payloads |
-| D7 | `connect` for PII | data-privacy decides and passes endpoint + credential per request |
-| D8 | Catalogue source of truth | Go definitions generate the TS file |
-| D9 | New `gateway` channel tier for the in-process dispatcher | Yes, Go only |
-| D10 | A Go secrets mechanism (`Secret.load` equivalent) | Resolve in `deps.go` now; a `pkg/secret` later |
-| D11 | Port the deprecated `pairwise_compare` | Only if it has usage in the last 90 days |
-| D12 | Per-project concurrency limit | 8 in flight per project, 64 global |
-| D13 | Who hosts the PII model for self-hosters by default | `null` until the sidecar is enabled in the chart |
-| D14 | Rollout switch | **Decided:** Python stays the production path; Go only behind an explicit flag (haven `+go-evaluators` in dev; chart values default off; nlpgo mounts `/go/evaluators` only with its secret) |
-| D15 | `valid_format` python and sql modes | **Decided:** best-effort Go parsers measured against the recorded fixtures; a mode short of parity keeps the evaluator on Python |
-| D16 | `lingua/language_detection` | **Decided:** Fork C: vendored lingua-go v1.4.0 in `third_party/`, flat models generated at build time into a file the nlp image ships and nlpgo maps at boot (`NLPGO_LINGUA_MODELS`; no build tag), Rust tokeniser regex; 1e-15 parity, ~7 MB anonymous RSS (measurements: the lingua research notes) |
-| D17 | Where evaluators run in production | Proposed: in place in a shared nlpgo Deployment, SaaS and self-hosted alike; no Lambda for evaluators (§13) |
-| D18 | Language for new code blocks | Open: Starlark in place is the recommendation; Python stays on the per-project Lambda (§13.3) |
+| #   | Decision                                                 | Recommendation                                                                                                                                                                                                                                                                                        |
+| --- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D1  | The `langevals` PyPI library                             | **Decided:** final release marked deprecated pointing at LangWatch evaluations; archive                                                                                                                                                                                                               |
+| D2  | Inbound auth on `/go/evaluators/*`                       | **Decided:** the Go services' internal RPC auth (langyagent's bearer secret + `pkg/rpc`), plus NetworkPolicy                                                                                                                                                                                          |
+| D3  | Trace credential                                         | **Decided:** short-lived ingest-only token minted by TS per evaluation; fingerprint routing either way                                                                                                                                                                                                |
+| D4  | Do evaluation spans count as billable spans?             | No; exempt origin `evaluation`                                                                                                                                                                                                                                                                        |
+| D5  | Move the studio from `TenantRouter` onto the bridge      | Yes, after phase 1, so nlpgo has one customer pile                                                                                                                                                                                                                                                    |
+| D6  | Clustering                                               | **Decided:** ported last (phase 5), superseding the ruling, in its own nlpgo Deployment with S3 staging kept for large payloads                                                                                                                                                                       |
+| D7  | `connect` for PII                                        | data-privacy decides and passes endpoint + credential per request                                                                                                                                                                                                                                     |
+| D8  | Catalogue source of truth                                | Go definitions generate the TS file                                                                                                                                                                                                                                                                   |
+| D9  | New `gateway` channel tier for the in-process dispatcher | Yes, Go only                                                                                                                                                                                                                                                                                          |
+| D10 | A Go secrets mechanism (`Secret.load` equivalent)        | Resolve in `deps.go` now; a `pkg/secret` later                                                                                                                                                                                                                                                        |
+| D11 | Port the deprecated `pairwise_compare`                   | Only if it has usage in the last 90 days                                                                                                                                                                                                                                                              |
+| D12 | Per-project concurrency limit                            | 8 in flight per project, 64 global                                                                                                                                                                                                                                                                    |
+| D13 | Who hosts the PII model for self-hosters by default      | `null` until the sidecar is enabled in the chart                                                                                                                                                                                                                                                      |
+| D14 | Rollout switch                                           | **Decided:** Python stays the production path; Go only behind an explicit flag (haven `+go-evaluators` in dev; chart values default off; nlpgo mounts `/go/evaluators` only with its secret)                                                                                                          |
+| D15 | `valid_format` python and sql modes                      | **Decided:** best-effort Go parsers measured against the recorded fixtures; a mode short of parity keeps the evaluator on Python                                                                                                                                                                      |
+| D16 | `lingua/language_detection`                              | **Decided:** Fork C: vendored lingua-go v1.4.0 in `third_party/`, flat models generated at build time into a file the nlp image ships and nlpgo maps at boot (`NLPGO_LINGUA_MODELS`; no build tag), Rust tokeniser regex; 1e-15 parity, ~7 MB anonymous RSS (measurements: the lingua research notes) |
+| D17 | Where evaluators run in production                       | Proposed: in place in a shared nlpgo Deployment, SaaS and self-hosted alike; no Lambda for evaluators (§13)                                                                                                                                                                                           |
+| D18 | Language for new code blocks                             | Open: Starlark in place is the recommendation; Python stays on the per-project Lambda (§13.3)                                                                                                                                                                                                         |
 
 ## 13. Production shape
 
@@ -569,13 +573,13 @@ single trusted tenant and should be documented as such.
 A language that runs in place, safely, would remove the Lambda cold start for new blocks.
 Candidates that embed in Go:
 
-| Option | Per call | Isolation | Close to today's Python |
-|---|---|---|---|
+| Option                                                     | Per call                                            | Isolation                                                                                    | Close to today's Python                                                     |
+| ---------------------------------------------------------- | --------------------------------------------------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
 | Starlark (`go.starlark.net`, already in `services/go.mod`) | microseconds to start; slower than CPython per step | No file, network or env access unless given; step limit and cancel; no memory cap of its own | Python syntax, dicts, lists, strings; no classes, `try`, `while` or imports |
-| goja (JavaScript in Go) | about 1 ms per runtime, pooled | Interrupt for time; no memory cap | A different language |
-| QuickJS compiled to wasm under wazero | milliseconds with a module cache | Strongest in place: hard memory cap, fuel or timeout, no host access | A different language |
-| Pydantic Monty under wazero | microseconds native, more in wasm | Hard memory cap through wasm | Python subset; young |
-| CEL / expr | nanoseconds | Not Turing-complete, cost limits | Expressions only |
+| goja (JavaScript in Go)                                    | about 1 ms per runtime, pooled                      | Interrupt for time; no memory cap                                                            | A different language                                                        |
+| QuickJS compiled to wasm under wazero                      | milliseconds with a module cache                    | Strongest in place: hard memory cap, fuel or timeout, no host access                         | A different language                                                        |
+| Pydantic Monty under wazero                                | microseconds native, more in wasm                   | Hard memory cap through wasm                                                                 | Python subset; young                                                        |
+| CEL / expr                                                 | nanoseconds                                         | Not Turing-complete, cost limits                                                             | Expressions only                                                            |
 
 Recommendation: Starlark. It reads like Python, it is already a dependency, and it has hard step
 limits and no outside access unless the host grants it. HTTP, JSON and the LangWatch client become
@@ -596,15 +600,15 @@ Every langevals call over HTTP, so every Lambda call, waits at least 100 ms in a
 `evaluate_batch` resets `_tqdm_disabled_once` and `_disable_tqdm` then sleeps 0.1 s
 (`langevals_core/base_evaluator.py:442-453`). That sleep is most of the gap.
 
-| | Go | langevals |
-|---|---|---|
-| One call in process, p50 (exact_match / rouge / context_f1 / PII regex / lingua) | 4.5 / 4.3 / 4.3 / 33 / 500 µs | 21 / 258 / 416 / 3,430 / 589 µs |
-| One call over HTTP, warm, p50 | 0.07 ms (lingua 0.65 ms) | 105 to 137 ms |
-| 32 concurrent, exact_match | 67,900 a second | 306 a second |
-| LLM judge overhead, instant fake model | 0.37 ms | 109 ms (2.3 ms without the sleep) |
-| Process start to first answer | 73 to 88 ms, every evaluator | 2.7 s (langevals) to 10 s (ragas) per evaluator package |
-| Memory, idle / under load | 129 / 335 MB, every evaluator | 2.8 / 2.9 GB, every package |
-| On disk | 308 MB binary with lingua's models (63 MB without) | 1.7 GB of packages, plus the Python image |
+|                                                                                  | Go                                                 | langevals                                               |
+| -------------------------------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------- |
+| One call in process, p50 (exact_match / rouge / context_f1 / PII regex / lingua) | 4.5 / 4.3 / 4.3 / 33 / 500 µs                      | 21 / 258 / 416 / 3,430 / 589 µs                         |
+| One call over HTTP, warm, p50                                                    | 0.07 ms (lingua 0.65 ms)                           | 105 to 137 ms                                           |
+| 32 concurrent, exact_match                                                       | 67,900 a second                                    | 306 a second                                            |
+| LLM judge overhead, instant fake model                                           | 0.37 ms                                            | 109 ms (2.3 ms without the sleep)                       |
+| Process start to first answer                                                    | 73 to 88 ms, every evaluator                       | 2.7 s (langevals) to 10 s (ragas) per evaluator package |
+| Memory, idle / under load                                                        | 129 / 335 MB, every evaluator                      | 2.8 / 2.9 GB, every package                             |
+| On disk                                                                          | 308 MB binary with lingua's models (63 MB without) | 1.7 GB of packages, plus the Python image               |
 
 Most evaluators are 4 to 100 times faster in process; PII is about 100 times because langevals
 runs spaCy's NER on every call even when only regex entities are on. Lingua is nearly a tie

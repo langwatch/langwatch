@@ -6,8 +6,8 @@ the LLM-judged `response_context_precision` (3.8) and the three non-LLM string-d
 
 Source of truth: the installed `ragas==0.4.3` package (legacy `ragas.metrics._*` classes, which is what
 `from ragas.metrics import X` resolves to, via a deprecated `__getattr__`), plus our wrapper code in
-`services/langevals/evaluators/ragas/langevals_ragas/*.py`. Every prompt block in section 6 is *rendered by
-running ragas* (`PydanticPrompt.to_string`), not retyped. Versions pinned in `services/langevals/uv.lock`:
+`services/langevals/evaluators/ragas/langevals_ragas/*.py`. Every prompt block in section 6 is _rendered by
+running ragas_ (`PydanticPrompt.to_string`), not retyped. Versions pinned in `services/langevals/uv.lock`:
 ragas 0.4.3, pydantic 2.13.4, sacrebleu 2.6.0, rouge-score 0.1.2, rapidfuzz 3.14.5, nltk 3.10.2, langchain-core 0.3.86,
 langchain-openai 0.3.35, langchain-community 0.3.31.
 
@@ -20,21 +20,21 @@ against a pure-Python reference (section 4.1) over ~140,000 random string pairs 
 
 ### Evaluator map (catalogue id -> wrapper file -> ragas class)
 
-| catalogue evaluator | wrapper file (`langevals_ragas/`) | ragas class actually run | kind | section |
-|---|---|---|---|---|
-| ragas/faithfulness | `faithfulness.py` | `Faithfulness` | LLM x2 (+1) | 3.1 |
-| ragas/factual_correctness | `factual_correctness.py` | `FactualCorrectness` | LLM x4 or x2 | 3.2 |
-| ragas/response_context_recall | `response_context_recall.py` | `LLMContextRecall` (confirmed: `from ragas.metrics import LLMContextRecall`) | LLM x1 | 3.3 |
-| ragas/response_relevancy | `response_relevancy.py` | `ResponseRelevancy` | LLM n=3 + embeddings | 3.4 |
-| ragas/summarization_score | `summarization_score.py` | `SummarizationScore` | LLM x3 | 3.5 |
-| ragas/rubrics_based_scoring | `rubrics_based_scoring.py` | `InstanceRubrics` | LLM x1 | 3.6 |
-| ragas/sql_query_equivalence | `sql_query_equivalence.py` | `LLMSQLEquivalence` | LLM x1 | 3.7 |
-| ragas/response_context_precision | `response_context_precision.py` | `LLMContextPrecisionWithReference` if `expected_output` is truthy, else `LLMContextPrecisionWithoutReference` | LLM x N contexts | 3.8 |
-| ragas/context_precision | `context_precision.py` | `NonLLMContextPrecisionWithReference` + `NonLLMStringSimilarity` | rapidfuzz | 4.2 |
-| ragas/context_recall | `context_recall.py` | `NonLLMContextRecall` (NOT the LLM one) | rapidfuzz | 4.3 |
-| ragas/context_f1 | `context_f1.py` | `NonLLMContextPrecisionWithReference` + `NonLLMContextRecall` | rapidfuzz | 4.4 |
-| ragas/bleu_score | `bleu_score.py` | `BleuScore` | sacrebleu | 4.5 |
-| ragas/rouge_score | `rouge_score.py` | `RougeScore` | rouge_score | 4.6 |
+| catalogue evaluator              | wrapper file (`langevals_ragas/`) | ragas class actually run                                                                                      | kind                 | section |
+| -------------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------- | -------------------- | ------- |
+| ragas/faithfulness               | `faithfulness.py`                 | `Faithfulness`                                                                                                | LLM x2 (+1)          | 3.1     |
+| ragas/factual_correctness        | `factual_correctness.py`          | `FactualCorrectness`                                                                                          | LLM x4 or x2         | 3.2     |
+| ragas/response_context_recall    | `response_context_recall.py`      | `LLMContextRecall` (confirmed: `from ragas.metrics import LLMContextRecall`)                                  | LLM x1               | 3.3     |
+| ragas/response_relevancy         | `response_relevancy.py`           | `ResponseRelevancy`                                                                                           | LLM n=3 + embeddings | 3.4     |
+| ragas/summarization_score        | `summarization_score.py`          | `SummarizationScore`                                                                                          | LLM x3               | 3.5     |
+| ragas/rubrics_based_scoring      | `rubrics_based_scoring.py`        | `InstanceRubrics`                                                                                             | LLM x1               | 3.6     |
+| ragas/sql_query_equivalence      | `sql_query_equivalence.py`        | `LLMSQLEquivalence`                                                                                           | LLM x1               | 3.7     |
+| ragas/response_context_precision | `response_context_precision.py`   | `LLMContextPrecisionWithReference` if `expected_output` is truthy, else `LLMContextPrecisionWithoutReference` | LLM x N contexts     | 3.8     |
+| ragas/context_precision          | `context_precision.py`            | `NonLLMContextPrecisionWithReference` + `NonLLMStringSimilarity`                                              | rapidfuzz            | 4.2     |
+| ragas/context_recall             | `context_recall.py`               | `NonLLMContextRecall` (NOT the LLM one)                                                                       | rapidfuzz            | 4.3     |
+| ragas/context_f1                 | `context_f1.py`                   | `NonLLMContextPrecisionWithReference` + `NonLLMContextRecall`                                                 | rapidfuzz            | 4.4     |
+| ragas/bleu_score                 | `bleu_score.py`                   | `BleuScore`                                                                                                   | sacrebleu            | 4.5     |
+| ragas/rouge_score                | `rouge_score.py`                  | `RougeScore`                                                                                                  | rouge_score          | 4.6     |
 
 (`response_context_recall` is the LLM recall; the plain `context_recall` id is the non-LLM one. Do not conflate them.)
 
@@ -60,17 +60,17 @@ Wrapper chain (`langevals_ragas/lib/common.py::prepare_llm`, `lib/model_to_langc
   - if `"gpt-5" in model` then `temperature = 1.0`.
   - builds `ChatOpenAI(model=model, api_key="dummy", temperature=temperature or 0, client=LitellmCompletion(temperature, extra_call_kwargs), async_client=AsyncLitellmCompletion(...))`.
 - `LitellmCompletion.create(**kwargs)`: `if self.temperature: kwargs["temperature"] = self.temperature` (so a NON-ZERO configured temperature
-  *overrides* whatever ragas asked for; a zero one does not), then `kwargs["drop_params"] = True`, then `kwargs.update(extra_call_kwargs)`
-  (azure `api_version` "2024-02-01" for azure models), then `litellm.completion(**kwargs)`. The async client calls the *sync* `litellm.completion`
+  _overrides_ whatever ragas asked for; a zero one does not), then `kwargs["drop_params"] = True`, then `kwargs.update(extra_call_kwargs)`
+  (azure `api_version` "2024-02-01" for azure models), then `litellm.completion(**kwargs)`. The async client calls the _sync_ `litellm.completion`
   (blocking).
 - `prepare_llm(..., temperature=0)` default; only ResponseRelevancy passes `temperature=0.7`. So the temperature actually sent is:
 
-| evaluator | configured temp | temperature in request | n |
-|---|---|---|---|
-| all except ResponseRelevancy, model not gpt-5 | 0 | **0.01** (ragas `get_temperature(n=1)`; not overridden because 0 is falsy) | 1 |
-| ResponseRelevancy | 0.7 | **0.7** (overrides ragas' 0.3 for n>1) | **3** (`strictness`), ONE request with `n=3` |
-| any evaluator, gpt-5 model | 1.0 | **1.0** | as above |
-| Faithfulness "I don't know" check | (sets `llm.langchain_llm.temperature = 0` then calls `.invoke`) | 0 (payload temperature 0; client override not applied since client temp is 0 for non-gpt-5) | 1 |
+| evaluator                                     | configured temp                                                 | temperature in request                                                                      | n                                            |
+| --------------------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| all except ResponseRelevancy, model not gpt-5 | 0                                                               | **0.01** (ragas `get_temperature(n=1)`; not overridden because 0 is falsy)                  | 1                                            |
+| ResponseRelevancy                             | 0.7                                                             | **0.7** (overrides ragas' 0.3 for n>1)                                                      | **3** (`strictness`), ONE request with `n=3` |
+| any evaluator, gpt-5 model                    | 1.0                                                             | **1.0**                                                                                     | as above                                     |
+| Faithfulness "I don't know" check             | (sets `llm.langchain_llm.temperature = 0` then calls `.invoke`) | 0 (payload temperature 0; client override not applied since client temp is 0 for non-gpt-5) | 1                                            |
 
 Request kwargs observed at `litellm.completion` (verified): `{"model": <settings.model>, "stream": False, "n": 1|3, "temperature": ..., "drop_params": True, "messages": [{"role": "user", "content": <prompt string>}]}`.
 There is exactly ONE message, role `user`, no system message, no `max_tokens`, no `stop`, no timeout, no response_format/JSON mode.
@@ -90,11 +90,9 @@ Because the langchain LLM is a `ChatOpenAI`, `set_run_config` sets `run_config.e
 Generation `n` handling (`LangchainLLMWrapper.agenerate_text`): `hasattr(ChatOpenAI, "n")` is true, so `langchain_llm.n = n` and ONE request is made
 with `n=n`; the n choices are read as `generations[0][i]`. (`BaseRagasLLM.get_temperature(n) = 0.3 if n > 1 else 0.01`.)
 
-
 ## 2. Prompt rendering, JSON parsing and output repair (shared)
 
 ### 2.1 `PydanticPrompt.to_string` (ragas/prompt/pydantic_prompt.py) -- verbatim source
-
 
 ```python
     def _generate_output_signature(self, indent: int = 4) -> str:
@@ -153,20 +151,23 @@ Please return the output in a JSON format that complies with the following schem
 \n
 Now perform the same with the following input\n
 input: <InputModel.model_dump_json(indent=4, exclude_none=True)>\n
-Output: 
+Output:
 ```
+
 (the last line is `Output: ` with a trailing space and no newline). `<examples block>` is
 `"\n--------EXAMPLES-----------\n" + "\n\n".join("Example {i+1}\nInput: " + in.model_dump_json(indent=4) + "\nOutput: " + out.model_dump_json(indent=4))` (1-based; examples use `model_dump_json(indent=4)` WITHOUT exclude_none).
 Details that matter for byte-exact parity:
+
 - `instruction` is used raw. Several instructions are triple-quoted with leading/trailing newlines and 4-space indentation (FactualCorrectness claim decomposition, SQL equivalence); the repr in section 6 shows the exact whitespace.
 - The output schema is `json.dumps(model.model_json_schema())` (Python default separators `", "` and `": "`, `ensure_ascii=True`, key order as pydantic emits: `properties`, `required`, `title`, `type`, plus `$defs` first where nested models exist). Copy the strings from section 6 verbatim rather than re-deriving them.
 - `model_dump_json(indent=4)` is pydantic's serializer: 4-space indent, `": "` separator, non-ASCII NOT escaped, `<`,`>`,`&` NOT escaped, only `"`, `\\` and control characters escaped (`\n`, `\t`, `\u00XX`); empty list renders as `[]`; field order = model field declaration order. Go's `encoding/json` escapes `<`,`>`,`&` and U+2028/2029 by default: use `SetEscapeHTML(false)` and handle 2028/2029 to match.
-- `exclude_none=True` on the *input* drops None fields (e.g. InstanceRubrics with no reference omits `reference`; Faithfulness with `input=""` keeps `"question": ""` because "" is not None).
+- `exclude_none=True` on the _input_ drops None fields (e.g. InstanceRubrics with no reference omits `reference`; Faithfulness with `input=""` keeps `"question": ""` because "" is not None).
 - The prompt string is sent as ONE user message via langchain `StringPromptValue` -> `[HumanMessage(content=text)]`.
 
 ### 2.2 `generate` / `generate_multiple` control flow
 
 `PydanticPrompt.generate(llm, data)` = `generate_multiple(n=1)[0]`. `generate_multiple(llm, data, n=1, temperature=None, stop=None, retries_left=3)`:
+
 1. `processed = self.process_input(data)` (identity), `prompt_value = StringPromptValue(text=self.to_string(processed))`.
 2. `LangchainLLMWrapper` is a `BaseRagasLLM` (not a langchain `BaseLanguageModel`), so it takes the "standard BaseRagasLLM" branch: `resp = await llm.generate(prompt_value, n=n, temperature=None, stop=None)` (temperature None -> `get_temperature(n)`), retried on RateLimitError as in section 1, then `is_finished` check.
 3. For each of the `n` generations: `RagasOutputParser.parse_output_string(output_string, prompt_value, llm, retries_left=3)`.
@@ -174,8 +175,7 @@ Details that matter for byte-exact parity:
 
 ### 2.3 Output parsing (`RagasOutputParser`, `extract_json`) -- verbatim source
 
-
-```python
+````python
 class RagasOutputParser(PydanticOutputParser[OutputModel]):
     async def parse_output_string(
         self,
@@ -249,13 +249,14 @@ def extract_json(text: str) -> str:
             return text[start_idx : i + 1]
 
     return text  # In case of unbalanced JSON, return the original text
-```
+````
 
 `super().parse(jsonstr)` is langchain-core 0.3.86 `PydanticOutputParser.parse` -> `parse_json_markdown` (`langchain_core/utils/json.py`): strips `" \n\r\t\`"` from both ends, escapes raw newlines/tabs inside JSON string values (`_custom_parser`),
-then `parse_partial_json` (**tolerates truncated JSON**: unterminated strings/arrays/objects are auto-closed; verified `{"answers": ["1","0"` parses to `['1','0']`), falling back to the content inside a ```` ```json ```` fence. Then `model_validate` (pydantic v2 lax mode, extra keys ignored). Verified behaviours:
+then `parse_partial_json`(**tolerates truncated JSON**: unterminated strings/arrays/objects are auto-closed; verified`{"answers": ["1","0"`parses to`['1','0']`), falling back to the content inside a ```` ```json ```` fence. Then `model_validate` (pydantic v2 lax mode, extra keys ignored). Verified behaviours:
+
 - trailing comma `{"a": [1,],}` -> fail; single-quoted JSON -> fail; no braces -> fail (all -> `OutputParserException`, triggers the repair path).
 - `int` fields: accept `4`, `"4"`, `4.0`, `true` (-> 1); reject `4.5`. `bool` fields accept `true`, `"true"`, `"True"`, `"yes"`, `1`, `0`, ... (pydantic lax bool). `str` fields REJECT numbers (`{"answers": [1,0]}` for `list[str]` fails validation -> repair path).
-- `extract_json` returns the first balanced `{...}` or `[...]` (whichever opens first; counting only the opener/closer of that type, ignoring braces inside strings), starting at a ```` ```json ```` marker if present; if unbalanced returns the whole text.
+- `extract_json` returns the first balanced `{...}` or `[...]` (whichever opens first; counting only the opener/closer of that type, ignoring braces inside strings), starting at a ` ```json ` marker if present; if unbalanced returns the whole text.
 
 ### 2.4 Repair (`fix_output_format`) and the failure budget
 
@@ -291,6 +292,7 @@ then `sample.to_dict()` = `model_dump(exclude_none=True)` before the metric read
 There is no timeout on the score call (`run(_async_wrapper)`). Any exception propagates out of `evaluate()`.
 
 Common wrapper pieces (`langevals_ragas/lib/common.py`), used by all LLM metrics:
+
 - `RagasSettings`: `model` (default `openai/gpt-5-mini`), `max_tokens` (default 2048).
 - `check_max_tokens(...)`: sums `len(litellm.encode(model=settings.model, text=t))` over `input or ""`, `output or ""`, `expected_output or ""` and EACH context individually; `limit = min(settings.max_tokens, MAX_TOKENS_HARD_LIMIT=1_048_576)`;
   if `total > limit` -> `EvaluationResultSkipped(details=f"Total tokens exceed the maximum of {limit}: {total}")`. This is a SKIP, not a truncation: the Ragas evaluators do NOT use `langevals_core/token_budget.py` (fit/cut-with-elision); nothing is ever truncated.
@@ -304,11 +306,12 @@ Common wrapper pieces (`langevals_ragas/lib/common.py`), used by all LLM metrics
 
 (Prompts are in section 6, at the end of the file; each metric lists which prompt it uses. Sections 3 and 4 together cover all 13 catalogue evaluators, see the map in the header.)
 
-### 3.1 Faithfulness  (wrapper `faithfulness.py`, ragas `metrics/_faithfulness.py::Faithfulness`)
+### 3.1 Faithfulness (wrapper `faithfulness.py`, ragas `metrics/_faithfulness.py::Faithfulness`)
 
 Entry: `input: Optional[str] = ""`, `output: str`, `contexts: list[str]`. Settings: `RagasSettings` + `autodetect_dont_know: bool = True`.
 
 Flow:
+
 1. `contexts = clear_context(entry.contexts)`; `check_max_tokens(input, output, contexts)` -> skip if too large.
 2. Sample: `user_input=entry.input` ("" allowed), `response=entry.output`, `retrieved_contexts=contexts`.
 3. **LLM call 1** `StatementGeneratorPrompt`: input `{question: user_input, answer: response}` -> `{statements: [str]}`. If `statements == []` the metric returns NaN (no call 2).
@@ -463,14 +466,15 @@ Wrapper source (verbatim), including the ragas>=0.3 vs <=0.2 `statements` shape 
         )
 ```
 
-### 3.2 FactualCorrectness  (wrapper `factual_correctness.py`, ragas `metrics/_factual_correctness.py`)
+### 3.2 FactualCorrectness (wrapper `factual_correctness.py`, ragas `metrics/_factual_correctness.py`)
 
 Entry: `output: str`, `expected_output: str`. Settings: `mode` in {f1 (default), precision, recall}, `atomicity` in {low (default), high}, `coverage` in {low (default), high}; plus `model`, `max_tokens`. `beta` = 1.0 (not exposed).
 `FactualCorrectness(llm=llm, mode=..., atomicity=..., coverage=...)`; sample `response=entry.output`, `reference=entry.expected_output`.
 
 Flow (`_single_turn_ascore`, verbatim below). Two directions run concurrently via `asyncio.gather`:
-- **A ("reference_response_task")** = `decompose_and_verify_claims(reference, response)` -> decompose the *response* into claims (LLM call, ClaimDecompositionPrompt with `response=<response text>`), then verify them against premise = the *reference* text (LLM call, NLIStatementPrompt `{context: reference, statements: claims}`). Result: bool array `reference_response`.
-- **B ("response_reference_task")** = `decompose_and_verify_claims(response, reference)` -> decompose the *reference* into claims, verify against premise = the *response*. Result `response_reference`. Skipped (replaced by an empty array) only when `mode == "precision"`.
+
+- **A ("reference_response_task")** = `decompose_and_verify_claims(reference, response)` -> decompose the _response_ into claims (LLM call, ClaimDecompositionPrompt with `response=<response text>`), then verify them against premise = the _reference_ text (LLM call, NLIStatementPrompt `{context: reference, statements: claims}`). Result: bool array `reference_response`.
+- **B ("response_reference_task")** = `decompose_and_verify_claims(response, reference)` -> decompose the _reference_ into claims, verify against premise = the _response_. Result `response_reference`. Skipped (replaced by an empty array) only when `mode == "precision"`.
 - The claim-decomposition prompt's `examples` are chosen by `f"{atomicity}_atomicity_{coverage}_coverage"` (four variants; instruction identical) -- all four are rendered in section 6. The NLI prompt is the Faithfulness `NLIStatementPrompt` (same instruction and 2 examples).
 - `verify_claims` returns `np.array([bool(verdict) ...])` over the verdict objects returned (empty array if none). The NLI call is made even when the claims list is empty.
 - Number of LLM calls: **f1 / recall: 4** (2 decompose + 2 NLI); **precision: 2**. (+ repairs.)
@@ -689,7 +693,7 @@ Wrapper source (verbatim):
         )
 ```
 
-### 3.3 LLMContextRecall  (wrapper `response_context_recall.py` = evaluator "RagasResponseContextRecall"; ragas `metrics/_context_recall.py::LLMContextRecall`)
+### 3.3 LLMContextRecall (wrapper `response_context_recall.py` = evaluator "RagasResponseContextRecall"; ragas `metrics/_context_recall.py::LLMContextRecall`)
 
 Entry: `input: str`, `output: str`, `contexts: list[str]`, `expected_output: str`. Settings: `RagasSettings` only. (`context_recall.py` is a different, non-LLM evaluator.)
 `check_max_tokens(input, output, expected_output, contexts)` (contexts NOT cleaned of empties here). Sample: `user_input=input, response=output, reference=expected_output, retrieved_contexts=contexts`. NOTE `response` (output) is not used by the metric (required columns: user_input, retrieved_contexts, reference).
@@ -797,7 +801,7 @@ Wrapper source (verbatim):
         )
 ```
 
-### 3.4 ResponseRelevancy  (wrapper `response_relevancy.py`, ragas `metrics/_answer_relevance.py::ResponseRelevancy`)
+### 3.4 ResponseRelevancy (wrapper `response_relevancy.py`, ragas `metrics/_answer_relevance.py::ResponseRelevancy`)
 
 Entry: `input: str`, `output: str`. Settings: `RagasSettings` + `embeddings_model: str = "openai/text-embedding-ada-002"`. `strictness = 3` (not exposed). LLM temperature 0.7 (see section 1).
 `prepare_llm` also builds the embeddings: `LangchainEmbeddingsWrapper(LitellmEmbeddingsWrapper(model=embeddings_model, api_key="dummy", client=LitellmEmbeddings(extra_call_kwargs=azure api_version 2024-02-01)))`;
@@ -805,11 +809,12 @@ Entry: `input: str`, `output: str`. Settings: `RagasSettings` + `embeddings_mode
 Sample: `user_input=entry.input`, `response=entry.output`. `check_max_tokens(input, output)`.
 
 Flow:
+
 1. **ONE LLM request with `n=3`** (`generate_multiple(n=self.strictness)`), `ResponseRelevancePrompt` with `{response}` -> 3 independent parses of `{question: str, noncommittal: int}` (each choice parsed and repaired independently).
 2. `_calculate_score(answers, row)`: `gen_questions = [a.question ...]`; `all_noncommittal = np.all([a.noncommittal ...])` (numpy truthiness of ints: nonzero = true). If ALL generated questions are `""` -> NaN (wrapper then skips: "No questions could be generated from output."). Otherwise
    `cosine_sim = calculate_similarity(question, gen_questions)`; `score = cosine_sim.mean() * int(not all_noncommittal)`.
 3. Embedding calls: `embed_query(user_input)` (one call, raw string) and `embed_documents(gen_questions)` (one batched call). Model = `settings.embeddings_model`. (langchain `OpenAIEmbeddings.embed_documents` with the default `check_embedding_ctx_length=True` tokenizes each text with tiktoken, splits into <=8191-token chunks, sends the decoded chunk strings, and length-weighted-averages + L2-normalises chunks per text; for short questions this is one chunk each and equals the plain embedding. `embed_query` is overridden to send the raw text and returns the raw vector.)
-Verbatim:
+   Verbatim:
 
 ```python
     def calculate_similarity(self, question: str, generated_questions: list[str]):
@@ -925,16 +930,17 @@ Wrapper source (verbatim):
         )
 ```
 
-### 3.5 SummarizationScore  (wrapper `summarization_score.py`, ragas `metrics/_summarization.py::SummarizationScore`)
+### 3.5 SummarizationScore (wrapper `summarization_score.py`, ragas `metrics/_summarization.py::SummarizationScore`)
 
 Entry: `output: str`, `contexts: list[str]`. Settings: `RagasSettings` only. Defaults kept: `coeff = 0.5`, `length_penalty = True`, `max_retries = 1`.
 Sample: `response=output`, `retrieved_contexts=contexts`, `reference_contexts=contexts` (both set; the metric reads `reference_contexts`). `check_max_tokens(output, contexts)`.
 
 Flow (3 sequential LLM calls; `text = "\n".join(reference_contexts)`, `summary = response`):
+
 1. `ExtractKeyphrasePrompt` input `StringIO{text}` -> `{keyphrases: [str]}`.
 2. `GenerateQuestionsPrompt` input `{text, keyphrases}` -> `{questions: [str]}`.
 3. `GenerateAnswersPrompt` input `SummaryAndQuestions{summary, questions}` -> `{answers: [str]}` (must be JSON strings "1"/"0"; numbers fail validation and trigger repair).
-Arithmetic (verbatim):
+   Arithmetic (verbatim):
 
 ```python
     async def _ascore(self, row: Dict, callbacks: Callbacks) -> float:
@@ -1021,16 +1027,17 @@ Wrapper source (verbatim):
         )
 ```
 
-### 3.6 InstanceRubrics  (wrapper `rubrics_based_scoring.py`, ragas `metrics/_instance_specific_rubrics.py::InstanceRubrics`)
+### 3.6 InstanceRubrics (wrapper `rubrics_based_scoring.py`, ragas `metrics/_instance_specific_rubrics.py::InstanceRubrics`)
 
 Entry: `input: str`, `output: str`, `expected_output: Optional[str] = None`. Settings: `RagasSettings` + `rubrics: list[{description}]`. Default rubrics (5, in order):
+
 1. "The response is incorrect, irrelevant."
 2. "The response partially answers the question but includes significant errors, omissions, or irrelevant information."
 3. "The response partially answers the question but includes minor errors, omissions, or irrelevant information."
 4. "The response fully answers the question and includes minor errors, omissions, or irrelevant information."
 5. "The response fully answers the question and includes no errors, omissions, or irrelevant information."
-Wrapper builds `rubrics = {f"score{i+1}_description": r.description for i, r in enumerate(settings.rubrics)}` (1-based, insertion order preserved in the JSON). `check_max_tokens(input, output, expected_output)`.
-Sample: `user_input=input, response=output, reference=expected_output (None -> omitted), rubrics=rubrics`. `retrieved_contexts` is never set, so the "answer using context" branch is not taken.
+   Wrapper builds `rubrics = {f"score{i+1}_description": r.description for i, r in enumerate(settings.rubrics)}` (1-based, insertion order preserved in the JSON). `check_max_tokens(input, output, expected_output)`.
+   Sample: `user_input=input, response=output, reference=expected_output (None -> omitted), rubrics=rubrics`. `retrieved_contexts` is never set, so the "answer using context" branch is not taken.
 
 Flow: **1 LLM call**, `SingleTurnPrompt` (the one in `_instance_specific_rubrics.py`, input model `SingleTurnInputWithRubric` = `user_input, response, retrieved_contexts, reference_contexts, reference` (all optional, None omitted) + `rubrics: dict[str,str]`), output `ScoreFeedback{feedback: str, score: int}`. **No examples.**
 `_ascore` returns `response.score` as is (no validation against the rubric range, no normalisation). Result `RagasResult(score=float(score), cost, details=feedback)`; `passed` is None.
@@ -1116,7 +1123,7 @@ Wrapper source (verbatim):
         )
 ```
 
-### 3.7 LLMSQLEquivalence  (wrapper `sql_query_equivalence.py`, ragas `metrics/_sql_semantic_equivalence.py`)
+### 3.7 LLMSQLEquivalence (wrapper `sql_query_equivalence.py`, ragas `metrics/_sql_semantic_equivalence.py`)
 
 Entry: `output: str` (response SQL), `expected_output: str` (reference SQL), `expected_contexts: list[str]` (schemas). Settings: `RagasSettings`.
 `check_max_tokens(output, expected_output, contexts=expected_contexts)`. Sample: `response=output, reference=expected_output, reference_contexts=expected_contexts`.
@@ -1197,11 +1204,12 @@ Wrapper source (verbatim):
         return int(response.equivalence)
 ```
 
-### 3.8 response_context_precision  (wrapper `response_context_precision.py`; ragas `metrics/_context_precision.py::LLMContextPrecisionWithReference` / `LLMContextPrecisionWithoutReference`)
+### 3.8 response_context_precision (wrapper `response_context_precision.py`; ragas `metrics/_context_precision.py::LLMContextPrecisionWithReference` / `LLMContextPrecisionWithoutReference`)
 
 Entry: `input: str`, `output: Optional[str] = None`, `contexts: list[str]`, `expected_output: Optional[str] = None`. Settings: `RagasSettings` only (`model`, `max_tokens`).
 
 Which scorer the wrapper picks (verbatim logic below):
+
 1. If neither `output` nor `expected_output` is truthy (None or empty string) -> `EvaluationResultSkipped(details="Either output or expected_output must be provided.")` BEFORE any LLM setup or token check.
 2. `check_max_tokens(input=input, output=None if expected_output else output, expected_output=expected_output, contexts=contexts)`; only the field that will be scored is counted (output is ignored when `expected_output` is truthy); each context counted separately, empty strings NOT dropped. Over the limit -> skip `Total tokens exceed the maximum of {limit}: {total}`.
 3. `if entry.expected_output:` (truthy) -> `LLMContextPrecisionWithReference`, sample `user_input=input, reference=expected_output, retrieved_contexts=contexts` (the `output` is not passed at all). Otherwise -> `LLMContextPrecisionWithoutReference`, sample `user_input=input, response=output, retrieved_contexts=contexts`. So expected_output wins whenever both are present.
@@ -1389,11 +1397,12 @@ So the pairwise similarity used everywhere is
 Inputs are Python `str` -> sequences of Unicode CODE POINTS (use `[]rune` in Go; bytes or grapheme clusters would give different numbers for non-ASCII).
 Because the metrics call it through `single_turn_ascore(SingleTurnSample(reference=<retrieved ctx>, response=<expected ctx>))`, the first argument is the RETRIEVED context and the second the EXPECTED one (all four measures are symmetric, so the order does not change the value).
 Semantics (all verified below to 1.2e-16 absolute against rapidfuzz):
+
 - **Levenshtein**: unit-cost insert/delete/substitute edit distance divided by `max(len(a), len(b))`; both empty -> distance 0.0 (similarity 1.0).
 - **Hamming** (`pad=True`): count of positions in the common prefix length where the runes differ PLUS the length difference, divided by `max(len)`; both empty -> 0.0.
 - **Jaro**: classic Jaro similarity; both empty -> similarity 1.0; exactly one empty -> 0.0. Match window `max(len)//2 - 1` (floored at 0) around each index of the SHORTER string P against the longer T, greedy left-to-right first unmatched equal rune; `t = (number of position mismatches among the matched runes in order) // 2` (INTEGER floor division, this matters); `sim = (m/|P| + m/|T| + (m - t)/m) / 3`, 0 if `m == 0`. `normalized_distance = 1 - sim`.
 - **JaroWinkler**: `s = jaro`; if `s > 0.7` (strictly) then `s += prefix * 0.1 * (1 - s)` where `prefix` = length of the common prefix of the two strings, capped at 4; `normalized_distance = 1 - s`.
-Empty strings: `similarity("", "") = 1.0` for all four; `similarity("a", "") = 0.0`. An empty-string context therefore matches an empty-string expected context perfectly.
+  Empty strings: `similarity("", "") = 1.0` for all four; `similarity("a", "") = 0.0`. An empty-string context therefore matches an empty-string expected context perfectly.
 
 Pure-Python reference (**verified**: rapidfuzz functions vs this code over ~140,000 random pairs incl. unicode and lengths up to 400 -> max abs diff 1.1e-16; the two metric functions below vs the real ragas `NonLLMContextPrecisionWithReference` / `NonLLMContextRecall` over 1,600 random context sets x 4 measures -> max abs diff 0.0). Port this line by line, comparing with a tolerance of 1e-9 or exactly with the same float operation order:
 
@@ -1482,15 +1491,16 @@ def context_recall(retrieved, expected, measure):      # NonLLMContextRecall
 Worked values for Go golden tests (computed with rapidfuzz 3.14.5): `similarity("abc","abd")`: levenshtein 0.666667, hamming 0.666667, jaro 0.777778, jaro_winkler 0.822222; `similarity("Paris is the capital of France.", "Paris is the capital of France.")` = 1.0;
 `similarity("The Eiffel Tower is in Paris.", "The Eiffel Tower is located in Paris.")`: levenshtein 0.783784, hamming 0.540541, jaro 0.904939, jaro_winkler 0.942964.
 
-### 4.2 ragas/context_precision  (wrapper `context_precision.py`; ragas `metrics/_context_precision.py::NonLLMContextPrecisionWithReference`)
+### 4.2 ragas/context_precision (wrapper `context_precision.py`; ragas `metrics/_context_precision.py::NonLLMContextPrecisionWithReference`)
 
 Entry: `contexts: list[str]` (retrieved), `expected_contexts: list[str]`. Settings: `distance_measure` in {levenshtein (default), hamming, jaro, jaro_winkler}. No LLM, no `RagasSettings`, no token check.
 Wrapper rules, checked in this order (score and `details` string exact):
+
 1. `expected_contexts` empty AND `contexts` empty -> score `1.0`, details `No contexts retrieved, but also no contexts expected, so that's a perfect precision of 1`.
 2. `expected_contexts` empty (contexts non-empty) -> score `0.0`, details `No contexts expected, yet some were retrieved, precision is 0`.
 3. `contexts` empty (expected non-empty) -> score `0.0`, details `No contexts retrieved, precision is 0`.
 4. Otherwise `NonLLMContextPrecisionWithReference(distance_measure=NonLLMStringSimilarity(distance_measure=<mapped enum>))`, sample `retrieved_contexts=contexts, reference_contexts=expected_contexts`; result `RagasResult(score=score, cost=None, details=None)`.
-Metric arithmetic (verbatim). For each retrieved context (in order): best similarity against any expected context; verdict = 1 if `best >= threshold` (**threshold 0.5, `>=`, inclusive**), else 0; then average precision exactly as in 3.8 (same `1e-10` epsilon, so one perfect hit is `0.9999999999`, and e.g. verdicts [1,0,1] -> `0.8333333332916666`):
+   Metric arithmetic (verbatim). For each retrieved context (in order): best similarity against any expected context; verdict = 1 if `best >= threshold` (**threshold 0.5, `>=`, inclusive**), else 0; then average precision exactly as in 3.8 (same `1e-10` epsilon, so one perfect hit is `0.9999999999`, and e.g. verdicts [1,0,1] -> `0.8333333332916666`):
 
 ```python
     async def _single_turn_ascore(
@@ -1578,15 +1588,16 @@ Wrapper source (verbatim):
         )
 ```
 
-### 4.3 ragas/context_recall  (wrapper `context_recall.py`; ragas `metrics/_context_recall.py::NonLLMContextRecall`)
+### 4.3 ragas/context_recall (wrapper `context_recall.py`; ragas `metrics/_context_recall.py::NonLLMContextRecall`)
 
 Confirmed: the `ragas/context_recall` catalogue evaluator is the NON-LLM recall; the LLM recall is `ragas/response_context_recall` (3.3). Entry/settings as 4.2 (`contexts`, `expected_contexts`, `distance_measure` default levenshtein).
 Wrapper rules, in order:
+
 1. both lists empty -> score `1.0`, details `No contexts retrieved, but also no contexts expected, so that's a perfect recall of 1`.
 2. `expected_contexts` empty -> score `1.0`, details `No contexts expected, meaning nothing was missing, so that's a perfect recall of 1`.
 3. `contexts` empty -> score `0.0`, details `No contexts retrieved, recall is 0`.
 4. Otherwise `scorer = NonLLMContextRecall(); scorer.distance_measure = <mapped enum>` (the property setter builds `NonLLMStringSimilarity(distance_measure=...)`), same sample as 4.2; `RagasResult(score=score, cost=None, details=None)`.
-Metric arithmetic (verbatim). Direction is the reverse of precision: for each EXPECTED context, the best similarity over all retrieved contexts; verdict = 1 if `best > 0.5` (**STRICTLY greater**, unlike precision's `>=`); score = mean of the verdicts:
+   Metric arithmetic (verbatim). Direction is the reverse of precision: for each EXPECTED context, the best similarity over all retrieved contexts; verdict = 1 if `best > 0.5` (**STRICTLY greater**, unlike precision's `>=`); score = mean of the verdicts:
 
 ```python
     async def _single_turn_ascore(
@@ -1671,15 +1682,16 @@ Wrapper source (verbatim):
         )
 ```
 
-### 4.4 ragas/context_f1  (wrapper `context_f1.py`)
+### 4.4 ragas/context_f1 (wrapper `context_f1.py`)
 
 Entry/settings as 4.2 (`contexts`, `expected_contexts`, `distance_measure` default levenshtein). Uses the SAME two metrics as 4.2 and 4.3 with the SAME `distance_measure`, but with its own empty-list rules:
+
 - precision: both empty -> `1.0`; exactly one empty -> `0.0`; else `NonLLMContextPrecisionWithReference` score (4.2, includes the `1e-10` epsilon).
 - recall: both empty -> `1.0`; expected empty -> `1.0`; contexts empty -> `0.0`; else `NonLLMContextRecall` score (4.3).
 - `f1 = 2 * (p * r) / (p + r)` if `p + r != 0` else `0` (plain harmonic mean; computed from the UNROUNDED p and r, so e.g. p=0.8333333332916666, r=0.6666666666666666 -> `0.7407407407242798`; p=0.9999999999666667, r=0.6666666666666666 -> `0.7999999999893334`).
 - Result `RagasResult(score=f1, cost=None, details=f"Precision: {precision_score}, Recall: {recall_score}")`. The details use Python's default float formatting (shortest round-trip repr: `1.0`, `0.0`, `0.8333333332916666`, `1e-05` style exponents for tiny values; NOT Go's `%v`), so emit shortest-repr floats with a trailing `.0` for whole numbers.
-Note context_f1 has no "No contexts..." message details (unlike 4.2/4.3): details is always the Precision/Recall string.
-Wrapper source (verbatim):
+  Note context_f1 has no "No contexts..." message details (unlike 4.2/4.3): details is always the Precision/Recall string.
+  Wrapper source (verbatim):
 
 ```python
     def evaluate(self, entry: RagasContextF1Entry) -> SingleEvaluationResult:
@@ -1741,7 +1753,7 @@ Wrapper source (verbatim):
         )
 ```
 
-### 4.5 BleuScore  (ragas `metrics/_bleu_score.py`; wrapper `bleu_score.py`)
+### 4.5 BleuScore (ragas `metrics/_bleu_score.py`; wrapper `bleu_score.py`)
 
 Wrapper: `BleuScore()` (no kwargs), sample `response=entry.output`, `reference=entry.expected_output`; `RagasResult(score=score, cost=None, details=None)`. No settings.
 ragas code (verbatim):
@@ -1765,7 +1777,7 @@ ragas code (verbatim):
 ```
 
 So: `reference_sentences = reference.split(". ")` (split on the exact 2-char string ". "), `response_sentences = response.split(". ")`;
-`references = [[s] for s in reference_sentences]` (i.e. N reference *streams* of one segment each, N = number of reference sentences); `hypotheses = response_sentences` (M strings).
+`references = [[s] for s in reference_sentences]` (i.e. N reference _streams_ of one segment each, N = number of reference sentences); `hypotheses = response_sentences` (M strings).
 Call: `sacrebleu.corpus_bleu(hypotheses, references)` (sacrebleu 2.6.0 `compat.corpus_bleu`) with all defaults: `smooth_method='exp'`, `smooth_value=None`, `force=False`, `lowercase=False`, `tokenize='13a'`, `use_effective_order=False` (=> `BLEU(effective_order=False, max_ngram_order=4)`); result `.score / 100`.
 
 **IMPORTANT parity quirk (verified empirically):** sacrebleu transposes the reference streams (`zip(*references)`) and `zip`s them with the hypotheses (`zip(hypotheses, ref_cache)`), so with `references=[[r1],[r2],...,[rN]]` there is exactly ONE reference segment holding N alternative references `(r1..rN)`, and only the FIRST hypothesis (`response_sentences[0]`) is scored, against ALL reference sentences as multiple references. Everything after the first ". " in the response is ignored. Multi-ref semantics: n-gram clip counts use the per-ngram MAX over references; reference length is the closest to hypothesis length (ties -> shorter).
@@ -1773,6 +1785,7 @@ Examples (verified): response "The cat sat on the mat. It was nice" vs reference
 No length assertion is raised. `assert isinstance(score, float)` holds. Results carry float noise (e.g. 1.0000000000000004) since 100*exp(sum(log 100)/4)/100; do not clamp unless matching that is not needed.
 
 sacrebleu algorithm actually executed (with defaults), for the Go port:
+
 - `_preprocess_segment(sent)`: (lowercase off) `tokenizer(sent.rstrip())`.
 - 13a tokenizer (`sacrebleu/tokenizers/tokenizer_13a.py` + `tokenizer_re.py`):
 
@@ -1827,6 +1840,7 @@ sacrebleu algorithm actually executed (with defaults), for the Go port:
 ```
 
 The regex character classes in the first rule are: `{`-`~`, `[`-`` ` ``, space-`&`, `(`-`+`, `:`-`@`, `/` (ASCII ranges, so each such punctuation char is surrounded by spaces). Final `' '.join(line.split())` collapses Unicode whitespace.
+
 - n-grams: `line.split()` tokens, all orders 1..4 (`extract_all_word_ngrams`), reference n-gram counts merged across references by MAX.
 - Segment stats (`_compute_segment_statistics`) and final formula (`compute_bleu`), verbatim:
 
@@ -1946,7 +1960,7 @@ def extract_all_word_ngrams(line: str, min_order: int, max_order: int) -> Tuple[
         # Compute brevity penalty
         bp = 1.0
         if sys_len < ref_len:
-            bp = math.exp(1 - ref_len / sys_len) if sys_len > 0 else 0.0            
+            bp = math.exp(1 - ref_len / sys_len) if sys_len > 0 else 0.0
 
         # n-gram precisions
         precisions = [0.0] * max_ngram_order
@@ -2004,7 +2018,7 @@ def my_log(num: float) -> float:
 
 Smoothing 'exp' (default): for each order n where `correct[n-1]==0`, `smooth_mteval *= 2; precision = 100/(smooth_mteval*total[n-1])`; if `total[n-1]==0` the loop breaks (precision stays 0.0 and, because `effective_order=False`, `eff_order` stays 4). If NO n-gram order has any match (`not any(correct)`) the score is exactly 0.0. `bp = exp(1 - ref_len/sys_len)` if `sys_len < ref_len` (0.0 when `sys_len == 0`), else 1.0.
 
-### 4.6 RougeScore  (ragas `metrics/_rouge_score.py`; wrapper `rouge_score.py`)
+### 4.6 RougeScore (ragas `metrics/_rouge_score.py`; wrapper `rouge_score.py`)
 
 Settings: `rouge_type` in {rouge1 (default), rougeL}; `measure_type` in {fmeasure (default), precision, recall}. Wrapper: `RougeScore(rouge_type=settings.rouge_type, mode=settings.measure_type)` (note ragas' own default would be rougeL; we pass explicitly), sample `response=output`, `reference=expected_output`; `RagasResult(score=score, cost=None, details=None)`.
 ragas code (verbatim):
@@ -2181,7 +2195,6 @@ Wrapper sources (verbatim):
 
 ## 6. Prompts (generated verbatim from ragas 0.4.3)
 
-
 <!-- GENERATED SECTION: rendered from ragas 0.4.3 objects by .claude/tmp/gen_prompts.py -->
 
 ### Shared: FixOutputFormat (repair) prompt
@@ -2193,6 +2206,7 @@ Wrapper sources (verbatim):
 - instruction (exact Python repr, whitespace matters): `'The output string did not satisfy the constraints given in the prompt. Fix the output string and return it.'`
 
 Input model JSON schema (documentation only; the input is rendered as data, not schema):
+
 ```json
 {
   "properties": {
@@ -2205,22 +2219,26 @@ Input model JSON schema (documentation only; the input is rendered as data, not 
       "type": "string"
     }
   },
-  "required": [
-    "output_string",
-    "prompt_value"
-  ],
+  "required": ["output_string", "prompt_value"],
   "title": "OutputStringAndPrompt",
   "type": "object"
 }
 ```
 
 Output model JSON schema (this exact `json.dumps(...)` string, single line, is embedded in the prompt):
+
 ```json
-{"properties": {"text": {"title": "Text", "type": "string"}}, "required": ["text"], "title": "StringIO", "type": "object"}
+{
+  "properties": { "text": { "title": "Text", "type": "string" } },
+  "required": ["text"],
+  "title": "StringIO",
+  "type": "object"
+}
 ```
 
 Full rendered prompt string sent to the LLM, `PydanticPrompt.to_string(data)` with placeholder input (everything before `input: ` is fixed text; examples are included verbatim):
-`````text
+
+```text
 The output string did not satisfy the constraints given in the prompt. Fix the output string and return it.
 Please return the output in a JSON format that complies with the following schema as specified in JSON Schema:
 {"properties": {"text": {"title": "Text", "type": "string"}}, "required": ["text"], "title": "StringIO", "type": "object"}Do not use single quotes in your response but double quotes,properly escaped with a backslash.
@@ -2232,8 +2250,8 @@ input: {
     "output_string": "<<BAD_OUTPUT_STRING>>",
     "prompt_value": "<<FULL_ORIGINAL_PROMPT_STRING>>"
 }
-Output: 
-`````
+Output:
+```
 
 ### Faithfulness prompts
 
@@ -2244,6 +2262,7 @@ Output:
 - instruction (exact Python repr, whitespace matters): `'Given a question and an answer, analyze the complexity of each sentence in the answer. Break down each sentence into one or more fully understandable statements. Ensure that no pronouns are used in any statement. Format the outputs in JSON.'`
 
 Input model JSON schema (documentation only; the input is rendered as data, not schema):
+
 ```json
 {
   "properties": {
@@ -2258,22 +2277,33 @@ Input model JSON schema (documentation only; the input is rendered as data, not 
       "type": "string"
     }
   },
-  "required": [
-    "question",
-    "answer"
-  ],
+  "required": ["question", "answer"],
   "title": "StatementGeneratorInput",
   "type": "object"
 }
 ```
 
 Output model JSON schema (this exact `json.dumps(...)` string, single line, is embedded in the prompt):
+
 ```json
-{"properties": {"statements": {"description": "The generated statements", "items": {"type": "string"}, "title": "Statements", "type": "array"}}, "required": ["statements"], "title": "StatementGeneratorOutput", "type": "object"}
+{
+  "properties": {
+    "statements": {
+      "description": "The generated statements",
+      "items": { "type": "string" },
+      "title": "Statements",
+      "type": "array"
+    }
+  },
+  "required": ["statements"],
+  "title": "StatementGeneratorOutput",
+  "type": "object"
+}
 ```
 
 Full rendered prompt string sent to the LLM, `PydanticPrompt.to_string(data)` with placeholder input (everything before `input: ` is fixed text; examples are included verbatim):
-`````text
+
+```text
 Given a question and an answer, analyze the complexity of each sentence in the answer. Break down each sentence into one or more fully understandable statements. Ensure that no pronouns are used in any statement. Format the outputs in JSON.
 Please return the output in a JSON format that complies with the following schema as specified in JSON Schema:
 {"properties": {"statements": {"description": "The generated statements", "items": {"type": "string"}, "title": "Statements", "type": "array"}}, "required": ["statements"], "title": "StatementGeneratorOutput", "type": "object"}Do not use single quotes in your response but double quotes,properly escaped with a backslash.
@@ -2299,8 +2329,8 @@ input: {
     "question": "<<QUESTION>>",
     "answer": "<<ANSWER>>"
 }
-Output: 
-`````
+Output:
+```
 
 #### NLIStatementPrompt
 
@@ -2311,6 +2341,7 @@ Also used by FactualCorrectness (verify_claims), with `context` = premise and `s
 - instruction (exact Python repr, whitespace matters): `'Your task is to judge the faithfulness of a series of statements based on a given context. For each statement you must return verdict as 1 if the statement can be directly inferred based on the context or 0 if the statement can not be directly inferred based on the context.'`
 
 Input model JSON schema (documentation only; the input is rendered as data, not schema):
+
 ```json
 {
   "properties": {
@@ -2328,22 +2359,56 @@ Input model JSON schema (documentation only; the input is rendered as data, not 
       "type": "array"
     }
   },
-  "required": [
-    "context",
-    "statements"
-  ],
+  "required": ["context", "statements"],
   "title": "NLIStatementInput",
   "type": "object"
 }
 ```
 
 Output model JSON schema (this exact `json.dumps(...)` string, single line, is embedded in the prompt):
+
 ```json
-{"$defs": {"StatementFaithfulnessAnswer": {"properties": {"statement": {"description": "the original statement, word-by-word", "title": "Statement", "type": "string"}, "reason": {"description": "the reason of the verdict", "title": "Reason", "type": "string"}, "verdict": {"description": "the verdict(0/1) of the faithfulness.", "title": "Verdict", "type": "integer"}}, "required": ["statement", "reason", "verdict"], "title": "StatementFaithfulnessAnswer", "type": "object"}}, "properties": {"statements": {"items": {"$ref": "#/$defs/StatementFaithfulnessAnswer"}, "title": "Statements", "type": "array"}}, "required": ["statements"], "title": "NLIStatementOutput", "type": "object"}
+{
+  "$defs": {
+    "StatementFaithfulnessAnswer": {
+      "properties": {
+        "statement": {
+          "description": "the original statement, word-by-word",
+          "title": "Statement",
+          "type": "string"
+        },
+        "reason": {
+          "description": "the reason of the verdict",
+          "title": "Reason",
+          "type": "string"
+        },
+        "verdict": {
+          "description": "the verdict(0/1) of the faithfulness.",
+          "title": "Verdict",
+          "type": "integer"
+        }
+      },
+      "required": ["statement", "reason", "verdict"],
+      "title": "StatementFaithfulnessAnswer",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "statements": {
+      "items": { "$ref": "#/$defs/StatementFaithfulnessAnswer" },
+      "title": "Statements",
+      "type": "array"
+    }
+  },
+  "required": ["statements"],
+  "title": "NLIStatementOutput",
+  "type": "object"
+}
 ```
 
 Full rendered prompt string sent to the LLM, `PydanticPrompt.to_string(data)` with placeholder input (everything before `input: ` is fixed text; examples are included verbatim):
-`````text
+
+```text
 Your task is to judge the faithfulness of a series of statements based on a given context. For each statement you must return verdict as 1 if the statement can be directly inferred based on the context or 0 if the statement can not be directly inferred based on the context.
 Please return the output in a JSON format that complies with the following schema as specified in JSON Schema:
 {"$defs": {"StatementFaithfulnessAnswer": {"properties": {"statement": {"description": "the original statement, word-by-word", "title": "Statement", "type": "string"}, "reason": {"description": "the reason of the verdict", "title": "Reason", "type": "string"}, "verdict": {"description": "the verdict(0/1) of the faithfulness.", "title": "Verdict", "type": "integer"}}, "required": ["statement", "reason", "verdict"], "title": "StatementFaithfulnessAnswer", "type": "object"}}, "properties": {"statements": {"items": {"$ref": "#/$defs/StatementFaithfulnessAnswer"}, "title": "Statements", "type": "array"}}, "required": ["statements"], "title": "NLIStatementOutput", "type": "object"}Do not use single quotes in your response but double quotes,properly escaped with a backslash.
@@ -2410,8 +2475,8 @@ input: {
         "<<STATEMENT 2>>"
     ]
 }
-Output: 
-`````
+Output:
+```
 
 ### FactualCorrectness prompts
 
@@ -2424,6 +2489,7 @@ Instruction is the same for all four variants; only `examples` differ.
 - instruction (exact Python repr, whitespace matters): `'\n    Decompose and break down each of the input sentences into one or more standalone statements. Each statement should be a standalone claim that can be independently verified.\n    Follow the level of atomicity and coverage as shown in the examples.\n    '`
 
 Input model JSON schema (documentation only; the input is rendered as data, not schema):
+
 ```json
 {
   "properties": {
@@ -2432,25 +2498,32 @@ Input model JSON schema (documentation only; the input is rendered as data, not 
       "type": "string"
     }
   },
-  "required": [
-    "response"
-  ],
+  "required": ["response"],
   "title": "ClaimDecompositionInput",
   "type": "object"
 }
 ```
 
 Output model JSON schema (this exact `json.dumps(...)` string, single line, is embedded in the prompt):
+
 ```json
-{"properties": {"claims": {"items": {"type": "string"}, "title": "Decomposed Claims", "type": "array"}}, "required": ["claims"], "title": "ClaimDecompositionOutput", "type": "object"}
+{
+  "properties": {
+    "claims": { "items": { "type": "string" }, "title": "Decomposed Claims", "type": "array" }
+  },
+  "required": ["claims"],
+  "title": "ClaimDecompositionOutput",
+  "type": "object"
+}
 ```
 
 Full rendered prompt string sent to the LLM, `PydanticPrompt.to_string(data)` with placeholder input (everything before `input: ` is fixed text; examples are included verbatim):
-`````text
+
+```text
 
     Decompose and break down each of the input sentences into one or more standalone statements. Each statement should be a standalone claim that can be independently verified.
     Follow the level of atomicity and coverage as shown in the examples.
-    
+
 Please return the output in a JSON format that complies with the following schema as specified in JSON Schema:
 {"properties": {"claims": {"items": {"type": "string"}, "title": "Decomposed Claims", "type": "array"}}, "required": ["claims"], "title": "ClaimDecompositionOutput", "type": "object"}Do not use single quotes in your response but double quotes,properly escaped with a backslash.
 
@@ -2481,8 +2554,8 @@ Now perform the same with the following input
 input: {
     "response": "<<TEXT TO DECOMPOSE>>"
 }
-Output: 
-`````
+Output:
+```
 
 #### ClaimDecompositionPrompt (atomicity=low, coverage=high)
 
@@ -2493,6 +2566,7 @@ Instruction is the same for all four variants; only `examples` differ.
 - instruction (exact Python repr, whitespace matters): `'\n    Decompose and break down each of the input sentences into one or more standalone statements. Each statement should be a standalone claim that can be independently verified.\n    Follow the level of atomicity and coverage as shown in the examples.\n    '`
 
 Input model JSON schema (documentation only; the input is rendered as data, not schema):
+
 ```json
 {
   "properties": {
@@ -2501,25 +2575,32 @@ Input model JSON schema (documentation only; the input is rendered as data, not 
       "type": "string"
     }
   },
-  "required": [
-    "response"
-  ],
+  "required": ["response"],
   "title": "ClaimDecompositionInput",
   "type": "object"
 }
 ```
 
 Output model JSON schema (this exact `json.dumps(...)` string, single line, is embedded in the prompt):
+
 ```json
-{"properties": {"claims": {"items": {"type": "string"}, "title": "Decomposed Claims", "type": "array"}}, "required": ["claims"], "title": "ClaimDecompositionOutput", "type": "object"}
+{
+  "properties": {
+    "claims": { "items": { "type": "string" }, "title": "Decomposed Claims", "type": "array" }
+  },
+  "required": ["claims"],
+  "title": "ClaimDecompositionOutput",
+  "type": "object"
+}
 ```
 
 Full rendered prompt string sent to the LLM, `PydanticPrompt.to_string(data)` with placeholder input (everything before `input: ` is fixed text; examples are included verbatim):
-`````text
+
+```text
 
     Decompose and break down each of the input sentences into one or more standalone statements. Each statement should be a standalone claim that can be independently verified.
     Follow the level of atomicity and coverage as shown in the examples.
-    
+
 Please return the output in a JSON format that complies with the following schema as specified in JSON Schema:
 {"properties": {"claims": {"items": {"type": "string"}, "title": "Decomposed Claims", "type": "array"}}, "required": ["claims"], "title": "ClaimDecompositionOutput", "type": "object"}Do not use single quotes in your response but double quotes,properly escaped with a backslash.
 
@@ -2550,8 +2631,8 @@ Now perform the same with the following input
 input: {
     "response": "<<TEXT TO DECOMPOSE>>"
 }
-Output: 
-`````
+Output:
+```
 
 #### ClaimDecompositionPrompt (atomicity=high, coverage=low)
 
@@ -2562,6 +2643,7 @@ Instruction is the same for all four variants; only `examples` differ.
 - instruction (exact Python repr, whitespace matters): `'\n    Decompose and break down each of the input sentences into one or more standalone statements. Each statement should be a standalone claim that can be independently verified.\n    Follow the level of atomicity and coverage as shown in the examples.\n    '`
 
 Input model JSON schema (documentation only; the input is rendered as data, not schema):
+
 ```json
 {
   "properties": {
@@ -2570,25 +2652,32 @@ Input model JSON schema (documentation only; the input is rendered as data, not 
       "type": "string"
     }
   },
-  "required": [
-    "response"
-  ],
+  "required": ["response"],
   "title": "ClaimDecompositionInput",
   "type": "object"
 }
 ```
 
 Output model JSON schema (this exact `json.dumps(...)` string, single line, is embedded in the prompt):
+
 ```json
-{"properties": {"claims": {"items": {"type": "string"}, "title": "Decomposed Claims", "type": "array"}}, "required": ["claims"], "title": "ClaimDecompositionOutput", "type": "object"}
+{
+  "properties": {
+    "claims": { "items": { "type": "string" }, "title": "Decomposed Claims", "type": "array" }
+  },
+  "required": ["claims"],
+  "title": "ClaimDecompositionOutput",
+  "type": "object"
+}
 ```
 
 Full rendered prompt string sent to the LLM, `PydanticPrompt.to_string(data)` with placeholder input (everything before `input: ` is fixed text; examples are included verbatim):
-`````text
+
+```text
 
     Decompose and break down each of the input sentences into one or more standalone statements. Each statement should be a standalone claim that can be independently verified.
     Follow the level of atomicity and coverage as shown in the examples.
-    
+
 Please return the output in a JSON format that complies with the following schema as specified in JSON Schema:
 {"properties": {"claims": {"items": {"type": "string"}, "title": "Decomposed Claims", "type": "array"}}, "required": ["claims"], "title": "ClaimDecompositionOutput", "type": "object"}Do not use single quotes in your response but double quotes,properly escaped with a backslash.
 
@@ -2620,8 +2709,8 @@ Now perform the same with the following input
 input: {
     "response": "<<TEXT TO DECOMPOSE>>"
 }
-Output: 
-`````
+Output:
+```
 
 #### ClaimDecompositionPrompt (atomicity=high, coverage=high)
 
@@ -2632,6 +2721,7 @@ Instruction is the same for all four variants; only `examples` differ.
 - instruction (exact Python repr, whitespace matters): `'\n    Decompose and break down each of the input sentences into one or more standalone statements. Each statement should be a standalone claim that can be independently verified.\n    Follow the level of atomicity and coverage as shown in the examples.\n    '`
 
 Input model JSON schema (documentation only; the input is rendered as data, not schema):
+
 ```json
 {
   "properties": {
@@ -2640,25 +2730,32 @@ Input model JSON schema (documentation only; the input is rendered as data, not 
       "type": "string"
     }
   },
-  "required": [
-    "response"
-  ],
+  "required": ["response"],
   "title": "ClaimDecompositionInput",
   "type": "object"
 }
 ```
 
 Output model JSON schema (this exact `json.dumps(...)` string, single line, is embedded in the prompt):
+
 ```json
-{"properties": {"claims": {"items": {"type": "string"}, "title": "Decomposed Claims", "type": "array"}}, "required": ["claims"], "title": "ClaimDecompositionOutput", "type": "object"}
+{
+  "properties": {
+    "claims": { "items": { "type": "string" }, "title": "Decomposed Claims", "type": "array" }
+  },
+  "required": ["claims"],
+  "title": "ClaimDecompositionOutput",
+  "type": "object"
+}
 ```
 
 Full rendered prompt string sent to the LLM, `PydanticPrompt.to_string(data)` with placeholder input (everything before `input: ` is fixed text; examples are included verbatim):
-`````text
+
+```text
 
     Decompose and break down each of the input sentences into one or more standalone statements. Each statement should be a standalone claim that can be independently verified.
     Follow the level of atomicity and coverage as shown in the examples.
-    
+
 Please return the output in a JSON format that complies with the following schema as specified in JSON Schema:
 {"properties": {"claims": {"items": {"type": "string"}, "title": "Decomposed Claims", "type": "array"}}, "required": ["claims"], "title": "ClaimDecompositionOutput", "type": "object"}Do not use single quotes in your response but double quotes,properly escaped with a backslash.
 
@@ -2693,8 +2790,8 @@ Now perform the same with the following input
 input: {
     "response": "<<TEXT TO DECOMPOSE>>"
 }
-Output: 
-`````
+Output:
+```
 
 ### LLMContextRecall prompt
 
@@ -2705,6 +2802,7 @@ Output:
 - instruction (exact Python repr, whitespace matters): `"Given a context, and an answer, analyze each sentence in the answer and classify if the sentence can be attributed to the given context or not. Use only 'Yes' (1) or 'No' (0) as a binary classification. Output json with reason."`
 
 Input model JSON schema (documentation only; the input is rendered as data, not schema):
+
 ```json
 {
   "properties": {
@@ -2721,23 +2819,44 @@ Input model JSON schema (documentation only; the input is rendered as data, not 
       "type": "string"
     }
   },
-  "required": [
-    "question",
-    "context",
-    "answer"
-  ],
+  "required": ["question", "context", "answer"],
   "title": "QCA",
   "type": "object"
 }
 ```
 
 Output model JSON schema (this exact `json.dumps(...)` string, single line, is embedded in the prompt):
+
 ```json
-{"$defs": {"ContextRecallClassification": {"properties": {"statement": {"title": "Statement", "type": "string"}, "reason": {"title": "Reason", "type": "string"}, "attributed": {"title": "Attributed", "type": "integer"}}, "required": ["statement", "reason", "attributed"], "title": "ContextRecallClassification", "type": "object"}}, "properties": {"classifications": {"items": {"$ref": "#/$defs/ContextRecallClassification"}, "title": "Classifications", "type": "array"}}, "required": ["classifications"], "title": "ContextRecallClassifications", "type": "object"}
+{
+  "$defs": {
+    "ContextRecallClassification": {
+      "properties": {
+        "statement": { "title": "Statement", "type": "string" },
+        "reason": { "title": "Reason", "type": "string" },
+        "attributed": { "title": "Attributed", "type": "integer" }
+      },
+      "required": ["statement", "reason", "attributed"],
+      "title": "ContextRecallClassification",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "classifications": {
+      "items": { "$ref": "#/$defs/ContextRecallClassification" },
+      "title": "Classifications",
+      "type": "array"
+    }
+  },
+  "required": ["classifications"],
+  "title": "ContextRecallClassifications",
+  "type": "object"
+}
 ```
 
 Full rendered prompt string sent to the LLM, `PydanticPrompt.to_string(data)` with placeholder input (everything before `input: ` is fixed text; examples are included verbatim):
-`````text
+
+```text
 Given a context, and an answer, analyze each sentence in the answer and classify if the sentence can be attributed to the given context or not. Use only 'Yes' (1) or 'No' (0) as a binary classification. Output json with reason.
 Please return the output in a JSON format that complies with the following schema as specified in JSON Schema:
 {"$defs": {"ContextRecallClassification": {"properties": {"statement": {"title": "Statement", "type": "string"}, "reason": {"title": "Reason", "type": "string"}, "attributed": {"title": "Attributed", "type": "integer"}}, "required": ["statement", "reason", "attributed"], "title": "ContextRecallClassification", "type": "object"}}, "properties": {"classifications": {"items": {"$ref": "#/$defs/ContextRecallClassification"}, "title": "Classifications", "type": "array"}}, "required": ["classifications"], "title": "ContextRecallClassifications", "type": "object"}Do not use single quotes in your response but double quotes,properly escaped with a backslash.
@@ -2781,8 +2900,8 @@ input: {
     "context": "<<CONTEXTS joined by \\n>>",
     "answer": "<<REFERENCE (expected_output)>>"
 }
-Output: 
-`````
+Output:
+```
 
 ### LLMContextPrecision prompt (WithReference and WithoutReference)
 
@@ -2795,6 +2914,7 @@ One call per retrieved context. `answer` is the reference for LLMContextPrecisio
 - instruction (exact Python repr, whitespace matters): `'Given question, answer and context verify if the context was useful in arriving at the given answer. Give verdict as "1" if useful and "0" if not with json output.'`
 
 Input model JSON schema (documentation only; the input is rendered as data, not schema):
+
 ```json
 {
   "properties": {
@@ -2814,23 +2934,33 @@ Input model JSON schema (documentation only; the input is rendered as data, not 
       "type": "string"
     }
   },
-  "required": [
-    "question",
-    "context",
-    "answer"
-  ],
+  "required": ["question", "context", "answer"],
   "title": "QAC",
   "type": "object"
 }
 ```
 
 Output model JSON schema (this exact `json.dumps(...)` string, single line, is embedded in the prompt):
+
 ```json
-{"properties": {"reason": {"description": "Reason for verification", "title": "Reason", "type": "string"}, "verdict": {"description": "Binary (0/1) verdict of verification", "title": "Verdict", "type": "integer"}}, "required": ["reason", "verdict"], "title": "Verification", "type": "object"}
+{
+  "properties": {
+    "reason": { "description": "Reason for verification", "title": "Reason", "type": "string" },
+    "verdict": {
+      "description": "Binary (0/1) verdict of verification",
+      "title": "Verdict",
+      "type": "integer"
+    }
+  },
+  "required": ["reason", "verdict"],
+  "title": "Verification",
+  "type": "object"
+}
 ```
 
 Full rendered prompt string sent to the LLM, `PydanticPrompt.to_string(data)` with placeholder input (everything before `input: ` is fixed text; examples are included verbatim):
-`````text
+
+```text
 Given question, answer and context verify if the context was useful in arriving at the given answer. Give verdict as "1" if useful and "0" if not with json output.
 Please return the output in a JSON format that complies with the following schema as specified in JSON Schema:
 {"properties": {"reason": {"description": "Reason for verification", "title": "Reason", "type": "string"}, "verdict": {"description": "Binary (0/1) verdict of verification", "title": "Verdict", "type": "integer"}}, "required": ["reason", "verdict"], "title": "Verification", "type": "object"}Do not use single quotes in your response but double quotes,properly escaped with a backslash.
@@ -2876,8 +3006,8 @@ input: {
     "context": "<<ONE retrieved context>>",
     "answer": "<<REFERENCE (expected_output) or RESPONSE (output)>>"
 }
-Output: 
-`````
+Output:
+```
 
 ### ResponseRelevancy prompt
 
@@ -2888,6 +3018,7 @@ Output:
 - instruction (exact Python repr, whitespace matters): `'Generate a question for the given answer and Identify if answer is noncommittal. Give noncommittal as 1 if the answer is noncommittal and 0 if the answer is committal. A noncommittal answer is one that is evasive, vague, or ambiguous. For example, "I don\'t know" or "I\'m not sure" are noncommittal answers'`
 
 Input model JSON schema (documentation only; the input is rendered as data, not schema):
+
 ```json
 {
   "properties": {
@@ -2896,21 +3027,29 @@ Input model JSON schema (documentation only; the input is rendered as data, not 
       "type": "string"
     }
   },
-  "required": [
-    "response"
-  ],
+  "required": ["response"],
   "title": "ResponseRelevanceInput",
   "type": "object"
 }
 ```
 
 Output model JSON schema (this exact `json.dumps(...)` string, single line, is embedded in the prompt):
+
 ```json
-{"properties": {"question": {"title": "Question", "type": "string"}, "noncommittal": {"title": "Noncommittal", "type": "integer"}}, "required": ["question", "noncommittal"], "title": "ResponseRelevanceOutput", "type": "object"}
+{
+  "properties": {
+    "question": { "title": "Question", "type": "string" },
+    "noncommittal": { "title": "Noncommittal", "type": "integer" }
+  },
+  "required": ["question", "noncommittal"],
+  "title": "ResponseRelevanceOutput",
+  "type": "object"
+}
 ```
 
 Full rendered prompt string sent to the LLM, `PydanticPrompt.to_string(data)` with placeholder input (everything before `input: ` is fixed text; examples are included verbatim):
-`````text
+
+```text
 Generate a question for the given answer and Identify if answer is noncommittal. Give noncommittal as 1 if the answer is noncommittal and 0 if the answer is committal. A noncommittal answer is one that is evasive, vague, or ambiguous. For example, "I don't know" or "I'm not sure" are noncommittal answers
 Please return the output in a JSON format that complies with the following schema as specified in JSON Schema:
 {"properties": {"question": {"title": "Question", "type": "string"}, "noncommittal": {"title": "Noncommittal", "type": "integer"}}, "required": ["question", "noncommittal"], "title": "ResponseRelevanceOutput", "type": "object"}Do not use single quotes in your response but double quotes,properly escaped with a backslash.
@@ -2939,8 +3078,8 @@ Now perform the same with the following input
 input: {
     "response": "<<RESPONSE>>"
 }
-Output: 
-`````
+Output:
+```
 
 ### SummarizationScore prompts
 
@@ -2951,6 +3090,7 @@ Output:
 - instruction (exact Python repr, whitespace matters): `'Extract keyphrases of type: Person, Organization, Location, Date/Time, Monetary Values, and Percentages.'`
 
 Input model JSON schema (documentation only; the input is rendered as data, not schema):
+
 ```json
 {
   "properties": {
@@ -2959,21 +3099,28 @@ Input model JSON schema (documentation only; the input is rendered as data, not 
       "type": "string"
     }
   },
-  "required": [
-    "text"
-  ],
+  "required": ["text"],
   "title": "StringIO",
   "type": "object"
 }
 ```
 
 Output model JSON schema (this exact `json.dumps(...)` string, single line, is embedded in the prompt):
+
 ```json
-{"properties": {"keyphrases": {"items": {"type": "string"}, "title": "Keyphrases", "type": "array"}}, "required": ["keyphrases"], "title": "ExtractedKeyphrases", "type": "object"}
+{
+  "properties": {
+    "keyphrases": { "items": { "type": "string" }, "title": "Keyphrases", "type": "array" }
+  },
+  "required": ["keyphrases"],
+  "title": "ExtractedKeyphrases",
+  "type": "object"
+}
 ```
 
 Full rendered prompt string sent to the LLM, `PydanticPrompt.to_string(data)` with placeholder input (everything before `input: ` is fixed text; examples are included verbatim):
-`````text
+
+```text
 Extract keyphrases of type: Person, Organization, Location, Date/Time, Monetary Values, and Percentages.
 Please return the output in a JSON format that complies with the following schema as specified in JSON Schema:
 {"properties": {"keyphrases": {"items": {"type": "string"}, "title": "Keyphrases", "type": "array"}}, "required": ["keyphrases"], "title": "ExtractedKeyphrases", "type": "object"}Do not use single quotes in your response but double quotes,properly escaped with a backslash.
@@ -2999,8 +3146,8 @@ Now perform the same with the following input
 input: {
     "text": "<<CONTEXTS joined by \\n>>"
 }
-Output: 
-`````
+Output:
+```
 
 #### GenerateQuestionsPrompt
 
@@ -3009,6 +3156,7 @@ Output:
 - instruction (exact Python repr, whitespace matters): `"Based on the given text and keyphrases, generate closed-ended questions that can be answered with '1' if the question can be answered using the text, or '0' if it cannot. The questions should ALWAYS result in a '1' based on the given text."`
 
 Input model JSON schema (documentation only; the input is rendered as data, not schema):
+
 ```json
 {
   "properties": {
@@ -3024,22 +3172,28 @@ Input model JSON schema (documentation only; the input is rendered as data, not 
       "type": "array"
     }
   },
-  "required": [
-    "text",
-    "keyphrases"
-  ],
+  "required": ["text", "keyphrases"],
   "title": "GenerateQuestionsPromptInput",
   "type": "object"
 }
 ```
 
 Output model JSON schema (this exact `json.dumps(...)` string, single line, is embedded in the prompt):
+
 ```json
-{"properties": {"questions": {"items": {"type": "string"}, "title": "Questions", "type": "array"}}, "required": ["questions"], "title": "QuestionsGenerated", "type": "object"}
+{
+  "properties": {
+    "questions": { "items": { "type": "string" }, "title": "Questions", "type": "array" }
+  },
+  "required": ["questions"],
+  "title": "QuestionsGenerated",
+  "type": "object"
+}
 ```
 
 Full rendered prompt string sent to the LLM, `PydanticPrompt.to_string(data)` with placeholder input (everything before `input: ` is fixed text; examples are included verbatim):
-`````text
+
+```text
 Based on the given text and keyphrases, generate closed-ended questions that can be answered with '1' if the question can be answered using the text, or '0' if it cannot. The questions should ALWAYS result in a '1' based on the given text.
 Please return the output in a JSON format that complies with the following schema as specified in JSON Schema:
 {"properties": {"questions": {"items": {"type": "string"}, "title": "Questions", "type": "array"}}, "required": ["questions"], "title": "QuestionsGenerated", "type": "object"}Do not use single quotes in your response but double quotes,properly escaped with a backslash.
@@ -3077,8 +3231,8 @@ input: {
         "<<kp2>>"
     ]
 }
-Output: 
-`````
+Output:
+```
 
 #### GenerateAnswersPrompt
 
@@ -3087,6 +3241,7 @@ Output:
 - instruction (exact Python repr, whitespace matters): `"Based on the list of close-ended '1' or '0' questions, generate a JSON with key 'answers', which is a list of strings that determines whether the provided summary contains sufficient information to answer EACH question. Answers should STRICTLY be either '1' or '0'. Answer '0' if the provided summary does not contain enough information to answer the question and answer '1' if the provided summary can answer the question."`
 
 Input model JSON schema (documentation only; the input is rendered as data, not schema):
+
 ```json
 {
   "properties": {
@@ -3102,22 +3257,28 @@ Input model JSON schema (documentation only; the input is rendered as data, not 
       "type": "array"
     }
   },
-  "required": [
-    "summary",
-    "questions"
-  ],
+  "required": ["summary", "questions"],
   "title": "SummaryAndQuestions",
   "type": "object"
 }
 ```
 
 Output model JSON schema (this exact `json.dumps(...)` string, single line, is embedded in the prompt):
+
 ```json
-{"properties": {"answers": {"items": {"type": "string"}, "title": "Answers", "type": "array"}}, "required": ["answers"], "title": "AnswersGenerated", "type": "object"}
+{
+  "properties": {
+    "answers": { "items": { "type": "string" }, "title": "Answers", "type": "array" }
+  },
+  "required": ["answers"],
+  "title": "AnswersGenerated",
+  "type": "object"
+}
 ```
 
 Full rendered prompt string sent to the LLM, `PydanticPrompt.to_string(data)` with placeholder input (everything before `input: ` is fixed text; examples are included verbatim):
-`````text
+
+```text
 Based on the list of close-ended '1' or '0' questions, generate a JSON with key 'answers', which is a list of strings that determines whether the provided summary contains sufficient information to answer EACH question. Answers should STRICTLY be either '1' or '0'. Answer '0' if the provided summary does not contain enough information to answer the question and answer '1' if the provided summary can answer the question.
 Please return the output in a JSON format that complies with the following schema as specified in JSON Schema:
 {"properties": {"answers": {"items": {"type": "string"}, "title": "Answers", "type": "array"}}, "required": ["answers"], "title": "AnswersGenerated", "type": "object"}Do not use single quotes in your response but double quotes,properly escaped with a backslash.
@@ -3161,8 +3322,8 @@ input: {
         "<<q2>>"
     ]
 }
-Output: 
-`````
+Output:
+```
 
 ### InstanceRubrics prompt (SingleTurnPrompt from _instance_specific_rubrics.py)
 
@@ -3175,6 +3336,7 @@ No examples. The 'Example' section is empty, so the text between the schema sent
 - instruction (exact Python repr, whitespace matters): `'Your task is to assign an appropriate score and provide feedback to the inputs based solely on the scoring criteria passed in the input.'`
 
 Input model JSON schema (documentation only; the input is rendered as data, not schema):
+
 ```json
 {
   "properties": {
@@ -3258,21 +3420,37 @@ Input model JSON schema (documentation only; the input is rendered as data, not 
       "type": "object"
     }
   },
-  "required": [
-    "rubrics"
-  ],
+  "required": ["rubrics"],
   "title": "SingleTurnInputWithRubric",
   "type": "object"
 }
 ```
 
 Output model JSON schema (this exact `json.dumps(...)` string, single line, is embedded in the prompt):
+
 ```json
-{"properties": {"feedback": {"description": "The feedback for the response", "title": "Feedback", "type": "string"}, "score": {"description": "The score given to the response", "title": "Score", "type": "integer"}}, "required": ["feedback", "score"], "title": "ScoreFeedback", "type": "object"}
+{
+  "properties": {
+    "feedback": {
+      "description": "The feedback for the response",
+      "title": "Feedback",
+      "type": "string"
+    },
+    "score": {
+      "description": "The score given to the response",
+      "title": "Score",
+      "type": "integer"
+    }
+  },
+  "required": ["feedback", "score"],
+  "title": "ScoreFeedback",
+  "type": "object"
+}
 ```
 
 Full rendered prompt string sent to the LLM, `PydanticPrompt.to_string(data)` with placeholder input (everything before `input: ` is fixed text; examples are included verbatim):
-`````text
+
+```text
 Your task is to assign an appropriate score and provide feedback to the inputs based solely on the scoring criteria passed in the input.
 Please return the output in a JSON format that complies with the following schema as specified in JSON Schema:
 {"properties": {"feedback": {"description": "The feedback for the response", "title": "Feedback", "type": "string"}, "score": {"description": "The score given to the response", "title": "Score", "type": "integer"}}, "required": ["feedback", "score"], "title": "ScoreFeedback", "type": "object"}Do not use single quotes in your response but double quotes,properly escaped with a backslash.
@@ -3289,8 +3467,8 @@ input: {
         "score2_description": "<<r2>>"
     }
 }
-Output: 
-`````
+Output:
+```
 
 ### LLMSQLEquivalence prompt
 
@@ -3301,6 +3479,7 @@ Output:
 - instruction (exact Python repr, whitespace matters): `'\n    Explain and compare two SQL queries (Q1 and Q2) based on the provided database schema. First, explain each query, then determine if they have significant logical differences.\n    '`
 
 Input model JSON schema (documentation only; the input is rendered as data, not schema):
+
 ```json
 {
   "properties": {
@@ -3320,26 +3499,45 @@ Input model JSON schema (documentation only; the input is rendered as data, not 
       "type": "string"
     }
   },
-  "required": [
-    "reference",
-    "response",
-    "database_schema"
-  ],
+  "required": ["reference", "response", "database_schema"],
   "title": "EquivalenceInput",
   "type": "object"
 }
 ```
 
 Output model JSON schema (this exact `json.dumps(...)` string, single line, is embedded in the prompt):
+
 ```json
-{"properties": {"response_query_explaination": {"description": "Explanation of the generated SQL", "title": "Response Query Explaination", "type": "string"}, "reference_query_explaination": {"description": "Explanation of the reference SQL", "title": "Reference Query Explaination", "type": "string"}, "equivalence": {"description": "Whether the generated SQL is equivalent to the reference SQL", "title": "Equivalence", "type": "boolean"}}, "required": ["response_query_explaination", "reference_query_explaination", "equivalence"], "title": "EquivalenceOutput", "type": "object"}
+{
+  "properties": {
+    "response_query_explaination": {
+      "description": "Explanation of the generated SQL",
+      "title": "Response Query Explaination",
+      "type": "string"
+    },
+    "reference_query_explaination": {
+      "description": "Explanation of the reference SQL",
+      "title": "Reference Query Explaination",
+      "type": "string"
+    },
+    "equivalence": {
+      "description": "Whether the generated SQL is equivalent to the reference SQL",
+      "title": "Equivalence",
+      "type": "boolean"
+    }
+  },
+  "required": ["response_query_explaination", "reference_query_explaination", "equivalence"],
+  "title": "EquivalenceOutput",
+  "type": "object"
+}
 ```
 
 Full rendered prompt string sent to the LLM, `PydanticPrompt.to_string(data)` with placeholder input (everything before `input: ` is fixed text; examples are included verbatim):
-`````text
+
+```text
 
     Explain and compare two SQL queries (Q1 and Q2) based on the provided database schema. First, explain each query, then determine if they have significant logical differences.
-    
+
 Please return the output in a JSON format that complies with the following schema as specified in JSON Schema:
 {"properties": {"response_query_explaination": {"description": "Explanation of the generated SQL", "title": "Response Query Explaination", "type": "string"}, "reference_query_explaination": {"description": "Explanation of the reference SQL", "title": "Reference Query Explaination", "type": "string"}, "equivalence": {"description": "Whether the generated SQL is equivalent to the reference SQL", "title": "Equivalence", "type": "boolean"}}, "required": ["response_query_explaination", "reference_query_explaination", "equivalence"], "title": "EquivalenceOutput", "type": "object"}Do not use single quotes in your response but double quotes,properly escaped with a backslash.
 
@@ -3363,5 +3561,5 @@ input: {
     "response": "<<RESPONSE SQL>>",
     "database_schema": "<<expected_contexts joined by \\n>>"
 }
-Output: 
-`````
+Output:
+```
