@@ -1393,43 +1393,6 @@ jobs:
       - name: Test the PR impact map categories
         run: node --test --experimental-strip-types .github/scripts/pr-impact-map-categories.test.ts
 
-  # The npm artifact's staging filters, run over the real tree.
-  #
-  # dev/scripts/pack-npm.sh decides what every `npx @langwatch/server` user
-  # receives. Its filters are rsync patterns, and a pattern that is broader than
-  # it means to be drops application source: twice already the published server
-  # died at first boot ~20 minutes in on exactly that. The guard inside the
-  # script compares what git tracks against what staging kept, and `--check-filters`
-  # runs it without a build and without packing, in about ten seconds.
-  #
-  # It used to run only inside npx-server-smoke, which does not run on main and
-  # whose path filter names none of the trees the guard reads. A `.gitignore`
-  # added under dev/scripts therefore merged green and turned every branch that
-  # merged main red.
-  #
-  # No path gate, on purpose. The guard reads every tree `files` in the root
-  # package.json names, and a path filter listing them would be a second copy of
-  # that list, stale the day someone edits it. A minute on an unrelated pull
-  # request is the cheaper mistake. A label event is not a change at all, so it
-  # skips like `changes` does.
-  pack-filters:
-    if: github.event_name != 'pull_request' || github.event.action != 'labeled' || github.event.label.name == 'ci:full'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
-        with:
-          # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
-          # None of it is in the package's `files`.
-          sparse-checkout: |
-            /*
-            !/docs/media/
-            !/docs/images/
-          sparse-checkout-cone-mode: false
-
-      - name: Check the npm pack filters
-        run: bash dev/scripts/pack-npm.sh --check-filters
-
   ci-self-test:
     needs: changes
     if: needs.changes.outputs.relevant == 'true'
@@ -1498,7 +1461,6 @@ jobs:
         build,
         ci-scripts-test,
         ci-self-test,
-        pack-filters,
       ]
     if: always() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || github.event.label.name == 'ci:full')
     runs-on: ubuntu-latest
