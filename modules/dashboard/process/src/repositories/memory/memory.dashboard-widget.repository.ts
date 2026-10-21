@@ -1,8 +1,8 @@
 import {
-  DashboardNotFoundError,
   DashboardWidgetDefinitionInvalidError,
   DashboardWidgetNotFoundError,
 } from "@langwatch/analytics-contract";
+import { DashboardNotFoundError } from "@langwatch/dashboard-contract";
 import {
   CHART_GRID_DEFAULT_COL_SPAN,
   CHART_GRID_DEFAULT_ROW_SPAN,
