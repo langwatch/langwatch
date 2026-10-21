@@ -585,3 +585,28 @@ QuickJS under wazero is the stronger sandbox, but blocks would be JavaScript.
 Migration: a block gets a language field. Existing blocks stay `python` and keep running where
 they run today. New blocks default to Starlark and run in place. Python blocks are deprecated
 once their count is low, and the per-project Lambda fleet is retired with the last one.
+
+### 13.4 Measured speed
+
+Apple M1 Max (arm64, as the Lambdas), the same recorded fixture inputs on both sides, 21 Oct
+2026, with other work on the machine (±20%). Reproduce the Go side with
+`go test -tags lingua_models -run '^$' -bench BenchmarkEvaluate ./nlpgo/modules/evaluators/services/`.
+
+Every langevals call over HTTP, so every Lambda call, waits at least 100 ms in a sleep:
+`evaluate_batch` resets `_tqdm_disabled_once` and `_disable_tqdm` then sleeps 0.1 s
+(`langevals_core/base_evaluator.py:442-453`). That sleep is most of the gap.
+
+| | Go | langevals |
+|---|---|---|
+| One call in process, p50 (exact_match / rouge / context_f1 / PII regex / lingua) | 4.5 / 4.3 / 4.3 / 33 / 500 µs | 21 / 258 / 416 / 3,430 / 589 µs |
+| One call over HTTP, warm, p50 | 0.07 ms (lingua 0.65 ms) | 105 to 137 ms |
+| 32 concurrent, exact_match | 67,900 a second | 306 a second |
+| LLM judge overhead, instant fake model | 0.37 ms | 109 ms (2.3 ms without the sleep) |
+| Process start to first answer | 73 to 88 ms, every evaluator | 2.7 s (langevals) to 10 s (ragas) per evaluator package |
+| Memory, idle / under load | 129 / 335 MB, every evaluator | 2.8 / 2.9 GB, every package |
+| On disk | 308 MB binary with lingua's models (63 MB without) | 1.7 GB of packages, plus the Python image |
+
+Most evaluators are 4 to 100 times faster in process; PII is about 100 times because langevals
+runs spaCy's NER on every call even when only regex entities are on. Lingua is nearly a tie
+(1.2 times), since Python's lingua is compiled Rust. langevals also retries entry errors that
+can never succeed, such as a broken JSON schema, which takes about 8 s each.
