@@ -25,7 +25,7 @@ const renderFilters = ({
 // One unbreakable token, the shape of a monitor id. Without min-width: 0 on
 // the flex child, its min-content width beats the chip's border and the text
 // bleeds into the next table column.
-const LONG_VALUE = "monitor_0008KDW6ykSweqn6dwR0UukEOi2wAbCdEfGhIjKlMnOpQrSt";
+const LONG_VALUE = "monitor_SyntheticUnbreakableIdentifierUsedToTestWrapping";
 
 const LONG_FILTER = { "trace_checks.check_id": [LONG_VALUE] };
 

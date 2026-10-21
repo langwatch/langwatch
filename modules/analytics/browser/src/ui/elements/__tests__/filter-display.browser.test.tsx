@@ -11,7 +11,7 @@ import { FilterDisplay } from "../filter-display.tsx";
 
 afterEach(cleanup);
 
-const MONITOR_ID = "monitor_0008KDW6ykSweqn6dwR0UukEOi2wAbCdEfGhIjKlMnOpQrSt";
+const MONITOR_ID = "monitor_SyntheticUnbreakableIdentifierUsedToTestWrapping";
 
 const renderNarrow = (filters: Record<string, unknown>) => {
   renderWithDesignSystem(
