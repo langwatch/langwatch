@@ -101,7 +101,6 @@ function stepOf(step: UpgradeStepView): OpsUpgradeStep {
     attempt: step.attempt,
     lastError: step.lastError,
     report: step.report,
-    logTail: [...step.logTail],
     progress: step.progress,
     waitingOn: step.waitingOn.map((writer) => ({ ...writer })),
     runId: step.runId,
@@ -122,7 +121,7 @@ function phaseOf(phase: UpgradeRunPhaseView): OpsUpgradeRunPhase {
 }
 
 function stepDetailOf(step: UpgradeStepDetail): OpsUpgradeStepDetail {
-  return { ...stepOf(step), targets: step.targets.map(targetOf) };
+  return { ...stepOf(step), logTail: [...step.logTail], targets: step.targets.map(targetOf) };
 }
 
 function runOf(run: UpgradeRunDetail): OpsUpgradeRun {

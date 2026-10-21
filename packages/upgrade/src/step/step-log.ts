@@ -113,16 +113,33 @@ export class StepLogTail implements MigrationStepLog {
   }
 }
 
-function redactFields({ value, redact }: { value: unknown; redact: LedgerTextRedactor }): unknown {
+const CYCLE_MARK = "[cycle]";
+
+/** `seen` holds the objects on the current path, so a self-reference forwards a mark. */
+function redactFields({
+  value,
+  redact,
+  seen = new WeakSet<object>(),
+}: {
+  value: unknown;
+  redact: LedgerTextRedactor;
+  seen?: WeakSet<object>;
+}): unknown {
   if (typeof value === "string") return redact(value);
-  if (Array.isArray(value)) return value.map((each) => redactFields({ value: each, redact }));
   if (value instanceof Error) return redact(value.message);
-  if (value !== null && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value).map(([key, each]) => [key, redactFields({ value: each, redact })]),
-    );
-  }
-  return value;
+  if (value === null || typeof value !== "object") return value;
+  if (seen.has(value)) return CYCLE_MARK;
+  seen.add(value);
+  const redacted = Array.isArray(value)
+    ? value.map((each: unknown) => redactFields({ value: each, redact, seen }))
+    : Object.fromEntries(
+        Object.entries(value).map(([key, each]) => [
+          key,
+          redactFields({ value: each, redact, seen }),
+        ]),
+      );
+  seen.delete(value);
+  return redacted;
 }
 
 function safeJson(fields: Record<string, unknown>): string {

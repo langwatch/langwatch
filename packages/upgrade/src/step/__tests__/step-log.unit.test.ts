@@ -52,6 +52,28 @@ describe("StepLogTail", () => {
     });
   });
 
+  describe("when a line's fields refer to themselves", () => {
+    it("forwards and keeps the line, marking the cycle", () => {
+      const forwarded: Record<string, unknown>[] = [];
+      const log = StepLogTail.create({
+        redact: ledgerRedactor({ secretValues: [] }),
+        forward: (_level, _message, fields) => void forwarded.push(fields),
+      });
+      const looped: Record<string, unknown> = { name: "page" };
+      looped.self = looped;
+      const shared = { id: "project_1" };
+
+      log.info("read page", { looped, first: shared, second: shared });
+
+      expect(forwarded[0]).toEqual({
+        looped: { name: "page", self: "[cycle]" },
+        first: { id: "project_1" },
+        second: { id: "project_1" },
+      });
+      expect(log.tail()).toHaveLength(1);
+    });
+  });
+
   describe("when a line was already logged by the caller", () => {
     it("keeps it without forwarding it again", () => {
       const forwarded: string[] = [];

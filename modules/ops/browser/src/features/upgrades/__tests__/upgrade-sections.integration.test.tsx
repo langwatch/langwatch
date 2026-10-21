@@ -62,7 +62,6 @@ function stepWith(overrides: Partial<UpgradeStepView>): UpgradeStepView {
     attempt: 1,
     lastError: null,
     report: null,
-    logTail: [],
     progress: null,
     waitingOn: [],
     runId: null,

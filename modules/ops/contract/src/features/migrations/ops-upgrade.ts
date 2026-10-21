@@ -189,8 +189,6 @@ const opsUpgradeStepSchemaDefinition = z.object({
   attempt: z.number().int(),
   lastError: z.string().nullable(),
   report: reportSchema,
-  /** The last attempt's log lines, redacted when written. */
-  logTail: z.array(z.string()),
   progress: opsUpgradeStepProgressSchema.nullable(),
   waitingOn: z.array(opsUpgradeWaitingWriterSchema),
   runId: z.string().nullable(),
@@ -215,6 +213,8 @@ export type OpsUpgradeTarget = z.infer<typeof opsUpgradeTargetSchema>;
 
 const opsUpgradeStepDetailSchemaDefinition = z.object({
   ...opsUpgradeStepSchema.shape,
+  /** The last attempt's log lines, redacted when written; only the step's own read carries them. */
+  logTail: z.array(z.string()),
   targets: z.array(opsUpgradeTargetSchema),
 });
 export interface OpsUpgradeStepDetailSchema extends Named<

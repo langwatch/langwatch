@@ -23,6 +23,12 @@ Feature: The ledger keeps a redacted error and log for each step
     Then the stored error does not contain the URL
 
   @unit
+  Scenario: A step error read from another tool's record is redacted and cut before it is stored
+    Given a migration tool's record of a failed step whose log quotes a store URL and runs to 20 KB
+    When the ledger is seeded from that record
+    Then the stored error does not contain the URL and is at most 4 KB
+
+  @unit
   Scenario: A very long step error is cut before it is stored
     Given a background step that fails with an error of 20 KB
     When the worker records the failure
