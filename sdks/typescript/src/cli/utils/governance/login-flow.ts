@@ -115,35 +115,42 @@ function reconcileEntries({ cfg, liveSet }: { cfg: GovernanceConfig; liveSet: Se
   return { reconciled, retired };
 }
 
-/** Drops cached keys the platform revoked, returning their secrets. */
-async function reconcileIngestKeys(cfg: GovernanceConfig): Promise<string[]> {
-  const cached = cfg.default_personal_ingest_keys;
-  if (!cached || Object.keys(cached).length === 0) return [];
+/** How long the login waits for the platform to list the live keys. */
+const LIVE_KEYS_TIMEOUT_MS = 5_000;
+
+/**
+ * Lists the user's live ingest keys, drops cached ones the platform revoked,
+ * and returns the live lookup ids: undefined when the platform did not answer,
+ * so the wiring refresh judges no key on a guess.
+ */
+async function reconcileIngestKeys(
+  cfg: GovernanceConfig,
+): Promise<ReadonlySet<string> | undefined> {
+  let liveKeys: Awaited<ReturnType<typeof listIngestionKeys>>;
   try {
-    const liveKeys = await listIngestionKeys(cfg);
-    const liveSet = new Set(liveKeys.map((k) => `${k.sourceType}:${k.lookupId}`));
-    const { reconciled, retired } = reconcileEntries({ cfg, liveSet });
-    if (retired.length > 0) {
-      cfg.default_personal_ingest_keys = reconciled;
-      saveConfig(cfg);
-    }
-    return retired;
-  } catch (error) {
-    // Network error / older server: keep existing cache untouched
-    void error;
-    return [];
+    liveKeys = await listIngestionKeys(cfg, { timeoutMs: LIVE_KEYS_TIMEOUT_MS });
+  } catch {
+    // Network error / older server: keep the cache untouched.
+    return undefined;
   }
+  const liveSet = new Set(liveKeys.map((k) => `${k.sourceType}:${k.lookupId}`));
+  const { reconciled, retired } = reconcileEntries({ cfg, liveSet });
+  if (retired.length > 0) {
+    cfg.default_personal_ingest_keys = reconciled;
+    saveConfig(cfg);
+  }
+  return new Set(liveKeys.map((k) => k.lookupId));
 }
 
 async function refreshWiringAfterLogin({
   cfg,
-  retiredKeys,
+  liveKeyIds,
 }: {
   cfg: GovernanceConfig;
-  retiredKeys: string[];
+  liveKeyIds: ReadonlySet<string> | undefined;
 }): Promise<void> {
   try {
-    const refresh = await refreshTelemetryWiringForLogin(cfg, { retiredKeys });
+    const refresh = await refreshTelemetryWiringForLogin(cfg, { liveKeyIds });
     if (refresh.mintedAny) saveConfig(cfg);
     if (refresh.labels.length > 0) {
       console.log();
@@ -210,18 +217,15 @@ async function completeDeviceSession({
 
   applyBootstrap({ cfg, bootstrap });
 
-  // Reconcile cached ingestion keys (#4755): after a fresh login, drop
-  // any locally cached entries whose token was revoked on the platform.
-  // Errors are swallowed — a login must never fail on reconcile; the
-  // worst outcome is a stale cache entry that the per-invocation wrapper
-  // check will catch anyway.
-  const retiredKeys = await reconcileIngestKeys(cfg);
+  // Reconcile cached ingestion keys (#4755): drop cached entries the
+  // platform revoked. Errors are swallowed and the wait is bounded: a login
+  // never fails or hangs on reconcile.
+  const liveKeyIds = await reconcileIngestKeys(cfg);
 
   // Latest login wins (#6202): re-point persisted wiring at this login when it
-  // names a DIFFERENT instance, or holds a key this login retired (signing the
-  // device in again revokes its previous login's keys, spec latest-login-wins).
-  // Minting fresh ingest keys where needed. Best-effort: never fails a login.
-  await refreshWiringAfterLogin({ cfg, retiredKeys });
+  // names a DIFFERENT instance, or holds a key the platform no longer lists,
+  // whichever login retired it (spec latest-login-wins, ADR-039 v7).
+  await refreshWiringAfterLogin({ cfg, liveKeyIds });
 
   if (isQuiet) return cfg;
 

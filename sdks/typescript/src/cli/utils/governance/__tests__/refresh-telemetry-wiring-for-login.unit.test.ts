@@ -88,7 +88,9 @@ describe("refreshTelemetryWiringForLogin", () => {
     });
   });
 
-  describe("given a copilot scoped function at this login holding a key the login retired", () => {
+  describe("given a copilot scoped function at this login holding a key the platform no longer lists", () => {
+    const STALE_LOOKUP_ID = "stalelogin000000";
+
     beforeEach(() => {
       vi.spyOn(console, "log").mockImplementation(() => undefined);
       persistBlockToRc(
@@ -112,7 +114,7 @@ describe("refreshTelemetryWiringForLogin", () => {
     it("rewrites the function with a key minted for this login", async () => {
       const cfg = baseCfg();
 
-      const result = await refreshTelemetryWiringForLogin(cfg, { retiredKeys: [STALE_TOKEN] });
+      const result = await refreshTelemetryWiringForLogin(cfg, { liveKeyIds: new Set() });
 
       const zshrc = fs.readFileSync(rcPath("zsh"), "utf8");
       expect(zshrc).toContain(CURRENT_TOKEN);
@@ -122,13 +124,39 @@ describe("refreshTelemetryWiringForLogin", () => {
       expect(result.labels.some((label) => label.includes("copilot"))).toBe(true);
     });
 
+    /** @scenario "Signing in again re-keys wiring whose key an earlier login retired" */
+    it("re-keys it although the cache never held the dead key", async () => {
+      const cfg = baseCfg();
+      expect(cfg.default_personal_ingest_keys?.copilot_cli).toBeUndefined();
+
+      const result = await refreshTelemetryWiringForLogin(cfg, {
+        liveKeyIds: new Set(["someotherkey0000"]),
+      });
+
+      const zshrc = fs.readFileSync(rcPath("zsh"), "utf8");
+      expect(zshrc).toContain(CURRENT_TOKEN);
+      expect(zshrc).not.toContain(STALE_TOKEN);
+      expect(result.labels).toContain("copilot shell function (~/.zshrc)");
+    });
+
     /** @scenario "Signing in again leaves wiring whose key is still live" */
-    it("leaves the function alone when the login retired no key it holds", async () => {
+    it("leaves the function alone when the platform still lists its key", async () => {
       const before = fs.readFileSync(rcPath("zsh"), "utf8");
 
       const result = await refreshTelemetryWiringForLogin(baseCfg(), {
-        retiredKeys: ["ik-lw-someotherkey000_retired"],
+        liveKeyIds: new Set([STALE_LOOKUP_ID]),
       });
+
+      expect(fs.readFileSync(rcPath("zsh"), "utf8")).toBe(before);
+      expect(cliApi.mintIngestionKey).not.toHaveBeenCalled();
+      expect(result.labels).toEqual([]);
+    });
+
+    /** @scenario "A login that cannot learn the live keys leaves the wiring's key alone" */
+    it("leaves the function alone when the login could not learn the live keys", async () => {
+      const before = fs.readFileSync(rcPath("zsh"), "utf8");
+
+      const result = await refreshTelemetryWiringForLogin(baseCfg(), {});
 
       expect(fs.readFileSync(rcPath("zsh"), "utf8")).toBe(before);
       expect(cliApi.mintIngestionKey).not.toHaveBeenCalled();
