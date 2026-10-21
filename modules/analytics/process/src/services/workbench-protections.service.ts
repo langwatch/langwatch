@@ -282,8 +282,10 @@ export class WorkbenchProtectionsService {
     }
   }
 
-  /** The resolved policy, or none when resolution failed -- which hides captured content. */
-  /** One project's policy, or the strictest across several (an aggregate and its members). */
+  /**
+   * One project's policy, or the strictest across several (an aggregate and its members); none
+   * when resolution failed, which hides captured content.
+   */
   private async policyFor(projectIds: readonly string[]): Promise<ResolvedDataPrivacy | undefined> {
     const [projectId] = projectIds;
     try {
