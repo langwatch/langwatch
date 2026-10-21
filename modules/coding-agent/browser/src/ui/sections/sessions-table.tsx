@@ -4,7 +4,7 @@ import { Pagination } from "@langwatch/design-system/pagination";
 import { Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import { SquareTerminal } from "lucide-react";
 import type React from "react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { codingAgentApi as api } from "../../behavior/coding-agent-api.ts";
 import { useCodingAgentRouter } from "../../behavior/coding-agent-router.ts";
@@ -55,7 +55,10 @@ export function SessionsTable({
     { projectId },
     { refetchOnWindowFocus: false },
   );
-  const rows: SessionListRow[] = (sessionsQuery.data ?? []).map(toListRow);
+  const rows = useMemo<SessionListRow[]>(
+    () => (sessionsQuery.data ?? []).map(toListRow),
+    [sessionsQuery.data],
+  );
 
   if (sessionsQuery.isLoading) {
     return <Skeleton height="180px" borderRadius="md" />;
@@ -94,13 +97,17 @@ const ListedSessions: React.FC<{
   const [search, setSearch] = useState("");
   const [periodSelection, setPeriodSelection] = useState<PeriodSelection | null>(null);
 
-  const filteredRows = rows.filter(
-    (row) =>
-      matchesSessionSearch({ row, query: search }) &&
-      isWithinPeriod({
-        lastUpdateAtMs: row.lastUpdateAtMs,
-        period: periodSelection?.period ?? null,
-      }),
+  const filteredRows = useMemo(
+    () =>
+      rows.filter(
+        (row) =>
+          matchesSessionSearch({ row, query: search }) &&
+          isWithinPeriod({
+            lastUpdateAtMs: row.lastUpdateAtMs,
+            period: periodSelection?.period ?? null,
+          }),
+      ),
+    [rows, search, periodSelection],
   );
   // Decided over every listed row, not one page, so the project line stays put while paging.
   const showProject = spansSeveralProjects(rows);
@@ -113,7 +120,10 @@ const ListedSessions: React.FC<{
   // page.
   const pageCount = Math.max(1, Math.ceil(sorted.length / pageSize));
   const currentPage = Math.min(page, pageCount);
-  const visibleRows = sorted.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const visibleRows = useMemo(
+    () => sorted.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    [sorted, currentPage, pageSize],
+  );
 
   return (
     <VStack align="stretch" gap={3} width="full">

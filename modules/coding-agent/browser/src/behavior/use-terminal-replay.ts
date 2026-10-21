@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 import {
   type ConversationTurn,
@@ -44,62 +44,77 @@ export function useTerminalReplay({ projectId, projectSlug }: TerminalReplayInpu
   /** Sessions whose turn is being looked up right now, by identity key. */
   const inFlightRef = useRef<Set<string>>(new Set());
 
-  const withLastTurn = async (
-    row: ReplayableSession,
-    open: (turn: ConversationTurn, tenantId: string | undefined) => void,
-  ) => {
-    // A second click on a session already being looked up is the same
-    // request, and answering it twice opens the replay twice. The guard is a
-    // ref rather than state because both clicks land before React has
-    // re-rendered either of them.
-    const key = sessionIdentityKey(row);
-    if (inFlightRef.current.has(key)) return;
-    inFlightRef.current.add(key);
-    setOpeningKey(key);
-    const tenantId = memberTenantOf({ tenantId: row.tenantId, projectId });
-    try {
-      const turn = await lastTurnOfSession({
-        utils,
-        projectId,
-        sessionId: row.sessionId,
-        tenantId,
-      });
-      if (turn) open(turn, tenantId);
-      else sayNothingWasStored(toaster);
-    } catch (error) {
-      showErrorToast({
-        error,
-        fallbackTitle: "Couldn't open the terminal replay",
-      });
-    } finally {
-      inFlightRef.current.delete(key);
-      // Only this session's own spinner is cleared. A reader who chose a
-      // second session while the first was still resolving is waiting on
-      // that one, and clearing whatever happens to be current would take
-      // its spinner away while it is still loading.
-      setOpeningKey((current) => (current === key ? null : current));
-    }
-  };
+  const withLastTurn = useCallback(
+    async (
+      row: ReplayableSession,
+      open: (turn: ConversationTurn, tenantId: string | undefined) => void,
+    ) => {
+      // A second click on a session already being looked up is the same
+      // request, and answering it twice opens the replay twice. The guard is a
+      // ref rather than state because both clicks land before React has
+      // re-rendered either of them.
+      const key = sessionIdentityKey(row);
+      if (inFlightRef.current.has(key)) return;
+      inFlightRef.current.add(key);
+      setOpeningKey(key);
+      const tenantId = memberTenantOf({ tenantId: row.tenantId, projectId });
+      try {
+        const turn = await lastTurnOfSession({
+          utils,
+          projectId,
+          sessionId: row.sessionId,
+          tenantId,
+        });
+        if (turn) open(turn, tenantId);
+        else sayNothingWasStored(toaster);
+      } catch (error) {
+        showErrorToast({
+          error,
+          fallbackTitle: "Couldn't open the terminal replay",
+        });
+      } finally {
+        inFlightRef.current.delete(key);
+        // Only this session's own spinner is cleared. A reader who chose a
+        // second session while the first was still resolving is waiting on
+        // that one, and clearing whatever happens to be current would take
+        // its spinner away while it is still loading.
+        setOpeningKey((current) => (current === key ? null : current));
+      }
+    },
+    [projectId, showErrorToast, toaster, utils],
+  );
 
-  const openReplay = (row: ReplayableSession) =>
-    withLastTurn(row, (turn, tenantId) => openReplayHere({ turn, projectId, tenantId, router }));
+  const openReplay = useCallback(
+    (row: ReplayableSession) =>
+      withLastTurn(row, (turn, tenantId) => openReplayHere({ turn, projectId, tenantId, router })),
+    [projectId, router, withLastTurn],
+  );
 
-  const openInExplorer = (row: ReplayableSession) =>
-    withLastTurn(row, (turn, tenantId) => {
-      if (projectSlug) openReplayInExplorer({ turn, projectSlug, tenantId, router });
-    });
-
-  const prefetch = (row: ReplayableSession) => {
-    void utils.traces.conversationContext.prefetch(
-      conversationContextInput({
-        projectId,
-        sessionId: row.sessionId,
-        tenantId: memberTenantOf({ tenantId: row.tenantId, projectId }),
+  const openInExplorer = useCallback(
+    (row: ReplayableSession) =>
+      withLastTurn(row, (turn, tenantId) => {
+        if (projectSlug) openReplayInExplorer({ turn, projectSlug, tenantId, router });
       }),
-    );
-  };
+    [projectSlug, router, withLastTurn],
+  );
 
-  const isOpening = (row: ReplayableSession) => openingKey === sessionIdentityKey(row);
+  const prefetch = useCallback(
+    (row: ReplayableSession) => {
+      void utils.traces.conversationContext.prefetch(
+        conversationContextInput({
+          projectId,
+          sessionId: row.sessionId,
+          tenantId: memberTenantOf({ tenantId: row.tenantId, projectId }),
+        }),
+      );
+    },
+    [projectId, utils],
+  );
+
+  const isOpening = useCallback(
+    (row: ReplayableSession) => openingKey === sessionIdentityKey(row),
+    [openingKey],
+  );
 
   return { isOpening, openReplay, openInExplorer, prefetch };
 }
