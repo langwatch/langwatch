@@ -24,6 +24,7 @@ import {
   scriptsFor,
   shardOf,
   staleEntries,
+  suiteEnv,
   summarise,
   type DiscoveredPackage,
   type SuiteJob,
@@ -577,6 +578,42 @@ void describe("given a shard that runs several suites at once", () => {
         [...statuses].map(([job, status]) => `${job.pkg.name} ${status}`).toSorted(),
         ["@fix/a 1", "@fix/b 0"],
       );
+    });
+  });
+});
+
+void describe("given the environment each suite starts with", () => {
+  const base = { PATH: "/bin" };
+  const envFor = (script: string, overrides: { heavy?: boolean; concurrency?: number } = {}) =>
+    suiteEnv({
+      job: { pkg: pkg("@fix/a", [script]), script },
+      heavy: overrides.heavy ?? false,
+      concurrency: overrides.concurrency ?? 2,
+      cores: 4,
+      base,
+    });
+
+  void describe("when a light shared-lane suite runs alongside others", () => {
+    /** @scenario "A light suite gets a share of the cores" */
+    void it("caps its workers at the cores divided by the concurrency", () => {
+      assert.deepEqual(envFor("test"), { PATH: "/bin", VITEST_MAX_WORKERS: "2" });
+      assert.equal(envFor("test:unit", { concurrency: 3 }).VITEST_MAX_WORKERS, "1");
+      assert.equal(envFor("test", { concurrency: 8 }).VITEST_MAX_WORKERS, "1");
+    });
+  });
+
+  void describe("when the suite is integration, browser or heavy", () => {
+    /** @scenario "A light suite gets a share of the cores" */
+    void it("keeps its own configured worker count", () => {
+      assert.equal(envFor("test:integration"), base);
+      assert.equal(envFor("test:browser"), base);
+      assert.equal(envFor("test", { heavy: true }), base);
+    });
+  });
+
+  void describe("when one suite runs at a time", () => {
+    void it("sets no worker count", () => {
+      assert.equal(envFor("test", { concurrency: 1 }), base);
     });
   });
 });
