@@ -15,7 +15,9 @@ export const analyticsTrpcTransport: TrpcRouterDeclaration<AnalyticsApi, typeof 
 
     .procedure("dataForFilter")
     .withPermission("analytics:view")
-    .handle(async ({ app, input }) => ({ options: await app.filterOptions(input) }))
+    .handle(async ({ app, input, authorization }) => ({
+      options: await app.filterOptions(input, { authorization }),
+    }))
 
     .procedure("topUsedDocuments")
     .withPermission("cost:view")

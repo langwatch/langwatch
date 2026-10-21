@@ -679,10 +679,13 @@ export interface TraceApi extends TraceOtlpIngestApi {
   /**
    * A legacy `filters` document compiled to parameterized ClickHouse conditions
    * over `trace_summaries ts`. Trace owns the grammar because it owns the tables.
+   * `fenced` writes the side-table subqueries for a statement read through a proof's fence
+   * (ADR-177), which names no tenant of its own.
    */
   translateLegacyFilters(input: {
     filters: Readonly<Record<string, unknown>>;
     window?: { startDate?: number; endDate?: number };
+    fenced?: boolean;
   }): { conditions: string[]; params: Record<string, unknown>; hasUnsupportedFilters: boolean };
   /**
    * The Explorer's own filter: the query compiled, hidden origins left out

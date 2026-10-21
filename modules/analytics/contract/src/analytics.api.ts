@@ -1,4 +1,4 @@
-import type { RestCredentialPrincipal } from "@langwatch/authorization";
+import type { Authorization, RestCredentialPrincipal } from "@langwatch/authorization";
 import { moduleApi } from "@langwatch/module";
 import type { Instant } from "@langwatch/time";
 
@@ -86,16 +86,19 @@ export interface AnalyticsApi {
     input: AnalyticsReadInput & AnalyticsFeedbacksPageParams,
   ): Promise<AnalyticsFeedbacksPageResult>;
   getTopUsedDocuments(input: AnalyticsReadInput): Promise<AnalyticsTopDocumentsResult>;
-  filterOptions(input: {
-    readonly projectId: string;
-    readonly field: string;
-    readonly startDate: number;
-    readonly endDate: number;
-    readonly query?: string;
-    readonly key?: string;
-    readonly subkey?: string;
-    readonly filters?: Record<string, unknown>;
-  }): Promise<AnalyticsFilterOption[]>;
+  filterOptions(
+    input: {
+      readonly projectId: string;
+      readonly field: string;
+      readonly startDate: number;
+      readonly endDate: number;
+      readonly query?: string;
+      readonly key?: string;
+      readonly subkey?: string;
+      readonly filters?: Record<string, unknown>;
+    },
+    options: { readonly authorization: Authorization },
+  ): Promise<AnalyticsFilterOption[]>;
   /** Refuses the dashboard-widget surface unless Dashboards and LangWatchQL are both on. */
   assertDashboardWidgetsEnabled(input: { projectId: string }): Promise<void>;
   upsertEvaluationAnalytics(input: AnalyticsEvaluationUpsertInput): Promise<void>;

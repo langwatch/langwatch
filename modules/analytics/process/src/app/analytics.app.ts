@@ -85,7 +85,6 @@ import type {
   LangWatchQlSupply,
 } from "../repositories/analytics.repositories.ts";
 import type { EvaluationAnalyticsClickHouseClient } from "../repositories/clickhouse/clickhouse.analytics-persistence.repository.ts";
-import { FilterOptionsClickHouseRepository } from "../repositories/clickhouse/clickhouse.filter-options.repository.ts";
 import { ClickHouseLangWatchQLExecutorRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-executor.repository.ts";
 import { LwqlKeyMapClickHouseRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-key-map.repository.ts";
 import { ClickHouseLangWatchQLProvisioningRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts";
@@ -164,6 +163,7 @@ type AnalyticsFilterOptionsLookup = Readonly<{
       startDate: number;
       endDate: number;
       scope?: { conditions: string[]; params: Record<string, unknown> };
+      authorization: Authorization;
     }>,
   ): Promise<AnalyticsFilterOption[]>;
 }>;
@@ -494,9 +494,7 @@ export class AnalyticsModule
       {
         analytics,
         hydration,
-        filterOptions: FilterService.create({
-          repository: FilterOptionsClickHouseRepository.create({ resolveClient }),
-        }),
+        filterOptions: FilterService.create({ repository: setup.repositories.filterOptions }),
         langWatchQL,
         featureFlags: setup.dependencies.featureFlags,
         authz: setup.dependencies.authz,
@@ -616,7 +614,10 @@ export class AnalyticsModule
    * — never by the field's own selection, or the picker could only re-offer what's already
    * chosen. Forgetting this exclusion wouldn't fail; it would quietly narrow the answer.
    */
-  filterOptions(request: AnalyticsFilterOptionsRequest): Promise<AnalyticsFilterOption[]> {
+  filterOptions(
+    request: AnalyticsFilterOptionsRequest,
+    { authorization }: { authorization: Authorization },
+  ): Promise<AnalyticsFilterOption[]> {
     if (filterFieldRequiresKey(request.field) && !request.key) {
       throw new ValidationError(`Field ${request.field} requires a key to be defined`);
     }
@@ -626,8 +627,12 @@ export class AnalyticsModule
     const scopeFilters = Object.fromEntries(
       Object.entries(request.filters ?? {}).filter(([name]) => name !== request.field),
     );
-    // Trace owns the filter grammar because it owns the tables the scope reads.
-    const scope = this.#dependencies.traces.translateLegacyFilters({ filters: scopeFilters });
+    // Trace owns the filter grammar because it owns the tables the scope reads. The picker
+    // reads through the proof's fence, so the scope names no tenant of its own.
+    const scope = this.#dependencies.traces.translateLegacyFilters({
+      filters: scopeFilters,
+      fenced: true,
+    });
 
     return this.#dependencies.filterOptions.getFilterOptions({
       projectId: request.projectId,
@@ -638,6 +643,7 @@ export class AnalyticsModule
       startDate: request.startDate,
       endDate: request.endDate,
       scope,
+      authorization,
     });
   }
 

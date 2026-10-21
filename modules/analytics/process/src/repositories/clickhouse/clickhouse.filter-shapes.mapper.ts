@@ -7,7 +7,6 @@ type FilterOptionsScope = {
 };
 
 export type ClickHouseFilterQueryParams = {
-  tenantId: string;
   query?: string;
   key?: string;
   subkey?: string;
