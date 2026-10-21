@@ -556,6 +556,7 @@ describe("UpgradeStepDetail", () => {
               report: { checkpoint: "org_42" },
             }),
             targets: [],
+            logTail: [],
           }}
         />,
       );

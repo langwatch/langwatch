@@ -114,6 +114,15 @@ export class EnterpriseOpsModule implements EnterpriseOpsApiContract {
     operator,
   }) => this.#instances.summarize({ operatorId: await this.#staff(operator) });
 
+  findUpgradeDiagnostics: EnterpriseOpsApiContract["findUpgradeDiagnostics"] = async ({
+    operator,
+    instanceRowId,
+  }) => this.#instances.findDiagnostics({ instanceRowId, operatorId: await this.#staff(operator) });
+
+  getUpgradeDiagnosticsDownload: EnterpriseOpsApiContract["getUpgradeDiagnosticsDownload"] =
+    async ({ operator, id }) =>
+      this.#instances.getDiagnosticsDownload({ id, operatorId: await this.#manager(operator) });
+
   /** The staff member's id, or not-found; ops admits only where its cloud-ops capability is on (§3.5). */
   async #staff(operator: OpsOperator | null): Promise<string> {
     return (await this.#ops.admitCloudAdmin(operator)).id;

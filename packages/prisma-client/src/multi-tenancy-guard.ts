@@ -151,6 +151,8 @@ const RELATIONAL_PARENT_SCOPED = [
   "ConnectedStatement",
   // A self-hosted instance's reports, reached through the instance row.
   "SelfHostedInstanceReport",
+  // A self-hosted instance's upgrade diagnostics, reached through the instance row.
+  "SelfHostedInstanceDiagnostic",
 ] as const;
 
 /**
