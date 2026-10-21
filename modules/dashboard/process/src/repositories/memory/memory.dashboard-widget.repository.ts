@@ -2,7 +2,6 @@ import {
   DashboardWidgetDefinitionInvalidError,
   DashboardWidgetNotFoundError,
 } from "@langwatch/analytics-contract";
-import { DashboardNotFoundError } from "@langwatch/dashboard-contract";
 import {
   CHART_GRID_DEFAULT_COL_SPAN,
   CHART_GRID_DEFAULT_ROW_SPAN,
@@ -12,6 +11,7 @@ import {
   DASHBOARD_WIDGET_DEFINITION_VERSION,
   dashboardWidgetDefinitionSchema,
 } from "@langwatch/analytics-contract/dashboard-widget-definition";
+import { DashboardNotFoundError } from "@langwatch/dashboard-contract";
 import { nowInstant } from "@langwatch/time";
 
 import type {
