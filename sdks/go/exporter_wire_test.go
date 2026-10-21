@@ -49,7 +49,9 @@ func (r *protobufReceiver) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func exportOneSpan(t *testing.T) *protobufReceiver {
+// exportOneSpan exports one span and returns the one request the receiver
+// got, read under the lock its handler appends with.
+func exportOneSpan(t *testing.T) (http.Header, *collectortrace.ExportTraceServiceRequest) {
 	t.Helper()
 	rec := &protobufReceiver{t: t}
 	srv := httptest.NewServer(rec)
@@ -61,8 +63,11 @@ func exportOneSpan(t *testing.T) *protobufReceiver {
 		tracetest.SpanStub{Name: "llm.chat"}.Snapshot(),
 	}))
 	require.NoError(t, exporter.Shutdown(context.Background()))
+
+	rec.mu.Lock()
+	defer rec.mu.Unlock()
 	require.Len(t, rec.requests, 1)
-	return rec
+	return rec.headers[0], rec.requests[0]
 }
 
 // @scenario "The Go SDK sends gzipped protobuf by default"
@@ -70,11 +75,11 @@ func TestNewExporter_SendsGzippedProtobufByDefault(t *testing.T) {
 	t.Setenv("OTEL_EXPORTER_OTLP_COMPRESSION", "")
 	t.Setenv("OTEL_EXPORTER_OTLP_TRACES_COMPRESSION", "")
 
-	rec := exportOneSpan(t)
+	header, req := exportOneSpan(t)
 
-	assert.Equal(t, "application/x-protobuf", rec.headers[0].Get("Content-Type"))
-	assert.Equal(t, "gzip", rec.headers[0].Get("Content-Encoding"))
-	spans := rec.requests[0].GetResourceSpans()[0].GetScopeSpans()[0].GetSpans()
+	assert.Equal(t, "application/x-protobuf", header.Get("Content-Type"))
+	assert.Equal(t, "gzip", header.Get("Content-Encoding"))
+	spans := req.GetResourceSpans()[0].GetScopeSpans()[0].GetSpans()
 	require.Len(t, spans, 1)
 	assert.Equal(t, "llm.chat", spans[0].GetName())
 }
@@ -87,10 +92,10 @@ func TestNewExporter_LeavesCompressionToTheOTelVariables(t *testing.T) {
 			t.Setenv("OTEL_EXPORTER_OTLP_TRACES_COMPRESSION", "")
 			t.Setenv(name, "none")
 
-			rec := exportOneSpan(t)
+			header, _ := exportOneSpan(t)
 
-			assert.Equal(t, "application/x-protobuf", rec.headers[0].Get("Content-Type"))
-			assert.Empty(t, rec.headers[0].Get("Content-Encoding"))
+			assert.Equal(t, "application/x-protobuf", header.Get("Content-Type"))
+			assert.Empty(t, header.Get("Content-Encoding"))
 		})
 	}
 }
