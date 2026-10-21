@@ -2235,7 +2235,7 @@ redis:
       secretKeyRef: { name: "", key: "" }
 
   # Redis container image (official Docker Hub image)
-  ## @extra redis.image Redis container image. Valkey 7.2+ works too via examples/overlays/redis-valkey.yaml.
+  ## @extra redis.image Redis container image. Valkey 9.1 via examples/overlays/redis-valkey.yaml.
   image:
     ## @param redis.image.repository [string, default: redis] Image repository (valkey/valkey for Valkey).
     repository: redis

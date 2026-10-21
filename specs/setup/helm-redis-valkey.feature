@@ -7,8 +7,10 @@ Feature: The chart-managed Redis can run as Valkey
   #   charts/langwatch/examples/overlays/redis-valkey.yaml - the overlay.
   #   charts/langwatch/tests/redis-valkey.sh - renders the chart and asserts these.
 
-  # The valkey/valkey image ships redis-server and redis-cli, and runs as uid 999
-  # like the Redis image, so only the image changes.
+  # The valkey/valkey:9.1 image ships redis-server and redis-cli, runs as uid 999
+  # like the Redis image, so only the image changes. It cannot load a Redis 8.0
+  # dump, so the overlay is for fresh installs: an existing release drains the
+  # workers and starts empty (Redis here holds only queues and cache).
 
   Rule: The overlay changes the image and nothing else
 
