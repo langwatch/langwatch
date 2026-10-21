@@ -49,8 +49,6 @@ const isVariablePriceRouter = (entry: LLMModelEntry | undefined) => {
  * Removing a line is the goal; adding one needs the reason written down.
  */
 const KNOWN_UNPRICED: Record<string, string> = {
-  "inclusionai/ling-3.1-flash":
-    "The upstream source lists it at zero per token and there is no published rate to correct it with, so no price is set here.",
   "gemini/lyria-3-clip-preview":
     "Music generation billed per 30-second clip at $0.04. Both upstream sources report zero per token and the catalog has no per-clip unit.",
   "gemini/lyria-3-pro-preview":

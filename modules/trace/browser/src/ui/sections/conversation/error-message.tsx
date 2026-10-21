@@ -1,9 +1,6 @@
 import { Link } from "@langwatch/browser-host/link";
 import { Alert } from "@langwatch/design-system/primitives";
-import {
-  explainHandledError,
-  OUT_OF_CREDIT_ADVICE,
-} from "@langwatch/handled-error/presentation";
+import { explainHandledError, OUT_OF_CREDIT_ADVICE } from "@langwatch/handled-error/presentation";
 import type { ParsedLLMError } from "@langwatch/prompt-contract";
 
 interface ErrorMessageProps {

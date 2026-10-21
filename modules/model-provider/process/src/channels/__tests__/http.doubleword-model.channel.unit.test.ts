@@ -39,8 +39,8 @@ describe("HttpDoublewordModelChannel", () => {
         outcome: "fetched",
         models: [{ model_name: FLASH.model_name }, { model_name: EMBEDDING.model_name }],
       });
-      expect(String(request.mock.calls[0]?.[0])).toContain("include=pricing&limit=100&skip=0");
-      expect(String(request.mock.calls[1]?.[0])).toContain("skip=100");
+      expect(request.mock.calls[0]?.[0] as string).toContain("include=pricing&limit=100&skip=0");
+      expect(request.mock.calls[1]?.[0] as string).toContain("skip=100");
       expect(request.mock.calls[0]?.[1]).toEqual({
         headers: { Authorization: "Bearer platform-key" },
       });
