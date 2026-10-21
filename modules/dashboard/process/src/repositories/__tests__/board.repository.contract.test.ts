@@ -5,7 +5,7 @@
  */
 import { randomUUID } from "node:crypto";
 
-import type { DashboardStar } from "@langwatch/dashboard-contract";
+import { DashboardNotFoundError, type DashboardStar } from "@langwatch/dashboard-contract";
 import { describe, expect, it } from "vitest";
 
 import type { BoardReach } from "../board.repository.ts";
@@ -48,7 +48,7 @@ function contractCases(backend: DashboardBackend): void {
       await expect(boards.updateBoard({ ...absent, data: { name: "Renamed" } })).rejects.toThrow(
         Error,
       );
-      await expect(boards.deleteBoard(absent)).rejects.toThrow(Error);
+      await expect(boards.deleteBoard(absent)).rejects.toThrow(DashboardNotFoundError);
     });
   });
 

@@ -6,7 +6,7 @@ import {
   type DashboardStar,
   type StarredDashboard,
 } from "@langwatch/dashboard-contract";
-import { PrismaRepository } from "@langwatch/prisma-client";
+import { isRecordNotFoundError, PrismaRepository } from "@langwatch/prisma-client";
 import type { DashboardsV2, Prisma } from "@langwatch/prisma-client/generated";
 
 import type {
@@ -17,9 +17,6 @@ import type {
   BoardUpdate,
   MemberStars,
 } from "../board.repository.ts";
-
-const isRecordNotFound = (error: unknown): boolean =>
-  typeof error === "object" && error !== null && "code" in error && error.code === "P2025";
 
 /** The column a star matches on: the board id for a board, the template id for a template. */
 const starTarget = (star: DashboardStar) =>
@@ -157,7 +154,7 @@ export class PrismaBoardRepository
       const board = await transaction.dashboardsV2
         .delete({ where: { id: dashboardId, projectId } })
         .catch((error: unknown) => {
-          throw isRecordNotFound(error) ? new DashboardNotFoundError(projectId) : error;
+          throw isRecordNotFoundError(error) ? new DashboardNotFoundError(projectId) : error;
         });
       await transaction.dashboardWidget.deleteMany({ where: { projectId, dashboardId } });
       await transaction.dashboardFavourite.deleteMany({ where: { projectId, dashboardId } });

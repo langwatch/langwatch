@@ -18,11 +18,11 @@ Dashboards and the graphs and saved workbench charts on them.
 
 | Kind           | Name                        | Declared at                                                                |
 | -------------- | --------------------------- | -------------------------------------------------------------------------- |
-| Postgres table | `DashboardsV2`              | `process/src/repositories/prisma/prisma.board.repository.ts:72`            |
-| Postgres table | `DashboardWidget`           | `process/src/repositories/prisma/prisma.board.repository.ts:72`            |
-| Postgres table | `DashboardFavourite`        | `process/src/repositories/prisma/prisma.board.repository.ts:72`            |
-| Postgres table | `CustomGraph`               | `process/src/repositories/prisma/prisma.board.repository.ts:72`            |
-| Postgres table | `Dashboard`                 | `process/src/repositories/prisma/prisma.board.repository.ts:72`            |
+| Postgres table | `DashboardsV2`              | `process/src/repositories/prisma/prisma.board.repository.ts:73`            |
+| Postgres table | `DashboardWidget`           | `process/src/repositories/prisma/prisma.board.repository.ts:73`            |
+| Postgres table | `DashboardFavourite`        | `process/src/repositories/prisma/prisma.board.repository.ts:73`            |
+| Postgres table | `CustomGraph`               | `process/src/repositories/prisma/prisma.board.repository.ts:73`            |
+| Postgres table | `Dashboard`                 | `process/src/repositories/prisma/prisma.board.repository.ts:73`            |
 | Postgres table | `DashboardWidget`           | `process/src/repositories/prisma/prisma.dashboard-widget.repository.ts:59` |
 | Postgres table | `DashboardsV2`              | `process/src/repositories/prisma/prisma.dashboard-widget.repository.ts:59` |
 | Postgres table | `CustomGraph`               | `process/src/repositories/prisma/prisma.dashboard-widget.repository.ts:59` |

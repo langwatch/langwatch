@@ -1,4 +1,5 @@
 import {
+  DashboardNotFoundError,
   dashboardSchema,
   type DashboardScope,
   type DashboardStar,
@@ -84,7 +85,10 @@ export class MemoryBoardRepository implements BoardRepository {
   }
 
   async deleteBoard(input: { projectId: string; dashboardId: string }): Promise<BoardRecord> {
-    const board = this.#requireBoard(input);
+    const board = this.#database.boards.find(
+      (row) => row.id === input.dashboardId && row.projectId === input.projectId,
+    );
+    if (!board) throw new DashboardNotFoundError(input.projectId);
     const database = this.#database;
     const onBoard = (row: { projectId: string; dashboardId: string | null }) =>
       row.projectId === board.projectId && row.dashboardId === board.id;
@@ -192,7 +196,7 @@ export class MemoryBoardRepository implements BoardRepository {
     );
   }
 
-  /** The Prisma twin's `update`/`delete` refuse an unmatched row; this does too. */
+  /** The Prisma twin's `update` refuses an unmatched row; this does too. */
   #requireBoard(input: { projectId: string; dashboardId: string }): BoardRecord {
     const board = this.#database.boards.find(
       (row) => row.id === input.dashboardId && row.projectId === input.projectId,
