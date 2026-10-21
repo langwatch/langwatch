@@ -7,8 +7,8 @@
 #   reader     the project whose traces show them ("braid into")
 #   condition  the OTTL subset a braid's spans must match, compiled when the braid is saved
 #
-# Who may braid: traces:braid on the owner and traces:view on the reader. Project roles come
-# from teams, so a team admin holds traces:braid on every project in that team (ADR-183 §2).
+# Who may braid: braids:manage on the owner and traces:view on the reader. Project roles come
+# from teams, so a team admin holds braids:manage on every project in that team (ADR-183 §2).
 #
 # EVERY SCENARIO IS @unimplemented: none of this is built. Each carries the level its
 # binding is expected at, and the pull request that builds it binds it.
@@ -87,7 +87,7 @@ Feature: Braids
       When a proof is minted for "frontdesk"
       Then it carries the braid from "orchestrator" and nothing braided into "orchestrator"
 
-  Rule: Whoever holds traces:braid on the owner and can read the reader may braid
+  Rule: Whoever holds braids:manage on the owner and can read the reader may braid
 
     @integration @unimplemented
     Scenario: A member may not create, change or remove a braid
@@ -106,7 +106,7 @@ Feature: Braids
     Scenario: A team admin may braid out of every project in that team and no other
       Given tom is an admin of the team holding "specialists" and "billing"
       When tom's permissions are read
-      Then tom holds traces:braid on "specialists" and on "billing"
+      Then tom holds braids:manage on "specialists" and on "billing"
       And on no project of another team
 
     @integration @unimplemented
@@ -116,8 +116,8 @@ Feature: Braids
       Then the braid is refused as a permission denial before anything is read or written
 
     @unit @unimplemented
-    Scenario: A custom role listing traces:braid braids only where it is bound
-      Given rui holds a custom role listing traces:braid and traces:view, bound to "specialists" alone
+    Scenario: A custom role listing braids:manage braids only where it is bound
+      Given rui holds a custom role listing braids:manage and traces:view, bound to "specialists" alone
       And rui can read "orchestrator" traces
       When rui braids "specialists" into "orchestrator"
       Then the braid is live
@@ -125,7 +125,7 @@ Feature: Braids
 
     @unit @unimplemented
     Scenario: Nobody braids spans they could not read themselves
-      Given rui holds traces:braid on "specialists" through a custom role that does not let rui read its traces
+      Given rui holds braids:manage on "specialists" through a custom role that does not let rui read its traces
       When rui asks to braid "specialists" into "orchestrator"
       Then the braid is refused as beyond the caller's permissions
 
@@ -151,7 +151,7 @@ Feature: Braids
       Given an organisation that has never changed who may braid
       And tom is an admin of the team holding "specialists"
       When tom's permissions are read
-      Then tom holds traces:braid on "specialists"
+      Then tom holds braids:manage on "specialists"
 
     @integration @unimplemented
     Scenario: With braids kept to organisation admins, a team admin may not braid

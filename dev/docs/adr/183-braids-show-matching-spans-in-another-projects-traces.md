@@ -20,7 +20,7 @@ brand kit beside it.
 > One line: a **braid** is a shared grant from an owner project to a reader project. The reader's trace
 > view shows the owner's spans that match the braid's condition, inside traces the reader already has,
 > matched by trace id. Nothing is copied. Release 1 is Enterprise only, read-only, created by whoever holds
-> the new `traces:braid` permission on the owner (project and organisation admins), and ships with call
+> the new `braids:manage` permission on the owner (project and organisation admins), and ships with call
 > signing, so a condition can require that the reader really made the call.
 
 ## Context
@@ -99,31 +99,33 @@ Braids are authz's grant door, beside the existing grant routes, not a new modul
 each project, named by route parameters:
 
 ```
-.withPermission("traces:braid", { at: "route", param: "ownerProjectId" })
+.withPermission("braids:manage", { at: "route", param: "ownerProjectId" })
 .withPermission("traces:view", { at: "route", param: "readerProjectId" })
 .withEntitlement("enterprise", { feature: "BRAIDS" })
 ```
 
-- **A new permission, `traces:braid`** (decided by Alex, 2026-10-21: project admins may braid out of their
-  own project). It joins the `traces` resource and the built-in admin role's additions. `traces:share` is
-  not used: members hold it, and it governs public share links.
+- **A new permission, `braids:manage`** (decided by Alex, 2026-10-21: project admins may braid out of their
+  own project). A `braids` resource whose one action is `manage`, appended last because the registry is
+  append-only and declaration order is the bitset index (ADR-092 §1); `traces:braid` would move every later
+  index. It joins the built-in admin role's additions. `traces:share` is not used: members hold it, and it
+  governs public share links.
 - **Project roles come from teams.** The built-in roles reach a project through a team: a team admin is
   admin of every project in that team, so "braid out of your own project" means "out of any project in a
   team you administer". An organisation admin holds it everywhere; a role bound to one project, or a custom
-  role listing `traces:braid`, holds it there only. Members and viewers do not.
+  role listing `braids:manage`, holds it there only. Members and viewers do not.
 - **Nobody braids into a project they cannot read.** The door asks `traces:view` at the reader, so a team
   admin cannot send their team's spans to a team they have no view of; braiding across teams takes an
   organisation admin or someone the reader's team lets read its traces. The preview asks the same (§7),
   so the dialog works for exactly the people who may save it. The door declares one target per route
   today; it is extended to take one per project (§10, package 2).
 - **The ceiling runs on the owner project.** The grant ceiling refuses a braid conferring more on the owner
-  than the caller holds there, so a custom role holding `traces:braid` without `traces:view` braids nothing.
-- **Either project's admins may remove a braid.** The remove route declares `traces:braid` at the project
+  than the caller holds there, so a custom role holding `braids:manage` without `traces:view` braids nothing.
+- **Either project's admins may remove a braid.** The remove route declares `braids:manage` at the project
   it names, and the service refuses a braid that does not touch that project with `braid_not_on_project`
   (a check on the loaded row). A reader's admins can end spans arriving that they never asked for.
 - **An organisation can keep braids to its admins** (decided by Alex, 2026-10-21). One organisation
   setting, off by default, owned by authz because it decides who holds a permission. When it is on, team
-  and project bindings in that organisation stop conferring `traces:braid`, as they confer no
+  and project bindings in that organisation stop conferring `braids:manage`, as they confer no
   organisation-only permission (`bindingScopeCanGrantPermission`); only organisation-wide bindings do. The
   routes declare the same permissions either way. The organisation's snapshot carries the setting and a
   change bumps the epoch, so it applies within `BRAID_REVOCATION_BOUND_MS`. Live braids stay; what changes
@@ -177,7 +179,9 @@ Rendering rules, each a security property:
   window, so two braids on one pair show a span that matches either. The `or` is the fence's, between whole
   owner-bound clauses; a condition itself still refuses it.
 - The latest version of each span is chosen first and the condition applied second, so an older version
-  that matched cannot reappear after the span changed.
+  that matched cannot reappear after the span changed. The span reads choose the latest version in an
+  inner subquery that carries its own `{{tenantScope:StartTime}}`, so the conditions get a marker of their
+  own, written only on the outer select; the inner marker renders tenants and windows alone.
 - Every cache and log key that the fence feeds (`readScopeKeyOf`, `tenantScopeKey`, the discovery and facet
   caches) carries a digest of the compiled tree and the compiler version.
 - **Size is bounded at every level.** One condition holds at most `BRAID_CONDITION_MAX_LENGTH` characters
@@ -194,16 +198,24 @@ A condition on a tag the caller sets (`attributes["orchestrator"] == "web"`) tru
 organisation. Signing lets a braid require that the reader really made the call.
 
 - **Signing keys belong to the API key module**, which handles credentials: a Postgres table it owns, the
-  secret encrypted through `@langwatch/secrets`, returned once from the create mutation and never from a
-  query (record §10). Never `Project.apiKey`. Whoever can create a braid manages keys (decided by Alex,
-  2026-10-21): create, rotate and revoke declare `traces:braid` at the key's project, the calling project
+  secret encrypted at rest by the process's `encryption` store (AES with rotation, as the secret module
+  stores its values; a hash would not do, since verifying needs the secret), returned once from the create
+  mutation and never from a query (record §10). Never `Project.apiKey`. Whoever can create a braid manages keys (decided by Alex,
+  2026-10-21): create, rotate and revoke declare `braids:manage` at the key's project, the calling project
   whose calls it signs, and Enterprise; each is audited.
 - **Rotation** issues a new key and keeps the old one verifying for `SIGNING_KEY_ROTATION_OVERLAP_MS`.
   **Revocation** ends a key at once, bounded by the key lookup cache (60 s, record §7).
 - **The SDK helper** (TypeScript, Python, Go). On the calling side it signs the baggage entries it names:
   an HMAC-SHA256, under the key, over the trace id and the sorted entries, carried with the key's public id
   in one baggage entry. On the called side it copies the named entries and the signature onto each span, by
-  wrapping OpenTelemetry's own baggage span processor.
+  wrapping OpenTelemetry's own baggage span processor. The wire format is below.
+- **The wire format, version 1.** The secret is one string, `lwsk_<publicId>_<secret>`, and the HMAC key is
+  its UTF-8 bytes. An entry key matches `[A-Za-z0-9._-]{1,128}`; values are the decoded baggage strings.
+  The signed message is `langwatch-braid-signature-v1`, the trace id in lower-case hex, then one
+  `<key>=<value>` per entry in ascending code-point order of key, all joined by `\n`. The signature travels
+  as the baggage entry, and the span attribute, `langwatch.signature`: base64url without padding of the JSON
+  `{"v":1,"kid":"<publicId>","keys":[...sorted keys],"sig":"<base64url HMAC>"}`. The entries themselves
+  travel as baggage under their own keys and become span attributes of the same names.
 - **What a signature proves, and its boundary.** It covers the trace id and the entries, not one hop: baggage
   travels down the call chain by design, so every call the reader's call leads to within that trace carries
   it, and any project that receives it can carry it further within that trace, and only that trace.
@@ -290,26 +302,28 @@ The braid dialog previews what the reader will see before anything is saved.
 
 Every route that writes a braid, a signing key or the organisation setting, and the preview, declares
 `withEntitlement("enterprise", { feature: "BRAIDS" })` and refuses 402 `enterprise_plan_required` below
-Enterprise; the lists stay open (§2). The screen shows what Braids does and offers a conversation. After a
-downgrade, braids **pause** and are kept (decided by Alex, 2026-10-21): the trace module,
-which owns the merged read, asks `EntitlementApi` (cached per organisation) before honouring `span` braids;
-the rows stay, and an upgrade shows them again. Authz never asks entitlement (record §7, "Plans").
+Enterprise; the lists stay open (§2). Most of these routes are scoped to a project, and the door reads
+that project's organisation for the plan gate (today a project-scoped plan gate throws). The screen shows
+what Braids does and offers a conversation. After a downgrade, braids **pause** and are kept (decided by
+Alex, 2026-10-21): the trace module, which owns the merged read, asks `EntitlementApi` (cached per
+organisation) before honouring `span` braids; the rows stay, and an upgrade shows them again. Authz never
+asks entitlement (record §7, "Plans").
 
 ### 10. Order of work
 
-| #   | Release 1 package                                                                        | Owner                |
-| --- | ---------------------------------------------------------------------------------------- | -------------------- |
-| 0   | This ADR, the ADR-177 revision note, the specs                                           | authz, trace         |
-| 1   | Conditions compiler and the fence's rendering of `span` windows (§3)                     | authz, framework     |
-| 2   | The braid door: grant shape, source, `traces:braid`, a target per project, refusals (§2) | authz, framework     |
-| 2b  | The organisation setting keeping braids to organisation admins (§2)                      | authz                |
-| 3a  | Merged detail read: TraceApi takes the proof, per-owner match, privacy per owner (§5)    | trace                |
-| 3b  | Trace view: badges, ancestors, disabled actions, header totals (§5)                      | trace browser        |
-| 4   | Braids screen and dialog; preview and test a trace (§7)                                  | authz browser, trace |
-| 5   | Read audit generalised to shared grants (§8)                                             | authz                |
-| 6   | Revocation: braid proof lifetime, failed bumps reported, expiry per query (§8)           | authz, framework     |
-| 7   | Signing keys, verification at ingest, `Verified()` (§4)                                  | api-key, trace       |
-| 8   | SDK helper (TypeScript, Python, Go) and the public docs                                  | sdks, docs           |
+| #   | Release 1 package                                                                         | Owner                |
+| --- | ----------------------------------------------------------------------------------------- | -------------------- |
+| 0   | This ADR, the ADR-177 revision note, the specs                                            | authz, trace         |
+| 1   | Conditions compiler and the fence's rendering of `span` windows (§3)                      | authz, framework     |
+| 2   | The braid door: grant shape, source, `braids:manage`, a target per project, refusals (§2) | authz, framework     |
+| 2b  | The organisation setting keeping braids to organisation admins (§2)                       | authz                |
+| 3a  | Merged detail read: TraceApi takes the proof, per-owner match, privacy per owner (§5)     | trace                |
+| 3b  | Trace view: badges, ancestors, disabled actions, header totals (§5)                       | trace browser        |
+| 4   | Braids screen and dialog; preview and test a trace (§7)                                   | authz browser, trace |
+| 5   | Read audit generalised to shared grants (§8)                                              | authz                |
+| 6   | Revocation: braid proof lifetime, failed bumps reported, expiry per query (§8)            | authz, framework     |
+| 7   | Signing keys, verification at ingest, `Verified()` (§4)                                   | api-key, trace       |
+| 8   | SDK helper (TypeScript, Python, Go) and the public docs                                   | sdks, docs           |
 
 Release 2: `ChangeGrant` (read first, write a release later); owner-only traces in the reader's list, with
 summaries recomputed for visible spans before sort and paging, against stated performance targets; the
@@ -322,7 +336,7 @@ per-braid option.
 | Name                               | Value                            | Purpose                                                                                    |
 | ---------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------ |
 | `GRANT_SOURCE_BRAID`               | `"braid"`                        | added to `GRANT_EVENT_SOURCES`                                                             |
-| `BRAID_PERMISSION`                 | `"traces:braid"`                 | create, change or remove a braid, and manage signing keys; in the admin role's additions   |
+| `BRAID_PERMISSION`                 | `"braids:manage"`                | create, change or remove a braid, and manage signing keys; in the admin role's additions   |
 | `BRAID_CONDITION_TYPE`             | `"span"`                         | the only condition type a braid writes in release 1                                        |
 | `BRAID_ENTITLEMENT_FEATURE`        | `"BRAIDS"`                       | `withEntitlement("enterprise", { feature })`                                               |
 | `BRAID_CONDITION_COMPILER_VERSION` | `1`                              | stored with `compiledWhere`; part of every fence cache key                                 |
@@ -346,7 +360,7 @@ per-braid option.
 | No forged verified mark               | A client-sent `langwatch.reserved.verified.*` is stripped; only verification at ingest writes one |
 | A signature is bound to its trace     | A signature copied into another trace does not verify; within its trace it travels down the chain |
 | Braid writes are serialised by reader | Concurrent writes into one reader run one at a time; a change replaces the braid it names or none |
-| Nobody braids past their reach        | The writer holds `traces:braid` on the owner and `traces:view` on the reader, asked at the door   |
+| Nobody braids past their reach        | The writer holds `braids:manage` on the owner and `traces:view` on the reader, asked at the door  |
 | Braids do not chain                   | No proof carries a grant whose principal is another project                                       |
 | Each span keeps its owner's privacy   | A braided span is never shown under the reader's looser policy                                    |
 | Same organisation, no aggregates      | Every braid joins two plain projects of one organisation                                          |
@@ -361,8 +375,8 @@ per-braid option.
 | Second legal foreign placement in the refinement | No: grants are ledger facts | Large: security boundary         | Human review, and the refinement's refusal tests for every other shape                                  |
 | Compiler and the fence's rendering               | Yes                         | Large: tenant and content leak   | Parameter-binding test (no condition text in SQL), latest-version test, largest-legal-proof size test   |
 | Reader lock and change order                     | Yes                         | Medium: duplicate or lost braids | Concurrent-create, concurrent-change, same-second change and failed-attach tests                        |
-| `traces:braid` in the admin role                 | Yes                         | Medium: data shared across teams | Door tests: a member is refused; a team admin of the owner who cannot read the reader is refused        |
-| The organisation setting                         | Yes                         | Medium: data shared across teams | With it on, no team or project binding confers `traces:braid`; turning it on applies within the bound   |
+| `braids:manage` in the admin role                | Yes                         | Medium: data shared across teams | Door tests: a member is refused; a team admin of the owner who cannot read the reader is refused        |
+| The organisation setting                         | Yes                         | Medium: data shared across teams | With it on, no team or project binding confers `braids:manage`; turning it on applies within the bound  |
 | Braid proof lifetime                             | Yes                         | Large: access after removal      | A proof minted before a removal reads no braided span once the bound passes                             |
 | Detail read keeps braids                         | Yes                         | Large: cross-project content     | "only matching spans leave the owner" integration test per read; aggregates still narrow to one member  |
 | Privacy per owning project                       | Yes                         | Large: personal data             | Test with a strict owner and a loose reader in one trace                                                |
@@ -387,7 +401,7 @@ model SigningKey {
   projectId        String    // the calling project, whose calls the key signs
   name             String
   publicId         String    @unique // carried in baggage beside the signature
-  secretCiphertext String    // encrypted through @langwatch/secrets; never returned by a query
+  secretCiphertext String    // encrypted by the process encryption store; never returned by a query
   createdByUserId  String
   createdAt        DateTime  @default(now())
   rotatedAt        DateTime? // set on the key a rotation replaced
@@ -422,7 +436,7 @@ the schemas that read `braid` and `compiledWhere` ship one release before any ro
   project; members hold `traces:share`. A braid is standing access between two projects, decided by an admin.
 - **Organisation admins only (`organization:manage`) for everyone.** The draft's choice; Alex decided
   project admins braid their own projects, and an organisation may still choose admins only (§2).
-- **`traces:braid` on both projects.** Across teams that means someone admin of both, in practice an
+- **`braids:manage` on both projects.** Across teams that means someone admin of both, in practice an
   organisation admin, which undoes the decision. Read access on the reader, with its admins free to remove
   the braid, gives the reader a say without making it a second approval.
 - **One braid per pair.** Several read as their union in the fence without `or` in the condition language;
@@ -495,3 +509,9 @@ the schemas that read `braid` and `compiledWhere` ship one release before any ro
   the reader asked at the door, removal from either side. Alex also added an organisation setting, in
   release 1, that keeps braids to organisation admins: authz owns it, and when it is on only
   organisation-wide bindings confer `traces:braid`.
+- v1.4 (2026-10-21, implementation notes from mapping the code, no decision of Alex's changed). The
+  permission is `braids:manage`, a resource appended last, because the registry is append-only. Signing
+  secrets are encrypted by the process's `encryption` store, since `@langwatch/secrets` holds no cipher.
+  Conditions render through a marker of their own on the outer select, since the latest-version subquery
+  carries the tenant marker too. The signed-call wire format is fixed (§4). The door reads a project's
+  organisation for a project-scoped plan gate.
