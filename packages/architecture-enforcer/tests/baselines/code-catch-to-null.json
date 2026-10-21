@@ -48,7 +48,6 @@
     "modules/langy/process/src/features/conversation/services/langy-conversation-lifecycle.service.ts": 1,
     "modules/langy/process/src/features/conversation/services/langy-conversation-read.service.ts": 2,
     "modules/langy/process/src/features/conversation/services/langy-conversation-turn.service.ts": 1,
-    "modules/langy/process/src/features/delete-confirmation/services/langy-delete-confirmation.service.ts": 1,
     "modules/langy/process/src/features/local-control/services/langy-local-call-keepalive.service.ts": 1,
     "modules/langy/process/src/features/local-control/services/langy-local-control-request.service.ts": 1,
     "modules/langy/process/src/features/local-control/services/langy-local-session-lifecycle.service.ts": 1,
