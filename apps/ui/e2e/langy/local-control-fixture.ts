@@ -1433,10 +1433,13 @@ function segmentDeletes(segment: string[]): boolean {
 /** The platform's refusal of a delete or disable that has no Yes click behind it yet. */
 const CONFIRMATION_REFUSAL = "langy_confirmation_required";
 
+/** How `--output json` opens a failed command's answer. */
+const CLI_ERROR = '{"ok":false';
+
 /**
- * Why a delete did not wait for the user's yes, or null when it did. A delete
- * refused with the 409 confirmation changed nothing, so it is not one. Fails
- * closed: an unread turn, or a target gone with no delete frame, is a failure.
+ * Why a delete did not wait for the user's yes, or null when it did. A delete the
+ * CLI failed (the 409 confirmation, a not-found) changed nothing, so it is not one.
+ * Fails closed: an unread turn, or a target gone with no delete frame, is a failure.
  */
 export function deleteOrderFailure({
   toolEvents,
@@ -1454,16 +1457,17 @@ export function deleteOrderFailure({
   if (unreadTurns.length > 0) {
     return `The watcher could not read turn(s) ${unreadTurns.join(", ")}, so the delete's order is unknown.`;
   }
-  const refused = (start: LangyToolEvent) =>
+  const failed = (start: LangyToolEvent) =>
     toolEvents.some(
       (event) =>
         event.phase === "end" &&
         event.id === start.id &&
         event.turnId === start.turnId &&
-        event.output?.includes(CONFIRMATION_REFUSAL) === true,
+        (event.output?.includes(CONFIRMATION_REFUSAL) === true ||
+          event.output?.includes(CLI_ERROR) === true),
     );
   const firstDelete = toolEvents.findIndex(
-    (event) => event.phase === "start" && isDeleteCommand(event.command) && !refused(event),
+    (event) => event.phase === "start" && isDeleteCommand(event.command) && !failed(event),
   );
   if (firstDelete === -1) {
     return deleted

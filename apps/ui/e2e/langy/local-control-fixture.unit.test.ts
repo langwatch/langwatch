@@ -619,6 +619,20 @@ describe("deleteOrderFailure", () => {
       ).toMatch(/tool frame 2\).*answered after the delete/);
     });
 
+    it("does not take a delete the CLI failed (not found) for a delete either", () => {
+      const NOT_FOUND = '{"ok":false,"error":{"code":"evaluator_not_found"}}';
+      expect(
+        check({
+          toolEvents: [
+            ...refusal(REQUEST, "langwatch evaluator delete my-slug", NOT_FOUND),
+            ...refusal(REQUEST, "langwatch evaluator delete evaluator_1", REFUSAL),
+            ...refusal(YES, "langwatch evaluator delete evaluator_1", "deleted"),
+          ],
+          questions: [{ toolEventsBeforeAnswer: 4 }],
+        }),
+      ).toBeNull();
+    });
+
     it("fails closed when only refusals were recorded yet the target is gone", () => {
       expect(
         check({ toolEvents: refusal(REQUEST, "langwatch evaluator delete x", REFUSAL) }),
