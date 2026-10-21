@@ -6,7 +6,6 @@
 set -euo pipefail
 
 reason=$1
-remote=${RELEASE_DOCS_REMOTE:-origin}
 attempts=${RELEASE_DOCS_ATTEMPTS:-5}
 delay=${RELEASE_DOCS_RETRY_SECONDS:-5}
 root=$(git rev-parse --show-toplevel)
@@ -27,12 +26,12 @@ bust_cache() {
 }
 
 for attempt in $(seq 1 "$attempts"); do
-  git -C "$root" fetch -q "$remote" main
-  git -C "$root" reset -q --hard "$remote/main"
+  git -C "$root" fetch -q origin main
+  git -C "$root" reset -q --hard origin/main
   bust_cache
   git -C "$root" add docs/docs.json
   git -C "$root" commit -q -m "Release docs ($reason) [skip ci]"
-  if git -C "$root" push -q "$remote" HEAD:main; then
+  if git -C "$root" push -q origin HEAD:main; then
     echo "Docs released on attempt $attempt."
     exit 0
   fi
