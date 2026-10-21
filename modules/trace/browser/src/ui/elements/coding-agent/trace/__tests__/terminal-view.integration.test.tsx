@@ -257,6 +257,7 @@ describe("TerminalView", () => {
   });
 
   describe("given the context grew into a bigger size band", () => {
+    /** @scenario "A context note counts the fresh part of the prompt" */
     it("notes the band crossing once, at the next visible beat", () => {
       const growingEntries: TranscriptEntry[] = [
         {
@@ -267,10 +268,11 @@ describe("TerminalView", () => {
           costUsd: 0.5,
           durationMs: 400,
           spanId: "llm-1",
-          inputTokens: 100,
+          // The cache alone is 45K, under the 50K band; the fresh 5K crosses it.
+          inputTokens: 5_000,
           outputTokens: 20,
           cacheReadTokens: 20_000,
-          cacheCreationTokens: 30_000,
+          cacheCreationTokens: 25_000,
         },
         {
           kind: "assistant_message",
@@ -852,8 +854,8 @@ describe("TerminalView", () => {
           });
         });
 
-        expect(screen.getByText("Context growing: 52K tokens")).toBeInTheDocument();
-        expect(screen.queryByText("Context growing: 60K tokens")).not.toBeInTheDocument();
+        expect(screen.getByText("Context growing: 52.2K tokens")).toBeInTheDocument();
+        expect(screen.queryByText("Context growing: 60.2K tokens")).not.toBeInTheDocument();
       });
     });
 
@@ -893,7 +895,7 @@ describe("TerminalView", () => {
           });
         });
 
-        expect(screen.getByText("Context growing: 60K tokens")).toBeInTheDocument();
+        expect(screen.getByText("Context growing: 60.2K tokens")).toBeInTheDocument();
         expect(offsetUnderTopEdge(view.screenEl, "bump the version")).toBe(before);
         // Two entries and the turn divider arrived above the reader. The note
         // below them is not part of that, and does not move the screen.

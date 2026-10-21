@@ -33,6 +33,18 @@ export function deriveTokenTimeline(entries: TranscriptEntry[]): TokenTimelinePo
   return points;
 }
 
+type ModelCall = Extract<TranscriptEntry, { kind: "model_call" }>;
+
+/** What a call read from or wrote to the cache: what the next call can reuse. */
+export function modelCallCachedTokens(entry: ModelCall): number {
+  return entry.cacheReadTokens + entry.cacheCreationTokens;
+}
+
+/** A call's context: the whole prompt it sent. Input arrives disjoint from the cache. */
+export function modelCallContextTokens(entry: ModelCall): number {
+  return entry.inputTokens + modelCallCachedTokens(entry);
+}
+
 /** A call that re-created most of the context instead of reading it from cache. */
 export interface CacheRebuildEvent {
   /**
@@ -67,9 +79,8 @@ export function findCacheRebuilds(entries: TranscriptEntry[]): CacheRebuildEvent
   for (const entry of entries) {
     if (entry.kind !== "model_call") continue;
     callIndex++;
-    const cachedTokens = entry.cacheReadTokens + entry.cacheCreationTokens;
-    // Input arrives disjoint from the cache, so the three are the whole prompt sent.
-    const contextTokens = entry.inputTokens + cachedTokens;
+    const cachedTokens = modelCallCachedTokens(entry);
+    const contextTokens = modelCallContextTokens(entry);
 
     if (
       callIndex > 0 &&

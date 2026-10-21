@@ -45,6 +45,7 @@ import {
 import {
   type CacheRebuildEvent,
   findCacheRebuilds,
+  modelCallContextTokens,
 } from "../../../../model/coding-agent/trace/token-timeline.ts";
 import { toolResultBodyToString } from "../../../../model/coding-agent/trace/tool-result-body.ts";
 import {
@@ -177,7 +178,7 @@ function markersForModelCall({
     });
   }
 
-  const contextTokens = entry.cacheReadTokens + entry.cacheCreationTokens;
+  const contextTokens = modelCallContextTokens(entry);
   const band = contextHeatBand(contextTokens);
   if (!band) return { markers, band: bandState };
 
