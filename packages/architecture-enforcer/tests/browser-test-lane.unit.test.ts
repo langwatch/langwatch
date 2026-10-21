@@ -138,6 +138,7 @@ describe("the real-browser test lane", () => {
       // declare it today are visible to that rule rather than to a list.
       expect(BROWSER_LANE.map((m) => m.dir)).toEqual([
         "modules/analytics/browser",
+        "modules/automation/browser",
         "modules/experiment/browser",
         "modules/model-provider/browser",
         "modules/navigation/browser",

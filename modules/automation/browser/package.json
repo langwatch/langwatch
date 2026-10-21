@@ -16,7 +16,8 @@
   },
   "scripts": {
     "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:browser": "playwright install --with-deps chromium && vitest run --config vitest.browser.config.ts"
   },
   "dependencies": {
     "@langwatch/analytics-filters": "workspace:*",
@@ -57,8 +58,10 @@
     "@testing-library/user-event": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
+    "@vitest/browser-playwright": "catalog:",
     "jsdom": "catalog:",
     "monaco-editor": "catalog:",
+    "playwright": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
     "typescript": "catalog:",
