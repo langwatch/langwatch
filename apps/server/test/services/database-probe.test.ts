@@ -158,7 +158,10 @@ describe("connecting to a database the person brings", () => {
       ).toEqual({ ok: true });
       expect(
         await probeDatabase({ id: "clickhouse", url: `http://127.0.0.1:${port}/missing` }),
-      ).toEqual({ ok: false, reason: "SELECT 1 answered 404: Code: 81. Database missing does not exist" });
+      ).toEqual({
+        ok: false,
+        reason: "SELECT 1 answered 404: Code: 81. Database missing does not exist",
+      });
     });
 
     /** @scenario "A database password is never shown" */
