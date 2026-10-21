@@ -7,6 +7,7 @@ import { createHash } from "node:crypto";
 
 import {
   AccessNotGrantedError,
+  AuthorizationExpiredError,
   type Authorization,
   type AuthorizationConditionType,
   type AuthorizationGrant,
@@ -488,6 +489,9 @@ export class TenantScopedReader {
       client: () => Promise<ClickHouseQueryClient>;
       fence: TenantFence;
       tenantId: string;
+      /** The proof's expiry, checked before every statement: a held reader outlives no proof. */
+      expiresAt?: number;
+      now?: () => number;
     },
   ) {}
 
@@ -497,6 +501,10 @@ export class TenantScopedReader {
   }
 
   async query<Row = unknown>(params: ScopedQueryParams): Promise<{ json(): Promise<Row[]> }> {
+    const { expiresAt, now } = this.deps;
+    if (expiresAt !== undefined && expiresAt <= (now?.() ?? nowInstant().epochMilliseconds)) {
+      throw new AuthorizationExpiredError(expiresAt);
+    }
     const expanded = expandStatement({
       query: params.query,
       queryParams: params.query_params ?? {},
@@ -687,6 +695,8 @@ export class AuthorizedClickHouse {
       client: () => this.deps.resolveClient(ownProjectId),
       fence,
       tenantId,
+      expiresAt: proof.expiresAt,
+      now: () => this.deps.now?.() ?? nowInstant().epochMilliseconds,
     });
   }
 }

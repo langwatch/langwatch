@@ -18,6 +18,7 @@ import type { AuthzRepositories } from "../authz.repositories.ts";
 import { AuthzMemoryStore } from "../memory/authz-memory.store.ts";
 import { MemoryAuthzAdmissionRepository } from "../memory/memory.authz-admission.repository.ts";
 import { MemoryAuthzAuditTrailRepository } from "../memory/memory.authz-audit-trail.repository.ts";
+import { MemoryAuthzBraidLockRepository } from "../memory/memory.authz-braid-lock.repository.ts";
 import { MemoryAuthzGrantProjectionRepository } from "../memory/memory.authz-grant-projection.repository.ts";
 import { MemoryAuthzLedgerReadRepository } from "../memory/memory.authz-ledger-read.repository.ts";
 import { MemoryAuthzLineageEpochRepository } from "../memory/memory.authz-lineage-epoch.repository.ts";
@@ -68,6 +69,7 @@ const backends: readonly Backend[] = [
         listing: MemoryAuthzListingRepository.create({ memory }),
         migration: MemoryAuthzMigrationRepository.create({ memory }),
         ledgerReads: MemoryAuthzLedgerReadRepository.create({ memory }),
+        braidLocks: MemoryAuthzBraidLockRepository.create(),
       };
     },
   },

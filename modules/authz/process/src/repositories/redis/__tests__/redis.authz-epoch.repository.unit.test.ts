@@ -34,7 +34,7 @@ describe("RedisAuthzEpochRepository", () => {
   );
 
   /** @scenario "Redis failures preserve their boundary-specific behaviour" */
-  it("fails open for unavailable Redis on reads and bumps", async () => {
+  it("fails open for unavailable Redis on reads and reports a failed bump", async () => {
     const redis = {
       get: vi.fn().mockRejectedValue(new Error("unavailable")),
       incr: vi.fn().mockRejectedValue(new Error("unavailable")),
@@ -42,7 +42,10 @@ describe("RedisAuthzEpochRepository", () => {
     const epoch = RedisAuthzEpochRepository.create({ redis });
 
     await expect(epoch.findEpoch({ organizationId: ORGANIZATION_ID })).resolves.toBeNull();
-    await expect(epoch.bump({ organizationId: ORGANIZATION_ID })).resolves.toBeUndefined();
+    // ADR-183 §8: the write before a bump is durable; the caller is told so it repeats it.
+    await expect(epoch.bump({ organizationId: ORGANIZATION_ID })).rejects.toMatchObject({
+      code: "authz_epoch_bump_failed",
+    });
   });
 
   it("does not touch storage when Redis is not composed", async () => {

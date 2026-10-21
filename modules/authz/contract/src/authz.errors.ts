@@ -495,3 +495,129 @@ export class BraidConditionRefusedError extends HandledError {
     this.name = "BraidConditionRefusedError";
   }
 }
+
+/** A project never braids into itself (ADR-183 §1). */
+export class BraidIntoItselfError extends HandledError {
+  declare readonly code: "braid_into_itself";
+
+  constructor(meta: { projectId: string }) {
+    super("braid_into_itself", "A project cannot be braided into itself", {
+      httpStatus: 422,
+      fault: "customer",
+      meta,
+    });
+    this.name = "BraidIntoItselfError";
+  }
+}
+
+/** Both projects of a braid live in one organisation. */
+export class BraidAcrossOrganizationsError extends HandledError {
+  declare readonly code: "braid_across_organizations";
+
+  constructor(meta: { projectId: string; readerProjectId: string }) {
+    super("braid_across_organizations", "A braid joins two projects of one organisation", {
+      httpStatus: 422,
+      fault: "customer",
+      meta,
+    });
+    this.name = "BraidAcrossOrganizationsError";
+  }
+}
+
+/** An aggregate project reads its members already; it neither braids nor is braided into. */
+export class BraidAggregateProjectError extends HandledError {
+  declare readonly code: "braid_aggregate_project";
+
+  constructor(meta: { projectId: string }) {
+    super("braid_aggregate_project", "An aggregate project cannot be part of a braid", {
+      httpStatus: 422,
+      fault: "customer",
+      meta,
+    });
+    this.name = "BraidAggregateProjectError";
+  }
+}
+
+/** The internal governance project is never part of a braid. */
+export class BraidGovernanceProjectError extends HandledError {
+  declare readonly code: "braid_governance_project";
+
+  constructor(meta: { projectId: string }) {
+    super("braid_governance_project", "The governance project cannot be part of a braid", {
+      httpStatus: 422,
+      fault: "customer",
+      meta,
+    });
+    this.name = "BraidGovernanceProjectError";
+  }
+}
+
+/** A live braid on the pair already has this condition, data window and end date. */
+export class BraidAlreadyExistsError extends HandledError {
+  declare readonly code: "braid_already_exists";
+
+  constructor(meta: { braidId: string }) {
+    super("braid_already_exists", "An identical braid between these projects is already live", {
+      httpStatus: 409,
+      fault: "customer",
+      meta,
+    });
+    this.name = "BraidAlreadyExistsError";
+  }
+}
+
+/** The braid named was changed or removed since it was read; nothing was written. */
+export class BraidChangedError extends HandledError {
+  declare readonly code: "braid_changed";
+
+  constructor(meta: { braidId: string }) {
+    super("braid_changed", "This braid was changed or removed in the meantime", {
+      httpStatus: 409,
+      fault: "customer",
+      meta,
+    });
+    this.name = "BraidChangedError";
+  }
+}
+
+/** A braid is removed from one of its own two projects only. */
+export class BraidNotOnProjectError extends HandledError {
+  declare readonly code: "braid_not_on_project";
+
+  constructor(meta: { braidId: string; projectId: string }) {
+    super("braid_not_on_project", "This braid does not touch the project named", {
+      httpStatus: 404,
+      fault: "customer",
+      meta,
+    });
+    this.name = "BraidNotOnProjectError";
+  }
+}
+
+/** A reader holds at most BRAID_MAX_DISTINCT_CONDITIONS distinct conditions (ADR-183 §3). */
+export class BraidConditionLimitReachedError extends HandledError {
+  declare readonly code: "braid_condition_limit_reached";
+
+  constructor(meta: { readerProjectId: string; limit: number }) {
+    super(
+      "braid_condition_limit_reached",
+      "The reader project already receives as many distinct braid conditions as it may",
+      { httpStatus: 422, fault: "customer", meta },
+    );
+    this.name = "BraidConditionLimitReachedError";
+  }
+}
+
+/** The change is durable but the epoch did not move; repeating it finishes (ADR-183 §8). */
+export class AuthzEpochBumpFailedError extends HandledError {
+  declare readonly code: "authz_epoch_bump_failed";
+
+  constructor(meta: { organizationId: string }) {
+    super(
+      "authz_epoch_bump_failed",
+      "The access change was saved but not yet applied everywhere; repeat it to finish",
+      { httpStatus: 503, meta },
+    );
+    this.name = "AuthzEpochBumpFailedError";
+  }
+}

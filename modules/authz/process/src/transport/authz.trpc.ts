@@ -5,6 +5,13 @@ import { toLedgerActor } from "@langwatch/authorization";
 import {
   AuthzApi,
   authzApplyMemberBindingsInputSchema,
+  authzBraidRemovedSchema,
+  authzBraidSchema,
+  authzChangeBraidInputSchema,
+  authzCreateBraidInputSchema,
+  authzListBraidsInputSchema,
+  authzProjectBraidsSchema,
+  authzRemoveBraidInputSchema,
   authzBindingMutationSuccessSchema,
   authzChangeGrantRoleInputSchema,
   authzCreateGrantInputSchema,
@@ -59,6 +66,22 @@ export const authzTrpc = defineTrpcContract("authz")
   .mutation("applyMemberGrants")
   .withInput(authzApplyMemberBindingsInputSchema.omit(IMPLIED_BY_SESSION))
   .withOutput(authzBindingMutationSuccessSchema)
+
+  .query("listBraids")
+  .withInput(authzListBraidsInputSchema)
+  .withOutput(authzProjectBraidsSchema)
+
+  .mutation("createBraid")
+  .withInput(authzCreateBraidInputSchema.omit(IMPLIED_BY_SESSION))
+  .withOutput(authzBraidSchema)
+
+  .mutation("changeBraid")
+  .withInput(authzChangeBraidInputSchema.omit(IMPLIED_BY_SESSION))
+  .withOutput(authzBraidSchema)
+
+  .mutation("removeBraid")
+  .withInput(authzRemoveBraidInputSchema.omit(IMPLIED_BY_SESSION))
+  .withOutput(authzBraidRemovedSchema)
   .build();
 
 /** The session as the escalation ceiling: a person, or the key a CLI session arrived on. */
@@ -71,6 +94,11 @@ function callerOf(actor: Actor): AuthzPrincipalRef {
 
 /** Assigning a custom role is the Enterprise capability, refused on every plan below it. */
 const customRoles = { feature: "RBAC", when: assignsCustomGrantRole };
+
+/** ADR-183 §9: every braid write is Enterprise; the list stays open so paused braids show. */
+const braids = { feature: "BRAIDS" };
+/** ADR-183 §2: nobody braids into a project whose traces they cannot read. */
+const AT_READER = { via: "projectId", field: "readerProjectId" } as const;
 
 /**
  * Membership itself is the only requirement for the standing: the answer is the
@@ -127,5 +155,34 @@ export const authzTrpcTransport: TrpcRouterDeclaration<AuthzApi, typeof authzTrp
     .withPermission("organization:manage")
     .handle(async ({ app, input, actor }) =>
       app.applyMemberBindings({ ...input, caller: callerOf(actor), actor: toLedgerActor(actor) }),
+    )
+
+    /** Members of either project list the braids touching it (ADR-183 §2). */
+    .procedure("listBraids")
+    .withPermission("project:view", { via: "projectId" })
+    .handle(async ({ app, input }) => app.listBraids(input))
+
+    /** The owner is the first target: braids:manage there, traces:view at the reader. */
+    .procedure("createBraid")
+    .withEntitlement("enterprise", braids)
+    .withPermission("braids:manage", { via: "projectId" })
+    .withPermission("traces:view", AT_READER)
+    .handle(async ({ app, input, actor }) =>
+      app.createBraid({ ...input, caller: callerOf(actor), actor: toLedgerActor(actor) }),
+    )
+
+    .procedure("changeBraid")
+    .withEntitlement("enterprise", braids)
+    .withPermission("braids:manage", { via: "projectId" })
+    .withPermission("traces:view", AT_READER)
+    .handle(async ({ app, input, actor }) =>
+      app.changeBraid({ ...input, caller: callerOf(actor), actor: toLedgerActor(actor) }),
+    )
+
+    /** Either side's admins, on any plan: stopping a share only narrows access (coordinator). */
+    .procedure("removeBraid")
+    .withPermission("braids:manage", { via: "projectId" })
+    .handle(async ({ app, input, actor }) =>
+      app.removeBraid({ ...input, caller: callerOf(actor), actor: toLedgerActor(actor) }),
     )
     .build();

@@ -34,7 +34,7 @@ Feature: Braids
       And its source is braid
       And its condition is of type span and carries the condition as written and in compiled form
 
-    @unit @unimplemented
+    @unit
     Scenario: A span condition with a compiled where is a legal shared placement
       When a project-reader grant with a span condition carrying a where and its compiled form is placed on a foreign project
       Then the grant is accepted
@@ -44,11 +44,11 @@ Feature: Braids
     @integration @unimplemented
     Scenario: Braids need the Enterprise plan
       Given an organisation below Enterprise
-      When ana asks to create, change or remove a braid
+      When ana asks to create or change a braid
       Then each is refused with enterprise_plan_required naming the Braids feature
-      And listing the organisation's braids is not refused
+      And removing a braid and listing the organisation's braids are not refused
 
-    @unit @unimplemented
+    @unit
     Scenario Outline: A braid joins two plain projects of one organisation
       When ana asks to braid <owner> into <reader>
       Then the braid is refused with <code>
@@ -61,13 +61,13 @@ Feature: Braids
         | "specialists"                      | an aggregate project                       | braid_aggregate_project     |
         | the internal governance project    | "orchestrator"                             | braid_governance_project    |
 
-    @unit @unimplemented
+    @unit
     Scenario: Several braids may join one pair of projects
       Given a live braid from "specialists" into "orchestrator" with the condition attributes["orchestrator"] == "web"
       When ana braids "specialists" into "orchestrator" with the condition name == "payments_agent"
       Then both braids are live
 
-    @unit @unimplemented
+    @unit
     Scenario: A braid identical to a live one on the same pair is refused
       Given a live braid from "specialists" into "orchestrator"
       When ana asks for a braid with the same projects, condition, data window and end date
@@ -123,7 +123,7 @@ Feature: Braids
       Then the braid is live
       And rui's request to braid "orchestrator" into "specialists" is refused as a permission denial
 
-    @unit @unimplemented
+    @unit
     Scenario: Nobody braids spans they could not read themselves
       Given rui holds braids:manage on "specialists" through a custom role that does not let rui read its traces
       When rui asks to braid "specialists" into "orchestrator"
@@ -136,7 +136,7 @@ Feature: Braids
       When olu removes the braid from "orchestrator"
       Then the grant is revoked with reason braid_removed
 
-    @unit @unimplemented
+    @unit
     Scenario: A braid cannot be removed from a project it does not touch
       Given a live braid from "specialists" into "orchestrator"
       And olu is an admin of a third project "frontdesk"
@@ -255,7 +255,7 @@ Feature: Braids
       And the other is refused with braid_changed
       And no third grant is attached
 
-    @unit @unimplemented
+    @unit
     Scenario: A change that is not valid writes nothing
       Given a live braid from "specialists" into "orchestrator"
       When ana changes its condition to one that is not supported
@@ -361,4 +361,5 @@ Feature: Braids
       When the organisation leaves Enterprise
       Then no "orchestrator" trace shows a "specialists" span
       And the braid is still listed, marked paused
+      And an admin can still remove it
       And returning to Enterprise shows the braided spans again without recreating the braid

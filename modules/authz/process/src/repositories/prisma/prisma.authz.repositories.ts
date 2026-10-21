@@ -6,6 +6,7 @@ import { EventingAuthzPlatformGrantRepository } from "../eventing/eventing.authz
 import { EventingAuthzReadRepository } from "../eventing/eventing.authz-read.repository.ts";
 import { PrismaAuthzAdmissionRepository } from "./prisma.authz-admission.repository.ts";
 import { PrismaAuthzAuditRepository } from "./prisma.authz-audit.repository.ts";
+import { PrismaAuthzBraidLockRepository } from "./prisma.authz-braid-lock.repository.ts";
 import { PrismaAuthzCutoverRepository } from "./prisma.authz-cutover.repository.ts";
 import { PrismaAuthzLedgerReadRepository } from "./prisma.authz-ledger-read.repository.ts";
 import { PrismaAuthzManagedGrantRepository } from "./prisma.authz-managed-grant.repository.ts";
@@ -41,6 +42,7 @@ export class PostgresAuthzRepositories {
       listing: EventingAuthzListingRepository.create(prisma),
       migration: PrismaAuthzMigrationRepository.create(prisma),
       ledgerReads: PrismaAuthzLedgerReadRepository.create({ prisma }),
+      braidLocks: PrismaAuthzBraidLockRepository.create({ prisma }),
     };
   }
 }

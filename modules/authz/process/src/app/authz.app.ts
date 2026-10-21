@@ -54,6 +54,7 @@ import { EventingAuthzGrantRepository } from "../repositories/eventing/eventing.
 import { bindingWire } from "../rules/role-binding-read-back.rules.ts";
 import { AuthzAdmissionService } from "../services/authz-admission.service.ts";
 import { AuthzAggregateReadAuditService } from "../services/authz-aggregate-read-audit.service.ts";
+import { AuthzBraidService } from "../services/authz-braid.service.ts";
 import { AuthzCutoverGateService } from "../services/authz-cutover-gate.service.ts";
 import { AuthzGrantIdentityService } from "../services/authz-grant-identity.service.ts";
 import {
@@ -176,6 +177,8 @@ export class AuthzModule implements AuthzApi {
   #platformOperators: AuthzPlatformOperatorsService | undefined;
   /** Absent on an app built by {@link AuthzModule.fromServices}, which audits no aggregate read. */
   #aggregateReads: AuthzAggregateReadAuditService | undefined;
+  /** Absent on an app built by {@link AuthzModule.fromServices}, which composes no braid lock. */
+  #braids: AuthzBraidService | undefined;
   /** Absent on an app built by {@link AuthzModule.fromServices}, which records no offboarding. */
   #memberOffboardings: AuthzMemberOffboardedNoticeService | undefined;
 
@@ -191,6 +194,7 @@ export class AuthzModule implements AuthzApi {
       sessionVersions?: AuthzSessionVersionService;
       platformOperators?: AuthzPlatformOperatorsService;
       aggregateReads?: AuthzAggregateReadAuditService;
+      braids?: AuthzBraidService;
       memberOffboardings?: AuthzMemberOffboardedNoticeService;
       eventing?: Readonly<{
         pipeline: AuthzPipeline;
@@ -210,6 +214,7 @@ export class AuthzModule implements AuthzApi {
     this.#sessionVersions = options.sessionVersions;
     this.#platformOperators = options.platformOperators;
     this.#aggregateReads = options.aggregateReads;
+    this.#braids = options.braids;
     this.#memberOffboardings = options.memberOffboardings;
   }
 
@@ -311,6 +316,14 @@ export class AuthzModule implements AuthzApi {
       permissions,
       offboarded: memberOffboardings,
     });
+    const braids = AuthzBraidService.create({
+      ledger,
+      reads: repositories.ledgerReads,
+      lineage: repositories.read,
+      locks: repositories.braidLocks,
+      epoch,
+      permissions,
+    });
     const sessionVersions = AuthzSessionVersionService.create({
       versions: repositories.sessionVersions,
       bindings: repositories.bindings,
@@ -339,6 +352,7 @@ export class AuthzModule implements AuthzApi {
       sessionVersions,
       platformOperators,
       aggregateReads,
+      braids,
       memberOffboardings,
       eventing: { pipeline, dispatcher },
     });
@@ -595,6 +609,21 @@ export class AuthzModule implements AuthzApi {
       );
     }
     return this.#memberships;
+  }
+
+  listBraids: AuthzApi["listBraids"] = (a) => this.braids().listBraids(a);
+  createBraid: AuthzApi["createBraid"] = (a) => this.braids().createBraid(a);
+  changeBraid: AuthzApi["changeBraid"] = (a) => this.braids().changeBraid(a);
+  removeBraid: AuthzApi["removeBraid"] = (a) => this.braids().removeBraid(a);
+
+  private braids(): AuthzBraidService {
+    if (!this.#braids) {
+      throw new Error(
+        "This AuthzModule was composed from already-built services, so it holds no braid lock: " +
+          "compose it through AuthzModule.create to read or write a braid.",
+      );
+    }
+    return this.#braids;
   }
 
   private admissions(): AuthzAdmissionService {

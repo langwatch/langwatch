@@ -1,5 +1,6 @@
 import type { AuthzAdmissionRepository } from "./authz-admission.repository.ts";
 import type { AuthzAuditTrailRepository } from "./authz-audit-trail.repository.ts";
+import type { AuthzBraidLockRepository } from "./authz-braid-lock.repository.ts";
 import type { AuthzCutoverRepository } from "./authz-cutover.repository.ts";
 import type { AuthzEpochRepository } from "./authz-epoch.repository.ts";
 import type { AuthzGrantProjectionRepository } from "./authz-grant-projection.repository.ts";
@@ -37,4 +38,6 @@ export interface AuthzRepositories {
   readonly migration: AuthzMigrationRepository;
   /** What the ledger's read-your-writes hold and the grant writer read. */
   readonly ledgerReads: AuthzLedgerReadRepository;
+  /** Serialises braid writes into one reader (ADR-183 §1). */
+  readonly braidLocks: AuthzBraidLockRepository;
 }

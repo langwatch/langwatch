@@ -3,10 +3,11 @@
  * behind every grant mutation, waiting (bounded) for the projection to land
  * attach- and role-shaped writes before returning (ADR-007's breaker doctrine).
  */
-import type { LedgerActor } from "@langwatch/authorization";
+import type { GrantCondition, LedgerActor } from "@langwatch/authorization";
 import {
   AuthzGrantNotConfirmedError,
   bindingScopeCanGrantPermission,
+  GRANT_SOURCE_BRAID,
   GrantValidationError,
   PlatformPermissionNotAssignableError,
   PLATFORM_OPERATOR_ROLE_ID,
@@ -551,6 +552,49 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
       await this.options.epoch.bump({ organizationId });
     }
     return { grantId, wasAttached: true };
+  }
+
+  /** ADR-183 §1: one braid's grant under a fresh id; the caller holds the reader's lock. */
+  async attachBraidGrant({
+    organizationId,
+    readerProjectId,
+    ownerProjectId,
+    condition,
+    expiresAtMs,
+    replacesGrantId,
+    actor,
+  }: {
+    organizationId: string;
+    readerProjectId: string;
+    ownerProjectId: string;
+    condition: GrantCondition;
+    expiresAtMs?: number;
+    replacesGrantId?: string;
+    actor: LedgerActor;
+  }): Promise<{ grantId: string }> {
+    refusePlatformTenant(organizationId);
+    const grantId = newAuthzGrantId();
+    await (
+      await this.commands()
+    ).commands.attachGrant.send({
+      tenantId: organizationId,
+      organizationId,
+      commandId: this.options.newCommandId?.() ?? newCommandId(),
+      grant: {
+        grantId,
+        principal: { type: "project", id: readerProjectId },
+        roleKey: sharedProjectReadsOf({ organizationId, readerProjectId }).roleKey,
+        scope: { type: "PROJECT", id: ownerProjectId },
+        condition,
+        ...(expiresAtMs === undefined ? {} : { expiresAtMs }),
+        ...(replacesGrantId === undefined ? {} : { replacesGrantId }),
+        source: GRANT_SOURCE_BRAID,
+        actor,
+        occurredAtMs: this.now(),
+      },
+    });
+    await this.awaitSharedProjectGrants({ organizationId, grantIds: [grantId] });
+    return { grantId };
   }
 
   /** One read-your-writes wait for a batch of shared reads; bumps the epoch once they land. */
