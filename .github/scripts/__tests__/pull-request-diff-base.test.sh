@@ -86,6 +86,8 @@ test_a_commit_that_is_not_a_merge_prints_nothing() {
   local repo="$WORK/single"
   g init -q "$repo"
   commit_file "$repo" a.txt
+  check "a root HEAD prints no base" "" "$(cd "$repo" && bash "$SCRIPT" 2>/dev/null)"
+  commit_file "$repo" b.txt
   check "a single-parent HEAD prints no base" "" "$(cd "$repo" && bash "$SCRIPT" 2>/dev/null)"
   check "and does not fail the step" "0" "$(cd "$repo" && bash "$SCRIPT" >/dev/null 2>&1; echo $?)"
 }

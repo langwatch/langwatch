@@ -189,8 +189,12 @@ export const inDetectorStep = (lines: string[], index: number): boolean => {
   const indent = indentOf(lines[index]!);
   for (let i = index - 1; i >= 0; i--) {
     const line = lines[i]!;
-    if (isBlank(line) || indentOf(line) >= indent || !/^\s*-\s/.test(line)) continue;
-    const step = [line, ...blockUnder(lines, i, indentOf(line))];
+    if (isBlank(line)) continue;
+    const lineIndent = indentOf(line);
+    if (lineIndent >= indent) continue;
+    const isListItem = /^\s*-\s/.test(line);
+    if (!isListItem) continue;
+    const step = [line, ...blockUnder(lines, i, lineIndent)];
     return step.some((stepLine) => DETECTOR_USES.test(stripComment(stepLine)));
   }
   return false;

@@ -30,6 +30,13 @@ interface Workflow {
 }
 
 const DORNY = "dorny/paths-filter@";
+/**
+ * The dorny release whose pull request path was read for the `base` input:
+ * with an empty token, src/main.ts diffs `base || pull_request.base.sha`
+ * against the checked-out commit (v4.0.3). A bump fails the test below until
+ * someone reads that path again and updates this pin.
+ */
+const DORNY_READ_FOR_BASE = "dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d";
 /** A step `if` that pins one event other than a pull request. */
 const NON_PR_EVENT_ONLY =
   /^github\.event_name\s*==\s*'(push|merge_group|schedule|workflow_dispatch)'$/;
@@ -80,6 +87,9 @@ describe("where CI path gates read a pull request's changed paths", () => {
           ".github/scripts/pull-request-diff-base.sh",
         );
         expect(base?.if).toBe("github.event_name == 'pull_request'");
+        expect(step.uses, `${where} runs a dorny nobody checked honours \`base\``).toBe(
+          DORNY_READ_FOR_BASE,
+        );
       }
     });
   });

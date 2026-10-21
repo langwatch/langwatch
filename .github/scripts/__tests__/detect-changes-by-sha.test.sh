@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Unit test for detect-changes-by-sha.sh, the pull_request_target path.
+# Unit test for detect-changes-by-sha.sh, the path pull_request and
+# pull_request_target runs take.
 #
 # A fork-style head (reachable only through refs/pull/1/head) is fetched by SHA
 # into the lean base checkout the gate runs in, and diffed. The head is never
