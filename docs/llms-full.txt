@@ -64581,17 +64581,16 @@ What `size-prod.yaml` processes with one setting changed:
 | Change | Processes (spans per second) |
 | --- | --- |
 | None | ~700 |
-| `workers.replicaCount: 1` | ~200 |
 | `workers.replicaCount: 4` | ~800: Redis CPU is then the limit |
 | `clickhouse.cpu: 2`, `clickhouse.memory: 4Gi` | ~200 |
 | Valkey instead of Redis | ~700, with about 10% less CPU on the queue |
 | All traffic from one project | ~60 for that project, under the default per-project limit |
 
-A worker replica uses about one core however high its CPU limit, so to process more, add replicas rather than CPU. More replicas raise the rate until Redis reaches 1 CPU, at about 800 spans per second. Every 100 spans per second needs about:
+Each worker replica processes about 350 spans per second on about one core, however high its CPU limit, so to process more, add replicas rather than CPU. More replicas raise the rate until Redis reaches 1 CPU, at about 800 spans per second. Every 100 spans per second needs about:
 
 | Component | CPU |
 | --- | --- |
-| LangWatch Workers | 0.5 core |
+| LangWatch Workers | 0.3 core |
 | LangWatch App | 0.15 core |
 | ClickHouse | 0.16 core |
 | Redis | 0.12 core, up to 1 core in total |
@@ -64603,7 +64602,9 @@ The queue for bursts lives in Redis too. Each waiting span takes about 8 KB, so 
 
 To accept more, add app replicas (each core takes about 700 spans per second) and give Redis up to 1 CPU.
 
-Each project gets a fair share of the workers, so one busy project can't slow down the others. To give a single project more, raise `LANGWATCH_DISPATCH_TENANT_CAP` in `workers.extraEnvs`: the number of traces one project can have in progress at once (default `50`). Setting it to `0` turns the limit off and lets one project take every worker.
+Each project gets a fair share of the workers, so one busy project can't slow down the others.
+
+To give a single project more, raise `LANGWATCH_DISPATCH_TENANT_CAP` in `workers.extraEnvs`: the number of traces one project can have in progress at once (default `50`). Each trace in progress moves at about one span per second, so the default gives one project about 60 spans per second. Setting it to `0` turns the limit off and lets one project take every worker.
 
 ## Scaling Guidelines
 
@@ -64613,7 +64614,7 @@ Each project gets a fair share of the workers, so one busy project can't slow do
 | --------------------------------------------------- | ------------------ | -------------------------------------------------------------------- |
 | Redis refuses writes (`OOM command not allowed`) or restarts with `OOMKilled` | Redis | Raise `redis.master.resources.limits.memory` (about 2.5 MiB per span/s, see [Throughput by Size](#throughput-by-size)) |
 | Redis CPU near its limit                            | Redis              | Raise `redis.master.resources.limits.cpu`, up to 1                   |
-| Trace ingestion is slow, workers near their CPU limit | LangWatch Workers | Increase `workers.replicaCount` (about 0.5 core per 100 spans per second) |
+| Trace ingestion is slow, each worker near one core | LangWatch Workers | Increase `workers.replicaCount` (about 350 spans per second each) |
 | One project falls behind while others keep up       | LangWatch Workers  | Raise `LANGWATCH_DISPATCH_TENANT_CAP` in `workers.extraEnvs` (default `50`) |
 | UI is slow, many concurrent users                   | LangWatch App      | Increase `app.replicaCount`                                          |
 | ClickHouse queries are slow, trace summaries lag    | ClickHouse         | Increase `clickhouse.cpu` and `clickhouse.memory`                    |
