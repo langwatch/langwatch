@@ -64587,7 +64587,7 @@ What `size-prod.yaml` processes with one setting changed:
 | Valkey instead of Redis | ~700, with about 10% less CPU on the queue |
 | All traffic from one project | ~60 for that project, under the default per-project limit |
 
-More worker replicas raise the rate until Redis reaches 1 CPU, at about 800 spans per second. Every 100 spans per second needs about:
+A worker replica uses about one core however high its CPU limit, so to process more, add replicas rather than CPU. More replicas raise the rate until Redis reaches 1 CPU, at about 800 spans per second. Every 100 spans per second needs about:
 
 | Component | CPU |
 | --- | --- |
@@ -64597,9 +64597,13 @@ More worker replicas raise the rate until Redis reaches 1 CPU, at about 800 span
 | Redis | 0.12 core, up to 1 core in total |
 | PostgreSQL | 0.03 core |
 
-Redis needs about 2.5 MiB of memory limit for each span per second; the table rounds up to leave room for bursts. It uses up to half of its limit and keeps the rest free for snapshots. The queue for bursts lives in Redis too: each waiting span takes about 8 KB, so a minute at 500 spans per second above the processing rate needs about 240 MiB more. To accept more, add app replicas (each core takes about 700 spans per second) and give Redis up to 1 CPU.
+Redis needs about 2.5 MiB of memory limit for each span per second; the table rounds up to leave room for bursts. It uses up to half of its limit and keeps the rest free for snapshots.
 
-Each project gets a fair share of the workers, so one busy project can't slow down the others. To give a single project more, raise `LANGWATCH_DISPATCH_TENANT_CAP` in `workers.extraEnvs` (default `50`). Setting it to `0` turns the limit off and lets one project take every worker.
+The queue for bursts lives in Redis too. Each waiting span takes about 8 KB, so a minute at 500 spans per second above the processing rate needs about 240 MiB more.
+
+To accept more, add app replicas (each core takes about 700 spans per second) and give Redis up to 1 CPU.
+
+Each project gets a fair share of the workers, so one busy project can't slow down the others. To give a single project more, raise `LANGWATCH_DISPATCH_TENANT_CAP` in `workers.extraEnvs`: the number of traces one project can have in progress at once (default `50`). Setting it to `0` turns the limit off and lets one project take every worker.
 
 ## Scaling Guidelines
 
