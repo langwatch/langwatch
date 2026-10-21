@@ -2,6 +2,7 @@ import {
   UPGRADE_DIAGNOSTICS_MAX_BYTES,
   type UpgradeDiagnosticsBundle,
 } from "@langwatch/ops-contract";
+import { isSensitiveAttributeKey, redactSecretsInText } from "@langwatch/redaction";
 import type { UpgradeStepDetail } from "@langwatch/upgrade/reader";
 import { redactSecrets } from "@langwatch/upgrade/runner";
 import { ledgerText } from "@langwatch/upgrade/step";
@@ -14,9 +15,12 @@ export type DiagnosticsDeployment = UpgradeDiagnosticsBundle["deployment"];
 /** Room left under the licence host's body cap for the submission around the bundle. */
 const BUNDLE_MAX_BYTES = UPGRADE_DIAGNOSTICS_MAX_BYTES - 1024;
 
-const scrubText = (text: string) => ledgerText({ text, redact: redactSecrets });
+/** The upgrade redactor, then the shared one, which also knows provider key and token shapes. */
+const redactOutbound = (text: string) => redactSecretsInText({ text: redactSecrets(text) }).text;
 
-/** Every string redacted and cut, every quoted value dropped, each drop named in `omitted`. */
+const scrubText = (text: string) => ledgerText({ text, redact: redactOutbound });
+
+/** Every string redacted and cut; each quoted or secret-named value dropped, named in `omitted`. */
 function scrub({
   value,
   path,
@@ -34,7 +38,7 @@ function scrub({
   const kept: Record<string, unknown> = {};
   for (const [key, each] of Object.entries(value)) {
     const at = path === "" ? key : `${path}.${key}`;
-    if (QUOTED_VALUE_KEYS.has(key)) {
+    if (QUOTED_VALUE_KEYS.has(key) || isSensitiveAttributeKey(key)) {
       omitted.push(at);
       continue;
     }

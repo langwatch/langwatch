@@ -35,12 +35,29 @@ const WAITING_ON: Readonly<Record<UpgradePhaseName, string>> = {
 };
 
 const URL_CREDENTIALS = /([a-z][a-z0-9+.-]*:\/\/[^\s:/@]*):[^\s@/]*@/gi;
-const SECRET_PAIRS =
-  /\b(password|passwd|pwd|token|secret|api[_-]?key|access[_-]?key|auth)=([^\s&;,"']+)/gi;
+const SECRET_NAME = String.raw`[\w.-]*?(?:password|passwd|pwd|token|secret|api[_-]?key|access[_-]?key|private[_-]?key|auth|authorization|credentials?|cookie)`;
+/** `key=value`, `key: value` and `"key":"value"`; a `Bearer`-style scheme stays, its value goes. */
+const SECRET_PAIRS = new RegExp(
+  String.raw`(["']?\b${SECRET_NAME}["']?\s*[=:]\s*(?:(?:bearer|basic|token)\s+)?)("[^"]*"|'[^']*'|[^\s&;,"']+)`,
+  "gi",
+);
+const AUTH_SCHEMES = /\b(bearer|basic)\s+[\w.~+/=-]{8,}/gi;
 
-/** A URL's password and every secret-named `key=value` masked; the user, host and path stay. */
+/** A masked value keeps the quotes it was written in. */
+const masked = (value: string) => {
+  const quote = value[0] === '"' || value[0] === "'" ? value[0] : "";
+  return `${quote}***${quote}`;
+};
+
+/**
+ * A URL's password, every secret-named value in `key=value`, `key: value` or JSON form, and
+ * every bearer or basic credential masked; the user, host and path stay.
+ */
 export function redactSecrets(text: string): string {
-  return text.replace(URL_CREDENTIALS, "$1:***@").replace(SECRET_PAIRS, "$1=***");
+  return text
+    .replace(URL_CREDENTIALS, "$1:***@")
+    .replace(SECRET_PAIRS, (_match, key: string, value: string) => `${key}${masked(value)}`)
+    .replace(AUTH_SCHEMES, "$1 ***");
 }
 
 function redactValue(value: unknown): unknown {

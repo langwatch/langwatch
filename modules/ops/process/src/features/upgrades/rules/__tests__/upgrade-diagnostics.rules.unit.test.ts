@@ -116,6 +116,48 @@ describe("upgradeDiagnosticsOf", () => {
     });
   });
 
+  describe("given a report, error and log carrying structured credentials", () => {
+    /** @scenario "A diagnostics bundle drops secret-named fields and masks credentials in text" */
+    it("drops the secret-named fields, masks the credentials in text and names each drop", () => {
+      const bundle = bundleOf(
+        stepDetail({
+          report: {
+            checkpoint: 12,
+            password: "synthetic-secret",
+            headers: { authorization: "Bearer synthetic-token" },
+            provider: { apiKey: "synthetic-key", region: "eu-west-1" },
+          },
+          lastError: 'request failed: {"apiKey":"synthetic-key-2","model":"gpt"}',
+          logTail: [
+            "calling provider with Authorization: Bearer synthetic-token-2",
+            'fields {"client_secret": "synthetic secret 3", "rows": 12}',
+            "retrying with x-api-key: synthetic-key-4",
+            `provider rejected sk-ant-api03-${"synthetic".repeat(5)}`,
+          ],
+        }),
+      );
+
+      expect(bundle.step.report).toEqual({
+        checkpoint: 12,
+        headers: {},
+        provider: { region: "eu-west-1" },
+      });
+      expect(bundle.omitted).toEqual([
+        "step.report.password",
+        "step.report.headers.authorization",
+        "step.report.provider.apiKey",
+      ]);
+      expect(bundle.step.lastError).toBe('request failed: {"apiKey":"***","model":"gpt"}');
+      expect(bundle.step.logTail.slice(0, 3)).toEqual([
+        "calling provider with Authorization: Bearer ***",
+        'fields {"client_secret": "***", "rows": 12}',
+        "retrying with x-api-key: ***",
+      ]);
+      expect(bundle.step.logTail.at(-1)).toMatch(/^provider rejected /);
+      expect(JSON.stringify(bundle)).not.toMatch(/synthetic/);
+    });
+  });
+
   describe("given a report and log that would exceed 64 KB", () => {
     /** @scenario "A diagnostics bundle stays under its size cap" */
     it("ends at most 64 KB and names what it left out", () => {

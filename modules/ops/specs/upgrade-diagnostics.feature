@@ -23,6 +23,13 @@ Feature: Upgrade step diagnostics
     Then the bundle masks the password and cuts the string to 4 KB
 
   @unit
+  Scenario: A diagnostics bundle drops secret-named fields and masks credentials in text
+    Given a failed step whose report holds a password, an authorization header and an apiKey
+    And whose error and log carry an apiKey in JSON and a bearer token in a header
+    When an operator asks for its diagnostics
+    Then the bundle drops those report fields, names each one it dropped, and masks the credentials in the text
+
+  @unit
   Scenario: A diagnostics bundle stays under its size cap
     Given a failed step whose report and log would exceed 64 KB
     When an operator asks for its diagnostics
