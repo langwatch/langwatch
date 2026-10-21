@@ -196,7 +196,7 @@ defaults to port 4173, and fails if its chosen port is occupied.
 
 ## Static artifact and CI
 
-`.github/workflows/docs-site.yml` installs materialized LFS assets, typechecks,
+`.github/workflows/docs-site.yml` installs dependencies, typechecks,
 tests, builds and checks the site, then uploads the `apps/docs/dist` artifact.
 It has no cloud deployment job or credentials. Build output contains no
 host-specific edge code. A future deployment belongs in GitHub Actions.
@@ -331,11 +331,11 @@ Alt+Shift+C copies the current page outside editable controls. The sidebar comma
 
 The coding-agent hero uses checked-in 640/1024/1560px WebP derivatives of the existing session-detail PNG, with responsive preload only on its overview page. Other imagery remains lazy. Run `test:refinement --out-dir <build> --screenshots <scratch-directory>` for the exports, clipboard, tab-panel mapping, responsive image, and footer checks.
 
-## Git LFS assets
+## Binary assets
 
-Docs images, video/audio, vector graphics, fonts and downloadable media are tracked by the docs-scoped patterns in `.gitattributes`. Install Git LFS, run `git lfs install --local --skip-repo` once when using this repo's `.githooks` (or ordinary `git lfs install` with Git's default hooks), then `git lfs pull` after a checkout that skipped LFS downloads. The docs CI checkout enables LFS, and the build rejects unresolved pointer files before emitting output. The static directory contains the full asset bytes; readers do not fetch from Git LFS.
-
-New asset revisions are stored in LFS. Conversion in this branch does not rewrite existing repository history, so historical binary blobs remain until a separately coordinated history migration.
+Docs images, video, fonts and downloads are ordinary Git files for now. Git LFS
+returns once these docs replace Mintlify. The build already rejects an unresolved
+LFS pointer file before emitting output, so that move needs no build change.
 
 ## Static search metadata
 

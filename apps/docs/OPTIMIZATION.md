@@ -19,7 +19,7 @@ CSS or images.
   article, heading, API and typo coverage when considering another engine.
 - Responsive WebP imagery, intrinsic dimensions, and short video replacements
   for the three referenced prompt GIFs. Keep playback optional and respect motion
-  preferences. Git LFS stores source assets; published output contains real bytes.
+  preferences.
 - Scoped, bounded offline caches and deliberate prefetch with save-data guards.
   Native Haven hosting supports `/docs` without capturing other app requests.
 - Content-addressed Brotli/gzip variants for the complete search index. Native

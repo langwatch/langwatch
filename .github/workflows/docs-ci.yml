@@ -85,8 +85,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          lfs: true
 
       # The CLI refuses to run on Node >= 25 and on < 20.17, and this job would
       # otherwise use whatever the runner image ships — so the next image bump

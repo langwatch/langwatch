@@ -14,8 +14,8 @@ Feature: Publish the documentation as a static site
 
   @unit
   Scenario: Build with materialized Git LFS assets
-    Given docs images, videos and fonts are tracked with Git LFS
-    When the documentation checkout downloads its LFS objects
+    Given docs images, videos and fonts may be stored with Git LFS
+    When the documentation checkout has its asset bytes
     Then the static build copies the original asset bytes
     But a remaining LFS pointer makes the build fail before publishing
 
