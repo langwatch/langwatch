@@ -220,6 +220,62 @@ describe("computeBTLeaderboard", () => {
     expect(result.entries[1]!.scoreCI).toBeNull();
   });
 
+  describe("given the default thousand resamples and seed", () => {
+    // Recorded from the fit before it moved onto typed arrays. The faster solver
+    // performs the same floating point operations in the same order, so a reader
+    // reopening a run sees the same scores and intervals to the last digit.
+    const comparisons: PairwiseComparison[] = [
+      ...wins("A", ["B"], 9),
+      ...wins("B", ["A"], 5),
+      ...wins("B", ["C"], 8),
+      ...wins("C", ["B"], 4),
+      ...wins("A", ["C"], 7),
+      ...wins("C", ["A"], 3),
+      ...wins("D", ["A"], 2),
+      ...wins("A", ["D"], 6),
+      ...wins("C", ["D"], 5),
+      ...wins("D", ["C"], 4),
+      ...ties("A", "B", 3),
+      ...ties("C", "D", 2),
+      ...["A", "B", "A", "C", "D", "A"].map((winner) => ({
+        candidates: ["A", "B", "C", "D"],
+        winner,
+      })),
+    ];
+
+    it("keeps every score and interval exactly as recorded", () => {
+      const result = computeBTLeaderboard({ comparisons, variantIds: ["A", "B", "C", "D"] });
+
+      expect(result.entries.map((e) => [e.variantId, e.score, e.scoreCI])).toEqual([
+        ["A", 114.14701602253214, [28.259283108064963, 220.7461236679491]],
+        ["B", 18.9145034769108, [-84.87384285943924, 123.88630846314871]],
+        ["C", -59.163494891806444, [-162.7774568453376, 33.16015155773397]],
+        ["D", -73.89802460763654, [-225.76971323082347, 42.995436912312016]],
+      ]);
+      expect(result.scoreDifferenceCI!.A).toEqual({
+        B: [-37.51742624635518, 237.63031467781698],
+        C: [40.230066879197175, 352.911154739249],
+        D: [16.594535275844542, 423.6238186793849],
+      });
+      expect(result.scoreDifferenceCI!.C!.D).toEqual([-158.91875063816465, 210.3365772619937]);
+      expect(result.bootstrapNonConvergence).toBe(0);
+    });
+
+    it("keeps a smoothed, degenerate field's intervals exactly as recorded", () => {
+      const result = computeBTLeaderboard({
+        comparisons: [...wins("A", ["B", "C"], 6), ...wins("B", ["C"], 4), ...wins("C", ["B"], 3)],
+        variantIds: ["A", "B", "C"],
+      });
+
+      expect(result.entries.map((e) => [e.variantId, e.score, e.scoreCI])).toEqual([
+        ["B", -129.30223094297995, [-255.07197502055595, -20.89813360122564]],
+        ["C", -168.37554914048062, [-299.5007664095226, -58.726263603871864]],
+        ["A", 297.6777800834606, [251.49186241711848, 346.0864130089249]],
+      ]);
+      expect(result.scoreDifferenceCI!.B!.C).toEqual([-189.5404787251107, 272.11856363269874]);
+    });
+  });
+
   /** @scenario "Sample size gating matters more as variants grow" */
   it("exposes minMatchups for sample-size gating", () => {
     // A: 10 matchups, B: 10, C: 4. UI should warn (C < 30).
