@@ -8,10 +8,10 @@
 import type { SelfHostedSignal } from "@langwatch/enterprise-licensing-contract";
 
 import type { SelfHostedInstanceRecord } from "../repositories/self-hosted-instance.repository.ts";
+import { selfHostedInstanceAdminUrl } from "../rules/self-hosted-instance.rules.ts";
 import { isReportNumber } from "../rules/self-hosted-report.rules.ts";
 import { SIGNAL_EVENTS, SIGNAL_HEADLINES } from "../rules/self-hosted-signals.rules.ts";
 import type { SelfHostedSignalEvent } from "../rules/self-hosted-signals.rules.ts";
-import { selfHostedInstanceAdminUrl } from "../rules/upgrade-diagnostics.rules.ts";
 import type { LicenseLogger } from "./license.service.ts";
 
 type SignalAnnouncement = Readonly<{

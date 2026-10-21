@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
- * Where Cloud keeps a received upgrade diagnostics bundle, how often one instance may send, and
- * the link a Slack message carries. Plan: dev/docs/plans/upgrade-diagnostics-via-connect.md
+ * Where Cloud keeps a received upgrade diagnostics bundle and how often one instance may send.
+ * Plan: dev/docs/plans/upgrade-diagnostics-via-connect.md
  */
 
 /** ADR-172: the kind prefix the 30-day lifecycle rule matches (charts/langwatch/values.yaml). */
@@ -28,16 +28,4 @@ export function upgradeDiagnosticsObjectKey({
 
 export function upgradeDiagnosticsRateLimitKey(instanceId: string): string {
   return `upgrade_diagnostics:${instanceId}`;
-}
-
-/** Cloud admin's self-hosted instances page, its drawer open on one row where it is known. */
-export function selfHostedInstanceAdminUrl({
-  baseUrl,
-  instanceRowId,
-}: {
-  baseUrl: string;
-  instanceRowId: string | null;
-}): string {
-  const page = `${baseUrl.replace(/\/+$/, "")}/ops/cloud/self-hosted-instances`;
-  return instanceRowId ? `${page}?instance=${encodeURIComponent(instanceRowId)}` : page;
 }

@@ -24,10 +24,8 @@ import type {
   UpgradeDiagnosticRecord,
   UpgradeDiagnosticRepository,
 } from "../repositories/upgrade-diagnostic.repository.ts";
-import {
-  selfHostedInstanceAdminUrl,
-  UPGRADE_DIAGNOSTICS_DOWNLOAD_MINUTES,
-} from "../rules/upgrade-diagnostics.rules.ts";
+import { selfHostedInstanceAdminUrl } from "../rules/self-hosted-instance.rules.ts";
+import { UPGRADE_DIAGNOSTICS_DOWNLOAD_MINUTES } from "../rules/upgrade-diagnostics.rules.ts";
 import type { LicenseLogger } from "./license.service.ts";
 
 type UpgradeDiagnosticsCollaborators = Readonly<{
