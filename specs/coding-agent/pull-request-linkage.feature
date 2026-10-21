@@ -688,6 +688,14 @@ Rule: Each pull request reports what every model consumed
     When the pull request usage is read
     Then the row reports each model's tokens rather than names alone
 
+  @unit
+  Scenario: A session without per-call data still names its models beside one that has them
+    Given a pull request with one session that logged model calls and one that only recorded its models
+    When the pull request usage is read
+    Then the second session's models are listed by name with unknown tokens
+    And the pull request totals are unchanged
+    And the model with per-call data stays first
+
   @integration
   Scenario: The detail names the models even without per-call data
     Given a pull request whose sessions recorded their models but logged no model calls

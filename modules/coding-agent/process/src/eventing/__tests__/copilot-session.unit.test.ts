@@ -611,25 +611,25 @@ describe("Copilot session fold", () => {
       const claudeRow = sessions.get("claude-session");
       const codexRow = [...sessions.values()].find((row) => row.agent === "codex");
 
-      /** @scenario Claude Code and Codex rows are unchanged by the Copilot declarations */
+      /** @scenario "Claude Code and Codex rows are unchanged by the Copilot declarations" */
       it("counts no AI units on either row", () => {
         expect(claudeRow?.agent).toBe("claude_code");
         expect(claudeRow?.aiUnits).toBe(0);
         expect(codexRow?.aiUnits).toBe(0);
       });
 
-      /** @scenario Claude Code and Codex rows are unchanged by the Copilot declarations */
+      /** @scenario "Claude Code and Codex rows are unchanged by the Copilot declarations" */
       it("keeps no per-model record on either row, so their pull-request reads are unchanged", () => {
         expect(claudeRow?.usageByModel).toEqual({});
         expect(codexRow?.usageByModel).toEqual({});
       });
 
-      /** @scenario Claude Code and Codex rows are unchanged by the Copilot declarations */
+      /** @scenario "Claude Code and Codex rows are unchanged by the Copilot declarations" */
       it("still keys the keyless codex span by its trace, rather than dropping it", () => {
         expect(codexRow?.sessionKeySource).toBe("trace_fallback");
       });
 
-      /** @scenario Claude Code and Codex rows are unchanged by the Copilot declarations */
+      /** @scenario "Claude Code and Codex rows are unchanged by the Copilot declarations" */
       it("does not fold the codex chat span as a Copilot model call", () => {
         expect(genAiOperationRoleOf({ agent: "codex", name: keylessCodexChat.name })).toBe(
           "undeclared",

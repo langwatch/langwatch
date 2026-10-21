@@ -1,6 +1,7 @@
 /**
  * @unit
  * @see specs/coding-agent/copilot-sessions.feature
+ * @see specs/coding-agent/pull-request-linkage.feature
  */
 import type {
   CodingAgentSessionContextUsage,
@@ -273,7 +274,7 @@ describe("Copilot pull-request cost", () => {
     };
 
     describe("when the pull request usage is read", () => {
-      /** @scenario "AI units are their own count and never enter the dollar total" */
+      /** @scenario "Claude Code and Codex rows are unchanged by the Copilot declarations" */
       it("keeps the Claude Code and Codex rows and their per-call model as before", async () => {
         const sessions = new TestSessions();
         sessions.branchRows = [claude, codex];
@@ -298,18 +299,26 @@ describe("Copilot pull-request cost", () => {
         );
       });
 
-      /** @scenario "Each Copilot model on a pull request has known tokens" */
+      /** @scenario "A session without per-call data still names its models beside one that has them" */
       it("still names the Codex model it has no per-call record for", async () => {
         const sessions = new TestSessions();
         sessions.branchRows = [codex, copilotSession()];
 
         const result = await serviceWith({ sessions }).getPullRequestUsage(query);
 
+        expect(result.modelBreakdown.map(({ model }) => model)).toEqual([
+          UNPRICED_MODEL,
+          PRICED_MODEL,
+          "gpt-5-codex",
+        ]);
         expect(result.modelBreakdown.find((each) => each.model === "gpt-5-codex")).toMatchObject({
           tokensKnown: false,
+          totalTokens: 0,
           costUsd: null,
           aiUnits: 0,
         });
+        expect(result.totals).toMatchObject({ inputTokens: 40 + 16, outputTokens: 2 + 88 });
+        expect(result.totals.costUsd).toBeCloseTo(0.25 + 0.002, 9);
       });
     });
   });
