@@ -84,7 +84,7 @@ export class SystemMigrationsService {
             migrationName: migration.name,
             // A step whose `migrated` is its steady state holds nobody; only parked rows count.
             statuses: migration.migratedIsSteady ? ["parked"] : ["migrated", "parked"],
-            // Expected, and no operator can act on it: counted below, never listed.
+            // Waits on the user proving the account or an operator lifting a pin: counted apart.
             exceptHeldReason: "person",
             limit: ATTENTION_LIMIT,
           }),

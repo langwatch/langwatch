@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { MemoryIdentityLatchRepository } from "../../repositories/memory/memory.identity-latch.repository.ts";
 import { MemoryIdentityStore } from "../../repositories/memory/memory.identity.store.ts";
 import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../../rules/identity-migration-names.rules.ts";
+import type { IdentityBackfillOutcome } from "../identity-backfill.service.ts";
 import { IdentityIdentifierBackfillMigrationService } from "../system-migration-identity-identifier-backfill.service.ts";
 
 describe("the identifier backfill migration", () => {
@@ -31,10 +32,14 @@ describe("the identifier backfill migration", () => {
   });
 
   describe("when the backfill holds a user", () => {
-    function holding(report: { kind: "parity"; diffs: [] } | { kind: "unproven_account" }) {
+    function holding(report: Extract<IdentityBackfillOutcome, { status: "migrated" }>["report"]) {
+      const migrateUser = vi.fn(async (): Promise<IdentityBackfillOutcome> => ({
+        status: "migrated",
+        report,
+      }));
       return IdentityIdentifierBackfillMigrationService.create({
         latch: MemoryIdentityLatchRepository.create(MemoryIdentityStore.create()),
-        backfill: { migrateUser: vi.fn(async () => ({ status: "migrated" as const, report })) },
+        backfill: { migrateUser },
         maxQueuedJobs: 5_000,
       });
     }

@@ -93,6 +93,7 @@ describe.skipIf(!DB_URL)("TenantStepSettleService over Postgres", () => {
   });
 
   /** @scenario "Settling over Postgres treats a tenant waiting on a person as settled" */
+  /** @scenario "Ops lists a step's held tenants without those waiting on a person, and counts those apart" */
   it("settles a step whose only hold waits on a person, and reopens on a proof hold", async () => {
     await createLedgerTables({ postgres });
     const ledger = UpgradeRunnerRepository.create({ postgres });
@@ -128,5 +129,23 @@ describe.skipIf(!DB_URL)("TenantStepSettleService over Postgres", () => {
     await state.upsertRecord({ ...held, tenantId: "org-1", heldReason: "proof" });
     await service.settle({ buckets: [{ ids: [PENDING], runner }] });
     expect(await statusOf({ id: PENDING })).toBe("pending");
+
+    await state.upsertRecord({ ...held, tenantId: "org-3", status: "parked" });
+    await state.upsertRecord({ ...held, tenantId: "org-4", heldReason: "pending" });
+    const listed = async (filter: { heldReason?: "pending"; exceptHeldReason?: "person" }) =>
+      (
+        await state.findRecordsByStatus({
+          migrationName: PENDING,
+          statuses: ["migrated", "parked"],
+          limit: 10,
+          ...filter,
+        })
+      )
+        .map((row) => row.tenantId)
+        .toSorted();
+    expect(await listed({ exceptHeldReason: "person" })).toEqual(["org-1", "org-3", "org-4"]);
+    expect(await listed({ heldReason: "pending" })).toEqual(["org-4"]);
+    expect(await listed({})).toEqual(["org-1", "org-2", "org-3", "org-4"]);
+    expect(await state.countHeld({ migrationName: PENDING, heldReason: "person" })).toBe(1);
   });
 });

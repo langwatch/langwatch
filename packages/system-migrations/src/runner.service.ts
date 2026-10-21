@@ -132,9 +132,9 @@ export class SystemMigrationRunnerService {
   }
 
   /**
-   * Whether an eligible tenant (this runner's source, inside the cohort) holds no finished row for
-   * `migrationName` (a steady step's `migrated`, or a hold waiting on a person, counts as finished).
-   * Read from state, never a pass: a tenant claimed elsewhere, or by nobody, counts until finished.
+   * Whether an eligible tenant (this runner's source, inside the cohort) holds no finished row
+   * for `migrationName` (`isFinishedRecord`). Read from state, never a pass: a tenant claimed
+   * elsewhere, or by nobody while the lease is down, counts until finished.
    */
   async hasUnfinishedTenant({ migrationName }: { migrationName: string }): Promise<boolean> {
     let cursor: string | null = null;
@@ -153,14 +153,7 @@ export class SystemMigrationRunnerService {
         (migration) => migration.name === migrationName && migration.migratedIsSteady,
       );
       const finished = new Set(
-        records
-          .filter(
-            (record) =>
-              isTerminalTenantStatus(record.status) ||
-              (steady && record.status === "migrated") ||
-              isWaitingOnPerson(record),
-          )
-          .map((r) => r.tenantId),
+        records.filter((record) => isFinishedRecord({ record, steady })).map((r) => r.tenantId),
       );
       if (eligible.some((tenantId) => !finished.has(tenantId))) return true;
     }
@@ -556,6 +549,18 @@ export class SystemMigrationRunnerService {
       );
     }
   }
+}
+
+/** Finished for its step: terminal, a steady step's `migrated`, or a hold waiting on a person. */
+function isFinishedRecord({
+  record,
+  steady,
+}: {
+  record: TenantMigrationRecord;
+  steady: boolean;
+}): boolean {
+  if (isTerminalTenantStatus(record.status) || isWaitingOnPerson(record)) return true;
+  return steady && record.status === "migrated";
 }
 
 /**

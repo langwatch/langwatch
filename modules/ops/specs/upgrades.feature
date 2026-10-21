@@ -88,7 +88,7 @@ Feature: Ops shows an installation's release upgrades, read-only
     And the overview still reads "Up to date"
 
   # Held until a person acts (the user proves the account, an operator lifts a pin): expected,
-  # and no operator can act on it (2026-10-21).
+  # so counted apart rather than listed (2026-10-21).
   @integration
   Scenario: Users waiting on a person are counted, not listed as needing attention
     Given the identifier backfill holds 2 users whose proof disagreed and 3 waiting to confirm their address

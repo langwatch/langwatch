@@ -540,6 +540,13 @@ Feature: Running system migrations across organizations
     Then the stored state is asked whether anything could still move
     And no pass runs
 
+  # A person's hold settles its step but may still move once the person acts (2026-10-21).
+  @unit
+  Scenario: A tenant waiting on a person still wakes the re-drive
+    Given a step whose only held tenant waits on a person
+    When the worker asks whether a pass could still move a tenant
+    Then it answers yes, so the tenant moves once the person acts
+
   @unit
   Scenario: Only a worker re-drives
     Given a process that does not run the worker stack

@@ -64,6 +64,7 @@ function gate({
   type Row = { name: string; status: TenantMigrationStatus; tenantId?: string };
   return {
     passes,
+    state,
     record: ({ name, status, tenantId = "org-1" }: Row) =>
       state.upsertRecord({ migrationName: name, tenantId, status, report: null }),
   };
@@ -109,6 +110,23 @@ describe("SystemMigrationPassService.hasTenantAwaitingRedrive", () => {
       await record({ name: STEP, status: "finalized" });
       await record({ name: STEP, status: "parked", tenantId: "org-2" });
 
+      expect(await passes.hasTenantAwaitingRedrive()).toBe(true);
+    });
+  });
+
+  describe("given a declared step whose only hold waits on a person", () => {
+    /** @scenario "A tenant waiting on a person still wakes the re-drive" */
+    it("asks for a pass, so the tenant moves once the person acts", async () => {
+      const { passes, state } = gate({ steps: [stepOf({ id: STEP })] });
+      await state.upsertRecord({
+        migrationName: STEP,
+        tenantId: "user-sam",
+        status: "migrated",
+        report: null,
+        heldReason: "person",
+      });
+
+      expect(await state.hasUnsettledTenant({ migrationName: STEP })).toBe(false);
       expect(await passes.hasTenantAwaitingRedrive()).toBe(true);
     });
   });
