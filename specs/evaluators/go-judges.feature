@@ -43,6 +43,23 @@ Feature: The langevals judges answer on the Go runtime as langevals answered
     And the entry is skipped with the prompt's token count and the maximum
 
   @unit
+  Scenario: An unset max tokens budgets the judge at 128000 and sends none to the provider
+    Given an LLM judge whose max tokens is not set, null or 0
+    When it evaluates an entry
+    Then the content is fitted to a budget of 128000 tokens, held to the model's input window
+    And the model call carries no max tokens, so the provider's own default applies
+    And a max tokens the platform sends with the tenant's model settings still goes to the provider
+
+  # langevals/llm_score's min and max are read by the platform, never by the judge.
+  @unit
+  Scenario: The score judge takes a min and max and keeps the model's score as given
+    Given a score judge whose settings ask for a score between 1 and 5
+    When the model answers with a score of 7
+    Then the result's score is 7, not clamped to the range
+    And the prompt sent is the settings' prompt alone, with nothing added for the range
+    And a min or max that is not a number is refused as a wrong-typed setting
+
+  @unit
   Scenario: Judge prompts and entry content never reach a log or a LangWatch span
     Given judges that answer, and judges whose answer cannot be read
     When they evaluate entries

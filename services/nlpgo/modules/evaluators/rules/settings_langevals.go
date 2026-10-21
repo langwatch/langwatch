@@ -6,12 +6,26 @@ import "encoding/json"
 // model and its token budget, embedded first by every langevals judge.
 type LLMEvaluatorSettings struct {
 	Model     string `json:"model"      desc:"The model to use for evaluation"`
-	MaxTokens int    `json:"max_tokens" desc:"Max tokens allowed for evaluation"`
+	MaxTokens *int   `json:"max_tokens" desc:"Max tokens allowed for evaluation; unset reads as 128000"`
 }
 
-// DefaultLLMEvaluatorSettings are the Python defaults.
+// JudgeDefaultMaxTokens is langevals_core's DEFAULT_MAX_TOKENS: what an unset
+// max tokens reads as for the input budget.
+const JudgeDefaultMaxTokens = 128_000
+
+// JudgeMaxTokens is `settings.max_tokens or DEFAULT_MAX_TOKENS`: an unset (or
+// zero) max tokens reads as 128000. Unset sends no max tokens to the provider;
+// only the tenant's X_LITELLM_max_tokens ever does.
+func (s LLMEvaluatorSettings) JudgeMaxTokens() int {
+	if s.MaxTokens == nil || *s.MaxTokens == 0 {
+		return JudgeDefaultMaxTokens
+	}
+	return *s.MaxTokens
+}
+
+// DefaultLLMEvaluatorSettings are the Python defaults: max tokens unset.
 func DefaultLLMEvaluatorSettings() LLMEvaluatorSettings {
-	return LLMEvaluatorSettings{Model: "openai/gpt-5-mini", MaxTokens: 128000}
+	return LLMEvaluatorSettings{Model: "openai/gpt-5-mini"}
 }
 
 // ParseLLMEvaluatorSettings parses langevals/query_resolution settings.
@@ -116,8 +130,8 @@ func ParseExactMatchSettings(raw json.RawMessage) (ExactMatchSettings, error) {
 	return ParseSettings(raw, DefaultExactMatchSettings())
 }
 
-// LLMPromptSettings are a judge with one prompt: llm_answer_match,
-// llm_boolean and llm_score, whose defaults differ only in the prompt.
+// LLMPromptSettings are a judge with one prompt: llm_boolean's, and the base
+// of llm_score's and llm_category's.
 type LLMPromptSettings struct {
 	LLMEvaluatorSettings
 	Prompt string `json:"prompt" desc:"The system prompt to use for the LLM to run the evaluation"`
@@ -156,16 +170,25 @@ func ParseCustomLLMBooleanSettings(raw json.RawMessage) (LLMPromptSettings, erro
 	return ParseSettings(raw, DefaultCustomLLMBooleanSettings())
 }
 
+// CustomLLMScoreSettings are langevals/llm_score's settings. Min and max are
+// the range the prompt asks for; langevals reads neither when it judges, so
+// the score is the model's own, never clamped. The platform reads them.
+type CustomLLMScoreSettings struct {
+	LLMPromptSettings
+	Min *float64 `json:"min" desc:"The lowest score the prompt asks for; unset reads as 0"`
+	Max *float64 `json:"max" desc:"The highest score the prompt asks for; unset reads as 1"`
+}
+
 // DefaultCustomLLMScoreSettings are langevals/llm_score's Python defaults.
-func DefaultCustomLLMScoreSettings() LLMPromptSettings {
-	return LLMPromptSettings{
+func DefaultCustomLLMScoreSettings() CustomLLMScoreSettings {
+	return CustomLLMScoreSettings{LLMPromptSettings: LLMPromptSettings{
 		LLMEvaluatorSettings: DefaultLLMEvaluatorSettings(),
 		Prompt:               "You are an LLM evaluator. Please score from 0.0 to 1.0 how likely the user is to be satisfied with this answer, from 0.0 being not satisfied at all to 1.0 being completely satisfied",
-	}
+	}}
 }
 
 // ParseCustomLLMScoreSettings parses langevals/llm_score settings.
-func ParseCustomLLMScoreSettings(raw json.RawMessage) (LLMPromptSettings, error) {
+func ParseCustomLLMScoreSettings(raw json.RawMessage) (CustomLLMScoreSettings, error) {
 	return ParseSettings(raw, DefaultCustomLLMScoreSettings())
 }
 

@@ -20,7 +20,6 @@ type doc struct {
 	literal       bool   // a hard line that keeps no indentation
 	breakContents *doc
 	flatContents  *doc
-	object        *jsObject // the object literal a group lays out, if any
 }
 
 type docKind int
@@ -180,11 +179,10 @@ func expand(c command) []command {
 	return nil
 }
 
-// layout prints root within width, prettier's printDocToString. Each object
-// literal it breaks is reported to brokeObject.
-func layout(root *doc, width int, brokeObject func(*jsObject)) string {
+// layout prints root within width, prettier's printDocToString.
+func layout(root *doc, width int) string {
 	propagateBreaks(root)
-	printer := layoutPrinter{width: width, brokeObject: brokeObject, commands: []command{{doc: root}}}
+	printer := layoutPrinter{width: width, commands: []command{{doc: root}}}
 	for len(printer.commands) > 0 {
 		c := printer.commands[len(printer.commands)-1]
 		printer.commands = printer.commands[:len(printer.commands)-1]
@@ -194,12 +192,11 @@ func layout(root *doc, width int, brokeObject func(*jsObject)) string {
 }
 
 type layoutPrinter struct {
-	width       int
-	brokeObject func(*jsObject)
-	commands    []command
-	out         []byte
-	pos         int
-	remeasure   bool
+	width     int
+	commands  []command
+	out       []byte
+	pos       int
+	remeasure bool
 }
 
 func (p *layoutPrinter) step(c command) {
@@ -275,9 +272,6 @@ func (p *layoutPrinter) chooseState(c command) command {
 }
 
 func (p *layoutPrinter) breakGroup(c command) {
-	if c.doc.object != nil {
-		p.brokeObject(c.doc.object)
-	}
 	p.commands = append(p.commands, command{c.indent, false, c.doc.contents})
 }
 

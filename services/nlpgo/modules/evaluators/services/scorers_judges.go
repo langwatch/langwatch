@@ -73,7 +73,7 @@ func (j *judges) runPromptJudge(ctx context.Context, judge promptJudge, in Entry
 	if j.tokensErr != nil {
 		return nil, rules.JudgeFit{}, nil, j.tokensErr
 	}
-	fit := j.tokens.FitJudgeContent(rules.JudgeFitRequest{Model: judge.settings.Model, MaxTokens: judge.settings.MaxTokens, Reserved: judge.reserved, Fields: fields})
+	fit := j.tokens.FitJudgeContent(rules.JudgeFitRequest{Model: judge.settings.Model, MaxTokens: judge.settings.JudgeMaxTokens(), Reserved: judge.reserved, Fields: fields})
 	if fit.Skip != "" {
 		skipped := skippedResult(fit.Skip)
 		return nil, fit, &skipped, nil
@@ -117,7 +117,7 @@ func (j *judges) scoreBoolean(ctx context.Context, settings rules.LLMPromptSetti
 	return vendorVerdict(boolScore(passed), passed, fit.WithNote(rules.JudgeText(arguments["reasoning"]))), nil
 }
 
-func (j *judges) scoreNumeric(ctx context.Context, settings rules.LLMPromptSettings, in EntryRun) (contract.Result, error) {
+func (j *judges) scoreNumeric(ctx context.Context, settings rules.CustomLLMScoreSettings, in EntryRun) (contract.Result, error) {
 	system := settings.Prompt + ". Always output a valid json for the function call"
 	arguments, fit, skipped, err := j.runPromptJudge(ctx, promptJudge{
 		settings: settings.LLMEvaluatorSettings,
@@ -189,7 +189,7 @@ func (j *judges) scoreAnswerMatch(ctx context.Context, settings rules.LLMAnswerM
 	question := entryText(in.Entry.Input)
 	fit := j.tokens.FitJudgeContent(rules.JudgeFitRequest{
 		Model:     settings.Model,
-		MaxTokens: settings.MaxTokens,
+		MaxTokens: settings.JudgeMaxTokens(),
 		Reserved:  []string{settings.Prompt, rules.AnswerMatchSignatureText},
 		Fields:    rules.JudgeFields{Input: &question, Output: in.Entry.Output, ExpectedOutput: in.Entry.ExpectedOutput},
 	})
