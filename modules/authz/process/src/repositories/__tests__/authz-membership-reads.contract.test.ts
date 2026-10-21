@@ -22,16 +22,18 @@ import { PostgresAuthzRepositories } from "../prisma/prisma.authz.repositories.t
 
 type MembershipRepositories = Pick<AuthzRepositories, "admissions" | "bindings" | "userStandings">;
 
+type MemberInput = {
+  pendingSsoGrantId?: string;
+  disabled?: boolean;
+  organizationId?: string;
+};
+
 type MembershipFixture = Readonly<{
   repositories: MembershipRepositories;
   organizationId: string;
   organizationName: string;
   foreignOrganizationId: string;
-  member: (input?: {
-    pendingSsoGrantId?: string;
-    disabled?: boolean;
-    organizationId?: string;
-  }) => Promise<string>;
+  member: (input?: MemberInput) => Promise<string>;
   team: (input: {
     name: string;
     personalFor?: string;
@@ -70,7 +72,7 @@ function memoryMembershipFixture(): MembershipFixture {
     organizationId,
     organizationName: "Members",
     foreignOrganizationId,
-    member: async ({ pendingSsoGrantId, disabled = false, organizationId: orgId } = {}) => {
+    member: async ({ pendingSsoGrantId, disabled = false, organizationId: orgId }: MemberInput = {}) => {
       const userId = id("user");
       memory.memberships.set(memory.membershipKey(orgId ?? organizationId, userId), {
         role: "MEMBER",
@@ -174,7 +176,7 @@ async function postgresMembershipFixture(): Promise<MembershipFixture> {
     organizationId,
     organizationName: "Members",
     foreignOrganizationId,
-    member: async ({ pendingSsoGrantId, disabled = false, organizationId: orgId } = {}) => {
+    member: async ({ pendingSsoGrantId, disabled = false, organizationId: orgId }: MemberInput = {}) => {
       const userId = id("user");
       await database.user.create({
         data: { id: userId, name: "Member", email: `${userId}@example.com` },

@@ -36,7 +36,10 @@ const HELD_ON_SIX = new Set([
 const MANIFEST_PATTERN =
   /^(package\.json|(apps|plugins|sdks|mcp|skills)\/[^/]+\/package\.json|packages\/(?:[^/]+\/)+package\.json|skills\/package\.json)$/;
 
-const SOURCE_PATTERN = /\.(c|m)?[jt]sx?$/;
+/** Platforms tsrs ships a binary for; elsewhere `tsc` runs the Go binary (ADR-181). */
+const TSRS_PLATFORMS = new Set(["darwin-arm64", "linux-x64", "linux-arm64"]);
+
+const SOURCE_PATTERN =/\.(c|m)?[jt]sx?$/;
 
 /**
  * A value import of the compiler's root export. `import type` is erased and
@@ -140,6 +143,19 @@ describe("given TypeScript 7 is the compiler", () => {
       );
       expect(local).toEqual([]);
     });
+
+    /** @scenario "The workspace compiler is the Rust port, with the Go binary one switch away" */
+    it.skipIf(!TSRS_PLATFORMS.has(`${process.platform}-${process.arch}`))(
+      "runs tsrs, and the Go binary under LANGWATCH_TSC=tsgo",
+      () => {
+      const tsc = resolve(REPO_ROOT, "node_modules/.bin/tsc");
+      const version = (env: NodeJS.ProcessEnv) =>
+        execFileSync(tsc, ["--version"], { cwd: REPO_ROOT, encoding: "utf8", env });
+
+      expect(version({ ...process.env, LANGWATCH_TSC: "" })).toContain("tsrs");
+      expect(version({ ...process.env, LANGWATCH_TSC: "tsgo" })).not.toContain("tsrs");
+    },
+    );
 
     /** @scenario "The superseded preview compiler is gone" */
     it("declares the native-preview package nowhere", () => {

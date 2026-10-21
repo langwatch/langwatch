@@ -50,10 +50,11 @@ type TsgoProcess struct {
 // @typescript/native-preview published it as `tsgo`, and typescript@7 renamed
 // it to `tsc` — the package picks the name (`lib/getExePath.js`:
 // `baseName === "typescript" ? "tsc" : "tsgo"`), and a local repo build still
-// produces `tsgo`, so both names stay live on real machines. One compiler is
-// one class with one set of limits: two classes would split the machine budget
-// in half and govern neither half of it.
-var typeScriptCompilerBinaries = []string{"tsc", "tsgo"}
+// produces `tsgo`, so both names stay live on real machines. `tsrs`, the Rust
+// port, is what the repo's `tsc` launcher runs (ADR-181). One compiler is one
+// class with one set of limits: separate classes would split the machine
+// budget and govern none of it.
+var typeScriptCompilerBinaries = []string{"tsc", "tsgo", "tsrs"}
 
 // TypeScriptCompilerClass is the single process class both compiler binaries
 // land in. Deliberately still spelled "tsgo" after the rename: the string is

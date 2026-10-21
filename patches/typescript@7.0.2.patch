@@ -1,19 +1,34 @@
 diff --git a/lib/tsc.js b/lib/tsc.js
-index eb869b715737e45fcf1af33d1af3157b59ba08de..bda11650f6b68415f9171710c74002a51350c9f0 100644
+index eb869b715737e45fcf1af33d1af3157b59ba08de..e49d31c13b3f13b2d91b51b6a104e23d278cfc67 100644
 --- a/lib/tsc.js
 +++ b/lib/tsc.js
-@@ -2,21 +2,142 @@
+@@ -2,21 +2,162 @@
  
  import getExePath from "#getExePath";
  import { execFileSync } from "node:child_process";
 +import { accessSync, constants, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
++import { createRequire } from "node:module";
 +import { homedir } from "node:os";
-+import { delimiter, join } from "node:path";
++import { delimiter, dirname, join } from "node:path";
++import { pathToFileURL } from "node:url";
  
- const exe = getExePath();
- 
--if (process.platform !== "win32" && typeof process.execve === "function") {
--    // > v22.15.0
+-const exe = getExePath();
++// LangWatch: `tsc` runs tsrs, the Rust port of this compiler (ADR-181). LANGWATCH_TSC=tsgo,
++// or a platform tsrs ships no binary for, runs the Go binary this package carries.
++async function tsrsExe() {
++    if (process.env.LANGWATCH_TSC === "tsgo") return undefined;
++    try {
++        const root = dirname(createRequire(import.meta.url).resolve("tsrs/package.json"));
++        return (await import(pathToFileURL(join(root, "lib", "getExePath.js")).href)).default();
++    }
++    catch {
++        return undefined;
++    }
++}
++
++const rust = await tsrsExe();
++const exe = rust ?? getExePath();
++
 +// LangWatch: a compile takes a `typecheck` slot of haven's machine budget for its whole
 +// run, and haven sets GOMAXPROCS and GOMEMLIMIT (dev/docs/plans/haven-exec-policy.md
 +// section 2). Without haven it waits for one of LANGWATCH_TSC_SLOTS (default 2) lock
@@ -21,6 +36,10 @@ index eb869b715737e45fcf1af33d1af3157b59ba08de..bda11650f6b68415f9171710c74002a5
 +const args = process.argv.slice(2);
 +const exempt = args.some((arg) => /^(-w|--watch|-v|--version|-h|--help|--lsp)$/.test(arg));
 +const held = process.env.RUSH_GATE_HELD || process.env.CHECK_QUEUE_HELD || process.env.LANGWATCH_TSC_SLOT;
++// tsrs ignores GOMAXPROCS; its checker threads take the same cap as a flag.
++if (rust && !exempt && !args.some((arg) => /^--(checkers|singleThreaded)$/.test(arg))) {
++    args.push("--checkers", process.env.GOMAXPROCS ?? "2");
++}
 +const canExec = process.platform !== "win32" && typeof process.execve === "function";
 +
 +function findBin(name, override) {
@@ -66,7 +85,9 @@ index eb869b715737e45fcf1af33d1af3157b59ba08de..bda11650f6b68415f9171710c74002a5
 +
 +process.env.GOMAXPROCS ??= "2";
 +process.env.GOMEMLIMIT ??= "3GiB";
-+
+ 
+-if (process.platform !== "win32" && typeof process.execve === "function") {
+-    // > v22.15.0
 +const slots = Number(process.env.LANGWATCH_TSC_SLOTS ?? "2");
 +const slotDir = join(homedir(), ".cache", "langwatch", "tsc-slots");
 +
