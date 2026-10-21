@@ -6,6 +6,7 @@ import {
   type Authorization,
   type AuthorizationGrant,
   internalActor,
+  type ProofBearingPermission,
   sealAuthorization,
 } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
@@ -19,27 +20,30 @@ const TEST_PROOF_LIFETIME_MS = 5 * 60 * 1000;
 export type TestSharedWindow = { projectId: string; from: number; until?: number };
 
 /**
- * A proof whose own grant is `projectId`, plus one shared trace grant per member window. It
+ * A proof whose own grant is `projectId`, plus one shared trace grant per member window, minted
+ * for `permission` (a series' `analytics:view` unless a cost read asks for `cost:view`). It
  * lives five minutes unless `expiresAt` says otherwise.
  */
 export function analyticsProof({
   projectId,
   shared = [],
+  permission = "analytics:view",
   expiresAt = nowInstant().epochMilliseconds + TEST_PROOF_LIFETIME_MS,
 }: {
   projectId: string;
   shared?: readonly TestSharedWindow[];
+  permission?: ProofBearingPermission;
   expiresAt?: number;
 }): Authorization {
   const own: AuthorizationGrant = {
     projectId,
-    permissions: ["analytics:view"],
+    permissions: [permission],
     via: [],
     kind: "own",
   };
   const members: AuthorizationGrant[] = shared.map((window) => ({
     projectId: window.projectId,
-    permissions: ["analytics:view"],
+    permissions: [permission],
     via: [],
     kind: "shared",
     condition: { type: "trace", from: window.from, until: window.until ?? null },

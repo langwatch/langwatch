@@ -3062,6 +3062,14 @@ const presentations = {
   },
 
   // ---- analytics ----
+  analytics_aggregate_unattended_read: {
+    // A scheduled report or alert runs with no person behind it, so there is
+    // no grant to read the member projects through. The chart still works
+    // when someone opens it.
+    title: "Reports and alerts aren't available on a group project yet",
+    describe: () =>
+      "Open the chart on the group project to see it, or set the report or alert up on a member project.",
+  },
   analytics_series_percentage_unsupported: {
     // A percentage is the series divided by the same measurement without the
     // series' own filters. A per-entity measurement (average per user, sum per

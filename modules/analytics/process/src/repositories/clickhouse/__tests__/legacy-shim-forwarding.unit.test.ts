@@ -59,7 +59,6 @@ function makeQuery(overrides: Partial<AnalyticsTimeseriesInput> = {}): Analytics
 
 describe("ClickHouseAnalyticsRepository", () => {
   const repository = ClickHouseAnalyticsRepository.create({
-    resolveClient: async () => fakeClient as any,
     clickhouse: fakeClient as any,
   });
 

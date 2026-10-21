@@ -31,12 +31,13 @@ export type ClickHouseClientResolver = (tenantId: string) => Promise<ClickHouseQ
 
 /**
  * What a reader may be asked for: the proof-bearing permission each one needs, and the resource
- * a shared grant's window must apply to for that grant to open rows of it. Both read trace rows,
- * so both take a `trace` window.
+ * a shared grant's window must apply to for that grant to open rows of it. All three read trace
+ * rows, so all take a `trace` window; `cost` is the cost-gated analytics reads (ADR-177 v4.15).
  */
 const READ_RESOURCES = {
   traces: { permission: "traces:view", condition: "trace" },
   analytics: { permission: "analytics:view", condition: "trace" },
+  cost: { permission: "cost:view", condition: "trace" },
 } as const satisfies Record<
   string,
   { permission: ProofBearingPermission; condition: AuthorizationConditionType }

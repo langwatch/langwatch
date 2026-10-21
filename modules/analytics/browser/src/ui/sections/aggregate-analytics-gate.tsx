@@ -7,8 +7,8 @@ import type { ComponentType } from "react";
 import { useAnalyticsHost } from "../../model/analytics-host.ts";
 
 /**
- * The page an analytics address renders on an aggregate project (ADR-177): the heading and a
- * notice pointing at the Trace Explorer, in place of a body whose charts would each say "No data".
+ * The page a one-project analytics address renders on an aggregate (ADR-177 v4.15): the heading
+ * and a notice pointing at the Trace Explorer, in place of a body that cannot add members up.
  */
 function AggregateAnalyticsPage({ title, projectSlug }: { title: string; projectSlug: string }) {
   return (
@@ -19,14 +19,14 @@ function AggregateAnalyticsPage({ title, projectSlug }: { title: string; project
       <PageLayout.Container>
         <Banner
           status="info"
-          title="Analytics across member projects is not available yet"
+          title="This page shows one project at a time"
           action={
             <BannerAction asChild>
               <Link href={`/${projectSlug}/traces`}>Open Trace Explorer</Link>
             </BannerAction>
           }
         >
-          Open Trace Explorer to see member traces.
+          Open a member project to see it here, or Trace Explorer to see member traces.
         </Banner>
       </PageLayout.Container>
     </>
@@ -34,8 +34,8 @@ function AggregateAnalyticsPage({ title, projectSlug }: { title: string; project
 }
 
 /**
- * Renders an analytics screen on every project but an aggregate, whose analytics do not read
- * across members yet. The screen never mounts there, so none of its queries run.
+ * Renders an analytics screen on every project but an aggregate, for a screen whose subject is
+ * kept inside one project (Topics). The screen never mounts there, so none of its queries run.
  */
 export function withAggregateAnalyticsGate<P extends object>(
   title: string,

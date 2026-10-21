@@ -15,7 +15,8 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { ClickHouseAnalyticsSessionsRepository } from "../../repositories/clickhouse/clickhouse.analytics-sessions.repository.ts";
+import { analyticsProof } from "../../repositories/__tests__/analytics-proof.fixture.ts";
+import { FilterOptionsClickHouseRepository } from "../../repositories/clickhouse/clickhouse.filter-options.repository.ts";
 import { MemoryAnalyticsRepositories } from "../../repositories/memory/memory.analytics.repositories.ts";
 import { AnalyticsModule } from "../analytics.app.ts";
 
@@ -47,7 +48,7 @@ async function appOver() {
     channels: { judge: createApiFixture<InstantEvalApi>() },
     repositories: {
       ...MemoryAnalyticsRepositories.create(),
-      sessions: ClickHouseAnalyticsSessionsRepository.create(clickhouse),
+      filterOptions: FilterOptionsClickHouseRepository.create({ clickhouse }),
     },
     config: {
       langwatchQl: {
@@ -75,16 +76,20 @@ describe("AnalyticsModule.filterOptions", () => {
     it("asks Trace to translate the other filters, leaving out the field being picked", async () => {
       const { app, translateLegacyFilters } = await appOver();
 
-      await app.filterOptions({
-        projectId: "project-1",
-        field: "metadata.user_id",
-        startDate: 1,
-        endDate: 2,
-        filters: { "metadata.user_id": ["u-1"], "traces.error": ["true"] },
-      });
+      await app.filterOptions(
+        {
+          projectId: "project-1",
+          field: "metadata.user_id",
+          startDate: 1,
+          endDate: 2,
+          filters: { "metadata.user_id": ["u-1"], "traces.error": ["true"] },
+        },
+        { authorization: analyticsProof({ projectId: "project-1" }) },
+      );
 
       expect(translateLegacyFilters).toHaveBeenCalledWith({
         filters: { "traces.error": ["true"] },
+        fenced: true,
       });
     });
 
@@ -92,13 +97,16 @@ describe("AnalyticsModule.filterOptions", () => {
     it("scopes the options query by Trace's conditions and their bound parameters", async () => {
       const { app, statements } = await appOver();
 
-      await app.filterOptions({
-        projectId: "project-1",
-        field: "metadata.user_id",
-        startDate: 1,
-        endDate: 2,
-        filters: { "traces.error": ["true"] },
-      });
+      await app.filterOptions(
+        {
+          projectId: "project-1",
+          field: "metadata.user_id",
+          startDate: 1,
+          endDate: 2,
+          filters: { "traces.error": ["true"] },
+        },
+        { authorization: analyticsProof({ projectId: "project-1" }) },
+      );
 
       expect(statements.at(0)?.sql).toContain("ts.ContainsErrorStatus = true");
       expect(statements.at(0)?.params).toMatchObject({ scope_f0_values: ["otlp2"] });

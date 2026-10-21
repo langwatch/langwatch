@@ -99,7 +99,6 @@ function readCost(authorization: Authorization): Promise<AnalyticsTimeseriesResu
 beforeAll(async () => {
   client = (await startMigratedClickHouse()).client;
   repository = ClickHouseAnalyticsRepository.create({
-    resolveClient: async () => client,
     clickhouse: clickHouseQueryClientOver(client),
   });
   await client.insert({

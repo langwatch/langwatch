@@ -44,7 +44,9 @@ Feature: An aggregate project reads its member projects
     Given a project-reader grant from an aggregate to a member project
     When the grant is asked for traces manage, project manage or prompts view
     Then each is denied
-    And traces view and analytics view are allowed
+    And traces view, analytics view and cost view are allowed
+    # Cost view lets a cost read reach the members. Whether the viewer sees cost
+    # is still their own cost view on the aggregate.
 
   @integration
   Scenario: Revoking a shared grant keeps its row
@@ -322,9 +324,8 @@ Feature: An aggregate project reads its member projects
   @integration
   Scenario: Test, Build and Online Evals are hidden on the aggregate
     When ana opens the aggregate project
-    Then the navigation shows Traces
-    And Analytics, Prompts, Experiments and Online Evaluations are absent
-    # Analytics leaves the navigation until analytics across members ships.
+    Then the navigation shows Traces and Analytics
+    And Dashboards, Prompts, Experiments and Online Evaluations are absent
     And Quick Search offers the same pages as the navigation and no action that creates data
     And no monitor can be created on the aggregate
 
@@ -598,13 +599,61 @@ Feature: An aggregate project reads its member projects
     Then the check's runs on the members' traces inside their windows are counted
     And the runs of another check and the non-member's runs are not
 
-  # Unimplemented: every timeseries table now reads members through the proof, but the
-  # analytics page stays hidden on an aggregate until its screens are opened up.
-  @integration @unimplemented
+  @integration
   Scenario: Analytics aggregate across members
     Given an aggregate project with two members each holding traces
     When ana opens the aggregate's analytics
     Then the counts cover both members' traces
+
+  @integration
+  Scenario: The aggregate's filter pickers offer member values inside their windows
+    Given an aggregate project with one member shared for its whole history
+    And a second member shared only from a point in time
+    And another project in the organisation that is not a member
+    When the aggregate's filter picker lists trace, span and evaluator values under its proof
+    Then it offers the first member's values and the second member's from the point its grant starts
+    And it offers none of the non-member's values
+
+  @integration
+  Scenario: The aggregate's top documents and feedbacks read members inside their windows
+    Given an aggregate project with one member shared for its whole history
+    And a second member shared only from a point in time
+    And another project in the organisation that is not a member
+    When the aggregate's top documents and feedbacks are read under its cost view proof
+    Then they cover the first member and the second member from the point its grant starts
+    And none of the non-member's documents or feedbacks
+
+  @integration
+  Scenario: The aggregate hides the views that only make sense inside one project
+    Given an aggregate project
+    When ana opens its analytics
+    Then the Topics view is not offered
+    And the evaluations page shows the overall health and pass or fail trend cards
+    And no card for a single monitor, since no monitor runs on member traces
+    And an ordinary project still shows its topics and per-monitor cards
+
+  @unit
+  Scenario: A scheduled report or a graph alert on an aggregate is refused by name
+    Given an aggregate project
+    When a scheduled report or a graph alert reads a series with no viewer
+    Then it is refused because the project is an aggregate
+    And no series is read
+    # Allowing them needs a decision on whose permission the read runs under.
+    # Until then the refusal stops a report that would say zero.
+
+  @unit
+  Scenario: A chart on the aggregate waits for each member's share
+    Given an aggregate project reading two members
+    When a chart on the aggregate runs
+    Then it holds one slot of the aggregate's bound and one of each member's
+    And it takes them in one sorted order, so two charts never wait on each other
+    And a plain project's chart holds only its own slot
+
+  @unit
+  Scenario: A chart on an aggregate with too many members is refused before any read
+    Given an aggregate project reading more members than the LangWatchQL member cap
+    When a chart on the aggregate runs
+    Then it is refused by name before any read
 
   @integration
   Scenario: The owner's existing evaluation results show on a member trace
@@ -821,11 +870,10 @@ Feature: An aggregate project reads its member projects
     And managing the aggregate itself stays available
 
   @integration
-  Scenario: A direct link to the aggregate's analytics says it is not available yet
+  Scenario: A direct link to the aggregate's analytics opens the page
     Given an aggregate project
-    When ana opens a link to its analytics, LLM metrics, topics, users, online evaluations, reports or custom graph page
-    Then the page shows its heading and says "Analytics across member projects is not available yet. Open Trace Explorer to see member traces."
-    And it draws no chart and runs no analytics query
+    When ana opens a link to its analytics, LLM metrics, users, online evaluations, reports or custom graph page
+    Then the page draws its charts over the members
     And it shows no saved views bar, so no view can be edited, renamed or deleted from it, and reads no saved views
     And an ordinary project's analytics still show the saved views bar
 

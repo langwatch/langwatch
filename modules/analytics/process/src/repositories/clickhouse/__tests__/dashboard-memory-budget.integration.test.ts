@@ -449,17 +449,12 @@ describe("dashboard panels under a memory cap", () => {
     /** @scenario The documents panel reads only the RAG contexts attribute */
     it("answers within the cap with the exact distinct document total", async () => {
       resetParamCounter();
-      const query = buildTopDocumentsQuery({
-        projectId: TENANT_ID,
-        startDate: start,
-        endDate: end,
-        filters: {},
-      });
+      const query = buildTopDocumentsQuery({ startDate: start, endDate: end, filters: {} });
       const rows = await runCapped<{
         documentId: string;
         count: string;
         total: string;
-      }>(ch, query);
+      }>(ch, { ...query, fenced: true });
       expect(rows).toHaveLength(10);
       expect(Number(rows[0]?.total)).toBe(RAG_DOCUMENT_COUNT);
       expect(Number(rows[0]?.count)).toBeGreaterThan(0);

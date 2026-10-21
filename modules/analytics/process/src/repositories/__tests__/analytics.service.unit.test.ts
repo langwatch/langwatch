@@ -32,13 +32,17 @@ const tenantLimiter = ({ maxConcurrent = 4 }: { maxConcurrent?: number } = {}) =
     overloadErrorFactory: { create: ({ cause }: { cause: unknown }) => cause },
   });
 
+/** A cost-gated read's proof for the one project these reads ask about. */
+const COST = {
+  authorization: analyticsProof({ projectId: "project-1", permission: "cost:view" }),
+};
+
 const serviceOver = (options: {
   resolveClient: (tenantId: string) => Promise<ClickHouseClient | null>;
   clickhouseEnabled: boolean;
 }): AnalyticsService =>
   AnalyticsService.create({
     repository: ClickHouseAnalyticsRepository.create({
-      resolveClient: options.resolveClient,
       clickhouse: clickHouseQueryClientOver(options.resolveClient),
     }),
     evaluationRepository: options.clickhouseEnabled
@@ -196,9 +200,57 @@ describe("AnalyticsService", () => {
     const service = createService(new RecordingRepository(), limiter);
 
     await service.getTimeseries(input());
-    await service.getTopUsedDocuments({ projectId: "project-1", startDate: 0, endDate: 1 });
+    await service.getTopUsedDocuments({ projectId: "project-1", startDate: 0, endDate: 1 }, COST);
 
     expect(run.mock.calls.map(([call]) => call.tenantId)).toEqual(["project-1", "project-1"]);
+  });
+
+  describe("given an aggregate whose proof opens two members", () => {
+    const aggregateProof = (permission: "analytics:view" | "cost:view" = "analytics:view") =>
+      analyticsProof({
+        projectId: "project-1",
+        permission,
+        shared: [
+          { projectId: "member-b", from: 0 },
+          { projectId: "member-a", from: 0 },
+        ],
+      });
+
+    /** @scenario "A chart on the aggregate waits for each member's share" */
+    it("takes the aggregate's slot and each member's, in one sorted order", async () => {
+      const limiter = tenantLimiter({ maxConcurrent: 1 });
+      const run = vi.spyOn(limiter, "run");
+      const service = createService(new RecordingRepository(), limiter);
+
+      await service.getTimeseries(input(), { authorization: aggregateProof() });
+      await service.getTopUsedDocuments(
+        { projectId: "project-1", startDate: 0, endDate: 1 },
+        { authorization: aggregateProof("cost:view") },
+      );
+
+      const order = ["member-a", "member-b", "project-1"];
+      expect(run.mock.calls.map(([call]) => call.tenantId)).toEqual([...order, ...order]);
+    });
+
+    /** @scenario "A chart on an aggregate with too many members is refused before any read" */
+    it("refuses a read over more members than the cap before it queues", async () => {
+      const repository = new RecordingRepository();
+      const limiter = tenantLimiter();
+      const run = vi.spyOn(limiter, "run");
+      const service = AnalyticsService.create({
+        repository,
+        evaluationRepository: NullAnalyticsEvaluationRepository.create(),
+        authz: analyticsTestAuthz(),
+        tenantLimiter: limiter,
+        maxMembers: 1,
+      });
+
+      await expect(
+        service.getTimeseries(input(), { authorization: aggregateProof() }),
+      ).rejects.toMatchObject({ code: "lwql_too_many_members" });
+      expect(run).not.toHaveBeenCalled();
+      expect(repository.queries).toHaveLength(0);
+    });
   });
 
   /** @scenario "Unsafe query shapes use the legacy trace table" */
@@ -319,28 +371,36 @@ describe("AnalyticsService", () => {
     const filters = { "metadata.user_id": ["user-1"] };
 
     await expect(
-      service.getFeedbacks({
-        projectId: "project-1",
-        startDate: 10,
-        endDate: 20,
-        filters,
-      }),
+      service.getFeedbacks(
+        {
+          projectId: "project-1",
+          startDate: 10,
+          endDate: 20,
+          filters,
+        },
+        COST,
+      ),
     ).resolves.toEqual({ events: [] });
     await expect(
-      service.getTopUsedDocuments({
-        projectId: "project-1",
-        startDate: 10,
-        endDate: 20,
-        filters,
-      }),
+      service.getTopUsedDocuments(
+        {
+          projectId: "project-1",
+          startDate: 10,
+          endDate: 20,
+          filters,
+        },
+        COST,
+      ),
     ).resolves.toEqual({ topDocuments: [], totalUniqueDocuments: 0 });
     expect(repository.lastFeedbackInput).toEqual({
+      authorization: COST.authorization,
       projectId: "project-1",
       startDate: 10,
       endDate: 20,
       filters,
     });
     expect(repository.lastDocumentsInput).toEqual({
+      authorization: COST.authorization,
       projectId: "project-1",
       startDate: 10,
       endDate: 20,
@@ -360,10 +420,16 @@ describe("AnalyticsService", () => {
       query: "refund",
       negateFilters: true,
     };
-    const expected = { projectId: "project-1", startDate: 10, endDate: 20, filters: {} };
+    const expected = {
+      authorization: COST.authorization,
+      projectId: "project-1",
+      startDate: 10,
+      endDate: 20,
+      filters: {},
+    };
 
-    await expect(service.getFeedbacks(toolbarRead)).resolves.toEqual({ events: [] });
-    await expect(service.getTopUsedDocuments(toolbarRead)).resolves.toEqual({
+    await expect(service.getFeedbacks(toolbarRead, COST)).resolves.toEqual({ events: [] });
+    await expect(service.getTopUsedDocuments(toolbarRead, COST)).resolves.toEqual({
       topDocuments: [],
       totalUniqueDocuments: 0,
     });
@@ -410,12 +476,15 @@ describe("AnalyticsService", () => {
     });
 
     await expect(
-      service.getFeedbacks({
-        projectId: "project-1",
-        startDate: 10,
-        endDate: 20,
-        filters: {},
-      }),
+      service.getFeedbacks(
+        {
+          projectId: "project-1",
+          startDate: 10,
+          endDate: 20,
+          filters: {},
+        },
+        COST,
+      ),
     ).resolves.toEqual({
       events: [
         {
@@ -434,12 +503,15 @@ describe("AnalyticsService", () => {
       ],
     });
     await expect(
-      service.getTopUsedDocuments({
-        projectId: "project-1",
-        startDate: 10,
-        endDate: 20,
-        filters: {},
-      }),
+      service.getTopUsedDocuments(
+        {
+          projectId: "project-1",
+          startDate: 10,
+          endDate: 20,
+          filters: {},
+        },
+        COST,
+      ),
     ).resolves.toEqual({
       topDocuments: [{ documentId: "doc-1", count: 3, traceId: "trace-1", content: "hello" }],
       totalUniqueDocuments: 7,

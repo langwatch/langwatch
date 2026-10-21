@@ -1,3 +1,5 @@
+import { tenantScope } from "@langwatch/clickhouse-client";
+
 import type { FilterOption } from "../filter-options.repository.ts";
 import type { ClickHouseFilterQueryParams } from "./clickhouse.filter-shapes.mapper.ts";
 
@@ -13,11 +15,13 @@ export const ATTRIBUTE_KEYS = {
 } as const;
 
 /**
- * Build common WHERE conditions for trace_summaries queries.
+ * Build common WHERE conditions for trace_summaries queries. Each table's helper writes the
+ * fence marker on its own time column, so a picker reads its tenants from the route's proof
+ * (ADR-177): an aggregate's members inside their windows, a plain project itself.
  */
 export function buildTraceSummariesConditions(_params: ClickHouseFilterQueryParams): string {
   const conditions: string[] = [
-    "TenantId = {tenantId:String}",
+    tenantScope("OccurredAt"),
     "OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})",
     "OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})",
   ];
@@ -29,7 +33,7 @@ export function buildTraceSummariesConditions(_params: ClickHouseFilterQueryPara
  */
 export function buildStoredSpansConditions(_params: ClickHouseFilterQueryParams): string {
   const conditions: string[] = [
-    "TenantId = {tenantId:String}",
+    tenantScope("StartTime"),
     "StartTime >= fromUnixTimestamp64Milli({startDate:UInt64})",
     "StartTime <= fromUnixTimestamp64Milli({endDate:UInt64})",
   ];
@@ -41,7 +45,7 @@ export function buildStoredSpansConditions(_params: ClickHouseFilterQueryParams)
  */
 export function buildEvaluationRunsConditions(_params: ClickHouseFilterQueryParams): string {
   const conditions: string[] = [
-    "TenantId = {tenantId:String}",
+    tenantScope("ScheduledAt"),
     "ScheduledAt >= fromUnixTimestamp64Milli({startDate:UInt64})",
     "ScheduledAt <= fromUnixTimestamp64Milli({endDate:UInt64})",
   ];

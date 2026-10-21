@@ -1,6 +1,6 @@
 /**
- * A ClickHouse refusal is translated once on every analytics read, through the per-tenant
- * session or the proof's fenced reader: a memory-limit error reaches the panel as the handled
+ * A ClickHouse refusal is translated once on every analytics read through the proof's fenced
+ * reader: a memory-limit error reaches the panel as the handled
  * `query_memory_exceeded` with its copy, not as an unknown 500.
  */
 import { ClickHouseQueryClient, type QueryDriver, TenantGuard } from "@langwatch/clickhouse-client";
@@ -8,7 +8,6 @@ import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import { analyticsProof } from "../../__tests__/analytics-proof.fixture.ts";
-import { ClickHouseAnalyticsSessionsRepository } from "../clickhouse.analytics-sessions.repository.ts";
 import { ClickHouseAnalyticsRepository } from "../clickhouse.analytics.repository.ts";
 
 /** The error `@clickhouse/client` raises when a statement passes its memory limit. */
@@ -23,11 +22,7 @@ function memoryLimitExceeded(): Error {
 
 function repositoryOver(driver: QueryDriver) {
   const clickhouse = new ClickHouseQueryClient({ tenantGuard: new TenantGuard(), driver });
-  const sessions = ClickHouseAnalyticsSessionsRepository.create(clickhouse);
-  return ClickHouseAnalyticsRepository.create({
-    resolveClient: (tenantId) => sessions.resolve(tenantId),
-    clickhouse,
-  });
+  return ClickHouseAnalyticsRepository.create({ clickhouse });
 }
 
 const failingWith = (error: () => Error): QueryDriver => ({
@@ -36,7 +31,13 @@ const failingWith = (error: () => Error): QueryDriver => ({
   command: () => Promise.reject(error()),
 });
 
-const readInput = { projectId: "project-1", startDate: 0, endDate: 1_000, filters: {} };
+const readInput = {
+  authorization: analyticsProof({ projectId: "project-1", permission: "cost:view" }),
+  projectId: "project-1",
+  startDate: 0,
+  endDate: 1_000,
+  filters: {},
+};
 
 describe("ClickHouseAnalyticsRepository", () => {
   describe("when ClickHouse refuses a panel read with a memory-limit error", () => {

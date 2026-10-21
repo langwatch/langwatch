@@ -4,6 +4,7 @@
  * never read from a session, so one operation serves a browser, an API key, or a background job.
  */
 import {
+  AggregateUnattendedReadError,
   analyticsServerConfig,
   type AnalyticsServerConfig,
   AnalyticsApi as AnalyticsApiToken,
@@ -14,6 +15,7 @@ import {
   type AnalyticsFilterOption,
   type AnalyticsMetricSource,
   type AnalyticsReadInput,
+  type CostReadOptions,
   type AnalyticsTimeseriesInput,
   type AnalyticsTimeseriesReadOptions,
   type AnalyticsTimeseriesResult,
@@ -60,7 +62,7 @@ import { InProcessTenantStatementLimiter } from "@langwatch/limiter";
 import { createLogger } from "@langwatch/observability";
 import type { FeatureSetup } from "@langwatch/process";
 import { OverloadedRefusal, StatementBoundTelemetry } from "@langwatch/process-stores";
-import { ProjectApi } from "@langwatch/project-contract";
+import { isAggregateProjectKind, ProjectApi } from "@langwatch/project-contract";
 import { Secret } from "@langwatch/secrets";
 import { toEpochMs, type Instant } from "@langwatch/time";
 import { TraceApi, type Trace, TRACE_FILTER_EXAMPLES } from "@langwatch/trace-contract";
@@ -85,7 +87,6 @@ import type {
   LangWatchQlSupply,
 } from "../repositories/analytics.repositories.ts";
 import type { EvaluationAnalyticsClickHouseClient } from "../repositories/clickhouse/clickhouse.analytics-persistence.repository.ts";
-import { FilterOptionsClickHouseRepository } from "../repositories/clickhouse/clickhouse.filter-options.repository.ts";
 import { ClickHouseLangWatchQLExecutorRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-executor.repository.ts";
 import { LwqlKeyMapClickHouseRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-key-map.repository.ts";
 import { ClickHouseLangWatchQLProvisioningRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts";
@@ -164,6 +165,7 @@ type AnalyticsFilterOptionsLookup = Readonly<{
       startDate: number;
       endDate: number;
       scope?: { conditions: string[]; params: Record<string, unknown> };
+      authorization: Authorization;
     }>,
   ): Promise<AnalyticsFilterOption[]>;
 }>;
@@ -429,6 +431,7 @@ export class AnalyticsModule
         telemetry: new StatementBoundTelemetry(),
         overloadErrorFactory: new OverloadedRefusal(),
       }),
+      maxMembers: setup.config.langwatchQl.aggregateMaxMembers,
       tripwire: LoggingAnalyticsTripwireService.create({
         isEnabled: (projectId) =>
           setup.dependencies.featureFlags.isEnabled(ANALYTICS_READ_TRIPWIRE_FLAG, {
@@ -494,9 +497,7 @@ export class AnalyticsModule
       {
         analytics,
         hydration,
-        filterOptions: FilterService.create({
-          repository: FilterOptionsClickHouseRepository.create({ resolveClient }),
-        }),
+        filterOptions: FilterService.create({ repository: setup.repositories.filterOptions }),
         langWatchQL,
         featureFlags: setup.dependencies.featureFlags,
         authz: setup.dependencies.authz,
@@ -586,29 +587,46 @@ export class AnalyticsModule
     return this.#dependencies.lwqlKeyMap.syncProject(input);
   }
 
-  /** The series behind every analytics chart and every dashboard graph card. */
-  getTimeseries(
+  /**
+   * The series behind every analytics chart and every dashboard graph card. A read with no
+   * proof (a scheduled report, a graph alert) on an aggregate is refused by name before any
+   * read: it would count the aggregate's own empty tenant and say zero (ADR-177 v4.15).
+   */
+  async getTimeseries(
     input: AnalyticsTimeseriesInput,
     options?: AnalyticsTimeseriesReadOptions,
   ): Promise<AnalyticsTimeseriesResult> {
+    if (!options?.authorization) {
+      const project = await this.#dependencies.projects.findById(input.projectId);
+      if (project && isAggregateProjectKind(project.kind)) {
+        throw new AggregateUnattendedReadError();
+      }
+    }
     return this.#dependencies.analytics.getTimeseries(input, options);
   }
 
   /** The retrieval documents a project's traces cite most. */
-  getTopUsedDocuments(input: AnalyticsReadInput): Promise<AnalyticsTopDocumentsResult> {
-    return this.#dependencies.analytics.getTopUsedDocuments(input);
+  getTopUsedDocuments(
+    input: AnalyticsReadInput,
+    options: CostReadOptions,
+  ): Promise<AnalyticsTopDocumentsResult> {
+    return this.#dependencies.analytics.getTopUsedDocuments(input, options);
   }
 
   /** The thumbs and comments left on the project's messages. */
-  getFeedbacks(input: AnalyticsReadInput): Promise<AnalyticsFeedbacksResult> {
-    return this.#dependencies.analytics.getFeedbacks(input);
+  getFeedbacks(
+    input: AnalyticsReadInput,
+    options: CostReadOptions,
+  ): Promise<AnalyticsFeedbacksResult> {
+    return this.#dependencies.analytics.getFeedbacks(input, options);
   }
 
   /** The same feedbacks, newest first, one bounded page at a time. */
   getFeedbacksPage(
     input: AnalyticsReadInput & AnalyticsFeedbacksPageParams,
+    options: CostReadOptions,
   ): Promise<AnalyticsFeedbacksPageResult> {
-    return this.#dependencies.analytics.getFeedbacksPage(input);
+    return this.#dependencies.analytics.getFeedbacksPage(input, options);
   }
 
   /**
@@ -616,7 +634,10 @@ export class AnalyticsModule
    * — never by the field's own selection, or the picker could only re-offer what's already
    * chosen. Forgetting this exclusion wouldn't fail; it would quietly narrow the answer.
    */
-  filterOptions(request: AnalyticsFilterOptionsRequest): Promise<AnalyticsFilterOption[]> {
+  filterOptions(
+    request: AnalyticsFilterOptionsRequest,
+    { authorization }: { authorization: Authorization },
+  ): Promise<AnalyticsFilterOption[]> {
     if (filterFieldRequiresKey(request.field) && !request.key) {
       throw new ValidationError(`Field ${request.field} requires a key to be defined`);
     }
@@ -626,8 +647,12 @@ export class AnalyticsModule
     const scopeFilters = Object.fromEntries(
       Object.entries(request.filters ?? {}).filter(([name]) => name !== request.field),
     );
-    // Trace owns the filter grammar because it owns the tables the scope reads.
-    const scope = this.#dependencies.traces.translateLegacyFilters({ filters: scopeFilters });
+    // Trace owns the filter grammar because it owns the tables the scope reads. The picker
+    // reads through the proof's fence, so the scope names no tenant of its own.
+    const scope = this.#dependencies.traces.translateLegacyFilters({
+      filters: scopeFilters,
+      fenced: true,
+    });
 
     return this.#dependencies.filterOptions.getFilterOptions({
       projectId: request.projectId,
@@ -638,6 +663,7 @@ export class AnalyticsModule
       startDate: request.startDate,
       endDate: request.endDate,
       scope,
+      authorization,
     });
   }
 
