@@ -18,7 +18,7 @@ const bodyOf = (width: "default" | "fill" | "narrow") => {
 };
 
 describe("page body widths", () => {
-  /** @scenario A narrow page body is one centred reading column */
+  /** @scenario "A narrow page body is one centred reading column" */
   it("caps a narrow body at the reading measure plus the page inset, centred", () => {
     const style = bodyOf("narrow");
 
