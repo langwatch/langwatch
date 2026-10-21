@@ -272,6 +272,7 @@ describe("given a Reports board and a Dashboards board holding a widget", () => 
     });
 
     /** @scenario "AC199n Split: the public API creates and deletes Dashboards boards" */
+    /** @scenario "A Langy key's delete card names the key owner's own Only me records" */
     it("names its owner's Only me board on a Langy key's card, and nobody else's", async () => {
       const { app } = await projectWithBothBoards();
       const owner = { userId: "user-2" };

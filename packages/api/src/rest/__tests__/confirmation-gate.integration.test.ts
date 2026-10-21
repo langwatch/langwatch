@@ -307,6 +307,7 @@ beforeEach(() => {
 
 describe("a route marked as removing something", () => {
   describe("when a Langy session key calls it with no click", () => {
+    /** @scenario "A Langy key's delete card names the key owner's own Only me records" */
     it("refuses with langy_confirmation_required before the handler runs", async () => {
       const answer = await call({
         gate: gateFor([]),

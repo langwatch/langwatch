@@ -150,7 +150,8 @@ export class PrismaBoardRepository
     const { projectId, dashboardId } = input;
     return this.transaction(async (transaction) => {
       // First, so an id only Reports holds is refused before anything else is touched.
-      // P2025 is a second delete that raced this one to the same row.
+      // P2025: no DashboardsV2 row matched (unknown id, another project, a Reports-only id,
+      // or a second delete that raced this one).
       const board = await transaction.dashboardsV2
         .delete({ where: { id: dashboardId, projectId } })
         .catch((error: unknown) => {
