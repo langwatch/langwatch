@@ -4,6 +4,7 @@
  * never read from a session, so one operation serves a browser, an API key, or a background job.
  */
 import {
+  AggregateUnattendedReadError,
   analyticsServerConfig,
   type AnalyticsServerConfig,
   AnalyticsApi as AnalyticsApiToken,
@@ -61,7 +62,7 @@ import { InProcessTenantStatementLimiter } from "@langwatch/limiter";
 import { createLogger } from "@langwatch/observability";
 import type { FeatureSetup } from "@langwatch/process";
 import { OverloadedRefusal, StatementBoundTelemetry } from "@langwatch/process-stores";
-import { ProjectApi } from "@langwatch/project-contract";
+import { isAggregateProjectKind, ProjectApi } from "@langwatch/project-contract";
 import { Secret } from "@langwatch/secrets";
 import { toEpochMs, type Instant } from "@langwatch/time";
 import { TraceApi, type Trace, TRACE_FILTER_EXAMPLES } from "@langwatch/trace-contract";
@@ -585,11 +586,21 @@ export class AnalyticsModule
     return this.#dependencies.lwqlKeyMap.syncProject(input);
   }
 
-  /** The series behind every analytics chart and every dashboard graph card. */
-  getTimeseries(
+  /**
+   * The series behind every analytics chart and every dashboard graph card. A read with no
+   * proof (a scheduled report, a graph alert) on an aggregate is refused by name before any
+   * read: it would count the aggregate's own empty tenant and say zero (ADR-177 v4.15).
+   */
+  async getTimeseries(
     input: AnalyticsTimeseriesInput,
     options?: AnalyticsTimeseriesReadOptions,
   ): Promise<AnalyticsTimeseriesResult> {
+    if (!options?.authorization) {
+      const project = await this.#dependencies.projects.findById(input.projectId);
+      if (project && isAggregateProjectKind(project.kind)) {
+        throw new AggregateUnattendedReadError();
+      }
+    }
     return this.#dependencies.analytics.getTimeseries(input, options);
   }
 
