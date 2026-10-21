@@ -2,8 +2,15 @@ import dns, { type LookupAddress } from "node:dns";
 import { isIP } from "node:net";
 
 import { createLogger } from "@langwatch/observability";
-import { Agent, type Response as FetchResponse, fetch as undiciFetch } from "undici";
+import {
+  Agent,
+  type Dispatcher,
+  type Response as FetchResponse,
+  ProxyAgent,
+  fetch as undiciFetch,
+} from "undici";
 
+import { type OutboundProxyConfig, resolveProxyForHost } from "../proxy/outbound-proxy.ts";
 import { classify } from "./address.ts";
 import {
   redactUrlForLog,
@@ -21,6 +28,12 @@ import {
  * Redirects are `manual`, always: `followRedirects: false` refuses every
  * hop; each hop is otherwise re-validated through `revalidate` (a caller
  * parameter, since this module has no environment) up to `MAX_REDIRECTS`.
+ */
+
+/**
+ * With `proxy` set, a judged hop the proxy applies to travels through it
+ * instead: the policy still decides first, the proxy only carries the request.
+ * The proxy resolves the name itself, so the operator's proxy owns that address.
  */
 
 /**
@@ -95,6 +108,8 @@ export interface FencedFetchOptions extends RequestInit {
   headersTimeoutMs?: number;
   /** Socket-level bound on inactivity while streaming the response body. */
   bodyTimeoutMs?: number;
+  /** The deployment's outbound proxy. Absent, or excluded by `NO_PROXY`: the pinned connection. */
+  proxy?: OutboundProxyConfig;
 }
 
 interface AgentTimeoutOptions {
@@ -170,6 +185,45 @@ function createGuardedAgent({
   });
 }
 
+/** A tunnel through the operator's proxy, with the same TLS and timeout policy as a pinned hop. */
+function createProxyAgent({
+  proxyUrl,
+  tls,
+  timeouts,
+}: {
+  proxyUrl: string;
+  tls: EgressTlsPolicy;
+  timeouts: AgentTimeoutOptions;
+}): ProxyAgent {
+  return new ProxyAgent({
+    ...timeouts,
+    uri: proxyUrl,
+    requestTls: { rejectUnauthorized: tls.rejectUnauthorized },
+  });
+}
+
+/** How this hop travels: through the proxy when one applies to its host, else pinned. */
+function createDispatcher({
+  validated,
+  init,
+  tls,
+}: {
+  validated: SsrfValidationResult;
+  init: FencedFetchOptions | undefined;
+  tls: EgressTlsPolicy;
+}): Dispatcher {
+  const timeouts = resolveAgentTimeouts(init);
+  const proxyUrl = init?.proxy && resolveProxyForHost(init.proxy, validated.hostname);
+  if (proxyUrl) return createProxyAgent({ proxyUrl, tls, timeouts });
+
+  const resolvedIp = getResolvedIpForPinning(validated);
+  return createGuardedAgent({
+    pinnedIp: resolvedIp && isIP(resolvedIp) !== 0 ? resolvedIp : null,
+    tls,
+    timeouts,
+  });
+}
+
 function getResolvedIpForPinning(result: SsrfValidationResult): string | null {
   switch (result.type) {
     case "resolved":
@@ -199,12 +253,7 @@ export async function fetchValidatedDestination(
   }
 
   const requestUrl = `${validated.protocol}//${validated.hostname}:${validated.port}${validated.path}`;
-  const resolvedIp = getResolvedIpForPinning(validated);
-  const dispatcher = createGuardedAgent({
-    pinnedIp: resolvedIp && isIP(resolvedIp) !== 0 ? resolvedIp : null,
-    tls,
-    timeouts: resolveAgentTimeouts(init),
-  });
+  const dispatcher = createDispatcher({ validated, init, tls });
 
   try {
     const response = await undiciFetch(requestUrl, {

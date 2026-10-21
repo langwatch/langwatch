@@ -25,3 +25,10 @@ Feature: An SSO connection reaches the endpoints its issuer's discovery document
     Given a registered issuer whose discovery document names an http endpoint and one resolving to a private address
     When a sign-in request names that issuer
     Then neither origin is trusted
+
+  @unit
+  Scenario: Issuer discovery leaves through the deployment's outbound proxy
+    Given the deployment reaches the internet only through an outbound proxy
+    When an administrator saves an OpenID Connect connection
+    Then the issuer's discovery document is read through the proxy
+    And the issuer's address is still judged public before the request is sent

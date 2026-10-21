@@ -72,6 +72,14 @@ async function installed() {
     .withConfig({
       identity: {
         ssoDomainProofDnsServers: [],
+        outboundProxy: {
+          HTTPS_PROXY: undefined,
+          https_proxy: undefined,
+          HTTP_PROXY: undefined,
+          http_proxy: undefined,
+          NO_PROXY: undefined,
+          no_proxy: undefined,
+        },
         isSaas: false,
         publicBaseUrl: undefined,
         passkeysEnabled: false,

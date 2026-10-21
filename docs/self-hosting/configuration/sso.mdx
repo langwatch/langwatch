@@ -92,6 +92,16 @@ ISSUER="https://login.microsoftonline.com/YOUR_TENANT_ID/v2.0"
 curl "$ISSUER/.well-known/openid-configuration"
 ```
 
+### Behind a corporate proxy
+
+If your installation reaches the internet only through an HTTP proxy, set the
+standard `HTTPS_PROXY` (or `HTTP_PROXY`) and `NO_PROXY` variables on the app and
+the workers. LangWatch fetches the discovery document, and the domain
+verification file, through the proxy. It still checks that the address is
+public first, and checks every redirect again. Hosts listed in `NO_PROXY` are
+reached directly, so list an identity provider that runs inside your network
+there.
+
 Register the client with the authorization code flow and the `openid`,
 `email` and `profile` scopes. GitHub sign-in is OAuth without OpenID Connect,
 so it cannot be a connection.

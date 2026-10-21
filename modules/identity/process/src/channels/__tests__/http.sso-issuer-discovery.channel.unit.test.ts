@@ -287,3 +287,43 @@ describe("given an issuer origin an operator vouched for", () => {
     expect(asked).toEqual([]);
   });
 });
+
+describe("given a deployment that reaches the internet only through an outbound proxy", () => {
+  const proxy = { httpsProxy: "http://proxy.corp.example:3128", noProxy: "corp.example" };
+
+  /** @scenario "Issuer discovery leaves through the deployment's outbound proxy" */
+  it("judges the issuer first, then hands the proxy to the fetch", async () => {
+    const steps: string[] = [];
+    const channel = HttpsSsoIssuerDiscoveryChannel.create({
+      policy: POLICY,
+      proxy,
+      validate: async (url) => {
+        steps.push("judged");
+        return admitted(url);
+      },
+      fetchValidated: async (_validated, init) => {
+        steps.push("fetched");
+        expect(init.proxy).toEqual(proxy);
+        return respond(200, DISCOVERY_DOCUMENT);
+      },
+    });
+
+    await expect(channel.discover({ issuer: ISSUER })).resolves.toMatchObject({ reachable: true });
+    expect(steps).toEqual(["judged", "fetched"]);
+  });
+
+  /** @scenario "Issuer discovery leaves through the deployment's outbound proxy" */
+  it("never reaches the proxy for an issuer the fence refuses", async () => {
+    const { channel, asked } = channelAnswering(
+      async () => respond(200, DISCOVERY_DOCUMENT),
+      async () => {
+        throw new Error("resolves to a private address");
+      },
+    );
+
+    await expect(channel.discover({ issuer: ISSUER })).resolves.toMatchObject({
+      reachable: false,
+    });
+    expect(asked).toEqual([]);
+  });
+});

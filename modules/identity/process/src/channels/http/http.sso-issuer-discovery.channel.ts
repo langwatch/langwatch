@@ -5,6 +5,7 @@ import {
   type EgressTlsPolicy,
   type FencedFetchOptions,
   isBlockedCloudDomain,
+  type OutboundProxyConfig,
   RedirectRefusedError,
   type SsrfUrlValidator,
   type SsrfValidationResult,
@@ -113,6 +114,7 @@ export class HttpsSsoIssuerDiscoveryChannel implements SsoIssuerDiscoveryChannel
   private readonly dialableInternalOrigins: () => readonly string[];
   private readonly fetchValidated: FencedDiscoveryFetch;
   private readonly tls: EgressTlsPolicy;
+  private readonly proxy: OutboundProxyConfig | undefined;
 
   private constructor({
     validate,
@@ -120,22 +122,27 @@ export class HttpsSsoIssuerDiscoveryChannel implements SsoIssuerDiscoveryChannel
     dialableInternalOrigins,
     fetchValidated,
     tls,
+    proxy,
   }: {
     validate: SsrfUrlValidator;
     validateVouched: SsrfUrlValidator;
     dialableInternalOrigins: () => readonly string[];
     fetchValidated: FencedDiscoveryFetch;
     tls: EgressTlsPolicy;
+    proxy: OutboundProxyConfig | undefined;
   }) {
     this.validate = validate;
     this.validateVouched = validateVouched;
     this.dialableInternalOrigins = dialableInternalOrigins;
     this.fetchValidated = fetchValidated;
     this.tls = tls;
+    this.proxy = proxy;
   }
 
   static create(options: {
     policy: SsoDomainProofEgressPolicy;
+    /** The outbound proxy, which carries each judged hop `NO_PROXY` does not name. */
+    proxy?: OutboundProxyConfig;
     /** Origins an operator named in advance, which may answer privately. */
     dialableInternalOrigins?: () => readonly string[];
     validate?: SsrfUrlValidator;
@@ -153,6 +160,7 @@ export class HttpsSsoIssuerDiscoveryChannel implements SsoIssuerDiscoveryChannel
       dialableInternalOrigins: options.dialableInternalOrigins ?? (() => []),
       fetchValidated: options.fetchValidated ?? fetchValidatedDestination,
       tls: { rejectUnauthorized: options.policy.verifyTls },
+      proxy: options.proxy,
     });
   }
 
@@ -185,6 +193,7 @@ export class HttpsSsoIssuerDiscoveryChannel implements SsoIssuerDiscoveryChannel
           signal: controller.signal,
           followRedirects: true,
           revalidate: this.judge,
+          proxy: this.proxy,
         },
         this.tls,
       );
