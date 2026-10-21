@@ -16,8 +16,9 @@ scripts and Hangul differently from lingua-rs. Decision: plan D16 in
   them at build time into `models.bin` (flat sorted fixed-width records, about 243 MB, gitignored)
   and `models.go` binary-searches it in place. `detector.go`'s loader returns that view instead
   of decoding into `map[string]float64`.
-- **Build tag**: `compact.go` (`lingua_models`) embeds `models.bin`; `compact_stub.go` leaves it
-  empty, so an untagged build compiles without it and `ModelsAvailable()` reports false.
+- **Loading**: `LoadModels` maps `models.bin` read-only at boot (`load.go`, `mmap_unix.go`); nlpgo
+  passes `NLPGO_LINGUA_MODELS`, which the nlp image sets. Until it is loaded every lookup misses and
+  `ModelsAvailable()` reports false. No build tag: every build compiles without the file.
   Generate with `make lingua-models` (or `go generate ./third_party/lingua-go`).
 - **Tokenizer**: `letters` in `constant.go` is lingua-rs 1.7.2's regex (whole runs of Bengali,
   Devanagari, Gujarati, Gurmukhi, Hangul, Tamil, Telugu and Thai). Go's `\p{L}` drops Indic

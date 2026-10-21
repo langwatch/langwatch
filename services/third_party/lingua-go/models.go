@@ -7,9 +7,11 @@ import (
 	"strings"
 )
 
-// ModelsAvailable reports whether this binary embeds the language models
-// (built with -tags lingua_models after cmd/genmodels). Without them every
-// ngram lookup misses and all confidences are zero.
+// modelsBin is cmd/genmodels' output, mapped by LoadModels; empty until then.
+var modelsBin string
+
+// ModelsAvailable reports whether LoadModels has mapped the language models.
+// Without them every ngram lookup misses and all confidences are zero.
 func ModelsAvailable() bool {
 	return modelsBin != ""
 }
@@ -28,22 +30,22 @@ type compactModel struct {
 	groups [21]group // indexed by ngram byte length
 }
 
-// modelIndex maps (ISO 639-1 code, ngram length) to its model. It is built once
-// and never written again. The layout is cmd/genmodels' output.
-var modelIndex = func() map[[3]byte]*compactModel {
+// modelIndex maps (ISO 639-1 code, ngram length) to its model. LoadModels
+// builds it once and it is never written again.
+var modelIndex = map[[3]byte]*compactModel{}
+
+// buildModelIndex reads the index at the head of cmd/genmodels' layout.
+func buildModelIndex(blob string) map[[3]byte]*compactModel {
 	idx := map[[3]byte]*compactModel{}
-	if modelsBin == "" {
-		return idx
-	}
-	count := int(le32(modelsBin, 0))
+	count := int(le32(blob, 0))
 	for i := range count {
 		h := 4 + 12*i
-		key := [3]byte{modelsBin[h], modelsBin[h+1], modelsBin[h+2]}
-		off, ln := int(le32(modelsBin, h+4)), int(le32(modelsBin, h+8))
-		idx[key] = newCompactModel(modelsBin[off : off+ln])
+		key := [3]byte{blob[h], blob[h+1], blob[h+2]}
+		off, ln := int(le32(blob, h+4)), int(le32(blob, h+8))
+		idx[key] = newCompactModel(blob[off : off+ln])
 	}
 	return idx
-}()
+}
 
 func newCompactModel(b string) *compactModel {
 	p := int(le32(b, 0))

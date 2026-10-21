@@ -26,7 +26,7 @@ Feature: Evaluators ported to the Go runtime answer as langevals answered
   @unit
   Scenario: Language detection answers as langevals answered, including Indic scripts and mixed Korean and English
     Given langevals' recorded answers for lingua language detection, Hindi and a Korean and English mix among them
-    When the Go runtime built with the embedded language models evaluates the same entries with the same settings
+    When the Go runtime with the language models loaded evaluates the same entries with the same settings
     Then every status, passed, label and details matches
     And every confidence and score matches within 1e-9
 

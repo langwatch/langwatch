@@ -234,7 +234,7 @@ herrgen:
 herrgen-check:
 	@go run ./cmd/herrgen -check
 
-# The language models nlpgo embeds under -tags lingua_models (Fork C, plan D16).
+# The language models nlpgo maps from NLPGO_LINGUA_MODELS (Fork C, plan D16).
 # About 10 s and 1.5 GB of RAM; skipped when models.bin already exists.
 lingua-models:
 	@test -s services/third_party/lingua-go/models.bin || (cd services && go generate ./third_party/lingua-go)

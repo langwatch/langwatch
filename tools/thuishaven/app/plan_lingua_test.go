@@ -23,17 +23,21 @@ func goLane(t *testing.T, sel domain.Selection) Child {
 	return Child{}
 }
 
-func TestGoEvaluatorsBuildTheGoLaneWithTheLanguageModels(t *testing.T) {
+func TestGoEvaluatorsPointTheGoLaneAtTheLanguageModels(t *testing.T) {
 	lane := goLane(t, domain.Selection{NLP: true, GoEvaluators: true})
 	if !strings.Contains(lane.Shell, "lingua-models && make") {
 		t.Errorf("go lane runs %q, want the models generated before it starts", lane.Shell)
 	}
-	if !slices.Contains(lane.Env, linguaModelsGoFlags) {
-		t.Errorf("go lane env %v is missing %q", lane.Env, linguaModelsGoFlags)
+	if !slices.ContainsFunc(lane.Env, isLinguaModelsEnv) {
+		t.Errorf("go lane env %v does not point nlpgo at the language models", lane.Env)
 	}
 
 	lane = goLane(t, domain.Selection{NLP: true})
-	if strings.Contains(lane.Shell, "lingua-models") || slices.Contains(lane.Env, linguaModelsGoFlags) {
+	if strings.Contains(lane.Shell, "lingua-models") || slices.ContainsFunc(lane.Env, isLinguaModelsEnv) {
 		t.Errorf("go lane without +go-evaluators changed: %q %v", lane.Shell, lane.Env)
 	}
+}
+
+func isLinguaModelsEnv(entry string) bool {
+	return strings.HasPrefix(entry, "NLPGO_LINGUA_MODELS=") && strings.HasSuffix(entry, "/services/third_party/lingua-go/models.bin")
 }

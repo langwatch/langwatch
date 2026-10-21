@@ -9,10 +9,10 @@ import (
 	lingua "github.com/langwatch/langwatch/services/third_party/lingua-go"
 )
 
-// linguaPrepares is lingua/language_detection, only in a binary built with
-// -tags lingua_models: without the models the slug stays evaluator_not_found
-// and TS keeps it on langevals. The detector is built once and shared; it is
-// safe for concurrent use and reads the embedded models in place.
+// linguaPrepares is lingua/language_detection once nlpgo has loaded the models
+// (NLPGO_LINGUA_MODELS): without them the slug stays evaluator_not_found and
+// TS keeps it on langevals. The detector is built once and shared; it is safe
+// for concurrent use and reads the mapped models in place.
 func linguaPrepares() map[string]func(json.RawMessage) (Score, error) {
 	if !lingua.ModelsAvailable() {
 		return map[string]func(json.RawMessage) (Score, error){}
