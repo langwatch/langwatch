@@ -27,6 +27,7 @@ export const reads = {
   "@langwatch/analytics-process": [
     "dev/docs/**/*",
     "docs/api-reference/query/**/*",
+    "docs/features/langwatchql/**/*",
     "mcp/typescript/src/__tests__/fixtures/**/*",
     "modules/trace/process/src/features/legacy/repositories/clickhouse/trace-legacy-read.repository.ts",
     "modules/dashboard/process/src/**/*",
