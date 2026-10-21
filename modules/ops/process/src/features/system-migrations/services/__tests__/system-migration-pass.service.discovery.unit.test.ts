@@ -117,7 +117,8 @@ describe("SystemMigrationPassService.hasTenantAwaitingRedrive", () => {
   describe("given a declared step whose only hold waits on a person", () => {
     /** @scenario "A tenant waiting on a person still wakes the re-drive" */
     it("asks for a pass, so the tenant moves once the person acts", async () => {
-      const { passes, state } = gate({ steps: [stepOf({ id: STEP })] });
+      const { passes, state, record } = gate({ steps: [stepOf({ id: STEP })] });
+      await record({ name: STEP, status: "finalized" });
       await state.upsertRecord({
         migrationName: STEP,
         tenantId: "user-sam",
@@ -128,6 +129,9 @@ describe("SystemMigrationPassService.hasTenantAwaitingRedrive", () => {
 
       expect(await state.hasUnsettledTenant({ migrationName: STEP })).toBe(false);
       expect(await passes.hasTenantAwaitingRedrive()).toBe(true);
+
+      await record({ name: STEP, status: "finalized", tenantId: "user-sam" });
+      expect(await passes.hasTenantAwaitingRedrive()).toBe(false);
     });
   });
 
