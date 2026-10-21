@@ -5,7 +5,7 @@ keywords: langwatch, langwatchql, lwql, sql examples, traces, spans, evaluations
 description: Worked LangWatchQL statements for traces, spans, evaluations, simulations, per-minute rollups, conversations, coding-agent sessions and Instant Eval judgments.
 ---
 
-Each statement below runs as written with `langwatch query "<statement>"` or in the `sql` field of `POST /api/v1/query`. Every one filters on its view's time column, because that filter is what keeps the read small: without it the query reads every partition your project has.
+Each statement below runs as written with `langwatch query "<statement>"` or in the `sql` field of `POST /api/v1/query`. The one exception is the judgments statement, which has a `{run:String}` parameter that needs a value. Every one filters on its view's time column, because that filter is what keeps the read small: without it the query reads every partition your project has.
 
 ## Traces: the most recent failures
 
@@ -59,7 +59,8 @@ LIMIT 50
 SELECT
   EvaluatorName,
   count() AS evaluations,
-  countIf(Passed = 1) AS passed
+  countIf(Passed = 1) AS passed,
+  countIf(Passed = 1) / count() AS pass_rate
 FROM langwatch.evaluations
 WHERE ScheduledAt >= subtractDays(now(), 7)
   AND Status = 'processed'
@@ -146,7 +147,7 @@ LIMIT 50
 
 ## Judgments: Instant Eval verdicts per question
 
-`judgments` has one row per [Instant Eval](/features/instant-evals/overview) run, trace and question, and its time column is `CreatedAt`. Bind the run id as a parameter with `--param run=<run-id>`.
+`judgments` has one row per [Instant Eval](/features/instant-evals/overview) run, trace and question, and its time column is `CreatedAt`. Bind the run id as a parameter. With the CLI, add `--param run=<run-id>`. With REST, add `"parameters": {"run": "<run-id>"}` to the request body.
 
 ```sql
 SELECT

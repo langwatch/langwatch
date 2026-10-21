@@ -7,6 +7,7 @@ description: How many rows a query returns, how large and long it can be, how ma
 
 ## Limits
 
+{/* lwql-limits-start */}
 | What | Limit | Over the limit |
 | --- | --- | --- |
 | Rows per response | 10,000. A statement with no `LIMIT` gets `LIMIT 10000` added at the end. | A `LIMIT` above 10,000 is refused with 400 `lwql_not_permitted`, `LIMIT_TOO_HIGH` |
@@ -16,17 +17,20 @@ description: How many rows a query returns, how large and long it can be, how ma
 | Memory | 1 GB | 422 `query_memory_exceeded` |
 | Data read | 1,000,000,000 rows or 10,000,000,000 bytes | 422 `query_scan_limit_exceeded` |
 | Threads | 4 per query | |
-| Queries running at once | 10 | 503 `lwql_busy` |
+| Queries running at once | 10, shared by the whole deployment, not per project or per key | 503 `lwql_busy` |
+{/* lwql-limits-end */}
 
 Adding `LIMIT 10000` is the only change LangWatch makes to your statement. The server limits are the shipped defaults, which LangWatch Cloud uses. A `SETTINGS` clause that tries to change them is refused.
 
 ## How many queries can I run per minute
 
+{/* lwql-rates-start */}
 | Plan | Queries per minute, per project |
 | --- | --- |
 | Free | 30 |
 | Paid | 60 |
 | Enterprise | 120 |
+{/* lwql-rates-end */}
 
 The window is a fixed 60 seconds. Over the limit the answer is 429 `lwql_rate_limited`, and `meta.retryAfterSeconds` in the error tells you how long to wait.
 

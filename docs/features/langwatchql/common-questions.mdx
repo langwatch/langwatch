@@ -21,7 +21,7 @@ LangWatchQL accepts a fixed list of ClickHouse functions. Rewrite the expression
 The view "<v>" is not available to you. Use one of the views from the schema endpoint.
 ```
 
-Check the spelling and the database prefix: `langwatch.` on LangWatch Cloud, `analytics.` by default on a self-hosted deployment. Pick a view from the `availableViews` list in the violation, or from `langwatch query schema`. There is no `conversations` or `threads` view: group `langwatch.trace_metrics` by `ConversationId` instead.
+Check the spelling and the database prefix: `langwatch.` on LangWatch Cloud. On a self-hosted deployment the prefix is the database named in `CLICKHOUSE_URL`, which is `langwatch` in the shipped chart and `.env.example`. Pick a view from the `availableViews` list in the violation, or from `langwatch query schema`. There is no `conversations` or `threads` view: group `langwatch.trace_metrics` by `ConversationId` instead.
 
 ## The field is not available to you
 

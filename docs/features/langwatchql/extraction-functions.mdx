@@ -9,10 +9,11 @@ description: Pull conversation transcripts, model calls and whole traces into a 
 
 An extraction function reads the content of a conversation, a trace or a span and puts it into a column of your result. For example, `conversation_bounded(ConversationId, 8000, '')` returns each conversation as a transcript of at most 8,000 tokens, so you can export a week of chats to a file with one query.
 
-Write each one in the top-level `SELECT` list, with an alias (`AS transcript`). Anywhere else, or without an alias, the query is refused. Exact signatures are in the [extraction functions reference](/api-reference/query/extraction-functions).
+Write each one in the top-level `SELECT` list, with an alias (`AS transcript`). Anywhere else, or without an alias, the query is refused. The one exception is an eval function: its text argument may hold one extraction function, but not a second level, as in the `eval` example below. Exact signatures are in the [extraction functions reference](/api-reference/query/extraction-functions).
 
 ## Which function do I need
 
+{/* lwql-key-caps-start */}
 | You want | Use | Rows one query reads |
 | --- | --- | --- |
 | The conversation as the chat view shows it | `conversation(thread_key)` | 200 conversations |
@@ -24,8 +25,9 @@ Write each one in the top-level `SELECT` list, with an alias (`AS transcript`). 
 | Only the request side, or only the response side | `llm_input_messages(trace_id)`, `llm_output_messages(trace_id)` | 1,000 traces |
 | The model call of one span | `llm_messages_span(trace_id, span_id)` | 1,000 spans |
 | The whole trace as JSON | `trace_json(trace_id)` | 1,000 traces |
+{/* lwql-key-caps-end */}
 
-These functions return message content, so your key needs the `input` or `output` permission. `thread_traces` returns only ids and needs neither.
+These functions return message content, so your key needs both the `input` and the `output` permission. Two exceptions: `llm_input_messages` needs only `input`, and `thread_traces` returns only ids and needs neither.
 
 ## Export a week of conversations
 

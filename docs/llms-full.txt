@@ -42798,7 +42798,7 @@ LangWatchQL accepts a fixed list of ClickHouse functions. Rewrite the expression
 The view "<v>" is not available to you. Use one of the views from the schema endpoint.
 ```
 
-Check the spelling and the database prefix: `langwatch.` on LangWatch Cloud, `analytics.` by default on a self-hosted deployment. Pick a view from the `availableViews` list in the violation, or from `langwatch query schema`. There is no `conversations` or `threads` view: group `langwatch.trace_metrics` by `ConversationId` instead.
+Check the spelling and the database prefix: `langwatch.` on LangWatch Cloud. On a self-hosted deployment the prefix is the database named in `CLICKHOUSE_URL`, which is `langwatch` in the shipped chart and `.env.example`. Pick a view from the `availableViews` list in the violation, or from `langwatch query schema`. There is no `conversations` or `threads` view: group `langwatch.trace_metrics` by `ConversationId` instead.
 
 ## The field is not available to you
 
@@ -42894,10 +42894,11 @@ description: Pull conversation transcripts, model calls and whole traces into a 
 
 An extraction function reads the content of a conversation, a trace or a span and puts it into a column of your result. For example, `conversation_bounded(ConversationId, 8000, '')` returns each conversation as a transcript of at most 8,000 tokens, so you can export a week of chats to a file with one query.
 
-Write each one in the top-level `SELECT` list, with an alias (`AS transcript`). Anywhere else, or without an alias, the query is refused. Exact signatures are in the [extraction functions reference](/api-reference/query/extraction-functions).
+Write each one in the top-level `SELECT` list, with an alias (`AS transcript`). Anywhere else, or without an alias, the query is refused. The one exception is an eval function: its text argument may hold one extraction function, but not a second level, as in the `eval` example below. Exact signatures are in the [extraction functions reference](/api-reference/query/extraction-functions).
 
 ## Which function do I need
 
+{/* lwql-key-caps-start */}
 | You want | Use | Rows one query reads |
 | --- | --- | --- |
 | The conversation as the chat view shows it | `conversation(thread_key)` | 200 conversations |
@@ -42909,8 +42910,9 @@ Write each one in the top-level `SELECT` list, with an alias (`AS transcript`). 
 | Only the request side, or only the response side | `llm_input_messages(trace_id)`, `llm_output_messages(trace_id)` | 1,000 traces |
 | The model call of one span | `llm_messages_span(trace_id, span_id)` | 1,000 spans |
 | The whole trace as JSON | `trace_json(trace_id)` | 1,000 traces |
+{/* lwql-key-caps-end */}
 
-These functions return message content, so your key needs the `input` or `output` permission. `thread_traces` returns only ids and needs neither.
+These functions return message content, so your key needs both the `input` and the `output` permission. Two exceptions: `llm_input_messages` needs only `input`, and `thread_traces` returns only ids and needs neither.
 
 ## Export a week of conversations
 
@@ -42959,7 +42961,7 @@ keywords: langwatch, langwatchql, lwql, sql examples, traces, spans, evaluations
 description: Worked LangWatchQL statements for traces, spans, evaluations, simulations, per-minute rollups, conversations, coding-agent sessions and Instant Eval judgments.
 ---
 
-Each statement below runs as written with `langwatch query "<statement>"` or in the `sql` field of `POST /api/v1/query`. Every one filters on its view's time column, because that filter is what keeps the read small: without it the query reads every partition your project has.
+Each statement below runs as written with `langwatch query "<statement>"` or in the `sql` field of `POST /api/v1/query`. The one exception is the judgments statement, which has a `{run:String}` parameter that needs a value. Every one filters on its view's time column, because that filter is what keeps the read small: without it the query reads every partition your project has.
 
 ## Traces: the most recent failures
 
@@ -43013,7 +43015,8 @@ LIMIT 50
 SELECT
   EvaluatorName,
   count() AS evaluations,
-  countIf(Passed = 1) AS passed
+  countIf(Passed = 1) AS passed,
+  countIf(Passed = 1) / count() AS pass_rate
 FROM langwatch.evaluations
 WHERE ScheduledAt >= subtractDays(now(), 7)
   AND Status = 'processed'
@@ -43100,7 +43103,7 @@ LIMIT 50
 
 ## Judgments: Instant Eval verdicts per question
 
-`judgments` has one row per [Instant Eval](/features/instant-evals/overview) run, trace and question, and its time column is `CreatedAt`. Bind the run id as a parameter with `--param run=<run-id>`.
+`judgments` has one row per [Instant Eval](/features/instant-evals/overview) run, trace and question, and its time column is `CreatedAt`. Bind the run id as a parameter. With the CLI, add `--param run=<run-id>`. With REST, add `"parameters": {"run": "<run-id>"}` to the request body.
 
 ```sql
 SELECT
@@ -43131,6 +43134,7 @@ description: How many rows a query returns, how large and long it can be, how ma
 
 ## Limits
 
+{/* lwql-limits-start */}
 | What | Limit | Over the limit |
 | --- | --- | --- |
 | Rows per response | 10,000. A statement with no `LIMIT` gets `LIMIT 10000` added at the end. | A `LIMIT` above 10,000 is refused with 400 `lwql_not_permitted`, `LIMIT_TOO_HIGH` |
@@ -43140,17 +43144,20 @@ description: How many rows a query returns, how large and long it can be, how ma
 | Memory | 1 GB | 422 `query_memory_exceeded` |
 | Data read | 1,000,000,000 rows or 10,000,000,000 bytes | 422 `query_scan_limit_exceeded` |
 | Threads | 4 per query | |
-| Queries running at once | 10 | 503 `lwql_busy` |
+| Queries running at once | 10, shared by the whole deployment, not per project or per key | 503 `lwql_busy` |
+{/* lwql-limits-end */}
 
 Adding `LIMIT 10000` is the only change LangWatch makes to your statement. The server limits are the shipped defaults, which LangWatch Cloud uses. A `SETTINGS` clause that tries to change them is refused.
 
 ## How many queries can I run per minute
 
+{/* lwql-rates-start */}
 | Plan | Queries per minute, per project |
 | --- | --- |
 | Free | 30 |
 | Paid | 60 |
 | Enterprise | 120 |
+{/* lwql-rates-end */}
 
 The window is a fixed 60 seconds. Over the limit the answer is 429 `lwql_rate_limited`, and `meta.retryAfterSeconds` in the error tells you how long to wait.
 
@@ -43213,7 +43220,9 @@ description: Read-only SQL over your traces, spans, evaluations, simulations and
 
 LangWatchQL is the ClickHouse SQL dialect that LangWatch accepts over its analytics views. You send one `SELECT` statement, optionally with a `WITH` clause, and you get back columns and rows. The database runs it with `readonly = 1`, so a statement cannot change your data.
 
-On LangWatch Cloud the views are in the `langwatch` database, for example `langwatch.traces` or `langwatch.trace_metrics_by_minute`, and the examples in this guide use that name. A self-hosted deployment uses the database named in its `CLICKHOUSE_URL`, and `analytics` when that URL names none. The full list, with every column and the permission it needs, is in the [Query API reference](/api-reference/query/overview#queryable-views), and `GET /api/v1/query/schema` returns the list your key can query today.
+On LangWatch Cloud the views are in the `langwatch` database, for example `langwatch.traces` or `langwatch.trace_metrics_by_minute`, and the examples in this guide use that name.
+
+A self-hosted deployment uses the database named in its `CLICKHOUSE_URL`. That is `langwatch` in the shipped Helm chart and in `.env.example`. LangWatchQL is unavailable when `CLICKHOUSE_URL` names no database. The full list, with every column and the permission it needs, is in the [Query API reference](/api-reference/query/overview#queryable-views), and `GET /api/v1/query/schema` returns the list your key can query today.
 
 ## When to use LangWatchQL instead of dashboards
 
@@ -43223,7 +43232,7 @@ For finding individual traces with their spans and evaluations, use the trace fi
 
 ## How do I run a query
 
-You can send the same statement three ways. All three need an API key with the `analytics:view` permission.
+You can send the same statement three ways. All three need the `analytics:view` permission. REST and the CLI use an API key. The hosted MCP server accepts OAuth sign-in or a personal API key, see [MCP](/integration/mcp).
 
 
   ### REST
