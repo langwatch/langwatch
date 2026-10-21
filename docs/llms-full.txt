@@ -41736,6 +41736,351 @@ Both can also be created with `langwatch trigger create --graph-alert` and `--re
 
 ---
 
+# FILE: ./features/braids.mdx
+
+---
+title: Braids
+description: Show another project's matching spans inside your traces, so an agent that calls agents in other projects can follow each call all the way down. The spans stay where they were recorded.
+sidebarTitle: Braids
+keywords: braids, cross-project traces, multi-agent, orchestrator, signed calls, signing keys, baggage, OTTL
+---
+
+**One trace. Every project.**
+
+When your agents call agents in other projects, each project records only its own half of the trace. The calling project sees its call go out, and the spans of the project it called stay out of view. A braid fixes that: it shows another project's matching spans inside your traces, in place, under the spans that made the calls.
+
+Braids copy no data. The spans stay in the project that recorded them, under that project's privacy settings, and an admin decides which spans are braided and for how long.
+
+<Frame>
+  <img src="/images/braids/braids-hero.svg" alt="One trace in Web orchestrator, holding spans recorded by Web orchestrator, Specialist agents and Search agent" />
+</Frame>
+
+<Note>
+  Braids is an **Enterprise** feature. See [Enterprise, and leaving it](#enterprise-and-leaving-it).
+</Note>
+
+## When to use a braid
+
+Use a braid when one project's agents call another project's agents and you want the calling project to see the whole run. A typical setup:
+
+- **Web orchestrator** handles the user's message and calls a team of specialist agents.
+- **Specialist agents** is a separate project, owned by another team, that records its own spans.
+
+Both projects record spans under the same trace id, because the trace context crosses the call. A braid from **Specialist agents** into **Web orchestrator** shows the specialists' matching spans inside the orchestrator's traces.
+
+On this page, the project the spans come from is the one you braid **from**, and the project whose traces show them is the one you braid **into**. A braid is always between two projects of the same organisation.
+
+## How it works
+
+<Steps>
+  <Step title="Tag the call">
+    The calling service puts a tag on its call, such as `orchestrator=web`, as an OpenTelemetry baggage entry. It can sign the tag with a [signing key](#signed-calls), so the tag cannot be faked.
+  </Step>
+  <Step title="Copy the tag">
+    The called service copies that entry onto every span it records. The LangWatch SDKs do this with one setup option.
+  </Step>
+  <Step title="Braid">
+    An admin of the called project braids it into the calling project, with a condition that matches the tag: `attributes["orchestrator"] == "web"`.
+  </Step>
+</Steps>
+
+From then on, every trace the calling project records shows the called project's spans that match the condition.
+
+For spans to line up, both services must send their spans to LangWatch, and the calling service must pass W3C trace context (`traceparent`) on the call. To carry the tag, it must pass W3C baggage too. The default setup of each LangWatch SDK does both for instrumented HTTP clients.
+
+## Create a braid
+
+Braids are managed under **Braids** in a project's settings. The page has three tabs: braids into other projects, braids from other projects, and the project's signing keys.
+
+To create one, open Braids in the settings of the project the spans come from, and click **New braid**.
+
+1. **Braid into.** Pick the project whose traces will show the spans. You can only pick a project whose traces you can read. A project cannot braid into itself, and aggregate projects, which read the traces of other projects, cannot take part in a braid.
+2. **Condition.** Write which spans to braid, in the [condition language](#conditions). The editor checks the condition as you type, says how to fix anything it cannot accept, and lets you insert the attributes this project's spans carry.
+3. **Only signed calls.** Turn this on to braid only calls the receiving project signed. It adds `Verified("<entry>")` to the condition, and removing that term turns the switch off. See [Signed calls](#signed-calls).
+4. **Data from.** The earliest spans the braid shows. It can be a date in the past: the receiving project then sees matching spans recorded earlier, inside traces it already holds.
+5. **End.** When the braid stops showing spans. You can leave a braid with no end.
+
+The dialog says how many members of the receiving project will see the braided spans. When the details are complete, the button reads **Braid into** followed by the project's name.
+
+### Preview, and test a trace
+
+Before you save, the dialog previews what the receiving project will see. It counts that project's traces over the last 7 days in three groups: those that get every span from this project, those that get some, and those that get none. With only signed calls on, it also counts the calls that would stay hidden because their signature is missing or invalid.
+
+The preview shows an example trace with the braided spans marked and the rest struck through. Only you see it.
+
+To check one trace exactly, use **Test a trace**: paste a trace id from the receiving project and see the trace with exactly the spans that project will see.
+
+### Several braids between two projects
+
+Two projects can share several braids, for example one per tag. A span shows when it matches any of them, inside that braid's dates. When you preview a further braid between the same two projects, the preview counts what the receiving project will see with all of them and how many more spans the new one shows.
+
+A braid identical to a live one, with the same projects, condition, dates and end, is refused with `braid_already_exists`.
+
+### Change a braid
+
+Choose **Edit** on a braid to change its condition, dates or end. Saving replaces the braid with a new one and removes the old one, and the audit log records both. If someone else changed or removed the braid while you were editing it, your change is refused with `braid_changed`: reopen the braid and make your change again.
+
+## Conditions
+
+A condition says which spans a braid shows. It is written in a subset of the [OpenTelemetry Transformation Language (OTTL)](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/pkg/ottl) and checked when you save the braid. Join comparisons with the lower-case word `and`, and put string values in double quotes.
+
+### What a condition accepts
+
+| Write | Matches a span when |
+| --- | --- |
+| `attributes["k"] == "v"` | its attribute `k` is exactly `v` |
+| `resource.attributes["k"] == "v"` | its resource attribute `k` is exactly `v`, for example `resource.attributes["service.name"] == "checkout"` |
+| `name == "v"` | its name is exactly `v` |
+| `attributes["k"] != nil` | it has the attribute `k`, whatever its value |
+| `Verified("k")` | its entry `k` was signed by the project you braid into, for this trace. See [Signed calls](#signed-calls) |
+| `a and b`, `(a and b)` | both match |
+
+For example:
+
+```text
+attributes["orchestrator"] == "web" and Verified("orchestrator")
+```
+
+Inside a string, escape a double quote as `\"` and a backslash as `\\`. A span that was updated later is checked against its latest version, so a span that stopped matching does not show.
+
+**An empty condition** is allowed. It braids every span of this project that shares a trace id with a trace of the receiving project.
+
+### What a condition refuses, and what to write instead
+
+A condition that uses anything else is refused with `braid_condition_unsupported`. The refusal names the part it cannot accept, where it is, and how to write it instead.
+
+| Refused | Write instead |
+| --- | --- |
+| `or` | One braid per alternative. Braids between the same two projects show spans matching any of them. |
+| `not` | Name what a braided span carries, for example `attributes["k"] == "v"`. |
+| `IsMatch(...)` and other functions | Compare whole values with `==`. The only function is `Verified("k")`. |
+| `>`, `<`, `>=`, `<=`, numbers | Compare strings with `==`, the value in double quotes. |
+| `attributes["k"] != "v"` | Name the value a braided span carries with `==`, or require the key with `attributes["k"] != nil`. |
+| `== true`, `== false` | Compare the attribute's string value with `==`. |
+| `attributes["k"] == ""` | `attributes["k"] != nil`. A missing attribute reads as an empty string, so `== ""` would match spans that never set it. |
+| `resource.attributes["k"] != nil` | Check presence on span attributes: `attributes["k"] != nil`. |
+
+A condition that is incomplete, such as a comparison with no value, is refused with `braid_condition_syntax`.
+
+### Limits
+
+| Limit | Value | Refused with |
+| --- | --- | --- |
+| Length of one condition | 1,000 characters | `braid_condition_too_large` |
+| Comparisons in one condition | 16 | `braid_condition_too_large` |
+| Nested parentheses | 4 deep | `braid_condition_too_large` |
+| Different conditions braided into one project | 50 | `braid_condition_limit_reached` |
+
+Every comparison is joined with `and`, so parentheses never change a condition's meaning and you can remove them. To stay under the comparison limit, split a condition across braids, or drop comparisons every braided span shares.
+
+## Signed calls
+
+A condition on a tag trusts whoever set the tag. `attributes["orchestrator"] == "web"` matches any span carrying that tag, and any service in your organisation could set it.
+
+Signed calls close that gap. The calling project signs its tags with a signing key only it holds, and LangWatch checks the signature when the spans arrive. A braid with `Verified("orchestrator")` in its condition then shows only spans whose tag the receiving project really signed.
+
+### Signing keys
+
+Signing keys belong to the project that makes the calls: in the example, **Web orchestrator**. Manage them on the **Signing keys** tab of Braids in that project's settings.
+
+- **Create** a key and give it a name, such as "Production". Its secret, which starts with `lwsk_`, is shown once, with setup snippets for TypeScript, Python and Go. Store it where your calling service reads its secrets, for example as `LANGWATCH_SIGNING_KEY`.
+- **Rotate** a key to get a new secret. The old secret keeps verifying for 7 days, so you can roll out the new one without a gap.
+- **Revoke** a key to end it. Spans signed with it stop being marked verified within a minute.
+
+Each key shows its status, when it was created and last used, and how many signed spans passed and failed the check over the last 24 hours. The people who may braid out of a project manage its signing keys, and every create, rotate and revoke is in the audit log, never with the secret.
+
+### Sign on the calling side, copy on the called side
+
+The calling service signs the entries it names, inside an active span: the signature covers that span's trace. The called service copies those entries and the signature onto every span it records.
+
+
+  ### TypeScript
+
+    ```typescript
+    // Calling service
+    import { withSignedBaggage } from "langwatch/observability/node";
+
+    // Inside an active span: the signature covers the current trace.
+    const answer = await withSignedBaggage(
+      { signingKey: process.env.LANGWATCH_SIGNING_KEY!, entries: { orchestrator: "web" } },
+      () => callSpecialists(message),
+    );
+    ```
+
+    ```typescript
+    // Called service
+    import { setupObservability } from "langwatch/observability/node";
+
+    setupObservability({
+      braids: { copyEntries: ["orchestrator"] },
+    });
+    ```
+
+    To build the context yourself, use `signBaggage({ signingKey, entries, context })`. With your own tracer provider, add `new BraidBaggageSpanProcessor({ copyEntries: ["orchestrator"] })` from `langwatch/observability`.
+
+  ### Python
+
+    ```python
+    # Calling service
+    import os
+    from langwatch.braids import signed_baggage
+
+    # Inside an active span: the signature covers the current trace.
+    with signed_baggage(os.environ["LANGWATCH_SIGNING_KEY"], {"orchestrator": "web"}):
+        answer = call_specialists(message)
+    ```
+
+    ```python
+    # Called service
+    import langwatch
+
+    langwatch.setup(braid_copy_entries=["orchestrator"])
+    ```
+
+    To build the context yourself, use `sign_baggage(signing_key, entries)` and attach it. With your own `TracerProvider`, add `BraidBaggageSpanProcessor(["orchestrator"])` from `langwatch.braids`.
+
+  ### Go
+
+    ```go
+    // Calling service, inside an active span: the signature covers the current trace.
+    ctx, err := langwatch.SignBaggage(ctx, os.Getenv("LANGWATCH_SIGNING_KEY"), map[string]string{
+    	"orchestrator": "web",
+    })
+    if err != nil {
+    	return err
+    }
+    answer, err := callSpecialists(ctx, message)
+    ```
+
+    ```go
+    // Called service: add the copy processor to your tracer provider.
+    braids, err := langwatch.NewBraidBaggageSpanProcessor("orchestrator")
+    if err != nil {
+    	return err
+    }
+    tp := sdktrace.NewTracerProvider(
+    	sdktrace.WithSpanProcessor(braids),
+    	sdktrace.WithBatcher(exporter),
+    )
+    ```
+
+    Your propagator must carry W3C baggage, for example `propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{})`.
+
+
+
+Then turn on **Only signed calls** in the braid, or add the term to its condition yourself:
+
+```text
+attributes["orchestrator"] == "web" and Verified("orchestrator")
+```
+
+Entry keys are 1 to 128 letters, digits, dots, dashes or underscores, and a value cannot hold a line break. The SDK refuses anything else with an error naming why; the [TypeScript](/integration/typescript/reference#braids-signed-calls), [Python](/integration/python/reference#braids-signed-calls) and [Go](/integration/go/reference#braids-signed-calls) references list the error codes.
+
+### What `Verified("k")` proves, and what it does not
+
+`Verified("k")` means: the project you braid into signed the entry `k`, with this value, for this trace. In other words, that project's call led here.
+
+- **It holds for the whole trace, not one hop.** Baggage travels down the call chain, so when Specialist agents calls Search agent within the same trace, Search agent's spans carry the signed entry too, and verify. Any service that receives the entry can pass it further down that trace.
+- **It holds for that trace only.** A signature copied into another trace does not verify, and neither does an entry whose value was changed.
+- **It holds only for the receiving project's own keys.** An entry verified with another project's key does not satisfy the braid, and a key from another organisation never verifies.
+- **A failed check never drops a span.** A span whose signature fails, or whose key cannot be checked at that moment, is stored as usual, without the verified mark, so a braid requiring signed calls does not show it.
+
+Span attributes that claim to be verified cannot be sent from your code: LangWatch removes them before storing the span, and only its own check sets the mark. The "Braided from" badge says where a span came from; it does not mean the span was verified.
+
+## Who may braid
+
+Creating, changing and removing braids, and managing signing keys, needs the `braids:manage` permission on the project the spans come from.
+
+| Who | Braids out of |
+| --- | --- |
+| Organisation admins | every project in the organisation |
+| Team admins | every project in the team they administer |
+| A custom role listing `braids:manage` | the projects the role is bound to |
+| Members and viewers | none |
+
+Two more checks apply to every braid:
+
+- **You can only braid into a project whose traces you can read.** A team admin cannot send their team's spans to a team they have no view of. Braiding across teams takes an organisation admin, or someone the other team lets read its traces.
+- **You can only braid spans you can read yourself.** A custom role holding `braids:manage` without permission to view the project's traces cannot braid.
+
+Braids and signing keys are managed by people in LangWatch. An API key cannot create, change or remove a braid, or manage signing keys, whatever permissions it holds.
+
+**Removing** a braid is open to admins of either project. The receiving project's admins can remove a braid they never asked for, but cannot edit it.
+
+**Listing** is open to members of both projects. Anyone who can view a project sees the braids out of it and into it, with each braid's condition, dates and creator.
+
+### Keep braids to organisation admins
+
+An organisation admin can choose that only organisation admins may braid. Open **Braids** in the organisation settings, which lists every braid in the organisation, and turn on the setting that keeps braids to organisation admins. It is off by default.
+
+While it is on, team admins and project-level roles no longer confer `braids:manage`: only organisation-wide roles do. Live braids stay as they are. Within thirty seconds, team admins can no longer create, change or remove braids or manage signing keys, and the project's Braids page tells them the organisation's admins manage braids. Changing the setting needs permission to manage the organisation, and each change is in the audit log.
+
+## What the receiving project sees
+
+Open a trace in the project you braided into, and the braided spans appear in it:
+
+- **Each braided span carries a badge** reading "Braided from" and the name of its project. The trace header says the trace includes spans from that project.
+- **A braided span hangs under its parent** when the parent is visible. When its parent was not braided, it shows at the top of the trace, as a span with a missing parent does. The view gives no hint of spans that were not braided: no count, gap or placeholder.
+- **The header's totals include braided spans and say so.** Duration, spans, cost and tokens show both this project's figure and the whole trace. The trace's row in the list keeps this project's own totals.
+- **Each span keeps its own project's privacy settings.** A braided span is redacted under the settings of the project it came from, and a setting that shows content only to some roles is checked against your role in that project. If you have no role there, that content stays hidden.
+- **Actions that would act on the other project's data are off** on a braided span: opening it in the playground, annotating it and evaluating it, each with the reason. The span says it is shown because it matches the braid's condition. **Open in** the other project is offered only if you can open that project.
+
+Spans from several projects can be braided into one trace, each with its own badge.
+
+### What stays each project's own
+
+Braided spans show only in the trace view. Everywhere else, a project shows its own spans:
+
+| Surface | What it shows |
+| --- | --- |
+| The trace list and its totals | this project's traces and spans |
+| Search and filters | this project's spans |
+| Analytics and dashboards | this project's spans |
+| The REST API, the MCP server and exports | this project's spans |
+| Langy | this project's spans |
+| Public share links | this project's spans |
+| Evaluations | not shared in either direction: the other project's results are not shown on braided spans, and your monitors do not run on them |
+
+Braided spans only appear inside traces the receiving project recorded itself. A trace only the other project holds is not listed, and opening its id returns not found.
+
+Braids do not pass along. If Specialist agents is braided into Web orchestrator and Web orchestrator into a third project, the third project sees Web orchestrator's matching spans and none of the spans braided into Web orchestrator.
+
+## Remove a braid, end dates and the audit log
+
+**Remove a braid** from its menu, in either project. The confirmation says which project stops seeing which project's spans. Once removed, no trace shows the braided spans within thirty seconds, including a trace someone already has open.
+
+**An end date** stops a braid showing spans when the date passes. The braid is then ended, not removed. **Data from** is different: it limits which spans show, by when they started, and never how long the braid lasts.
+
+**The audit log** records:
+
+- each braid created, changed and removed, naming both projects and the condition. A change is recorded as a removal and a creation that names the braid it replaced;
+- each signing key created, rotated and revoked, naming the key and never its secret;
+- each change to who may braid;
+- each time someone opens traces holding braided spans: one entry per person and pair of projects every five minutes, naming no span and no trace content.
+
+Choose **View in audit log** on a braid to see its entries.
+
+## Enterprise, and leaving it
+
+Creating and changing braids, managing signing keys, choosing who may braid, and the preview need the Enterprise plan. Removing a braid never does, so an admin can always stop sharing. Below Enterprise, these are refused with `enterprise_plan_required`, and the Braids page explains what braids do and offers a conversation about Enterprise.
+
+If your organisation leaves Enterprise, its braids **pause** and are kept. No trace shows braided spans, and the Braids page marks each braid as paused, with a banner saying they start again on upgrade. Members can still list them, and admins can still remove them. When the organisation returns to Enterprise, the braided spans show again without recreating any braid.
+
+### Messages you may see
+
+| Code | Meaning |
+| --- | --- |
+| `braid_into_itself` | A project cannot braid into itself. |
+| `braid_across_organizations` | Both projects must belong to the same organisation. |
+| `braid_aggregate_project` | Aggregate projects cannot take part in a braid. |
+| `braid_already_exists` | An identical braid between these projects is already live. |
+| `braid_changed` | Someone changed or removed this braid while you were editing it. Reopen it and try again. |
+| `braid_not_on_project` | The braid does not touch the project you removed it from. |
+| `braid_condition_unsupported`, `braid_condition_syntax`, `braid_condition_too_large`, `braid_condition_limit_reached` | See [Conditions](#conditions). |
+| `enterprise_plan_required` | The action needs the Enterprise plan. |
+
+---
+
 # FILE: ./features/dashboards.mdx
 
 ---
