@@ -11,7 +11,6 @@ import { afterEach, describe, expect, it } from "vitest";
 import { insightEntry, renderWithInsightHost } from "../../../testing.tsx";
 import { InsightsNavCount } from "../insights-nav-count.tsx";
 
-/** Draws the pill over unseen insights of these verdicts and hands back its class. */
 async function pillOver(tones: readonly InsightTone[]): Promise<HTMLElement> {
   const unseen = tones.map((tone, index) => insightEntry({ id: `insight-${index}`, tone }));
   renderWithInsightHost({

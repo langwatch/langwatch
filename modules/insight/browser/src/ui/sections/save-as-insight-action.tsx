@@ -1,8 +1,7 @@
 /**
  * "Save as insight" under a settled Langy answer, lent through Langy's answer-action extension
- * point. Opens a short form prefilled from the answer, or from one bad or watch finding of its
- * insights card; good findings are never offered. Saving files it for the person who saved it.
- * Draws nothing without the flag or `analytics:view`, or for a card of good news alone.
+ * point. Prefills from the answer, or from one bad or watch finding of its card; good findings
+ * are never offered. Draws nothing without the flag or `analytics:view`, or for good news alone.
  */
 
 import { Dialog } from "@langwatch/design-system/dialog";
