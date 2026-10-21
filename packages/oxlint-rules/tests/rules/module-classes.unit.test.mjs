@@ -292,7 +292,10 @@ describe("given an opted-in framework package", () => {
       expect(frameworkReport(code, filename)).toEqual([["publicConstructor", 2]]);
 
       const entry = join(framework.cwd, RELAY, "index.ts");
-      appendFileSync(entry, 'export { LateService } from "./features/late/services/late.service.ts";\n');
+      appendFileSync(
+        entry,
+        'export { LateService } from "./features/late/services/late.service.ts";\n',
+      );
       const later = new Date(Date.now() + 60_000);
       utimesSync(entry, later, later);
       expect(frameworkReport(code, filename)).toEqual([]);
