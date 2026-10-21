@@ -41,7 +41,7 @@ export function dlqGroupKeys({ keyPrefix, groupId }: { keyPrefix: string; groupI
  * Takes the live jobs it removes off the total-pending counter (KEYS[15]); a dead worker's
  * claimed jobs were taken off at claim, so they move without touching it.
  */
-export const MOVE_TO_DLQ_LUA = `
+export const MOVE_TO_DLQ_LUA = `#!lua flags=allow-oom
 local srcJobsKey   = KEYS[1]
 local srcDataKey   = KEYS[2]
 local activeKey    = KEYS[3]
@@ -137,6 +137,7 @@ return count
  * added to the total-pending counter (KEYS[9]). Answers the dead-lettered jobs it took.
  */
 export const REPLAY_FROM_DLQ_LUA =
+  "#!lua\n" +
   PENDING_INDEX_HELPER_LUA +
   TTL_HELPER_LUA +
   PARK_HELPER_LUA +
@@ -196,7 +197,7 @@ return count
  * Discard: the operator marking a group's jobs never-to-run. Answers the job count and last error
  * the audit row records (specs/ops/dead-letter-recovery.feature).
  */
-export const DISCARD_FROM_DLQ_LUA = `
+export const DISCARD_FROM_DLQ_LUA = `#!lua flags=allow-oom
 local dlqJobsKey   = KEYS[1]
 local dlqDataKey   = KEYS[2]
 local dlqErrorKey  = KEYS[3]
@@ -219,7 +220,7 @@ return {count, lastError or ""}
  * index, then each group's jobs, data and error keys in ARGV order. A group leaves only when
  * none of its three keys exists at the moment of removal; answers the ids it removed.
  */
-export const DLQ_INDEX_PRUNE_LUA = `
+export const DLQ_INDEX_PRUNE_LUA = `#!lua flags=allow-oom
 if #KEYS ~= 1 + (#ARGV * 3) then
   return redis.error_reply("DLQ_INDEX_PRUNE expects three keys per group id")
 end
@@ -238,6 +239,7 @@ return pruned
  * already re-staged on the live group, taken off it. The group itself stays live.
  */
 const DEAD_LETTER_JOB_LUA =
+  "#!lua flags=allow-oom\n" +
   BLOB_LEASE_HELPER_LUA +
   ROUTING_META_HELPER_LUA +
   `

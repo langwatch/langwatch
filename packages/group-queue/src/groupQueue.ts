@@ -52,6 +52,7 @@ import {
   GroupQueueConfigurationError,
   GroupQueueError,
   HandBackGroupQueueError,
+  QueueStagingClosedError,
 } from "./errors.ts";
 import { runGroupBatch } from "./groupBatchRun.ts";
 import {
@@ -813,11 +814,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
   /** Refuses a send once the drain has finished; work produced during the drain still stages. */
   private assertStagingOpen(operation: "send" | "sendBatch" | "sendEach"): void {
     if (this.stagingClosed) {
-      throw new GroupQueueError({
-        queueName: this.queueName,
-        operation,
-        message: "Cannot send to queue after its drain has finished",
-      });
+      throw new QueueStagingClosedError({ queueName: this.queueName, operation });
     }
   }
 

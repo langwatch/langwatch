@@ -2334,6 +2334,8 @@ its attempts. Only a single call that may run longer raises the limit (Alex, 202
 through the framework; no module scans queues or reads the `gq:parked-tenants` keys directly (Alex,
 2026-09-29). A tenant is parked only while
 the system is under load; otherwise a tenant may burst past the others (Alex, 2026-09-29).
+Queue Lua scripts declare Redis 7 script flags: growth scripts are refused whole at the memory cap,
+scripts that free memory carry allow-oom; Redis 7 is the minimum (Alex, 2026-10-20).
 
 A dequeued event whose type no pipeline on that worker declares is handed back without using an
 attempt, not refused (Alex, 2026-10-08, round 24; 2026-10-12, G1-F1): mid rolling deploy an older
