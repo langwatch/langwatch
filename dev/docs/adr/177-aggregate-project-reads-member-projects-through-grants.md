@@ -1,8 +1,8 @@
 # ADR-177: An aggregate project reads its member projects through shared grants
 
-**Date:** 2026-09-26, revised 2026-10-15
+**Date:** 2026-09-26, revised 2026-10-19
 
-**Status:** Accepted (v4.13, 2026-10-15)
+**Status:** Accepted (v4.14, 2026-10-19)
 
 **Builds on:** ADR-166 (grant-scoped data access: a sealed `Authorization`
 proof minted once at the door, carried by hand, applied by the store client),
@@ -861,3 +861,26 @@ side keeps its existing guards until ADR-166's `prisma.as` lands.
   builders), filter options, feedbacks and top documents keep their own
   tenant, so the Analytics pages stay hidden on an aggregate (decision 8)
   until those are fenced too.
+- v4.14 (2026-10-19, decision 8 changed: LangWatchQL on the aggregate).
+  LangWatchQL becomes the way an aggregate reads analytics; the legacy
+  Analytics pages are not fenced further and retire with that service. The
+  in-app door (`AnalyticsApp.executeLangWatchQL`) reads the members from the
+  route's `analytics:view` proof (`fenceFor`), never from the request, and
+  runs the statement under each member's LangWatchQL key, so the row policy
+  bounds the tenants as it does for a multi-project API key (ADR-142). A
+  member whose key cannot be read refuses the run by name. The row policy
+  knows no dates, so the door also narrows every catalogued view the
+  statement reads to each shared grant's window on that view's time column,
+  through the same reference rewrite that leaves out origins; a view with no
+  time column reads only members shared for their whole history. An app
+  function's text read takes a key from the result and no date, so it reads
+  only whole-history members, and Instant Evals are off on an aggregate. The tenant
+  bound is the store's, the date bound is the rewrite's, so the gate is an
+  integration test counting rows across a window edge and a non-member. The
+  strictest member protections apply (decision 9), the bounds are charged to
+  the aggregate once, a member count above the key-set cap is refused before
+  any read, and the audit row is the one the permission gate already writes
+  when it mints the proof. A plain project's statement reaches the store as
+  before. Not moved: the Analytics and Dashboards navigation stay hidden on
+  an aggregate until the Dashboards pages ship there.
+  Spec: `specs/lwql/aggregate-reads.feature`.

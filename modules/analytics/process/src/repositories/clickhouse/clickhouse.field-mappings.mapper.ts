@@ -3,6 +3,8 @@
  * access.
  */
 
+import { OWN_TENANT_SQL, type TenantSql } from "./clickhouse.tenant-predicate.mapper.ts";
+
 /**
  * Identity columns always included in trace_summaries dedup subqueries.
  * These are required for deduplication (TraceId, UpdatedAt),
@@ -468,17 +470,20 @@ export function getTableAlias(table: CHTable): string {
  * @param requiredColumns optional column subset (defaults to all analytics columns).
  * @param spanTimeFilter `stored_spans` partition bound; omitted, it cold-scans every partition.
  * @param evalTimeFilter `evaluation_runs` partition bound; omitted, it cold-scans every partition.
+ * @param tenant how the joined subquery names its tenants; the own project's when omitted.
  */
 export function buildJoinClause({
   table,
   requiredColumns,
   spanTimeFilter,
   evalTimeFilter,
+  tenant = OWN_TENANT_SQL,
 }: {
   table: CHTable;
   requiredColumns?: ReadonlySet<string>;
   spanTimeFilter?: string;
   evalTimeFilter?: string;
+  tenant?: TenantSql;
 }): string {
   const alias = tableAliases[table];
   const baseAlias = tableAliases.trace_summaries;
@@ -489,7 +494,7 @@ export function buildJoinClause({
         ? mergeWithIdentity(requiredColumns, SPAN_IDENTITY_COLUMNS)
         : SPAN_ANALYTICS_COLUMNS;
       const timeBound = spanTimeFilter ? ` ${spanTimeFilter}` : "";
-      return `JOIN (SELECT ${Array.from(columns).join(", ")} FROM stored_spans WHERE TenantId = {tenantId:String}${timeBound}) ${alias} ON ${baseAlias}.TenantId = ${alias}.TenantId AND ${baseAlias}.TraceId = ${alias}.TraceId`;
+      return `JOIN (SELECT ${Array.from(columns).join(", ")} FROM stored_spans WHERE ${tenant.sideTable}${timeBound}) ${alias} ON ${baseAlias}.TenantId = ${alias}.TenantId AND ${baseAlias}.TraceId = ${alias}.TraceId`;
     }
     case "evaluation_runs": {
       const columns = requiredColumns
@@ -498,11 +503,11 @@ export function buildJoinClause({
       const evalTimeBound = evalTimeFilter ? ` ${evalTimeFilter}` : "";
       return `JOIN (
         SELECT ${Array.from(columns).join(", ")} FROM evaluation_runs
-        WHERE TenantId = {tenantId:String}${evalTimeBound}
+        WHERE ${tenant.sideTable}${evalTimeBound}
           AND (TenantId, EvaluationId, UpdatedAt) IN (
             SELECT TenantId, EvaluationId, max(UpdatedAt)
             FROM evaluation_runs
-            WHERE TenantId = {tenantId:String}${evalTimeBound}
+            WHERE ${tenant.sideTable}${evalTimeBound}
             GROUP BY TenantId, EvaluationId
           )
       ) ${alias} ON ${baseAlias}.TenantId = ${alias}.TenantId AND ${baseAlias}.TraceId = ${alias}.TraceId`;

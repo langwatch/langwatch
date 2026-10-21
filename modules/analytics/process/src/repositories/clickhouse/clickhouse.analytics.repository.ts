@@ -63,24 +63,23 @@ type TimeseriesBuilder = (input: TimeseriesQueryInput) => {
 };
 
 /**
- * How a table's statement picks its tenants: `fenced` builders write the proof's marker and
- * read through it (ADR-177); `own` builders still name the input's project by hand.
+ * The builder for a table. Every builder writes the proof's markers and is read through the
+ * fenced reader (ADR-177); `evaluation_runs` is joined beside trace_summaries, never its own
+ * FROM, so both legacy tables share one builder.
  */
-type TimeseriesRoute = { scope: "fenced" | "own"; build: TimeseriesBuilder };
-
-const routeFor = (table: AnalyticsTable): TimeseriesRoute => {
+const builderFor = (table: AnalyticsTable): TimeseriesBuilder => {
   switch (table) {
     case "trace_analytics_rollup":
-      return { scope: "fenced", build: buildRollupTimeseriesQuery };
+      return buildRollupTimeseriesQuery;
     case "trace_analytics":
-      return { scope: "fenced", build: buildSlimTimeseriesQuery };
+      return buildSlimTimeseriesQuery;
     case "evaluation_analytics_rollup":
-      return { scope: "fenced", build: buildEvalRollupTimeseriesQuery };
+      return buildEvalRollupTimeseriesQuery;
     case "evaluation_analytics":
-      return { scope: "fenced", build: buildEvalSlimTimeseriesQuery };
+      return buildEvalSlimTimeseriesQuery;
     case "trace_summaries":
     case "evaluation_runs":
-      return { scope: "own", build: buildTimeseriesQuery };
+      return buildTimeseriesQuery;
     default: {
       const exhaustive: never = table;
       throw new Error(`Unknown Analytics table ${String(exhaustive)}`);
@@ -88,7 +87,7 @@ const routeFor = (table: AnalyticsTable): TimeseriesRoute => {
   }
 };
 
-/** What a timeseries statement is sent through: the fenced reader or the own tenant's client. */
+/** What a timeseries statement is sent through: the fenced reader. */
 type TimeseriesStatementClient = {
   query(input: {
     query: string;
@@ -139,12 +138,8 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
     if (!projectId.trim()) {
       throw new Error("Analytics timeseries projectId is required");
     }
-    const route = routeFor(query.table);
-    const client = await this.statementClient({
-      scope: route.scope,
-      authorization: query.authorization,
-      projectId,
-    });
+    const build = builderFor(query.table);
+    const client = this.statementClient({ authorization: query.authorization, projectId });
 
     const builderInput: TimeseriesQueryInput = {
       projectId,
@@ -161,7 +156,7 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
       negateFilters: query.input.negateFilters,
       excludeOrigins: query.input.excludeOrigins,
     };
-    const built = route.build(builderInput);
+    const built = build(builderInput);
 
     try {
       const response = await client.query({
@@ -328,24 +323,21 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
   }
 
   /**
-   * The client a series is sent through. The proof is checked either way and must be for the
-   * input's project, so a series cannot be asked under one project and read under another's.
+   * The fenced reader a series is sent through. The proof must be for the input's project, so
+   * a series cannot be asked under one project and read under another's.
    */
-  private async statementClient({
-    scope,
+  private statementClient({
     authorization,
     projectId,
   }: {
-    scope: TimeseriesRoute["scope"];
     authorization: Authorization;
     projectId: string;
-  }): Promise<TimeseriesStatementClient> {
+  }): TimeseriesStatementClient {
     const reader = this.authorized.as(authorization, { reads: "analytics" });
     if (!reader.fence.own.includes(projectId)) {
       throw new AnalyticsProofProjectMismatchError(projectId);
     }
-    if (scope === "fenced") return translatingFailures(reader);
-    return this.clientFor(projectId);
+    return translatingFailures(reader);
   }
 
   private async clientFor(tenantId: string): Promise<EvaluationAnalyticsClickHouseClient> {

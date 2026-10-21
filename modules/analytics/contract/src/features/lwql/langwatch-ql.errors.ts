@@ -403,6 +403,57 @@ export class LangWatchQLRateLimitedError extends HandledError {
 }
 
 /**
+ * An aggregate's run needs every member's LangWatchQL key, and these members have none that can
+ * be read, so nothing runs: reading the rest would show a total that silently leaves them out.
+ */
+export class LangWatchQLMemberKeyMissingError extends HandledError {
+  declare readonly code: "lwql_member_key_missing";
+
+  constructor(input: { projectIds: readonly string[]; projectNames?: readonly string[] }) {
+    super("lwql_member_key_missing", "A member project of this aggregate cannot be queried.", {
+      httpStatus: 503,
+      fault: "platform",
+      meta: { projectIds: [...input.projectIds], projectNames: [...(input.projectNames ?? [])] },
+    });
+    this.name = "LangWatchQLMemberKeyMissingError";
+  }
+}
+
+/**
+ * An aggregate reads more members than one LangWatchQL statement may name, refused before any
+ * read rather than answered for a part of them.
+ */
+export class LangWatchQLTooManyMembersError extends HandledError {
+  declare readonly code: "lwql_too_many_members";
+
+  constructor(input: { memberCount: number; maxMembers: number }) {
+    super("lwql_too_many_members", "This aggregate has too many members to query at once.", {
+      httpStatus: 422,
+      fault: "customer",
+      meta: { memberCount: input.memberCount, maxMembers: input.maxMembers },
+    });
+    this.name = "LangWatchQLTooManyMembersError";
+  }
+}
+
+/**
+ * A view the read keeps to a window is read as a subquery, and ClickHouse takes no `FINAL` or
+ * `SAMPLE` on one. The views already keep one row per key, so `FINAL` adds nothing there.
+ */
+export class LangWatchQLTableModifierError extends HandledError {
+  declare readonly code: "lwql_table_modifier_unsupported";
+
+  constructor(input: { modifiers: readonly string[] }) {
+    super("lwql_table_modifier_unsupported", "FINAL and SAMPLE cannot be used on this read.", {
+      httpStatus: 400,
+      fault: "customer",
+      meta: { modifiers: [...input.modifiers] },
+    });
+    this.name = "LangWatchQLTableModifierError";
+  }
+}
+
+/**
  * The shared LangWatchQL identity is already running as many statements as it
  * may (ClickHouse TOO_MANY_SIMULTANEOUS_QUERIES). Nothing is wrong with the
  * query: the same request succeeds moments later, so it is retryable.

@@ -346,6 +346,36 @@ Feature: An aggregate project reads its member projects
     Then the sessions of both members show, newest first
     And the sessions before that grant's start are absent
 
+  # A session id is unique only within the project that recorded it, so every
+  # row carries its member project and the replay reads under that member.
+
+  @unit
+  Scenario: Two member projects' sessions that share an id stay two rows on the aggregate's Sessions page
+    Given an aggregate reading two members through shared grants
+    And each member recorded a session with the same id, in its own repository, pull request and cost
+    When ana opens the aggregate's Sessions page
+    Then two rows show, each carrying its own member project, project name, cost and pull requests
+    And the member project names are looked up once for the page
+
+  @unit
+  Scenario: A member project the name lookup cannot find is named by its id
+    Given an aggregate whose member project has no name the lookup can find
+    When ana opens the aggregate's Sessions page
+    Then that member's rows are named by the member project's id
+
+  @integration
+  Scenario: The group project's Sessions page names the member project on each row
+    Given the aggregate's Sessions page lists sessions from two member projects
+    Then each row names the member project that recorded it
+    And a page whose rows all come from one project names none
+
+  @integration
+  Scenario: Opening a member project's session replays that member's conversation
+    Given the aggregate's Sessions page lists two sessions that share an id, from member A and member B
+    When ana opens member B's session
+    Then the replay reads member B's conversation and opens the trace drawer on member B
+    And member A's row is not marked as opening
+
   @unit
   Scenario: A sessions read through the proof names no tenant of its own
     Given a repository reading sessions through the proof-checked client
@@ -549,9 +579,27 @@ Feature: An aggregate project reads its member projects
     Then the member's traces inside the window are counted
     And the member's traces outside the window and the non-member's traces are not
 
-  # Unimplemented: the rollup and slim analytics tables read members through the
-  # proof, but trace_summaries and evaluation_runs still read the aggregate's own
-  # tenant, and the page stays hidden until they are fenced too.
+  @integration
+  Scenario: The aggregate's trace summaries count members inside their windows
+    Given an aggregate project with one member shared for its whole history
+    And a second member shared only from a point in time
+    And another project in the organisation that is not a member and holds traces
+    When the aggregate's trace cost is read from the trace summaries under its proof
+    Then every trace of the first member is counted
+    And the second member's traces are counted only from the point its grant starts
+    And the non-member's traces are not
+
+  @integration
+  Scenario: The aggregate's evaluation chart counts members inside their windows
+    Given an aggregate project with one member shared for its whole history
+    And a second member shared only from a point in time
+    And another project in the organisation that is not a member and holds evaluation runs
+    When the aggregate's score for one check is read from the evaluation runs under its proof
+    Then the check's runs on the members' traces inside their windows are counted
+    And the runs of another check and the non-member's runs are not
+
+  # Unimplemented: every timeseries table now reads members through the proof, but the
+  # analytics page stays hidden on an aggregate until its screens are opened up.
   @integration @unimplemented
   Scenario: Analytics aggregate across members
     Given an aggregate project with two members each holding traces

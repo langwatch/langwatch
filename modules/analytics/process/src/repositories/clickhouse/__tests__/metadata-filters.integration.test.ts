@@ -90,13 +90,10 @@ function traceAnalyticsRow(trace: (typeof TRACES)[number]) {
 
 type Filters = TimeseriesQueryInput["filters"];
 
-/**
- * Each graph table with its builder and how its statement is sent: `trace_summaries` names its
- * project by hand, `trace_analytics` reads through the proof as the repository sends it.
- */
+/** Each graph table with its builder; both read through the proof as the repository sends them. */
 const BUILDERS = [
-  ["trace_summaries", buildTimeseriesQuery, "own"],
-  ["trace_analytics", buildSlimTimeseriesQuery, "fenced"],
+  ["trace_summaries", buildTimeseriesQuery],
+  ["trace_analytics", buildSlimTimeseriesQuery],
 ] as const;
 
 describe("analytics metadata filters", () => {
@@ -129,7 +126,7 @@ describe("analytics metadata filters", () => {
     await deleteTenantRows();
   });
 
-  describe.each(BUILDERS)("when the graph reads %s", (_, build, scope) => {
+  describe.each(BUILDERS)("when the graph reads %s", (_, build) => {
     /** Traces the series counts in the current period under `filters`. */
     const countWith = async (filters: Filters): Promise<number> => {
       resetParamCounter();
@@ -139,10 +136,9 @@ describe("analytics metadata filters", () => {
         filters,
       });
       const statement = { query: sql, query_params: params, format: "JSONEachRow" } as const;
-      const result =
-        scope === "fenced"
-          ? await ownProjectReaderOver({ client: ch, projectId: TENANT_ID }).query(statement)
-          : await ch.query(statement);
+      const result = await ownProjectReaderOver({ client: ch, projectId: TENANT_ID }).query(
+        statement,
+      );
       const rows = (await result.json()) as Record<string, number | string>[];
       return rows
         .filter((row) => row.period === "current")

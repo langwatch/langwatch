@@ -482,6 +482,17 @@ const presentations = {
     title: "Queries are queued up right now",
     describe: () => "Too many queries were running at once. Try again in a few seconds.",
   },
+  lwql_member_key_missing: {
+    title: "A member project can't be queried yet",
+    describe: (error) => {
+      const names = strList(error, "projectNames");
+      if (names.length === 0) {
+        return "One of the projects this group project reads isn't set up for queries yet. Try again later, or ask your administrator.";
+      }
+      const plural = names.length > 1;
+      return `${listLabels(names.map((name) => `"${name}"`))} ${plural ? "aren't" : "isn't"} set up for queries yet. Try again later, or ask your administrator.`;
+    },
+  },
   lwql_not_permitted: {
     title: "This query isn't allowed here",
     describe: () =>
@@ -506,6 +517,16 @@ const presentations = {
     // loop runs up is the project's, so the budget is too.
     title: "Too many queries just now",
     describe: () => "Wait a minute, then run the query again.",
+  },
+  lwql_table_modifier_unsupported: {
+    title: "FINAL and SAMPLE can't be used here",
+    describe: () =>
+      "This read keeps each project to its own dates, and that can't be combined with FINAL or SAMPLE. The datasets already keep one row per item, so remove them and run it again.",
+  },
+  lwql_too_many_members: {
+    title: "This aggregate reads too many projects",
+    describe: () =>
+      "A query can read only so many projects at once. Narrow the aggregate's projects and try again.",
   },
   lwql_reserved_parameter_supplied: {
     // One code covers three reserved names, so both halves of the copy are

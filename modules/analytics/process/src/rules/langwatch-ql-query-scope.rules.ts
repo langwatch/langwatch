@@ -1,6 +1,9 @@
 import {
   formatLangWatchQLDateTimeParameter,
+  type LangWatchQLCaller,
+  type LangWatchQLMemberWindow,
   type LangWatchQLProtections,
+  LangWatchQLTableModifierError,
   type LangWatchQLTimeWindow,
 } from "@langwatch/analytics-contract";
 import { DEFAULT_TRACE_ORIGIN } from "@langwatch/trace-contract";
@@ -121,6 +124,32 @@ function findViewReferences({
 }
 
 /**
+ * Refuses `FINAL` or `SAMPLE` on a view about to be read as a subquery, which ClickHouse rejects
+ * with a bare error. The parser gives neither a position, so neither can be moved inside.
+ * @throws {LangWatchQLTableModifierError} naming the modifiers written.
+ */
+function assertNoTableModifiers({
+  statements,
+  references,
+}: {
+  statements: readonly SqlAstNode[];
+  references: readonly ViewReference[];
+}): void {
+  const rewritten = new Set(references.map((reference) => reference.start));
+  const modifiers = new Set<string>();
+  for (const expression of collectNodes(statements, "TableExpression", [])) {
+    const table = expression.database_and_table_name as
+      | { location?: { start?: { offset?: unknown } } }
+      | undefined;
+    const start = table?.location?.start?.offset;
+    if (typeof start !== "number" || !rewritten.has(start)) continue;
+    if (expression.final === true) modifiers.add("FINAL");
+    if (expression.sample_size !== undefined) modifiers.add("SAMPLE");
+  }
+  if (modifiers.size > 0) throw new LangWatchQLTableModifierError({ modifiers: [...modifiers] });
+}
+
+/**
  * The predicate keeping each view's rows to the origins not left out, keyed like a reference.
  * A view with no `Origin` and no `TraceId`, such as a per-minute rollup, gets none.
  */
@@ -159,17 +188,69 @@ function buildOriginPredicates({
   return predicates;
 }
 
+const TENANT_COLUMN = "TenantId";
+
+/** Admits no row: a view the windows cannot be applied to reads nothing on an aggregate. */
+const NO_ROWS = "0";
+
 /**
- * `sql`, an accepted statement, with every catalogued view it reads replaced by that view minus
- * the `excludeOrigins` traces: a board shows the member's agent, not Langy's turns (ADR-061).
- * Scoping each reference keeps a widget's own Origin filter meaningful (analytics ADR-003).
+ * The predicate keeping each view's rows to the members inside their windows, keyed like a
+ * reference. The row policy already bounds the tenants; this bounds when each is read from. A
+ * view without the window's time column keeps only the members shared for their whole history.
  */
-export function scopeLangWatchQLToOrigins({
+function buildWindowPredicates({
+  views,
+  database,
+  memberWindows,
+}: {
+  views: readonly LangWatchQLViewDefinition[];
+  database: string;
+  memberWindows: readonly LangWatchQLMemberWindow[];
+}): ReadonlyMap<string, string> {
+  const whole = memberWindows.filter((window) => window.from <= 0);
+  const dated = memberWindows.filter((window) => window.from > 0);
+  const wholeClause =
+    whole.length === 0
+      ? undefined
+      : `${TENANT_COLUMN} IN (${whole.map((window) => clickHouseLiteral(window.projectId)).join(", ")})`;
+
+  const predicates = new Map<string, string>();
+  for (const view of views) {
+    const columns = new Set(view.columns.map((column) => column.name));
+    const key = qualifyTableName({ table: view.name, defaultDatabase: database });
+    if (!columns.has(TENANT_COLUMN)) {
+      predicates.set(key, NO_ROWS);
+      continue;
+    }
+    const timeColumn =
+      view.timeColumn !== undefined && columns.has(view.timeColumn) ? view.timeColumn : undefined;
+    const picks = [
+      ...(wholeClause === undefined ? [] : [wholeClause]),
+      ...(timeColumn === undefined
+        ? []
+        : dated.map(
+            (window) =>
+              `(${TENANT_COLUMN} = ${clickHouseLiteral(window.projectId)} AND ` +
+              `${timeColumn} >= fromUnixTimestamp64Milli(toInt64(${Math.trunc(window.from)})))`,
+          )),
+    ];
+    predicates.set(key, picks.length === 0 ? NO_ROWS : `(${picks.join(" OR ")})`);
+  }
+  return predicates;
+}
+
+/**
+ * `sql` with each catalogued view it reads replaced by that view minus the `excludeOrigins` traces
+ * (ADR-061, analytics ADR-003). With `memberWindows`, each view is also kept to the members inside
+ * their grants' windows, and a view outside `views` reads nothing (ADR-177 v4.14).
+ */
+export function scopeLangWatchQL({
   sql,
   excludeOrigins,
   database,
   views,
   timeWindow,
+  memberWindows,
 }: {
   sql: string;
   excludeOrigins: readonly string[];
@@ -178,24 +259,47 @@ export function scopeLangWatchQLToOrigins({
   views: readonly LangWatchQLViewDefinition[];
   /** The period the statement is bound to; absent, the trace lookup reads all history. */
   timeWindow?: LangWatchQLTimeWindow;
+  /** The members an aggregate reads and where each window opens; absent on a plain project. */
+  memberWindows?: readonly LangWatchQLMemberWindow[];
 }): string {
-  if (excludeOrigins.length === 0) return sql;
+  // Whole-history members need no rewrite: the row policy bounds them exactly.
+  const isWindowed = memberWindows?.some((window) => window.from > 0) === true;
+  if (excludeOrigins.length === 0 && !isWindowed) return sql;
 
   const parsed = clickHouseSqlParser.parse(sql);
   if (!parsed.ok) {
-    throw new Error("LangWatchQL origin scope: an accepted statement no longer parses");
+    throw new Error("LangWatchQL scope: an accepted statement no longer parses");
   }
 
-  const predicates = buildOriginPredicates({
-    views,
-    database,
-    excludeOrigins,
-    ...(timeWindow ? { timeWindow } : {}),
+  const origins =
+    excludeOrigins.length === 0
+      ? new Map<string, string>()
+      : buildOriginPredicates({
+          views,
+          database,
+          excludeOrigins,
+          ...(timeWindow ? { timeWindow } : {}),
+        });
+  const windows =
+    isWindowed && memberWindows
+      ? buildWindowPredicates({ views, database, memberWindows })
+      : undefined;
+  const rewrites = findViewReferences({ statements: parsed.statements, database }).flatMap(
+    (reference) => {
+      const window =
+        windows === undefined ? undefined : (windows.get(reference.qualified) ?? NO_ROWS);
+      const predicate = [origins.get(reference.qualified), window]
+        .filter((part) => part !== undefined)
+        .join(" AND ");
+      return predicate === "" ? [] : [{ reference, predicate }];
+    },
+  );
+  assertNoTableModifiers({
+    statements: parsed.statements,
+    references: rewrites.map(({ reference }) => reference),
   });
   let scoped = sql;
-  for (const reference of findViewReferences({ statements: parsed.statements, database })) {
-    const predicate = predicates.get(reference.qualified);
-    if (predicate === undefined) continue;
+  for (const { reference, predicate } of rewrites) {
     const written = sql.slice(reference.start, reference.end);
     const alias = reference.impliedAlias === undefined ? "" : ` AS ${reference.impliedAlias}`;
     scoped =
@@ -203,4 +307,23 @@ export function scopeLangWatchQLToOrigins({
       scoped.slice(reference.end);
   }
   return scoped;
+}
+
+/**
+ * The projects an app function may read text from. Its key is a value in the result, which a
+ * statement can write as a literal, and the text read takes no date: so on an aggregate only
+ * members shared for their whole history are read, and a dated member's text stays unresolved.
+ */
+export function hydratableProjects({
+  projects,
+  memberWindows,
+}: {
+  projects: readonly LangWatchQLCaller[];
+  memberWindows: readonly LangWatchQLMemberWindow[] | undefined;
+}): readonly LangWatchQLCaller[] {
+  if (memberWindows === undefined) return projects;
+  const whole = new Set(
+    memberWindows.filter((window) => window.from <= 0).map((window) => window.projectId),
+  );
+  return projects.filter((project) => whole.has(project.id));
 }

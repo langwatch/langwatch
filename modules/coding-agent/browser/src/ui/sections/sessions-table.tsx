@@ -4,7 +4,7 @@ import { Pagination } from "@langwatch/design-system/pagination";
 import { Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import { SquareTerminal } from "lucide-react";
 import type React from "react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import { codingAgentApi as api } from "../../behavior/coding-agent-api.ts";
 import { useCodingAgentRouter } from "../../behavior/coding-agent-router.ts";
@@ -25,6 +25,7 @@ import {
   matchesSessionSearch,
   type PeriodSelection,
 } from "../../model/session-filters.ts";
+import { sessionIdentityKey, spansSeveralProjects } from "../../model/session-identity.ts";
 import { SessionRow } from "../blocks/session-row.tsx";
 import { SessionsTableHeader } from "../blocks/sessions-table-header.tsx";
 import { SessionsToolbar } from "../blocks/sessions-toolbar.tsx";
@@ -54,10 +55,7 @@ export function SessionsTable({
     { projectId },
     { refetchOnWindowFocus: false },
   );
-  const rows = useMemo<SessionListRow[]>(
-    () => (sessionsQuery.data ?? []).map(toListRow),
-    [sessionsQuery.data],
-  );
+  const rows: SessionListRow[] = (sessionsQuery.data ?? []).map(toListRow);
 
   if (sessionsQuery.isLoading) {
     return <Skeleton height="180px" borderRadius="md" />;
@@ -96,18 +94,16 @@ const ListedSessions: React.FC<{
   const [search, setSearch] = useState("");
   const [periodSelection, setPeriodSelection] = useState<PeriodSelection | null>(null);
 
-  const filteredRows = useMemo(
-    () =>
-      rows.filter(
-        (row) =>
-          matchesSessionSearch({ row, query: search }) &&
-          isWithinPeriod({
-            lastUpdateAtMs: row.lastUpdateAtMs,
-            period: periodSelection?.period ?? null,
-          }),
-      ),
-    [rows, search, periodSelection],
+  const filteredRows = rows.filter(
+    (row) =>
+      matchesSessionSearch({ row, query: search }) &&
+      isWithinPeriod({
+        lastUpdateAtMs: row.lastUpdateAtMs,
+        period: periodSelection?.period ?? null,
+      }),
   );
+  // Decided over every listed row, not one page, so the project line stays put while paging.
+  const showProject = spansSeveralProjects(rows);
   const { sorted, sort, onSort } = useSessionsSort({ rows: filteredRows });
 
   // A refetch, a search or a narrower period can leave fewer rows than the page
@@ -117,10 +113,7 @@ const ListedSessions: React.FC<{
   // page.
   const pageCount = Math.max(1, Math.ceil(sorted.length / pageSize));
   const currentPage = Math.min(page, pageCount);
-  const visibleRows = useMemo(
-    () => sorted.slice((currentPage - 1) * pageSize, currentPage * pageSize),
-    [sorted, currentPage, pageSize],
-  );
+  const visibleRows = sorted.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   return (
     <VStack align="stretch" gap={3} width="full">
@@ -155,6 +148,7 @@ const ListedSessions: React.FC<{
           projectId={projectId}
           projectSlug={projectSlug}
           rows={visibleRows}
+          showProject={showProject}
           totalCount={sorted.length}
           page={currentPage}
           pageSize={pageSize}
@@ -183,6 +177,8 @@ const OnePageOfSessions: React.FC<{
   projectId: string;
   projectSlug: string | null;
   rows: SessionListRow[];
+  /** Whether each row names its member project: only when the rows span several. */
+  showProject: boolean;
   totalCount: number;
   page: number;
   pageSize: number;
@@ -194,6 +190,7 @@ const OnePageOfSessions: React.FC<{
   projectId,
   projectSlug,
   rows,
+  showProject,
   totalCount,
   page,
   pageSize,
@@ -217,11 +214,12 @@ const OnePageOfSessions: React.FC<{
         <ListTable.Body>
           {rows.map((row) => (
             <SessionRow
-              key={row.sessionId}
+              key={sessionIdentityKey(row)}
               row={row}
+              showProject={showProject}
               largestTotal={largestTotal}
               largestCost={largestCost}
-              isOpening={replay.openingSessionId === row.sessionId}
+              isOpening={replay.isOpening(row)}
               onOpenReplay={() => void replay.openReplay(row)}
               onOpenInExplorer={projectSlug ? () => void replay.openInExplorer(row) : undefined}
               onOpenPullRequest={(pullRequest) =>

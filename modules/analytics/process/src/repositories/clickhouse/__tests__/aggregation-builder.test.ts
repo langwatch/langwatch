@@ -1,4 +1,5 @@
 import type { AnalyticsSeries } from "@langwatch/analytics-contract";
+import { tenantScope, tenantSet } from "@langwatch/clickhouse-client";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import {
@@ -84,7 +85,7 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("WHERE");
       expect(result.sql).toContain("GROUP BY");
       expect(result.sql).toContain("period");
-      expect(result.params.tenantId).toBe("test-project");
+      expect(result.params).not.toHaveProperty("tenantId");
     });
 
     it("includes period case statement", () => {
@@ -123,9 +124,9 @@ describe("aggregation-builder", () => {
       };
       const result = buildTimeseriesQuery(input);
 
-      // The JOIN subquery filters stored_spans by StartTime, not just TenantId.
-      expect(result.sql).toMatch(
-        /JOIN \(SELECT[\s\S]*FROM stored_spans WHERE TenantId = \{tenantId:String\} AND StartTime >= \{previousStart:DateTime64\(3\)\}/,
+      // The JOIN subquery filters stored_spans by StartTime, not just the tenant set.
+      expect(result.sql).toContain(
+        `FROM stored_spans WHERE ${tenantSet()} AND StartTime >= {previousStart:DateTime64(3)}`,
       );
       expect(result.sql).toContain("StartTime < {currentEnd:DateTime64(3)}");
     });
@@ -1251,8 +1252,8 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("AS date");
       expect(result.sql).toContain("avg(inner_value)");
       expect(result.sql).toContain("GROUP BY");
-      expect(result.params.tenantId).toBe("test-project");
-      expect(result.sql).toContain("TenantId = {tenantId:String}");
+      expect(result.params).not.toHaveProperty("tenantId");
+      expect(result.sql).toContain(tenantScope("OccurredAt"));
     });
 
     it("builds date-bucketed pipeline query with evaluation groupBy", () => {
@@ -1279,9 +1280,9 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("AS date");
       expect(result.sql).toContain("AS period");
       expect(result.sql).toContain("sum(inner_value)");
-      expect(result.params.tenantId).toBe("test-project");
+      expect(result.params).not.toHaveProperty("tenantId");
       expect(result.params).toHaveProperty("groupByKey", "my-evaluator");
-      expect(result.sql).toContain("TenantId = {tenantId:String}");
+      expect(result.sql).toContain(tenantScope("OccurredAt"));
     });
 
     it("builds date-bucketed pipeline query for nested subquery metrics", () => {
@@ -1305,8 +1306,8 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("pipeline_key");
       expect(result.sql).toContain("AS date");
       expect(result.sql).toContain("AS period");
-      expect(result.params.tenantId).toBe("test-project");
-      expect(result.sql).toContain("TenantId = {tenantId:String}");
+      expect(result.params).not.toHaveProperty("tenantId");
+      expect(result.sql).toContain(tenantScope("OccurredAt"));
     });
 
     it("enforces tenant isolation in date-bucketed pipeline queries", () => {
@@ -1328,10 +1329,10 @@ describe("aggregation-builder", () => {
       };
       const result = buildTimeseriesQuery(input);
 
-      // Tenant isolation in params
-      expect(result.params.tenantId).toBe("test-project");
-      // Tenant isolation in SQL (dedupedTraceSummaries + baseWhere)
-      expect(result.sql).toContain("TenantId = {tenantId:String}");
+      // The proof's fence picks the tenants, inside the deduped trace subquery.
+      expect(result.params).not.toHaveProperty("tenantId");
+      expect(result.sql).toContain(tenantScope("OccurredAt"));
+      expect(result.sql).not.toContain("{tenantId:String}");
     });
 
     describe("when groupBy is evaluation field with cross-evaluator metrics", () => {
