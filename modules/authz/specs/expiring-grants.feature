@@ -137,6 +137,16 @@ Feature: Expiring grants
     When a grant for a shared resource also states an end date of its own
     Then the fact is refused
 
+  # A braid (ADR-183) answers two questions with two fields: the grant's end
+  # date says when the reader stops seeing spans, and its condition's window
+  # says which spans it sees. Neither stands in for the other.
+  @unit @unimplemented
+  Scenario: A braid's end date ends the access and its data window bounds the spans
+    Given a braid whose data window ends on 30 September and whose grant ends on 31 December
+    When the reader opens a trace on 1 November
+    Then it sees braided spans recorded up to 30 September
+    And from 31 December it sees none
+
   # ═══ The end date is not the grant's identity ═════════════════════════
 
   @unit

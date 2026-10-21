@@ -203,6 +203,14 @@ Feature: Share a trace behind a secret, scoped, expiring link
       When the holder opens the link
       Then the payload carries no API key identifier
 
+    # A braid (ADR-183) shows another project's spans to that project's own
+    # members; it never reaches past them to a link's holder.
+    @integration @unimplemented
+    Scenario: A shared link shows only the project's own spans, never braided ones
+      Given a share link for a trace that holds spans braided in from another project
+      When the holder opens the link
+      Then the payload carries only the sharing project's own spans
+
   Rule: The shared link renders the new Trace Explorer, read-only
 
     @integration

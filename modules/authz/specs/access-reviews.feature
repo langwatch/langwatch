@@ -19,7 +19,8 @@
 #   reach       what a principal can actually do at a scope, however they got
 #               it — not the rows bound at that scope.
 #   path        how a reach was arrived at: directly, through a group, through
-#               a key whose owner sets its ceiling, or through a share link.
+#               a key whose owner sets its ceiling, through a share link, or
+#               through a braid (ADR-183) into a project the person can read.
 #   change      one access fact that was attached, re-roled, revoked, or a role
 #               that was defined, edited or deleted.
 #
@@ -73,6 +74,14 @@ Feature: Access reviews
     And the published link is listed as a way into the trace it was published
       for
     And nobody appears without the answer saying how they got there
+
+  @unimplemented
+  Scenario: Spans braided into another project are a way into the project they came from
+    Given a braid from "chatbot" into "billing" on a condition
+    When olivia asks who can reach "chatbot"
+    Then the members of "billing" are listed as reaching the spans of "chatbot"
+      that match the condition, through the braid
+    And the answer names the braid's condition, its data window and when it ends
 
   @unimplemented
   Scenario: Access granted higher up the account reaches the project

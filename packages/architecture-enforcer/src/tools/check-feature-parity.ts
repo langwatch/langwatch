@@ -339,6 +339,14 @@ const LEGACY_INERT: string[] = [
   "modules/authz/specs/access-reviews.feature",
   "modules/authz/specs/agent-principals.feature",
   "modules/authz/specs/authz-passports.feature",
+  // PLANNED, NOT YET BUILT (ADR-183, Braids). Every scenario is @unimplemented and names
+  // the level it becomes; the pull request that builds each surface binds its file and
+  // deletes its entry here.
+  "modules/api-key/specs/signing-keys.feature",
+  "modules/authz/specs/braids-screen.feature",
+  "modules/authz/specs/braids.feature",
+  "modules/trace/specs/braided-spans.feature",
+  "modules/trace/specs/signed-calls.feature",
   // 2026-09-06 core-logic audit: these five ship ahead of the tests that
   // would bind them (packages/architecture-enforcer's unspecced-core report),
   // every scenario @unimplemented on purpose. Remove each entry with its
