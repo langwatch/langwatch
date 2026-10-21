@@ -27,7 +27,7 @@ const SHARED_FROM = Date.parse("2026-06-10T12:00:00.000Z");
 const WINDOW = { start: "2026-06-10T00:00:00.000Z", end: "2026-06-11T00:00:00.000Z" };
 /** Holds rows but is no member: its key is never sent. */
 const NON_MEMBER = "tenant-c";
-const VIEWS = ["traces"];
+const VIEWS = ["traces", "evaluations"];
 
 const IN_PERIOD =
   "OccurredAt >= {dashboard_context_period_start:DateTime} " +
@@ -72,6 +72,21 @@ describe("given an aggregate over project A for its whole history and project B 
         Version: "1",
         OccurredAt: at,
         UpdatedAt: at,
+      })),
+    });
+    // Each of project B's traces is evaluated after noon, the one from before it included.
+    await harness.admin.insert({
+      table: `${facts}.evaluation_runs`,
+      format: "JSONEachRow",
+      values: [2, 3].map((index) => ({
+        ProjectionId: `${tenantB.tenantId}/aggregate-windows-eval-${index}`,
+        TenantId: tenantB.tenantId,
+        EvaluationId: `${tenantB.tenantId}-aggregate-windows-eval-${index}`,
+        Version: "1",
+        TraceId: `${tenantB.tenantId}-aggregate-windows-${index}`,
+        Status: "processed",
+        ScheduledAt: AFTER,
+        UpdatedAt: AFTER,
       })),
     });
 
@@ -119,6 +134,39 @@ describe("given an aggregate over project A for its whole history and project B 
 
       expect(result.rows.map((row) => [row.TenantId, Number(row.n)])).toEqual([
         [tenantA.tenantId, 2],
+        [tenantB.tenantId, 1],
+      ]);
+    });
+  });
+
+  describe("when ana counts project B's evaluations, one of a trace from before noon", () => {
+    /** @scenario "The aggregate counts a member's evaluations by when their trace occurred" */
+    it("counts only the evaluation whose trace is inside the window", async () => {
+      const { tenantA, tenantB } = harness;
+
+      const result = await service.executeForProjects({
+        projects: [
+          { id: tenantA.tenantId, lwqlKey: tenantA.rawSecret },
+          { id: tenantB.tenantId, lwqlKey: tenantB.rawSecret },
+        ],
+        memberWindows: [
+          { projectId: tenantA.tenantId, from: 0 },
+          { projectId: tenantB.tenantId, from: SHARED_FROM },
+        ],
+        protections: {
+          catalogue: EVERY_CATALOGUE_PERMISSION,
+          canSeeCosts: true,
+          canSeeCapturedInput: true,
+          canSeeCapturedOutput: true,
+        },
+        sql:
+          "SELECT TenantId, count() AS n FROM evaluations " +
+          "WHERE ScheduledAt >= {dashboard_context_period_start:DateTime} " +
+          "AND ScheduledAt < {dashboard_context_period_end:DateTime} GROUP BY TenantId",
+        timeWindow: WINDOW,
+      });
+
+      expect(result.rows.map((row) => [row.TenantId, Number(row.n)])).toEqual([
         [tenantB.tenantId, 1],
       ]);
     });

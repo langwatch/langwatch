@@ -189,7 +189,9 @@ export class AnalyticsService {
     options: { authorization: Authorization; maxResultRows: number | undefined },
   ): Promise<AnalyticsTimeseriesResult> {
     const { input: routedInput, ...window } = this.timeseriesRequest.windowOf(parsed);
-    const table = this.repository.tableFor(routedInput);
+    // The tripwire is asked of one project's reads; a proof spanning members is left out of it.
+    const readsOneProject = projectIdsReadBy(options.authorization, "analytics:view").length === 1;
+    const table = this.repository.tableFor(routedInput, { readsMembers: !readsOneProject });
     const query = {
       table,
       authorization: options.authorization,
@@ -197,8 +199,6 @@ export class AnalyticsService {
       ...window,
       maxResultRows: options.maxResultRows,
     };
-    // The tripwire is asked of one project's reads; a proof spanning members is left out of it.
-    const readsOneProject = projectIdsReadBy(options.authorization, "analytics:view").length === 1;
     if (
       table === "trace_summaries" ||
       table === "evaluation_runs" ||

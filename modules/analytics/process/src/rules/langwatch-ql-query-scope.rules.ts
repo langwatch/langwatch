@@ -190,6 +190,20 @@ function buildOriginPredicates({
 
 const TENANT_COLUMN = "TenantId";
 
+/** The one-row-per-trace view a dated member's evaluations are timed through. */
+const TRACE_VIEW = "traces";
+
+/**
+ * Views whose rows are evaluations, timed when the evaluation ran, not when its trace occurred.
+ * A dated member's evaluation is read only when its trace is inside the window, so a trace from
+ * before the share evaluated after it stays out (ADR-177 v4.15).
+ */
+const EVALUATION_VIEWS: readonly string[] = [
+  "evaluations",
+  "evaluation_metrics",
+  "evaluation_metrics_by_minute",
+];
+
 /** Admits no row: a view the windows cannot be applied to reads nothing on an aggregate. */
 const NO_ROWS = "0";
 
@@ -208,35 +222,85 @@ function buildWindowPredicates({
   memberWindows: readonly LangWatchQLMemberWindow[];
 }): ReadonlyMap<string, string> {
   const whole = memberWindows.filter((window) => window.from <= 0);
-  const dated = memberWindows.filter((window) => window.from > 0);
   const wholeClause =
     whole.length === 0
       ? undefined
       : `${TENANT_COLUMN} IN (${whole.map((window) => clickHouseLiteral(window.projectId)).join(", ")})`;
+  const qualified = (table: string) => qualifyTableName({ table, defaultDatabase: database });
+  const traceView = qualified(TRACE_VIEW);
+  const reach: WindowReach = {
+    database,
+    dated: memberWindows.filter((window) => window.from > 0),
+    canReachTraceView: views.some((view) => qualified(view.name) === traceView),
+    evaluationViews: new Set(EVALUATION_VIEWS.map(qualified)),
+  };
 
   const predicates = new Map<string, string>();
   for (const view of views) {
-    const columns = new Set(view.columns.map((column) => column.name));
-    const key = qualifyTableName({ table: view.name, defaultDatabase: database });
-    if (!columns.has(TENANT_COLUMN)) {
-      predicates.set(key, NO_ROWS);
-      continue;
-    }
-    const timeColumn =
-      view.timeColumn !== undefined && columns.has(view.timeColumn) ? view.timeColumn : undefined;
+    const key = qualified(view.name);
     const picks = [
       ...(wholeClause === undefined ? [] : [wholeClause]),
-      ...(timeColumn === undefined
-        ? []
-        : dated.map(
-            (window) =>
-              `(${TENANT_COLUMN} = ${clickHouseLiteral(window.projectId)} AND ` +
-              `${timeColumn} >= fromUnixTimestamp64Milli(toInt64(${Math.trunc(window.from)})))`,
-          )),
+      ...datedPicks({ view, key, reach }),
     ];
-    predicates.set(key, picks.length === 0 ? NO_ROWS : `(${picks.join(" OR ")})`);
+    const tenanted = view.columns.some((column) => column.name === TENANT_COLUMN);
+    predicates.set(key, !tenanted || picks.length === 0 ? NO_ROWS : `(${picks.join(" OR ")})`);
   }
   return predicates;
+}
+
+/** What a view's dated-member windows are built from, the same for every view. */
+type WindowReach = {
+  database: string;
+  dated: readonly LangWatchQLMemberWindow[];
+  canReachTraceView: boolean;
+  evaluationViews: ReadonlySet<string>;
+};
+
+const startOf = (window: LangWatchQLMemberWindow) =>
+  `fromUnixTimestamp64Milli(toInt64(${Math.trunc(window.from)}))`;
+
+/** The window's trace lookup. A row naming no trace keeps its own time; `NULL IN (…)` is NULL. */
+function traceInside({
+  window,
+  database,
+}: {
+  window: LangWatchQLMemberWindow;
+  database: string;
+}): string {
+  return (
+    `(ifNull(${TRACE_ID_COLUMN}, '') = '' OR (${TENANT_COLUMN}, ${TRACE_ID_COLUMN}) IN ` +
+    `(SELECT ${TENANT_COLUMN}, ${TRACE_ID_COLUMN} FROM ${database}.${TRACE_VIEW} ` +
+    `WHERE ${TENANT_COLUMN} = ${clickHouseLiteral(window.projectId)} ` +
+    `AND OccurredAt >= ${startOf(window)}))`
+  );
+}
+
+/**
+ * Each dated member's clause on one view: from its start on the view's time column, and on an
+ * evaluation view only for a trace inside the window. None when the view cannot be timed so.
+ */
+function datedPicks({
+  view,
+  key,
+  reach,
+}: {
+  view: LangWatchQLViewDefinition;
+  key: string;
+  reach: WindowReach;
+}): string[] {
+  const columns = new Set(view.columns.map((column) => column.name));
+  const timeColumn = view.timeColumn;
+  if (timeColumn === undefined || !columns.has(timeColumn)) return [];
+  const isEvaluationView = reach.evaluationViews.has(key);
+  const canTimeByTrace = columns.has(TRACE_ID_COLUMN) && reach.canReachTraceView;
+  if (isEvaluationView && !canTimeByTrace) return [];
+  return reach.dated.map(
+    (window) =>
+      `(${TENANT_COLUMN} = ${clickHouseLiteral(window.projectId)} AND ` +
+      `${timeColumn} >= ${startOf(window)}` +
+      (isEvaluationView ? ` AND ${traceInside({ window, database: reach.database })}` : "") +
+      ")",
+  );
 }
 
 /**

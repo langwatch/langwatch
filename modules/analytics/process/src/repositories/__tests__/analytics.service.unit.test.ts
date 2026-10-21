@@ -16,7 +16,11 @@ import { describe, expect, it, vi } from "vitest";
 
 import { AnalyticsService } from "../../services/analytics.service.ts";
 import { NullAnalyticsEvaluationRepository } from "../analytics-persistence.repository.ts";
-import { AnalyticsRepository, type AnalyticsTimeseriesQuery } from "../analytics.repository.ts";
+import {
+  AnalyticsRepository,
+  type AnalyticsTableReadScope,
+  type AnalyticsTimeseriesQuery,
+} from "../analytics.repository.ts";
 import {
   clickHouseQueryClientOver,
   deferredVendor,
@@ -111,8 +115,11 @@ class RecordingRepository extends AnalyticsRepository {
 
   // The real routing, because what these cases claim is which table a read is
   // sent to — a double that answered a fixed table would assert itself.
-  tableFor(timeseriesInput: AnalyticsTimeseriesInput): AnalyticsTable {
-    return pickAnalyticsTable(timeseriesInput);
+  tableFor(
+    timeseriesInput: AnalyticsTimeseriesInput,
+    scope?: AnalyticsTableReadScope,
+  ): AnalyticsTable {
+    return pickAnalyticsTable(timeseriesInput, scope);
   }
 
   async runTimeseries(query: AnalyticsTimeseriesQuery): Promise<AnalyticsTimeseriesResult> {
@@ -235,6 +242,23 @@ describe("AnalyticsService", () => {
 
       const order = ["member-a", "member-b", "project-1"];
       expect(run.mock.calls.map(([call]) => call.tenantId)).toEqual([...order, ...order]);
+    });
+
+    /** @scenario "The aggregate counts a member's evaluations by when their trace occurred" */
+    it("sends the evaluations summary to the legacy builder, which windows each trace", async () => {
+      const repository = new RecordingRepository();
+      const service = createService(repository);
+
+      await service.getTimeseries(
+        input({
+          series: [{ metric: "evaluations.evaluation_runs", aggregation: "cardinality", key: "" }],
+          groupBy: "evaluations.evaluation_passed",
+          timeScale: "full",
+        }),
+        { authorization: aggregateProof() },
+      );
+
+      expect(repository.lastQuery?.table).toBe("evaluation_runs");
     });
 
     /** @scenario "A chart on an aggregate with too many members is refused before any read" */

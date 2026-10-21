@@ -938,4 +938,14 @@ side keeps its existing guards until ADR-166's `prisma.as` lands.
     member out of the total. No view can keep a read to before the end, and
     the reconciler writes no end today. The rate limit is checked before
     any member is looked up.
+  - A member's evaluation is counted only when its trace is inside the
+    grant's window. An evaluation is timed when it ran, so a window on that
+    time let a trace from before the share in once it was evaluated after
+    it. On an aggregate a chart of evaluations reads the legacy builder,
+    which windows the trace and joins its evaluations, never the
+    evaluation slim or rollup tables. In LangWatchQL a dated member's
+    `evaluations` and `evaluation_metrics` rows must name a trace in
+    `traces` inside the window; `evaluation_metrics_by_minute` names no
+    trace, so it reads only members shared for their whole history. An
+    evaluation that names no trace keeps its own time.
     Spec: `specs/governance/aggregate-project.feature`, section D.

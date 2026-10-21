@@ -53,6 +53,15 @@ export interface AnalyticsFeedbackPageRead {
   readonly hasMore: boolean;
 }
 
+/** How the read is scoped, beside what it asks for. */
+export type AnalyticsTableReadScope = {
+  /**
+   * The proof reads an aggregate's members, so evaluations are read through their trace's time,
+   * not their own: the legacy builder windows the trace (ADR-177 v4.15).
+   */
+  readsMembers?: boolean;
+};
+
 /** The single persistence capability owned by Analytics. */
 export abstract class AnalyticsRepository {
   /**
@@ -60,7 +69,10 @@ export abstract class AnalyticsRepository {
    * depends on which columns each table carries and which of them the query needs, so it
    * belongs beside the builders that know those tables rather than in the service.
    */
-  abstract tableFor(input: AnalyticsTimeseriesInput): AnalyticsTable;
+  abstract tableFor(
+    input: AnalyticsTimeseriesInput,
+    scope?: AnalyticsTableReadScope,
+  ): AnalyticsTable;
 
   abstract runTimeseries(query: AnalyticsTimeseriesQuery): Promise<AnalyticsTimeseriesResult>;
 

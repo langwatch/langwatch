@@ -23,6 +23,7 @@ import {
   type AnalyticsFeedbackPageRead,
   type AnalyticsFeedbackPageReadInput,
   type AnalyticsLegacyReadInput,
+  type AnalyticsTableReadScope,
   type AnalyticsTimeseriesQuery,
 } from "../analytics.repository.ts";
 import {
@@ -114,8 +115,8 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
     super();
   }
 
-  tableFor(input: AnalyticsTimeseriesInput): AnalyticsTable {
-    return pickAnalyticsTable(input);
+  tableFor(input: AnalyticsTimeseriesInput, scope?: AnalyticsTableReadScope): AnalyticsTable {
+    return pickAnalyticsTable(input, scope);
   }
 
   async runTimeseries(query: AnalyticsTimeseriesQuery): Promise<AnalyticsTimeseriesResult> {

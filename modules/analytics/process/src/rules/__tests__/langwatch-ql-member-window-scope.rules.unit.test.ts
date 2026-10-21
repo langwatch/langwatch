@@ -153,6 +153,58 @@ describe("scopeLangWatchQL with member windows", () => {
     });
   });
 
+  describe("given a dated member's evaluations", () => {
+    const traceInside =
+      "(ifNull(TraceId, '') = '' OR (TenantId, TraceId) IN (SELECT TenantId, TraceId " +
+      "FROM analytics.traces WHERE TenantId = 'project_b' " +
+      `AND OccurredAt >= fromUnixTimestamp64Milli(toInt64(${SHARED_FROM}))))`;
+
+    /** @scenario "The aggregate counts a member's evaluations by when their trace occurred" */
+    it("reads an evaluation only when its trace is inside the window", () => {
+      expect(
+        scope({ sql: "SELECT count() FROM evaluations", memberWindows: [WHOLE_A, DATED_B] }),
+      ).toBe(
+        "SELECT count() FROM (SELECT * FROM evaluations WHERE (TenantId IN ('project_a') OR " +
+          "(TenantId = 'project_b' AND " +
+          `ScheduledAt >= fromUnixTimestamp64Milli(toInt64(${SHARED_FROM})) AND ${traceInside}))) ` +
+          "AS evaluations",
+      );
+    });
+
+    it("reads no dated member from the per-minute evaluation rollup, which names no trace", () => {
+      expect(
+        scope({
+          sql: "SELECT sum(EvalCount) FROM evaluation_metrics_by_minute",
+          memberWindows: [WHOLE_A, DATED_B],
+        }),
+      ).toBe(
+        "SELECT sum(EvalCount) FROM (SELECT * FROM evaluation_metrics_by_minute " +
+          "WHERE (TenantId IN ('project_a'))) AS evaluation_metrics_by_minute",
+      );
+    });
+
+    it("reads no dated member's evaluations when the traces view is out of reach", () => {
+      const scoped = scopeLangWatchQL({
+        sql: "SELECT count() FROM evaluations",
+        excludeOrigins: [],
+        database: "analytics",
+        views: VIEWS.filter((view) => view.name !== "traces"),
+        memberWindows: [WHOLE_A, DATED_B],
+      });
+
+      expect(scoped).toBe(
+        "SELECT count() FROM (SELECT * FROM evaluations WHERE (TenantId IN ('project_a'))) " +
+          "AS evaluations",
+      );
+    });
+
+    it("keeps a trace view's window on the trace's own time", () => {
+      expect(scope({ sql: "SELECT count() FROM traces", memberWindows: [DATED_B] })).toBe(
+        `SELECT count() FROM (SELECT * FROM traces WHERE (${B_FROM})) AS traces`,
+      );
+    });
+  });
+
   describe("given members all shared for their whole history", () => {
     it("runs the statement as written, since the row policy bounds them exactly", () => {
       const sql = "SELECT count() FROM traces";

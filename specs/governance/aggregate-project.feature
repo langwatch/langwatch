@@ -581,6 +581,15 @@ Feature: An aggregate project reads its member projects
     And the member's traces outside the window and the non-member's traces are not
 
   @integration
+  Scenario: The aggregate counts a member's evaluations by when their trace occurred
+    Given an aggregate project with one member shared from a date
+    And a member trace from before that date, evaluated after it
+    And a member trace from after that date, evaluated after it
+    When the aggregate's evaluation runs are counted under its proof
+    Then only the evaluation of the trace from after the date is counted
+    And the member's own read still counts both evaluations
+
+  @integration
   Scenario: The aggregate's trace summaries count members inside their windows
     Given an aggregate project with one member shared for its whole history
     And a second member shared only from a point in time

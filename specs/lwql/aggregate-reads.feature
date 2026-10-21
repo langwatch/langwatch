@@ -131,3 +131,11 @@ Feature: LangWatchQL on an aggregate project reads its members inside their gran
     When ana counts trace rows on the aggregate through LangWatchQL
     Then the count is project A's rows plus project B's rows on or after its start
     And project C's rows and project B's earlier rows are not counted
+
+  @integration
+  Scenario: The aggregate counts a member's evaluations by when their trace occurred
+    Given project B holds a trace from before its start and one after it
+    And both traces were evaluated after its start
+    When ana counts evaluations on the aggregate through LangWatchQL
+    Then only the evaluation of the trace after its start is counted
+    And the per-minute evaluation rollup, which names no trace, reads no member shared from a date
