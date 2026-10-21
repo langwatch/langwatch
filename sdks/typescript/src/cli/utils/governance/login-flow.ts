@@ -94,10 +94,10 @@ function applyBootstrap({
 /** Keeps a cached key the platform still lists, and any hand-placed credential. */
 function reconcileEntries({ cfg, liveSet }: { cfg: GovernanceConfig; liveSet: Set<string> }): {
   reconciled: GovernanceConfig["default_personal_ingest_keys"];
-  changed: boolean;
+  retired: string[];
 } {
   const reconciled: GovernanceConfig["default_personal_ingest_keys"] = {};
-  let changed = false;
+  const retired: string[] = [];
   for (const [sourceType, entry] of Object.entries(cfg.default_personal_ingest_keys ?? {})) {
     const lookupId = extractLookupIdFromToken(entry.secret ?? "");
     if (lookupId === undefined) {
@@ -109,32 +109,41 @@ function reconcileEntries({ cfg, liveSet }: { cfg: GovernanceConfig; liveSet: Se
       reconciled[sourceType] = entry;
     } else {
       // Revoked on the platform — omit from reconciled.
-      changed = true;
+      if (entry.secret) retired.push(entry.secret);
     }
   }
-  return { reconciled, changed };
+  return { reconciled, retired };
 }
 
-async function reconcileIngestKeys(cfg: GovernanceConfig): Promise<void> {
+/** Drops cached keys the platform revoked, returning their secrets. */
+async function reconcileIngestKeys(cfg: GovernanceConfig): Promise<string[]> {
   const cached = cfg.default_personal_ingest_keys;
-  if (!cached || Object.keys(cached).length === 0) return;
+  if (!cached || Object.keys(cached).length === 0) return [];
   try {
     const liveKeys = await listIngestionKeys(cfg);
     const liveSet = new Set(liveKeys.map((k) => `${k.sourceType}:${k.lookupId}`));
-    const { reconciled, changed } = reconcileEntries({ cfg, liveSet });
-    if (changed) {
+    const { reconciled, retired } = reconcileEntries({ cfg, liveSet });
+    if (retired.length > 0) {
       cfg.default_personal_ingest_keys = reconciled;
       saveConfig(cfg);
     }
+    return retired;
   } catch (error) {
     // Network error / older server: keep existing cache untouched
     void error;
+    return [];
   }
 }
 
-async function refreshWiringAfterLogin(cfg: GovernanceConfig): Promise<void> {
+async function refreshWiringAfterLogin({
+  cfg,
+  retiredKeys,
+}: {
+  cfg: GovernanceConfig;
+  retiredKeys: string[];
+}): Promise<void> {
   try {
-    const refresh = await refreshTelemetryWiringForLogin(cfg);
+    const refresh = await refreshTelemetryWiringForLogin(cfg, { retiredKeys });
     if (refresh.mintedAny) saveConfig(cfg);
     if (refresh.labels.length > 0) {
       console.log();
@@ -206,14 +215,13 @@ async function completeDeviceSession({
   // Errors are swallowed — a login must never fail on reconcile; the
   // worst outcome is a stale cache entry that the per-invocation wrapper
   // check will catch anyway.
-  await reconcileIngestKeys(cfg);
+  const retiredKeys = await reconcileIngestKeys(cfg);
 
-  // Latest login wins (#6202): telemetry wiring a previous install
-  // persisted (claude settings env, codex [otel] block, gemini/opencode
-  // shell functions) pointing at a DIFFERENT instance would silently
-  // reroute every plain-tool run there. Re-point it at this login now,
-  // minting fresh ingest keys where needed. Best-effort: never fails a login.
-  await refreshWiringAfterLogin(cfg);
+  // Latest login wins (#6202): re-point persisted wiring at this login when it
+  // names a DIFFERENT instance, or holds a key this login retired (signing the
+  // device in again revokes its previous login's keys, spec latest-login-wins).
+  // Minting fresh ingest keys where needed. Best-effort: never fails a login.
+  await refreshWiringAfterLogin({ cfg, retiredKeys });
 
   if (isQuiet) return cfg;
 

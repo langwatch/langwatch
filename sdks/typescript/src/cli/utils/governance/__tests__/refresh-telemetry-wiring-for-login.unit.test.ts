@@ -88,6 +88,54 @@ describe("refreshTelemetryWiringForLogin", () => {
     });
   });
 
+  describe("given a copilot scoped function at this login holding a key the login retired", () => {
+    beforeEach(() => {
+      vi.spyOn(console, "log").mockImplementation(() => undefined);
+      persistBlockToRc(
+        "zsh",
+        buildScopedToolFunction(
+          "copilot",
+          buildOtelEnvBlock("copilot", CURRENT_ENDPOINT, STALE_TOKEN),
+          "zsh",
+        ),
+        toolMarkers("copilot"),
+      );
+      vi.mocked(cliApi.listIngestionKeys).mockResolvedValue([]);
+      vi.mocked(cliApi.mintIngestionKey).mockResolvedValue({
+        token: CURRENT_TOKEN,
+        prefix: "ik-lw-newl",
+        endpoint: CURRENT_ENDPOINT,
+      });
+    });
+
+    /** @scenario "Signing in again re-keys wiring whose key the new login retired" */
+    it("rewrites the function with a key minted for this login", async () => {
+      const cfg = baseCfg();
+
+      const result = await refreshTelemetryWiringForLogin(cfg, { retiredKeys: [STALE_TOKEN] });
+
+      const zshrc = fs.readFileSync(rcPath("zsh"), "utf8");
+      expect(zshrc).toContain(CURRENT_TOKEN);
+      expect(zshrc).not.toContain(STALE_TOKEN);
+      expect(cliApi.mintIngestionKey).toHaveBeenCalledWith(expect.any(Object), "copilot_cli");
+      expect(cfg.default_personal_ingest_keys?.copilot_cli?.secret).toBe(CURRENT_TOKEN);
+      expect(result.labels.some((label) => label.includes("copilot"))).toBe(true);
+    });
+
+    /** @scenario "Signing in again leaves wiring whose key is still live" */
+    it("leaves the function alone when the login retired no key it holds", async () => {
+      const before = fs.readFileSync(rcPath("zsh"), "utf8");
+
+      const result = await refreshTelemetryWiringForLogin(baseCfg(), {
+        retiredKeys: ["ik-lw-someotherkey000_retired"],
+      });
+
+      expect(fs.readFileSync(rcPath("zsh"), "utf8")).toBe(before);
+      expect(cliApi.mintIngestionKey).not.toHaveBeenCalled();
+      expect(result.labels).toEqual([]);
+    });
+  });
+
   describe("given persisted wiring pointing at a previous instance", () => {
     beforeEach(() => {
       // claude → user-level settings env at the stale instance

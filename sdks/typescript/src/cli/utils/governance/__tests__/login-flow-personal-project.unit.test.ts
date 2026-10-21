@@ -60,6 +60,7 @@ vi.mock("../../identityNotice", () => ({
   rememberProjectName: vi.fn(),
 }));
 
+import { extractLookupIdFromToken } from "../cli-api";
 import { loadConfig } from "../config";
 import type * as deviceFlowModule from "../device-flow";
 import { runUnifiedLoginFlow } from "../login-flow";
@@ -100,6 +101,23 @@ describe("runUnifiedLoginFlow (device session) personal-project persistence", ()
     await runUnifiedLoginFlow({ kind: "device_session" });
 
     expect(warn).toHaveBeenCalledWith(expect.stringContaining(notice));
+  });
+
+  /** @scenario "Signing in again re-keys wiring whose key the new login retired" */
+  it("hands the wiring refresh every cached key the platform stopped listing", async () => {
+    pollUntilDone.mockResolvedValue(exchangeResult());
+    vi.mocked(loadConfig).mockReturnValueOnce({
+      control_plane_url: "https://app.langwatch.ai",
+      gateway_url: "https://gateway.langwatch.ai",
+      default_personal_ingest_keys: { copilot_cli: { secret: "ik-lw-rotated_secret" } },
+    });
+    vi.mocked(extractLookupIdFromToken).mockReturnValueOnce("rotated");
+
+    await runUnifiedLoginFlow({ kind: "device_session" });
+
+    expect(refreshTelemetryWiringForLogin).toHaveBeenCalledWith(expect.any(Object), {
+      retiredKeys: ["ik-lw-rotated_secret"],
+    });
   });
 
   /** @scenario device-login exchange delivers the personal project key and the CLI stores it */

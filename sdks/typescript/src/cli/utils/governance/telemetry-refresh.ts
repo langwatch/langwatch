@@ -13,6 +13,7 @@ import {
   codexGatewayBlockBaseUrl,
   codexHasGatewayBlock,
   codexHasOtelBlock,
+  codexOtelBlockAuthToken,
   codexOtelBlockEndpoint,
   codexTraceEndpoint,
   defaultCodexConfigPath,
@@ -478,6 +479,28 @@ function toolWiringNeedsLoginRefresh(tool: string, expectedEndpoint: string): bo
   return scopedShellFunctionNeedsRefresh(tool, expectedEndpoint);
 }
 
+/**
+ * Whether a tool's persisted wiring still carries a key this login retired:
+ * signing the device in again revokes the keys minted under its previous login
+ * (cause "rotation"), so wiring that already names this instance goes dead too.
+ */
+function toolWiringCarriesRetiredKey(tool: string, retiredKeys: readonly string[]): boolean {
+  if (retiredKeys.length === 0) return false;
+  if (tool === "claude") {
+    const target = appSettingsTargetFor("claude");
+    const headers = target ? appEnvValues(target).OTEL_EXPORTER_OTLP_HEADERS : undefined;
+    return !!headers && retiredKeys.some((key) => headers.includes(key));
+  }
+  if (tool === "codex") {
+    const token = codexOtelBlockAuthToken(defaultCodexConfigPath());
+    return token !== null && retiredKeys.includes(token);
+  }
+  const markers = toolMarkers(tool);
+  return REFRESH_SHELLS.some((shell) =>
+    retiredKeys.some((key) => rcHasLangwatchBlock({ shell, markers, requiredKeys: [key] })),
+  );
+}
+
 export interface LoginTelemetryRefreshResult {
   /** One human-readable label per persisted target that was refreshed. */
   labels: string[];
@@ -551,6 +574,7 @@ async function refreshToolForLogin({
   sourceType,
   expectedEndpoint,
   loopbackLogin,
+  retiredKeys,
   keptForLoopback,
   labels,
   warnings,
@@ -560,6 +584,7 @@ async function refreshToolForLogin({
   sourceType: string;
   expectedEndpoint: string;
   loopbackLogin: boolean;
+  retiredKeys: readonly string[];
   keptForLoopback: string[];
   labels: string[];
   warnings: string[];
@@ -589,11 +614,13 @@ async function refreshToolForLogin({
     // wiring; a new login never re-points it at the personal path.
     return false;
   }
-  if (!toolWiringNeedsLoginRefresh(tool, expectedEndpoint)) return false;
-  // allowOfflineFallback: false - see resolveLiveIngestionKey's doc.
-  // This caller only gets here because the persisted endpoint
-  // already differs from the new login, so a network hiccup must
-  // mint fresh rather than reuse a secret bound to the old instance.
+  const stale =
+    toolWiringNeedsLoginRefresh(tool, expectedEndpoint) ||
+    toolWiringCarriesRetiredKey(tool, retiredKeys);
+  if (!stale) return false;
+  // allowOfflineFallback: false - see resolveLiveIngestionKey's doc. The
+  // persisted endpoint or key is no longer this login's, so a network hiccup
+  // must mint fresh rather than reuse a secret the login did not confirm.
   const key = await resolveLiveIngestionKey({
     cfg,
     sourceType,
@@ -651,11 +678,12 @@ function resyncCodexGatewayBlock({
 
 /**
  * Login-time half of latest-login-wins: refresh any langwatch-authored block whose endpoint
- * differs from the new control plane; a block already pointing here is left for the next
- * wrapper run to re-sync. Best-effort — per-tool failures skip that tool, never the login.
+ * differs from the new control plane, or whose key the login retired (`retiredKeys`, the
+ * cached keys the platform no longer lists). Best-effort: a failure skips a tool, never the login.
  */
 export async function refreshTelemetryWiringForLogin(
   cfg: GovernanceConfig,
+  { retiredKeys = [] }: { retiredKeys?: readonly string[] } = {},
 ): Promise<LoginTelemetryRefreshResult> {
   const labels: string[] = [];
   let mintedAny = false;
@@ -688,6 +716,7 @@ export async function refreshTelemetryWiringForLogin(
         sourceType,
         expectedEndpoint,
         loopbackLogin,
+        retiredKeys,
         keptForLoopback,
         labels,
         warnings,

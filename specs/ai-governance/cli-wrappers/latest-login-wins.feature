@@ -124,6 +124,27 @@ Feature: The latest login wins over stale persisted telemetry wiring
       Then no ingest key is minted for the refresh
       And no wiring file is rewritten
 
+    # Signing this device in again retires its previous login, and the
+    # ingestion keys minted under it go with it (cause "rotation"). Wiring
+    # that already names this instance still carries one of those keys, so
+    # a plain tool run would export into a 401 with no word of why.
+    @unit @cli-wrappers @latest-login-wins @rotated-key
+    Scenario: Signing in again re-keys wiring whose key the new login retired
+      Given a copilot shell function that points at this instance with a cached ingestion key
+      And signing this device in again retired that key on the platform
+      When the user completes `langwatch login --device` against the same instance
+      Then the shell function is rewritten with a live ingest key minted for this login
+      And the retired key is no longer in the shell function
+      And the login output lists the shell function as updated
+
+    @unit @cli-wrappers @latest-login-wins @rotated-key
+    Scenario: Signing in again leaves wiring whose key is still live
+      Given a copilot shell function that points at this instance with a cached ingestion key
+      And the platform still lists that key as live after the login
+      When the user completes `langwatch login --device` against the same instance
+      Then no ingest key is minted for the refresh
+      And the shell function is byte for byte what it was
+
     @unit @cli-wrappers @latest-login-wins @project-pin
     Scenario: A project-pinned tool is not re-pointed by a new login
       Given codex is pinned to a team project (`tool_project_keys.codex`)
