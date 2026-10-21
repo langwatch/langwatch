@@ -871,7 +871,7 @@ describe("aggregation-builder", () => {
         });
 
         expect(result.sql).toMatch(
-          /uniqIf\(ts\.TraceId, \(\(ts\.TraceId IN \(\s*SELECT TraceId FROM stored_spans/,
+          /uniqIf\(ts\.TraceId, \(\(\(ts\.TenantId, ts\.TraceId\) IN \(\s*SELECT TenantId, TraceId FROM stored_spans/,
         );
         expect(result.sql).toContain("uniq(ts.TraceId) AS 1__");
         expect(Object.keys(result.params)).toContain("spanTypes_0");

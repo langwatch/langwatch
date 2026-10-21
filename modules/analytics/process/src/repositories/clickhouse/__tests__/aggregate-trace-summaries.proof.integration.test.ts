@@ -35,6 +35,7 @@ const FOREIGN = `test-agg-summaries-foreign-${RUN}`;
 const SEEDED_TABLES = ["trace_summaries", "evaluation_runs"] as const;
 const EVALUATOR = `${RUN}-check`;
 const OTHER_EVALUATOR = `${RUN}-other-check`;
+const SHARED_ID_EVALUATOR = `${RUN}-shared-id-check`;
 
 const DAY = "2026-06-15";
 const at = (time: string) => Temporal.Instant.from(`${DAY}T${time}Z`);
@@ -50,17 +51,28 @@ const TRACES: { tenantId: string; time: string; value: number }[] = [
   { tenantId: AGGREGATE, time: "10:30:00", value: 32 }, // the aggregate's own
 ];
 
+/** One trace id both members use; only the first member's trace has a run of its own check. */
+const SHARED_TRACE_ID = `trace-${RUN}-shared`;
+const SHARED_ID_TRACES: { tenantId: string; time: string; value: number }[] = [
+  { tenantId: WHOLE_HISTORY_MEMBER, time: "11:30:00", value: 64 },
+  { tenantId: LATE_MEMBER, time: "11:30:00", value: 128 },
+];
+
 let client: ClickHouseClient;
 let repository: ClickHouseAnalyticsRepository;
 
 const traceIdOf = (index: number) => `trace-${RUN}-${index}`;
 
-function traceSummaryRow({ tenantId, time, value }: (typeof TRACES)[number], index: number) {
+function traceSummaryRow(
+  { tenantId, time, value }: (typeof TRACES)[number],
+  index: number,
+  traceId = traceIdOf(index),
+) {
   const occurredAt = new Date(at(time).epochMilliseconds);
   return {
     ProjectionId: `proj-${randomUUID()}`,
     TenantId: tenantId,
-    TraceId: traceIdOf(index),
+    TraceId: traceId,
     Version: "v1",
     Attributes: {},
     OccurredAt: occurredAt,
@@ -92,10 +104,12 @@ function evaluationRunRow({
   trace,
   index,
   evaluatorId,
+  traceId = traceIdOf(index),
 }: {
   trace: (typeof TRACES)[number];
   index: number;
   evaluatorId: string;
+  traceId?: string;
 }) {
   const scheduledAt = new Date(at(trace.time).epochMilliseconds).toISOString();
   return {
@@ -105,7 +119,7 @@ function evaluationRunRow({
     Version: "1",
     EvaluatorId: evaluatorId,
     EvaluatorType: "langevals/exact_match",
-    TraceId: traceIdOf(index),
+    TraceId: traceId,
     Status: "processed",
     Score: evaluatorId === EVALUATOR ? trace.value : 1000,
     Passed: 1,
@@ -172,6 +186,8 @@ const aggregateProof = () =>
   });
 
 const IN_WINDOWS = 1 + 2 + 8 + 32;
+/** Both members' traces on the shared trace id, inside each window. */
+const SHARED_ID_TOTAL = 64 + 128;
 
 beforeAll(async () => {
   client = (await startMigratedClickHouse()).client;
@@ -181,17 +197,28 @@ beforeAll(async () => {
   const settings = { async_insert: 0, wait_for_async_insert: 0 } as const;
   await client.insert({
     table: "trace_summaries",
-    values: TRACES.map(traceSummaryRow),
+    values: [
+      ...TRACES.map((trace, index) => traceSummaryRow(trace, index)),
+      ...SHARED_ID_TRACES.map((trace, index) => traceSummaryRow(trace, index, SHARED_TRACE_ID)),
+    ],
     format: "JSONEachRow",
     clickhouse_settings: settings,
   });
   await client.insert({
     table: "evaluation_runs",
-    values: TRACES.flatMap((trace, index) =>
-      [EVALUATOR, OTHER_EVALUATOR].map((evaluatorId) =>
-        evaluationRunRow({ trace, index, evaluatorId }),
+    values: [
+      ...TRACES.flatMap((trace, index) =>
+        [EVALUATOR, OTHER_EVALUATOR].map((evaluatorId) =>
+          evaluationRunRow({ trace, index, evaluatorId }),
+        ),
       ),
-    ),
+      evaluationRunRow({
+        trace: SHARED_ID_TRACES[0]!,
+        index: 0,
+        evaluatorId: SHARED_ID_EVALUATOR,
+        traceId: SHARED_TRACE_ID,
+      }),
+    ],
     format: "JSONEachRow",
     clickhouse_settings: settings,
   });
@@ -219,7 +246,7 @@ describe("legacy trace summaries read under an aggregate's proof", () => {
         series: COST_SERIES,
       });
 
-      expect(seriesTotal(result, COST_SERIES)).toBe(1 + 2 + 4 + 8 + 32);
+      expect(seriesTotal(result, COST_SERIES)).toBe(1 + 2 + 4 + 8 + 32 + SHARED_ID_TOTAL);
     });
   });
 
@@ -232,7 +259,7 @@ describe("legacy trace summaries read under an aggregate's proof", () => {
         series: COST_SERIES,
       });
 
-      expect(seriesTotal(result, COST_SERIES)).toBe(IN_WINDOWS);
+      expect(seriesTotal(result, COST_SERIES)).toBe(IN_WINDOWS + SHARED_ID_TOTAL);
     });
 
     it("keeps the windows when a filter reads the evaluation side table", async () => {
@@ -244,6 +271,17 @@ describe("legacy trace summaries read under an aggregate's proof", () => {
       });
 
       expect(seriesTotal(result, COST_SERIES)).toBe(IN_WINDOWS);
+    });
+
+    it("keeps only the member whose own trace matches a side-table filter on a trace id both use", async () => {
+      const result = await read({
+        authorization: aggregateProof(),
+        table: "trace_summaries",
+        series: COST_SERIES,
+        filters: { "evaluations.evaluator_id": [SHARED_ID_EVALUATOR] },
+      });
+
+      expect(seriesTotal(result, COST_SERIES)).toBe(64);
     });
 
     /** @scenario "The aggregate's evaluation chart counts members inside their windows" */

@@ -93,7 +93,9 @@ describe("tenant scope guard vs the timeseries builders", () => {
         negateFilters: true,
       });
 
-      expect(sql).toMatch(/ts\.TraceId NOT IN \(\s*SELECT TraceId FROM stored_spans/);
+      expect(sql).toMatch(
+        /\(ts\.TenantId, ts\.TraceId\) NOT IN \(\s*SELECT TenantId, TraceId FROM stored_spans/,
+      );
       expect(sql).not.toMatch(/NOT \(\(?ts\.TraceId IN/);
       expect(fencedViolations({ sql, params })).toEqual([null, null]);
     });

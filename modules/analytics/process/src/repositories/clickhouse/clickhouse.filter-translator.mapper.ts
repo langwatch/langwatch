@@ -358,9 +358,9 @@ function translateTraceNameFilter(values: string[]): FilterTranslation {
 }
 
 /**
- * Translate span type filter (requires JOIN). Uses an IN subquery rather than
- * a direct JOIN: a trace with multiple matching spans would be duplicated by
- * a JOIN, inflating count metrics — IN returns true once, once is enough.
+ * Translate span type filter. An IN subquery, since a JOIN duplicates a trace with several
+ * matching spans. It matches tenant and trace id together, so a trace id two members share
+ * never keeps the other member's trace (ADR-177).
  */
 function translateSpanTypeFilter({
   values,
@@ -371,8 +371,8 @@ function translateSpanTypeFilter({
   const paramName = genParamName("spanTypes");
 
   return {
-    whereClause: `${ts}.TraceId IN (
-      SELECT TraceId FROM stored_spans
+    whereClause: `(${ts}.TenantId, ${ts}.TraceId) IN (
+      SELECT TenantId, TraceId FROM stored_spans
       WHERE ${tenant.sideTable}
         ${spanTimePredicate}
         AND SpanAttributes['langwatch.span.type'] IN ({${paramName}:Array(String)})
@@ -394,8 +394,8 @@ function translateSpanModelFilter({
   const paramName = genParamName("models");
 
   return {
-    whereClause: `${ts}.TraceId IN (
-      SELECT TraceId FROM stored_spans
+    whereClause: `(${ts}.TenantId, ${ts}.TraceId) IN (
+      SELECT TenantId, TraceId FROM stored_spans
       WHERE ${tenant.sideTable}
         ${spanTimePredicate}
         AND SpanAttributes['gen_ai.request.model'] IN ({${paramName}:Array(String)})
@@ -423,8 +423,8 @@ function translateEvaluatorIdFilter({
   const paramName = genParamName("evaluatorIds");
 
   return {
-    whereClause: `${ts}.TraceId IN (
-      SELECT TraceId FROM evaluation_runs
+    whereClause: `(${ts}.TenantId, ${ts}.TraceId) IN (
+      SELECT TenantId, TraceId FROM evaluation_runs
       WHERE ${tenant.sideTable}
         AND EvaluatorId IN ({${paramName}:Array(String)})
         ${additionalWhere}
@@ -458,8 +458,8 @@ function translateEvaluationPassedFilter({
   }
 
   return {
-    whereClause: `${ts}.TraceId IN (
-      SELECT TraceId FROM evaluation_runs
+    whereClause: `(${ts}.TenantId, ${ts}.TraceId) IN (
+      SELECT TenantId, TraceId FROM evaluation_runs
       WHERE ${tenant.sideTable}
         ${evaluatorCondition}
         AND Passed IN ({${paramName}:Array(UInt8)})
@@ -498,8 +498,8 @@ function translateEvaluationScoreFilter({
   }
 
   return {
-    whereClause: `${ts}.TraceId IN (
-      SELECT TraceId FROM evaluation_runs
+    whereClause: `(${ts}.TenantId, ${ts}.TraceId) IN (
+      SELECT TenantId, TraceId FROM evaluation_runs
       WHERE ${tenant.sideTable}
         ${evaluatorCondition}
         AND Score >= {${minParam}:Float64}
@@ -531,8 +531,8 @@ function translateEvaluationLabelFilter({
   }
 
   return {
-    whereClause: `${ts}.TraceId IN (
-      SELECT TraceId FROM evaluation_runs
+    whereClause: `(${ts}.TenantId, ${ts}.TraceId) IN (
+      SELECT TenantId, TraceId FROM evaluation_runs
       WHERE ${tenant.sideTable}
         ${evaluatorCondition}
         AND Label IN ({${paramName}:Array(String)})
@@ -563,8 +563,8 @@ function translateEvaluationStateFilter({
   }
 
   return {
-    whereClause: `${ts}.TraceId IN (
-      SELECT TraceId FROM evaluation_runs
+    whereClause: `(${ts}.TenantId, ${ts}.TraceId) IN (
+      SELECT TenantId, TraceId FROM evaluation_runs
       WHERE ${tenant.sideTable}
         ${evaluatorCondition}
         AND Status IN ({${paramName}:Array(String)})
@@ -586,8 +586,8 @@ function translateEventTypeFilter({
   const paramName = genParamName("eventTypes");
 
   return {
-    whereClause: `${ts}.TraceId IN (
-      SELECT TraceId FROM stored_spans
+    whereClause: `(${ts}.TenantId, ${ts}.TraceId) IN (
+      SELECT TenantId, TraceId FROM stored_spans
       WHERE ${tenant.sideTable}
         ${spanTimePredicate}
         AND hasAny("Events.Name", {${paramName}:Array(String)})
@@ -635,8 +635,8 @@ function translateEventMetricKeyFilter({
   }
 
   return {
-    whereClause: `${ts}.TraceId IN (
-      SELECT TraceId FROM stored_spans
+    whereClause: `(${ts}.TenantId, ${ts}.TraceId) IN (
+      SELECT TenantId, TraceId FROM stored_spans
       WHERE ${tenant.sideTable}
         ${spanTimePredicate}
         AND ${metricKeyCondition}
@@ -701,8 +701,8 @@ function translateEventMetricValueFilter({
   }
 
   return {
-    whereClause: `${ts}.TraceId IN (
-      SELECT TraceId FROM stored_spans
+    whereClause: `(${ts}.TenantId, ${ts}.TraceId) IN (
+      SELECT TenantId, TraceId FROM stored_spans
       WHERE ${tenant.sideTable}
         ${spanTimePredicate}
         AND ${valueCondition}
@@ -786,10 +786,10 @@ function negatedConjunction(whereClauses: string[]): string {
   return negated.length === 1 ? negated[0]! : `(${negated.join(" OR ")})`;
 }
 
-const SPAN_SUBQUERY_FILTER = /^(\w+\.TraceId) IN (\(.*\))$/s;
+const SPAN_SUBQUERY_FILTER = /^(\(\w+\.TenantId, \w+\.TraceId\)) IN (\(.*\))$/s;
 
 /**
- * One filter inverted. A trace-id subquery becomes `NOT IN`: its subquery carries its own
+ * One filter inverted. A side-table subquery becomes `NOT IN`: its subquery carries its own
  * tenant predicate, which a `NOT (…)` bracket would appear to negate to the tenant guard
  * (WEB-17801).
  */
