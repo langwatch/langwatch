@@ -59,13 +59,10 @@ e361040a34adcefc378718482969f16445ac70e9:modules/agent/process/src/transport/__t
 47d388239a9827aa4f01dd366260ff1263f793c5:tools/visualdiff/publish_test.go:generic-api-key:114
 47d388239a9827aa4f01dd366260ff1263f793c5:tools/visualdiff/runner/src/__tests__/totp.unit.test.ts:generic-api-key:6
 f483fe302e7c3dfb100e1d6fa9c99b6d9a049c20:specs/server/feature-configuration.feature:generic-api-key:40
-<<<<<<< HEAD
 6078b9b5db2995fab5636ab022dd490f5d53343e:.github/scripts/nightly-hygiene.test.ts:generic-api-key:147
-=======
 
 # A relay test quoted a made-up OpenAI key (`sk-proj-abc123`) inside a refused
 # key message, to prove the span drops it. It was never a credential; the
 # fixture now reads "Incorrect API key provided." with no key, so the tree is
 # clean and only this pull request's history still carries the literal.
 785058250c14fe307ce07f37644f3668c23cea47:services/langyagent/adapters/otelrelay/llmproxy_credit_test.go:generic-api-key:129
->>>>>>> origin/main
