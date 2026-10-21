@@ -149,9 +149,11 @@ jobs:
 
       - name: Run evaluator regression tests that need no provider
         # `evaluators/langevals/tests/` is ignored by the step above because
-        # its LLM-judged tests are non-deterministic. This file is not one of
-        # them: it stubs the call to the provider, so it needs no key, makes no
-        # provider request and always gives the same answer. The step above also
+        # its LLM-judged tests are non-deterministic. The two files named here
+        # are not among them: they stub the call to the provider, so they need
+        # no key, make no provider request and always give the same answer.
+        # The similarity one counts how often the target text is embedded.
+        # The step above also
         # ignores `tests/`, which holds the same kind of test. Naming both paths
         # here is what makes them run, and they run on forks too. They guard the
         # dspy thread-affinity crash that broke every evaluation after the first
@@ -163,7 +165,7 @@ jobs:
         # so a contributor could otherwise break the request shape and see CI
         # stay green.
         working-directory: services/langevals
-        run: uv run pytest -x -v evaluators/langevals/tests/test_llm_answer_match_threading.py tests/deterministic/ langevals_core/tests/
+        run: uv run pytest -x -v evaluators/langevals/tests/test_llm_answer_match_threading.py evaluators/langevals/tests/test_similarity_cache.py tests/deterministic/ langevals_core/tests/
 
   docker-build:
     needs: changes

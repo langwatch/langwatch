@@ -1,3 +1,7 @@
+import hashlib
+import json
+import threading
+from collections import OrderedDict
 from typing import Literal, Optional
 from langevals_core.base_evaluator import (
     DEFAULT_MAX_TOKENS,
@@ -8,9 +12,65 @@ from langevals_core.base_evaluator import (
     SingleEvaluationResult,
     EvaluationResultSkipped,
 )
+from langevals_core.request_env import current_request_env
 from pydantic import Field
 import litellm
 import numpy as np
+
+
+class TargetEmbeddingCache:
+    """Embeddings of the fixed target text from the settings, kept in memory.
+
+    The server builds a new evaluator for every request and the app sends one
+    entry per request, so the target text would be embedded again on every
+    call. This cache lives for the whole process instead.
+
+    An entry is looked up by the embeddings model, a digest of the request env
+    (the credentials and endpoint the call goes out with) and a digest of the
+    text. Two projects only ever share an entry when they send the exact same
+    credentials and endpoint, so a project never gets a vector computed with
+    someone else's key. Only digests are kept, never the text or the keys, and
+    nothing is written outside the process. The entry content of a trace is
+    never cached, only the target text from the settings.
+    """
+
+    def __init__(self, max_entries: int = 256):
+        self.max_entries = max_entries
+        self._entries: OrderedDict[tuple[str, str, str], np.ndarray] = OrderedDict()
+        self._lock = threading.Lock()
+
+    @staticmethod
+    def key(model: str, env: dict[str, str], text: str) -> tuple[str, str, str]:
+        env_digest = hashlib.sha256(
+            json.dumps(env, sort_keys=True).encode("utf-8")
+        ).hexdigest()
+        text_digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
+        return (model, env_digest, text_digest)
+
+    def get(self, key: tuple[str, str, str]) -> np.ndarray | None:
+        with self._lock:
+            embedding = self._entries.get(key)
+            if embedding is not None:
+                self._entries.move_to_end(key)
+            return embedding
+
+    def put(self, key: tuple[str, str, str], embedding: np.ndarray) -> None:
+        with self._lock:
+            self._entries[key] = embedding
+            self._entries.move_to_end(key)
+            while len(self._entries) > self.max_entries:
+                self._entries.popitem(last=False)
+
+    def clear(self) -> None:
+        with self._lock:
+            self._entries.clear()
+
+    def __len__(self) -> int:
+        with self._lock:
+            return len(self._entries)
+
+
+target_embedding_cache = TargetEmbeddingCache()
 
 
 class CustomSimilarityEntry(EvaluatorEntry):
@@ -58,7 +118,7 @@ class CustomSimilarityEvaluator(
     is_guardrail = True
 
     def evaluate(self, entry: CustomSimilarityEntry) -> SingleEvaluationResult:
-        target_value_embeddings = self.get_embeddings(self.settings.value)
+        target_value_embeddings = self.get_target_embeddings(self.settings.value)
         if isinstance(target_value_embeddings, EvaluationResultSkipped):
             return target_value_embeddings
 
@@ -90,6 +150,25 @@ class CustomSimilarityEvaluator(
                 passed=cosine_similarity < self.settings.threshold,
                 details=details,
             )
+
+    def get_target_embeddings(self, text: str):
+        key = TargetEmbeddingCache.key(
+            self.settings.embeddings_model, current_request_env(), text
+        )
+        cached = target_embedding_cache.get(key)
+        if cached is not None:
+            return cached
+
+        embedding = self.get_embeddings(text)
+        if isinstance(embedding, EvaluationResultSkipped):
+            return embedding
+
+        # float64, the same precision np.dot gives the plain list, so the
+        # score is identical whether the target came from the cache or not.
+        array = np.asarray(embedding, dtype=np.float64)
+        array.setflags(write=False)
+        target_embedding_cache.put(key, array)
+        return array
 
     def get_embeddings(self, text: str):
         model = self.settings.embeddings_model
