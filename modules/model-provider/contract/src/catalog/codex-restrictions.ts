@@ -1,4 +1,4 @@
-/** Codex surfaces: Langy + FAST assists only. */
+/** Codex surfaces: Langy + the FAST assists that run through the AI gateway. */
 
 import { featuresByRole, type ModelRole } from "./model-feature-registry.ts";
 
@@ -12,14 +12,24 @@ export const LANGY_CHAT_FEATURE_KEY = "langy.chat";
 export const CONNECTION_TEST_FEATURE_KEY = "model_provider.connection_test";
 
 /**
- * The rule, not a hand-kept list: Langy plus every FAST-role assist — the
- * fast tier IS the "light AI assists" the codex terms cover, so a new fast
- * feature is codex-allowed by construction. A test pins the expansion.
+ * FAST features that skip the AI gateway, the only road to codex: they hand
+ * LiteLLM parameters to langevals, which calls the provider itself. Allowing
+ * codex on them only moves the refusal from selection to execution.
+ */
+export const CODEX_NON_GATEWAY_FAST_FEATURE_KEYS: readonly string[] = [
+  "analytics.topic_clustering_llm",
+];
+
+/**
+ * Langy plus every FAST assist that runs through the gateway. A new FAST
+ * feature is codex-allowed unless listed as non-gateway above; a test pins it.
  */
 export const CODEX_ALLOWED_FEATURE_KEYS: readonly string[] = [
   LANGY_CHAT_FEATURE_KEY,
   CONNECTION_TEST_FEATURE_KEY,
-  ...featuresByRole("FAST").map((f) => f.key),
+  ...featuresByRole("FAST")
+    .map((f) => f.key)
+    .filter((key) => !CODEX_NON_GATEWAY_FAST_FEATURE_KEYS.includes(key)),
 ];
 
 export function isCodexAllowedFeature(featureKey: string): boolean {
@@ -57,9 +67,9 @@ export function isModelAllowedForFeature({
 }
 
 /**
- * Role-level defaults apply across every feature in the role, so a
- * restricted model may only sit on a role whose ENTIRE set is codex-allowed:
- * LANGY and FAST. DEFAULT and EMBEDDINGS carry general inference and stay closed.
+ * A restricted model may be the LANGY or FAST role default. FAST features in
+ * {@link CODEX_NON_GATEWAY_FAST_FEATURE_KEYS} step over it at resolution time.
+ * DEFAULT and EMBEDDINGS carry general inference and stay closed.
  */
 export function isModelAllowedAsRoleDefault(modelId: string, role: ModelRole): boolean {
   if (!isCodexModel(modelId)) return true;

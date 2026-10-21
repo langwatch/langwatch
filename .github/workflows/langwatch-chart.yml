@@ -226,6 +226,10 @@ jobs:
         if: "!cancelled()"
         run: ./tests/langevals-sizing.sh
 
+      - name: "assert the redis-valkey overlay swaps only the image"
+        if: "!cancelled()"
+        run: ./tests/redis-valkey.sh
+
       # Static on purpose, and helm being installed here changes nothing.
       # Every `lookup` in the render step runs against no cluster and so
       # returns empty, which is exactly what a lookup the installer is
