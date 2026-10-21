@@ -55,6 +55,7 @@ Feature: Coding-agent session signals reach Customer.io
     Then Customer.io identifies integration_method=coding_agent for each member once
     And a member of a second organization is identified once too
     # Known limit: the member list is read once, so a member who joins later is not identified.
+    # Known limit: a member whose own claim throws is not retried; the delivery claim drops the redelivery.
 
   @unit
   Scenario: A member claim that fails never strands a member already claimed
