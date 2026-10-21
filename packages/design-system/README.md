@@ -102,6 +102,12 @@ reduced graphics. A reserved 1px hairline starts transparent and fades in
 after scrolling without changing layout. Reduced motion disables the fade.
 Section headers share the same behaviour. `withBorder={false}` opts out.
 
+## Branded features
+
+A feature with its own name, mark and art (Braids is the first) is branded through
+`FeatureMark`, `FeatureLockup` and `FeatureIllustration` and its `feature.<name>.*` colour
+roles. [How features are branded](docs/feature-branding.md) has the rules and the steps.
+
 ## Checklist
 
 - Tokens, never literals: `fg.muted`, `border.emphasized`, `red.solid` — no hex.
