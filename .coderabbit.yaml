@@ -11,8 +11,8 @@
 #      semgrep rules); path_instructions keeps only judgment rules.
 #  (3) AC5 leaves CodeRabbit entirely (path_instructions cannot see PR
 #      descriptions). It now lives in .github/workflows/deployment-impact-check.yml.
-#  (4) Phased rollout — mode:warning for sprint 1, per-rule promotion to error
-#      after baseline is verifiably clean for that rule.
+#  (4) Pre-merge checks are off: workflows gate the PR title and description,
+#      and the docstring rule lives in path_instructions below.
 #
 # All path_instructions below say "flag only newly added or modified lines" —
 # the baseline has 527 `any`s, 5 CH migrations with $CLICKHOUSE_DATABASE, etc.
@@ -47,11 +47,10 @@ reviews:
     # after a batch of fixes, rather than getting a new review on every push.
     auto_incremental_review: false
 
-  # Phased rollout. Promote individual checks to mode:error in follow-up PRs
-  # after baseline is clean for that check.
   pre_merge_checks:
-    # Off: workflows already gate the title and the description sections, and
-    # docstring coverage is not a rule here.
+    # Off: workflows already gate the title and the description sections. The
+    # docstring rule is the path_instruction on new exported symbols below,
+    # not a repo-wide coverage percentage.
     title:
       mode: off
     description:
@@ -64,8 +63,8 @@ reviews:
     # golangci-lint), and a second copy only repeats them as review comments.
     # The rest (actionlint, shellcheck, hadolint, ...) have no CI equivalent
     # and are off on purpose: style findings were most of the review noise.
-    # Security scanners stay on, including zizmor (workflow injection) and
-    # checkov (IaC misconfiguration), which CI does not run.
+    # Security scanners stay on, including opengrep (SAST), zizmor (workflow
+    # injection) and checkov (IaC misconfiguration), which CI does not run.
     ast-grep:
       enabled: false
     shellcheck:
@@ -112,8 +111,6 @@ reviews:
       enabled: false
     reactDoctor:
       enabled: false
-    opengrep:
-      enabled: false
     oasdiff:
       enabled: false
     circleci:
@@ -140,8 +137,8 @@ reviews:
         Never comment on anything a linter, formatter, type checker or CI
         workflow in this repository enforces: comment length, formatting,
         import order, unused symbols, naming rules, PR title or description
-        sections. CI reports those. Comment only on behaviour, security,
-        data loss, architecture and missing tests.
+        sections. CI reports those. The path-specific rules below still
+        apply in full.
 
     # ── AC4: structural ${...} guard ───────────────────────────────────────
     # PR #3476 leaked a literal "${HOME/workspace/orchard-codex/contracts}"
