@@ -187,6 +187,7 @@ export const reads = {
     "skills/{package.json,tsconfig*.json}",
     "tools/dev-runtime/package.json",
     "tools/devscripts/ensurebuilt.go",
+    "dev/dogfood/langy/package.json",
     "dev/dogfood/acme-support/typescript/package.json",
     "dev/scripts/**/*",
     "dev/tests/*/package.json",

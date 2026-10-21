@@ -50,7 +50,7 @@ const TRACE_EVALUATION_COLUMNS_LIGHT = [
 const TRACE_EVALUATION_COLUMNS_WITH_INPUTS = `${TRACE_EVALUATION_COLUMNS_LIGHT}, Inputs`;
 const logger = createLogger("langwatch:trace:clickhouse.trace-evaluation-runs");
 
-/** The attempt columns migration 00110 adds, each with the default it reads as until it lands. */
+/** The attempt columns migration 00122 adds, each with the default it reads as until it lands. */
 const ATTEMPT_COLUMNS = {
   Attempts: "toUInt16(0)",
   LastAttemptAt: "CAST(NULL AS Nullable(DateTime64(3)))",
@@ -229,6 +229,7 @@ export class ClickHouseTraceEvaluationRunsRepository extends TraceEvaluationRuns
     traceId: string;
     attempts: string;
   }): Promise<EvaluationRunData[]> {
+    // ID_BOUND_SKIP: evaluation's index, registered by evaluation; moves there with trace-review.
     const result = await input.client.query({
       query: `
         SELECT EvaluationId, EvaluatorId, EvaluatorType, EvaluatorName, TraceId,
@@ -289,6 +290,7 @@ export class ClickHouseTraceEvaluationRunsRepository extends TraceEvaluationRuns
     if (input.traceIds.length === 0) return [];
     try {
       const client = this.clickhouse.as(input.authorization, { reads: "traces" });
+      // ID_BOUND_SKIP: evaluation's index, registered by evaluation; moves there with trace-review.
       const result = await client.query({
         query: `
           SELECT TenantId, EvaluationId, EvaluatorId, EvaluatorType, EvaluatorName,
@@ -421,6 +423,7 @@ export class ClickHouseTraceEvaluationRunsRepository extends TraceEvaluationRuns
     columns: string;
     attempts: string;
   }): Promise<Record<string, TraceEvaluationData[]>> {
+    // ID_BOUND_SKIP: evaluation's index, registered by evaluation; moves there with trace-review.
     const result = await input.client.query({
       query: `
         SELECT ${input.columns}, ${input.attempts}, ${ATTEMPT_MOMENTS}

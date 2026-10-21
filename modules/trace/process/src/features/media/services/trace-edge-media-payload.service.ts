@@ -1,6 +1,6 @@
 import type { RecordSpanCommandData } from "@langwatch/trace-contract";
 
-import { TraceIngressPayload } from "../../ingestion/services/trace-ingestion.service.ts";
+import { TraceIngressPayload } from "../../ingestion/services/trace-span-collection.service.ts";
 import {
   TraceEdgeMediaExtractionService,
   type EdgeMediaExtractionDeps,

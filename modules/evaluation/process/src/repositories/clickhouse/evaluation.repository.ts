@@ -1,6 +1,6 @@
 import type { Authorization } from "@langwatch/authorization";
 import { AuthorizedClickHouse, type ClickHouseClientResolver } from "@langwatch/clickhouse-client";
-import type { EvaluationRunData } from "@langwatch/evaluation-contract";
+import type { EvaluationRunData, TraceEvaluationData } from "@langwatch/evaluation-contract";
 
 import {
   EvaluationRunRepository,
@@ -24,10 +24,12 @@ export class ClickHouseEvaluationRepository extends EvaluationRunRepository {
   private readonly reader: EvaluationRunClickHouseReadRepository;
   private readonly writer: EvaluationRunClickHouseWriteRepository;
 
-  private constructor(options: {
-    resolveClient: EvaluationClickHouseResolver;
-    resolveQueryClient: ClickHouseClientResolver;
-  }) {
+  private constructor(
+    private readonly options: {
+      resolveClient: EvaluationClickHouseResolver;
+      resolveQueryClient: ClickHouseClientResolver;
+    },
+  ) {
     super();
     this.reader = EvaluationRunClickHouseReadRepository.create({
       clickhouse: new AuthorizedClickHouse({ resolveClient: options.resolveQueryClient }),
@@ -65,6 +67,13 @@ export class ClickHouseEvaluationRepository extends EvaluationRunRepository {
     traceId: string;
   }): Promise<EvaluationRunData[]> {
     return this.reader.findByTraceId(input);
+  }
+
+  findTraceEvaluations(input: {
+    authorization: Authorization;
+    traceIds: readonly string[];
+  }): Promise<TraceEvaluationData[]> {
+    return this.reader.findTraceEvaluations(input);
   }
 
   findInputs(input: {

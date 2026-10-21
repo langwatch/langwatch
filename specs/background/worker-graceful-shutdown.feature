@@ -105,6 +105,17 @@ Feature: Worker graceful shutdown does not sever in-flight ClickHouse work
     Then it is the drain plus twenty seconds of close slack
     And an explicit PROCESS_SHUTDOWN_DEADLINE_MS still wins
 
+  # Closing the process stores drains eventing's queues, but the phase ran on the
+  # runner's 10s default, so a 25s drain was cut at 10s and the connections it
+  # still used were closed under it.
+
+  @unit @shutdown-budget
+  Scenario: Closing the stores gets the queue's drain budget, not the runner default
+    Given SHUTDOWN_DRAIN_TIMEOUT_MS names a drain budget longer than ten seconds
+    When the process stores take longer than ten seconds to close
+    Then the stores phase is not abandoned
+    And with no budget named the stores phase still outwaits the queue's 25s default
+
   @unit @shutdown-budget
   Scenario: A malformed drain override is reported and falls back, never fatal
     Given the configured drain budget is not a positive number of milliseconds
@@ -344,6 +355,16 @@ Feature: Worker graceful shutdown does not sever in-flight ClickHouse work
     Given the app Deployment is rendered
     Then it sets terminationGracePeriodSeconds
     And the value covers the drain budget plus thirty seconds
+
+  # The app had no preStop, so SIGTERM could reach it before every proxy had
+  # dropped its endpoint, and requests still routed to it were refused.
+
+  @regression @helm-grace-period
+  Scenario: The app pod sleeps before SIGTERM so its endpoint removal propagates
+    Given the app Deployment is rendered
+    Then its container has a preStop sleep of app.preStopSleepSeconds, five by default
+    And a preStop sleep the grace period cannot fit beside the drain refuses to render
+    And app.preStopSleepSeconds of zero renders no preStop
 
   @regression @helm-grace-period
   Scenario: The process is told the same drain budget the pod is sized for

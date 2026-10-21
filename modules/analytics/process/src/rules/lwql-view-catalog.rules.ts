@@ -3756,9 +3756,10 @@ export const LWQL_VIEW_CATALOG: readonly LangWatchQLViewDefinition[] = [
   clickhouseView("simulation_trace_metrics", ["TenantId", "ScenarioRunId", "TraceId", "EventId"]),
   clickhouseView("test_suite_runs", ["TenantId", "ProjectionId"]),
   // Deliberately excluded (absent = unqueryable), see specs/lwql/catalog-inclusion.feature:
-  // the *_mv materialised-view objects (their targets are included), goose_db_version (tooling,
-  // no tenant column), instant_eval_runs (read through the runs API) and
-  // lwql_api_key_tenant_map (access-control plumbing the row policy reads).
+  // the *_mv materialised-view objects, the *_id_index tables (read plumbing that maps an id to
+  // its time range, dev/docs/plans/id-index-2026-10-10.md), goose_db_version (tooling, no tenant
+  // column), instant_eval_runs (read through the runs API) and lwql_api_key_tenant_map
+  // (access-control plumbing the row policy reads).
   ...LWQL_POSTGRES_CATALOG,
 ];
 

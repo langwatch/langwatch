@@ -3,10 +3,42 @@ import { nowInstant } from "@langwatch/time";
 import type fastq from "fastq";
 
 import { gqJobsDispatchedTotal } from "./metrics.ts";
-import type { DispatchResult, GroupStagingScripts } from "./scripts.ts";
+import type { DispatchedWork, DispatchResult, GroupStagingScripts } from "./scripts.ts";
 
 /** Max jobs to dispatch per Lua call to bound script execution time. */
 const MAX_BATCH_SIZE = 200;
+/** Claims at or above this many leave no pause before the next: there is a backlog to drain. */
+const FULL_CLAIM = 32;
+
+/** The shortest BRPOP wait: a due-but-unclaimable group cannot spin the loop faster. */
+const MIN_SIGNAL_WAIT_MS = 50;
+
+/**
+ * One script reply's claims: those sharing a batch slot become one cross-group task, the rest run
+ * alone, in claim order. Slots are numbered per call, so never pass claims of two calls together.
+ */
+export function dispatchedWorkOf(results: readonly DispatchResult[]): DispatchedWork[] {
+  const work: DispatchedWork[] = [];
+  const batches = new Map<number, DispatchResult[]>();
+  for (const result of results) {
+    const slot = result.batchSlot;
+    if (slot === undefined || !Number.isSafeInteger(slot)) {
+      work.push(result);
+      continue;
+    }
+    const batch = batches.get(slot);
+    if (batch) {
+      batch.push(result);
+      continue;
+    }
+    const groups = [result];
+    batches.set(slot, groups);
+    work.push({ groups });
+  }
+  return work.map((each) =>
+    "groups" in each && each.groups.length === 1 ? each.groups[0]! : each,
+  );
+}
 
 /** The dedicated connection the dispatcher blocks on; an IORedis or a Cluster. */
 interface BlockingConnection {
@@ -39,16 +71,23 @@ export class GroupQueueDispatcher {
         GroupStagingScripts,
         "getSignalKey" | "getEarliestReadyScore" | "getEarliestCandidateScore" | "dispatchBatch"
       >;
-      processingQueue: fastq.queueAsPromised<DispatchResult, void>;
+      processingQueue: fastq.queueAsPromised<DispatchedWork, void>;
       blockingConnection: BlockingConnection;
       queueName: string;
-      globalConcurrency: number;
+      /** Slots this consumer runs; a function when the count adapts at runtime. */
+      globalConcurrency: number | (() => number);
       activeTtlSec: number;
       signalTimeoutSec: number;
+      /** Staging's settling window; above 0, a group due within one BRPOP wait is met on time. */
+      settleWindowMs?: number;
       logger: Logger;
       dispatchGroupAllowListKey?: string;
       /** The lists a listed-group dispatcher runs, read before each claim. */
       listedGroupsKeys?: () => Promise<readonly string[]>;
+      /** Cross-group batching, read before each claim; absent or one group claims each alone. */
+      groupBatch?: () => { maxGroups: number; routes: readonly string[] } | undefined;
+      /** The worker stamped on each claim's poison-guard marker, read before each claim. */
+      claimGuardWorkerId?: () => string | undefined;
     },
   ) {}
 
@@ -116,8 +155,12 @@ export class GroupQueueDispatcher {
     let dispatched: number;
     do {
       dispatched = await this.dispatchBatch();
-      if (dispatched > 0) {
+      // A short claim means the queue is nearly drained: pause so arrivals gather. A full one
+      // means a backlog, so only yield the turn; a fixed pause capped each pod's claim rate.
+      if (dispatched > 0 && dispatched < FULL_CLAIM) {
         await new Promise((resolve) => setTimeout(resolve, 25));
+      } else if (dispatched > 0) {
+        await new Promise((resolve) => setImmediate(resolve));
       }
     } while (dispatched > 0 && !this.shutdownRequested);
 
@@ -171,10 +214,24 @@ export class GroupQueueDispatcher {
   private async waitForSignal(): Promise<void> {
     if (this.listed) return this.pollListedGroups();
     const signalKey = this.params.scripts.getSignalKey();
-    await this.params.blockingConnection.brpop(signalKey, await this.nextWakeTimeoutSec());
-    // Drain remaining buffered signals — the upcoming dispatchBatch
-    // handles multiple jobs in one Lua call, so N signals = 1 cycle.
-    await this.params.blockingConnection.del(signalKey);
+    const untilDueMs = await this.untilEarliestDueMs();
+    // A settling group comes due within one BRPOP floor; signals meanwhile stay listed.
+    if (this.settlesBeforeFloor(untilDueMs)) {
+      await new Promise((resolve) => setTimeout(resolve, untilDueMs + 1));
+      return;
+    }
+    // Buffered signals stay until the cycle ends: dispatchUntilEmpty clears them in its one DEL,
+    // which drops nothing a DEL here would have kept, so N signals still cost one cycle.
+    await this.params.blockingConnection.brpop(signalKey, this.wakeTimeoutSec(untilDueMs));
+  }
+
+  private settlesBeforeFloor(untilDueMs: number | null): untilDueMs is number {
+    return (
+      (this.params.settleWindowMs ?? 0) > 0 &&
+      untilDueMs !== null &&
+      untilDueMs > 0 &&
+      untilDueMs < MIN_SIGNAL_WAIT_MS
+    );
   }
 
   /**
@@ -220,33 +277,44 @@ export class GroupQueueDispatcher {
     }
   }
 
+  private slots(): number {
+    const { globalConcurrency } = this.params;
+    return typeof globalConcurrency === "number" ? globalConcurrency : globalConcurrency();
+  }
+
   private saturated(): boolean {
     return (
-      this.params.processingQueue.length() + this.params.processingQueue.running() >=
-      this.params.globalConcurrency
+      this.params.processingQueue.length() + this.params.processingQueue.running() >= this.slots()
     );
+  }
+
+  /** Milliseconds until the earliest ready group is due; null when saturated, empty or unknown. */
+  private async untilEarliestDueMs(): Promise<number | null> {
+    if (this.saturated()) return null;
+    try {
+      const earliest = await this.params.scripts.getEarliestReadyScore();
+      if (earliest === null) return null;
+      return earliest - nowInstant().epochMilliseconds;
+    } catch {
+      // Peek is best-effort; fall back to the fixed interval.
+      return null;
+    }
   }
 
   /**
    * Clamps BRPOP timeout to the earliest due group, handling delayed jobs
    * and signal-loss edge cases; falls back to fixed interval when saturated.
    */
-  private async nextWakeTimeoutSec(): Promise<number> {
-    if (this.saturated()) return this.params.signalTimeoutSec;
-    try {
-      const earliest = await this.params.scripts.getEarliestReadyScore();
-      if (earliest === null) return this.params.signalTimeoutSec;
-      const untilDueSec = (earliest - nowInstant().epochMilliseconds) / 1000;
-      return Math.min(this.params.signalTimeoutSec, Math.max(untilDueSec, 0.05));
-    } catch {
-      // Peek is best-effort; fall back to the fixed interval.
-      return this.params.signalTimeoutSec;
-    }
+  private wakeTimeoutSec(untilDueMs: number | null): number {
+    if (untilDueMs === null) return this.params.signalTimeoutSec;
+    return Math.min(this.params.signalTimeoutSec, Math.max(untilDueMs, MIN_SIGNAL_WAIT_MS) / 1000);
   }
 
   /** One claim over the allow-list, or over each open list in turn while slots remain. */
-  private async claim(maxJobs: number): Promise<DispatchResult[]> {
+  private async claim(maxJobs: number): Promise<DispatchedWork[]> {
     this.claimedAtMs = nowInstant().epochMilliseconds;
+    const claimGuardWorkerId = this.params.claimGuardWorkerId?.();
+    const guard = claimGuardWorkerId ? { claimGuardWorkerId } : {};
     const claimFrom = ({
       allowedGroupsKey,
       jobs,
@@ -262,47 +330,68 @@ export class GroupQueueDispatcher {
         maxJobs: jobs,
         allowedGroupsKey,
         ...(listKey ? { listKey } : {}),
+        ...guard,
       });
     if (!this.params.listedGroupsKeys) {
       const allowList = this.params.dispatchGroupAllowListKey;
       this.scannedCandidates = allowList ? [allowList] : [];
-      return claimFrom({ allowedGroupsKey: allowList, jobs: maxJobs });
+      if (allowList) {
+        return dispatchedWorkOf(await claimFrom({ allowedGroupsKey: allowList, jobs: maxJobs }));
+      }
+      return dispatchedWorkOf(
+        await this.params.scripts.dispatchBatch({
+          nowMs: nowInstant().epochMilliseconds,
+          activeTtlSec: this.params.activeTtlSec,
+          maxJobs,
+          ...this.groupBatchArgs(),
+          ...guard,
+        }),
+      );
     }
-    const results: DispatchResult[] = [];
+    const work: DispatchedWork[] = [];
     const lists = await this.params.listedGroupsKeys();
     this.scannedCandidates = lists.map((listKey) => `${listKey}:candidates`);
     const first = this.nextList++ % Math.max(lists.length, 1);
     for (const listKey of [...lists.slice(first), ...lists.slice(0, first)]) {
-      if (results.length >= maxJobs) break;
-      const jobs = maxJobs - results.length;
-      results.push(
-        ...(await claimFrom({ allowedGroupsKey: `${listKey}:candidates`, jobs, listKey })),
-      );
+      if (work.length >= maxJobs) break;
+      const jobs = maxJobs - work.length;
+      // Each list's reply numbers its batch slots from one, so it is grouped on its own.
+      const claims = await claimFrom({ allowedGroupsKey: `${listKey}:candidates`, jobs, listKey });
+      work.push(...dispatchedWorkOf(claims));
     }
-    return results;
+    return work;
+  }
+
+  /** Batching for the queue's own claim; listed and allow-listed claims take groups alone. */
+  private groupBatchArgs(): {
+    groupBatch?: { maxGroups: number; routes: readonly string[]; maxClaims: number };
+  } {
+    const batching = this.params.groupBatch?.();
+    if (!batching || batching.maxGroups <= 1 || batching.routes.length === 0) return {};
+    return { groupBatch: { ...batching, maxClaims: MAX_BATCH_SIZE } };
   }
 
   private async dispatchBatch(): Promise<number> {
     if (this.paused) return 0;
     this.slotFreed = false;
     const availableSlots =
-      this.params.globalConcurrency -
-      this.params.processingQueue.length() -
-      this.params.processingQueue.running();
+      this.slots() - this.params.processingQueue.length() - this.params.processingQueue.running();
     if (availableSlots <= 0) {
       return 0;
     }
 
     const maxJobs = Math.min(availableSlots, MAX_BATCH_SIZE);
-    const results = await this.claim(maxJobs);
+    let claimed = 0;
 
-    for (const result of results) {
-      const run = this.params.processingQueue.push(result).catch((err) => {
+    for (const work of await this.claim(maxJobs)) {
+      const claims = "groups" in work ? work.groups : [work];
+      claimed += claims.length;
+      const run = this.params.processingQueue.push(work).catch((err) => {
         this.params.logger.debug(
           {
             queueName: this.params.queueName,
-            groupId: result.groupId,
-            stagedJobId: result.stagedJobId,
+            groupIds: claims.map((claim) => claim.groupId),
+            stagedJobIds: claims.map((claim) => claim.stagedJobId),
             error: err instanceof Error ? err.message : String(err),
           },
           "fastq push error (already handled in processWithRetries)",
@@ -311,19 +400,19 @@ export class GroupQueueDispatcher {
       // The shared signal is the main dispatcher's; a listed one wakes on its own freed slot.
       if (this.listed) void run.finally(() => this.wakeForFreedSlot());
 
-      gqJobsDispatchedTotal.inc({ queue_name: this.params.queueName });
+      gqJobsDispatchedTotal.inc({ queue_name: this.params.queueName }, claims.length);
     }
 
-    if (results.length > 0) {
+    if (claimed > 0) {
       this.params.logger.debug(
         {
           queueName: this.params.queueName,
-          count: results.length,
+          count: claimed,
         },
         "Batch dispatched jobs from staging to fastq",
       );
     }
 
-    return results.length;
+    return claimed;
   }
 }

@@ -413,6 +413,8 @@ export class EvaluationModule implements EvaluationApiContract {
     });
     const execution = EvaluationExecutionService.create({
       traces: dependencies.traces,
+      runs: repositories.runs,
+      authz: dependencies.authz,
       spanDigest: EvaluationSpanDigestService.create(dependencies.traces),
       modelEnvResolver: EvaluatorModelEnvService.create({
         modelProviders: dependencies.modelProviders,

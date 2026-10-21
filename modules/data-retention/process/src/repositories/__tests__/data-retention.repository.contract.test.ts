@@ -203,6 +203,23 @@ function contractCases(backend: Backend): void {
         [],
       );
     });
+
+    /** @scenario "The memory and Postgres data retention repositories answer alike" */
+    it("lists the named organizations' policies in one read, and only theirs", async () => {
+      const repository = backend.repository();
+      await repository.upsertForScope({
+        organizationId: other(),
+        scope: team(),
+        category: "traces",
+        retentionDays: 35,
+      });
+
+      const named = await repository.findAllInOrganizations({ organizationIds: [other()] });
+      const unnamed = await repository.findAllInOrganizations({ organizationIds: [acme()] });
+
+      expect(named).toEqual([expect.objectContaining({ organizationId: other(), ...team() })]);
+      expect(unnamed).toEqual([]);
+    });
   });
 }
 

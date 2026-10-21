@@ -109,6 +109,7 @@ const summary = {
   failedCount: 1,
   stalledCount: 0,
   cancelledCount: 0,
+  notScoredCount: 0,
   completedCount: 3,
   totalCount: 3,
   inProgressCount: 0,

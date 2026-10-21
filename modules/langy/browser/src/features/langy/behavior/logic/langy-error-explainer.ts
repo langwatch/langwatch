@@ -1,5 +1,6 @@
 import {
   explainHandledError,
+  PROVIDER_ALLOWANCE_REASONS,
   PROVIDER_CONFIG_PROBLEMS,
   PROVIDER_CREDENTIAL_REASONS,
   PROVIDER_INVALID_REQUEST_REASONS,
@@ -541,11 +542,12 @@ export function explainLangyError(received: LangyDomainError): LangyErrorPresent
     }
 
     case "llm_upstream_error": {
-      // The provider was reached and refused. A refused key, a model it
-      // does not serve or a request it reads as invalid fails the same way
-      // every time, so the card offers the model settings; anything else (a
+      // The provider was reached and refused. A refused key, a spent balance, a
+      // model it does not serve or a request it reads as invalid fails the same
+      // way every time, so the card offers the model settings; anything else (a
       // rate limit, an outage) can pass, so it offers another try.
       const deterministic =
+        hasReasonKind(domain.reasons, PROVIDER_ALLOWANCE_REASONS) ||
         hasReasonKind(domain.reasons, PROVIDER_CREDENTIAL_REASONS) ||
         hasReasonKind(domain.reasons, PROVIDER_MODEL_MISSING_REASONS) ||
         hasReasonKind(domain.reasons, PROVIDER_INVALID_REQUEST_REASONS);

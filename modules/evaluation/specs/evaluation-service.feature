@@ -112,6 +112,16 @@ Feature: Evaluation service boundary
     When the cost is recorded
     Then the ledger holds one entry under the id the call chose, inside its project only
 
+  # The verdict was answered 200 even when its reported event could not be sent,
+  # so a result the caller saw was never stored.
+  @integration
+  Scenario: An evaluate call whose verdict cannot be recorded answers a retryable 503
+    Given an evaluate call whose evaluator ran
+    And the event pipeline refuses the verdict
+    When the call is answered
+    Then the answer is 503, marked retryable
+    And the caller is not told the evaluation succeeded
+
   @unit
   Scenario: An evaluate call outside a trace still records its cost
     Given an evaluate call from an experiment workbench, which names no trace
@@ -235,6 +245,12 @@ Feature: Evaluation service boundary
     Then it is refused naming the incremental clustering, the status text and the body
 
   @unit
+  Scenario: A langevals clustering refusal keeps its status and failure code
+    Given langevals refuses a clustering call with a failure code in its error detail
+    When topic clustering asks evaluation for a batch clustering
+    Then the refusal carries the HTTP status and that failure code
+
+  @unit
   Scenario: A clustering call aborted by its caller does not reach langevals
     Given topic clustering's deadline has already fired
     When it asks evaluation for a batch clustering
@@ -353,6 +369,22 @@ Feature: Evaluation service boundary
     When its lifecycle fact is recorded
     Then the fact carries the project, the evaluation, its evaluator type, score and verdict
     And it names no admin and no organization count
+
+  # Keyed by the evaluation, not the project (2026-10-20): keyed by project, every settled
+  # evaluation in a project queued behind the one before it, so one busy project held its whole
+  # backlog in a single queue group.
+  @unit
+  Scenario: A settled evaluation's fact is keyed by the evaluation, not its project
+    Given two evaluations in the same project settle
+    When their lifecycle facts are recorded
+    Then each fact is keyed by its own evaluation, so neither waits for the other
+
+  @unit
+  Scenario: A hand-run evaluation's fact is keyed by the run, not its project
+    Given two people in the same project each run an evaluation by hand
+    When their ran facts are recorded
+    Then each fact is keyed by its person and instant, so neither waits for the other
+    And the same run sent twice is still one fact
 
   @integration
   Scenario: An evaluate request that fails validation answers 400 with the sentence

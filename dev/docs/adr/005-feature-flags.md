@@ -318,12 +318,14 @@ The experiment property and the `onboarding_variant` person property ship on
 every guided onboarding event, on `scenario_created` and on
 `scenario_run_succeeded`; the browser registers the property once the variant
 is known. The mapping lives in the onboarding contract
-(`onboardingExperimentProperties`). The rest of the amendment above was not
-built, and is recorded here as ideas.
+(`onboardingExperimentProperties`). The `onboarding_variant_assigned` exposure
+event is tracked once per organization, for both variants: onboarding records
+the `lw.guided_onboarding.variant_assigned` fact when the organization is
+created with a variant, and nurturing sends it to PostHog. The rest of the
+amendment above was not built, and is recorded here as ideas.
 
 ### Ideas not built
 
-- An `onboarding_variant_assigned` exposure event, tracked once when the organization is created.
 - `first_trace_integrated` carrying `onboarding_variant` and the experiment property.
 - A producer for `project_active_day`: the first application trace of a day, and the first successful scenario run of a day, each once per project per day, never for Langy's own turns or sample traces.
 - The `viewed onboarding_progress` event carrying `onboarding_variant`.

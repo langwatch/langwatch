@@ -22,7 +22,7 @@ on:
 concurrency:
   # A label event for any label but `ci:full` gets its own group, so it neither
   # cancels a running full run nor is cancelled by one.
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ (github.event_name == 'pull_request' && github.event.action == 'labeled' && github.event.label.name != 'ci:full') && format('label-{0}', github.run_id) || github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ ((github.event_name == 'pull_request' && github.event.action == 'labeled' && github.event.label.name != 'ci:full') || (github.event_name == 'pull_request_target' && github.event.label.name != 'approved-ci')) && format('label-{0}', github.run_id) || github.event.pull_request.number || github.ref }}
   # Supersede an outdated run on a PR branch, never on main: every commit
   # that lands on main has to keep its own validation, and cancelling here
   # would let a merge silently void the run for the commit before it.
@@ -30,8 +30,11 @@ concurrency:
 
 jobs:
   changes:
-    # Skips the whole run for a label event other than `ci:full`.
-    if: github.event_name != 'pull_request' || github.event.action != 'labeled' || github.event.label.name == 'ci:full'
+    # Skips the whole run for a label event other than `ci:full`, and for a
+    # pull_request_target label other than `approved-ci`: that event exists only
+    # to let `approved-ci` run a fork's PR, and without this every label added to
+    # any PR started this job and the aggregator on a runner.
+    if: (github.event_name != 'pull_request' || github.event.action != 'labeled' || github.event.label.name == 'ci:full') && (github.event_name != 'pull_request_target' || github.event.label.name == 'approved-ci')
     runs-on: ubuntu-latest
     outputs:
       relevant: ${{ steps.detect.outputs.relevant }}
@@ -180,7 +183,7 @@ jobs:
 
   sdk-go-complete:
     needs: [changes, test, typecheck, build]
-    if: always() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || github.event.label.name == 'ci:full')
+    if: always() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || github.event.label.name == 'ci:full') && (github.event_name != 'pull_request_target' || github.event.label.name == 'approved-ci')
     runs-on: ubuntu-latest
     steps:
       - uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2

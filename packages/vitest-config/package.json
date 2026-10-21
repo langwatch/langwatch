@@ -27,6 +27,10 @@
     "./console-guard": {
       "types": "./dist/console-guard.d.ts",
       "default": "./src/console-guard.ts"
+    },
+    "./mocks-modules": {
+      "types": "./dist/mocks-modules.d.ts",
+      "default": "./src/mocks-modules.ts"
     }
   },
   "scripts": {

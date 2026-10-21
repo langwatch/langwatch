@@ -6,7 +6,7 @@ The server half of [evaluation](../README.md). Evaluations: running evaluators a
 
 ## Installation
 
-`defineProcessModule("evaluation").withRepositories(evaluationRepositories).withChannels(evaluationChannels).withApi(EvaluationModule).withTransports(evaluationTrpcTransport, evaluationsLegacyRest).withEventing(evaluationProcessingEventing).withEventing(evaluationLifecycleEventing)`, `src/evaluation.module.ts:16`.
+`defineProcessModule("evaluation").withRepositories(evaluationRepositories).withChannels(evaluationChannels).withApi(EvaluationModule).withTransports(evaluationTrpcTransport, evaluationsLegacyRest).withEventing(evaluationProcessingEventing).withEventing(evaluationLifecycleEventing).withIdIndexes(EVALUATION_ID_INDEXES, …).withIdIndexes(EVALUATION_SECOND_ID_INDEXES, …)`, `src/evaluation.module.ts:20`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -216,7 +216,7 @@ detectPii(input: PiiDetectionRequest): Promise<PiiDetectionOutcome>;
 
 |             |                                                |
 | ----------- | ---------------------------------------------- |
-| Declared at | `src/transport/evaluations-legacy.rest.ts:147` |
+| Declared at | `src/transport/evaluations-legacy.rest.ts:148` |
 | Base URL    | none: each route's path is its address         |
 | Addressing  | literal                                        |
 | Credential  | project                                        |
@@ -225,12 +225,12 @@ detectPii(input: PiiDetectionRequest): Promise<PiiDetectionOutcome>;
 
 List the built-in evaluators
 
-Public: static evaluator catalogue; the same list for every caller, no project data. Declared at `src/transport/evaluations-legacy.rest.ts:155`.
+Public: static evaluator catalogue; the same list for every caller, no project data. Declared at `src/transport/evaluations-legacy.rest.ts:156`.
 
 Answers at `/api/evaluations/list`, `/api/v1/evaluations/list`.
 
 ```typescript
-// Response: inline, src/transport/evaluations-legacy.rest.ts:162
+// Response: inline, src/transport/evaluations-legacy.rest.ts:163
 type Response = unknown;
 ```
 
@@ -238,7 +238,7 @@ type Response = unknown;
 
 Run an evaluator
 
-Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:183`.
+Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:184`.
 
 Answers at `/api/evaluations/:evaluator/evaluate`, `/api/v1/evaluations/:evaluator/evaluate`.
 
@@ -247,9 +247,9 @@ Answers at `/api/evaluations/:evaluator/evaluate`, `/api/v1/evaluations/:evaluat
 interface Params {
   evaluator: string;
 }
-// Body: inline, src/transport/evaluations-legacy.rest.ts:187
+// Body: inline, src/transport/evaluations-legacy.rest.ts:188
 type Body = Record<string, unknown>;
-// Response: inline, src/transport/evaluations-legacy.rest.ts:190
+// Response: inline, src/transport/evaluations-legacy.rest.ts:191
 type Response = unknown;
 ```
 
@@ -257,7 +257,7 @@ type Response = unknown;
 
 Run a namespaced evaluator
 
-Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:214`.
+Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:215`.
 
 Answers at `/api/evaluations/:evaluator/:subpath/evaluate`, `/api/v1/evaluations/:evaluator/:subpath/evaluate`.
 
@@ -267,9 +267,9 @@ interface Params {
   evaluator: string;
   subpath: string;
 }
-// Body: inline, src/transport/evaluations-legacy.rest.ts:221
+// Body: inline, src/transport/evaluations-legacy.rest.ts:222
 type Body = Record<string, unknown>;
-// Response: inline, src/transport/evaluations-legacy.rest.ts:224
+// Response: inline, src/transport/evaluations-legacy.rest.ts:225
 type Response = unknown;
 ```
 
@@ -277,15 +277,15 @@ type Response = unknown;
 
 Run an evaluator as a guardrail
 
-Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:248`.
+Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:249`.
 
 Answers at `/api/guardrails/:evaluator/evaluate`, `/api/v1/guardrails/:evaluator/evaluate`.
 
 ```typescript
 type Params = z.infer<typeof evaluatorParamsSchema>; // ../contract/src/evaluation-legacy.schemas.ts:17
-// Body: inline, src/transport/evaluations-legacy.rest.ts:251
+// Body: inline, src/transport/evaluations-legacy.rest.ts:252
 type Body = Record<string, unknown>;
-// Response: inline, src/transport/evaluations-legacy.rest.ts:254
+// Response: inline, src/transport/evaluations-legacy.rest.ts:255
 type Response = unknown;
 ```
 
@@ -391,14 +391,14 @@ Declared at `src/eventing/evaluation-processing-definition.pipeline.ts:150`. Eve
 | command                    | `completeEvaluation`                                                                           | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:207` |
 | command                    | `reportEvaluation`                                                                             | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:210` |
 | peer subscriber            | `traceEvaluationTrigger`                                                                       | `lw.obs.trace.span_received` from [trace](../../trace/README.md)             | `src/eventing/evaluation-processing-definition.pipeline.ts:218` |
-| peer subscriber            | `traceOriginEvaluationTrigger`                                                                 | `lw.obs.trace.origin_resolved` from [trace](../../trace/README.md)           | `src/eventing/evaluation-processing-definition.pipeline.ts:236` |
-| peer subscriber            | `traceCustomEvaluationSync`                                                                    | `lw.obs.trace.span_received` from [trace](../../trace/README.md)             | `src/eventing/evaluation-processing-definition.pipeline.ts:247` |
-| peer subscriber            | `traceCollectorEvaluation`                                                                     | `lw.trace.collector_evaluation_received` from [trace](../../trace/README.md) | `src/eventing/evaluation-processing-definition.pipeline.ts:271` |
+| peer subscriber            | `traceOriginEvaluationTrigger`                                                                 | `lw.obs.trace.origin_resolved` from [trace](../../trace/README.md)           | `src/eventing/evaluation-processing-definition.pipeline.ts:239` |
+| peer subscriber            | `traceCustomEvaluationSync`                                                                    | `lw.obs.trace.span_received` from [trace](../../trace/README.md)             | `src/eventing/evaluation-processing-definition.pipeline.ts:253` |
+| peer subscriber            | `traceCollectorEvaluation`                                                                     | `lw.trace.collector_evaluation_received` from [trace](../../trace/README.md) | `src/eventing/evaluation-processing-definition.pipeline.ts:277` |
 | ClickHouse fold projection | `≈ EvaluationRunFoldProjection.create({ store: this.deps.evalRunStore, })`                     | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:163` |
 | ClickHouse fold projection | `≈ EvaluationAnalyticsFoldProjection.create({ store: this.deps.evaluationAnalyticsStore, })`   | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:168` |
 | ClickHouse map projection  | `≈ EvaluationAnalyticsRollupMapProjection.create({ store: this.deps.evaluationAnalyticsRollu…` | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:173` |
 | projection subscriber      | `lifecycleCompleted`                                                                           | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:178` |
-| lane aliases               | `≈ MAIN_TRACE_REACTION_LANE_ALIASES`                                                           | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:277` |
+| lane aliases               | `≈ MAIN_TRACE_REACTION_LANE_ALIASES`                                                           | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:283` |
 
 ## Configuration
 

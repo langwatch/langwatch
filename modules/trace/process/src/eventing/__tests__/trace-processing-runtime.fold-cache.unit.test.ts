@@ -36,6 +36,7 @@ function compose() {
       analyticsFoldCache: RedisTraceAnalyticsFoldCacheRepository.create({ redis, ttlSeconds: 300 }),
     },
     canonicalisation: TraceCanonicalisationService.create(),
+    spool: createApiFixture<TraceProcessingPipelineInput["spool"]>(),
     commands: createApiFixture<TraceProcessingPipelineInput["commands"]>(),
     findSummary: async () => null,
     recordTrackedEvent: async () => undefined,

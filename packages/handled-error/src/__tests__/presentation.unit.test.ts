@@ -539,6 +539,33 @@ describe("explainHandledError", () => {
       );
     });
 
+    /** @scenario "A plan or quota limit that resets reads as no allowance left" */
+    it.each([
+      "usage_limit_reached",
+      "codex_plan_limit",
+      "insufficient_quota",
+      "billing_hard_limit_reached",
+    ])("headlines the provider's %s code as no allowance left", (code) => {
+      const { title } = explainHandledError(
+        shape({ code: "llm_upstream_error", reasons: [reason(code)] }),
+      );
+
+      expect(title).toBe("This provider account has no allowance left");
+      expect(title).not.toContain("out of credit");
+    });
+
+    /** @scenario "A plan or quota limit that resets reads as no allowance left" */
+    it("keeps the allowance headline when the proxy files its out-of-credit reason beside the code", () => {
+      const { title } = explainHandledError(
+        shape({
+          code: "llm_upstream_error",
+          reasons: [reason("insufficient_quota"), reason("llm_provider_out_of_credit")],
+        }),
+      );
+
+      expect(title).toBe("This provider account has no allowance left");
+    });
+
     /** @scenario "A provider that does not know the model gets its own remediation copy" */
     it.each([
       "upstream_not_found",

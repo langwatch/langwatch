@@ -37,6 +37,11 @@ const registry = {
       "Send the body with the Content-Type in meta.expected; meta.received names the one that was sent",
     ],
   },
+  request_body_unreadable: {
+    tips: [
+      "This usually means the connection closed before the body finished uploading. Send the request again.",
+    ],
+  },
 
   // ---- dataset storage ----
   private_dataplane_unavailable: {
@@ -51,6 +56,21 @@ const registry = {
       "Set S3_BUCKET_NAME (with its credentials) so datasets are stored in object storage",
       "Or point LANGWATCH_LOCAL_STORAGE_PATH at a writable, persistent directory and restart the service",
       "The server log line next to this failure names the directory that was refused",
+    ],
+  },
+
+  dataset_invalid_column: {
+    tips: [
+      "Add the column to the dataset, or remove it from the row, and send it again; retrying unchanged will fail identically",
+      "The message names the dataset's valid columns",
+    ],
+  },
+
+  // ---- automations ----
+  automation_dataset_unavailable: {
+    tips: [
+      "Open the automation and pick a dataset that exists, or restore the archived one",
+      "Check the column mapping still names columns the dataset has; retrying unchanged will fail identically",
     ],
   },
 

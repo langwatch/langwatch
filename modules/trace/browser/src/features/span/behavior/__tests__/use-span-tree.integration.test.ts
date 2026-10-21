@@ -49,7 +49,6 @@ let sseConnectionState = "connected";
 let traceQueryArgs = {
   isLive: true,
   isReady: true,
-  hintReady: true,
   queryArgs: { projectId: "p1", traceId: "t1" },
 };
 
@@ -142,19 +141,16 @@ describe("useSpanTree", () => {
     traceQueryArgs = {
       isLive: true,
       isReady: true,
-      hintReady: true,
       queryArgs: { projectId: "p1", traceId: "t1" },
     };
   });
 
-  describe("when the drawer opened from a deep link with no partition hint", () => {
-    /** @scenario "Sibling reads wait for the partition hint on a deep link" */
-    it("holds the tree walk until the header backfills the hint", () => {
-      traceQueryArgs = { ...traceQueryArgs, hintReady: false };
-
+  describe("when the drawer opened from a link with no partition hint", () => {
+    /** @scenario "The browser opens a trace by id alone" */
+    it("walks the tree at once, by trace id alone", () => {
       renderHook(() => useSpanTree(), { wrapper: MemoryRouterWrapper });
 
-      expect(lastTreeOptions().enabled).toBe(false);
+      expect(lastTreeOptions().enabled).toBe(true);
     });
   });
 

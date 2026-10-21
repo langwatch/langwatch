@@ -123,11 +123,14 @@ const nurturingSignalSchemaDefinition = z.discriminatedUnion("kind", [
     /** The organization's admin. */
     userId: id,
     projectId: id,
+    /** The latest of the evaluations this signal counts; its type, score and verdict follow. */
     evaluationId: id,
     evaluatorType: z.string().nullish(),
     score: z.number().nullish(),
     passed: z.boolean().nullish(),
-    /** Counted by nurturing since the cutover, including this one. */
+    /** The project's evaluations one batch counted together; absent on a signal from before batching. */
+    evaluationsCounted: countIncludingThis.optional(),
+    /** Counted by nurturing since the cutover, including these. */
     organizationEvaluationCount: countIncludingThis,
     /** The organization's first: never for one learned from project's backfill. */
     first: z.boolean(),
@@ -234,6 +237,14 @@ const nurturingSignalSchemaDefinition = z.discriminatedUnion("kind", [
     ]),
     payload: z.record(z.string(), z.union([z.string(), z.array(z.string()), z.number()])),
     state: guidedOnboardingStateSchema,
+  }),
+  z.object({
+    kind: z.literal("onboarding_variant_assigned"),
+    ...signalSource,
+    /** The person who created the organization. */
+    userId: id,
+    organizationId: id,
+    variant: onboardingVariantSchema,
   }),
   z.object({
     kind: z.literal("subscription_changed"),

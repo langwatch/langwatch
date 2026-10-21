@@ -1,7 +1,6 @@
-import { ClickHouseColumns } from "@langwatch/clickhouse-client";
+import { idIndexedClientDouble } from "@langwatch/clickhouse-client/testing";
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
 import { SecurityError } from "@langwatch/eventing";
-import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -9,6 +8,10 @@ import {
   ownProof,
 } from "../../../__tests__/support/authorization-proofs.fixture.ts";
 import type { EvaluationRetentionLookup } from "../../evaluation.repository.ts";
+import {
+  EVALUATION_ID_INDEXES,
+  EVALUATION_SECOND_ID_INDEXES,
+} from "../clickhouse.evaluation-id-indexes.database.ts";
 import type {
   EvaluationClickHouseClient,
   EvaluationClickHouseInsert,
@@ -119,8 +122,13 @@ function harness(rows: Record<string, unknown>[][] = []): {
   };
   const floor = new TestRetention();
   // Every column present: the column list is the schema's, never a scripted answer.
-  const allColumns = ClickHouseColumns.over({ read: async () => [] });
-  const queryClient = clickHouseQueryClientDouble({ query: reader, columns: () => allColumns });
+  const queryClient = idIndexedClientDouble({
+    indexes: [...EVALUATION_ID_INDEXES, ...EVALUATION_SECOND_ID_INDEXES],
+    driver: {
+      execute: async (request) =>
+        request.sql.includes("system.columns") ? { rows: [] } : reader(request),
+    },
+  });
   return {
     client,
     reader,
@@ -205,7 +213,7 @@ describe("ClickHouseEvaluationRepository", () => {
     });
     expect(client.queries[0]).toContain("argMax(ScheduledAt, UpdatedAt)");
     expect(client.queries.at(-1)).toContain("PREWHERE");
-    expect(client.queries.at(-1)).toContain("scheduledAtFrom");
+    expect(client.queries.at(-1)).toContain("idBound_fromMs");
     expect(client.queries.at(-1)).toContain("max(UpdatedAt)");
   });
 
@@ -268,9 +276,8 @@ describe("ClickHouseEvaluationRepository", () => {
       expect(client.queries[heavyIndex]).toContain("t.ScheduledAt >=");
       expect(client.queries[heavyIndex]).not.toContain("t.ScheduledAt <=");
       expect(client.queryParams[heavyIndex]).toMatchObject({
-        scheduledAtFrom: floorMs,
+        idBound_fromMs: floorMs,
       });
-      expect(client.queryParams[heavyIndex]).not.toHaveProperty("scheduledAtTo");
     } finally {
       vi.useRealTimers();
     }
