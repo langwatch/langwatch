@@ -148,13 +148,6 @@ Feature: A package's integration suite runs in CI when it declares one
       Then they never overlap, and light suites run alongside them
 
     @unit
-    Scenario: A light suite gets a share of the cores
-      Given a shard that runs suites concurrently
-      When a light unit suite starts
-      Then its vitest workers are capped at the cores divided by the concurrency
-      And integration, browser and heavy suites keep their own worker count
-
-    @unit
     Scenario: A shard starts its heaviest suites first
       Given a shard whose packages differ in recorded weight
       When the package suites job runs

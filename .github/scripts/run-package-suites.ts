@@ -5,7 +5,6 @@
 
 import { execFileSync, spawn } from "node:child_process";
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
-import { availableParallelism } from "node:os";
 import { join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -270,29 +269,6 @@ export const parseConcurrency = (value: string | undefined): number => {
     throw new Error(`PACKAGE_SUITES_CONCURRENCY='${value}' is not a positive whole number.`);
   }
   return parsed;
-};
-
-/**
- * A light shared-lane suite gets a share of the cores through VITEST_MAX_WORKERS.
- * Integration, browser and heavy suites keep their own config, which the variable
- * would outrank (an integration suite's serial files would overlap).
- */
-export const suiteEnv = ({
-  job,
-  heavy,
-  concurrency,
-  cores,
-  base,
-}: {
-  job: SuiteJob;
-  heavy: boolean;
-  concurrency: number;
-  cores: number;
-  base: NodeJS.ProcessEnv;
-}): NodeJS.ProcessEnv => {
-  if (concurrency <= 1 || heavy || laneOf(job.script) !== "shared") return base;
-  const workers = Math.max(1, Math.floor(cores / concurrency));
-  return { ...base, VITEST_MAX_WORKERS: String(workers) };
 };
 
 /** Every script the gate runs, package by package; an excluded package has none. */
@@ -656,16 +632,15 @@ if (isEntrypoint()) {
     process.exit(1);
   }
   for (const line of exclusionNotices(assigned, excluded)) console.log(line);
+  // Each suite keeps its own configured worker count. VITEST_MAX_WORKERS would
+  // outrank it, and an integration suite's serial files would then overlap.
   const live = concurrency === 1;
-  const isHeavy = (pkg: DiscoveredPackage) => isHeavyPackage({ weightOf, pkg });
-  const cores = availableParallelism();
   console.log(`Running up to ${concurrency} suite(s) at once.`);
   const runner = createSuiteRunner({
     live,
     start: (job) =>
       spawn("pnpm", ["--filter", job.pkg.name, "run", job.script], {
         stdio: live ? "inherit" : ["ignore", "pipe", "pipe"],
-        env: suiteEnv({ job, heavy: isHeavy(job.pkg), concurrency, cores, base: process.env }),
       }),
     log: (line) => console.log(line),
     write: (output) => process.stdout.write(output),
@@ -684,7 +659,7 @@ if (isEntrypoint()) {
     jobs: jobsFor(heaviestFirst({ packages: assigned, weightOf }), excluded),
     concurrency,
     run: runner.run,
-    isHeavy,
+    isHeavy: (pkg) => isHeavyPackage({ weightOf, pkg }),
   });
   const statusOf = (pkg: DiscoveredPackage) => (script: string) =>
     [...statuses].find(([job]) => job.pkg === pkg && job.script === script)?.[1] ?? 1;
