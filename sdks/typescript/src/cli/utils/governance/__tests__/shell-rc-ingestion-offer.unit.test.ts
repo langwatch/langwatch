@@ -514,10 +514,32 @@ describe("maybeOfferIngestionShellRcPersist", () => {
       });
     });
 
-    describe("and somebody else's file already sits at the hook file's path", () => {
+    describe("and somebody else's file that runs the LangWatch hook sits at the hook file's path", () => {
       const foreign = `${JSON.stringify({
         hooks: {
           sessionStart: [{ bash: "langwatch ingest hook copilot" }, { bash: "echo mine" }],
+          preToolUse: [{ bash: "echo guard" }],
+        },
+      })}\n`;
+
+      /** @scenario "A user's langwatch.json that runs the LangWatch hook is not reported as turning linking off" */
+      it("leaves the file alone and never says repository linking is off", async () => {
+        fs.mkdirSync(path.dirname(copilotHookFilePath()), { recursive: true });
+        fs.writeFileSync(copilotHookFilePath(), foreign);
+        answers.push("y");
+        const { maybeOfferIngestionShellRcPersist } = await import("../shell-rc.js");
+        await maybeOfferIngestionShellRcPersist({ cfg: cfg(), tool: "copilot", vars: otelVars });
+
+        expect(lastPrompts[0]).not.toContain("langwatch.json");
+        expect(fs.readFileSync(copilotHookFilePath(), "utf8")).toBe(foreign);
+        expect(logged()).not.toContain("will not report their repository or branch");
+      });
+    });
+
+    describe("and somebody else's file already sits at the hook file's path", () => {
+      const foreign = `${JSON.stringify({
+        hooks: {
+          sessionStart: [{ bash: "echo mine" }],
           preToolUse: [{ bash: "echo guard" }],
         },
       })}\n`;

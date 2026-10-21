@@ -340,6 +340,11 @@ function renderSessionHooks(report: InstallReport): void {
     const displayPath = report.session_hooks_path ?? "";
     const notice = hookFileNotOursNotice({ displayPath, command: "copilot" });
     process.stdout.write(`${chalk.yellow("!")} ${notice}\n`);
+  } else if (report.session_hooks_action === "user_file_runs_hook") {
+    process.stdout.write(
+      `${chalk.green("✓")} ${report.session_hooks_path} is your own file and runs the LangWatch ` +
+        `hook, so it was left alone\n`,
+    );
   } else if (report.session_hooks_action) {
     const hooksVerb =
       report.session_hooks_action === "unchanged"
@@ -386,7 +391,11 @@ function renderToolInstallationNotes(report: InstallReport): void {
       );
     }
   } else if (report.tool === "copilot_cli") {
-    if (report.session_hooks_action && report.session_hooks_action !== "not_ours") {
+    const wroteHookFile =
+      report.session_hooks_action === "created" ||
+      report.session_hooks_action === "updated" ||
+      report.session_hooks_action === "unchanged";
+    if (wroteHookFile) {
       process.stdout.write(
         `\nA LangWatch hook file was added to your Copilot hooks folder, so every Copilot CLI\n` +
           `and VS Code session reports the repository, branch and worktree it ran in. Your\n` +

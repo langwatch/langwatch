@@ -643,15 +643,29 @@ Rule: Copilot reports through one hook file LangWatch owns
   @unit
   Scenario: Instrumenting Copilot over the user's langwatch.json says repository linking is off
     Given a Copilot langwatch.json that LangWatch did not write
+    And the file does not run the LangWatch hook command
     When `langwatch instrument copilot` or `langwatch instrument code` runs
     Then the file is left exactly as it was
     And the user is told the file is not LangWatch's and was left alone
     And that Copilot sessions will not report their repository or branch
     And to rename the file and run the same command again
 
+  # A user's file that runs the LangWatch hook command itself still reports
+  # each session's repository and branch, so saying linking is off would be
+  # wrong, and asking them to rename it would cost them their own hooks.
+  @unit
+  Scenario: A user's langwatch.json that runs the LangWatch hook is not reported as turning linking off
+    Given a Copilot langwatch.json that LangWatch did not write
+    And the file runs the LangWatch hook command for copilot beside hooks of the user's own
+    When `langwatch instrument copilot`, the copilot wrapper or the copilot ingestion install runs
+    Then the file is left exactly as it was
+    And the user is not told repository linking is off
+    And the ingestion install does not say a LangWatch hook file was added
+
   @unit
   Scenario: The copilot ingestion install reports the user's langwatch.json it left alone
     Given a Copilot langwatch.json that LangWatch did not write
+    And the file does not run the LangWatch hook command
     When the copilot ingestion install runs
     Then the report says the file is not LangWatch's and repository linking is off
     And it does not say a LangWatch hook file was added
@@ -669,6 +683,7 @@ Rule: Copilot reports through one hook file LangWatch owns
   @unit
   Scenario: The wrapper's offer never promises a hook file it will not write
     Given a Copilot langwatch.json that LangWatch did not write
+    And the file does not run the LangWatch hook command
     When the user says yes to the offer the copilot wrapper makes to keep capturing
     Then the question did not name the hook file
     And the file is left exactly as it was

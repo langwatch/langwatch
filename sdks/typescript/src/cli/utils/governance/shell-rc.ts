@@ -620,7 +620,7 @@ function installRawSessionContextHooks(): void {
  */
 export function assertOwnedSessionHookFile({ tool }: { tool: string }): void {
   const hooks = assertOwnedHookFileFor({ command: tool });
-  if (!hooks || hooks.action === "unchanged") return;
+  if (!hooks || hooks.action === "unchanged" || hooks.action === "user_file_runs_hook") return;
   if (hooks.action === "not_ours") {
     console.log(
       chalk.yellow(

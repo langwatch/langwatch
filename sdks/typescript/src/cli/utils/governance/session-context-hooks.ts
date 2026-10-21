@@ -60,8 +60,17 @@ export function sessionContextHooksTarget(tool: HookedTool): HooksTarget {
   return SESSION_CONTEXT_AGENTS[tool].hookTarget.resolve();
 }
 
-/** `not_ours`: a file of the user's holds our path (Copilot), so nothing was written. */
-export type SessionContextHooksAction = "created" | "updated" | "unchanged" | "not_ours";
+/**
+ * `not_ours`: a file of the user's holds our path (Copilot), so nothing was
+ * written and sessions report no repository. `user_file_runs_hook`: the same,
+ * but their file runs our hook command, so sessions still report it.
+ */
+export type SessionContextHooksAction =
+  | "created"
+  | "updated"
+  | "unchanged"
+  | "not_ours"
+  | "user_file_runs_hook";
 
 export interface SessionContextHooksInstallResult extends HooksTarget {
   action: SessionContextHooksAction;
@@ -304,7 +313,8 @@ function resolveTarget({
 
 /**
  * Write the tool's own hook file. A file at our path that is not ours (see
- * `readOwnedHookFile`) is left exactly as it is and reported `not_ours`.
+ * `readOwnedHookFile`) is left exactly as it is and reported `not_ours`, or
+ * `user_file_runs_hook` when it runs our hook command itself.
  */
 function installOwnedHookFile({
   tool,
@@ -320,7 +330,8 @@ function installOwnedHookFile({
     existing = null;
   }
   if (existing !== null && readOwnedHookFile({ tool, filePath: target.path }) === null) {
-    return { action: "not_ours", ...target };
+    const runsOurHook = fileRunsHookCommand({ tool, filePath: target.path });
+    return { action: runsOurHook ? "user_file_runs_hook" : "not_ours", ...target };
   }
 
   const document = copilotHookFileDocument(tool);
@@ -385,6 +396,28 @@ function readOwnedHookFile({
     return entries.every(isOurEntry);
   };
   return events.length > 0 && events.every(isOnlyOurs) ? parsed : null;
+}
+
+/**
+ * Whether a hook file, ours or the user's, runs our hook command on some event,
+ * alone or chained, which is what makes a session report its repository.
+ */
+function fileRunsHookCommand({ tool, filePath }: { tool: HookedTool; filePath: string }): boolean {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
+  } catch {
+    return false;
+  }
+  if (!isPlainObject(parsed) || !isPlainObject(parsed.hooks)) return false;
+  const command = sessionContextHookCommand(tool);
+  const runsCommand = (entry: unknown): boolean =>
+    isPlainObject(entry) &&
+    typeof entry.bash === "string" &&
+    entry.bash.split(/&&|\|\||;/).some((part) => part.trim() === command);
+  return Object.values(parsed.hooks).some(
+    (entries) => Array.isArray(entries) && entries.some(runsCommand),
+  );
 }
 
 /** Delete the owned hook file when it is ours. Returns whether it was removed. */

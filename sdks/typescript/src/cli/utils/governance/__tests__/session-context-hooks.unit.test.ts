@@ -410,7 +410,7 @@ describe("the Copilot hook file LangWatch owns", () => {
         fs.mkdirSync(path.dirname(copilotFile()), { recursive: true });
         fs.writeFileSync(copilotFile(), theirs);
 
-        expect(install({ tool: "copilot" }).action).toBe("not_ours");
+        expect(install({ tool: "copilot" }).action).toBe("user_file_runs_hook");
         expect(has("copilot")).toBe(false);
         expect(remove("copilot")).toBe(false);
         expect(fs.readFileSync(copilotFile(), "utf8")).toBe(theirs);
