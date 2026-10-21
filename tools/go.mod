@@ -1,6 +1,6 @@
 module github.com/langwatch/langwatch/tools
 
-go 1.27.2
+go 1.27.3
 
 // Monorepo: the in-tree sdk-go directory IS the source of truth for
 // every root-module consumer (nlpgo, aigateway, …). Changes to sdk-go

@@ -32,6 +32,7 @@
     "@langwatch/api-key-contract": "workspace:*",
     "@langwatch/authorization": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/egress": "workspace:*",
     "@langwatch/enterprise-governance-contract": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
@@ -71,7 +72,6 @@
   },
   "devDependencies": {
     "@clickhouse/client": "catalog:",
-    "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/clickhouse-migrations": "workspace:*",
     "@langwatch/evaluation-process": "workspace:*",
     "@langwatch/handled-error": "workspace:*",

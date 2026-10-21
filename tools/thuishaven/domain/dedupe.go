@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"cmp"
 	"fmt"
 	"path/filepath"
 	"regexp"
@@ -302,6 +303,20 @@ func JudgeDuplicates(instances []InfraInstance) []DuplicateGroup {
 		if len(list) < 2 {
 			continue
 		}
+		// The app collects instances from maps, so the order is fixed here: the
+		// copy haven points at first, then by pid and container.
+		slices.SortStableFunc(list, func(a, b InfraInstance) int {
+			if a.Referenced != b.Referenced {
+				if a.Referenced {
+					return -1
+				}
+				return 1
+			}
+			if a.PID != b.PID {
+				return cmp.Compare(a.PID, b.PID)
+			}
+			return cmp.Compare(a.ContainerID, b.ContainerID)
+		})
 		g := DuplicateGroup{Kind: kind}
 		for n := range list {
 			g.Canonical = g.Canonical || list[n].Referenced

@@ -1,6 +1,6 @@
 module github.com/langwatch/langwatch/pkg
 
-go 1.27.2
+go 1.27.3
 
 require (
 	github.com/go-playground/validator/v10 v10.30.2

@@ -541,8 +541,8 @@ Answers at `/api/v1/agents/:id/call`.
 
 ```typescript
 type Params = z.infer<typeof agentRestParamsSchema>; // ../contract/src/agent-rest.schemas.ts:13
-type Body = z.infer<typeof relayCallBodySchema>; // ../contract/src/connected-agent.call.ts:40
-type Response = z.infer<typeof relayCallResponseSchema>; // ../contract/src/connected-agent.call.ts:57
+type Body = z.infer<typeof relayCallBodySchema>; // ../contract/src/connected-agent.call.ts:59
+type Response = z.infer<typeof relayCallResponseSchema>; // ../contract/src/connected-agent.call.ts:79
 ```
 
 ## tRPC transport
