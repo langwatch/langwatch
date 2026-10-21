@@ -74,3 +74,40 @@ Feature: Pending counter conservation across job lifecycle
     Given a queue whose processor has not finished its first job
     When further jobs are staged for the same group
     Then the group is recorded as holding pending work
+
+  # An operator's whole-group dead-letter move and its replay change live jobs
+  # too, so they adjust the counter in the same script that moves the jobs. Only
+  # live zset members count: a dead worker's claimed job was taken off at claim,
+  # and a replayed job id the live group already holds keeps its stored score.
+  @integration @counter @dead-letter
+  Scenario: Moving a group to the dead-letter queue takes its live jobs off the counter
+    Given a group holding three staged jobs
+    When an operator moves the group to the dead-letter queue
+    Then the counter is decremented by three
+
+  @integration @counter @dead-letter
+  Scenario: A dead worker's claimed job moves to the dead-letter queue without being subtracted twice
+    Given a group whose worker died holding one claimed job, with two jobs still staged
+    When an operator moves the group to the dead-letter queue
+    Then all three jobs are dead-lettered
+    And the counter is decremented by two
+
+  @integration @counter @dead-letter
+  Scenario: Replaying a dead-lettered group adds only new live jobs to the counter
+    Given a dead-lettered group whose live group already holds one of its job ids
+    When an operator replays the group
+    Then the counter is incremented only for the job that was not already live
+    And the live copy keeps its stored score and value
+
+  @integration @counter @dead-letter
+  Scenario: Repeating a dead-letter move or replay changes the counter only once
+    Given a group an operator has moved to the dead-letter queue
+    When the move is repeated, or the replay is repeated after it
+    Then the repeat leaves the counter unchanged
+
+  @integration @counter @dead-letter
+  Scenario: The counter equals the live jobs through repeated dead-letter moves, replays and a worker death
+    Given a group moved to the dead-letter queue and replayed
+    And its worker dies holding a claimed job
+    When the operator moves and replays it again
+    Then total-pending equals the sum of ZCARD across the live groups after every step

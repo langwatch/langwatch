@@ -1,6 +1,10 @@
 import type { Authorization } from "@langwatch/authorization";
 import type { RetentionDaysProvider } from "@langwatch/clickhouse-client";
-import type { EvaluationRunData, EvaluationRunLookup } from "@langwatch/evaluation-contract";
+import type {
+  EvaluationRunData,
+  EvaluationRunLookup,
+  TraceEvaluationData,
+} from "@langwatch/evaluation-contract";
 
 /** A run lookup fenced by a proof instead of a bare tenant id (ruling AGG-EVAL-PROOF). */
 export type EvaluationRunProofLookup = Omit<EvaluationRunLookup, "tenantId"> &
@@ -26,6 +30,11 @@ export abstract class EvaluationRunRepository {
     authorization: Authorization;
     traceId: string;
   }): Promise<EvaluationRunData[]>;
+  /** The latest version of each run on any of the traces, unordered; absent traces add nothing. */
+  abstract findTraceEvaluations(input: {
+    authorization: Authorization;
+    traceIds: readonly string[];
+  }): Promise<TraceEvaluationData[]>;
   /** The newest inputs in the first project the proof reads that holds the run. */
   abstract findInputs(input: {
     authorization: Authorization;

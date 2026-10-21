@@ -58,9 +58,8 @@ export interface TraceLegacyRead {
   ): Promise<TraceSummaryPage>;
 
   /**
-   * Named traces with their spans. `occurredAt` is the partition-pruning hint:
-   * dropping it turns a bounded read into a scan of every partition, cold
-   * storage included.
+   * Named traces with their spans. `occurredAt` is the partition-pruning hint;
+   * without it the trace id index bounds the read server-side.
    */
   getTracesWithSpans(params: {
     /** The own-only proof the store read goes through. */

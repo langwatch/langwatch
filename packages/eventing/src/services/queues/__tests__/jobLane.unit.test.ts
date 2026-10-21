@@ -89,6 +89,29 @@ describe("routing a job at send", () => {
   });
 });
 
+describe("reading a dequeued job's routing", () => {
+  describe("given the queue asks for it once per send option", () => {
+    it("parses the routing once and answers every later ask from that parse", () => {
+      const envelope = { [JOB_ROUTING_FIELD]: { ...route(laneWith()) } };
+
+      const first = readJobRouting(envelope);
+      // A parse builds a fresh object, so the same instance on every ask is one parse.
+      for (let ask = 0; ask < 4; ask++) expect(readJobRouting(envelope)).toBe(first);
+
+      expect(first?.groupKey).toBe("tenant-a/job/test/a");
+    });
+  });
+
+  describe("given routing its schema refuses", () => {
+    it("answers absent on every ask", () => {
+      const envelope = { [JOB_ROUTING_FIELD]: { groupKey: 7 } };
+
+      expect(readJobRouting(envelope)).toBeUndefined();
+      expect(readJobRouting(envelope)).toBeUndefined();
+    });
+  });
+});
+
 describe("reading a dequeued batch", () => {
   describe("given one payload that fails its lane's schema", () => {
     it("refuses the batch non-retryably, by path, before the handler runs", () => {

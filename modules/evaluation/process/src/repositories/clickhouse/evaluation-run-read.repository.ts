@@ -1,6 +1,8 @@
 import type { Authorization } from "@langwatch/authorization";
 import {
   type AuthorizedClickHouse,
+  type IdBoundOptions,
+  type IdBoundResolved,
   ownProjectIdOf,
   RetentionFloorService,
   singleTenantOf,
@@ -12,7 +14,9 @@ import {
 import {
   evaluationRunDataSchema,
   EvaluationNotFoundError,
+  traceEvaluationDataSchema,
   type EvaluationRunData,
+  type TraceEvaluationData,
 } from "@langwatch/evaluation-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
@@ -28,8 +32,10 @@ import type { ClickHouseEvaluationRunRecord } from "./evaluation-run-write.repos
 
 const TABLE_NAME = "evaluation_runs" as const;
 const RESOLVER_RECENT_WINDOW_MS = 35 * 24 * 60 * 60 * 1000;
+const TRACE_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
 const RUNS = "runs" as const;
-const inputsRowsSchema = z.array(z.object({ TenantId: z.string(), Inputs: z.string().nullable() }));
+const inputsRowSchema = z.object({ TenantId: z.string(), Inputs: z.string().nullable() });
+const inputsRowsSchema = z.array(inputsRowSchema);
 const logger = createLogger("langwatch:evaluation:clickhouse.evaluation-run-read");
 
 /** The tenant an unhinted read's retention floor is read for: the one it reads, else its own. */
@@ -39,6 +45,50 @@ function retentionTenantOf(authorization: Authorization): string {
     ownProjectIdOf({ authorization, reads: "traces" })
   );
 }
+
+const TRACE_EVALUATION_COLUMNS_LIGHT = [
+  "EvaluationId",
+  "EvaluatorId",
+  "EvaluatorType",
+  "EvaluatorName",
+  "TraceId",
+  "IsGuardrail",
+  "Status",
+  "Score",
+  "Passed",
+  "Label",
+  "Details",
+  "Error",
+  `toUnixTimestamp64Milli(${RUNS}.ScheduledAt) AS ScheduledAt`,
+  `toUnixTimestamp64Milli(${RUNS}.StartedAt) AS StartedAt`,
+  `toUnixTimestamp64Milli(${RUNS}.CompletedAt) AS CompletedAt`,
+].join(", ");
+const TRACE_EVALUATION_COLUMNS_WITH_INPUTS = `${TRACE_EVALUATION_COLUMNS_LIGHT}, Inputs`;
+
+type TraceEvaluationRow = {
+  EvaluationId: string;
+  EvaluatorId: string;
+  EvaluatorType: string;
+  EvaluatorName: string | null;
+  TraceId: string | null;
+  IsGuardrail: boolean | number | string;
+  Status: string;
+  Score: number | null;
+  Passed: boolean | number | string | null;
+  Label: string | null;
+  Details: string | null;
+  Error: string | null;
+  Inputs?: string | null;
+  ScheduledAt: number | string | null;
+  StartedAt: number | string | null;
+  CompletedAt: number | string | null;
+};
+
+function isFlagSet(flag: boolean | number | string): boolean {
+  return flag === true || flag === 1 || flag === "1" || flag === "true";
+}
+
+type ScheduledAtRange = { scheduledAtFrom: number; scheduledAtTo?: number };
 
 function toNumberOrNull(value: number | string | null): number | null {
   return value === null ? null : Number(value);
@@ -96,55 +146,7 @@ export class EvaluationRunClickHouseReadRepository {
   async getByEvaluationId(input: EvaluationRunFloorLookup): Promise<EvaluationRunData> {
     let row: ClickHouseEvaluationRunRecord | undefined;
     try {
-      const { scheduledAtFrom, scheduledAtTo } = await this.resolveScheduledAtRange(input);
-      const bounds = (column: string): string =>
-        `AND ${column} >= fromUnixTimestamp64Milli({scheduledAtFrom:Int64})` +
-        (scheduledAtTo === undefined
-          ? ""
-          : ` AND ${column} <= fromUnixTimestamp64Milli({scheduledAtTo:Int64})`);
-      const client = this.options.clickhouse.as(input.authorization, { reads: "traces" });
-      // The outer scope's bare `ScheduledAt` is the UInt64 alias below, so the windowed fence
-      // reads the raw column in the dedup subquery; the outer scope takes the tenant set alone.
-      const result = await client.query<ClickHouseEvaluationRunRecord>({
-        query: `
-          SELECT
-            t.ProjectionId AS ProjectionId, t.TenantId AS TenantId,
-            t.EvaluationId AS EvaluationId, t.Version AS Version,
-            t.EvaluatorId AS EvaluatorId, t.EvaluatorType AS EvaluatorType,
-            t.EvaluatorName AS EvaluatorName, t.TraceId AS TraceId,
-            t.IsGuardrail AS IsGuardrail, t.Status AS Status, t.Score AS Score,
-            t.Passed AS Passed, t.Label AS Label, t.Details AS Details,
-            t.Inputs AS Inputs, t.Error AS Error, t.ErrorDetails AS ErrorDetails,
-            toUnixTimestamp64Milli(t.CreatedAt) AS CreatedAt,
-            toUnixTimestamp64Milli(t.UpdatedAt) AS UpdatedAt,
-            toUnixTimestamp64Milli(t.ArchivedAt) AS ArchivedAt,
-            toUnixTimestamp64Milli(t.ScheduledAt) AS ScheduledAt,
-            toUnixTimestamp64Milli(t.StartedAt) AS StartedAt,
-            toUnixTimestamp64Milli(t.CompletedAt) AS CompletedAt,
-            t.CostId AS CostId, t.LastProcessedEventId AS LastProcessedEventId,
-            toUnixTimestamp64Milli(t.LastEventOccurredAt) AS LastEventOccurredAt
-          FROM ${TABLE_NAME} AS t
-          PREWHERE (t.TenantId, t.EvaluationId, t.UpdatedAt) IN (
-            SELECT TenantId, EvaluationId, max(UpdatedAt)
-            FROM ${TABLE_NAME}
-            WHERE ${tenantScope("ScheduledAt")}
-              AND EvaluationId = {evaluationId:String}
-              ${bounds("ScheduledAt")}
-            GROUP BY TenantId, EvaluationId
-          )
-          WHERE ${tenantSet()}
-            AND t.EvaluationId = {evaluationId:String}
-            ${bounds("t.ScheduledAt")}
-          LIMIT 1
-        `,
-        query_params: {
-          evaluationId: input.evaluationId,
-          scheduledAtFrom,
-          ...(scheduledAtTo === undefined ? {} : { scheduledAtTo }),
-        },
-        format: "JSONEachRow",
-      });
-      row = (await result.json())[0];
+      row = await this.findRunRow(input);
     } catch (error) {
       logger.warn(
         {
@@ -158,6 +160,69 @@ export class EvaluationRunClickHouseReadRepository {
     }
     if (!row) throw new EvaluationNotFoundError(input.evaluationId);
     return this.fromClickHouseRecord(row);
+  }
+
+  /**
+   * A caller's `scheduledAt` bounds the read within its slack, never widening; without one the
+   * id index does once ready, and before that the floor-and-probe ladder resolves the range.
+   */
+  private findRunRow(
+    input: EvaluationRunFloorLookup,
+  ): Promise<ClickHouseEvaluationRunRecord | undefined> {
+    const slackMs = input.scheduledAtSlackMs ?? DEFAULT_SCHEDULED_AT_SLACK_MS;
+    const idBound: IdBoundOptions = input.scheduledAt
+      ? { occurredAtHint: input.scheduledAt.getTime(), windowMs: slackMs, fallback: "none" }
+      : { fallback: "none", resolveHint: () => this.resolveScheduledAtWindow(input) };
+    return this.readRunRow({ input, idBound });
+  }
+
+  private async readRunRow({
+    input,
+    idBound,
+  }: {
+    input: EvaluationRunFloorLookup;
+    idBound: IdBoundOptions;
+  }): Promise<ClickHouseEvaluationRunRecord | undefined> {
+    const client = this.options.clickhouse.as(input.authorization, { reads: "traces" });
+    // The outer scope's bare `ScheduledAt` is the UInt64 alias below, so the windowed fence
+    // reads the raw column in the dedup subquery; the outer scope takes the tenant set alone.
+    const result = await client.query<ClickHouseEvaluationRunRecord>({
+      query: `
+        SELECT
+          t.ProjectionId AS ProjectionId, t.TenantId AS TenantId,
+          t.EvaluationId AS EvaluationId, t.Version AS Version,
+          t.EvaluatorId AS EvaluatorId, t.EvaluatorType AS EvaluatorType,
+          t.EvaluatorName AS EvaluatorName, t.TraceId AS TraceId,
+          t.IsGuardrail AS IsGuardrail, t.Status AS Status, t.Score AS Score,
+          t.Passed AS Passed, t.Label AS Label, t.Details AS Details,
+          t.Inputs AS Inputs, t.Error AS Error, t.ErrorDetails AS ErrorDetails,
+          toUnixTimestamp64Milli(t.CreatedAt) AS CreatedAt,
+          toUnixTimestamp64Milli(t.UpdatedAt) AS UpdatedAt,
+          toUnixTimestamp64Milli(t.ArchivedAt) AS ArchivedAt,
+          toUnixTimestamp64Milli(t.ScheduledAt) AS ScheduledAt,
+          toUnixTimestamp64Milli(t.StartedAt) AS StartedAt,
+          toUnixTimestamp64Milli(t.CompletedAt) AS CompletedAt,
+          t.CostId AS CostId, t.LastProcessedEventId AS LastProcessedEventId,
+          toUnixTimestamp64Milli(t.LastEventOccurredAt) AS LastEventOccurredAt
+        FROM ${TABLE_NAME} AS t
+        PREWHERE (t.TenantId, t.EvaluationId, t.UpdatedAt) IN (
+          SELECT TenantId, EvaluationId, max(UpdatedAt)
+          FROM ${TABLE_NAME}
+          WHERE ${tenantScope("ScheduledAt")}
+            AND EvaluationId = {evaluationId:String}
+            {{idBound:evaluation_runs.EvaluationId:evaluationId}}
+          GROUP BY TenantId, EvaluationId
+        )
+        WHERE ${tenantSet()}
+          AND t.EvaluationId = {evaluationId:String}
+          {{idBound:evaluation_runs.EvaluationId:evaluationId:t}}
+        LIMIT 1
+      `,
+      query_params: { evaluationId: input.evaluationId },
+      format: "JSONEachRow",
+      idBound,
+    });
+    return (await result.json())[0];
   }
 
   async findByTraceId(input: {
@@ -183,18 +248,25 @@ export class EvaluationRunClickHouseReadRepository {
           WHERE ${tenantSet()}
             AND ${RUNS}.ScheduledAt >= now() - INTERVAL 7 DAY
             AND ${RUNS}.TraceId = {traceId:String}
+            {{idBound:evaluation_runs.TraceId:traceId:${RUNS}}}
             AND (${RUNS}.TenantId, ${RUNS}.EvaluationId, ${RUNS}.UpdatedAt) IN (
               SELECT TenantId, EvaluationId, max(UpdatedAt)
               FROM ${TABLE_NAME}
               WHERE ${tenantScope("ScheduledAt")}
                 AND ScheduledAt >= now() - INTERVAL 7 DAY
                 AND TraceId = {traceId:String}
+                {{idBound:evaluation_runs.TraceId:traceId}}
               GROUP BY TenantId, EvaluationId
             )
           ORDER BY ${RUNS}.UpdatedAt DESC
         `,
         query_params: { traceId: input.traceId },
         format: "JSONEachRow",
+        idBound: {
+          occurredAtHint: nowInstant().epochMilliseconds,
+          windowMs: TRACE_LOOKBACK_MS,
+          fallback: "none",
+        },
       });
       return (await result.json()).map((row) => this.fromClickHouseRecord(row));
     } catch (error) {
@@ -210,24 +282,111 @@ export class EvaluationRunClickHouseReadRepository {
     }
   }
 
+  /**
+   * Each trace's latest evaluation versions, unordered, with no time bound of their own: only
+   * the trace id index narrows the read. A memory-limit failure retries without the inputs.
+   */
+  async findTraceEvaluations(input: {
+    authorization: Authorization;
+    traceIds: readonly string[];
+  }): Promise<TraceEvaluationData[]> {
+    if (input.traceIds.length === 0) return [];
+    try {
+      return await this.queryTraceEvaluations({
+        ...input,
+        columns: TRACE_EVALUATION_COLUMNS_WITH_INPUTS,
+      });
+    } catch (error) {
+      if (!isMemoryLimitError(error)) {
+        logger.error(
+          { traceIdCount: input.traceIds.length, error },
+          "Failed to fetch trace evaluations from ClickHouse",
+        );
+        throw error;
+      }
+      logger.warn(
+        { traceIdCount: input.traceIds.length },
+        "Trace evaluation read hit the ClickHouse memory limit; retrying without inputs",
+      );
+      return this.queryTraceEvaluations({ ...input, columns: TRACE_EVALUATION_COLUMNS_LIGHT });
+    }
+  }
+
+  private async queryTraceEvaluations(input: {
+    authorization: Authorization;
+    traceIds: readonly string[];
+    columns: string;
+  }): Promise<TraceEvaluationData[]> {
+    const client = this.options.clickhouse.as(input.authorization, { reads: "traces" });
+    const result = await client.query<TraceEvaluationRow>({
+      query: `
+        SELECT ${input.columns}
+        FROM ${TABLE_NAME} AS ${RUNS}
+        WHERE ${tenantSet()}
+          AND ${RUNS}.TraceId IN ({traceIds:Array(String)})
+          {{idBound:evaluation_runs.TraceId:traceIds:${RUNS}}}
+          AND (${RUNS}.TenantId, ${RUNS}.EvaluationId, ${RUNS}.UpdatedAt) IN (
+            SELECT TenantId, EvaluationId, max(UpdatedAt)
+            FROM ${TABLE_NAME}
+            WHERE ${tenantScope("ScheduledAt")}
+              AND TraceId IN ({traceIds:Array(String)})
+              {{idBound:evaluation_runs.TraceId:traceIds}}
+            GROUP BY TenantId, EvaluationId
+          )
+      `,
+      query_params: { traceIds: [...input.traceIds] },
+      format: "JSONEachRow",
+      idBound: { fallback: "unbounded" },
+    });
+    return (await result.json()).flatMap((row) =>
+      row.TraceId
+        ? [
+            traceEvaluationDataSchema.parse({
+              evaluationId: row.EvaluationId,
+              evaluatorId: row.EvaluatorId,
+              evaluatorType: row.EvaluatorType,
+              evaluatorName: row.EvaluatorName,
+              traceId: row.TraceId,
+              isGuardrail: isFlagSet(row.IsGuardrail),
+              status: row.Status,
+              score: row.Score,
+              passed: row.Passed === null ? null : isFlagSet(row.Passed),
+              label: row.Label,
+              details: row.Details,
+              error: row.Error,
+              ...(row.Inputs === undefined ? {} : { inputs: parseObject(row.Inputs) }),
+              timestamps: {
+                scheduledAt: toNumberOrNull(row.ScheduledAt),
+                startedAt: toNumberOrNull(row.StartedAt),
+                completedAt: toNumberOrNull(row.CompletedAt),
+              },
+            }),
+          ]
+        : [],
+    );
+  }
+
   async findInputs(input: {
     authorization: Authorization;
     evaluationId: string;
   }): Promise<EvaluationInputsRead | null> {
     try {
       const reader = this.options.clickhouse.as(input.authorization, { reads: "traces" });
+      // Today's read has no time bound at all; only the index narrows it.
       const result = await reader.query({
         query: `
           SELECT TenantId, argMax(Inputs, UpdatedAt) AS Inputs
           FROM ${TABLE_NAME}
           WHERE ${tenantScope("ScheduledAt")}
             AND EvaluationId = {evaluationId:String}
+            {{idBound:evaluation_runs.EvaluationId:evaluationId}}
           GROUP BY TenantId
           ORDER BY TenantId
           LIMIT 1
         `,
         query_params: { evaluationId: input.evaluationId },
         format: "JSONEachRow",
+        idBound: { fallback: "unbounded" },
       });
       const row = inputsRowsSchema.parse(await result.json())[0];
       return row ? { tenantId: row.TenantId, inputs: parseObject(row.Inputs) } : null;
@@ -249,17 +408,21 @@ export class EvaluationRunClickHouseReadRepository {
     }
   }
 
-  private async resolveScheduledAtRange(input: EvaluationRunFloorLookup): Promise<{
-    scheduledAtFrom: number;
-    scheduledAtTo?: number;
-  }> {
+  /**
+   * The not-ready ladder: the run's ScheduledAt within the recent probe, else above the
+   * retention floor; with neither, every row above the floor, open above.
+   */
+  private async resolveScheduledAtWindow(
+    input: EvaluationRunFloorLookup,
+  ): Promise<IdBoundResolved> {
+    const range = await this.resolveScheduledAtRange(input);
+    return { fromMs: range.scheduledAtFrom, toMs: range.scheduledAtTo };
+  }
+
+  private async resolveScheduledAtRange(
+    input: EvaluationRunFloorLookup,
+  ): Promise<ScheduledAtRange> {
     const slackMs = input.scheduledAtSlackMs ?? DEFAULT_SCHEDULED_AT_SLACK_MS;
-    if (input.scheduledAt) {
-      return {
-        scheduledAtFrom: input.scheduledAt.getTime() - slackMs,
-        scheduledAtTo: input.scheduledAt.getTime() + slackMs,
-      };
-    }
 
     const floorMs = await this.floorOver(input.retention).getFloorMs({
       table: TABLE_NAME,
@@ -290,6 +453,7 @@ export class EvaluationRunClickHouseReadRepository {
   }): Promise<number | undefined> {
     const client = this.options.clickhouse.as(input.authorization, { reads: "traces" });
     const result = await client.query<{ scheduledAtMs: number | string | null }>({
+      // ID_BOUND_SKIP: the not-ready ladder's probe; the index path never runs it.
       query: `
         SELECT toUnixTimestamp64Milli(argMax(ScheduledAt, UpdatedAt)) AS scheduledAtMs
         FROM ${TABLE_NAME}

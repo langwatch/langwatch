@@ -47,7 +47,7 @@ export interface TraceEventRollupParams {
   /**
    * The list's time range. Every trace on the page occurred inside it, so the
    * read is padded by {@link DEFAULT_PARTITION_WINDOW_MS} and pruned to those
-   * partitions rather than scanning every week including the cold tier.
+   * partitions.
    */
   timeRange: { from: number; to: number };
 }
@@ -78,7 +78,7 @@ export interface SpanLangwatchSignalsRow {
 /**
  * Optional partition-pruning hint. stored_spans partitions by
  * toYearWeek(StartTime); an approximate timestamp restricts the scan to a
- * small window instead of walking every weekly partition (incl. cold S3).
+ * small window. Without it the trace id index bounds the read.
  */
 export interface OccurredAtHint {
   occurredAtMs?: number;

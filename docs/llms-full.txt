@@ -21282,8 +21282,7 @@ You can pass an instance of the CrewAI instrumentor to the `instrumentors` list 
 ```python openinference_setup.py
 import langwatch
 from crewai import Agent, Task, Crew
-import os
-from openinference.instrumentation.crewai import CrewAIInstrumentor # Assuming this is the correct import
+from openinference.instrumentation.crewai import CrewAIInstrumentor
 
 # Ensure LANGWATCH_API_KEY is set in your environment, or set it in `setup`
 langwatch.setup(
@@ -21302,14 +21301,22 @@ writer = Agent(
   backstory='A wordsmith who can make complex AI topics accessible and engaging.'
 )
 
-task1 = Task(description='Investigate the latest advancements in LLM prompting techniques.', agent=researcher)
-task2 = Task(description='Write a blog post summarizing the findings.', agent=writer)
+task1 = Task(
+  description='Investigate the latest advancements in LLM prompting techniques.',
+  expected_output='A bullet list of the key advancements.',
+  agent=researcher
+)
+task2 = Task(
+  description='Write a blog post summarizing the findings.',
+  expected_output='A short blog post in markdown.',
+  agent=writer
+)
 
 # Create and run the crew
 crew = Crew(
   agents=[researcher, writer],
   tasks=[task1, task2],
-  verbose=2
+  verbose=True
 )
 
 @langwatch.trace(name="CrewAI Execution with OpenInference")
@@ -21327,8 +21334,7 @@ if __name__ == "__main__":
 ```python openllmetry_setup.py
 import langwatch
 from crewai import Agent, Task, Crew
-import os
-from opentelemetry_instrumentation_crewai import CrewAIInstrumentor # Assuming this is the correct import
+from opentelemetry.instrumentation.crewai import CrewAIInstrumentor
 
 # Ensure LANGWATCH_API_KEY is set in your environment, or set it in `setup`
 langwatch.setup(
@@ -21347,14 +21353,22 @@ writer = Agent(
   backstory='A wordsmith who can make complex AI topics accessible and engaging.'
 )
 
-task1 = Task(description='Investigate the latest advancements in LLM prompting techniques.', agent=researcher)
-task2 = Task(description='Write a blog post summarizing the findings.', agent=writer)
+task1 = Task(
+  description='Investigate the latest advancements in LLM prompting techniques.',
+  expected_output='A bullet list of the key advancements.',
+  agent=researcher
+)
+task2 = Task(
+  description='Write a blog post summarizing the findings.',
+  expected_output='A short blog post in markdown.',
+  agent=writer
+)
 
 # Create and run the crew
 crew = Crew(
   agents=[researcher, writer],
   tasks=[task1, task2],
-  verbose=2
+  verbose=True
 )
 
 @langwatch.trace(name="CrewAI Execution with OpenLLMetry")
@@ -21372,10 +21386,10 @@ if __name__ == "__main__":
 </CodeGroup>
 
 <Note>
-  Ensure you have the respective community instrumentation library installed: - For OpenLLMetry:
-  `pip install opentelemetry-instrumentation-crewai` - For OpenInference: `pip install
-  openinference-instrumentation-crewai` Consult the specific library's documentation for the exact
-  package name and instrumentor class if the above assumptions are incorrect.
+  Install the instrumentation library for the instrumentor you use:
+
+  - OpenLLMetry: `pip install opentelemetry-instrumentation-crewai`
+  - OpenInference: `pip install openinference-instrumentation-crewai`
 </Note>
 
 ### 2. Direct Instrumentation
@@ -21387,8 +21401,7 @@ If you have an existing OpenTelemetry `TracerProvider` configured in your applic
 ```python openinference_direct.py
 import langwatch
 from crewai import Agent, Task, Crew
-import os
-from openinference.instrumentation.crewai import CrewAIInstrumentor # Assuming this is the correct import
+from openinference.instrumentation.crewai import CrewAIInstrumentor
 # from opentelemetry.sdk.trace import TracerProvider # If managing your own provider
 # from opentelemetry.sdk.trace.export import SimpleSpanProcessor, ConsoleSpanExporter # If managing your own provider
 
@@ -21402,7 +21415,11 @@ planner = Agent(
   goal='Plan an engaging tech conference',
   backstory='An experienced planner with a passion for technology events.'
 )
-task_planner = Task(description='Outline the agenda for a 3-day AI conference.', agent=planner)
+task_planner = Task(
+  description='Outline the agenda for a 3-day AI conference.',
+  expected_output='A day-by-day agenda.',
+  agent=planner
+)
 conference_crew = Crew(agents=[planner], tasks=[task_planner])
 
 @langwatch.trace(name="CrewAI Direct Instrumentation with OpenInference")
@@ -21420,8 +21437,7 @@ if __name__ == "__main__":
 ```python openllmetry_direct.py
 import langwatch
 from crewai import Agent, Task, Crew
-import os
-from opentelemetry_instrumentation_crewai import CrewAIInstrumentor # Assuming this is the correct import
+from opentelemetry.instrumentation.crewai import CrewAIInstrumentor
 # from opentelemetry.sdk.trace import TracerProvider # If managing your own provider
 # from opentelemetry.sdk.trace.export import SimpleSpanProcessor, ConsoleSpanExporter # If managing your own provider
 
@@ -21435,7 +21451,11 @@ planner = Agent(
   goal='Plan an engaging tech conference',
   backstory='An experienced planner with a passion for technology events.'
 )
-task_planner = Task(description='Outline the agenda for a 3-day AI conference.', agent=planner)
+task_planner = Task(
+  description='Outline the agenda for a 3-day AI conference.',
+  expected_output='A day-by-day agenda.',
+  agent=planner
+)
 conference_crew = Crew(agents=[planner], tasks=[task_planner])
 
 @langwatch.trace(name="CrewAI Direct Instrumentation with OpenLLMetry")
@@ -23520,11 +23540,11 @@ LangWatch captures traces generated by SmolAgents through its built-in OpenTelem
 2.  **Install SmolAgents and OpenInference instrumentor**:
 
     ```bash
-    pip install smolagents openinference-instrumentation-smolagents
+    pip install "smolagents[litellm]" openinference-instrumentation-smolagents
     ```
 
 3.  **Set up your LLM provider**:
-    You'll need to configure your preferred LLM provider (OpenAI, Anthropic, etc.) with the appropriate API keys.
+    The samples below use `LiteLLMModel` with OpenAI, so set `OPENAI_API_KEY` in your environment. LiteLLM also supports Anthropic and other providers through the `model_id`, for example `anthropic/claude-sonnet-4-5`.
 
 ## Instrumentation with OpenInference
 
@@ -23536,23 +23556,23 @@ Here's the simplest way to instrument your application:
 
 ```python
 import langwatch
-from smolagents import Agent
+from smolagents import CodeAgent, LiteLLMModel
 from openinference.instrumentation.smolagents import SmolagentsInstrumentor
-import os
 
 # Initialize LangWatch with the SmolAgents instrumentor
 langwatch.setup(
     instrumentors=[SmolagentsInstrumentor()]
 )
 
-# Set up environment variables
-os.environ["OPENAI_API_KEY"] = "your-openai-api-key"
+# LiteLLMModel reads OPENAI_API_KEY from the environment
+model = LiteLLMModel(model_id="openai/gpt-5")
 
 # Create your agent
-agent = Agent(
+agent = CodeAgent(
+    tools=[],
+    model=model,
     name="hello_agent",
-    model="gpt-5",
-    instruction="You are a helpful assistant. Always be friendly and concise.",
+    instructions="You are a helpful assistant. Always be friendly and concise.",
 )
 
 # Use the agent as usual, traces are sent to LangWatch automatically
@@ -23576,15 +23596,19 @@ If you want to add additional context or metadata to your traces, you can option
 
 ```python
 import langwatch
-from smolagents import Agent
+from smolagents import CodeAgent, LiteLLMModel
 from openinference.instrumentation.smolagents import SmolagentsInstrumentor
-import os
 
 langwatch.setup(
     instrumentors=[SmolagentsInstrumentor()]
 )
 
-# ... agent setup code ...
+agent = CodeAgent(
+    tools=[],
+    model=LiteLLMModel(model_id="openai/gpt-5"),
+    name="hello_agent",
+    instructions="You are a helpful assistant. Always be friendly and concise.",
+)
 
 @langwatch.trace(name="SmolAgents Run")
 def run_agent_interaction(user_message: str):
@@ -23637,7 +23661,7 @@ You can use this integration together with the LangWatch Python SDK to add addit
 
 ```python
 import langwatch
-from smolagents import Agent
+from smolagents import CodeAgent, LiteLLMModel
 from openinference.instrumentation.smolagents import SmolagentsInstrumentor
 
 langwatch.setup(
@@ -23647,10 +23671,11 @@ langwatch.setup(
 @langwatch.trace(name="Custom SmolAgents Agent")
 def my_custom_agent(input_message: str):
     # Your SmolAgents code here
-    agent = Agent(
+    agent = CodeAgent(
+        tools=[],
+        model=LiteLLMModel(model_id="openai/gpt-5"),
         name="custom_agent",
-        model="gpt-5",
-        instruction="Your custom instructions",
+        instructions="Your custom instructions",
     )
 
     # Update the current trace with additional metadata
@@ -65901,7 +65926,7 @@ This configures smaller resource limits, single replicas, and disables evaluator
 
 For production, you should:
 
-1. Use external managed databases (PostgreSQL, Redis)
+1. Use external managed databases (PostgreSQL, and Redis 7.0 or later or Valkey 7.2 or later)
 2. Provide Kubernetes Secrets from your secret manager
 3. Expose via Ingress with TLS
 4. Disable auto-generation
@@ -69759,7 +69784,7 @@ Roughly 1 KB per span (compressed). See [Sizing & Scaling](/self-hosting/configu
 
 ### Can I use an existing PostgreSQL, Redis?
 
-Yes. Use the external database overlays:
+Yes. Redis must be 7.0 or later (or Valkey 7.2 or later); LangWatch refuses to start when the server reports an older version (a server that does not report its version starts with a warning). Use the external database overlays:
 
 ```bash
 helm install langwatch langwatch/langwatch \

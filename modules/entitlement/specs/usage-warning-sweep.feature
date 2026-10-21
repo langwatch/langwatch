@@ -20,3 +20,9 @@ Feature: Daily usage-limit warning sweep
     Given a self-hosted deployment
     When the daily sweep runs
     Then no organization is read and no warning is checked
+
+  @unit @entitlements
+  Scenario: A project whose team was deleted does not stop the usage-warning sweep
+    Given a project whose team no longer exists, alongside projects in live teams
+    When the daily sweep lists the organizations to check
+    Then the organizations of the live teams are listed and the orphan project is skipped
