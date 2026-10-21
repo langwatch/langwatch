@@ -234,6 +234,44 @@ describe("Copilot pull-request cost", () => {
     });
   });
 
+  describe("given an older Copilot session with no per-model figures on a model a newer one priced", () => {
+    const older = branchSession({
+      sessionId: "copilot-old",
+      agent: "copilot",
+      gitBranch: "feature",
+      models: [PRICED_MODEL],
+      startedAtMs: TEST_NOW_MS - 4 * DAY,
+      inputTokens: 500,
+      outputTokens: 20,
+      costUsd: 0.01,
+    });
+
+    describe("when its usage is read", () => {
+      /** @scenario "A model an older session also ran reads as not fully known" */
+      it("reads that model's tokens as not known and still totals both sessions", async () => {
+        const sessions = new TestSessions();
+        sessions.branchRows = [copilotSession(), older];
+
+        const result = await serviceWith({ sessions }).getPullRequestUsage(query);
+
+        expect(result.modelBreakdown.find((each) => each.model === PRICED_MODEL)).toMatchObject({
+          tokensKnown: false,
+          totalTokens: 0,
+          costUsd: null,
+        });
+        expect(result.modelBreakdown.find((each) => each.model === UNPRICED_MODEL)).toMatchObject({
+          tokensKnown: true,
+          inputTokens: 13,
+        });
+        expect(result.totals).toMatchObject({
+          sessionsCount: 2,
+          inputTokens: 16 + 500,
+          outputTokens: 88 + 20,
+        });
+      });
+    });
+  });
+
   describe("given Claude Code and Codex sessions on the same pull request as a Copilot one", () => {
     const claude = branchSession({
       sessionId: "claude-1",

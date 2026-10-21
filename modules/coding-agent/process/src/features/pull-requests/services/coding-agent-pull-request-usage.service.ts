@@ -284,13 +284,16 @@ export class CodingAgentPullRequestUsageService {
       );
     }
 
-    const known = [...byModel.values()]
-      .map((usage) => (unpriced.has(usage.model) ? { ...usage, costUsd: null } : usage))
-      .toSorted((a, b) => b.totalTokens - a.totalTokens);
-    const knownModels = new Set(byModel.keys());
+    // A model a session without per-model figures also ran is not fully known: its line would
+    // otherwise count only the other sessions while the totals count them all.
     const unrecorded = this.unknownModels(
       sessions.filter((session) => !withTotals.has(`${session.tenantId}\0${session.sessionId}`)),
-    ).filter((usage) => !knownModels.has(usage.model));
+    );
+    const unrecordedModels = new Set(unrecorded.map((usage) => usage.model));
+    const known = [...byModel.values()]
+      .filter((usage) => !unrecordedModels.has(usage.model))
+      .map((usage) => (unpriced.has(usage.model) ? { ...usage, costUsd: null } : usage))
+      .toSorted((a, b) => b.totalTokens - a.totalTokens);
 
     return [...known, ...unrecorded];
   }
