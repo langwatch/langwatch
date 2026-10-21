@@ -628,6 +628,7 @@ Feature: An aggregate project reads its member projects
     Given an aggregate project
     When ana opens its analytics
     Then the Topics view is not offered
+    And opening the Topics address leads back to the analytics overview
     And the evaluations page shows the overall health and pass or fail trend cards
     And no card for a single monitor, since no monitor runs on member traces
     And an ordinary project still shows its topics and per-monitor cards

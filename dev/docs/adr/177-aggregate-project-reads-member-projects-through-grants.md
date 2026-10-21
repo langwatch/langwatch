@@ -910,6 +910,8 @@ side keeps its existing guards until ADR-166's `prisma.as` lands.
     shows beside a strict member's hidden one, is tasks#960.
   - The Topics views stay hidden: a topic belongs to one project's
     clustering, and two members' topic ids do not name the same topic.
+    Opening the Topics address leads back to the Overview, with no
+    history entry, rather than a page explaining why it is empty.
   - The per-monitor cards on the evaluations page stay hidden: they list
     the aggregate's own monitors, which never run on member traces
     (decision 8), so they would say "No data" for ever. The overall health
