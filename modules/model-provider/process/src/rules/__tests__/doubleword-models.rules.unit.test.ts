@@ -176,6 +176,18 @@ describe("resolveDoublewordEntries", () => {
     });
   });
 
+  describe("when the list read has no model the gateway can price", () => {
+    /** @scenario The catalog sync keeps the Doubleword models when the list has no priced model */
+    it("keeps the Doubleword entries already in the catalog", () => {
+      const entries = resolveDoublewordEntries({
+        fetched: [BATCH_ONLY],
+        previousModels,
+        excludeIds: new Set(["doubleword/overlaid/Model"]),
+      });
+      expect(entries.map((e) => e.id)).toEqual(["doubleword/kept/Model"]);
+    });
+  });
+
   describe("when the key is missing or the request failed", () => {
     /** @scenario The catalog sync keeps the Doubleword models when it cannot read the list */
     it("keeps the Doubleword entries already in the catalog", () => {

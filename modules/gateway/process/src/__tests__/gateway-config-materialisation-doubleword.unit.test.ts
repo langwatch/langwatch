@@ -11,12 +11,13 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import { PrismaGatewayScopeResolutionRepository } from "../repositories/prisma/prisma.gateway-scope-resolution.repository.ts";
+import { MemoryGatewayScopeResolutionRepository } from "../repositories/memory/memory.gateway-scope-resolution.repository.ts";
+import { MemoryGatewayStore } from "../repositories/memory/memory.gateway.store.ts";
 import type { GatewayModelProviderCredentials } from "../rules/gateway-config-wire.rules.ts";
 import { GatewayConfigAssemblyService } from "../services/gateway-config-assembly.service.ts";
 
 const assembly = GatewayConfigAssemblyService.create({
-  repository: PrismaGatewayScopeResolutionRepository.create({ database: {} as never }),
+  repository: MemoryGatewayScopeResolutionRepository.create(MemoryGatewayStore.create()),
   platformProviders: createApiFixture<ModelProviderApi>({
     platformProviderChain: () => Promise.resolve([]),
   }),

@@ -137,7 +137,7 @@ export const MODEL_PROVIDER_FIELD_METADATA: Record<
   doubleword: {
     DOUBLEWORD_API_KEY: {
       label: "API Key",
-      description: "Your Doubleword API key from app.doubleword.ai",
+      description: "An inference API key from app.doubleword.ai/api-keys",
     },
   },
   custom: {

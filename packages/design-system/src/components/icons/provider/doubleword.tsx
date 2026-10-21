@@ -1,4 +1,5 @@
 /** The Doubleword logo, shown next to the Doubleword model provider. */
+// no-test: static SVG markup with no behaviour, like the other provider icons.
 export function Doubleword() {
   return (
     <svg

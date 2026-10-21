@@ -80,7 +80,7 @@ export const GUIDED_PANEL_SPECS: Record<string, GuidedPanelSpec> = {
   },
   doubleword: {
     name: "Doubleword",
-    hint: "Platform API key",
+    hint: "Inference API key",
     fields: [apiKey("sk-...", "DOUBLEWORD_API_KEY")],
   },
   groq: { name: "Groq", hint: "Console API key", fields: [apiKey("gsk_...", "GROQ_API_KEY")] },

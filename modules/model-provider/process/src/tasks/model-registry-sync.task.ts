@@ -271,7 +271,7 @@ async function mergeDoublewordModels({
   const fetched = list.outcome === "fetched" ? list.models : undefined;
   const entries = resolveDoublewordEntries({
     fetched,
-    previousModels: fetched ? {} : readPreviousModels(),
+    previousModels: readPreviousModels(),
     excludeIds,
   });
   for (const entry of entries) transformedModels[entry.id] = entry;

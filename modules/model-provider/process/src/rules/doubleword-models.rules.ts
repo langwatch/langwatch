@@ -155,9 +155,9 @@ export function mapDoublewordModels(
 }
 
 /**
- * The Doubleword entries a sync run writes. Without a model list from this run (`fetched`
- * undefined), the Doubleword entries of the catalog already on disk are kept, so a bad run
- * does not delete them. `excludeIds` always wins, so an overlay correction is never contested.
+ * The Doubleword entries a sync run writes. When this run read no list, or a list with no priced
+ * model (an inference key lists models without prices), the entries already on disk are kept,
+ * so a bad run does not delete them. `excludeIds` always wins over both.
  */
 export function resolveDoublewordEntries({
   fetched,
@@ -168,7 +168,8 @@ export function resolveDoublewordEntries({
   previousModels: Record<string, LLMModelEntry>;
   excludeIds: ReadonlySet<string>;
 }): LLMModelEntry[] {
-  if (fetched) return mapDoublewordModels(fetched, excludeIds);
+  const mapped = fetched ? mapDoublewordModels(fetched, excludeIds) : [];
+  if (mapped.length > 0) return mapped;
   return Object.values(previousModels).filter(
     (model) => model.provider === DOUBLEWORD_PROVIDER && !excludeIds.has(model.id),
   );

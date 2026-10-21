@@ -72,7 +72,7 @@ export const GUIDED_PROVIDERS: readonly GuidedProvider[] = [
     kind: "api-key",
     registryKey: "doubleword",
     name: "Doubleword",
-    hint: "Platform API key",
+    hint: "Inference API key",
   },
   { id: "groq", kind: "api-key", registryKey: "groq", name: "Groq", hint: "Console API key" },
   {

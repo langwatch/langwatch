@@ -73,3 +73,9 @@ Feature: Doubleword model provider
     Given the catalog already lists Doubleword models
     When the sync runs without a Doubleword platform key or the request fails
     Then the Doubleword entries already in the catalog are kept
+
+  @unit
+  Scenario: The catalog sync keeps the Doubleword models when the list has no priced model
+    Given the catalog already lists Doubleword models
+    When the sync reads a model list where no model has a realtime price
+    Then the Doubleword entries already in the catalog are kept
