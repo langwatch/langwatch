@@ -116,8 +116,10 @@ Feature: A package's integration suite runs in CI when it declares one
 
   Rule: A shard runs several suites at once without letting them collide
 
-    # Most suites run on a single vitest worker, so a shard that ran them one
-    # after another kept three of a runner's four cores idle. Integration suites
+    # The patched vitest launcher gives each suite two workers, so a shard that ran
+    # them one after another left half of a runner's four cores idle. A heavy suite
+    # runs alone: design-system's story tests time out under any CPU sharing.
+    # Integration suites
     # stay one at a time because their files share one datastore and run serially
     # for that reason. Browser suites stay one at a time because each installs its
     # browser through apt, which holds a machine-wide lock. Each suite's output is
@@ -142,10 +144,11 @@ Feature: A package's integration suite runs in CI when it declares one
       Then their browser suites never overlap
 
     @unit
-    Scenario: Only one heavy suite runs at a time
-      Given two packages whose recorded weight marks them as heavy
-      When the package suites job runs them concurrently
-      Then they never overlap, and light suites run alongside them
+    Scenario: A heavy suite runs alone
+      Given a shard with packages whose recorded weight marks them as heavy
+      When the package suites job runs concurrently
+      Then no other suite runs while a heavy suite runs
+      And every heavy suite starts before any light one
 
     @unit
     Scenario: A shard starts its heaviest suites first

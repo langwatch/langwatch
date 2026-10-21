@@ -745,8 +745,8 @@ jobs:
       VITEST_ISOLATE_WORKER_REDIS: "1"
       CI: "true"
     runs-on: ubuntu-latest
-    # Bounded within a leg: PACKAGE_SUITES_CONCURRENCY suites at once, with
-    # integration and browser suites still one at a time (run-package-suites.ts).
+    # Bounded within a leg: PACKAGE_SUITES_CONCURRENCY suites at once, a heavy
+    # suite alone, integration and browser suites one at a time (run-package-suites.ts).
     # Parallel across legs: over two hundred package suites run one after
     # another take well past two hours, so the list is split by measured weight
     # (PACKAGE_SUITES_SHARD, .github/package-suites.weights) over separate runners.
@@ -885,8 +885,8 @@ jobs:
         env:
           REQUIRE_HELM_TESTS: "1"
           PACKAGE_SUITES_SHARD: ${{ matrix.shard }}/8
-          # Most suites use one vitest worker, so one at a time left cores idle.
-          # Integration and browser suites still run one at a time.
+          # Each suite gets two vitest workers (patches/vitest@5.0.1.patch), so one
+          # at a time left half the cores idle. A heavy suite still runs alone.
           PACKAGE_SUITES_CONCURRENCY: "2"
           # A pull request runs the suites its change reaches; main runs all.
           PACKAGE_SUITES_ONLY: ${{ needs.affected.outputs.projects }}

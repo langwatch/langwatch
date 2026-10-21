@@ -455,39 +455,49 @@ void describe("given a shard that runs several suites at once", () => {
     });
   });
 
-  void describe("when two packages are heavy", () => {
-    /** @scenario "Only one heavy suite runs at a time" */
-    void it("never overlaps them, while light suites still run alongside", async () => {
-      const heavy = ["a", "b"].map((name) => pkg(`@fix/heavy-${name}`, ["test"]));
-      const light = ["c", "d"].map((name) => pkg(`@fix/light-${name}`, ["test"]));
+  void describe("when a shard has heavy and light packages", () => {
+    const heavy = ["a", "b"].map((name) => pkg(`@fix/heavy-${name}`, ["test", "test:integration"]));
+    const light = ["c", "d", "e"].map((name) => pkg(`@fix/light-${name}`, ["test"]));
+    const record = async (jobs: SuiteJob[]) => {
       const overlaps: string[][] = [];
+      const events: string[] = [];
       let running: string[] = [];
       await runJobs({
-        jobs: jobsFor([...heavy, ...light], new Map()),
-        concurrency: 3,
+        jobs,
+        concurrency: 2,
         isHeavy: (candidate) => candidate.name.includes("heavy"),
         run: async (job) => {
           running = [...running, job.pkg.name];
           overlaps.push(running);
+          events.push(`start ${job.pkg.name}`);
           await new Promise((settle) => setTimeout(settle, 5));
           running = running.filter((name) => name !== job.pkg.name);
           return 0;
         },
       });
+      return { overlaps, events };
+    };
+
+    /** @scenario "A heavy suite runs alone" */
+    void it("runs each heavy suite with nothing beside it, and light ones two at a time", async () => {
+      const { overlaps } = await record(jobsFor([...heavy, ...light], new Map()));
       for (const together of overlaps) {
-        assert.ok(together.filter((name) => name.includes("heavy")).length <= 1, together.join());
+        if (together.some((name) => name.includes("heavy"))) {
+          assert.equal(together.length, 1, together.join());
+        }
       }
-      assert.ok(
-        overlaps.some(
-          (together) =>
-            together.some((name) => name.includes("heavy")) &&
-            together.some((name) => name.includes("light")),
-        ),
-        "a light suite ran alongside a heavy one",
-      );
+      assert.ok(overlaps.some((together) => together.length === 2));
     });
 
-    /** @scenario "Only one heavy suite runs at a time" */
+    /** @scenario "A heavy suite runs alone" */
+    void it("starts every heavy suite before any light one, whatever the order given", async () => {
+      const { events } = await record(jobsFor([light[0]!, ...heavy, ...light.slice(1)], new Map()));
+      const lastHeavy = events.findLastIndex((event) => event.includes("heavy"));
+      const firstLight = events.findIndex((event) => event.includes("light"));
+      assert.ok(lastHeavy < firstLight, events.join("\n"));
+    });
+
+    /** @scenario "A heavy suite runs alone" */
     void it("counts a package as heavy from its recorded weight of 100 seconds", () => {
       const weights = new Map([
         ["@fix/light", 99],

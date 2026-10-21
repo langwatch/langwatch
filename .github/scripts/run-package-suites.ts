@@ -141,8 +141,8 @@ export const parseOnly = (value: string | undefined): Set<string> | undefined =>
 };
 
 /**
- * Packages at least this slow run one at a time: two at once ran design-system's
- * interaction tests past their five-second timeout. Light suites fill around them.
+ * A package at least this slow runs alone on its shard: design-system's story
+ * tests time out under any CPU sharing, even beside one light suite.
  */
 export const HEAVY_SECONDS = 100;
 
@@ -303,8 +303,8 @@ const startReady = ({
 
 /**
  * Runs every job, at most `concurrency` at once, in order where it can. A package
- * runs one script at a time; `integration` and `browser` hold one slot each across
- * the shard. Every job runs even after one fails.
+ * runs one script at a time, `integration` and `browser` hold one slot each, and a
+ * heavy job runs alone. Every job runs even after one fails.
  */
 export const runJobs = async ({
   jobs,
@@ -323,28 +323,31 @@ export const runJobs = async ({
   const running = new Set<Promise<void>>();
   const holds = (job: SuiteJob) => {
     const lane = laneOf(job.script);
-    return [
-      `package:${job.pkg.name}`,
-      ...(lane === "shared" ? [] : [lane]),
-      ...(isHeavy(job.pkg) ? ["heavy"] : []),
-    ];
+    return [`package:${job.pkg.name}`, ...(lane === "shared" ? [] : [lane])];
   };
   const start = (job: SuiteJob) => {
+    if (isHeavy(job.pkg)) busy.add("heavy");
     for (const key of holds(job)) busy.add(key);
     const settled: Promise<void> = run(job)
       .catch(() => 1)
       .then((status) => {
         statuses.set(job, status);
         for (const key of holds(job)) busy.delete(key);
+        if (isHeavy(job.pkg)) busy.delete("heavy");
         running.delete(settled);
       });
     running.add(settled);
   };
   // Only a package's earliest queued script may start, so a later lane never
   // overtakes an earlier one that is waiting for its slot.
+  const earliest = (job: SuiteJob) =>
+    queue.find((queued) => queued.pkg.name === job.pkg.name) === job;
+  // A heavy job waits for the shard to drain, and nothing light starts meanwhile.
+  const heavyWaiting = () => queue.some((queued) => isHeavy(queued.pkg) && earliest(queued));
+  const alone = (job: SuiteJob) =>
+    isHeavy(job.pkg) ? running.size === 0 : !busy.has("heavy") && !heavyWaiting();
   const startable = (job: SuiteJob) =>
-    queue.find((queued) => queued.pkg.name === job.pkg.name) === job &&
-    holds(job).every((key) => !busy.has(key));
+    earliest(job) && alone(job) && holds(job).every((key) => !busy.has(key));
   while (queue.length > 0 || running.size > 0) {
     startReady({ queue, concurrency, running, startable, start });
     await Promise.race(running);
