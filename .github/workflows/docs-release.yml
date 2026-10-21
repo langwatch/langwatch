@@ -13,6 +13,7 @@ on:
     paths:
       - "docs/**"
       - ".github/workflows/docs-release.yml"
+      - ".github/scripts/release-docs.sh"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -38,30 +39,7 @@ jobs:
           git config --global user.name "LangWatch Docs Bot"
           git config --global user.email "y.budnyk789@gmail.com"
 
-      # Main moves while this runs, so each attempt rewrites the redirect on the
-      # newest main rather than pushing a commit made on the one it checked out.
       - name: Trigger Release
         env:
           REASON: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_reason || 'auto-release on merge to main' }}
-        run: |
-          for attempt in 1 2 3 4 5; do
-            git fetch origin main && git reset --hard origin/main
-            jq --arg current_time_val "$(date +%s)" \
-              '([.redirects[] | select(.source | startswith("/ci/cache/busted/"))] | length) as $n
-              | if $n == 1 then
-                  .redirects |= map(
-                    if (.source | startswith("/ci/cache/busted/"))
-                    then .source = ("/ci/cache/busted/" + $current_time_val)
-                    else . end)
-                else
-                  error("Error: expected exactly one redirect with source /ci/cache/busted/*, found \($n)")
-                end' \
-              docs.json > docs.json.tmp
-            mv docs.json.tmp docs.json
-            git add docs.json
-            git commit -m "Release docs ($REASON) [skip ci]"
-            if git push origin HEAD:main; then exit 0; fi
-            sleep $((attempt * 5))
-          done
-          echo "::error::main kept moving; the docs release was not pushed after 5 attempts."
-          exit 1
+        run: bash ../.github/scripts/release-docs.sh "$REASON"

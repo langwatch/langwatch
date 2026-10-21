@@ -66,9 +66,10 @@ jobs:
     # Draft PRs release the runner slot entirely; the work returns on
     # ready_for_review and in the merge queue. This was `needs.changes.outputs
     # .heavy`, which cost a whole gate job to compute the same expression.
-    # A PR labelled `ci:full` runs on a draft too.
+    # A PR labelled `ci:full` runs on a draft or release-please PR too.
     if: >-
-      (github.event_name != 'pull_request' || github.event.pull_request.draft == false
+      (github.event_name != 'pull_request' || (github.event.pull_request.draft == false
+       && !(startsWith(github.head_ref, 'release-please--') && github.event.pull_request.user.login == 'langwatch-agent'))
        || contains(github.event.pull_request.labels.*.name, 'ci:full'))
     runs-on: ubuntu-latest
     # Read the checkout; write only to prune this pull request's older cache copies.

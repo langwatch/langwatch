@@ -46,7 +46,8 @@ env:
   NODE_ENV: "test"
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  # A manual run (coverage, duration weights) has its own group, so a push cannot cancel it.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
   # A newer commit supersedes an older run, on main too: the newest verdict
   # covers the commits before it. Image and release builds keep their own rule.
   cancel-in-progress: true
@@ -807,7 +808,7 @@ jobs:
       # The suites' own Nx cache, apart from the build cache so it holds only test
       # results and stays small. Per shard: a re-push to the same change splits alike.
       - name: Restore the package suite results
-        if: ${{ !((github.ref == 'refs/heads/main' && github.event_name == 'push') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]')) }}
+        if: ${{ !((github.ref == 'refs/heads/main' && github.event_name != 'pull_request_target') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]')) }}
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .nx/suites
@@ -815,7 +816,7 @@ jobs:
           restore-keys: ${{ runner.os }}-nx-suites-${{ matrix.shard }}-
 
       - name: Restore the package suite results, saving them at the end of the job
-        if: ${{ (github.ref == 'refs/heads/main' && github.event_name == 'push') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]') }}
+        if: ${{ (github.ref == 'refs/heads/main' && github.event_name != 'pull_request_target') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]') }}
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .nx/suites
@@ -1304,6 +1305,9 @@ jobs:
 
       - name: Test notify-slack-release.sh
         run: bash .github/scripts/__tests__/notify-slack-release.test.sh
+
+      - name: Test release-docs.sh
+        run: bash .github/scripts/__tests__/release-docs.test.sh
 
       - name: Test run-package-suites.ts
         run: node --test --experimental-strip-types .github/scripts/run-package-suites.test.ts
