@@ -65,8 +65,11 @@ export class LangWatchQLAggregateScopeService {
         projectNames: closed.flatMap(({ project }) => (project ? [project.name] : [])),
       });
     }
-    const missing = found.filter(({ project }) => !project?.lwqlKey);
-    if (missing.length > 0) {
+    const keyed = found.flatMap(({ window, project }) =>
+      project?.lwqlKey ? [{ window, member: { id: project.id, lwqlKey: project.lwqlKey } }] : [],
+    );
+    if (keyed.length < found.length) {
+      const missing = found.filter(({ project }) => !project?.lwqlKey);
       throw new LangWatchQLMemberKeyMissingError({
         projectIds: missing.map(({ window }) => window.projectId),
         projectNames: missing.flatMap(({ project }) => (project ? [project.name] : [])),
@@ -74,10 +77,11 @@ export class LangWatchQLAggregateScopeService {
     }
 
     return {
-      projects: found.flatMap(({ project }) =>
-        project?.lwqlKey ? [{ id: project.id, lwqlKey: project.lwqlKey }] : [],
-      ),
-      memberWindows: shared.map((window) => ({ projectId: window.projectId, from: window.from })),
+      projects: keyed.map(({ member }) => member),
+      memberWindows: keyed.map(({ window }) => ({
+        projectId: window.projectId,
+        from: window.from,
+      })),
     };
   }
 }
