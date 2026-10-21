@@ -22,14 +22,14 @@ Feature: Braided spans in the reader's traces
 
   Rule: Braided spans appear only in traces the reader already has
 
-    @integration @unimplemented
+    @integration
     Scenario: A reader's trace shows the owner's matching spans
       Given an "orchestrator" trace whose call into "specialists" recorded spans under the same trace id
       When sam opens the trace
       Then the "specialists" spans carrying orchestrator "web" appear in the trace
       And each sits under its parent span as it ran
 
-    @integration @unimplemented
+    @integration
     Scenario: Owner spans that do not match never reach the reader
       Given an "orchestrator" trace whose "specialists" spans carry orchestrator "web" and orchestrator "app"
       When sam opens the trace
@@ -49,13 +49,13 @@ Feature: Braided spans in the reader's traces
       When sam opens the trace
       Then each owner's matching spans appear, each under its own project
 
-    @integration @unimplemented
+    @integration
     Scenario: The condition is applied to each span's latest version
       Given a "specialists" span that matched the condition until a later version of it stopped matching
       When sam opens the trace
       Then the span does not appear
 
-    @integration @unimplemented
+    @integration
     Scenario: Spans outside the braid's data window do not appear
       Given a braid whose data starts on 1 October
       And an "orchestrator" trace holding matching "specialists" spans from before and after 1 October
@@ -70,7 +70,7 @@ Feature: Braided spans in the reader's traces
       Then the spans matching either braid appear
       And a span matching only the second braid appears only when it started on or after 1 October
 
-    @unit @unimplemented
+    @unit
     Scenario: Two projects holding the same span id show both spans
       Given "orchestrator" and "specialists" each hold a span with the same span id in one trace
       When the trace is read for "orchestrator"
@@ -119,7 +119,7 @@ Feature: Braided spans in the reader's traces
       When the trace's span tree is built for "orchestrator"
       Then the span hangs under that "orchestrator" span
 
-    @unit @unimplemented
+    @unit
     Scenario: Nothing hints at owner spans that were not braided
       Given an "orchestrator" trace whose "specialists" spans partly match the condition
       When the trace is read for "orchestrator"
@@ -179,7 +179,7 @@ Feature: Braided spans in the reader's traces
 
   Rule: A trace read carries the caller's proof all the way down
 
-    @unit @unimplemented
+    @unit
     Scenario: A trace content read cannot swap the route's proof for an own-only one
       When a trace operation that reads span content mints its own proof instead of taking the caller's
       Then the trace route gate fails the build

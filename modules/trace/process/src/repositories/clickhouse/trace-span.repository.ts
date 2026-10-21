@@ -3,6 +3,7 @@ import {
   type AuthorizedClickHouse,
   type IdBoundOptions,
   tenantScope,
+  tenantScopeWithConditions,
 } from "@langwatch/clickhouse-client";
 import { nowInstant } from "@langwatch/time";
 import {
@@ -14,6 +15,7 @@ import {
 } from "@langwatch/trace-contract";
 import { z } from "zod";
 
+import { braidedOwnerOf, readsBraidedSpans } from "../../rules/braided-span-owner.rules.ts";
 import {
   TraceProjectedReadRepository,
   type TraceIngestLagSample,
@@ -60,6 +62,7 @@ const spanSummaryRowSchema = z.looseObject({
   DurationMs: numeric,
   UpdatedAtMs: numeric,
   StatusCode: numeric.nullable(),
+  TenantId: chString.optional(),
 });
 
 const spanSummaryRowsSchema = z.array(spanSummaryRowSchema);
@@ -95,6 +98,10 @@ const summarySelect = `
   toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAtMs,
   StatusCode
 `;
+
+/** A braided read names each span's owner; a read without braids keeps today's statement. */
+const summarySelectFor = (authorization: Authorization): string =>
+  readsBraidedSpans(authorization) ? `${summarySelect},\n  TenantId` : summarySelect;
 
 /** The dedup election under the proof's fence; the tree reads never name a tenant (ADR-177). */
 // ID_BOUND_SKIP: a dedup subquery fragment; its statement carries the marker.
@@ -280,15 +287,15 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
     sinceUpdatedAtMs: number;
     occurredAtMs?: number;
   }): Promise<TraceSpanSummaryRecord[]> {
-    const client = this.clickhouse.as(input.authorization, { reads: "traces" });
+    const client = this.clickhouse.as(input.authorization, { reads: "spans" });
     // `UpdatedAt` is not the partition key, so the trace-id marker bounds the
     // read from below only: a live trace can run past any upper bound.
     const sinceFilter = "AND UpdatedAt > fromUnixTimestamp64Milli({sinceUpdatedAtMs:Int64})";
     const result = await client.query({
       query: `
-        SELECT ${summarySelect}
+        SELECT ${summarySelectFor(input.authorization)}
         FROM ${STORED_SPANS_TABLE}
-        WHERE ${tenantScope("StartTime")} AND TraceId = {traceId:String}
+        WHERE ${tenantScopeWithConditions("StartTime")} AND TraceId = {traceId:String}
           ${STORED_SPANS_ID_BOUND}
           ${sinceFilter}
           AND ${fencedDedupInTuple(`${STORED_SPANS_ID_BOUND} ${sinceFilter}`)}
@@ -309,7 +316,7 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
     });
     return spanSummaryRowsSchema
       .parse(await result.json())
-      .map((row) => ClickHouseTraceSpanRepository.mapSummary(row));
+      .map((row) => ClickHouseTraceSpanRepository.mapSummary(row, input.authorization));
   }
 
   private async queryPage(
@@ -322,7 +329,7 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
     },
     idBound: IdBoundOptions | undefined,
   ): Promise<TraceSpanPage> {
-    const client = this.clickhouse.as(input.authorization, { reads: "traces" });
+    const client = this.clickhouse.as(input.authorization, { reads: "spans" });
     const cursor = input.cursor
       ? "AND StartTime >= fromUnixTimestamp64Milli({cursorStart:Int64}) AND (toUnixTimestamp64Milli(StartTime), SpanId) > ({cursorStart:Int64}, {cursorSpan:String})"
       : "";
@@ -331,9 +338,9 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
     const result = await client.query({
       // ID_BOUND_SKIP: a first page carries the marker in timeFilter; a cursor page, its cursor.
       query: `
-        SELECT ${summarySelect}
+        SELECT ${summarySelectFor(input.authorization)}
         FROM ${STORED_SPANS_TABLE}
-        WHERE ${tenantScope("StartTime")} AND TraceId = {traceId:String}
+        WHERE ${tenantScopeWithConditions("StartTime")} AND TraceId = {traceId:String}
           ${timeFilter}
           ${cursor}
           AND ${fencedDedupInTuple(timeFilter)}
@@ -354,7 +361,9 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
       ...(idBound === undefined ? {} : { idBound }),
     });
     const rows = spanSummaryRowsSchema.parse(await result.json());
-    const mapped = rows.map((row) => ClickHouseTraceSpanRepository.mapSummary(row));
+    const mapped = rows.map((row) =>
+      ClickHouseTraceSpanRepository.mapSummary(row, input.authorization),
+    );
     return {
       rows: mapped.slice(0, input.limit),
       hasMore: mapped.length > input.limit,
@@ -461,7 +470,7 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
     };
   }
 
-  private static mapSummary(row: SpanSummaryRow) {
+  private static mapSummary(row: SpanSummaryRow, authorization: Authorization) {
     const explicitCost = ClickHouseTraceSpanRepository.numberOrNull(row.Cost);
     const cost = explicitCost !== null && explicitCost > 0 ? explicitCost : null;
 
@@ -483,6 +492,7 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
       cacheCreationTokens: ClickHouseTraceSpanRepository.numberOrNull(row.CacheCreationTokens),
       updatedAtMs: Number(row.UpdatedAtMs),
       costInput: ClickHouseTraceSpanRepository.costInputOf(row),
+      ...braidedOwnerOf({ authorization, tenantId: row.TenantId }),
     };
   }
 

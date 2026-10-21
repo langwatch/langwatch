@@ -4,6 +4,8 @@
  * the proof by name. A route that mints none does not compile, so typecheck is the build gate.
  * Each call sits behind `@ts-expect-error`; the bodies are never run.
  */
+import { readFileSync } from "node:fs";
+
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
@@ -32,6 +34,36 @@ describe("a trace route and the proof", () => {
       const byTenant = () => app.readSpans({ authorization: "project-1", traceId: "trace" });
 
       expect(byTenant).toBeTypeOf("function");
+    });
+  });
+
+  describe("when a trace operation that reads span content mints its own proof", () => {
+    const source = readFileSync(new URL("../../app/trace.app.ts", import.meta.url), "utf8");
+    /** The trace view's content reads (ADR-183 §5): each reads under the caller's proof. */
+    const contentReads = [
+      "authorizationForTrace",
+      "readTraceSummary",
+      "readSpanSummaries",
+      "readSpans",
+      "findSpan",
+      "readSpanEvents",
+      "readLangwatchSignals",
+      "readSpanResources",
+      "readTraceEvents",
+      "readSpanTreePage",
+      "readSpanTreeDelta",
+      "readSpanDetailForViewer",
+    ];
+    const bodyOf = (name: string): string => {
+      const start = source.search(new RegExp(`\\n  (?:async )?${name}\\(`));
+      if (start < 0) throw new Error(`trace app has no operation ${name}`);
+      const end = source.indexOf("\n  }\n", start);
+      return source.slice(start, end);
+    };
+
+    /** @scenario "A trace content read cannot swap the route's proof for an own-only one" */
+    it.each(contentReads)("fails the gate if %s mints a proof of its own", (name) => {
+      expect(bodyOf(name)).not.toMatch(/#authorize(?:Own|Content)Read|authorizeRead\(/);
     });
   });
 });
