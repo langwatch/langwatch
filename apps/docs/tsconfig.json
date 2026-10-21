@@ -25,13 +25,13 @@
   "include": ["src", "vite.config.ts", "vitest.config.ts"],
   "references": [
     {
-      "path": "../../packages/design-system/tsconfig.build.json"
+      "path": "../../packages/design-system"
     },
     {
-      "path": "../../packages/time/tsconfig.build.json"
+      "path": "../../packages/vitest-config"
     },
     {
-      "path": "../../packages/vitest-config/tsconfig.build.json"
+      "path": "../../packages/time"
     }
   ]
 }
