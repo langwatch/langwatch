@@ -132,14 +132,18 @@ describe("GroupQueueProcessor staging gate during shutdown", () => {
   });
 
   describe("given a queue whose drain has finished", () => {
-    /** @scenario Staging is refused once the drain is over */
-    it("refuses further work, naming shutdown as the reason", async () => {
-      const processor = makeProcessor();
+    let processor: GroupQueueProcessor<TestPayload>;
+
+    beforeEach(async () => {
+      processor = makeProcessor();
       const closing = processor.close();
       await drainIsOpen();
       releaseDrain?.();
       await closing;
+    });
 
+    /** @scenario Staging is refused once the drain is over */
+    it("refuses further work, naming shutdown as the reason", async () => {
       await expect(processor.send({ id: "a", groupId: "g" })).rejects.toThrow(/drain has finished/);
       await expect(processor.sendBatch([{ id: "a", groupId: "g" }])).rejects.toThrow(
         /drain has finished/,
@@ -148,12 +152,6 @@ describe("GroupQueueProcessor staging gate during shutdown", () => {
 
     /** @scenario A dispatch refused because the drain already ended is a warning */
     it("refuses with a QueueStagingClosedError that isQueueStagingClosed recognises", async () => {
-      const processor = makeProcessor();
-      const closing = processor.close();
-      await drainIsOpen();
-      releaseDrain?.();
-      await closing;
-
       const refusal = await processor.send({ id: "a", groupId: "g" }).then(
         () => undefined,
         (error: unknown) => error,
