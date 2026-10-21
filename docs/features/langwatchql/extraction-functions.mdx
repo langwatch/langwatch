@@ -31,7 +31,7 @@ These functions return message content, so your key needs the `input` or `output
 
 ```sql
 SELECT ConversationId, conversation_bounded(ConversationId, 8000, '') AS transcript
-FROM analytics.trace_metrics
+FROM langwatch.trace_metrics
 WHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''
 GROUP BY ConversationId
 ORDER BY ConversationId

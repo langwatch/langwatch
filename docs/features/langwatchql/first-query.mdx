@@ -13,7 +13,7 @@ Each statement below runs as written with `langwatch query "<statement>"` or in 
 
 ```sql
 SELECT TraceId, TraceName, OccurredAt, TotalDurationMs
-FROM analytics.traces
+FROM langwatch.traces
 WHERE OccurredAt >= subtractDays(now(), 1)
   AND ContainsErrorStatus
 ORDER BY OccurredAt DESC
@@ -27,7 +27,7 @@ SELECT
   quantile(0.5)(TotalDurationMs) AS p50_ms,
   quantile(0.95)(TotalDurationMs) AS p95_ms,
   quantile(0.99)(TotalDurationMs) AS p99_ms
-FROM analytics.traces
+FROM langwatch.traces
 WHERE OccurredAt >= subtractDays(now(), 7)
 ```
 
@@ -41,8 +41,8 @@ SELECT
   t.TraceName AS TraceName,
   count() AS spans,
   max(s.DurationMs) AS slowest_span_ms
-FROM analytics.traces AS t
-INNER JOIN analytics.spans AS s
+FROM langwatch.traces AS t
+INNER JOIN langwatch.spans AS s
   ON s.TenantId = t.TenantId AND s.TraceId = t.TraceId
 WHERE t.OccurredAt >= subtractDays(now(), 1)
   AND s.StartTime >= subtractDays(now(), 1)
@@ -60,7 +60,7 @@ SELECT
   EvaluatorName,
   count() AS evaluations,
   countIf(Passed = 1) AS passed
-FROM analytics.evaluations
+FROM langwatch.evaluations
 WHERE ScheduledAt >= subtractDays(now(), 7)
   AND Status = 'processed'
 GROUP BY EvaluatorName
@@ -74,7 +74,7 @@ LIMIT 50
 
 ```sql
 SELECT ScenarioRunId, Name, Verdict, StartedAt
-FROM analytics.simulations
+FROM langwatch.simulations
 WHERE StartedAt >= subtractDays(now(), 7)
   AND Verdict = 'failure'
 ORDER BY StartedAt DESC
@@ -90,7 +90,7 @@ SELECT
   toStartOfHour(BucketStart) AS hour,
   sum(TraceCount) AS traces,
   sum(ErrorCount) AS errors
-FROM analytics.trace_metrics_by_minute
+FROM langwatch.trace_metrics_by_minute
 WHERE BucketStart >= subtractDays(now(), 2)
 GROUP BY hour
 ORDER BY hour
@@ -103,7 +103,7 @@ SELECT
   Model,
   sum(CostSum) AS cost_usd,
   sum(PromptTokensSum + CompletionTokensSum) AS tokens
-FROM analytics.model_usage_by_minute
+FROM langwatch.model_usage_by_minute
 WHERE BucketStart >= subtractDays(now(), 7)
 GROUP BY Model
 ORDER BY cost_usd DESC
@@ -120,7 +120,7 @@ SELECT
   count() AS turns,
   min(OccurredAt) AS started_at,
   max(OccurredAt) AS last_turn
-FROM analytics.trace_metrics
+FROM langwatch.trace_metrics
 WHERE OccurredAt >= subtractDays(now(), 7)
   AND ConversationId IS NOT NULL
 GROUP BY ConversationId
@@ -137,7 +137,7 @@ SELECT
   Agent,
   RepositoryName,
   count() AS sessions
-FROM analytics.coding_sessions
+FROM langwatch.coding_sessions
 WHERE StartedAt >= subtractDays(now(), 7)
 GROUP BY Agent, RepositoryName
 ORDER BY sessions DESC
@@ -153,7 +153,7 @@ SELECT
   QuestionId,
   sum(Passed) AS yes,
   count() AS judged
-FROM analytics.judgments
+FROM langwatch.judgments
 WHERE RunId = {run:String}
   AND CreatedAt >= subtractDays(now(), 7)
 GROUP BY QuestionId

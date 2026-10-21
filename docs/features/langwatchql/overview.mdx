@@ -9,7 +9,7 @@ description: Read-only SQL over your traces, spans, evaluations, simulations and
 
 LangWatchQL is the ClickHouse SQL dialect that LangWatch accepts over its analytics views. You send one `SELECT` statement, optionally with a `WITH` clause, and you get back columns and rows. The database runs it with `readonly = 1`, so a statement cannot change your data.
 
-The views are written against the `analytics.` database, for example `analytics.traces` or `analytics.trace_metrics_by_minute`. The full list, with every column and the permission it needs, is in the [Query API reference](/api-reference/query/overview#queryable-views), and `GET /api/v1/query/schema` returns the list your key can query today.
+On LangWatch Cloud the views are in the `langwatch` database, for example `langwatch.traces` or `langwatch.trace_metrics_by_minute`, and the examples in this guide use that name. A self-hosted deployment uses `analytics` unless `LWQL_DATABASE` sets another name. The full list, with every column and the permission it needs, is in the [Query API reference](/api-reference/query/overview#queryable-views), and `GET /api/v1/query/schema` returns the list your key can query today.
 
 ## When to use LangWatchQL instead of dashboards
 
@@ -29,7 +29,7 @@ You can send the same statement three ways. All three need an API key with the `
     curl -X POST https://app.langwatch.ai/api/v1/query \
       -H "X-Auth-Token: $LANGWATCH_API_KEY" \
       -H "Content-Type: application/json" \
-      -d '{"sql": "SELECT TraceId, TraceName, OccurredAt, TotalDurationMs FROM analytics.traces WHERE OccurredAt >= subtractDays(now(), 1) AND ContainsErrorStatus ORDER BY OccurredAt DESC LIMIT 100"}'
+      -d '{"sql": "SELECT TraceId, TraceName, OccurredAt, TotalDurationMs FROM langwatch.traces WHERE OccurredAt >= subtractDays(now(), 1) AND ContainsErrorStatus ORDER BY OccurredAt DESC LIMIT 100"}'
     ```
 
     Send `projectId` in the body to read one project only. Request fields, auth headers and status codes are in [Run a LangWatchQL query](/api-reference/query/run-a-langwatchql-query).
@@ -41,7 +41,7 @@ You can send the same statement three ways. All three need an API key with the `
     npm install -g langwatch
     langwatch login
     langwatch query "SELECT TraceId, TraceName, OccurredAt, TotalDurationMs
-    FROM analytics.traces
+    FROM langwatch.traces
     WHERE OccurredAt >= subtractDays(now(), 1)
       AND ContainsErrorStatus
     ORDER BY OccurredAt DESC

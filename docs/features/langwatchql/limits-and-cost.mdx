@@ -36,7 +36,7 @@ Page through the result. Order by a time column and an id, alias those two colum
 
 ```sql
 SELECT OccurredAt AS after_ts, TraceId AS after_id, CapturedInput, CapturedOutput
-FROM analytics.traces
+FROM langwatch.traces
 WHERE OccurredAt >= subtractDays(now(), 7)
   AND (OccurredAt, TraceId) > ({after_ts:DateTime64(3)}, {after_id:String})
 ORDER BY OccurredAt, TraceId
