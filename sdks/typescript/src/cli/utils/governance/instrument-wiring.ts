@@ -15,6 +15,7 @@ import { buildOtelEnvBlock } from "./otel-env-block";
 import { runningCodeRestartNotice } from "./running-code";
 import {
   assertOwnedHookFileFor,
+  hookFileNotOursNotice,
   installSessionContextHooks,
   removeSessionContextHooks,
 } from "./session-context-hooks";
@@ -169,9 +170,7 @@ export function installTelemetryWiring({
     return { labels, warnings, requiredFailures };
   }
 
-  // Both Copilot surfaces load the one hook file LangWatch owns (ADR-039 S4), so
-  // wiring either writes it. Quiet, idempotent and best-effort, as claude's is.
-  assertOwnedHookFileFor({ command: tool });
+  warnings.push(...assertCopilotHookFile(tool));
 
   // Every remaining tool persists as a scoped shell function so the OTel
   // env applies to `<tool>` runs only, never to other shell children.
@@ -210,4 +209,15 @@ export function installTelemetryWiring({
     if (notice) warnings.push(notice);
   }
   return { labels, warnings, requiredFailures };
+}
+
+/**
+ * Both Copilot surfaces load the one hook file LangWatch owns (ADR-039 S4), so
+ * wiring either writes it, quietly and best-effort as claude's is. The warning
+ * it returns is for a file of the user's at its path: then linking is off.
+ */
+function assertCopilotHookFile(tool: string): string[] {
+  const hookFile = assertOwnedHookFileFor({ command: tool });
+  if (hookFile?.action !== "not_ours") return [];
+  return [hookFileNotOursNotice({ displayPath: hookFile.displayPath, command: tool })];
 }

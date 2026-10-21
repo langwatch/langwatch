@@ -632,6 +632,24 @@ Rule: Copilot reports through one hook file LangWatch owns
     When the copilot ingestion install runs
     Then the file is rewritten to the current LangWatch hook file
 
+  # A user's file at LangWatch's path means Copilot sessions never report their
+  # repository, so saying "wired" and nothing else would hide that for good.
+  @unit
+  Scenario: Instrumenting Copilot over the user's langwatch.json says repository linking is off
+    Given a Copilot langwatch.json that LangWatch did not write
+    When `langwatch instrument copilot` or `langwatch instrument code` runs
+    Then the file is left exactly as it was
+    And the user is told the file is not LangWatch's and was left alone
+    And that Copilot sessions will not report their repository or branch
+    And to rename the file and run the same command again
+
+  @unit
+  Scenario: The copilot ingestion install reports the user's langwatch.json it left alone
+    Given a Copilot langwatch.json that LangWatch did not write
+    When the copilot ingestion install runs
+    Then the report says the file is not LangWatch's and repository linking is off
+    And it does not say a LangWatch hook file was added
+
   # A user who only ever runs `langwatch copilot` or `langwatch code` never runs
   # the install, so the wrapper's offer to keep capturing writes the file too.
   # Its question names the file, because a bare Enter is a yes.
@@ -641,6 +659,14 @@ Rule: Copilot reports through one hook file LangWatch owns
     When the user says yes to the offer `langwatch copilot` or `langwatch code` makes to keep capturing
     Then the question named the LangWatch hook file before the answer
     And the LangWatch hook file runs the hook command for copilot on sessionStart and agentStop
+
+  @unit
+  Scenario: The wrapper's offer never promises a hook file it will not write
+    Given a Copilot langwatch.json that LangWatch did not write
+    When the user says yes to the offer the copilot wrapper makes to keep capturing
+    Then the question did not name the hook file
+    And the file is left exactly as it was
+    And the wrapper says the file is not LangWatch's and repository linking is off
 
   @unit
   Scenario: Declining the wrapper's offer writes no Copilot hook file

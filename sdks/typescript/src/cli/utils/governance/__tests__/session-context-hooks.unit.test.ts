@@ -371,7 +371,7 @@ describe("the Copilot hook file LangWatch owns", () => {
     });
 
     it("neither overwrites, lists nor removes it", () => {
-      expect(install({ tool: "copilot" }).action).toBe("unchanged");
+      expect(install({ tool: "copilot" }).action).toBe("not_ours");
       expect(has("copilot")).toBe(false);
       expect(remove("copilot")).toBe(false);
       expect(fs.readFileSync(copilotFile(), "utf8")).toBe(theirs);
@@ -410,7 +410,7 @@ describe("the Copilot hook file LangWatch owns", () => {
         fs.mkdirSync(path.dirname(copilotFile()), { recursive: true });
         fs.writeFileSync(copilotFile(), theirs);
 
-        install({ tool: "copilot" });
+        expect(install({ tool: "copilot" }).action).toBe("not_ours");
         expect(has("copilot")).toBe(false);
         expect(remove("copilot")).toBe(false);
         expect(fs.readFileSync(copilotFile(), "utf8")).toBe(theirs);
@@ -423,7 +423,7 @@ describe("the Copilot hook file LangWatch owns", () => {
       fs.mkdirSync(path.dirname(copilotFile()), { recursive: true });
       fs.writeFileSync(copilotFile(), "{ not json");
 
-      expect(install({ tool: "copilot" }).action).toBe("unchanged");
+      expect(install({ tool: "copilot" }).action).toBe("not_ours");
       expect(remove("copilot")).toBe(false);
       expect(fs.readFileSync(copilotFile(), "utf8")).toBe("{ not json");
     });

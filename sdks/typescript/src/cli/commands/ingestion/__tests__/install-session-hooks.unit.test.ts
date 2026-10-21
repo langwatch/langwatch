@@ -423,5 +423,15 @@ describe("the copilot ingestion install", () => {
       removeTelemetryTargets();
       expect(fs.readFileSync(langwatchFile(), "utf8")).toBe(userBytes);
     });
+
+    /** @scenario "The copilot ingestion install reports the user's langwatch.json it left alone" */
+    it("reports the file left alone and linking off, never that a hook file was added", async () => {
+      await runCopilotInstall();
+
+      expect(stdout()).toContain(
+        `~/.copilot/hooks/${COPILOT_HOOK_FILE_NAME} is not a LangWatch file, so it was left alone`,
+      );
+      expect(stdout()).not.toContain("A LangWatch hook file was added");
+    });
   });
 });

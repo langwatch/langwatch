@@ -60,7 +60,8 @@ export function sessionContextHooksTarget(tool: HookedTool): HooksTarget {
   return SESSION_CONTEXT_AGENTS[tool].hookTarget.resolve();
 }
 
-export type SessionContextHooksAction = "created" | "updated" | "unchanged";
+/** `not_ours`: a file of the user's holds our path (Copilot), so nothing was written. */
+export type SessionContextHooksAction = "created" | "updated" | "unchanged" | "not_ours";
 
 export interface SessionContextHooksInstallResult extends HooksTarget {
   action: SessionContextHooksAction;
@@ -102,6 +103,33 @@ export function installSessionContextHooks({
 export function ownedHookFileTargetFor({ command }: { command: string }): HooksTarget | null {
   const tool = ownedHookFileToolForCommand(command);
   return tool ? sessionContextHooksTarget(tool) : null;
+}
+
+/**
+ * Where the wrapper for `command` would write its hook file, when a file of the
+ * user's already holds that path, so a question offering to write it must not.
+ */
+export function ownedHookFilePathHeldByUser({ command }: { command: string }): HooksTarget | null {
+  const tool = ownedHookFileToolForCommand(command);
+  if (!tool) return null;
+  const target = sessionContextHooksTarget(tool);
+  if (!fs.existsSync(target.path)) return null;
+  return readOwnedHookFile({ tool, filePath: target.path }) === null ? target : null;
+}
+
+/** What the user reads when their own file holds our hook file's path. */
+export function hookFileNotOursNotice({
+  displayPath,
+  command,
+}: {
+  displayPath: string;
+  command: string;
+}): string {
+  return (
+    `${displayPath} is not a LangWatch file, so it was left alone, and Copilot ` +
+    `sessions will not report their repository or branch. Copilot loads every .json file ` +
+    `in that folder: rename yours, then run \`langwatch instrument ${command}\` again.`
+  );
 }
 
 /**
@@ -276,7 +304,7 @@ function resolveTarget({
 
 /**
  * Write the tool's own hook file. A file at our path that is not ours (see
- * `readOwnedHookFile`) is left exactly as it is and reported `unchanged`.
+ * `readOwnedHookFile`) is left exactly as it is and reported `not_ours`.
  */
 function installOwnedHookFile({
   tool,
@@ -292,7 +320,7 @@ function installOwnedHookFile({
     existing = null;
   }
   if (existing !== null && readOwnedHookFile({ tool, filePath: target.path }) === null) {
-    return { action: "unchanged", ...target };
+    return { action: "not_ours", ...target };
   }
 
   const document = copilotHookFileDocument(tool);

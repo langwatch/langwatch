@@ -49,6 +49,35 @@ describe("installTelemetryWiring", () => {
       },
     );
 
+    describe("given a langwatch.json the user wrote at the hook file's path", () => {
+      const theirs = JSON.stringify({ hooks: { preToolUse: [{ bash: "echo guard" }] } });
+      const hookFile = () => path.join(temp.home, ".copilot", "hooks", "langwatch.json");
+
+      beforeEach(() => {
+        fs.mkdirSync(path.dirname(hookFile()), { recursive: true });
+        fs.writeFileSync(hookFile(), theirs);
+      });
+
+      /** @scenario "Instrumenting Copilot over the user's langwatch.json says repository linking is off" */
+      it.each(["copilot", "code"])(
+        "leaves it alone and warns that repository linking is off, for %s",
+        (tool) => {
+          const result = installTelemetryWiring({
+            cfg: baseCfg(),
+            tool,
+            endpoint: ENDPOINT,
+            token: TOKEN,
+          });
+
+          expect(fs.readFileSync(hookFile(), "utf8")).toBe(theirs);
+          const warning = result.warnings.find((line) => line.includes("langwatch.json"));
+          expect(warning).toContain("~/.copilot/hooks/langwatch.json is not a LangWatch file");
+          expect(warning).toContain("will not report their repository or branch");
+          expect(warning).toContain(`langwatch instrument ${tool}`);
+        },
+      );
+    });
+
     it("writes no Copilot hook file for another tool", () => {
       installTelemetryWiring({
         cfg: baseCfg(),

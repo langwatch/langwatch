@@ -515,14 +515,28 @@ describe("maybeOfferIngestionShellRcPersist", () => {
     });
 
     describe("and somebody else's file already sits at the hook file's path", () => {
-      it("leaves it exactly as it was", async () => {
-        const foreign = `${JSON.stringify({ version: 1, hooks: {} })}\n`;
+      const foreign = `${JSON.stringify({
+        hooks: {
+          sessionStart: [{ bash: "langwatch ingest hook copilot" }, { bash: "echo mine" }],
+          preToolUse: [{ bash: "echo guard" }],
+        },
+      })}\n`;
+
+      beforeEach(async () => {
         fs.mkdirSync(path.dirname(copilotHookFilePath()), { recursive: true });
         fs.writeFileSync(copilotHookFilePath(), foreign);
         answers.push("y");
         const { maybeOfferIngestionShellRcPersist } = await import("../shell-rc.js");
         await maybeOfferIngestionShellRcPersist({ cfg: cfg(), tool: "copilot", vars: otelVars });
+      });
+
+      /** @scenario "The wrapper's offer never promises a hook file it will not write" */
+      it("asks without naming the hook file, leaves the file alone and says linking is off", () => {
+        expect(lastPrompts).toHaveLength(1);
+        expect(lastPrompts[0]).not.toContain("langwatch.json");
         expect(fs.readFileSync(copilotHookFilePath(), "utf8")).toBe(foreign);
+        expect(logged()).toContain("~/.copilot/hooks/langwatch.json is not a LangWatch file");
+        expect(logged()).toContain("will not report their repository or branch");
       });
     });
   });

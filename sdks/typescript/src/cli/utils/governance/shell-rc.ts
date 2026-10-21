@@ -28,7 +28,9 @@ import { assertCodexAgentGuidance } from "./codex-agents-md";
 import { type GovernanceConfig, saveConfig } from "./config";
 import {
   assertOwnedHookFileFor,
+  hookFileNotOursNotice,
   installSessionContextHooks,
+  ownedHookFilePathHeldByUser,
   ownedHookFileTargetFor,
   removeSessionContextHooks,
 } from "./session-context-hooks";
@@ -324,7 +326,10 @@ function persistQuestion({ tool, targetHint }: { tool: string; targetHint: strin
       `hooks record the repository and branch each session works on.`
     );
   }
-  const hookFile = ownedHookFileTargetFor({ command: tool });
+  // A file of the user's at our path is never written, so the question never offers to.
+  const hookFile = ownedHookFilePathHeldByUser({ command: tool })
+    ? null
+    : ownedHookFileTargetFor({ command: tool });
   if (hookFile) {
     return (
       `Install env vars to ${targetHint} and the LangWatch hook file ${hookFile.displayPath}, ` +
@@ -616,6 +621,14 @@ function installRawSessionContextHooks(): void {
 export function assertOwnedSessionHookFile({ tool }: { tool: string }): void {
   const hooks = assertOwnedHookFileFor({ command: tool });
   if (!hooks || hooks.action === "unchanged") return;
+  if (hooks.action === "not_ours") {
+    console.log(
+      chalk.yellow(
+        `  ! ${hookFileNotOursNotice({ displayPath: hooks.displayPath, command: tool })}`,
+      ),
+    );
+    return;
+  }
   console.log(
     chalk.green(
       `  ✓ Installed ${hooks.displayPath}, whose hooks report each session's repository and branch`,
