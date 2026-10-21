@@ -246,14 +246,23 @@ describe("VertexAdkCanonicaliserService", () => {
     });
 
     describe("when the span already reports standard token usage", () => {
-      it("keeps the explicitly reported token counts", () => {
+      it("keeps the explicitly reported output count", () => {
         const ctx = createExtractorContext(llmSpanAttrs());
 
         extractor.apply(ctx);
 
-        expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS]).toBeUndefined();
         expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS]).toBeUndefined();
-        expect(ctx.bag.attrs.get(ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS)).toBe(2500);
+        expect(ctx.bag.attrs.get(ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS)).toBe(64);
+      });
+
+      /** @scenario "A Gemini prompt count that includes its cached content is restated as fresh input" */
+      it("restates the prompt count, which includes the cached content, as the fresh remainder", () => {
+        const ctx = createExtractorContext(llmSpanAttrs());
+
+        extractor.apply(ctx);
+
+        expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS]).toBe(400);
+        expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe(2100);
       });
 
       it("still lifts cached prompt tokens as cache-read tokens", () => {
@@ -274,7 +283,7 @@ describe("VertexAdkCanonicaliserService", () => {
 
         extractor.apply(ctx);
 
-        expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS]).toBe(2500);
+        expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS]).toBe(400);
         expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS]).toBe(64);
       });
     });

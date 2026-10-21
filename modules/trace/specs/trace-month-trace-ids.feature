@@ -29,6 +29,14 @@ Feature: Trace sends this month's trace ids to entitlement at upgrade
     Then it sends that project's trace ids after the saved one, then the projects after it
     And it keeps the month and the time window it started with
 
+  @unit @regression
+  Scenario: The upgrade skips a project no organisation owns
+    Given a project whose team was deleted, so no organisation owns its data
+    When the upgrade step runs
+    Then the step completes without reading that project's trace ids
+    And the report counts it as a skipped orphan and names its id
+    And a resumed run carries on past it without counting it twice
+
   @unit
   Scenario: A dry run of the upgrade sends and saves nothing
     When the upgrade step runs as a dry run

@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
- * The server half of `scimOversight.*`: the back office's directory-sync
- * oversight (ADR-122). Gated on the platform-operator grant (ops:* at the
- * platform tier), never an org-scoped RBAC permission, so no org role may widen
- * who may re-drive a customer's deprovision. enterprise/modules/scim/specs/scim-reconciliation-surfaces.feature
+ * `scimOversight.*`, the back office's directory-sync oversight (ADR-122): the door asks
+ * ops:manage at the platform tier, never an org permission; every refusal is a not-found.
+ * enterprise/modules/scim/specs/scim-reconciliation-surfaces.feature
  */
 import {
   defineTrpcRouter,
@@ -12,8 +11,7 @@ import {
 } from "@langwatch/api/trpc";
 import { ScimApi, scimOversightTrpc, type ScimOperator } from "@langwatch/enterprise-scim-contract";
 
-const STAFF_LIST_REASON =
-  "admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design";
+const OPERATOR_SCOPE = { at: "platform", refusal: "hidden" } as const;
 
 /** The impersonator where there is one: debugging a customer stays operator work. */
 function operatorOf(actor: TrpcHandlerActor): ScimOperator {
@@ -27,21 +25,21 @@ function operatorOf(actor: TrpcHandlerActor): ScimOperator {
 export const scimOversightTrpcTransport: TrpcRouterDeclaration<ScimApi, typeof scimOversightTrpc> =
   defineTrpcRouter(ScimApi, scimOversightTrpc)
     .procedure("getAll")
-    .noPermission({ reason: STAFF_LIST_REASON })
+    .withPermission("ops:manage", OPERATOR_SCOPE)
     .handle(({ app, input, actor }) => app.listOversightSyncs(input, operatorOf(actor)))
 
     .procedure("getById")
-    .noPermission({ reason: STAFF_LIST_REASON })
+    .withPermission("ops:manage", OPERATOR_SCOPE)
     .handle(
       async ({ app, input, actor }) =>
         (await app.findOversightSync(input, operatorOf(actor)))[0] ?? null,
     )
 
     .procedure("directoryIdentities")
-    .noPermission({ reason: STAFF_LIST_REASON })
+    .withPermission("ops:manage", OPERATOR_SCOPE)
     .handle(({ app, input, actor }) => app.findDirectoryIdentities(input, operatorOf(actor)))
 
     .procedure("redriveRetiredApply")
-    .noPermission({ reason: STAFF_LIST_REASON })
+    .withPermission("ops:manage", OPERATOR_SCOPE)
     .handle(({ app, input, actor }) => app.redriveRetiredApply(input, operatorOf(actor)))
     .build();

@@ -21,15 +21,28 @@ Feature: Internal ops navigation
     Given I have ops access and I am an admin
     When the settings sidebar renders
     Then it holds no Health, Tools, Instance or Cloud group
-    And no entry in it leads to an ops page
+    And no menu group in it leads to an ops page
+
+  @integration
+  Scenario: Settings points operators to the Operations console
+    Given I have ops access
+    When the settings sidebar renders
+    Then an "Ops have moved" link is pinned to the bottom of its menu
+    And it leads to the Operations console
+
+  @integration
+  Scenario: Settings shows no signpost to a reader without ops access
+    Given I have no ops access
+    When the settings sidebar renders
+    Then there is no "Ops have moved" link
 
   @integration
   Scenario: The Admin console has its own sidebar
     Given I have ops access and I am an admin on LangWatch Cloud
     When I open an ops page
     Then the sidebar is the Admin console's, grouped Health, Tools, Instance and Cloud
-    And the top bar names Admin rather than Settings
-    And the product switcher and the user menu each offer Admin to an operator
+    And the top bar names Operations rather than Settings
+    And the product switcher and the user menu each offer Operations to an operator
 
   @integration
   Scenario: A reader without ops access sees no ops groups

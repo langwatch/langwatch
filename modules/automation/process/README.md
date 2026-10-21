@@ -6,7 +6,7 @@ The server half of [automation](../README.md). Automations: triggers and their f
 
 ## Installation
 
-`defineProcessModule("automation").withRepositories(automationRepositories).withChannels(automationChannels).withApi(AutomationModule).withTransports(…, automationTrpcTransport, emailSuppressionTrpcTransport, slackAutomationRest, unsubscribeRest).provideMiddlewareContext(…).withTasks(…).withMigrations(…).withEventing(automationsEventing)`, `src/automation.module.ts:23`.
+`defineProcessModule("automation").withRepositories(automationRepositories).withChannels(automationChannels).withApi(AutomationModule).withTransports(…, automationTrpcTransport, emailSuppressionTrpcTransport, slackAutomationRest, unsubscribeRest).provideMiddlewareContext(…).withTasks(…).withMigrations(…).withEventing(automationsEventing)`, `src/automation.module.ts:24`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -983,19 +983,19 @@ Declared at `src/eventing/automation.pipeline.ts:181`. Events: `triggerMatchReco
 | command         | `requestReportRun`                 | –                                                                                                                                             | `src/eventing/automation.pipeline.ts:198` |
 | command         | `settleReportRun`                  | –                                                                                                                                             | `src/eventing/automation.pipeline.ts:199` |
 | process manager | `triggerSettlement`                | intents `logOverflow`, `persistMatch`, `notifyDigest`, `persistMatch`, `notifyDigest`, `logOverflow`, `notifyDigest`, `persistMatch` (outbox) | `src/eventing/automation.pipeline.ts:200` |
-| process manager | `reportSchedule`                   | intents `dispatchReport` (outbox)                                                                                                             | `src/eventing/automation.pipeline.ts:298` |
-| process manager | `automationAudit`                  | every 1 d (`AUTOMATION_AUDIT_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `pruneAudit`, `recordAudit` (outbox)                          | `src/eventing/automation.pipeline.ts:314` |
-| process manager | `graphAlertSweep`                  | every 30 s (`GRAPH_ALERT_SWEEP_INTERVAL_MS`); intents `evaluateGraph`                                                                         | `src/eventing/automation.pipeline.ts:331` |
-| peer subscriber | `traceSpanTriggerMatch`            | `lw.obs.trace.span_received` from [trace](../../trace/README.md)                                                                              | `src/eventing/automation.pipeline.ts:342` |
-| peer subscriber | `traceOriginTriggerMatch`          | `lw.obs.trace.origin_resolved` from [trace](../../trace/README.md)                                                                            | `src/eventing/automation.pipeline.ts:359` |
-| peer subscriber | `evaluationCompletedTriggerMatch`  | `lw.evaluation.completed` from [evaluation](../../evaluation/README.md)                                                                       | `src/eventing/automation.pipeline.ts:375` |
-| peer subscriber | `evaluationReportedTriggerMatch`   | `lw.evaluation.reported` from [evaluation](../../evaluation/README.md)                                                                        | `src/eventing/automation.pipeline.ts:392` |
-| peer subscriber | `traceSpanGraphActivity`           | `lw.obs.trace.span_received` from [trace](../../trace/README.md)                                                                              | `src/eventing/automation.pipeline.ts:410` |
-| peer subscriber | `traceOriginGraphActivity`         | `lw.obs.trace.origin_resolved` from [trace](../../trace/README.md)                                                                            | `src/eventing/automation.pipeline.ts:420` |
-| peer subscriber | `evaluationCompletedGraphActivity` | `lw.evaluation.completed` from [evaluation](../../evaluation/README.md)                                                                       | `src/eventing/automation.pipeline.ts:430` |
-| peer subscriber | `evaluationReportedGraphActivity`  | `lw.evaluation.reported` from [evaluation](../../evaluation/README.md)                                                                        | `src/eventing/automation.pipeline.ts:440` |
-| lane aliases    | `≈ MAIN_TRIGGER_LANE_ALIASES`      | –                                                                                                                                             | `src/eventing/automation.pipeline.ts:450` |
-| retention       | `≈ deps.tenantRetention`           | –                                                                                                                                             | `src/eventing/automation.pipeline.ts:451` |
+| process manager | `reportSchedule`                   | intents `dispatchReport` (outbox)                                                                                                             | `src/eventing/automation.pipeline.ts:301` |
+| process manager | `automationAudit`                  | every 1 d (`AUTOMATION_AUDIT_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `pruneAudit`, `recordAudit` (outbox)                          | `src/eventing/automation.pipeline.ts:317` |
+| process manager | `graphAlertSweep`                  | every 30 s (`GRAPH_ALERT_SWEEP_INTERVAL_MS`); intents `evaluateGraph`                                                                         | `src/eventing/automation.pipeline.ts:334` |
+| peer subscriber | `traceSpanTriggerMatch`            | `lw.obs.trace.span_received` from [trace](../../trace/README.md)                                                                              | `src/eventing/automation.pipeline.ts:345` |
+| peer subscriber | `traceOriginTriggerMatch`          | `lw.obs.trace.origin_resolved` from [trace](../../trace/README.md)                                                                            | `src/eventing/automation.pipeline.ts:362` |
+| peer subscriber | `evaluationCompletedTriggerMatch`  | `lw.evaluation.completed` from [evaluation](../../evaluation/README.md)                                                                       | `src/eventing/automation.pipeline.ts:378` |
+| peer subscriber | `evaluationReportedTriggerMatch`   | `lw.evaluation.reported` from [evaluation](../../evaluation/README.md)                                                                        | `src/eventing/automation.pipeline.ts:395` |
+| peer subscriber | `traceSpanGraphActivity`           | `lw.obs.trace.span_received` from [trace](../../trace/README.md)                                                                              | `src/eventing/automation.pipeline.ts:413` |
+| peer subscriber | `traceOriginGraphActivity`         | `lw.obs.trace.origin_resolved` from [trace](../../trace/README.md)                                                                            | `src/eventing/automation.pipeline.ts:423` |
+| peer subscriber | `evaluationCompletedGraphActivity` | `lw.evaluation.completed` from [evaluation](../../evaluation/README.md)                                                                       | `src/eventing/automation.pipeline.ts:433` |
+| peer subscriber | `evaluationReportedGraphActivity`  | `lw.evaluation.reported` from [evaluation](../../evaluation/README.md)                                                                        | `src/eventing/automation.pipeline.ts:443` |
+| lane aliases    | `≈ MAIN_TRIGGER_LANE_ALIASES`      | –                                                                                                                                             | `src/eventing/automation.pipeline.ts:453` |
+| retention       | `≈ deps.tenantRetention`           | –                                                                                                                                             | `src/eventing/automation.pipeline.ts:454` |
 
 ### Tasks
 
@@ -1009,7 +1009,7 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                        | Environment variable                   | Declared at                               |
 | ------ | --------------------------- | -------------------------------------- | ----------------------------------------- |
-| secret | `unsubscribe`               | `NEXTAUTH_SECRET`                      | `src/app/automation.app.ts:428`           |
+| secret | `unsubscribe`               | `NEXTAUTH_SECRET`                      | `src/app/automation.app.ts:433`           |
 | config | `emailHourlyCap`            | `TRIGGER_EMAIL_HOURLY_CAP`             | `../contract/src/automation.config.ts:18` |
 | config | `tenantDailyCap`            | `TRIGGER_EMAIL_TENANT_DAILY_CAP`       | `../contract/src/automation.config.ts:19` |
 | config | `persistDailyCapFree`       | `TRIGGER_PERSIST_DAILY_CAP_FREE`       | `../contract/src/automation.config.ts:20` |

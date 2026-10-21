@@ -51,6 +51,23 @@ Feature: Model Provider service
     Then the stored provider is disabled by default
 
   @unit
+  Scenario: A Vertex AI call carries the service account stored on the provider
+    Given a project has a Vertex AI provider with a service account JSON, a project and a location
+    When a Vertex AI model call is prepared for the project
+    Then vertex_credentials carries the stored service account JSON
+    And vertex_project and vertex_location carry the stored project and location
+    And the service account is never sent as api_key
+
+  @unit
+  Scenario: An evaluator's max tokens fits the model it runs on, Vertex AI included
+    Given an LLM evaluator whose max tokens is not set
+    When it is prepared to run on a model served by Vertex AI
+    Then no max tokens is sent, so the provider's default applies
+    When the user sets a max tokens above a Gemini model's output limit
+    Then the max tokens sent is the catalogue's output limit for that model
+    And on a model whose limit is unknown the value the user set is sent as is
+
+  @unit
   Scenario: The platform chain borrows the Google credential from data privacy
     Given data privacy holds the deployment's Google application credential
     When the platform provider chain is read
@@ -102,6 +119,15 @@ Feature: Model Provider service
     Then the stored key is not kept
     And its masked extra header values are not kept
     And saving with a newly typed key keeps the new key with the new base URL
+
+  @unit
+  Scenario: A provider row falls back to the install-wide provider settings
+    Given a deployment that sets OPENAI_BASE_URL, ANTHROPIC_BASE_URL, AZURE_OPENAI_ENDPOINT, CUSTOM_BASE_URL, VERTEXAI_PROJECT, VERTEXAI_LOCATION or AWS_REGION_NAME
+    And a project's provider row that leaves the matching field empty
+    When a model on that provider is prepared for execution
+    Then the deployment's value is used for that field
+    And a value the row stored itself is used instead of the deployment's
+    And no API key or secret is ever taken from the deployment's environment
 
   @unit
   Scenario: A stored key is checked only against the endpoint it was saved with

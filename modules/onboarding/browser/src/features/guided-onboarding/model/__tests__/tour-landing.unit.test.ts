@@ -35,7 +35,31 @@ describe("landingNeedsTour", () => {
     );
   });
 
-  /** @scenario a skipped provider means no tour */
+  /** @scenario a skipped provider still runs the tour */
+  it("is true for a fresh path whose provider step was skipped", () => {
+    expect(
+      landingNeedsTour({
+        paths: ["llmops"],
+        currentPath: "llmops",
+        donePaths: [],
+        providerSkippedAt: "2026-10-18T09:00:00.000Z",
+      }),
+    ).toBe(true);
+  });
+
+  /** @scenario a landing after the model prompt was put off does nothing */
+  it("is false once the model prompt was put off with no provider since", () => {
+    expect(
+      landingNeedsTour({
+        paths: ["llmops"],
+        currentPath: "llmops",
+        donePaths: [],
+        providerSkippedAt: "2026-10-18T09:00:00.000Z",
+        providerPromptDismissedAt: "2026-10-18T09:05:00.000Z",
+      }),
+    ).toBe(false);
+  });
+
   it("is false once the tour has completed or been skipped", () => {
     expect(
       landingNeedsTour({
@@ -67,6 +91,19 @@ describe("landingNeedsKickoff", () => {
       true,
     );
   });
+
+  /** @scenario a landing after the model prompt was put off does nothing */
+  it("is false once the model prompt was put off, for good", () => {
+    const putOff = {
+      paths: ["coding" as const],
+      currentPath: "coding" as const,
+      donePaths: [],
+      providerSkippedAt: "2026-10-18T09:00:00.000Z",
+      providerPromptDismissedAt: "2026-10-18T09:05:00.000Z",
+    };
+    expect(landingNeedsKickoff(putOff)).toBe(false);
+    expect(landingNeedsKickoff({ ...putOff, provider: "openai" })).toBe(false);
+  });
 });
 
 describe("tourStatusForLanding", () => {
@@ -77,7 +114,6 @@ describe("tourStatusForLanding", () => {
     ).toBe("none");
   });
 
-  /** @scenario a skipped provider means no tour */
   it("is skipped when skipped and not completed", () => {
     expect(
       tourStatusForLanding(

@@ -1006,6 +1006,34 @@ describe("SystemMigrationRunnerService held tenants", () => {
   });
 });
 
+describe("SystemMigrationRunnerService over a step that never finalizes by design", () => {
+  /** @scenario "A step that never finalizes by design keeps its tenants settled, not held" */
+  it("records migrated without a hold and counts the tenant finished", async () => {
+    const state = new FakeStateRepository();
+    const runner = new SystemMigrationRunnerService({
+      now: nowInstant,
+      state,
+      lease: new FakeLeaseRepository(),
+      tenants: tenantSourceOf(["org_acme"]),
+      cohort: () => true,
+      migrations: [
+        {
+          ...migrationOf("m1", async () => ({ status: "migrated", report: null })),
+          migratedIsSteady: true,
+        },
+      ],
+    });
+
+    await runner.runPass();
+
+    const record = await state.getRecord({ migrationName: "m1", tenantId: "org_acme" });
+    expect(record.status).toBe("migrated");
+    expect(record).not.toHaveProperty("heldReason");
+    expect(record).not.toHaveProperty("heldSince");
+    expect(await runner.hasUnfinishedTenant({ migrationName: "m1" })).toBe(false);
+  });
+});
+
 describe("isHeldTenantFailed", () => {
   const heldSince = Temporal.Instant.from("2026-10-09T10:00:00Z");
   const record: TenantMigrationRecord = {

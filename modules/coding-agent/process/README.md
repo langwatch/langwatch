@@ -6,7 +6,7 @@ The server half of [coding-agent](../README.md). Coding-agent observability: ses
 
 ## Installation
 
-`defineProcessModule("coding-agent").withRepositories(codingAgentRepositories).withApi(CodingAgentModule).withTransports(codingAgentRest, codingAgentRollupRest, codingAgentV1Rest, codingAgentTrpcTransport).withEventing(codingAgentEventing).provideMiddlewareContext(…)`, `src/coding-agent.module.ts:20`.
+`defineProcessModule("coding-agent").withRepositories(codingAgentRepositories).withApi(CodingAgentModule).withTransports(codingAgentRest, codingAgentRollupRest, codingAgentV1Rest, codingAgentTrpcTransport).withEventing(codingAgentEventing).provideMiddlewareContext(…).withIdIndexes(CODING_AGENT_ID_INDEXES, …)`, `src/coding-agent.module.ts:21`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -66,10 +66,10 @@ listRecent(input: CodingAgentRecentSessionsInput): Promise<CodingAgentSession[]>
 
 #### `listForProject`
 
-The Sessions screen's rows, cut to what this viewer may see: the generated title follows the project's content visibility, the cost follows `cost:view`.
+The Sessions screen's rows, cut to what this viewer may see (title under content visibility, cost under `cost:view`), read through the route's proof so an aggregate's page spans its members (ADR-177).
 
 ```typescript
-listForProject(input: CodingAgentSessionsListInput, by: CodingAgentViewer): Promise<CodingAgentSessionListRow[]>;
+listForProject(input: CodingAgentSessionsListInput & { authorization: Authorization }, by: CodingAgentViewer): Promise<CodingAgentSessionListRow[]>;
 ```
 
 #### `contributeSpanFacts`

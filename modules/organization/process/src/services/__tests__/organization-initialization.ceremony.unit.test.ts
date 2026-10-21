@@ -36,7 +36,8 @@ function harness(
 ) {
   const signals = {
     trackServerEvent: vi.fn(),
-    sendSlackSignupEvent: vi.fn(async () => undefined),
+    announceNewOrganization: vi.fn(async () => undefined),
+    announceJoin: vi.fn(async () => undefined),
     sendHubspotSignupForm: vi.fn(async () => undefined),
     reportError: vi.fn(),
     ...overrides,
@@ -176,7 +177,11 @@ describe("given the sign-up succeeded", () => {
         signUpData,
       };
 
-      expect(signals.sendSlackSignupEvent).toHaveBeenCalledWith(payload);
+      expect(signals.announceNewOrganization).toHaveBeenCalledWith({
+        ...payload,
+        userId: CALLER.id,
+        organizationId: ORGANIZATION.id,
+      });
       expect(signals.sendHubspotSignupForm).toHaveBeenCalledWith(payload);
     });
 
@@ -184,7 +189,7 @@ describe("given the sign-up succeeded", () => {
     it("completes the ceremony when a notification door is down", async () => {
       const failure = new Error("Slack down");
       const { onboarding, signals } = harness({
-        sendSlackSignupEvent: vi.fn(async () => {
+        announceNewOrganization: vi.fn(async () => {
           throw failure;
         }),
       });

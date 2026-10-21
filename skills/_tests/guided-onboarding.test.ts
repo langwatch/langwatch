@@ -51,6 +51,13 @@ const VERBATIM_LINES = {
     "No worries! Everything the tour covers is in the menu on the left. I'll be right here when you need me.",
   "the mid-setup line":
     "We'll get to that! Let me finish getting you set up first, then I'm all yours.",
+  "the no-agent question":
+    "I read {folder} and found no LLM agent in it, so there is nothing for me to trace yet. Want me to write a small starter agent here to set up with?",
+  "the starter key question":
+    "The starter agent needs an OpenAI key to answer. Add OPENAI_API_KEY to langwatch-starter-agent/.env, then pick Done.",
+  "the another-folder line":
+    "Run the same share command in the folder that holds your agent, and send me a message once it is connected: I'll start the setup there.",
+  "the starter framework line": "I wrote a plain OpenAI agent in langwatch-starter-agent/main.py.",
 } as const;
 
 describe("the guided-onboarding skill", () => {
@@ -967,11 +974,73 @@ describe("the guided-onboarding skill", () => {
         "Then step 2 continues on the langy branch exactly as the no-remote path says: `git checkout -b langy/<slug>` from the branch `git init` made, no `git fetch`, no `git push`, and the no-remote line takes the pull request line's place.",
       );
       expect(section).toContain(
-        'On "I\'ll choose another folder": end the turn saying which folder to connect next through the code access card, and nothing else runs.',
+        'On "I\'ll choose another folder": say the another-folder line of the fourth dead end with `say`, verbatim, and end the turn; nothing else runs.',
       );
       expect(section).toContain("`gh` not signed in is not a dead end");
       expect(rendered).toContain(
         'When the workspace facts say `git: not a repository`, there is no branch to make: that is the first unlock question of "When a step fails", asked before any command of this step.',
+      );
+    });
+
+    /** @scenario "A folder with no LLM agent gets a question, never a stop" */
+    it("asks the no-agent question before the branch, and offers a starter agent or another folder", () => {
+      const failed = rendered.indexOf("### When a step fails");
+      const section = rendered.slice(failed, rendered.indexOf("## coding: Coding agents"));
+      expect(rendered).toContain(
+        'When no file of the folder calls a model or builds an agent (an app, firmware or a library with no LLM call in it), there is nothing to trace yet: that is the fourth unlock question of "When a step fails", asked before the branch and any edit, and never a line saying the setup is not done.',
+      );
+      // The rule sits in step 2 before the branch is made.
+      expect(rendered.indexOf("that is the fourth unlock question")).toBeLessThan(
+        rendered.indexOf("`git checkout -b langy/<slug> origin/<default>`"),
+      );
+      expect(section).toContain(
+        "The fourth: no file of the folder calls a model or builds an agent, so there is nothing to trace.",
+      );
+      expect(section).toContain(VERBATIM_LINES["the no-agent question"]);
+      expect(section).toContain(
+        "with {folder} the folder's own name, the last part of the path the workspace facts name (never `.` and never the full path)",
+      );
+      expect(section).toContain(
+        'Options, in this order: "Write a starter agent for me" and "I\'ll connect another folder".',
+      );
+      expect(section).toContain(
+        "on the langy branch you write a folder of its own, `langwatch-starter-agent/`",
+      );
+      expect(section).toContain(
+        'the framework line reads "I wrote a plain OpenAI agent in langwatch-starter-agent/main.py."',
+      );
+      expect(section).toContain(VERBATIM_LINES["the starter key question"]);
+      expect(section).toContain("You never write the key and never ask for its value.");
+      expect(section).toContain(
+        "with it still missing, ask the same question again and end the turn on its card. The starter agent never starts without the key.",
+      );
+      const another = section.indexOf('On "I\'ll connect another folder"');
+      expect(another).toBeGreaterThan(-1);
+      expect(section.indexOf(VERBATIM_LINES["the another-folder line"], another)).toBeGreaterThan(
+        another,
+      );
+    });
+
+    /** @scenario "An unlock question reaches a person who asked for notifications" */
+    it("notifies before an unlock card when notifications were offered, never saying the project is ready", () => {
+      const failed = rendered.indexOf("### When a step fails");
+      const section = rendered.slice(failed, rendered.indexOf("## coding: Coding agents"));
+      expect(section).toContain(
+        'When `offer_notifications` was called in this conversation, call `notify` right before the card, with the title "Langy needs your answer" and the question as the body',
+      );
+      expect(section).toContain("That notify never says the project is ready.");
+    });
+
+    /** @scenario "The mid-setup line answers only a message the person typed" */
+    it("keeps the mid-setup line for typed messages, and never answers a LangWatch note with it", () => {
+      expect(rendered).toContain(
+        "That line answers a message the person typed while the setup is still going on, and the work it promises follows it in the same turn.",
+      );
+      expect(rendered).toContain(
+        'A message that opens "LangWatch note: the person sent nothing." comes from LangWatch, not from the person: it is never answered with that line or any other reply to it, only with the step it names.',
+      );
+      expect(rendered).toContain(
+        "A path stopped on a dead end answers with that dead end's question, never with a promise to continue.",
       );
     });
 
@@ -1045,7 +1114,7 @@ describe("the guided-onboarding skill", () => {
       const failed = rendered.indexOf("### When a step fails");
       const section = rendered.slice(failed, rendered.indexOf("## coding: Coding agents"));
       expect(section).toContain(
-        "Three dead ends have a known unlock, and an unlock is asked, never stopped on:",
+        "Four dead ends have a known unlock, and an unlock is asked, never stopped on:",
       );
       expect(section).toContain(
         "The third: the check of item 1 fails, or the installed version is below 1.3.0, after an install that reported success.",

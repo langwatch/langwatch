@@ -853,19 +853,26 @@ Run by the tasks process, before serve.
 | ------ | -------------------------------------------- | ---------------------------------------------- | --------------------------------------------- |
 | secret | `...ModelProviderModule.platformCredentials` | ≈ `...ModelProviderModule.platformCredentials` | `src/app/model-provider.app.ts:250`           |
 | secret | `...ModelProviderModule.operationalSecrets`  | ≈ `...ModelProviderModule.operationalSecrets`  | `src/app/model-provider.app.ts:251`           |
-| config | `blockLocalHttpCalls`                        | `BLOCK_LOCAL_HTTP_CALLS`                       | `../contract/src/model-provider.config.ts:26` |
-| config | `allowedProxyHosts`                          | `ALLOWED_PROXY_HOSTS`                          | `../contract/src/model-provider.config.ts:27` |
-| config | `defaultModel`                               | `LANGWATCH_DEFAULT_MODEL`                      | `../contract/src/model-provider.config.ts:28` |
-| config | `nlpServiceUrl`                              | `LANGWATCH_NLP_SERVICE`                        | `../contract/src/model-provider.config.ts:29` |
-| config | `gatewayInternalUrl`                         | `LW_GATEWAY_INTERNAL_URL`                      | `../contract/src/model-provider.config.ts:30` |
-| config | `gatewayPublicUrl`                           | `LW_GATEWAY_PUBLIC_URL`                        | `../contract/src/model-provider.config.ts:31` |
-| config | `gatewayLegacyUrl`                           | `LW_GATEWAY_BASE_URL`                          | `../contract/src/model-provider.config.ts:32` |
-| config | `probeBaseUrls.gemini`                       | `GEMINI_BASE_URL`                              | `../contract/src/model-provider.config.ts:38` |
-| config | `probeBaseUrls.deepseek`                     | `DEEPSEEK_BASE_URL`                            | `../contract/src/model-provider.config.ts:39` |
-| config | `probeBaseUrls.xai`                          | `XAI_BASE_URL`                                 | `../contract/src/model-provider.config.ts:40` |
-| config | `probeBaseUrls.cerebras`                     | `CEREBRAS_BASE_URL`                            | `../contract/src/model-provider.config.ts:41` |
-| config | `probeBaseUrls.groq`                         | `GROQ_BASE_URL`                                | `../contract/src/model-provider.config.ts:42` |
-| config | `probeBaseUrls.elevenlabs`                   | `ELEVENLABS_BASE_URL`                          | `../contract/src/model-provider.config.ts:43` |
-| config | `codexOAuthIssuer`                           | `CODEX_OAUTH_ISSUER`                           | `../contract/src/model-provider.config.ts:46` |
+| config | `blockLocalHttpCalls`                        | `BLOCK_LOCAL_HTTP_CALLS`                       | `../contract/src/model-provider.config.ts:31` |
+| config | `allowedProxyHosts`                          | `ALLOWED_PROXY_HOSTS`                          | `../contract/src/model-provider.config.ts:32` |
+| config | `defaultModel`                               | `LANGWATCH_DEFAULT_MODEL`                      | `../contract/src/model-provider.config.ts:33` |
+| config | `nlpServiceUrl`                              | `LANGWATCH_NLP_SERVICE`                        | `../contract/src/model-provider.config.ts:34` |
+| config | `gatewayInternalUrl`                         | `LW_GATEWAY_INTERNAL_URL`                      | `../contract/src/model-provider.config.ts:35` |
+| config | `gatewayPublicUrl`                           | `LW_GATEWAY_PUBLIC_URL`                        | `../contract/src/model-provider.config.ts:36` |
+| config | `gatewayLegacyUrl`                           | `LW_GATEWAY_BASE_URL`                          | `../contract/src/model-provider.config.ts:37` |
+| config | `probeBaseUrls.gemini`                       | `GEMINI_BASE_URL`                              | `../contract/src/model-provider.config.ts:43` |
+| config | `probeBaseUrls.deepseek`                     | `DEEPSEEK_BASE_URL`                            | `../contract/src/model-provider.config.ts:44` |
+| config | `probeBaseUrls.xai`                          | `XAI_BASE_URL`                                 | `../contract/src/model-provider.config.ts:45` |
+| config | `probeBaseUrls.cerebras`                     | `CEREBRAS_BASE_URL`                            | `../contract/src/model-provider.config.ts:46` |
+| config | `probeBaseUrls.groq`                         | `GROQ_BASE_URL`                                | `../contract/src/model-provider.config.ts:47` |
+| config | `probeBaseUrls.elevenlabs`                   | `ELEVENLABS_BASE_URL`                          | `../contract/src/model-provider.config.ts:48` |
+| config | `providerFallbacks.OPENAI_BASE_URL`          | `OPENAI_BASE_URL`                              | `../contract/src/model-provider.config.ts:55` |
+| config | `providerFallbacks.ANTHROPIC_BASE_URL`       | `ANTHROPIC_BASE_URL`                           | `../contract/src/model-provider.config.ts:56` |
+| config | `providerFallbacks.AZURE_OPENAI_ENDPOINT`    | `AZURE_OPENAI_ENDPOINT`                        | `../contract/src/model-provider.config.ts:57` |
+| config | `providerFallbacks.CUSTOM_BASE_URL`          | `CUSTOM_BASE_URL`                              | `../contract/src/model-provider.config.ts:58` |
+| config | `providerFallbacks.VERTEXAI_PROJECT`         | `VERTEXAI_PROJECT`                             | `../contract/src/model-provider.config.ts:59` |
+| config | `providerFallbacks.VERTEXAI_LOCATION`        | `VERTEXAI_LOCATION`                            | `../contract/src/model-provider.config.ts:60` |
+| config | `providerFallbacks.AWS_REGION_NAME`          | `AWS_REGION_NAME`                              | `../contract/src/model-provider.config.ts:61` |
+| config | `codexOAuthIssuer`                           | `CODEX_OAUTH_ISSUER`                           | `../contract/src/model-provider.config.ts:64` |
 
 <!-- readme:generated:end -->

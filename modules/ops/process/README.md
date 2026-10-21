@@ -6,7 +6,7 @@ The server half of [ops](../README.md). Platform administration for every deploy
 
 ## Installation
 
-`defineProcessModule("ops").withRepositories(opsRepositories).withChannels(opsChannels).withApi(OpsModule).withTransports(adminRest, opsBugReportRest, opsClickHouseExplainRest, opsTrpcTransport, opsUpgradeTrpcTransport, opsBugReportTrpcTransport, checkupTrpcTransport, checkupRest).provideMiddlewareBindings(…).provideMiddlewareContext(…).withEventing(usageReportEventing).withEventing(anomalyDetectionEventing).withEventing(storageStatsEventing).withEventing(groupQueueReaperEventing).withEventing(upgradeAlertsEventing).withEventing(projectionReplayEventing).withEventing(systemMigrationsEventing).withEventing(platformOperatorSeedEventing).withTasks(…).withMigrations(…)`, `src/ops.module.ts:40`.
+`defineProcessModule("ops").withRepositories(opsRepositories).withChannels(opsChannels).withApi(OpsModule).withTransports(adminRest, opsBugReportRest, opsClickHouseExplainRest, opsTrpcTransport, opsUpgradeTrpcTransport, opsBugReportTrpcTransport, checkupTrpcTransport, checkupRest).provideMiddlewareBindings(…).provideMiddlewareContext(…).withEventing(usageReportEventing).withEventing(anomalyDetectionEventing).withEventing(storageStatsEventing).withEventing(groupQueueReaperEventing).withEventing(upgradeAlertsEventing).withEventing(projectionReplayEventing).withEventing(systemMigrationsEventing).withEventing(platformOperatorSeedEventing).withTasks(…).withMigrations(…).withIdIndexes(…, …)`, `src/ops.module.ts:41`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -941,7 +941,7 @@ interface Response {
 
 #### `DELETE /api/admin/impersonate` · `stopAdminImpersonation`
 
-Platform permission `ops:manage`. Credential `browser`. Declared at `src/transport/admin.rest.ts:48`.
+Platform permission `ops:view`. Credential `browser`. Declared at `src/transport/admin.rest.ts:48`.
 
 Answers at `/api/admin/impersonate`, `/api/v1/admin/impersonate`.
 
@@ -956,7 +956,7 @@ interface Response {
 
 #### `POST /api/admin/:resource` · `runAdminOperation`
 
-Platform permission `ops:view`. Credential `browser`. Declared at `src/transport/admin.rest.ts:59`.
+Platform permission `ops:view`. Credential `browser`. Declared at `src/transport/admin.rest.ts:60`.
 
 Answers at `/api/admin/:resource`, `/api/v1/admin/:resource`.
 
@@ -1081,7 +1081,7 @@ Contract `../contract/src/features/checkup/checkup.trpc.ts:38`, router `src/tran
 | `checkup.status`                 | query    | Permission `organization:view`   | `organizationInput` | `checkupAnswer`     |
 | `checkup.run`                    | mutation | Permission `organization:manage` | inline              | `checkupAnswer`     |
 | `checkup.usageReport`            | query    | Permission `organization:view`   | `organizationInput` | `usageReportAnswer` |
-| `checkup.setUsageReportSwitches` | mutation | Permission `organization:manage` | inline              | `usageReportAnswer` |
+| `checkup.setUsageReportSwitches` | mutation | Platform permission `ops:manage` | inline              | `usageReportAnswer` |
 
 ```typescript
 // checkup.status
@@ -2345,7 +2345,7 @@ interface Output {
 // ops.upgrade.listMigrationEnrollments
 // Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:410
 type Input = unknown;
-// Output: opsMigrationEnrollmentListingSchema, ../contract/src/features/migrations/ops-system-migration.ts:157
+// Output: opsMigrationEnrollmentListingSchema, ../contract/src/features/migrations/ops-system-migration.ts:160
 interface Output {
   enrollments: {
     organizationId: string;
@@ -2358,7 +2358,7 @@ interface Output {
 }
 
 // ops.upgrade.searchMigrationOrganizations
-// Input: opsSearchMigrationOrganizationsInputSchema, ../contract/src/features/migrations/ops-system-migration.ts:54
+// Input: opsSearchMigrationOrganizationsInputSchema, ../contract/src/features/migrations/ops-system-migration.ts:57
 interface Input {
   query: string;
 }
@@ -2369,7 +2369,7 @@ type Output = {
 }[];
 
 // ops.upgrade.enrollMigrationTenant
-// Input: opsEnrollMigrationTenantInputSchema, ../contract/src/features/migrations/ops-system-migration.ts:32
+// Input: opsEnrollMigrationTenantInputSchema, ../contract/src/features/migrations/ops-system-migration.ts:35
 interface Input {
   organizationId: string;
   migrationName: string;
@@ -2381,7 +2381,7 @@ interface Output {
 }
 
 // ops.upgrade.enrollMigrationCohort
-// Input: opsEnrollMigrationCohortInputSchema, ../contract/src/features/migrations/ops-system-migration.ts:45
+// Input: opsEnrollMigrationCohortInputSchema, ../contract/src/features/migrations/ops-system-migration.ts:48
 interface Input {
   migrationName: string;
   sampleSize: number;
@@ -2389,7 +2389,7 @@ interface Input {
   includePrivateDataplane?: boolean;
   confirm?: "ENROLL";
 }
-// Output: opsMigrationCohortResultSchema, ../contract/src/features/migrations/ops-system-migration.ts:225
+// Output: opsMigrationCohortResultSchema, ../contract/src/features/migrations/ops-system-migration.ts:228
 interface Output {
   enrolled: {
     id: string;
@@ -2399,7 +2399,7 @@ interface Output {
 }
 
 // ops.upgrade.withdrawMigrationTenant
-// Input: opsMigrationTenantInputSchema, ../contract/src/features/migrations/ops-system-migration.ts:19
+// Input: opsMigrationTenantInputSchema, ../contract/src/features/migrations/ops-system-migration.ts:22
 interface Input {
   organizationId: string;
   migrationName: string;
@@ -2410,13 +2410,13 @@ interface Output {
 }
 
 // ops.upgrade.runSystemMigrationForOrganization
-// Input: opsRunSystemMigrationForOrganizationInputSchema, ../contract/src/features/migrations/ops-system-migration.ts:66
+// Input: opsRunSystemMigrationForOrganizationInputSchema, ../contract/src/features/migrations/ops-system-migration.ts:69
 interface Input {
   organizationId: string;
   migrationName: string;
   confirm?: "RUN";
 }
-// Output: opsMigrationTargetedRunResultSchema, ../contract/src/features/migrations/ops-system-migration.ts:241
+// Output: opsMigrationTargetedRunResultSchema, ../contract/src/features/migrations/ops-system-migration.ts:244
 interface Output {
   status: "migrated" | "finalized" | "parked" | "rolled_back" | null;
   waiting: boolean;
@@ -2431,7 +2431,7 @@ interface Output {
 }
 
 // ops.upgrade.assertSystemMigrationLegacyWritersDrained
-// Input: opsAssertLegacyWritersDrainedInputSchema, ../contract/src/features/migrations/ops-system-migration.ts:78
+// Input: opsAssertLegacyWritersDrainedInputSchema, ../contract/src/features/migrations/ops-system-migration.ts:81
 interface Input {
   migrationName: string;
   tenantId: string;
@@ -2444,7 +2444,7 @@ interface Output {
 }
 
 // ops.upgrade.rollBackSystemMigrationTenant
-// Input: opsRollBackSystemMigrationTenantInputSchema, ../contract/src/features/migrations/ops-system-migration.ts:90
+// Input: opsRollBackSystemMigrationTenantInputSchema, ../contract/src/features/migrations/ops-system-migration.ts:93
 interface Input {
   migrationName: string;
   tenantId: string;
@@ -2547,11 +2547,11 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                             | Environment variable                | Declared at                        |
 | ------ | -------------------------------- | ----------------------------------- | ---------------------------------- |
-| secret | `licensePrivateKey`              | `LANGWATCH_LICENSE_PRIVATE_KEY`     | `src/app/ops.app.ts:810`           |
-| secret | `slackBugReportsBotToken`        | `SLACK_BUG_REPORTS_BOT_TOKEN`       | `src/app/ops.app.ts:811`           |
-| secret | `credentials`                    | `CREDENTIALS_SECRET`                | `src/app/ops.app.ts:813`           |
-| secret | `credentialsFallback`            | `NEXTAUTH_SECRET`                   | `src/app/ops.app.ts:814`           |
-| secret | `credentialsPrevious`            | `CREDENTIALS_SECRET_PREVIOUS`       | `src/app/ops.app.ts:815`           |
+| secret | `licensePrivateKey`              | `LANGWATCH_LICENSE_PRIVATE_KEY`     | `src/app/ops.app.ts:811`           |
+| secret | `slackBugReportsBotToken`        | `SLACK_BUG_REPORTS_BOT_TOKEN`       | `src/app/ops.app.ts:812`           |
+| secret | `credentials`                    | `CREDENTIALS_SECRET`                | `src/app/ops.app.ts:814`           |
+| secret | `credentialsFallback`            | `NEXTAUTH_SECRET`                   | `src/app/ops.app.ts:815`           |
+| secret | `credentialsPrevious`            | `CREDENTIALS_SECRET_PREVIOUS`       | `src/app/ops.app.ts:816`           |
 | config | `apiKey`                         | `LANGWATCH_OPS_API_KEY`             | `../contract/src/ops.config.ts:30` |
 | config | `clickhouseOpsUrl`               | `CLICKHOUSE_OPS_URL`                | `../contract/src/ops.config.ts:32` |
 | config | `usageStats.disabled`            | `DISABLE_USAGE_STATS`               | `../contract/src/ops.config.ts:34` |

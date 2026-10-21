@@ -5,6 +5,7 @@ import type { DatasetCountRepository } from "./dataset-count.repository.ts";
 import type { DatasetMigrationRepository } from "./dataset-migration.repository.ts";
 import type { DatasetRecordContentRepository } from "./dataset-record-content.repository.ts";
 import type { DatasetRecordRepository } from "./dataset-record.repository.ts";
+import type { DatasetSingleFileRepository } from "./dataset-single-file.repository.ts";
 import type { DatasetRepository } from "./dataset.repository.ts";
 
 export interface DatasetRepositories {
@@ -26,4 +27,6 @@ export interface DatasetRepositories {
   readonly migration: DatasetMigrationRepository;
   /** The chunk store that move writes into. */
   readonly migrationChunks: DatasetChunkRepository;
+  /** The previous release's single-file datasets, read and rewritten where it kept them. */
+  readonly singleFiles: DatasetSingleFileRepository;
 }

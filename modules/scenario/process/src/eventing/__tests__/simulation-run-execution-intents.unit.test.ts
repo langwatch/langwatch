@@ -88,6 +88,10 @@ class TestScenarioExecutionService extends ScenarioExecutionService {
   recordCutAtLimit(): Promise<void> {
     throw new Error("recordCutAtLimit unexpectedly called in simulation intent tests");
   }
+
+  recordHooks(): Promise<void> {
+    throw new Error("recordHooks unexpectedly called in simulation intent tests");
+  }
 }
 
 function executionService(submit: (job: ScenarioExecutionJob) => void): ScenarioExecutionService {
@@ -177,6 +181,16 @@ describe("createExecuteRunHandler", () => {
       );
     });
 
+    /** @scenario "Rerun and keep data skips teardown for that rerun" */
+    it("forwards keep data onto the pool job", async () => {
+      const submit = vi.fn();
+      const run = createExecuteRunHandler(executionService(submit));
+
+      await run(makeExecutePayload({ keepData: true }), makeContext());
+
+      expect(submit).toHaveBeenCalledWith(expect.objectContaining({ keepData: true }));
+    });
+
     it("omits scenarioName when the intent carries no name", async () => {
       const submit = vi.fn();
       const run = createExecuteRunHandler(executionService(submit));
@@ -244,6 +258,36 @@ describe("createFinishRunHandler", () => {
       error: "stalled",
       occurredAt: expect.any(Number),
     });
+  });
+
+  it("dates the finished event at the intent's outcome time", async () => {
+    const finishRun = vi.fn().mockResolvedValue(undefined);
+    const run = createFinishRunHandler(TestSimulationService.create({ finishRun }));
+
+    await run(
+      {
+        scenarioRunId: RUN_ID,
+        projectId: PROJECT_ID,
+        status: "ERROR",
+        error: "stalled",
+        outcomeAtMs: 1_000,
+      },
+      makeContext(),
+    );
+
+    expect(finishRun).toHaveBeenCalledWith(expect.objectContaining({ occurredAt: 1_000 }));
+  });
+
+  /** @scenario "A finish that names no outcome time is dated when it is written" */
+  it("dates the finished event when it is written when the intent names no outcome time", async () => {
+    const finishRun = vi.fn().mockResolvedValue(undefined);
+    const run = createFinishRunHandler(TestSimulationService.create({ finishRun }));
+    const before = Date.now();
+
+    await run({ scenarioRunId: RUN_ID, projectId: PROJECT_ID, status: "CANCELLED" }, makeContext());
+
+    const [{ occurredAt }] = finishRun.mock.calls[0] as [{ occurredAt: number }];
+    expect(occurredAt).toBeGreaterThanOrEqual(before);
   });
 
   it("omits error when the intent carries none", async () => {

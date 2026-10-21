@@ -123,6 +123,19 @@ describe("auth server configuration", () => {
       ).resolves.toEqual(["auth0", "google", "github"]);
       await expect(providers({ GOOGLE_CLIENT_ID: "g" })).resolves.toEqual([]);
     });
+
+    /** @scenario "Cloud's Connect buttons offer the native providers, never Auth0" */
+    it("leaves Auth0 out on cloud, and keeps it on a self-hosted install", async () => {
+      const cloud = { IS_SAAS: "true", AUTH_PROVIDER: "auth0", GOOGLE_CLIENT_ID: "g" };
+
+      await expect(providers({ ...cloud, LOCAL_PASSWORDS_ENABLED: "on" })).resolves.toEqual([
+        "google",
+      ]);
+      await expect(providers(cloud)).resolves.toEqual(["google"]);
+      await expect(
+        providers({ AUTH_PROVIDER: "auth0", LOCAL_PASSWORDS_ENABLED: "on", GOOGLE_CLIENT_ID: "g" }),
+      ).resolves.toEqual(["auth0", "google"]);
+    });
   });
 
   describe("given the installation's sign-up mode", () => {

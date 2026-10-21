@@ -13,6 +13,7 @@ import {
   type DataPrivacyScopeTarget,
   type DataPrivacyServerConfig,
   type DataPrivacySnapshot,
+  isGoogleDlpDisabled,
   type PrivacyPolicyRequestMemo,
   type ResolvedDataPrivacy,
   type SpanContentDropResult,
@@ -152,7 +153,7 @@ export class DataPrivacyModule implements DataPrivacyApi {
       presidio,
       dlp: GoogleDlpRedactionService.create({
         dlp: channels.dlp,
-        disabled: config.googleDlpDisabled === true || config.googleDlpDisabled === "true",
+        disabled: isGoogleDlpDisabled({ config }),
         metrics,
       }),
     });

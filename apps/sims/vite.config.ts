@@ -28,6 +28,7 @@ const pages = {
   },
   llm: { port: 5579, api: ["/_sim/api"], url: "LLMSIM_URL", fallback: "http://127.0.0.1:5595" },
   mail: { port: 5574, api: ["/api"], url: "MAILSIM_URL", fallback: "http://127.0.0.1:5580" },
+  mcp: { port: 5585, api: ["/_sim/api"], url: "MCPSIM_URL", fallback: "http://127.0.0.1:5598" },
   outbound: {
     port: 5582,
     api: ["/_sim/api"],

@@ -54,6 +54,7 @@ function withRateLimits(
   return {
     sessions: memory.sessions,
     cliSessions: memory.cliSessions,
+    cliRotations: memory.cliRotations,
     signUpTokens: memory.signUpTokens,
     signInLocks: memory.signInLocks,
     rateLimits,

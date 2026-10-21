@@ -1,0 +1,17 @@
+{
+  "name": "W1: no traces in the window, says how old the newest is",
+  "situation": "You are a LangWatch user talking to Langy, the in-product assistant. The test state is the test's own bookkeeping: take only the values the instructions below name, never mention facts or anything else from it. Write short, plain messages. In your first message, ask exactly (with the real value of trace_name): 'Any traces named <trace_name> in the last 2 hours?' Once Langy has answered, reply 'Thanks.'",
+  "criteria": [
+    "Langy does not stop at 'no traces': it says there are none in the last 2 hours and says how long ago the newest trace named trace_name arrived (about newest_trace_age_hours_at_setup hours ago).",
+    "Code check: the age Langy states for the newest trace is within one hour of facts_now.newest_trace_age_hours."
+  ],
+  "labels": ["jobs", "confidence"],
+  "parameters": [
+    {
+      "name": "world",
+      "description": "Which world the setup hook builds",
+      "defaultValue": "W1"
+    }
+  ],
+  "maxTurns": 2
+}

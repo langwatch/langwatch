@@ -1,7 +1,7 @@
 /**
- * The Auth0 connection bridge (D09, deliberately short-term): on SaaS each brokered social
- * connection is its own branded sign-in method, dialling Auth0 pre-scoped to that connection.
- * A natively mounted provider takes its bridge slot, which is that provider's cutover.
+ * The Auth0 broker: on cloud it serves only organizations still on legacy Auth0 SSO, reached by
+ * domain routing, so the sign-in rail draws neither it nor its social connections. The branded
+ * method ids below survive only so a dial already holding one still reaches Auth0.
  */
 
 /** An Auth0 social connection: its strategy, and the native provider it stands in for. */
@@ -34,15 +34,16 @@ export const AUTH0_BRIDGE_METHODS: readonly Auth0BridgeMethod[] = AUTH0_SOCIAL_S
   }),
 );
 
-/** The bridge's rail ids in order, each replaced by its native method where that one is mounted. */
-export function auth0BridgeRailIds({
-  mountedSocialMethodIds,
+/**
+ * Whether the named provider is only the broker for legacy SSO organizations, never a way in from
+ * the rail: Auth0 on cloud. A self-hosted install naming Auth0 still has it as its front door.
+ */
+export function namedProviderServesOnlyLegacySso({
+  authProvider,
+  selfHosted,
 }: {
-  mountedSocialMethodIds: readonly string[];
-}): readonly string[] {
-  return AUTH0_BRIDGE_METHODS.map((method) =>
-    mountedSocialMethodIds.includes(method.nativeMethodId)
-      ? method.nativeMethodId
-      : method.methodId,
-  );
+  authProvider: string | undefined;
+  selfHosted: boolean;
+}): boolean {
+  return authProvider === "auth0" && !selfHosted;
 }

@@ -10,6 +10,26 @@ export type ReportScheduleTarget = {
   projectId: string;
   actionParams: Record<string, unknown>;
 };
+/** The two jsonb columns an earlier release could store as JSON text. */
+export type TriggerJsonColumn = "filters" | "actionParams";
+
+/**
+ * A trigger whose `filters` or `actionParams` an earlier release stored as a JSON string
+ * (jsonb `"{...}"`) instead of an object: the text as stored, or null where the column is not text.
+ */
+export type TriggerJsonText = {
+  id: string;
+  projectId: string;
+  filters: string | null;
+  actionParams: string | null;
+};
+
+/**
+ * What one unwrap did: stored the object, found the column changed since it was read, or found
+ * text the database will not store as jsonb (a NUL escape, say), left as it is.
+ */
+export type TriggerJsonTextOutcome = "unwrapped" | "changed" | "unparseable";
+
 /** The deployment's cipher; the live repository seals and opens `actionParams` secrets with it. */
 export abstract class TriggerSecretCipher {
   abstract encrypt(value: string): string;
@@ -64,6 +84,18 @@ export abstract class TriggerRepository {
     expected: unknown;
     actionParams: Record<string, unknown>;
   }): Promise<boolean>;
+  /** Every project's triggers after `after`, by id, whose filters or actionParams are text. */
+  abstract findJsonTextPage(input: { after?: string; limit: number }): Promise<TriggerJsonText[]>;
+  /**
+   * Replaces `column`'s JSON text with the object it encodes, only while the column still holds
+   * `text`. Leaves `updatedAt` alone: the value a reader gets is the same.
+   */
+  abstract unwrapJsonText(input: {
+    triggerId: string;
+    projectId: string;
+    column: TriggerJsonColumn;
+    text: string;
+  }): Promise<TriggerJsonTextOutcome>;
   abstract create(input: CreateTriggerCommand): Promise<Trigger>;
   abstract update(input: UpdateTriggerCommand): Promise<Trigger>;
   /** A secret stored in `actionParams` in the clear; called only where it is sent or re-written. */

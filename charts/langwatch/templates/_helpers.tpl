@@ -1066,8 +1066,8 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 # Telemetry - Usage analytics collection
 - name: DISABLE_USAGE_STATS
   value: {{ (not (ternary .Values.app.telemetry.usage.enabled true (hasKey .Values.app.telemetry.usage "enabled"))) | quote }}
-# Telemetry - Prometheus metrics collection. The processes open their own
-# scrape listener only with a prometheus exporter and METRICS_API_KEY (ADR-175).
+{{- /* Telemetry - Prometheus metrics collection. The processes open their own
+       scrape listener only with a prometheus exporter and METRICS_API_KEY (ADR-175). */}}
 {{- if .Values.app.telemetry.metrics.enabled }}
 - name: OTEL_METRICS_EXPORTER
   value: "prometheus"
@@ -1682,7 +1682,7 @@ containers:
   # event loop is turning, which `kill -0 1` cannot tell us.
   #
   # The probe targets /healthz, NOT /metrics. The scrape door is on its
-  # own port and opens only with METRICS_API_KEY (the default,
+  # own port and opens only with the metrics API key (the default,
   # app.telemetry.metrics.enabled is false, sets none), so a /metrics
   # probe would fail and crash-loop the workers on a stock install. And an httpGet probe cannot read a
   # Secret, so a key delivered via secretKeyRef could never be put in a

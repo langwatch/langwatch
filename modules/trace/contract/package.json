@@ -44,6 +44,7 @@
     "@langwatch/plans": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",
     "@langwatch/span-normalisation": "workspace:*",
+    "@langwatch/stored-object-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@opentelemetry/core": "catalog:",
     "@opentelemetry/otlp-transformer": "catalog:",

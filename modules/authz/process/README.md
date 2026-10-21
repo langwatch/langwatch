@@ -97,7 +97,7 @@ authorize(args: { principal: AuthzPrincipalRef; permission: Permission; scope: E
 
 #### `authorizeInternal`
 
-The own-only proof platform code reads its own project with (ADR-177); evaluates nothing.
+The own-only proof platform code reads its own project with (ADR-177); evaluates nothing. A project that no longer exists throws `ProjectNotFoundError`.
 
 ```typescript
 authorizeInternal(args: { actor: Extract<Actor, { type: "internal" | "system" }>; projectId: string; permission: AuthzPermission; purpose: AuthorizationPurpose; }): Promise<Authorization>;
