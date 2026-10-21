@@ -1,9 +1,11 @@
 import { IconButton, Link } from "@langwatch/design-system/primitives";
 import { ChevronDown, Copy, Terminal } from "lucide-react";
+import type { CSSProperties } from "react";
 
 import { pagePath } from "../../../lib/site-path.ts";
+import { CODING_AGENTS, wheelOffset } from "../model/agent-wheel.ts";
 
-const CODING_AGENTS = ["claude", "codex", "copilot", "gemini", "opencode"];
+const START = "claude";
 
 export function AgentLauncher() {
   return (
@@ -12,10 +14,23 @@ export function AgentLauncher() {
         <Terminal size={16} aria-hidden="true" />
         <code className="docs-agent-command">npx langwatch</code>
         <span className="docs-agent-pick">
-          <span className="docs-agent-name" aria-hidden="true">
-            claude
+          <span className="docs-agent-wheel" aria-hidden="true">
+            {CODING_AGENTS.map((agent, index) => {
+              const offset = wheelOffset({ index, chosen: CODING_AGENTS.indexOf(START) });
+              return (
+                <span
+                  key={agent}
+                  className="docs-agent-name"
+                  data-agent={agent}
+                  data-distance={Math.abs(offset)}
+                  style={{ "--docs-agent-offset": offset } as CSSProperties}
+                >
+                  {agent}
+                </span>
+              );
+            })}
           </span>
-          <select aria-label="Coding agent" defaultValue="claude">
+          <select aria-label="Coding agent" defaultValue={START}>
             {CODING_AGENTS.map((agent) => (
               <option key={agent} value={agent}>
                 {agent}
@@ -30,7 +45,7 @@ export function AgentLauncher() {
           size="sm"
           variant="ghost"
           aria-label="Copy agent command"
-          data-docs-copy="npx langwatch claude"
+          data-docs-copy={`npx langwatch ${START}`}
         >
           <Copy size={14} />
         </IconButton>

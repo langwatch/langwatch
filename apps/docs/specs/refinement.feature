@@ -71,7 +71,8 @@ Feature: Actionable documentation and restrained reading surfaces
   Scenario: Choose an agent and copy the complete setup prompt
     Given the sidebar command and setup prompt card are visible
     Then the command has a visible agent picker
-    And agent names keep typing and cycling until I choose one, unless motion is reduced
+    And the agent names sit on a wheel, fading with distance, that spins to the next agent until I choose one, unless motion is reduced
+    And choosing an agent spins the wheel to it
     And the setup card has one copy action beside its prompt title
     When I select an agent and navigate to another page
     Then the sidebar keeps that choice and copies its command

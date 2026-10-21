@@ -26,8 +26,10 @@ await it("keeps agent commands deliberate and setup prompts complete in both the
           await page.waitForFunction(() => {
             const launcher = document.querySelector(".docs-left-rail .docs-agent-launcher");
             const select = launcher?.querySelector("select");
-            const name = launcher?.querySelector(".docs-agent-name");
-            return select?.value !== "claude" && name && name.textContent !== select?.value;
+            const centre = launcher?.querySelector('.docs-agent-name[data-distance="0"]');
+            return (
+              select?.value !== "claude" && centre?.getAttribute("data-agent") === select?.value
+            );
           });
           assert.ok(
             await page.getByText("Trace any coding agent", { exact: false }).first().isVisible(),

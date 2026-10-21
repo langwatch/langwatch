@@ -1,15 +1,27 @@
+import { CODING_AGENTS, wheelOffset } from "../model/agent-wheel.ts";
+
 const LAUNCHER = ".docs-agent-launcher";
 const motion = matchMedia("(prefers-reduced-motion: no-preference)");
 let chosen = "claude";
 let manual = false;
 let timer: ReturnType<typeof setTimeout> | undefined;
 
-function show(text = chosen) {
+/* Turns the wheel to the chosen agent; a name wrapping round the back jumps without sweeping. */
+function show() {
+  const current = CODING_AGENTS.indexOf(chosen);
   document.querySelectorAll<HTMLElement>(LAUNCHER).forEach((launcher) => {
     const select = launcher.querySelector("select");
-    const name = launcher.querySelector(".docs-agent-name");
     if (select) select.value = chosen;
-    if (name) name.textContent = text;
+    launcher.querySelectorAll<HTMLElement>(".docs-agent-name").forEach((name) => {
+      const offset = wheelOffset({
+        index: CODING_AGENTS.indexOf(name.dataset.agent ?? ""),
+        chosen: current,
+      });
+      const before = Number(name.style.getPropertyValue("--docs-agent-offset") || offset);
+      name.toggleAttribute("data-wrap", Math.abs(offset - before) > 1);
+      name.style.setProperty("--docs-agent-offset", String(offset));
+      name.dataset.distance = String(Math.abs(offset));
+    });
   });
 }
 
@@ -20,19 +32,6 @@ function busy() {
   );
 }
 
-function typeName(length = 0) {
-  if (manual || !motion.matches || busy()) {
-    show();
-    schedule();
-    return;
-  }
-  show(chosen.slice(0, length));
-  timer = setTimeout(() => {
-    if (length < chosen.length) typeName(length + 1);
-    else schedule();
-  }, 85);
-}
-
 function schedule() {
   clearTimeout(timer);
   if (manual || !motion.matches) return;
@@ -41,7 +40,8 @@ function schedule() {
     if (!select || busy()) return schedule();
     const options = [...select.options].map((option) => option.value);
     chosen = options[(options.indexOf(chosen) + 1) % options.length] ?? chosen;
-    typeName();
+    show();
+    schedule();
   }, 2800);
 }
 
