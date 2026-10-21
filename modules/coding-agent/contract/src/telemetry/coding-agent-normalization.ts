@@ -352,6 +352,9 @@ export const SESSION_NAME_FACT_KEY = "langwatch.session.name";
  */
 export const WITHHELD_PROMPT_TEXT = "[REDACTED]";
 
+/** The GenAI semconv operation of a tool run span. */
+const GEN_AI_TOOL_RUN_OPERATION = "execute_tool";
+
 /** The most of a prompt that becomes a session's name. */
 const MAX_PROMPT_TITLE_CHARS = 120;
 
@@ -484,6 +487,11 @@ export function deriveToolName({
 
   const name = spanName ?? "";
   if (name.length === 0) return null;
+  // GenAI semconv names a tool run `execute_tool {tool}` and declares the tool by attribute.
+  if (name.split(" ", 1)[0] === GEN_AI_TOOL_RUN_OPERATION) {
+    const declared = pickFirstString(attrs, ["gen_ai.tool.name"]);
+    if (declared !== null) return declared;
+  }
   for (const agent of CODING_AGENT_REGISTRY) {
     const tool = agent.extractToolNameFromSpanName?.(name) ?? null;
     if (tool !== null) return tool;

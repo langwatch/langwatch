@@ -639,6 +639,96 @@ describe("buildCodingAgentTranscript for non-claude agents", () => {
 
       expect(transcript.totals.modelCalls).toBe(1);
     });
+
+    // The shapes the trace read hands over for a Copilot CLI 1.0.100 turn: the system
+    // instructions prepended to the call's own messages, each in GenAI message parts.
+    const prompt =
+      "<current_datetime>2026-10-21T15:36:06+02:00</current_datetime>\n\nRun ls, then count the files";
+    const copilotTurn = [
+      spanDetail({
+        spanId: "chat-1",
+        name: "chat gpt-6-luna",
+        startTimeMs: 1_000,
+        endTimeMs: 2_000,
+        metrics: { promptTokens: 3, completionTokens: 25 },
+        params: { "gen_ai.request.model": "gpt-6-luna" },
+        input: JSON.stringify([
+          { role: "system", content: "You are the GitHub Copilot CLI." },
+          { role: "user", parts: [{ type: "text", content: prompt }] },
+        ]),
+        output: JSON.stringify([
+          {
+            role: "assistant",
+            parts: [
+              { type: "tool_call", id: "call_1", name: "bash", arguments: { command: "ls" } },
+            ],
+          },
+        ]),
+      }),
+      spanDetail({
+        spanId: "tool-1",
+        name: "execute_tool bash bash",
+        startTimeMs: 2_100,
+        endTimeMs: 2_200,
+        params: { "gen_ai.tool.name": "bash", "gen_ai.tool.call.id": "call_1" },
+        input: JSON.stringify({ command: "ls" }),
+        output: "README.md\nnotes.txt",
+      }),
+      spanDetail({
+        spanId: "chat-2",
+        name: "chat gpt-6-luna",
+        startTimeMs: 2_300,
+        endTimeMs: 3_000,
+        metrics: { promptTokens: 3, completionTokens: 33 },
+        params: { "gen_ai.request.model": "gpt-6-luna" },
+        input: JSON.stringify([
+          { role: "system", content: "You are the GitHub Copilot CLI." },
+          {
+            role: "tool",
+            parts: [{ type: "tool_call_response", id: "call_1", response: "README.md" }],
+          },
+        ]),
+        output: JSON.stringify([
+          {
+            role: "assistant",
+            parts: [
+              { type: "reasoning", content: "Counting the entries" },
+              { type: "text", content: "2" },
+            ],
+          },
+        ]),
+      }),
+    ];
+
+    /** @scenario "A Copilot session shows its prompts, replies and tool runs" */
+    it("shows the prompt, the tool run and the reply, in the order they happened", () => {
+      const transcript = buildCodingAgentTranscript({ spans: copilotTurn, logs: [] });
+
+      const story = transcript.entries
+        .filter((entry) => entry.kind !== "model_call" && entry.kind !== "system_prompt")
+        .map((entry) => [entry.kind, "text" in entry ? entry.text : entry.name]);
+      expect(story).toEqual([
+        ["user_prompt", prompt],
+        ["tool", "bash"],
+        ["assistant_message", "2"],
+      ]);
+      expect(transcript.totals.toolCalls).toBe(1);
+      expect(transcript.entries.find((entry) => entry.kind === "tool")).toMatchObject({
+        input: { command: "ls" },
+        output: "README.md\nnotes.txt",
+      });
+      expect(JSON.stringify(transcript.entries)).not.toContain("Counting the entries");
+    });
+
+    /** @scenario "A Copilot session shows its prompts, replies and tool runs" */
+    it("shows a prompt a log event already reported once", () => {
+      const transcript = buildCodingAgentTranscript({
+        spans: copilotTurn,
+        logs: [log({ "event.name": "user_prompt", prompt }, 900)],
+      });
+
+      expect(transcript.entries.filter((entry) => entry.kind === "user_prompt")).toHaveLength(1);
+    });
   });
 });
 

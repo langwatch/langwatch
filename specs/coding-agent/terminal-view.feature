@@ -64,6 +64,20 @@ Feature: Coding agent terminal view
     When the Terminal tab renders the session
     Then those events are read and rendered like any other
 
+  # Copilot sends no log events: its prompt and reply ride its `chat` spans as
+  # GenAI message parts (`{"type": "text", "content": ...}`) and each tool run is
+  # an `execute_tool` span naming `gen_ai.tool.name`. Read from there, the
+  # replay is the conversation, not only the context it carried.
+
+  @unit
+  Scenario: A Copilot session shows its prompts, replies and tool runs
+    Given a Copilot session whose model calls carry the user's message and the reply as message parts
+    And whose tool runs are execute_tool spans
+    When the Terminal tab renders the session
+    Then each prompt, the reply text and each tool run are shown
+    And the model's reasoning is not shown as its reply
+    And a prompt a log event already reported is shown once
+
   # The system prompt is the context the user pays for on every call - CLAUDE.md,
   # MCP tool definitions, skills. It rides the first request body of the session.
 
