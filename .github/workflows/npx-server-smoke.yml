@@ -9,13 +9,11 @@
 # Trigger policy:
 # - workflow_dispatch (manual, with optional `port_base` input)
 # - nightly schedule (04:00 UTC)
-# - push, on any branch INCLUDING main, when key files change (Linux only off main)
+# - push to main, when key files change
 #
-# main was excluded from the push trigger for as long as this file has existed,
-# which left the nightly as its only cover. A defect that lands after the
-# nightly sits on main for up to a day while main reads green, and every branch
-# that merges main in that window goes red on work it did not do. The
-# concurrency block below already assumed a per-commit run on main.
+# Branch pushes no longer run it: it is a signal, not a gate, and it ran on
+# every dependabot, release-please and feature push. A defect a branch brings in
+# shows on main's run for that merge, rather than sitting until the nightly.
 #
 # This workflow is intentionally not in the langwatch-app-complete required
 # checks — postgres/clickhouse/uv downloads are heavy and flaky-prone. Treat
@@ -33,6 +31,7 @@ on:
   schedule:
     - cron: "0 4 * * *"
   push:
+    branches: [main]
     paths:
       - "package.json"
       - "pnpm-workspace.yaml"
@@ -70,10 +69,9 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  # Supersede an outdated run on a PR branch, never on main: every commit
-  # that lands on main has to keep its own validation, and cancelling here
-  # would let a merge silently void the run for the commit before it.
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  # A newer commit supersedes an older run, on main too: the newest verdict
+  # covers the commits before it. Image and release builds keep their own rule.
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -83,10 +81,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Every platform on main, nightly and manual runs; a branch push gets
-        # Linux only. Branch pushes were 118 runs in three days, each holding a
-        # macOS and an arm runner for ~18 minutes.
-        runner: ${{ fromJSON((github.ref == 'refs/heads/main' || github.event_name != 'push') && '["macos-latest","ubuntu-latest","ubuntu-24.04-arm"]' || '["ubuntu-latest"]') }}
+        runner: [macos-latest, ubuntu-latest, ubuntu-24.04-arm]
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     env:

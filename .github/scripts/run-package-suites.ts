@@ -258,6 +258,25 @@ const LANES: Record<string, "integration" | "browser"> = {
 export const laneOf = (script: string): "integration" | "browser" | "shared" =>
   LANES[script] ?? "shared";
 
+/** The scripts nx.json caches. They run through Nx, so an unchanged suite replays its pass. */
+const CACHED_SCRIPTS = new Set(["test", "test:unit"]);
+
+/** The pnpm arguments that run a job; dependencies are built by an earlier step. */
+export const commandFor = (job: SuiteJob): string[] =>
+  CACHED_SCRIPTS.has(job.script)
+    ? [
+        "exec",
+        "nx",
+        "run-many",
+        "--targets",
+        job.script,
+        "--projects",
+        job.pkg.name,
+        "--excludeTaskDependencies",
+        "--outputStyle=stream-without-prefixes",
+      ]
+    : ["--filter", job.pkg.name, "run", job.script];
+
 /**
  * Parses `PACKAGE_SUITES_CONCURRENCY`. Absent means one suite at a time; a
  * malformed value is an error, never a silent guess.
@@ -666,7 +685,7 @@ if (isEntrypoint()) {
   const runner = createSuiteRunner({
     live,
     start: (job) =>
-      spawn("pnpm", ["--filter", job.pkg.name, "run", job.script], {
+      spawn("pnpm", commandFor(job), {
         stdio: live ? "inherit" : ["ignore", "pipe", "pipe"],
       }),
     log: (line) => console.log(line),

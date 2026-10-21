@@ -5,6 +5,7 @@ import { describe, it } from "node:test";
 import {
   DEFAULT_WEIGHT_SECONDS,
   balanceShards,
+  commandFor,
   createSuiteRunner,
   discover,
   exclusionNotices,
@@ -800,5 +801,26 @@ void describe("given the list of projects a pull request reaches", () => {
       assert.throws(() => parseOnly("not json"), /PACKAGE_SUITES_ONLY/);
       assert.throws(() => parseOnly('{"a":1}'), /PACKAGE_SUITES_ONLY/);
     });
+  });
+});
+
+void describe("given a suite script", () => {
+  const pkg: DiscoveredPackage = { name: "@fix/a", dir: "packages/a", scripts: [] };
+
+  /** @scenario "A suite Nx caches runs through Nx" */
+  void it("runs a cached script through Nx without rebuilding its dependencies", () => {
+    for (const script of ["test", "test:unit"]) {
+      const command = commandFor({ pkg, script });
+      assert.deepEqual(command.slice(0, 3), ["exec", "nx", "run-many"]);
+      assert.ok(command.includes(script) && command.includes("@fix/a"));
+      assert.ok(command.includes("--excludeTaskDependencies"));
+    }
+  });
+
+  /** @scenario "An integration or browser suite runs uncached" */
+  void it("runs the integration and browser lanes through pnpm", () => {
+    for (const script of ["test:integration", "test:browser"]) {
+      assert.deepEqual(commandFor({ pkg, script }), ["--filter", "@fix/a", "run", script]);
+    }
   });
 });
