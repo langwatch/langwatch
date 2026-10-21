@@ -77,13 +77,15 @@ func TestClassifyTsgo(t *testing.T) {
 }
 
 // @scenario "The compiler is governed under each of its names"
-func TestClassifyWatchedProcessPutsBothCompilerNamesInOneClass(t *testing.T) {
+func TestClassifyWatchedProcessPutsEveryCompilerNameInOneClass(t *testing.T) {
 	t.Run("given the compiler under each of its names", func(t *testing.T) {
 		cases := map[string]TsgoClass{
 			"/Users/x/repo/node_modules/.pnpm/@typescript+typescript-darwin-arm64@7.0.2/node_modules/@typescript/typescript-darwin-arm64/lib/tsc --noEmit --project ./tsconfig.tsgo.json": TsgoRun,
 			"/x/lib/tsgo --noEmit -p tsconfig.tsgo.json": TsgoRun,
 			"/x/lib/tsc --lsp --stdio":                   TsgoLSP,
 			"/x/lib/tsgo --lsp --stdio":                  TsgoLSP,
+			"/Users/x/repo/node_modules/.pnpm/@tsrs+darwin-arm64@0.18.0/node_modules/@tsrs/darwin-arm64/tsrs -b --builders 1 --checkers 2": TsgoRun,
+			"/x/@tsrs/linux-x64-gnu/tsrs --lsp -stdio": TsgoLSP,
 		}
 
 		t.Run("each lands in the one class, with its own role", func(t *testing.T) {

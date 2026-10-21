@@ -76,7 +76,7 @@ func TestProcessWatchKillsARunawayTsgo(t *testing.T) {
 // an ordinary `pnpm typecheck` today. It went ungoverned and unobserved while
 // the governor selected on the old name.
 // @scenario "The compiler is governed under each of its names"
-func TestProcessWatchGovernsTheCompilerUnderBothNames(t *testing.T) {
+func TestProcessWatchGovernsTheCompilerUnderEachName(t *testing.T) {
 	now := time.Date(2026, 8, 25, 12, 0, 0, 0, time.UTC)
 
 	t.Run("given a runaway typescript@7 run", func(t *testing.T) {

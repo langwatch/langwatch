@@ -1,8 +1,8 @@
 diff --git a/lib/tsc.js b/lib/tsc.js
-index eb869b715737e45fcf1af33d1af3157b59ba08de..e49d31c13b3f13b2d91b51b6a104e23d278cfc67 100644
+index eb869b715737e45fcf1af33d1af3157b59ba08de..4393e84adfe8175b0933a634c2943ea8abc5023c 100644
 --- a/lib/tsc.js
 +++ b/lib/tsc.js
-@@ -2,21 +2,162 @@
+@@ -2,21 +2,168 @@
  
  import getExePath from "#getExePath";
  import { execFileSync } from "node:child_process";
@@ -14,21 +14,28 @@ index eb869b715737e45fcf1af33d1af3157b59ba08de..e49d31c13b3f13b2d91b51b6a104e23d
  
 -const exe = getExePath();
 +// LangWatch: `tsc` runs tsrs, the Rust port of this compiler (ADR-181). LANGWATCH_TSC=tsgo,
-+// or a platform tsrs ships no binary for, runs the Go binary this package carries.
++// or a platform tsrs ships no binary for, runs the Go binary this package carries. On a
++// platform tsrs does support, a missing binary is an install fault and stops the run.
 +async function tsrsExe() {
 +    if (process.env.LANGWATCH_TSC === "tsgo") return undefined;
 +    try {
 +        const root = dirname(createRequire(import.meta.url).resolve("tsrs/package.json"));
-+        return (await import(pathToFileURL(join(root, "lib", "getExePath.js")).href)).default();
++        const lib = (file) => import(pathToFileURL(join(root, "lib", file)).href);
++        const optional = JSON.parse(readFileSync(join(root, "package.json"), "utf8")).optionalDependencies ?? {};
++        if (!((await lib("platform.js")).getPlatformPackageName() in optional)) return undefined;
++        return (await lib("getExePath.js")).default();
 +    }
-+    catch {
-+        return undefined;
++    catch (error) {
++        process.stderr.write(`tsc: cannot run tsrs: ${error.message}\nReinstall, or set LANGWATCH_TSC=tsgo to run the Go compiler.\n`);
++        process.exit(1);
 +    }
 +}
 +
 +const rust = await tsrsExe();
 +const exe = rust ?? getExePath();
-+
+ 
+-if (process.platform !== "win32" && typeof process.execve === "function") {
+-    // > v22.15.0
 +// LangWatch: a compile takes a `typecheck` slot of haven's machine budget for its whole
 +// run, and haven sets GOMAXPROCS and GOMEMLIMIT (dev/docs/plans/haven-exec-policy.md
 +// section 2). Without haven it waits for one of LANGWATCH_TSC_SLOTS (default 2) lock
@@ -36,8 +43,9 @@ index eb869b715737e45fcf1af33d1af3157b59ba08de..e49d31c13b3f13b2d91b51b6a104e23d
 +const args = process.argv.slice(2);
 +const exempt = args.some((arg) => /^(-w|--watch|-v|--version|-h|--help|--lsp)$/.test(arg));
 +const held = process.env.RUSH_GATE_HELD || process.env.CHECK_QUEUE_HELD || process.env.LANGWATCH_TSC_SLOT;
-+// tsrs ignores GOMAXPROCS; its checker threads take the same cap as a flag.
-+if (rust && !exempt && !args.some((arg) => /^--(checkers|singleThreaded)$/.test(arg))) {
++// tsrs ignores GOMAXPROCS; its checker threads take the same cap as a flag, watch included.
++const informational = args.some((arg) => /^(-v|--version|-h|--help|--lsp)$/.test(arg));
++if (rust && !informational && !args.some((arg) => /^--(checkers|singleThreaded)$/.test(arg))) {
 +    args.push("--checkers", process.env.GOMAXPROCS ?? "2");
 +}
 +const canExec = process.platform !== "win32" && typeof process.execve === "function";
@@ -75,30 +83,28 @@ index eb869b715737e45fcf1af33d1af3157b59ba08de..e49d31c13b3f13b2d91b51b6a104e23d
 +        // execve refused: haven's slot below
 +    }
 +    const haven = findBin("haven", process.env.HAVEN_BIN);
-+    try {
+     try {
+-        process.execve(exe, [exe, ...process.argv.slice(2)]);
 +        if (haven) process.execve(haven, [haven, "machine", "slot", "run", "--class", "typecheck", "--label", "tsc", "--", exe, ...args]);
-+    }
-+    catch {
+     }
+     catch {
+-        // may not be available, ignore the error and fallback
 +        // execve refused: fall back to the lock folder below
 +    }
 +}
 +
 +process.env.GOMAXPROCS ??= "2";
 +process.env.GOMEMLIMIT ??= "3GiB";
- 
--if (process.platform !== "win32" && typeof process.execve === "function") {
--    // > v22.15.0
++
 +const slots = Number(process.env.LANGWATCH_TSC_SLOTS ?? "2");
 +const slotDir = join(homedir(), ".cache", "langwatch", "tsc-slots");
 +
 +function ownerAlive(lock) {
 +    let pid;
-     try {
--        process.execve(exe, [exe, ...process.argv.slice(2)]);
++    try {
 +        pid = Number(readFileSync(join(lock, "pid"), "utf8"));
-     }
-     catch {
--        // may not be available, ignore the error and fallback
++    }
++    catch {
 +        return Date.now() - statSync(lock).mtimeMs < 10_000;
 +    }
 +    try {

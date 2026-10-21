@@ -63,6 +63,7 @@ Feature: TypeScript 7 is the compiler
     When it reports its version
     Then it names tsrs
     But with LANGWATCH_TSC set to "tsgo" it is the Go binary TypeScript 7 ships
+    And on a platform tsrs supports, a missing tsrs binary stops the run instead of falling back
 
   @unit
   Scenario: The superseded preview compiler is gone

@@ -72,7 +72,11 @@ function memoryMembershipFixture(): MembershipFixture {
     organizationId,
     organizationName: "Members",
     foreignOrganizationId,
-    member: async ({ pendingSsoGrantId, disabled = false, organizationId: orgId }: MemberInput = {}) => {
+    member: async ({
+      pendingSsoGrantId,
+      disabled = false,
+      organizationId: orgId,
+    }: MemberInput = {}) => {
       const userId = id("user");
       memory.memberships.set(memory.membershipKey(orgId ?? organizationId, userId), {
         role: "MEMBER",
@@ -176,7 +180,11 @@ async function postgresMembershipFixture(): Promise<MembershipFixture> {
     organizationId,
     organizationName: "Members",
     foreignOrganizationId,
-    member: async ({ pendingSsoGrantId, disabled = false, organizationId: orgId }: MemberInput = {}) => {
+    member: async ({
+      pendingSsoGrantId,
+      disabled = false,
+      organizationId: orgId,
+    }: MemberInput = {}) => {
       const userId = id("user");
       await database.user.create({
         data: { id: userId, name: "Member", email: `${userId}@example.com` },

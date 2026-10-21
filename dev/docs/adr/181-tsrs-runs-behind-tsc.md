@@ -35,11 +35,13 @@ resolve it.
 
 **The Go binary stays one switch away.** `LANGWATCH_TSC=tsgo` runs the binary
 TypeScript 7.0.2 ships. A platform tsrs publishes no binary for (macOS on Intel,
-Windows) falls back to it without being asked.
+Windows) falls back to it without being asked. On a platform tsrs does publish for, a
+missing tsrs binary is an install fault: `tsc` says so and exits, rather than quietly
+checking with the Go binary under 7.0 rules.
 
 **The thread cap carries over.** tsrs ignores `GOMAXPROCS`, so the launcher passes
-the same cap as `--checkers` unless the caller already set `--checkers` or
-`--singleThreaded`.
+the same cap as `--checkers` (watch mode included) unless the caller already set
+`--checkers` or `--singleThreaded`.
 
 **`typescript` stays the library.** The `typescript/unstable/*` imports, the editor
 and the packages held on 6 (ADR-099) are untouched.
