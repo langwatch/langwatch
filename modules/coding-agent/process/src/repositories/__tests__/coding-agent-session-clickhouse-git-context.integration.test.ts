@@ -2,6 +2,7 @@
  * Round-trips the session row's git-context columns through real ClickHouse SQL.
  * @see specs/coding-agent/session-git-context.feature
  * @see specs/coding-agent/pull-request-linkage.feature
+ * @see specs/coding-agent/copilot-sessions.feature
  */
 import { randomUUID } from "node:crypto";
 
@@ -448,6 +449,87 @@ describe.skipIf(clickHouseUrl === null)("coding_agent_sessions git context round
 
     expect(read).not.toBeNull();
     expect(read!.usageByContext).toEqual([]);
+    expect(read!.inputTokens).toBe(100);
+  });
+
+  /** @scenario "The per-model usage round-trips through the session row" */
+  it("writes what the session spent on each model and reads it back", async () => {
+    const context = {
+      repositoryHost: "github.com",
+      repositoryOwner: "acme",
+      repositoryName: "widgets",
+      branch: "feat/copilot",
+    };
+    const usageByModel = [
+      {
+        ...context,
+        model: "gpt-6-luna",
+        inputTokens: 40,
+        outputTokens: 20,
+        cacheReadTokens: 4_000_000_000,
+        cacheCreationTokens: 4,
+        costUsd: 0.5,
+        aiUnits: 3,
+        priced: true,
+      },
+      {
+        ...context,
+        model: "unpriced-model",
+        inputTokens: 60,
+        outputTokens: 30,
+        cacheReadTokens: 0,
+        cacheCreationTokens: 0,
+        costUsd: 0,
+        aiUnits: 1.5,
+        priced: false,
+      },
+    ];
+    const row = session({
+      tenantId,
+      sessionId: `${tag}-usage-by-model`,
+      startedAtMs: baseMs,
+      agent: "copilot",
+      usageByModel,
+    });
+    await sessions.upsert(row, 30, []);
+
+    const read = await sessions.findBySessionId({
+      tenantId,
+      sessionId: `${tag}-usage-by-model`,
+      window: { fromMs: baseMs - 60_000, toMs: baseMs + 60_000 },
+    });
+
+    expect(read).not.toBeNull();
+    expect(read!.usageByModel).toEqual(usageByModel);
+  });
+
+  /** @scenario "A session row from before the per-model usage column decodes with none" */
+  it("decodes a row written before the per-model usage column with no record", async () => {
+    const sessionId = `${tag}-pre-usage-by-model`;
+    // A writer from before migration 00123 emits no UsageByModel field, so
+    // ClickHouse supplies the column's DEFAULT [].
+    await ch.insert({
+      table: "coding_agent_sessions",
+      values: [
+        {
+          TenantId: tenantId,
+          SessionId: sessionId,
+          StartedAt: new Date(baseMs),
+          Version: "2026-07-21",
+          InputTokens: "100",
+        },
+      ],
+      format: "JSONEachRow",
+    });
+
+    const read = await sessions.findBySessionId({
+      tenantId,
+      sessionId,
+      window: { fromMs: baseMs - 60_000, toMs: baseMs + 60_000 },
+    });
+
+    expect(read).not.toBeNull();
+    expect(read!.usageByModel).toEqual([]);
     expect(read!.inputTokens).toBe(100);
   });
 });

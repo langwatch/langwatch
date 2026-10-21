@@ -134,3 +134,15 @@ Rule: Pull-request cost keeps AI units apart from dollars
     Given a Copilot model call on a model with no price
     When the pull request cost is shown
     Then its tokens appear and its cost reads as unknown, not zero
+
+  @integration
+  Scenario: The per-model usage round-trips through the session row
+    Given a session that used two models, one of them unpriced, and consumed AI units
+    When the session row is written and read back
+    Then the row carries each model's tokens, cost, AI units and whether it was priced
+
+  @integration
+  Scenario: A session row from before the per-model usage column decodes with none
+    Given a session row written before the per-model usage column existed
+    When the row is read back
+    Then the session decodes with no per-model usage
