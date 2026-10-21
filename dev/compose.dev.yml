@@ -141,7 +141,7 @@ services:
   # =============================================================================
 
   init:
-    image: node:24
+    image: node:24.22.1
     working_dir: /
     volumes:
       # The container mirrors the repo layout rooted at `/` (ADR-076: one pnpm
@@ -206,7 +206,7 @@ services:
   # that wants the API without the proxy hop.
 
   ui:
-    image: node:24
+    image: node:24.22.1
     restart: unless-stopped
     working_dir: /apps/ui
     volumes:
@@ -277,7 +277,7 @@ services:
   # against a half-migrated database.
 
   api:
-    image: node:24
+    image: node:24.22.1
     restart: unless-stopped
     working_dir: /apps/api
     volumes:
@@ -351,7 +351,7 @@ services:
   # it never runs an application, so no workers.
 
   workers:
-    image: node:24
+    image: node:24.22.1
     working_dir: /apps/worker
     profiles: [workers, scenarios, full]
     volumes:
