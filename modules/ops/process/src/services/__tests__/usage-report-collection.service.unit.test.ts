@@ -237,7 +237,7 @@ describe("given a customer who switched the optional category off", () => {
       state.emailDomains = { "acme.test": 1 };
 
       const payload = await report({
-        switches: { optional: false, hostname: false, upgradeDiagnostics: true },
+        switches: { optional: false, hostname: false },
       });
 
       expect(payload.version).toBe("3.17.0");
@@ -257,7 +257,7 @@ describe("given a customer who switched hostname off and nothing else", () => {
       state.emailDomains = { "acme.test": 1 };
 
       const payload = await report({
-        switches: { optional: true, hostname: false, upgradeDiagnostics: true },
+        switches: { optional: true, hostname: false },
       });
 
       expect(payload.hostname).toBeUndefined();
@@ -390,7 +390,6 @@ describe("given a process that composes ops health", () => {
       const payload = await withOpsHealth({
         optional: true,
         hostname: true,
-        upgradeDiagnostics: true,
       });
 
       expect(payload.ops_health).toEqual(OPS_HEALTH);
@@ -403,7 +402,6 @@ describe("given a process that composes ops health", () => {
       const payload = await withOpsHealth({
         optional: false,
         hostname: true,
-        upgradeDiagnostics: true,
       });
 
       expect(payload.ops_health).toBeUndefined();

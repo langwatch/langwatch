@@ -78622,15 +78622,11 @@
                             },
                             "hostname": {
                               "type": "boolean"
-                            },
-                            "upgradeDiagnostics": {
-                              "type": "boolean"
                             }
                           },
                           "required": [
                             "optional",
-                            "hostname",
-                            "upgradeDiagnostics"
+                            "hostname"
                           ],
                           "additionalProperties": false
                         },

@@ -14,19 +14,15 @@ class GetApiCheckupResponse200UsageReportSwitches:
     Attributes:
         optional (bool):
         hostname (bool):
-        upgrade_diagnostics (bool):
     """
 
     optional: bool
     hostname: bool
-    upgrade_diagnostics: bool
 
     def to_dict(self) -> dict[str, Any]:
         optional = self.optional
 
         hostname = self.hostname
-
-        upgrade_diagnostics = self.upgrade_diagnostics
 
         field_dict: dict[str, Any] = {}
 
@@ -34,7 +30,6 @@ class GetApiCheckupResponse200UsageReportSwitches:
             {
                 "optional": optional,
                 "hostname": hostname,
-                "upgradeDiagnostics": upgrade_diagnostics,
             }
         )
 
@@ -47,12 +42,9 @@ class GetApiCheckupResponse200UsageReportSwitches:
 
         hostname = d.pop("hostname")
 
-        upgrade_diagnostics = d.pop("upgradeDiagnostics")
-
         get_api_checkup_response_200_usage_report_switches = cls(
             optional=optional,
             hostname=hostname,
-            upgrade_diagnostics=upgrade_diagnostics,
         )
 
         return get_api_checkup_response_200_usage_report_switches

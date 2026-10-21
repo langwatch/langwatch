@@ -14,6 +14,22 @@ export const UPGRADE_DIAGNOSTICS_TEXT_MAX_CHARS = 4096;
 
 const diagnosticsText = z.string().max(UPGRADE_DIAGNOSTICS_TEXT_MAX_CHARS);
 
+/** UTF-8 byte length without `TextEncoder` or `Buffer`, which this contract's libs do not carry. */
+function utf8ByteLength(text: string): number {
+  let bytes = 0;
+  for (const char of text) {
+    bytes += utf8WidthOf(char.codePointAt(0) ?? 0);
+  }
+  return bytes;
+}
+
+function utf8WidthOf(codePoint: number): number {
+  if (codePoint < 0x80) return 1;
+  if (codePoint < 0x800) return 2;
+  if (codePoint < 0x10000) return 3;
+  return 4;
+}
+
 const upgradeDiagnosticsTargetSchemaDefinition = z.object({
   target: z.string(),
   status: z.string(),
@@ -56,11 +72,9 @@ const upgradeDiagnosticsBundleSchemaDefinition = z
     /** What the size cap or the redaction left out, so a reader knows the bundle is partial. */
     omitted: z.array(z.string()),
   })
-  .refine(
-    (bundle) =>
-      new TextEncoder().encode(JSON.stringify(bundle)).length <= UPGRADE_DIAGNOSTICS_MAX_BYTES,
-    { message: `a diagnostics bundle is at most ${UPGRADE_DIAGNOSTICS_MAX_BYTES} bytes` },
-  );
+  .refine((bundle) => utf8ByteLength(JSON.stringify(bundle)) <= UPGRADE_DIAGNOSTICS_MAX_BYTES, {
+    message: `a diagnostics bundle is at most ${UPGRADE_DIAGNOSTICS_MAX_BYTES} bytes`,
+  });
 export interface UpgradeDiagnosticsBundleSchema extends Named<
   typeof upgradeDiagnosticsBundleSchemaDefinition
 > {}
