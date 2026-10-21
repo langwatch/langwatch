@@ -5547,6 +5547,9 @@ importers:
       '@langwatch/api-key-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time

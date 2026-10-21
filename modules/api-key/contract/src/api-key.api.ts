@@ -39,6 +39,16 @@ import type {
   RevokeApiKeyInput,
   UpdateApiKeyInput,
 } from "./api-key.ts";
+import type {
+  BraidSignatureVerdict,
+  CreateSigningKeyInput,
+  FindSigningKeysInput,
+  IssuedSigningKey,
+  RevokeSigningKeyInput,
+  RotateSigningKeyInput,
+  SigningKey,
+  VerifyBraidSignatureInput,
+} from "./signing-key.ts";
 
 const apiKeyVisibleProjectsInputSchemaDefinition = z
   .object({
@@ -285,6 +295,16 @@ export interface ApiKeyApi {
     input: { organizationId: string },
     by: ApiKeyManagementCaller,
   ): Promise<ApiKeyUser[]>;
+  /** ADR-183 §4: a project's braid signing keys with their last 24 hours; never a secret. */
+  findSigningKeys(input: FindSigningKeysInput): Promise<SigningKey[]>;
+  /** Issues a signing key; the answer is the only place its secret is ever returned. */
+  createSigningKey(input: CreateSigningKeyInput): Promise<IssuedSigningKey>;
+  /** Issues a replacement; the old key keeps verifying for `SIGNING_KEY_ROTATION_OVERLAP_MS`. */
+  rotateSigningKey(input: RotateSigningKeyInput): Promise<IssuedSigningKey>;
+  /** Ends a key at once, bounded by the lookup cache (`SIGNING_KEY_LOOKUP_CACHE_MS`). */
+  revokeSigningKey(input: RevokeSigningKeyInput): Promise<SigningKey>;
+  /** Span admission's check of one `langwatch.signature`; the secret never leaves this module. */
+  verifyBraidSignature(input: VerifyBraidSignatureInput): Promise<BraidSignatureVerdict>;
 }
 
 export const ApiKeyApi = moduleApi<ApiKeyApi>()("api-key");

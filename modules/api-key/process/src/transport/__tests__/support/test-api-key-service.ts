@@ -38,6 +38,11 @@ export class TestApiKeyService implements ApiKeyApi {
   listCallerBindings = unsupported<ApiKeyApi["listCallerBindings"]>();
   findIngestionKeysForUser = unsupported<ApiKeyApi["findIngestionKeysForUser"]>();
   listIngestionKeysForProject = unsupported<ApiKeyApi["listIngestionKeysForProject"]>();
+  findSigningKeys = unsupported<ApiKeyApi["findSigningKeys"]>();
+  createSigningKey = unsupported<ApiKeyApi["createSigningKey"]>();
+  rotateSigningKey = unsupported<ApiKeyApi["rotateSigningKey"]>();
+  revokeSigningKey = unsupported<ApiKeyApi["revokeSigningKey"]>();
+  verifyBraidSignature = unsupported<ApiKeyApi["verifyBraidSignature"]>();
   listKeys = unsupported<ApiKeyApi["listKeys"]>();
   listOrganizationMembers = unsupported<ApiKeyApi["listOrganizationMembers"]>();
   listOrganizationProjects = unsupported<ApiKeyApi["listOrganizationProjects"]>();
