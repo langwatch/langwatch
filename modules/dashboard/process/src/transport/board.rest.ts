@@ -8,6 +8,7 @@ import {
   canonicalBaseResponses,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
+  nameUnlessMissing,
   resolver,
   type RouteResponse,
 } from "@langwatch/api/rest";
@@ -18,6 +19,7 @@ import {
   boardResourceSchema,
   DashboardApi,
   dashboardDeletedResponseSchema,
+  DashboardNotFoundError,
   dashboardRestNameSchema,
   type Dashboard,
 } from "@langwatch/dashboard-contract";
@@ -128,6 +130,7 @@ export const boardRest = defineRestRouter(DashboardApi)
     "/api/v1/projects/:projectId/analytics/boards",
     "postApiV1ProjectsByProjectIdAnalyticsBoards",
   )
+  .keepsRecords()
   .withAudit("boards.create")
   .withSharedPath(PROJECT_ANALYTICS)
   .withParams(boardProjectParamsSchema)
@@ -165,6 +168,17 @@ export const boardRest = defineRestRouter(DashboardApi)
   .withSharedPath(PROJECT_ANALYTICS)
   .withParams(boardParamsSchema)
   .withPermission("analytics:delete")
+  .withConfirmation({
+    resource: "board",
+    action: "delete",
+    idParam: "boardId",
+    name: ({ app, projectId, id }) =>
+      nameUnlessMissing({
+        read: app.getBoard({ projectId, dashboardId: id }),
+        missing: DashboardNotFoundError,
+        nameOf: (board) => board.name,
+      }),
+  })
   .withOutput(dashboardDeletedResponseSchema)
   .withDocs({
     summary: "Delete a Dashboards board",

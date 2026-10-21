@@ -440,7 +440,7 @@ countUsage(input: { projectIds: readonly string[] }): Promise<DashboardUsageCoun
 
 |             |                                        |
 | ----------- | -------------------------------------- |
-| Declared at | `src/transport/board.rest.ts:60`       |
+| Declared at | `src/transport/board.rest.ts:62`       |
 | Base URL    | none: each route's path is its address |
 | Addressing  | literal                                |
 | Credential  | project                                |
@@ -449,7 +449,7 @@ countUsage(input: { projectIds: readonly string[] }): Promise<DashboardUsageCoun
 
 List Dashboards boards
 
-Permission `analytics:view`. Declared at `src/transport/board.rest.ts:65`.
+Permission `analytics:view`. Declared at `src/transport/board.rest.ts:67`.
 
 Answers at `/api/v1/projects/:projectId/analytics/boards`.
 
@@ -465,7 +465,7 @@ type Response = z.infer<typeof boardListSchema>; // ../contract/src/board-rest.s
 
 Get a Dashboards board
 
-Permission `analytics:view`. Declared at `src/transport/board.rest.ts:96`.
+Permission `analytics:view`. Declared at `src/transport/board.rest.ts:98`.
 
 Answers at `/api/v1/projects/:projectId/analytics/boards/:boardId`.
 
@@ -492,7 +492,7 @@ interface Response {
 
 Create a Dashboards board
 
-Permission `analytics:create`. Declared at `src/transport/board.rest.ts:127`.
+Permission `analytics:create`. Declared at `src/transport/board.rest.ts:129`.
 
 Answers at `/api/v1/projects/:projectId/analytics/boards`.
 
@@ -509,7 +509,7 @@ type Response = z.infer<typeof boardResourceSchema>; // ../contract/src/board-re
 
 Delete a Dashboards board
 
-Permission `analytics:delete`. Declared at `src/transport/board.rest.ts:160`.
+Permission `analytics:delete`. Declared at `src/transport/board.rest.ts:163`.
 
 Answers at `/api/v1/projects/:projectId/analytics/boards/:boardId`.
 
