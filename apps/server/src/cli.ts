@@ -160,11 +160,20 @@ program
       onReady: (ready) => predepArrived({ ready, gate, door }),
       onSkipped: gate.skip,
     })
-      .then((run) => {
-        if (run.outcome === "aborted") {
-          void shutdown({ exitCode: run.exitCode, reason: run.reason });
-        }
-      })
+      .then(
+        (run) => {
+          if (run.outcome === "aborted") {
+            void shutdown({ exitCode: run.exitCode, reason: run.reason });
+          }
+        },
+        // A predep step that throws (a mkdir, a detect) ends the boot with its own cause.
+        (error: unknown) => {
+          void shutdown({
+            exitCode: 1,
+            reason: error instanceof Error ? error.message : String(error),
+          });
+        },
+      )
       .finally(() => gate.finish());
     const write = heldOutput({ until: predepsDone });
 
