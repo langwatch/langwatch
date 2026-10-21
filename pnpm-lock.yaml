@@ -1211,7 +1211,7 @@ importers:
         version: 4.3.0
       zod:
         specifier: 'catalog:'
-        version: 4.6.5
+        version: 4.6.7
     devDependencies:
       '@langwatch/time':
         specifier: workspace:*
