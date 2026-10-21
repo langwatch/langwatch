@@ -1,8 +1,6 @@
 /**
- * Real-Chromium Model Providers layout: the providers table spans the page column and lines up
- * with the Default models table, which jsdom cannot lay out. It used to shrink to its content
- * while Default models below ran full width.
- * Spec: specs/model-providers/provider-list.feature
+ * Real-Chromium layout, which jsdom cannot do: the providers table spans the page column and
+ * lines up with Default models. Spec: specs/model-providers/provider-list.feature
  */
 
 import { cleanup, screen } from "@testing-library/react";
