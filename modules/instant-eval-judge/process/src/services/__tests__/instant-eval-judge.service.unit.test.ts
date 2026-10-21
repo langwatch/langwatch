@@ -15,6 +15,7 @@ import { describe, expect, it, vi } from "vitest";
 import { MemoryInstantEvalClassifierChannel } from "../../__tests__/support/instant-eval-classifier.test-fakes.ts";
 import { MemoryInstantEvalRateLimiter } from "../../__tests__/support/instant-eval-rate-limiter.test-fakes.ts";
 import type { InstantEvalClassifyRequest } from "../../channels/instant-eval-classifier.channel.ts";
+import { MemoryInstantEvalDecisionModelChannel } from "../../channels/memory/memory.instant-eval-decision-model.channel.ts";
 import {
   MemoryInstantEvalJudgeProjectRepository,
   MemoryInstantEvalJudgeRepositories,
@@ -75,7 +76,15 @@ function harness({
   const recorded: InstantEvalJudgeSpendPricedEventData[] = [];
   const { logger, lines } = createTestLogger();
   let minted = 0;
+  const decisionModels = MemoryInstantEvalDecisionModelChannel.create({
+    answer: () => ({
+      verdicts: [{ questionId: QUESTION.id, probability: 0.7 }],
+      inputTokens: 0,
+      isTextTruncated: false,
+    }),
+  });
   const service = InstantEvalJudgeService.create({
+    decisionModels,
     repositories,
     classifier: hasClassifier ? classifier : undefined,
     limiter: MemoryInstantEvalRateLimiter.create(),
@@ -112,7 +121,15 @@ function harness({
       });
     }
   };
-  return { service, classifier: { classify: classifySpy }, recorded, repositories, lines, seed };
+  return {
+    service,
+    classifier: { classify: classifySpy },
+    decisionModels,
+    recorded,
+    repositories,
+    lines,
+    seed,
+  };
 }
 
 const call = { projectId: PROJECT_ID, text: "Input: hi\nOutput: hello", questions: [QUESTION] };
@@ -356,6 +373,7 @@ describe("given a judge call the classifier answers", () => {
       };
       const { logger, lines } = createTestLogger();
       const service = InstantEvalJudgeService.create({
+        decisionModels: MemoryInstantEvalDecisionModelChannel.create(),
         repositories,
         limiter: MemoryInstantEvalRateLimiter.create(),
         classifier: { classify: async () => answered(500) },
@@ -425,6 +443,7 @@ describe("given an Instant Evals run's spend, for a project the judge has not le
   describe("when the priced fact cannot be stored", () => {
     it("throws, so the run's finish retries onto the same request id", async () => {
       const service = InstantEvalJudgeService.create({
+        decisionModels: MemoryInstantEvalDecisionModelChannel.create(),
         repositories: MemoryInstantEvalJudgeRepositories.create(),
         limiter: MemoryInstantEvalRateLimiter.create(),
         classifier: undefined,
@@ -437,6 +456,36 @@ describe("given an Instant Evals run's spend, for a project the judge has not le
       });
 
       await expect(service.recordSpend(record)).rejects.toThrow(/queue down/);
+    });
+  });
+});
+
+describe("given a judge call on an own decision model", () => {
+  const decisionModel = {
+    model: "inception/decisions:mercury-decide",
+    wire: "jev" as const,
+    providerModel: "mercury-decide",
+    endpoint: "https://api.inceptionlabs.ai/v1/decisions",
+    apiKey: "customer-key",
+  };
+
+  describe("when the project is unknown, the install is not cloud and the budget is spent", () => {
+    /** @scenario "An LLM judge on an own decision model is not metered or capped" */
+    it("judges through the own model at no price and records nothing", async () => {
+      const { service, classifier, decisionModels, recorded, seed } = harness({
+        isCloud: false,
+        isProjectKnown: false,
+        spentNanoUsd: 5_000_000_000n,
+      });
+      await seed();
+
+      const answer = await service.judge({ ...call, decisionModel });
+
+      expect(answer).toMatchObject({ outcome: "judged", priceUsd: 0 });
+      expect(decisionModels.requests).toHaveLength(1);
+      expect(decisionModels.requests[0]?.decisionModel).toEqual(decisionModel);
+      expect(classifier.classify).not.toHaveBeenCalled();
+      expect(recorded).toEqual([]);
     });
   });
 });

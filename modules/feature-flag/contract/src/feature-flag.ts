@@ -154,6 +154,13 @@ export const FEATURE_FLAGS = [
       "The operator's switch for Instant Evals and the LangWatchQL eval functions, the judged columns that classify a conversation, a trace or any text a query projects. Off by default; enable per project or organization via a targeting rule, which is how an enterprise organization that asked gets them. On the hosted service this releases an enterprise organization only: a self-serve one is released by switching them on itself from the search bar, whatever this says. A self-hosted install that judges through Connect is released by a license that names Instant Evals alone, and this never releases it; only a development checkout that judges with its own key still needs this. A deployment with no classifier configured keeps them unavailable either way.",
   },
   {
+    key: "release_instant_evals_own_decision_model",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Lets an organization run Instant Evals on its own decision model and key, picked in the Instant Evals column of Default models (ADR-182). Off by default; enable per organization via a targeting rule. Off, the column offers LangWatch Instant Preview only, writes of any other model are refused, and a project that already picked one runs on LangWatch Instant Preview again.",
+  },
+  {
     key: "release_lwql_workbench",
     scope: "PRODUCT",
     defaultValue: false,

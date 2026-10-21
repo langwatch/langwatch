@@ -104,8 +104,17 @@ export function instantEvalSkipResultOf(
   if (SKIPPED_REASONS.has(reason)) {
     return { status: "skipped", details: `Instant Evals skipped this evaluation: ${reason}` };
   }
-  return errorResultOf({ code: reason });
+  const message = NEXT_STEPS[reason];
+  return errorResultOf({ code: reason, ...(message ? { message } : {}) });
 }
+
+/** What to do about a decision model that did not answer; never the provider's words (ADR-182). */
+const NEXT_STEPS: Partial<Record<InstantEvalJudgeSkipReason, string>> = {
+  classifier_key_invalid:
+    "The decision model's key is missing, switched off or refused. Check it in Settings > Model Providers.",
+  classifier_rate_limited: "The decision model is rate limited. Wait a moment and retry.",
+  classifier_provider_unavailable: "The decision model's provider is unavailable. Retry later.",
+};
 
 /** A refused judge call, returned as an error naming its code so it is never read as a skip. */
 export function instantEvalRefusalResultOf({

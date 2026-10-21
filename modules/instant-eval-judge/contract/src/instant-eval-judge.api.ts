@@ -26,7 +26,8 @@ export interface InstantEvalJudgeApi {
   classify(input: InstantEvalClassification): Promise<InstantEvalJudgement>;
   /**
    * One metered judge call: cloud only, unknown project, budget, classify, price, priced event.
-   * A refusal is returned, never thrown, and calls no classifier.
+   * A refusal is returned, never thrown, and calls no classifier. With an own decision model it
+   * only classifies, at no price (ADR-182 decision 7).
    */
   judge(input: InstantEvalJudgeCall): Promise<InstantEvalJudgeAnswer>;
   /**
@@ -44,6 +45,24 @@ export interface InstantEvalJudgeApi {
 
 export const InstantEvalJudgeApi = moduleApi<InstantEvalJudgeApi>()("instant-eval-judge");
 
+/** The request shapes an own decision model speaks, one channel each (ADR-182 decision 8). */
+export const INSTANT_EVAL_DECISION_WIRES = ["openai_decisions", "jev", "cloudflare_jev"] as const;
+
+export type InstantEvalDecisionWire = (typeof INSTANT_EVAL_DECISION_WIRES)[number];
+
+/**
+ * An organization's own decision model, resolved by the caller from Default models. The judge
+ * calls it with the organization's key, unmetered and uncapped (ADR-182 decisions 6 and 7).
+ */
+export interface InstantEvalOwnDecisionModel {
+  readonly model: string;
+  readonly wire: InstantEvalDecisionWire;
+  readonly providerModel: string;
+  readonly endpoint: string;
+  /** Never logged, stored or returned. */
+  readonly apiKey: string;
+}
+
 /** One text and every question about it, judged for a project. */
 export interface InstantEvalClassification {
   /** Names the share of the rate the request draws on; the classifier never sees it. */
@@ -52,6 +71,8 @@ export interface InstantEvalClassification {
   readonly text: string;
   readonly questions: readonly InstantEvalQuestion[];
   readonly signal?: AbortSignal;
+  /** Present when the project runs on its own decision model instead of LangWatch's. */
+  readonly decisionModel?: InstantEvalOwnDecisionModel;
 }
 
 /** The model a judge's settings name to be answered by Instant Evals (ADR-174 decision 11). */
@@ -171,6 +192,10 @@ export const INSTANT_EVAL_SKIP_REASONS = [
   "classifier_rate_limited",
   "classifier_input_too_large",
   "classifier_failed",
+  // An own decision model's key is missing, off or refused; fixed in Model Providers (ADR-182).
+  "classifier_key_invalid",
+  // An own decision model's provider is down or answered unreadably; retry later (ADR-182).
+  "classifier_provider_unavailable",
 ] as const;
 
 export type InstantEvalSkipReason = (typeof INSTANT_EVAL_SKIP_REASONS)[number];

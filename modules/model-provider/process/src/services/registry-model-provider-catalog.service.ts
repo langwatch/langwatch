@@ -12,7 +12,9 @@ import {
   isLatestAlias,
   isModelAllowedAsRoleDefault,
   isModelAllowedForFeature,
+  isDecisionModelId,
   isModelRole,
+  MODEL_ROLES,
   ModelDefaultValidationError,
   modelProviders,
   normalizeRoutingHandle,
@@ -26,6 +28,7 @@ import { Temporal, toDate, type Instant } from "@langwatch/time";
 import { z } from "zod";
 
 import type { ModelProviderCredentialProbe } from "../features/credential-probe/services/http-model-provider-credential-probe.service.ts";
+import { isDecisionDefaultKey } from "../rules/decision-model.rules.ts";
 import type { ModelProviderManagedGateway } from "./managed-model-provider-gateway.service.ts";
 
 /** Registry/SDK boundary. Provider SDKs and environment configuration stay behind this port. */
@@ -117,13 +120,7 @@ export abstract class ModelProviderCatalog {
     config: Record<string, unknown>;
     stored?: Record<string, string>;
   }): { config: Record<string, string>; droppedRestricted: boolean } {
-    const valid = new Set<string>([
-      "DEFAULT",
-      "FAST",
-      "LANGY",
-      "EMBEDDINGS",
-      ...allFeatures().map((feature) => feature.key),
-    ]);
+    const valid = new Set<string>([...MODEL_ROLES, ...allFeatures().map((feature) => feature.key)]);
     const clean: Record<string, string> = {};
     let droppedRestricted = false;
     for (const [key, value] of Object.entries(config)) {
@@ -140,6 +137,16 @@ export abstract class ModelProviderCatalog {
       if (!allowed && stored[key] === value) {
         droppedRestricted = true;
         continue;
+      }
+      if (!allowed && isDecisionDefaultKey(key)) {
+        throw new ModelDefaultValidationError(
+          `"${value}" is not a decision model. Pick one from the Instant Evals list.`,
+        );
+      }
+      if (!allowed && isDecisionModelId(value)) {
+        throw new ModelDefaultValidationError(
+          `"${value}" is a decision model and can only be the Instant Evals default.`,
+        );
       }
       if (!allowed) {
         throw new ModelDefaultValidationError(

@@ -235,6 +235,13 @@ function judgementsForRow({
   );
 }
 
+/** The judge lost these cells; an own decision model's key or outage counts too (ADR-182). */
+const FAILED_SKIP_REASONS: ReadonlySet<string> = new Set([
+  "classifier_failed",
+  "classifier_key_invalid",
+  "classifier_provider_unavailable",
+]);
+
 /** What a cell's own status is: answered, lost by the judge, or declined. */
 function statusOf({
   answered,
@@ -245,7 +252,7 @@ function statusOf({
 }): InstantEvalJudgmentStatus {
   if (answered) return "judged";
 
-  return skipReason === "classifier_failed" ? "failed" : "skipped";
+  return FAILED_SKIP_REASONS.has(skipReason) ? "failed" : "skipped";
 }
 
 /** One cell of one row as the judgement row it is written as. */

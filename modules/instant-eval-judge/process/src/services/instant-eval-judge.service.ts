@@ -1,7 +1,8 @@
 /**
  * One metered judge call (ADR-174 decisions 8, 10, 14, 15), in a fixed order: cloud only,
  * unknown project, budget, classify, price, priced fact. A refusal is returned, never thrown, and
- * calls no classifier. Spec: modules/instant-eval/specs/instant-eval-judge-model.feature
+ * calls no classifier. An own decision model skips all of it but the call (ADR-182 decision 7).
+ * Spec: modules/instant-eval/specs/instant-eval-judge-model.feature
  */
 
 import {
@@ -21,6 +22,7 @@ import type {
   InstantEvalClassifierChannel,
   InstantEvalRateLimiter,
 } from "../channels/instant-eval-classifier.channel.ts";
+import type { InstantEvalDecisionModelChannel } from "../channels/instant-eval-decision-model.channel.ts";
 import type { InstantEvalJudgeRepositories } from "../repositories/instant-eval-judge.repositories.ts";
 import { instantEvalJudgeBudgetOf } from "../rules/instant-eval-judge-budget.rules.ts";
 import {
@@ -42,6 +44,8 @@ type InstantEvalJudgeServiceDeps = Readonly<{
   repositories: Pick<InstantEvalJudgeRepositories, "projects" | "usageBilling" | "spend">;
   /** LangWatch's own classifier; absent where the deployment holds no key. */
   classifier: InstantEvalClassifierChannel | undefined;
+  /** An organization's own decision model, unmetered and uncapped (ADR-182 decision 7). */
+  decisionModels: InstantEvalDecisionModelChannel;
   /** Paces every classify send over the module's own rate buckets. */
   limiter: InstantEvalRateLimiter;
   /** LangWatch cloud, the only install a judge call is answered on. */
@@ -72,7 +76,15 @@ export class InstantEvalJudgeService {
     questions,
     requestKey,
     signal,
+    decisionModel,
   }: InstantEvalJudgeCall): Promise<InstantEvalJudgeAnswer> {
+    if (decisionModel) {
+      const judgement = await this.deps.decisionModels.classify(
+        { text, questions, decisionModel },
+        ...(signal ? [signal] : []),
+      );
+      return { outcome: "judged", judgement, priceUsd: 0 };
+    }
     // Off cloud nothing judges, so the project's placement is never the reason to give.
     const { classifier } = this.deps;
     if (!this.deps.isCloud || !classifier) {

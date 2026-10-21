@@ -216,6 +216,38 @@ describe("given the Default Models table", () => {
     });
   });
 
+  describe("given the Instant Evals column", () => {
+    /** @scenario The Default models table shows an Instant Evals column defaulting to LangWatch Instant Preview */
+    it("reads LangWatch Instant Preview where nothing is set, never Not configured", () => {
+      renderSection();
+
+      expect(screen.getByRole("columnheader", { name: "Instant Evals" })).toBeInTheDocument();
+      const cell = screen.getByTestId("config-row-cfg_acme_org-cell-instant_evals");
+      expect(cell.textContent).toBe("LangWatch Instant Preview");
+      expect(cell.textContent).not.toMatch(/Not configured/);
+    });
+
+    it("reads the picked decision model's label, not its id", () => {
+      mockGetDefaultModels.mockReturnValue({
+        data: {
+          ...FAKE_PAYLOAD,
+          configs: [
+            {
+              ...FAKE_PAYLOAD.configs[0]!,
+              config: { INSTANT_EVALS: "inception/decisions:mercury-decide" },
+            },
+          ],
+        },
+        isLoading: false,
+      });
+      renderSection();
+
+      expect(screen.getByTestId("config-row-cfg_acme_org-cell-instant_evals").textContent).toBe(
+        "Inception Mercury Decide",
+      );
+    });
+  });
+
   describe("given a config whose role model is a renamed custom model", () => {
     describe("when the section receives the resolved displayNames map", () => {
       it("renders the table chip with the configured display name, not the raw model id", () => {

@@ -28,6 +28,7 @@ import {
   INSTANT_EVAL_REQUEST_TYPE,
   type InstantEvalJudgeApi,
 } from "@langwatch/instant-eval-judge-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
@@ -237,6 +238,10 @@ function installation({
         authz: createApiFixture<AuthzApi>({ can: async () => mayManageOrganization }),
         "feature-flag": createApiFixture<FeatureFlagApi>({
           isEnabled: async () => isReleased,
+        }),
+        // Every project here runs on LangWatch Instant Preview (ADR-182).
+        "model-provider": createApiFixture<ModelProviderApi>({
+          resolveDecisionModel: async () => ({ kind: "langwatch" }),
         }),
         // The key is the judge's: Instant Evals asks for it on its first call (ADR-174 d. 13).
         "instant-eval-judge": createApiFixture<InstantEvalJudgeApi>({
