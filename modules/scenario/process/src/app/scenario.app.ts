@@ -444,7 +444,11 @@ export class ScenarioModule implements ScenarioApi {
       lifecycle: buildScenarioLifecyclePipeline(),
       simulationCommands,
       simulationProcessing: SimulationProcessingRuntimeAdapter.create({
-        pool: { slotBudget: config.slotBudget, consumed: config.consumedResourceClasses },
+        pool: {
+          slotBudget: config.slotBudget,
+          consumed: config.consumedResourceClasses,
+          voiceRunsMaxConcurrent: config.voiceRunsMaxConcurrent,
+        },
         runs: setup.repositories.simulationRunProcessing,
         cancellations,
         traces: setup.dependencies.traces,
@@ -913,6 +917,7 @@ export class ScenarioModule implements ScenarioApi {
         ...(input.simulatorModel ? { simulatorModel: input.simulatorModel } : {}),
         ...(input.judgeModel ? { judgeModel: input.judgeModel } : {}),
         ...withResolvedModels(input.resolvedModels),
+        ...(input.keepData ? { keepData: true } : {}),
       },
       ...withNote(input.note),
       ...(Object.keys(input.parameters).length > 0 ? { parameters: input.parameters } : {}),
@@ -1218,6 +1223,8 @@ export interface ScenarioChildEnvironment {
   telemetry: { endpoint: string; apiKey: string };
   /** The caller's provider keys for a voice target's TTS and transcription; never logged. */
   callerEnv?: Record<string, string>;
+  /** The target declares scenario hooks, which only the Node child calls (ADR-180). */
+  callsHooks?: boolean;
 }
 
 export interface ScenarioChildExecutionSession {

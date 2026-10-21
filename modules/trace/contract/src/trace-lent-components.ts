@@ -42,7 +42,7 @@ export type AnnotationQueueConversationProps = {
 /** What a screen hands trace's way into correcting one trace. */
 export type TraceEditButtonProps = {
   traceId: string;
-  /** When the trace started, so the drawer reads its partition; null when unknown. */
+  /** When the trace started, so the drawer can prune to its partition; null when unknown. */
   occurredAtMs: number | null;
   disabled?: boolean;
 };

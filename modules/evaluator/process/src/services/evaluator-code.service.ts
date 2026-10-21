@@ -105,27 +105,23 @@ export class EvaluatorCodeService {
         projectId: input.projectId,
         principal: input.principal,
       });
-      const response = await this.options.codeExecution.execute({
+      const answer = await this.options.codeExecution.execute({
         projectId: input.projectId,
         event: enriched,
         causalityDepth: input.parentCausalityDepth ?? 0,
         ...(input.parentTrace ? { parentTrace: input.parentTrace } : {}),
       });
-      if (!response.ok) {
-        throw new Error(`Error running code evaluator: ${response.statusText}`);
-      }
-
-      if (response.body.status !== "success") {
+      if (answer.status !== "success") {
         return {
           status: "error",
-          details: response.body.error?.message ?? "Code evaluator execution failed",
+          details: answer.error?.message ?? "Code evaluator execution failed",
           error_type: "CODE_EVALUATOR_ERROR",
-          traceback: response.body.error?.traceback ? [response.body.error.traceback] : [],
+          traceback: answer.error?.traceback ? [answer.error.traceback] : [],
         };
       }
 
       return {
-        ...this.coerceResult(response.body.result ?? {}),
+        ...this.coerceResult(answer.result ?? {}),
         status: "processed",
       };
     } catch (error) {

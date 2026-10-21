@@ -89,6 +89,7 @@ func buildMessagesResponsesRequest(
 	bfReq.Model = model
 	bfReq.Fallbacks = nil
 	normalizeReasoningBudget(bfReq)
+	restoreReasoningItemIDs(bfReq)
 
 	return bfReq, nil
 }
@@ -188,6 +189,7 @@ func assembleAnthropicMessageBody(
 	resp *bfschemas.BifrostResponsesResponse,
 	model string,
 ) ([]byte, error) {
+	exposeEncryptedReasoning(resp)
 	anthResp := bfanthropic.ToAnthropicResponsesResponse(bfCtx, resp)
 	if anthResp == nil {
 		return nil, anthropicUpstreamError(http.StatusBadGateway, "provider response could not be translated")
@@ -201,6 +203,7 @@ func assembleAnthropicMessageBody(
 	if anthResp.Content == nil {
 		anthResp.Content = []bfanthropic.AnthropicContentBlock{}
 	}
+	sealResponseReasoningData(resp, anthResp.Content)
 	// A reply carrying a tool call ends in tool_use, whatever the provider
 	// reported. Providers that translate through their own chat shape lose the
 	// distinction and answer end_turn, which tells the client the turn is over

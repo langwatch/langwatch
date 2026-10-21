@@ -7,6 +7,7 @@ import {
   type ReplayEventSource,
 } from "../../../replay/replayEventSource.ts";
 import type { EventingClickHouseReplayClient } from "../../clickhouse-client-resolver.ts";
+import { type EventLogIdIndex, eventLogOccurredRange } from "../../tables/event-log-id-index.ts";
 
 /** ClickHouse event_log row shape. */
 export interface ClickHouseEventRow {
@@ -192,36 +193,54 @@ export async function countEventsForAggregates({
   return parseInt(rows[0]?.totalEvents ?? "0", 10);
 }
 
-/** SQL fragment + params for an optional occurred-at pruning predicate. */
+/**
+ * SQL fragment + params for an optional occurred-at pruning predicate. Rows with no occurred time
+ * (0) are always kept: the index's bounds leave them out, the event log's own include them.
+ */
 function occurredAtPredicate(bounds?: OccurredAtBounds): {
   sql: string;
   params: Record<string, unknown>;
 } {
   if (!bounds) return { sql: "", params: {} };
   return {
-    sql: `AND EventOccurredAt >= {minOccurredAtMs:UInt64}
-        AND EventOccurredAt <= {maxOccurredAtMs:UInt64}`,
+    sql: `AND (
+          EventOccurredAt = 0
+          OR (
+            EventOccurredAt >= {minOccurredAtMs:UInt64}
+            AND EventOccurredAt <= {maxOccurredAtMs:UInt64}
+          )
+        )`,
     params: { minOccurredAtMs: bounds.minMs, maxOccurredAtMs: bounds.maxMs },
   };
 }
 
 /**
  * Compute the `EventOccurredAt` min/max over ALL events of the given aggregates (no event-type
- * filter, full history).
- * are handled by live processing per the replay marker protocol (ADR-015),
+ * filter, full history). With the event log index trusted for every type, its span answers; an
+ * aggregate it has not seen reads the event log itself, unbounded, as before the index.
  */
 export async function getAggregateOccurredAtBounds({
   client,
   tenantId,
   aggregateTypes,
   aggregateIds,
+  eventLogIndex,
 }: {
   client: EventingClickHouseReplayClient;
   tenantId: string;
   aggregateTypes: string[];
   aggregateIds: string[];
+  eventLogIndex?: EventLogIdIndex | undefined;
 }): Promise<OccurredAtBounds | undefined> {
   if (aggregateIds.length === 0) return undefined;
+  const indexed = await eventLogOccurredRange({
+    index: eventLogIndex,
+    read: "replay",
+    tenantId,
+    aggregateTypes,
+    aggregateIds,
+  });
+  if (indexed !== null) return { minMs: indexed.fromMs, maxMs: indexed.toMs };
 
   const { rows } = await client.query<{
     cnt: string;
@@ -321,12 +340,14 @@ export async function getBoundedCutoffs({
   aggregateTypes,
   aggregateIds,
   eventTypes,
+  eventLogIndex,
 }: {
   client: EventingClickHouseReplayClient;
   tenantId: string;
   aggregateTypes: string[];
   aggregateIds: string[];
   eventTypes: readonly string[];
+  eventLogIndex?: EventLogIdIndex | undefined;
 }): Promise<{
   cutoffs: Map<string, CutoffInfo>;
   occurredAtBounds: OccurredAtBounds | undefined;
@@ -336,6 +357,7 @@ export async function getBoundedCutoffs({
     tenantId,
     aggregateTypes,
     aggregateIds,
+    eventLogIndex,
   });
   if (!occurredAtBounds) {
     return {
@@ -513,10 +535,17 @@ export async function batchLoadAggregateEvents({
 export class EventingClickHouseReplayEventSource implements ReplayEventSource {
   private readonly clickhouse: EventingClickHouseReplayClient;
   private readonly lean: ReplayEventLean;
+  private readonly eventLogIndex: EventLogIdIndex | undefined;
 
-  constructor(deps: { clickhouse: EventingClickHouseReplayClient; lean: ReplayEventLean }) {
+  constructor(deps: {
+    clickhouse: EventingClickHouseReplayClient;
+    lean: ReplayEventLean;
+    /** Bounds each batch by the aggregate index once it is ready on the tenant's target. */
+    eventLogIndex?: EventLogIdIndex;
+  }) {
     this.clickhouse = deps.clickhouse;
     this.lean = deps.lean;
+    this.eventLogIndex = deps.eventLogIndex;
   }
 
   discoverTenants(input: { eventTypes: readonly string[]; sinceMs: number }): Promise<string[]> {
@@ -545,7 +574,11 @@ export class EventingClickHouseReplayEventSource implements ReplayEventSource {
     aggregateIds: string[];
     eventTypes: readonly string[];
   }) {
-    return getBoundedCutoffs({ client: this.clickhouse, ...input });
+    return getBoundedCutoffs({
+      client: this.clickhouse,
+      eventLogIndex: this.eventLogIndex,
+      ...input,
+    });
   }
 
   streamEventsForAggregates(input: {

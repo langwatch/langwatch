@@ -13,10 +13,11 @@ import {
   DatasetNotFoundError,
   DatasetPageTooLargeError,
   DatasetTooLargeToReadInlineError,
+  InvalidColumnError,
   DatasetNotReadyError,
   DATASET_DEFAULT_LIMITS,
   type DatasetApi,
-  type DatasetSummary,
+  type DatasetListEntry,
 } from "@langwatch/dataset-contract";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
@@ -201,23 +202,10 @@ function multipartBody(fields: Record<string, string>, file?: string) {
 describe("the mounted dataset REST family", () => {
   describe("when the project's datasets are listed", () => {
     it("answers main's fields only, never the storage internals", async () => {
-      const storedRow: DatasetSummary = {
+      const storedRow: DatasetListEntry = {
         ...dataset,
         columnTypes: [{ name: "input", type: "string" }],
-        projectId: "project-1",
-        archivedAt: null,
-        mapping: null,
-        useS3: true,
-        s3RecordCount: 2,
-        contentLayout: "s3_jsonl",
         status: "ready",
-        statusError: null,
-        stagingKey: "staging/key",
-        uploadFilename: null,
-        rowCount: 2,
-        sizeBytes: null,
-        chunkCount: 1,
-        chunkOffsets: null,
         recordCount: 2,
       };
       const { send } = mount({
@@ -244,22 +232,6 @@ describe("the mounted dataset REST family", () => {
           "updatedAt",
         ].toSorted(),
       );
-    });
-
-    describe("given a dataset whose rows were prepared from an uploaded file", () => {
-      /** @scenario "List datasets counts the rows of a dataset built from an uploaded file" */
-      it("answers the number of rows the file held", async () => {
-        const { send } = mount({
-          listDatasets: vi.fn(async () => ({
-            data: [{ ...dataset, contentLayout: "s3_jsonl", rowCount: 10, recordCount: 0 }],
-            pagination: { page: 1, limit: 50, total: 1, totalPages: 1 },
-          })) as never,
-        });
-
-        const response = await send("GET", "/api/dataset");
-
-        await expect(response.json()).resolves.toMatchObject({ data: [{ recordCount: 10 }] });
-      });
     });
 
     /** @scenario "List datasets with page and limit parameters" */
@@ -734,10 +706,11 @@ describe("the mounted dataset REST family", () => {
     it("answers 400 when an entry names a column the dataset does not have", async () => {
       const { send } = mount({
         batchCreateRecords: vi.fn(async () => {
-          throw domainError(
-            "InvalidColumnError",
-            'Invalid column "foo". Valid columns: input, output',
-          );
+          throw new InvalidColumnError({
+            columnName: "foo",
+            datasetName: "my-dataset",
+            validColumns: ["input", "output"],
+          });
         }) as never,
       });
 

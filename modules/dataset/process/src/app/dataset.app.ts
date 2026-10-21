@@ -15,6 +15,7 @@ import {
   type BatchEvaluationRecord,
   type BatchEvaluationSummary,
   type CopyDatasetInput,
+  type CountDatasetRecordsInput,
   type CreateDatasetAttachmentUploadInput,
   type CreateDatasetFromStoredObjectInput,
   type CreateDatasetFromUploadInput,
@@ -38,8 +39,10 @@ import {
   type DatasetPage,
   type DatasetPageInput,
   type DatasetRecord,
+  type DatasetRecordCount,
   type DatasetRecordMutationResult,
   type DatasetRecordPage,
+  type DatasetSummary,
   type DatasetUsageCount,
   type DatasetWithRecords,
   type DatasetApiDeleteInput,
@@ -72,6 +75,7 @@ import { DatasetContentService } from "../services/dataset-content.service.ts";
 import { DatasetInlineAttachmentService } from "../services/dataset-inline-attachment.service.ts";
 import { DatasetNormalizeService } from "../services/dataset-normalize.service.ts";
 import { DatasetRequestBoundsService } from "../services/dataset-request-bounds.service.ts";
+import { DatasetSingleFileService } from "../services/dataset-single-file.service.ts";
 import { DatasetUploadService } from "../services/dataset-upload.service.ts";
 import { DatasetService } from "../services/dataset.service.ts";
 
@@ -152,6 +156,12 @@ export class DatasetModule implements DatasetApi {
       inlineAttachments,
     });
 
+    const singleFile = DatasetSingleFileService.create({
+      files: repositories.singleFiles,
+      datasets: repositories.content,
+      generateId: () => generate(DATASET_RECORD_KSUID_RESOURCE).toString(),
+    });
+
     this.#datasets = DatasetService.create({
       repository: repositories.datasets,
       records: repositories.records,
@@ -162,9 +172,11 @@ export class DatasetModule implements DatasetApi {
         storedObjects: dependencies.storedObjects,
         requestBounds: this.#requestBounds,
         inlineAttachments,
+        singleFile,
       }),
       queue: this.#normalization,
       content: DatasetContentService.create({ datasets: repositories.content, storage: chunks }),
+      singleFile,
       // The identifier format a new entry is written under is this module's
       // own business, not something a composing process supplies: every real
       // composition that ever wired this feature left it unset, and the
@@ -226,6 +238,16 @@ export class DatasetModule implements DatasetApi {
   /** A page of the project's non-archived datasets. */
   listDatasets(input: ListDatasetsInput): Promise<DatasetListResult> {
     return this.#datasets.listDatasets(input);
+  }
+
+  /** The same page without entry counts, so a list renders before its counts arrive. */
+  findDatasetSummaries(input: ListDatasetsInput): Promise<DatasetSummary[]> {
+    return this.#datasets.findDatasetSummaries(input);
+  }
+
+  /** Each named dataset's entry count, whichever storage it uses. */
+  countRecords(input: CountDatasetRecordsInput): Promise<DatasetRecordCount[]> {
+    return this.#datasets.countRecords(input);
   }
 
   /** One dataset by slug or id. Missing or archived refuses. */

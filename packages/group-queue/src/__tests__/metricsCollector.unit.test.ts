@@ -1,16 +1,11 @@
+import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
+import { createTestLogger, type TestLogLines } from "@langwatch/test-harness";
 import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
-import { register } from "prom-client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-  gqGroupStagingDepthMax,
-  gqGroupsOverStagingDepth,
-  gqOldestBacklogAgeMilliseconds,
-  gqOldestPendingAgeMilliseconds,
-  STAGING_DEPTH_REPORT_FLOOR,
-} from "../metrics.ts";
+import { STAGING_DEPTH_REPORT_FLOOR } from "../metrics.ts";
 import { GroupQueueMetricsCollector } from "../metricsCollector.ts";
 import { MIN_PLAUSIBLE_EPOCH_MS } from "../readyScore.ts";
 import { GroupStagingScripts } from "../scripts.ts";
@@ -85,6 +80,17 @@ function makeRedis(
      * whether a second gets past the in-flight guard.
      */
     gateFirstCall?: Promise<void>;
+    /** Members of the blocked set. */
+    blocked?: string[];
+    /** SCARD of the blocked set when it exceeds the members a scan returns. */
+    blockedTotal?: number;
+    /** Make the label script reject, or the blocked-set scan throw. */
+    evalshaRejects?: boolean;
+    blockedScanRejects?: boolean;
+    /** groupId -> the [pipeline, jobType, jobName] its head job's header carries. */
+    routing?: Record<string, [string, string, string]>;
+    /** tenantId -> parked group count; the keys are the parked-tenants registry. */
+    parked?: Record<string, number>;
   } = {},
 ) {
   let gateUsed = false;
@@ -101,9 +107,11 @@ function makeRedis(
     // Answering per key is what makes "swept the wrong index" visible: a
     // group that is parked, blocked or claimed is in pending-groups and in
     // no ready set at all.
-    const members = String(args[0]).endsWith("pending-groups")
-      ? (opts.pendingGroups ?? readyMembers)
-      : readyMembers;
+    const key = String(args[0]);
+    if (opts.blockedScanRejects && key.endsWith("blocked")) throw new Error("scan failed");
+    let members = readyMembers;
+    if (key.endsWith("pending-groups")) members = opts.pendingGroups ?? readyMembers;
+    else if (key.endsWith("blocked")) members = opts.blocked ?? [];
     const cursor = Number(args[1]);
     const countIdx = args.indexOf("COUNT");
     const pageSize = opts.scanPageSize ?? (countIdx >= 0 ? Number(args[countIdx + 1]) : 10);
@@ -111,16 +119,28 @@ function makeRedis(
     const nextCursor = cursor + pageSize >= members.length ? "0" : String(cursor + pageSize);
     return [nextCursor, page];
   });
+  const evalsha = vi.fn(
+    async (_sha: string, _numKeys: number, _key: string, _prefix: string, ...ids: string[]) => {
+      if (opts.evalshaRejects) throw new Error("script failed");
+      return ids.flatMap((id) => opts.routing?.[id] ?? ["", "", ""]);
+    },
+  );
   const redis = redisDouble({
-    zcard: vi.fn(async () => {
+    zcard: vi.fn(async (key: string) => {
       if (opts.gateFirstCall && !gateUsed) {
         gateUsed = true;
         await opts.gateFirstCall;
       }
-      return 0;
+      const parkedTenant = key.startsWith(`${PREFIX}parked:`)
+        ? key.slice(`${PREFIX}parked:`.length)
+        : undefined;
+      return parkedTenant === undefined ? 0 : (opts.parked?.[parkedTenant] ?? 0);
     }),
-    scard: vi.fn(async () => 0),
-    smembers: vi.fn(async () => [] as string[]),
+    scard: vi.fn(async (key: string) =>
+      key.endsWith("blocked") ? (opts.blockedTotal ?? opts.blocked?.length ?? 0) : 0,
+    ),
+    smembers: vi.fn(async () => Object.keys(opts.parked ?? {})),
+    evalsha,
     zrangebyscore,
     sscan,
     pipeline: vi.fn(() => {
@@ -149,7 +169,7 @@ function makeRedis(
       return chain;
     }),
   });
-  return { redis, zrangebyscore, sscan };
+  return { redis, zrangebyscore, sscan, evalsha };
 }
 
 /** A logger stub whose calls a test can read. */
@@ -213,14 +233,21 @@ function runCollect(redis: IORedis | Cluster) {
   return makeCollector({ redis }).collect();
 }
 
-async function readGauge(): Promise<number | undefined> {
-  const m = await gqOldestPendingAgeMilliseconds.get();
-  return m.values.find((v) => v.labels.queue_name === QUEUE)?.value;
+let meter = createRecordingMeterProvider();
+
+/** The latest value a gauge wrote for the test queue. */
+function lastGauge(name: string): number | undefined {
+  return meter.valuesOf(name, { queue_name: QUEUE }).at(-1);
+}
+
+function readGauge(): number | undefined {
+  return lastGauge("gq_oldest_pending_age_milliseconds");
 }
 
 describe("GroupQueueMetricsCollector — oldest pending age", () => {
   beforeEach(() => {
-    register.resetMetrics();
+    meter = createRecordingMeterProvider();
+    meter.install();
     // Freeze the clock so scores seeded relative to "now" keep their
     // eligible/deferred classification no matter how slowly the test runs,
     // and ages assert exactly instead of through tolerance windows.
@@ -229,6 +256,7 @@ describe("GroupQueueMetricsCollector — oldest pending age", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    meter.uninstall();
   });
 
   it("reports the age of the oldest eligible-waiting group", async () => {
@@ -238,7 +266,7 @@ describe("GroupQueueMetricsCollector — oldest pending age", () => {
 
     await runCollect(redis);
 
-    expect(await readGauge()).toBe(5_000);
+    expect(readGauge()).toBe(5_000);
 
     // The query must start at the plausible-epoch floor (which drops the
     // unblock sentinel and every mis-scored row alike), cap at "now", and read
@@ -262,7 +290,7 @@ describe("GroupQueueMetricsCollector — oldest pending age", () => {
       readyZset: [{ member: "just-unblocked", score: 1 }],
     });
     await runCollect(redis);
-    expect(await readGauge()).toBe(0);
+    expect(readGauge()).toBe(0);
   });
 
   it("never emits a negative age (clock skew / future score)", async () => {
@@ -270,19 +298,21 @@ describe("GroupQueueMetricsCollector — oldest pending age", () => {
       readyZset: [{ member: "group-future", score: Date.now() + 1_000 }],
     });
     await runCollect(redis);
-    const age = await readGauge();
+    const age = readGauge();
     expect(age).toBeGreaterThanOrEqual(0);
   });
 });
 
 describe("GroupQueueMetricsCollector - scores that are not timestamps", () => {
   beforeEach(() => {
-    register.resetMetrics();
+    meter = createRecordingMeterProvider();
+    meter.install();
     vi.useFakeTimers({ now: Date.now() });
   });
 
   afterEach(() => {
     vi.useRealTimers();
+    meter.uninstall();
   });
 
   describe("given a group staged a few seconds after the Unix epoch", () => {
@@ -300,8 +330,8 @@ describe("GroupQueueMetricsCollector - scores that are not timestamps", () => {
 
       await runCollect(redis);
 
-      expect(await readGauge()).toBe(0);
-      expect(await readBacklogGauge()).toBe(0);
+      expect(readGauge()).toBe(0);
+      expect(readBacklogGauge()).toBe(0);
       expect(zrangebyscore.mock.calls[0]![1]).toBe(MIN_PLAUSIBLE_EPOCH_MS);
     });
 
@@ -317,7 +347,7 @@ describe("GroupQueueMetricsCollector - scores that are not timestamps", () => {
 
       await runCollect(redis);
 
-      expect(await readGauge()).toBe(5_000);
+      expect(readGauge()).toBe(5_000);
     });
   });
 
@@ -338,7 +368,7 @@ describe("GroupQueueMetricsCollector - scores that are not timestamps", () => {
 
       await runCollect(redis);
 
-      expect(await readBacklogGauge()).toBe(0);
+      expect(readBacklogGauge()).toBe(0);
     });
 
     it("still reports a genuinely old head job, however far past it is", async () => {
@@ -352,19 +382,19 @@ describe("GroupQueueMetricsCollector - scores that are not timestamps", () => {
 
       await runCollect(redis);
 
-      expect(await readBacklogGauge()).toBe(30 * 24 * 60 * 60 * 1000);
+      expect(readBacklogGauge()).toBe(30 * 24 * 60 * 60 * 1000);
     });
   });
 });
 
-async function readBacklogGauge(): Promise<number | undefined> {
-  const m = await gqOldestBacklogAgeMilliseconds.get();
-  return m.values.find((v) => v.labels.queue_name === QUEUE)?.value;
+function readBacklogGauge(): number | undefined {
+  return lastGauge("gq_oldest_backlog_age_milliseconds");
 }
 
 describe("GroupQueueMetricsCollector — oldest backlog age", () => {
   beforeEach(() => {
-    register.resetMetrics();
+    meter = createRecordingMeterProvider();
+    meter.install();
     // Frozen clock: a score of now+5s must stay DEFERRED through the whole
     // test, however slowly CI runs it — otherwise the group turns eligible,
     // the deferred sample skips its head job, and the assertion flakes.
@@ -373,6 +403,7 @@ describe("GroupQueueMetricsCollector — oldest backlog age", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    meter.uninstall();
   });
 
   describe("when a group is pinned in retry backoff (deferred ready score, day-old head job)", () => {
@@ -390,8 +421,8 @@ describe("GroupQueueMetricsCollector — oldest backlog age", () => {
 
       await runCollect(redis);
 
-      expect(await readGauge()).toBe(0);
-      expect(await readBacklogGauge()).toBe(60_000);
+      expect(readGauge()).toBe(0);
+      expect(readBacklogGauge()).toBe(60_000);
     });
   });
 
@@ -409,7 +440,7 @@ describe("GroupQueueMetricsCollector — oldest backlog age", () => {
 
       await runCollect(redis);
 
-      expect(await readBacklogGauge()).toBe(0);
+      expect(readBacklogGauge()).toBe(0);
     });
   });
 
@@ -421,7 +452,7 @@ describe("GroupQueueMetricsCollector — oldest backlog age", () => {
 
       await runCollect(redis);
 
-      expect(await readBacklogGauge()).toBe(5_000);
+      expect(readBacklogGauge()).toBe(5_000);
     });
   });
 
@@ -453,7 +484,7 @@ describe("GroupQueueMetricsCollector — oldest backlog age", () => {
 
         await runCollect(redis);
 
-        expect(await readBacklogGauge()).toBe(86_400_000);
+        expect(readBacklogGauge()).toBe(86_400_000);
       });
     });
   });
@@ -466,19 +497,19 @@ describe("GroupQueueMetricsCollector — oldest backlog age", () => {
  */
 describe("GroupQueueMetricsCollector, per-group staging depth", () => {
   beforeEach(() => {
-    register.resetMetrics();
+    meter = createRecordingMeterProvider();
+    meter.install();
     vi.useFakeTimers({ now: Date.now() });
   });
 
   afterEach(() => {
     vi.useRealTimers();
+    meter.uninstall();
   });
 
-  const readMax = async () =>
-    (await gqGroupStagingDepthMax.get()).values.find((v) => v.labels.queue_name === QUEUE)?.value;
+  const readMax = () => lastGauge("gq_group_staging_depth_max");
 
-  const readOverThreshold = async () =>
-    (await gqGroupsOverStagingDepth.get()).values.find((v) => v.labels.queue_name === QUEUE)?.value;
+  const readOverThreshold = () => lastGauge("gq_groups_over_staging_depth");
 
   const ready = (...members: string[]): ReadyEntry[] =>
     members.map((member, i) => ({ member, score: Date.now() + i }));
@@ -493,7 +524,7 @@ describe("GroupQueueMetricsCollector, per-group staging depth", () => {
 
         await runCollect(redis);
 
-        expect(await readMax()).toBe(900);
+        expect(readMax()).toBe(900);
       });
 
       it("counts how many are over the reporting threshold", async () => {
@@ -513,7 +544,7 @@ describe("GroupQueueMetricsCollector, per-group staging depth", () => {
         // The floor is inclusive: `a` sits exactly on it and counts, `b` is
         // one below and does not. That boundary is the one most likely to be
         // chosen deliberately, so it is the one worth pinning.
-        expect(await readOverThreshold()).toBe(2);
+        expect(readOverThreshold()).toBe(2);
       });
     });
   });
@@ -529,10 +560,10 @@ describe("GroupQueueMetricsCollector, per-group staging depth", () => {
         const collector = makeCollector({ redis });
 
         await collector.collect();
-        expect(await readMax()).toBe(2);
+        expect(readMax()).toBe(2);
 
         await collector.collect();
-        expect(await readMax()).toBe(250_000);
+        expect(readMax()).toBe(250_000);
       });
     });
   });
@@ -549,12 +580,12 @@ describe("GroupQueueMetricsCollector, per-group staging depth", () => {
 
         // One cycle covers both groups, so this cycle completes a rotation.
         await collector.collect();
-        expect(await readMax()).toBe(250_000);
+        expect(readMax()).toBe(250_000);
 
         depths.deep = 0;
         await collector.collect();
 
-        expect(await readMax()).toBe(3);
+        expect(readMax()).toBe(3);
       });
     });
   });
@@ -572,8 +603,8 @@ describe("GroupQueueMetricsCollector, per-group staging depth", () => {
 
         await runCollect(redis);
 
-        expect(await readMax()).toBe(7);
-        expect(await readOverThreshold()).toBe(0);
+        expect(readMax()).toBe(7);
+        expect(readOverThreshold()).toBe(0);
       });
     });
   });
@@ -596,8 +627,8 @@ describe("GroupQueueMetricsCollector, per-group staging depth", () => {
 
         await runCollect(redis);
 
-        expect(await readMax()).toBe(STAGING_DEPTH_REPORT_FLOOR * 25);
-        expect(await readOverThreshold()).toBe(1);
+        expect(readMax()).toBe(STAGING_DEPTH_REPORT_FLOOR * 25);
+        expect(readOverThreshold()).toBe(1);
       });
     });
   });
@@ -652,8 +683,8 @@ describe("GroupQueueMetricsCollector, per-group staging depth", () => {
         await collector.collect();
         await collector.collect();
 
-        expect(await readOverThreshold()).toBe(1);
-        expect(await readMax()).toBe(deep);
+        expect(readOverThreshold()).toBe(1);
+        expect(readMax()).toBe(deep);
       });
     });
   });
@@ -672,7 +703,7 @@ describe("GroupQueueMetricsCollector, per-group staging depth", () => {
         // Both gauges read 0 here, which is indistinguishable from a quiet
         // queue. The log line is the only thing that says the sweep saw
         // nothing rather than nothing being there.
-        expect(await readMax()).toBe(0);
+        expect(readMax()).toBe(0);
         expect(logger.debug).toHaveBeenCalledWith(
           expect.objectContaining({ dropped: 2, ofGroups: 2 }),
           expect.stringContaining("dropped replies"),
@@ -688,9 +719,282 @@ describe("GroupQueueMetricsCollector, per-group staging depth", () => {
 
         await runCollect(redis);
 
-        expect(await readMax()).toBe(0);
-        expect(await readOverThreshold()).toBe(0);
+        expect(readMax()).toBe(0);
+        expect(readOverThreshold()).toBe(0);
       });
     });
+  });
+});
+
+describe("GroupQueueMetricsCollector — blocked groups by pipeline and job", () => {
+  beforeEach(() => {
+    meter = createRecordingMeterProvider();
+    meter.install();
+    vi.useFakeTimers({ now: Date.now() });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    meter.uninstall();
+  });
+
+  const traceFold = {
+    pipeline_name: "trace_processing",
+    job_type: "projection",
+    job_name: "traceSummary",
+  };
+  const evalHandler = { pipeline_name: "evaluation", job_type: "handler", job_name: "runEval" };
+
+  function blockedFor(labels: Record<string, string>): number | undefined {
+    return meter.valuesOf("gq_blocked_groups", { queue_name: QUEUE, ...labels }).at(-1);
+  }
+
+  describe("given blocked groups from two jobs", () => {
+    describe("when a cycle runs", () => {
+      /** @scenario "Blocked groups are counted per pipeline and job" */
+      it("publishes one series per pipeline and job of the groups' head jobs", async () => {
+        const { redis } = makeRedis({
+          blocked: ["t1/a", "t2/a", "t1/b"],
+          routing: {
+            "t1/a": ["trace_processing", "projection", "traceSummary"],
+            "t2/a": ["trace_processing", "projection", "traceSummary"],
+            "t1/b": ["evaluation", "handler", "runEval"],
+          },
+        });
+
+        await runCollect(redis);
+
+        expect(blockedFor(traceFold)).toBe(2);
+        expect(blockedFor(evalHandler)).toBe(1);
+      });
+    });
+  });
+
+  describe("given a job whose blocked groups were all unblocked", () => {
+    describe("when the next cycle runs", () => {
+      /** @scenario "A cleared job's blocked series drops to zero" */
+      it("sets that job's series to 0 instead of leaving its last value", async () => {
+        const blocked = ["t1/a", "t1/b"];
+        const { redis } = makeRedis({
+          blocked,
+          routing: {
+            "t1/a": ["trace_processing", "projection", "traceSummary"],
+            "t1/b": ["evaluation", "handler", "runEval"],
+          },
+        });
+        const collector = makeCollector({ redis });
+        await collector.collect();
+        expect(blockedFor(evalHandler)).toBe(1);
+
+        blocked.splice(1, 1);
+        await collector.collect();
+
+        expect(blockedFor(evalHandler)).toBe(0);
+        expect(blockedFor(traceFold)).toBe(1);
+      });
+    });
+  });
+
+  describe("given a group whose head job carries no routing header", () => {
+    describe("when a cycle runs", () => {
+      /** @scenario "A blocked group without routing metadata counts as unknown" */
+      it("counts it under unknown so the series still sum to the queue total", async () => {
+        const { redis } = makeRedis({ blocked: ["t1/legacy"] });
+
+        await runCollect(redis);
+
+        expect(
+          blockedFor({ pipeline_name: "unknown", job_type: "unknown", job_name: "unknown" }),
+        ).toBe(1);
+      });
+    });
+  });
+
+  describe("given more blocked groups than the scan returns", () => {
+    describe("when a cycle runs", () => {
+      /** @scenario "Blocked groups beyond the scan cap are counted as unknown" */
+      it("attributes the remainder to unknown so the series still sum to SCARD", async () => {
+        const { redis } = makeRedis({
+          blocked: ["t1/a", "t2/a"],
+          blockedTotal: 5,
+          routing: {
+            "t1/a": ["trace_processing", "projection", "traceSummary"],
+            "t2/a": ["trace_processing", "projection", "traceSummary"],
+          },
+        });
+
+        await runCollect(redis);
+
+        expect(blockedFor(traceFold)).toBe(2);
+        expect(
+          blockedFor({ pipeline_name: "unknown", job_type: "unknown", job_name: "unknown" }),
+        ).toBe(3);
+      });
+    });
+  });
+
+  describe("given the label script rejects", () => {
+    describe("when a cycle runs", () => {
+      /** @scenario "A failed label lookup or blocked scan does not stop the cycle" */
+      it("counts the groups as unknown and still publishes the other gauges", async () => {
+        const { redis } = makeRedis({ blocked: ["t1/a", "t2/a"], evalshaRejects: true });
+
+        await runCollect(redis);
+
+        expect(
+          blockedFor({ pipeline_name: "unknown", job_type: "unknown", job_name: "unknown" }),
+        ).toBe(2);
+        expect(readGauge()).toBeDefined();
+      });
+    });
+  });
+
+  describe("given the blocked-set scan fails", () => {
+    describe("when a cycle runs", () => {
+      /** @scenario "A failed label lookup or blocked scan does not stop the cycle" */
+      it("counts the whole total as unknown and still publishes the other gauges", async () => {
+        const { redis } = makeRedis({
+          blocked: ["t1/a", "t2/a"],
+          blockedScanRejects: true,
+        });
+
+        await runCollect(redis);
+
+        expect(
+          blockedFor({ pipeline_name: "unknown", job_type: "unknown", job_name: "unknown" }),
+        ).toBe(2);
+        expect(readGauge()).toBeDefined();
+      });
+    });
+  });
+
+  describe("given a group that stays blocked across cycles", () => {
+    describe("when a later cycle runs", () => {
+      it("resolves its labels once rather than every cycle", async () => {
+        const { redis, evalsha } = makeRedis({
+          readyZset: [{ member: "t9/ready", score: Date.now() - 5_000 }],
+          blocked: ["t1/a"],
+          routing: { "t1/a": ["trace_processing", "projection", "traceSummary"] },
+        });
+        const collector = makeCollector({ redis });
+        await collector.collect();
+        const namingBlocked = () =>
+          evalsha.mock.calls.filter((call) => call.includes("t1/a")).length;
+        expect(namingBlocked()).toBe(1);
+
+        await collector.collect();
+
+        expect(namingBlocked()).toBe(1);
+        expect(blockedFor(traceFold)).toBe(1);
+      });
+    });
+  });
+});
+
+describe("GroupQueueMetricsCollector — oldest pending age by pipeline and job", () => {
+  beforeEach(() => {
+    meter = createRecordingMeterProvider();
+    meter.install();
+    vi.useFakeTimers({ now: Date.now() });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    meter.uninstall();
+  });
+
+  describe("given the oldest eligible group changes between cycles", () => {
+    /** @scenario "The oldest pending age names the oldest group's pipeline and job" */
+    it("labels the age with the oldest group's job and zeroes the previous holder", async () => {
+      const readyZset = [{ member: "t1/a", score: Date.now() - 5_000 }];
+      const { redis } = makeRedis({
+        readyZset,
+        routing: {
+          "t1/a": ["trace_processing", "projection", "traceSummary"],
+          "t1/b": ["evaluation", "handler", "runEval"],
+        },
+      });
+      const collector = makeCollector({ redis });
+      await collector.collect();
+      expect(
+        meter
+          .valuesOf("gq_oldest_pending_age_milliseconds", {
+            queue_name: QUEUE,
+            pipeline_name: "trace_processing",
+            job_name: "traceSummary",
+          })
+          .at(-1),
+      ).toBe(5_000);
+
+      // The next tick advances the frozen clock by one interval before reading.
+      readyZset.splice(0, 1, { member: "t1/b", score: Date.now() + METRICS_INTERVAL_MS - 2_000 });
+      await collector.collect();
+
+      const ageOf = (job_name: string) =>
+        meter
+          .valuesOf("gq_oldest_pending_age_milliseconds", { queue_name: QUEUE, job_name })
+          .at(-1);
+      expect(ageOf("traceSummary")).toBe(0);
+      expect(ageOf("runEval")).toBe(2_000);
+    });
+  });
+});
+
+describe("GroupQueueMetricsCollector — parked tenant transitions", () => {
+  beforeEach(() => {
+    meter = createRecordingMeterProvider();
+    meter.install();
+    vi.useFakeTimers({ now: Date.now() });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    meter.uninstall();
+  });
+
+  const parkLines = (lines: TestLogLines, fragment: string) =>
+    lines.filter((line) => String(line.msg).includes(fragment));
+
+  function collectorWithTestLogger(redis: IORedis | Cluster) {
+    const { logger, lines } = createTestLogger();
+    return { lines, ...makeCollector({ redis, logger: logger as never }) };
+  }
+
+  /** @scenario "A tenant's park start and stop are each logged once" */
+  it("warns once when a tenant starts being parked and logs once when it stops", async () => {
+    const parked: Record<string, number> = { "tenant-a": 3 };
+    const { redis } = makeRedis({ parked });
+    const { lines, collect } = collectorWithTestLogger(redis);
+
+    await collect();
+    parked["tenant-a"] = 7;
+    await collect();
+    delete parked["tenant-a"];
+    await collect();
+    await collect();
+
+    const started = parkLines(lines, "started being parked");
+    expect(started).toHaveLength(1);
+    expect(started[0]).toMatchObject({
+      level: 40,
+      queueName: QUEUE,
+      tenantId: "tenant-a",
+      parkedGroups: 3,
+    });
+    const stopped = parkLines(lines, "stopped being parked");
+    expect(stopped).toHaveLength(1);
+    expect(stopped[0]).toMatchObject({ level: 30, queueName: QUEUE, tenantId: "tenant-a" });
+  });
+
+  it("treats a tenant whose parked set emptied as no longer parked", async () => {
+    const parked: Record<string, number> = { "tenant-a": 2 };
+    const { redis } = makeRedis({ parked });
+    const { lines, collect } = collectorWithTestLogger(redis);
+
+    await collect();
+    parked["tenant-a"] = 0;
+    await collect();
+
+    expect(lines.findLine("info", "stopped being parked")).toMatchObject({ tenantId: "tenant-a" });
   });
 });

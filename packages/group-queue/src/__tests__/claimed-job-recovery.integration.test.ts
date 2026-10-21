@@ -10,7 +10,7 @@ import { deadLetterJob } from "../deadLetter.ts";
 import { NonRetryableGroupQueueError } from "../errors.ts";
 import { GroupQueueProcessor } from "../groupQueue.ts";
 import { readEnvelopeLease } from "../jobEnvelope.ts";
-import { type DispatchResult, GroupStagingScripts } from "../scripts.ts";
+import { DRAIN_WRITE_CHUNK_JOBS, type DispatchResult, GroupStagingScripts } from "../scripts.ts";
 import { InMemoryObjectStore, mintTestUri } from "./blob-test-doubles.ts";
 
 type TestPayload = { id: string; groupId: string };
@@ -175,6 +175,134 @@ describe("GroupQueue claimed-job recovery", () => {
     });
   });
 
+  describe("given a claimed group whose middle sibling has lost its body", () => {
+    /** @scenario "A drained sibling whose body is gone leaves the group without a recovery copy" */
+    it("takes every sibling off the group and the counter and holds only the ones with a body", async () => {
+      const q = freshQueue();
+      for (const [index, id] of ["j1", "j2", "j3", "j4"].entries()) {
+        await q.scripts.stage(stageJob(id, 100 * (index + 1)));
+      }
+      const claimed = await q.scripts.dispatch({ nowMs: 1_000, activeTtlSec: 60 });
+      await redis.hdel(`${q.keyPrefix}group:g1:data`, "j3");
+
+      const siblings = await q.scripts.drainGroupReady({
+        groupId: "g1",
+        nowMs: 1_000,
+        maxJobs: 3,
+        claimToken: claimed!.claimToken,
+      });
+
+      expect(siblings.map((s) => [s.stagedJobId, s.jobDataJson])).toEqual([
+        ["j2", JSON.stringify({ stagedJobId: "j2" })],
+        ["j3", ""],
+        ["j4", JSON.stringify({ stagedJobId: "j4" })],
+      ]);
+      expect(await redis.zcard(`${q.keyPrefix}group:g1:jobs`)).toBe(0);
+      expect(await q.pending()).toBe(0);
+      expect(await redis.hgetall(q.claimedKey("g1"))).toEqual({
+        token: claimed!.claimToken,
+        "s:j1": "100",
+        "d:j1": JSON.stringify({ stagedJobId: "j1" }),
+        "s:j2": "200",
+        "d:j2": JSON.stringify({ stagedJobId: "j2" }),
+        "s:j4": "400",
+        "d:j4": JSON.stringify({ stagedJobId: "j4" }),
+      });
+    });
+  });
+
+  describe("given a claimed group whose second sibling would overflow the byte budget", () => {
+    /** @scenario "A drain stops at the first sibling that would overflow the byte budget" */
+    it("drains only the first sibling and leaves the rest staged in order", async () => {
+      const q = freshQueue();
+      await q.scripts.stage(stageJob("j1", 100));
+      await q.scripts.stage({ ...stageJob("j2", 200), jobDataJson: "a".repeat(10) });
+      await q.scripts.stage({ ...stageJob("j3", 300), jobDataJson: "b".repeat(100) });
+      await q.scripts.stage({ ...stageJob("j4", 400), jobDataJson: "c".repeat(10) });
+      const claimed = await q.scripts.dispatch({ nowMs: 1_000, activeTtlSec: 60 });
+      const drain = (initialBytes: number) =>
+        q.scripts.drainGroupReady({
+          groupId: "g1",
+          nowMs: 1_000,
+          maxJobs: 3,
+          maxBytes: 50,
+          initialBytes,
+          claimToken: claimed!.claimToken,
+        });
+
+      expect((await drain(0)).map((s) => s.stagedJobId)).toEqual(["j2"]);
+      const record = await redis.hgetall(q.claimedKey("g1"));
+      expect(await drain(10)).toEqual([]);
+
+      expect(await redis.zrange(`${q.keyPrefix}group:g1:jobs`, 0, -1)).toEqual(["j3", "j4"]);
+      expect(await q.pending()).toBe(2);
+      expect(record).toEqual({
+        token: claimed!.claimToken,
+        "s:j1": "100",
+        "d:j1": JSON.stringify({ stagedJobId: "j1" }),
+        "s:j2": "200",
+        "d:j2": "a".repeat(10),
+      });
+      expect(await redis.hgetall(q.claimedKey("g1"))).toEqual(record);
+    });
+  });
+
+  describe("given a claimed group with more due siblings than one write carries", () => {
+    /** @scenario "A drain too large for one write is held whole and comes back in order" */
+    it("holds every sibling in the record and brings them all back in order after a death", async () => {
+      const q = freshQueue();
+      const siblingCount = DRAIN_WRITE_CHUNK_JOBS * 2 + 7;
+      const ids = Array.from({ length: siblingCount + 1 }, (_, index) => `j${index}`);
+      for (let start = 0; start < ids.length; start += 200) {
+        await Promise.all(
+          ids
+            .slice(start, start + 200)
+            .map((id, offset) => q.scripts.stage(stageJob(id, 100 + start + offset))),
+        );
+      }
+      const claimed = await q.scripts.dispatch({ nowMs: 10_000, activeTtlSec: 1 });
+
+      const siblings = await q.scripts.drainGroupReady({
+        groupId: "g1",
+        nowMs: 10_000,
+        maxJobs: siblingCount,
+        claimToken: claimed!.claimToken,
+      });
+
+      expect(siblings.map((s) => s.stagedJobId)).toEqual(ids.slice(1));
+      expect(await q.pending()).toBe(0);
+      expect(await redis.hlen(q.claimedKey("g1"))).toBe(1 + 2 * ids.length);
+      expect(await redis.pttl(q.claimedKey("g1"))).toBeGreaterThan(0);
+
+      await redis.del(q.activeKey("g1"));
+      const again = await q.scripts.dispatch({ nowMs: 20_000, activeTtlSec: 60 });
+      expect(again?.stagedJobId).toBe("j0");
+      expect(await q.pending()).toBe(siblingCount);
+      expect(await redis.zrange(`${q.keyPrefix}group:g1:jobs`, 0, -1)).toEqual(ids.slice(1));
+    });
+  });
+
+  describe("given a claim whose worker drains siblings without a claim token", () => {
+    /** @scenario "A previous-release worker's drain writes nothing into the claimed record" */
+    it("takes the siblings off the group and the counter and leaves the record as the claim wrote it", async () => {
+      const q = freshQueue();
+      await q.scripts.stage(stageJob("j1", 100));
+      await q.scripts.stage(stageJob("j2", 200));
+      await q.scripts.stage(stageJob("j3", 300));
+      const claimed = await q.scripts.dispatch({ nowMs: 1_000, activeTtlSec: 60 });
+
+      const siblings = await q.scripts.drainGroupReady({ groupId: "g1", nowMs: 1_000, maxJobs: 2 });
+
+      expect(siblings.map((s) => s.stagedJobId)).toEqual(["j2", "j3"]);
+      expect(await q.pending()).toBe(0);
+      expect(await redis.hgetall(q.claimedKey("g1"))).toEqual({
+        token: claimed!.claimToken,
+        "s:j1": "100",
+        "d:j1": JSON.stringify({ stagedJobId: "j1" }),
+      });
+    });
+  });
+
   describe("given a worker whose claim was recovered by a second worker while it ran", () => {
     /** @scenario "A slow former owner's completion does not double-complete" */
     it("changes nothing on the late completion and lets the second worker complete once", async () => {
@@ -208,6 +336,79 @@ describe("GroupQueue claimed-job recovery", () => {
       await q.scripts.complete({ groupId: "g1", stagedJobId: "j2", claimToken: next!.claimToken });
       expect(await q.completed()).toBe(2);
       expect(await q.pending()).toBe(0);
+    });
+  });
+
+  describe("given a worker whose own claim lapsed and which claimed the group again", () => {
+    /** @scenario "A late outcome from a worker's own earlier claim leaves its newer claim alone" */
+    it("refuses the earlier claim's completion, retry and block and leaves the newer claim's marker", async () => {
+      const q = freshQueue();
+      const worker = "worker-that-reclaimed";
+      const scripts = new GroupStagingScripts(redis, q.name, { claimMarkerOwner: worker });
+      const markerKey = `${q.keyPrefix}group:g1:claim`;
+      const claim = async (nowMs: number, activeTtlSec: number) =>
+        (
+          await scripts.dispatchBatch({
+            nowMs,
+            activeTtlSec,
+            maxJobs: 1,
+            claimGuardWorkerId: worker,
+          })
+        )[0];
+      // Dispatch writes the marker only while the worker's beacon is alive.
+      await redis.set(`${q.keyPrefix}worker:${worker}`, "alive", "EX", 90);
+      await scripts.stage(stageJob("j1", 100));
+      await scripts.stage(stageJob("j2", 200));
+
+      // The earlier claim's active key lapses; the same worker claims the group again.
+      const earlier = await claim(1_000, 1);
+      await redis.del(q.activeKey("g1"));
+      const newer = await claim(3_000, 60);
+      expect(newer?.stagedJobId).toBe("j1");
+      expect(newer?.claimToken).not.toBe(earlier?.claimToken);
+      await redis.hset(markerKey, "deaths", "2");
+
+      const state = async () => ({
+        marker: await redis.hgetall(markerKey),
+        claimed: await redis.hgetall(q.claimedKey("g1")),
+        active: await redis.get(q.activeKey("g1")),
+        jobs: await redis.zrange(`${q.keyPrefix}group:g1:jobs`, 0, -1, "WITHSCORES"),
+        blocked: await redis.sismember(`${q.keyPrefix}blocked`, "g1"),
+        pending: await q.pending(),
+        completed: await q.completed(),
+      });
+      const before = await state();
+      expect(before.marker).toMatchObject({ owner: worker, deaths: "2", token: newer!.claimToken });
+
+      const late = { groupId: "g1", stagedJobId: "j1", claimToken: earlier!.claimToken };
+      expect(await scripts.complete(late)).toBe(false);
+      expect(
+        await scripts.retryRestage({
+          ...late,
+          newStagedJobId: "j1",
+          dispatchAfterMs: 5_000,
+          jobDataJson: earlier!.jobDataJson,
+          backoffMs: 1_000,
+          attempt: 2,
+          attemptTtlSec: 60,
+        }),
+      ).toBe(false);
+      expect(
+        await scripts.restageAndBlock({
+          groupId: "g1",
+          newStagedJobId: "j1",
+          score: 100,
+          jobDataJson: earlier!.jobDataJson,
+          errorMessage: "late failure",
+          claimToken: earlier!.claimToken,
+        }),
+      ).toBe(false);
+      expect(await state()).toEqual(before);
+
+      expect(
+        await scripts.complete({ groupId: "g1", stagedJobId: "j1", claimToken: newer!.claimToken }),
+      ).toBe(true);
+      expect(await redis.exists(markerKey)).toBe(0);
     });
   });
 

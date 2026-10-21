@@ -328,6 +328,31 @@ Feature: An aggregate project reads its member projects
     And Quick Search offers the same pages as the navigation and no action that creates data
     And no monitor can be created on the aggregate
 
+  # An aggregate records no coding-agent session of its own, so the recency
+  # signal an ordinary project grows the Sessions destination from never
+  # arrives; the aggregate offers it on its kind alone (v4.12).
+
+  @integration
+  Scenario: The aggregate offers Sessions without a session of its own
+    Given the aggregate recorded no coding-agent session
+    When ana opens the aggregate project
+    Then the navigation shows Sessions beside Trace Explorer
+
+  @unit
+  Scenario: The aggregate's Sessions page lists its members' sessions under their windows
+    Given an aggregate reading two members through shared grants
+    And one member's grant starts after some of its sessions
+    When ana opens the aggregate's Sessions page
+    Then the sessions of both members show, newest first
+    And the sessions before that grant's start are absent
+
+  @unit
+  Scenario: A sessions read through the proof names no tenant of its own
+    Given a repository reading sessions through the proof-checked client
+    When it reads an aggregate's page
+    Then the statement's tenants and the window on StartedAt come from the proof
+    And the latest-version group is bound to the same tenants
+
   # ── E. The reconciler keeps members current ──────────────────────────────
 
   @integration
@@ -376,12 +401,35 @@ Feature: An aggregate project reads its member projects
     Then the ledger holds the same grant rows with the same ids
     And no duplicate row exists
 
-  @integration
-  Scenario: A nightly sweep catches a missed trigger
-    Given an aggregate project with the rule "all personal projects"
-    And a personal project that was created while the reconciler was unavailable
-    When the nightly sweep runs for the organisation
-    Then that personal project is a member
+  # Reconciles come from facts alone: no daily re-check of every aggregate (ADR-177, ADR-025).
+  @unit
+  Scenario: A burst of changes in one organisation queues one reconcile
+    Given an organisation with an aggregate project
+    When several members are removed, moved or disabled within 30 seconds
+    Then one reconcile job is queued for the organisation after the 30 seconds settle
+    And that job carries the newest fact
+
+  @unit
+  Scenario: A reconcile that keeps failing is parked for an operator after five tries
+    Given a reconcile of an aggregate project that fails on every attempt
+    When the outbox has tried it five times
+    Then it is marked dead and tried no more
+    And it stays in the outbox for an operator to redrive
+
+  @unit
+  Scenario: A reconcile that attaches every member but one is tried again
+    Given a reconcile of an aggregate project in which one member's attach is refused
+    When the outbox runs it
+    Then the reconcile is not marked finished
+    And it is tried again, and finishes once that member's attach goes through
+
+  @unit
+  Scenario: The daily wake only clears finished reconciles
+    Given a finished reconcile and a dead one, both older than two days
+    When the daily wake runs
+    Then the finished reconcile is deleted
+    And the dead reconcile is kept
+    And no reconcile is queued
 
   # A member's read starts at the beginning of time under an all-personal or
   # explicit rule, and on the day it joined under a department rule, so a move
@@ -405,7 +453,7 @@ Feature: An aggregate project reads its member projects
   Scenario: An aggregate whose reads start at their join date is widened to full history
     Given an aggregate project with the rule "all personal projects"
     And a member whose read was attached before full history was the rule
-    When the reconciler or the nightly sweep runs
+    When the reconciler runs for that aggregate
     Then that read is revoked as a window change
     And the member is attached again with a read from the beginning of time
 

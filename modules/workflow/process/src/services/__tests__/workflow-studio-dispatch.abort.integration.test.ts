@@ -117,3 +117,52 @@ describe("given a studio run that finishes before any stop", () => {
     });
   });
 });
+
+describe("given a studio run streaming from a slow model whose stop flag cannot be read", () => {
+  describe("when reading the stop flag fails while a chunk is pending", () => {
+    /** @scenario "A stop flag that cannot be read leaves the run streaming" */
+    it("keeps streaming to the end without an unhandled rejection", async () => {
+      const cancel = vi.fn(async () => undefined);
+      let release: () => void = () => undefined;
+      const slow = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      let reads = 0;
+      const reader: ReadableStreamDefaultReader<Uint8Array> = {
+        read: async () => {
+          reads += 1;
+          if (reads > 1) return { done: true, value: undefined };
+          await slow;
+          return { done: false, value: new TextEncoder().encode('data: {"type":"done"}\n\n') };
+        },
+        cancel,
+        releaseLock: vi.fn(),
+        closed: Promise.resolve(undefined),
+      };
+      const onEvent = vi.fn<(event: StudioServerEvent) => void>();
+      let checks = 0;
+
+      const running = dispatch(reader).postEvent({
+        projectId: "project-1",
+        event: blockedCell,
+        onEvent,
+        // The first check passes; every poll while the read is pending fails, as a Redis blip.
+        isAborted: async () => {
+          checks += 1;
+          if (checks > 1) throw new Error("Connection is closed.");
+          return false;
+        },
+      });
+      await new Promise((resolve) => setTimeout(resolve, 1_300));
+      release();
+
+      // A poll rejection the run let escape would reject `running` or fail the run as unhandled.
+      await expect(running).resolves.toBeUndefined();
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(checks).toBeGreaterThan(1);
+      expect(cancel).not.toHaveBeenCalled();
+      expect(onEvent).toHaveBeenCalledWith(expect.objectContaining({ type: "done" }));
+    });
+  });
+});

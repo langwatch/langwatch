@@ -47,6 +47,28 @@ Feature: Upgrade alerts reach platform operators
       And its idempotency key names the wake and the recipient
 
     @unit
+    Scenario: The alert email links each failed step to its own page
+      Given a step failed and the runner's lease expired since the last wake
+      When the upgrade alert check runs
+      Then the email names the installation by its host
+      And each failed step carries its description, its error, its release and a link that opens that step
+      And the stopped runner is named by its owner and host
+
+    # A self-hosted operator cannot fix an upgrade step: plain words and a way to reach us.
+    # LangWatch staff on Cloud keep the ids and errors. Plan: dev/docs/plans/upgrade-diagnostics-via-connect.md
+    @unit
+    Scenario: On LangWatch Cloud the alert email is worded for LangWatch staff
+      Given a step failed since the last wake
+      When the upgrade alert check runs on LangWatch Cloud
+      Then the email is worded for LangWatch staff, with each step's id and error
+
+    @unit
+    Scenario: On a self-hosted installation the alert email is worded for its operator
+      Given a step failed since the last wake
+      When the upgrade alert check runs on a self-hosted installation
+      Then the email is worded for the installation's operator, in plain words
+
+    @unit
     Scenario: Nothing is sent when nothing changed
       Given no step failed and no lease expired since the last wake
       When the upgrade alert check runs

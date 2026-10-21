@@ -11,27 +11,33 @@ import {
 } from "../../repositories/trace-span-dedup.repository.ts";
 
 describe("TraceSpanDedupRepository", () => {
-  describe("given a plain object with the port's three methods", () => {
+  describe("given a plain object with the port's methods", () => {
     it("is usable as the port, so a caller needs no adapter class", () => {
       const seen: SpanDedupRef[] = [];
       const dedup: TraceSpanDedupRepository = {
-        async claimProcessing(span: SpanDedupRef): Promise<SpanDedupClaim> {
-          seen.push(span);
-          return { outcome: "acquired" };
+        async claimProcessing(spans: readonly SpanDedupRef[]): Promise<SpanDedupClaim[]> {
+          seen.push(...spans);
+          return spans.map(() => ({ outcome: "acquired" }));
         },
-        async confirmProcessed(span: SpanDedupRef) {
-          seen.push(span);
+        async confirmProcessed(spans: readonly SpanDedupRef[]) {
+          seen.push(...spans);
         },
         async releaseOnFailure(span: SpanDedupRef) {
           seen.push(span);
         },
+        async claimUsageRecord(): Promise<SpanDedupClaim> {
+          return { outcome: "acquired" };
+        },
+        async releaseUsageRecord() {},
       };
 
-      void dedup.claimProcessing({
-        tenantId: "tenant-1",
-        traceId: "trace-1",
-        spanId: "span-1",
-      });
+      void dedup.claimProcessing([
+        {
+          tenantId: "tenant-1",
+          traceId: "trace-1",
+          spanId: "span-1",
+        },
+      ]);
 
       expect(seen).toEqual([{ tenantId: "tenant-1", traceId: "trace-1", spanId: "span-1" }]);
     });

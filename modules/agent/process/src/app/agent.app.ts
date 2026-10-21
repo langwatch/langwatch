@@ -470,6 +470,9 @@ export class AgentModule implements AgentApi {
         session: input.session,
         traceparent: input.traceparent ?? context.traceparent,
         run: input.run ?? {},
+        kind: input.kind,
+        state: input.state,
+        timeoutMs: input.timeoutMs,
       },
       signal: context.signal,
     });
@@ -477,6 +480,7 @@ export class AgentModule implements AgentApi {
     return {
       output: outcome.output,
       ...(outcome.session !== void 0 ? { session: outcome.session } : {}),
+      ...(outcome.state != null ? { state: outcome.state } : {}),
       instance: { hostname: outcome.instance.hostname, label: outcome.instance.label },
       durationMs: outcome.durationMs,
     };

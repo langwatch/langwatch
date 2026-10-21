@@ -598,7 +598,9 @@ closed: a table is refused if any of its projects lacks it. Filtering per projec
 is a tracked gap (`@unimplemented` in `specs/lwql/catalogue-grants.feature`).
 
 **Authority fails closed, tooling fails open** (Alex, 2026-09-30). A failed authz check is a plain 500
-with no rows, never a partial answer. The LWQL editor still edits without a schema (grammar only), a
+with no rows, never a partial answer. The hosted MCP endpoint answers a grant or credential re-check
+that could not run as a 503 with `Retry-After` (`mcp_store_unavailable`), because MCP clients read a
+401 as "sign in again" and a 500 as fatal (Alex, 2026-10-14). The LWQL editor still edits without a schema (grammar only), a
 failed validation clears its markers, and Run always asks the server. Its markers come from the
 `analytics.lwql.validate` query (Alex, 2026-09-30), the server's own validator, which never executes;
 the browser never validates.
@@ -856,7 +858,7 @@ readings and publishes them to shared state; each process's gauge reads that sta
 never repeat the query and every gauge agrees (Alex, 2026-09-29).
 Traces and logs compose through the `langwatch` SDK's own observability
 setup where its API fits — the platform dogfoods its SDK.
-`hostedStores(stores)` from process-stores, `hostedRuntime({ name, runtime,
+`hostedStores({ source, drainTimeoutMs })` from process-stores, `hostedRuntime({ name, runtime,
 drain })` from the process package. A raw `{ name, start, stop }` object
 literal at a call site is banned — if a component has no spoken factory,
 write the factory. Transport/route discovery is likewise built in at the
@@ -1701,12 +1703,14 @@ read through a narrow single-event read seat beside the producer-only store, wit
 window; the producer-only rule stands for everything else (Alex, 2026-10-06, round 3, Q209).
 2026-10-10: identity reads one aggregate's history through the read seat; WEB-9103.
 
-**A trace summary lookup is anchored on its event's time** (Alex, 2026-10-10): a summary is filed
-under its trace's start, which never moves, so a lookup reads windows widening back from the span's
-own occurredAt (3, 7, 21, 30 days, plus 1 day forward), stops at the first hit, and never scans every
-partition. Next: per-owner id index tables (unpartitioned, filled by a materialised view) for one
-exact read by id (`dev/docs/plans/id-index-2026-10-10.md`), replacing this ladder; parked: a
-default retention-period bound on every ClickHouse read.
+**A lookup by id reads through its table's id index** (Alex, 2026-10-11): each time-partitioned
+table looked up by id alone has an unpartitioned `<table>_id_index` (TenantId, id to its time range),
+owned by the table's owner and filled by a materialised view, with one background step per owner
+filling history. A read takes the caller's time when given, else the index's range, else (index not
+yet ready, or a miss) the old anchored or windowed read. Ready means the index holds its marker row
+on that ClickHouse target, written by the fill or, over an empty source, by the first check; never a
+feature flag (Alex, 2026-10-11). `dev/docs/plans/id-index-2026-10-10.md`.
+Parked: a default retention-period bound on every ClickHouse read.
 
 **A ClickHouse table has one owner, and others read it through that owner** (Alex, 2026-10-06,
 round 3, Q207). A plain read of another module's table is a query operation on its owner's `*Api`
@@ -1789,6 +1793,9 @@ markPaidOutOfBand take `ops:manage`. A view-only operator reads and is refused o
 task). Cloud never bootstraps: staff are seeded at cutover. On a self-hosted install the first user to sign up is recorded as the seed's decision (`first-user`) from user's `lw.user.created` fact, whatever `ADMIN_EMAILS` says, while nobody holds the grant and they are the only user; the seed's one-key record and latch grant at most one (Alex, 2026-10-10).
 A set `ADMIN_EMAILS` never falls back to an org admin: the seed waits, unlatched, until a named verified
 user exists. Users with no organization yet also wait; only a decision latches (Alex, 2026-10-01).
+On a deployment LangWatch runs (the seed's `cloud`, a developer's local stack excepted) the page and the
+recovery task grant only an account whose verified address is on `langwatch.ai`; the task, like the page,
+grants verified accounts only, everywhere. `can()` asks nothing more than the live grant (Alex, 2026-10-14).
 Deactivating a user ends their sessions and CLI tokens before user's fact is sent, without an outbox;
 user's lifecycle facts carry the database clock. The back office refuses bulk user writes, a deliberate
 difference from main (Alex, 2026-10-01).
@@ -2162,6 +2169,7 @@ An upcast's step id is `upcast:<pipeline>:<stored type>`; its optional rewrite c
 are gone; a fresh install plans upcast steps by their mode (Alex, 2026-10-06, rounds 15 and 16;
 no floor, Alex, 2026-10-11).
 A lane that moved or was renamed declares `.withLaneAliases([{ from, to: { jobType, lane }, eventTypes?, data? }])` on its pipeline: jobs an older release queued under `from` run on that lane, its own or its peer lane; the alias is kept like every step (Alex, 2026-10-11). They are chosen by the event type they carry, and a reactor's body is read as its event unless `data` reads it. A lane with no successor is tombstoned (`{ from, tombstone }`), and an aliased job whose event type no successor takes is acknowledged with a log line; an alias whose lane is not installed still retries (Alex, 2026-10-08, round 49 E4; `packages/eventing/specs/lane-alias.feature`).
+Beside an event subscriber's `enqueue.stage` (ADR-069), a fold projection subscriber may queue a compact job body parsed by its own schema instead of the event (`withProjectionSubscriber({ job })`); readers accept both bodies before any writer switches (Alex, 2026-10-20; `packages/eventing/specs/compact-subscriber-job.feature`).
 `defineProjectionReplayStep` takes `since`, the instant a first run replays from, so a handed-over
 fold is refolded over the deploy overlap only; absent, the start of the log (round 16).
 A process-manager handler emits intents through the typed accessor `ctx.intent(name, key, payload)`, and
@@ -2203,6 +2211,12 @@ A replay reads its projections off the pipelines the process registered: `replay
 unwraps a `RedisCachedFoldStore` to its durable tier, and a map projection's owner declares the
 `targetTable` a rebuild optimizes on its definition. No list outside the owning module names a
 store or a table (Alex, 2026-09-28).
+Ready groups of one handler and one tenant run as one batch, with one store write and one
+fold-state read; a failure retries per group, and a batch never waits past the settling window
+(Alex, 2026-10-16; `packages/group-queue/specs/cross-group-batch.feature`).
+Queue slots grow only while each step raises completed jobs per second, and shrink when job
+duration, failures, event-loop or heap pressure rise; never below the configured concurrency, at
+most 1000 (Alex, 2026-10-20; `packages/group-queue/specs/adaptive-slots.feature`).
 A pipeline whose projections write tenant rows declares each tenant's retention itself (Alex,
 2026-09-28): `.withRetention(resolver)`, built from its module's own `DataRetentionApi` dependency
 (`getResolvedForProject`, a tenant being a project), and registration prefers it to the runtime's.
@@ -2320,6 +2334,8 @@ its attempts. Only a single call that may run longer raises the limit (Alex, 202
 through the framework; no module scans queues or reads the `gq:parked-tenants` keys directly (Alex,
 2026-09-29). A tenant is parked only while
 the system is under load; otherwise a tenant may burst past the others (Alex, 2026-09-29).
+Queue Lua scripts declare Redis 7 script flags: growth scripts are refused whole at the memory cap,
+scripts that free memory carry allow-oom; Redis 7 is the minimum (Alex, 2026-10-20).
 
 A dequeued event whose type no pipeline on that worker declares is handed back without using an
 attempt, not refused (Alex, 2026-10-08, round 24; 2026-10-12, G1-F1): mid rolling deploy an older

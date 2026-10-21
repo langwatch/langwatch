@@ -63,15 +63,10 @@ jobs:
     outputs:
       relevant: ${{ steps.detect.outputs.relevant }}
       feature-parity: ${{ steps.detect.outputs.feature-parity }}
-      # Draft PRs get the fast, cheap signal only: lint, typecheck,
-      # feature-parity. The 10 test shards and the build are the runner budget,
-      # and on a draft they mostly re-run against work in progress.
-      #
-      # A PR labelled `ci:full` gets the full suite as a draft too.
-      # Everything heavy comes back on ready_for_review, and `merge_group`
-      # is never a draft — so nothing reaches main without the full suite
-      # having run on it.
-      heavy: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false || contains(github.event.pull_request.labels.*.name, 'ci:full') }}
+      # Drafts and release-please PRs (rewritten on every merge) get lint, typecheck and
+      # feature-parity only; `ci:full` lifts that. merge_group is never a draft and main
+      # runs the full suite, so nothing lands without it.
+      heavy: ${{ github.event_name != 'pull_request' || (github.event.pull_request.draft == false && !startsWith(github.head_ref, 'release-please--')) || contains(github.event.pull_request.labels.*.name, 'ci:full') }}
       # One shard each on a draft, because the draft run is affected-tests-only
       # and a subset does not need splitting.
       #
@@ -108,8 +103,8 @@ jobs:
       # healthy shard before the four-minute floor. At that measured rate,
       # eight shards put about 315 files and three minutes on each runner,
       # preserving the floor's intended minute of headroom.
-      unit-shards: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false || contains(github.event.pull_request.labels.*.name, 'ci:full')) && '[1,2,3,4,5,6,7,8]' || '[1]' }}
-      unit-shard-count: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false || contains(github.event.pull_request.labels.*.name, 'ci:full')) && '8' || '1' }}
+      unit-shards: ${{ (github.event_name != 'pull_request' || (github.event.pull_request.draft == false && !startsWith(github.head_ref, 'release-please--')) || contains(github.event.pull_request.labels.*.name, 'ci:full')) && '[1,2,3,4,5,6,7,8]' || '[1]' }}
+      unit-shard-count: ${{ (github.event_name != 'pull_request' || (github.event.pull_request.draft == false && !startsWith(github.head_ref, 'release-please--')) || contains(github.event.pull_request.labels.*.name, 'ci:full')) && '8' || '1' }}
       # Six became four when the component lane took the files that never
       # needed a datastore. 540 of the 1017 integration files declare jsdom and
       # name no database, queue or cache; they now run on `test-component`
@@ -129,7 +124,7 @@ jobs:
       # the shared lane runs ~4x faster per file, so 331 shared files and 146
       # mocking ones are close to balanced at 2+2 — the same four runners as
       # before, finishing sooner.
-      integration-matrix: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false || contains(github.event.pull_request.labels.*.name, 'ci:full')) && '[{"lane":"shared","shard":1,"count":2},{"lane":"shared","shard":2,"count":2},{"lane":"mocking","shard":1,"count":2},{"lane":"mocking","shard":2,"count":2}]' || '[{"lane":"shared","shard":1,"count":1},{"lane":"mocking","shard":1,"count":1}]' }}
+      integration-matrix: ${{ (github.event_name != 'pull_request' || (github.event.pull_request.draft == false && !startsWith(github.head_ref, 'release-please--')) || contains(github.event.pull_request.labels.*.name, 'ci:full')) && '[{"lane":"shared","shard":1,"count":2},{"lane":"shared","shard":2,"count":2},{"lane":"mocking","shard":1,"count":2},{"lane":"mocking","shard":2,"count":2}]' || '[{"lane":"shared","shard":1,"count":1},{"lane":"mocking","shard":1,"count":1}]' }}
       # The component lane is unit-shaped: forked VM workers and concurrent
       # files, with no service containers to wait on, so a shard gets through
       # its files far faster than a datastore shard does. (It does NOT share a
@@ -146,8 +141,8 @@ jobs:
       # outgrew its split, so the cost of being close to it is a confusing
       # failure rather than a slow pass. Every PR that adds a component test
       # spends that margin, so the split has to leave some.
-      component-shards: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false || contains(github.event.pull_request.labels.*.name, 'ci:full')) && '[1,2,3]' || '[1]' }}
-      component-shard-count: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false || contains(github.event.pull_request.labels.*.name, 'ci:full')) && '3' || '1' }}
+      component-shards: ${{ (github.event_name != 'pull_request' || (github.event.pull_request.draft == false && !startsWith(github.head_ref, 'release-please--')) || contains(github.event.pull_request.labels.*.name, 'ci:full')) && '[1,2,3]' || '[1]' }}
+      component-shard-count: ${{ (github.event_name != 'pull_request' || (github.event.pull_request.draft == false && !startsWith(github.head_ref, 'release-please--')) || contains(github.event.pull_request.labels.*.name, 'ci:full')) && '3' || '1' }}
       # Coverage instrumentation costs ~45% of the run (measured: a unit subset
       # goes 3.7s -> 6.6s with --coverage). Nothing gates on it — there is no
       # codecov.yml, no codecov status check, and both uploads are
@@ -502,9 +497,11 @@ jobs:
             !/docs/images/
           sparse-checkout-cone-mode: false
 
+      # The one job that saves the pnpm store (not on the critical path).
       - uses: ./.github/actions/setup-pnpm-node
         with:
           install: all
+          save-store: "true"
 
       - uses: ./.github/actions/prepare-generated-files
 
@@ -748,12 +745,11 @@ jobs:
       VITEST_ISOLATE_WORKER_REDIS: "1"
       CI: "true"
     runs-on: ubuntu-latest
-    # Serial within a leg: each suite is its own vitest with its own worker
-    # pool, and several at once on a 4-core runner produce "[vitest-pool]:
-    # Worker forks emitted error", which reads as a broken test and is not one.
+    # Bounded within a leg: PACKAGE_SUITES_CONCURRENCY suites at once, a heavy
+    # suite alone, integration and browser suites one at a time (run-package-suites.ts).
     # Parallel across legs: over two hundred package suites run one after
-    # another take well past two hours, so the list is split round-robin
-    # (PACKAGE_SUITES_SHARD) over separate runners.
+    # another take well past two hours, so the list is split by measured weight
+    # (PACKAGE_SUITES_SHARD, .github/package-suites.weights) over separate runners.
     strategy:
       fail-fast: false
       matrix:
@@ -815,6 +811,25 @@ jobs:
 
       - uses: ./.github/actions/prepare-generated-files
 
+      # Each browser lane runs `playwright install --with-deps chromium` in its own
+      # script (browser-test-lane.md), and the first one on a shard spent ~17s
+      # downloading Chromium. Cached by Playwright version, that install finds the
+      # browser already there and only checks the system libraries. Keyed on the
+      # version rather than the lockfile, so an unrelated dependency bump keeps
+      # the cache and the repository's cache quota is not churned.
+      - name: Read the Playwright version
+        id: playwright
+        run: |
+          version=$(grep -m1 -oE '^  playwright@[0-9][^:]*' pnpm-lock.yaml | cut -d@ -f2)
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Cache the Playwright browser
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.playwright.outputs.version }}
+
       - name: Generate a throwaway CREDENTIALS_SECRET
         # Same reason as test-unit and test-component: anything encrypted at
         # rest has to round-trip through a real key, and a test asserting that
@@ -870,6 +885,9 @@ jobs:
         env:
           REQUIRE_HELM_TESTS: "1"
           PACKAGE_SUITES_SHARD: ${{ matrix.shard }}/8
+          # Each suite gets two vitest workers (patches/vitest@5.0.1.patch), so one
+          # at a time left half the cores idle. A heavy suite still runs alone.
+          PACKAGE_SUITES_CONCURRENCY: "2"
           # A pull request runs the suites its change reaches; main runs all.
           PACKAGE_SUITES_ONLY: ${{ needs.affected.outputs.projects }}
           # The hook records what each cached suite reads outside its package (ADR-150).
@@ -893,6 +911,10 @@ jobs:
     needs: changes
     if: needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-latest
+    env:
+      # 0 turns off oxlint's local slot queue (patches/oxlint@1.85.0.patch). On a
+      # runner only this job uses, it parks the third process of `lint:types`.
+      LANGWATCH_LINT_SLOTS: "0"
     # Read-only. This job used to carry `pull-requests: write` so that a
     # reviewdog pass could post inline lint annotations through the Review
     # API. The Oxlint gate reports through the job's exit code and writes
@@ -1330,9 +1352,6 @@ jobs:
       - name: Test start-clickhouse-with-storage-policy.sh
         run: bash .github/scripts/__tests__/start-clickhouse-with-storage-policy.test.sh
 
-      - name: Test start-boxd-ssh-agent.sh
-        run: bash .github/scripts/__tests__/start-boxd-ssh-agent.test.sh
-
       - name: Test notify-slack-release.sh
         run: bash .github/scripts/__tests__/notify-slack-release.test.sh
 
@@ -1385,11 +1404,13 @@ jobs:
   # added under dev/scripts therefore merged green and turned every branch that
   # merged main red.
   #
-  # No `if:` gate, on purpose. The guard reads every tree `files` in the root
+  # No path gate, on purpose. The guard reads every tree `files` in the root
   # package.json names, and a path filter listing them would be a second copy of
   # that list, stale the day someone edits it. A minute on an unrelated pull
-  # request is the cheaper mistake.
+  # request is the cheaper mistake. A label event is not a change at all, so it
+  # skips like `changes` does.
   pack-filters:
+    if: github.event_name != 'pull_request' || github.event.action != 'labeled' || github.event.label.name == 'ci:full'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

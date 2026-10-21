@@ -15,7 +15,7 @@ import (
 // skill is the .claude/skills directory that teaches it.
 var simulators = []struct{ name, skill string }{
 	{"mail", "mailsim"}, {"idp", "idpsim"}, {"storage", "storagesim"}, {"llm", "llmsim"},
-	{"voice", "voicesim"}, {"analytics", "analyticssim"}, {"outbound", "outboundsim"}, {"payment", "paymentsim"}, {"telemetry", "telemetrysim"}, {"lambda", "lambdasim"}, {"github", "githubsim"},
+	{"voice", "voicesim"}, {"analytics", "analyticssim"}, {"outbound", "outboundsim"}, {"payment", "paymentsim"}, {"telemetry", "telemetrysim"}, {"lambda", "lambdasim"}, {"github", "githubsim"}, {"mcp", "mcpsim"},
 }
 
 // simRow is one simulator as `haven sim --json` reports it.

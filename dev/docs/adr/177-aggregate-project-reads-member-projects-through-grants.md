@@ -201,7 +201,11 @@ AND StartTime within the grant's window))` onto the query. A trace from a
    list and detail show the owner's existing evaluation results. No monitor
    can be created on an aggregate, and the evaluation trigger subscriber is
    untouched. Online Evals, Test and Build are hidden from the aggregate's
-   navigation; Observe shows Traces. Analytics leaves the navigation until
+   navigation; Observe shows Traces and, since v4.12, Sessions: the
+   coding-agent session list reads through the route's proof, so the page
+   spans the members under their grants' windows on `StartedAt`, and the
+   aggregate offers the destination on its kind alone, since it records no
+   session of its own to grow it from. Analytics leaves the navigation until
    analytics across members ships (v4.8). Annotations on member traces are
    out of scope. (Block D.)
 
@@ -230,20 +234,22 @@ AND StartTime within the grant's window))` onto the query. A trace from a
 
 ## Constants
 
-| Name                                | Value                                                                 | Purpose                                                                                                                              |
-| ----------------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `PROJECT_KIND_AGGREGATE`            | `"aggregate"`                                                         | `Project.kind` value                                                                                                                 |
-| `PROJECT_READER_ROLE_KEY`           | `"project-reader"`                                                    | `Grant.roleKey` for a project-to-project read grant                                                                                  |
-| `PROJECT_READER_PERMISSIONS`        | `["traces:view", "analytics:view"]`                                   | the role's whole permission list                                                                                                     |
-| `GRANT_SOURCE_AGGREGATE_RECONCILER` | `"aggregate-reconciler"`                                              | added to `GRANT_EVENT_SOURCES`                                                                                                       |
-| `AUTHORIZATION_CONDITION_TYPES`     | `"trace" \| "span" \| "log"`                                          | `Grant.condition.type` and the proof's condition type, in `@langwatch/actor` beside `grantConditionSchema`; v1 writes only `"trace"` |
-| `AUTHORIZATION_GRANT_KINDS`         | `"own" \| "shared"`                                                   | ADR-166 grant kind inside the proof                                                                                                  |
-| `AUTHORIZATION_PURPOSES`            | `"route" \| "event" \| "operator"`                                    | ADR-166 purpose; v1 mints only `"route"`                                                                                             |
-| `CLICKHOUSE_READ_RESOURCES`         | `"traces" \| "analytics"`                                             | the `reads` declaration on `as()`; span reads declare `"traces"`                                                                     |
-| `AGGREGATE_RULE_KINDS`              | `"all-personal" \| "personal-by-department" \| "explicit"`            | discriminator of `Project.aggregateRule`                                                                                             |
-| `AGGREGATE_DEFAULT_RULE`            | `{ kind: "all-personal" }`                                            | preselected on creation                                                                                                              |
-| `ADMIN_WORKSPACE_VIEW_DEDUP_MS`     | `300000` (5 × 60 × 1000)                                              | existing list-view audit dedup window, reused                                                                                        |
-| `AGGREGATE_RECONCILE_SWEEP`         | nightly at 03:17 UTC (`17 3 * * *`), one `ScheduledJob` per aggregate | catch-up for missed triggers                                                                                                         |
+| Name                                | Value                                                      | Purpose                                                                                                                              |
+| ----------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `PROJECT_KIND_AGGREGATE`            | `"aggregate"`                                              | `Project.kind` value                                                                                                                 |
+| `PROJECT_READER_ROLE_KEY`           | `"project-reader"`                                         | `Grant.roleKey` for a project-to-project read grant                                                                                  |
+| `PROJECT_READER_PERMISSIONS`        | `["traces:view", "analytics:view"]`                        | the role's whole permission list                                                                                                     |
+| `GRANT_SOURCE_AGGREGATE_RECONCILER` | `"aggregate-reconciler"`                                   | added to `GRANT_EVENT_SOURCES`                                                                                                       |
+| `AUTHORIZATION_CONDITION_TYPES`     | `"trace" \| "span" \| "log"`                               | `Grant.condition.type` and the proof's condition type, in `@langwatch/actor` beside `grantConditionSchema`; v1 writes only `"trace"` |
+| `AUTHORIZATION_GRANT_KINDS`         | `"own" \| "shared"`                                        | ADR-166 grant kind inside the proof                                                                                                  |
+| `AUTHORIZATION_PURPOSES`            | `"route" \| "event" \| "operator"`                         | ADR-166 purpose; v1 mints only `"route"`                                                                                             |
+| `CLICKHOUSE_READ_RESOURCES`         | `"traces" \| "analytics"`                                  | the `reads` declaration on `as()`; span reads declare `"traces"`                                                                     |
+| `AGGREGATE_RULE_KINDS`              | `"all-personal" \| "personal-by-department" \| "explicit"` | discriminator of `Project.aggregateRule`                                                                                             |
+| `AGGREGATE_DEFAULT_RULE`            | `{ kind: "all-personal" }`                                 | preselected on creation                                                                                                              |
+| `ADMIN_WORKSPACE_VIEW_DEDUP_MS`     | `300000` (5 × 60 × 1000)                                   | existing list-view audit dedup window, reused                                                                                        |
+| `AGGREGATE_RECONCILE_SETTLE_MS`     | `30000`, per lane and key                                  | a burst of facts queues one reconcile (v4.11)                                                                                        |
+| `AGGREGATE_RECONCILE_MAX_ATTEMPTS`  | `5`                                                        | then the reconcile is dead, kept for an operator                                                                                     |
+| `AGGREGATE_PRUNE_INTERVAL_MS`       | daily                                                      | prunes finished reconciles older than two days; queues none                                                                          |
 
 ## Invariants
 
@@ -590,8 +596,9 @@ side keeps its existing guards until ADR-166's `prisma.as` lands.
   the proof, the fold store and the settle confirm with an own-only
   internal one. The lint gate refuses any call from a trace router into a
   proof-taking service whose own arguments carry no proof, positional or
-  named; log records and coding-agent sessions stay behind a counted
-  baseline. An aggregate is never the project the app lands on. Not
+  named; log records and the coding-agent reads other than the session
+  list (proof-fenced since v4.12) stay behind a counted baseline. An
+  aggregate is never the project the app lands on. Not
   delivered: analytics across members, because every analytics read goes
   through a raw client over three tables and the rollup windows on
   `BucketStart`, a time column the client does not admit; the scenario
@@ -792,8 +799,45 @@ side keeps its existing guards until ADR-166's `prisma.as` lands.
   (null when it no longer parses), and the reconciler compares it with the
   rule's window: a wrong start is revoked with reason
   `aggregate_read_window_changed` and attached again, after the dropped
-  members are revoked, and the nightly sweep brings every existing
-  aggregate across. A department read with any attach-time start is left
+  members are revoked, the next time a fact queues a reconcile for that
+  aggregate (v4.11). A department read with any attach-time start is left
   alone, so nothing is rewritten on a later run. A member is unread
   between its revoke and its new attach; a failed attach is retried by the
   next reconcile, like any other.
+- v4.11 (2026-10-12, decision 3 changed: what runs a reconcile). The
+  reconcile is event-driven only; the nightly sweep is gone. A project or
+  member fact waits 30 seconds per key, the newest replacing older ones,
+  then queues one reconcile on the aggregate's outbox: member facts and a
+  created or revived project key per organisation, an archived project or
+  a department assignment per project, a rule change per aggregate. A
+  reconcile that fails is tried five times, then parked as dead for an
+  operator to redrive from ops. The daily wake only deletes finished
+  reconciles older than two days; it queues none and never deletes a dead
+  one. Why no re-check of every aggregate: a hidden fix-all hides the
+  trigger that missed (ADR-025), and a dead reconcile already says which
+  one. Governance's own department write no longer queues a reconcile of
+  its own: organisation's `member_department_changed` fact does. No
+  deploy step re-checks existing aggregates for the v4.10 window: none
+  exist yet, and a later aggregate is created with the full-history read.
+  A reconcile that attaches every member but one is not finished: it
+  throws, so the outbox tries it again on the same ladder, and the grants
+  already attached read as held on that try. (The "next reconcile" that
+  v4.10 relied on for a refused attach was the sweep.)
+- v4.12 (2026-10-13, decision 8 changed: Sessions on the aggregate). The
+  coding-agent session list (`codingAgents.sessionsList`) takes the proof
+  its route already minted and reads `coding_agent_sessions` through the
+  proof-checked client, `StartedAt` admitted as a fence time column (it is
+  the table's partition key). An aggregate's page therefore spans its
+  members under their windows; a plain project's reads its own rows as
+  before. The latest-version group is bound to the same tenant set, and the
+  in-memory collapse keys on tenant and session, since one session id in
+  two members is two sessions. The metric-series fill runs per tenant the
+  rows came back under. Viewer protections for the list fold the proof in
+  (decision 9), so the title and cost gates are the strictest across the
+  members. The navigation offers Sessions on the aggregate kind alone, no
+  recency signal, because an aggregate owns no session to touch
+  `lastCodingAgentSessionAt`. Not moved: the other coding-agent procedures
+  (`usageTotals`, `recentSessions`, `pullRequestUsage`, the session and
+  transcript reads) keep their own tenant and find nothing on an aggregate;
+  the session rows carry no member name, so the page does not yet say which
+  member a session belongs to.

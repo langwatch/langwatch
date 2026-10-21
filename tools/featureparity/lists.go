@@ -49,6 +49,7 @@ var (
 		"services/sims/telemetrysim",
 		"services/sims/lambdasim",
 		"services/sims/githubsim",
+		"services/sims/mcpsim",
 		"services/scenariorunner",
 		"tools/workerrun",
 		"tools/seedgen",
@@ -83,7 +84,6 @@ var (
 		"specs/langy/langy-projection-independent-reactions.feature",
 	}
 	legacyInert = []string{
-		"specs/clickhouse/id-index-reads.feature",
 		"modules/authz/specs/access-reviews.feature",
 		"modules/authz/specs/agent-principals.feature",
 		"modules/authz/specs/authz-passports.feature",
@@ -280,7 +280,6 @@ var (
 		"specs/nlp-go/proxy.feature",
 		"specs/nlp-go/python-removal.feature",
 		"specs/nlp-go/remove-execute-evaluation.feature",
-		"specs/nlp-go/topic-clustering.feature",
 		"specs/nlp-go/tracing-parity.feature",
 		"specs/npx-installer/01-bootstrap.feature",
 		"specs/npx-installer/02-predeps.feature",

@@ -131,6 +131,30 @@ Feature: Anthropic Messages translation: reaching non-Anthropic providers from a
     And the conversation continues rather than restarting
 
   # ==========================================================================
+  # Reasoning: encrypted reasoning returns under the id it was issued with
+  # ==========================================================================
+
+  @bdd @messages-translation @integration
+  Scenario: Reasoning from a previous turn returns to the provider under its own item id
+    Given the destination is an OpenAI Responses provider
+    And a previous turn returned encrypted reasoning as a `redacted_thinking` block
+    When the client sends that block back in the next request
+    Then the provider receives a reasoning item with the id it issued
+    And the encrypted content arrives unchanged
+
+  @bdd @messages-translation @integration
+  Scenario: A non-streaming reply keeps the encrypted reasoning
+    Given the destination is an OpenAI Responses provider
+    When the provider answers with an encrypted reasoning item and no summary
+    Then the reply carries a `redacted_thinking` block the client can send back
+
+  @bdd @messages-translation @unit
+  Scenario: Redacted thinking the gateway did not mint passes through unchanged
+    Given a `redacted_thinking` block whose data the gateway did not produce
+    When the client sends it in a request
+    Then its data reaches the provider as it arrived
+
+  # ==========================================================================
   # Non-streaming
   # ==========================================================================
 
