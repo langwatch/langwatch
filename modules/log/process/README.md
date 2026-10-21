@@ -64,8 +64,8 @@ Authenticated: the OTLP ingest door's resolved key is the whole gate, as on main
 Answers at `/api/otel/v1/logs`.
 
 ```typescript
-// Rawbody: "bytes" (inline, src/transport/otlp-logs.rest.ts:121)
-// Response: inline, src/transport/otlp-logs.rest.ts:124
+// Rawbody: "bytes" (inline, src/transport/otlp-logs.rest.ts:122)
+// Response: inline, src/transport/otlp-logs.rest.ts:125
 type Response = unknown;
 ```
 

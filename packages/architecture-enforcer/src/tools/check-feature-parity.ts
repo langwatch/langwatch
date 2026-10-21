@@ -436,7 +436,6 @@ const LEGACY_INERT: string[] = [
   "specs/dependencies/supply-chain-age-gates.feature",
   "specs/evaluations/experiments-online-evaluations-separation.feature",
   "specs/evaluators/create-workflow-evaluator.feature",
-  "specs/evaluators/evaluator-cli.feature",
   "specs/evaluators/evaluator-error-propagation.feature",
   "specs/evaluators/satisfaction-score-migration.feature",
   "specs/evaluators/thread-eval-skips-without-thread-id.feature",
@@ -470,7 +469,6 @@ const LEGACY_INERT: string[] = [
   "specs/features/evaluation-cli.feature",
   "specs/features/graph-cli.feature",
   "specs/features/model-provider-cli.feature",
-  "specs/features/monitor-cli.feature",
   "specs/features/onboarding/primary-use-setting.feature",
   "specs/features/prompt-versions-cli.feature",
   "specs/features/secret-cli.feature",
@@ -662,6 +660,12 @@ const LEGACY_INERT: string[] = [
 
 /** Feature files with mixed tagged/untagged scenarios (legacy tolerance; new files fail) */
 const LEGACY_PARTIAL: string[] = [
+  // Reason: left LEGACY_INERT when evaluator get gained name resolution; its
+  // scenarios are enforced. The other CLI scenarios stay untagged.
+  "specs/evaluators/evaluator-cli.feature",
+  // Reason: left LEGACY_INERT when monitor get gained name resolution; its
+  // scenarios are enforced. The other CLI scenarios stay untagged.
+  "specs/features/monitor-cli.feature",
   // Reason: left LEGACY_INERT when the launcher's place beside an open drawer
   // was bound (#8588). The peek scenarios are still planned and stay untagged.
   "specs/langy/langy-peek-dock.feature",
