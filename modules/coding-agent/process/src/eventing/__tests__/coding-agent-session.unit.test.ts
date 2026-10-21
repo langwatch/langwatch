@@ -251,6 +251,27 @@ describe("CodingAgentSessionFoldProjection", () => {
       expect(state.agent).toBe("claude_code");
     });
 
+    /** @scenario "a session's peak context counts the fresh input beside the cached prompt" */
+    it("measures the peak context as fresh input plus cache reads and writes", () => {
+      const projection = makeProjection();
+
+      const state = projection.handleCodingAgentSessionSpanFactsContributed(
+        spanFactsEvent({
+          name: "claude_code.llm_request",
+          spanId: "llm-context",
+          facts: {
+            input_tokens: 1_200,
+            output_tokens: 300,
+            cache_read_tokens: 5_000,
+            cache_creation_tokens: 800,
+          },
+        }),
+        projection.init(),
+      );
+
+      expect(state.peakContextTokens).toBe(7_000);
+    });
+
     /** @scenario "The session's cost is computed from tokens, same formula as the trace" */
     it("computes the span's cost and keeps the reported figure beside it", () => {
       const projection = makeProjection();
@@ -1352,7 +1373,7 @@ describe("read-back losslessness (ADR-066)", () => {
 
       // The fields the pre-ADR-066 row could not represent are actually populated.
       expect(state.subAgentIds).toEqual(["sub-agent-1"]);
-      expect(state.previousCallContextTokens).toBe(1_000);
+      expect(state.previousCallContextTokens).toBe(1_100);
       expect(state.steps[0]?.startedAtMs).toBe(3_000);
       expect(Object.keys(state.metricSeries)).toContain("loc-added");
       expect(state.linesAdded).toBe(42);
@@ -1739,7 +1760,10 @@ describe("coding-agent session fold, codex", () => {
   };
 
   describe("when a codex turn span contributes", () => {
-    /** @scenario "a codex turn span folds the turn's model call and tokens" */
+    /**
+     * @scenario "a codex turn span folds the turn's model call and tokens"
+     * @scenario "a session's peak context counts the fresh input beside the cached prompt"
+     */
     it("folds the turn as a model call with disjoint token buckets", () => {
       const projection = makeProjection();
 
@@ -1763,7 +1787,8 @@ describe("coding-agent session fold, codex", () => {
       expect(state.outputTokens).toBe(7);
       expect(state.cacheReadTokens).toBe(11_008);
       expect(state.cacheCreationTokens).toBe(0);
-      expect(state.peakContextTokens).toBe(11_008);
+      // The whole 13944 codex reported, its cached 11008 counted once.
+      expect(state.peakContextTokens).toBe(13_944);
       // The turn's wall time includes the tools that ran inside it, so it
       // does not pretend to be model latency.
       expect(state.modelCallMs).toBe(0);

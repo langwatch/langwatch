@@ -127,6 +127,14 @@ Feature: Coding-agent sessions
     When a run of its model calls is written together
     Then the session's context growth, final request and stop reason match the last call in that run
 
+  # A call's context is the whole prompt it sent: the part read from the cache,
+  # the part written to it and the part sent fresh. Every agent's input count
+  # reaches the fold as the fresh part only, so adding the three counts it once.
+  Scenario: a session's peak context counts the fresh input beside the cached prompt
+    When a session's model call reads part of its prompt from the cache, writes part to it and sends the rest fresh
+    Then the session's peak context is the whole prompt the call sent
+    And a codex turn, whose input includes the cache, counts its cached input once
+
   Scenario: a reported rate limit is counted apart from an inferred one
     When an agent session reports rate-limit events and separately fails an API call with a 429
     Then the session counts the reported rate-limit events on their own

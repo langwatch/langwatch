@@ -575,7 +575,10 @@ export class CodingAgentSessionStateProjection {
 
     const cacheReadTokens = this.number(attrs.cache_read_tokens);
     const cacheCreationTokens = this.number(attrs.cache_creation_tokens);
-    const contextTokens = cacheReadTokens + cacheCreationTokens;
+    const inputTokens = this.number(attrs.input_tokens);
+    // Every carrier hands the fold fresh input disjoint from the cache, so the
+    // sum is the whole prompt the call sent.
+    const contextTokens = inputTokens + cacheReadTokens + cacheCreationTokens;
     // The first call is never a "rebuild" — there is nothing to reuse yet,
     // so a cold cache isn't the session's fault. `previousCallContextTokens`
     // starts at 0, which doubles as that gate.
@@ -593,7 +596,7 @@ export class CodingAgentSessionStateProjection {
       // Attempts includes the first try, so attempts > modelCalls means the
       // session paid for retries somewhere.
       attempts: next.attempts + Math.max(1, this.number(attrs.attempt)),
-      inputTokens: next.inputTokens + this.number(attrs.input_tokens),
+      inputTokens: next.inputTokens + inputTokens,
       outputTokens: next.outputTokens + this.number(attrs.output_tokens),
       cacheReadTokens: next.cacheReadTokens + cacheReadTokens,
       cacheCreationTokens: next.cacheCreationTokens + cacheCreationTokens,
