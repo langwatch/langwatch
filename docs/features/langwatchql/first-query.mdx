@@ -1,0 +1,165 @@
+---
+title: "LangWatchQL first queries: one example per view"
+sidebarTitle: Your first queries
+keywords: langwatch, langwatchql, lwql, sql examples, traces, spans, evaluations, simulations, trace_metrics, rollups, coding sessions, judgments
+description: Worked LangWatchQL statements for traces, spans, evaluations, simulations, per-minute rollups, conversations, coding-agent sessions and Instant Eval judgments.
+---
+
+Each statement below runs as written with `langwatch query "<statement>"` or in the `sql` field of `POST /api/v1/query`. Every one filters on its view's time column, because that filter is what keeps the read small: without it the query reads every partition your project has.
+
+## Traces: the most recent failures
+
+`traces` has one row per trace, and its time column is `OccurredAt`.
+
+```sql
+SELECT TraceId, TraceName, OccurredAt, TotalDurationMs
+FROM analytics.traces
+WHERE OccurredAt >= subtractDays(now(), 1)
+  AND ContainsErrorStatus
+ORDER BY OccurredAt DESC
+LIMIT 100
+```
+
+For latency, use `quantile` on the same view:
+
+```sql
+SELECT
+  quantile(0.5)(TotalDurationMs) AS p50_ms,
+  quantile(0.95)(TotalDurationMs) AS p95_ms,
+  quantile(0.99)(TotalDurationMs) AS p99_ms
+FROM analytics.traces
+WHERE OccurredAt >= subtractDays(now(), 7)
+```
+
+## Spans: the slowest span in each trace
+
+`spans` has one row per span, and its time column is `StartTime`. When you join two views, filter the time column on both sides, because the join key does not narrow the read.
+
+```sql
+SELECT
+  t.TraceId AS TraceId,
+  t.TraceName AS TraceName,
+  count() AS spans,
+  max(s.DurationMs) AS slowest_span_ms
+FROM analytics.traces AS t
+INNER JOIN analytics.spans AS s
+  ON s.TenantId = t.TenantId AND s.TraceId = t.TraceId
+WHERE t.OccurredAt >= subtractDays(now(), 1)
+  AND s.StartTime >= subtractDays(now(), 1)
+GROUP BY TraceId, TraceName
+ORDER BY slowest_span_ms DESC
+LIMIT 50
+```
+
+## Evaluations: pass rate per evaluator
+
+`evaluations` has one row per evaluator result, and its time column is `ScheduledAt`. Filter on `Status = 'processed'`, because scheduled, skipped and errored rows have no verdict and would lower the rate.
+
+```sql
+SELECT
+  EvaluatorName,
+  count() AS evaluations,
+  countIf(Passed = 1) AS passed
+FROM analytics.evaluations
+WHERE ScheduledAt >= subtractDays(now(), 7)
+  AND Status = 'processed'
+GROUP BY EvaluatorName
+ORDER BY evaluations DESC
+LIMIT 50
+```
+
+## Simulations: runs that failed
+
+`simulations` has one row per scenario run, and its time column is `StartedAt`.
+
+```sql
+SELECT ScenarioRunId, Name, Verdict, StartedAt
+FROM analytics.simulations
+WHERE StartedAt >= subtractDays(now(), 7)
+  AND Verdict = 'failure'
+ORDER BY StartedAt DESC
+LIMIT 50
+```
+
+## Rollups: traffic per hour and cost per model
+
+`trace_metrics_by_minute` and `model_usage_by_minute` hold one row per minute that is already summed, so a count or a sum over time reads far less here than over `traces`. Every measure is a sum, so divide by `TraceCount` when you want an average. Their time column is `BucketStart`.
+
+```sql
+SELECT
+  toStartOfHour(BucketStart) AS hour,
+  sum(TraceCount) AS traces,
+  sum(ErrorCount) AS errors
+FROM analytics.trace_metrics_by_minute
+WHERE BucketStart >= subtractDays(now(), 2)
+GROUP BY hour
+ORDER BY hour
+```
+
+Cost columns need the `cost:view` permission on your key:
+
+```sql
+SELECT
+  Model,
+  sum(CostSum) AS cost_usd,
+  sum(PromptTokensSum + CompletionTokensSum) AS tokens
+FROM analytics.model_usage_by_minute
+WHERE BucketStart >= subtractDays(now(), 7)
+GROUP BY Model
+ORDER BY cost_usd DESC
+LIMIT 50
+```
+
+## Conversations: the longest ones of the week
+
+There is no conversations view. A conversation is the group of traces that share a `ConversationId`, and `trace_metrics` is the view that has that column, along with `UserId`, `CustomerId` and `HasError`.
+
+```sql
+SELECT
+  ConversationId,
+  count() AS turns,
+  min(OccurredAt) AS started_at,
+  max(OccurredAt) AS last_turn
+FROM analytics.trace_metrics
+WHERE OccurredAt >= subtractDays(now(), 7)
+  AND ConversationId IS NOT NULL
+GROUP BY ConversationId
+ORDER BY turns DESC
+LIMIT 50
+```
+
+## Coding-agent sessions: sessions per agent and repository
+
+`coding_sessions` has one row per coding-agent session, and its time column is `StartedAt`.
+
+```sql
+SELECT
+  Agent,
+  RepositoryName,
+  count() AS sessions
+FROM analytics.coding_sessions
+WHERE StartedAt >= subtractDays(now(), 7)
+GROUP BY Agent, RepositoryName
+ORDER BY sessions DESC
+LIMIT 50
+```
+
+## Judgments: Instant Eval verdicts per question
+
+`judgments` has one row per [Instant Eval](/features/instant-evals/overview) run, trace and question, and its time column is `CreatedAt`. Bind the run id as a parameter with `--param run=<run-id>`.
+
+```sql
+SELECT
+  QuestionId,
+  sum(Passed) AS yes,
+  count() AS judged
+FROM analytics.judgments
+WHERE RunId = {run:String}
+  AND CreatedAt >= subtractDays(now(), 7)
+GROUP BY QuestionId
+ORDER BY QuestionId
+```
+
+To read verdicts next to trace data, join `judgments` to `traces` on `TraceId`, as in [Reading the results](/features/instant-evals/results#the-judgments-dataset).
+
+**Also check:** `langwatch query examples` prints more worked statements, and the [Query API reference](/api-reference/query/overview#queryable-views) lists every view and column.

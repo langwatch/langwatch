@@ -1,0 +1,77 @@
+---
+title: LangWatchQL limits, rate limits and cost
+sidebarTitle: Limits and cost
+keywords: langwatch, langwatchql, lwql, row limit, 10000 rows, timeout, rate limit, queries per minute, result too large, billing, cost
+description: How many rows a query returns, how large and long it can be, how many queries a plan runs per minute, and what is charged.
+---
+
+## Limits
+
+| What | Limit | Over the limit |
+| --- | --- | --- |
+| Rows per response | 10,000. A statement with no `LIMIT` gets `LIMIT 10000` added at the end. | A `LIMIT` above 10,000 is refused with 400 `lwql_not_permitted`, `LIMIT_TOO_HIGH` |
+| Result size | About 8,000,000 bytes | 413 `lwql_result_too_large`. You never get a cut result. |
+| Statement length | 50,000 characters | The request is refused |
+| Run time | 10 seconds | 504 `query_timeout` |
+| Memory | 1 GB | 422 `query_memory_exceeded` |
+| Data read | 1,000,000,000 rows or 10,000,000,000 bytes | 422 `query_scan_limit_exceeded` |
+| Threads | 4 per query | |
+| Queries running at once | 10 | 503 `lwql_busy` |
+
+Adding `LIMIT 10000` is the only change LangWatch makes to your statement. The server limits are fixed for every query, and a `SETTINGS` clause that tries to change them is refused.
+
+## How many queries can I run per minute
+
+| Plan | Queries per minute, per project |
+| --- | --- |
+| Free | 30 |
+| Paid | 60 |
+| Enterprise | 120 |
+
+The window is a fixed 60 seconds. Over the limit the answer is 429 `lwql_rate_limited`, and `meta.retryAfterSeconds` in the error tells you how long to wait.
+
+## How do I get more than 10,000 rows
+
+Page through the result. Order by a time column and an id, alias those two columns to the cursor parameter names `after_ts` and `after_id`, and let the CLI rebind them for each page:
+
+```sql
+SELECT OccurredAt AS after_ts, TraceId AS after_id, CapturedInput, CapturedOutput
+FROM analytics.traces
+WHERE OccurredAt >= subtractDays(now(), 7)
+  AND (OccurredAt, TraceId) > ({after_ts:DateTime64(3)}, {after_id:String})
+ORDER BY OccurredAt, TraceId
+LIMIT 1000
+```
+
+```bash
+langwatch query --sql-file export.sql --page-by keyset --format jsonl --out export.jsonl
+```
+
+From the REST API, page with `LIMIT` and `OFFSET` and an `ORDER BY`. In a `UNION`, give every branch its own `LIMIT`, or the query is refused with `LIMIT_REQUIRED_PER_BRANCH`.
+
+## What does a query cost
+
+Eval functions (`eval`, `eval_passed`, `eval_score` and the others) are metered and charged per query. The [extraction functions reference](/api-reference/query/extraction-functions#what-one-query-costs) has the details.
+
+These docs do not state a charge for a plain SQL query without eval functions.
+
+## Error codes
+
+| Status | Code | What it means |
+| --- | --- | --- |
+| 400 | `validation_error` | The request body is not valid |
+| 400 | `lwql_unparseable` | The statement is not valid ClickHouse SQL |
+| 400 | `lwql_not_permitted` | The statement uses something LangWatchQL does not allow, such as a second statement, a view or a function |
+| 400 | `lwql_unknown_identifier` | The statement names a column that does not exist |
+| 401 | `missing_credentials`, `invalid_credentials` | No API key, or a key LangWatch does not know |
+| 403 | `api_key_permission_denied` | The key does not have `analytics:view` |
+| 404 | `project_not_found` | The `projectId` in the body does not exist, or the key cannot read it with `analytics:view` |
+| 413 | `lwql_result_too_large` | The result is over about 8,000,000 bytes |
+| 422 | `query_scan_limit_exceeded`, `query_memory_exceeded` | The query reads too much data or uses too much memory |
+| 422 | `lwql_app_function_key_cap` | An extraction function was given more keys than one query reads |
+| 422 | `instant_eval_query_budget_exceeded` | The eval functions in the query are over their token budget |
+| 429 | `lwql_rate_limited` | Too many queries this minute for this project |
+| 503 | `lwql_busy` | Too many queries are running at once |
+| 504 | `query_timeout` | The query ran for more than 10 seconds |
+
+[Common questions](/features/langwatchql/common-questions) has the exact messages and how to fix each one.
