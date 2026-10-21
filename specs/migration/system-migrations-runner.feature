@@ -202,6 +202,13 @@ Feature: Running system migrations across organizations
     Then it tells the scheduled process nothing
     And the short cadence ends
 
+  @unit
+  Scenario: A tenant held for queued work is pending however many tenants wait on a person
+    Given many tenants wait on a person and one is held because its queued work has not drained
+    When a run that advanced nothing ends
+    Then the store is asked only for tenants held for queued work
+    And the run tells the scheduled process that a pass is pending
+
   # The barrier's deadline is the one refusal a booting fleet cannot answer:
   # every replica runs this preflight before it starts consuming, so work it
   # queues drains only if some other process already serves that queue, and a
@@ -441,6 +448,12 @@ Feature: Running system migrations across organizations
     Then it does not read as failed
 
   @unit
+  Scenario: A tenant waiting on a person never reads as failed
+    Given "org_acme" has waited on a person for longer than the held threshold
+    When its record is read
+    Then it does not read as failed
+
+  @unit
   Scenario: A paced pass leaves undrained queue work to the next pass but fails on a tenant fault
     Given a paced migration whose pass runs on a queue list of its own
     When the list's queue work stops draining
@@ -453,6 +466,26 @@ Feature: Running system migrations across organizations
     Given a migration whose work for "org_acme" is queued but not drained
     When a pass runs
     Then "org_acme" is held with reason "pending"
+
+  # A hold no pass can move: the user proves the account, or an operator lifts a pin (2026-10-21).
+  @unit
+  Scenario: A tenant waiting on a person is held with reason person and counts as finished
+    Given a migration that holds "org_acme" until a person acts
+    When a pass runs
+    Then "org_acme" is held with reason "person"
+    And the migration has no unfinished tenant
+
+  @unit
+  Scenario: A tenant held because its proof disagreed still leaves the migration unfinished
+    Given a migration whose own proof disagrees for "org_acme"
+    When a pass runs
+    Then the migration still has an unfinished tenant
+
+  @unit
+  Scenario: A tenant still waiting on a person is logged at info, not warn
+    Given "org_acme" has waited on a person since an earlier pass
+    When a later pass still holds it on the person
+    Then the hold is logged at info
 
   # A first hold is usually a projection still folding under the upgrade's
   # drain; the next pass re-proves it. Only a hold that persists is a warn.
