@@ -28,6 +28,10 @@ import {
 } from "./document.ts";
 
 const DEV_SOURCES = Object.fromEntries(ISLAND_NAMES.map((name) => [name, `/${ISLANDS[name]}`]));
+/* Linked so the first paint is styled; the bootstrap's own imports only take over for updates. */
+const DEV_STYLES = ["/src/app/docs.css", "/src/browser/islands.css"]
+  .map((href) => `<link rel="stylesheet" href="${href}">`)
+  .join("");
 
 function send({ response, type, body }: { response: ServerResponse; type: string; body: string }) {
   response.setHeader("Content-Type", type);
@@ -108,7 +112,7 @@ async function serveDocument({
     const html = composeDocument({
       template: readFileSync(path.join(appRoot, "index.html"), "utf8"),
       islands: islandHead({ sources: DEV_SOURCES }),
-      head: `${head}<style data-docs-style>${styled.css}</style>`,
+      head: `${head}${DEV_STYLES}<style data-docs-style>${styled.css}</style>`,
       app: styled.html,
       slug,
       operation: result.operation,
