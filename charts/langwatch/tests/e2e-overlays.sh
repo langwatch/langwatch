@@ -1409,6 +1409,43 @@ test_install_profile_local() {
   helm_uninstall
 }
 
+# ─────────────────────────────────────────────────────────────────────────────
+# SUITE: Install — redis-valkey overlay boots and answers with auth on
+# ─────────────────────────────────────────────────────────────────────────────
+# @scenario "The Valkey overlay boots and answers with auth on in a real cluster"
+test_install_redis_valkey() {
+  sep; info "Suite: install size-minimal + redis-valkey (auth on)"
+
+  # values-e2e.yaml turns Redis auth off; switch it back on so the chart's own
+  # probes (REDISCLI_AUTH) are what must pass for the pod to become Ready.
+  helm_install \
+    --set autogen.enabled=true \
+    -f "${OVERLAYS}/size-minimal.yaml" \
+    -f "${OVERLAYS}/access-nodeport.yaml" \
+    -f "${CHART_DIR}/tests/values-e2e.yaml" \
+    -f "${OVERLAYS}/redis-valkey.yaml" \
+    --set redis.auth.enabled=true
+  pass "helm install (minimal + redis-valkey, auth on)"
+
+  wait_pod_ready "app.kubernetes.io/component=redis" 120
+  pass "Valkey pod ready (probes pass with auth on)"
+
+  local pod image
+  pod=$(kc get pod -l "app.kubernetes.io/component=redis" \
+    -o jsonpath='{.items[0].metadata.name}')
+  image=$(kc get pod "$pod" -o jsonpath='{.spec.containers[?(@.name=="redis")].image}')
+  assert_eq "Redis container runs the Valkey image" "$image" "valkey/valkey:9.1"
+
+  local pong val
+  pong=$(kc exec "$pod" -- sh -c 'REDISCLI_AUTH=$REDIS_PASSWORD redis-cli ping')
+  assert_eq "Valkey PING with auth -> PONG" "$pong" "PONG"
+  kc exec "$pod" -- sh -c 'REDISCLI_AUTH=$REDIS_PASSWORD redis-cli SET e2e:valkey hello' > /dev/null
+  val=$(kc exec "$pod" -- sh -c 'REDISCLI_AUTH=$REDIS_PASSWORD redis-cli GET e2e:valkey')
+  assert_eq "Valkey SET/GET with auth roundtrip" "$val" "hello"
+
+  helm_uninstall
+}
+
 # ─── Image loading ────────────────────────────────────────────────────────────
 load_images() {
   sep; info "Building and loading images for install tests"
@@ -1510,6 +1547,7 @@ main() {
   test_install_prod_ingress
   test_install_external_ch
   test_install_profile_local
+  test_install_redis_valkey
 
   sep
   pass "All overlay E2E tests passed"
