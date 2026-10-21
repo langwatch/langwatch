@@ -409,11 +409,11 @@ export class LangWatchQLRateLimitedError extends HandledError {
 export class LangWatchQLMemberKeyMissingError extends HandledError {
   declare readonly code: "lwql_member_key_missing";
 
-  constructor(input: { projectIds: readonly string[] }) {
+  constructor(input: { projectIds: readonly string[]; projectNames?: readonly string[] }) {
     super("lwql_member_key_missing", "A member project of this aggregate cannot be queried.", {
       httpStatus: 503,
       fault: "platform",
-      meta: { projectIds: [...input.projectIds] },
+      meta: { projectIds: [...input.projectIds], projectNames: [...(input.projectNames ?? [])] },
     });
     this.name = "LangWatchQLMemberKeyMissingError";
   }
@@ -433,6 +433,23 @@ export class LangWatchQLTooManyMembersError extends HandledError {
       meta: { memberCount: input.memberCount, maxMembers: input.maxMembers },
     });
     this.name = "LangWatchQLTooManyMembersError";
+  }
+}
+
+/**
+ * A view the read keeps to a window is read as a subquery, and ClickHouse takes no `FINAL` or
+ * `SAMPLE` on one. The views already keep one row per key, so `FINAL` adds nothing there.
+ */
+export class LangWatchQLTableModifierError extends HandledError {
+  declare readonly code: "lwql_table_modifier_unsupported";
+
+  constructor(input: { modifiers: readonly string[] }) {
+    super("lwql_table_modifier_unsupported", "FINAL and SAMPLE cannot be used on this read.", {
+      httpStatus: 400,
+      fault: "customer",
+      meta: { modifiers: [...input.modifiers] },
+    });
+    this.name = "LangWatchQLTableModifierError";
   }
 }
 

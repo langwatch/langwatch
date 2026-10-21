@@ -18,6 +18,7 @@ import {
   buildTimeseriesQuery,
 } from "../clickhouse.aggregation-builder.mapper.ts";
 import { resetParamCounter } from "../clickhouse.filter-translator.mapper.ts";
+import { ownProjectReaderOver } from "./support/clickhouse-query-client.support.ts";
 
 const TENANT_ID = "test-eval-join-bounds-6392";
 const SEEDED_TABLES = ["trace_summaries", "evaluation_runs"] as const;
@@ -147,12 +148,12 @@ describe("the evaluation_runs JOIN time bounds", () => {
       ...baseInput,
       series: [{ metric, aggregation, key: evaluatorId }],
     });
-    const result = await client.query({
+    const result = await ownProjectReaderOver({ client, projectId: TENANT_ID }).query<Row>({
       query: sql,
       query_params: params,
       format: "JSONEachRow",
     });
-    return metricValue(await result.json<Row>(), "current");
+    return metricValue(await result.json(), "current");
   }
 
   beforeAll(async () => {

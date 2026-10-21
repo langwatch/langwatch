@@ -3,7 +3,10 @@
  * bounds the tenants, this rewrite bounds when each member is read from.
  * @see specs/lwql/aggregate-reads.feature
  */
-import type { LangWatchQLMemberWindow } from "@langwatch/analytics-contract";
+import {
+  type LangWatchQLMemberWindow,
+  LangWatchQLTableModifierError,
+} from "@langwatch/analytics-contract";
 import { describe, expect, it } from "vitest";
 
 import type { LangWatchQLViewDefinition } from "../../services/langwatch-ql-catalog-shapes.service.ts";
@@ -44,6 +47,15 @@ function scope({
     views: VIEWS,
     ...(memberWindows ? { memberWindows } : {}),
   });
+}
+
+function captureRefusal(run: () => unknown): unknown {
+  try {
+    run();
+  } catch (error) {
+    return error;
+  }
+  throw new Error("expected the rewrite to refuse");
 }
 
 describe("scopeLangWatchQL with member windows", () => {
@@ -128,11 +140,28 @@ describe("scopeLangWatchQL with member windows", () => {
 
       expect(scoped).toContain("TenantId = 'o\\'x'");
     });
+
+    /** @scenario "FINAL or SAMPLE on a narrowed view is refused with a clear message" */
+    it.each([
+      ["FINAL", "SELECT count() FROM traces FINAL"],
+      ["SAMPLE", "SELECT count() FROM traces AS t SAMPLE 0.5"],
+    ])("refuses %s instead of sending a statement the store rejects", (modifier, sql) => {
+      const refusal = captureRefusal(() => scope({ sql, memberWindows: [WHOLE_A, DATED_B] }));
+
+      expect(refusal).toBeInstanceOf(LangWatchQLTableModifierError);
+      expect((refusal as LangWatchQLTableModifierError).meta).toEqual({ modifiers: [modifier] });
+    });
   });
 
   describe("given members all shared for their whole history", () => {
     it("runs the statement as written, since the row policy bounds them exactly", () => {
       const sql = "SELECT count() FROM traces";
+
+      expect(scope({ sql, memberWindows: [WHOLE_A] })).toBe(sql);
+    });
+
+    it("leaves FINAL in place, since the statement is not rewritten", () => {
+      const sql = "SELECT count() FROM traces FINAL";
 
       expect(scope({ sql, memberWindows: [WHOLE_A] })).toBe(sql);
     });

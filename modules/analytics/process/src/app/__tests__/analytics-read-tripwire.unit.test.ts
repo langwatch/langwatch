@@ -102,6 +102,7 @@ async function harness(tripwireOn: boolean) {
         postgresHost: void 0,
         accessModelMode: void 0,
         sqlSingleNode: void 0,
+        aggregateMaxMembers: void 0,
       },
       tenantAnalyticsConcurrency: 4,
       publicBaseUrl: "https://app.langwatch.test",

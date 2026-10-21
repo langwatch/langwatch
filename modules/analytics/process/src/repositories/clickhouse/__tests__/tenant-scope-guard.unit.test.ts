@@ -60,7 +60,7 @@ describe("tenant scope guard vs the timeseries builders", () => {
       timeScale: 60,
     });
 
-    expect(checkTenantScope({ sql, params, tenantId: "tenant-a" })).toBeNull();
+    expect(fencedViolations({ sql, params })).toEqual([null, null]);
   });
 
   it("passes buildTimeseriesQuery when a filter clause carries its own OR", () => {
@@ -74,7 +74,7 @@ describe("tenant scope guard vs the timeseries builders", () => {
     });
 
     expect(sql).toContain("ContainsErrorStatus = 0 OR");
-    expect(checkTenantScope({ sql, params, tenantId: "tenant-a" })).toBeNull();
+    expect(fencedViolations({ sql, params })).toEqual([null, null]);
   });
 
   describe("given negated filters", () => {
@@ -95,7 +95,7 @@ describe("tenant scope guard vs the timeseries builders", () => {
 
       expect(sql).toMatch(/ts\.TraceId NOT IN \(\s*SELECT TraceId FROM stored_spans/);
       expect(sql).not.toMatch(/NOT \(\(?ts\.TraceId IN/);
-      expect(checkTenantScope({ sql, params, tenantId: "tenant-a" })).toBeNull();
+      expect(fencedViolations({ sql, params })).toEqual([null, null]);
     });
 
     it("keeps NOT around a filter without a subquery", () => {
@@ -110,7 +110,7 @@ describe("tenant scope guard vs the timeseries builders", () => {
       });
 
       expect(sql).toMatch(/NOT \(ts\.TraceName IN/);
-      expect(checkTenantScope({ sql, params, tenantId: "tenant-a" })).toBeNull();
+      expect(fencedViolations({ sql, params })).toEqual([null, null]);
     });
   });
 
@@ -123,7 +123,7 @@ describe("tenant scope guard vs the timeseries builders", () => {
       timeScale: "full",
     });
 
-    expect(checkTenantScope({ sql, params, tenantId: "tenant-a" })).toBeNull();
+    expect(fencedViolations({ sql, params })).toEqual([null, null]);
   });
 
   describe.each([
@@ -173,7 +173,7 @@ describe("tenant scope guard vs the timeseries builders", () => {
         ...overrides,
       } as Parameters<typeof buildTimeseriesQuery>[0]);
 
-      expect(checkTenantScope({ sql, params, tenantId: "tenant-a" })).toBeNull();
+      expect(fencedViolations({ sql, params })).toEqual([null, null]);
     });
   });
 
@@ -250,7 +250,7 @@ describe("tenant scope guard vs the timeseries builders", () => {
           timeScale,
         } as Parameters<typeof buildTimeseriesQuery>[0]);
 
-        expect(checkTenantScope({ sql, params, tenantId: "tenant-a" })).toBeNull();
+        expect(fencedViolations({ sql, params })).toEqual([null, null]);
       },
     );
   });
@@ -268,19 +268,15 @@ describe("tenant scope guard vs the timeseries builders", () => {
       timeZone: "Europe/Amsterdam",
     };
     const table = pickAnalyticsTable(input);
-    const fenced = {
+    const routed = {
       evaluation_analytics_rollup: buildEvalRollupTimeseriesQuery,
       evaluation_analytics: buildEvalSlimTimeseriesQuery,
     }[table as string];
     resetParamCounter();
-    const built = (fenced ?? buildTimeseriesQuery)(
+    const built = (routed ?? buildTimeseriesQuery)(
       input as Parameters<typeof buildTimeseriesQuery>[0],
     );
 
-    const violations = fenced
-      ? fencedViolations(built)
-      : [checkTenantScope({ ...built, tenantId: "tenant-a" })];
-
-    expect(violations.filter((violation) => violation !== null)).toEqual([]);
+    expect(fencedViolations(built)).toEqual([null, null]);
   });
 });

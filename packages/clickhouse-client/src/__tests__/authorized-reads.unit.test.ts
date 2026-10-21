@@ -348,6 +348,23 @@ describe("AuthorizedClickHouse", () => {
         );
         expect(query).toContain("SELECT TenantId, TraceId FROM t WHERE (TenantId IN");
       });
+
+      it("still allows a join key that equates two tenant columns", () => {
+        const { query } = expand(
+          `SELECT 1 FROM (SELECT TenantId, TraceId FROM t WHERE ${tenantScope("OccurredAt")}) ts JOIN (SELECT TenantId, TraceId FROM s WHERE ${tenantSet()}) ss ON ts.TenantId = ss.TenantId AND ts.TraceId = ss.TraceId`,
+        );
+        expect(query).toContain("ON ts.TenantId = ss.TenantId AND");
+      });
+
+      it("refuses an equality whose other side is not a tenant column", () => {
+        for (const predicate of ["ts.TenantId = ss.TraceId", "TenantId == {t:String}"]) {
+          expect(() =>
+            expand(`SELECT 1 FROM t WHERE ${tenantScope("OccurredAt")} AND ${predicate}`),
+          ).toThrow(
+            expect.objectContaining({ violation: { kind: "hand-written-tenant-predicate" } }),
+          );
+        }
+      });
     });
 
     describe("when the marker names the evaluation table's own occurrence time", () => {
