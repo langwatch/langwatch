@@ -94,8 +94,9 @@ describe("ModelProviderDefaultsWriteService.save", () => {
 
         await writer.save({ id: CONFIG_ID, config: { ...stored, DEFAULT: "openai/gpt-5" } });
 
-        await expect(defaults.getById(CONFIG_ID)).resolves.toMatchObject({
-          config: { FAST: CODEX_MODEL, DEFAULT: "openai/gpt-5" },
+        expect((await defaults.getById(CONFIG_ID)).config).toEqual({
+          FAST: CODEX_MODEL,
+          DEFAULT: "openai/gpt-5",
         });
       });
     });
@@ -115,10 +116,9 @@ describe("ModelProviderDefaultsWriteService.save", () => {
             scopes: [SCOPE, { scopeType: "PROJECT" as const, scopeId: "project-2" }],
           }),
         ).rejects.toMatchObject({ code: "validation_error" });
-        await expect(defaults.getById(CONFIG_ID)).resolves.toMatchObject({
-          config: stored,
-          scopes: [SCOPE],
-        });
+        const kept = await defaults.getById(CONFIG_ID);
+        expect(kept.config).toEqual(stored);
+        expect(kept.scopes).toEqual([SCOPE]);
       });
     });
   });
@@ -151,7 +151,7 @@ describe("ModelProviderDefaultsWriteService.save", () => {
         await expect(
           writer.save({ id: CONFIG_ID, config: { ...stored, [TOPIC_CLUSTERING]: CODEX_MODEL } }),
         ).rejects.toMatchObject({ code: "validation_error" });
-        await expect(defaults.getById(CONFIG_ID)).resolves.toMatchObject({ config: stored });
+        expect((await defaults.getById(CONFIG_ID)).config).toEqual(stored);
       });
     });
   });
