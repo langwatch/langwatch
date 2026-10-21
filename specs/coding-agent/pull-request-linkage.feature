@@ -425,6 +425,16 @@ Rule: A session's cost splits across the pull requests it drove, by the work sta
     When each pull request's usage is read
     Then each reports the share the row recorded under its branch
 
+  # Each counter and the cost take their ratio from the record's own figure for
+  # that counter, so a pull request priced at another rate than the session's
+  # other work reports what was recorded, as its model breakdown does.
+  @unit
+  Scenario: A session that worked on two repositories at different rates reports the recorded figures
+    Given a session whose row records work on another repository at one rate and on the pull request's branch at another
+    When the pull request's usage is read
+    Then its cost and each token count are exactly what the row recorded under that branch
+    And the pull request totals match its model breakdown
+
   @unit
   Scenario: Usage from before the session declared anything follows its first declared branch
     Given a session that spent most of its tokens before its first declaration

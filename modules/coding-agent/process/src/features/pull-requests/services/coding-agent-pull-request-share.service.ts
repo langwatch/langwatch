@@ -2,7 +2,10 @@ import type { CodingAgentSessionBranchRecord } from "@langwatch/coding-agent-con
 
 import { MAX_USAGE_CONTEXTS } from "../../../eventing/coding-agent-session-state.projection.ts";
 import {
+  allocateCost,
   allocateCounters,
+  type BucketAmounts,
+  bucketAmountsOf,
   isStampedOnRepository,
   isUnstamped,
   costOf,
@@ -162,6 +165,15 @@ export class CodingAgentPullRequestShareService {
       repositoryHost,
       repositoryFullName,
     });
+    const amounts = bucketAmountsOf({
+      ledger,
+      keyOf: (usage) =>
+        CodingAgentPullRequestShareService.bucketKeyOf({
+          usage,
+          repositoryHost,
+          repositoryFullName,
+        }),
+    });
 
     const unstampedWinner = CodingAgentPullRequestShareService.unstampedWinnerOf({
       ledger,
@@ -182,6 +194,7 @@ export class CodingAgentPullRequestShareService {
       perBranch,
       prNumber,
       buckets,
+      amounts,
       totalWeight,
       repositoryHost,
       repositoryFullName,
@@ -197,6 +210,7 @@ export class CodingAgentPullRequestShareService {
     perBranch,
     prNumber,
     buckets,
+    amounts,
     totalWeight,
     repositoryHost,
     repositoryFullName,
@@ -208,6 +222,7 @@ export class CodingAgentPullRequestShareService {
     perBranch: ReadonlyMap<string, number>;
     prNumber: number;
     buckets: ReadonlyMap<string, number>;
+    amounts: ReadonlyMap<string, BucketAmounts>;
     totalWeight: number;
     repositoryHost: string;
     repositoryFullName: string;
@@ -244,20 +259,13 @@ export class CodingAgentPullRequestShareService {
         }),
       ),
     );
-    const allocated = allocateCounters({
-      session,
-      buckets,
-      totalWeight,
-      ownKeys,
-    });
+    const split = { buckets, amounts, totalWeight, ownKeys };
 
     return {
       session: {
         ...session,
-        ...allocated,
-        // Cost is never rounded: it is a currency amount, so the share stays
-        // exact and only the integer counters need whole units handed out.
-        costUsd: (session.costUsd * prWeight) / totalWeight,
+        ...allocateCounters({ session, ...split }),
+        costUsd: allocateCost({ costUsd: session.costUsd, ...split }),
       },
       prRows,
     };
