@@ -2327,10 +2327,21 @@ async function callerOf({
   return door.authenticate({
     request,
     permission: permissionOf(route.permission),
-    permissions: routePermissions(route),
+    permissions: credentialPermissions(route),
     ...(route.permissionReach ? { reach: route.permissionReach } : {}),
     ...(route.keyKinds ? { keyKinds: route.keyKinds } : {}),
   });
+}
+
+/**
+ * Every permission the route asks, further targets' included, so a key door holds the key to its
+ * own limits for each one and not only the first (ADR-183 §2). In declared order, each once.
+ */
+function credentialPermissions(route: RestTransportRoute<unknown>): readonly AuthzPermission[] {
+  if (!route.furtherPermissions) return routePermissions(route);
+  const further = route.furtherPermissions.map(({ permission }) => permission);
+
+  return [...new Set([...routePermissions(route), ...further])];
 }
 
 /** Whether the route answers a credential its door refuses as no credential at all. */

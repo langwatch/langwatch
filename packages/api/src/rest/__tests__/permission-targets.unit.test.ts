@@ -6,6 +6,7 @@
 import {
   type Authorization,
   type AuthzPermission,
+  PermissionDeniedError,
   type ProofBearingPermission,
   sealAuthorization,
 } from "@langwatch/authorization";
@@ -42,12 +43,16 @@ function mounted({
   first,
   second,
   held,
+  keyHolds,
 }: {
   first: AuthzPermission;
   second: ProofBearingPermission | AuthzPermission;
   held: ReadonlySet<string>;
+  /** A key's own permissions: its door refuses any other it is asked, whatever its owner holds. */
+  keyHolds?: ReadonlySet<AuthzPermission>;
 }) {
   const asked: string[] = [];
+  const authenticated: (readonly AuthzPermission[])[] = [];
   const ran: string[] = [];
   const handed: (Readonly<Record<string, Authorization>> | undefined)[] = [];
   const caller = {
@@ -55,7 +60,19 @@ function mounted({
     scope: { tier: "organization", id: "org_acme" },
   } as const;
   const door: RestIdentity = {
-    authenticate: () => caller,
+    authenticate: ({ permissions }) => {
+      authenticated.push(permissions);
+      const missing = permissions.find((permission) => keyHolds && !keyHolds.has(permission));
+      if (missing) {
+        throw new PermissionDeniedError({
+          permission: missing,
+          scope: { type: "organization", id: "org_acme" },
+          denialReason: "no-grant",
+        });
+      }
+
+      return caller;
+    },
     identify: () => caller,
     authorize: async ({ permission, target }) => {
       asked.push(`${permission}@${target.id}`);
@@ -104,6 +121,7 @@ function mounted({
 
   return {
     asked,
+    authenticated,
     ran,
     handed,
     request: () =>
@@ -233,5 +251,26 @@ describe("a second permission a route declares", () => {
     expect(() =>
       route().withPermission("project:view").withPermission("traces:view", READER),
     ).toThrow(/declares withPermission\(\) twice/);
+  });
+});
+
+describe("an API key calling a route asking two targets", () => {
+  describe("when the key's own permissions lack the second, though its owner holds both", () => {
+    /** @scenario "A key lacking the second permission is refused though its owner holds it" */
+    it("asks the key both permissions and refuses it before the handler", async () => {
+      const route = mounted({
+        first: "project:view",
+        second: "traces:view",
+        held: new Set(["project:view@proj_owner", "traces:view@proj_reader"]),
+        keyHolds: new Set(["project:view"]),
+      });
+
+      const response = await route.request();
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({ code: "permission_denied" });
+      expect(route.authenticated).toEqual([["project:view", "traces:view"]]);
+      expect(route.ran).toEqual([]);
+    });
   });
 });

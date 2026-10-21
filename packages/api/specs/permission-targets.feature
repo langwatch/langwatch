@@ -47,6 +47,57 @@ Feature: A route asks a permission at each of several targets before its handler
       When it declares another with no route target, at the target it already named, or after a set or an input choice
       Then the declaration is refused naming the route
 
+  Rule: A tRPC procedure composes two targets the way a REST route does
+
+    @unit
+    Scenario: A procedure asking two targets asks both before its handler
+      Given a procedure declaring "project:view" at its "projectId" and "traces:view" at the project its "readerProjectId" names
+      And the caller holds both permissions at both projects
+      When the caller calls the procedure
+      Then the door asks "project:view" at the owner project, then "traces:view" at the reader project
+      And the handler runs
+
+    @unit
+    Scenario: A procedure refuses a caller the second target refuses, before its handler
+      Given a procedure declaring a permission at its owner project and another at its reader project
+      And the caller holds the reader's permission nowhere
+      When the caller calls the procedure
+      Then the answer is FORBIDDEN permission_denied naming the reader project
+      And the handler never runs
+
+    @unit
+    Scenario: A procedure's handler is handed one proof per proof-bearing target
+      Given a procedure declaring "traces:view" at its owner project and at its reader project
+      When a caller holding both calls the procedure
+      Then the handler is handed a proof minted for the owner project, under "projectId"
+      And a proof minted for the reader project, under "readerProjectId"
+      And its single "authorization" is still the first target's proof
+      And a procedure asking one target is handed no proofs by field
+
+    @unit
+    Scenario: A procedure's further permission the composition cannot honour is refused at declaration
+      Given a procedure that already declared its access
+      When it declares a further permission after a set or a platform permission, with no target, at a scope field, at a field it already named, or at a field its input does not carry
+      Then the declaration is refused naming the procedure
+
+  Rule: A credential is held to its own limits at every target
+
+    @unit
+    Scenario: A key lacking the second permission is refused though its owner holds it
+      Given a REST route declaring a permission at its owner project and another at its reader project
+      And an API key whose own permissions hold only the first, owned by a person holding both
+      When the key calls the route
+      Then the key door is asked both permissions under the key's own limits
+      And the answer is 403 and the handler never runs
+
+    @unit
+    Scenario: A caller bound to one project is refused at a further target naming another
+      Given a procedure declaring a permission at its owner project and another at its reader project
+      And a caller whose credential resolved the owner project
+      When the caller names another project as the reader
+      Then the answer is FORBIDDEN scope_input_mismatch
+      And the handler never runs
+
   Rule: A project-scoped plan gate reads the project's organization
 
     @unit
