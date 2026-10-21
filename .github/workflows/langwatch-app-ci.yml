@@ -37,9 +37,8 @@ on:
   # taking a PR out of draft fires no event, so the heavy jobs gated on
   # `draft == false` below would never get their first run.
   pull_request:
-    # `labeled` fires for every label; a run starts only for `ci:full`, which
-    # also lifts the draft gate. Any other label is skipped by the gates below.
-    types: [opened, synchronize, reopened, ready_for_review, labeled]
+    # No `labeled`: a label starts no run, and `ci:full` counts from the next push.
+    types: [opened, synchronize, reopened, ready_for_review]
   merge_group:
   workflow_dispatch:
 
@@ -47,18 +46,13 @@ env:
   NODE_ENV: "test"
 
 concurrency:
-  # A label event for any label but `ci:full` gets its own group, so it neither
-  # cancels a running full run nor is cancelled by one.
-  group: ${{ github.workflow }}-${{ (github.event_name == 'pull_request' && github.event.action == 'labeled' && github.event.label.name != 'ci:full') && format('label-{0}', github.run_id) || github.ref }}
-  # Supersede an outdated run on a PR branch, never on main: every commit
-  # that lands on main has to keep its own validation, and cancelling here
-  # would let a merge silently void the run for the commit before it.
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # A newer commit supersedes an older run, on main too: the newest verdict
+  # covers the commits before it. Image and release builds keep their own rule.
+  cancel-in-progress: true
 
 jobs:
   changes:
-    # Skips the whole run for a label event other than `ci:full`.
-    if: github.event_name != 'pull_request' || github.event.action != 'labeled' || github.event.label.name == 'ci:full'
     runs-on: ubuntu-latest
     outputs:
       relevant: ${{ steps.detect.outputs.relevant }}
@@ -66,83 +60,7 @@ jobs:
       # Drafts and release-please PRs (rewritten on every merge) get lint, typecheck and
       # feature-parity only; `ci:full` lifts that. merge_group is never a draft and main
       # runs the full suite, so nothing lands without it.
-      heavy: ${{ github.event_name != 'pull_request' || (github.event.pull_request.draft == false && !startsWith(github.head_ref, 'release-please--')) || contains(github.event.pull_request.labels.*.name, 'ci:full') }}
-      # One shard each on a draft, because the draft run is affected-tests-only
-      # and a subset does not need splitting.
-      #
-      # Integration runs four shards, each running its files serially.
-      #
-      # An earlier four-shard split traded wall-clock for runner-minutes on the
-      # strength of running two files AT ONCE inside a shard, and it did not
-      # hold: shards ran 7.4-9.2 min against the ~6 min the six-way serial split
-      # took, and two groupQueue suites began failing non-deterministically with
-      # Redis state disappearing underneath them (a staged job never dispatched;
-      # `j1` gone from a group set). That is why files are still serial here.
-      #
-      # The two kinds of parallelism are not interchangeable. A shard is its
-      # own runner with its own Redis service container, so shards cannot
-      # reach each other. Files inside a shard share one Redis server and are
-      # kept apart only by logical-database juggling, which is exactly what
-      # stopped holding. Buy the parallelism where it is free.
-      #
-      # Four is affordable again for a different reason: the lane is now ~477
-      # files rather than 1024, because the ones that never needed a datastore
-      # moved to `test-component`. Fewer files over fewer shards, with files
-      # still strictly serial — the property above is untouched.
-      #
-      # The counts below are the `--shard=N/COUNT` denominators, and they MUST
-      # track the arrays. They were a literal `/4` in both run steps, which is
-      # how raising integration to six produced `--shard=5/4` and a startup
-      # error. Emitting the count next to the array is what keeps the two from
-      # drifting apart again.
-      #
-      # It also fixes the draft case, which was silently wrong: a draft got
-      # `shards: [1]` and still ran `--shard=1/4`, so it executed a quarter of
-      # its files while reporting a pass over all of them.
-      # PR2's full 2,513-file run reached only 426/628 files on its slowest
-      # healthy shard before the four-minute floor. At that measured rate,
-      # eight shards put about 315 files and three minutes on each runner,
-      # preserving the floor's intended minute of headroom.
-      unit-shards: ${{ (github.event_name != 'pull_request' || (github.event.pull_request.draft == false && !startsWith(github.head_ref, 'release-please--')) || contains(github.event.pull_request.labels.*.name, 'ci:full')) && '[1,2,3,4,5,6,7,8]' || '[1]' }}
-      unit-shard-count: ${{ (github.event_name != 'pull_request' || (github.event.pull_request.draft == false && !startsWith(github.head_ref, 'release-please--')) || contains(github.event.pull_request.labels.*.name, 'ci:full')) && '8' || '1' }}
-      # Six became four when the component lane took the files that never
-      # needed a datastore. 540 of the 1017 integration files declare jsdom and
-      # name no database, queue or cache; they now run on `test-component`
-      # below, with no service containers at all. What is left here is ~477
-      # files that genuinely talk to something, so the same per-shard file count
-      # fits in fewer shards — and two runners come off the critical path,
-      # which is its own win while every shard is queueing 5-10 minutes for one.
-      #
-      # The lane splits again by whether a file can share a module registry.
-      # Import was 42% of this lane's runner time — ~1.6s per file rebuilding
-      # the same Prisma client and server graph — and 331 of the 477 files can
-      # share one. The other 146 call `vi.mock`, which cannot apply to a
-      # registry an earlier file already populated, so they keep isolation.
-      # See packages/test-harness/src/integration-module-graph.ts.
-      #
-      # Two shards each rather than four of one kind: measured on src/app/api,
-      # the shared lane runs ~4x faster per file, so 331 shared files and 146
-      # mocking ones are close to balanced at 2+2 — the same four runners as
-      # before, finishing sooner.
-      integration-matrix: ${{ (github.event_name != 'pull_request' || (github.event.pull_request.draft == false && !startsWith(github.head_ref, 'release-please--')) || contains(github.event.pull_request.labels.*.name, 'ci:full')) && '[{"lane":"shared","shard":1,"count":2},{"lane":"shared","shard":2,"count":2},{"lane":"mocking","shard":1,"count":2},{"lane":"mocking","shard":2,"count":2}]' || '[{"lane":"shared","shard":1,"count":1},{"lane":"mocking","shard":1,"count":1}]' }}
-      # The component lane is unit-shaped: forked VM workers and concurrent
-      # files, with no service containers to wait on, so a shard gets through
-      # its files far faster than a datastore shard does. (It does NOT share a
-      # module registry the way the unit lane does, see the `isolate` note in
-      # vitest.component.config.ts.)
-      #
-      # Three rather than two, because two put the lane inside a minute of the
-      # hard floor. The floor in src/test-unit-global-setup.ts fires at 4 min
-      # and is calibrated for a lane whose healthy shard takes ~3 min; measured
-      # on 540 files over two shards, shard 1 spent 3m34s in the test step, so
-      # 26 seconds separated a green lane from one the floor cut mid-run. Six
-      # more files crossed it. The floor then reports the shard as red with no
-      # failed test in it, which reads as a wedge rather than as a lane that
-      # outgrew its split, so the cost of being close to it is a confusing
-      # failure rather than a slow pass. Every PR that adds a component test
-      # spends that margin, so the split has to leave some.
-      component-shards: ${{ (github.event_name != 'pull_request' || (github.event.pull_request.draft == false && !startsWith(github.head_ref, 'release-please--')) || contains(github.event.pull_request.labels.*.name, 'ci:full')) && '[1,2,3]' || '[1]' }}
-      component-shard-count: ${{ (github.event_name != 'pull_request' || (github.event.pull_request.draft == false && !startsWith(github.head_ref, 'release-please--')) || contains(github.event.pull_request.labels.*.name, 'ci:full')) && '3' || '1' }}
+      heavy: ${{ github.event_name != 'pull_request' || (github.event.pull_request.draft == false && !(startsWith(github.head_ref, 'release-please--') && github.event.pull_request.user.login == 'langwatch-agent')) || contains(github.event.pull_request.labels.*.name, 'ci:full') }}
       # Coverage instrumentation costs ~45% of the run (measured: a unit subset
       # goes 3.7s -> 6.6s with --coverage). Nothing gates on it — there is no
       # codecov.yml, no codecov status check, and both uploads are
@@ -724,7 +642,8 @@ jobs:
   # missing from CI. See specs/ci/integration-test-lanes.feature.
   package-suites:
     needs: [changes, affected]
-    if: needs.changes.outputs.relevant == 'true'
+    # A draft or release-please PR skips the datastore suites (see `heavy`).
+    if: needs.changes.outputs.relevant == 'true' && needs.changes.outputs.heavy == 'true'
     env:
       BUILD_TIME: "true"
       BASE_HOST: "localhost:3000"
@@ -745,6 +664,10 @@ jobs:
       VITEST_ISOLATE_WORKER_REDIS: "1"
       CI: "true"
     runs-on: ubuntu-latest
+    # Read the checkout; write only to prune this pull request's older suite results.
+    permissions:
+      contents: read
+      actions: write
     # Bounded within a leg: PACKAGE_SUITES_CONCURRENCY suites at once, a heavy
     # suite alone, integration and browser suites one at a time (run-package-suites.ts).
     # Parallel across legs: over two hundred package suites run one after
@@ -881,8 +804,35 @@ jobs:
       - name: Build chart dependencies
         run: pnpm exec nx run chart-langwatch:helm:deps --outputStyle=static
 
+      # The suites' own Nx cache, apart from the build cache so it holds only test
+      # results and stays small. Per shard: a re-push to the same change splits alike.
+      - name: Restore the package suite results
+        if: ${{ !((github.ref == 'refs/heads/main' && github.event_name == 'push') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]')) }}
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .nx/suites
+          key: ${{ runner.os }}-nx-suites-${{ matrix.shard }}-${{ github.sha }}
+          restore-keys: ${{ runner.os }}-nx-suites-${{ matrix.shard }}-
+
+      - name: Restore the package suite results, saving them at the end of the job
+        if: ${{ (github.ref == 'refs/heads/main' && github.event_name == 'push') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]') }}
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .nx/suites
+          key: ${{ runner.os }}-nx-suites-${{ matrix.shard }}-${{ github.sha }}
+          restore-keys: ${{ runner.os }}-nx-suites-${{ matrix.shard }}-
+
+      - uses: ./.github/actions/prune-pr-caches
+        with:
+          prefix: ${{ runner.os }}-nx-suites-${{ matrix.shard }}-
+
+      - name: Adopt the restored suite results index
+        run: mkdir -p .nx/suites/data && bash .github/scripts/adopt-nx-cache-index.sh .nx/suites/data
+
       - name: Run every workspace package suite
         env:
+          NX_CACHE_DIRECTORY: ${{ github.workspace }}/.nx/suites/cache
+          NX_WORKSPACE_DATA_DIRECTORY: ${{ github.workspace }}/.nx/suites/data
           REQUIRE_HELM_TESTS: "1"
           PACKAGE_SUITES_SHARD: ${{ matrix.shard }}/8
           # Each suite gets two vitest workers (patches/vitest@5.0.1.patch), so one
@@ -1462,7 +1412,7 @@ jobs:
         ci-scripts-test,
         ci-self-test,
       ]
-    if: always() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || github.event.label.name == 'ci:full')
+    if: always()
     runs-on: ubuntu-latest
     steps:
       - uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2

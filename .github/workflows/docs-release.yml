@@ -16,10 +16,8 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  # Supersede an outdated run on a PR branch, never on main: every commit
-  # that lands on main has to keep its own validation, and cancelling here
-  # would let a merge silently void the run for the commit before it.
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  # Only the newest cache-bust matters, so a newer push supersedes an older run.
+  cancel-in-progress: true
 
 jobs:
   docs:
@@ -35,33 +33,35 @@ jobs:
           token: ${{ secrets.RELEASE_DOCS_TOKEN }}
           fetch-depth: 0
 
-      - name: Update cache buster redirect
-        run: |
-          CURRENT_TIME=$(date +%s)
-          jq --arg current_time_val "$CURRENT_TIME" \
-            '([.redirects[] | select(.source | startswith("/ci/cache/busted/"))] | length) as $n
-            | if $n == 1 then
-                .redirects |= map(
-                  if (.source | startswith("/ci/cache/busted/"))
-                  then .source = ("/ci/cache/busted/" + $current_time_val)
-                  else . end)
-              else
-                error("Error: expected exactly one redirect with source /ci/cache/busted/*, found \($n)")
-              end' \
-            docs.json > docs.json.tmp && \
-          mv docs.json.tmp docs.json
-
       - name: Configure Git
         run: |
           git config --global user.name "LangWatch Docs Bot"
           git config --global user.email "y.budnyk789@gmail.com"
 
+      # Main moves while this runs, so each attempt rewrites the redirect on the
+      # newest main rather than pushing a commit made on the one it checked out.
       - name: Trigger Release
+        env:
+          REASON: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_reason || 'auto-release on merge to main' }}
         run: |
-          git add docs.json
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            git commit -m "Release docs (${{ github.event.inputs.release_reason }}) [skip ci]"
-          else
-            git commit -m "Release docs (auto-release on merge to main) [skip ci]"
-          fi
-          git push origin HEAD:main
+          for attempt in 1 2 3 4 5; do
+            git fetch origin main && git reset --hard origin/main
+            jq --arg current_time_val "$(date +%s)" \
+              '([.redirects[] | select(.source | startswith("/ci/cache/busted/"))] | length) as $n
+              | if $n == 1 then
+                  .redirects |= map(
+                    if (.source | startswith("/ci/cache/busted/"))
+                    then .source = ("/ci/cache/busted/" + $current_time_val)
+                    else . end)
+                else
+                  error("Error: expected exactly one redirect with source /ci/cache/busted/*, found \($n)")
+                end' \
+              docs.json > docs.json.tmp
+            mv docs.json.tmp docs.json
+            git add docs.json
+            git commit -m "Release docs ($REASON) [skip ci]"
+            if git push origin HEAD:main; then exit 0; fi
+            sleep $((attempt * 5))
+          done
+          echo "::error::main kept moving; the docs release was not pushed after 5 attempts."
+          exit 1
