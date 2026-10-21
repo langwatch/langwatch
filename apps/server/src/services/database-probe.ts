@@ -111,14 +111,17 @@ function withoutCredentials(url: string): { target: URL; headers: Record<string,
 }
 
 /**
- * ClickHouse: `SELECT 1` over HTTP, answered "1". Not /ping, which answers without checking the
- * user and password. fetch refuses a URL carrying credentials, so they go in a header.
+ * ClickHouse: `SELECT 1` over HTTP in the URL path's database, answered "1". Not /ping, which
+ * checks neither the user and password nor the database. fetch refuses a URL carrying
+ * credentials, so they go in a header.
  */
 async function probeClickhouse(url: string): Promise<ProbeResult> {
   try {
     const { target, headers } = withoutCredentials(url);
+    const database = decodeURIComponent(target.pathname.replace(/^\/+|\/+$/g, ""));
     const query = new URL("/", target);
-    query.search = `query=${encodeURIComponent("SELECT 1")}`;
+    if (database !== "") query.searchParams.set("database", database);
+    query.searchParams.set("query", "SELECT 1");
     const response = await fetch(query, {
       headers,
       signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),

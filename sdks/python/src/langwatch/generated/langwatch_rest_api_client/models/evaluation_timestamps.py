@@ -20,8 +20,8 @@ class EvaluationTimestamps:
         started_at (float | None | Unset):
         finished_at (float | None | Unset):
         updated_at (float | None | Unset):
-        last_attempt_at (float | None | Unset):
-        next_attempt_at (float | None | Unset):
+        last_attempt_at (int | None | Unset):
+        next_attempt_at (int | None | Unset):
     """
 
     ignore_timestamps_on_write: bool | None | Unset = UNSET
@@ -29,8 +29,8 @@ class EvaluationTimestamps:
     started_at: float | None | Unset = UNSET
     finished_at: float | None | Unset = UNSET
     updated_at: float | None | Unset = UNSET
-    last_attempt_at: float | None | Unset = UNSET
-    next_attempt_at: float | None | Unset = UNSET
+    last_attempt_at: int | None | Unset = UNSET
+    next_attempt_at: int | None | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -64,13 +64,13 @@ class EvaluationTimestamps:
         else:
             updated_at = self.updated_at
 
-        last_attempt_at: float | None | Unset
+        last_attempt_at: int | None | Unset
         if isinstance(self.last_attempt_at, Unset):
             last_attempt_at = UNSET
         else:
             last_attempt_at = self.last_attempt_at
 
-        next_attempt_at: float | None | Unset
+        next_attempt_at: int | None | Unset
         if isinstance(self.next_attempt_at, Unset):
             next_attempt_at = UNSET
         else:
@@ -145,21 +145,21 @@ class EvaluationTimestamps:
 
         updated_at = _parse_updated_at(d.pop("updated_at", UNSET))
 
-        def _parse_last_attempt_at(data: object) -> float | None | Unset:
+        def _parse_last_attempt_at(data: object) -> int | None | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
                 return data
-            return cast(float | None | Unset, data)
+            return cast(int | None | Unset, data)
 
         last_attempt_at = _parse_last_attempt_at(d.pop("last_attempt_at", UNSET))
 
-        def _parse_next_attempt_at(data: object) -> float | None | Unset:
+        def _parse_next_attempt_at(data: object) -> int | None | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
                 return data
-            return cast(float | None | Unset, data)
+            return cast(int | None | Unset, data)
 
         next_attempt_at = _parse_next_attempt_at(d.pop("next_attempt_at", UNSET))
 

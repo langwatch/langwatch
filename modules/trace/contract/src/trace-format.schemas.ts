@@ -720,8 +720,8 @@ const evaluationSchemaDefinition = z.object({
     started_at: z.number().optional().nullable(),
     finished_at: z.number().optional().nullable(),
     updated_at: z.number().optional().nullable(),
-    last_attempt_at: z.number().optional().nullable(),
-    next_attempt_at: z.number().optional().nullable(),
+    last_attempt_at: z.number().int().optional().nullable(),
+    next_attempt_at: z.number().int().optional().nullable(),
   }),
 });
 export interface EvaluationSchema extends Named<typeof evaluationSchemaDefinition> {}

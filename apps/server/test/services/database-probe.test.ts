@@ -124,7 +124,7 @@ describe("connecting to a database the person brings", () => {
   });
 
   describe("when it is ClickHouse", () => {
-    const SELECT_ONE = "/?query=SELECT%201";
+    const SELECT_ONE = "/?database=langwatch&query=SELECT+1";
     /** @scenario "A database they bring is connected before it is saved" */
     it("runs SELECT 1 and refuses a server that does not answer 1", async () => {
       const server = http.createServer((req, res) => {
@@ -142,6 +142,23 @@ describe("connecting to a database the person brings", () => {
       expect(
         await probeDatabase({ id: "clickhouse", url: `http://127.0.0.1:${refusingPort}/x` }),
       ).toEqual({ ok: false, reason: "SELECT 1 answered 516: Authentication failed" });
+    });
+
+    /** @scenario "A database they bring is connected before it is saved" */
+    it("runs SELECT 1 in the URL path's database and names a database that does not exist", async () => {
+      const server = http.createServer((req, res) => {
+        const database = new URL(req.url ?? "/", "http://probe").searchParams.get("database");
+        if (database === "langwatch") res.end("1\n");
+        else res.writeHead(404).end(`Code: 81. Database ${database} does not exist`);
+      });
+      const port = await listen(server);
+
+      expect(
+        await probeDatabase({ id: "clickhouse", url: `http://127.0.0.1:${port}/langwatch` }),
+      ).toEqual({ ok: true });
+      expect(
+        await probeDatabase({ id: "clickhouse", url: `http://127.0.0.1:${port}/missing` }),
+      ).toEqual({ ok: false, reason: "SELECT 1 answered 404: Code: 81. Database missing does not exist" });
     });
 
     /** @scenario "A database password is never shown" */

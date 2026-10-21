@@ -33022,8 +33022,8 @@ type EvaluationTimestamps struct {
 	FinishedAt              *float32 `json:"finished_at,omitempty"`
 	IgnoreTimestampsOnWrite *bool    `json:"ignore_timestamps_on_write,omitempty"`
 	InsertedAt              *float32 `json:"inserted_at,omitempty"`
-	LastAttemptAt           *float32 `json:"last_attempt_at,omitempty"`
-	NextAttemptAt           *float32 `json:"next_attempt_at,omitempty"`
+	LastAttemptAt           *int     `json:"last_attempt_at,omitempty"`
+	NextAttemptAt           *int     `json:"next_attempt_at,omitempty"`
 	StartedAt               *float32 `json:"started_at,omitempty"`
 	UpdatedAt               *float32 `json:"updated_at,omitempty"`
 }

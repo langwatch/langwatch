@@ -198,6 +198,7 @@ Feature: `npx @langwatch/server` runs a prebuilt app
     Given the stores started while the other predeps were still installing
     When an install fails and they abort, or CI aborts for them, or they press Ctrl+C at the prompt
     Then every service already started is stopped
+    And a service whose start was still under way is not launched after the stop
     And the CLI exits with 1 for an abort and 130 for Ctrl+C
 
   @unit
