@@ -26,6 +26,41 @@ Feature: Evaluator CLI Commands
     When I run "langwatch evaluator get evaluator_abc123"
     Then I see evaluator metadata and configuration
 
+  @unit
+  Scenario: Get evaluator details by display name
+    Given my project has an evaluator named "Tone Check" with slug "tone-check"
+    When I run "langwatch evaluator get 'tone check'"
+    Then I see that evaluator's metadata and configuration
+
+  @unit
+  Scenario: Get evaluator by a display name two evaluators share
+    Given my project has two evaluators named "Twin" with ids "ev_1" and "ev_2"
+    When I run "langwatch evaluator get Twin"
+    Then I see an error listing both ids and asking me to pass the id
+
+  @unit
+  Scenario: Get evaluator by a name nothing matches
+    Given my project has no evaluator with id, slug or name "ghost"
+    When I run "langwatch evaluator get ghost"
+    Then I see an error that the evaluator was not found
+    And the error code is "evaluator_not_found"
+
+  @unit
+  Scenario: Delete an evaluator by display name is refused
+    Given my project has an evaluator named "Tone Check" with slug "tone-check"
+    When I run "langwatch evaluator delete 'Tone Check'"
+    Then I see an error that no evaluator has that id or slug
+    And the error says to find its id with "langwatch evaluator get <name>"
+    And nothing is deleted
+
+  @unit
+  Scenario: Update an evaluator by display name is refused
+    Given my project has an evaluator named "Tone Check" with slug "tone-check"
+    When I run "langwatch evaluator update 'Tone Check' --name 'Renamed'"
+    Then I see an error that no evaluator has that id or slug
+    And the error says to find its id with "langwatch evaluator get <name>"
+    And nothing is updated
+
   Scenario: Get evaluator that does not exist
     When I run "langwatch evaluator get nonexistent"
     Then I see an error that the evaluator was not found

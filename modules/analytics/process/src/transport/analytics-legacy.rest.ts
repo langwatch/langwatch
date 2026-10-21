@@ -46,6 +46,7 @@ export const analyticsLegacyRest = defineRestRouter(AnalyticsLegacyApi)
   .withAddressing("literal")
 
   .post("/api/analytics", "postApiAnalytics")
+  .keepsRecords()
   .withoutAudit("read sent as a POST")
   // Main parsed the body as JSON under any Content-Type; a mislabelled one is still read.
   .withRawBody("text", { mediaType: "application/json", mismatch: "accepted" })

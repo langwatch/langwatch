@@ -4653,6 +4653,11 @@ const presentations = {
     describe: () =>
       "Check the allowed models list in the provider settings, or answer each card as it comes.",
   },
+  langy_confirmation_required: {
+    title: "Waiting for your confirmation",
+    describe: () =>
+      "Langy asked to remove or turn off something. It runs only after you choose Yes on the card in the conversation.",
+  },
   langy_wait_expired: {
     title: "That card is not waiting any more",
     describe: (error) => {

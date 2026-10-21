@@ -1082,6 +1082,9 @@ importers:
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../packages/ksuid
+      '@langwatch/langy-contract':
+        specifier: workspace:*
+        version: link:../../modules/langy/contract
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../modules/model-provider/contract
