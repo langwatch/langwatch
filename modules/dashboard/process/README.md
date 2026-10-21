@@ -920,7 +920,7 @@ type Response = unknown;
 
 Place a saved workbench chart on a dashboard
 
-Permission `analytics:update`. Declared at `src/transport/saved-workbench-chart.rest.ts:289`.
+Permission `analytics:update`. Declared at `src/transport/saved-workbench-chart.rest.ts:293`.
 
 Answers at `/api/v1/projects/:projectId/analytics/charts/:chartId/placement`.
 
@@ -941,7 +941,7 @@ type Response = z.infer<typeof savedWorkbenchChartResourceSchema>; // ../contrac
 
 Remove a saved workbench chart from its dashboard
 
-Permission `analytics:update`. Declared at `src/transport/saved-workbench-chart.rest.ts:328`.
+Permission `analytics:update`. Declared at `src/transport/saved-workbench-chart.rest.ts:332`.
 
 Answers at `/api/v1/projects/:projectId/analytics/charts/:chartId/placement`.
 
