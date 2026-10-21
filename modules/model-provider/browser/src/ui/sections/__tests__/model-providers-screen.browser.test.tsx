@@ -1,6 +1,7 @@
 /**
- * Real-Chromium Model Providers layout: the providers table spans the page column, which jsdom
- * cannot lay out. It used to shrink to its content while Default models below ran full width.
+ * Real-Chromium Model Providers layout: the providers table spans the page column and lines up
+ * with the Default models table, which jsdom cannot lay out. It used to shrink to its content
+ * while Default models below ran full width.
  * Spec: specs/model-providers/provider-list.feature
  */
 
@@ -10,13 +11,41 @@ import { page } from "vitest/browser";
 
 import { renderWithModelProviderHost } from "../../../testing.tsx";
 
+const DEFAULT_MODELS = {
+  projectId: "proj-1",
+  teamId: "team-1",
+  organizationId: "org-1",
+  organizationName: "Acme",
+  effective: {
+    DEFAULT: { model: "openai/gpt-5.5", source: "role_default", scope: "organization" },
+  },
+  configs: [
+    {
+      id: "cfg_acme_org",
+      config: { DEFAULT: "openai/gpt-5.5" },
+      createdAt: new Date("2026-05-15T12:00:00Z"),
+      updatedAt: new Date("2026-05-15T12:00:00Z"),
+      authorId: "user-1",
+      scopes: [{ type: "ORGANIZATION", id: "org-1", name: "Acme" }],
+    },
+  ],
+  available: {
+    organization: { id: "org-1", name: "Acme" },
+    teams: [{ id: "team-1", name: "Platform" }],
+    projects: [{ id: "proj-1", name: "Acme App", teamId: "team-1" }],
+  },
+  features: [],
+};
+
 vi.mock("../../../behavior/model-provider-api.ts", () => ({
   modelProviderApi: {
     useUtils: () => ({ modelProvider: { invalidate: vi.fn() } }),
     modelProvider: {
       delete: { useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }) },
       testConnection: { useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }) },
-      getDefaultModelsForProject: { useQuery: () => ({ data: void 0, isLoading: true }) },
+      getDefaultModelsForProject: {
+        useQuery: () => ({ data: DEFAULT_MODELS, isLoading: false }),
+      },
       getResolvedDefault: { useQuery: () => ({ data: void 0, isLoading: false }) },
       codexApplyCodingDefaults: { useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }) },
       deleteDefaultModelsConfig: {
@@ -52,15 +81,19 @@ beforeEach(async () => {
 afterEach(() => cleanup());
 
 describe("given the Model Providers screen in a real browser", () => {
-  describe("when providers are listed", () => {
+  describe("when providers and default models are listed", () => {
     /** @scenario The providers table spans the page column */
-    it("draws the providers table as wide as the page column", async () => {
+    it("draws the providers table as wide as the page column, flush with Default models", async () => {
       await screen.findByText("OpenAI");
-      // The card is the table's named scroll region; Default models draws its own table below.
-      const card = screen.getByRole("region", { name: "Model providers" });
-      const column = card.parentElement!;
+      // Each table's card is its named scroll region.
+      const providers = screen.getByRole("region", { name: "Model providers" });
+      const defaults = await screen.findByRole("region", { name: "Default models by scope" });
+      const column = providers.parentElement!.getBoundingClientRect();
+      const providersBox = providers.getBoundingClientRect();
+      const defaultsBox = defaults.getBoundingClientRect();
 
-      expect(card.getBoundingClientRect().width).toBe(column.getBoundingClientRect().width);
+      expect(providersBox.width).toBe(column.width);
+      expect(providersBox.right).toBe(defaultsBox.right);
     });
   });
 });
