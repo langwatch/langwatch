@@ -182,6 +182,28 @@ describe("the declare command's session resolution", () => {
     });
   });
 
+  it("declares for a Copilot session the flags name, with the surface's own key", async () => {
+    await runContext({
+      agent: "copilot",
+      sessionId: "copilot-conversation",
+      env: { CLAUDECODE: "", COPILOT_CLI: "1" },
+      readCliConfig: () => ({
+        control_plane_url: "https://app.example.com",
+        default_personal_ingest_keys: {
+          copilot_cli: { secret: "ik-lw-copilot-cli" },
+          copilot_vscode: { secret: "ik-lw-copilot-vscode" },
+        },
+      }),
+    });
+
+    expect(posted).toHaveLength(1);
+    expect(posted[0]!.headers.Authorization).toBe("Bearer ik-lw-copilot-cli");
+    expect(attributesOf(posted[0]!)).toMatchObject({
+      "coding_agent.name": "copilot",
+      "session.id": "copilot-conversation",
+    });
+  });
+
   it("asks for both flags when only one is passed", async () => {
     await runContext({ sessionId: "half-a-session" });
 

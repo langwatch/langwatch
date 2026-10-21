@@ -15,7 +15,9 @@ import {
   OPENCODE_HOOK_COMMAND,
   OPENCODE_PLUGIN_FILE_NAME,
 } from "@/cli/utils/governance/opencode-plugin";
+import { COPILOT_HOOK_FILE_NAME } from "@/cli/utils/governance/session-context-agents";
 import { sessionContextHookCommand } from "@/cli/utils/governance/session-context-hooks";
+import { scanTelemetryTargets } from "@/cli/utils/governance/telemetry-targets";
 
 // Hoisted, because the factory below is: a plain top-level const is still in
 // its temporal dead zone if anything on the static import graph reaches
@@ -72,6 +74,8 @@ let stdoutSpy: ReturnType<typeof vi.spyOn>;
 const origConfig = process.env.LANGWATCH_CLI_CONFIG;
 const origHome = process.env.HOME;
 const origUserprofile = process.env.USERPROFILE;
+const origCopilotHome = process.env.COPILOT_HOME;
+let copilotHooksDir: string;
 
 const readJson = (file = settingsPath): Record<string, any> =>
   JSON.parse(fs.readFileSync(file, "utf8")) as Record<string, any>;
@@ -91,6 +95,18 @@ const runOpencodeInstall = async (): Promise<void> => {
   await installCommand("opencode", { opencodePluginDir });
 };
 
+const runCopilotInstall = async (): Promise<void> => {
+  const { installCommand } = await import("../install.js");
+  await installCommand("copilot_cli");
+};
+
+/** What `langwatch logout` does with the targets it finds, without its prompt or revoke. */
+const removeTelemetryTargets = (): void => {
+  for (const target of scanTelemetryTargets({ cwd: tmpDir }).filter((t) => t.present)) {
+    target.remove();
+  }
+};
+
 const stdout = (): string =>
   stdoutSpy.mock.calls.map((call: unknown[]) => String(call[0])).join("");
 
@@ -105,6 +121,10 @@ beforeEach(() => {
   codexHooksPath = path.join(tmpDir, ".codex", "hooks.json");
   codexConfigPath = path.join(tmpDir, ".codex", "config.toml");
   opencodePluginDir = path.join(tmpDir, ".config", "opencode", "plugins");
+  // Copilot's hook folder follows COPILOT_HOME first; unset, it is the one
+  // under the temp HOME, and a developer's own relocated folder is never reached.
+  delete process.env.COPILOT_HOME;
+  copilotHooksDir = path.join(tmpDir, ".copilot", "hooks");
 
   const configPath = path.join(tmpDir, "config.json");
   fs.writeFileSync(
@@ -134,6 +154,8 @@ afterEach(() => {
   else process.env.HOME = origHome;
   if (origUserprofile === undefined) delete process.env.USERPROFILE;
   else process.env.USERPROFILE = origUserprofile;
+  if (origCopilotHome === undefined) delete process.env.COPILOT_HOME;
+  else process.env.COPILOT_HOME = origCopilotHome;
   fs.rmSync(tmpDir, { recursive: true, force: true });
   vi.clearAllMocks();
 });
@@ -275,6 +297,102 @@ describe("the opencode ingestion install", () => {
       await installCommand("opencode", { opencodePluginDir, envOnly: true });
 
       expect(fs.existsSync(opencodePluginDir)).toBe(false);
+    });
+  });
+});
+
+describe("the copilot ingestion install", () => {
+  /** LangWatch's file, in the format the Copilot CLI and VS Code both load. */
+  const copilotHookEntry = {
+    type: "command",
+    bash: "langwatch ingest hook copilot",
+    timeoutSec: 10,
+  };
+
+  describe("given a Copilot hooks folder without the LangWatch file", () => {
+    /** @scenario "Installing copilot writes LangWatch's own hook file" */
+    it("leaves exactly one LangWatch file after two runs, running the copilot hook", async () => {
+      await runCopilotInstall();
+      await runCopilotInstall();
+
+      expect(fs.readdirSync(copilotHooksDir)).toEqual([COPILOT_HOOK_FILE_NAME]);
+      expect(readJson(path.join(copilotHooksDir, COPILOT_HOOK_FILE_NAME))).toEqual({
+        version: 1,
+        hooks: {
+          sessionStart: [copilotHookEntry],
+          agentStop: [copilotHookEntry],
+        },
+      });
+    });
+
+    it("reports the file and says the user's own hook files are untouched", async () => {
+      await runCopilotInstall();
+
+      expect(stdout()).toContain(
+        `~/.copilot/hooks/${COPILOT_HOOK_FILE_NAME} session hooks created`,
+      );
+      expect(stdout()).toContain("own hook files are untouched");
+    });
+
+    it("mints the key under the CLI's own source type", async () => {
+      const { installCommand } = await import("../install.js");
+      await installCommand("copilot_cli", { json: true });
+
+      expect(mintIngestionKeyMock.mock.calls[0]?.[1]).toBe("copilot_cli");
+      expect(JSON.parse(stdout())).toMatchObject({
+        tool: "copilot_cli",
+        source_type: "copilot_cli",
+        session_hooks_action: "created",
+      });
+    });
+
+    it("writes no hook file when only the exports were asked for", async () => {
+      const { installCommand } = await import("../install.js");
+      await installCommand("copilot_cli", { envOnly: true });
+
+      expect(fs.existsSync(copilotHooksDir)).toBe(false);
+    });
+  });
+
+  describe("given COPILOT_HOME points at another folder", () => {
+    /** @scenario "The Copilot hook file follows COPILOT_HOME" */
+    it("writes the LangWatch file under that folder's hooks directory", async () => {
+      const relocated = path.join(tmpDir, "elsewhere", "copilot");
+      process.env.COPILOT_HOME = relocated;
+
+      await runCopilotInstall();
+
+      expect(fs.readdirSync(path.join(relocated, "hooks"))).toEqual([COPILOT_HOOK_FILE_NAME]);
+      expect(fs.existsSync(copilotHooksDir)).toBe(false);
+    });
+  });
+
+  describe("given a Copilot hooks folder holding a hook file the user wrote", () => {
+    const userHookFile = () => path.join(copilotHooksDir, "my-hooks.json");
+    const userHookBytes = `${JSON.stringify(
+      {
+        version: 1,
+        hooks: { sessionStart: [{ type: "command", bash: "./scripts/log-session.sh" }] },
+      },
+      null,
+      4,
+    )}\n`;
+
+    beforeEach(() => {
+      fs.mkdirSync(copilotHooksDir, { recursive: true });
+      fs.writeFileSync(userHookFile(), userHookBytes);
+    });
+
+    /** @scenario "The user's own Copilot hook files are never touched" */
+    it("keeps the user's file byte for byte through install and logout, and logout deletes ours", async () => {
+      await runCopilotInstall();
+      expect(fs.readFileSync(userHookFile(), "utf8")).toBe(userHookBytes);
+      expect(fs.existsSync(path.join(copilotHooksDir, COPILOT_HOOK_FILE_NAME))).toBe(true);
+
+      removeTelemetryTargets();
+
+      expect(fs.readFileSync(userHookFile(), "utf8")).toBe(userHookBytes);
+      expect(fs.readdirSync(copilotHooksDir)).toEqual(["my-hooks.json"]);
     });
   });
 });

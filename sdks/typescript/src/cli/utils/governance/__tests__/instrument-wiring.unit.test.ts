@@ -33,6 +33,34 @@ afterEach(() => {
 });
 
 describe("installTelemetryWiring", () => {
+  describe("when a Copilot surface is wired", () => {
+    it.each(["copilot", "code"])(
+      "writes the one hook file both Copilot surfaces load, for %s",
+      (tool) => {
+        installTelemetryWiring({ cfg: baseCfg(), tool, endpoint: ENDPOINT, token: TOKEN });
+
+        const hookFile = path.join(temp.home, ".copilot", "hooks", "langwatch.json");
+        expect(JSON.parse(fs.readFileSync(hookFile, "utf8"))).toMatchObject({
+          hooks: {
+            sessionStart: [{ bash: "langwatch ingest hook copilot" }],
+            agentStop: [{ bash: "langwatch ingest hook copilot" }],
+          },
+        });
+      },
+    );
+
+    it("writes no Copilot hook file for another tool", () => {
+      installTelemetryWiring({
+        cfg: baseCfg(),
+        tool: "opencode",
+        endpoint: ENDPOINT,
+        token: TOKEN,
+      });
+
+      expect(fs.existsSync(path.join(temp.home, ".copilot"))).toBe(false);
+    });
+  });
+
   describe("when langwatch code is running", () => {
     const notice = "Restart `langwatch code` to apply the updated telemetry settings.";
     const install = (token = TOKEN) =>
