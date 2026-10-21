@@ -164,6 +164,10 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   // an inline scope) on every call site.
   CustomRole: {},
   Group: {},
+  // ADR-183 §4: a project's braid signing keys; every read and write names its organization.
+  SigningKey: {},
+  // ADR-183 §2: an organization's braid setting, one row keyed by organizationId.
+  AuthzOrganizationPolicy: {},
   // A request to join one organization (D12), read by organization or row id,
   // plus one READ bounded by subject: "what am I waiting on" spans every
   // organization one named user asked. Writes keyed on userId stay refused.
