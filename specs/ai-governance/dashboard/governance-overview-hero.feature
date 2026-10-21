@@ -135,6 +135,18 @@ Feature: The governance overview opens with a hero and nothing else
     And a section named "Recent activity" is shown beside it
     And it says recent screens will show up there
 
+  # The #7536 port kept the column's 900px measure but dropped its centring, so
+  # on a wide window the whole overview hugged the left edge (issue #8930). The
+  # measure now comes from the page body, and the empty lists use the design
+  # system's one-line empty state rather than a copy of it.
+
+  @integration
+  Scenario: The overview is one centred column
+    When the overview renders
+    Then its column is the design system's narrow page body, centred in the page
+    And the screen sets no width or margin of its own
+    And each empty list is the design system's one-line empty state
+
   # The overview starts empty. Both lists fill only after samples are enabled.
 
   @integration

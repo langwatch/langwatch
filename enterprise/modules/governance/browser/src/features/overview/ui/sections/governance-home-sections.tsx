@@ -3,6 +3,7 @@
  * here can fail; sample mode swaps in invented rows from
  * `../../model/sample-home-rows.ts`. Ported from `.../GovernanceHomeSections.tsx` (main).
  */
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import {
   Badge,
   Box,
@@ -48,7 +49,10 @@ export function GovernanceHomeSections({
             ))}
           </RowList>
         ) : (
-          <EmptyLine text="Nothing to report yet. Insights appear here once sources are pulling." />
+          <NoDataInfoBlock
+            size="line"
+            title="Nothing to report yet. Insights appear here once sources are pulling."
+          />
         )}
         {canSetUpInsights && (
           <Box paddingTop={4}>
@@ -67,7 +71,7 @@ export function GovernanceHomeSections({
             ))}
           </RowList>
         ) : (
-          <EmptyLine text="Your recent screens will show up here." />
+          <NoDataInfoBlock size="line" title="Your recent screens will show up here." />
         )}
       </HomeSection>
     </Grid>
@@ -219,14 +223,5 @@ function HomeSection({
         {children}
       </Box>
     </VStack>
-  );
-}
-
-/** The line an empty list carries instead of rows. */
-function EmptyLine({ text }: { text: string }) {
-  return (
-    <Text fontSize="sm" color="fg.muted" maxWidth="52ch" paddingTop={2}>
-      {text}
-    </Text>
   );
 }
