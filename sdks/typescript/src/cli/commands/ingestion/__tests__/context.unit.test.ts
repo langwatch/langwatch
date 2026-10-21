@@ -14,6 +14,7 @@ import {
   readSpooledDeclarations,
   spoolDir,
   spoolFilePath,
+  writeSpooledDeclaration,
 } from "@/cli/utils/governance/session-context-spool";
 
 import { contextCommand, runContextProcess } from "../context";
@@ -630,5 +631,46 @@ describe("a queued declaration and the next session report", () => {
     await runHookSeam({ fetchImpl: unreachableCollector });
 
     expect(readSpooledDeclarations({ stateDir, now: () => NOW })).toHaveLength(1);
+  });
+  const queueSessions = (count: number): void => {
+    for (let index = 0; index < count; index++) {
+      writeSpooledDeclaration({
+        stateDir,
+        agent: "copilot",
+        sessionId: `queued-${index}`,
+        fingerprint: `fingerprint-${index}`,
+        payload: { queued: index },
+        now: () => NOW,
+      });
+    }
+  };
+
+  /** @scenario "A report that cannot reach the collector sends no queued declarations" */
+  it("sends nothing queued once its own post got no answer", async () => {
+    queueSessions(5);
+    let attempts = 0;
+    const silentCollector = (async () => {
+      attempts++;
+      throw new Error("connect ETIMEDOUT");
+    }) as unknown as typeof fetch;
+
+    await runHookSeam({ fetchImpl: silentCollector });
+
+    expect(attempts).toBe(1);
+    expect(readSpooledDeclarations({ stateDir, now: () => NOW })).toHaveLength(5);
+  });
+
+  /** @scenario "The queue drains once the collector answers again" */
+  it("posts every queued declaration when the collector answers again", async () => {
+    queueSessions(5);
+    await runHookSeam({ fetchImpl: unreachableCollector });
+    expect(readSpooledDeclarations({ stateDir, now: () => NOW })).toHaveLength(5);
+
+    await runHookSeam();
+
+    expect(posted.map((request) => request.body)).toEqual(
+      expect.arrayContaining([0, 1, 2, 3, 4].map((queued) => ({ queued }))),
+    );
+    expect(readSpooledDeclarations({ stateDir, now: () => NOW })).toEqual([]);
   });
 });

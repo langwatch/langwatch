@@ -264,6 +264,33 @@ Rule: The agent can declare its working context itself
     When that session next reports its context
     Then the declaration stays queued for the next turn
 
+  # Each send to a collector that does not answer waits for its deadline, and
+  # the hook has seven seconds of the agent's ten. Once one send in a report
+  # got no answer, the rest would only spend the budget on the same silence.
+  @unit
+  Scenario: A report that cannot reach the collector sends no queued declarations
+    Given declarations queued for several sessions
+    And a collector the session report cannot reach
+    When a session reports its context
+    Then the queued declarations are not sent
+    And they all stay queued for the next turn
+
+  @unit
+  Scenario: A drain stops at the first queued declaration the collector does not answer
+    Given declarations queued for several sessions
+    And a collector that stops answering after the first send
+    When the queue drains
+    Then nothing is sent after the send that got no answer
+    And every declaration not delivered stays queued
+
+  @unit
+  Scenario: The queue drains once the collector answers again
+    Given declarations queued for several sessions while the collector could not be reached
+    And a collector that answers again
+    When a session reports its context
+    Then every queued declaration is posted
+    And nothing is left queued
+
 Rule: The agent is told when to declare
 
   The guidance is one short text with one source in the code, injected through

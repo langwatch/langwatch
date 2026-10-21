@@ -258,14 +258,18 @@ async function runHook({
     }
   }
 
-  // Whatever this hook had to say about its own directory is said. Anything
-  // the agent declared from a shell that could not reach the collector goes
-  // out now, last, so the declared checkout is the session's current one.
+  // Anything the agent declared from a shell that could not reach the
+  // collector goes out now, last, so the declared checkout is the session's
+  // current one. A collector that just gave no answer is not asked again.
+  if (own.collectorUnreachable) return;
   await drainSessionContextSpool({
     stateDir,
     now,
-    post: async (payload) =>
-      (await postSessionContext({ target: liveTarget, env, payload, fetchImpl })).ok,
+    post: async (payload) => {
+      const sent = await postSessionContext({ target: liveTarget, env, payload, fetchImpl });
+      if (sent.status === null) throw new Error("the collector did not answer");
+      return sent.ok;
+    },
   });
 }
 
@@ -568,6 +572,7 @@ async function postOwnSessionContext({
   if (!posted.ok) {
     return {
       httpStatus: posted.status,
+      collectorUnreachable: posted.status === null,
       retry: async (healed) => {
         const again = await postSessionContext({
           target: healed,
@@ -592,6 +597,8 @@ async function postOwnSessionContext({
  */
 interface OwnContextOutcome {
   httpStatus: number | null;
+  /** The post got no answer at all: the collector is down or unreachable. */
+  collectorUnreachable?: boolean;
   retry?: (target: TelemetryTarget) => Promise<boolean>;
 }
 
