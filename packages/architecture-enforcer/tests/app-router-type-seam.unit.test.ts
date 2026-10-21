@@ -15,11 +15,10 @@ import { createWorkspaceModuleResolver, moduleImports } from "../src/workspace/m
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
 /**
+ * 1,540 with `pnpm ensure:built` (#8795) once ops imports system-migrations types only.
  * A ceiling, not a target. Lower it when earned; never raise it without saying why.
- * 1,710: main is 1,699 in CI (1,690 + 9 built SDK files), hooks adds 1, upgrade diagnostics 2.
- * The count depends on `pnpm ensure:built`: https://github.com/langwatch/langwatch/issues/8795
  */
-const CEILING = 1_710;
+const CEILING = 1_560;
 
 /** Every browser file that declares a module's typed procedures through `createModuleApi`. */
 function moduleApiDeclarations(): string[] {
