@@ -107,9 +107,8 @@ export abstract class ModelProviderCatalog {
   }
   /**
    * Drops unknown and empty keys, refuses a newly picked restricted model. A
-   * restricted model the stored config already held is dropped instead: it
-   * predates the restriction, and refusing it would block every other key;
-   * `droppedRestricted` names those keys.
+   * restricted model already stored is dropped (named in `droppedRestricted`):
+   * it predates the restriction, and refusing it would block every other key.
    */
   sanitizeDefaultConfig({
     config,

@@ -250,7 +250,7 @@ describe("ModelProviderResolutionService.resolve", () => {
 
   // Clustering names its topics in the evaluation service, which calls the
   // provider directly and has no road to Codex. The codex FAST default set by
-  // the Codex setup must not reach it — and because the skip happens at read
+  // the Codex setup must not reach it; because the skip happens at read
   // time, a project that stored that default earlier needs no migration.
   describe("given the FAST role default is a Codex model", () => {
     const codexFast = (extra: ReturnType<typeof config>[] = []) =>

@@ -135,8 +135,8 @@ describe("codexRestrictions", () => {
 
   it("pins the allowed set: langy.chat plus the gateway-run FAST tier", () => {
     // The rule is derived (Langy + every FAST feature not listed as
-    // non-gateway); this pin makes any widening of it — a feature moving into
-    // FAST, a new fast assist — show up in review rather than land silently.
+    // non-gateway); this pin makes any widening of it (a feature moving into
+    // FAST, a new fast assist) show up in review rather than land silently.
     expect([...CODEX_ALLOWED_FEATURE_KEYS].toSorted()).toEqual(
       [
         "langy.chat",
