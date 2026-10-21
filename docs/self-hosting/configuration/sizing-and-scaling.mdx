@@ -88,9 +88,9 @@ For production with single-node ClickHouse.
 - Langy: 1 replica, 500m/2 CPU, 1Gi/4Gi memory
 - ClickHouse: 4 CPU, 8Gi memory, 100Gi storage
 - PostgreSQL: 250m/1 CPU, 512Mi/1Gi memory, 20Gi storage
-- Redis: 250m/500m CPU, 256Mi/512Mi memory, 5Gi storage
+- Redis: 500m/1 CPU, 1Gi/3Gi memory, 5Gi storage
 - Prometheus: 200m/500m CPU, 512Mi/2Gi memory, 30d retention, 20Gi storage
-- Total: ~8.9 CPU, ~23 Gi RAM requests
+- Total: ~9.1 CPU, ~23.8 Gi RAM requests
 
 ```bash
 helm install langwatch langwatch/langwatch \
@@ -111,9 +111,9 @@ For production with replicated ClickHouse.
 - ClickHouse: 3 nodes, 4 CPU, 16Gi memory, 300Gi storage each
 - ClickHouse Keeper: 3 nodes, 250m/1 CPU, 512Mi/1Gi memory
 - PostgreSQL: 250m/1 CPU, 512Mi/1Gi memory, 50Gi storage
-- Redis: 250m/500m CPU, 256Mi/512Mi memory, 10Gi storage
+- Redis: 500m/1 CPU, 1Gi/3Gi memory, 10Gi storage
 - Prometheus: 200m/500m CPU, 512Mi/2Gi memory, 60d retention, 50Gi storage
-- Total: ~22.9 CPU, ~84.8 Gi RAM requests
+- Total: ~23.1 CPU, ~85.6 Gi RAM requests
 
 ```bash
 helm install langwatch langwatch/langwatch \

@@ -272,6 +272,13 @@ jobs:
         if: "!cancelled()"
         run: ./tests/clickhouse-pool-sizing.sh
 
+      # Redis is started with a memory ceiling at half its limit so a snapshot
+      # fits under the container limit. Only the render shows the byte count,
+      # and a number written in a values file arrives as a float.
+      - name: "assert Redis memory ceiling is half the limit"
+        if: "!cancelled()"
+        run: ./tests/redis-maxmemory.sh
+
       # In local-filesystem mode the app and the workers mount one ReadWriteOnce
       # PVC, and a helm upgrade rolls both Deployments at once. The pre-upgrade
       # hook that orders them is a template over several values, so which
