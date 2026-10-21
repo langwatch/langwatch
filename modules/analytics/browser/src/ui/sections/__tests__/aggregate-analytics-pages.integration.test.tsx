@@ -42,7 +42,9 @@ vi.mock("../../../behavior/use-dashboards.ts", () => ({
 vi.mock("../analytics-header.tsx", () => ({
   AnalyticsHeader: ({ tabs }: { tabs: ReactNode }) => tabs,
 }));
-vi.mock("../custom-dashboards-section.tsx", () => ({ DashboardsTabMenu: () => null }));
+vi.mock("../custom-dashboards-section.tsx", () => ({
+  DashboardsTabMenu: () => <p>dashboards menu</p>,
+}));
 vi.mock("../../../behavior/use-filter-toggle.ts", () => ({
   useFilterToggle: () => ({ showFilters: true }),
 }));
@@ -100,6 +102,18 @@ describe("the analytics pages on an aggregate project", () => {
     });
 
     /** @scenario "The aggregate hides the views that only make sense inside one project" */
+    it("offers no Dashboards menu, which would open with nothing in it", () => {
+      renderWithAnalyticsHost(
+        <AnalyticsLayout tab="overview">
+          <p>the charts</p>
+        </AnalyticsLayout>,
+        { project: projectOfKind("aggregate") },
+      );
+
+      expect(screen.queryByText("dashboards menu")).not.toBeInTheDocument();
+    });
+
+    /** @scenario "The aggregate hides the views that only make sense inside one project" */
     it("shows the overall health and trend cards and no card for one monitor", () => {
       monitorsRead.mockClear();
       renderWithAnalyticsHost(<AnalyticsEvaluationsScreen />, {
@@ -137,6 +151,7 @@ describe("the analytics pages on an aggregate project", () => {
       );
       expect(tabLabels()).toContain("Topics");
       expect(screen.getByText("topic picker")).toBeInTheDocument();
+      expect(screen.getByText("dashboards menu")).toBeInTheDocument();
     });
 
     it("still draws a card per monitor on the evaluations page", () => {

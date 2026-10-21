@@ -35,6 +35,7 @@ import {
 } from "./clickhouse.latest-version-dedup.mapper.ts";
 import {
   buildMetricAlias,
+  memberScopedTraceAttribute,
   type MetricTranslation,
   nonBilledCostExpression,
   translateMetric,
@@ -1600,6 +1601,12 @@ function hasEvalMixedWithTraceMetrics(metrics: readonly MetricTranslation[]): bo
  * expression.
  */
 function extractTraceAggregationColumn(expression: string): string | null {
+  // 0. A member-scoped id key is one value per trace: carry it whole, or the
+  //    member column inside it would be left outside the per-trace CTE.
+  for (const { attributeKey } of MEMBER_SCOPED_ID_METRIC_COLUMNS) {
+    const key = memberScopedTraceAttribute(attributeKey);
+    if (expression.includes(key)) return key;
+  }
   // 1. Prefer a bracketed map-access column like `ts.Attributes['langwatch.user_id']`
   //    or `ts.Attributes["langwatch.user_id"]`. ClickHouse accepts both quote
   //    styles. Map keys can contain arbitrary characters except the matching
@@ -1758,9 +1765,24 @@ function buildTraceColumnSelects({
   // Pushing all of them would widen the dedup subquery with the wide
   // Attributes map for every grouped query — the same cost the conditional
   // cache-token hoist below exists to avoid.
+
+  // A member-scoped id key is hoisted whole; the bare read inside it only when read alone.
+  const readsOutsideMemberKeys = simpleMetrics.map((m) =>
+    MEMBER_SCOPED_ID_METRIC_COLUMNS.reduce(
+      (expression, { attributeKey }) =>
+        expression.split(memberScopedTraceAttribute(attributeKey)).join(""),
+      m.selectExpression,
+    ),
+  );
+  for (const { attributeKey, cteColumn } of MEMBER_SCOPED_ID_METRIC_COLUMNS) {
+    const source = memberScopedTraceAttribute(attributeKey);
+    const isRead = simpleMetrics.some((m) => m.selectExpression.includes(source));
+    if (!isRead) continue;
+    traceColumnSelects.push(`${traceColumnWrapper(source)} AS ${cteColumn}`);
+  }
   for (const { attributeKey, cteColumn } of TRACE_ATTRIBUTE_METRIC_COLUMNS) {
     const source = traceAttributeSource(attributeKey);
-    const isRead = simpleMetrics.some((m) => m.selectExpression.includes(source));
+    const isRead = readsOutsideMemberKeys.some((expression) => expression.includes(source));
     if (!isRead) continue;
     traceColumnSelects.push(`${traceColumnWrapper(source)} AS ${cteColumn}`);
   }
@@ -2967,6 +2989,15 @@ export const TRACE_ATTRIBUTE_METRIC_COLUMNS = [
   { attributeKey: "langwatch.prompt_ids", cteColumn: "trace_attr_prompt_ids" },
 ] as const;
 
+/**
+ * Member-scoped id keys ({@link memberScopedTraceAttribute}) a metric may count, and the CTE
+ * column each is hoisted to. A key contains the bare attribute read, so it is rewritten first.
+ */
+export const MEMBER_SCOPED_ID_METRIC_COLUMNS = [
+  { attributeKey: "langwatch.user_id", cteColumn: "trace_member_user_id" },
+  { attributeKey: "gen_ai.conversation.id", cteColumn: "trace_member_thread_id" },
+] as const;
+
 /** The `ts.Attributes['<key>']` source expression for a hoisted attribute. */
 function traceAttributeSource(attributeKey: string): string {
   return `${tableAliases.trace_summaries}.Attributes['${attributeKey}']`;
@@ -2988,6 +3019,10 @@ function dedupSubstitutions(): {
     // composites below come first: their source contains no bare column, but
     // keeping every map read ahead of the plain list makes the ordering rule
     // one rule ("longest / most specific first") rather than two.
+    ...MEMBER_SCOPED_ID_METRIC_COLUMNS.map(({ attributeKey, cteColumn }) => ({
+      source: memberScopedTraceAttribute(attributeKey),
+      cteColumn,
+    })),
     ...TRACE_ATTRIBUTE_METRIC_COLUMNS.map(({ attributeKey, cteColumn }) => ({
       source: traceAttributeSource(attributeKey),
       cteColumn,

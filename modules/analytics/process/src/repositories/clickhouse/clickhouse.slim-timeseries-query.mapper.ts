@@ -22,7 +22,7 @@ import {
   type LatestVersionColumn,
   latestVersionSubquery,
 } from "./clickhouse.latest-version-dedup.mapper.ts";
-import { buildMetricAlias } from "./clickhouse.metric-translator.mapper.ts";
+import { buildMetricAlias, memberScopedId } from "./clickhouse.metric-translator.mapper.ts";
 import {
   appendMetadataValueFilterClauses,
   collectStringValues,
@@ -59,10 +59,11 @@ function slimColumnFor(metric: SlimTraceMetricKey): string {
   switch (metric) {
     case "metadata.trace_id":
       return `${ta}.TraceId`;
+    // Keyed by member: two members of a group project can hold the same id.
     case "metadata.user_id":
-      return `${ta}.UserId`;
+      return memberScopedId({ tenantColumn: `${ta}.TenantId`, idColumn: `${ta}.UserId` });
     case "metadata.thread_id":
-      return `${ta}.ConversationId`;
+      return memberScopedId({ tenantColumn: `${ta}.TenantId`, idColumn: `${ta}.ConversationId` });
     case "performance.total_cost":
       return `${ta}.TotalCost`;
     case "performance.cost_non_billed":
