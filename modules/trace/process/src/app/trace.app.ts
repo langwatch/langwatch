@@ -168,6 +168,9 @@ import {
   type ScenarioRoleMetricsInput,
   type TraceQueryEvaluationRun,
   type TraceTopicAssignment,
+  type SimilarTracesInput,
+  type SimilarTracesResult,
+  type TraceEmbeddingsRecord,
   type TraceTopicClusteringCounts,
   type TraceTopicClusteringPage,
   type TraceTopicClusteringPageInput,
@@ -328,6 +331,7 @@ import {
 } from "../features/read/services/trace-read-full-io.service.ts";
 import { SpanStorageService } from "../features/read/services/trace-span-storage-read.service.ts";
 import { TraceSummaryService } from "../features/read/services/trace-summary-read.service.ts";
+import { TraceSimilarityService } from "../features/similarity/services/trace-similarity.service.ts";
 import {
   SpanCostSuggestionService,
   type TraceSpanCostSuggestion,
@@ -772,6 +776,8 @@ export interface TraceAppDependencies {
   topicClustering?: TraceTopicClusteringReadService | undefined;
   /** trace_processing's assignTopic sender; absent, a topic assignment refuses. */
   topicAssignment?: TraceTopicAssignment | undefined;
+  /** Clustering's kept embeddings and the nearest-trace read; absent, both refuse. */
+  similarity?: TraceSimilarityService | undefined;
 }
 
 /** Main's cap on each known-signal list the search router's context line names. */
@@ -1244,6 +1250,10 @@ export class TraceModule implements TraceApi, CollectorApp {
       }),
       topicClustering: TraceTopicClusteringReadService.create({
         repository: options.repositories.clusteringSample,
+      }),
+      similarity: TraceSimilarityService.create({
+        repository: options.repositories.embeddings,
+        dataRetention: options.dataRetention,
       }),
       topicAssignment: EventingTraceTopicAssignment.create({
         sendAssignTopic: async (input) => {
@@ -2334,7 +2344,17 @@ export class TraceModule implements TraceApi, CollectorApp {
     return this.#composed("topicClustering", "A topic clustering read").readPage(input);
   }
 
-  #composed<K extends "scenarioRoleMetrics" | "topicClustering" | "topicAssignment">(
+  async recordTraceEmbeddings(input: TraceEmbeddingsRecord): Promise<void> {
+    return this.#composed("similarity", "A trace embeddings write").record(input);
+  }
+
+  async findSimilarTraces(
+    input: SimilarTracesInput & { authorization: Authorization },
+  ): Promise<SimilarTracesResult> {
+    return this.#composed("similarity", "A similar traces read").findSimilar(input);
+  }
+
+  #composed<K extends "scenarioRoleMetrics" | "topicClustering" | "topicAssignment" | "similarity">(
     key: K,
     capability: string,
   ): NonNullable<TraceAppDependencies[K]> {

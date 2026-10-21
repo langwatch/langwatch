@@ -76,6 +76,11 @@ import type {
   TraceQueryFieldCatalogueInput,
 } from "./features/query/trace-query.contract.ts";
 import type { RouteSearchInput, RouteSearchResult } from "./features/query/trace-search-route.ts";
+import type {
+  SimilarTracesInput,
+  SimilarTracesResult,
+  TraceEmbeddingsRecord,
+} from "./features/similarity/trace-similarity.ts";
 import type { LogTraceContribution } from "./features/span/trace-log-contribution.ts";
 import type {
   SpanSummaryRow,
@@ -947,6 +952,12 @@ export interface TraceApi extends TraceOtlpIngestApi {
   }): boolean;
   readTopicClusteringCounts(input: { projectId: string }): Promise<TraceTopicClusteringCounts>;
   readTopicClusteringPage(input: TraceTopicClusteringPageInput): Promise<TraceTopicClusteringPage>;
+  /** Keeps the embeddings one clustering page computed; a rewrite of a trace replaces its row. */
+  recordTraceEmbeddings(input: TraceEmbeddingsRecord): Promise<void>;
+  /** The traces nearest one trace by cosine distance, inside the one project that holds it. */
+  findSimilarTraces(
+    input: SimilarTracesInput & { authorization: Authorization },
+  ): Promise<SimilarTracesResult>;
   /** The project's distinct traces over the last 24 hours. */
   countTracesInLastDay(input: { projectId: string }): Promise<number>;
   /** Whether any trace carrying `attribute` landed for the project at or after `sinceMs`. */

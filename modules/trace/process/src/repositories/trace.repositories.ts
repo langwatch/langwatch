@@ -5,6 +5,7 @@ import type { TraceExportSlotRepository } from "../features/export/repositories/
 import type { TraceIngestSourceBillingRepository } from "../features/ingestion/repositories/trace-ingest-source-billing.repository.ts";
 import type { TraceRateLimitRepository } from "../features/ingestion/repositories/trace-rate-limit.repository.ts";
 import type { TraceLegacyReadRepository } from "../features/legacy/repositories/trace-legacy-read.repository.ts";
+import type { TraceEmbeddingRepository } from "../features/similarity/repositories/trace-embedding.repository.ts";
 import type { TraceClusteringSampleRepository } from "../features/topic/repositories/trace-clustering-sample.repository.ts";
 import type { TraceTopicNamesReadRepository } from "../features/topic/repositories/trace-topic-names.repository.ts";
 import type { TraceClickHouse } from "./clickhouse/clickhouse.trace-member-client.repository.ts";
@@ -71,6 +72,8 @@ export interface TraceRepositories {
   /** Claim-check reads for fields the fold offloaded out of the summary. */
   readonly eventPayloads: TracePayloadReaderRepository;
   readonly clusteringSample: TraceClusteringSampleRepository;
+  /** The embeddings topic clustering computes, kept for "traces like this one". */
+  readonly embeddings: TraceEmbeddingRepository;
   readonly usageCount: TraceUsageCountRepository;
   /** Goose 00103's `idx_updated_at` materialisation, which a background step waits on. */
   readonly indexMaterialisation: TraceIndexMaterialisationRepository;

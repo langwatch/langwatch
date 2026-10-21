@@ -27,6 +27,7 @@ export function fakeRunnerDeps(overrides: Partial<TopicClusteringRunnerDeps> = {
       }),
       readTopicClusteringPage: vi.fn().mockResolvedValue(tracePage(0)),
       assignTopic: vi.fn().mockResolvedValue(undefined),
+      recordTraceEmbeddings: vi.fn().mockResolvedValue(undefined),
     },
     models: {
       resolveClusteringModel: vi.fn().mockResolvedValue({ model: "openai/gpt-5-mini" }),
@@ -82,5 +83,8 @@ export function tracePage(count: number, now = Date.now()): TraceTopicClustering
     traces,
     lastSort: count > 0 ? [now - (count - 1) * 1000, `trace-${count - 1}`] : undefined,
     returnedCount: count,
+    occurredAtMsByTraceId: Object.fromEntries(
+      traces.map((trace, i) => [trace.trace_id, now - i * 1000] as const),
+    ),
   };
 }

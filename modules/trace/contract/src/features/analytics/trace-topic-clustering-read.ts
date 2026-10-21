@@ -25,4 +25,6 @@ export interface TraceTopicClusteringPage {
   traces: TraceTopicClusteringTrace[];
   lastSort: [number, string] | undefined;
   returnedCount: number;
+  /** When each paged trace happened, so what clustering derives from it ages with it. */
+  occurredAtMsByTraceId: Readonly<Record<string, number>>;
 }

@@ -70,6 +70,10 @@ export type BatchClusteringParams = {
   litellm_params: Record<string, string>;
   embeddings_litellm_params: Record<string, unknown>;
   traces: TopicClusteringTrace[];
+  /** Asks langevals to hand back the embeddings it computes; an older langevals ignores it. */
+  return_trace_embeddings?: boolean;
+  /** The response ceiling langevals leaves embeddings out to stay under. */
+  max_response_bytes?: number;
 };
 
 export type IncrementalClusteringParams = {
@@ -79,6 +83,10 @@ export type IncrementalClusteringParams = {
   topics: TopicClusteringTopic[];
   subtopics: TopicClusteringSubtopic[];
   traces: TopicClusteringTrace[];
+  /** Asks langevals to hand back the embeddings it computes; an older langevals ignores it. */
+  return_trace_embeddings?: boolean;
+  /** The response ceiling langevals leaves embeddings out to stay under. */
+  max_response_bytes?: number;
 };
 
 /** The clustering call's billed cost. */
@@ -94,11 +102,28 @@ export const topicClusteringCostSchema: TopicClusteringCostSchema =
 
 export type TopicClusteringCost = z.infer<typeof topicClusteringCostSchema>;
 
+/** One trace's embedding as langevals sends it: base64 of int8, largest component scaled to 127. */
+const topicClusteringTraceEmbeddingSchemaDefinition = z.object({
+  trace_id: z.string(),
+  embedding: z.string(),
+});
+export interface TopicClusteringTraceEmbeddingSchema extends Named<
+  typeof topicClusteringTraceEmbeddingSchemaDefinition
+> {}
+export const topicClusteringTraceEmbeddingSchema: TopicClusteringTraceEmbeddingSchema =
+  topicClusteringTraceEmbeddingSchemaDefinition;
+
+export type TopicClusteringTraceEmbedding = z.infer<typeof topicClusteringTraceEmbeddingSchema>;
+
 const topicClusteringResponseSchemaDefinition = z.object({
   topics: z.array(topicClusteringTopicSchema),
   subtopics: z.array(topicClusteringSubtopicSchema),
   traces: z.array(topicClusteringTraceTopicMapSchema),
   cost: topicClusteringCostSchema,
+  /** Present only when the request set `return_trace_embeddings`. */
+  trace_embeddings: z.array(topicClusteringTraceEmbeddingSchema).optional(),
+  /** Embedded traces left out to keep the response under `max_response_bytes`. */
+  trace_embeddings_omitted: z.number().int().nonnegative().optional(),
 });
 export interface TopicClusteringResponseSchema extends Named<
   typeof topicClusteringResponseSchemaDefinition

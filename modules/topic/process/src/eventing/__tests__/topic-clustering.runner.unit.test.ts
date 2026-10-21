@@ -37,7 +37,12 @@ describe("clusterTopicsForProject", () => {
       // A full page of empty-input traces clusters nothing, but the cursor
       // must still advance or older eligible traces are stranded.
       const deps = depsReading({
-        page: { traces: [], lastSort: [1_700_000_000_000, "trace-14"], returnedCount: 15 },
+        page: {
+          traces: [],
+          lastSort: [1_700_000_000_000, "trace-14"],
+          returnedCount: 15,
+          occurredAtMsByTraceId: {},
+        },
       });
 
       const outcome = await clusterTopicsForProject(deps, { projectId: "proj-1" });

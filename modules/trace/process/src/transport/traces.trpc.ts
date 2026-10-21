@@ -850,6 +850,11 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
       });
     })
 
+    /** Ids and distances only, so no content protection applies to the answer. */
+    .procedure("findSimilar")
+    .withPermission("traces:view")
+    .handle(({ app, input, authorization }) => app.findSimilarTraces({ ...input, authorization }))
+
     /**
      * Trace-level events for the drawer, split off the header so the header
      * stays a pure summary read.

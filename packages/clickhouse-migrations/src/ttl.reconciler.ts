@@ -152,6 +152,14 @@ export const TABLE_TTL_CONFIG: readonly TableTTLEntry[] = [
     envVar: "CLICKHOUSE_COLD_STORAGE_TRACE_ANALYTICS_TTL_DAYS",
     hardcodedDefault: 49,
   },
+  // Trace ADR-003: clustering's kept embeddings age with the trace they came from.
+  {
+    table: "trace_embeddings",
+    ttlColumn: "OccurredAt",
+    retentionTTLColumn: "OccurredAt",
+    envVar: "CLICKHOUSE_COLD_STORAGE_TRACE_EMBEDDINGS_TTL_DAYS",
+    hardcodedDefault: 49,
+  },
   // ADR-034 Phase 1: per-span rollup. Anchor on BucketStart (its sort + partition
   // leaf). BucketStart is DateTime64(3), so the ttlColumnExpression wraps in
   // toDateTime — CH rejects DateTime64 directly in TTL arithmetic.

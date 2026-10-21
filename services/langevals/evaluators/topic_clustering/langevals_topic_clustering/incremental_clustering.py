@@ -26,7 +26,7 @@ from langevals_topic_clustering.types import (
 from scipy.spatial.distance import cdist
 import numpy as np
 
-from langevals_topic_clustering.utils import fill_embeddings
+from langevals_topic_clustering.utils import attach_trace_embeddings, fill_embeddings
 from langevals_topic_clustering.failures import configured_model, failure_answer
 from langevals_topic_clustering._logger import get_logger, set_log_context, clear_log_context
 
@@ -245,6 +245,9 @@ class IncrementalClusteringParams(BaseModel):
     deployment_name: Optional[str] = None
     litellm_params: dict[str, str]
     embeddings_litellm_params: dict[str, Any]
+    return_trace_embeddings: bool = False
+    # A deployment's response ceiling (Lambda's is 6 MB); embeddings that would pass it are left out.
+    max_response_bytes: Optional[int] = None
 
 
 def setup_endpoints(app: FastAPI):
@@ -311,12 +314,17 @@ def setup_endpoints(app: FastAPI):
                 total_trace_assignments=total_traces,
             )
 
-            return {
+            response: TopicClusteringResponse = {
                 "topics": new_topics,
                 "subtopics": new_subtopics,
                 "traces": traces_to_assign + traces_from_new_topics_to_assign,
                 "cost": cost,
             }
+            if params.return_trace_embeddings:
+                return attach_trace_embeddings(
+                    response, traces_with_embeddings, params.max_response_bytes
+                )
+            return response
         except Exception as e:
             answer = failure_answer(e, logger, "Incremental")
             if answer is e:

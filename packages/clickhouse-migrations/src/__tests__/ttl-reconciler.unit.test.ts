@@ -311,6 +311,7 @@ describe("ttlReconciler", () => {
         "stored_spans",
         "trace_summaries",
         "trace_analytics",
+        "trace_embeddings",
         "trace_analytics_rollup",
         "evaluation_analytics",
         "evaluation_analytics_rollup",

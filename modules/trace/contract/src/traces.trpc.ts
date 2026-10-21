@@ -16,6 +16,10 @@ import {
   routeSearchInputSchema,
   routeSearchResultSchema,
 } from "./features/query/trace-search-route.ts";
+import {
+  similarTracesInputSchema,
+  similarTracesResultSchema,
+} from "./features/similarity/trace-similarity.ts";
 import { evaluationSchema, traceSchema } from "./trace-format.schemas.ts";
 import { checkPreconditionsSchema } from "./trace-precondition.schemas.ts";
 import {
@@ -597,6 +601,11 @@ export const tracesTrpc = defineTrpcContract("traces")
     }),
   )
   .withOutput(traceResourceInfoSchema)
+
+  /** The traces nearest one trace by its clustering embedding (trace ADR-003). */
+  .query("findSimilar")
+  .withInput(similarTracesInputSchema)
+  .withOutput(similarTracesResultSchema)
 
   /**
    * Trace-level events ({spanId, timestamp, name, attributes}) for the

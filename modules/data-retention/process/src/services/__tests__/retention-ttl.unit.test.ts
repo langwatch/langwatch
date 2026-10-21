@@ -102,8 +102,8 @@ describe("hasRetentionTTL", () => {
 });
 
 describe("RETENTION_MANAGED_TABLES", () => {
-  it("includes all 19 retention-managed tables", () => {
-    expect(RETENTION_MANAGED_TABLES).toHaveLength(19);
+  it("includes all 20 retention-managed tables", () => {
+    expect(RETENTION_MANAGED_TABLES).toHaveLength(20);
     expect(RETENTION_MANAGED_TABLES).toContain("stored_spans");
     expect(RETENTION_MANAGED_TABLES).toContain("event_log");
     expect(RETENTION_MANAGED_TABLES).toContain("trace_summaries");
@@ -116,6 +116,8 @@ describe("RETENTION_MANAGED_TABLES", () => {
     // and age on the same per-project retention policy as trace_summaries.
     expect(RETENTION_MANAGED_TABLES).toContain("trace_analytics");
     expect(RETENTION_MANAGED_TABLES).toContain("trace_analytics_rollup");
+    // Trace ADR-003: clustering's kept embeddings expire with their trace.
+    expect(RETENTION_MANAGED_TABLES).toContain("trace_embeddings");
     // ADR-034 Phase 6 — eval mirrors; age with the eval-pipeline retention
     // (currently categorised "traces" until eval split-out lands).
     expect(RETENTION_MANAGED_TABLES).toContain("evaluation_analytics");

@@ -16,6 +16,7 @@ export const RETENTION_TABLE_CATEGORY_MAP = {
   trace_summaries: "traces",
   trace_analytics: "traces",
   trace_analytics_rollup: "traces",
+  trace_embeddings: "traces",
   evaluation_runs: "traces",
   evaluation_analytics: "traces",
   evaluation_analytics_rollup: "traces",
@@ -109,6 +110,8 @@ const TABLES_WITHOUT_SIZE_COLUMN = new Set<RetentionManagedTable>([
   "trace_analytics_rollup",
   "evaluation_analytics",
   "evaluation_analytics_rollup",
+  // Derived by the platform from the trace's input; not customer storage.
+  "trace_embeddings",
 ]);
 
 export const PRODUCTION_STORAGE_METER_TABLES = RETENTION_MANAGED_TABLES.filter(

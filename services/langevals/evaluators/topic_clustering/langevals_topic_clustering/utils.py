@@ -1,11 +1,18 @@
 from typing import Optional
+import base64
 import contextvars
+import json
 import litellm
 import numpy as np
 from scipy.spatial.distance import cdist
 import concurrent.futures
 
-from langevals_topic_clustering.types import Trace, TraceWithEmbeddings
+from langevals_topic_clustering.types import (
+    TopicClusteringResponse,
+    Trace,
+    TraceEmbedding,
+    TraceWithEmbeddings,
+)
 from langevals_topic_clustering._logger import get_logger
 
 logger = get_logger("topic_clustering.utils")
@@ -189,3 +196,54 @@ def fill_embeddings(
         for trace, embedding in zip(traces_, embeddings)
         if embedding is not None
     ]
+
+
+# Per-entry JSON framing around the id and the base64 text: keys, quotes, commas.
+_TRACE_EMBEDDING_FRAMING_BYTES = 40
+# The two top-level keys this adds, with their brackets and the omitted count.
+_TRACE_EMBEDDINGS_KEYS_BYTES = 64
+
+
+def quantize_embedding(vector: list[float]) -> str:
+    """The vector scaled so its largest component is 127, as base64 of int8.
+
+    Cosine distance ignores a vector's length, so the scale is not sent.
+    """
+    values = np.asarray(vector, dtype=np.float64)
+    peak = float(np.max(np.abs(values))) if values.size else 0.0
+    if peak == 0.0:
+        quantized = np.zeros(values.shape, dtype=np.int8)
+    else:
+        quantized = np.clip(np.rint(values * (127.0 / peak)), -127, 127).astype(np.int8)
+    return base64.b64encode(quantized.tobytes()).decode("ascii")
+
+
+def attach_trace_embeddings(
+    response: TopicClusteringResponse,
+    traces: list[TraceWithEmbeddings],
+    max_response_bytes: Optional[int],
+) -> TopicClusteringResponse:
+    """Adds the embeddings clustering computed, in page order, while the response fits."""
+    budget = (
+        None
+        if max_response_bytes is None
+        else max_response_bytes
+        - len(json.dumps(response, default=str))
+        - _TRACE_EMBEDDINGS_KEYS_BYTES
+    )
+    kept: list[TraceEmbedding] = []
+    used = 0
+    for trace in traces:
+        entry = TraceEmbedding(
+            trace_id=trace["trace_id"],
+            embedding=quantize_embedding(trace["embeddings"]),
+        )
+        size = len(entry["trace_id"]) + len(entry["embedding"]) + _TRACE_EMBEDDING_FRAMING_BYTES
+        if budget is not None and used + size > budget:
+            break
+        kept.append(entry)
+        used += size
+
+    response["trace_embeddings"] = kept
+    response["trace_embeddings_omitted"] = len(traces) - len(kept)
+    return response

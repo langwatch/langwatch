@@ -143,7 +143,12 @@ describe("TraceTopicClusteringReadService", () => {
     it("answers no cursor for an empty page", async () => {
       const page = await reader(new RecordingClusteringSampleRepository()).readPage(firstPage);
 
-      expect(page).toEqual({ traces: [], lastSort: undefined, returnedCount: 0 });
+      expect(page).toEqual({
+        traces: [],
+        lastSort: undefined,
+        returnedCount: 0,
+        occurredAtMsByTraceId: {},
+      });
     });
 
     it("keeps a trace's topic only when the caller knows that topic", async () => {

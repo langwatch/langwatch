@@ -86,6 +86,9 @@ export class TraceTopicClusteringReadService {
       traces,
       lastSort: lastRow ? [lastRow.occurredAtMs, lastRow.traceId] : undefined,
       returnedCount: rows.length,
+      occurredAtMsByTraceId: Object.fromEntries(
+        rows.map((row) => [row.traceId, row.occurredAtMs] as const),
+      ),
     };
   }
 

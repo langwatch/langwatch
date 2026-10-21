@@ -2,6 +2,7 @@ import type { FoldProjectionStore } from "@langwatch/eventing";
 import { memoryObjectStorage } from "@langwatch/process-stores";
 import { TraceCapabilityUnavailableError } from "@langwatch/trace-contract";
 
+import { MemoryTraceEmbeddingRepository } from "../../features/similarity/repositories/memory/memory.trace-embedding.repository.ts";
 import {
   TraceClickHouse,
   type TraceClickHouseClient,
@@ -171,6 +172,7 @@ export class MemoryTraceRepositories {
       sessionGroups: new NullSessionGroupsRepository(),
       eventPayloads: MemoryTracePayloadReaderRepository.create(),
       clusteringSample: MemoryNullTraceClusteringSampleRepository.create(),
+      embeddings: MemoryTraceEmbeddingRepository.create(),
       usageCount: MemoryTraceUsageCountRepository.create(),
       indexMaterialisation: MemoryTraceIndexMaterialisationRepository.create(),
       modelSpend: MemoryTraceModelSpendRepository.create(),

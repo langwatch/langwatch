@@ -6,6 +6,7 @@ from langevals_topic_clustering.topic_naming import (
     generate_topic_and_subtopic_names,
 )
 from langevals_topic_clustering.utils import (
+    attach_trace_embeddings,
     calculate_centroid_and_distance,
     fill_embeddings,
 )
@@ -90,6 +91,9 @@ class BatchClusteringParams(BaseModel):
     deployment_name: Optional[str] = None
     litellm_params: dict[str, str]
     embeddings_litellm_params: dict[str, Any]
+    return_trace_embeddings: bool = False
+    # A deployment's response ceiling (Lambda's is 6 MB); embeddings that would pass it are left out.
+    max_response_bytes: Optional[int] = None
 
 
 def setup_endpoints(app: FastAPI):
@@ -139,12 +143,17 @@ def setup_endpoints(app: FastAPI):
                 trace_assignment_count=len(traces_to_assign),
             )
 
-            return {
+            response: TopicClusteringResponse = {
                 "topics": topics,
                 "subtopics": subtopics,
                 "traces": traces_to_assign,
                 "cost": cost,
             }
+            if params.return_trace_embeddings:
+                return attach_trace_embeddings(
+                    response, traces_with_embeddings, params.max_response_bytes
+                )
+            return response
         except Exception as e:
             answer = failure_answer(e, logger, "Batch")
             if answer is e:

@@ -22,6 +22,7 @@ describe("clusterTopicsForProject", () => {
             }),
             readTopicClusteringPage: vi.fn().mockResolvedValue(tracePage(12)),
             assignTopic: vi.fn().mockResolvedValue(undefined),
+            recordTraceEmbeddings: vi.fn().mockResolvedValue(undefined),
           },
           evaluations: {
             requestTopicClustering: vi.fn().mockResolvedValue({ kind: "not_configured" }),

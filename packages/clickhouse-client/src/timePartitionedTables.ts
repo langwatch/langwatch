@@ -23,6 +23,7 @@ export const TIME_PARTITIONED_TABLES = {
   trace_analytics: ["OccurredAt"],
   trace_analytics_rollup: ["BucketStart"],
   trace_summaries: ["OccurredAt"],
+  trace_embeddings: ["OccurredAt"],
   evaluation_analytics: ["OccurredAt"],
   evaluation_analytics_rollup: ["BucketStart"],
   evaluation_runs: ["ScheduledAt"],

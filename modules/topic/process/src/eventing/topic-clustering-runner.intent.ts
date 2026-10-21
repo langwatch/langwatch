@@ -21,6 +21,7 @@ import {
 import type { TraceApi } from "@langwatch/trace-contract";
 
 import type { TopicClusteringRepository } from "../repositories/topic-clustering.repository.ts";
+import { anchoredTraceEmbeddings } from "../rules/trace-embedding-decoding.rules.ts";
 import type { EventingTopicClusteringCommandsService } from "../services/topic-clustering-commands.service.ts";
 import {
   TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS,
@@ -32,6 +33,9 @@ const logger = createLogger("langwatch:topicClustering");
 
 /** The embeddings dimension the clustering params pin (text-embedding-3-small). */
 const OPENAI_EMBEDDING_DIMENSION = 1536;
+
+/** Under the 6 MB a Lambda-hosted langevals can answer with; embeddings past it are left out. */
+const TOPIC_CLUSTERING_MAX_RESPONSE_BYTES = 5 * 1024 * 1024;
 
 // Hard deadline on langevals call derived from outbox lease to prevent concurrent runs
 // destroying the model in batch mode; 60% of lease leaves room for response + store + outcome.
@@ -83,7 +87,13 @@ interface TopicClusteringWritePathSeed {
  */
 export interface TopicClusteringRunnerDeps {
   /** Trace owns the summaries clustering reads and the topic it assigns (ARCHITECTURE §3.3). */
-  traces: Pick<TraceApi, "readTopicClusteringCounts" | "readTopicClusteringPage" | "assignTopic">;
+  traces: Pick<
+    TraceApi,
+    | "readTopicClusteringCounts"
+    | "readTopicClusteringPage"
+    | "assignTopic"
+    | "recordTraceEmbeddings"
+  >;
   models: TopicClusteringModels;
   /** `not_configured` when the deployment names no langevals endpoint; evaluation logs it. */
   evaluations: Pick<EvaluationApi, "requestTopicClustering">;
@@ -216,13 +226,14 @@ export const clusterTopicsForProject = async (
     "Starting trace search for topic clustering",
   );
 
-  const { traces, lastSort, returnedCount } = await deps.traces.readTopicClusteringPage({
-    projectId,
-    isIncrementalProcessing,
-    topicIds,
-    subtopicIds,
-    ...(searchAfter ? { searchAfter } : {}),
-  });
+  const { traces, lastSort, returnedCount, occurredAtMsByTraceId } =
+    await deps.traces.readTopicClusteringPage({
+      projectId,
+      isIncrementalProcessing,
+      topicIds,
+      subtopicIds,
+      ...(searchAfter ? { searchAfter } : {}),
+    });
 
   const minimumTraces = isIncrementalProcessing ? 1 : 10;
 
@@ -261,8 +272,8 @@ export const clusterTopicsForProject = async (
   }
 
   const outcome = isIncrementalProcessing
-    ? await incrementalClustering({ deps, projectId, traces, runContext })
-    : await batchClusterTraces({ deps, projectId, traces, runContext });
+    ? await incrementalClustering({ deps, projectId, traces, runContext, occurredAtMsByTraceId })
+    : await batchClusterTraces({ deps, projectId, traces, runContext, occurredAtMsByTraceId });
 
   logger.info({ projectId }, "done! project");
 
@@ -328,11 +339,13 @@ const batchClusterTraces = async ({
   projectId,
   traces,
   runContext,
+  occurredAtMsByTraceId,
 }: {
   deps: TopicClusteringRunnerDeps;
   projectId: string;
   traces: TopicClusteringTrace[];
   runContext?: ClusteringRunContext;
+  occurredAtMsByTraceId: Readonly<Record<string, number>>;
 }): Promise<ClusteringRunOutcome> => {
   logger.info({ tracesLength: traces.length, projectId }, "batch clustering topics");
 
@@ -357,22 +370,30 @@ const batchClusterTraces = async ({
       dimensions: OPENAI_EMBEDDING_DIMENSION,
     },
     traces,
+    return_trace_embeddings: true,
+    max_response_bytes: TOPIC_CLUSTERING_MAX_RESPONSE_BYTES,
   });
 
   if (fetched.kind === "not_configured") {
     return fetched;
   }
 
-  return {
-    kind: "stored",
-    summary: await storeResults({
-      deps,
-      projectId,
-      clusteringResult: fetched.response,
-      isIncremental: false,
-      runContext,
-    }),
-  };
+  const summary = await storeResults({
+    deps,
+    projectId,
+    clusteringResult: fetched.response,
+    isIncremental: false,
+    runContext,
+  });
+  await keepTraceEmbeddings({
+    deps,
+    projectId,
+    embeddingsModel: embeddingsModel.model,
+    clusteringResult: fetched.response,
+    occurredAtMsByTraceId,
+  });
+
+  return { kind: "stored", summary };
 };
 
 const incrementalClustering = async ({
@@ -380,11 +401,13 @@ const incrementalClustering = async ({
   projectId,
   traces,
   runContext,
+  occurredAtMsByTraceId,
 }: {
   deps: TopicClusteringRunnerDeps;
   projectId: string;
   traces: TopicClusteringTrace[];
   runContext?: ClusteringRunContext;
+  occurredAtMsByTraceId: Readonly<Record<string, number>>;
 }): Promise<ClusteringRunOutcome> => {
   logger.info({ tracesLength: traces.length, projectId }, "incremental topic clustering");
 
@@ -430,22 +453,70 @@ const incrementalClustering = async ({
     traces,
     topics,
     subtopics,
+    return_trace_embeddings: true,
+    max_response_bytes: TOPIC_CLUSTERING_MAX_RESPONSE_BYTES,
   });
 
   if (fetched.kind === "not_configured") {
     return fetched;
   }
 
-  return {
-    kind: "stored",
-    summary: await storeResults({
-      deps,
-      projectId,
-      clusteringResult: fetched.response,
-      isIncremental: true,
-      runContext,
-    }),
-  };
+  const summary = await storeResults({
+    deps,
+    projectId,
+    clusteringResult: fetched.response,
+    isIncremental: true,
+    runContext,
+  });
+  await keepTraceEmbeddings({
+    deps,
+    projectId,
+    embeddingsModel: embeddingsModel.model,
+    clusteringResult: fetched.response,
+    occurredAtMsByTraceId,
+  });
+
+  return { kind: "stored", summary };
+};
+
+/**
+ * Hands trace the embeddings this page already paid for (trace ADR-003). Best effort: losing
+ * them costs a "similar traces" answer, while failing the page would pay for them twice.
+ */
+const keepTraceEmbeddings = async ({
+  deps,
+  projectId,
+  embeddingsModel,
+  clusteringResult,
+  occurredAtMsByTraceId,
+}: {
+  deps: TopicClusteringRunnerDeps;
+  projectId: string;
+  embeddingsModel: string;
+  clusteringResult: TopicClusteringResponse;
+  occurredAtMsByTraceId: Readonly<Record<string, number>>;
+}): Promise<void> => {
+  const embeddings = anchoredTraceEmbeddings({
+    embeddings: clusteringResult.trace_embeddings ?? [],
+    occurredAtMsByTraceId,
+  });
+  const omitted = clusteringResult.trace_embeddings_omitted ?? 0;
+  if (omitted > 0) {
+    logger.info(
+      { projectId, kept: embeddings.length, omitted },
+      "langevals left trace embeddings out to keep its response under the ceiling",
+    );
+  }
+  if (embeddings.length === 0) return;
+
+  try {
+    await deps.traces.recordTraceEmbeddings({ tenantId: projectId, embeddingsModel, embeddings });
+  } catch (error) {
+    logger.error(
+      { projectId, embeddings: embeddings.length, error },
+      "Failed to keep trace embeddings from topic clustering",
+    );
+  }
 };
 
 const recordClusteredTopics = async ({

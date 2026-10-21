@@ -18,6 +18,7 @@ const CONVERTED_REPOSITORIES = [
   "trace-metrics-analytics.repository.ts",
   "session-groups.repository.ts",
   "trace-span.repository.ts",
+  "../../features/similarity/repositories/clickhouse/clickhouse.trace-embedding.repository.ts",
 ];
 
 /** Every template literal's text, each line tagged with where it sits in the file. */

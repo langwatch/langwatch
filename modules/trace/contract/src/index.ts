@@ -77,6 +77,7 @@ export * from "./features/ingest/trace-projection.ts";
 export * from "./features/ingest/trace-origin-guards.ts";
 export * from "./features/ingest/trace-processing.commands.ts";
 export * from "./features/analytics/trace-topic-clustering-read.ts";
+export * from "./features/similarity/trace-similarity.ts";
 export * from "./features/ingest/trace-processing.events.ts";
 export * from "./features/span/trace-log-contribution.ts";
 export * from "./trace-message.schemas.ts";
