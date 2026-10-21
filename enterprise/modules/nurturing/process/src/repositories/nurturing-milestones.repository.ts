@@ -14,6 +14,17 @@ export type NurturingOrganizationState = Readonly<{
 /** An organization as nurturing's own table holds it, without the owners' project facts. */
 export type NurturingOrganizationCounts = Omit<NurturingOrganizationState, "firstProjectCreatedAt">;
 
+/** An organization's row with its coding-agent signals, as the coding step reads it. */
+export type NurturingOrganizationRow = NurturingOrganizationCounts &
+  Readonly<{
+    /** Epoch ms of the organization's first coding-agent session; null until recorded. */
+    codingFirstSessionAt: number | null;
+    codingAgentTypes: string[];
+    codingActiveDays: number;
+    /** UTC `YYYY-MM-DD` of the latest counted active day; sorts lexically. */
+    codingLastActiveDay: string | null;
+  }>;
+
 /**
  * Nurturing's own read model, written by its peer subscribers (§9). A project's organization is
  * read by the service through `NurturingProjectDirectoryRepository`, never here (R40).
@@ -35,4 +46,24 @@ export interface NurturingMilestonesRepository {
   countSimulationRun(
     input: Readonly<{ organizationId: string; by: number }>,
   ): Promise<NurturingOrganizationCounts[]>;
+}
+
+/** The coding-agent signals of the same organizations table, written one conditional update each. */
+export interface NurturingCodingMilestonesRepository {
+  /** The organization's row; empty when nurturing never learned it. */
+  findOrganization(
+    input: Readonly<{ organizationId: string }>,
+  ): Promise<NurturingOrganizationRow[]>;
+  /** Sets the first coding session once; `first` is true for exactly one caller, ever. */
+  recordCodingFirstSession(
+    input: Readonly<{ organizationId: string; occurredAt: number }>,
+  ): Promise<{ first: boolean }>;
+  /** Adds the agent type once; `changed` is false for a known type or an unlearned organization. */
+  addCodingAgentType(
+    input: Readonly<{ organizationId: string; agentType: string }>,
+  ): Promise<{ changed: boolean; codingAgentTypes: string[] }>;
+  /** Counts the UTC `day` only when it is later than the last counted one. */
+  recordCodingActiveDay(
+    input: Readonly<{ organizationId: string; day: string }>,
+  ): Promise<{ changed: boolean; codingActiveDays: number }>;
 }

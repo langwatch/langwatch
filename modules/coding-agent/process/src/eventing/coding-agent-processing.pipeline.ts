@@ -53,6 +53,7 @@ import {
   EventingSessionMetricSeriesAppendService,
 } from "../services/coding-agent-projection-append.service.ts";
 import type { CodingAgentReceivedFactsService } from "../services/coding-agent-received-facts.service.ts";
+import type { CodingAgentSessionFactsService } from "../services/coding-agent-session-facts.service.ts";
 import type { CodingAgentProjectActivity } from "../services/coding-agent-session-seen.service.ts";
 import { CodingAgentSessionSeenService } from "../services/coding-agent-session-seen.service.ts";
 import { EventingCodingAgentSessionStoreService } from "../services/coding-agent-session-store.service.ts";
@@ -94,6 +95,8 @@ export interface CodingAgentProcessingPipelineDeps {
   defaultRetentionDays: () => number;
   /** Each tenant's retention, stamped in place of the default (§9); absent, the default stands. */
   retention?: RetentionPolicyResolver;
+  /** Raises the session-stored fact for each stored session; absent, none is raised. */
+  sessionFacts?: Pick<CodingAgentSessionFactsService, "record">;
   sessionContextMemo: CodingAgentSessionContextMemoRepository;
   sessionFoldCache: CodingAgentSessionFoldCacheRepository;
   /** Absent where there is no GitHub connection to ask: no mapping subscriber is mounted. */
@@ -133,7 +136,11 @@ export class EventingCodingAgentProcessingAdapter {
       EventingCodingAgentSessionStoreService.create({
         persistence: deps.projections,
         defaultRetentionDays: deps.defaultRetentionDays,
-        onSessionsStored: (tenantIds) => sessionSeen.record(tenantIds),
+        // The fact reads the project stamp, so it must record before the stamp moves.
+        onSessionsStored: async (sessions) => {
+          await deps.sessionFacts?.record(sessions);
+          await sessionSeen.record(sessions.map((session) => session.tenantId));
+        },
       }),
     );
 

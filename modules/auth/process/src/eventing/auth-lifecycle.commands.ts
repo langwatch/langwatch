@@ -1,4 +1,5 @@
 import {
+  APP_PAGE_OPENED_EVENT_TYPE,
   SESSION_STARTED_EVENT_TYPE,
   SIGNED_UP_EVENT_TYPE,
   SSO_AUTO_ADDED_EVENT_TYPE,
@@ -7,11 +8,15 @@ import type { Command, CommandHandler } from "@langwatch/eventing";
 import { createTenantId, defineCommandSchema, EventUtils } from "@langwatch/eventing";
 
 import {
+  type AppPageOpenedEvent,
   AUTH_LIFECYCLE_EVENT_VERSION,
   AUTH_USER_AGGREGATE_TYPE,
+  RECORD_APP_PAGE_OPENED_COMMAND_TYPE,
   RECORD_SESSION_STARTED_COMMAND_TYPE,
   RECORD_SIGNED_UP_COMMAND_TYPE,
   RECORD_SSO_AUTO_ADDED_COMMAND_TYPE,
+  type RecordAppPageOpenedCommandData,
+  recordAppPageOpenedCommandDataSchema,
   type RecordSessionStartedCommandData,
   recordSessionStartedCommandDataSchema,
   type RecordSignedUpCommandData,
@@ -115,6 +120,38 @@ export class RecordSignedUpCommand implements CommandHandler<
   }
 
   static getAggregateId(payload: RecordSignedUpCommandData): string {
+    return payload.userId;
+  }
+}
+
+/** Records a page open; one event per person, page and instant. */
+export class RecordAppPageOpenedCommand implements CommandHandler<
+  Command<RecordAppPageOpenedCommandData>,
+  AppPageOpenedEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_APP_PAGE_OPENED_COMMAND_TYPE,
+    recordAppPageOpenedCommandDataSchema,
+    "Record that a person opened an app page in the browser",
+  );
+
+  handle(command: Command<RecordAppPageOpenedCommandData>): AppPageOpenedEvent[] {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<AppPageOpenedEvent>({
+        aggregateType: AUTH_USER_AGGREGATE_TYPE,
+        aggregateId: data.userId,
+        tenantId: createTenantId(command.tenantId),
+        type: APP_PAGE_OPENED_EVENT_TYPE,
+        version: AUTH_LIFECYCLE_EVENT_VERSION,
+        data,
+        occurredAt: data.occurredAt,
+        idempotencyKey: `${data.userId}:app_page_opened:${data.page}:${data.occurredAt}`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: RecordAppPageOpenedCommandData): string {
     return payload.userId;
   }
 }

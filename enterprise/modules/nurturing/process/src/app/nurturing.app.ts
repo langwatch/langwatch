@@ -13,6 +13,7 @@ import { UserApi } from "@langwatch/user-contract";
 import type { NurturingChannels } from "../channels/nurturing.channels.ts";
 import { buildNurturingPipeline, type NurturingPipeline } from "../eventing/nurturing.pipeline.ts";
 import type { NurturingRepositories } from "../repositories/nurturing.repositories.ts";
+import { NurturingCodingMilestonesService } from "../services/nurturing-coding-milestones.service.ts";
 import { NurturingDeliveryService } from "../services/nurturing-delivery.service.ts";
 import { NurturingMilestonesService } from "../services/nurturing-milestones.service.ts";
 import { NurturingService } from "../services/nurturing.service.ts";
@@ -61,6 +62,10 @@ export class NurturingModule implements NurturingApi {
       projects: repositories.projects,
       claims: repositories.claims,
     });
+    const codingMilestones = NurturingCodingMilestonesService.create({
+      milestones: repositories.milestones,
+      projects: repositories.projects,
+    });
     return new NurturingModule(
       buildNurturingPipeline({
         deliver: (input) => delivery.deliver(input),
@@ -69,6 +74,7 @@ export class NurturingModule implements NurturingApi {
         usageReportReceived: (input) => delivery.deliverUsageReport(input),
         evaluationsCompleted: (input) => milestones.evaluationsCompleted(input),
         simulationRunsFinished: (input) => milestones.simulationRunsFinished(input),
+        codingSessionsStored: (input) => codingMilestones.sessionsStored(input),
       }),
     );
   }

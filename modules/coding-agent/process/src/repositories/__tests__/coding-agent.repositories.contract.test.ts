@@ -63,6 +63,57 @@ describe.each(backends)("given the $name coding-agent repositories", ({ create }
     });
   });
 
+  describe("when asked whether a project holds another session", () => {
+    /** @scenario "A project with an older session is never first" */
+    it("answers yes when a different session of the tenant is stored", async () => {
+      const repositories = create();
+      await repositories.sessions.upsert(
+        session({ tenantId: "project-1", sessionId: "session-1" }),
+        30,
+        [],
+      );
+
+      await expect(
+        repositories.sessions.hasOtherSession({
+          tenantId: "project-1",
+          excludeSessionId: "session-2",
+        }),
+      ).resolves.toBe(true);
+    });
+
+    it("answers no when the only stored session is the excluded one", async () => {
+      const repositories = create();
+      await repositories.sessions.upsert(
+        session({ tenantId: "project-1", sessionId: "session-1" }),
+        30,
+        [],
+      );
+
+      await expect(
+        repositories.sessions.hasOtherSession({
+          tenantId: "project-1",
+          excludeSessionId: "session-1",
+        }),
+      ).resolves.toBe(false);
+    });
+
+    it("answers no when only another tenant holds sessions", async () => {
+      const repositories = create();
+      await repositories.sessions.upsert(
+        session({ tenantId: "project-2", sessionId: "session-9" }),
+        30,
+        [],
+      );
+
+      await expect(
+        repositories.sessions.hasOtherSession({
+          tenantId: "project-1",
+          excludeSessionId: "session-1",
+        }),
+      ).resolves.toBe(false);
+    });
+  });
+
   describe("when a session's events are appended", () => {
     it("lists them in time order, bounded by the caller's page size", async () => {
       const repositories = create();

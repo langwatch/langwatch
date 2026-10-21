@@ -1,7 +1,10 @@
+import type { AppPage } from "@langwatch/auth-contract";
 import type { EventingCommandSender } from "@langwatch/eventing";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import { nowInstant } from "@langwatch/time";
 
 import type {
+  RecordAppPageOpenedCommandData,
   RecordSessionStartedCommandData,
   RecordSignedUpCommandData,
   RecordSsoAutoAddedCommandData,
@@ -13,6 +16,7 @@ export type AuthLifecycleSenders = Readonly<{
   recordSessionStarted: Sender<RecordSessionStartedCommandData>;
   recordSsoAutoAdded: Sender<RecordSsoAutoAddedCommandData>;
   recordSignedUp: Sender<RecordSignedUpCommandData>;
+  recordAppPageOpened: Sender<RecordAppPageOpenedCommandData>;
 }>;
 
 /**
@@ -52,6 +56,16 @@ export class AuthLifecycleNoticeService {
     });
   }
 
+  /** A person opened an app page in the browser; ids and the page only. */
+  appPageOpened(input: Readonly<{ userId: string; page: AppPage }>): void {
+    this.#send(this.#senders?.recordAppPageOpened, {
+      tenantId: input.userId,
+      occurredAt: this.#now(),
+      userId: input.userId,
+      page: input.page,
+    });
+  }
+
   ssoAutoAdded(
     input: Readonly<{ userId: string; organizationId: string; organizationName: string }>,
   ): void {
@@ -76,5 +90,45 @@ export class AuthLifecycleNoticeService {
     void Promise.resolve()
       .then(() => sender.send(data))
       .catch((failure: unknown) => this.dependencies.reportError(failure));
+  }
+}
+
+/**
+ * Announces a page open as auth's fact: only a browser login session (a CLI device login or an
+ * API key carries none) of a person who belongs to an organization. A failure is reported, never
+ * thrown: the page opens whether or not it was announced.
+ */
+export class AppPageOpenedService {
+  static create(dependencies: {
+    organizations: Pick<OrganizationApi, "countMembershipsForUser">;
+    lifecycle: { appPageOpened(input: { userId: string; page: AppPage }): void };
+    reportError: (error: unknown) => void;
+  }): AppPageOpenedService {
+    return new AppPageOpenedService(dependencies);
+  }
+
+  private constructor(
+    private readonly dependencies: {
+      organizations: Pick<OrganizationApi, "countMembershipsForUser">;
+      lifecycle: { appPageOpened(input: { userId: string; page: AppPage }): void };
+      reportError: (error: unknown) => void;
+    },
+  ) {}
+
+  async record(input: {
+    userId: string;
+    browserSessionId: string | null;
+    page: AppPage;
+  }): Promise<void> {
+    if (input.browserSessionId === null) return;
+    try {
+      const memberships = await this.dependencies.organizations.countMembershipsForUser({
+        userId: input.userId,
+      });
+      if (memberships === 0) return;
+      this.dependencies.lifecycle.appPageOpened({ userId: input.userId, page: input.page });
+    } catch (error) {
+      this.dependencies.reportError(error);
+    }
   }
 }

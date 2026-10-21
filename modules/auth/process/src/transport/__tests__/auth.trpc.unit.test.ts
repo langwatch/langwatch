@@ -42,6 +42,7 @@ const setOwnFirstPassword = vi.fn<AuthApi["setOwnFirstPassword"]>();
 const changeOwnPassword = vi.fn<AuthApi["changeOwnPassword"]>();
 const unlinkOwnAccount = vi.fn<AuthApi["unlinkOwnAccount"]>();
 const registerCredentialAccount = vi.fn<AuthApi["registerCredentialAccount"]>();
+const recordPageOpened = vi.fn<AuthApi["recordPageOpened"]>();
 
 /** The seven operations this surface calls; the rest of the module refuses. */
 const door: AuthApi = {
@@ -101,6 +102,7 @@ const door: AuthApi = {
   changeOwnPassword,
   unlinkOwnAccount,
   registerCredentialAccount,
+  recordPageOpened,
   changeUserEmail: () => unreached("changeUserEmail"),
 };
 
@@ -142,6 +144,7 @@ describe("the signed-out front door", () => {
         "inviteLanding",
         "myAddressConfirmation",
         "priorSession",
+        "recordPageOpened",
         "register",
         "requestFreshInvite",
         "requestSignUpVerification",
@@ -177,6 +180,7 @@ describe("the signed-out front door", () => {
         changePassword: "mutation",
         unlinkAccount: "mutation",
         register: "mutation",
+        recordPageOpened: "mutation",
       });
     });
   });
@@ -200,6 +204,36 @@ describe("the signed-out front door", () => {
         userId: "user-1",
         sessionId: "session-2",
         currentSessionId: "session-0",
+      });
+    });
+  });
+
+  describe("when a signed-in person opens an app page", () => {
+    /** @scenario "A browser session opening the page records the fact" */
+    it("hands auth the person and the browser session that opened it", async () => {
+      recordPageOpened.mockResolvedValue(undefined);
+      const person = router.createCaller({ actor: { id: "user-1" }, sessionId: "session-0" });
+
+      await person.recordPageOpened({ page: "me_sessions" });
+
+      expect(recordPageOpened).toHaveBeenCalledWith({
+        userId: "user-1",
+        browserSessionId: "session-0",
+        page: "me_sessions",
+      });
+    });
+
+    /** @scenario "A call without a browser session records nothing" */
+    it("hands auth no browser session for a caller that carries none, so nothing is recorded", async () => {
+      recordPageOpened.mockResolvedValue(undefined);
+      const cliCaller = router.createCaller({ actor: { id: "user-1" } });
+
+      await cliCaller.recordPageOpened({ page: "me_sessions" });
+
+      expect(recordPageOpened).toHaveBeenCalledWith({
+        userId: "user-1",
+        browserSessionId: null,
+        page: "me_sessions",
       });
     });
   });

@@ -619,6 +619,34 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
     };
   }
 
+  /** Whether the tenant holds a session besides the one named. */
+  async hasOtherSession({
+    tenantId,
+    excludeSessionId,
+  }: {
+    tenantId: string;
+    excludeSessionId: string;
+  }): Promise<boolean> {
+    EventUtils.validateTenantId(
+      { tenantId },
+      "CodingAgentSessionClickHouseRepository.hasOtherSession",
+    );
+    const { rows } = await this.clickhouse.query<Record<string, unknown>>({
+      tenantId,
+      table: TABLE_NAME,
+      kind: "read",
+      sql: `
+        SELECT 1 AS found
+        FROM ${TABLE_NAME}
+        WHERE TenantId = {tenantId:String}
+          AND SessionId != {excludeSessionId:String}
+        LIMIT 1
+      `,
+      params: { tenantId, excludeSessionId },
+    });
+    return rows.length > 0;
+  }
+
   /**
    * Read newest sessions after tenant-wide deduplication: the inner scan reads
    * only key columns across the tenant, while the outer range prunes returned

@@ -404,6 +404,12 @@ export class TestSessions extends CodingAgentSessionRepository {
     return this.applied;
   }
 
+  async hasOtherSession(input: { tenantId: string; excludeSessionId: string }): Promise<boolean> {
+    return this.rows.some(
+      (row) => row.tenantId === input.tenantId && row.sessionId !== input.excludeSessionId,
+    );
+  }
+
   async findManyRecent(input: {
     tenantId: string;
     userId?: string;
@@ -776,7 +782,10 @@ export class TestGithubService implements GithubApi {
   }
 }
 
-function projectRow(id: string): PaginatedProjects["data"][number] {
+export function projectRow(
+  id: string,
+  overrides: Partial<PaginatedProjects["data"][number]> = {},
+): PaginatedProjects["data"][number] {
   const at = new Date(0);
   return {
     id,
@@ -807,6 +816,7 @@ function projectRow(id: string): PaginatedProjects["data"][number] {
     langyEgressAllowlist: null,
     lastCodingAgentSessionAt: null,
     lastCodingAgentPullRequestAt: null,
+    ...overrides,
   };
 }
 

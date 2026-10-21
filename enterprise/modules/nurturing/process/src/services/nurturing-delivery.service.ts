@@ -14,6 +14,11 @@ import type { PostHogChannel } from "../channels/posthog.channel.ts";
 import type { NurturingClaimRepository } from "../repositories/nurturing-claim.repository.ts";
 import { fire as fireActivity } from "../rules/nurturing-activity-tracking-service.rules.ts";
 import {
+  customerIoDebouncesOf,
+  fireCodingOrApp,
+  isCodingOrAppSignal,
+} from "../rules/nurturing-coding-delivery.rules.ts";
+import {
   fireExperimentRan,
   fireScenarioCreated,
   fireTeamMemberInvited,
@@ -63,17 +68,6 @@ function reportFailure(error: unknown): void {
 
 /** How long a delivered signal is remembered against a redelivered source event. */
 const DELIVERED_WINDOW_SECONDS = 7 * 24 * 60 * 60;
-
-/**
- * Main's CRM contract, not a queue tunable: a tenant's trace, simulation or evaluation
- * update reaches Customer.io at most once in this window.
- */
-const CIO_SYNC_DEBOUNCE_SECONDS = 5 * 60;
-const CIO_SYNC_DEBOUNCED_KINDS = new Set<NurturingSignal["kind"]>([
-  "trace_received",
-  "simulation_run_finished",
-  "evaluation_completed",
-]);
 
 function isoOf(epochMilliseconds: number): string {
   return Temporal.Instant.fromEpochMilliseconds(epochMilliseconds).toString({
@@ -158,14 +152,11 @@ export class NurturingDeliveryService {
     }
   }
 
-  /** True when this tenant's trace/simulation/evaluation update already sent this window. */
+  /** True when this signal's debounce window already sent for its tenant or person. */
   private async withinCustomerIoDebounce(signal: NurturingSignal): Promise<boolean> {
-    if (!CIO_SYNC_DEBOUNCED_KINDS.has(signal.kind)) return false;
-    const claimed = await this.deps.claims.claim(
-      `nurturing:cio-sync:${signal.kind}:${signal.tenantId}`,
-      CIO_SYNC_DEBOUNCE_SECONDS,
-    );
-    return !claimed;
+    const [debounce] = customerIoDebouncesOf(signal);
+    if (!debounce) return false;
+    return !(await this.deps.claims.claim(debounce.claimKey, debounce.seconds));
   }
 
   /** Runs a rule's decision against the configured Customer.io sink, one call at a time. */
@@ -195,6 +186,7 @@ export class NurturingDeliveryService {
 
   private toCustomerIo(signal: NurturingSignal): void {
     if (!this.deps.customerIo) return;
+    if (isCodingOrAppSignal(signal)) return this.sendCustomerIoCalls(fireCodingOrApp(signal));
     switch (signal.kind) {
       case "scenario_created":
         return this.sendCustomerIoCalls(fireScenarioCreated(signal));
@@ -249,7 +241,8 @@ export class NurturingDeliveryService {
 
   private toPostHog(signal: NurturingSignal): void {
     const posthog = this.deps.posthog;
-    if (!posthog) return;
+    // The coding-agent and app-open signals go to Customer.io only.
+    if (!posthog || isCodingOrAppSignal(signal)) return;
     const track = ({
       userId,
       event,

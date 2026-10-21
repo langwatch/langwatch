@@ -62,6 +62,12 @@ export class MemoryCodingAgentSessionRepository extends CodingAgentSessionReposi
     return { row: stored.row, appliedEventIds: [...stored.appliedEventIds] };
   }
 
+  async hasOtherSession(input: { tenantId: string; excludeSessionId: string }): Promise<boolean> {
+    return this.rows().some(
+      (row) => row.tenantId === input.tenantId && row.sessionId !== input.excludeSessionId,
+    );
+  }
+
   async findManyRecent(input: {
     tenantId: string;
     userId?: string;
