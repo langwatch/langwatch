@@ -10601,7 +10601,7 @@ A gateway whose `ENVIRONMENT` is set to anything other than `local` refuses to s
 | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | `BLOCK_LOCAL_HTTP_CALLS`         | Refuses a customer-configured provider endpoint that resolves to a private or link-local address                              |
 | `REQUIRE_HTTPS_CUSTOM_ENDPOINTS` | Refuses a customer-configured provider endpoint that is plain HTTP                                                            |
-| `ALLOWED_PROXY_HOSTS`            | Exact hostnames that may use a private address while the guard is on. Cloud metadata and link-local destinations stay refused |
+| `ALLOWED_PROXY_HOSTS`            | Exact hostnames that pass the endpoint check on a private address while the guard is on. Chat dispatch still refuses private addresses until the guard is off. Cloud metadata and link-local destinations stay refused |
 
 ## Calling the gateway from a browser
 
@@ -10697,7 +10697,8 @@ These apply to the base URLs customers configure on their own provider credentia
 | -------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | `BLOCK_LOCAL_HTTP_CALLS`         | `false` | Refuse a provider endpoint that resolves to a private, loopback or otherwise non-public address                                     |
 | `REQUIRE_HTTPS_CUSTOM_ENDPOINTS` | `false` | Refuse a provider endpoint with an `http://` scheme                                                                                 |
-| `ALLOWED_PROXY_HOSTS`            | empty   | Comma-separated hostnames, matched case-insensitively, allowed to resolve to a private address while `BLOCK_LOCAL_HTTP_CALLS` is on |
+| `ALLOWED_PROXY_HOSTS`            | empty   | Comma-separated hostnames, matched case-insensitively, allowed past the endpoint check on a private address while `BLOCK_LOCAL_HTTP_CALLS` is on. Chat dispatch still refuses private addresses until the block is off |
+| `SSL_CERT_DIR`                   | unset   | Colon-separated directories of PEM CA certificates trusted beside the public roots, for provider endpoints on a private CA            |
 
 ## Browser access
 
@@ -11019,9 +11020,25 @@ TLS in front of the gateway is one boundary. The other is the provider endpoints
 | -------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------- |
 | `security.requireHTTPSCustomEndpoints` | `REQUIRE_HTTPS_CUSTOM_ENDPOINTS` | Refuse a provider base URL with an `http://` scheme                                         |
 | `security.blockLocalHTTPCalls`         | `BLOCK_LOCAL_HTTP_CALLS`         | Refuse a provider base URL that resolves to a private, loopback or other non-public address |
-| `security.allowedProxyHosts`           | `ALLOWED_PROXY_HOSTS`            | Hostnames that may resolve to a private address while the block is on                       |
+| `security.allowedProxyHosts`           | `ALLOWED_PROXY_HOSTS`            | Hostnames that pass the endpoint check on a private address while the block is on. Chat dispatch still refuses them |
 
 Both switches default to `false`, so a self-hosted install can route to a model server on the cluster network. Cloud metadata addresses, `0.0.0.0`, `::` and link-local ranges are refused with every setting. Setting `ENVIRONMENT` to anything other than `local` requires both switches to be `true`.
+
+### Provider endpoints on a private CA
+
+When a provider endpoint serves TLS from your own certificate authority, put the CA certificates (PEM) in a ConfigMap and name it in `gateway.security.extraCACertsConfigMap`:
+
+```bash
+kubectl -n langwatch create configmap internal-ca --from-file=internal-ca.pem
+```
+
+```yaml
+gateway:
+  security:
+    extraCACertsConfigMap: internal-ca
+```
+
+The chart mounts it at `/etc/langwatch/ca` and sets `SSL_CERT_DIR` to that path. The gateway then trusts those certificates beside the public roots for every outbound call. Outside the chart, mount a directory of PEM files and set `SSL_CERT_DIR` yourself.
 
 ## Common failures
 
@@ -11031,7 +11048,8 @@ Both switches default to `false`, so a self-hosted install can route to a model 
 | Streamed responses arrive all at once | Buffering is on at the proxy | With `ingress.className: nginx` the chart adds `proxy-buffering: "off"` to the gateway Ingress; on another controller, set the equivalent in `ingress.gateway.annotations` |
 | A long stream stops at 60 seconds | The load balancer idle timeout is shorter than the stream | Raise the controller's idle or read timeout |
 | CLI users get `http://localhost:5563` as the gateway URL | The control plane has no `LW_GATEWAY_PUBLIC_URL` | Set `ingress.gateway.host`, or `gateway.publicUrl` |
-| A provider credential with a private base URL fails to dispatch | `BLOCK_LOCAL_HTTP_CALLS` is on | Add the hostname to `ALLOWED_PROXY_HOSTS` |
+| A provider credential with a private base URL fails to dispatch | `BLOCK_LOCAL_HTTP_CALLS` is on | Set `BLOCK_LOCAL_HTTP_CALLS` to `false`. `ALLOWED_PROXY_HOSTS` gets the host past the endpoint check, but chat dispatch refuses private addresses while the block is on |
+| A provider call fails with `x509: certificate signed by unknown authority` | The endpoint's certificate comes from a private CA | Set `gateway.security.extraCACertsConfigMap` (see [Provider endpoints on a private CA](#provider-endpoints-on-a-private-ca)) |
 
 More symptoms are on [Troubleshooting](/ai-gateway/troubleshooting).
 
@@ -11253,6 +11271,7 @@ gateway:
     blockLocalHTTPCalls: false
     requireHTTPSCustomEndpoints: false
     allowedProxyHosts: []
+    extraCACertsConfigMap: "" # ConfigMap of PEM CA certificates to trust
     corsAllowedOrigins: [] # browser origins allowed to call /v1
 
   # OTLP/HTTP endpoint for the gateway's own spans. Empty disables export.
@@ -11324,6 +11343,7 @@ The chart passes these environment variables to the container. Every other key i
 | `BLOCK_LOCAL_HTTP_CALLS`                               | `security.blockLocalHTTPCalls`                                       | Refuse provider endpoints on private addresses |
 | `REQUIRE_HTTPS_CUSTOM_ENDPOINTS`                       | `security.requireHTTPSCustomEndpoints`                               | Refuse `http://` provider endpoints            |
 | `ALLOWED_PROXY_HOSTS`                                  | `security.allowedProxyHosts`, comma-joined                           | Private hostnames exempt from the block        |
+| `SSL_CERT_DIR`                                         | set to `/etc/langwatch/ca` when `security.extraCACertsConfigMap` is set | Extra CA certificates to trust              |
 | `LW_GATEWAY_CORS_ALLOWED_ORIGINS`                      | `security.corsAllowedOrigins`, comma-joined                          | Browser origins allowed to call `/v1`          |
 | `LW_GATEWAY_INTERNAL_SECRET`                           | Secret `secrets.existingSecretName`, key `secrets.internalSecretKey` | HMAC secret for control plane calls            |
 | `LW_GATEWAY_JWT_SECRET`                                | Secret `secrets.existingSecretName`, key `secrets.jwtSecretKey`      | JWT verification secret                        |
@@ -53022,7 +53042,7 @@ After creation, verify the saved resource:
 
 ```bash
 langwatch monitor list --format json
-langwatch monitor get <monitor-id> --format json
+langwatch monitor get <idOrSlugOrName> --format json
 ```
 
 The task is complete only when the created monitor appears with the intended evaluator, execution mode, level, sample rate, and enabled state.
@@ -56696,7 +56716,7 @@ After creation, verify the saved resource:
 
 ```bash
 langwatch monitor list --format json
-langwatch monitor get <monitor-id> --format json
+langwatch monitor get <idOrSlugOrName> --format json
 ```
 
 The task is complete only when the created monitor appears with the intended evaluator, execution mode, level, sample rate, and enabled state.
@@ -58589,7 +58609,7 @@ Production quality signals live in monitors (online evaluation) and their evalua
 
 ```bash
 langwatch monitor list -o json           # which monitors exist, are they enabled/firing?
-langwatch monitor get <id> -o json       # one monitor's config and recent state
+langwatch monitor get <idOrSlugOrName> -o json     # one monitor's config and recent state
 langwatch evaluator list -o json         # the evaluators the monitors run
 ```
 
@@ -58729,7 +58749,7 @@ For each failing row, note the input, the expected output (from the dataset), an
 
 ```bash
 langwatch evaluator list -o json
-langwatch evaluator get <idOrSlug> -o json
+langwatch evaluator get <idOrSlugOrName> -o json
 ```
 
 Before blaming the agent, rule out the scorer:
@@ -59743,7 +59763,7 @@ With no `--grid-row`, the platform allocates the next free row, so it never land
 langwatch chart list -f json
 langwatch chart get <chart-id> -f json    # SQL, parameters, spec, placement
 langwatch chart update <chart-id> --sql-file query.sql
-langwatch chart delete <chart-id>
+langwatch chart delete <chart-id>   # destructive: confirm on a choices card first
 ```
 
 ## Failure modes worth knowing
@@ -64520,7 +64540,7 @@ For production with single-node ClickHouse.
 - PostgreSQL: 250m/1 CPU, 512Mi/1Gi memory, 20Gi storage
 - Redis: 500m/1 CPU, 1Gi/3Gi memory, 5Gi storage
 - Prometheus: 200m/500m CPU, 512Mi/2Gi memory, 30d retention, 20Gi storage
-- Total: ~9.2 CPU, ~23.8 Gi RAM requests
+- Total: ~9.1 CPU, ~23.8 Gi RAM requests
 
 ```bash
 helm install langwatch langwatch/langwatch \
@@ -64543,7 +64563,7 @@ For production with replicated ClickHouse.
 - PostgreSQL: 250m/1 CPU, 512Mi/1Gi memory, 50Gi storage
 - Redis: 500m/1 CPU, 1Gi/3Gi memory, 10Gi storage
 - Prometheus: 200m/500m CPU, 512Mi/2Gi memory, 60d retention, 50Gi storage
-- Total: ~23.2 CPU, ~85.6 Gi RAM requests
+- Total: ~23.1 CPU, ~85.6 Gi RAM requests
 
 ```bash
 helm install langwatch langwatch/langwatch \
@@ -65985,7 +66005,7 @@ This configures smaller resource limits, single replicas, and disables evaluator
 
 For production, you should:
 
-1. Use external managed databases (PostgreSQL, Redis)
+1. Use external managed databases (PostgreSQL, and Redis 7.0 or later or Valkey 7.2 or later)
 2. Provide Kubernetes Secrets from your secret manager
 3. Expose via Ingress with TLS
 4. Disable auto-generation
@@ -66295,6 +66315,7 @@ The chart ships with composable overlay files in `examples/overlays/`. Combine t
 | ---------------------------- | -------------------------------------------- |
 | `postgres-external.yaml`     | External PostgreSQL (RDS, Cloud SQL)         |
 | `redis-external.yaml`        | External Redis (ElastiCache, Memorystore)    |
+| `redis-valkey.yaml`          | Valkey 9.1 as the chart-managed Redis, fresh installs |
 | `clickhouse-external.yaml`   | External ClickHouse instance                 |
 | `clickhouse-replicated.yaml` | 3-node replicated ClickHouse                 |
 | `cold-storage-s3.yaml`       | S3 cold storage + backups                    |
@@ -69843,7 +69864,7 @@ Roughly 1 KB per span (compressed). See [Sizing & Scaling](/self-hosting/configu
 
 ### Can I use an existing PostgreSQL, Redis?
 
-Yes. Use the external database overlays:
+Yes. Redis must be 7.0 or later (or Valkey 7.2 or later); LangWatch refuses to start when the server reports an older version (a server that does not report its version starts with a warning). Use the external database overlays:
 
 ```bash
 helm install langwatch langwatch/langwatch \

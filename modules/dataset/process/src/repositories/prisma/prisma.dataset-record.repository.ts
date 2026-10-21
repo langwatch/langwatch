@@ -4,8 +4,8 @@ import {
   type DatasetRecord,
   type DatasetRecordInput,
 } from "@langwatch/dataset-contract";
-import { PrismaRepository } from "@langwatch/prisma-client";
 import { type Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
+import { prismaTables } from "@langwatch/prisma-client/ownership";
 
 import type { DatasetRecordRepository } from "../dataset-record.repository.ts";
 
@@ -13,17 +13,21 @@ import type { DatasetRecordRepository } from "../dataset-record.repository.ts";
  * Only what this repository touches, so composition names the slice it needs
  * rather than the whole generated client.
  */
-type DatasetRecordDatabase = Pick<PrismaClient, "datasetRecord">;
+type DatasetRecordDatabase = Pick<PrismaClient, "datasetRecord" | "$queryRaw">;
 
-export class PrismaDatasetRecordRepository
-  extends PrismaRepository.for("DatasetRecord")
-  implements DatasetRecordRepository
-{
-  static readonly create = this.factory((prisma) => new PrismaDatasetRecordRepository(prisma));
+/**
+ * Declared rather than inherited from `PrismaRepository.for`: the ordered reads
+ * are SQL, and the model-scoped client that base class hands over has no
+ * `$queryRaw`. Prisma cannot sort by `id COLLATE "C"`, so the order is written here.
+ */
+export class PrismaDatasetRecordRepository implements DatasetRecordRepository {
+  static readonly tables = prismaTables("DatasetRecord");
 
-  private get database(): DatasetRecordDatabase {
-    return this.prisma;
+  static create({ prisma }: { prisma: DatasetRecordDatabase }): PrismaDatasetRecordRepository {
+    return new PrismaDatasetRecordRepository(prisma);
   }
+
+  private constructor(private readonly database: DatasetRecordDatabase) {}
 
   async count(input: { datasetId: string; projectId: string }): Promise<number> {
     return this.database.datasetRecord.count({ where: input });
@@ -48,12 +52,22 @@ export class PrismaDatasetRecordRepository
     limit: number;
     cursorId?: string;
   }): Promise<DatasetRecord[]> {
-    const rows = await this.database.datasetRecord.findMany({
-      where: { datasetId: input.datasetId, projectId: input.projectId },
-      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-      take: input.limit,
-      ...(input.cursorId ? { cursor: { id: input.cursorId }, skip: 1 } : {}),
-    });
+    const cursorId = input.cursorId ?? null;
+    const rows = await this.database.$queryRaw<unknown[]>`
+      SELECT "id", "datasetId", "projectId", "entry", "createdAt", "updatedAt"
+        FROM "DatasetRecord"
+       WHERE "datasetId" = ${input.datasetId}
+         AND "projectId" = ${input.projectId}
+         AND (${cursorId}::text IS NULL OR ("createdAt", "id" COLLATE "C") > (
+               SELECT "createdAt", "id" COLLATE "C"
+                 FROM "DatasetRecord"
+                WHERE "id" = ${cursorId}
+                  AND "datasetId" = ${input.datasetId}
+                  AND "projectId" = ${input.projectId}
+             ))
+       ORDER BY "createdAt" ASC, "id" COLLATE "C" ASC
+       LIMIT ${input.limit}
+    `;
     return rows.map(toDatasetRecord);
   }
 
@@ -77,12 +91,14 @@ export class PrismaDatasetRecordRepository
   }): Promise<{ records: DatasetRecord[]; total: number }> {
     const where = { datasetId: input.datasetId, projectId: input.projectId };
     const [rows, total] = await Promise.all([
-      this.database.datasetRecord.findMany({
-        where,
-        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-        skip: (input.page - 1) * input.limit,
-        take: input.limit,
-      }),
+      this.database.$queryRaw<unknown[]>`
+        SELECT "id", "datasetId", "projectId", "entry", "createdAt", "updatedAt"
+          FROM "DatasetRecord"
+         WHERE "datasetId" = ${input.datasetId}
+           AND "projectId" = ${input.projectId}
+         ORDER BY "createdAt" ASC, "id" COLLATE "C" ASC
+         LIMIT ${input.limit} OFFSET ${(input.page - 1) * input.limit}
+      `,
       this.database.datasetRecord.count({ where }),
     ]);
     return { records: rows.map(toDatasetRecord), total };
@@ -101,14 +117,14 @@ export class PrismaDatasetRecordRepository
         entry: entry as Prisma.InputJsonValue,
       })),
     });
-    const rows = await this.database.datasetRecord.findMany({
-      where: {
-        datasetId: input.datasetId,
-        projectId: input.projectId,
-        id: { in: input.entries.map((entry) => entry.id) },
-      },
-      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-    });
+    const rows = await this.database.$queryRaw<unknown[]>`
+      SELECT "id", "datasetId", "projectId", "entry", "createdAt", "updatedAt"
+        FROM "DatasetRecord"
+       WHERE "datasetId" = ${input.datasetId}
+         AND "projectId" = ${input.projectId}
+         AND "id" = ANY(${input.entries.map((entry) => entry.id)}::text[])
+       ORDER BY "createdAt" ASC, "id" COLLATE "C" ASC
+    `;
     return rows.map(toDatasetRecord);
   }
 

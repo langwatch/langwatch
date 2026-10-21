@@ -90,7 +90,7 @@ export class ScenarioFailureHandlerService {
         },
       },
       async (span) => {
-        const { projectId, scenarioId, setId, batchRunId, error, cancelled } = params;
+        const { projectId, scenarioId, setId, batchRunId, error, cancelled, notScored } = params;
         const status = cancelled ? ScenarioRunStatus.CANCELLED : ScenarioRunStatus.ERROR;
         const scenarioRunId = params.scenarioRunId;
 
@@ -118,11 +118,16 @@ export class ScenarioFailureHandlerService {
             scenarioRunId,
             occurredAt: timestamp,
             status,
-            results: buildFailureResults({
-              cancelled: cancelled ?? false,
-              error,
-              targetHasDevTunnel,
-            }),
+            // A run whose setup failed has no verdict; its hook record holds the error (ADR-180).
+            ...(notScored
+              ? {}
+              : {
+                  results: buildFailureResults({
+                    cancelled: cancelled ?? false,
+                    error,
+                    targetHasDevTunnel,
+                  }),
+                }),
           });
           span.setAttribute("result.emitted_run_finished", true);
         } catch (err) {

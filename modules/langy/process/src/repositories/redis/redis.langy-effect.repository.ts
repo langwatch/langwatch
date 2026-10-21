@@ -26,6 +26,7 @@ interface CreateLangyEffectRepositoryOptions {
     userId: string;
     projectId: string;
     organizationId: string;
+    conversation: { id: string; turnId: string };
   }) => Promise<{ token: string; apiKeyId: string }>;
   revokeSessionKey: (args: { apiKeyId: string; projectId: string }) => Promise<void>;
   /** Terminalizes a permanently rejected turn — same port liveness uses. */
@@ -157,6 +158,7 @@ class LangyTurnDispatchEffect {
       userId: handoff.actorUserId,
       projectId: turn.projectId,
       organizationId: handoff.credentials.organizationId,
+      conversation: { id: turn.conversationId, turnId: turn.turnId },
     });
     const recovered = {
       ...handoff,

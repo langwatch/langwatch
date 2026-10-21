@@ -109,6 +109,7 @@ const organizationApiKeyResolutionSchemaDefinition = z.discriminatedUnion("ok", 
           apiKeyId: z.string().min(1),
           userId: z.string().min(1).nullable(),
           organizationId: z.string().min(1),
+          isLangySessionKey: z.boolean().optional(),
         })
         .strict(),
     })

@@ -1,7 +1,7 @@
 .PHONY: help start sync-all-openapi user-delete-dry-run user-delete es-delete-dry-run es-delete
 .PHONY: down logs clean ps quickstart quickstart-help worktree refresh-dev-s3
 .PHONY: dev-up dev-down dev-logs setup-hooks service service-watch test-scripts
-.PHONY: dogfood-langy-local
+.PHONY: dogfood-langy-local dogfood-langy-hooks
 .PHONY: herrgen herrgen-check test-scripts-run lint-rules-run
 .PHONY: lint-rules lint-rules-changed lint-rules-test go-lint go-lint-slot go-lint-changed
 .PHONY: _dev-up-deprecation-warning
@@ -53,6 +53,7 @@ help:
 	@echo "    make dogfood-langy-local lang=python      boot the ACME support demo (FastAPI)"
 	@echo "    make dogfood-langy-local lang=typescript  boot the ACME support demo (Hono)"
 	@echo "    make dogfood-langy-local lang=langgraph   boot the ACME checkout demo (LangGraph)"
+	@echo "    make dogfood-langy-hooks                  connect Langy itself as the agent \"langy\""
 	@echo ""
 	@echo "  Per-worktree isolated stacks (for AI agents / parallel work):"
 	@echo "    make dev-up [PROFILE=full]            start isolated containers"
@@ -69,6 +70,10 @@ ifeq ($(lang),langgraph)
 else
 	@$(MAKE) -C dev/dogfood/acme-support dogfood-langy-local $(if $(lang),lang=$(lang))
 endif
+
+# Langy as a connected agent with scenario hooks, in the background; see dev/dogfood/langy/README.md.
+dogfood-langy-hooks:
+	@dev/dogfood/langy/run.sh
 
 # dev/haven.mk is included at the BOTTOM of this file: its `make haven <sub>`
 # passthrough neutralises the trailing words (e.g. `down`, `install`) as no-op

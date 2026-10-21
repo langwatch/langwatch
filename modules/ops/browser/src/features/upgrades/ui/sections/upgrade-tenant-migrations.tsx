@@ -27,6 +27,7 @@ import { api, type RouterOutputs } from "../../../../behavior/ops-api.ts";
 import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
 import { useIsSharedInstall, useOpsPermission } from "../../../../behavior/ops-session.ts";
 import { ConfirmDialog } from "../../../../ui/elements/ops-confirm-dialog.tsx";
+import { migratedSplit } from "../../model/upgrade-labels.ts";
 import { UpgradeTenantList } from "./upgrade-tenant-list.tsx";
 const STATUS_COLOR: Record<string, string> = {
   finalized: "green",
@@ -228,6 +229,20 @@ function KeptInStepCell({ count }: { count: number }) {
   );
 }
 
+/** Held tenants take the badge; those waiting on a person are expected, so only noted. */
+function HeldCell({ migrated, waitingOnPerson }: { migrated: number; waitingOnPerson: number }) {
+  const split = migratedSplit({ migrated, waitingOnPerson });
+  if (split.waitingOnPerson === 0) return <CountCell count={split.held} palette="orange" />;
+  return (
+    <Stack gap={0} align="end">
+      <CountCell count={split.held} palette="orange" />
+      <Text as="span" textStyle="xs" color="fg.muted" data-testid="upgrade-waiting-on-person">
+        <FormattedNumber value={split.waitingOnPerson} /> waiting on the person
+      </Text>
+    </Stack>
+  );
+}
+
 function MigrationRow({
   migration,
   previousMigrationTitle,
@@ -265,7 +280,10 @@ function MigrationRow({
         {migration.migratedIsSteady ? (
           <KeptInStepCell count={migration.counts.migrated} />
         ) : (
-          <CountCell count={migration.counts.migrated} palette="orange" />
+          <HeldCell
+            migrated={migration.counts.migrated}
+            waitingOnPerson={migration.waitingOnPerson}
+          />
         )}
       </Table.Cell>
       <Table.Cell textAlign="end">

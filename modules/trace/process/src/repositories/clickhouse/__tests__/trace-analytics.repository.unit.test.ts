@@ -8,12 +8,16 @@ import { env as nodeProcessEnv } from "node:process";
 nodeProcessEnv.TZ = "Asia/Kolkata";
 
 import { AuthorizedClickHouse, setWindowedReadMetrics } from "@langwatch/clickhouse-client";
-import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
-import { describe, expect, it } from "vitest";
+import {
+  idIndexedClientDouble,
+  type ScriptedStatements,
+} from "@langwatch/clickhouse-client/testing";
+import { describe, expect, it, vi } from "vitest";
 
 import type { TraceAnalyticsRow } from "#eventing/trace-derived.projection";
 
 import { ownProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
+import { TRACE_ID_INDEXES } from "../clickhouse.trace-id-indexes.database.ts";
 import type { TraceClickHouseWriteClient } from "../clickhouse.trace-member-client.repository.ts";
 import { TraceAnalyticsClickHouseRepository } from "../trace-metrics-analytics.repository.ts";
 import {
@@ -35,14 +39,17 @@ setWindowedReadMetrics(windowedReadMetrics);
 function readsOver(client: TraceClickHouseWriteClient): AuthorizedClickHouse {
   return new AuthorizedClickHouse({
     resolveClient: async () =>
-      clickHouseQueryClientDouble({
-        query: async ({ sql, params = {} }: { sql: string; params?: Record<string, unknown> }) => {
-          const result = await client.query({
-            query: sql,
-            query_params: params,
-            format: "JSONEachRow",
-          });
-          return { rows: await result.json() };
+      idIndexedClientDouble({
+        indexes: TRACE_ID_INDEXES,
+        driver: {
+          execute: vi.fn<ScriptedStatements["execute"]>(async ({ sql, params = {} }) => {
+            const result = await client.query({
+              query: sql,
+              query_params: params,
+              format: "JSONEachRow",
+            });
+            return { rows: await result.json() };
+          }),
         },
       }),
   });
