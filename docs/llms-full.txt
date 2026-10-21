@@ -18386,8 +18386,9 @@ A background agent spends tokens the same way an interactive one does, and needs
 ```bash
 langwatch instrument claude --key ik-lw-...
 langwatch instrument codex --key ik-lw-...
-langwatch instrument copilot --key ik-lw-...
 ```
+
+GitHub Copilot CLI is different: `langwatch instrument copilot` writes a shell function to your shell's startup file, which a non-interactive bash or zsh shell, such as a CI step or a service, does not load. On those machines, export the lines that `langwatch ingest install copilot_cli --env-only` prints instead, as [Bake it into an image](#bake-it-into-an-image) shows.
 
 The command reads the same value from the environment, which is how you keep the key out of shell history and provisioning scripts:
 
