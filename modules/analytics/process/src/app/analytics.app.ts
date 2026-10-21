@@ -839,9 +839,9 @@ export class AnalyticsModule
     const shared = authorization
       ? sharedWindowsReadBy({ authorization, permission: "analytics:view", condition: "trace" })
       : [];
+    await this.#dependencies.lwqlBounds.assertQueryWithinBounds({ projectId: project.id });
     const aggregate =
       shared.length > 0 ? await this.#aggregateScope.getMemberScope({ shared }) : undefined;
-    await this.#dependencies.lwqlBounds.assertQueryWithinBounds({ projectId: project.id });
 
     if (aggregate) {
       // A judged column is charged to one project, so an aggregate's statement may call none.

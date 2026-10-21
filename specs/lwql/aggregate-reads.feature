@@ -41,6 +41,13 @@ Feature: LangWatchQL on an aggregate project reads its members inside their gran
     And no statement reaches the store
 
   @unit
+  Scenario: A member shared up to a date is refused by name
+    Given project B is shared with the aggregate up to a date
+    When ana runs a statement on the aggregate
+    Then the run is refused naming project B
+    And no statement reaches the store
+
+  @unit
   Scenario: The members come from the proof, never from the request
     Given a request that names project C
     When ana runs a statement on the aggregate

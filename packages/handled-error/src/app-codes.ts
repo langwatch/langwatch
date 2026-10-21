@@ -500,6 +500,7 @@ export const APP_ERROR_CODES = [
   "lwql_granularity_requires_window",
   "lwql_granularity_too_fine",
   "lwql_invalid_query",
+  "lwql_member_grant_closed",
   "lwql_member_key_missing",
   "lwql_not_enabled",
   "lwql_not_permitted",

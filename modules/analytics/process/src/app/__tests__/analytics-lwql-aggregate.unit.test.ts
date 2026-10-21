@@ -30,6 +30,7 @@ const MEMBERS = ["project_a", "project_b"];
  * that passes every gate answers `lwql_unavailable` from the executor door.
  */
 async function harness({ keyless = [] }: { keyless?: readonly string[] } = {}) {
+  const lookedUp: string[] = [];
   const app = await AnalyticsModule.create({
     dependencies: {
       featureFlags: createApiFixture<FeatureFlagApi>(),
@@ -37,7 +38,10 @@ async function harness({ keyless = [] }: { keyless?: readonly string[] } = {}) {
       dataPrivacy: createApiFixture<DataPrivacyApi>(),
       projects: createApiFixture<ProjectApi>({
         getOrganizationId: async () => "org-free",
-        findById: async (id) => (keyless.includes(id) ? null : project(id)),
+        findById: async (id) => {
+          lookedUp.push(id);
+          return keyless.includes(id) ? null : project(id);
+        },
       }),
       plans: createApiFixture<EntitlementApi>({
         requestBound: ({ key }) => Promise.resolve(resolveRequestBound(key, "FREE")),
@@ -93,7 +97,7 @@ async function harness({ keyless = [] }: { keyless?: readonly string[] } = {}) {
       }),
     );
 
-  return { onAggregate, onMember };
+  return { onAggregate, onMember, lookedUp };
 }
 
 const FREE_QUERIES_PER_MINUTE = resolveRequestBound("lwqlPerMinute", "FREE");
@@ -110,6 +114,15 @@ describe("AnalyticsModule.executeLangWatchQL on an aggregate", () => {
       expect(await onAggregate()).toBe("lwql_rate_limited");
       expect(await onMember("project_a")).toBe("lwql_unavailable");
       expect(await onMember("project_b")).toBe("lwql_unavailable");
+    });
+
+    it("refuses before looking up any member", async () => {
+      const { onAggregate, lookedUp } = await harness();
+      for (let index = 0; index < FREE_QUERIES_PER_MINUTE; index++) await onAggregate();
+      lookedUp.length = 0;
+
+      expect(await onAggregate()).toBe("lwql_rate_limited");
+      expect(lookedUp).toEqual([]);
     });
   });
 

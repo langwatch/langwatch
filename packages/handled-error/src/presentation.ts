@@ -482,6 +482,17 @@ const presentations = {
     title: "Queries are queued up right now",
     describe: () => "Too many queries were running at once. Try again in a few seconds.",
   },
+  lwql_member_grant_closed: {
+    title: "A member project is shared up to a date",
+    describe: (error) => {
+      const names = strList(error, "projectNames");
+      if (names.length === 0) {
+        return "One of the projects this group project reads is shared only up to a date, which queries can't keep to. Ask your administrator to share it without an end.";
+      }
+      const plural = names.length > 1;
+      return `${listLabels(names.map((name) => `"${name}"`))} ${plural ? "are" : "is"} shared only up to a date, which queries can't keep to. Ask your administrator to share ${plural ? "them" : "it"} without an end.`;
+    },
+  },
   lwql_member_key_missing: {
     title: "A member project can't be queried yet",
     describe: (error) => {

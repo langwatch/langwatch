@@ -420,6 +420,27 @@ export class LangWatchQLMemberKeyMissingError extends HandledError {
 }
 
 /**
+ * These members are shared up to an end date, and no view can keep a read to before it, so
+ * nothing runs: reading the rest would show a total that silently leaves them out.
+ */
+export class LangWatchQLMemberGrantClosedError extends HandledError {
+  declare readonly code: "lwql_member_grant_closed";
+
+  constructor(input: { projectIds: readonly string[]; projectNames?: readonly string[] }) {
+    super(
+      "lwql_member_grant_closed",
+      "A member project of this aggregate is shared up to a date.",
+      {
+        httpStatus: 422,
+        fault: "customer",
+        meta: { projectIds: [...input.projectIds], projectNames: [...(input.projectNames ?? [])] },
+      },
+    );
+    this.name = "LangWatchQLMemberGrantClosedError";
+  }
+}
+
+/**
  * An aggregate reads more members than one LangWatchQL statement may name, refused before any
  * read rather than answered for a part of them.
  */

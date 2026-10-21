@@ -82,17 +82,21 @@ describe("LangWatchQLAggregateScopeService", () => {
       expect(scope.projects.map((project) => project.id)).not.toContain("project_c");
     });
 
-    it("leaves out a member whose grant has an end", async () => {
-      const scope = await scopeOver().getMemberScope({
-        shared: sharedOf(
-          aggregateProof([
-            { projectId: "project_a", from: 0 },
-            { projectId: "project_b", from: 0, until: SHARED_FROM },
-          ]),
-        ),
-      });
+    /** @scenario "A member shared up to a date is refused by name" */
+    it("refuses the run naming a member whose grant has an end", async () => {
+      const refusal = await scopeOver()
+        .getMemberScope({
+          shared: sharedOf(
+            aggregateProof([
+              { projectId: "project_a", from: 0 },
+              { projectId: "project_b", from: 0, until: SHARED_FROM },
+            ]),
+          ),
+        })
+        .catch((error: unknown) => error);
 
-      expect(scope.projects.map((project) => project.id)).toEqual(["project_a"]);
+      expect(codeOf(refusal)).toBe("lwql_member_grant_closed");
+      expect(refusal).toMatchObject({ meta: { projectIds: ["project_b"] } });
     });
   });
 

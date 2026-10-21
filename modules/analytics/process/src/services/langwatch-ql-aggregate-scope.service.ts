@@ -5,18 +5,16 @@
  * @see dev/docs/adr/177-aggregate-project-reads-member-projects-through-grants.md (v4.14)
  */
 import {
+  LangWatchQLMemberGrantClosedError,
   LangWatchQLMemberKeyMissingError,
   LangWatchQLTooManyMembersError,
   type LangWatchQLCaller,
   type LangWatchQLMemberWindow,
 } from "@langwatch/analytics-contract";
 import type { SharedWindow } from "@langwatch/authorization";
-import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 
 import { LWQL_TENANT_CAPABILITY_MAX_PROJECTS } from "./langwatch-ql-capability.service.ts";
-
-const logger = createLogger("langwatch:analytics:lwql:aggregate-scope");
 
 /** The members an aggregate's statement runs over, and where each is read from. */
 export type LangWatchQLAggregateScope = Readonly<{
@@ -38,9 +36,10 @@ export class LangWatchQLAggregateScopeService {
   private constructor(private readonly deps: LangWatchQLAggregateScopeDependencies) {}
 
   /**
-   * The members behind the proof's `shared` windows. A grant with a closed end is left out: the
-   * reconciler writes none, and no view can tell where a bucket that straddles the end belongs.
+   * The members behind the proof's `shared` windows.
    * @throws {LangWatchQLTooManyMembersError} before any read, past the member cap.
+   * @throws {LangWatchQLMemberGrantClosedError} naming every member shared up to a date: the
+   *   reconciler writes none, and no view can tell where a bucket that straddles the end belongs.
    * @throws {LangWatchQLMemberKeyMissingError} naming every member whose key cannot be read.
    */
   async getMemberScope({
@@ -48,24 +47,24 @@ export class LangWatchQLAggregateScopeService {
   }: {
     shared: readonly SharedWindow[];
   }): Promise<LangWatchQLAggregateScope> {
-    const open = shared.filter((window) => window.until === null);
-    if (open.length < shared.length) {
-      logger.warn(
-        { left: shared.length - open.length },
-        "aggregate LangWatchQL read left out members whose grant has an end",
-      );
-    }
     const maxMembers = this.deps.maxMembers ?? LWQL_TENANT_CAPABILITY_MAX_PROJECTS;
-    if (open.length > maxMembers) {
-      throw new LangWatchQLTooManyMembersError({ memberCount: open.length, maxMembers });
+    if (shared.length > maxMembers) {
+      throw new LangWatchQLTooManyMembersError({ memberCount: shared.length, maxMembers });
     }
 
     const found = await Promise.all(
-      open.map(async (window) => ({
+      shared.map(async (window) => ({
         window,
         project: await this.deps.projects.findById(window.projectId),
       })),
     );
+    const closed = found.filter(({ window }) => window.until !== null);
+    if (closed.length > 0) {
+      throw new LangWatchQLMemberGrantClosedError({
+        projectIds: closed.map(({ window }) => window.projectId),
+        projectNames: closed.flatMap(({ project }) => (project ? [project.name] : [])),
+      });
+    }
     const missing = found.filter(({ project }) => !project?.lwqlKey);
     if (missing.length > 0) {
       throw new LangWatchQLMemberKeyMissingError({
@@ -78,7 +77,7 @@ export class LangWatchQLAggregateScopeService {
       projects: found.flatMap(({ project }) =>
         project?.lwqlKey ? [{ id: project.id, lwqlKey: project.lwqlKey }] : [],
       ),
-      memberWindows: open.map((window) => ({ projectId: window.projectId, from: window.from })),
+      memberWindows: shared.map((window) => ({ projectId: window.projectId, from: window.from })),
     };
   }
 }
