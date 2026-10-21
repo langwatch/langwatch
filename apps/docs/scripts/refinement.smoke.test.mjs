@@ -237,28 +237,3 @@ await it("renders responsive product imagery and a solid footer across themes an
     },
   });
 });
-
-await it("caps ambient rendering resolution and disables it for reduced motion", async () => {
-  await withPreviewBrowser({
-    outDir,
-    run: async ({ browser, base }) => {
-      const context = await browser.newContext({
-        viewport: { width: 1440, height: 1000 },
-        reducedMotion: "no-preference",
-      });
-      try {
-        const page = await context.newPage();
-        await page.goto(base + "coding-agents/overview");
-        await page.locator(".docs-ground-live canvas").waitFor();
-        const pixels = await page
-          .locator(".docs-ground-live canvas")
-          .evaluate((canvas) => canvas.width * canvas.height);
-        assert.ok(pixels > 0 && pixels <= 362000, `ambient pixels: ${pixels}`);
-        await page.emulateMedia({ reducedMotion: "reduce" });
-        await page.locator(".docs-ground-live").waitFor({ state: "detached" });
-      } finally {
-        await context.close();
-      }
-    },
-  });
-});

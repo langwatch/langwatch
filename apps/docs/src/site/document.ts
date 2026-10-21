@@ -5,7 +5,6 @@ import type { Operation } from "../features/api-reference/model/operation.ts";
 /** Lazy browser entries by name; the bootstrap loads each through a `docs-island-<name>` meta. */
 export const ISLANDS = {
   controls: "src/features/shell/browser/controls.ts",
-  ground: "src/features/shell/browser/ground.ts",
   "context-menus": "src/features/shell/browser/context-menus.tsx",
   copy: "src/features/shell/browser/copy.ts",
   tabs: "src/features/content/browser/tabs.ts",

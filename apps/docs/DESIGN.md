@@ -78,9 +78,9 @@ See [MDN lifecycle guidance](https://developer.mozilla.org/en-US/docs/Web/API/Se
 
 ## Scroll layout
 
-The page has three document-flow regions: sticky header, a floating paper panel,
-and a full-width footer outside that panel. A 32-pixel desktop gap exposes the
-ambient ground above rounded paper corners. The navigation rail stays below the
+The page has three document-flow regions: sticky header, a flat paper page and a
+full-width footer, matching the brand site: white paper, ink type and hairline
+rules, with no floating panel or gradient ground. The navigation rail stays below the
 header and scrolls on its own; a tall contents rail flows with the document and
 only one that fits the available viewport becomes sticky.
 Code, tables, prompts and API responses have no vertical scroll limit. The sidebar is 280 pixels
@@ -105,7 +105,7 @@ mobile drawer and command bar are overlays with bounded scrolling.
 `pnpm --filter @langwatch/docs-site size --out-dir <build> --before <baseline>`
 reports raw and gzipped sizes and fails above 3,000 bytes for initial reading or
 15,000 bytes for bootstrap plus idle controls. It also reports deferred reading,
-shader and interaction costs separately. `test:performance` exercises zero-JavaScript styling,
+and interaction costs separately. `test:performance` exercises zero-JavaScript styling,
 client navigation, prefetch reuse, worker updates/offline fallback and a lazy API
 request. `test:layout` checks 1280/1440/1670/390 widths in both themes. Existing
 smoke and mock-session tests continue to cover the interactive surface.
@@ -125,11 +125,9 @@ future search mode without enabling Langy. Keyboard navigation keeps the caret
 in the search field and identifies its active result; Enter opens it, modifier
 Enter opens a new tab, modifier L copies its link, and Escape restores focus.
 
-The ambient shader uses the design system's framework-free export, in a separate
-idle chunk. Reduced motion loads no shader; visibility and theme changes dispose
-and remount its graphics resources. The footer stays opaque. Paper uses a 96% opaque fill and a slight backdrop blur
-only without reduced motion; reduced transparency and forced colours retain
-opaque paper.
+Headings use the brand's Sentient serif; body text is Inter and code JetBrains
+Mono, all self-hosted. Brand orange (#f56b1a) decorates; text accents use its
+darker brand-700 companion so they meet AA on paper.
 The static floor uses the marketing mesh palette and is present without scripts.
 
 Design-system candidates: Kbd size variants; CommandBarInput native input/ARIA
@@ -162,4 +160,4 @@ coding agent”.
 
 Linked cards are real cards at rest: a raised surface with a full border, an outline icon or a light logo chip (so dark third-party marks stay visible in both themes), title and description; hover only adds lift and an accent edge. Steps use solid accent number markers joined by an accent line, and authored tabs sit in one framed panel with a raised active tab. Coding-agent setup is a real CLI command line in every sidebar, with direct setup links on its overview. The overview's existing product capture supplies visual context; it remains a screenshot, not an interactive demo. The contents rail curves between nesting levels and animates the active segment; reduced motion disables the animation. Overflowing tab strips show a scrolling hint, reveal keyboard-selected tabs horizontally, and preserve document scroll. The footer and document overscroll share opaque paper.
 
-Design-system ownership remains tokens, primitives, accessible menus/dialogs/tabs, brand assets, command bar and ambient rendering. Documentation owns its page grid, navigation tree, ToC, prose/MDX adapters, release strip, agent setup composition, copy controls and exports.
+Design-system ownership remains tokens, primitives, accessible menus/dialogs/tabs, brand assets and command bar. Documentation owns its page grid, navigation tree, ToC, prose/MDX adapters, release strip, agent setup composition, copy controls and exports.

@@ -5,18 +5,18 @@ export type TypeMode = "expressive" | "productive";
 
 const COMPACT = "@media (max-width: 47.99rem)";
 
-/** Reading and reference scales share Inter; prose keeps the more generous measure and leading. */
+/** Prose headings use the Sentient serif; reference pages keep Inter for dense section headings. */
 export const TYPE_MODES: Record<TypeMode, Record<string, string | Record<string, string>>> = {
   expressive: {
     "--docs-font-heading": "var(--chakra-fonts-heading)",
-    "--docs-weight-heading": "600",
+    "--docs-weight-heading": "500",
     "--docs-body-size": "16px",
     "--docs-body-line": "28px",
-    "--docs-h2-size": "24px",
-    "--docs-h2-line": "32px",
-    "--docs-h3-size": "20px",
+    "--docs-h2-size": "28px",
+    "--docs-h2-line": "34px",
+    "--docs-h3-size": "21px",
     "--docs-h3-line": "28px",
-    "--docs-heading-tracking": "0",
+    "--docs-heading-tracking": "-0.015em",
     [COMPACT]: {
       "--docs-body-size": "16px",
       "--docs-body-line": "26px",
@@ -27,7 +27,7 @@ export const TYPE_MODES: Record<TypeMode, Record<string, string | Record<string,
     },
   },
   productive: {
-    "--docs-font-heading": "var(--chakra-fonts-heading)",
+    "--docs-font-heading": "var(--chakra-fonts-body)",
     "--docs-weight-heading": "600",
     "--docs-body-size": "14px",
     "--docs-body-line": "20px",

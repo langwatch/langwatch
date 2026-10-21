@@ -105,12 +105,6 @@ export function DocsShell({
           Skip to page list
         </a>
       ) : null}
-      <Box
-        className="docs-ground"
-        data-home={kind === "home"}
-        pointerEvents="none"
-        aria-hidden="true"
-      />
       <SiteBanner />
       <Header kind={kind} onMenu={() => setMenuOpen(true)} />
       <Box

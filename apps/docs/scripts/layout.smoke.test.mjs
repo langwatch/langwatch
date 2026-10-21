@@ -79,11 +79,13 @@ async function reviewPage({ page, base, slug, width, mode }) {
   await page.evaluate(() => scrollTo(0, 0));
   const header = await page.locator("header").boundingBox();
   const panel = await page.locator(".docs-layout").boundingBox();
-  assert.ok(panel.y - header.y - header.height >= 19);
-  assert.ok(
-    await page
-      .locator(".docs-layout")
-      .evaluate((node) => parseFloat(getComputedStyle(node).borderTopLeftRadius) >= 12),
+  assert.ok(panel.y >= header.y + header.height - 1);
+  assert.deepEqual(
+    await page.locator(".docs-layout").evaluate((node) => {
+      const style = getComputedStyle(node);
+      return { radius: style.borderTopLeftRadius, shadow: style.boxShadow };
+    }),
+    { radius: "0px", shadow: "none" },
   );
   const name = slug.replaceAll("/", "_");
   await capture({ page, name: `${name}-top`, width, mode });

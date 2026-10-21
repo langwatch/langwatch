@@ -66,8 +66,11 @@ function Breadcrumb({ trail }: { trail: string[] }) {
     <Text
       as="nav"
       aria-label="Breadcrumb"
-      fontSize="14px"
+      fontFamily="mono"
+      fontSize="12px"
       lineHeight="20px"
+      letterSpacing="0.08em"
+      textTransform="uppercase"
       color="accent.fg"
       fontWeight="500"
       margin="0"
@@ -112,10 +115,10 @@ export function PageHeader({
           margin="0"
           position="relative"
           fontFamily="heading"
-          fontWeight="650"
-          fontSize={{ base: "28px", md: "34px" }}
-          lineHeight={{ base: "36px", md: "42px" }}
-          letterSpacing="-0.025em"
+          fontWeight="400"
+          fontSize={{ base: "32px", md: "42px" }}
+          lineHeight={{ base: "36px", md: "46px" }}
+          letterSpacing="-0.02em"
           paddingInlineEnd={{ base: "0", xl: slug === "404" ? "0" : "10rem" }}
           textWrap="pretty"
         >

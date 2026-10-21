@@ -108,10 +108,10 @@ Feature: Static documentation with progressive interaction
   Scenario: Scroll a long API section naturally
     Given an API introduction is open at a desktop or phone width
     Then the document scrolls without an inner content panel
-    And a gradient gap separates the header and rounded paper
+    And the page sits flat on paper directly beneath the header
     And tall desktop rails flow with the document without an inner scrollbar
     And short rails may stick beneath the header
-    And the full-width footer follows the panel and never clips navigation
+    And the full-width footer follows the page and never clips navigation
     And unrelated navigation groups start collapsed
     And the active page remains in an expanded branch
     And initial loading preserves the article heading and top gap
@@ -142,7 +142,6 @@ Feature: Static documentation with progressive interaction
     When a reader chooses an agent and copies the setup prompt
     Then the picker identifies the selected agent with its brand mark
     And the complete authored prompt is copied with a success state
-    And reduced motion keeps the background static
 
   @e2e
   Scenario: Render brand marks during development

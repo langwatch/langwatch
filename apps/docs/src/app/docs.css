@@ -16,6 +16,38 @@
     U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
     U+A720-A7FF;
 }
+@font-face {
+  font-family: "Sentient";
+  src: url("/fonts/Sentient-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Sentient";
+  src: url("/fonts/Sentient-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/fonts/JetBrainsMono-Variable-latin.woff2") format("woff2");
+  font-weight: 400 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/fonts/JetBrainsMono-Variable-latin-ext.woff2") format("woff2");
+  font-weight: 400 600;
+  font-style: normal;
+  font-display: swap;
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
 
 html {
   scroll-padding-top: calc(var(--docs-header-h, 64px) + 1.5rem);
@@ -243,18 +275,12 @@ body {
   display: grid;
   position: relative;
   z-index: 1;
-  max-width: 1360px;
-  margin: 32px auto 48px;
+  max-width: 1440px;
+  margin: 0 auto;
   min-height: calc(100vh - var(--docs-header-h));
   padding-inline: 24px;
   grid-template-columns: minmax(0, 1fr);
   grid-template-areas: "main";
-  background: var(--chakra-colors-docs-paper);
-  border: 1px solid var(--chakra-colors-border);
-  border-radius: 16px;
-  box-shadow:
-    0 2px 4px var(--chakra-colors-docs-shadow),
-    0 24px 80px var(--chakra-colors-docs-shadow);
 }
 .docs-page-header {
   position: relative;
@@ -264,24 +290,6 @@ body {
   position: absolute;
   inset-inline-end: 0;
   top: 2rem;
-}
-.docs-ground {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  background:
-    radial-gradient(ellipse 65% 85% at 4% 8%, var(--chakra-colors-docs-mesh-blue), transparent 72%),
-    radial-gradient(
-      ellipse 60% 80% at 96% 8%,
-      var(--chakra-colors-docs-mesh-warm),
-      transparent 72%
-    ),
-    radial-gradient(
-      ellipse 65% 65% at 65% 100%,
-      var(--chakra-colors-docs-mesh-rust),
-      transparent 80%
-    ),
-    var(--chakra-colors-docs-canvas);
 }
 .docs-callout a {
   color: inherit;
@@ -319,9 +327,6 @@ body {
 .docs-prose td {
   color: var(--chakra-colors-docs-body);
 }
-.docs-field code {
-  color: var(--chakra-colors-blue-fg);
-}
 .docs-field-body {
   color: var(--chakra-colors-docs-body);
 }
@@ -334,8 +339,7 @@ body {
 }
 @media (min-width: 64rem) {
   .docs-layout {
-    width: calc(100% - 48px);
-    padding-inline: 0 40px;
+    padding-inline: 24px 40px;
     grid-template-columns: 280px minmax(0, 1fr);
     grid-template-areas: "nav main";
     column-gap: 32px;
@@ -347,8 +351,6 @@ body {
   .docs-nav-plane {
     background: var(--chakra-colors-docs-sidebar);
     border-inline-end: 1px solid var(--chakra-colors-border);
-    border-start-start-radius: 16px;
-    border-end-start-radius: 16px;
   }
 }
 @media (min-width: 80rem) {
@@ -369,11 +371,7 @@ body {
 }
 @media (max-width: 63.99rem) {
   .docs-layout {
-    margin: 20px 0 32px;
     padding-inline: 20px;
-    border: 0;
-    border-radius: 16px 16px 0 0;
-    box-shadow: none;
   }
 }
 
@@ -405,9 +403,6 @@ body {
   position: relative;
 }
 @media (prefers-reduced-transparency: reduce), (forced-colors: active) {
-  .docs-ground {
-    display: none;
-  }
   .docs-method-bar::before {
     display: none;
   }
@@ -726,20 +721,6 @@ body {
   }
 }
 
-.docs-ground-live {
-  position: absolute;
-  inset: 0;
-  opacity: 0.65;
-}
-.docs-ground-live canvas {
-  width: 100%;
-  height: 100%;
-}
-@media (prefers-reduced-motion: reduce) {
-  .docs-ground-live {
-    display: none;
-  }
-}
 .docs-shortcut {
   display: inline-flex;
   align-items: center;
@@ -764,9 +745,9 @@ body {
   border-color: var(--chakra-colors-border);
 }
 .docs-agent-start [data-docs-agent][aria-pressed="true"] {
-  background: var(--chakra-colors-blue-subtle);
-  color: var(--chakra-colors-blue-fg);
-  border-color: var(--chakra-colors-blue-fg);
+  background: var(--chakra-colors-docs-raised);
+  color: var(--chakra-colors-fg);
+  border-color: var(--chakra-colors-fg);
 }
 .docs-agent-check {
   visibility: hidden;
@@ -926,16 +907,6 @@ body {
 @media (prefers-reduced-motion: no-preference) {
   .docs-toc-path {
     transition: stroke-dashoffset 160ms ease;
-  }
-  .docs-layout {
-    background: color-mix(in srgb, var(--chakra-colors-docs-paper) 96%, transparent);
-    backdrop-filter: blur(12px);
-  }
-}
-@media (prefers-reduced-transparency: reduce), (forced-colors: active) {
-  .docs-layout {
-    background: var(--chakra-colors-docs-paper);
-    backdrop-filter: none;
   }
 }
 
@@ -1252,9 +1223,4 @@ body {
 
 .docs-layout[data-kind="endpoint"] {
   max-width: none;
-  width: 100%;
-  margin: 0;
-  border-radius: 0;
-  border-inline: 0;
-  box-shadow: none;
 }

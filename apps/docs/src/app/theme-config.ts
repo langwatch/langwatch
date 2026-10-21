@@ -4,73 +4,55 @@ const colour = ({ light, dark }: { light: string; dark: string }) => ({
   value: { _light: light, _dark: dark },
 });
 
-// Docs-local theme candidates: paper, canvas, ground, primary and controlBorder.
-// Brand orange is retained for decoration; its darker text companion meets AA on light surfaces.
+// Brand palette from langwatch.ai/brand: paper, ink and orange (#f56b1a).
+// Orange decorates; its darker brand-700 companion carries text and meets AA on paper.
 export const docsTheme = {
   theme: {
     semanticTokens: {
       colors: {
         docs: {
-          paper: colour({ light: "#fffefa", dark: "#181a1e" }),
-          canvas: colour({ light: "#efeee9", dark: "#0a0a0c" }),
-          sidebar: colour({ light: "#faf9f5", dark: "#15171b" }),
-          raised: colour({ light: "#ffffff", dark: "#202328" }),
-          chrome: colour({ light: "#fffefae6", dark: "#14161ad9" }),
-          shadow: colour({ light: "#30251814", dark: "#00000055" }),
-          shadowStrong: colour({ light: "#30251821", dark: "#00000080" }),
-          meshBlue: colour({ light: "#cddcf9", dark: "#234887" }),
-          meshWarm: colour({ light: "#ffaf6e", dark: "#a86632" }),
-          meshRust: colour({ light: "#edc8be", dark: "#853f38" }),
-          primary: colour({ light: "#e17100", dark: "#fe9a00" }),
-          primaryText: colour({ light: "#201307", dark: "#201307" }),
-          primaryHover: colour({ light: "#f28a16", dark: "#ffad33" }),
-          promptHeading: colour({ light: "#465da5", dark: "#9db9ff" }),
-          promptCommand: colour({ light: "#875327", dark: "#efbf82" }),
-          controlBorder: colour({ light: "#87817b", dark: "#77736f" }),
-          body: colour({ light: "#3b3835", dark: "#d6d3d0" }),
-          lede: colour({ light: "#5f5a55", dark: "#a8a4a0" }),
-          contents: colour({ light: "#6f6a65", dark: "#9a9692" }),
-          tile: colour({ light: "#ecebe8", dark: "#24272b" }),
-          action: colour({ light: "#26694d", dark: "#26694d" }),
-          actionText: colour({ light: "#ffffff", dark: "#ffffff" }),
-          banner: colour({ light: "#232a32", dark: "#101216" }),
-          bannerText: colour({ light: "#f8f6f2", dark: "#efede9" }),
-          rule: colour({
-            light: "linear-gradient(90deg, #cddcf9, #ffaf6e, transparent)",
-            dark: "linear-gradient(90deg, #3b5bdb, #c97b3a, transparent)",
-          }),
-          ground: colour({
-            light:
-              "radial-gradient(ellipse at 15% 0%, #cddcf9 0%, transparent 65%), radial-gradient(ellipse at 85% 10%, #ffaf6e 0%, transparent 65%), {colors.docs.canvas}",
-            dark: "radial-gradient(ellipse at 15% 0%, #1d2a44 0%, transparent 65%), radial-gradient(ellipse at 85% 10%, #7a4a22 0%, transparent 65%), {colors.docs.canvas}",
-          }),
+          paper: colour({ light: "#ffffff", dark: "#141417" }),
+          canvas: colour({ light: "#ffffff", dark: "#141417" }),
+          sidebar: colour({ light: "#ffffff", dark: "#141417" }),
+          raised: colour({ light: "#ffffff", dark: "#1b1b1f" }),
+          chrome: colour({ light: "#ffffffe6", dark: "#141417e6" }),
+          shadow: colour({ light: "#14141714", dark: "#00000055" }),
+          shadowStrong: colour({ light: "#14141721", dark: "#00000080" }),
+          primary: colour({ light: "#f56b1a", dark: "#f56b1a" }),
+          primaryText: colour({ light: "#141417", dark: "#141417" }),
+          controlBorder: colour({ light: "#8a8981", dark: "#77766f" }),
+          body: colour({ light: "#36352f", dark: "#d6d5d0" }),
+          lede: colour({ light: "#4d4d46", dark: "#aaa9a2" }),
+          contents: colour({ light: "#5e5d56", dark: "#9a9992" }),
+          action: colour({ light: "#141417", dark: "#f0f0ee" }),
+          actionText: colour({ light: "#ffffff", dark: "#141417" }),
         },
         bg: {
           DEFAULT: { value: "{colors.bg.surface}" },
           surface: { value: "{colors.docs.paper}" },
           panel: { value: "{colors.bg.surface}" },
-          subtle: colour({ light: "#f5f4f1", dark: "#202327" }),
+          subtle: colour({ light: "#f7f7f5", dark: "#1e1e22" }),
           muted: { value: "{colors.bg.subtle}" },
           control: { value: "{colors.bg.subtle}" },
-          nested: colour({ light: "{colors.docs.paper}", dark: "#101215" }),
+          nested: colour({ light: "#f7f7f5", dark: "#0a0a0c" }),
           hover: { value: "{colors.bg.subtle}" },
         },
         fg: {
-          DEFAULT: colour({ light: "#201e1b", dark: "#ece9e6" }),
-          muted: colour({ light: "#625d58", dark: "#aaa6a3" }),
+          DEFAULT: colour({ light: "#141417", dark: "#f0f0ee" }),
+          muted: colour({ light: "#4d4d46", dark: "#aaa9a2" }),
           subtle: { value: "{colors.fg.muted}" },
         },
-        nav: { fg: colour({ light: "#4d4945", dark: "#b4b0ac" }) },
+        nav: { fg: colour({ light: "#4d4d46", dark: "#b4b3ac" }) },
         border: {
-          DEFAULT: colour({ light: "#e5e2df", dark: "#34373b" }),
-          muted: colour({ light: "#efedeb", dark: "#2b2e32" }),
+          DEFAULT: colour({ light: "#e3e2dd", dark: "#2e2e33" }),
+          muted: colour({ light: "#f0f0ee", dark: "#232327" }),
           nested: { value: "{colors.border}" },
           emphasized: { value: "{colors.docs.controlBorder}" },
         },
         accent: {
           solid: { value: "{colors.docs.primary}" },
-          fg: colour({ light: "#a95000", dark: "#fe9a00" }),
-          subtle: colour({ light: "#fdf1e4", dark: "#2a1d08" }),
+          fg: colour({ light: "#a83e05", dark: "#ff8a3d" }),
+          subtle: colour({ light: "#fff1e7", dark: "#2a1a0e" }),
           indicator: { value: "{colors.accent.fg}" },
         },
       },
@@ -78,7 +60,10 @@ export const docsTheme = {
     tokens: {
       fonts: {
         body: { value: "Inter, ui-sans-serif, system-ui, sans-serif" },
-        heading: { value: "Inter, ui-sans-serif, system-ui, sans-serif" },
+        heading: {
+          value: 'Sentient, Charter, "Source Serif Pro", ui-serif, Georgia, serif',
+        },
+        mono: { value: '"JetBrains Mono", ui-monospace, SFMono-Regular, monospace' },
       },
     },
   },

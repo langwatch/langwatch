@@ -91,7 +91,6 @@ const enhanceReading = () => {
   loadIsland({ name: "toc" });
   loadIsland({ name: "tabs" });
   loadIsland({ name: "reading" });
-  if (matchMedia("(prefers-reduced-motion: no-preference)").matches) loadIsland({ name: "ground" });
 };
 if ("requestIdleCallback" in window) window.requestIdleCallback(enhanceReading, { timeout: 1000 });
 else setTimeout(enhanceReading, 100);

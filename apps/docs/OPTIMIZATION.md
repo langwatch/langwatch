@@ -4,7 +4,7 @@ Keep the approved UI, shared React components, and a complete static artifact.
 Required reading stays independent of React, Chakra, schema validation, syntax
 highlighting and Markdown compilation in the browser. Measure complete interaction
 costs as well as the initial script; a small bootstrap does not describe search,
-CSS, images or the optional shader.
+CSS or images.
 
 ## Implemented priorities
 

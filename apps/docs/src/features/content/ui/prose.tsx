@@ -31,10 +31,10 @@ export function DocsInlineCode({ children }: { children?: ReactNode }) {
     <Box
       as="code"
       className="docs-inline-code"
-      bg="blue.subtle"
-      color="blue.fg"
+      bg="bg.subtle"
+      color="fg"
       borderWidth="1px"
-      borderColor="blue.muted"
+      borderColor="border"
       fontFamily="mono"
       fontSize="0.875em"
       lineHeight="1.7"

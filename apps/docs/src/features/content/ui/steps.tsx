@@ -83,9 +83,9 @@ export function Step({
           margin="0"
           marginBottom="3"
           paddingTop="0"
-          fontSize="17px"
+          fontSize="19px"
           lineHeight="28px"
-          fontWeight="600"
+          fontWeight="var(--docs-weight-heading)"
           fontFamily="var(--docs-font-heading)"
         >
           {icon ? <Icon icon={icon} size={18} /> : null}

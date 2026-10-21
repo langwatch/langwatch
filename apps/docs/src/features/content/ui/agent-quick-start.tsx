@@ -81,9 +81,9 @@ export function AgentQuickStart({ prompt }: { prompt: string }) {
   const { state, copy, ready } = useCopy();
   return (
     <Box className="docs-agent-start" marginY="6">
-      <Card variant="nested" tone="blue" padding="none">
+      <Card variant="nested" tone="neutral" padding="none">
         <Box padding={{ base: "5", md: "7" }}>
-          <Flex gap="3" alignItems="center" marginBottom="4" color="blue.fg">
+          <Flex gap="3" alignItems="center" marginBottom="4" color="fg">
             <Terminal size={22} strokeWidth={1.7} aria-hidden="true" />
             <Text as="div" fontSize="20px" lineHeight="28px" fontWeight="600" color="fg" margin="0">
               Let your coding agent set it up
@@ -106,9 +106,9 @@ export function AgentQuickStart({ prompt }: { prompt: string }) {
                 disabled={!ready}
                 aria-pressed={agent === name}
                 onClick={() => setAgent(name)}
-                bg={agent === name ? "blue.subtle" : "transparent"}
-                color={agent === name ? "blue.fg" : "fg"}
-                borderColor={agent === name ? "blue.fg" : "border"}
+                bg={agent === name ? "docs.raised" : "transparent"}
+                color="fg"
+                borderColor={agent === name ? "fg" : "border"}
                 _hover={{ bg: "bg.hover" }}
               >
                 <img
@@ -129,8 +129,9 @@ export function AgentQuickStart({ prompt }: { prompt: string }) {
               <Button
                 size="sm"
                 minHeight="40px"
-                variant="subtle"
-                colorPalette="blue"
+                bg="docs.action"
+                color="docs.actionText"
+                _hover={{ bg: "docs.action", opacity: 0.9 }}
                 disabled={!ready}
                 data-docs-prompt=""
                 onClick={() => copy({ text: prompt })}

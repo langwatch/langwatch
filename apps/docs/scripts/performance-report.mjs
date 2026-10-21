@@ -50,17 +50,14 @@ async function measure({ directory }) {
   );
   const worker = gzipSync(await readFile(path.join(directory, "sw.js"))).length;
   const initial = entryFiles({ name: "index" });
-  /* Islands every page loads at idle without a reader action; the shader is counted apart. */
+  /* Islands every page loads at idle without a reader action. */
   const idle = ["tabs", "toc", "reading"].flatMap((name) => entryFiles({ name }));
-  const shader = entryFiles({ name: "ground" });
   const index = await readFile(path.join(directory, "search-index.json"));
   return {
     initialGzip: inline + (await gzipFiles({ directory, files: initial })),
     serviceWorkerGzip: worker,
     withIdleControlsGzip:
       inline + worker + (await gzipFiles({ directory, files: [...initial, ...idle] })),
-    withIdleControlsAndShaderGzip:
-      inline + worker + (await gzipFiles({ directory, files: [...initial, ...idle, ...shader] })),
     deferredReadingGzip: await gzipFiles({ directory, files: entryFiles({ name: "reading" }) }),
     simpleIslandsGzip: await gzipFiles({
       directory,
@@ -75,7 +72,6 @@ async function measure({ directory }) {
         "reading",
       ].flatMap((name) => entryFiles({ name })),
     }),
-    ambientEnhancementGzip: await gzipFiles({ directory, files: shader }),
     searchIndexBytes: index.length,
     searchIndexGzip: gzipSync(index).length,
     contextMenusInteractionGzip: await gzipFiles({
@@ -99,7 +95,7 @@ const report = {
   before,
   after,
   pageTypes: ["home", "guide", "API reference"],
-  note: "All page types share the same bootstrap. Idle controls are tabs, toc and reading, loaded on every page; the shader (ground) loads too when motion is allowed and is counted in withIdleControlsAndShaderGzip. Search index JSON is reported apart from search JS. Interaction sizes include shared React/Zod chunks once. Assets and total sizes are uncompressed.",
+  note: "All page types share the same bootstrap. Idle controls are tabs, toc and reading, loaded on every page. Search index JSON is reported apart from search JS. Interaction sizes include shared React/Zod chunks once. Assets and total sizes are uncompressed.",
 };
 console.log(JSON.stringify(report, null, 2));
 if (values.report) await writeFile(values.report, JSON.stringify(report, null, 2));

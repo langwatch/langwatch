@@ -122,8 +122,6 @@ async function navigate({ url, restored = false }: { url: URL; restored?: boolea
       .querySelectorAll<HTMLDialogElement>("dialog[open]")
       .forEach((dialog) => dialog.close());
     document.querySelector(".docs-layout")?.replaceWith(layout);
-    const ground = document.querySelector<HTMLElement>(".docs-ground");
-    if (ground) ground.dataset.home = String(layout.getAttribute("data-kind") === "home");
     document
       .querySelector("header")
       ?.setAttribute("data-kind", layout.getAttribute("data-kind") ?? "guide");

@@ -299,10 +299,9 @@ and credential isolation. `test:layout` checks 1280, 1440, 1670 and 390 pixel wi
 in light and dark. Run worker tests only against an isolated build: the update
 scenario temporarily changes that build’s `sw.js` and restores it afterwards.
 
-The page uses one document scroll: the floating content panel has a gradient gap
-above it, tall rails flow naturally, and the full-width footer sits outside it.
-Only a rail that fits the viewport becomes sticky. The ground shader is a separate
-idle enhancement; reduced motion keeps the static floor without loading it.
+The page uses one document scroll on flat paper: tall rails flow naturally and the
+full-width footer follows the content. Only a rail that fits the viewport becomes
+sticky.
 
 ```sh
 pnpm --filter @langwatch/docs-site test:polish --out-dir "$TMPDIR/docs-test-dist" --screenshots "$TMPDIR/docs-polish"
@@ -330,7 +329,7 @@ Every configured page exports identical Markdown at `.md`, `.claude` and `.agent
 
 Alt+Shift+C copies the current page outside editable controls. The sidebar command selector copies the five supported CLI launchers; Cursor and Aider use the gateway guide rather than an invented wrapper command. Page feedback links open a GitHub issue draft containing the page URL.
 
-The coding-agent hero uses checked-in 640/1024/1560px WebP derivatives of the existing session-detail PNG, with responsive preload only on its overview page. Other imagery remains lazy. Ambient rendering has a docs-specific 360,000-pixel cap and 0.5 minimum pixel ratio; design-system callers retain their existing defaults. Run `test:refinement --out-dir <build> --screenshots <scratch-directory>` for the exports, clipboard, tab-panel mapping, responsive image, footer and shader checks.
+The coding-agent hero uses checked-in 640/1024/1560px WebP derivatives of the existing session-detail PNG, with responsive preload only on its overview page. Other imagery remains lazy. Run `test:refinement --out-dir <build> --screenshots <scratch-directory>` for the exports, clipboard, tab-panel mapping, responsive image, and footer checks.
 
 ## Git LFS assets
 

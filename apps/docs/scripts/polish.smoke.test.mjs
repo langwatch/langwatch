@@ -176,7 +176,6 @@ await it("copies the complete prompt with branded selection and a visible succes
           await card.getByRole("button", { name: "Prompt copied" }).waitFor();
           assert.equal(await page.evaluate(() => navigator.clipboard.readText()), full);
           assert.match(await card.locator("output").textContent(), /Paste into your agent/);
-          assert.equal(await page.locator(".docs-ground-live").count(), 0);
           await shot({ page, name: `agent-success-${width}-dark` });
         } finally {
           await context.close();
