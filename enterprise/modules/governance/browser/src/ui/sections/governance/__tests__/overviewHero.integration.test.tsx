@@ -237,6 +237,26 @@ describe("given the overview renders", () => {
       "Your recent screens will show up here.",
     ].map((text) => screen.getByText(text).closest("[data-size='line']"));
     expect(emptyLines.every(Boolean)).toBe(true);
+    // A one-line empty state names where the list fills from, rather than ending there.
+    expect(
+      within(emptyLines[1] as HTMLElement).getByRole("link", { name: /Open the inventory/ }),
+    ).toHaveAttribute("href", "/governance/inventory");
+    // This reader may not see sources, so the Insights line does not point at them.
+    expect(screen.queryByRole("link", { name: /Connect a source/ })).toBeNull();
+  });
+
+  /** @scenario "The overview is one centred column" */
+  it("points the empty Insights line at the sources for whoever may see them", () => {
+    window.sessionStorage.setItem(SAMPLE_CHOICE_KEY, "false");
+    renderOverview({ permissions: [...VIEWER, "ingestionSources:view"] });
+
+    const insightsLine = screen
+      .getByText("Nothing to report yet. Insights appear here once sources are pulling.")
+      .closest("[data-size='line']") as HTMLElement;
+    expect(within(insightsLine).getByRole("link", { name: /Connect a source/ })).toHaveAttribute(
+      "href",
+      "/governance/inventory?tab=sources",
+    );
   });
 
   /** @scenario "The overview renders no error alert and issues no spend read" */

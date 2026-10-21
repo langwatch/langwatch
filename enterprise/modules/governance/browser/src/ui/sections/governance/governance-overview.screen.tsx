@@ -74,7 +74,11 @@ function GovernanceOverviewPage() {
             <GuidedOnboardingOffer space="governance" spaceInUse={sourcesInUse} />
           </VStack>
 
-          <GovernanceHomeSections canSetUpInsights={canSetUpInsights} sample={sample.active} />
+          <GovernanceHomeSections
+            canSetUpInsights={canSetUpInsights}
+            canViewSources={canReadSources}
+            sample={sample.active}
+          />
         </VStack>
       </PageLayout.Container>
     </GovernanceLayout>

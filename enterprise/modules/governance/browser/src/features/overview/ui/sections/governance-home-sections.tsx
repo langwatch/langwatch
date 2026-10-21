@@ -16,8 +16,13 @@ import {
 } from "@langwatch/design-system/primitives";
 import type React from "react";
 
+import { useGovernanceHost } from "../../../../model/governance-host.ts";
 import { Link } from "../../../../ui/elements/governance-link.tsx";
 import type { SampleActivityRow, SampleInsight } from "../../model/sample-home-rows.ts";
+import { INVENTORY_SOURCES_HREF } from "./governance-hero.tsx";
+
+/** Where Recent activity's empty line sends the reader: the inventory every reader may open. */
+const INVENTORY_HREF = "/governance/inventory";
 import {
   INSIGHTS_HREF,
   SAMPLE_ACTIVITY,
@@ -30,13 +35,18 @@ const SEVERITY_COLUMN = "104px";
 
 export function GovernanceHomeSections({
   canSetUpInsights,
+  canViewSources,
   sample,
 }: {
   /** Whether Insights is offered; also filters which sample rows draw. */
   canSetUpInsights: boolean;
+  /** Holds `ingestionSources:view`, so the empty Insights line may point at the sources. */
+  canViewSources: boolean;
   /** Whether the two lists carry invented rows rather than empty lines. */
   sample: boolean;
 }) {
+  const host = useGovernanceHost();
+  const onNavigate = ({ href }: { href: string }) => host.navigate(href);
   const activity = SAMPLE_ACTIVITY.filter((row) => canSetUpInsights || !row.ridesInsightsFlag);
 
   return (
@@ -52,6 +62,16 @@ export function GovernanceHomeSections({
           <NoDataInfoBlock
             size="line"
             title="Nothing to report yet. Insights appear here once sources are pulling."
+            {...(canViewSources && {
+              next: [
+                {
+                  kind: "setting",
+                  label: "Connect a source",
+                  href: INVENTORY_SOURCES_HREF,
+                  onNavigate,
+                },
+              ],
+            })}
           />
         )}
         {canSetUpInsights && (
@@ -71,7 +91,13 @@ export function GovernanceHomeSections({
             ))}
           </RowList>
         ) : (
-          <NoDataInfoBlock size="line" title="Your recent screens will show up here." />
+          <NoDataInfoBlock
+            size="line"
+            title="Your recent screens will show up here."
+            next={[
+              { kind: "setting", label: "Open the inventory", href: INVENTORY_HREF, onNavigate },
+            ]}
+          />
         )}
       </HomeSection>
     </Grid>
