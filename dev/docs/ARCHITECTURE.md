@@ -181,8 +181,8 @@ or drops it. Each patch has one owning module and a test there that runs the pat
 
 **Build stamp** (Alex, 2026-10-09). `isReleaseBuild` in `packages/config/src/release-build.ts` is a
 committed `false`; the release image build sets it `true` in its builder stage (`infra/docker/Dockerfile`,
-build arg `LANGWATCH_RELEASE_BUILD`, default `true`) and `dev/scripts/pack-npm.sh` sets it on the npx
-staged copy. Runtime env cannot change it, only a rebuild can. A release build verifies licences
+build arg `LANGWATCH_RELEASE_BUILD`, default `true`) and `dev/scripts/build-app-archive.sh` sets it on
+the npx app archive's staged copy (ADR-180). Runtime env cannot change it, only a rebuild can. A release build verifies licences
 against the embedded LangWatch key only and logs once, by name, that the public-key override is ignored.
 
 ---

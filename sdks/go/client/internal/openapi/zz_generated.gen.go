@@ -33207,8 +33207,9 @@ type DatasetPostEntries struct {
 
 // Evaluation defines model for Evaluation.
 type Evaluation struct {
-	Details *string `json:"details,omitempty"`
-	Error   *struct {
+	Attempts *int    `json:"attempts,omitempty"`
+	Details  *string `json:"details,omitempty"`
+	Error    *struct {
 		HasError   EvaluationErrorHasError `json:"has_error"`
 		Message    string                  `json:"message"`
 		Stacktrace []string                `json:"stacktrace"`
@@ -33219,6 +33220,7 @@ type Evaluation struct {
 	Inputs             *map[string]interface{} `json:"inputs,omitempty"`
 	IsGuardrail        *bool                   `json:"is_guardrail,omitempty"`
 	Label              *string                 `json:"label,omitempty"`
+	LastAttemptError   *string                 `json:"last_attempt_error,omitempty"`
 	Name               string                  `json:"name"`
 	Passed             *bool                   `json:"passed,omitempty"`
 	Retries            *float32                `json:"retries,omitempty"`
@@ -33257,6 +33259,8 @@ type EvaluationTimestamps struct {
 	FinishedAt              *float32 `json:"finished_at,omitempty"`
 	IgnoreTimestampsOnWrite *bool    `json:"ignore_timestamps_on_write,omitempty"`
 	InsertedAt              *float32 `json:"inserted_at,omitempty"`
+	LastAttemptAt           *int     `json:"last_attempt_at,omitempty"`
+	NextAttemptAt           *int     `json:"next_attempt_at,omitempty"`
 	StartedAt               *float32 `json:"started_at,omitempty"`
 	UpdatedAt               *float32 `json:"updated_at,omitempty"`
 }

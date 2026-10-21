@@ -25,6 +25,10 @@ const evaluationRunDataSchemaDefinition = z.object({
   startedAt: z.number().nullable(),
   completedAt: z.number().nullable(),
   costId: z.string().nullable(),
+  attempts: z.number().int().nonnegative().optional(),
+  lastAttemptAt: z.number().nullable().optional(),
+  lastAttemptError: z.string().nullable().optional(),
+  nextAttemptAt: z.number().nullable().optional(),
 });
 export interface EvaluationRunDataSchema extends Named<typeof evaluationRunDataSchemaDefinition> {}
 export const evaluationRunDataSchema: EvaluationRunDataSchema = evaluationRunDataSchemaDefinition;

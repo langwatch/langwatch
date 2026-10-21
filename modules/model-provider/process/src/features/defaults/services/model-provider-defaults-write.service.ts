@@ -33,8 +33,8 @@ export class ModelProviderDefaultsWriteService {
 
   async set(input: ModelDefaultAssignmentInput): Promise<void> {
     const parsed = modelDefaultAssignmentInputSchema.parse(input);
-    const config = this.options.catalog.sanitizeDefaultConfig({
-      [parsed.key]: parsed.model ?? "",
+    const { config } = this.options.catalog.sanitizeDefaultConfig({
+      config: { [parsed.key]: parsed.model ?? "" },
     });
     if (parsed.model !== null && !config[parsed.key]) {
       throw new ModelProviderInvalidError(`Model is not allowed for default key: ${parsed.key}`);
@@ -63,9 +63,15 @@ export class ModelProviderDefaultsWriteService {
       return this.deleteEmptyConfig(parsed.actorId, existing);
     }
 
-    const config = this.options.catalog.sanitizeDefaultConfig(
-      parsed.config ?? existing?.config ?? {},
-    );
+    const { config, droppedRestricted } = this.options.catalog.sanitizeDefaultConfig({
+      config: parsed.config ?? existing?.config ?? {},
+      stored: existing?.config,
+    });
+    if (Object.keys(config).length === 0 && droppedRestricted) {
+      throw new ModelDefaultValidationError(
+        "Every model in this config is restricted to coding-assistant surfaces. Pick another model, or remove the config.",
+      );
+    }
     if (Object.keys(config).length === 0) {
       if (existing) {
         return this.deleteEmptyConfig(parsed.actorId, existing);

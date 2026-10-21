@@ -529,7 +529,6 @@ const LEGACY_INERT: string[] = [
   "specs/model-config/unified-reasoning-ui.feature",
   "specs/model-providers/custom-model-max-tokens.feature",
   "specs/model-providers/default-provider.feature",
-  "specs/model-providers/provider-list.feature",
   "specs/monitors/evaluation-trigger-skips-derived-and-stale-traces.feature",
   "specs/monitors/guardrails-api-compatibility.feature",
   "specs/monitors/monitor-execution-backend.feature",
@@ -803,6 +802,9 @@ const LEGACY_PARTIAL: string[] = [
   "specs/model-providers/onboarding-flow.feature",
   "specs/model-providers/provider-configuration.feature",
   "specs/model-providers/provider-deletion.feature",
+  // Reason: left LEGACY_INERT when the providers table's page width was bound
+  // (langwatch/tasks#963). The @visual and @unimplemented scenarios stay as they were.
+  "specs/model-providers/provider-list.feature",
   "specs/model-providers/scope-and-multi-instance.feature",
   "specs/monitors/online-evaluator-loop-prevention.feature",
   "specs/navigation/shared-section-navigation-layout.feature",
