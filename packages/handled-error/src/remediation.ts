@@ -66,6 +66,14 @@ const registry = {
     ],
   },
 
+  // ---- automations ----
+  automation_dataset_unavailable: {
+    tips: [
+      "Open the automation and pick a dataset that exists, or restore the archived one",
+      "Check the column mapping still names columns the dataset has; retrying unchanged will fail identically",
+    ],
+  },
+
   // ---- traces ----
   trace_not_found: {
     tips: [

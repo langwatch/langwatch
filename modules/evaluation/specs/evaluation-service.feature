@@ -370,6 +370,22 @@ Feature: Evaluation service boundary
     Then the fact carries the project, the evaluation, its evaluator type, score and verdict
     And it names no admin and no organization count
 
+  # Keyed by the evaluation, not the project (2026-10-20): keyed by project, every settled
+  # evaluation in a project queued behind the one before it, so one busy project held its whole
+  # backlog in a single queue group.
+  @unit
+  Scenario: A settled evaluation's fact is keyed by the evaluation, not its project
+    Given two evaluations in the same project settle
+    When their lifecycle facts are recorded
+    Then each fact is keyed by its own evaluation, so neither waits for the other
+
+  @unit
+  Scenario: A hand-run evaluation's fact is keyed by the run, not its project
+    Given two people in the same project each run an evaluation by hand
+    When their ran facts are recorded
+    Then each fact is keyed by its person and instant, so neither waits for the other
+    And the same run sent twice is still one fact
+
   @integration
   Scenario: An evaluate request that fails validation answers 400 with the sentence
     Given a project API key that may manage evaluations

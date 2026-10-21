@@ -56,6 +56,7 @@ import {
   ValidationError,
 } from "../services/errorHandling.ts";
 import type {
+  EventSubscriberContext,
   EventSubscriberDefinition,
   EventSubscriberOptions,
   PeerSubscriberDefinition,
@@ -226,20 +227,21 @@ export class PipelineBuilder<
     if (this.globalProjections.some((declared) => declared.name === lane)) {
       this.throwDuplicateProjectionName(lane);
     }
+    const coalesceMaxBatch = subscriber.options?.coalesceMaxBatch ?? 1;
+    if (!subscriber.handleBatch && coalesceMaxBatch > 1) {
+      throw new ConfigurationError(
+        "PipelineBuilder",
+        `Peer subscriber "${lane}" coalesces up to ${coalesceMaxBatch} events but handles one at a time: declare handleBatch to coalesce`,
+        { subscriberName: lane, coalesceMaxBatch },
+      );
+    }
     this.globalProjections.push({
       name: lane,
       register: (registry) =>
         registry.registerEventSubscriber({
           name: lane,
           eventTypes: [subscriber.eventType],
-          handle: (event, context) =>
-            subscriber.handle(subscriber.data.parse(event.data), {
-              ...context,
-              occurredAt: event.occurredAt,
-              createdAt: event.createdAt,
-              eventId: event.id,
-              ...(event.idempotencyKey && { idempotencyKey: event.idempotencyKey }),
-            }),
+          ...peerSubscriberHandlers(subscriber),
           options: peerSubscriberOptions(subscriber),
         }),
     });
@@ -784,6 +786,41 @@ export class PipelineDeclaration {
     };
     return new PipelineBuilder(this.name, this.aggregate, { eventSchemas, parseEvent });
   }
+}
+
+/**
+ * A peer subscriber's handlers on its lane: each event's data parsed with the contract's schema
+ * (a refusal throws, failing the delivery) beside its instant, id and idempotency key. A batch
+ * subscriber takes a single delivery as a batch of one.
+ */
+function peerSubscriberHandlers<Data extends ParsingSchema>(
+  subscriber: PeerSubscriberDefinition<Data>,
+): Pick<EventSubscriberDefinition, "handle" | "handleBatch"> {
+  const itemOf = (event: Event, context: EventSubscriberContext) => ({
+    data: subscriber.data.parse(event.data),
+    context: {
+      ...context,
+      occurredAt: event.occurredAt,
+      createdAt: event.createdAt,
+      eventId: event.id,
+      ...(event.idempotencyKey && { idempotencyKey: event.idempotencyKey }),
+    },
+  });
+  if (!subscriber.handleBatch) {
+    const handle = subscriber.handle;
+    return {
+      handle: (event, context) => {
+        const { data, context: peerContext } = itemOf(event, context);
+        return handle(data, peerContext);
+      },
+    };
+  }
+  const handleBatch = subscriber.handleBatch;
+  return {
+    handle: async (event, context) => handleBatch([itemOf(event, context)]),
+    handleBatch: async (events, contexts) =>
+      handleBatch(events.map((event, index) => itemOf(event, contexts[index]!))),
+  };
 }
 
 /** A peer subscriber's options on its lane, its data filter lifted to the staged event. */
