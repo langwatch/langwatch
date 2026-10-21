@@ -78,12 +78,15 @@ describe("the @langwatch/eventing package boundary", () => {
       expect(TIER_PATH.test("stores/repositories/eventRepositoryMemory.ts")).toBe(false);
       expect(TIER_CLIENT.test("@prisma/client")).toBe(true);
       expect(TIER_CLIENT.test("@clickhouse/client")).toBe(true);
+      expect(TIER_CLIENT.test("@langwatch/prisma-client")).toBe(true);
+      expect(TIER_CLIENT.test("@langwatch/clickhouse-client")).toBe(true);
     });
   });
 });
 
 const TIER_PATH = /(^|\/)(server|repositories\/(prisma|clickhouse))\//;
-const TIER_CLIENT = /^@(prisma|clickhouse)\/client(\/|$)/;
+const TIER_CLIENT =
+  /^@(?:(?:prisma|clickhouse)\/client|langwatch\/(?:prisma|clickhouse)-client)(\/|$)/;
 
 function specifiersOf(source: string): string[] {
   return [...source.matchAll(/(?:from|import)\s*\(?\s*["']([^"']+)["']/g)].map(

@@ -17,4 +17,4 @@ Feature: Eventing refactor safety nets
     Given the import graph walked from the root entry
     When every transitively imported relative file is collected
     Then no file under server, repositories/prisma or repositories/clickhouse is reached
-    And no file imports @prisma/client or @clickhouse/client
+    And no file imports @prisma/client, @clickhouse/client, @langwatch/prisma-client or @langwatch/clickhouse-client

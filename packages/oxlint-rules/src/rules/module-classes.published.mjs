@@ -8,7 +8,13 @@ import { parseFile } from "../parse.mjs";
 // lines of the entry files its `exports` names (ADR-181 decision 3). A published class
 // keeps its name and its constructor; `export *` is followed into its target.
 
+// Keyed by package root; an entry is reused only while every file it read keeps its mtime,
+// so a long-running language server sees an export added or removed.
 const publishedCache = new Map();
+
+function mtimesOf(files) {
+  return files.map((file) => (existsSync(file) ? statSync(file).mtimeMs : -1)).join(",");
+}
 
 function resolveRelative({ from, specifier }) {
   if (!specifier.startsWith(".")) return undefined;
@@ -58,7 +64,7 @@ function collectExports({ filename, names, visited }) {
 
 function readPublished(root) {
   const manifestPath = join(root, "package.json");
-  if (!existsSync(manifestPath)) return new Set();
+  if (!existsSync(manifestPath)) return { names: new Set(), files: [manifestPath] };
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
   const names = new Set();
   const visited = new Set();
@@ -67,7 +73,7 @@ function readPublished(root) {
     if (existsSync(filename)) collectExports({ filename, names, visited });
   }
 
-  return names;
+  return { names, files: [manifestPath, ...visited] };
 }
 
 /**
@@ -78,7 +84,10 @@ function readPublished(root) {
 export function publishedNamesOf({ cwd, file }) {
   const packagePath = file.workspacePath.slice(0, -file.relative.length);
   const root = join(cwd, packagePath);
-  if (!publishedCache.has(root)) publishedCache.set(root, readPublished(root));
+  const cached = publishedCache.get(root);
+  if (cached && mtimesOf(cached.files) === cached.stamp) return cached.names;
+  const { names, files } = readPublished(root);
+  publishedCache.set(root, { names, files, stamp: mtimesOf(files) });
 
-  return publishedCache.get(root);
+  return names;
 }

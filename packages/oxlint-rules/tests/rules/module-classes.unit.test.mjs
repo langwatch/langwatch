@@ -1,3 +1,6 @@
+import { appendFileSync, utimesSync } from "node:fs";
+import { join } from "node:path";
+
 import { afterAll, describe, expect, it } from "vitest";
 
 import { moduleClassesRule } from "../../src/rules/module-classes.rule.mjs";
@@ -274,6 +277,25 @@ describe("given an opted-in framework package", () => {
       ).toEqual([]);
       const processor = "export class RelayProcessor {\n  constructor(readonly name: string) {}\n}";
       expect(frameworkReport(processor, `${RELAY}/app/relay.app.ts`)).toEqual([]);
+    });
+  });
+  describe("when an entry starts publishing the class after a first lint", () => {
+    /** @scenario "A framework class takes the module's shape unless an entry publishes it" */
+    it("reads the entry again instead of reusing the names it read before", () => {
+      const filename = `${RELAY}/features/late/services/late.service.ts`;
+      const code = [
+        "export class LateService {",
+        "  constructor() {}",
+        "  static create() { return new LateService(); }",
+        "}",
+      ].join("\n");
+      expect(frameworkReport(code, filename)).toEqual([["publicConstructor", 2]]);
+
+      const entry = join(framework.cwd, RELAY, "index.ts");
+      appendFileSync(entry, 'export { LateService } from "./features/late/services/late.service.ts";\n');
+      const later = new Date(Date.now() + 60_000);
+      utimesSync(entry, later, later);
+      expect(frameworkReport(code, filename)).toEqual([]);
     });
   });
 });
