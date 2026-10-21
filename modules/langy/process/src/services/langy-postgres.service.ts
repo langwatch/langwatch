@@ -16,6 +16,7 @@ import {
   LangyTurnService,
   type LangyTurnTechnicalMembers,
 } from "../features/turn/services/langy-turn.service.ts";
+import type { LangyDeleteConfirmationRepository } from "../repositories/langy-delete-confirmation.repository.ts";
 import type { LangyFeedbackPromptRepository } from "../repositories/langy-feedback-prompt.repository.ts";
 import type { LangyDatabaseRepositories } from "../repositories/langy-repositories.registry.ts";
 import type { LangyBlockMetrics } from "./langy-block-metrics-otel.service.ts";
@@ -129,6 +130,8 @@ export class LangyPostgresService {
     apiKeys: ApiKeyApi;
     authz: Pick<AuthzApi, "effectivePermissions">;
     metrics: LangySessionKeyMetrics;
+    /** Where each key's conversation is written, for the delete confirmation. */
+    bindings?: Pick<LangyDeleteConfirmationRepository, "saveKeyBinding">;
   }): LangySessionKeyService {
     if (!this.sessionKeys) {
       this.sessionKeys = LangySessionKeyService.create({

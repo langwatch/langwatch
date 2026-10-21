@@ -35,6 +35,34 @@ Feature: GroupQueue brings back a job whose worker died while running it
     And the total-pending counter is conserved through the death and the recovery
 
   @integration
+  Scenario: A drained sibling whose body is gone leaves the group without a recovery copy
+    Given a claimed group whose middle sibling has lost its body
+    When the siblings are drained into the claim
+    Then every sibling leaves the group and the total-pending counter
+    And the claimed record holds the siblings that had a body, with their original scores
+
+  @integration
+  Scenario: A drain stops at the first sibling that would overflow the byte budget
+    Given a claimed group whose second sibling would push the batch past its byte budget
+    When the siblings are drained into the claim
+    Then only the first sibling joins the claim
+    And the later siblings stay staged in order, still counted as pending, even one small enough to fit
+
+  @integration
+  Scenario: A drain too large for one write is held whole and comes back in order
+    Given a claimed group with more due siblings than one write carries
+    When they are all drained into the claim and the worker dies
+    Then the claimed record held every sibling's body and original score
+    And the next claim brings every job back in its original order with the counter conserved
+
+  @integration
+  Scenario: A previous-release worker's drain writes nothing into the claimed record
+    Given a claim whose worker drains siblings without a claim token
+    When the siblings are drained
+    Then they leave the group and the total-pending counter
+    And the claimed record holds only the claimed job
+
+  @integration
   Scenario: A slow former owner's completion does not double-complete
     Given a worker whose active key lapsed while it was still running a job
     And a second worker that has recovered the job and is running it
@@ -42,6 +70,14 @@ Feature: GroupQueue brings back a job whose worker died while running it
     Then its completion changes nothing and reports the claim as lost
     And the second worker's active key and claimed record survive
     And the second worker's completion frees the group, counted once
+
+  @integration
+  Scenario: A late outcome from a worker's own earlier claim leaves its newer claim alone
+    Given a worker whose claim on a group lapsed and which then claimed the group again
+    When the outcome of its earlier claim arrives late, as a completion, a retry or a block
+    Then each is refused as a lost claim
+    And the newer claim's poison-guard marker, death count, counters and claimed bodies are as they were
+    And the newer claim's own completion still releases the marker
 
   @unit
   Scenario: A former owner that dead-letters or parks a recovered job leaves the group alone

@@ -6,7 +6,8 @@
 import { randomUUID } from "node:crypto";
 
 import type { ClickHouseClient } from "@clickhouse/client";
-import { ClickHouseQueryClient, type QueryDriver, TenantGuard } from "@langwatch/clickhouse-client";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { vendorQueryClient } from "@langwatch/clickhouse-client/testing";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { session } from "../../__tests__/fixtures/coding-agent.fixture.ts";
@@ -16,6 +17,7 @@ import {
   createTestClickHouseClient,
   testClickHouseUrl,
 } from "../clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
+import { CODING_AGENT_ID_INDEXES } from "../clickhouse/clickhouse.coding-agent-id-indexes.database.ts";
 import { CodingAgentSessionClickHouseRepository } from "../clickhouse/clickhouse.coding-agent-session.repository.ts";
 import { CodingAgentTraceSessionClickHouseRepository } from "../clickhouse/clickhouse.coding-agent-trace-session.repository.ts";
 import { SessionMetricSeriesClickHouseRepository } from "../clickhouse/clickhouse.session-metric-series.repository.ts";
@@ -38,33 +40,7 @@ let traceSessions: CodingAgentTraceSessionClickHouseRepository;
 let metricSeries: SessionMetricSeriesClickHouseRepository;
 
 function queryClient(client: ClickHouseClient): ClickHouseQueryClient {
-  const driver: QueryDriver = {
-    async execute(request) {
-      const result = await client.query({
-        query: request.sql,
-        format: "JSONEachRow",
-        ...(request.params === undefined ? {} : { query_params: request.params }),
-        ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
-      });
-      return { rows: await result.json() };
-    },
-    async insert(request) {
-      await client.insert({
-        table: request.table,
-        values: request.rows,
-        format: "JSONEachRow",
-        ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
-      });
-    },
-    async command(request) {
-      await client.command({
-        query: request.sql,
-        ...(request.params === undefined ? {} : { query_params: request.params }),
-        ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
-      });
-    },
-  };
-  return new ClickHouseQueryClient({ tenantGuard: new TenantGuard(), driver });
+  return vendorQueryClient({ vendor: client, indexes: CODING_AGENT_ID_INDEXES });
 }
 
 beforeAll(() => {

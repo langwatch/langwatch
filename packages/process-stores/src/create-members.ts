@@ -3,7 +3,10 @@
  * same client would split one process into duplicate caches and dedup
  * keyspaces. An unconfigured member REFUSES BY NAME, never a silent omission.
  */
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { EventReadSeat } from "@langwatch/eventing";
+import { eventLogIdIndexReadiness } from "@langwatch/eventing/server";
+import { GROUP_QUEUE_CONFIG } from "@langwatch/group-queue";
 import { createLogger } from "@langwatch/observability";
 import type { OperatorReadMint } from "@langwatch/prisma-client";
 
@@ -242,13 +245,25 @@ function eventingMember({
     ...(eventing.groupQueue === undefined ? {} : { redis: read("redis") }),
     ...(eventing.store.kind === "producer-only" && !clickhouseConfigured(config)
       ? {}
-      : {
-          eventLog: {
-            clickhouse: read("clickhouse"),
-            organizationOf: (tenantId: string) => tenantDirectory().organizationForTenant(tenantId),
-          },
-        }),
+      : eventLogMembers({
+          clickhouse: read("clickhouse"),
+          organizationOf: (tenantId: string) => tenantDirectory().organizationForTenant(tenantId),
+        })),
   });
+}
+
+/** The event log a role reads, and its aggregate index's readiness from the index's marker row. */
+function eventLogMembers({
+  clickhouse,
+  organizationOf,
+}: {
+  clickhouse: ClickHouseQueryClient;
+  organizationOf: (tenantId: string) => Promise<string | null>;
+}) {
+  return {
+    eventLog: { clickhouse, organizationOf },
+    eventLogIndexReadiness: eventLogIdIndexReadiness({ clickhouse }),
+  };
 }
 
 /** A role whose eventing reads no event log still hands a seat: only a read through it refuses. */
@@ -426,12 +441,24 @@ export function buildProcessStores(options: BuildProcessStoresOptions): ProcessS
   return { members: source, operatorReads };
 }
 
-/** Host before the runtime so its stores close after the runtime stops; ready once they answer. */
-export function hostedStores(source: ProcessMemberSource) {
+/** Room above the queue drain for closing Redis, Prisma and ClickHouse once eventing drained. */
+const STORE_CLOSE_MARGIN_MS = 5_000;
+
+/**
+ * Host before the runtime so its stores close after the runtime stops; ready once they answer.
+ * Closing them drains eventing's queues, so the phase gets the queue's drain budget, not the
+ * runner's 10s default. Spec: specs/background/worker-graceful-shutdown.feature
+ */
+export function hostedStores({
+  source,
+  drainTimeoutMs,
+}: Readonly<{ source: ProcessMemberSource; drainTimeoutMs?: number | undefined }>) {
   return {
     name: "process stores",
     stopping: () => source.beginClose?.(),
     stop: () => source.close(),
+    drain: true,
+    timeoutMs: (drainTimeoutMs ?? GROUP_QUEUE_CONFIG.shutdownTimeoutMs) + STORE_CLOSE_MARGIN_MS,
     ...(source.answer === undefined
       ? {}
       : {

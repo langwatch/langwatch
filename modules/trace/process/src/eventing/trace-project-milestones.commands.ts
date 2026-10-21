@@ -55,7 +55,10 @@ export class RecordFirstTraceCommand implements CommandHandler<
   }
 }
 
-/** Records a later real trace; one event per project and trace instant. */
+/**
+ * Records a later real trace; one event per project and trace instant, keyed by both, so a busy
+ * project's facts never queue behind one another in a single group.
+ */
 export class RecordTraceReceivedCommand implements CommandHandler<
   Command<RecordTraceReceivedCommandData>,
   TraceReceivedEvent
@@ -71,7 +74,7 @@ export class RecordTraceReceivedCommand implements CommandHandler<
     return [
       EventUtils.createEvent<TraceReceivedEvent>({
         aggregateType: TRACE_PROJECT_AGGREGATE_TYPE,
-        aggregateId: data.projectId,
+        aggregateId: RecordTraceReceivedCommand.getAggregateId(data),
         tenantId: createTenantId(command.tenantId),
         type: TRACE_RECEIVED_EVENT_TYPE,
         version: TRACE_PROJECT_MILESTONES_EVENT_VERSION,
@@ -83,7 +86,7 @@ export class RecordTraceReceivedCommand implements CommandHandler<
   }
 
   static getAggregateId(payload: RecordTraceReceivedCommandData): string {
-    return payload.projectId;
+    return `${payload.projectId}:${payload.occurredAt}`;
   }
 }
 

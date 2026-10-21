@@ -120,6 +120,7 @@ export const teamsRest = defineRestRouter(TeamManagementApi)
   })
 
   .post("/", "createTeam")
+  .keepsRecords()
   .withPermission("team:manage")
   .withInput(organizationTeamRestCreateSchema)
   .withOutput(organizationTeamRestSchema)
@@ -158,6 +159,7 @@ export const teamsRest = defineRestRouter(TeamManagementApi)
   )
 
   .patch("/:teamId", "updateTeam")
+  .keepsRecords()
   .withPermission("team:manage", { at: "route", param: "teamId" })
   .withParams(organizationTeamRestParamsSchema)
   .withInput(organizationTeamRestUpdateSchema)
@@ -188,6 +190,7 @@ export const teamsRest = defineRestRouter(TeamManagementApi)
     description: "Archive a team (soft-delete)",
   })
   .withAudit("management.team.archive-by-id")
+  .withoutConfirmation("Langy keys cannot hold team:manage")
   .handle(async ({ app, input, scope }) => {
     const team = await app.archiveTeam({
       teamId: input.teamId,
@@ -229,6 +232,7 @@ export const teamsRest = defineRestRouter(TeamManagementApi)
   })
 
   .post("/:teamId/members", "addTeamMember")
+  .keepsRecords()
   .withPermission("team:manage", { at: "route", param: "teamId" })
   .withParams(organizationTeamRestParamsSchema)
   .withInput(organizationTeamRestAddMemberSchema)
@@ -271,6 +275,7 @@ export const teamsRest = defineRestRouter(TeamManagementApi)
   })
   .withMiddlewareContext(organizationKeyContext)
   .withAudit("management.team.remove-member")
+  .withoutConfirmation("Langy keys cannot hold team:manage")
   .handle(async ({ app, input, scope, actor }, key) => {
     await app.removeTeamMember(
       {

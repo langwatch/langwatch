@@ -484,38 +484,38 @@ Public: the device flow authenticates the caller inside its own handlers (the CL
 Answers at `/api/auth/cli/device-code`, `/api/v1/auth/cli/device-code`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/auth-cli-device-flow.rest.ts:95)
-// Response: inline, src/transport/auth-cli-device-flow.rest.ts:98
+// Rawbody: "text" (inline, src/transport/auth-cli-device-flow.rest.ts:96)
+// Response: inline, src/transport/auth-cli-device-flow.rest.ts:99
 type Response = unknown;
 ```
 
 #### `POST /api/auth/cli/exchange` · `exchangeCliDeviceCode`
 
-Public: the device flow authenticates the caller inside its own handlers (the CLI half by device code and refresh token, the browser half by the session cookie the process resolves) and answers its own 401, 403 and RFC 8628 refusals. Declared at `src/transport/auth-cli-device-flow.rest.ts:103`.
+Public: the device flow authenticates the caller inside its own handlers (the CLI half by device code and refresh token, the browser half by the session cookie the process resolves) and answers its own 401, 403 and RFC 8628 refusals. Declared at `src/transport/auth-cli-device-flow.rest.ts:104`.
 
 Answers at `/api/auth/cli/exchange`, `/api/v1/auth/cli/exchange`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/auth-cli-device-flow.rest.ts:105)
-// Response: inline, src/transport/auth-cli-device-flow.rest.ts:108
+// Rawbody: "text" (inline, src/transport/auth-cli-device-flow.rest.ts:107)
+// Response: inline, src/transport/auth-cli-device-flow.rest.ts:110
 type Response = unknown;
 ```
 
 #### `POST /api/auth/cli/refresh` · `refreshCliDeviceSession`
 
-Public: the device flow authenticates the caller inside its own handlers (the CLI half by device code and refresh token, the browser half by the session cookie the process resolves) and answers its own 401, 403 and RFC 8628 refusals. Declared at `src/transport/auth-cli-device-flow.rest.ts:113`.
+Public: the device flow authenticates the caller inside its own handlers (the CLI half by device code and refresh token, the browser half by the session cookie the process resolves) and answers its own 401, 403 and RFC 8628 refusals. Declared at `src/transport/auth-cli-device-flow.rest.ts:115`.
 
 Answers at `/api/auth/cli/refresh`, `/api/v1/auth/cli/refresh`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/auth-cli-device-flow.rest.ts:115)
-// Response: inline, src/transport/auth-cli-device-flow.rest.ts:118
+// Rawbody: "text" (inline, src/transport/auth-cli-device-flow.rest.ts:118)
+// Response: inline, src/transport/auth-cli-device-flow.rest.ts:121
 type Response = unknown;
 ```
 
 #### `GET /api/auth/cli/lookup` · `lookupCliDeviceCode`
 
-Public: the device flow authenticates the caller inside its own handlers (the CLI half by device code and refresh token, the browser half by the session cookie the process resolves) and answers its own 401, 403 and RFC 8628 refusals. Declared at `src/transport/auth-cli-device-flow.rest.ts:128`.
+Public: the device flow authenticates the caller inside its own handlers (the CLI half by device code and refresh token, the browser half by the session cookie the process resolves) and answers its own 401, 403 and RFC 8628 refusals. Declared at `src/transport/auth-cli-device-flow.rest.ts:131`.
 
 Answers at `/api/auth/cli/lookup`, `/api/v1/auth/cli/lookup`.
 
@@ -524,49 +524,49 @@ Answers at `/api/auth/cli/lookup`, `/api/v1/auth/cli/lookup`.
 interface Query {
   user_code?: string;
 }
-// Response: inline, src/transport/auth-cli-device-flow.rest.ts:131
+// Response: inline, src/transport/auth-cli-device-flow.rest.ts:134
 type Response = unknown;
 ```
 
 #### `POST /api/auth/cli/approve` · `approveCliDeviceCode`
 
-Public: the device flow authenticates the caller inside its own handlers (the CLI half by device code and refresh token, the browser half by the session cookie the process resolves) and answers its own 401, 403 and RFC 8628 refusals. Declared at `src/transport/auth-cli-device-flow.rest.ts:136`.
+Public: the device flow authenticates the caller inside its own handlers (the CLI half by device code and refresh token, the browser half by the session cookie the process resolves) and answers its own 401, 403 and RFC 8628 refusals. Declared at `src/transport/auth-cli-device-flow.rest.ts:139`.
 
 Answers at `/api/auth/cli/approve`, `/api/v1/auth/cli/approve`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/auth-cli-device-flow.rest.ts:138)
-// Response: inline, src/transport/auth-cli-device-flow.rest.ts:141
+// Rawbody: "text" (inline, src/transport/auth-cli-device-flow.rest.ts:142)
+// Response: inline, src/transport/auth-cli-device-flow.rest.ts:145
 type Response = unknown;
 ```
 
 #### `POST /api/auth/cli/deny` · `denyCliDeviceCode`
 
-Public: the device flow authenticates the caller inside its own handlers (the CLI half by device code and refresh token, the browser half by the session cookie the process resolves) and answers its own 401, 403 and RFC 8628 refusals. Declared at `src/transport/auth-cli-device-flow.rest.ts:146`.
+Public: the device flow authenticates the caller inside its own handlers (the CLI half by device code and refresh token, the browser half by the session cookie the process resolves) and answers its own 401, 403 and RFC 8628 refusals. Declared at `src/transport/auth-cli-device-flow.rest.ts:150`.
 
 Answers at `/api/auth/cli/deny`, `/api/v1/auth/cli/deny`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/auth-cli-device-flow.rest.ts:148)
-// Response: inline, src/transport/auth-cli-device-flow.rest.ts:151
+// Rawbody: "text" (inline, src/transport/auth-cli-device-flow.rest.ts:153)
+// Response: inline, src/transport/auth-cli-device-flow.rest.ts:156
 type Response = unknown;
 ```
 
 #### `POST /api/auth/cli/logout` · `endCliDeviceSession`
 
-Public: the device flow authenticates the caller inside its own handlers (the CLI half by device code and refresh token, the browser half by the session cookie the process resolves) and answers its own 401, 403 and RFC 8628 refusals. Declared at `src/transport/auth-cli-device-flow.rest.ts:161`.
+Public: the device flow authenticates the caller inside its own handlers (the CLI half by device code and refresh token, the browser half by the session cookie the process resolves) and answers its own 401, 403 and RFC 8628 refusals. Declared at `src/transport/auth-cli-device-flow.rest.ts:166`.
 
 Answers at `/api/auth/cli/logout`, `/api/v1/auth/cli/logout`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/auth-cli-device-flow.rest.ts:163)
-// Response: inline, src/transport/auth-cli-device-flow.rest.ts:166
+// Rawbody: "text" (inline, src/transport/auth-cli-device-flow.rest.ts:169)
+// Response: inline, src/transport/auth-cli-device-flow.rest.ts:172
 type Response = unknown;
 ```
 
 #### `GET /api/auth/cli/device-approval` · `watchCliDeviceApproval`
 
-Public: the device flow authenticates the caller inside its own handlers (the CLI half by device code and refresh token, the browser half by the session cookie the process resolves) and answers its own 401, 403 and RFC 8628 refusals. Declared at `src/transport/auth-cli-device-flow.rest.ts:176`.
+Public: the device flow authenticates the caller inside its own handlers (the CLI half by device code and refresh token, the browser half by the session cookie the process resolves) and answers its own 401, 403 and RFC 8628 refusals. Declared at `src/transport/auth-cli-device-flow.rest.ts:182`.
 
 Answers at `/api/auth/cli/device-approval`, `/api/v1/auth/cli/device-approval`.
 
@@ -575,7 +575,7 @@ Answers at `/api/auth/cli/device-approval`, `/api/v1/auth/cli/device-approval`.
 interface Query {
   device_code: string;
 }
-// Response: inline, src/transport/auth-cli-device-flow.rest.ts:179
+// Response: inline, src/transport/auth-cli-device-flow.rest.ts:185
 type Response = unknown;
 ```
 
@@ -596,7 +596,7 @@ Answers at `/api/auth/validate`.
 
 ```typescript
 type Headers = z.infer<typeof VALIDATE_HEADERS>; // src/transport/auth.rest.ts:65
-// Response: inline, src/transport/auth.rest.ts:100
+// Response: inline, src/transport/auth.rest.ts:101
 interface Response {
   projectSlug: string;
 }
@@ -604,46 +604,46 @@ interface Response {
 
 #### `GET /api/auth/session` · `readBrowserAuthSession`
 
-Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:108`.
+Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:109`.
 
 Answers at `/api/auth/session`.
 
 ```typescript
 type Headers = z.infer<typeof COOKIE_HEADERS>; // src/transport/auth.rest.ts:70
-// Response: inline, src/transport/auth.rest.ts:111
+// Response: inline, src/transport/auth.rest.ts:112
 type Response = unknown;
 ```
 
 #### `GET /api/auth/logout` · `endBrowserSessionAndRedirect`
 
-Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:116`.
+Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:117`.
 
 Answers at `/api/auth/logout`.
 
 ```typescript
-// Response: inline, src/transport/auth.rest.ts:118
+// Response: inline, src/transport/auth.rest.ts:119
 type Response = unknown;
 ```
 
 #### `POST /api/auth/logout` · `endBrowserSession`
 
-Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:121`.
+Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:122`.
 
 Answers at `/api/auth/logout`.
 
 ```typescript
-// Response: inline, src/transport/auth.rest.ts:124
+// Response: inline, src/transport/auth.rest.ts:126
 type Response = unknown;
 ```
 
 #### `ALL /api/auth/*` · `betterAuthHandshake`
 
-Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:132`.
+Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:134`.
 
 Answers at `/api/auth/*`.
 
 ```typescript
-// Response: inline, src/transport/auth.rest.ts:134
+// Response: inline, src/transport/auth.rest.ts:136
 type Response = unknown;
 ```
 

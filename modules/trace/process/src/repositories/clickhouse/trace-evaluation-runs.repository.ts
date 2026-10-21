@@ -187,6 +187,7 @@ export class ClickHouseTraceEvaluationRunsRepository extends TraceEvaluationRuns
     params: Record<string, string>;
     traceId: string;
   }): Promise<EvaluationRunData[]> {
+    // ID_BOUND_SKIP: evaluation's index, registered by evaluation; moves there with trace-review.
     const result = await input.client.query({
       query: `
         SELECT EvaluationId, EvaluatorId, EvaluatorType, EvaluatorName, TraceId,
@@ -246,6 +247,7 @@ export class ClickHouseTraceEvaluationRunsRepository extends TraceEvaluationRuns
     if (input.traceIds.length === 0) return [];
     try {
       const client = this.clickhouse.as(input.authorization, { reads: "traces" });
+      // ID_BOUND_SKIP: evaluation's index, registered by evaluation; moves there with trace-review.
       const result = await client.query({
         query: `
           SELECT TenantId, EvaluationId, EvaluatorId, EvaluatorType, EvaluatorName,
@@ -351,6 +353,7 @@ export class ClickHouseTraceEvaluationRunsRepository extends TraceEvaluationRuns
     traceIds: readonly string[];
     columns: string;
   }): Promise<Record<string, TraceEvaluationData[]>> {
+    // ID_BOUND_SKIP: evaluation's index, registered by evaluation; moves there with trace-review.
     const result = await input.client.query({
       query: `
         SELECT ${input.columns}

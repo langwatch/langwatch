@@ -520,3 +520,40 @@ describe("LangySessionKeyService", () => {
     expect(LANGY_CANDIDATE_PERMISSIONS).toContain("project:view");
   });
 });
+
+describe("given a key minted for a conversation's turn", () => {
+  describe("when the key is minted", () => {
+    it("binds the key to that conversation and turn for the key's own lifetime", async () => {
+      const apiKeys: ApiKeyApi = Object.create(null);
+      apiKeys.create = vi.fn(async () => ({
+        token: "session-token",
+        apiKey: Object.assign(Object.create(null), { id: "key-bound" }),
+      })) as ApiKeyApi["create"];
+      const authz: AuthzApi = createApiFixture<AuthzApi>();
+      authz.effectivePermissions = vi.fn(async () => ["evaluations:manage" as const]);
+      const saved: unknown[] = [];
+      const service = LangySessionKeyService.create({
+        repository: new SessionKeyRepository(),
+        apiKeys,
+        authz,
+        metrics: new SessionKeyMetrics(),
+        bindings: { saveKeyBinding: async (input) => void saved.push(input) },
+      });
+
+      await service.mint({
+        session: { user: { id: "user-1" } },
+        projectId: "project-1",
+        organizationId: "organization-1",
+        conversation: { id: "conv-1", turnId: "turn-1" },
+      });
+
+      expect(saved).toEqual([
+        {
+          apiKeyId: "key-bound",
+          binding: { projectId: "project-1", conversationId: "conv-1", turnId: "turn-1" },
+          ttlSeconds: 6 * 60 * 60,
+        },
+      ]);
+    });
+  });
+});

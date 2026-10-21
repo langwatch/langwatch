@@ -477,7 +477,7 @@ interface Response {
 
 #### `POST /api/connect/v1/license/activate` · `redeemActivationCode`
 
-Authenticated: a self-hosted install presents its license token or activation code as the bearer; the door verifies it and no permission names a licence holder. Credential `licence_token`. Hidden from the OpenAPI document. Declared at `src/transport/connect-host.rest.ts:63`.
+Authenticated: a self-hosted install presents its license token or activation code as the bearer; the door verifies it and no permission names a licence holder. Credential `licence_token`. Hidden from the OpenAPI document. Declared at `src/transport/connect-host.rest.ts:64`.
 
 Answers at `/api/connect/v1/license/activate`.
 

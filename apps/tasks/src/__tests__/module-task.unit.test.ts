@@ -34,6 +34,7 @@ vi.mock("@langwatch/process", async (importOriginal) => {
     withSecrets: () => preamble,
     withHealthPort: () => preamble,
     withProcessOwnership: () => preamble,
+    withIdIndexRetention: () => preamble,
     start: async () => server,
   };
   return { ...actual, processConfig: () => [], Server: { create: () => preamble } };
