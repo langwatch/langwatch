@@ -55,7 +55,8 @@ without exact results.
 ## Consequences
 
 Scores, score intervals and per-variant cost and duration intervals are identical to
-what they were. Pairwise cost and duration intervals move by Monte Carlo noise (median
+what they were on the same machine, and within 1e-9 across platforms (`Math.log` and
+`Math.exp` round the last digit differently on arm64 and x86). Pairwise cost and duration intervals move by Monte Carlo noise (median
 3% of the interval's width per bound, the same as changing the seed), and a pair's
 interval still depends only on its own values, never on which other variants are in
 the run.
