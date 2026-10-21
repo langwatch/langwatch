@@ -548,6 +548,32 @@ A `Criteria` matches on `ScopeName` (the `InstrumentationScope.Name`) and/or `Sp
 Multiple filters use AND semantics (a span must pass all). Within a `Criteria`, matchers use OR semantics (a span matches if any matcher matches); multiple fields in a `Criteria` use AND.
 </Note>
 
+## Braids: signed calls
+
+A braid can require that the calling project really made a call. The calling service signs the
+baggage entries it names with one of its project's signing keys; the called service copies those
+entries and the signature onto its spans, and LangWatch checks the signature at ingest.
+
+```go
+// Calling side, inside an active span: the signature covers the current trace.
+ctx, err := langwatch.SignBaggage(ctx, os.Getenv("LANGWATCH_SIGNING_KEY"), map[string]string{
+	"orchestrator": "web",
+})
+
+// Called side: add the copy processor to your tracer provider.
+braids, err := langwatch.NewBraidBaggageSpanProcessor("orchestrator")
+tp := sdktrace.NewTracerProvider(
+	sdktrace.WithSpanProcessor(braids),
+	sdktrace.WithBatcher(exporter),
+)
+```
+
+Your propagator must carry W3C baggage, for example
+`propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{})`.
+Signing returns a `*langwatch.BraidSigningError` whose `Code` is `malformed_signing_key`,
+`empty_entries`, `invalid_entry_key` (keys match `[A-Za-z0-9._-]{1,128}`), `invalid_entry_value`
+or `no_active_trace`.
+
 ## LangWatch Span Types
 
 `SpanType` is a string constant used with `span.SetType()` to categorize spans in LangWatch for specialized UI treatment and analytics.

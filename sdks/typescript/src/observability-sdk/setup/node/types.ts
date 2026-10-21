@@ -16,6 +16,7 @@ import {
 } from "@opentelemetry/sdk-trace-base";
 
 import { type Logger } from "../../../logger";
+import { type BraidOptions } from "../../braids";
 import { type DataCaptureOptions } from "../../features/data-capture/types";
 import { type SemConvAttributes } from "../../semconv";
 
@@ -88,6 +89,12 @@ export interface SetupObservabilityOptions {
    * or processing logic.
    */
   spanProcessors?: SpanProcessor[];
+
+  /**
+   * Called side of a braid's signed calls (ADR-183): copies these baggage
+   * entries, and `langwatch.signature`, onto every span this service starts.
+   */
+  braids?: BraidOptions;
 
   /**
    * OTLP protocol this process exports spans with (default "http"). "grpc"
