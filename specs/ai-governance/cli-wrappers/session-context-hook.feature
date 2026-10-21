@@ -5,7 +5,7 @@
 #   sdks/typescript/src/cli/commands/ingestion/hook-input.ts           (the payload the agent writes to its stdin)
 #   sdks/typescript/src/cli/commands/ingestion/end-process.ts          (ends the hook process inside its time budget)
 #   sdks/typescript/src/cli/commands/ingestion/git-context.ts          (what git says about the session's directory)
-#   sdks/typescript/src/cli/commands/ingestion/hook-state.ts           (the per-session fingerprint store)
+#   sdks/typescript/src/cli/utils/governance/hook-state.ts             (the per-session fingerprint store)
 #   sdks/typescript/src/cli/commands/ingestion/install.ts              (each tool's seam wired at install)
 #   sdks/typescript/src/cli/utils/governance/session-context-hooks.ts  (the Claude Code, Codex and Copilot hook files)
 #   sdks/typescript/src/cli/utils/governance/shell-rc.ts               (the wrapper's persist offer, which writes the Copilot hook file)
@@ -179,6 +179,12 @@ Rule: The hook reports the git identity of the session
     Given a session id already reported for one agent
     When another agent reports the same session id
     Then the second agent posts rather than reading the first one's fingerprint
+
+  @unit
+  Scenario: An isolated CLI config keeps its own session fingerprints
+    Given LANGWATCH_CLI_CONFIG names a config outside the home directory
+    When the hook records a session's fingerprint
+    Then the fingerprint is kept beside that config, not under the home directory
 
 Rule: The session's own name travels with its context
 
