@@ -51,24 +51,25 @@ helm install lw ./charts/langwatch -n langwatch --create-namespace \
 
 All overlays live in `examples/overlays/`:
 
-| Overlay                        | Description                                                                     |
-| ------------------------------ | ------------------------------------------------------------------------------- |
-| **Size** (pick one)            |                                                                                 |
-| `size-minimal`                 | CI smoke test — absolute minimum resources                                      |
-| `size-dev`                     | Local dev / small team                                                          |
-| `size-prod`                    | Production — single-node ClickHouse, 2 app/worker replicas                      |
-| `size-ha`                      | HA production — 3-node replicated ClickHouse, 3 app/worker replicas             |
-| **Access** (pick one)          |                                                                                 |
-| `access-nodeport`              | Kind: NodePort 30560 → http://localhost:30560                                   |
-| `access-ingress`               | Cloud: Ingress + TLS (nginx class)                                              |
-| **Infrastructure** (stack any) |                                                                                 |
-| `local-images`                 | `pullPolicy: Never` for Kind / minikube                                         |
-| `clickhouse-external`          | Use an external ClickHouse instance                                             |
-| `clickhouse-replicated`        | Upgrade chart-managed ClickHouse to 3-node                                      |
-| `postgres-external`            | External PostgreSQL (RDS, Cloud SQL)                                            |
-| `redis-external`               | External Redis (ElastiCache, Memorystore)                                       |
-| `cold-storage-s3`              | S3 cold storage tiering + backups                                               |
-| `strict-admission`             | Toggles for Pod Security Admission `restricted` / Gatekeeper / Kyverno clusters |
+| Overlay                        | Description                                                                                                                                              |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Size** (pick one)            |                                                                                                                                                          |
+| `size-minimal`                 | CI smoke test — absolute minimum resources                                                                                                               |
+| `size-dev`                     | Local dev / small team                                                                                                                                   |
+| `size-prod`                    | Production — single-node ClickHouse, 2 app/worker replicas                                                                                               |
+| `size-ha`                      | HA production — 3-node replicated ClickHouse, 3 app/worker replicas                                                                                      |
+| **Access** (pick one)          |                                                                                                                                                          |
+| `access-nodeport`              | Kind: NodePort 30560 → http://localhost:30560                                                                                                            |
+| `access-ingress`               | Cloud: Ingress + TLS (nginx class)                                                                                                                       |
+| **Infrastructure** (stack any) |                                                                                                                                                          |
+| `local-images`                 | `pullPolicy: Never` for Kind / minikube                                                                                                                  |
+| `clickhouse-external`          | Use an external ClickHouse instance                                                                                                                      |
+| `clickhouse-replicated`        | Upgrade chart-managed ClickHouse to 3-node                                                                                                               |
+| `postgres-external`            | External PostgreSQL (RDS, Cloud SQL)                                                                                                                     |
+| `redis-external`               | External Redis (ElastiCache, Memorystore)                                                                                                                |
+| `redis-valkey`                 | Valkey 9.1 as the chart-managed Redis; fresh installs only (an existing release starts with an empty redis-data volume, losing queued jobs and sessions) |
+| `cold-storage-s3`              | S3 cold storage tiering + backups                                                                                                                        |
+| `strict-admission`             | Toggles for Pod Security Admission `restricted` / Gatekeeper / Kyverno clusters                                                                          |
 
 > **Sizing notes.** The Node app and workers need roughly **2Gi to boot** (they cold-load the TS server through tsx); the `size-minimal` and `size-dev` overlays account for this, so don't trim app/worker memory below ~2Gi or they OOM at startup. **ClickHouse memory scales with ingest volume** - the chart-managed defaults in `size-minimal`/`size-dev` (1-2Gi) are for light/local use; raise `clickhouse.memory` (and `cpu`) before pushing real trace throughput, or a large ingest burst will OOM it.
 
@@ -988,9 +989,9 @@ npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 | `redis.external.architecture`                  | Redis architecture for external mode.                                                                                                                                                                    | `standalone`   |
 | `redis.external.connectionString.value`        | Redis connection string URL.                                                                                                                                                                             | `""`           |
 | `redis.external.connectionString.secretKeyRef` | Secret ref for connection string.                                                                                                                                                                        | `{}`           |
-| `redis.image`                                  | Redis container image.                                                                                                                                                                                   |                |
-| `redis.image.repository`                       | Image repository.                                                                                                                                                                                        | `redis`        |
-| `redis.image.tag`                              | Image tag.                                                                                                                                                                                               | `"8.0"`        |
+| `redis.image`                                  | Redis container image. Valkey 9.1 via examples/overlays/redis-valkey.yaml.                                                                                                                               |                |
+| `redis.image.repository`                       | Image repository (valkey/valkey for Valkey).                                                                                                                                                             | `redis`        |
+| `redis.image.tag`                              | Image tag ("9.1" with valkey/valkey).                                                                                                                                                                    | `"8.0"`        |
 | `redis.image.pullPolicy`                       | Image pull policy.                                                                                                                                                                                       | `IfNotPresent` |
 | `redis.auth.enabled`                           | Enable Redis AUTH.                                                                                                                                                                                       | `true`         |
 | `redis.auth.password`                          | Redis password (autogenerated if empty when chart-managed).                                                                                                                                              | `""`           |
