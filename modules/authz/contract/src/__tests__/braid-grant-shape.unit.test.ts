@@ -5,7 +5,7 @@
 import { BRAID_CONDITION_COMPILER_VERSION } from "@langwatch/authorization";
 import { describe, expect, it } from "vitest";
 
-import { grantAttachedPayloadSchema } from "../authz-grant.events.ts";
+import { GRANT_EVENT_SOURCES, grantAttachedPayloadSchema } from "../authz-grant.events.ts";
 
 const COMPILED = {
   version: BRAID_CONDITION_COMPILER_VERSION,
@@ -64,6 +64,18 @@ describe("the shared grant shape", () => {
 
       expect(attach(read).success).toBe(true);
       expect(attach({ source: "aggregate-reconciler" }).success).toBe(false);
+    });
+
+    it("refuses a span condition from every other source, so only the braid routes make a braid", () => {
+      const span = { type: "span", from: "2026-10-01T00:00:00.000Z" };
+      const sources = GRANT_EVENT_SOURCES.filter((source) => source !== "braid");
+
+      expect(sources.length).toBeGreaterThan(0);
+      for (const source of sources) {
+        expect(attach({ source, condition: span }).success).toBe(false);
+        expect(attach({ source, condition: { ...span, type: "trace" } }).success).toBe(true);
+      }
+      expect(attach({ condition: span }).success).toBe(true);
     });
   });
 

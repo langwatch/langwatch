@@ -23,6 +23,8 @@ import {
   type AuthzChangeBraidInput,
   type AuthzCreateBraidInput,
   type AuthzListBraidsInput,
+  type AuthzOrganizationBraids,
+  type AuthzOrganizationInput,
   type AuthzPrincipalRef,
   type AuthzProjectBraids,
   type AuthzRemoveBraidInput,
@@ -79,6 +81,14 @@ export class AuthzBraidService {
       intoOtherProjects: braids.filter((braid) => braid.ownerProjectId === projectId),
       fromOtherProjects: braids.filter((braid) => braid.readerProjectId === projectId),
     };
+  }
+
+  /** Every live braid in the organisation, for its admins (ADR-183 §2). */
+  async listOrganizationBraids({
+    organizationId,
+  }: AuthzOrganizationInput): Promise<AuthzOrganizationBraids> {
+    const rows = await this.deps.reads.findBraids({ organizationId });
+    return rows.map(braidOf);
   }
 
   async createBraid(input: AuthzCreateBraidInput): Promise<AuthzBraid> {

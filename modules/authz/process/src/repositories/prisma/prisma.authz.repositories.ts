@@ -12,6 +12,7 @@ import { PrismaAuthzLedgerReadRepository } from "./prisma.authz-ledger-read.repo
 import { PrismaAuthzManagedGrantRepository } from "./prisma.authz-managed-grant.repository.ts";
 import { PrismaAuthzMembershipStampRepository } from "./prisma.authz-membership-stamp.repository.ts";
 import { PrismaAuthzMigrationRepository } from "./prisma.authz-migration.repository.ts";
+import { PrismaAuthzOrganizationPolicyRepository } from "./prisma.authz-organization-policy.repository.ts";
 import { PrismaAuthzProjectionRepository } from "./prisma.authz-projection.repository.ts";
 import { PrismaAuthzRevocationRepository } from "./prisma.authz-revocation.repository.ts";
 import { PrismaAuthzUserStandingRepository } from "./prisma.authz-user-standing.repository.ts";
@@ -43,6 +44,7 @@ export class PostgresAuthzRepositories {
       migration: PrismaAuthzMigrationRepository.create(prisma),
       ledgerReads: PrismaAuthzLedgerReadRepository.create({ prisma }),
       braidLocks: PrismaAuthzBraidLockRepository.create({ prisma }),
+      organizationPolicies: PrismaAuthzOrganizationPolicyRepository.create({ database: prisma }),
     };
   }
 }

@@ -135,11 +135,14 @@ export const grantShapeRefinement = {
     );
   },
   message:
-    "a RESOURCE grant carries resource terms and a null roleKey, every other scope carries a roleKey and no resource terms; a RESOURCE grant states its expiry inside those terms and never as the grant's own `expiresAtMs`; `anyone` principals exist only at RESOURCE scope, a `project` principal exists at RESOURCE scope, as its own project's credential (a PROJECT scope whose id is the principal's), or as a `project-reader` on another project's PROJECT scope carrying a condition with an empty where, or, from a braid, a span condition whose where carries its compiled form; only that shared read carries a condition or the `project-reader` role, and a braid is only that shared span read",
+    "a RESOURCE grant carries resource terms and a null roleKey, every other scope carries a roleKey and no resource terms; a RESOURCE grant states its expiry inside those terms and never as the grant's own `expiresAtMs`; `anyone` principals exist only at RESOURCE scope, a `project` principal exists at RESOURCE scope, as its own project's credential (a PROJECT scope whose id is the principal's), or as a `project-reader` on another project's PROJECT scope carrying a non-span condition with an empty where, or, from a braid alone, a span condition whose where carries its compiled form; only that shared read carries a condition or the `project-reader` role, and a braid is only that shared span read",
   path: ["resource"] as const,
 };
 
-/** A braid's span condition may carry a where with its compiled form; any other has neither. */
+/**
+ * Only a braid writes a span condition, so no other writer makes a braid without the braid
+ * routes' checks; it may carry a where with its compiled form. Any other has neither.
+ */
 function sharedConditionIsLegal({
   condition,
   source,
@@ -149,7 +152,9 @@ function sharedConditionIsLegal({
 }): boolean {
   const hasWhere = condition.where !== undefined && condition.where !== "";
   const hasCompiledWhere = condition.compiledWhere !== undefined;
-  if (source !== GRANT_SOURCE_BRAID) return !hasWhere && !hasCompiledWhere;
+  if (source !== GRANT_SOURCE_BRAID) {
+    return condition.type !== "span" && !hasWhere && !hasCompiledWhere;
+  }
   if (condition.type !== "span") return false;
 
   return hasWhere === hasCompiledWhere;

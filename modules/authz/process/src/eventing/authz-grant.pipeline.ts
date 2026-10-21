@@ -25,6 +25,7 @@ import {
 import type { AuthzModule } from "../app/authz.app.ts";
 import type { AuthzAuditTrailRepository } from "../repositories/authz-audit-trail.repository.ts";
 import type { AuthzGrantProjectionRepository } from "../repositories/authz-grant-projection.repository.ts";
+import type { AuthzLedgerReadRepository } from "../repositories/authz-ledger-read.repository.ts";
 import type { AuthzRepositories } from "../repositories/authz.repositories.ts";
 import { isEngineMigrationStep } from "../rules/authz-engine-switch.rules.ts";
 import type { AuthzCutoverGateService } from "../services/authz-cutover-gate.service.ts";
@@ -52,6 +53,8 @@ export const AUTHZ_GRANT_PIPELINE_NAME = "authz_grant" as const;
 interface EventingAuthzAdapterOptions {
   authzGrantsWriteStore: AuthzGrantProjectionRepository;
   authzAuditTrailStore: AuthzAuditTrailRepository;
+  /** Lets a revoked braid's audit entry name both projects and the condition (ADR-183 §2). */
+  authzBraidReads?: Pick<AuthzLedgerReadRepository, "findBraids">;
   /** Absent on the consumer-only twin, which bumps no session version. */
   sessionVersions?: AuthzSessionVersionService;
   /** Absent on the consumer-only twin, which keeps no user standing. */
@@ -75,6 +78,7 @@ const buildAuthzGrantPipeline = (options: EventingAuthzAdapterOptions) => {
       "auditTrail",
       EventingAuthzAuditAdapter.create({
         store: options.authzAuditTrailStore,
+        ...(options.authzBraidReads ? { braids: options.authzBraidReads } : {}),
       }),
     )
     // One grant per lane via serializeByAggregate: prevents same-grant

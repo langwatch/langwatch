@@ -102,7 +102,7 @@ Feature: Braids
       Then the braid is live
       And tom is named as its creator
 
-    @unit @unimplemented
+    @unit
     Scenario: A team admin may braid out of every project in that team and no other
       Given tom is an admin of the team holding "specialists" and "billing"
       When tom's permissions are read
@@ -115,7 +115,7 @@ Feature: Braids
       When tom asks to braid "specialists" into "orchestrator"
       Then the braid is refused as a permission denial before anything is read or written
 
-    @unit @unimplemented
+    @unit
     Scenario: A custom role listing braids:manage braids only where it is bound
       Given rui holds a custom role listing braids:manage and traces:view, bound to "specialists" alone
       And rui can read "orchestrator" traces
@@ -146,7 +146,7 @@ Feature: Braids
 
   Rule: An organisation can keep braids to its admins
 
-    @unit @unimplemented
+    @unit
     Scenario: Project admins may braid until the organisation keeps braids to its admins
       Given an organisation that has never changed who may braid
       And tom is an admin of the team holding "specialists"

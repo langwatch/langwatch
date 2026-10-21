@@ -198,6 +198,21 @@ export interface AuthzApi {
   changeBraid(args: Braids.AuthzChangeBraidInput): Promise<Braids.AuthzBraid>;
   /** Revokes a braid touching `projectId` with reason `braid_removed`. */
   removeBraid(args: Braids.AuthzRemoveBraidInput): Promise<Braids.AuthzBraidRemoved>;
+  /**
+   * ADR-183 §8: one `braided_spans.viewed` audit row per actor, reader and owner per five
+   * minutes, naming the braids and never a span. Never fails the read that calls it.
+   */
+  recordBraidedSpansView(args: Braids.AuthzRecordBraidedSpansViewInput): Promise<void>;
+  /** The organisation's authz settings; one with no stored row has every setting off. */
+  getOrganizationPolicy(
+    args: Braids.AuthzOrganizationInput,
+  ): Promise<Braids.AuthzOrganizationPolicy>;
+  /** Keeps braids to organisation admins or opens them again; audited, and bumps the epoch. */
+  setBraidsPolicy(args: Braids.AuthzSetBraidsPolicyInput): Promise<Braids.AuthzOrganizationPolicy>;
+  /** Every live braid in the organisation. */
+  listOrganizationBraids(
+    args: Braids.AuthzOrganizationInput,
+  ): Promise<Braids.AuthzOrganizationBraids>;
   changeBindingRole(
     args: Commands.AuthzChangeBindingRoleInput,
   ): Promise<Commands.AuthzChangeBindingRoleOutput>;

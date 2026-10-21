@@ -10,6 +10,10 @@ import {
   authzChangeBraidInputSchema,
   authzCreateBraidInputSchema,
   authzListBraidsInputSchema,
+  authzOrganizationBraidsSchema,
+  authzOrganizationInputSchema,
+  authzOrganizationPolicySchema,
+  authzSetBraidsPolicyInputSchema,
   authzProjectBraidsSchema,
   authzRemoveBraidInputSchema,
   authzBindingMutationSuccessSchema,
@@ -82,6 +86,18 @@ export const authzTrpc = defineTrpcContract("authz")
   .mutation("removeBraid")
   .withInput(authzRemoveBraidInputSchema.omit(IMPLIED_BY_SESSION))
   .withOutput(authzBraidRemovedSchema)
+
+  .query("getBraidsPolicy")
+  .withInput(authzOrganizationInputSchema)
+  .withOutput(authzOrganizationPolicySchema)
+
+  .mutation("setBraidsPolicy")
+  .withInput(authzSetBraidsPolicyInputSchema.omit({ actor: true }))
+  .withOutput(authzOrganizationPolicySchema)
+
+  .query("listOrganizationBraids")
+  .withInput(authzOrganizationInputSchema)
+  .withOutput(authzOrganizationBraidsSchema)
   .build();
 
 /** The session as the escalation ceiling: a person, or the key a CLI session arrived on. */
@@ -185,4 +201,22 @@ export const authzTrpcTransport: TrpcRouterDeclaration<AuthzApi, typeof authzTrp
     .handle(async ({ app, input, actor }) =>
       app.removeBraid({ ...input, caller: callerOf(actor), actor: toLedgerActor(actor) }),
     )
+
+    /** Any member reads whether project admins may braid (ADR-183 §2). */
+    .procedure("getBraidsPolicy")
+    .withPermission("organization:view")
+    .handle(async ({ app, input }) => app.getOrganizationPolicy(input))
+
+    /** Keeping braids to organisation admins is theirs alone, and Enterprise. */
+    .procedure("setBraidsPolicy")
+    .withEntitlement("enterprise", braids)
+    .withPermission("organization:manage")
+    .handle(async ({ app, input, actor }) =>
+      app.setBraidsPolicy({ ...input, actor: toLedgerActor(actor) }),
+    )
+
+    /** The organisation's Braids screen: every live braid, for its admins on any plan. */
+    .procedure("listOrganizationBraids")
+    .withPermission("organization:manage")
+    .handle(async ({ app, input }) => app.listOrganizationBraids(input))
     .build();

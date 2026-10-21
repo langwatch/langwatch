@@ -1,4 +1,4 @@
-import { ledgerActorSchema } from "@langwatch/authorization";
+import { actorSchema, ledgerActorSchema } from "@langwatch/authorization";
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
@@ -108,3 +108,71 @@ const authzBraidRemovedSchemaDefinition = z.object({ braidId: z.string().min(1) 
 export interface AuthzBraidRemovedSchema extends Named<typeof authzBraidRemovedSchemaDefinition> {}
 export const authzBraidRemovedSchema: AuthzBraidRemovedSchema = authzBraidRemovedSchemaDefinition;
 export type AuthzBraidRemoved = z.infer<typeof authzBraidRemovedSchema>;
+
+/** ADR-183 §8: who read which reader's traces holding spans braided from which owners. */
+const authzRecordBraidedSpansViewInputSchemaDefinition = z
+  .object({
+    actor: actorSchema,
+    readerProjectId: z.string().min(1),
+    /** The owners whose braided spans the read showed; the reader itself is ignored. */
+    ownerProjectIds: z.array(z.string().min(1)),
+  })
+  .strict();
+export interface AuthzRecordBraidedSpansViewInputSchema extends Named<
+  typeof authzRecordBraidedSpansViewInputSchemaDefinition
+> {}
+export const authzRecordBraidedSpansViewInputSchema: AuthzRecordBraidedSpansViewInputSchema =
+  authzRecordBraidedSpansViewInputSchemaDefinition;
+export type AuthzRecordBraidedSpansViewInput = z.infer<
+  typeof authzRecordBraidedSpansViewInputSchema
+>;
+
+const organizationShape = { organizationId: z.string().min(1) };
+
+/** ADR-183 §2: an organisation's authz settings; one that never changed them has every one off. */
+const authzOrganizationPolicySchemaDefinition = z
+  .object({
+    ...organizationShape,
+    /** While on, only organisation-wide bindings confer `braids:manage`. */
+    braidsOrganizationAdminsOnly: z.boolean(),
+    updatedByUserId: z.string().nullable(),
+    updatedAtMs: z.number().int().nullable(),
+  })
+  .strict();
+export interface AuthzOrganizationPolicySchema extends Named<
+  typeof authzOrganizationPolicySchemaDefinition
+> {}
+export const authzOrganizationPolicySchema: AuthzOrganizationPolicySchema =
+  authzOrganizationPolicySchemaDefinition;
+export type AuthzOrganizationPolicy = z.infer<typeof authzOrganizationPolicySchema>;
+
+const authzOrganizationInputSchemaDefinition = z.object(organizationShape).strict();
+export interface AuthzOrganizationInputSchema extends Named<
+  typeof authzOrganizationInputSchemaDefinition
+> {}
+export const authzOrganizationInputSchema: AuthzOrganizationInputSchema =
+  authzOrganizationInputSchemaDefinition;
+export type AuthzOrganizationInput = z.infer<typeof authzOrganizationInputSchema>;
+
+const authzSetBraidsPolicyInputSchemaDefinition = z
+  .object({
+    ...organizationShape,
+    braidsOrganizationAdminsOnly: z.boolean(),
+    actor: ledgerActorSchema,
+  })
+  .strict();
+export interface AuthzSetBraidsPolicyInputSchema extends Named<
+  typeof authzSetBraidsPolicyInputSchemaDefinition
+> {}
+export const authzSetBraidsPolicyInputSchema: AuthzSetBraidsPolicyInputSchema =
+  authzSetBraidsPolicyInputSchemaDefinition;
+export type AuthzSetBraidsPolicyInput = z.infer<typeof authzSetBraidsPolicyInputSchema>;
+
+/** Every live braid in an organisation, for its admins' Braids screen. */
+const authzOrganizationBraidsSchemaDefinition = z.array(authzBraidSchema);
+export interface AuthzOrganizationBraidsSchema extends Named<
+  typeof authzOrganizationBraidsSchemaDefinition
+> {}
+export const authzOrganizationBraidsSchema: AuthzOrganizationBraidsSchema =
+  authzOrganizationBraidsSchemaDefinition;
+export type AuthzOrganizationBraids = z.infer<typeof authzOrganizationBraidsSchema>;

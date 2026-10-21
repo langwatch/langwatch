@@ -15,6 +15,7 @@ import {
   type AuthzAuditTrailRepository,
   type AuthzAuditRow,
 } from "../repositories/authz-audit-trail.repository.ts";
+import type { AuthzLedgerReadRepository } from "../repositories/authz-ledger-read.repository.ts";
 import type { AuthzGrantsEvent } from "./authz-grant.events.ts";
 
 const AUTHZ_AUDIT_ACTION_PREFIX = "authz.grants." as const;
@@ -58,6 +59,7 @@ const AUDIT_METADATA_FIELDS: Record<AuditableEventType, readonly string[]> = {
     "source",
     "legacyRole",
     "condition",
+    "replacesGrantId",
   ],
   [GRANT_ROLE_CHANGED_EVENT_TYPE]: ["grantId", "from", "to"],
   [GRANT_REVOKED_EVENT_TYPE]: ["grantId", "selector", "reason"],
@@ -135,18 +137,47 @@ function metadata(event: AuthzGrantsEvent): Record<string, unknown> {
   return metadata;
 }
 
+type BraidReads = Pick<AuthzLedgerReadRepository, "findBraids">;
+
 interface EventingAuthzAuditAdapterOptions {
   store: AuthzAuditTrailRepository;
+  /** ADR-183 §2: a revoked braid's projects and condition, read from authz's own projection. */
+  braids?: BraidReads;
+}
+
+/** A revoke names only the grant; a braid's entry also names both projects and the condition. */
+async function revokedBraidTerms({
+  event,
+  braids,
+}: {
+  event: AuthzGrantsEvent;
+  braids: BraidReads | undefined;
+}): Promise<Record<string, unknown>> {
+  if (event.type !== GRANT_REVOKED_EVENT_TYPE || !braids) return {};
+  const [braid] = await braids.findBraids({
+    organizationId: event.tenantId,
+    grantId: event.data.grantId,
+    includeRevoked: true,
+  });
+  if (!braid) return {};
+  return {
+    principal: { type: "project", id: braid.readerProjectId },
+    scope: { type: "PROJECT", id: braid.ownerProjectId },
+    ...(braid.condition ? { condition: braid.condition } : {}),
+  };
 }
 
 /** Class-backed Eventing subscriber; replay never invokes event subscribers. */
 export class EventingAuthzAuditAdapter {
   readonly events = AUTHZ_AUDIT_EVENT_TYPES;
 
-  private constructor(private readonly store: AuthzAuditTrailRepository) {}
+  private constructor(
+    private readonly store: AuthzAuditTrailRepository,
+    private readonly braids: BraidReads | undefined,
+  ) {}
 
   static create(options: EventingAuthzAuditAdapterOptions): EventingAuthzAuditAdapter {
-    return new EventingAuthzAuditAdapter(options.store);
+    return new EventingAuthzAuditAdapter(options.store, options.braids);
   }
 
   when(event: AuthzGrantsEvent): boolean {
@@ -155,6 +186,8 @@ export class EventingAuthzAuditAdapter {
 
   async handler(event: AuthzGrantsEvent, _context?: TriggerContext<unknown>): Promise<void> {
     if (!isAuditable(event)) return;
-    await this.store.insert(toRow(event));
+    const row = toRow(event);
+    const braid = await revokedBraidTerms({ event, braids: this.braids });
+    await this.store.insert({ ...row, metadata: { ...row.metadata, ...braid } });
   }
 }

@@ -10,6 +10,7 @@ import type { AuthzListingRepository } from "./authz-listing.repository.ts";
 import type { AuthzManagedGrantRepository } from "./authz-managed-grant.repository.ts";
 import type { AuthzMembershipStampRepository } from "./authz-membership-stamp.repository.ts";
 import type { AuthzMigrationRepository } from "./authz-migration.repository.ts";
+import type { AuthzOrganizationPolicyRepository } from "./authz-organization-policy.repository.ts";
 import type { AuthzPlatformGrantRepository } from "./authz-platform-grant.repository.ts";
 import type { AuthzReadRepository } from "./authz-read.repository.ts";
 import type { AuthzRevocationRepository } from "./authz-revocation.repository.ts";
@@ -40,4 +41,6 @@ export interface AuthzRepositories {
   readonly ledgerReads: AuthzLedgerReadRepository;
   /** Serialises braid writes into one reader (ADR-183 §1). */
   readonly braidLocks: AuthzBraidLockRepository;
+  /** An organisation's settings, read into its snapshot (ADR-183 §2). */
+  readonly organizationPolicies: AuthzOrganizationPolicyRepository;
 }
