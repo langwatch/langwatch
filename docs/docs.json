@@ -124,6 +124,7 @@
                   "agent-testing/scenarios",
                   "agent-testing/test-suites",
                   "agent-testing/designing-a-suite",
+                  "agent-testing/build-a-scenario-suite",
                   "agent-testing/evaluators",
                   "agent-testing/run-parameters"
                 ]
