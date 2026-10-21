@@ -25,7 +25,7 @@ import {
 } from "@langwatch/dashboard-contract";
 import type { z } from "zod";
 
-import { viewerOfActor } from "../rules/dashboard-viewer.rules.ts";
+import { authorOfActor, viewerOfActor } from "../rules/dashboard-viewer.rules.ts";
 
 /** The tags every operation in this file carries in the published document. */
 const BOARD_TAGS = ["Analytics / LangWatchQL"];
@@ -153,7 +153,7 @@ export const boardRest = defineRestRouter(DashboardApi)
     const board = await app.createBoard({
       projectId,
       name: input.name,
-      ...(actor?.type === "user" ? { createdById: actor.id } : {}),
+      ...authorOfActor({ actor }),
     });
     const links = await app.getBoardLinks({ projectId, dashboardIds: [board.id] });
 

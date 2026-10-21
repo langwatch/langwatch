@@ -9,3 +9,11 @@ import type { DashboardViewer } from "@langwatch/dashboard-contract";
 export function viewerOfActor({ actor }: { actor: Actor | null }): { viewer?: DashboardViewer } {
   return actor?.type === "user" ? { viewer: { userId: actor.id } } : {};
 }
+
+/**
+ * Who a REST call authors a board as: the person behind the actor, as for `viewerOfActor`. A key
+ * that names nobody authors nothing, so the board is left without a creator.
+ */
+export function authorOfActor({ actor }: { actor: Actor | null }): { createdById?: string } {
+  return actor?.type === "user" ? { createdById: actor.id } : {};
+}

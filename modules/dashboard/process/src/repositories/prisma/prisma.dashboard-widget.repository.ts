@@ -84,7 +84,7 @@ export class PrismaDashboardWidgetRepository
   /**
    * Saves a new widget below the lowest row it would collide with; row
    * computation and write share one transaction so concurrent creates can't race.
-   * @throws {DashboardWidgetNotFoundError} when `dashboardId` names no dashboard here (IDOR).
+   * @throws {DashboardNotFoundError} when `dashboardId` names no dashboard here (IDOR).
    */
   async createWidget({
     id,
@@ -101,7 +101,7 @@ export class PrismaDashboardWidgetRepository
   }): Promise<DashboardWidgetRow> {
     const row = await this.transaction(async (tx) => {
       if (dashboardId !== undefined && !(await ownsBoard(tx, { dashboardId, projectId }))) {
-        throw new DashboardWidgetNotFoundError();
+        throw new DashboardNotFoundError(projectId);
       }
 
       // Scoped to the placement target: a card on another dashboard must not push this one
