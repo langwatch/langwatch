@@ -5,6 +5,7 @@
  */
 import { z } from "zod";
 
+import { braidConditionDigest, compiledWhereSchema } from "./braid-condition.ts";
 import type { AuthzPermission } from "./registry.ts";
 import { SYSTEM_ACTORS, type SystemActorName } from "./system-actors.ts";
 
@@ -40,17 +41,29 @@ const actorSchema = z.discriminatedUnion("type", [
     .strict(),
 ]);
 
-/** The window a shared grant opens. `from` and `until` are epoch
- *  milliseconds; `until` null means open-ended. `where` is an OTTL slot
- *  that nothing compiles in v1, so a minter must not copy a non-empty one. */
+/** The window a shared grant opens. `from` and `until` are epoch milliseconds; `until` null
+ *  means open-ended. Only a `span` condition (a braid, ADR-183 §3) carries `compiledWhere`, and
+ *  one with a non-empty `where` must, so no condition reaches a fence it cannot apply. */
 export const authorizationConditionSchema = z
   .object({
     type: z.enum(AUTHORIZATION_CONDITION_TYPES),
     where: z.string().optional(),
+    compiledWhere: compiledWhereSchema.optional(),
     from: z.number().int(),
     until: z.number().int().nullable(),
   })
-  .strict();
+  .strict()
+  .refine((condition) => condition.compiledWhere === undefined || condition.type === "span", {
+    message: "only a span condition carries a compiled where",
+    path: ["compiledWhere"],
+  })
+  .refine(
+    (condition) =>
+      condition.type !== "span" ||
+      (condition.where ?? "").trim() === "" ||
+      condition.compiledWhere !== undefined,
+    { message: "a span condition with a where carries its compiled form", path: ["compiledWhere"] },
+  );
 export type AuthorizationCondition = z.infer<typeof authorizationConditionSchema>;
 
 /**
@@ -61,6 +74,7 @@ export type AuthorizationCondition = z.infer<typeof authorizationConditionSchema
 export const grantConditionSchema = z.object({
   type: z.enum(AUTHORIZATION_CONDITION_TYPES),
   where: z.string().optional(),
+  compiledWhere: compiledWhereSchema.optional(),
   from: z.string().datetime({ offset: true }).optional(),
   until: z.string().datetime({ offset: true }).optional(),
 });
@@ -161,10 +175,24 @@ export function isSealedAuthorization(value: unknown): value is Authorization {
   return typeof value === "object" && value !== null && sealed.has(value);
 }
 
+/** A braid (ADR-183 §1): a shared grant whose window opens span reads alone, never trace reads. */
+export function isSpanBraidGrant(grant: AuthorizationGrant): boolean {
+  return grant.kind === "shared" && grant.condition?.type === "span";
+}
+
+/** Whether a proof is narrowed to one of its own projects, where its braids still read. */
+function isNarrowedToOwn(authorization: Authorization): boolean {
+  const { narrowedTo } = authorization;
+  return (
+    narrowedTo !== undefined &&
+    authorization.grants.some((grant) => grant.kind === "own" && grant.projectId === narrowedTo)
+  );
+}
+
 /**
- * The same proof, narrowed to one project its grants name; never widened. It keeps the own grant
- * and that project's, and marks the cut with `narrowedTo`. A project it does not name returns
- * `null`. Only a sealed proof is narrowed; a forged one is refused.
+ * The same proof narrowed to one project its grants name, never widened: the own grant, that
+ * project's, and the braids when it is the own one (ADR-183 §5). A project named by no grant or
+ * by braids alone is `null`, as a braid never opens an owner's trace. A forged proof is refused.
  */
 export function narrowAuthorization({
   authorization,
@@ -176,27 +204,32 @@ export function narrowAuthorization({
   if (!isSealedAuthorization(authorization)) {
     throw new ForgedAuthorizationError();
   }
-  if (!authorization.grants.some((grant) => grant.projectId === projectId)) {
-    return null;
-  }
+  const names = (grant: AuthorizationGrant) =>
+    grant.projectId === projectId && !isSpanBraidGrant(grant);
+  if (!authorization.grants.some(names)) return null;
   if (authorization.narrowedTo === projectId) return authorization;
   if (authorization.narrowedTo !== undefined) return null;
+  const toOwn = authorization.grants.some(
+    (grant) => grant.kind === "own" && grant.projectId === projectId,
+  );
   return sealAuthorization({
     ...authorization,
     grants: authorization.grants.filter(
-      (grant) => grant.kind === "own" || grant.projectId === projectId,
+      (grant) => grant.kind === "own" || names(grant) || (toOwn && isSpanBraidGrant(grant)),
     ),
     narrowedTo: projectId,
   });
 }
 
-/** The projects a proof reads in: its grants under `permission`, cut to `narrowedTo` when set. */
+/** The projects a proof reads in: its grants under `permission` bar braids, cut to `narrowedTo`
+ *  when set. */
 export function projectIdsReadBy(
   authorization: Authorization,
   permission: ProofBearingPermission = "traces:view",
 ): string[] {
   const projects = authorization.grants
     .filter((grant) => grant.permissions.includes(permission))
+    .filter((grant) => grant.kind === "own" || grant.condition?.type === "trace")
     .flatMap((grant) => grant.projectId ?? []);
   const { narrowedTo } = authorization;
   const read = narrowedTo === undefined ? projects : projects.filter((id) => id === narrowedTo);
@@ -238,21 +271,27 @@ export function ownProjectIdReadBy(authorization: Authorization): string {
 }
 
 /** A stable key for the projects and windows a proof reads in under `permission`; an aggregate
- *  and a member never share one. */
+ *  and a member never share one. A braid's window carries its condition's digest (ADR-183 §3). */
 export function readScopeKeyOf(
   authorization: Authorization,
   permission: ProofBearingPermission = "traces:view",
 ): string {
   const { narrowedTo } = authorization;
+  const braidsRead = narrowedTo === undefined || isNarrowedToOwn(authorization);
   return authorization.grants
     .filter((grant) => grant.permissions.includes(permission))
-    .filter((grant) => narrowedTo === undefined || grant.projectId === narrowedTo)
+    .filter(
+      (grant) =>
+        narrowedTo === undefined ||
+        grant.projectId === narrowedTo ||
+        (braidsRead && isSpanBraidGrant(grant)),
+    )
     .flatMap(({ kind, projectId, condition }) => {
       if (projectId === undefined) return [];
       if (kind === "own") return [projectId];
-      return [
-        `${projectId}@${condition?.type ?? ""}:${condition?.from ?? 0}-${condition?.until ?? ""}`,
-      ];
+      const window = `${projectId}@${condition?.type ?? ""}:${condition?.from ?? 0}-${condition?.until ?? ""}`;
+      const compiled = condition?.compiledWhere;
+      return [compiled === undefined ? window : `${window}#${braidConditionDigest(compiled)}`];
     })
     .toSorted()
     .join(",");
