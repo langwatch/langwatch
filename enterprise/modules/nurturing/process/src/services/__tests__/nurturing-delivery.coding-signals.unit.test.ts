@@ -282,6 +282,29 @@ describe("NurturingDeliveryService coding-agent signals", () => {
       ).toHaveLength(1);
     });
 
+    /** @scenario "A member who chose another integration method in onboarding is still identified as coding_agent" */
+    it("identifies a member who chose platform earlier as coding_agent too", async () => {
+      const { delivery, cio } = deliveryOver(new ClockedClaims());
+
+      await deliver(delivery, {
+        kind: "integration_method_chosen",
+        sourceEventId: "choice-1",
+        tenantId: "member-2",
+        occurredAt: T0 - 1_000,
+        userId: "member-2",
+        selection: "via-platform",
+      });
+      await deliver(delivery, { ...firstSession, memberUserIds: ["member-2"] });
+      await settle();
+
+      expect(
+        cio
+          .identifies()
+          .filter((call) => call.userId === "member-2")
+          .map((call) => call.traits),
+      ).toEqual([{ integration_method: "platform" }, { integration_method: "coding_agent" }]);
+    });
+
     it("delivers a redelivered first-session signal once", async () => {
       const { delivery, cio } = deliveryOver(new ClockedClaims());
 

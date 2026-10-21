@@ -56,6 +56,13 @@ Feature: Coding-agent session signals reach Customer.io
     And a member of a second organization is identified once too
 
   @unit
+  Scenario: A member who chose another integration method in onboarding is still identified as coding_agent
+    Given member-2 chose the platform integration method in onboarding
+    And the app keeps no record of that choice, only the event sent to Customer.io
+    When the first-session signal carrying member-2 is delivered
+    Then Customer.io identifies member-2 with integration_method=coding_agent after the earlier platform identify
+
+  @unit
   Scenario: A seeded organization never gets the first-session signal
     Given the organization was learned from project's backfill
     When a session-stored fact says first
