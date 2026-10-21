@@ -52,6 +52,16 @@ function contractCases(backend: DashboardBackend): void {
     });
   });
 
+  describe("when a widget is placed on a board the project does not own", () => {
+    /** @scenario "The memory and Postgres dashboard repositories answer alike" */
+    it("refuses it as a missing board", async () => {
+      const foreign = await board("Theirs", backend.otherProjectId());
+
+      await expect(widget("dash_absent")).rejects.toThrow(DashboardNotFoundError);
+      await expect(widget(foreign.id)).rejects.toThrow(DashboardNotFoundError);
+    });
+  });
+
   describe("when boards are written", () => {
     /** @scenario "AC170 Scope: a new board starts at Project and My dashboard at Only me" */
     it("stores a new board at the scope Project unless one is named", async () => {

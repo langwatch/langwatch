@@ -172,9 +172,13 @@ export const boardRest = defineRestRouter(DashboardApi)
     resource: "board",
     action: "delete",
     idParam: "boardId",
-    name: ({ app, projectId, id }) =>
+    name: ({ app, projectId, id, ownerUserId }) =>
       nameUnlessMissing({
-        read: app.getBoard({ projectId, dashboardId: id }),
+        read: app.getBoard({
+          projectId,
+          dashboardId: id,
+          ...(ownerUserId ? { viewer: { userId: ownerUserId } } : {}),
+        }),
         missing: DashboardNotFoundError,
         nameOf: (board) => board.name,
       }),
