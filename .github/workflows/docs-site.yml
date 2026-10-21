@@ -43,7 +43,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          install: "@langwatch/docs-site..."
+          install: "@langwatch/docs-site... @langwatch/workspace"
       - name: Restore content-addressed docs caches
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -53,6 +53,13 @@ jobs:
             docs-site-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
       - name: Install build browser
         run: pnpm --filter @langwatch/docs-site exec playwright install --with-deps chromium
+      # The typecheck's references reach observability, which imports the built
+      # SDK, so build it first (the workspace root install brings Nx).
+      - uses: ./.github/actions/nx-cache
+        with:
+          suffix: docs-site
+      - name: Build the TypeScript SDK
+        run: pnpm exec nx run langwatch:build --outputStyle=static
       - name: Typecheck the docs app
         run: pnpm --filter @langwatch/docs-site typecheck
       - name: Test docs generation and local routing
