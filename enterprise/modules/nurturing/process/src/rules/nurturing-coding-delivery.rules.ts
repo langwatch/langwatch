@@ -5,7 +5,7 @@ import type {
   NurturingSignalOf,
 } from "@langwatch/enterprise-nurturing-contract";
 
-import { isoOf } from "./nurturing-coding-signals.rules.ts";
+import { isoOf } from "./nurturing-time.rules.ts";
 
 const CODING_AND_APP_KINDS = [
   "coding_session_stored",

@@ -13,9 +13,9 @@ import {
   codingAgentFirstSessionSignal,
   codingAgentTypesSignal,
   codingSessionStoredSignal,
-  utcDayOf,
 } from "../rules/nurturing-coding-signals.rules.ts";
 import { seededAtRead } from "../rules/nurturing-owner-signals.rules.ts";
+import { utcDayOf } from "../rules/nurturing-time.rules.ts";
 
 type Deliver = (signal: NurturingSignal) => Promise<void>;
 type Fact = CodingAgentSessionStoredEventData;

@@ -38,8 +38,8 @@ Feature: Coding-agent session signals reach Customer.io
     Then the first-session signal carries every active member of the organization
 
   @unit
-  Scenario: A failed delivery is not lost when the fact is redelivered
-    Given delivering a signal fails once
+  Scenario: A delivery that fails before it is claimed is not lost when the fact is redelivered
+    Given delivering a signal fails once, before the delivery claim is taken
     When the same session-stored fact is delivered again
     Then the signal is sent exactly once
 
@@ -54,6 +54,13 @@ Feature: Coding-agent session signals reach Customer.io
     When the first-session signal is delivered, then delivered again
     Then Customer.io identifies integration_method=coding_agent for each member once
     And a member of a second organization is identified once too
+    # Known limit: the member list is read once, so a member who joins later is not identified.
+
+  @unit
+  Scenario: A member claim that fails never strands a member already claimed
+    Given the claim for the second member throws
+    When the first-session signal carrying two members is delivered
+    Then the first member is still identified with integration_method=coding_agent
 
   @unit
   Scenario: A member who chose another integration method in onboarding is still identified as coding_agent

@@ -305,6 +305,29 @@ describe("NurturingDeliveryService coding-agent signals", () => {
       ).toEqual([{ integration_method: "platform" }, { integration_method: "coding_agent" }]);
     });
 
+    /** @scenario "A member claim that fails never strands a member already claimed" */
+    it("still identifies the first member when the second member's claim throws", async () => {
+      const claims = new ClockedClaims();
+      const claim = claims.claim.bind(claims);
+      claims.claim = async (key, ttlSeconds) => {
+        if (key.endsWith(":member-3")) throw new Error("redis down");
+        return claim(key, ttlSeconds);
+      };
+      const { delivery, cio } = deliveryOver(claims);
+
+      await expect(
+        deliver(delivery, { ...firstSession, memberUserIds: ["member-2", "member-3"] }),
+      ).rejects.toThrow("redis down");
+      await settle();
+
+      expect(
+        cio
+          .identifies()
+          .filter((call) => "integration_method" in (call.traits as object))
+          .map((call) => call.userId),
+      ).toEqual(["member-2"]);
+    });
+
     it("delivers a redelivered first-session signal once", async () => {
       const { delivery, cio } = deliveryOver(new ClockedClaims());
 

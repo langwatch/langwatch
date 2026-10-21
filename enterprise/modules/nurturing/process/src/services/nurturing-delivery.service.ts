@@ -13,7 +13,6 @@ import type { PostHogChannel } from "../channels/posthog.channel.ts";
 import type { NurturingClaimRepository } from "../repositories/nurturing-claim.repository.ts";
 import { fire as fireActivity } from "../rules/nurturing-activity-tracking-service.rules.ts";
 import { fireCodingOrApp, isCodingOrAppSignal } from "../rules/nurturing-coding-delivery.rules.ts";
-import { isoOf } from "../rules/nurturing-coding-signals.rules.ts";
 import { pickCustomerIoDebounce } from "../rules/nurturing-delivery-debounce.rules.ts";
 import {
   fireExperimentRan,
@@ -51,6 +50,7 @@ import {
   fireSubscriptionStarted,
   fireSubscriptionSync,
 } from "../rules/nurturing-subscription-sync-service.rules.ts";
+import { isoOf } from "../rules/nurturing-time.rules.ts";
 import type { NurturingService } from "./nurturing.service.ts";
 
 const nurturingLogger = createLogger("langwatch:nurturing");
@@ -89,7 +89,7 @@ export class NurturingDeliveryService {
     return new NurturingDeliveryService(deps);
   }
 
-  /** `key` names the signal: its kind and source event. */
+  /** `key` names the signal: its kind and source event. A first session also identifies the members. */
   async deliver({ key, signal }: { key: string; signal: NurturingSignal }): Promise<void> {
     if (!this.deps.customerIo && !this.deps.posthog) return;
     if (!(await this.deps.claims.claim(`nurturing:${key}`, DELIVERED_WINDOW_SECONDS))) return;
@@ -105,12 +105,12 @@ export class NurturingDeliveryService {
    */
   private async identifyCodingAgentMembers(signal: NurturingSignal): Promise<void> {
     if (signal.kind !== "coding_agent_first_session" || !this.deps.customerIo) return;
-    const unclaimed: string[] = [];
     for (const userId of new Set(signal.memberUserIds)) {
       const claimKey = `nurturing:integration_method:coding_agent:${userId}`;
-      if (await this.deps.claims.claim(claimKey, DELIVERED_WINDOW_SECONDS)) unclaimed.push(userId);
+      if (!(await this.deps.claims.claim(claimKey, DELIVERED_WINDOW_SECONDS))) continue;
+      // Sent at once, so a later member's claim failing never strands one already claimed.
+      this.sendCustomerIoCalls(fireCodingAgentIntegrationMethod({ memberUserIds: [userId] }));
     }
-    this.sendCustomerIoCalls(fireCodingAgentIntegrationMethod({ memberUserIds: unclaimed }));
   }
 
   /** Langy's failed guided turn: PostHog only, once per source event, never failing the fact. */

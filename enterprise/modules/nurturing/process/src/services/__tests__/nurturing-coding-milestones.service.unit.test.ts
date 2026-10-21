@@ -148,7 +148,7 @@ describe("NurturingCodingMilestonesService", () => {
   });
 
   describe("when delivering the first-session signal fails once", () => {
-    /** @scenario "A failed delivery is not lost when the fact is redelivered" */
+    /** @scenario "A delivery that fails before it is claimed is not lost when the fact is redelivered" */
     it("sends the first-session signal exactly once after the redelivery", async () => {
       const { send, ofKind } = await serviceOver({
         failFirstDeliveryOf: "coding_agent_first_session",
@@ -163,7 +163,7 @@ describe("NurturingCodingMilestonesService", () => {
   });
 
   describe("when delivering the active-day signal fails once", () => {
-    /** @scenario "A failed delivery is not lost when the fact is redelivered" */
+    /** @scenario "A delivery that fails before it is claimed is not lost when the fact is redelivered" */
     it("sends the active-day signal exactly once after the redelivery", async () => {
       const { send, ofKind } = await serviceOver({ failFirstDeliveryOf: "coding_active_days" });
 

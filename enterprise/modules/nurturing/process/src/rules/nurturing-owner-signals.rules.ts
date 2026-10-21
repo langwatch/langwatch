@@ -36,7 +36,7 @@ import type {
 import type { UserLifecycleEventData } from "@langwatch/user-contract";
 import type { WorkflowCreatedEventData } from "@langwatch/workflow-contract";
 
-import { utcDayOf } from "./nurturing-coding-signals.rules.ts";
+import { utcDayOf } from "./nurturing-time.rules.ts";
 
 /** The signal a peer's event raises, keyed by the aggregate and instant the event carries. */
 type OwnerEvent<Data> = Readonly<{ data: Data; aggregateId: string }>;

@@ -31,7 +31,7 @@ describe("MemoryNurturingMilestonesRepository coding signals", () => {
       expect(results).toEqual([{ first: true }, { first: false }]);
     });
 
-    /** @scenario "A failed delivery is not lost when the fact is redelivered" */
+    /** @scenario "A delivery that fails before it is claimed is not lost when the fact is redelivered" */
     it("reports first again for a retry of the fact that set it", async () => {
       const repository = await learned();
       await repository.recordCodingFirstSession({ organizationId: "org-1", occurredAt: 100 });
