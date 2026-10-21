@@ -450,3 +450,48 @@ export class PlatformPermissionNotAssignableError extends HandledError {
     this.name = "PlatformPermissionNotAssignableError";
   }
 }
+
+/** Why a braid's condition was refused on save (ADR-183 §3). */
+export const BRAID_CONDITION_REFUSAL_CODES = [
+  "braid_condition_unsupported",
+  "braid_condition_syntax",
+  "braid_condition_too_large",
+] as const;
+export const braidConditionRefusalCodeSchema = z.enum(BRAID_CONDITION_REFUSAL_CODES);
+export type BraidConditionRefusalCode = z.infer<typeof braidConditionRefusalCodeSchema>;
+
+/** The size bound a `braid_condition_too_large` refusal passed. */
+export const braidConditionLimitSchema = z.enum(["characters", "comparisons", "depth"]);
+
+/** A refusal: the construct found, its character offset in the text, and how to write it. */
+const braidConditionRefusalSchemaDefinition = z
+  .object({
+    ok: z.literal(false),
+    code: braidConditionRefusalCodeSchema,
+    construct: z.string(),
+    at: z.number().int().min(0),
+    fix: z.string(),
+    limit: braidConditionLimitSchema.optional(),
+  })
+  .strict();
+export interface BraidConditionRefusalSchema extends Named<
+  typeof braidConditionRefusalSchemaDefinition
+> {}
+export const braidConditionRefusalSchema: BraidConditionRefusalSchema =
+  braidConditionRefusalSchemaDefinition;
+export type BraidConditionRefusal = z.infer<typeof braidConditionRefusalSchema>;
+
+/** Thrown by the save path for a refused condition; the editor shows the refusal itself. */
+export class BraidConditionRefusedError extends HandledError {
+  declare readonly code: BraidConditionRefusalCode;
+
+  constructor({ refusal }: { refusal: BraidConditionRefusal }) {
+    const { code, construct, at, fix, limit } = refusal;
+    super(code, `The condition cannot hold ${construct}. ${fix}`, {
+      httpStatus: 422,
+      fault: "customer",
+      meta: { construct, at, fix, ...(limit ? { limit } : {}) },
+    });
+    this.name = "BraidConditionRefusedError";
+  }
+}

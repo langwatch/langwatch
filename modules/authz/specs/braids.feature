@@ -10,8 +10,8 @@
 # Who may braid: braids:manage on the owner and traces:view on the reader. Project roles come
 # from teams, so a team admin holds braids:manage on every project in that team (ADR-183 §2).
 #
-# EVERY SCENARIO IS @unimplemented: none of this is built. Each carries the level its
-# binding is expected at, and the pull request that builds it binds it.
+# A scenario still tagged @unimplemented is not built yet; it names the level its binding
+# is expected at, and the change that builds it binds it.
 
 @authz @grants @braids
 Feature: Braids
@@ -182,7 +182,7 @@ Feature: Braids
 
   Rule: A condition is an OTTL subset, compiled once when the braid is saved
 
-    @unit @unimplemented
+    @unit
     Scenario Outline: A condition in the supported set compiles
       When ana saves a braid with the condition <condition>
       Then the condition compiles
@@ -196,7 +196,7 @@ Feature: Braids
         | attributes["orchestrator"] != nil                                 |
         | attributes["orchestrator"] == "web" and Verified("orchestrator")  |
 
-    @unit @unimplemented
+    @unit
     Scenario Outline: An unsupported condition is refused with a fix the admin can act on
       When ana saves a braid with the condition <condition>
       Then the braid is refused with braid_condition_unsupported
@@ -224,7 +224,7 @@ Feature: Braids
       Then the stored condition carries the compiler version that compiled it
       And every cache key the fence feeds changes when the condition or the compiler version changes
 
-    @unit @unimplemented
+    @unit
     Scenario: A condition too large to read is refused
       When ana saves a braid whose condition is longer, holds more comparisons or nests deeper than a condition may
       Then the braid is refused with braid_condition_too_large
