@@ -39,7 +39,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
         with:
-          node-version: 24
+          node-version: "24.22.1"
 
       - name: Check guard tests
         run: node --test --experimental-strip-types .github/scripts/guard-breaking-change-scope.test.ts

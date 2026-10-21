@@ -92,7 +92,7 @@ jobs:
       # what .github/actions/setup-pnpm-node pins for the sibling job.
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
         with:
-          node-version: 24
+          node-version: "24.22.1"
 
       # `mint` is the CLI. `mintlify` is the same package at the same version,
       # and Mintlify's install docs say to remove it if both are present, so

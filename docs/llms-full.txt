@@ -65765,7 +65765,7 @@ The main application image. Used for both LangWatch App and LangWatch Workers. H
 |                |                                                                                                     |
 | -------------- | --------------------------------------------------------------------------------------------------- |
 | **Port**       | 5560                                                                                                |
-| **Base**       | `node:24-alpine`                                                                                    |
+| **Base**       | `node:24.22.1-alpine`                                                                               |
 | **Entrypoint** | `pnpm start`                                                                                        |
 | **Workers**    | In Kubernetes, Workers run as a separate Deployment using the same image with `pnpm start:workers`. |
 
