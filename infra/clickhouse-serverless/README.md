@@ -67,6 +67,27 @@ From 3 inputs (CPU, RAM, replicated), the Go binary derives ~40 parameters:
 | Merge parts limit  | 5 / 8 / 15 (by CPU tier) |
 | S3 cache           | RAM * 25%                |
 
+Pods with 4 GiB of RAM or less also get an explicit memory budget, because
+ClickHouse otherwise lets each cache grow to half of RAM. Larger pods keep the
+ClickHouse defaults for all of these:
+
+| Parameter (server setting)                      | Small-pod value              |
+| ----------------------------------------------- | ---------------------------- |
+| `mark_cache_size`                               | RAM / 16                     |
+| `index_mark_cache_size`, `primary_index_cache_size`, `query_condition_cache_size`, `compiled_expression_cache_size` | RAM / 64 each |
+| `mmap_cache_size`                               | 128 (regions, not bytes)     |
+| `merges_mutations_memory_usage_to_ram_ratio`    | 0.25                         |
+| `background_merges_mutations_concurrency_ratio` | 1                            |
+| `background_schedule_pool_size` / `common` / `move` | 16 / 4 / 2               |
+| `background_message_broker_schedule_pool_size`, `background_distributed_schedule_pool_size`, `background_buffer_flush_schedule_pool_size`, `background_fetches_pool_size` | 1 each |
+| `max_thread_pool_free_size`                     | 8 (idle threads each keep an allocator cache) |
+| System log queues (`max_size_rows` etc.)        | 16384 / 1024 reserved / 8192 flush |
+| `query_metric_log`, `query_thread_log`, `query_views_log`, `asynchronous_insert_log` | removed |
+
+Replicated pods (`CH_REPLICATED`) keep the ClickHouse default thread pools, because
+replication fetches and schedules on them; they still get the cache and log budget.
+Each value can be overridden by the env var named in `internal/config/compute.go`.
+
 ## Testing
 
 ```bash
