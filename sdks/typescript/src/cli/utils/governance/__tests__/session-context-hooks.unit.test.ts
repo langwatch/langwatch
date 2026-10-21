@@ -418,6 +418,40 @@ describe("the Copilot hook file LangWatch owns", () => {
     }
   });
 
+  describe("given a user's file that runs our hook through another launcher", () => {
+    const assertFor = (command: string) => {
+      const theirs = JSON.stringify({
+        hooks: { sessionStart: [{ bash: command }], preToolUse: [{ bash: "echo guard" }] },
+      });
+      fs.mkdirSync(path.dirname(copilotFile()), { recursive: true });
+      fs.writeFileSync(copilotFile(), theirs);
+      const action = install({ tool: "copilot" }).action;
+      expect(fs.readFileSync(copilotFile(), "utf8")).toBe(theirs);
+      return action;
+    };
+
+    /** @scenario "A user's langwatch.json running the hook by path or npx is not reported as turning linking off" */
+    it.each([
+      "/opt/homebrew/bin/langwatch ingest hook copilot",
+      '"/Users/me/My Tools/langwatch" ingest hook copilot',
+      "npx langwatch ingest hook copilot",
+      "npx -y langwatch@1.19.0 ingest hook copilot",
+      "/usr/local/bin/node /usr/local/lib/node_modules/langwatch/dist/cli/index.js ingest hook copilot",
+    ])("reports %s as the user's file that runs our hook", (command) => {
+      expect(assertFor(command)).toBe("user_file_runs_hook");
+    });
+
+    /** @scenario "A user's langwatch.json running another program named like langwatch still gets the notice" */
+    it.each([
+      "/opt/homebrew/bin/langwatch-foo ingest hook copilot",
+      "npx langwatch-foo ingest hook copilot",
+      "npx @acme/langwatch ingest hook copilot",
+      "langwatch ingest hook claude-code",
+    ])("reports %s as not ours", (command) => {
+      expect(assertFor(command)).toBe("not_ours");
+    });
+  });
+
   describe("given a file at our path that is not JSON", () => {
     it("leaves it exactly as it was", () => {
       fs.mkdirSync(path.dirname(copilotFile()), { recursive: true });

@@ -662,6 +662,40 @@ Rule: Copilot reports through one hook file LangWatch owns
     And the user is not told repository linking is off
     And the ingestion install does not say a LangWatch hook file was added
 
+  # The user may launch the CLI by its full path, through npx, or the way the
+  # CLI writes itself into codex (the node binary and the CLI's entry script).
+  # Each still runs the hook; a different program whose name only starts with
+  # langwatch does not.
+  @unit
+  Scenario Outline: A user's langwatch.json running the hook by path or npx is not reported as turning linking off
+    Given a Copilot langwatch.json that LangWatch did not write
+    And the file runs `<command>` on sessionStart
+    When the copilot hook file is asserted
+    Then the file is reported as the user's own file that runs the LangWatch hook
+    And the file is left exactly as it was
+
+    Examples:
+      | launcher           | command                                                                                         |
+      | an absolute path   | /opt/homebrew/bin/langwatch ingest hook copilot                                                 |
+      | a quoted path      | "/Users/me/My Tools/langwatch" ingest hook copilot                                              |
+      | npx                | npx langwatch ingest hook copilot                                                               |
+      | npx with a version | npx -y langwatch@1.19.0 ingest hook copilot                                                     |
+      | node and the entry | /usr/local/bin/node /usr/local/lib/node_modules/langwatch/dist/cli/index.js ingest hook copilot |
+
+  @unit
+  Scenario Outline: A user's langwatch.json running another program named like langwatch still gets the notice
+    Given a Copilot langwatch.json that LangWatch did not write
+    And the file runs `<command>` on sessionStart
+    When the copilot hook file is asserted
+    Then the file is reported as not LangWatch's, with repository linking off
+
+    Examples:
+      | command                                             |
+      | /opt/homebrew/bin/langwatch-foo ingest hook copilot |
+      | npx langwatch-foo ingest hook copilot               |
+      | npx @acme/langwatch ingest hook copilot             |
+      | langwatch ingest hook claude-code                   |
+
   @unit
   Scenario: The copilot ingestion install reports the user's langwatch.json it left alone
     Given a Copilot langwatch.json that LangWatch did not write

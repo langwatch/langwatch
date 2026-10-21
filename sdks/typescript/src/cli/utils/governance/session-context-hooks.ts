@@ -410,14 +410,58 @@ function fileRunsHookCommand({ tool, filePath }: { tool: HookedTool; filePath: s
     return false;
   }
   if (!isPlainObject(parsed) || !isPlainObject(parsed.hooks)) return false;
-  const command = sessionContextHookCommand(tool);
+  const hookArgs = ["ingest", "hook", SESSION_CONTEXT_AGENTS[tool].hookArgument];
   const runsCommand = (entry: unknown): boolean =>
     isPlainObject(entry) &&
     typeof entry.bash === "string" &&
-    entry.bash.split(/&&|\|\||;/).some((part) => part.trim() === command);
+    entry.bash.split(/&&|\|\||;/).some((part) => runsLangwatchWith({ part, args: hookArgs }));
   return Object.values(parsed.hooks).some(
     (entries) => Array.isArray(entries) && entries.some(runsCommand),
   );
+}
+
+/** The words of one shell command, with the quotes taken off a quoted one. */
+function shellWords(part: string): string[] {
+  return [...part.matchAll(/"([^"]*)"|'([^']*)'|(\S+)/g)].map((m) => m[1] ?? m[2] ?? m[3] ?? "");
+}
+
+function basename(word: string): string {
+  return word.split(/[\\/]/).pop() ?? "";
+}
+
+/** The npx package spec of this CLI: `langwatch` or `langwatch@<version>`, nothing else. */
+const NPX_PACKAGE_RE = /^langwatch(@[^\s@/]+)?$/;
+
+/** The CLI's entry script under its installed package, as the codex notify argv names it. */
+const ENTRY_SCRIPT_RE = /[\\/]langwatch[\\/]dist[\\/]cli[\\/]index\.js$/;
+
+/**
+ * How many leading words launch this CLI in `words`: `langwatch` by name or
+ * path, `npx [flags] langwatch[@v]`, or `node <entry>`. Zero when they launch
+ * anything else, so `langwatch-foo` or `npx @acme/langwatch` never count.
+ */
+function langwatchLauncherLength(words: readonly string[]): number {
+  const [first = "", ...rest] = words;
+  const name = basename(first);
+  if (name === "langwatch") return 1;
+  if (name === "npx") {
+    const at = rest.findIndex((word) => !word.startsWith("-"));
+    return at !== -1 && NPX_PACKAGE_RE.test(rest[at] ?? "") ? at + 2 : 0;
+  }
+  if (name === "node") {
+    const entry = rest[0] ?? "";
+    return basename(entry) === "langwatch" || ENTRY_SCRIPT_RE.test(entry) ? 2 : 0;
+  }
+  return 0;
+}
+
+/** Whether one command of a chain runs this CLI with exactly `args`. */
+function runsLangwatchWith({ part, args }: { part: string; args: readonly string[] }): boolean {
+  const words = shellWords(part.trim());
+  const launcher = langwatchLauncherLength(words);
+  if (launcher === 0) return false;
+  const rest = words.slice(launcher);
+  return rest.length === args.length && rest.every((word, i) => word === args[i]);
 }
 
 /** Delete the owned hook file when it is ours. Returns whether it was removed. */
