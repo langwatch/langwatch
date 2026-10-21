@@ -16,12 +16,20 @@ import (
 // DefaultClusteringMaxBodyBytes is the clustering body cap (plan §5.4).
 const DefaultClusteringMaxBodyBytes int64 = 180 << 20
 
+// DefaultClusteringMaxTraces is the most traces one call may cluster. The app
+// sends at most 2,000 (its page CTE); Ward linkage holds n(n-1)/2 float64
+// distances, so 5,000 is about 100 MB and keeps a shared pod safe from a
+// caller that sends more.
+const DefaultClusteringMaxTraces = 5000
+
 // TopicClusteringRoutes are what the two clustering routes need. A zero
-// MaxBodyBytes is DefaultClusteringMaxBodyBytes.
+// MaxBodyBytes is DefaultClusteringMaxBodyBytes, a zero MaxTraces is
+// DefaultClusteringMaxTraces.
 type TopicClusteringRoutes struct {
 	API            contract.EvaluatorRuntimeAPI
 	InternalSecret string
 	MaxBodyBytes   int64
+	MaxTraces      int
 }
 
 // clusteringBody is langevals' batch and incremental request body;
@@ -42,22 +50,28 @@ func MountTopicClustering(mux *http.ServeMux, routes TopicClusteringRoutes) {
 	httprpc.RegisterStatuses()
 	herr.RegisterStatus(contract.ErrTopicClusteringFailed, http.StatusInternalServerError)
 	herr.RegisterStatus(contract.ErrTopicClusteringTooFewTraces, http.StatusUnprocessableEntity)
-	maxBodyBytes := routes.MaxBodyBytes
-	if maxBodyBytes == 0 {
-		maxBodyBytes = DefaultClusteringMaxBodyBytes
+	caps := clusteringCaps{bodyBytes: routes.MaxBodyBytes, traces: routes.MaxTraces}
+	if caps.bodyBytes == 0 {
+		caps.bodyBytes = DefaultClusteringMaxBodyBytes
+	}
+	if caps.traces == 0 {
+		caps.traces = DefaultClusteringMaxTraces
 	}
 	for _, mode := range []contract.ClusteringMode{contract.ClusteringBatch, contract.ClusteringIncremental} {
 		mux.Handle("POST /go/evaluators/topics/"+string(mode)+"_clustering",
-			requireInternalSecret(routes.InternalSecret, clusteringHandler(routes.API, mode, maxBodyBytes)))
+			requireInternalSecret(routes.InternalSecret, clusteringHandler(routes.API, mode, caps)))
 	}
 }
 
-func clusteringHandler(api contract.EvaluatorRuntimeAPI, mode contract.ClusteringMode, maxBodyBytes int64) http.HandlerFunc {
+// clusteringCaps are the most one clustering call may send.
+type clusteringCaps struct {
+	bodyBytes int64
+	traces    int
+}
+
+func clusteringHandler(api contract.EvaluatorRuntimeAPI, mode contract.ClusteringMode, caps clusteringCaps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		body, err := httprpc.Decode[clusteringBody](w, r, maxBodyBytes)
-		if herr.IsCode(err, httprpc.CodePayloadTooLarge) {
-			err = herr.New(r.Context(), contract.ErrPayloadTooLarge, herr.M{"message": "clustering payload too large"})
-		}
+		body, err := decodeClusteringBody(w, r, caps)
 		if err != nil {
 			herr.WriteHTTP(w, err)
 			return
@@ -75,6 +89,18 @@ func clusteringHandler(api contract.EvaluatorRuntimeAPI, mode contract.Clusterin
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write(encoded.Bytes())
 	}
+}
+
+// decodeClusteringBody reads the body and refuses one over either cap with 413.
+func decodeClusteringBody(w http.ResponseWriter, r *http.Request, caps clusteringCaps) (clusteringBody, error) {
+	body, err := httprpc.Decode[clusteringBody](w, r, caps.bodyBytes)
+	if herr.IsCode(err, httprpc.CodePayloadTooLarge) {
+		return body, herr.New(r.Context(), contract.ErrPayloadTooLarge, herr.M{"message": "clustering payload too large"})
+	}
+	if err == nil && len(body.Traces) > caps.traces {
+		return body, herr.New(r.Context(), contract.ErrPayloadTooLarge, herr.M{"message": "too many traces to cluster in one call", "traces": len(body.Traces), "max": caps.traces})
+	}
+	return body, err
 }
 
 // clusteringRequest moves the litellm params into Tenant.Env under the

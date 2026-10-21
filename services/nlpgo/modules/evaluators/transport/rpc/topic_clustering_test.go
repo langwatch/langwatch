@@ -88,6 +88,21 @@ func TestClusteringBodyOverTheCapIs413(t *testing.T) {
 	assert.False(t, called)
 }
 
+func TestClusteringOverTheTraceCapIs413(t *testing.T) {
+	called := false
+	api := clusteringAPI{cluster: func(context.Context, contract.TopicClusteringRequest) (contract.TopicClusteringResult, error) {
+		called = true
+		return contract.TopicClusteringResult{}, nil
+	}}
+	routes := evalrpc.TopicClusteringRoutes{API: api, InternalSecret: secret, MaxTraces: 1}
+	twoTraces := strings.Replace(clusteringBody, `"traces":[{`,
+		`"traces":[{"trace_id":"b","input":"hi","topic_id":null,"subtopic_id":null},{`, 1)
+	rec := postClustering(routes, "/go/evaluators/topics/batch_clustering", "Bearer "+secret, twoTraces)
+	assert.Equal(t, http.StatusRequestEntityTooLarge, rec.Code)
+	assert.Equal(t, "evaluation_payload_too_large", errorCode(t, rec))
+	assert.False(t, called)
+}
+
 // @scenario "Fewer than 2 usable traces answers topic_clustering_too_few_traces"
 func TestTooFewUsableTracesIs422(t *testing.T) {
 	llm := memory.NewLLM()
