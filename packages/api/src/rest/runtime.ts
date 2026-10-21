@@ -82,6 +82,7 @@ import {
   DOOR_SCOPE_TIER,
   permissionOf,
   routePermissions,
+  routeTargetField,
   type RestDeprecation,
   type RestDoorCredential,
   type RestPermissionTarget,
@@ -1476,6 +1477,7 @@ function handlerMiddleware<Api>({
     }
 
     const target = await checkRouteScope({ route, caller, door, ports, input, context });
+    const further = await checkFurtherTargets({ route, caller, door, ports, input, context });
     const capabilities = { route, ports, context, family, version, caller, input } as const;
 
     // The scope access resolved: the one a route's own path named when it named
@@ -1498,12 +1500,22 @@ function handlerMiddleware<Api>({
     if (stored) return stored;
 
     const actor = doorActorOf({ credential, actor: decision.actor });
+    const proofActor =
+      actor ?? ownerlessKeyProofActor({ credential, request: context.req.raw, resolved });
     const authorization = await mintAuthorization({
       permission: route.permission,
-      actor: actor ?? ownerlessKeyProofActor({ credential, request: context.req.raw, resolved }),
+      actor: proofActor,
       scope: resolved,
       authorize,
       route: `${family}.${route.operation}`,
+    });
+    const targeted = await targetProofs({
+      route,
+      further,
+      authorization,
+      actor: proofActor,
+      authorize,
+      address: `${family}.${route.operation}`,
     });
 
     const run = async (): Promise<Response | undefined> => {
@@ -1541,6 +1553,7 @@ function handlerMiddleware<Api>({
                   scope: handlerScopeOf({ route, credential, caller }),
                   target,
                   authorization,
+                  ...targeted,
                   session: sessionOf({ route, credential, caller }),
                   key: keyOf({ route, credential, request: context.req.raw }),
                 }),
@@ -1962,6 +1975,7 @@ function handlerArguments<Api>({
   scope,
   target,
   authorization = null,
+  authorizations,
   session,
   key,
 }: {
@@ -1973,6 +1987,7 @@ function handlerArguments<Api>({
   scope: AuthzDeclaredScopeId | null;
   target: AuthzDeclaredScopeId | null;
   authorization?: Authorization | null;
+  authorizations?: Readonly<Record<string, Authorization>>;
   session?: unknown;
   key?: RestKeyCredential | undefined;
 }): StoredHandlerArguments<Api> {
@@ -1983,6 +1998,7 @@ function handlerArguments<Api>({
     scope,
     target,
     authorization,
+    ...(authorizations ? { authorizations } : {}),
     session,
     key,
     signal: context.req.raw.signal,
@@ -2146,6 +2162,81 @@ async function checkRouteScope({
   }
 
   return asked.named ? asked.target : null;
+}
+
+/** A route target after the first, with the scope its input named (ADR-183 §2). */
+type FurtherTarget = Readonly<{
+  permission: AuthzPermission;
+  field: string;
+  scope: AuthzDeclaredScopeId;
+}>;
+
+/**
+ * Each further route target, in declared order after the first and before the handler: the
+ * question and refusal the first target gets, so no handler checks one (CLAUDE.md rule 6).
+ */
+async function checkFurtherTargets({
+  route,
+  caller,
+  door,
+  ports,
+  input,
+  context,
+}: {
+  route: RestTransportRoute<unknown>;
+  caller: RestCaller;
+  door: RestIdentity;
+  ports: RestRuntimeMembers;
+  input: unknown;
+  context: Context;
+}): Promise<readonly FurtherTarget[]> {
+  if (!route.furtherPermissions) return [];
+
+  const authorize = ports.authorization.forRequest(context.req.raw);
+  const asked: FurtherTarget[] = [];
+  for (const { permission, target } of route.furtherPermissions) {
+    const scope = routeScopeOf({ param: target.param, input: pathScopeInput(target, input) });
+    const decision = await requireAuthorize(door)({ caller, permission, target: scope });
+
+    assertRouteScopePermission({
+      permission,
+      target: scope,
+      decision: await gatedDecision({ decisions: authorize, scope, decision }),
+      ...(ports.denials ? { denials: ports.denials } : {}),
+    });
+    asked.push({ permission, field: routeTargetField(target), scope });
+  }
+
+  return asked;
+}
+
+/** One proof per proof-bearing route target, by the field naming it; the first's is reused. */
+async function targetProofs({
+  route,
+  further,
+  authorization,
+  actor,
+  authorize,
+  address,
+}: {
+  route: RestTransportRoute<unknown>;
+  further: readonly FurtherTarget[];
+  authorization: Authorization | null;
+  actor: Actor | null;
+  authorize: Authorize;
+  address: string;
+}): Promise<Readonly<{ authorizations?: Readonly<Record<string, Authorization>> }>> {
+  if (further.length === 0 || !route.permissionTarget) return {};
+
+  const proofs: Record<string, Authorization> = {};
+  if (authorization) proofs[routeTargetField(route.permissionTarget)] = authorization;
+
+  for (const { permission, field, scope } of further) {
+    const proof = await mintAuthorization({ permission, actor, scope, authorize, route: address });
+    if (proof) proofs[field] = proof;
+  }
+
+  return { authorizations: proofs };
 }
 
 /**

@@ -269,6 +269,12 @@ type KeyArguments<Key extends boolean> = Key extends true
 type ProofArguments<Proof extends boolean> = Proof extends true
   ? { readonly authorization: Authorization }
   : unknown;
+/** A route asking at several targets is handed each proof-bearing target's proof, by its field. */
+type TargetProofArguments<Composed extends boolean, Fields extends string> = Composed extends true
+  ? [Fields] extends [never]
+    ? unknown
+    : { readonly authorizations: Readonly<Record<Fields, Authorization>> }
+  : unknown;
 /**
  * What a route's own door may be told: the session it hands, whether the handler reads the key
  * (key doors only, E5), and the key kinds it admits (the project door only, E7).
@@ -355,6 +361,8 @@ export type StoredHandlerArguments<Api> = Readonly<{
   scope: AuthzDeclaredScopeId | null;
   target: AuthzDeclaredScopeId | null;
   authorization: Authorization | null;
+  /** Each proof-bearing target's proof, by its field; present only on a route asking several. */
+  authorizations?: Readonly<Record<string, Authorization>>;
   /** The door's session parsed against the route's schema; undefined when it declared none. */
   session: unknown;
   /** The key the door resolved, for a route that declared it reads it; undefined elsewhere. */
@@ -534,6 +542,17 @@ export type RestPermissionPlatform = PlatformPermissionTarget;
  */
 export type RestPermissionReach = Readonly<{ at: "grants" | "organization" }>;
 
+/** A permission asked at a further route target, after the route's first (ADR-183 §2). */
+export type RestFurtherPermission = Readonly<{
+  permission: AuthzPermission;
+  target: Extract<RestPermissionTarget, { at: "route" }>;
+}>;
+
+/** The input field a route target is named by: its `field`, else its `param`. */
+export function routeTargetField(target: Readonly<{ param: string; field?: string }>): string {
+  return target.field ?? target.param;
+}
+
 export type RestTransportRoute<Api> = Readonly<{
   readonly method: HttpMethod;
   readonly path: string;
@@ -552,6 +571,8 @@ export type RestTransportRoute<Api> = Readonly<{
   readonly permissionBy?: InputPermission;
   /** Where that permission is asked; absent means at the credential's scope. */
   readonly permissionTarget?: RestPermissionTarget;
+  /** Present exactly when the route asks at several targets: each after the first, in order. */
+  readonly furtherPermissions?: readonly RestFurtherPermission[];
   /** How far the key door asks it; absent means the key's project, else its organization. */
   readonly permissionReach?: RestPermissionReach["at"];
   /** Present exactly when `permission` is asked at the platform, with how it refuses (E4). */
@@ -678,6 +699,7 @@ type RouteState = Readonly<{
   permissions?: readonly [AuthzPermission, AuthzPermission, ...AuthzPermission[]];
   permissionBy?: InputPermission;
   permissionTarget?: RestPermissionTarget;
+  furtherPermissions?: readonly RestFurtherPermission[];
   permissionReach?: RestPermissionReach["at"];
   permissionPlatform?: PlatformPermissionDeclaration;
   key?: true;
@@ -756,6 +778,10 @@ type RouteShape = Readonly<{
   permission: boolean;
   /** Whether that permission mints the proof the handler is handed (ADR-166). */
   proof: boolean;
+  /** Whether a further permission is asked at a route target of its own (ADR-183 §2). */
+  composed: boolean;
+  /** The fields of the route targets whose permission mints a proof. */
+  proofTargets: string;
   middleware: readonly MiddlewareContext[];
   access: RouteAccessKind;
   /** The family's door, which a route may narrow to its own. */
@@ -777,6 +803,23 @@ type RouteShape = Readonly<{
 type With<S extends RouteShape, Changes extends Partial<RouteShape>> = {
   readonly [Field in keyof RouteShape]: Field extends keyof Changes ? Changes[Field] : S[Field];
 };
+
+/** The input field a declared target is named by; none for a target that names no route scope. */
+type TargetField<Target> =
+  Target extends Readonly<{ field: infer Field extends string }>
+    ? Field
+    : Target extends Readonly<{ param: infer Param extends string }>
+      ? Param
+      : never;
+
+/** A first permission says how the route is reached; a further one composes at its own target. */
+type Permitted<
+  S extends RouteShape,
+  First extends Partial<RouteShape>,
+  Field extends string,
+> = S["permission"] extends true
+  ? With<S, { composed: true; proofTargets: S["proofTargets"] | Field }>
+  : With<S, First & { proofTargets: Field }>;
 
 /** A body is declared only on a method that carries one; a GET or HEAD route is refused here. */
 type BodyMethodGate<Method> = [Extract<Method, "get" | "head">] extends [never] ? unknown : never;
@@ -1130,11 +1173,14 @@ class RouteBuilder<in out Api, in out S extends RouteShape> {
     });
   }
 
-  /** A proof-bearing permission: the door mints the proof and the handler is handed it. */
-  withPermission(
+  /**
+   * A proof-bearing permission: the door mints the proof and the handler is handed it. A second
+   * call at another route target composes (ADR-183 §2): both asked, one proof per target.
+   */
+  withPermission<const Target extends RestPermissionTarget | undefined = undefined>(
     permission: ProofBearingPermission,
-    target?: RestPermissionTarget,
-  ): RouteBuilder<Api, With<S, { permission: true; proof: true }>>;
+    target?: Target,
+  ): RouteBuilder<Api, Permitted<S, { permission: true; proof: true }, TargetField<Target>>>;
   /**
    * The permission this route demands, and where it is asked. `{ at: "route", param }` asks at
    * the scope the route's own path names, for a credential one tier wider than the resource.
@@ -1143,7 +1189,7 @@ class RouteBuilder<in out Api, in out S extends RouteShape> {
   withPermission(
     permission: AuthzPermission,
     target?: RestPermissionTarget | RestPermissionReach,
-  ): RouteBuilder<Api, With<S, { permission: true }>>;
+  ): RouteBuilder<Api, Permitted<S, { permission: true }, never>>;
   /** Every one of them, asked in this order before the handler; naming an array says AND (E2). */
   withPermission(
     permissions: readonly [AuthzPermission, AuthzPermission, ...AuthzPermission[]],
@@ -1169,6 +1215,11 @@ class RouteBuilder<in out Api, in out S extends RouteShape> {
     declared: AuthzPermission | readonly AuthzPermission[] | InputPermission,
     target?: RestPermissionTarget | RestPermissionReach | RestPermissionPlatform,
   ): unknown {
+    const { permission, permissions, permissionBy, permissionPlatform } = this.state;
+    if (permission ?? permissions ?? permissionBy ?? permissionPlatform) {
+      return this.#furtherPermission(declared, target);
+    }
+
     if (target?.at === "platform") return this.#platformPermission(declared, target);
 
     const reach = target?.at === "grants" || target?.at === "organization" ? target.at : void 0;
@@ -1189,6 +1240,48 @@ class RouteBuilder<in out Api, in out S extends RouteShape> {
         ...(scoped ? { permissionTarget: scoped } : {}),
         ...(reach ? { permissionReach: reach } : {}),
       },
+    });
+  }
+
+  /** A second permission composes only as one more route target, beside a first that names one. */
+  #furtherPermission(
+    declared: AuthzPermission | readonly AuthzPermission[] | InputPermission,
+    target: RestPermissionTarget | RestPermissionReach | RestPermissionPlatform | undefined,
+  ): RouteBuilder<Api, S> {
+    const { permissionTarget: first, permissions, permissionBy, permissionPlatform } = this.state;
+    const composable =
+      typeof declared === "string" &&
+      target?.at === "route" &&
+      first?.at === "route" &&
+      !permissions &&
+      !permissionBy &&
+      !permissionPlatform &&
+      !this.state.permissionReach;
+
+    if (!composable) {
+      throw new Error(
+        `REST ${this.operation} declares withPermission() twice; a further permission is one ` +
+          'permission at a route target of its own, beside a first that names { at: "route" }',
+      );
+    }
+
+    assertNotPlatformPermission({ address: `REST ${this.operation}`, permissions: [declared] });
+
+    const further = this.state.furtherPermissions ?? [];
+    const named = [first, ...further.map((asked) => asked.target)].map(routeTargetField);
+
+    if (named.includes(routeTargetField(target))) {
+      throw new Error(
+        `REST ${this.operation} asks a permission at "${routeTargetField(target)}" twice`,
+      );
+    }
+
+    return new RouteBuilder<Api, S>({
+      router: this.router,
+      method: this.method,
+      path: this.path,
+      operation: this.operation,
+      state: { ...this.state, furtherPermissions: [...further, { permission: declared, target }] },
     });
   }
 
@@ -1476,6 +1569,7 @@ class RouteBuilder<in out Api, in out S extends RouteShape> {
       > &
         KeyArguments<S["key"]> &
         ProofArguments<S["proof"]> &
+        TargetProofArguments<S["composed"], S["proofTargets"]> &
         RawBodyArguments<S["body"]> &
         MultipartArguments<S["body"]> &
         RawResponseArguments<S["answer"]> &
@@ -1817,6 +1911,7 @@ function accessParts(
   | "permissions"
   | "permissionBy"
   | "permissionTarget"
+  | "furtherPermissions"
   | "permissionReach"
   | "permissionPlatform"
 > {
@@ -1840,6 +1935,7 @@ function accessParts(
     permission: permissionOf(state.permission),
     ...(state.permissions ? { permissions: state.permissions } : {}),
     ...(state.permissionTarget ? { permissionTarget: state.permissionTarget } : {}),
+    ...(state.furtherPermissions ? { furtherPermissions: state.furtherPermissions } : {}),
     ...(state.permissionReach ? { permissionReach: state.permissionReach } : {}),
   };
 }
@@ -1899,6 +1995,8 @@ type OpenRoute<
     answer: Missing;
     permission: false;
     proof: false;
+    composed: false;
+    proofTargets: never;
     middleware: [];
     access: "scoped";
     family: Door;
@@ -2398,6 +2496,10 @@ function assertRouteReady({
   }
 
   if (state.permissionTarget) assertPermissionTarget({ operation, state });
+
+  for (const further of state.furtherPermissions ?? []) {
+    assertPermissionTarget({ operation, state: { ...state, permissionTarget: further.target } });
+  }
 
   if (state.permissionBy) {
     assertInputPermission({

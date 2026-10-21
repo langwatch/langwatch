@@ -9,7 +9,12 @@ import {
 } from "@langwatch/api/rest";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
-import { PermissionDeniedError, type Actor, type Authorization } from "@langwatch/authorization";
+import {
+  PermissionDeniedError,
+  type Actor,
+  type Authorization,
+  type AuthzDeclaredScopeId,
+} from "@langwatch/authorization";
 import {
   AuthzScopeNotFoundError,
   type AuthzApi,
@@ -351,19 +356,24 @@ export class ApiDoorService {
     };
   }
 
+  /** ADR-183 §9: a project's plan is its organization's, read through the door's own resolver. */
+  async #planOrganizationOf(scope: AuthzDeclaredScopeId): Promise<string | undefined> {
+    if (scope.tier === "organization") return scope.id;
+    if (scope.tier === "team") {
+      return this.#peers.organizations.getOrganizationIdByTeamId({ teamId: scope.id });
+    }
+
+    return (await this.#audit.findOrganizationIds({ tier: "project", id: scope.id }))[0];
+  }
+
   /** Composed here because authz and organization cannot depend on entitlement without a cycle. */
   #planEntitlements(): Entitlements {
-    const { entitlements: plans, organizations } = this.#peers;
+    const { entitlements: plans } = this.#peers;
 
     return {
       holds: async ({ entitlement, scope }) => {
-        if (scope.tier === "project") {
-          throw new Error(`No plan gate reads a project's organization yet (${scope.id})`);
-        }
-        const organizationId =
-          scope.tier === "organization"
-            ? scope.id
-            : await organizations.getOrganizationIdByTeamId({ teamId: scope.id });
+        const organizationId = await this.#planOrganizationOf(scope);
+        if (organizationId === undefined) return false;
         const plan = await plans.getActivePlan({ organizationId });
 
         // ADR-072: billing events are sold under the webhook platform's own plan flag.
