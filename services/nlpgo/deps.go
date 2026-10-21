@@ -25,6 +25,7 @@ import (
 	"github.com/langwatch/langwatch/services/nlpgo/modules/evaluators/channels/gateway"
 	evalhttp "github.com/langwatch/langwatch/services/nlpgo/modules/evaluators/channels/http"
 	evalrpc "github.com/langwatch/langwatch/services/nlpgo/modules/evaluators/transport/rpc"
+	lingua "github.com/langwatch/langwatch/services/third_party/lingua-go"
 )
 
 // configureNLPGoOTel installs nlpgo's OTel provider in multi-tenant
@@ -153,6 +154,11 @@ func NewEvaluatorsHandler(ctx context.Context, opts EvaluatorsOptions) (http.Han
 	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("evaluators customer trace: %w", err)
+	}
+	if cfg.LinguaModelsPath != "" {
+		if err := lingua.LoadModels(cfg.LinguaModelsPath); err != nil {
+			return nil, nil, fmt.Errorf("evaluators: %w", err)
+		}
 	}
 	var piiAnalyzer channels.PIIAnalyzer // a nil *PIIAnalyzer must not become a non-nil interface
 	if cfg.PIIAnalyzerURL != "" {

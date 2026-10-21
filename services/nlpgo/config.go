@@ -59,6 +59,9 @@ type Config struct {
 	PIIAnalyzerURL string `env:"NLPGO_PII_ANALYZER_URL"`
 	// PIIAnalyzerKey is its Bearer key. A secret: never logged.
 	PIIAnalyzerKey string `env:"NLPGO_PII_ANALYZER_KEY"`
+	// LinguaModelsPath is the language models file (`make lingua-models`); the nlp
+	// image ships it. Empty leaves lingua/language_detection on langevals.
+	LinguaModelsPath string `env:"NLPGO_LINGUA_MODELS"`
 }
 
 // EngineConfig surfaces engine knobs (timeouts, code-block sandbox).

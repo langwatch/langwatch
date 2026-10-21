@@ -518,7 +518,7 @@ Patterns (all Presidio recognisers we request, with scores and boosting); `PIIAn
 | D13 | Who hosts the PII model for self-hosters by default | `null` until the sidecar is enabled in the chart |
 | D14 | Rollout switch | **Decided:** Python stays the production path; Go only behind an explicit flag (haven `+go-evaluators` in dev; chart values default off; nlpgo mounts `/go/evaluators` only with its secret) |
 | D15 | `valid_format` python and sql modes | **Decided:** best-effort Go parsers measured against the recorded fixtures; a mode short of parity keeps the evaluator on Python |
-| D16 | `lingua/language_detection` | **Decided:** Fork C: vendored lingua-go v1.4.0 in `third_party/`, flat models generated at build time and embedded behind the `lingua_models` tag, Rust tokeniser regex; 1e-15 parity, ~7 MB anonymous RSS (measurements: the lingua research notes) |
+| D16 | `lingua/language_detection` | **Decided:** Fork C: vendored lingua-go v1.4.0 in `third_party/`, flat models generated at build time into a file the nlp image ships and nlpgo maps at boot (`NLPGO_LINGUA_MODELS`; no build tag), Rust tokeniser regex; 1e-15 parity, ~7 MB anonymous RSS (measurements: the lingua research notes) |
 | D17 | Where evaluators run in production | Proposed: in place in a shared nlpgo Deployment, SaaS and self-hosted alike; no Lambda for evaluators (§13) |
 | D18 | Language for new code blocks | Open: Starlark in place is the recommendation; Python stays on the per-project Lambda (§13.3) |
 
@@ -590,7 +590,7 @@ once their count is low, and the per-project Lambda fleet is retired with the la
 
 Apple M1 Max (arm64, as the Lambdas), the same recorded fixture inputs on both sides, 21 Oct
 2026, with other work on the machine (±20%). Reproduce the Go side with
-`go test -tags lingua_models -run '^$' -bench BenchmarkEvaluate ./nlpgo/modules/evaluators/services/`.
+`make lingua-models && go test -run '^$' -bench BenchmarkEvaluate ./nlpgo/modules/evaluators/services/`.
 
 Every langevals call over HTTP, so every Lambda call, waits at least 100 ms in a sleep:
 `evaluate_batch` resets `_tqdm_disabled_once` and `_disable_tqdm` then sleeps 0.1 s

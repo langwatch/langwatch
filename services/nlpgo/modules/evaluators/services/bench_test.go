@@ -16,6 +16,7 @@ import (
 	"github.com/langwatch/langwatch/services/nlpgo/modules/evaluators/channels/memory"
 	"github.com/langwatch/langwatch/services/nlpgo/modules/evaluators/contract"
 	"github.com/langwatch/langwatch/services/nlpgo/modules/evaluators/services"
+	lingua "github.com/langwatch/langwatch/services/third_party/lingua-go"
 )
 
 // benchFixtures are the model-free evaluators and the recorded langevals
@@ -39,8 +40,11 @@ func benchFixtures() map[string]string {
 // BenchmarkEvaluate times one service.Evaluate call of one entry, cycling
 // through the evaluator's recorded cases: settings parsing, admission and
 // scoring, without HTTP. Besides the mean it reports the median and p95 call.
-// Lingua runs only under -tags lingua_models.
+// Lingua runs when `make lingua-models` has generated its models.
 func BenchmarkEvaluate(b *testing.B) {
+	if _, err := os.Stat(linguaModels); err == nil {
+		require.NoError(b, lingua.LoadModels(linguaModels))
+	}
 	service := services.NewEvaluationService(services.EvaluationDeps{
 		Config:        contract.DefaultConfig(),
 		LLM:           memory.NewLLM(),
@@ -80,8 +84,8 @@ func BenchmarkEvaluate(b *testing.B) {
 	}
 }
 
-// BenchmarkBuiltinEvaluators times building the evaluator table, which is
-// where the lingua detector loads its models in a lingua_models build.
+// BenchmarkBuiltinEvaluators times building the evaluator table, including
+// the lingua detector once its models are loaded.
 func BenchmarkBuiltinEvaluators(b *testing.B) {
 	for range b.N {
 		_ = services.BuiltinEvaluators()
