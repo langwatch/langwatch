@@ -44,9 +44,8 @@ function appWithDatabase() {
 async function privateReportsBoard({ app, database }: ReturnType<typeof appWithDatabase>) {
   const reports = await app.create({ projectId: PROJECT, name: "Private" });
   const makePrivate = () => {
-    database.dashboards = database.dashboards.map(
-      (row): DashboardRecord =>
-        row.id === reports.id ? { ...row, scope: "PRIVATE", createdById: OWNER.userId } : row,
+    database.dashboards = database.dashboards.map((row): DashboardRecord =>
+      row.id === reports.id ? { ...row, scope: "PRIVATE", createdById: OWNER.userId } : row,
     );
   };
   return { reports, makePrivate };
@@ -54,8 +53,9 @@ async function privateReportsBoard({ app, database }: ReturnType<typeof appWithD
 
 /** The delete mark a router declares for `resource`. */
 function markOf(router: RestTransportDeclaration<DashboardApi>, resource: string) {
-  const mark = router.routes.find((route) => route.confirmation?.resource === resource)
-    ?.confirmation;
+  const mark = router.routes.find(
+    (route) => route.confirmation?.resource === resource,
+  )?.confirmation;
   if (!mark) throw new Error(`no confirmation for ${resource}`);
   return mark;
 }
