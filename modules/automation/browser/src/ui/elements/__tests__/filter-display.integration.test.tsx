@@ -90,6 +90,29 @@ describe("FilterDisplay", () => {
     });
   });
 
+  describe("given a keyed filter whose key is one long unbreakable token", () => {
+    const LONG_KEY_FILTER = { "evaluations.passed": { [LONG_VALUE]: ["0", "false"] } };
+
+    /** @scenario "A long key wraps inside its filter chip" */
+    it("lets the label shrink and break mid-token inside the chip", () => {
+      renderFilters({ filters: LONG_KEY_FILTER, shouldClampValues: false });
+
+      const style = getComputedStyle(screen.getByText(new RegExp(LONG_VALUE)));
+      expect(style.minWidth).toBe("0px");
+      expect(style.overflowWrap).toBe("anywhere");
+      expect(style.flexShrink).not.toBe("0");
+    });
+
+    it("wraps the value onto its own line rather than squeezing it", () => {
+      renderFilters({ filters: LONG_KEY_FILTER, shouldClampValues: false });
+
+      const row = screen.getByText(new RegExp(LONG_VALUE)).parentElement!;
+      expect(row).toContainElement(screen.getByText("0, false"));
+      expect(getComputedStyle(row).flexWrap).toBe("wrap");
+      expect(getComputedStyle(row).minWidth).toBe("0px");
+    });
+  });
+
   describe("given a keyed filter stored as a bare list", () => {
     /** @scenario "A keyed filter stored without its key is flagged as never matching" */
     it("renders a warning chip instead of a valid-looking one", () => {

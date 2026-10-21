@@ -4,7 +4,7 @@
  * import another — renders `ClampedText`, `HoverableBigText` refused promotion.
  */
 
-import { Box, HStack, Text } from "@langwatch/design-system/primitives";
+import { Box, Flex, HStack, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { AlertTriangle, Filter } from "react-feather";
 
@@ -50,13 +50,20 @@ const FilterContainer = ({
         <Filter width={16} aria-hidden="true" />
       )}
     </Box>
-    {children}
+    {/* Wraps, so a value that cannot fit beside a long label takes its own line. */}
+    <Flex flex="1" minWidth={0} wrap="wrap">
+      {children}
+    </Flex>
   </HStack>
 );
 
-/** The field's name, then the key it selects by: "Metadata · plan". */
+/**
+ * The field's name, then the key it selects by: "Metadata · plan". A key can
+ * be one unbreakable token (a monitor id), so it breaks mid-token rather than
+ * run past the chip's border.
+ */
 const FilterLabel = ({ label, keys }: { label: string; keys: string[] }) => (
-  <Box padding={1} fontWeight="500" color="fg.subtle" flexShrink={0}>
+  <Box padding={1} fontWeight="500" color="fg.subtle" minWidth={0} overflowWrap="anywhere">
     {[label, ...keys].join(" · ")}
   </Box>
 );
