@@ -91,3 +91,30 @@ func TestParseSettingsRefusesAListElementMissingARequiredField(t *testing.T) {
 
 	require.EqualError(t, err, "settings.allowed_topics[0].description is required")
 }
+
+// @scenario "An unset max tokens budgets the judge at 128000 and sends none to the provider"
+func TestJudgeMaxTokensReadsUnsetAsTheDefault(t *testing.T) {
+	for raw, want := range map[string]int{`{}`: 128_000, `{"max_tokens":null}`: 128_000, `{"max_tokens":0}`: 128_000, `{"max_tokens":4000}`: 4000} {
+		settings, err := ParseLLMEvaluatorSettings(json.RawMessage(raw))
+		require.NoError(t, err, raw)
+		assert.Equal(t, want, settings.JudgeMaxTokens(), raw)
+	}
+	assert.Equal(t, 128_000, JudgeTokenBudget("custom/judge", DefaultLLMEvaluatorSettings().JudgeMaxTokens()))
+}
+
+// @scenario "The score judge takes a min and max and keeps the model's score as given"
+func TestParseCustomLLMScoreSettingsReadsTheRange(t *testing.T) {
+	settings, err := ParseCustomLLMScoreSettings(json.RawMessage(`{"min":1,"max":5}`))
+	require.NoError(t, err)
+	require.NotNil(t, settings.Min)
+	require.NotNil(t, settings.Max)
+	assert.InDelta(t, 1.0, *settings.Min, 0)
+	assert.InDelta(t, 5.0, *settings.Max, 0)
+
+	unset := DefaultCustomLLMScoreSettings()
+	assert.Nil(t, unset.Min)
+	assert.Nil(t, unset.Max)
+
+	_, err = ParseCustomLLMScoreSettings(json.RawMessage(`{"max":"high"}`))
+	require.EqualError(t, err, "settings.max has the wrong type")
+}

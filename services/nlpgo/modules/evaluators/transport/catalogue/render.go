@@ -39,9 +39,8 @@ type (
 
 func z(method string, args ...any) zodCall { return zodCall{method: method, args: args} }
 
-// Render lays out evaluators.generated.ts from the definitions. The committed
-// file was laid out at 80 columns and later at 100, where oxfmt keeps an
-// object broken once it was: both passes replay here.
+// Render lays out evaluators.generated.ts from the definitions, as oxfmt does
+// at 100 columns.
 func Render(definitions []rules.Definition) []byte {
 	schemas := &jsObject{hard: true}
 	entries := &jsObject{hard: true}
@@ -52,14 +51,10 @@ func Render(definitions []rules.Definition) []byte {
 		schemas.props = append(schemas.props, jsProp{definition.Slug, zodChain{z("object", settings)}})
 		entries.props = append(entries.props, jsProp{definition.Slug, entry(definition, defaults)})
 	}
-	body := func(p printer, width int, broke func(*jsObject)) string {
-		schemaDoc := concat(text("export const evaluatorsSchema = "), p.node(zodChain{z("object", schemas)}), text(";"))
-		entriesDoc := concat(text("} = "), p.node(entries), text(";"))
-		return layout(schemaDoc, width, broke) + fileMiddle + layout(entriesDoc, width, broke) + "\n"
-	}
-	brokenAt80 := map[*jsObject]bool{}
-	body(printer{hard: map[*jsObject]bool{}}, 80, func(o *jsObject) { brokenAt80[o] = true })
-	return []byte(fileHead + body(printer{hard: brokenAt80}, 100, func(*jsObject) {}))
+	var p printer
+	schemaDoc := concat(text("const evaluatorsSchemaDefinition = "), p.node(zodChain{z("object", schemas)}), text(";"))
+	entriesDoc := concat(text("} = "), p.node(entries), text(";"))
+	return []byte(fileHead + layout(schemaDoc, 100) + fileMiddle + layout(entriesDoc, 100) + "\n")
 }
 
 // settingsSchema is langevals' settings_to_zod.
@@ -233,9 +228,7 @@ func stringArray(values []string) jsArray {
 
 // printer turns catalogue values into layout documents the way prettier's
 // estree printer does, for the shapes the catalogue uses.
-type printer struct {
-	hard map[*jsObject]bool // objects a narrower pass broke
-}
+type printer struct{}
 
 func (p printer) node(value any) *doc {
 	switch v := value.(type) {
@@ -297,9 +290,7 @@ func (p printer) object(object *jsObject) *doc {
 		props[i] = p.property(prop)
 	}
 	members := join(concat(text(","), line), props)
-	d := group(concat(text("{"), indent(concat(line, members, ifBreak(text(","), nil))), line, text("}")), object.hard || p.hard[object])
-	d.object = object
-	return d
+	return group(concat(text("{"), indent(concat(line, members, ifBreak(text(","), nil))), line, text("}")), object.hard)
 }
 
 var identifier = regexp.MustCompile(`^[A-Za-z_$][A-Za-z0-9_$]*$`)

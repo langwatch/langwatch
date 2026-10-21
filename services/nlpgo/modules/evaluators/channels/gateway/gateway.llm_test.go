@@ -128,3 +128,14 @@ func TestCustomProviderAtAPrivateAddressIsRefused(t *testing.T) {
 	require.Error(t, err)
 	assert.Zero(t, hits.Load(), "the call must be refused before it leaves the runtime")
 }
+
+// @scenario "An unset max tokens budgets the judge at 128000 and sends none to the provider"
+func TestCompletionSendsMaxTokensOnlyFromTheTenantsParams(t *testing.T) {
+	unset, err := buildCompletion(chat(map[string]string{"X_LITELLM_api_key": "sk-tenant"}, "openai/gpt-4o-mini"))
+	require.NoError(t, err)
+	assert.NotContains(t, decodeBody(t, unset), "max_tokens")
+
+	set, err := buildCompletion(chat(map[string]string{"X_LITELLM_api_key": "sk-tenant", "X_LITELLM_max_tokens": "4000"}, "openai/gpt-4o-mini"))
+	require.NoError(t, err)
+	assert.InDelta(t, 4000, decodeBody(t, set)["max_tokens"], 0)
+}

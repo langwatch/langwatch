@@ -38,16 +38,14 @@ type judgeTrim struct {
 }
 
 // trimmedJudgeMessages trims as the older judges do, to the smaller of the
-// max tokens setting and the model's maximum.
+// max tokens setting (128000 when unset) and the model's maximum.
 func (j *judges) trimmedJudgeMessages(trim judgeTrim) ([]channels.Message, error) {
 	if j.tokensErr != nil {
 		return nil, j.tokensErr
 	}
 	messages := trim.messages
 	if limit := rules.JudgeMaxOutputTokens(trim.limitModel); limit > 0 {
-		if trim.maxTokens > 0 {
-			limit = min(trim.maxTokens, limit)
-		}
+		limit = min(trim.maxTokens, limit)
 		messages = j.tokens.TrimJudgeMessages(trim.model, messages, limit)
 	}
 	out := make([]channels.Message, len(messages))
@@ -85,7 +83,7 @@ func (j *judges) scoreCompetitor(ctx context.Context, settings rules.CompetitorL
 		return skippedResult("Input and Output are empty"), nil
 	}
 	prompt := "You are a competitor detection system. Your task is to determine whether a question explicitly or implicitly refers to any competitors.\n        This includes: comparisons between our brand and others, direct inquiries about competitors' products or services, and any mention of similar industries.\n        Remember that Your company is " + settings.Name + " - " + settings.Description + ".\n        If a question pertains to a related industry but not directly to our company, treat it as an implicit reference to competitors."
-	messages, err := j.trimmedJudgeMessages(judgeTrim{model: wire, limitModel: limit, maxTokens: settings.MaxTokens, messages: []rules.JudgeMessage{{Role: "system", Content: prompt}, {Role: "user", Content: content}}})
+	messages, err := j.trimmedJudgeMessages(judgeTrim{model: wire, limitModel: limit, maxTokens: settings.JudgeMaxTokens(), messages: []rules.JudgeMessage{{Role: "system", Content: prompt}, {Role: "user", Content: content}}})
 	if err != nil {
 		return contract.Result{}, err
 	}
@@ -123,7 +121,7 @@ func (j *judges) scoreCompetitorFunctionCall(ctx context.Context, settings rules
 		competitors += competitor + "\n"
 	}
 	prompt := "Remember that you are an advanced competitor detection system, developed by " + settings.Name + " - " + settings.Description + ".\n                    Your task is to identify mentions of competitors in any given message.\n                    The competitors specialize in the same field as your company and are listed below:\n\n                    Competitors:\n                    " + competitors + "\n\n                    Identify if the competitor was mentioned in the following message: " + content
-	messages, err := j.trimmedJudgeMessages(judgeTrim{model: wire, limitModel: limit, maxTokens: settings.MaxTokens, messages: []rules.JudgeMessage{{Role: "user", Content: prompt}}})
+	messages, err := j.trimmedJudgeMessages(judgeTrim{model: wire, limitModel: limit, maxTokens: settings.JudgeMaxTokens(), messages: []rules.JudgeMessage{{Role: "user", Content: prompt}}})
 	if err != nil {
 		return contract.Result{}, err
 	}
@@ -187,7 +185,7 @@ func (j *judges) scoreOffTopic(ctx context.Context, settings rules.OffTopicSetti
 	}
 	descriptions, intents := offTopicIntents(settings.AllowedTopics)
 	prompt := "You are an intent classification system. Your goal is to identify the intent of the message. Consider these intents and their following descriptions: " + strings.Join(descriptions, "\n #")
-	messages, err := j.trimmedJudgeMessages(judgeTrim{model: wire, limitModel: wire, maxTokens: settings.MaxTokens, messages: []rules.JudgeMessage{{Role: "system", Content: prompt}, {Role: "user", Content: content}}})
+	messages, err := j.trimmedJudgeMessages(judgeTrim{model: wire, limitModel: wire, maxTokens: settings.JudgeMaxTokens(), messages: []rules.JudgeMessage{{Role: "system", Content: prompt}, {Role: "user", Content: content}}})
 	if err != nil {
 		return contract.Result{}, err
 	}
@@ -270,7 +268,7 @@ func (j *judges) scoreQueryResolution(ctx context.Context, settings rules.LLMEva
 		return skippedResult("The conversation is empty"), nil
 	}
 	prompt := "You are an accurate Query Resolution Evaluator. Your goal is to find out if all of the user querries were resolved in the conversation with the chatbot."
-	messages, err := j.trimmedJudgeMessages(judgeTrim{model: wire, limitModel: wire, maxTokens: settings.MaxTokens, messages: []rules.JudgeMessage{{Role: "system", Content: prompt}, {Role: "user", Content: conversation}}})
+	messages, err := j.trimmedJudgeMessages(judgeTrim{model: wire, limitModel: wire, maxTokens: settings.JudgeMaxTokens(), messages: []rules.JudgeMessage{{Role: "system", Content: prompt}, {Role: "user", Content: conversation}}})
 	if err != nil {
 		return contract.Result{}, err
 	}

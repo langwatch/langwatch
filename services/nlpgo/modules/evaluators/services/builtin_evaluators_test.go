@@ -44,7 +44,7 @@ func catalogueDefinition(t *testing.T, slug string) rules.Definition {
 
 // @scenario "Settings of the wrong type are refused"
 func TestEvaluateRefusesAWrongTypedSettingBeforeAnyModelCall(t *testing.T) {
-	scoreByModel := func(ctx context.Context, settings rules.LLMPromptSettings, in services.EntryRun) (contract.Result, error) {
+	scoreByModel := func(ctx context.Context, settings rules.CustomLLMScoreSettings, in services.EntryRun) (contract.Result, error) {
 		_, err := in.Models.Complete(ctx, channels.CompletionRequest{Model: settings.Model})
 		return contract.Result{Status: contract.StatusProcessed}, err
 	}
