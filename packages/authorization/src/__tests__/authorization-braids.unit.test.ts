@@ -8,6 +8,7 @@ import {
   projectIdsReadBy,
   readScopeKeyOf,
   sealAuthorization,
+  withoutSpanBraids,
 } from "../index";
 
 /**
@@ -105,6 +106,38 @@ describe("a proof carrying braids", () => {
       expect(
         narrowAuthorization({ authorization: proof([own, braid()]), projectId: OWNER }),
       ).toBeNull();
+    });
+  });
+
+  describe("when its braids are stripped", () => {
+    it("keeps every grant but the braids, still sealed", () => {
+      const stripped = withoutSpanBraids(proof([own, braid()]));
+
+      expect(stripped.grants.map((grant) => grant.projectId)).toEqual([READER]);
+      expect(narrowAuthorization({ authorization: stripped, projectId: READER })).not.toBeNull();
+    });
+
+    it("keeps the narrowing, so a narrowed proof stays on its project", () => {
+      const narrowed = narrowAuthorization({
+        authorization: proof([own, braid()]),
+        projectId: READER,
+      });
+
+      expect(narrowed && withoutSpanBraids(narrowed).narrowedTo).toBe(READER);
+    });
+
+    it("returns a proof with no braids as it is", () => {
+      const plain = proof([own]);
+
+      expect(withoutSpanBraids(plain)).toBe(plain);
+    });
+
+    it("refuses a forged proof", () => {
+      const forged = { ...proof([own, braid()]) };
+
+      expect(() => withoutSpanBraids(forged)).toThrow(
+        expect.objectContaining({ code: "authorization_forged" }),
+      );
     });
   });
 

@@ -355,7 +355,7 @@ Feature: Braids
 
   Rule: Braids pause below Enterprise and are kept
 
-    @integration @unimplemented
+    @unit
     Scenario: After leaving Enterprise, braids stop showing and are kept
       Given a live braid from "specialists" into "orchestrator"
       When the organisation leaves Enterprise

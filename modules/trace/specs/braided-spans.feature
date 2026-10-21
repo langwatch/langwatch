@@ -162,6 +162,12 @@ Feature: Braided spans in the reader's traces
         | a trace export                  |
         | Langy                           |
 
+    @unit
+    Scenario: A public share link of a trace shows only the project's own spans
+      Given an "orchestrator" trace holding braided spans
+      When someone opens a public share link to it
+      Then only "orchestrator" spans are read
+
   Rule: Evaluations are not shared in either direction
 
     @integration @unimplemented

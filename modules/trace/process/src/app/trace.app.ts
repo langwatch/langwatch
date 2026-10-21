@@ -1,5 +1,10 @@
 import { ApiKeyApi } from "@langwatch/api-key-contract";
-import { internalActor, narrowAuthorization, projectIdsReadBy } from "@langwatch/authorization";
+import {
+  internalActor,
+  narrowAuthorization,
+  projectIdsReadBy,
+  withoutSpanBraids,
+} from "@langwatch/authorization";
 /**
  * Trace feature application: one typed contract replacing five previous bags.
  * Rules: attribution (caller stamped), full resolution on consuming reads,
@@ -317,6 +322,7 @@ import { TraceQueryEvaluationService } from "../features/query/services/trace-qu
 import { TraceQueryFieldsService } from "../features/query/services/trace-query-fields.service.ts";
 import { TraceQueryTranslationService } from "../features/query/services/trace-query-translation.service.ts";
 import { TraceSearchRouterService } from "../features/query/services/trace-search-router.service.ts";
+import { TraceBraidPauseService } from "../features/read/services/trace-braid-pause.service.ts";
 import { TraceContentReadService } from "../features/read/services/trace-content-read.service.ts";
 import { TraceListService } from "../features/read/services/trace-list-read.service.ts";
 import { TraceLogRecordIOService } from "../features/read/services/trace-log-record-io.service.ts";
@@ -740,6 +746,8 @@ export interface TraceAppDependencies {
    * carry the registry's enterprise ceiling.
    */
   requestBounds: Pick<EntitlementApi, "requestBound">;
+  /** The plan the merged read asks before honouring braids; absent, braids pause (ADR-183 §9). */
+  braidPlans?: Pick<EntitlementApi, "getActivePlan">;
   /**
    * The export download door's tier-effective rate window and in-flight
    * slots. Absent on a process that serves no export door; the door then
@@ -859,6 +867,7 @@ type TraceReaderCompositionOptions = {
    * only carry the registry's enterprise ceiling.
    */
   requestBounds: TraceAppDependencies["requestBounds"];
+  braidPlans?: TraceAppDependencies["braidPlans"];
   /** The export door's rate window and in-flight slots, built by the app from its registry. */
   exportBounds: TraceAppDependencies["exportBounds"];
   shareReadLimiter?: TraceAppDependencies["shareReadLimiter"];
@@ -945,6 +954,7 @@ export class TraceModule implements TraceApi, CollectorApp {
         codingAgentSpanFilterEnabled: !disableCodingAgentSpanFilter,
         ...(publicBaseUrl === undefined ? {} : { publicBaseUrl }),
         requestBounds: dependencies.plans,
+        braidPlans: dependencies.plans,
         ingestAllowance: TraceIngestAllowanceService.create({ entitlement: dependencies.plans }),
         exportBounds: TraceExportBoundsService.create({
           entitlement: dependencies.plans,
@@ -1224,6 +1234,7 @@ export class TraceModule implements TraceApi, CollectorApp {
       authorizeRead: ({ codePath, ...params }) =>
         foldReadAuthorizer({ authz: options.protections.authz, codePath })(params),
       requestBounds: options.requestBounds,
+      ...(options.braidPlans === undefined ? {} : { braidPlans: options.braidPlans }),
       exportBounds: options.exportBounds,
       shareReadLimiter: options.shareReadLimiter,
       ...(options.apiKeys
@@ -1396,6 +1407,7 @@ export class TraceModule implements TraceApi, CollectorApp {
   #aiQuery: TraceAiQueryService | null;
   #searchRouter: TraceSearchRouterService | null;
   #sharedRead: TraceSharedReadService | null;
+  #braidPause: TraceBraidPauseService;
   #transcriptRead: TraceTranscriptReadService;
   #exportProgress: TraceExportProgressService;
   #tenantUpdates: TraceTenantUpdateStreamService;
@@ -1412,12 +1424,16 @@ export class TraceModule implements TraceApi, CollectorApp {
     });
     this.#exportProgress = TraceExportProgressService.create({ updates: this.#tenantUpdates });
     const { authorizeRead } = dependencies;
+    this.#braidPause = TraceBraidPauseService.create({ plans: dependencies.braidPlans ?? null });
     this.#sharedRead =
       dependencies.protections && dependencies.shareReadLimiter && authorizeRead
         ? TraceSharedReadService.create({
             reads: this,
-            authorize: (params) =>
-              authorizeRead({ ...params, codePath: "api/routers/sharedTrace" }),
+            // A share link shows only the project's own spans (ADR-183 §5).
+            authorize: async (params) =>
+              withoutSpanBraids(
+                await authorizeRead({ ...params, codePath: "api/routers/sharedTrace" }),
+              ),
             share: dependencies.share,
             projects: dependencies.projects,
             protections: dependencies.protections,
@@ -2801,18 +2817,19 @@ export class TraceModule implements TraceApi, CollectorApp {
   // -------------------------------------------------------------------------
 
   /** Port of main's `authorizationForTrace`: the detail reads go through the trace's member. */
-  authorizationForTrace(input: {
+  async authorizationForTrace(input: {
     authorization: Authorization;
     traceId: string;
     tenantId?: string | undefined;
   }): Promise<Authorization> {
     const summary = this.#dependencies.traces.summary;
     if (!summary.getTraceAuthorization) throw new Error("Trace member narrowing is unavailable");
-    return summary.getTraceAuthorization({
+    const authorization = await summary.getTraceAuthorization({
       authorization: input.authorization,
       traceId: input.traceId,
       ...(input.tenantId !== undefined ? { tenantId: input.tenantId } : {}),
     });
+    return this.#braidPause.honoured({ authorization });
   }
 
   /** One trace's summary fold, read from the named member when the header names one. */

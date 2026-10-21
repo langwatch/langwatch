@@ -221,6 +221,19 @@ export function narrowAuthorization({
   });
 }
 
+/** The same proof without its braids, for a read that may not honour them (ADR-183 §5, §9).
+ *  A proof with none is returned as it is; a forged proof is refused. */
+export function withoutSpanBraids(authorization: Authorization): Authorization {
+  if (!isSealedAuthorization(authorization)) {
+    throw new ForgedAuthorizationError();
+  }
+  if (!authorization.grants.some(isSpanBraidGrant)) return authorization;
+  return sealAuthorization({
+    ...authorization,
+    grants: authorization.grants.filter((grant) => !isSpanBraidGrant(grant)),
+  });
+}
+
 /** The projects a proof reads in: its grants under `permission` bar braids, cut to `narrowedTo`
  *  when set. */
 export function projectIdsReadBy(
