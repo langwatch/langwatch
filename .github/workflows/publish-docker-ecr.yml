@@ -49,10 +49,9 @@ on:
 permissions:
   contents: read
 
-# Never cancel in flight. A superseded run may already have pushed some of the
-# per-arch layers, and every commit that lands on main needs its own `git-<sha>`
-# published rather than being voided by the commit after it — the same rule
-# code-scanners.yml and langwatch-app-ci.yml apply to main.
+# Never cancel in flight: a superseded run may already have pushed per-arch layers.
+# Merges that land while one builds wait as one: each newer commit replaces the
+# waiting one, so a burst builds its first and its newest commit. A release has its own group.
 concurrency:
   group: publish-docker-ecr-${{ github.ref }}
   cancel-in-progress: false
