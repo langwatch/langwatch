@@ -270,7 +270,7 @@ export class McpSessionService {
 /**
  * Enqueues `text` on each stream the transport holds open, answering how many took it.
  * WORKAROUND: the SDK keeps its stream controllers private; checked against
- * @modelcontextprotocol/sdk@1.31.0, and a changed shape writes nothing rather than throwing.
+ * @modelcontextprotocol/sdk@1.32.0, and a changed shape writes nothing rather than throwing.
  */
 function writeToOpenStreams(transport: StreamableHTTPServerTransport, text: string): number {
   const transportFields: Record<string, unknown> = Object(transport);
