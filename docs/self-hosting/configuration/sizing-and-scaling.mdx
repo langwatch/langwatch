@@ -137,6 +137,7 @@ How much trace data each profile can take. Each profile accepts spans faster tha
 | `size-prod.yaml` | ~2,500 | ~700 | ~60M | ~1.8B | ~60 GB | 3Gi |
 | `size-ha.yaml` | ~2,500 | ~800 | ~70M | ~2.1B | ~70 GB | 3Gi |
 
+- These rates are for traffic from many projects. One project on its own processes about 60 spans per second under the default per-project limit: if most of your traffic comes from one project, [raise the limit](#per-project-limit).
 - Per day, per month and disk follow the processing rate, which is what the install keeps up with all day.
 - Treat these as ceilings and plan to run at about 70% of them. Long prompts and completions lower them.
 - Per day and per month assume the same rate around the clock. Size for your busiest hour.
@@ -171,6 +172,8 @@ Redis needs about 2.5 MiB of memory limit for each span per second; the table ro
 The queue for bursts lives in Redis too. Each waiting span takes about 8 KB, so a minute at 500 spans per second above the processing rate needs about 240 MiB more.
 
 To accept more, add app replicas (each core takes about 700 spans per second) and give Redis up to 1 CPU.
+
+### Per-project limit
 
 Each project gets a fair share of the workers, so one busy project can't slow down the others.
 
