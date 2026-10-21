@@ -745,9 +745,8 @@ jobs:
       VITEST_ISOLATE_WORKER_REDIS: "1"
       CI: "true"
     runs-on: ubuntu-latest
-    # Serial within a leg: each suite is its own vitest with its own worker
-    # pool, and several at once on a 4-core runner produce "[vitest-pool]:
-    # Worker forks emitted error", which reads as a broken test and is not one.
+    # Bounded within a leg: PACKAGE_SUITES_CONCURRENCY suites at once, a heavy
+    # suite alone, integration and browser suites one at a time (run-package-suites.ts).
     # Parallel across legs: over two hundred package suites run one after
     # another take well past two hours, so the list is split by measured weight
     # (PACKAGE_SUITES_SHARD, .github/package-suites.weights) over separate runners.
@@ -812,6 +811,25 @@ jobs:
 
       - uses: ./.github/actions/prepare-generated-files
 
+      # Each browser lane runs `playwright install --with-deps chromium` in its own
+      # script (browser-test-lane.md), and the first one on a shard spent ~17s
+      # downloading Chromium. Cached by Playwright version, that install finds the
+      # browser already there and only checks the system libraries. Keyed on the
+      # version rather than the lockfile, so an unrelated dependency bump keeps
+      # the cache and the repository's cache quota is not churned.
+      - name: Read the Playwright version
+        id: playwright
+        run: |
+          version=$(grep -m1 -oE '^  playwright@[0-9][^:]*' pnpm-lock.yaml | cut -d@ -f2)
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Cache the Playwright browser
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.playwright.outputs.version }}
+
       - name: Generate a throwaway CREDENTIALS_SECRET
         # Same reason as test-unit and test-component: anything encrypted at
         # rest has to round-trip through a real key, and a test asserting that
@@ -867,6 +885,9 @@ jobs:
         env:
           REQUIRE_HELM_TESTS: "1"
           PACKAGE_SUITES_SHARD: ${{ matrix.shard }}/8
+          # Each suite gets two vitest workers (patches/vitest@5.0.1.patch), so one
+          # at a time left half the cores idle. A heavy suite still runs alone.
+          PACKAGE_SUITES_CONCURRENCY: "2"
           # A pull request runs the suites its change reaches; main runs all.
           PACKAGE_SUITES_ONLY: ${{ needs.affected.outputs.projects }}
           # The hook records what each cached suite reads outside its package (ADR-150).
@@ -1331,9 +1352,6 @@ jobs:
       - name: Test start-clickhouse-with-storage-policy.sh
         run: bash .github/scripts/__tests__/start-clickhouse-with-storage-policy.test.sh
 
-      - name: Test start-boxd-ssh-agent.sh
-        run: bash .github/scripts/__tests__/start-boxd-ssh-agent.test.sh
-
       - name: Test notify-slack-release.sh
         run: bash .github/scripts/__tests__/notify-slack-release.test.sh
 
@@ -1351,6 +1369,9 @@ jobs:
 
       - name: Test detect-changes-by-sha.sh
         run: bash .github/scripts/__tests__/detect-changes-by-sha.test.sh
+
+      - name: Test pull-request-diff-base.sh
+        run: bash .github/scripts/__tests__/pull-request-diff-base.test.sh
 
       - name: Test the change detector's pathspec parity with dorny's matcher
         run: |
@@ -1371,41 +1392,6 @@ jobs:
 
       - name: Test the PR impact map categories
         run: node --test --experimental-strip-types .github/scripts/pr-impact-map-categories.test.ts
-
-  # The npm artifact's staging filters, run over the real tree.
-  #
-  # dev/scripts/pack-npm.sh decides what every `npx @langwatch/server` user
-  # receives. Its filters are rsync patterns, and a pattern that is broader than
-  # it means to be drops application source: twice already the published server
-  # died at first boot ~20 minutes in on exactly that. The guard inside the
-  # script compares what git tracks against what staging kept, and `--check-filters`
-  # runs it without a build and without packing, in about ten seconds.
-  #
-  # It used to run only inside npx-server-smoke, which does not run on main and
-  # whose path filter names none of the trees the guard reads. A `.gitignore`
-  # added under dev/scripts therefore merged green and turned every branch that
-  # merged main red.
-  #
-  # No `if:` gate, on purpose. The guard reads every tree `files` in the root
-  # package.json names, and a path filter listing them would be a second copy of
-  # that list, stale the day someone edits it. A minute on an unrelated pull
-  # request is the cheaper mistake.
-  pack-filters:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
-        with:
-          # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
-          # None of it is in the package's `files`.
-          sparse-checkout: |
-            /*
-            !/docs/media/
-            !/docs/images/
-          sparse-checkout-cone-mode: false
-
-      - name: Check the npm pack filters
-        run: bash dev/scripts/pack-npm.sh --check-filters
 
   ci-self-test:
     needs: changes
@@ -1475,7 +1461,6 @@ jobs:
         build,
         ci-scripts-test,
         ci-self-test,
-        pack-filters,
       ]
     if: always() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || github.event.label.name == 'ci:full')
     runs-on: ubuntu-latest

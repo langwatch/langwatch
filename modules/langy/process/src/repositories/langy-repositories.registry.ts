@@ -9,6 +9,7 @@ import { defineRepositories } from "@langwatch/process";
 import type { LangyAnalyticsEventRepository } from "./langy-analytics-event.repository.ts";
 import type { LangyConversationRepository } from "./langy-conversation-projection.repository.ts";
 import type { LangyCredentialRepository } from "./langy-credential.repository.ts";
+import type { LangyDeleteConfirmationRepository } from "./langy-delete-confirmation.repository.ts";
 import type { LangyFeedbackPromptRepository } from "./langy-feedback-prompt.repository.ts";
 import type { LangyGithubPrCountRepository } from "./langy-github-pr-count.repository.ts";
 import type {
@@ -44,6 +45,8 @@ export interface LangyRepositories extends LangyDatabaseRepositories {
   readonly localCalls: LangyLocalCallRepository;
   readonly localUserWaits: LangyLocalUserWaitRepository;
   readonly localControlRequests: LangyLocalControlRequestRepository;
+  /** Which conversation each Langy key works for, its waiting cards and unspent Yes clicks. */
+  readonly deleteConfirmations: LangyDeleteConfirmationRepository;
   /** The per-user daily count of pull requests Langy opened. */
   readonly githubPrCounts: LangyGithubPrCountRepository;
   /** When each person was last asked for feedback. */

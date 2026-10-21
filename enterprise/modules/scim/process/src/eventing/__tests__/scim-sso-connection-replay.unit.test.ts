@@ -188,14 +188,14 @@ function identityStandIn() {
 }
 
 /** A worker installing SCIM over memory stores, whose eventing replays over the seeded log. */
-async function bootWorker() {
+async function bootWorker({ log = identityLog }: { log?: ReplayEvent[] } = {}) {
   const closed: string[] = [];
   const eventing = new EventSourcing({
     enabled: false,
     processStore: InMemoryProcessStore.createForTesting(),
     replayEngine: () => ({
       service: new ReplayService({
-        eventSource: new SeededIdentityLog(identityLog),
+        eventSource: new SeededIdentityLog(log),
         redis: memoryRedisDouble({
           script: { hdel: async () => 0, hlen: async () => 0, lpush: async () => 0 },
         }),
@@ -237,6 +237,7 @@ describe("given a worker installing SCIM over an empty connection view and ident
     const saved: MigrationStepReport[] = [];
     const pass = (resumeFrom: MigrationStepReport | null) =>
       step?.run({
+        log: { info: () => undefined, warn: () => undefined },
         checkpoint: { resumeFrom, save: async ({ report }) => void saved.push(report) },
         dryRun: false,
         signal: new AbortController().signal,
@@ -274,6 +275,7 @@ describe("given a worker installing SCIM over identity's connection log", () => 
 
     try {
       await step?.run({
+        log: { info: () => undefined, warn: () => undefined },
         checkpoint: { resumeFrom: null, save: async ({ report }) => void saved.push(report) },
         dryRun: false,
         signal: new AbortController().signal,
@@ -286,6 +288,61 @@ describe("given a worker installing SCIM over identity's connection log", () => 
       await expect(
         runtime.service(ScimApi).findConnections({ organizationId: "org_acme" }),
       ).resolves.toHaveLength(1);
+    } finally {
+      await runtime.stop();
+    }
+  });
+});
+
+/**
+ * A registration written between 2026-08-25 and 2026-09-21 (95512d492b6..d41f19a46ef) states
+ * `allowsJit` and no `arrivalPolicy`; production's log still holds them.
+ */
+function legacyRegistration({ id, allowsJit }: { id: string; allowsJit?: boolean }): ReplayEvent {
+  const data: Record<string, unknown> = {
+    connectionId: id,
+    organizationId: "org_acme",
+    type: "oidc",
+    idp: { issuer: null, providerId: id, clientIdRef: null, secretRef: null, certRefs: [] },
+    actor,
+    source: "legacy-grandfathered",
+  };
+  if (allowsJit !== undefined) data.allowsJit = allowsJit;
+  return {
+    ...fact({ n: 1, type: CONNECTION_REGISTERED_EVENT_TYPE, data }),
+    id: `${id}-1`,
+    aggregateId: id,
+  };
+}
+
+describe("given identity's log holds registrations written before the arrival policy existed", () => {
+  /** @scenario "SCIM's connection view replay reads a registration written before the arrival policy existed" */
+  it("replays every legacy registration into the view instead of failing the batch", async () => {
+    const log = [
+      legacyRegistration({ id: "conn_jit", allowsJit: true }),
+      legacyRegistration({ id: "conn_closed", allowsJit: false }),
+      legacyRegistration({ id: "conn_unstated" }),
+    ];
+    const { runtime } = await bootWorker({ log });
+    const step = runtime.migrationSteps(isMigrationStep).find(({ id }) => id === STEP_ID);
+
+    try {
+      const report = await step?.run({
+        log: { info: () => undefined, warn: () => undefined },
+        checkpoint: { resumeFrom: null, save: async () => undefined },
+        dryRun: false,
+        signal: new AbortController().signal,
+      });
+
+      expect(report).toMatchObject({ aggregatesReplayed: 3, totalEvents: 3 });
+      const connections = await runtime
+        .service(ScimApi)
+        .findConnections({ organizationId: "org_acme" });
+      expect(connections.map(({ connectionId }) => connectionId).toSorted()).toEqual([
+        "conn_closed",
+        "conn_jit",
+        "conn_unstated",
+      ]);
     } finally {
       await runtime.stop();
     }

@@ -6,7 +6,7 @@ The server half of [trace](../README.md). Traces: ingestion and canonicalisation
 
 ## Installation
 
-`defineProcessModule("trace").withRepositories(traceRepositories).withChannels(traceChannels).withApi(TraceModule).withTransports(tracesTrpcTransport, sharedTraceTrpcTransport, spansTrpcTransport, exportProgressTrpcTransport, traceEditOverlayTrpcTransport, traceExportRest, traceLegacyRest, tracesRest, trackedEventRest, trackedEventLegacyPathRest, collectorRest, otlpIngestRest).provideMiddlewareContext(…).withDoors(…).withEventing(traceProcessingEventing).withEventing(traceProjectMilestonesEventing).withEventing(traceCollectorEvaluationsEventing).withEventing(traceIngestSourceBillingEventing).withMigrations(…)`, `src/trace.module.ts:36`.
+`defineProcessModule("trace").withRepositories(traceRepositories).withChannels(traceChannels).withApi(TraceModule).withTransports(tracesTrpcTransport, sharedTraceTrpcTransport, spansTrpcTransport, exportProgressTrpcTransport, traceEditOverlayTrpcTransport, traceExportRest, traceLegacyRest, tracesRest, trackedEventRest, trackedEventLegacyPathRest, collectorRest, otlpIngestRest).provideMiddlewareContext(…).withDoors(…).withEventing(traceProcessingEventing).withEventing(traceProjectMilestonesEventing).withEventing(traceCollectorEvaluationsEventing).withEventing(traceIngestSourceBillingEventing).withMigrations(…).withIdIndexes(TRACE_ID_INDEXES, …)`, `src/trace.module.ts:37`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -1043,9 +1043,9 @@ Public: Trace collection API key resolved in-handler, so the refusal carries the
 Answers at `/api/collector`.
 
 ```typescript
-// Body: inline, src/transport/collector.rest.ts:297
+// Body: inline, src/transport/collector.rest.ts:298
 type Body = Record<string, unknown>;
-// Response: inline, src/transport/collector.rest.ts:305
+// Response: inline, src/transport/collector.rest.ts:306
 type Response = unknown;
 ```
 
@@ -1065,8 +1065,8 @@ Authenticated: the OTLP ingest door's resolved key is the whole gate, as on main
 Answers at `/api/otel/v1/traces`.
 
 ```typescript
-// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:275)
-// Response: inline, src/transport/otlp-ingest.rest.ts:278
+// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:276)
+// Response: inline, src/transport/otlp-ingest.rest.ts:279
 type Response = unknown;
 ```
 
@@ -1087,7 +1087,7 @@ Answers at `/api/export/traces/download`.
 
 ```typescript
 type Body = z.infer<typeof traceExportRequestSchema>; // ../contract/src/features/export/trace-export.vocabulary.ts:87
-// Response: inline, src/transport/trace-export.rest.ts:35
+// Response: inline, src/transport/trace-export.rest.ts:36
 type Response = unknown;
 ```
 
@@ -1132,7 +1132,7 @@ Answers at `/api/trace/:id/share`.
 
 ```typescript
 type Params = z.infer<typeof traceLegacyIdParamsSchema>; // ../contract/src/trace-rest.schemas.ts:152
-// Response: inline, src/transport/trace-legacy.rest.ts:411
+// Response: inline, src/transport/trace-legacy.rest.ts:412
 type Response = unknown;
 ```
 
@@ -1140,13 +1140,13 @@ type Response = unknown;
 
 Deletes a public path for a trace
 
-Permission `traces:share`. Declared at `src/transport/trace-legacy.rest.ts:427`.
+Permission `traces:share`. Declared at `src/transport/trace-legacy.rest.ts:428`.
 
 Answers at `/api/trace/:id/unshare`.
 
 ```typescript
 type Params = z.infer<typeof traceLegacyIdParamsSchema>; // ../contract/src/trace-rest.schemas.ts:152
-// Response: inline, src/transport/trace-legacy.rest.ts:431
+// Response: inline, src/transport/trace-legacy.rest.ts:433
 type Response = unknown;
 ```
 
@@ -1154,20 +1154,20 @@ type Response = unknown;
 
 Search traces
 
-Permission `traces:view`. Declared at `src/transport/trace-legacy.rest.ts:450`.
+Permission `traces:view`. Declared at `src/transport/trace-legacy.rest.ts:452`.
 
 Answers at `/api/trace/search`.
 
 ```typescript
-// Body: inline, src/transport/trace-legacy.rest.ts:452
+// Body: inline, src/transport/trace-legacy.rest.ts:455
 type Body = Record<string, unknown>;
-// Response: inline, src/transport/trace-legacy.rest.ts:456
+// Response: inline, src/transport/trace-legacy.rest.ts:459
 type Response = unknown;
 ```
 
 #### `GET /api/thread/:threadId` · `getLegacyThread`
 
-Permission `traces:view`. Hidden from the OpenAPI document. Declared at `src/transport/trace-legacy.rest.ts:478`.
+Permission `traces:view`. Hidden from the OpenAPI document. Declared at `src/transport/trace-legacy.rest.ts:481`.
 
 Answers at `/api/thread/:threadId`.
 
@@ -1176,7 +1176,7 @@ Answers at `/api/thread/:threadId`.
 interface Params {
   threadId: string;
 }
-// Response: inline, src/transport/trace-legacy.rest.ts:482
+// Response: inline, src/transport/trace-legacy.rest.ts:485
 type Response = unknown;
 ```
 
@@ -1200,7 +1200,7 @@ Answers at `/api/traces/search`, `/api/v1/traces/search`; also, undocumented, `/
 
 ```typescript
 type Body = z.infer<typeof traceSearchBodySchema>; // ../contract/src/trace-rest.schemas.ts:124
-// Response: inline, src/transport/traces.rest.ts:315
+// Response: inline, src/transport/traces.rest.ts:316
 type Response = unknown;
 ```
 
@@ -1208,7 +1208,7 @@ type Response = unknown;
 
 Discover what the trace filter fields hold
 
-Permission `traces:view`. Declared at `src/transport/traces.rest.ts:337`.
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:338`.
 
 Answers at `/api/traces/facets`, `/api/v1/traces/facets`; also, undocumented, `/api/traces/2026-08-07/facets`, `/api/v1/traces/2026-08-07/facets`, `/api/traces/latest/facets`, `/api/v1/traces/latest/facets`.
 
@@ -1230,7 +1230,7 @@ type Response = Record<string, unknown>;
 
 Derived coding-agent transcript for a trace: what the agent did, in order, with per-call token and cost economics. Empty entries for traces without coding-agent content.
 
-Permission `traces:view`. Declared at `src/transport/traces.rest.ts:370`.
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:371`.
 
 Answers at `/api/traces/:traceId/transcript`, `/api/v1/traces/:traceId/transcript`; also, undocumented, `/api/traces/2026-08-07/:traceId/transcript`, `/api/v1/traces/2026-08-07/:traceId/transcript`, `/api/traces/latest/:traceId/transcript`, `/api/v1/traces/latest/:traceId/transcript`.
 
@@ -1246,7 +1246,7 @@ type Response = z.infer<typeof transcriptRestResponseSchema>; // ../contract/src
 
 Update metadata on a trace after creation. Inserts a synthetic span carrying the new attributes through the standard ingestion pipeline. New keys are added, existing keys are updated, missing keys are preserved. Labels replace entirely.
 
-Permission `traces:update`. Declared at `src/transport/traces.rest.ts:409`.
+Permission `traces:update`. Declared at `src/transport/traces.rest.ts:410`.
 
 Answers at `/api/traces/:traceId/metadata`, `/api/v1/traces/:traceId/metadata`; also, undocumented, `/api/traces/2026-08-07/:traceId/metadata`, `/api/v1/traces/2026-08-07/:traceId/metadata`, `/api/traces/latest/:traceId/metadata`, `/api/v1/traces/latest/:traceId/metadata`.
 
@@ -1266,7 +1266,7 @@ interface Response {
 
 Get a single trace by ID.
 
-Permission `traces:view`. Declared at `src/transport/traces.rest.ts:434`.
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:436`.
 
 Answers at `/api/traces/:traceId`, `/api/v1/traces/:traceId`; also, undocumented, `/api/traces/2026-08-07/:traceId`, `/api/v1/traces/2026-08-07/:traceId`, `/api/traces/latest/:traceId`, `/api/v1/traces/latest/:traceId`.
 
@@ -1296,7 +1296,7 @@ Permission `traces:create`. Declared at `src/transport/tracked-event.rest.ts:48`
 Answers at `/api/events/track`, `/api/v1/events/track`; also, undocumented, `/api/events/2026-08-07/track`, `/api/v1/events/2026-08-07/track`, `/api/events/latest/track`, `/api/v1/events/latest/track`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/tracked-event.rest.ts:50)
+// Rawbody: "text" (inline, src/transport/tracked-event.rest.ts:51)
 // Response: trackEventResponseSchema, ../contract/src/trace-rest.schemas.ts:291
 interface Response {
   message: "Event tracked";
@@ -1307,7 +1307,7 @@ interface Response {
 
 |             |                                          |
 | ----------- | ---------------------------------------- |
-| Declared at | `src/transport/tracked-event.rest.ts:83` |
+| Declared at | `src/transport/tracked-event.rest.ts:84` |
 | Base URL    | none: each route's path is its address   |
 | Addressing  | literal                                  |
 | Credential  | project                                  |
@@ -1316,12 +1316,12 @@ interface Response {
 
 Track an event (legacy path)
 
-Permission `traces:create`. Declared at `src/transport/tracked-event.rest.ts:88`.
+Permission `traces:create`. Declared at `src/transport/tracked-event.rest.ts:89`.
 
 Answers at `/api/track_event`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/tracked-event.rest.ts:90)
+// Rawbody: "text" (inline, src/transport/tracked-event.rest.ts:92)
 type Response = z.infer<typeof trackEventResponseSchema>; // ../contract/src/trace-rest.schemas.ts:291
 ```
 
@@ -1371,7 +1371,7 @@ Contract `../contract/src/traces.trpc.ts:620`, router `src/transport/shared-trac
 interface Input {
   token: string;
 }
-type Output = z.infer<typeof sharedTraceDtoSchema>; // ../contract/src/trace-share.schemas.ts:213
+type Output = z.infer<typeof sharedTraceDtoSchema>; // ../contract/src/trace-share.schemas.ts:215
 ```
 
 ### `spans`
@@ -1492,7 +1492,7 @@ interface Input {
   traceId: string;
   withEditOverlay?: boolean;
 }
-type Output = z.infer<typeof traceSchema>; // ../contract/src/trace-format.schemas.ts:816
+type Output = z.infer<typeof traceSchema>; // ../contract/src/trace-format.schemas.ts:822
 
 // traces.getEvaluations
 // Input: inline, ../contract/src/traces.trpc.ts:191
@@ -1996,14 +1996,16 @@ Declared at `src/features/ingestion/eventing/trace-ingest-source-billing.pipelin
 
 ## Configuration
 
-| Kind   | Leaf                           | Environment variable                         | Declared at                          |
-| ------ | ------------------------------ | -------------------------------------------- | ------------------------------------ |
-| config | `spanProcessingShards`         | `TRACE_SPAN_PROCESSING_SHARDS`               | `../contract/src/trace.config.ts:9`  |
-| config | `tokenizer.bpeDirectory`       | `TIKTOKENS_PATH`                             | `../contract/src/trace.config.ts:11` |
-| config | `tokenizer.fetchTimeoutMs`     | `TIKTOKEN_FETCH_TIMEOUT_MS`                  | `../contract/src/trace.config.ts:12` |
-| config | `tokenizer.disabled`           | `DISABLE_TOKENIZATION`                       | `../contract/src/trace.config.ts:16` |
-| config | `disableCodingAgentSpanFilter` | `LANGWATCH_DISABLE_CODING_AGENT_SPAN_FILTER` | `../contract/src/trace.config.ts:24` |
-| config | `foldCacheTtlSeconds`          | `LANGWATCH_FOLD_CACHE_TTL_SECONDS`           | `../contract/src/trace.config.ts:31` |
-| config | `publicBaseUrl`                | `BASE_HOST`                                  | `../contract/src/trace.config.ts:32` |
+| Kind   | Leaf                            | Environment variable                         | Declared at                          |
+| ------ | ------------------------------- | -------------------------------------------- | ------------------------------------ |
+| config | `spanProcessingShards`          | `TRACE_SPAN_PROCESSING_SHARDS`               | `../contract/src/trace.config.ts:13` |
+| config | `tokenizer.bpeDirectory`        | `TIKTOKENS_PATH`                             | `../contract/src/trace.config.ts:15` |
+| config | `tokenizer.fetchTimeoutMs`      | `TIKTOKEN_FETCH_TIMEOUT_MS`                  | `../contract/src/trace.config.ts:16` |
+| config | `tokenizer.disabled`            | `DISABLE_TOKENIZATION`                       | `../contract/src/trace.config.ts:20` |
+| config | `disableCodingAgentSpanFilter`  | `LANGWATCH_DISABLE_CODING_AGENT_SPAN_FILTER` | `../contract/src/trace.config.ts:28` |
+| config | `foldCacheTtlSeconds`           | `LANGWATCH_FOLD_CACHE_TTL_SECONDS`           | `../contract/src/trace.config.ts:35` |
+| config | `publicBaseUrl`                 | `BASE_HOST`                                  | `../contract/src/trace.config.ts:36` |
+| config | `objectRetentionConfirmed`      | `OBJECT_RETENTION_CONFIRMED`                 | `../contract/src/trace.config.ts:38` |
+| config | `legacySpoolRetentionConfirmed` | `AZURE_BLOB_SPOOL_RETENTION_CONFIRMED`       | `../contract/src/trace.config.ts:39` |
 
 <!-- readme:generated:end -->

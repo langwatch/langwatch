@@ -55,7 +55,8 @@
     "prisma:seed": "pnpm --filter @langwatch/prisma-client db:seed",
     "seed:dashboards-demo": "pnpm --filter @langwatch/tasks task dashboards-demo-seed && pnpm --filter @langwatch/tasks task lwql-provision",
     "pack:npm": "bash dev/scripts/pack-npm.sh",
-    "release:dry-run": "bash dev/scripts/pack-npm.sh && tar -tzf langwatch-server-*.tgz | head -50",
+    "pack:app": "bash dev/scripts/build-app-archive.sh && bash dev/scripts/check-app-archive.sh _pack/langwatch-app-*.tar.gz",
+    "release:dry-run": "bash dev/scripts/pack-npm.sh && tar -tzf langwatch-server-*.tgz",
     "build:types": "GOMAXPROCS=2 FORCE_COLOR=0 NX_LOAD_DOT_ENV_FILES=false nx run workspace:build:types --outputStyle=static",
     "nx": "nx",
     "graph": "nx graph",
@@ -80,6 +81,7 @@
     "oxfmt": "0.70.0",
     "oxlint": "catalog:",
     "oxlint-tsgolint": "catalog:",
+    "tsrs": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:"

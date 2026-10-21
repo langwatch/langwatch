@@ -427,12 +427,15 @@ func TestLLMProxy_ErrorCapture(t *testing.T) {
 			// The provider discriminant, or the status-derived fallback,
 			// expected as the captured cause's single typed reason.
 			wantCauseType string
+			// The account-level cause the proxy names beside it, when there is one.
+			wantAccountCause herr.Code
 		}{
 			{
 				name:             "anthropic real credit-balance body",
 				body:             `{"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."}}`,
 				formerlyCaptured: "Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.",
 				wantCauseType:    "invalid_request_error",
+				wantAccountCause: ErrProviderOutOfCredit,
 			},
 			{
 				name:             "codex backend usage limit",
@@ -445,6 +448,7 @@ func TestLLMProxy_ErrorCapture(t *testing.T) {
 				body:             `{"error":{"type":"invalid_request_error","code":"invalid_api_key","message":"Incorrect API key provided."}}`,
 				formerlyCaptured: "Incorrect API key provided.",
 				wantCauseType:    "invalid_api_key",
+				wantAccountCause: ErrProviderKeyRejected,
 			},
 			{
 				name:             "codex backend detail",
@@ -500,12 +504,22 @@ func TestLLMProxy_ErrorCapture(t *testing.T) {
 				if e.Meta["http_status"] != http.StatusBadRequest {
 					t.Errorf("captured http_status = %v, want 400", e.Meta["http_status"])
 				}
-				if len(e.Reasons) != 1 {
-					t.Fatalf("captured reasons = %d, want exactly one handled reason", len(e.Reasons))
+				wantReasons := 1
+				if tc.wantAccountCause != "" {
+					wantReasons = 2
+				}
+				if len(e.Reasons) != wantReasons {
+					t.Fatalf("captured reasons = %d, want %d", len(e.Reasons), wantReasons)
 				}
 				var cause herr.E
 				if !errors.As(e.Reasons[0], &cause) || string(cause.Code) != tc.wantCauseType {
 					t.Errorf("captured cause = %v, want code %q", e.Reasons[0], tc.wantCauseType)
+				}
+				if tc.wantAccountCause != "" {
+					var account herr.E
+					if !errors.As(e.Reasons[1], &account) || account.Code != tc.wantAccountCause {
+						t.Errorf("account cause = %v, want code %q", e.Reasons[1], tc.wantAccountCause)
+					}
 				}
 			})
 		}

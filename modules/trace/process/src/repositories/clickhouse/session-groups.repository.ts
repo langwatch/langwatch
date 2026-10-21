@@ -329,6 +329,7 @@ export class SessionGroupsClickHouseRepository implements SessionGroupsRepositor
 
     const client = this.clickhouse.as(args.authorization, { reads: "traces" });
     const result = await client.query({
+      // ID_BOUND_SKIP: a page's previews, bounded by the page's time range.
       query: `
         SELECT TenantId, TraceId, ComputedInput, ComputedOutput
         FROM ${TABLE_NAME}

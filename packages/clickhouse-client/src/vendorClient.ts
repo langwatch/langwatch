@@ -6,6 +6,7 @@
 
 import type { AbortSignalLike } from "./query.ts";
 import { runWithRetry } from "./retry.ts";
+import { turnsAsyncInsertOff, VIEW_DEDUP } from "./routingDriver.ts";
 import {
   StatementReporter,
   type StatementLogSink,
@@ -163,7 +164,7 @@ export class VendorClientResilience {
     const table = tableOf(params);
     const start = now();
     try {
-      const result = await client.insert(params);
+      const result = await client.insert(withInsertSettings(params));
       const durationMs = now() - start;
       this.report.success({ operation: "insert", durationMs, params });
       this.report.outcome({ queryType: "INSERT", table, durationMs, outcome: "success" });
@@ -267,6 +268,16 @@ function isJsonResult(value: unknown): value is JsonResult {
     "json" in value &&
     typeof value.json === "function"
   );
+}
+
+/** The routed driver's per-insert rule: only an insert that turns async off gets view dedup. */
+function withInsertSettings(params: unknown): unknown {
+  if (params === null || typeof params !== "object") return params;
+  const own = "clickhouse_settings" in params ? params.clickhouse_settings : undefined;
+  const settings: Record<string, unknown> =
+    own !== null && typeof own === "object" ? { ...own } : {};
+  if (!turnsAsyncInsertOff(settings.async_insert)) return params;
+  return { ...params, clickhouse_settings: { ...VIEW_DEDUP, ...settings } };
 }
 
 function tableOf(params: unknown): string {

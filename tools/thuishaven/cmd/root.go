@@ -228,7 +228,7 @@ func wire(logger *zap.Logger, isAgent bool, worktree, target string) deps {
 	chRuntime, ch := managedClickHouse(rt, settings)
 	pg := postgresbrew.New(envOr("HAVEN_PG_FORMULA", domain.DefaultPostgresFormula), envInt("HAVEN_PG_PORT", domain.DefaultPostgresPort))
 	rds := redisbrew.New(
-		envOr("HAVEN_REDIS_FORMULA", domain.DefaultRedisFormula),
+		envOr("HAVEN_REDIS_FORMULA", ""), // "": valkey or redis, whichever is installed
 		envInt("HAVEN_REDIS_PORT", domain.DefaultRedisPort),
 		envInt("HAVEN_REDIS_MAXMEMORY_MB", domain.DefaultRedisMaxMemoryMB),
 	)

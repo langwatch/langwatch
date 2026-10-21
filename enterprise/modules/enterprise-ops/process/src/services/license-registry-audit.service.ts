@@ -61,8 +61,8 @@ export class LicenseRegistryAuditService {
         page: query.page,
         pageSize: query.pageSize,
         hasSearch: Boolean(query.search),
-        onlyActive: query.onlyActive ?? false,
-        hideInternal: query.hideInternal ?? false,
+        status: query.status ?? "all",
+        audience: query.audience ?? "all",
       },
     });
     return this.registry.listIssuedLicenses(query);

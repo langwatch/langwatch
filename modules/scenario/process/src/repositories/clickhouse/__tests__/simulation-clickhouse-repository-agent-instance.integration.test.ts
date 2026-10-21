@@ -16,6 +16,7 @@ import {
 } from "../../../eventing/simulation-run-state.projection.ts";
 import { ClickHouseSimulationRunStateRepository } from "../clickhouse.simulation-run-state.repository.ts";
 import { SimulationClickHouseRepository } from "../simulation-clickhouse.repository.ts";
+import { scenarioClickHouseOver } from "./simulation-clickhouse-rows.fixture.ts";
 
 const configuredClickHouseUrl = process.env.TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL;
 const databaseUrl = configuredClickHouseUrl ? new URL(configuredClickHouseUrl) : null;
@@ -81,10 +82,10 @@ beforeAll(() => {
     clickhouse_settings: { date_time_input_format: "best_effort" },
   });
   stateRepository = ClickHouseSimulationRunStateRepository.create<SimulationRunState>({
-    resolveClient: async () => ch!,
+    resolveClient: scenarioClickHouseOver(ch),
     defaultRetentionDays: () => 30,
   });
-  runs = SimulationClickHouseRepository.create(async () => ch!);
+  runs = SimulationClickHouseRepository.create(scenarioClickHouseOver(ch));
 });
 
 afterAll(async () => {

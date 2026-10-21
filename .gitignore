@@ -261,3 +261,6 @@ dev/docs/plans/handover-*.md
 !.claude/handoffs/README.md
 .claude/manifests/*
 !.claude/manifests/README.md
+
+# npx server packs and app archives (dev/scripts/pack-npm.sh, build-app-archive.sh)
+/_pack/

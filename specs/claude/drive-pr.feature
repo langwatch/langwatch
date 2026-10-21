@@ -29,10 +29,18 @@ Feature: Drive PR to mergeable state
     When /drive-pr is invoked
     And CI checks pass
     And there are unresolved review comments
-    Then the skill addresses actionable comments
+    Then the skill addresses every actionable comment in one batch
     And replies to non-actionable comments with reasoning
-    And pushes changes
+    And pushes the batch as one push, not one push per comment
+    And requests a single re-review with "@coderabbitai review"
     And re-checks CI and reviews until both are green
+
+  Scenario: Lint or format finding in a review comment
+    Given a PR exists for the current branch
+    And a review comment reports a lint, format or PR-body finding
+    When /drive-pr addresses the comment
+    Then the skill runs the repository's tool to fix it
+    And does not hand-edit the code for the finding
 
   Scenario: PR with both CI failures and review comments
     Given a PR exists for the current branch

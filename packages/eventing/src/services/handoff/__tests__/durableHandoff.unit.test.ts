@@ -248,7 +248,7 @@ describe("durable hand-off", () => {
   });
 
   describe("given a fold whose key spans aggregates", () => {
-    /** @scenario "A lane keyed across aggregates cannot rebuild from one aggregate and retires dead" */
+    /** @scenario "A keyed lane that does not accept redelivery cannot rebuild from one aggregate and retires dead" */
     it("retires the row dead rather than rebuilding from one aggregate", async () => {
       const handoffStore = InMemoryProcessStore.createForTesting();
       const { store } = foldStoreInMemory();
@@ -265,6 +265,38 @@ describe("durable hand-off", () => {
 
       expect(report.dead).toHaveLength(1);
       expect(store.store).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("given a fold whose key spans aggregates and that accepts redelivery", () => {
+    /** @scenario "A keyed lane that accepts redelivery gets the single event re-sent" */
+    it("folds the missed event onto the live lane once without rebuilding", async () => {
+      const handoffStore = InMemoryProcessStore.createForTesting();
+      const { store, current } = foldStoreInMemory();
+      vi.mocked(store.store).mockRejectedValueOnce(new Error("clickhouse refused"));
+      const fold = createMockFoldProjectionDefinition("perOrganization", {
+        store,
+        init: () => ({ count: 0, seen: [], LastEventOccurredAt: 0 }),
+        apply: countEvent,
+      });
+      fold.key = () => "organization-1";
+      fold.options = { resendOnRedelivery: true };
+      const eventLoader = vi.fn(async () => []);
+      fold.eventLoader = eventLoader;
+      const { service, drain } = serviceWith({
+        handoffStore,
+        foldProjections: [sealFoldProjection(fold)],
+      });
+      const event = appended();
+
+      await service.storeEvents([event], { tenantId });
+      expect(current()).toBeNull();
+      const report = await drain(Date.now());
+
+      expect(report.dispatched).toHaveLength(1);
+      expect(report.dead).toHaveLength(0);
+      expect(current()?.state.seen).toEqual([event.id]);
+      expect(eventLoader).not.toHaveBeenCalled();
     });
   });
 

@@ -49,10 +49,20 @@ export {
 // The runtime half: the ports a process fills, and the mount that puts a
 // family's declaration behind the one execution path.
 export { RestHost, type RestIdentities, type RestFamilyBearers } from "./host.ts";
+export {
+  bindConfirmationGate,
+  nameUnlessMissing,
+  openConfirmationGate,
+  type RestConfirmation,
+  type RestConfirmationGate,
+  type RestConfirmationReceipt,
+  type RestConfirmationRequest,
+} from "./confirmation.ts";
 export { canonicalOtlpRequest, withOtlpPathAliases } from "./otlp-path-alias.ts";
 
 export {
   createRestRuntime,
+  type RestConfirmationLog,
   type RestDeprecationLog,
   type RestMountOptions,
   type RestRuntime,
@@ -105,6 +115,7 @@ export {
   defineMiddlewareContext,
   loggerMiddleware,
   multipartMiddleware,
+  recordAnsweredCause,
   RequestValidationError,
   requestValidationErrorFrom,
   restCacheKey,

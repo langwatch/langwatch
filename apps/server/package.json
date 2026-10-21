@@ -25,8 +25,7 @@
     "langwatch-server": "dist/cli.cjs"
   },
   "files": [
-    "dist",
-    "src"
+    "dist"
   ],
   "type": "module",
   "main": "dist/cli.cjs",
@@ -43,7 +42,7 @@
     "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:invariants": "vitest run test/workspace-invariants.test.ts test/pack-npm-filters.test.ts"
+    "test:invariants": "vitest run test/workspace-invariants.test.ts test/pack-npm.test.ts test/app-archive.test.ts"
   },
   "dependencies": {
     "@langwatch/config": "workspace:*",
@@ -56,6 +55,7 @@
     "execa": "^9.6.0",
     "listr2": "^9.0.4",
     "ora": "catalog:",
+    "pg": "catalog:",
     "prompts": "catalog:",
     "tar": "^7.4.3",
     "zod": "catalog:"
@@ -63,6 +63,7 @@
   "devDependencies": {
     "@langwatch/vitest-config": "workspace:*",
     "@types/node": "catalog:",
+    "@types/pg": "catalog:",
     "@types/prompts": "catalog:",
     "@types/tar": "^6.1.13",
     "esbuild": "catalog:",
@@ -70,7 +71,7 @@
     "vitest": "catalog:"
   },
   "engines": {
-    "node": ">=22",
+    "node": ">=24",
     "pnpm": ">=10"
   },
   "packageManager": "pnpm@12.6.0"

@@ -1,0 +1,111 @@
+import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
+import {
+  type OpsUpgradeDiagnosticsAvailability,
+  type OpsUpgradeDiagnosticsReceipt,
+  type UpgradeDiagnosticsAutoSend,
+  type UpgradeDiagnosticsBundle,
+  UpgradeStepNotFailedError,
+} from "@langwatch/ops-contract";
+import { nowInstant } from "@langwatch/time";
+
+import type { UpgradeLedgerRepository } from "#repositories/upgrade-ledger.repository";
+
+import {
+  type DiagnosticsDeployment,
+  resealedDiagnosticsOf,
+  upgradeDiagnosticsOf,
+} from "../rules/upgrade-diagnostics.rules.ts";
+
+type Licensing = Pick<
+  LicensingApi,
+  | "findInstanceIdentity"
+  | "getUpgradeDiagnosticsAvailability"
+  | "sendUpgradeDiagnostics"
+  | "setUpgradeDiagnosticsOptOut"
+>;
+
+/**
+ * A failed upgrade step's diagnostics for the LangWatch team, built and redacted on this install,
+ * sent over Connect by an operator or by the hourly check. Spec: upgrade-diagnostics.feature
+ */
+export class UpgradeDiagnosticsService {
+  static create(input: {
+    ledger: Pick<UpgradeLedgerRepository, "getStep">;
+    licensing: Licensing;
+    deployment: Omit<DiagnosticsDeployment, "instanceId">;
+    /** `DISABLE_UPGRADE_DIAGNOSTICS_AUTO_SEND`: the hourly check sends nothing by itself. */
+    automaticDisabled: boolean;
+    now?: () => string;
+  }): UpgradeDiagnosticsService {
+    return new UpgradeDiagnosticsService(input);
+  }
+
+  private constructor(
+    private readonly deps: Parameters<typeof UpgradeDiagnosticsService.create>[0],
+  ) {}
+
+  /** The bundle as it would be sent; an unknown step is refused as `upgrade_not_found`. */
+  async getBundle({ id }: { id: string }): Promise<UpgradeDiagnosticsBundle> {
+    const [step, [identity]] = await Promise.all([
+      this.deps.ledger.getStep({ id }),
+      this.deps.licensing.findInstanceIdentity(),
+    ]);
+    return upgradeDiagnosticsOf({
+      step,
+      deployment: { ...this.deps.deployment, instanceId: identity?.instanceId ?? null },
+      generatedAt: this.deps.now?.() ?? nowInstant().toString(),
+    });
+  }
+
+  async getAvailability(): Promise<OpsUpgradeDiagnosticsAvailability> {
+    const [availability, [identity]] = await Promise.all([
+      this.deps.licensing.getUpgradeDiagnosticsAvailability(),
+      this.deps.licensing.findInstanceIdentity(),
+    ]);
+    const optedOut = this.deps.automaticDisabled || (identity?.upgradeDiagnosticsOptOut ?? false);
+    return { ...availability, automatic: availability.available && !optedOut };
+  }
+
+  /** The operator's switch for automatic sending, apart from the environment variable. */
+  async getAutoSend(): Promise<UpgradeDiagnosticsAutoSend> {
+    const [identity] = await this.deps.licensing.findInstanceIdentity();
+    return { enabled: !(identity?.upgradeDiagnosticsOptOut ?? false) };
+  }
+
+  async setAutoSend({ enabled }: { enabled: boolean }): Promise<UpgradeDiagnosticsAutoSend> {
+    await this.deps.licensing.setUpgradeDiagnosticsOptOut({ optOut: !enabled });
+    return this.getAutoSend();
+  }
+
+  /**
+   * Sends the bundle an operator reviewed, so LangWatch gets what they saw. It is redacted and
+   * fitted again on the way out. Its step must be in the ledger (`upgrade_not_found`) and
+   * failed (`upgrade_step_not_failed`).
+   */
+  async sendReviewed({
+    bundle,
+  }: {
+    bundle: UpgradeDiagnosticsBundle;
+  }): Promise<OpsUpgradeDiagnosticsReceipt> {
+    const step = await this.deps.ledger.getStep({ id: bundle.step.id });
+    if (step.status !== "failed") {
+      throw new UpgradeStepNotFailedError({ stepId: step.id, status: step.status });
+    }
+    return this.deps.licensing.sendUpgradeDiagnostics({
+      trigger: "operator",
+      bundle: resealedDiagnosticsOf(bundle),
+    });
+  }
+
+  /** Builds and sends the step's bundle now; licensing refuses by name without Connect. */
+  async send({
+    id,
+    trigger,
+  }: {
+    id: string;
+    trigger: "operator" | "automatic";
+  }): Promise<OpsUpgradeDiagnosticsReceipt> {
+    const bundle = await this.getBundle({ id });
+    return this.deps.licensing.sendUpgradeDiagnostics({ trigger, bundle });
+  }
+}
