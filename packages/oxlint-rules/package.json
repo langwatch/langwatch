@@ -22,7 +22,7 @@
   },
   "dependencies": {
     "@langwatch/secrets": "workspace:*",
-    "oxc-parser": "^0.127.0"
+    "oxc-parser": "^0.154.0"
   },
   "devDependencies": {
     "@langwatch/vitest-config": "workspace:*",

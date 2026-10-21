@@ -32,13 +32,13 @@
     "@langwatch/webhook-contract": "workspace:*",
     "croner": "catalog:",
     "liquidjs": "catalog:",
-    "marked": "^18.0.5",
-    "sanitize-html": "^2.17.7",
+    "marked": "^18.1.1",
+    "sanitize-html": "^2.18.0",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
-    "@types/sanitize-html": "^2.16.0",
+    "@types/sanitize-html": "^2.16.2",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }
