@@ -45,7 +45,11 @@ import {
   type AnalyticsEvaluationUpsertInput,
 } from "@langwatch/analytics-contract";
 import { DEFAULT_LWQL_RESOURCE_LIMITS } from "@langwatch/analytics-contract/langwatch-ql-limits";
-import type { Authorization, RestCredentialPrincipal } from "@langwatch/authorization";
+import {
+  type Authorization,
+  type RestCredentialPrincipal,
+  sharedWindowsReadBy,
+} from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
@@ -102,6 +106,7 @@ import { LoggingAnalyticsTripwireService } from "../services/analytics-tripwire.
 import { AnalyticsService as AnalyticsServiceClass } from "../services/analytics.service.ts";
 import { DashboardWidgetAccessService } from "../services/dashboard-widget-access.service.ts";
 import { FilterService } from "../services/filter.service.ts";
+import { LangWatchQLAggregateScopeService } from "../services/langwatch-ql-aggregate-scope.service.ts";
 import { LangWatchQLBoundsService } from "../services/langwatch-ql-bounds.service.ts";
 import {
   LangWatchQLConnectionService,
@@ -202,6 +207,8 @@ interface AnalyticsAppDependencies {
   lwqlProvisioning: LwqlProvisioningOperations;
   /** A new project's key-map row, written on project's created event; no-op without LangWatchQL. */
   lwqlKeyMap: LwqlKeyMapService;
+  /** How many members one group project's statement may name; the key set's ceiling unset. */
+  lwqlAggregateMaxMembers?: number;
 }
 
 /** The peer modules the Workbench's access rules read, resolved through their own tokens. */
@@ -511,6 +518,9 @@ export class AnalyticsModule
             ? { target: { connection, sourceDatabase: admin.target.database } }
             : {}),
         }),
+        ...(lwqlConfig.aggregateMaxMembers === undefined
+          ? {}
+          : { lwqlAggregateMaxMembers: lwqlConfig.aggregateMaxMembers }),
       },
       setup.config.publicBaseUrl,
     );
@@ -523,12 +533,19 @@ export class AnalyticsModule
   #widgetAccess: DashboardWidgetAccessService;
   #hydration: LangWatchQLHydrationService;
   #queryScope: LangWatchQLQueryScopeService;
+  #aggregateScope: LangWatchQLAggregateScopeService;
   #protections: WorkbenchProtectionsService;
   #validationReport: LangWatchQLValidationReportService;
 
   private constructor(dependencies: AnalyticsAppDependencies, publicBaseUrl: string | undefined) {
     this.#dependencies = dependencies;
     this.#queryScope = LangWatchQLQueryScopeService.create(dependencies);
+    this.#aggregateScope = LangWatchQLAggregateScopeService.create({
+      projects: dependencies.projects,
+      ...(dependencies.lwqlAggregateMaxMembers === undefined
+        ? {}
+        : { maxMembers: dependencies.lwqlAggregateMaxMembers }),
+    });
     this.#protections = WorkbenchProtectionsService.create(dependencies);
     this.#validationReport = LangWatchQLValidationReportService.create({
       langWatchQL: dependencies.langWatchQL,
@@ -785,11 +802,30 @@ export class AnalyticsModule
   }
 
   /**
-   * Runs one submitted statement exactly as it was written, counted against the
-   * project's window first so an over-limit caller never reaches the engine.
+   * Runs one submitted statement as written, counted against the project's window first so an
+   * over-limit caller never reaches the engine. On an aggregate it runs under the proof's members'
+   * keys, each from where its grant opens, and is still counted once, against the aggregate.
    */
-  async executeLangWatchQL(input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult> {
-    await this.#dependencies.lwqlBounds.assertQueryWithinBounds({ projectId: input.project.id });
+  async executeLangWatchQL(
+    input: LangWatchQLExecuteInput & Readonly<{ authorization?: Authorization }>,
+  ): Promise<LangWatchQLQueryResult> {
+    const { authorization, project, ...run } = input;
+    const shared = authorization
+      ? sharedWindowsReadBy({ authorization, permission: "analytics:view", condition: "trace" })
+      : [];
+    const aggregate =
+      shared.length > 0 ? await this.#aggregateScope.getMemberScope({ shared }) : undefined;
+    await this.#dependencies.lwqlBounds.assertQueryWithinBounds({ projectId: project.id });
+
+    if (aggregate) {
+      // A judged column is charged to one project, so an aggregate's statement may call none.
+      return this.#dependencies.langWatchQL.executeForProjects({
+        ...run,
+        projects: aggregate.projects,
+        memberWindows: aggregate.memberWindows,
+        isInstantEvalsEnabled: false,
+      });
+    }
 
     // Resolved before the engine validates, because whether an eval function
     // may be called is part of that verdict — and only for a statement that
@@ -798,7 +834,7 @@ export class AnalyticsModule
       statementMightCallEvalFunction(input.sql) &&
       (await this.#isInstantEvalsEnabled(input.project.id));
 
-    return this.#dependencies.langWatchQL.execute({ ...input, isInstantEvalsEnabled });
+    return this.#dependencies.langWatchQL.execute({ project, ...run, isInstantEvalsEnabled });
   }
 
   /**
@@ -932,10 +968,12 @@ export class AnalyticsModule
   resolveProtections(input: {
     userId: string;
     projectId: string;
+    authorization?: Authorization;
   }): Promise<LangWatchQLProtections> {
     return this.#protections.resolveMemberProtections({
       userId: input.userId,
       projectId: input.projectId,
+      ...(input.authorization ? { authorization: input.authorization } : {}),
     });
   }
 
@@ -988,10 +1026,15 @@ export class AnalyticsModule
    * same project peer the rollout gate reads — never a raw Prisma client in this App.
    * Refuses with `project_not_found` when the project no longer exists.
    */
-  resolveRunCaller(input: { userId: string; projectId: string }): Promise<LangWatchQLRunCaller> {
+  resolveRunCaller(input: {
+    userId: string;
+    projectId: string;
+    authorization?: Authorization;
+  }): Promise<LangWatchQLRunCaller> {
     return this.#protections.resolveRunCaller({
       userId: input.userId,
       projectId: input.projectId,
+      ...(input.authorization ? { authorization: input.authorization } : {}),
     });
   }
 

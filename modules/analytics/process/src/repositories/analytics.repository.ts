@@ -14,9 +14,8 @@ import type { Instant } from "@langwatch/time";
 export interface AnalyticsTimeseriesQuery {
   readonly table: AnalyticsTable;
   /**
-   * The proof the read runs under (ADR-177). The rollup and slim tables read every project it
-   * fences, a shared one inside its grant's window; `trace_summaries` and `evaluation_runs`
-   * still read the input's own project alone.
+   * The proof the read runs under (ADR-177). Every table reads every project it fences, a
+   * shared one inside its grant's window.
    */
   readonly authorization: Authorization;
   readonly input: AnalyticsTimeseriesInput;

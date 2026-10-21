@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { scopeLangWatchQLToOrigins } from "../langwatch-ql-query-scope.rules.ts";
+import { scopeLangWatchQL } from "../langwatch-ql-query-scope.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../lwql-view-catalog.rules.ts";
 
 const WINDOW = { start: "2026-02-01T00:00:00.000Z", end: "2026-02-04T00:00:00.000Z" };
@@ -29,7 +29,7 @@ function scope({
   excludeOrigins?: readonly string[];
   timeWindow?: { start: string; end: string };
 }): string {
-  return scopeLangWatchQLToOrigins({
+  return scopeLangWatchQL({
     sql,
     excludeOrigins,
     database: "analytics",
@@ -38,7 +38,7 @@ function scope({
   });
 }
 
-describe("scopeLangWatchQLToOrigins", () => {
+describe("scopeLangWatchQL", () => {
   describe("given a view that carries each row's origin", () => {
     it("reads the view minus the rows of the origins left out", () => {
       expect(scope({ sql: "SELECT count() FROM trace_metrics" })).toBe(

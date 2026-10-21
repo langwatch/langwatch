@@ -182,6 +182,12 @@ Feature: Analytics timeseries service
       When the same series is asked again under a proof that has expired
       Then the repeat is refused and the cache does not answer it
 
+    @unit
+    Scenario: A trace summaries series leaves its tenants to the proof
+      Given a series the router sends to the trace summaries table
+      When its statement is built
+      Then it carries the proof's marker and names no tenant of its own
+
   Rule: Keep feature ownership narrow
 
     @unit

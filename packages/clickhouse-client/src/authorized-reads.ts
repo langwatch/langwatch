@@ -11,6 +11,8 @@ import {
   type AuthorizationConditionType,
   type AuthorizationGrant,
   type ProofBearingPermission,
+  type SharedWindow,
+  sharedWindowsReadBy,
   usableAuthorization,
 } from "@langwatch/authorization";
 import {
@@ -45,12 +47,12 @@ const MARKER = /\{\{tenantScope:([A-Za-z_][A-Za-z0-9_]*)\}\}/g;
 const SET_MARKER = /\{\{tenantSet\}\}/g;
 
 /**
- * A tenant predicate written by hand (`TenantId =`, `IN`, comparisons); a projection or dedup
- * tuple member is fine. Exported so the source scan over the converted repositories refuses
- * the same shapes the reader refuses at run time.
+ * A tenant predicate written by hand (`TenantId =`, `IN`, comparisons); a projection, a dedup
+ * tuple member or a join key equating two `TenantId` columns is fine. Exported so the source
+ * scan over the converted repositories refuses the shapes the reader refuses at run time.
  */
 export const HAND_WRITTEN_TENANT_PREDICATE =
-  /\bTenantId\s*(?:=|!=|<>|<=|>=|<|>|(?:NOT\s+)?IN\b|(?:NOT\s+)?LIKE\b)/i;
+  /\bTenantId\s*(?:=(?!\s*(?:[A-Za-z_]\w*\.)?TenantId\b)|!=|<>|<=|>=|<|>|(?:NOT\s+)?IN\b|(?:NOT\s+)?LIKE\b)/i;
 
 /**
  * A stable cache key for who a proof fences, under which windows. Own projects stay readable;
@@ -73,9 +75,6 @@ export function tenantScopeKey({
   const digest = createHash("sha256").update(windows).digest("hex");
   return `${own}+${fence.shared.length}:${digest}`;
 }
-
-/** One shared project and the window its grant opens, as the fence binds it. */
-type SharedWindow = { projectId: string; from: number; until: number | null };
 
 type TenantFence = {
   /**
@@ -185,14 +184,7 @@ export function fenceFor({
     .filter(carries)
     .map((grant) => grant.projectId as string);
   if (own.length === 0) throw new AccessNotGrantedError(permission);
-  const shared = authorization.grants
-    .filter((grant) => grant.kind === "shared" && grant.condition?.type === condition)
-    .filter(carries)
-    .map((grant) => ({
-      projectId: grant.projectId as string,
-      from: grant.condition?.from ?? 0,
-      until: grant.condition?.until ?? null,
-    }));
+  const shared = sharedWindowsReadBy({ authorization, permission, condition });
   const narrowedTo = authorization.narrowedTo;
   if (narrowedTo === undefined) return { own, shared };
   const narrowed = {

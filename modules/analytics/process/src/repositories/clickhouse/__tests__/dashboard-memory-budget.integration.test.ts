@@ -124,15 +124,15 @@ function buildPanelQuery(input: AnalyticsTimeseriesInput) {
       return { table, fenced: true, ...buildEvalSlimTimeseriesQuery(builderInput) };
     case "trace_summaries":
     case "evaluation_runs":
-      return { table, fenced: false, ...buildTimeseriesQuery(builderInput) };
+      return { table, fenced: true, ...buildTimeseriesQuery(builderInput) };
     default:
       throw new Error(`panel routed to an unexpected table: ${table}`);
   }
 }
 
 /**
- * Runs a panel's statement under the scaled-down cap. A slim statement reads through the
- * project's own proof, as the repository sends it; the legacy one names its project by hand.
+ * Runs a panel's statement under the scaled-down cap. A series reads through the project's own
+ * proof, as the repository sends it; top documents still name the project by hand.
  */
 async function runCapped<T>(
   ch: ClickHouseClient,
