@@ -25,7 +25,7 @@ import type {
 } from "../dashboard-widget.repository.ts";
 import { MemoryDashboardDatabase } from "./memory.dashboard.database.ts";
 
-/** In-memory parity for widget CRUD, refusing a placement on a board this project does not own. */
+/** In-memory parity for widget CRUD; `createWidget` refuses a board this project does not own. */
 export class MemoryDashboardWidgetRepository implements DashboardWidgetRepository {
   #database: MemoryDashboardDatabase;
 
