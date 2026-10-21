@@ -174,7 +174,7 @@ To accept more, add app replicas (each core takes about 700 spans per second) an
 
 Each project gets a fair share of the workers, so one busy project can't slow down the others.
 
-To give a single project more, raise `LANGWATCH_DISPATCH_TENANT_CAP` in `workers.extraEnvs`: the number of traces one project can have in progress at once (default `50`). Each trace in progress moves at about one span per second, so the default gives one project about 60 spans per second. Setting it to `0` turns the limit off and lets one project take every worker.
+To give a single project more, raise `LANGWATCH_DISPATCH_TENANT_CAP` in `workers.extraEnvs`: the number of traces one project can have in progress at once (default `50`). At the default, one project on its own processes about 60 spans per second. Setting it to `0` turns the limit off and lets one project take every worker.
 
 ## Scaling Guidelines
 
