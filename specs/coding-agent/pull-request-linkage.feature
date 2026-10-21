@@ -1139,6 +1139,15 @@ Rule: The v1 usage read needs only an organization credential
   # the whole point of a restricted key — so the rollup intersects the
   # holder's cut with the key's, the same key-plus-holder decision every
   # other REST door asks.
+  # A deployment may serve GitHub's web pages from an origin other than the
+  # host its repositories live on (a stand-in, a proxy), so a read that names
+  # no host asks about the repository host, never the web origin's name.
+  @unit
+  Scenario: A read that names no host asks about the instance's repository host
+    Given an instance whose GitHub web pages are served from another origin than its repository host
+    When pull request usage is read without naming a host
+    Then the read asks about the instance's repository host
+
   @integration
   Scenario: A narrowed key reads with its own scope, not its holder's
     Given a holder who may view traces in two projects

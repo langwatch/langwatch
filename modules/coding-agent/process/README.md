@@ -96,10 +96,12 @@ Records who read an answer that names people.
 recordPullRequestUsageRead(read: CodingAgentPullRequestUsageRead): Promise<void>;
 ```
 
-#### `githubWebBase`
+#### `githubRepositoryHost`
+
+The host pull requests are mapped under, never the web origin's name.
 
 ```typescript
-githubWebBase(): string;
+githubRepositoryHost(): string;
 ```
 
 #### `findOrganizationForProject`
