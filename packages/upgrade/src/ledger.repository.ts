@@ -97,7 +97,7 @@ export class UpgradeLedgerRepository {
     private readonly redact: LedgerTextRedactor,
   ) {}
 
-  /** `redact` masks stored step and target errors; the gate passes one that knows its store URLs. */
+  /** `redact` masks stored step and target errors; the gate passes one that knows its URLs. */
   static create({
     postgres,
     redact = redactSecrets,

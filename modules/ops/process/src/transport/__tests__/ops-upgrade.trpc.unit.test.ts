@@ -229,12 +229,17 @@ describe("the ops.upgrade reads", () => {
         latestRelease: null,
       });
       expect(await operator.listReleases()).toEqual(await reader.listReleases());
-      expect(await operator.listSteps({ release: "3.23.0" })).toEqual(
-        await reader.listSteps({ release: "3.23.0" }),
-      );
+      const { items, cursor } = await reader.listSteps({ release: "3.23.0" });
+      expect(await operator.listSteps({ release: "3.23.0" })).toEqual({
+        items: items.map(({ logTail: _logTail, ...step }) => step),
+        cursor,
+      });
       expect(await operator.getStep({ id: STEP.id })).toEqual(STEP_DETAIL);
       expect(await operator.listRuns({ limit: 20 })).toEqual(await reader.listRuns({ limit: 20 }));
-      expect(await operator.getRun({ id: RUN.id })).toEqual(RUN);
+      expect(await operator.getRun({ id: RUN.id })).toEqual({
+        ...RUN,
+        steps: RUN.steps.map(({ logTail: _logTail, ...step }) => step),
+      });
       expect(reader.listSteps).toHaveBeenCalledWith({ release: "3.23.0" });
       expect(reader.getRun).toHaveBeenCalledWith({ id: RUN.id });
     });

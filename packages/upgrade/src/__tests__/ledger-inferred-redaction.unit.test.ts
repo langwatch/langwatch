@@ -52,7 +52,7 @@ describe("UpgradeLedgerRepository.writeInferredSteps()", () => {
         ],
       });
 
-      const [stored, untouched] = postgres.sent.at(-1)?.[4] as (string | null)[];
+      const [stored, untouched] = postgres.sent.at(-1)![4] as (string | null)[];
       expect(stored).not.toContain("opaquetoken");
       expect(stored?.startsWith("could not reach ***")).toBe(true);
       expect(stored?.length).toBeLessThanOrEqual(LEDGER_TEXT_MAX_CHARS);
