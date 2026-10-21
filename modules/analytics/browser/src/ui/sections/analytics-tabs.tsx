@@ -1,4 +1,5 @@
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { isAggregateProjectKind } from "@langwatch/project-contract";
 
 import { useAnalyticsHost } from "../../model/analytics-host.ts";
 import type { AnalyticsTab } from "./analytics-layout.tsx";
@@ -24,11 +25,15 @@ export function AnalyticsTabs({
     evaluations: { label: "Evaluations", href: `${base}/evaluations` },
   };
   const activeHref = !tab || tab === "reports" ? "" : tabs[tab].href;
+  // An aggregate's members keep their own topic clusters, which do not add up (ADR-177 v4.15).
+  const offered = isAggregateProjectKind(host.project()?.kind)
+    ? Object.values(tabs).filter((offeredTab) => offeredTab !== tabs.topics)
+    : Object.values(tabs);
 
   return (
     <PageLayout.Tabs
       label="Analytics pages"
-      tabs={Object.values(tabs)}
+      tabs={offered}
       activeHref={activeHref}
       onNavigate={(href) => host.navigate(href)}
     >

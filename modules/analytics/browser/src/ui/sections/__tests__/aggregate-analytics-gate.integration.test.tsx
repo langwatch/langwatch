@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
- * An aggregate project's analytics do not read across its members yet (ADR-177): every
- * analytics address says so and starts no chart.
+ * A page whose subject is kept inside one project (Topics) says so on an aggregate (ADR-177
+ * v4.15) and starts no chart.
  * @see specs/governance/aggregate-project.feature
  */
 
@@ -18,7 +18,7 @@ function ChartsScreen() {
   return <p>the charts</p>;
 }
 
-const GatedScreen = withAggregateAnalyticsGate("LLM Metrics", ChartsScreen);
+const GatedScreen = withAggregateAnalyticsGate("Topics", ChartsScreen);
 
 const projectOfKind = (kind: string) => ({
   id: "proj-1",
@@ -38,15 +38,13 @@ describe("withAggregateAnalyticsGate()", () => {
   });
 
   describe("when the project is an aggregate", () => {
-    /** @scenario "A direct link to the aggregate's analytics says it is not available yet" */
+    /** @scenario "The aggregate hides the views that only make sense inside one project" */
     it("renders the page's heading and the notice instead of the page", () => {
       charts.mockClear();
       renderWithAnalyticsHost(<GatedScreen />, { project: projectOfKind("aggregate") });
 
-      expect(screen.getByText("LLM Metrics")).toBeInTheDocument();
-      expect(
-        screen.getByText(/Analytics across member projects is not available yet/),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Topics")).toBeInTheDocument();
+      expect(screen.getByText(/This page shows one project at a time/)).toBeInTheDocument();
       expect(screen.getByRole("link", { name: "Open Trace Explorer" })).toHaveAttribute(
         "href",
         "/company-traces/traces",

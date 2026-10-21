@@ -98,7 +98,6 @@ import { FilterSidebar } from "../../../ui/sections/filter-sidebar.tsx";
 import { FilterToggle, FilterToggleButton } from "../../../ui/sections/filter-toggle.tsx";
 import { SavedViewsScope } from "../../../ui/sections/saved-views-scope.tsx";
 import { SeriesFiltersDialog } from "../../../ui/sections/series-filters-dialog.tsx";
-import { withAggregateAnalyticsGate } from "../aggregate-analytics-gate.tsx";
 import { AnalyticsOverflowMenu } from "../analytics-overflow-menu.tsx";
 
 /** Which of the builder's two addresses this render is. */
@@ -924,7 +923,10 @@ function CustomGraphForm({
         >
           Cancel
         </Button>
-        {customId ? (
+        {/* A write the shell refuses (an aggregate, ADR-177, or no grant) offers no button. */}
+        {!host.hasPermission(
+          customId ? "analytics:update" : "analytics:create",
+        ) ? null : customId ? (
           <Button
             colorPalette="orange"
             onClick={updateGraph}
@@ -1598,4 +1600,4 @@ function CustomGraphScreen({ mode }: { mode: CustomGraphScreenMode }) {
   );
 }
 
-export default withAggregateAnalyticsGate("Custom graph", CustomGraphScreen);
+export default CustomGraphScreen;
