@@ -926,7 +926,7 @@ getUpgradeDiagnosticsAvailability(): Promise<OpsUpgradeDiagnosticsAvailability>;
 
 #### `sendUpgradeStepDiagnostics`
 
-Sends the bundle the operator reviewed to LangWatch over Connect, as the operator who asked.
+Sends the bundle the operator reviewed to LangWatch over Connect, as the asking operator.
 
 ```typescript
 sendUpgradeStepDiagnostics(input: OpsUpgradeSendDiagnosticsInput): Promise<OpsUpgradeDiagnosticsReceipt>;
