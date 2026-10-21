@@ -912,7 +912,7 @@ Answers at `/api/v1/projects/:projectId/analytics/charts/:chartId`.
 
 ```typescript
 type Params = z.infer<typeof savedWorkbenchChartParamsSchema>; // ../contract/src/saved-workbench-chart-rest.schemas.ts:126
-// Response: inline, src/transport/saved-workbench-chart.rest.ts:267
+// Response: inline, src/transport/saved-workbench-chart.rest.ts:271
 type Response = unknown;
 ```
 
@@ -947,7 +947,7 @@ Answers at `/api/v1/projects/:projectId/analytics/charts/:chartId/placement`.
 
 ```typescript
 type Params = z.infer<typeof savedWorkbenchChartParamsSchema>; // ../contract/src/saved-workbench-chart-rest.schemas.ts:126
-// Response: inline, src/transport/saved-workbench-chart.rest.ts:347
+// Response: inline, src/transport/saved-workbench-chart.rest.ts:355
 type Response = unknown;
 ```
 
