@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
 import { defineConfig, type ViteUserConfig } from "vitest/config";
 
+import { moduleLoadingCacheExecArgv } from "./module-loading-cache.ts";
 import { splitIsolationByMocking } from "./split-isolation-by-mocking.ts";
 
 // Absolute so it resolves the same regardless of the consuming package's cwd.
@@ -94,6 +95,9 @@ export function moduleVitestTestOptions(
     // transform share of the run entirely.
     // https://vitest.dev/config/#fsmodulecache (top-level since vitest 4.0.11)
     fsModuleCache: fast,
+    // Answers Node's resolution and reads of installed packages in each worker from one
+    // file each, kept per worktree. See ./module-loading-cache.ts.
+    ...(fast ? { execArgv: moduleLoadingCacheExecArgv() } : {}),
     // https://vitest.dev/config/#fileparallelism
     fileParallelism: true,
     // Skips CSS parse/transform on import. No package under this builder

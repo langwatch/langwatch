@@ -168,6 +168,35 @@ names the files that would break with `isolate: false`, which is the list to
 work through before flipping a mock-heavy package. Run it on one package at a
 time: it runs the suite more than once.
 
+## The module loading cache in the workers
+
+Vitest hands everything it does not transform (Vitest's own runtime, jsdom, React,
+most of `node_modules`) to Node's own loader in each worker. Under isolation every
+test file gets a new worker, and Node resolves and reads the same few thousand
+installed files again in each one. In fast mode the helper adds
+`--import packages/vitest-config/src/module-loading-cache/register.ts` to
+`test.execArgv`, which answers those lookups and reads from two files under this
+worktree's `node_modules/.cache/vitest-module-loading/`.
+
+- **What it caches.** A resolution only when its answer is a file in an installed
+  package, and only when no project file can change it (a package name, or any
+  specifier from inside `node_modules`). A file's source only for files in installed
+  packages, and it is served only while the file's size, modification time and inode
+  match what was read, so an edited file is read again, never served stale. Dot
+  directories under `node_modules` (`.vite`, `.vitest-cache`) are left to Node.
+- **When it starts again.** The file names carry the lockfile, pnpm's
+  `node_modules/.modules.yaml` (rewritten on every install) and the Node version, so
+  an install or a Node upgrade starts fresh files and the next save removes the old.
+- **Worktrees.** The files live in each worktree's own `node_modules`, so nothing is
+  shared between worktrees.
+- **Switching it off.** On for local runs, off when `CI` is set: a fresh runner only
+  pays to fill it. `LANGWATCH_VITEST_MODULE_CACHE=0` turns it off,
+  `LANGWATCH_VITEST_MODULE_CACHE=1` turns it on in CI. `LANGWATCH_VITEST_FAST=0` drops
+  it with the rest of fast mode. If you suspect it, delete the directory.
+
+The design and the before and after numbers are in
+[ADR-183](../adr/183-vitest-workers-cache-module-loading.md).
+
 ## `NODE_COMPILE_CACHE`
 
 V8 bytecode caching is an environment variable, not a config key, so it has to
