@@ -141,7 +141,7 @@ type ContextMarker =
       kind: "deadSite";
       atMs: number;
       cacheCreationTokens: number;
-      previousContextTokens: number;
+      previousCachedTokens: number;
     };
 
 /**
@@ -173,7 +173,7 @@ function markersForModelCall({
       kind: "deadSite",
       atMs: entry.atMs,
       cacheCreationTokens: rebuild.cacheCreationTokens,
-      previousContextTokens: rebuild.previousContextTokens,
+      previousCachedTokens: rebuild.previousCachedTokens,
     });
   }
 
@@ -1518,7 +1518,7 @@ function ContextMarkerLine({ marker }: { marker: ContextMarker }) {
     marker.kind === "deadSite"
       ? [
           TERMINAL_TOKENS.red,
-          `Cache rebuilt: ${formatTokens(marker.cacheCreationTokens)} tokens re-sent instead of reusing ${formatTokens(marker.previousContextTokens)} tokens cached`,
+          `Cache rebuilt: ${formatTokens(marker.cacheCreationTokens)} tokens re-sent instead of reusing ${formatTokens(marker.previousCachedTokens)} tokens cached`,
         ]
       : [marker.color, `Context ${marker.label}: ${formatTokens(marker.contextTokens)} tokens`];
   return (

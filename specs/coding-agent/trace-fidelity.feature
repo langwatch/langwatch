@@ -346,6 +346,18 @@ Feature: Coding Agent Trace Fidelity (Path B direct OTLP)
     When the usage chart looks for cache rebuilds
     Then it flags the next call as a rebuild of the context the first call sent
 
+  # The rebuild note reads "re-sent N instead of reusing M tokens cached". Only
+  # what a call read from or wrote to the cache is there for the next call to
+  # reuse; its fresh input never was, so M leaves the fresh part out.
+
+  @integration
+  Scenario: A cache rebuild note counts only what the call before it left in the cache
+    Given a session's model call that wrote its prompt to the cache and sent a little of it fresh
+    And the next call wrote about as much to the cache again
+    When the terminal shows the rebuild
+    Then the note says how many tokens were re-sent instead of reusing what the first call cached
+    And the first call's fresh input is not counted as cached
+
   @unit
   Scenario: Context size is shown in the trace list next to tokens
     Given a trace list row whose trace reported a context size

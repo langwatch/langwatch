@@ -285,6 +285,7 @@ describe("TerminalView", () => {
   });
 
   describe("given a call that rebuilt the cache instead of reusing it", () => {
+    /** @scenario "A cache rebuild note counts only what the call before it left in the cache" */
     it("flags it as a dead site with the tokens re-sent and what was cached", () => {
       const rebuildEntries: TranscriptEntry[] = [
         {

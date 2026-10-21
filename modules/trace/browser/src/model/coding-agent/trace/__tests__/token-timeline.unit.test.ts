@@ -90,7 +90,11 @@ describe("findCacheRebuilds", () => {
       ]);
 
       expect(events).toHaveLength(1);
-      expect(events[0]).toMatchObject({ callIndex: 1, previousContextTokens: 80_000 });
+      expect(events[0]).toMatchObject({
+        callIndex: 1,
+        previousContextTokens: 80_000,
+        previousCachedTokens: 20_000,
+      });
     });
   });
 

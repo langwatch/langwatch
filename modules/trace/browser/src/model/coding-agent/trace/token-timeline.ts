@@ -42,8 +42,10 @@ export interface CacheRebuildEvent {
   callIndex: number;
   atMs: number;
   cacheCreationTokens: number;
-  /** The context size the PREVIOUS call had cached, for the "instead of reusing N" comparison. */
+  /** The whole prompt the PREVIOUS call sent, which the rebuild is measured against. */
   previousContextTokens: number;
+  /** What the PREVIOUS call left in the cache (read plus written), shown as "reusing N cached". */
+  previousCachedTokens: number;
   /** The nearest user message before this call — usually what caused the rebuild. */
   precedingPrompt: string | null;
 }
@@ -59,13 +61,15 @@ const REBUILD_MIN_TOKENS = 1_000;
 export function findCacheRebuilds(entries: TranscriptEntry[]): CacheRebuildEvent[] {
   const events: CacheRebuildEvent[] = [];
   let previousContextTokens = 0;
+  let previousCachedTokens = 0;
   let callIndex = -1;
 
   for (const entry of entries) {
     if (entry.kind !== "model_call") continue;
     callIndex++;
+    const cachedTokens = entry.cacheReadTokens + entry.cacheCreationTokens;
     // Input arrives disjoint from the cache, so the three are the whole prompt sent.
-    const contextTokens = entry.inputTokens + entry.cacheReadTokens + entry.cacheCreationTokens;
+    const contextTokens = entry.inputTokens + cachedTokens;
 
     if (
       callIndex > 0 &&
@@ -78,11 +82,13 @@ export function findCacheRebuilds(entries: TranscriptEntry[]): CacheRebuildEvent
         atMs: entry.atMs,
         cacheCreationTokens: entry.cacheCreationTokens,
         previousContextTokens,
+        previousCachedTokens,
         precedingPrompt: nearestPrecedingPrompt(entries, entry.atMs),
       });
     }
 
     previousContextTokens = contextTokens;
+    previousCachedTokens = cachedTokens;
   }
 
   return events;
