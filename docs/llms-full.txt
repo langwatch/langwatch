@@ -38440,14 +38440,7 @@ To inspect the data a run made, open the run in **Simulations** and choose **Rer
 
 **Use run parameters to pick the test data.** For example, one scenario can cover several loyalty tiers when setup reads the `loyalty_tier` parameter and the scenario text reads the same value as `{{ params.loyalty_tier }}`. See [Run parameters](/agent-testing/run-parameters).
 
-## Related
-
-- [Connect your agent](/agent-testing/connect-your-agent)
-- [Run parameters](/agent-testing/run-parameters)
-- [Scenarios](/agent-testing/scenarios)
-- [Results](/agent-testing/results)
-- [TypeScript agent SDK reference](/integration/typescript/agent-reference)
-- [Python agent SDK reference](/integration/python/agent-reference)
+Also check: [Connect your agent](/agent-testing/connect-your-agent), [Run parameters](/agent-testing/run-parameters), [Scenarios](/agent-testing/scenarios), [Results](/agent-testing/results), [TypeScript agent SDK reference](/integration/typescript/agent-reference), [Python agent SDK reference](/integration/python/agent-reference).
 
 ---
 
