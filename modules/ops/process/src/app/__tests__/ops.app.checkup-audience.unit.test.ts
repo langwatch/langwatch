@@ -59,7 +59,12 @@ function diagnosticsService(): UpgradeDiagnosticsService {
   return UpgradeDiagnosticsService.create({
     ledger: MemoryUpgradeLedgerRepository.create(),
     licensing: createApiFixture<LicensingApi>({
-      findInstanceIdentity: async () => [],
+      getUpgradeDiagnosticsSettings: async () => ({
+        available: false,
+        reason: "no_licence",
+        instanceId: null,
+        optOut: optOutWrites.at(-1) ?? false,
+      }),
       setUpgradeDiagnosticsOptOut: async ({ optOut }) => {
         optOutWrites.push(optOut);
       },

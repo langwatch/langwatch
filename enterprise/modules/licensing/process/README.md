@@ -458,12 +458,12 @@ A failed upgrade step's diagnostics (dev/docs/plans/upgrade-diagnostics-via-conn
 sendUpgradeDiagnostics(submission: UpgradeDiagnosticsSubmission): Promise<UpgradeDiagnosticsReceipt>;
 ```
 
-#### `getUpgradeDiagnosticsAvailability`
+#### `getUpgradeDiagnosticsSettings`
 
-Whether this install can send one: Connect permitted and a licence that carries a token.
+Whether this install can send one (Connect permitted and a licence that carries a token), the instance it sends as, and whether the operator opted out of automatic sending.
 
 ```typescript
-getUpgradeDiagnosticsAvailability(): Promise<UpgradeDiagnosticsAvailability>;
+getUpgradeDiagnosticsSettings(): Promise<UpgradeDiagnosticsSettings>;
 ```
 
 #### `recordUpgradeDiagnostics`

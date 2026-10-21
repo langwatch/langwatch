@@ -60,7 +60,7 @@ import type {
   SelfHostedSignal,
 } from "./self-hosted-instance.ts";
 import type {
-  UpgradeDiagnosticsAvailability,
+  UpgradeDiagnosticsSettings,
   UpgradeDiagnosticsDownload,
   UpgradeDiagnosticsReceipt,
   UpgradeDiagnosticsReport,
@@ -305,8 +305,11 @@ export interface LicensingApi {
   sendUpgradeDiagnostics(
     submission: UpgradeDiagnosticsSubmission,
   ): Promise<UpgradeDiagnosticsReceipt>;
-  /** Whether this install can send one: Connect permitted and a licence that carries a token. */
-  getUpgradeDiagnosticsAvailability(): Promise<UpgradeDiagnosticsAvailability>;
+  /**
+   * Whether this install can send one (Connect permitted and a licence that carries a token), the
+   * instance it sends as, and whether the operator opted out of automatic sending.
+   */
+  getUpgradeDiagnosticsSettings(): Promise<UpgradeDiagnosticsSettings>;
   /** The licence host's intake, from the install its door verified; a refusal throws its code. */
   recordUpgradeDiagnostics(input: {
     caller: ConnectLicenceCaller;
