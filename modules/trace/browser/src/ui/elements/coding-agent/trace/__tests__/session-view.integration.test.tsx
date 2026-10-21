@@ -252,7 +252,7 @@ describe("SessionView", () => {
     });
   });
 
-  describe("given a session opened on a turn that made fewer of its calls", () => {
+  describe("given a chart that could read fewer calls than the session made", () => {
     const call = (atMs: number): TranscriptEntry => ({
       kind: "model_call",
       atMs,
@@ -267,14 +267,14 @@ describe("SessionView", () => {
       cacheCreationTokens: 5_000,
     });
 
-    /** @scenario "The per-call chart says it draws the open turn of a longer session" */
-    it("says the chart draws the open turn's calls of the session's", () => {
-      renderSession({ modelCalls: 6 }, [call(1_000), call(2_000)]);
-      expect(screen.getByText("This turn's 2 model calls of the session's 6")).toBeTruthy();
+    /** @scenario "The per-call chart says when it draws fewer calls than the session made" */
+    it("says how many of the session's calls the chart draws", () => {
+      renderSession({ modelCalls: 6 }, [call(1_000), call(2_000), call(3_000), call(4_000)]);
+      expect(screen.getByText("The chart draws 4 of the session's 6 model calls")).toBeTruthy();
     });
 
-    /** @scenario "The per-call chart says it draws the open turn of a longer session" */
-    it("adds no note when the open turn holds every call", () => {
+    /** @scenario "The per-call chart says when it draws fewer calls than the session made" */
+    it("adds no note when the chart holds every call", () => {
       renderSession({ modelCalls: 2 }, [call(1_000), call(2_000)]);
       expect(screen.queryByText(/of the session's/)).toBeNull();
     });

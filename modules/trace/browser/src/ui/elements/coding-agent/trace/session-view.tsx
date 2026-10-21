@@ -67,10 +67,10 @@ export function SessionView({ session, entries }: SessionViewProps) {
 
         {tokenTimeline.length > 0 && (
           <Section title="Where the tokens went">
-            {/* The chart reads the open turn; the cards above count the whole session. */}
+            {/* A turn the chart could not read leaves it short of the cards' count. */}
             {tokenTimeline.length < session.modelCalls && (
               <Text textStyle="xs" color="fg.muted">
-                {`This turn's ${tokenTimeline.length} model calls of the session's ${session.modelCalls}`}
+                {`The chart draws ${tokenTimeline.length} of the session's ${session.modelCalls} model calls`}
               </Text>
             )}
             <TokenTimelineChart points={tokenTimeline} rebuilds={cacheRebuilds} />
