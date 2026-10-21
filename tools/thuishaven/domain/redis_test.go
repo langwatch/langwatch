@@ -43,7 +43,6 @@ func TestStartedRedisFormulaReadsBrewServicesList(t *testing.T) {
 // Valkey reports a redis_version for compatibility, so the health line must
 // look at server_name first or every Valkey reads as Redis 7.2.
 // @scenario "The Redis health line names the server that answered"
-// @scenario "The Redis health line names the server that answered"
 func TestRedisServerNameTellsValkeyFromRedis(t *testing.T) {
 	valkey := map[string]string{"server_name": "valkey", "valkey_version": "9.1.2", "redis_version": "7.2.4"}
 	if got := RedisServerName(valkey); got != "valkey 9.1.2" {

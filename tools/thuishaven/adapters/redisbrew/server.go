@@ -49,10 +49,13 @@ func (s *Server) Ensure(ctx context.Context) (int, error) {
 	}
 	formula := s.formula
 	if !s.ping(ctx) {
+		var installed bool
 		if formula == "" {
-			formula = chooseFormula(ctx)
+			formula, installed = chooseFormula(ctx)
+		} else {
+			installed = isInstalled(ctx, formula)
 		}
-		if err := exec.CommandContext(ctx, "brew", "list", "--formula", formula).Run(); err != nil {
+		if !installed {
 			// A cancelled context kills the probe too, so a failed `brew list`
 			// only means "not installed" when the context is still alive —
 			// otherwise the honest answer is that we never got to look.
@@ -77,16 +80,22 @@ func (s *Server) Ensure(ctx context.Context) (int, error) {
 // chooseFormula asks brew which of valkey and redis is installed and which
 // service it already reports started. A probe that fails reads as "no", so
 // the worst case is the default formula and Ensure's "not installed".
-func chooseFormula(ctx context.Context) string {
+// It also reports whether the chosen formula is installed.
+func chooseFormula(ctx context.Context) (string, bool) {
 	installed := map[string]bool{}
 	for _, formula := range domain.RedisFormulas {
-		installed[formula] = exec.CommandContext(ctx, "brew", "list", "--formula", formula).Run() == nil
+		installed[formula] = isInstalled(ctx, formula)
 	}
 	started := ""
 	if out, err := exec.CommandContext(ctx, "brew", "services", "list").Output(); err == nil {
 		started = domain.StartedRedisFormula(string(out))
 	}
-	return domain.ChooseRedisFormula(installed, started)
+	chosen := domain.ChooseRedisFormula(installed, started)
+	return chosen, installed[chosen] || chosen == started
+}
+
+func isInstalled(ctx context.Context, formula string) bool {
+	return exec.CommandContext(ctx, "brew", "list", "--formula", formula).Run() == nil
 }
 
 // CLI is the client binary haven talks to the server with: valkey-cli or
@@ -178,19 +187,25 @@ func (s *Server) Running() bool {
 	return s.ping(ctx)
 }
 
+// healthFormula names the formula for a health line: the configured one, else
+// the one brew has, since cmd/root.go leaves the configured formula empty.
+func (s *Server) healthFormula(ctx context.Context) string {
+	if s.formula != "" {
+		return s.formula
+	}
+	formula, _ := chooseFormula(ctx)
+	return formula
+}
+
 // Health pings the server and returns a one-line status naming which server
 // answered (valkey or redis) and its memory footprint against the ceiling.
 func (s *Server) Health(ctx context.Context) (bool, string) {
 	if !s.ping(ctx) {
-		formula := s.formula
-		if formula == "" {
-			formula = chooseFormula(ctx)
-		}
-		return false, fmt.Sprintf("not answering on :%d (brew services info %s)", s.port, formula)
+		return false, fmt.Sprintf("not answering on :%d (brew services info %s)", s.port, s.healthFormula(ctx))
 	}
 	name, mem := s.serverInfo(ctx)
 	if name == "" {
-		name = s.formula
+		name = s.healthFormula(ctx)
 	}
 	detail := fmt.Sprintf("up on :%d", s.port)
 	if name != "" {
