@@ -64565,6 +64565,7 @@ How much trace data each profile can take. Each profile accepts spans faster tha
 | `size-minimal.yaml` | ~250 | ~50 | ~4M | ~130M | ~4 GB | 128Mi |
 | `size-dev.yaml` | ~600 | ~200 | ~17M | ~520M | ~17 GB | 512Mi |
 | `size-prod.yaml` | ~2,500 | ~700 | ~60M | ~1.8B | ~60 GB | 3Gi |
+| `size-ha.yaml` | ~2,500 | ~800 | ~70M | ~2.1B | ~70 GB | 3Gi |
 
 - Per day, per month and disk follow the processing rate, which is what the install keeps up with all day.
 - Treat these as ceilings and plan to run at about 70% of them. Long prompts and completions lower them.
@@ -64573,7 +64574,20 @@ How much trace data each profile can take. Each profile accepts spans faster tha
 - `size-dev.yaml` ships Redis at 256Mi. Raise `redis.master.resources.limits.memory` to 512Mi to reach its rate.
 - `size-minimal.yaml` is held back by ClickHouse memory. Setting `clickhouse.memory` to 2Gi roughly doubles its processing rate.
 
-To process more than a profile's rate, add worker replicas. Every 100 spans per second needs about:
+### Changing `size-prod.yaml`
+
+What `size-prod.yaml` processes with one setting changed:
+
+| Change | Processes (spans per second) |
+| --- | --- |
+| None | ~700 |
+| `workers.replicaCount: 1` | ~200 |
+| `workers.replicaCount: 4` | ~800: Redis CPU is then the limit |
+| `clickhouse.cpu: 2`, `clickhouse.memory: 4Gi` | ~200 |
+| Valkey instead of Redis | ~700, with about 10% less CPU on the queue |
+| All traffic from one project | ~60 for that project, under the default per-project limit |
+
+More worker replicas raise the rate until Redis reaches 1 CPU, at about 800 spans per second. Every 100 spans per second needs about:
 
 | Component | CPU |
 | --- | --- |
