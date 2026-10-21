@@ -21,6 +21,7 @@ import { deps, input } from "./trace-search-router.harness.ts";
 
 /** A provider failure as the AI composer raises it, meta and all. */
 class ProviderFailed extends HandledError {
+  static readonly code = "ai_query_provider_error" as const;
   declare readonly code: "ai_query_provider_error";
   constructor() {
     super("ai_query_provider_error", "The model did not answer usably.", {

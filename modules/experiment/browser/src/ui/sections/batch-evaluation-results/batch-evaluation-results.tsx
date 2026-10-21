@@ -4,6 +4,7 @@ import { useDrawer } from "@langwatch/browser-host/drawer";
 import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { Alert, Box, Card, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { TraceIdPeek } from "@langwatch/trace-client";
 import type React from "react";
 import { useCallback, useMemo, useState } from "react";
 
@@ -14,7 +15,6 @@ import {
 } from "../../../behavior/batch-evaluation-results/use-multi-run-data.ts";
 import { useShowComparisonLeaderboard } from "../../../behavior/batch-evaluation-results/use-show-comparison-leaderboard.ts";
 import { experimentApi } from "../../../behavior/experiment-api.ts";
-import { TraceIdPeek } from "../../../behavior/lent-trace.tsx";
 import { useComparisonMode } from "../../../behavior/use-comparison-mode.ts";
 import { useResultDisplayPreferences } from "../../../behavior/use-result-display-preferences.ts";
 import { getRunDisplayName } from "../../../model/batch-evaluation-results.run-display-name.ts";

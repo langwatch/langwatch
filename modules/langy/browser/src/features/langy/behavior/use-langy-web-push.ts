@@ -13,8 +13,8 @@ import {
   listenToWebPushWorker,
   removeWebPushSubscription,
 } from "@langwatch/browser-host/web-push";
-import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { LANGY_NOTIFICATION_TOPIC } from "@langwatch/langy-contract";
+import { WebPushEndpointRefusedError } from "@langwatch/notification-contract";
 import { useCallback, useEffect, useRef } from "react";
 
 import { api } from "../../../behavior/langy-api.ts";
@@ -67,7 +67,7 @@ export function useLangyPushDevice(): {
       // A push service the server never sends to: drop the subscription so this device falls
       // back to the tab. Any other failure leaves it subscribed and the next page load stores
       // it again; the tab stays quiet rather than risk a second notification.
-      if (readHandledError(error)?.code === "web_push_endpoint_refused") {
+      if (WebPushEndpointRefusedError.is(error)) {
         await removeWebPushSubscription({ unusable: true });
       }
       return false;

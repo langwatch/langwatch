@@ -222,8 +222,9 @@ vi.mock("../../../../../behavior/use-model-providers-settings.ts", () => ({
   useModelProvidersSettings: () => ({ hasEnabledProviders: true }),
 }));
 
-vi.mock("../../../../../behavior/lent-model-provider.tsx", () => ({
-  LLMModelDisplay: ({ model }: { model: string }) => (
+vi.mock("@langwatch/model-provider-client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  ModelDisplay: ({ model }: { model: string }) => (
     <span>
       <svg data-testid="model-provider-icon" />
       {model.split("/")[1] ?? model}

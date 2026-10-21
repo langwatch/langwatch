@@ -12,6 +12,7 @@ import { HandledError } from "@langwatch/handled-error";
  * team. Some rows failing is not this — those are skipped cells.
  */
 export class InstantEvalClassifierUnavailableError extends HandledError {
+  static readonly code = "instant_eval_classifier_unavailable" as const;
   declare readonly code: "instant_eval_classifier_unavailable";
 
   constructor(options: { reasons?: readonly Error[] } = {}) {
@@ -29,6 +30,7 @@ export class InstantEvalClassifierUnavailableError extends HandledError {
  * anything is judged, so the budget is a ceiling rather than a later bill.
  */
 export class InstantEvalFreeBudgetExhaustedError extends HandledError {
+  static readonly code = "instant_eval_free_budget_exhausted" as const;
   declare readonly code: "instant_eval_free_budget_exhausted";
 
   constructor({ spentUsd, budgetUsd }: { readonly spentUsd: number; readonly budgetUsd: number }) {

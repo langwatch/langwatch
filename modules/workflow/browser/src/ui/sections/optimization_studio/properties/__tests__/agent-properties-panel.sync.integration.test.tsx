@@ -89,11 +89,13 @@ vi.mock("../../../../../behavior/agents/http/index.ts", () => ({
   useHttpTest: () => ({ handleTest: vi.fn() }),
 }));
 
-vi.mock("../../../../../behavior/lent-agent.tsx", () => ({
+vi.mock("@langwatch/agent-client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   HttpConfigEditor: () => null,
 }));
 
-vi.mock("../../../../../behavior/lent-prompt.tsx", () => ({
+vi.mock("@langwatch/prompt-client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   OutputsSection: () => null,
   VariablesSection: () => null,
 }));

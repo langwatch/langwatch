@@ -2,7 +2,7 @@ import { createHmac } from "node:crypto";
 
 import { normalizeIdentifierValue } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
-import type { SignUpVerdict } from "@langwatch/organization-contract";
+import { SignUpRestrictedError, type SignUpVerdict } from "@langwatch/organization-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import type { GenericEndpointContext } from "better-auth";
 import { APIError, getSessionFromCtx } from "better-auth/api";
@@ -44,7 +44,7 @@ export const PASSKEY_SIGNUP_VERIFICATION_REQUIRED = "VERIFICATION_REQUIRED";
 export const PASSKEY_SIGNUP_ALREADY_SIGNED_IN = "ALREADY_SIGNED_IN";
 
 /** The installation restricts who may create an account, and this address is not admitted. */
-export const PASSKEY_SIGNUP_RESTRICTED = "auth_sign_up_restricted";
+export const PASSKEY_SIGNUP_RESTRICTED = SignUpRestrictedError.code;
 
 /** Main's code for an address that must use its organization's sign-in method. */
 export const PASSKEY_SIGNUP_NOT_LOCAL = "REGISTRATION_NOT_ALLOWED";

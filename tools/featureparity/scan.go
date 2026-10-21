@@ -2,6 +2,7 @@ package featureparity
 
 import (
 	"regexp"
+	"slices"
 	"strings"
 	"unicode/utf16"
 	"unicode/utf8"
@@ -31,6 +32,9 @@ type Scenario struct {
 	Title string
 	Tags  []string
 	Line  int
+	// CitesIssue is whether an issue is cited for it, by tag or by the comment
+	// lines directly above its tags.
+	CitesIssue bool
 }
 
 // BindingRef is where a binding annotation sits in a test file.
@@ -46,8 +50,10 @@ type Binding struct {
 }
 
 var (
-	scenarioLine    = jsRegexp(`^Scenario(?:\s+Outline)?:\s*([^\n\r\x{2028}\x{2029}]+)$`)
-	gherkinBodyHead = []string{"Given", "When", "Then", "And", "But", "|"}
+	issueTagRE       = regexp.MustCompile(`^@issue[:-][0-9]+$`)
+	issueReferenceRE = regexp.MustCompile(`(?:^|[^A-Za-z0-9_&])#[0-9]+\b|/issues/[0-9]+\b`)
+	scenarioLine     = jsRegexp(`^Scenario(?:\s+Outline)?:\s*([^\n\r\x{2028}\x{2029}]+)$`)
+	gherkinBodyHead  = []string{"Given", "When", "Then", "And", "But", "|"}
 )
 
 // ParseFeature reads the scenarios of one .feature source, with feature-level
@@ -65,11 +71,18 @@ type featureParser struct {
 	scenarios                []Scenario
 	featureTags, pendingTags []string
 	featureSeen              bool
+	// pendingComments are the comment lines directly above the next scenario.
+	pendingComments []string
 }
 
 // line reads one trimmed line, numbered from 1.
 func (p *featureParser) line(number int, trimmed string) {
-	if strings.HasPrefix(trimmed, "#") || trimmed == "" {
+	if trimmed == "" {
+		p.pendingComments = nil
+		return
+	}
+	if strings.HasPrefix(trimmed, "#") {
+		p.pendingComments = append(p.pendingComments, trimmed)
 		return
 	}
 	if strings.HasPrefix(trimmed, "@") {
@@ -77,18 +90,24 @@ func (p *featureParser) line(number int, trimmed string) {
 		return
 	}
 	if !p.featureSeen && strings.HasPrefix(trimmed, "Feature:") {
-		p.featureTags, p.pendingTags, p.featureSeen = p.pendingTags, nil, true
+		p.featureTags, p.pendingTags, p.pendingComments, p.featureSeen = p.pendingTags, nil, nil, true
 		return
 	}
 	if m := scenarioLine.FindStringSubmatch(trimmed); m != nil {
 		tags := append(append([]string{}, p.featureTags...), p.pendingTags...)
-		p.scenarios = append(p.scenarios, Scenario{Title: jsTrim(m[1]), Tags: tags, Line: number})
-		p.pendingTags = nil
+		p.scenarios = append(p.scenarios, Scenario{Title: jsTrim(m[1]), Tags: tags, Line: number, CitesIssue: p.citesIssue(tags)})
+		p.pendingTags, p.pendingComments = nil, nil
 		return
 	}
+	p.pendingComments = nil
 	if !isGherkinBody(trimmed) {
 		p.pendingTags = nil
 	}
+}
+
+// citesIssue is whether a tag or the pending comment lines name an issue.
+func (p *featureParser) citesIssue(tags []string) bool {
+	return slices.ContainsFunc(tags, issueTagRE.MatchString) || slices.ContainsFunc(p.pendingComments, issueReferenceRE.MatchString)
 }
 
 // tagsOf is the @tags on a tag line.

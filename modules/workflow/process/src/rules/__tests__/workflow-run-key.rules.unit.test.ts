@@ -3,7 +3,6 @@
  *
  * @see modules/workflow/specs/workflow-service.feature
  */
-import { RUN_KEY_LIFETIME_MS } from "@langwatch/api-key-contract";
 import { describe, expect, it } from "vitest";
 
 import { LAMBDA_INVOCATION_TIMEOUT_SECONDS } from "../nlp-lambda-config.rules.ts";
@@ -19,7 +18,7 @@ describe("dispatchKeyFloorMs", () => {
   });
 
   /** @scenario "A dispatch never holds a key that lapses before the dispatch can end" */
-  it("asks a self-hosted engine's dispatch for a full fresh lifetime", () => {
-    expect(dispatchKeyFloorMs({ onLambda: false })).toBe(RUN_KEY_LIFETIME_MS);
+  it("asks a self-hosted engine's dispatch for a fresh key", () => {
+    expect(dispatchKeyFloorMs({ onLambda: false })).toBe("fresh");
   });
 });

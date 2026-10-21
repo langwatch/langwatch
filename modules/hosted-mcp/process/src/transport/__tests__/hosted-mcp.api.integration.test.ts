@@ -29,6 +29,7 @@ import type {
   McpLiveProjectLookup,
   ProjectMcpProjectLookupService,
 } from "../../services/project-mcp-project-lookup.service.ts";
+import { answerMcpExchange } from "../mcp-endpoint.rest.ts";
 import { FakeCliSessions } from "./support/fake-cli-sessions.ts";
 
 function stringField(body: unknown, key: string): string {
@@ -358,7 +359,12 @@ beforeAll(async () => {
   }).createHandler();
 
   server = createServer((req, res) => {
-    handler.handleRequest(req, res);
+    answerMcpExchange({
+      endpoint: handler,
+      runner: handler.sessionRunner,
+      request: req,
+      response: res,
+    });
   });
 
   await new Promise<void>((done) => {

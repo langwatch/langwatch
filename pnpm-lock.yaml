@@ -3064,6 +3064,9 @@ importers:
       '@langwatch/enterprise-governance-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/entitlement-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/entitlement/contract
       '@langwatch/error-views':
         specifier: workspace:*
         version: link:../../../../packages/error-views
@@ -3088,9 +3091,6 @@ importers:
       '@langwatch/onboarding-client':
         specifier: workspace:*
         version: link:../../../../modules/onboarding/client
-      '@langwatch/onboarding-contract':
-        specifier: workspace:*
-        version: link:../../../../modules/onboarding/contract
       '@langwatch/project-client':
         specifier: workspace:*
         version: link:../../../../modules/project/client
@@ -3486,6 +3486,9 @@ importers:
 
   enterprise/modules/licensing/client:
     dependencies:
+      '@langwatch/browser-host':
+        specifier: workspace:*
+        version: link:../../../../packages/browser-host
       '@langwatch/enterprise-licensing-contract':
         specifier: workspace:*
         version: link:../contract
@@ -4017,6 +4020,9 @@ importers:
       '@langwatch/enterprise-scim-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/entitlement-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/entitlement/contract
       '@langwatch/error-views':
         specifier: workspace:*
         version: link:../../../../packages/error-views
@@ -4569,9 +4575,6 @@ importers:
       '@langwatch/trace-client':
         specifier: workspace:*
         version: link:../../trace/client
-      '@langwatch/trace-contract':
-        specifier: workspace:*
-        version: link:../../trace/contract
       '@langwatch/workflow-contract':
         specifier: workspace:*
         version: link:../../workflow/contract
@@ -4642,6 +4645,9 @@ importers:
       '@langwatch/agent-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/browser-host':
+        specifier: workspace:*
+        version: link:../../../packages/browser-host
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
@@ -4686,6 +4692,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/api-key-contract':
+        specifier: workspace:*
+        version: link:../../api-key/contract
       '@langwatch/audit-log-contract':
         specifier: workspace:*
         version: link:../../audit-log/contract
@@ -4750,9 +4759,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.7
     devDependencies:
-      '@langwatch/api-key-contract':
-        specifier: workspace:*
-        version: link:../../api-key/contract
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
@@ -4804,9 +4810,6 @@ importers:
       '@langwatch/analytics-contract':
         specifier: workspace:*
         version: link:../contract
-      '@langwatch/analytics-filters':
-        specifier: workspace:*
-        version: link:../filters
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
@@ -4985,10 +4988,19 @@ importers:
       '@langwatch/analytics-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/browser-host':
+        specifier: workspace:*
+        version: link:../../../packages/browser-host
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
+      react:
+        specifier: ^19.2.7
+        version: 19.2.8
     devDependencies:
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.2.18
       typescript:
         specifier: 'catalog:'
         version: 7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)
@@ -5035,25 +5047,6 @@ importers:
       vega-lite:
         specifier: 'catalog:'
         version: 6.4.3(vega@6.3.1)
-      vitest:
-        specifier: 'catalog:'
-        version: 5.0.1(patch_hash=2921221142707f0afee9faf1cba6c6fea7201f30a6ddf42aaf4c420be2067eb3)(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
-
-  modules/analytics/filters:
-    dependencies:
-      zod:
-        specifier: 'catalog:'
-        version: 4.6.7
-    devDependencies:
-      '@langwatch/vitest-config':
-        specifier: workspace:*
-        version: link:../../../packages/vitest-config
-      '@types/node':
-        specifier: ^26.0.1
-        version: 26.2.0
-      typescript:
-        specifier: 'catalog:'
-        version: 7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)
       vitest:
         specifier: 'catalog:'
         version: 5.0.1(patch_hash=2921221142707f0afee9faf1cba6c6fea7201f30a6ddf42aaf4c420be2067eb3)(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
@@ -5305,6 +5298,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/browser-host':
+        specifier: workspace:*
+        version: link:../../../packages/browser-host
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
@@ -5620,6 +5616,9 @@ importers:
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../packages/eventing
+      '@langwatch/handled-error':
+        specifier: workspace:*
+        version: link:../../../packages/handled-error
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -5669,9 +5668,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.7
     devDependencies:
-      '@langwatch/handled-error':
-        specifier: workspace:*
-        version: link:../../../packages/handled-error
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
@@ -6262,9 +6258,9 @@ importers:
 
   modules/automation/browser:
     dependencies:
-      '@langwatch/analytics-filters':
+      '@langwatch/analytics-contract':
         specifier: workspace:*
-        version: link:../../analytics/filters
+        version: link:../../analytics/contract
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
@@ -6447,9 +6443,6 @@ importers:
       '@langwatch/analytics-contract':
         specifier: workspace:*
         version: link:../../analytics/contract
-      '@langwatch/analytics-filters':
-        specifier: workspace:*
-        version: link:../../analytics/filters
       '@langwatch/annotation-contract':
         specifier: workspace:*
         version: link:../../annotation/contract
@@ -7363,9 +7356,6 @@ importers:
       '@langwatch/trace-client':
         specifier: workspace:*
         version: link:../../trace/client
-      '@langwatch/trace-contract':
-        specifier: workspace:*
-        version: link:../../trace/contract
       '@langwatch/workflow-contract':
         specifier: workspace:*
         version: link:../../workflow/contract
@@ -7448,6 +7438,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/browser-host':
+        specifier: workspace:*
+        version: link:../../../packages/browser-host
       '@langwatch/dataset-contract':
         specifier: workspace:*
         version: link:../contract
@@ -7908,9 +7901,6 @@ importers:
       '@langwatch/analytics-contract':
         specifier: workspace:*
         version: link:../../analytics/contract
-      '@langwatch/analytics-filters':
-        specifier: workspace:*
-        version: link:../../analytics/filters
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
@@ -8104,6 +8094,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/browser-host':
+        specifier: workspace:*
+        version: link:../../../packages/browser-host
       '@langwatch/evaluator-contract':
         specifier: workspace:*
         version: link:../contract
@@ -8332,9 +8325,6 @@ importers:
       '@langwatch/trace-client':
         specifier: workspace:*
         version: link:../../trace/client
-      '@langwatch/trace-contract':
-        specifier: workspace:*
-        version: link:../../trace/contract
       '@langwatch/workflow-client':
         specifier: workspace:*
         version: link:../../workflow/client
@@ -8465,6 +8455,9 @@ importers:
 
   modules/experiment/client:
     dependencies:
+      '@langwatch/browser-host':
+        specifier: workspace:*
+        version: link:../../../packages/browser-host
       '@langwatch/experiment-contract':
         specifier: workspace:*
         version: link:../contract
@@ -9672,6 +9665,9 @@ importers:
       '@langwatch/feature-flag-contract':
         specifier: workspace:*
         version: link:../../feature-flag/contract
+      '@langwatch/insight-client':
+        specifier: workspace:*
+        version: link:../client
       '@langwatch/insight-contract':
         specifier: workspace:*
         version: link:../contract
@@ -9730,6 +9726,25 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 5.0.1(patch_hash=2921221142707f0afee9faf1cba6c6fea7201f30a6ddf42aaf4c420be2067eb3)(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.4.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  modules/insight/client:
+    dependencies:
+      '@langwatch/browser-host':
+        specifier: workspace:*
+        version: link:../../../packages/browser-host
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
+      react:
+        specifier: ^19.2.7
+        version: 19.2.8
+    devDependencies:
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.2.18
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)
 
   modules/insight/contract:
     dependencies:
@@ -10151,6 +10166,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/api-key-contract':
+        specifier: workspace:*
+        version: link:../../api-key/contract
       '@langwatch/automation-contract':
         specifier: workspace:*
         version: link:../../automation/contract
@@ -10169,6 +10187,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
+      '@langwatch/enterprise-licensing-contract':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/licensing/contract
       '@langwatch/experiment-contract':
         specifier: workspace:*
         version: link:../../experiment/contract
@@ -10877,6 +10898,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/browser-host':
+        specifier: workspace:*
+        version: link:../../../packages/browser-host
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../contract
@@ -11072,9 +11096,6 @@ importers:
       '@langwatch/trace-client':
         specifier: workspace:*
         version: link:../../trace/client
-      '@langwatch/trace-contract':
-        specifier: workspace:*
-        version: link:../../trace/contract
       lucide-react:
         specifier: 'catalog:'
         version: 1.22.0(react@19.2.8)
@@ -11286,9 +11307,9 @@ importers:
       '@langwatch/identity-contract':
         specifier: workspace:*
         version: link:../../identity/contract
-      '@langwatch/insight-contract':
+      '@langwatch/insight-client':
         specifier: workspace:*
-        version: link:../../insight/contract
+        version: link:../../insight/client
       '@langwatch/langy-contract':
         specifier: workspace:*
         version: link:../../langy/contract
@@ -11389,6 +11410,9 @@ importers:
 
   modules/navigation/client:
     dependencies:
+      '@langwatch/browser-host':
+        specifier: workspace:*
+        version: link:../../../packages/browser-host
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
@@ -11722,6 +11746,9 @@ importers:
 
   modules/onboarding/client:
     dependencies:
+      '@langwatch/browser-host':
+        specifier: workspace:*
+        version: link:../../../packages/browser-host
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
@@ -11993,6 +12020,9 @@ importers:
 
   modules/ops/client:
     dependencies:
+      '@langwatch/browser-host':
+        specifier: workspace:*
+        version: link:../../../packages/browser-host
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
@@ -12417,6 +12447,9 @@ importers:
 
   modules/organization/client:
     dependencies:
+      '@langwatch/browser-host':
+        specifier: workspace:*
+        version: link:../../../packages/browser-host
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
@@ -13008,6 +13041,9 @@ importers:
 
   modules/project/client:
     dependencies:
+      '@langwatch/browser-host':
+        specifier: workspace:*
+        version: link:../../../packages/browser-host
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
@@ -13345,6 +13381,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/browser-host':
+        specifier: workspace:*
+        version: link:../../../packages/browser-host
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
@@ -13392,6 +13431,9 @@ importers:
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
+      '@langwatch/dataset-contract':
+        specifier: workspace:*
+        version: link:../../dataset/contract
       '@langwatch/entitlement-contract':
         specifier: workspace:*
         version: link:../../entitlement/contract
@@ -13937,6 +13979,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/browser-host':
+        specifier: workspace:*
+        version: link:../../../packages/browser-host
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
@@ -15250,6 +15295,9 @@ importers:
       '@langwatch/instant-eval-contract':
         specifier: workspace:*
         version: link:../../instant-eval/contract
+      '@langwatch/instant-eval-judge-contract':
+        specifier: workspace:*
+        version: link:../../instant-eval-judge/contract
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -15473,6 +15521,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/browser-host':
+        specifier: workspace:*
+        version: link:../../../packages/browser-host
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
@@ -15571,9 +15622,6 @@ importers:
       '@langwatch/analytics-contract':
         specifier: workspace:*
         version: link:../../analytics/contract
-      '@langwatch/analytics-filters':
-        specifier: workspace:*
-        version: link:../../analytics/filters
       '@langwatch/annotation-contract':
         specifier: workspace:*
         version: link:../../annotation/contract
@@ -15833,6 +15881,9 @@ importers:
       '@langwatch/onboarding-client':
         specifier: workspace:*
         version: link:../../onboarding/client
+      '@langwatch/organization-contract':
+        specifier: workspace:*
+        version: link:../../organization/contract
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -16217,6 +16268,9 @@ importers:
       '@langwatch/api-key-client':
         specifier: workspace:*
         version: link:../../api-key/client
+      '@langwatch/authz-contract':
+        specifier: workspace:*
+        version: link:../../authz/contract
       '@langwatch/browser':
         specifier: workspace:*
         version: link:../../../packages/browser
@@ -16431,6 +16485,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/browser-host':
+        specifier: workspace:*
+        version: link:../../../packages/browser-host
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module

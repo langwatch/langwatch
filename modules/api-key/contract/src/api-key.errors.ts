@@ -1,6 +1,7 @@
 import { HandledError, NotFoundError, remediation } from "@langwatch/handled-error";
 
 export class ApiKeyNotFoundError extends NotFoundError {
+  static readonly code = "api_key_not_found" as const;
   declare readonly code: "api_key_not_found";
 
   constructor(id: string, options: { reasons?: readonly Error[] } = {}) {
@@ -36,6 +37,7 @@ const ADMIN_REQUIRED_MESSAGES: Readonly<Record<ApiKeyAdminRequiredAction, string
  * all taking organization admin — one rule, so one refusal, act in `meta`.
  */
 export class ApiKeyAdminRequiredError extends HandledError {
+  static readonly code = "api_key_admin_required" as const;
   declare readonly code: "api_key_admin_required";
 
   constructor(action: ApiKeyAdminRequiredAction) {
@@ -49,6 +51,7 @@ export class ApiKeyAdminRequiredError extends HandledError {
 }
 
 export class ApiKeyNotOwnedError extends HandledError {
+  static readonly code = "api_key_not_owned" as const;
   declare readonly code: "api_key_not_owned";
 
   constructor(id: string) {
@@ -63,6 +66,7 @@ export class ApiKeyNotOwnedError extends HandledError {
 }
 
 export class ApiKeyAlreadyRevokedError extends HandledError {
+  static readonly code = "api_key_already_revoked" as const;
   declare readonly code: "api_key_already_revoked";
 
   constructor(id: string) {
@@ -77,6 +81,7 @@ export class ApiKeyAlreadyRevokedError extends HandledError {
 }
 
 export class ApiKeyReservedNameError extends HandledError {
+  static readonly code = "api_key_reserved_name" as const;
   declare readonly code: "api_key_reserved_name";
 
   constructor(name: string) {
@@ -95,6 +100,7 @@ export class ApiKeyReservedNameError extends HandledError {
 }
 
 export class ApiKeyScopeViolationError extends HandledError {
+  static readonly code = "api_key_scope_violation" as const;
   declare readonly code: "api_key_scope_violation";
 
   constructor(message: string) {
@@ -108,6 +114,7 @@ export class ApiKeyScopeViolationError extends HandledError {
 }
 
 export class ApiKeyPermissionDeniedError extends HandledError {
+  static readonly code = "api_key_permission_denied" as const;
   declare readonly code: "api_key_permission_denied";
 
   constructor(permission: string, options: { meta?: Record<string, unknown> } = {}) {
@@ -126,6 +133,7 @@ export class ApiKeyPermissionDeniedError extends HandledError {
 }
 
 export class ApiKeyPermissionNotDelegableError extends HandledError {
+  static readonly code = "api_key_permission_not_delegable" as const;
   declare readonly code: "api_key_permission_not_delegable";
 
   constructor(permission: string, options: { subject: string; meta?: Record<string, unknown> }) {
@@ -144,6 +152,7 @@ export class ApiKeyPermissionNotDelegableError extends HandledError {
 }
 
 export class ProjectVisibilityTooWideError extends HandledError {
+  static readonly code = "project_visibility_too_wide" as const;
   declare readonly code: "project_visibility_too_wide";
 
   constructor(message: string, options: { meta?: Record<string, unknown> } = {}) {
@@ -158,6 +167,7 @@ export class ProjectVisibilityTooWideError extends HandledError {
 }
 
 export class CliKeySelectionInvalidError extends HandledError {
+  static readonly code = "cli_key_selection_invalid" as const;
   declare readonly code: "cli_key_selection_invalid";
 
   constructor(public readonly fieldErrors: Record<string, string[]>) {
@@ -176,6 +186,7 @@ export class CliKeySelectionInvalidError extends HandledError {
  * be real and it is the project that accepts none.
  */
 export class AggregateProjectHasNoCredentialError extends HandledError {
+  static readonly code = "aggregate_project_has_no_credential" as const;
   declare readonly code: "aggregate_project_has_no_credential";
 
   constructor(options: { meta?: Record<string, unknown> } = {}) {

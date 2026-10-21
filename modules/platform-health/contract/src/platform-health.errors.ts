@@ -7,6 +7,7 @@ import type { PlatformHealthReport } from "./platform-health.ts";
  * fixed at release, so the caller's own URL is what it can act on.
  */
 export class PlatformHealthSubsystemNotFoundError extends HandledError {
+  static readonly code = "platform_health_subsystem_not_found" as const;
   declare readonly code: "platform_health_subsystem_not_found";
 
   constructor() {
@@ -22,6 +23,7 @@ export class PlatformHealthSubsystemNotFoundError extends HandledError {
  * a failure of the family, so it carries the report the monitor came to read.
  */
 export class PlatformHealthUnhealthyError extends HandledError {
+  static readonly code = "platform_health_unhealthy" as const;
   declare readonly code: "platform_health_unhealthy";
 
   readonly report: PlatformHealthReport;
@@ -45,6 +47,7 @@ export type CanaryTransport = "rest" | "otlp";
  * only the probe, transport and upstream status; the cause goes in the log.
  */
 export class HealthCheckFailedError extends HandledError {
+  static readonly code = "health_check_failed" as const;
   declare readonly code: "health_check_failed";
 
   constructor({

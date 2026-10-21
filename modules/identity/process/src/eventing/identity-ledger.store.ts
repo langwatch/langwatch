@@ -33,23 +33,6 @@ import type { IdentityEvent, IdentityFoldState } from "./identity-state.projecti
 
 const logger = createLogger("langwatch:identity:ledger");
 
-/**
- * A ceremony's read-your-writes wait expired before the fold landed its events in the `Identifier`
- * projection (the grants ledger's `awaitProjection` shape).
- */
-export const identityProjectionConvergenceTimeoutsTotal = counter({
-  name: "identity_projection_convergence_timeouts_total",
-  description:
-    "Identity ceremonies that returned before the fold landed their events; the append is durable and the projection converges later.",
-});
-
-/** End-to-end cost of one identity commit: append, stage, and the wait. */
-const identityCommitDurationSeconds = histogram({
-  name: "identity_commit_duration_seconds",
-  description:
-    "Duration of an identity ledger commit: durable append, queue staging, and the read-your-writes wait.",
-});
-
 /** The read-your-writes window, the grants ledger's convergence shape. */
 const IDENTITY_CONVERGENCE_TIMEOUT_MS = 2_000;
 const IDENTITY_CONVERGENCE_POLL_MS = 25;
@@ -101,6 +84,21 @@ export class IdentityLedgerStore implements IdentityLedger {
   private readonly heads: IdentityLedgerWriterDeps["heads"];
   private readonly stagedSender: (name: string) => Promise<IdentityStagedSender | null>;
   private readonly convergence: { timeoutMs: number; pollMs: number } | null;
+  /**
+   * A ceremony's read-your-writes wait expired before the fold landed its events in the
+   * `Identifier` projection (the grants ledger's `awaitProjection` shape).
+   */
+  private readonly convergenceTimeouts = counter({
+    name: "identity_projection_convergence_timeouts_total",
+    description:
+      "Identity ceremonies that returned before the fold landed their events; the append is durable and the projection converges later.",
+  });
+  /** End-to-end cost of one identity commit: append, stage, and the wait. */
+  private readonly commitDuration = histogram({
+    name: "identity_commit_duration_seconds",
+    description:
+      "Duration of an identity ledger commit: durable append, queue staging, and the read-your-writes wait.",
+  });
 
   static create(deps: IdentityLedgerWriterDeps): IdentityLedgerStore {
     return new IdentityLedgerStore(deps);
@@ -136,7 +134,7 @@ export class IdentityLedgerStore implements IdentityLedger {
       await this.stageAndAwait({ command, events });
       return events;
     } finally {
-      identityCommitDurationSeconds.observe((performance.now() - startedAt) / 1000);
+      this.commitDuration.observe((performance.now() - startedAt) / 1000);
     }
   }
 
@@ -237,7 +235,7 @@ export class IdentityLedgerStore implements IdentityLedger {
     }
     if (isReached) return;
 
-    identityProjectionConvergenceTimeoutsTotal.inc();
+    this.convergenceTimeouts.inc();
     logger.warn(
       { userId, commandCount: events.length },
       "identity projection did not land a ceremony's events within the read-your-writes window; the command is queued and the fold will converge",

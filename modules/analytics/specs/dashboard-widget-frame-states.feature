@@ -40,6 +40,20 @@ Feature: A dashboard widget frame shows what its queries report
       Then the card says "Couldn't load Cost per trace" with the reason
       And Retry starts the widget over, so its queries run again
 
+    @unit
+    Scenario: A widget that runs too many queries at once is told why
+      Given a widget that starts more queries at once than the frame allows
+      When the frame refuses the extra query
+      Then the reader sees a title and a sentence saying the extra query was not started
+      And the line is never empty after the code
+
+    @unit
+    Scenario: A failure with a code the registry lacks keeps what the executor said
+      Given a query fails with a code this client has no copy for, or with no code at all
+      When the failure is worded
+      Then the reader sees the executor's own sentence, including its first tip
+      And the failure's trace id reaches the reader as the error id
+
     @integration
     Scenario: A failure the frame will retry does not fail the card yet
       Given a widget whose query is refused as busy

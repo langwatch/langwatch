@@ -1,6 +1,6 @@
 import {
   AgentApi,
-  MAX_CALL_TIMEOUT_MS,
+  maxCallTimeoutMs,
   type AgentTestRunResult,
   type AgentTestTurnResult,
   type HttpAgentTestInput,
@@ -367,7 +367,7 @@ export class ScenarioModule implements ScenarioApi {
           ...config.nlpTimeouts,
           engineCodeBlockTimeoutSeconds: Number(setup.config.nlpCodeBlockTimeoutSeconds),
         },
-        maxCallTimeoutMs: MAX_CALL_TIMEOUT_MS,
+        maxCallTimeoutMs: maxCallTimeoutMs(),
       }),
       connectedTargets: ConnectedTargetService.create(setup.dependencies.agents),
       httpAgentTesting: HttpAgentTestService.create({

@@ -62,10 +62,11 @@ export function lastRunWords({
   return lastRunReason === null ? lastRunOutcome : `${lastRunOutcome} · ${lastRunReason}`;
 }
 
-/** "2 of 7": the skipped days beside how many turn the schedule off. */
+/** "2 skipped, off after 5 more": the skipped days beside how many more turn the schedule off. */
 export function skippedDaysWords({
   consecutiveSkips,
-  skippedDaysBeforeOff,
-}: Pick<OpsInsightSchedule, "consecutiveSkips" | "skippedDaysBeforeOff">): string {
-  return `${consecutiveSkips} of ${skippedDaysBeforeOff}`;
+  daysUntilOff,
+}: Pick<OpsInsightSchedule, "consecutiveSkips" | "daysUntilOff">): string {
+  if (daysUntilOff === null) return `${consecutiveSkips} skipped`;
+  return `${consecutiveSkips} skipped, off after ${daysUntilOff} more`;
 }

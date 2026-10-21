@@ -4,6 +4,7 @@ import { HandledError } from "@langwatch/handled-error";
  * person has an action to take. See ADR-117 §3.
  */
 export class IdentityLinkProposedError extends HandledError {
+  static readonly code = "identity_link_proposed" as const;
   declare readonly code: "identity_link_proposed";
 
   constructor() {
@@ -16,6 +17,7 @@ export class IdentityLinkProposedError extends HandledError {
 }
 
 export class IdentityJitDisabledError extends HandledError {
+  static readonly code = "identity_jit_disabled" as const;
   declare readonly code: "identity_jit_disabled";
 
   constructor() {

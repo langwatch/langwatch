@@ -6,6 +6,7 @@ import { HandledError } from "@langwatch/handled-error";
  * carrying its `httpStatus` alongside trace/span ids and the structured error shape.
  */
 export class ScenarioRunExportUnauthenticatedError extends HandledError {
+  static readonly code = "scenario_run_export_unauthenticated" as const;
   declare readonly code: "scenario_run_export_unauthenticated";
 
   constructor() {
@@ -21,6 +22,7 @@ export class ScenarioRunExportUnauthenticatedError extends HandledError {
  * trail records which permission was the blocker rather than a bare 403.
  */
 export class ScenarioRunExportForbiddenError extends HandledError {
+  static readonly code = "scenario_run_export_forbidden" as const;
   declare readonly code: "scenario_run_export_forbidden";
 
   constructor(projectId: string) {

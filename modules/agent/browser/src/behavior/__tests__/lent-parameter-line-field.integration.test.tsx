@@ -7,11 +7,13 @@ import {
 } from "@langwatch/browser-host/capabilities";
 import { uiDeclarations, type UiDeclarations } from "@langwatch/browser-host/declarations";
 import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
-import { ParameterLineFieldToken, type ParameterLineFieldProps } from "@langwatch/scenario-client";
+import {
+  ParameterLineFieldToken,
+  type ParameterLineFieldProps,
+  ParameterLineField,
+} from "@langwatch/scenario-client";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-
-import { ParameterLineField } from "../lent-parameter-line-field.tsx";
 
 const scenarioLends = uiDeclarations([
   {

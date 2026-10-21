@@ -6,6 +6,7 @@ import { HandledError } from "@langwatch/handled-error";
  * to a decompression bomb. 413, not 400, since the request is well-formed.
  */
 export class OtlpBodyTooLargeError extends HandledError {
+  static readonly code = "ERR_PAYLOAD_TOO_LARGE" as const;
   declare readonly code: "ERR_PAYLOAD_TOO_LARGE";
 
   /**
@@ -38,6 +39,7 @@ export class OtlpBodyTooLargeError extends HandledError {
  * fix: the bytes never arrived, so it must not pollute the 5xx rate.
  */
 export class OtlpBodyUnreadableError extends HandledError {
+  static readonly code = "ERR_BODY_UNREADABLE" as const;
   declare readonly code: "ERR_BODY_UNREADABLE";
 
   constructor({ cause }: { cause?: unknown } = {}) {
@@ -59,6 +61,7 @@ export class OtlpBodyUnreadableError extends HandledError {
  * the boundary unclassified and counting as a server fault.
  */
 export class OtlpUnsupportedEncodingError extends HandledError {
+  static readonly code = "ERR_UNSUPPORTED_ENCODING" as const;
   declare readonly code: "ERR_UNSUPPORTED_ENCODING";
 
   constructor({ encoding }: { encoding: string }) {
@@ -74,6 +77,7 @@ export class OtlpUnsupportedEncodingError extends HandledError {
 
 /** An ingestion key arrived on a process that resolves no source billing. */
 export class OtlpIngestSourceBillingUnavailableError extends HandledError {
+  static readonly code = "service_unavailable" as const;
   declare readonly code: "service_unavailable";
 
   constructor(sourceType: string) {

@@ -2,7 +2,7 @@
  * Two hosted MCP replicas sharing one Redis, for the cross-replica suites, kept
  * apart from the scenarios so those read as behaviour rather than as plumbing.
  */
-import { createServer, type Server, type IncomingMessage } from "node:http";
+import { createServer, type Server } from "node:http";
 
 import { type Cluster, Redis } from "ioredis";
 
@@ -11,12 +11,16 @@ import { LiveHostedMcpRepositories } from "../../../repositories/live/live.hoste
 import type { McpSessionCipher } from "../../../repositories/mcp-session.repository.ts";
 import { RedisMcpSessionRepository } from "../../../repositories/redis/redis.mcp-session.repository.ts";
 import type { AuthzMcpSessionGrantService } from "../../../services/authz-mcp-session-grant.service.ts";
-import type { HeaderMcpClientAddressService } from "../../../services/header-mcp-client-address.service.ts";
+import type {
+  HeaderMcpClientAddressService,
+  McpClientAddressSource,
+} from "../../../services/header-mcp-client-address.service.ts";
 import type { McpHandler } from "../../../services/mcp-endpoint.service.ts";
 import type {
   McpLiveProjectLookup,
   ProjectMcpProjectLookupService,
 } from "../../../services/project-mcp-project-lookup.service.ts";
+import { answerMcpExchange } from "../../mcp-endpoint.rest.ts";
 import { FakeCliSessions } from "./fake-cli-sessions.ts";
 
 export const SESSION_PREFIX = "mcp:session:";
@@ -65,8 +69,8 @@ class HarnessCipher implements McpSessionCipher {
 
 /** Every replica answers on loopback, so every caller is the same address. */
 class HarnessClientAddress implements Pick<HeaderMcpClientAddressService, "clientIp"> {
-  clientIp(request: IncomingMessage): string {
-    return request.socket.remoteAddress ?? "127.0.0.1";
+  clientIp(request: McpClientAddressSource): string {
+    return request.remoteAddress ?? "127.0.0.1";
   }
 }
 
@@ -129,7 +133,9 @@ export async function startReplicaPair({
         address: new HarnessClientAddress(),
         baseHost: "https://app.langwatch.ai",
       }).createHandler();
-      const server = createServer((req, res) => handler.handleRequest(req, res));
+      const server = createServer((request, response) =>
+        answerMcpExchange({ endpoint: handler, runner: handler.sessionRunner, request, response }),
+      );
       await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
       const address = server.address();
       if (typeof address !== "object" || !address) {

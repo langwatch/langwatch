@@ -21,7 +21,9 @@ export const RULES_DIRECTORY = "packages/oxlint-rules/src/rules";
 export const POLICY_REGISTRY = fileURLToPath(new URL("../index.ts", import.meta.url));
 export const ENFORCER_TESTS = "packages/architecture-enforcer/tests";
 export const SKILLS_DIRECTORY = ".claude/skills";
-const TEACHING_DIRECTORIES = [SKILLS_DIRECTORY, ".claude/rules"] as const;
+/** The pattern pages agents and engineers learn from; a dead citation here is held at zero. */
+export const BEST_PRACTICES_DIRECTORY = "dev/docs/best_practices";
+const TEACHING_DIRECTORIES = [SKILLS_DIRECTORY, ".claude/rules", BEST_PRACTICES_DIRECTORY] as const;
 const TEACHING_FILES = ["CLAUDE.md"] as const;
 
 /** Skills the Claude Code harness ships; a page may route to one without it living in the tree. */
@@ -38,6 +40,11 @@ export const HARNESS_SKILLS: ReadonlySet<string> = new Set([
 /** The top-level folders a backticked path must start with to be read as a repository path. */
 const REPOSITORY_ROOTS: ReadonlySet<string> = new Set([
   "apps",
+  "platform",
+  "charts",
+  "infra",
+  "pkg",
+  "plugins",
   "modules",
   "enterprise",
   "packages",
@@ -52,7 +59,7 @@ const REPOSITORY_ROOTS: ReadonlySet<string> = new Set([
   ".github",
 ]);
 
-type Known = {
+export type Known = {
   rules: ReadonlySet<string>;
   policies: ReadonlySet<string>;
   sections: ReadonlySet<string>;
@@ -60,7 +67,7 @@ type Known = {
   enforcerTests: readonly string[];
 };
 
-type Citation = {
+export type Citation = {
   kind: "rule" | "backing" | "policy" | "section" | "skill" | "path" | "enforcer-test";
   cited: string;
   line: number;
@@ -70,16 +77,31 @@ function workspacePath({ root, file }: { root: string; file: string }): string {
   return relative(root, file).split(sep).join("/");
 }
 
-function markdownUnder(directory: string): string[] {
+export function filesUnder({
+  directory,
+  extensions = [".md"],
+}: {
+  directory: string;
+  extensions?: readonly string[];
+}): string[] {
   if (!existsSync(directory)) return [];
 
   return readdirSync(directory, { withFileTypes: true, recursive: true })
-    .filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
+    .filter(
+      (entry) =>
+        entry.isFile() &&
+        !entry.parentPath.split(sep).includes("node_modules") &&
+        extensions.some((extension) => entry.name.endsWith(extension)),
+    )
     .map((entry) => join(entry.parentPath, entry.name))
     .toSorted();
 }
 
-/** CLAUDE.md and every Markdown page under .claude/skills and .claude/rules. */
+function markdownUnder(directory: string): string[] {
+  return filesUnder({ directory });
+}
+
+/** CLAUDE.md and every Markdown page under .claude/{skills,rules} and dev/docs/best_practices. */
 export function citingSurfaces(root: string): string[] {
   const files = TEACHING_FILES.map((file) => join(root, file)).filter((file) => existsSync(file));
 
@@ -183,19 +205,26 @@ export function pathExists({ root, path }: { root: string; path: string }): bool
   return true;
 }
 
+/** Build output and `*.local*` files exist only on a machine that made them, never in the tree. */
+const LOCAL_ONLY = /^(?:dist|node_modules)$|\.local(?:\.|$)/;
+
 /** A backticked span read as a repository path, its line suffix and anchor dropped. */
 export function repositoryPathOf(span: string): string | undefined {
   if (/[\s=@$|;'"(),]/.test(span) || !span.includes("/")) return undefined;
   const path = span.replace(/#.*$/, "").replace(/:\d+(?:[-,]\d+)*$/, "");
   const [first, ...rest] = path.split("/");
   if (rest.some((segment) => segment.startsWith("."))) return undefined;
+  if (rest.some((segment) => LOCAL_ONLY.test(segment))) return undefined;
 
   if (!REPOSITORY_ROOTS.has(first!)) return undefined;
 
   return path;
 }
 
-type Table = { backedBy: number; skill: number };
+type Table = { backedBy: number; skill: number; history: number };
+
+/** A column headed "Was" (or "Before", "Old", "Former") names what used to be there. */
+const HISTORY_HEADER = /^\s*(?:was|before|old|former)\b/i;
 
 function headerOf(line: string): Table {
   const cells = cellsOf(line);
@@ -203,6 +232,7 @@ function headerOf(line: string): Table {
   return {
     backedBy: cells.findIndex((cell) => /backed by/i.test(cell)),
     skill: cells.findIndex((cell) => /\bskills?\b/i.test(cell) && !/backed by/i.test(cell)),
+    history: cells.findIndex((cell) => HISTORY_HEADER.test(cell)),
   };
 }
 
@@ -276,7 +306,8 @@ function inlineCitations({ text, line }: { text: string; line: number }): Citati
 }
 
 /** A citation its paragraph retires ("deleted", "the former") is history, not teaching. */
-const RETIRED = /\b(?:deleted|gone|former(?:ly)?|removed|retired|no longer|not in the tree)\b/i;
+const RETIRED =
+  /\b(?:deleted|gone|former(?:ly)?|removed|retired|replaced|used to|refuse[sd]?|no longer|not in the tree|not (?:\w+ )?yet)\b/i;
 /** "Never" retires only what its own line names; the rest of the paragraph still teaches. */
 const FORBIDDEN = /\bnever\b/i;
 
@@ -332,7 +363,14 @@ export function citationsIn(source: string): Citation[] {
       found.push(...rowCitations({ table, text, line }));
     }
 
-    found.push(...inlineCitations({ text, line }));
+    const history = table === undefined ? -1 : table.history;
+    const current =
+      history < 0
+        ? text
+        : cellsOf(text)
+            .filter((_, at) => at !== history)
+            .join("|");
+    found.push(...inlineCitations({ text: current, line }));
   });
 
   return found.filter(
@@ -400,34 +438,62 @@ function isModuleRelative({ root, path }: { root: string; path: string }): boole
   );
 }
 
-/** Every rule, policy, section, skill and path a teaching page cites that does not exist. */
-export function lintTeachingCitations(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
-  const { root } = snapshot;
-  const known: Known = {
+/** What the tree declares today: the names a citation is checked against. */
+export function readKnown(root: string): Known {
+  return {
     rules: new Set(readLintRules(root).keys()),
     policies: readPolicyIds(),
     sections: readSections(root),
     skills: readSkills(root),
     enforcerTests: readEnforcerTests(root),
   };
-  const violations: ArchitectureViolation[] = [];
+}
 
-  for (const file of citingSurfaces(root)) {
-    for (const citation of citationsIn(readFileSync(file, "utf8"))) {
-      if (exists({ citation, known, root })) continue;
-      violations.push({
-        policy: TEACHING_CITATIONS_POLICY,
-        file,
-        line: citation.line,
-        specifier: `${citation.kind}:${citation.cited}`,
-        message: `This page cites ${NOUN[citation.kind]}${citation.cited}\`, which is not ${WHERE[citation.kind]}; an agent following it will look for something that is gone.`,
-        allowed:
-          "Cite what exists today: the renamed rule, policy, section, skill or path, or drop the citation. A `<placeholder>` or `*` segment matches any name.",
-      });
-    }
-  }
+/** One citation on one page that names something not in the tree. */
+export type DeadCitation = Citation & { file: string };
 
-  return violations;
+/** Every citation the given pages make, of the given kinds, that does not exist. */
+export function deadCitations({
+  root,
+  files,
+  known,
+  kinds,
+}: {
+  root: string;
+  files: readonly string[];
+  known: Known;
+  kinds?: ReadonlySet<Citation["kind"]>;
+}): DeadCitation[] {
+  return files.flatMap((file) =>
+    citationsIn(readFileSync(file, "utf8"))
+      .filter((citation) => kinds === undefined || kinds.has(citation.kind))
+      .filter((citation) => !exists({ citation, known, root }))
+      .map((citation) => ({ ...citation, file })),
+  );
+}
+
+/** The finding text for a dead citation, shared by every policy that reports one. */
+export function deadCitationMessage(citation: Citation): { message: string; allowed: string } {
+  return {
+    message: `This page cites ${NOUN[citation.kind]}${citation.cited}\`, which is not ${WHERE[citation.kind]}; an agent following it will look for something that is gone.`,
+    allowed:
+      "Cite what exists today: the renamed rule, policy, section, skill or path, or drop the citation. A `<placeholder>` or `*` segment matches any name.",
+  };
+}
+
+/** Every rule, policy, section, skill and path a teaching page cites that does not exist. */
+export function lintTeachingCitations(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
+  const { root } = snapshot;
+
+  return deadCitations({ root, files: citingSurfaces(root), known: readKnown(root) }).map(
+    (citation) => ({
+      policy: TEACHING_CITATIONS_POLICY,
+      file: citation.file,
+      line: citation.line,
+      specifier: `${citation.kind}:${citation.cited}`,
+      ...deadCitationMessage(citation),
+    }),
+  );
 }
 
 /** Comments say why a rule exists; only its messages and docs reach the agent that trips it. */

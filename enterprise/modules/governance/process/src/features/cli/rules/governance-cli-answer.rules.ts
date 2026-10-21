@@ -5,6 +5,7 @@ import {
   governanceCliRefusalAnswers,
   type GovernanceCliRefusalAnswer,
 } from "@langwatch/enterprise-governance-contract";
+import { EnterprisePlanRequiredError } from "@langwatch/entitlement-contract";
 import { HandledError } from "@langwatch/handled-error";
 
 /** The answer bodies every `/api/auth/cli` route shares: success, created, refusal. */
@@ -89,7 +90,7 @@ function cliDoorAnswer({
 }): CliDoorAnswer {
   if (!HandledError.isHandled(failure)) return { outcome: "declined" };
 
-  if (failure.code === "enterprise_plan_required") {
+  if (EnterprisePlanRequiredError.is(failure)) {
     const body = governanceCliRefusalAnswers[402].parse({
       error: "payment_required",
       error_description: failure.message,

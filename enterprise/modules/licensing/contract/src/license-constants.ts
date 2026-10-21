@@ -78,6 +78,17 @@ iQIDAQAB
  */
 export const DENIED_SSO_GATE_TTL_MS = 60_000;
 
+/** Whether a deny the SSO gate kept at `deniedAtMs` is old enough to re-read from the store. */
+export function isDeniedSsoGateStale({
+  deniedAtMs,
+  nowMs,
+}: {
+  deniedAtMs: number;
+  nowMs: number;
+}): boolean {
+  return nowMs - deniedAtMs >= DENIED_SSO_GATE_TTL_MS;
+}
+
 /**
  * Compatibility export. The provider-neutral plan contract is owned by the
  * core Entitlements feature; Licensing only supplies one possible source.

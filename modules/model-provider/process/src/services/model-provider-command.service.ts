@@ -23,6 +23,7 @@ import {
   type ModelProviderTestConnectionInput,
   type ModelProviderWriteInput,
 } from "@langwatch/model-provider-contract";
+import { ProjectNotFoundError } from "@langwatch/project-contract";
 import { nowInstant, toDate } from "@langwatch/time";
 
 import type { ModelProviderConnectionPingService } from "../features/credential-probe/services/model-provider-connection-ping.service.ts";
@@ -128,7 +129,7 @@ export class ModelProviderCommandService {
         organizationId: parsed.organizationId,
       })
       .catch((error: unknown) => {
-        if (HandledError.isHandled(error) && error.code === "project_not_found")
+        if (HandledError.isHandled(error) && ProjectNotFoundError.is(error))
           throw new ModelProviderNotFoundError();
         throw error;
       });
@@ -137,7 +138,7 @@ export class ModelProviderCommandService {
       const projectScopes = await this.options.scopes
         .getProjectScopes(parsed.projectId)
         .catch((error: unknown) => {
-          if (HandledError.isHandled(error) && error.code === "project_not_found")
+          if (HandledError.isHandled(error) && ProjectNotFoundError.is(error))
             throw new ModelProviderNotFoundError();
           throw error;
         });
@@ -180,7 +181,7 @@ export class ModelProviderCommandService {
         organizationId: parsed.organizationId,
       })
       .catch((error: unknown) => {
-        if (HandledError.isHandled(error) && error.code === "project_not_found")
+        if (HandledError.isHandled(error) && ProjectNotFoundError.is(error))
           throw new ModelProviderNotFoundError();
         throw error;
       });
@@ -258,7 +259,7 @@ export class ModelProviderCommandService {
   private async getExistingProvider(input: ModelProviderWriteInput): Promise<ModelProvider | null> {
     const projectScopes = input.projectId
       ? await this.options.scopes.getProjectScopes(input.projectId).catch((error: unknown) => {
-          if (HandledError.isHandled(error) && error.code === "project_not_found") return undefined;
+          if (HandledError.isHandled(error) && ProjectNotFoundError.is(error)) return undefined;
           throw error;
         })
       : undefined;
@@ -332,7 +333,7 @@ export class ModelProviderCommandService {
           organizationId: input.organizationId,
         })
         .catch((error: unknown) => {
-          if (HandledError.isHandled(error) && error.code === "project_not_found") {
+          if (HandledError.isHandled(error) && ProjectNotFoundError.is(error)) {
             throw new ModelProviderInvalidError(
               "Provider scope does not resolve to an organization",
             );

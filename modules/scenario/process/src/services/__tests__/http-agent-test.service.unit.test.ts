@@ -215,4 +215,54 @@ describe("HttpAgentTestService", () => {
       expect(sent[1]).not.toContain("tenant-secret");
     });
   });
+
+  describe("when the test fails", () => {
+    function failingService(executeComponent: WorkflowApi["executeComponent"]) {
+      return HttpAgentTestService.create({
+        agents: createApiFixture<AgentApi>(),
+        secrets: createApiFixture<SecretApi>(),
+        traces: createApiFixture<TraceApi>(),
+        workflows: createApiFixture<WorkflowApi>({ executeComponent }),
+      });
+    }
+    const request = {
+      projectId,
+      actorId: "user_1",
+      url: savedUrl,
+      method: "POST" as const,
+      bodyTemplate: '{"input": "ping"}',
+    };
+
+    /** @scenario "Every failed HTTP agent test names its cause by a code with copy" */
+    it("carries the engine's code, the generic one when it named none, and the endpoint's body as data", async () => {
+      const timedOut = await failingService(
+        async () =>
+          ({
+            status: "error",
+            error: "context deadline exceeded",
+            error_type: "http_timeout",
+          }) as never,
+      ).execute(request);
+      const unnamed = await failingService(
+        async () =>
+          ({
+            status: "error",
+            error: "boom",
+            http: { status_code: 502, response_body: '{"detail":"down"}' },
+          }) as never,
+      ).execute(request);
+      const unreachable = await failingService(async () => {
+        throw new Error("dispatch failed");
+      }).execute(request);
+
+      expect(timedOut).toMatchObject({ success: false, errorCode: "http_timeout" });
+      expect(unnamed).toMatchObject({
+        success: false,
+        errorCode: "http_error",
+        status: 502,
+        response: { detail: "down" },
+      });
+      expect(unreachable).toMatchObject({ success: false, errorCode: "http_executor_unavailable" });
+    });
+  });
 });

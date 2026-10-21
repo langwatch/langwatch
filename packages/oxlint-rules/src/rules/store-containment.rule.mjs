@@ -30,7 +30,7 @@ const STORES = [
   },
 ];
 
-const MODULE_ROLES = new Set(["contract", "process", "browser", "library", "client"]);
+const MODULE_ROLES = new Set(["contract", "process", "browser", "client"]);
 
 // Named exceptions: the file, the stores it may name, and why (Alex, 2026-10-06, Q212).
 // A third-party library takes the raw client itself; each moves with its code.

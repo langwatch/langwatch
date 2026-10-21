@@ -13,12 +13,12 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
+import { ModelSelector } from "@langwatch/model-provider-client";
 import { allModelOptions, LANGY_CHAT_FEATURE_KEY } from "@langwatch/model-provider-contract";
 import { UserRoundCog } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 
 import { api } from "../../behavior/governance-api.ts";
-import { ModelSelector } from "../../behavior/lent-model-provider.tsx";
 
 /**
  * What the daily Insights job would be told; nothing is stored yet, so Save only hands edits back

@@ -23,9 +23,10 @@ const SIGNED_IN: AuthSessionPoll = {
 };
 
 function authWorld(overrides: Partial<AuthDoorApi> = {}) {
-  const betterAuthHandshake = vi.fn<(request: Request) => Promise<Response>>(async () =>
-    Response.json({ handledByBetterAuth: true }),
-  );
+  const betterAuthHandshake = vi.fn<AuthDoorApi["betterAuthHandshake"]>(async () => ({
+    kind: "engine",
+    response: Response.json({ handledByBetterAuth: true }),
+  }));
   const revokeSessionFromCookies = vi.fn<(input: { cookie: string | undefined }) => Promise<void>>(
     async () => {},
   );

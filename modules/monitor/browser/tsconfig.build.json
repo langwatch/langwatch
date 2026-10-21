@@ -21,9 +21,6 @@
   ],
   "references": [
     {
-      "path": "../../trace/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../trace/client/tsconfig.build.json"
     },
     {

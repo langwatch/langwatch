@@ -4,6 +4,7 @@
  * (reserved dashboard-context params: ADR-130). Versioned like `workbenchChartDefinition.ts`.
  */
 
+import type { AppErrorCode } from "@langwatch/handled-error";
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
@@ -197,14 +198,13 @@ export type DashboardWidgetSource = z.infer<typeof dashboardWidgetSourceSchema>;
 export type DashboardWidgetQueryParamValue = string | number | boolean;
 
 /**
- * What a rejected `LW.query(name, params)` carries back to the frame. Shaped to assign
- * structurally into the bridge's own `ChartQueryError` (`.../bridgeProtocol.ts`) without
- * this server module importing that client one.
+ * What a rejected `LW.query(name, params)` carries back: a code and the meta its copy reads. The
+ * words are the code's entry in the presentation registry; the browser fills them in before the
+ * failure reaches the frame or the screen.
  */
 export interface DashboardWidgetQueryParamError {
-  readonly code: string;
-  readonly title: string;
-  readonly message: string;
+  readonly code: Extract<AppErrorCode, `dashboard_widget_query_${string}`>;
+  readonly meta: Readonly<Record<string, string>>;
 }
 
 export type DashboardWidgetQueryParamValidation =
@@ -235,21 +235,14 @@ export function validateDashboardWidgetQueryParams({
     if (first?.startsWith(DASHBOARD_CONTEXT_PARAMETER_PREFIX)) {
       return {
         ok: false,
-        error: {
-          code: "dashboard_widget_query_reserved_param",
-          title: "Reserved query parameter",
-          message: `"${first}" is bound automatically from the page's own dashboard context (window and granularity) — a query never sets it, and LW.query must not pass it either.`,
-        },
+        error: { code: "dashboard_widget_query_reserved_param", meta: { parameter: first } },
       };
     }
     return {
       ok: false,
       error: {
         code: "dashboard_widget_query_undeclared_param",
-        title: "Unknown query parameter",
-        message: `This query does not declare a parameter named "${first}". Declared: ${
-          declared.length > 0 ? declared.map((p) => p.name).join(", ") : "(none)"
-        }.`,
+        meta: { parameter: first ?? "", declared: declared.map((p) => p.name).join(", ") },
       },
     };
   }
@@ -287,8 +280,7 @@ function resolveDeclaredParam({
       ok: false,
       error: {
         code: "dashboard_widget_query_missing_param",
-        title: "Missing query parameter",
-        message: `"${declaration.name}" is required and has no default — pass a value for it.`,
+        meta: { parameter: declaration.name },
       },
     };
   }
@@ -297,8 +289,7 @@ function resolveDeclaredParam({
       ok: false,
       error: {
         code: "dashboard_widget_query_mistyped_param",
-        title: "Wrong query parameter type",
-        message: `"${declaration.name}" must be a ${declaration.type}, got ${typeof value}.`,
+        meta: { parameter: declaration.name, expected: declaration.type, received: typeof value },
       },
     };
   }
@@ -312,8 +303,7 @@ function resolveDeclaredParam({
       ok: false,
       error: {
         code: "dashboard_widget_query_invalid_param",
-        title: "Invalid query parameter value",
-        message: `"${declaration.name}" is out of the allowed range for a ${declaration.type}.`,
+        meta: { parameter: declaration.name, expected: declaration.type },
       },
     };
   }

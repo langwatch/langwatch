@@ -157,12 +157,12 @@ owners' facts; each cross-subject query names its read-model owner, grain, join 
 semantics and freshness. Today's trace and evaluation analytical joins are a named compatibility
 surface until migrated, not licence to query a peer's tables (Alex, 2026-10-01; replaces the
 open item of 2026-09-29).
-Analytics' filter field registry (`availableFilters` and its field types) is `modules/analytics/filters`
-(`@langwatch/analytics-filters`), an analytics-owned package, portable and framework-free on the same
-terms; analytics' browser and automation's process import it (Alex, 2026-09-30).
+Analytics' filter field registry (`availableFilters` and its field types) lives in analytics' contract,
+`@langwatch/analytics-contract/filters`; analytics' browser, automation, trace's process and evaluator's
+browser import it (Alex, 2026-10-20; replaces 2026-09-30).
 The unkeyed-filter detector (`findUnkeyedFilterFields`) moves to the contract that owns the filter grammar,
 and both trace search and automation triggers import it (Alex, 2026-10-05): that is
-`@langwatch/analytics-filters`, which owns `requiresKey` and which automation already imports, so trace's
+`@langwatch/analytics-contract/filters`, which owns `requiresKey` and which automation already imports, so trace's
 process becomes an importer (coordinator, citing that ruling, 2026-10-05). Trace owns the metadata columns, so
 trace-contract exports main's two metadata key/value condition builders (the three storage formats) and
 analytics imports them: one copy, a contract export, not an Api operation (Alex, 2026-10-05).
@@ -189,8 +189,9 @@ against the embedded LangWatch key only and logs once, by name, that the public-
 
 ## 3. A module
 
-A module is one folder owning up to four workspace packages, plus any portable, framework-free library its
-process and browser both import (`modules/analytics/filters` is one; Alex, 2026-09-29).
+A module is one folder owning up to four workspace packages: contract, process, browser and client. Any
+other folder holding a `package.json` is refused (`feature-layout`); shared vocabulary goes in the contract
+(Alex, 2026-10-20; the library kind is deleted).
 `modules/catalogue.json` maps every subject to exactly one owning module.
 The owning module's process serves the subject's endpoints and runs its collection; another module's
 share crosses only as its `*Api` ops. Where main hosted a subject elsewhere (`traces.logCollection`),
@@ -538,7 +539,9 @@ logic goes to the owner's contract; framework hooks go to `browser-host`. Module
 module whose procedures another browser reads has a `<name>-client` package (`modules/<name>/client`;
 Alex, 2026-10-08, round 31 CT-1: clients on demand) holding the hooks
 `createModuleApi` derives from its own contract, at most a few thin convenience hooks and the
-module's lent tokens (§10.1; Alex, 2026-10-06, round 7b), never a component. A client imports only
+module's lent tokens (§10.1; Alex, 2026-10-06, round 7b), each beside the ready component
+`lentComponent(Token)` makes of it (§10.1; Alex, 2026-10-20), never a component of its own: no JSX,
+no design system. A client imports only
 its contract, `@langwatch/api/web`, `@langwatch/browser-host` and React, never another client; a
 hook combining two modules lives in the screen that needs it. Kits and their law existed until
 2026-10-01 and are gone; what remains of them is that browser packages are closed.
@@ -553,7 +556,8 @@ loading and error never look alike. A full-page spinner is for the first boot on
 `<name>-client`, or by the design system, the owner's contract and `browser-host`, as the paragraph
 above rules. Closed to values only: an `import type` / `export type` of a browser package crosses,
 because types are erased (Alex, 2026-09-27). A component that fetches a peer's data or reads a
-`*HostApi` is lent by its owner's token (§10.1) and the consumer renders what it is handed. A flow
+`*HostApi` is lent by its owner's token (§10.1), and the consumer renders the owner client's ready
+component. A flow
 opens as the owner's drawer by name: ops' SSO import opens sso's register-connection drawer
 (Alex, 2026-09-29).
 
@@ -2777,9 +2781,13 @@ invented:
 
 - **A name another module depends on is a token from its owner** (Alex, 2026-10-01). A lent
   component, lent operations, lent hooks, an extension point and a drawer are each declared once as
-  a typed token, `uiTokens("<owner>").component<Props>("<name>")` from the light core. Consumers
-  read `useLent(Token)`, `useLentAll(Token)` or `openDrawer(Token, props)`. browser-host knows no
-  feature, and the compiler checks lender and reader against the one type.
+  a typed token, `uiTokens("<owner>").component<Props>("<name>")` from the light core. The owner's
+  client exports a component token's ready component beside it, `export const X =
+lentComponent(XToken)` (browser-host; an optional `fallback(props)` draws while nothing is lent),
+  and a borrower imports `X` and writes no `lent-*` wrapper (Alex, 2026-10-20). Consumers otherwise
+  read `useLentAll(Token)`, `useLentHooks(Token)`, `useLentOperations(Token)` or
+  `openDrawer(Token, props)`; `useLent(Token)` stays for a borrower that must adapt the component.
+  browser-host knows no feature, and the compiler checks lender and reader against the one type.
 
   **The owner lends by token.** `.lends(Token, { load })` and `.drawer(Token, { load })` check the
   loaded default against the token and refuse a token another module owns. An extension token is the
@@ -3333,14 +3341,47 @@ to this file in the same commit as the code — an out-of-date architecture
 document is worse than none, because it reads authoritative.
 `typescript/no-misused-spread` is off in `packages/*/type-tests/**` only, where the spread is what
 the type test asserts (Alex, 2026-09-27).
-A policy reads no baseline and reports every finding. A ruled transition may hold a shrink-only list
+A policy reports every finding and, but for `deleted-spellings`, reads no baseline. A ruled transition may hold a shrink-only list
 beside the enforcer's tests (`packages/architecture-enforcer/tests/baselines/`), keyed so that growth
 inside a key is refused (a count per key), with a test that also refuses a listed finding that is
-gone. Three exist: §7's event-table access (Alex, 2026-09-29); "framework packages depend on no
-module contract" (§10.1), baselined on today's edges and shrinking as UI tokens move the feature types
-out (Alex, 2026-10-01); and §15's per-spelling count of deleted spellings in code
-(`deleted-spellings.json`, 2026-10-05). §5's peer cycles held a third until it was deleted: every cycle is refused now
-(Alex, 2026-10-05).
+gone. §5's peer cycles held one until it was deleted: every cycle is refused now (Alex, 2026-10-05).
+
+**Shrink lists.** The table is every list there is. Each file's `record` names its rule, and the
+test beside it refuses a count that rose and a listed finding that is gone. Most tests are
+`tests/<list>.ratchet.unit.test.ts`; `eventing-table-access` and `framework-module-contracts` share
+`tests/boundary-ratchets.unit.test.ts`, `prisma-relations` has `tests/prisma-relations.unit.test.ts`,
+and `deleted-spellings` is read by its policy, `src/policies/quality/deleted-spellings.ts`.
+
+| List (`tests/baselines/`)          | What it counts                                                                                                           | Fixed by                                                                     |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------- |
+| `eventing-table-access.json`       | a read of an event table outside eventing (§7, Alex, 2026-09-29)                                                         | going through eventing's api                                                 |
+| `framework-module-contracts.json`  | a framework package importing a module contract (§10.1, Alex, 2026-10-01)                                                | moving the type into a UI token                                              |
+| `deleted-spellings.json`           | a deleted spelling still in code (§15, 2026-10-05)                                                                       | the spelling's replacement                                                   |
+| `prisma-relations.json`            | an `@relation` in the Prisma schema (Alex, 2026-10-06)                                                                   | an id column and a service lookup                                            |
+| `raw-colour.json`                  | rule 1: a `var(--chakra-colors-*)`, hex, `rgb()` or `hsl()` colour outside the design system                             | a semantic token                                                             |
+| `peer-route-literal.json`          | rule 3: a literal spelling another module's `*.web.ts` screen address                                                    | that module's exported route builder                                         |
+| `duplicate-across-modules.json`    | rule 4: a source file byte-identical to one in another module                                                            | one copy, in a package or the owning module, imported by the other           |
+| `design-system-recomposition.json` | rule 6: `chakra.button`/`input`/`a`, a Link sent in-app, error text hand-painted red                                     | the design-system component                                                  |
+| `handled-error-sentence-copy.json` | rule 8: a `{ code, message }` failure in module contract or process code whose message is customer sentence copy         | the code alone, with the words in the client presentation registry           |
+| `code-catch-to-null.json`          | rule 7d: a catch that compares `.code` to a literal and answers null                                                     | a `find*` call that answers `[]`                                             |
+| `adr-number-unique.json`           | rule 10: an ADR number two records in one folder share                                                                   | renumbering the later record                                                 |
+| `dead-path-citations.json`         | rule 11: a backticked path in `docs/`, `specs/` or `dev/docs` that does not exist                                        | citing the path it moved to, or deleting the sentence                        |
+| `prisma-model-ownership.json`      | rule 13a: a Prisma model's delegate reached outside its owning module                                                    | a call to the owner's api                                                    |
+| `peer-feature-directory.json`      | rule 13b: a module's `features/<dir>` named after another module                                                         | moving the screen to that module and lending it                              |
+| `error-code-single-owner.json`     | rule 13c: a handled error code declared by more than one class                                                           | the owner's class, imported                                                  |
+| `peer-api-fan-in.json`             | rule 13d: a service using 4 or more operations of one peer `*Api`                                                        | moving the logic to the peer, behind one operation                           |
+| `browser-timing-workaround.json`   | rule 15: a frame wait, deferred frame, document query or timeout re-read in browser code                                 | the state or ref the code is waiting on                                      |
+| `restated-contract-constant.json`  | rule 16: a literal restating a contract's exported string constant                                                       | importing the constant                                                       |
+| `metric-instrument-home.json`      | a metric instrument created in module production code in a file whose name does not contain `metrics` (Alex, 2026-10-20) | moving the instrument into the module's `*-metrics` service and injecting it |
+
+`packages/architecture-enforcer/src/tools/feature-parity-frozen.json` is the parity list (rule 9): an
+untagged scenario, an `@unimplemented` scenario with no `@issue`, an annotation on an untagged
+scenario. It is fixed by tagging and binding the scenario, or citing the issue.
+
+Working one: fix every finding under one key, the way "Fixed by" says, then lower that key's count
+(delete it at zero) in the same commit, and run `pnpm --filter @langwatch/architecture-enforcer test`.
+Never raise a count or add a key: a new finding is fixed, not listed. A finding whose fix needs a
+decision no rule makes goes to a human, not into the list.
 The `service-ceilings` policy is ported to a custom langwatch oxlint rule with the same exact limits
 (Alex, 2026-09-29).
 
@@ -3354,7 +3395,7 @@ multi-line why (Alex, 2026-10-05). The `feature-configuration` policy demands no
 2026-10-05: the tree follows the record).
 `modules/<name>/client` and `enterprise/modules/<name>/client` have the `client` role in the enforcer
 (`manifests`, `application-boundaries`, `browser-node-leak`) and in `langwatch/package-boundaries`
-(`clientRuntime`, `clientConsumer`), not the portable library's (Alex, 2026-10-06, round 4, Q208).
+(`clientRuntime`, `clientConsumer`), not a process's or a contract's (Alex, 2026-10-06, round 4, Q208).
 `packages/eventing` and `packages/group-queue` have the `framework` role. One that opts into the
 feature layout (§3.4) also has a strict source and a layer (`packages/oxlint-rules/src/classify.mjs`):
 the grammar's `FRAMEWORK_PATTERNS` and the entry files its `exports` names are its homes, the layer

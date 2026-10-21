@@ -20,6 +20,7 @@ import {
 } from "@langwatch/design-system/primitives";
 
 import "@xyflow/react/dist/style.css";
+import { ModelDisplay as LLMModelDisplay } from "@langwatch/model-provider-client";
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
 import { PromptListDrawerToken } from "@langwatch/prompt-client";
 import {
@@ -49,7 +50,6 @@ import {
 } from "react-resizable-panels";
 import { useShallow } from "zustand/react/shallow";
 
-import { LLMModelDisplay } from "../../../behavior/lent-model-provider.tsx";
 import { useComponentVersion } from "../../../behavior/optimization_studio/use-component-version.tsx";
 import { useGetDatasetData } from "../../../behavior/optimization_studio/use-get-dataset-data.ts";
 import { useLoadWorkflow } from "../../../behavior/optimization_studio/use-load-workflow.ts";

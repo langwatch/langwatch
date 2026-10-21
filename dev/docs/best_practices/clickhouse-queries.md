@@ -233,7 +233,7 @@ Anything else that wants to skip the filter should be a repository method taking
 A table whose whole purpose is to total usage _across_ an organization's projects cannot lead with `TenantId` — the aggregate it exists to answer has no single tenant. Two tables qualify today:
 
 - `metric_usage_estimates` (written by `clickhouse.metric-data-point-append.repository.ts`; it has no reader today, so the first one must meet every condition below) — ORDER BY `(OrganizationId, TenantId, PointId)`.
-- `billable_events` (`enterprise/modules/billing/process/src/repositories/clickhouse/clickhouse.billable-events.repository.ts`, every organization read setting `SKIP_TENANT_CHECK: true` under a comment giving its reason) — ORDER BY `(OrganizationId, TenantId, DeduplicationKeyHash)`; the columns are identifiers, an event type and timestamps only. Open items against the conditions below, checked 2026-09-23 — see the note after them.
+- `billable_events` (`modules/entitlement/process/src/repositories/clickhouse/clickhouse.billable-events-meter.repository.ts`, every organization read setting `SKIP_TENANT_CHECK: true` under a comment giving its reason) — ORDER BY `(OrganizationId, TenantId, DeduplicationKeyHash)`; the columns are identifiers, an event type and timestamps only. Open items against the conditions below, checked 2026-09-23 — see the note after them.
 
 It is allowed to lead with `OrganizationId` **only** because all of these hold:
 
@@ -274,11 +274,12 @@ JS-safe range, LEFT-JOIN gaps surface as nulls where the interface said
 boundary catches all three; `.catch()` on individual fields provides safe
 defaults for expected variations, while fields without one fail fast on drift.
 
-Reference implementation:
-`modules/trace/process/src/repositories/clickhouse/trace-event-payload.repository.ts`
-(the pattern arrived with PR #7146's governance activity-monitor repositories,
-which did not survive the platform split in that shape). New
-`*.clickhouse.repository.ts` files should follow it; existing ones migrate
+Reference implementation: the usage read in
+`modules/coding-agent/process/src/repositories/clickhouse/clickhouse.coding-agent-session.repository.ts`
+parses its rows with a Zod schema at the read boundary (the pattern arrived
+with PR #7146's governance activity-monitor repositories, which did not survive
+the platform split in that shape). New `clickhouse.<name>.repository.ts` files
+should follow it; existing ones migrate
 opportunistically when their queries change anyway.
 
 ## JOINs — Prefer Not To, Then Prefer `IN`

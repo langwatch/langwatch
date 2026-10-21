@@ -3,15 +3,14 @@
  * access, and says where the product's own links open it. Nothing an agent
  * authored ever becomes the address.
  */
-import type { AgentApi } from "@langwatch/agent-contract";
+import { type AgentApi, AgentNotFoundError } from "@langwatch/agent-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { ExperimentApi } from "@langwatch/experiment-contract";
-import { HandledError } from "@langwatch/handled-error";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
-import type { ScenarioApi } from "@langwatch/scenario-contract";
-import type { WorkflowApi } from "@langwatch/workflow-contract";
+import { type ScenarioApi, ScenarioNotFoundError } from "@langwatch/scenario-contract";
+import { type WorkflowApi, WorkflowNotFoundError } from "@langwatch/workflow-contract";
 
 import {
   type LangyNavigateResourceKind,
@@ -104,7 +103,7 @@ export class LangyNavigateResourceLocatorService {
       const workflow = await this.#peers.workflows.getById({ id: resourceId, projectId });
       return this.#underProject(NAVIGATE_RESOURCE_PATHS.workflow(workflow.id));
     } catch (error) {
-      if (HandledError.isHandled(error) && error.code === "workflow_not_found") return UNKNOWN;
+      if (WorkflowNotFoundError.is(error)) return UNKNOWN;
       throw error;
     }
   }
@@ -126,7 +125,7 @@ export class LangyNavigateResourceLocatorService {
       const scenario = await this.#peers.scenarios.getById({ id: resourceId, projectId });
       return this.#scenarioAddress({ projectId, resource: { scenarioId: scenario.id } });
     } catch (error) {
-      if (HandledError.isHandled(error) && error.code === "scenario_not_found") return UNKNOWN;
+      if (ScenarioNotFoundError.is(error)) return UNKNOWN;
       throw error;
     }
   }
@@ -183,7 +182,7 @@ export class LangyNavigateResourceLocatorService {
           ),
       };
     } catch (error) {
-      if (HandledError.isHandled(error) && error.code === "agent_not_found") return UNKNOWN;
+      if (AgentNotFoundError.is(error)) return UNKNOWN;
       throw error;
     }
   }

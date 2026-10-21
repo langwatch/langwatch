@@ -3,9 +3,8 @@
  * through model-provider, which keeps the vendor handle to itself.
  * @see specs/langy/langy-conversation-title.feature
  */
-import { HandledError } from "@langwatch/handled-error";
 import { LANGY_TITLE_GENERATION } from "@langwatch/langy-contract";
-import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { type ModelProviderApi, ModelNotConfiguredError } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 
 import { normalizeLangyConversationTitle } from "../rules/langy-conversation-title.rules.ts";
@@ -52,7 +51,7 @@ type LangyTitleGeneratorDeps = Readonly<{
 
 /** Nothing to retry: this project has no model to ask. */
 function isModelNotConfigured(error: unknown): boolean {
-  return HandledError.isHandled(error) && error.code === "model_not_configured";
+  return ModelNotConfiguredError.is(error);
 }
 
 /**

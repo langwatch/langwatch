@@ -54,9 +54,10 @@ const cliPlaneRest = defineRestRouter(CliPlaneApi)
   .build();
 
 function mountedInInstallOrder() {
-  const handler = vi.fn<(request: Request) => Promise<Response>>(
-    async () => new Response(null, { status: 404 }),
-  );
+  const handler = vi.fn<AuthDoorApi["betterAuthHandshake"]>(async () => ({
+    kind: "engine",
+    response: new Response(null, { status: 404 }),
+  }));
   const door: AuthDoorApi = {
     validateProjectAuthToken: async () => ({ projectSlug: "unreached" }),
     getSessionByCookie: async () => ({ document: null }),

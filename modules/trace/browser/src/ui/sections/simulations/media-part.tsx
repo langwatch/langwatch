@@ -1,7 +1,7 @@
+import { MediaPart as LentMediaPart } from "@langwatch/scenario-client";
 import type { MediaPartProps, MediaProbeResult } from "@langwatch/scenario-contract";
 import { useEffect, useState } from "react";
 
-import { LentMediaPart } from "../../../behavior/lent-media-part.tsx";
 import { useStoredObjectHead } from "../../../behavior/reads/use-project-reads.ts";
 
 /** Where the part's bytes live: a binary's own url, or a url-typed source. */

@@ -4,6 +4,9 @@
  * landing destination.
  */
 
+/**
+ * @ownerOnly Langy's own address; a peer asks Langy for a link instead of spelling the parameter.
+ */
 export const LANGY_CONVERSATION_PARAM = "langyConversation";
 
 /**

@@ -1,6 +1,10 @@
 import type { Trigger } from "@langwatch/automation-contract";
 import { HandledError } from "@langwatch/handled-error";
-import type { SlackApi, SlackConnectionClaim } from "@langwatch/slack-contract";
+import {
+  type SlackApi,
+  type SlackConnectionClaim,
+  SlackIntegrationMissingError,
+} from "@langwatch/slack-contract";
 import { z } from "zod";
 
 import type { TriggerRepository } from "../../../repositories/trigger.repository.ts";
@@ -60,7 +64,7 @@ function holdsClaim({
 }
 
 function isUnusableConnection(error: unknown): boolean {
-  return HandledError.isHandled(error) && error.code === "slack_integration_missing";
+  return HandledError.isHandled(error) && SlackIntegrationMissingError.is(error);
 }
 
 /**

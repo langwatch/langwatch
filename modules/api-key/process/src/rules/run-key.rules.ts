@@ -1,15 +1,24 @@
-import { RUN_KEY_LIFETIME_MS } from "@langwatch/api-key-contract";
+import type { MintRunKeyInput } from "@langwatch/api-key-contract";
+
+/** How long a run's key lives when no caller needs it to outlast a longer bound. */
+export const RUN_KEY_LIFETIME_MS = 15 * 60 * 1000;
 
 /** A held run key is handed out only while at least this much of its life remains. */
 export const RUN_KEY_REUSE_MARGIN_MS = 5 * 60 * 1000;
 
-/** The life a handed-out key must still have: the caller's bound, never under the margin. */
-function runKeyFloorMs(minRemainingMs: number | undefined): number {
+type MinRemainingMs = MintRunKeyInput["minRemainingMs"];
+
+/**
+ * The life a handed-out key must still have: the caller's bound, never under the margin. A
+ * caller asking for `"fresh"` holds the key with no bound of its own, so it needs a full lifetime.
+ */
+function runKeyFloorMs(minRemainingMs: MinRemainingMs): number {
+  if (minRemainingMs === "fresh") return RUN_KEY_LIFETIME_MS;
   return Math.max(RUN_KEY_REUSE_MARGIN_MS, minRemainingMs ?? 0);
 }
 
 /** A fresh key outlives the caller's bound by the reuse window, so it can still be shared. */
-export function runKeyLifetimeMs(minRemainingMs: number | undefined): number {
+export function runKeyLifetimeMs(minRemainingMs: MinRemainingMs): number {
   return Math.max(RUN_KEY_LIFETIME_MS, runKeyFloorMs(minRemainingMs) + RUN_KEY_REUSE_MARGIN_MS);
 }
 
@@ -21,7 +30,7 @@ export function isRunKeyReusable({
 }: {
   expiresAtMs: number;
   nowMs: number;
-  minRemainingMs: number | undefined;
+  minRemainingMs: MinRemainingMs;
 }): boolean {
   return expiresAtMs - nowMs >= runKeyFloorMs(minRemainingMs);
 }

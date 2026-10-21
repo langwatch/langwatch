@@ -62,3 +62,29 @@ Feature: The API process serves the auth door
     When the user signs out of LangWatch
     Then only the LangWatch session ends
     And the user lands on the sign-in page, never on the provider's sign-out page
+
+  @unit
+  Scenario: A sign-in call from another origin is refused with a 403
+    Given a call to the auth family from an origin the deployment does not trust
+    When the sign-in door answers
+    Then it is a 403 in JSON with the message "Invalid origin" and the code INVALID_ORIGIN
+
+  @unit
+  Scenario: The sign-in engine's answer passes through untouched
+    Given the Better Auth engine answered a call
+    When the sign-in door answers
+    Then the browser receives that very response
+
+  @unit
+  Scenario: A replaced redirect target keeps the engine's status, headers and cookies
+    Given the engine answered with a redirect and several cookies
+    And a step replaced the redirect target
+    When the sign-in door answers
+    Then only the location changes
+    And the status, the other headers, every cookie and the body are the engine's
+
+  @unit
+  Scenario: A sign-in callback that failed on the server redirects to the error screen
+    Given a sign-in callback failed on the server
+    When the sign-in door answers
+    Then it is a 302 to the error screen with no body

@@ -62,34 +62,10 @@ Feature: The package-boundaries lint rule
     And each other eventing entry is reported as contractRuntime
 
   @unit
-  Scenario: A module library importing a runtime or implementation is reported as libraryRuntime
-    Given a module's portable library that imports node, react, a framework package, its own process or browser package, or another module's contract
-    When the package-boundaries rule runs over it
-    Then it reports libraryRuntime at that import
-
-  @unit
-  Scenario: A module library importing its own contract and other libraries is left alone
-    Given a module's portable library that imports its own contract, another module's library and zod
-    When the package-boundaries rule runs over it
-    Then it reports nothing
-
-  @unit
   Scenario: A module client may take react for generic hooks and nothing else of the browser
     Given a module's client file that imports react, and another that imports react-dom or chakra
     When the package-boundaries rule runs over them
     Then react is allowed and the others are reported as clientRuntime
-
-  @unit
-  Scenario: Process, browser and application code may import any module's library
-    Given a service, a browser module and an application file that import another module's library
-    When the package-boundaries rule runs over them
-    Then it reports nothing
-
-  @unit
-  Scenario: A contract importing its module's library is reported as contractRuntime
-    Given a contract module that imports its own module's library
-    When the package-boundaries rule runs over it
-    Then it reports contractRuntime
 
   @unit
   Scenario: Core code importing an enterprise implementation is reported as coreImportsEnterprise

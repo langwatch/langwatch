@@ -1,3 +1,4 @@
+import { describeError } from "@langwatch/browser-host/errors";
 import { Banner } from "@langwatch/design-system/banner";
 import { Card } from "@langwatch/design-system/card";
 import {
@@ -81,27 +82,6 @@ interface IssuedKey {
   baseUrl: string;
 }
 
-/**
- * tRPC's Zod input-validation errors arrive as the raw JSON-stringified
- * ZodError array; end users shouldn't see that shape, so extract the
- * human-readable `message` field(s), falling back to the raw string (Ariana QA G31).
- */
-function humanizeZodMessage(raw: string): string {
-  const trimmed = raw.trim();
-  const looksLikeJson = trimmed.startsWith("[") || trimmed.startsWith("{");
-  if (!looksLikeJson) return raw;
-  try {
-    const parsed = JSON.parse(trimmed);
-    const issues = Array.isArray(parsed) ? parsed : [parsed];
-    const messages = issues
-      .map((i: { message?: unknown }) => (typeof i?.message === "string" ? i.message : null))
-      .filter((m): m is string => !!m);
-    return messages.length ? messages.join(". ") : raw;
-  } catch {
-    return raw;
-  }
-}
-
 export function ModelProviderTile({
   displayName,
   config,
@@ -130,7 +110,7 @@ export function ModelProviderTile({
     },
     onError: (err) => {
       if (workspaceWait.absorb(err)) return;
-      setErrorMessage(humanizeZodMessage(err.message));
+      setErrorMessage(describeError({ error: err, fallbackTitle: "Couldn't issue the key" }));
     },
   });
 

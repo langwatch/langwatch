@@ -64,6 +64,7 @@ export class PermissionDeniedError extends HandledError {
 
 /** A named scope field had no usable id, so the client can correct its input. */
 export class BlankScopeIdError extends HandledError {
+  static readonly code = "validation_error" as const;
   declare readonly code: "validation_error";
 
   constructor({ field }: { field: string }) {
@@ -77,6 +78,7 @@ export class BlankScopeIdError extends HandledError {
 }
 
 export class LiteMemberRestrictedError extends HandledError {
+  static readonly code = "lite_member_restricted" as const;
   declare readonly code: "lite_member_restricted";
 
   constructor(resource: string) {
@@ -93,6 +95,7 @@ export class LiteMemberRestrictedError extends HandledError {
  * The seat is the reason, not a missing binding, so the way forward is another seat.
  */
 export class DeveloperSeatRestrictedError extends HandledError {
+  static readonly code = "developer_seat_restricted" as const;
   declare readonly code: "developer_seat_restricted";
 
   constructor(resource: string) {
@@ -105,6 +108,7 @@ export class DeveloperSeatRestrictedError extends HandledError {
 }
 
 export class ProjectPermissionDeniedError extends HandledError {
+  static readonly code = "project_permission_denied" as const;
   declare readonly code: "project_permission_denied";
 
   constructor(permission: string) {
@@ -122,6 +126,7 @@ export class ProjectPermissionDeniedError extends HandledError {
  * reachable — distinct from a permission the caller merely lacks.
  */
 export class MembershipDisabledError extends HandledError {
+  static readonly code = "membership_disabled" as const;
   declare readonly code: "membership_disabled";
 
   constructor() {
@@ -135,6 +140,7 @@ export class MembershipDisabledError extends HandledError {
 
 /** A write was aimed at an aggregate project, which is read only (ADR-177 decision 8). */
 export class AggregateProjectIsReadOnlyError extends HandledError {
+  static readonly code = "aggregate_project_is_read_only" as const;
   declare readonly code: "aggregate_project_is_read_only";
 
   constructor() {

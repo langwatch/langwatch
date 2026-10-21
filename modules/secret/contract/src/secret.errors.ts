@@ -3,6 +3,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { MAX_SECRETS_PER_PROJECT } from "./secret.ts";
 
 export class SecretNotFoundError extends HandledError {
+  static readonly code = "secret_not_found" as const;
   declare readonly code: "secret_not_found";
 
   constructor() {
@@ -15,6 +16,7 @@ export class SecretNotFoundError extends HandledError {
 }
 
 export class SecretReservedNameError extends HandledError {
+  static readonly code = "secret_name_reserved" as const;
   declare readonly code: "secret_name_reserved";
 
   constructor(name: string) {
@@ -28,6 +30,7 @@ export class SecretReservedNameError extends HandledError {
 }
 
 export class SecretLimitReachedError extends HandledError {
+  static readonly code = "secret_limit_reached" as const;
   declare readonly code: "secret_limit_reached";
 
   constructor(limit = MAX_SECRETS_PER_PROJECT) {
@@ -42,6 +45,7 @@ export class SecretLimitReachedError extends HandledError {
 
 /** A named secret whose stored value cannot be read under this deployment's key. */
 export class SecretUnreadableError extends HandledError {
+  static readonly code = "secret_unreadable" as const;
   declare readonly code: "secret_unreadable";
 
   constructor(name: string) {
@@ -55,6 +59,7 @@ export class SecretUnreadableError extends HandledError {
 }
 
 export class SecretDuplicateError extends HandledError {
+  static readonly code = "secret_already_exists" as const;
   declare readonly code: "secret_already_exists";
 
   constructor(name: string) {
@@ -73,6 +78,7 @@ export class SecretDuplicateError extends HandledError {
  * log needs to know whether the secret was served or never arrived.
  */
 export class SecretAlreadyRevealedError extends HandledError {
+  static readonly code = "secret_already_revealed" as const;
   declare readonly code: "secret_already_revealed";
 
   constructor(revealId: string) {
@@ -89,6 +95,7 @@ export class SecretAlreadyRevealedError extends HandledError {
  *  same refusal for both, because telling them apart would say whether an id
  *  somebody guessed was ever real. */
 export class SecretRevealExpiredError extends HandledError {
+  static readonly code = "secret_reveal_expired" as const;
   declare readonly code: "secret_reveal_expired";
 
   constructor(revealId: string) {

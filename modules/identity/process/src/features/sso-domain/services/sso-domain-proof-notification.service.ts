@@ -1,10 +1,10 @@
-import { HandledError } from "@langwatch/handled-error";
 import {
   SSO_DNS_RECORD_NAME,
   SSO_DNS_RECORD_TYPE,
   ssoDnsRecordName,
 } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
+import { OrganizationNotFoundError } from "@langwatch/organization-contract";
 
 import type { SsoDomainProofMail } from "../../../channels/sso-domain-proof-mail.channel.ts";
 import type {
@@ -111,8 +111,7 @@ export class SsoDomainProofNotificationService implements SsoDomainProofNotifica
   }> {
     const [organizationName, admins] = await Promise.all([
       this.audience.getOrganizationName({ organizationId }).catch((error: unknown) => {
-        if (HandledError.isHandled(error) && error.code === "organization_not_found")
-          return UNNAMED_ORGANIZATION;
+        if (OrganizationNotFoundError.is(error)) return UNNAMED_ORGANIZATION;
         throw error;
       }),
       this.audience.findAdmins({ organizationId }),

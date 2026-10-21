@@ -1,5 +1,10 @@
+import { LimitExceededError } from "@langwatch/enterprise-licensing-contract";
 import { HandledError } from "@langwatch/handled-error";
-import { type LimitType, limitTypeSchema } from "@langwatch/organization-contract";
+import {
+  type LimitType,
+  limitTypeSchema,
+  MemberSeatLimitReachedError,
+} from "@langwatch/organization-contract";
 import { z } from "zod";
 
 /** The allowance a seat refusal carries in its `meta`. */
@@ -16,7 +21,7 @@ export function readSeatRefusal(
   error: unknown,
 ): { kind: "seat-limit"; limit: SeatLimit } | { kind: "other" } {
   if (!HandledError.isHandled(error)) return { kind: "other" };
-  if (error.code !== "resource_limit_exceeded" && error.code !== "member_seat_limit_reached") {
+  if (!LimitExceededError.is(error) && !MemberSeatLimitReachedError.is(error)) {
     return { kind: "other" };
   }
 

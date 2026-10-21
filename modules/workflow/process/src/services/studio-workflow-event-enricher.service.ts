@@ -1,5 +1,5 @@
 import { AgentNotFoundError, type AgentApi, type HttpAgentConfig } from "@langwatch/agent-contract";
-import type { ApiKeyApi } from "@langwatch/api-key-contract";
+import type { ApiKeyApi, MintRunKeyInput } from "@langwatch/api-key-contract";
 import {
   LlmModelNotSetError,
   httpAgentIdsOf,
@@ -33,7 +33,7 @@ type StudioWorkflowEventEnricherOptions = {
   /** The key every run calls LangWatch with: its starter's, or an ownerless one. */
   runKeys: Pick<ApiKeyApi, "mintRunKey">;
   /** The life a dispatch's key must still have when handed out: the engine's own bound. */
-  dispatchKeyFloorMs: number;
+  dispatchKeyFloorMs: NonNullable<MintRunKeyInput["minRemainingMs"]>;
 };
 
 type WorkflowEvent = Exclude<StudioClientEvent, { type: "is_alive" | "stop_execution" }>;

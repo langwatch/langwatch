@@ -24,7 +24,7 @@ const meta = {
           "| `no-direct-chakra` | Only `packages/design-system` imports `@chakra-ui/*` or `@emotion/*`. | Ruled (ARCHITECTURE.md §2, §10.2), not yet in `packages/oxlint-rules`: review, and the Scoreboard count. |",
           "| `no-raw-color` | No hex, `rgb()`, palette step or bare white or black outside the design system. | Ruled (ARCHITECTURE.md §2), not yet a lint rule: review, and the Scoreboard count. |",
           "| `list-table.md` | Every list of rows is a List table. | Review; the Scoreboard counts hand-rolled tables. |",
-          "| `alerts-toasts-and-field-errors.md` | Field error, alert or toast, by how long it stays true. | `tests/no-raw-error-toasts.unit.test.ts` in this package. |",
+          "| `alerts-toasts-and-field-errors.md` | Field error, alert or toast, by how long it stays true. | the `langwatch/no-raw-error-message-in-ui` lint rule. |",
         ].join("\n"),
       },
     },

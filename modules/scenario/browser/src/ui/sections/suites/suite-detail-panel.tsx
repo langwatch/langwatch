@@ -6,6 +6,7 @@ import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Box, Button, HStack, Separator, Text, VStack } from "@langwatch/design-system/primitives";
 import { getSuiteSetId, parseSuiteTargets } from "@langwatch/suite-contract";
+import { SetupWithAgentButton } from "@langwatch/trace-client";
 import {
   BarChart3,
   CheckCircle,
@@ -21,7 +22,6 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
-import { SetupWithAgentButton } from "../../../behavior/lent-trace.tsx";
 import type { SimulationSuite } from "../../../behavior/scenario-api.ts";
 import { useNow } from "../../../behavior/use-now.ts";
 import type { Period } from "../../../model/analytics/period.ts";

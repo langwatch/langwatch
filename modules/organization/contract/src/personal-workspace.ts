@@ -74,6 +74,7 @@ export type EnsuredPersonalWorkspace = z.infer<typeof ensuredPersonalWorkspaceSc
 
 /** A mutation that needs the personal project refuses while project is still creating it. */
 export class PersonalWorkspacePendingError extends HandledError {
+  static readonly code = "personal_workspace_pending" as const;
   declare readonly code: "personal_workspace_pending";
 
   constructor() {
@@ -130,6 +131,7 @@ export function readPersonalFeatures(stored: unknown): PersonalFeatures {
 }
 
 export class PersonalProjectNotFoundError extends NotFoundError {
+  static readonly code = "personal_project_not_found" as const;
   declare readonly code: "personal_project_not_found";
 
   constructor(projectId: string) {
@@ -140,6 +142,7 @@ export class PersonalProjectNotFoundError extends NotFoundError {
 
 /** Answers as not found, so a caller cannot probe other people's personal projects by id. */
 export class PersonalProjectOwnerMismatchError extends NotFoundError {
+  static readonly code = "personal_project_owner_mismatch" as const;
   declare readonly code: "personal_project_owner_mismatch";
 
   constructor(projectId: string) {

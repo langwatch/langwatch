@@ -36,7 +36,7 @@ export function JsonView() {
       setTrace(parsed);
       setParseError(null);
     } catch (err) {
-      setParseError(err instanceof Error ? err.message : "Invalid JSON");
+      setParseError(err instanceof SyntaxError ? err.message : "Invalid JSON");
     }
   }
 

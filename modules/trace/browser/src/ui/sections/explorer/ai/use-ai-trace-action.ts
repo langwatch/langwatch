@@ -1,4 +1,7 @@
-import { isAggregateProjectKind } from "@langwatch/project-contract";
+import {
+  AggregateProjectIsReadOnlyError,
+  isAggregateProjectKind,
+} from "@langwatch/project-contract";
 import type {
   AiActionError,
   AiActionErrorDetails,
@@ -39,7 +42,7 @@ function readAiErrorDetails(
   return Object.keys(details).length > 0 ? details : undefined;
 }
 
-const READ_ONLY_CODE: AppErrorCode = "aggregate_project_is_read_only";
+const READ_ONLY_CODE: AppErrorCode = AggregateProjectIsReadOnlyError.code;
 
 /**
  * A lens asked for on an aggregate project (ADR-177): the store refuses it silently, so the

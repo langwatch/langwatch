@@ -96,6 +96,9 @@
       "path": "../../../packages/browser/tsconfig.build.json"
     },
     {
+      "path": "../../authz/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../api-key/client/tsconfig.build.json"
     },
     {

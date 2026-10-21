@@ -1,10 +1,14 @@
 // @vitest-environment jsdom
 
 import "@testing-library/jest-dom/vitest";
-import { AnnotateBodyToken, type AnnotateBodyProps } from "@langwatch/annotation-client";
+import {
+  AnnotateBodyToken,
+  type AnnotateBodyProps,
+  AnnotateBody,
+} from "@langwatch/annotation-client";
 import type { AnnotationFormState } from "@langwatch/annotation-contract";
 import { uiDeclarations, type UiDeclarations } from "@langwatch/browser-host/declarations";
-import { MediaPartToken } from "@langwatch/scenario-client";
+import { MediaPartToken, MediaPart as LentMediaPart } from "@langwatch/scenario-client";
 import type { MediaPartProps } from "@langwatch/scenario-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -17,9 +21,6 @@ vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   useUiDeclarations: () => declarations.current,
 }));
-
-import { AnnotateBody } from "../../features/annotation/behavior/lent-annotation-form.tsx";
-import { LentMediaPart } from "../lent-media-part.tsx";
 
 const peerLends = uiDeclarations([
   {

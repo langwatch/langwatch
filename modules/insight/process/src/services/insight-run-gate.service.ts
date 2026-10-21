@@ -4,7 +4,9 @@
  * ORDER IS THE CONTRACT: the project, the flag, the person, their access, then the board.
  */
 
+import { CustomChartPlaygroundNotEnabledError } from "@langwatch/analytics-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import { DashboardNotFoundError, DashboardsNotEnabledError } from "@langwatch/dashboard-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { InsightRunBoard, InsightRunSkipReason } from "@langwatch/insight-contract";
 import { isAggregateProjectKind, type ProjectApi } from "@langwatch/project-contract";
@@ -70,9 +72,9 @@ type InsightRunGateMembers = Readonly<{
  * `board_unreadable`: dashboards, or the custom charts on them, are off for the project.
  */
 const BOARD_REFUSALS: Readonly<Record<string, InsightRunSkipReason>> = {
-  dashboard_not_found: "board_deleted",
-  dashboards_not_enabled: "board_unreadable",
-  custom_chart_playground_not_enabled: "board_unreadable",
+  [DashboardNotFoundError.code]: "board_deleted",
+  [DashboardsNotEnabledError.code]: "board_unreadable",
+  [CustomChartPlaygroundNotEnabledError.code]: "board_unreadable",
 };
 
 function skipped(reason: InsightRunSkipReason): RunGateResult {

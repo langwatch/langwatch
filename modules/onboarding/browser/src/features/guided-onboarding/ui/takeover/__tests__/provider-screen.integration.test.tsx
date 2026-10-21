@@ -19,8 +19,9 @@ vi.mock("../../../behavior/use-guided-provider-connect.ts", () => ({
   useGuidedProviderConnect: () => ({ onSaved: onSavedMock, skip: skipMock, isSaving: false }),
 }));
 
-vi.mock("../../../../../behavior/lent-edit-model-provider-form.tsx", () => ({
-  LentEditModelProviderForm: ({
+vi.mock("@langwatch/model-provider-client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  EditModelProviderForm: ({
     providerKey,
     onSaved,
   }: {

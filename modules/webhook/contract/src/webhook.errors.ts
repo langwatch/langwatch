@@ -11,6 +11,7 @@ export const WEBHOOK_ENDPOINTS_ENTITLEMENT_MESSAGE =
   "Webhook endpoints are an enterprise feature; this organization's plan does not include them.";
 
 export class WebhookEndpointsNotEntitledError extends HandledError {
+  static readonly code = "webhook_endpoints_not_entitled" as const;
   declare readonly code: "webhook_endpoints_not_entitled";
 
   constructor() {
@@ -23,6 +24,7 @@ export class WebhookEndpointsNotEntitledError extends HandledError {
 }
 
 export class WebhookEndpointValidationError extends HandledError {
+  static readonly code = "webhook_endpoint_invalid" as const;
   declare readonly code: "webhook_endpoint_invalid";
 
   constructor(message: string, reason?: "metadata_address" | "private_address") {
@@ -36,6 +38,7 @@ export class WebhookEndpointValidationError extends HandledError {
 }
 
 export class WebhookEndpointNotFoundError extends HandledError {
+  static readonly code = "webhook_endpoint_not_found" as const;
   declare readonly code: "webhook_endpoint_not_found";
 
   constructor() {
@@ -48,6 +51,7 @@ export class WebhookEndpointNotFoundError extends HandledError {
 }
 
 export class WebhookEventNotFoundError extends HandledError {
+  static readonly code = "webhook_event_not_found" as const;
   declare readonly code: "webhook_event_not_found";
 
   constructor() {
@@ -65,6 +69,7 @@ export class WebhookEventNotFoundError extends HandledError {
  * out — a test flood would leave LangWatch egress IPs toward a third party.
  */
 export class WebhookTestRateLimitedError extends HandledError {
+  static readonly code = "webhook_test_rate_limited" as const;
   declare readonly code: "webhook_test_rate_limited";
 
   constructor(input: { retryAfterSeconds?: number | undefined }) {

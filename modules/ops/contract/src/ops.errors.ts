@@ -8,6 +8,7 @@ import type { OpsOperatorPermission } from "./ops.responses.ts";
  * customer sent caused it.
  */
 export class OpsCapabilityUnavailableError extends HandledError {
+  static readonly code = "service_unavailable" as const;
   declare readonly code: "service_unavailable";
 
   constructor(capability: string) {
@@ -21,6 +22,7 @@ export class OpsCapabilityUnavailableError extends HandledError {
 
 /** Cloud admin asked for at boot without the licence key that proves the release's owner. */
 export class CloudOpsKeyMismatchError extends HandledError {
+  static readonly code = "cloud_ops_key_mismatch" as const;
   declare readonly code: "cloud_ops_key_mismatch";
 
   constructor() {
@@ -35,6 +37,7 @@ export class CloudOpsKeyMismatchError extends HandledError {
 
 /** The checkup over REST is for self-hosted installs; LangWatch Cloud answers that it has none. */
 export class CheckupNotSelfHostedError extends HandledError {
+  static readonly code = "checkup_not_self_hosted" as const;
   declare readonly code: "checkup_not_self_hosted";
 
   constructor() {
@@ -47,6 +50,7 @@ export class CheckupNotSelfHostedError extends HandledError {
 }
 
 export class ReplayAlreadyRunningError extends HandledError {
+  static readonly code = "replay_already_running" as const;
   declare readonly code: "replay_already_running";
 
   constructor() {
@@ -59,6 +63,7 @@ export class ReplayAlreadyRunningError extends HandledError {
 }
 
 export class ReplayStartFailedError extends HandledError {
+  static readonly code = "replay_start_failed" as const;
   declare readonly code: "replay_start_failed";
 
   constructor(cause: unknown) {
@@ -77,6 +82,7 @@ export class ReplayStartFailedError extends HandledError {
  * shape, and this stands in front of irreversible members work.
  */
 export class OpsOperatorSessionRequiredError extends HandledError {
+  static readonly code = "ops_operator_session_required" as const;
   declare readonly code: "ops_operator_session_required";
 
   constructor() {
@@ -90,6 +96,7 @@ export class OpsOperatorSessionRequiredError extends HandledError {
 
 /** A search with neither a query nor a tenant would scan the whole event log. */
 export class OpsSearchQueryRequiredError extends HandledError {
+  static readonly code = "ops_search_query_required" as const;
   declare readonly code: "ops_search_query_required";
 
   constructor() {
@@ -108,6 +115,7 @@ export class OpsSearchQueryRequiredError extends HandledError {
  * for irreversible surgery, since the audit trail would name the impersonated account.
  */
 export class OpsImpersonatedOperatorRefusedError extends HandledError {
+  static readonly code = "ops_impersonated_operator_refused" as const;
   declare readonly code: "ops_impersonated_operator_refused";
 
   constructor() {
@@ -126,6 +134,7 @@ export class OpsImpersonatedOperatorRefusedError extends HandledError {
  * the act deliberate. The ops UI dialog is not this guard: procedures are callable directly.
  */
 export class OpsConfirmationRequiredError extends HandledError {
+  static readonly code = "ops_confirmation_required" as const;
   declare readonly code: "ops_confirmation_required";
 
   constructor() {
@@ -143,6 +152,7 @@ export class OpsConfirmationRequiredError extends HandledError {
  * value nothing ever reads.
  */
 export class OpsUnknownFeatureFlagError extends HandledError {
+  static readonly code = "ops_feature_flag_unknown" as const;
   declare readonly code: "ops_feature_flag_unknown";
 
   constructor(key: string) {
@@ -161,6 +171,7 @@ export class OpsUnknownFeatureFlagError extends HandledError {
  * module's own, not a scope decision the door could have made.
  */
 export class OpsOperatorRequiredError extends HandledError {
+  static readonly code = "permission_denied" as const;
   declare readonly code: "permission_denied";
 
   constructor(permission: OpsOperatorPermission) {
@@ -188,6 +199,7 @@ export class BugReportRateLimitedError extends HandledError {
  * the hosted cloud staff ones. Never echoes the address: logs and responses carry the account id.
  */
 export class PlatformOperatorUserNotFoundError extends HandledError {
+  static readonly code = "platform_operator_user_not_found" as const;
   declare readonly code: "platform_operator_user_not_found";
 
   constructor({ userId }: { userId?: string } = {}) {

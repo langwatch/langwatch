@@ -61,10 +61,12 @@ vi.mock("../../../model/workflow/random-workflow-icon.ts", () => ({
 vi.mock("../../elements/workflow/code/workflow-code-editor.tsx", () => ({
   WorkflowCodeEditorModal: () => null,
 }));
-vi.mock("../../../behavior/lent-setup-with-agent-button.tsx", () => ({
+vi.mock("@langwatch/trace-client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   SetupWithAgentButton: () => null,
 }));
-vi.mock("../../../behavior/lent-parameter-line-field.tsx", () => ({
+vi.mock("@langwatch/scenario-client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   ParameterLineField: () => null,
 }));
 

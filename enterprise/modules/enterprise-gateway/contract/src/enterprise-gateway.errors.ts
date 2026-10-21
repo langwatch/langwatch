@@ -2,6 +2,7 @@
 import { HandledError } from "@langwatch/handled-error";
 
 export class PersonalVirtualKeyLabelTakenError extends HandledError {
+  static readonly code = "personal_virtual_key_label_taken" as const;
   declare readonly code: "personal_virtual_key_label_taken";
 
   constructor(label: string) {
@@ -14,6 +15,7 @@ export class PersonalVirtualKeyLabelTakenError extends HandledError {
 }
 
 export class NoEligibleModelProvidersError extends HandledError {
+  static readonly code = "no_eligible_model_providers" as const;
   declare readonly code: "no_eligible_model_providers";
 
   constructor(organizationId: string) {
@@ -26,6 +28,7 @@ export class NoEligibleModelProvidersError extends HandledError {
 }
 
 export class RoutingPolicyEmptyError extends HandledError {
+  static readonly code = "routing_policy_has_no_providers" as const;
   declare readonly code: "routing_policy_has_no_providers";
 
   constructor(routingPolicyId: string, routingPolicyName: string) {
@@ -38,6 +41,7 @@ export class RoutingPolicyEmptyError extends HandledError {
 }
 
 export class PersonalVirtualKeyMissingError extends HandledError {
+  static readonly code = "virtual_key_not_found" as const;
   declare readonly code: "virtual_key_not_found";
 
   constructor(virtualKeyId: string) {
@@ -50,6 +54,7 @@ export class PersonalVirtualKeyMissingError extends HandledError {
 }
 
 export class RoutingPolicyProviderRequiredError extends HandledError {
+  static readonly code = "routing_policy_must_have_provider" as const;
   declare readonly code: "routing_policy_must_have_provider";
 
   constructor() {
@@ -61,6 +66,7 @@ export class RoutingPolicyProviderRequiredError extends HandledError {
 }
 
 export class RoutingPolicyScopeRequiredError extends HandledError {
+  static readonly code = "routing_policy_must_have_scope" as const;
   declare readonly code: "routing_policy_must_have_scope";
 
   constructor() {
@@ -72,6 +78,7 @@ export class RoutingPolicyScopeRequiredError extends HandledError {
 }
 
 export class RoutingPolicyModelNotConcreteError extends HandledError {
+  static readonly code = "routing_policy_model_must_be_concrete" as const;
   declare readonly code: "routing_policy_model_must_be_concrete";
 
   constructor(field: string, value: string) {

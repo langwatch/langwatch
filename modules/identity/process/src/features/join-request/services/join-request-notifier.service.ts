@@ -1,5 +1,7 @@
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
+import { OrganizationNotFoundError } from "@langwatch/organization-contract";
+import { UserNotFoundError } from "@langwatch/user-contract";
 
 import type { JoinRequestNotificationMail } from "../../../channels/join-request-notification-mail.channel.ts";
 import type {
@@ -319,8 +321,7 @@ export class JoinRequestNotifierService implements JoinRequestNotifier {
 
   private async organizationName({ organizationId }: { organizationId: string }): Promise<string> {
     return this.audience.getOrganizationName({ organizationId }).catch((error: unknown) => {
-      if (HandledError.isHandled(error) && error.code === "organization_not_found")
-        return "your organization";
+      if (OrganizationNotFoundError.is(error)) return "your organization";
       throw error;
     });
   }
@@ -337,8 +338,7 @@ export class JoinRequestNotifierService implements JoinRequestNotifier {
     const organization = await this.context
       .getOrganizationIntent(organizationId)
       .catch((error: unknown) => {
-        if (HandledError.isHandled(error) && error.code === "organization_not_found")
-          return undefined;
+        if (OrganizationNotFoundError.is(error)) return undefined;
         throw error;
       });
 
@@ -358,7 +358,7 @@ export class JoinRequestNotifierService implements JoinRequestNotifier {
       .getUserProfile({ userId })
       .then((profile) => profile.name ?? profile.email ?? "A colleague")
       .catch((error: unknown) => {
-        if (HandledError.isHandled(error) && error.code === "user_not_found") return "A colleague";
+        if (UserNotFoundError.is(error)) return "A colleague";
         throw error;
       });
   }
@@ -368,7 +368,7 @@ export class JoinRequestNotifierService implements JoinRequestNotifier {
       .getUserProfile({ userId })
       .then((profile) => profile.email)
       .catch((error: unknown) => {
-        if (HandledError.isHandled(error) && error.code === "user_not_found") return null;
+        if (UserNotFoundError.is(error)) return null;
         throw error;
       });
   }

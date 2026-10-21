@@ -46,6 +46,31 @@ function severityOf(setting) {
   return Array.isArray(setting) ? setting[0] : setting;
 }
 
+/**
+ * Override entries a human decided may turn a house rule down, as `config | files | rule`.
+ * Each is recorded in the PR's Architecture section; this list is the second lock.
+ */
+const DECIDED_LOWERINGS = [
+  // Prisma's extended client has no nameable type; the one cast stays (Alex, 2026-09-27).
+  ".oxlintrc.plugin.jsonc | packages/prisma-client/src/connection.ts | langwatch/stand-in-cast",
+];
+
+/** Every `config | files | rule` where an override sets a registered house rule below error. */
+function loweredHouseRules() {
+  return CONFIGS.flatMap((path) =>
+    (readJsonc(path).overrides ?? []).flatMap((entry) =>
+      Object.entries(entry.rules ?? {})
+        .filter(
+          ([id, setting]) =>
+            id.startsWith("langwatch/") &&
+            Object.hasOwn(rules, id.slice("langwatch/".length)) &&
+            !["error", 2].includes(severityOf(setting)),
+        )
+        .map(([id]) => `${path} | ${(entry.files ?? []).join(", ")} | ${id}`),
+    ),
+  );
+}
+
 describe("given the plugin registry and the two oxlint configs", () => {
   const declared = declaredRules();
 
@@ -70,6 +95,11 @@ describe("given the plugin registry and the two oxlint configs", () => {
     /** @scenario "Every registered rule is enabled" */
     it("enables every registered rule at error", () => {
       expect(Object.keys(rules).filter((name) => !enabled.has(name))).toEqual([]);
+    });
+
+    /** @scenario "No override turns a registered rule down unless a human decided it" */
+    it("finds no override lowering a registered rule beyond the decided ones", () => {
+      expect(loweredHouseRules().filter((entry) => !DECIDED_LOWERINGS.includes(entry))).toEqual([]);
     });
 
     /** @scenario "Every configured langwatch rule is registered" */

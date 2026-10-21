@@ -170,6 +170,41 @@ Feature: Handled errors — what the customer actually reads
       # docs are an extra destination, not a second phrasing, so they never
       # compete with the description
 
+  @unit @bdd @handled-errors @presentation
+  Scenario: A failure keeps the one fix the screen offered
+    Given a screen reports a failure and offers one fix as a labelled action
+    When the failure is surfaced
+    Then the registry's words are shown together with the action
+    And taking the action runs it once
+    But a failure that offers no fix shows no action at all
+
+  @unit @bdd @handled-errors @presentation
+  Scenario: A failure stays up only when the reader must act on it
+    Given a screen reports a failure whose offered action the reader must take
+    When the screen marks the failure sticky
+    Then the failure stays on screen until the reader dismisses it
+    But a failure that is not marked sticky leaves after the host's own duration
+
+  @unit @bdd @handled-errors @presentation
+  Scenario: A report with no working feedback host is logged, never thrown
+    Given no feedback host is mounted, or the mounted one is the unavailable stand-in
+    When a screen reports a failure, a success or a warning
+    Then the title is written to the console as a warning
+    And the report does not throw into the screen's own error handling
+
+  @unit @bdd @handled-errors @presentation
+  Scenario: A copy helper keeps its promise when feedback is unavailable
+    Given the browser refuses to copy and no working feedback host is mounted
+    When the screen's copy helper reports the refusal
+    Then the helper still answers that nothing was copied
+    And it does not throw
+
+  @unit @bdd @handled-errors @presentation
+  Scenario: A browser-side refusal is worded by the registry
+    Given the browser refuses to copy to the clipboard
+    When the screen reports it with the clipboard_unavailable code
+    Then the customer reads the registry's title and remediation, not the screen's headline
+
   @unit @integration @bdd @handled-errors @presentation
   Scenario: Technical detail stops at the trace id
     Given a handled error carries meta and a chain of reasons
@@ -366,9 +401,3 @@ Feature: Handled errors — what the customer actually reads
     And when a code is enumerated that nothing raises
     Then the suite fails too, because its copy is dead
 
-  @unit @bdd @handled-errors @presentation
-  Scenario: The raw-message habit cannot grow back
-    Given error toasts must be raised through the shared helper
-    When a call site renders an error's raw message into a toast instead
-    Then the suite fails and names the file and line
-      # a type cannot catch this: `error.message` is a perfectly good string

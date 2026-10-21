@@ -1,7 +1,7 @@
 import { SimpleGrid } from "@langwatch/design-system/primitives";
+import { ResourceLimitRow } from "@langwatch/enterprise-licensing-client";
 import type { Plan as PlanInfo } from "@langwatch/entitlement-contract";
 
-import { ResourceLimitRow } from "../../behavior/lent-resource-limit-row.tsx";
 import { api } from "../../behavior/organization-api.ts";
 import { SEAT_TYPE_COPY } from "../../model/seat-type-copy.ts";
 

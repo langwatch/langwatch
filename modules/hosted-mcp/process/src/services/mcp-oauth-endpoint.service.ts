@@ -1,6 +1,4 @@
-import type { IncomingMessage, ServerResponse } from "node:http";
-
-import { McpMetadataUnpublishedError } from "@langwatch/hosted-mcp-contract";
+import { type McpDoorAnswer, McpMetadataUnpublishedError } from "@langwatch/hosted-mcp-contract";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
@@ -11,9 +9,10 @@ import {
   buildProtectedResourceMetadata,
   extractClientIdFromBasicAuth,
   parseFormBody,
+  extractSingleHeader,
 } from "../rules/mcp-routes.rules.ts";
+import type { McpAnswerService, McpRequest } from "./mcp-answer.service.ts";
 import type { McpCallerAuthService } from "./mcp-caller-auth.service.ts";
-import type { McpHttpService } from "./mcp-http.service.ts";
 import type { McpOAuthTokenService } from "./mcp-oauth-token.service.ts";
 import { McpRateLimitService } from "./mcp-rate-limit.service.ts";
 
@@ -29,7 +28,7 @@ const registrationSchema = z.object({
 });
 
 type McpOAuthEndpointCollaborators = Readonly<{
-  http: McpHttpService;
+  answers: McpAnswerService;
   auth: McpCallerAuthService;
   oauthTokens: McpOAuthTokenService;
   clients: McpOAuthClientRepository;
@@ -53,49 +52,48 @@ export class McpOAuthEndpointService {
     return new McpOAuthEndpointService(collaborators);
   }
 
-  handleProtectedResourceMetadata(res: ServerResponse, resourceSuffix = ""): void {
-    const { http } = this.#collaborators;
-    http.sendJson(res, 200, buildProtectedResourceMetadata(http.baseHost, resourceSuffix));
+  answerProtectedResourceMetadata(resourceSuffix = ""): McpDoorAnswer {
+    const { answers } = this.#collaborators;
+    return answers.json(200, buildProtectedResourceMetadata(answers.baseHost, resourceSuffix));
   }
 
-  handleAuthorizationServerMetadata(res: ServerResponse): void {
-    const { http } = this.#collaborators;
-    http.sendJson(res, 200, buildAuthorizationServerMetadata(http.baseHost));
+  answerAuthorizationServerMetadata(): McpDoorAnswer {
+    const { answers } = this.#collaborators;
+    return answers.json(200, buildAuthorizationServerMetadata(answers.baseHost));
   }
 
   /**
    * The discovery subtree this server claims but publishes nothing at. Falling through to the
    * single-page app would answer 200 text/html; a JSON 404 lets the client move on.
    */
-  async handleUnpublishedMetadata(res: ServerResponse): Promise<void> {
-    await this.#collaborators.http.sendHandled(res, new McpMetadataUnpublishedError());
+  answerUnpublishedMetadata(): McpDoorAnswer {
+    return this.#collaborators.answers.refusal(new McpMetadataUnpublishedError());
   }
 
   /**
    * Any registration succeeds; what matters is binding the client_id to the redirect_uris it
    * registered, so `/mcp/authorize` can refuse a request that later names a different one.
    */
-  async handleRegister(req: IncomingMessage, res: ServerResponse): Promise<void> {
-    const { http } = this.#collaborators;
-    if (this.#isThrottled({ limiter: this.#registerLimiter, req, res })) return;
+  async answerRegister(request: McpRequest): Promise<McpDoorAnswer> {
+    const { answers } = this.#collaborators;
+    const throttled = this.#throttle({ limiter: this.#registerLimiter, request });
+    if (throttled) return throttled;
 
-    const read = await http.readRawBody(req, res);
-    if (read.kind === "answered") return;
+    const read = await answers.readRawBody(request);
+    if (read.kind === "answered") return read.answer;
 
     let document: unknown;
     try {
       document = JSON.parse(read.body);
     } catch {
-      http.sendJson(res, 400, { error: "invalid_client_metadata" });
-      return;
+      return answers.json(400, { error: "invalid_client_metadata" });
     }
     const registration = registrationSchema.safeParse(document);
     if (!registration.success) {
-      http.sendJson(res, 400, {
+      return answers.json(400, {
         error: "invalid_client_metadata",
         error_description: "redirect_uris is required",
       });
-      return;
     }
 
     const redirectUris = registration.data.redirect_uris;
@@ -111,12 +109,11 @@ export class McpOAuthEndpointService {
       });
     } catch (err) {
       logger.error({ error: err }, "Failed to persist OAuth client registration");
-      http.sendJson(res, 500, { error: "server_error" });
-      return;
+      return answers.json(500, { error: "server_error" });
     }
 
-    http.noteLogFields(res, { clientId });
-    http.sendJson(res, 201, {
+    request.noteLogFields({ clientId });
+    return answers.json(201, {
       client_id: clientId,
       client_name: clientName,
       redirect_uris: redirectUris,
@@ -126,16 +123,19 @@ export class McpOAuthEndpointService {
     });
   }
 
-  async handleToken(req: IncomingMessage, res: ServerResponse): Promise<void> {
-    const { http } = this.#collaborators;
-    if (this.#isThrottled({ limiter: this.#tokenLimiter, req, res })) return;
+  async answerToken(request: McpRequest): Promise<McpDoorAnswer> {
+    const { answers } = this.#collaborators;
+    const throttled = this.#throttle({ limiter: this.#tokenLimiter, request });
+    if (throttled) return throttled;
 
-    const read = await http.readRawBody(req, res);
-    if (read.kind === "answered") return;
+    const read = await answers.readRawBody(request);
+    if (read.kind === "answered") return read.answer;
     const params = parseFormBody(read.body);
     const clientId =
-      params.client_id ?? extractClientIdFromBasicAuth(req.headers.authorization) ?? null;
-    if (clientId) http.noteLogFields(res, { clientId });
+      params.client_id ??
+      extractClientIdFromBasicAuth(extractSingleHeader(request.headers.authorization)) ??
+      null;
+    if (clientId) request.noteLogFields({ clientId });
 
     const exchange = await this.#collaborators.oauthTokens.redeem({
       grantType: params.grant_type,
@@ -145,7 +145,7 @@ export class McpOAuthEndpointService {
       refreshToken: params.refresh_token,
       clientId,
     });
-    http.sendJson(res, exchange.status, exchange.body);
+    return answers.json(exchange.status, exchange.body);
   }
 
   sweep(): void {
@@ -158,18 +158,14 @@ export class McpOAuthEndpointService {
     this.#tokenLimiter.clear();
   }
 
-  /** Counts this call against the caller's budget, answering 429 when it is already spent. */
-  #isThrottled(input: {
+  /** Counts this call against the caller's budget; the 429 to answer when it is already spent. */
+  #throttle(input: {
     limiter: McpRateLimitService;
-    req: IncomingMessage;
-    res: ServerResponse;
-  }): boolean {
-    const ip = this.#collaborators.auth.clientIpOf(input.req);
-    if (input.limiter.isBlocked(ip)) {
-      this.#collaborators.http.sendRateLimited(input.res);
-      return true;
-    }
+    request: McpRequest;
+  }): McpDoorAnswer | undefined {
+    const ip = this.#collaborators.auth.clientIpOf(input.request);
+    if (input.limiter.isBlocked(ip)) return this.#collaborators.answers.rateLimited();
     input.limiter.track(ip);
-    return false;
+    return undefined;
   }
 }

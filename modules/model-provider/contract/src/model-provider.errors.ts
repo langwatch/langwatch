@@ -7,6 +7,7 @@ import { ROUTING_HANDLE_RULE } from "./model-provider.ts";
 export const MODEL_NOT_CONFIGURED_CAUSE = "MODEL_NOT_CONFIGURED" as const;
 
 export class ModelNotConfiguredError extends HandledError {
+  static readonly code = "model_not_configured" as const;
   declare readonly code: "model_not_configured";
   readonly cause = MODEL_NOT_CONFIGURED_CAUSE;
 
@@ -65,6 +66,7 @@ export type ModelProviderResolvedAlternate = {
 };
 
 export class ModelProviderDisabledError extends HandledError {
+  static readonly code = "model_provider_disabled" as const;
   declare readonly code: "model_provider_disabled";
   readonly cause = MODEL_PROVIDER_DISABLED_CAUSE;
 
@@ -150,6 +152,7 @@ export class ModelProviderDisabledError extends HandledError {
 }
 
 export class ModelRestrictedForFeatureError extends HandledError {
+  static readonly code = "model_restricted_for_feature" as const;
   declare readonly code: "model_restricted_for_feature";
 
   readonly featureKey: string;
@@ -193,6 +196,7 @@ export class ModelRestrictedForFeatureError extends HandledError {
  * predating the restriction, not a feature default to change).
  */
 export class ModelRestrictedForExecutionError extends HandledError {
+  static readonly code = "model_restricted_for_execution" as const;
   declare readonly code: "model_restricted_for_execution";
 
   readonly model: string;
@@ -230,6 +234,7 @@ export class ModelRestrictedForExecutionError extends HandledError {
 }
 
 export class ModelProviderNotFoundError extends HandledError {
+  static readonly code = "model_provider_not_found" as const;
   declare readonly code: "model_provider_not_found";
 
   constructor() {
@@ -243,6 +248,7 @@ export class ModelProviderNotFoundError extends HandledError {
 
 /** A provider row that stores no custom keys, asked for them by a peer that needs one. */
 export class ModelProviderCustomKeysMissingError extends HandledError {
+  static readonly code = "model_provider_custom_keys_missing" as const;
   declare readonly code: "model_provider_custom_keys_missing";
 
   constructor() {
@@ -255,6 +261,7 @@ export class ModelProviderCustomKeysMissingError extends HandledError {
 }
 
 export class ModelProviderInvalidError extends HandledError {
+  static readonly code = "model_provider_invalid" as const;
   declare readonly code: "model_provider_invalid";
 
   constructor(message = "Invalid model provider", reason?: "endpoint_not_allowed") {
@@ -268,6 +275,7 @@ export class ModelProviderInvalidError extends HandledError {
 }
 
 export class ModelProviderScopesRequiredError extends HandledError {
+  static readonly code = "model_provider_scopes_required" as const;
   declare readonly code: "model_provider_scopes_required";
 
   constructor() {
@@ -281,6 +289,7 @@ export class ModelProviderScopesRequiredError extends HandledError {
 }
 
 export class ModelProviderAnchorRequiredError extends HandledError {
+  static readonly code = "model_provider_anchor_required" as const;
   declare readonly code: "model_provider_anchor_required";
 
   constructor(requires: "project_or_organization" | "project") {
@@ -294,6 +303,7 @@ export class ModelProviderAnchorRequiredError extends HandledError {
 }
 
 export class ModelProviderScopeForbiddenError extends HandledError {
+  static readonly code = "model_provider_scope_forbidden" as const;
   declare readonly code: "model_provider_scope_forbidden";
 
   constructor(input: { scopeType: string; requiredPermission: string }) {
@@ -307,6 +317,7 @@ export class ModelProviderScopeForbiddenError extends HandledError {
 }
 
 export class ModelProviderDeprecatedError extends HandledError {
+  static readonly code = "model_provider_deprecated" as const;
   declare readonly code: "model_provider_deprecated";
 
   constructor(input: { provider: string; replacement?: string }) {
@@ -322,6 +333,7 @@ export class ModelProviderDeprecatedError extends HandledError {
 }
 
 export class ModelProviderRoutingHandleInvalidError extends HandledError {
+  static readonly code = "model_provider_routing_handle_invalid" as const;
   declare readonly code: "model_provider_routing_handle_invalid";
 
   constructor(input: { handle: string; problem: "shape" | "reserved" }) {
@@ -337,6 +349,7 @@ export class ModelProviderRoutingHandleInvalidError extends HandledError {
 }
 
 export class ModelProviderRoutingHandleTakenError extends HandledError {
+  static readonly code = "model_provider_routing_handle_taken" as const;
   declare readonly code: "model_provider_routing_handle_taken";
 
   constructor(input: { handle: string }) {
@@ -350,6 +363,7 @@ export class ModelProviderRoutingHandleTakenError extends HandledError {
 }
 
 export class ModelProviderTestRateLimitedError extends HandledError {
+  static readonly code = "model_provider_test_rate_limited" as const;
   declare readonly code: "model_provider_test_rate_limited";
 
   constructor(input: { retryAfterSeconds: number }) {
@@ -363,6 +377,7 @@ export class ModelProviderTestRateLimitedError extends HandledError {
 }
 
 export class ModelProviderCredentialsWouldBeDroppedError extends HandledError {
+  static readonly code = "model_provider_credentials_would_be_dropped" as const;
   declare readonly code: "model_provider_credentials_would_be_dropped";
 
   constructor(provider: string) {
@@ -376,6 +391,7 @@ export class ModelProviderCredentialsWouldBeDroppedError extends HandledError {
 }
 
 export class ModelProviderCredentialsUnreadableError extends HandledError {
+  static readonly code = "model_provider_credentials_unreadable" as const;
   declare readonly code: "model_provider_credentials_unreadable";
 
   constructor(provider: string) {
@@ -394,6 +410,7 @@ export class ModelProviderCredentialsUnreadableError extends HandledError {
  * routes the refusal onto the drawer's textarea rather than a toast.
  */
 export class ModelProviderSkipPermissionsPatternInvalidError extends HandledError {
+  static readonly code = "model_provider_skip_permissions_pattern_invalid" as const;
   declare readonly code: "model_provider_skip_permissions_pattern_invalid";
 
   constructor({ line, pattern }: { line: number; pattern: string }) {
@@ -417,6 +434,7 @@ export class ModelProviderSkipPermissionsPatternInvalidError extends HandledErro
 }
 
 export class ModelDefaultNotFoundError extends HandledError {
+  static readonly code = "model_default_not_found" as const;
   declare readonly code: "model_default_not_found";
 
   constructor() {
@@ -429,6 +447,7 @@ export class ModelDefaultNotFoundError extends HandledError {
 }
 
 export class ModelDefaultScopeForbiddenError extends HandledError {
+  static readonly code = "model_default_scope_forbidden" as const;
   declare readonly code: "model_default_scope_forbidden";
 
   constructor(input: { scopeType: string; requiredPermission: string }) {
@@ -447,6 +466,7 @@ export class ModelDefaultScopeForbiddenError extends HandledError {
  * inspect a working key.
  */
 export class ModelDefaultUserKeyRequiredError extends HandledError {
+  static readonly code = "model_default_user_key_required" as const;
   declare readonly code: "model_default_user_key_required";
 
   constructor() {
@@ -461,6 +481,7 @@ export class ModelDefaultUserKeyRequiredError extends HandledError {
 
 /** Keeps the established default-model validation envelope at the service boundary. */
 export class ModelDefaultValidationError extends HandledError {
+  static readonly code = "validation_error" as const;
   declare readonly code: "validation_error";
 
   constructor(message: string) {
@@ -470,6 +491,7 @@ export class ModelDefaultValidationError extends HandledError {
 }
 
 export class ModelCostNotFoundError extends HandledError {
+  static readonly code = "model_cost_not_found" as const;
   declare readonly code: "model_cost_not_found";
 
   constructor() {
@@ -487,6 +509,7 @@ export class ModelCostNotFoundError extends HandledError {
  * talk somebody out of a rule that works.
  */
 export class ModelCostPreviewUnavailableError extends HandledError {
+  static readonly code = "service_unavailable" as const;
   declare readonly code: "service_unavailable";
 
   constructor() {
@@ -705,6 +728,7 @@ export const AI_CALL_FAILED_CAUSE = "AI_CALL_FAILED" as const;
  * exists, the SDK threw parsing a malformed response.
  */
 export class AiCallFailedError extends HandledError {
+  static readonly code = "ai_call_failed" as const;
   declare readonly code: "ai_call_failed";
 
   /**
@@ -763,6 +787,7 @@ export class AiCallFailedError extends HandledError {
 
 /** An evaluator's model setting names a provider or model this project cannot run it with. */
 export class EvaluatorConfigError extends HandledError {
+  static readonly code = "evaluator_config_error" as const;
   declare readonly code: "evaluator_config_error";
 
   constructor(

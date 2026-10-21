@@ -1,8 +1,7 @@
-import type { IncomingMessage, ServerResponse } from "node:http";
-
 import { RateLimitedError } from "@langwatch/api";
 import {
   McpAuthorizationRequiredError,
+  type McpDoorAnswer,
   McpSessionIdRequiredError,
   McpSessionLimitReachedError,
   McpSessionNotFoundError,
@@ -14,8 +13,8 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 
 import { extractSessionIdHeader } from "../rules/mcp-routes.rules.ts";
+import type { McpAnswerService, McpRequest } from "./mcp-answer.service.ts";
 import type { McpCallerAuthService, McpCallerLookup } from "./mcp-caller-auth.service.ts";
-import type { McpHttpService } from "./mcp-http.service.ts";
 import {
   MAX_SESSIONS_PER_KEY,
   type McpSessionService,
@@ -38,14 +37,14 @@ type McpStreamableSessionLookup =
   | Readonly<{ kind: "found"; session: McpStreamableSession }>
   | Readonly<{ kind: "missing" }>;
 
-/** A session request's caller and session, or the answer already sent. */
+/** A session request's caller and session, or the answer to give instead. */
 type McpSessionResolution =
   | Readonly<{ kind: "found"; session: McpStreamableSession } & McpResolvedCaller>
   | Readonly<{ kind: "missing" } & McpResolvedCaller>
-  | Readonly<{ kind: "answered" }>;
+  | Readonly<{ kind: "answered"; answer: McpDoorAnswer }>;
 
 type McpStreamableCollaborators = Readonly<{
-  http: McpHttpService;
+  answers: McpAnswerService;
   auth: McpCallerAuthService;
   sessions: McpSessionService;
 }>;
@@ -68,73 +67,57 @@ export class McpStreamableTransportService {
     return new McpStreamableTransportService(collaborators);
   }
 
-  async handlePost(req: IncomingMessage, res: ServerResponse): Promise<void> {
-    const { http } = this.#collaborators;
-    const read = await http.readJsonBody(req, res);
-    if (read.kind === "answered") return;
+  async answerPost(request: McpRequest): Promise<McpDoorAnswer> {
+    const { answers } = this.#collaborators;
+    const read = await answers.readJsonBody(request);
+    if (read.kind === "answered") return read.answer;
 
-    const sessionId = extractSessionIdHeader(req.headers["mcp-session-id"]);
+    const sessionId = extractSessionIdHeader(request.headers["mcp-session-id"]);
     if (!sessionId) {
-      if (isInitializeRequest(read.body)) {
-        await this.#openSession({ req, res, body: read.body });
-        return;
-      }
-      await http.sendHandled(res, new McpSessionIdRequiredError());
-      return;
+      if (isInitializeRequest(read.body)) return this.#openSession({ request, body: read.body });
+      return answers.refusal(new McpSessionIdRequiredError());
     }
 
-    const resolution = await this.#resolveSession({ req, res, sessionId });
-    if (resolution.kind === "answered") return;
+    const resolution = await this.#resolveSession({ request, sessionId });
+    if (resolution.kind === "answered") return resolution.answer;
     if (resolution.kind === "found") {
-      await this.#drive({ req, res, sessionId, ...resolution, body: read.body });
-      return;
+      return this.#drive({ request, sessionId, ...resolution, body: read.body });
     }
     // A client re-initializing under a lost session's id is served a new session.
-    if (isInitializeRequest(read.body)) {
-      await this.#openSession({ req, res, body: read.body });
-      return;
-    }
-    await this.#answerMissing({ req, res, caller: resolution.caller });
+    if (isInitializeRequest(read.body)) return this.#openSession({ request, body: read.body });
+    return this.#answerMissing({ request, caller: resolution.caller });
   }
 
-  async handleGet(req: IncomingMessage, res: ServerResponse): Promise<void> {
-    const sessionId = extractSessionIdHeader(req.headers["mcp-session-id"]);
-    if (!sessionId) {
-      await this.#collaborators.http.sendHandled(res, new McpSessionIdRequiredError());
-      return;
-    }
+  async answerGet(request: McpRequest): Promise<McpDoorAnswer> {
+    const sessionId = extractSessionIdHeader(request.headers["mcp-session-id"]);
+    if (!sessionId) return this.#collaborators.answers.refusal(new McpSessionIdRequiredError());
 
-    const resolution = await this.#resolveSession({ req, res, sessionId });
-    if (resolution.kind === "answered") return;
+    const resolution = await this.#resolveSession({ request, sessionId });
+    if (resolution.kind === "answered") return resolution.answer;
     if (resolution.kind === "missing") {
-      await this.#answerMissing({ req, res, caller: resolution.caller });
-      return;
+      return this.#answerMissing({ request, caller: resolution.caller });
     }
-    await this.#drive({ req, res, sessionId, ...resolution });
+    return this.#drive({ request, sessionId, ...resolution });
   }
 
   /** The client ending its session: the one place a session record is removed. */
-  async handleDelete(req: IncomingMessage, res: ServerResponse): Promise<void> {
-    const { http, sessions } = this.#collaborators;
-    const sessionId = extractSessionIdHeader(req.headers["mcp-session-id"]);
-    if (!sessionId) {
-      await this.#sendSessionNotFound(res);
-      return;
-    }
+  async answerDelete(request: McpRequest): Promise<McpDoorAnswer> {
+    const { answers, sessions } = this.#collaborators;
+    const sessionId = extractSessionIdHeader(request.headers["mcp-session-id"]);
+    if (!sessionId) return this.#sessionNotFound(request);
 
-    const resolution = await this.#resolveSession({ req, res, sessionId });
-    if (resolution.kind === "answered") return;
+    const resolution = await this.#resolveSession({ request, sessionId });
+    if (resolution.kind === "answered") return resolution.answer;
     const { session } = resolution.kind === "found" ? resolution : { session: undefined };
     if (!session || !sessions.adoptsCaller({ sessionId, session, caller: resolution.caller })) {
-      await this.#answerMissing({ req, res, caller: resolution.caller });
-      return;
+      return this.#answerMissing({ request, caller: resolution.caller });
     }
 
-    http.noteLogFields(res, { projectId: session.projectId });
+    request.noteLogFields({ projectId: session.projectId });
     sessions.streamable.delete(sessionId);
     await session.transport.close();
     await sessions.removeRecord({ sessionId, apiKey: session.apiKey });
-    http.sendJson(res, 200, { status: "session closed" });
+    return answers.json(200, { status: "session closed" });
   }
 
   /**
@@ -142,34 +125,29 @@ export class McpStreamableTransportService {
    * owns it. Naming someone else's session id rebuilds nothing and reads as missing.
    */
   async #resolveSession(input: {
-    req: IncomingMessage;
-    res: ServerResponse;
+    request: McpRequest;
     sessionId: string;
   }): Promise<McpSessionResolution> {
-    const { http, auth, sessions } = this.#collaborators;
-    const token = auth.extractBearer(input.req);
+    const { answers, auth, sessions } = this.#collaborators;
+    const { request } = input;
+    const token = auth.extractBearer(request);
     if (!token) {
-      await http.sendHandled(input.res, new McpAuthorizationRequiredError());
-      return { kind: "answered" };
+      return { kind: "answered", answer: answers.refusal(new McpAuthorizationRequiredError()) };
     }
     const caller = await auth.resolveCaller(token);
     if (caller.kind !== "resolved") {
-      await auth.answerUnresolved(input.req, input.res, { token, caller });
-      return { kind: "answered" };
+      return { kind: "answered", answer: auth.answerUnresolved({ request, token, caller }) };
     }
 
     const held = sessions.streamable.get(input.sessionId);
     if (held) return { kind: "found", session: held, token, caller };
     try {
       const rebuilt = await this.#rebuildOnce({ sessionId: input.sessionId, caller });
-      http.noteLogFields(input.res, {
-        sessionOutcome: rebuilt.kind === "found" ? "rebuilt" : "missing",
-      });
+      request.noteLogFields({ sessionOutcome: rebuilt.kind === "found" ? "rebuilt" : "missing" });
       return { ...rebuilt, token, caller };
     } catch (err) {
       logger.error({ error: err }, "MCP session recovery failed");
-      await http.sendHandled(input.res, new McpStoreUnavailableError());
-      return { kind: "answered" };
+      return { kind: "answered", answer: answers.refusal(new McpStoreUnavailableError()) };
     }
   }
 
@@ -196,56 +174,46 @@ export class McpStreamableTransportService {
 
   /** Hands the request to the session once the caller proves it may drive it. */
   async #drive(input: {
-    req: IncomingMessage;
-    res: ServerResponse;
+    request: McpRequest;
     sessionId: string;
     caller: McpResolvedCaller["caller"];
     session: McpStreamableSession;
     body?: unknown;
-  }): Promise<void> {
-    const { http, sessions } = this.#collaborators;
-    const { session, sessionId, caller } = input;
+  }): Promise<McpDoorAnswer> {
+    const { answers, sessions } = this.#collaborators;
+    const { request, session, sessionId, caller } = input;
     if (!sessions.adoptsCaller({ sessionId, session, caller })) {
-      await this.#answerMissing({ req: input.req, res: input.res, caller });
-      return;
+      return this.#answerMissing({ request, caller });
     }
 
-    http.noteLogFields(input.res, { projectId: session.projectId });
+    request.noteLogFields({ projectId: session.projectId });
     sessions.markActive(session);
     void sessions.touchRecord({ sessionId, apiKey: session.apiKey });
-    // nginx buffers a streamed response unless told not to.
-    input.res.setHeader("X-Accel-Buffering", "no");
-    await sessions.runAs(session.apiKey, () =>
-      session.transport.handleRequest(input.req, input.res, input.body),
-    );
+    return answers.stream({
+      transport: session.transport,
+      apiKey: session.apiKey,
+      body: input.body,
+    });
   }
 
   /** A new session: an initialize request, from an authenticated caller under the session limit. */
-  async #openSession(input: {
-    req: IncomingMessage;
-    res: ServerResponse;
-    body: unknown;
-  }): Promise<void> {
-    const { http, auth, sessions } = this.#collaborators;
+  async #openSession(input: { request: McpRequest; body: unknown }): Promise<McpDoorAnswer> {
+    const { answers, auth, sessions } = this.#collaborators;
+    const { request } = input;
     // Failed auth is counted inside authenticate; here it is only checked.
-    if (auth.isAuthFailureBlocked(input.req)) {
-      await http.sendHandled(input.res, new RateLimitedError());
-      return;
-    }
+    if (auth.isAuthFailureBlocked(request)) return answers.refusal(new RateLimitedError());
 
-    const authentication = await auth.authenticate(input.req, input.res);
-    if (authentication.kind === "answered") return;
+    const authentication = await auth.authenticate(request);
+    if (authentication.kind === "answered") return authentication.answer;
     const { apiKey, projectId } = authentication;
 
-    const caller = await auth.resolveOptionalCaller(auth.extractBearer(input.req));
+    const caller = await auth.resolveOptionalCaller(auth.extractBearer(request));
     const userId = caller.kind === "resolved" ? caller.userId : undefined;
 
     if (await sessions.isAtSessionLimit(apiKey)) {
-      await http.sendHandled(
-        input.res,
+      return answers.refusal(
         new McpSessionLimitReachedError({ maxSessions: MAX_SESSIONS_PER_KEY }),
       );
-      return;
     }
 
     const transport: StreamableHTTPServerTransport = new StreamableHTTPServerTransport({
@@ -258,10 +226,14 @@ export class McpStreamableTransportService {
     });
     transport.onclose = () => this.#forgetLocalCopy(transport);
 
-    http.noteLogFields(input.res, { sessionOutcome: "opened" });
-    input.res.setHeader("X-Accel-Buffering", "no");
-    await sessions.connectServer({ transport, apiKey, projectId, userId });
-    await sessions.runAs(apiKey, () => transport.handleRequest(input.req, input.res, input.body));
+    request.noteLogFields({ sessionOutcome: "opened" });
+    try {
+      await sessions.connectServer({ transport, apiKey, projectId, userId });
+    } catch (error) {
+      // The stream was about to start, so the refusal keeps the stream's unbuffered header.
+      return answers.unbuffered(answers.failure({ error, url: request.url }));
+    }
+    return answers.stream({ transport, apiKey, body: input.body });
   }
 
   /**
@@ -327,25 +299,18 @@ export class McpStreamableTransportService {
 
   /** 404 for a session this caller cannot reach, unless the credential itself is dead (401). */
   async #answerMissing(input: {
-    req: IncomingMessage;
-    res: ServerResponse;
+    request: McpRequest;
     caller: McpResolvedCaller["caller"];
-  }): Promise<void> {
-    const { auth, http } = this.#collaborators;
+  }): Promise<McpDoorAnswer> {
+    const { auth, answers } = this.#collaborators;
     const live = await auth.credentialIsLive(input.caller);
-    if (live === "unavailable") {
-      await http.sendHandled(input.res, new McpStoreUnavailableError());
-      return;
-    }
-    if (!live) {
-      await auth.refuseBearer(input.req, input.res, input.caller.apiKey);
-      return;
-    }
-    await this.#sendSessionNotFound(input.res);
+    if (live === "unavailable") return answers.refusal(new McpStoreUnavailableError());
+    if (!live) return auth.refuseBearer({ request: input.request, token: input.caller.apiKey });
+    return this.#sessionNotFound(input.request);
   }
 
-  async #sendSessionNotFound(res: ServerResponse): Promise<void> {
-    this.#collaborators.http.noteLogFields(res, { sessionOutcome: "missing" });
-    await this.#collaborators.http.sendHandled(res, new McpSessionNotFoundError());
+  #sessionNotFound(request: McpRequest): McpDoorAnswer {
+    request.noteLogFields({ sessionOutcome: "missing" });
+    return this.#collaborators.answers.refusal(new McpSessionNotFoundError());
   }
 }

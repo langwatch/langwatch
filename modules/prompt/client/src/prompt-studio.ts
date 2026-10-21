@@ -1,5 +1,6 @@
 /** Prompt's editors the workflow studio and evaluator settings draw, by token (§10.1). */
 
+import { lentComponent } from "@langwatch/browser-host/lent";
 import { uiTokens } from "@langwatch/module";
 import type { ReactNode } from "react";
 
@@ -175,3 +176,10 @@ export const VariablesSectionToken = prompt.component<VariablesSectionProps>("va
 export const OutputsSectionToken = prompt.component<OutputsSectionProps>("outputsSection");
 export const LlmConfigFieldToken = prompt.component<LlmConfigFieldProps>("llmConfigField");
 export const LlmConfigPopoverToken = prompt.component<LlmConfigPopoverProps>("llmConfigPopover");
+
+/** The tokens above as ready components: a borrower imports these and writes no wrapper (§10.1). */
+export const LlmConfigPopover = lentComponent(LlmConfigPopoverToken);
+export const OutputsSection = lentComponent(OutputsSectionToken);
+export const LlmConfigField = lentComponent(LlmConfigFieldToken);
+export const VariablesSection = lentComponent(VariablesSectionToken);
+export const StudioPromptEditor = lentComponent(StudioPromptEditorToken);

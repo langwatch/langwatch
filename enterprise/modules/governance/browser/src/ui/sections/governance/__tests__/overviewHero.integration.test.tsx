@@ -29,7 +29,8 @@ import { SAMPLE_CHOICE_KEY } from "../../../elements/governance-sample-mode.ts";
 const harness = vi.hoisted(() => ({ requested: [] as string[] }));
 
 vi.mock("@paper-design/shaders-react", () => ({ MeshGradient: () => null }));
-vi.mock("../../../../behavior/lent-hero-ask-field.tsx", () => ({
+vi.mock("@langwatch/project-client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   HeroAskField: ({ placeholder }: { placeholder: string }) => <input placeholder={placeholder} />,
 }));
 vi.mock("../../../../features/overview/ui/sections/quarantine-fill-panel.tsx", () => ({

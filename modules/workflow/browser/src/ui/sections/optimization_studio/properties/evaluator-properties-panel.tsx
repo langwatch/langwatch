@@ -1,7 +1,11 @@
 import { ActionRow } from "@langwatch/design-system/action-row";
 import { Button, HStack, Spacer } from "@langwatch/design-system/primitives";
 import { SkeletonRows } from "@langwatch/design-system/skeletons";
-import { evaluatorClient } from "@langwatch/evaluator-client";
+import {
+  evaluatorClient,
+  EvaluatorSettingsForm,
+  StudioEvaluatorEditor,
+} from "@langwatch/evaluator-client";
 import { type EvaluatorEditorValues, type EvaluatorOutputs } from "@langwatch/evaluator-client";
 import {
   AVAILABLE_EVALUATORS,
@@ -15,10 +19,6 @@ import { useDebouncedCallback } from "use-debounce";
 import { z } from "zod";
 import { useShallow } from "zustand/react/shallow";
 
-import {
-  EvaluatorSettingsForm,
-  StudioEvaluatorEditor,
-} from "../../../../behavior/lent-evaluator.tsx";
 import { useOrganizationTeamProject } from "../../../../behavior/studio-host/use-organization-team-project.ts";
 import { useWorkflowStore } from "../../../../behavior/use-workflow-store.ts";
 import {

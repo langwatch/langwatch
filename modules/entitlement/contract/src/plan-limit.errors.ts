@@ -5,6 +5,7 @@ import { HandledError } from "@langwatch/handled-error";
  * as the failure is terminal. Code stays ERR_PLAN_LIMIT for SDK compatibility.
  */
 export class PlanLimitExceededError extends HandledError {
+  static readonly code = "ERR_PLAN_LIMIT" as const;
   declare readonly code: "ERR_PLAN_LIMIT";
 
   constructor(
@@ -28,6 +29,7 @@ export class PlanLimitExceededError extends HandledError {
 /** The approaching-limit mail on a deployment with no Enterprise billing
  * gateway composed. */
 export class EntitlementNotifierUnavailableError extends HandledError {
+  static readonly code = "service_unavailable" as const;
   declare readonly code: "service_unavailable";
 
   constructor(processName: string) {

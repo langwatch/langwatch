@@ -9,6 +9,7 @@ import { Card } from "@langwatch/design-system/card";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Box, Text } from "@langwatch/design-system/primitives";
 
+import { explainChartQueryError } from "../../../../model/dashboard-widget/chart-query-error-copy.ts";
 import { formatNumber } from "../../../../model/format.ts";
 import type { QueryLastRun } from "../../behavior/use-dashboard-widget-executor.ts";
 
@@ -34,9 +35,11 @@ export function DashboardWidgetQueryResultView({ run }: DashboardWidgetQueryResu
   }
 
   if (run.error) {
+    const explanation = explainChartQueryError(run.error);
     return (
-      <Banner status="error" placement="inline" title={run.error.title}>
-        [{run.error.code}]: {run.error.message}
+      <Banner status="error" placement="inline" title={explanation.title}>
+        [{run.error.code}]: {explanation.description}
+        {explanation.traceId ? ` (error id ${explanation.traceId})` : ""}
       </Banner>
     );
   }

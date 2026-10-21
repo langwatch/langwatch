@@ -2,6 +2,13 @@ export {
   HostedMcpApi,
   type HostedMcpApiContract,
   type HostedMcpHandler,
+  type McpDoorAccessLog,
+  type McpDoorAnswer,
+  type McpDoorBodyRead,
+  type McpDoorReply,
+  type McpDoorRequest,
+  type McpDoorStream,
+  type McpSessionRunner,
 } from "./mcp-authorize.schemas.ts";
 
 export {

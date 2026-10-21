@@ -3,7 +3,7 @@
 // process's Hono stack, so they never reached the access log, the metrics or
 // the traces the rest of the deployment produces. A broken integration was
 // invisible: nothing recorded that the request had happened at all.
-import { createServer, type IncomingMessage, type Server } from "node:http";
+import { createServer, type Server } from "node:http";
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -40,13 +40,17 @@ import { MemoryMcpOAuthClientRepository } from "../../repositories/memory/memory
 import { MemoryMcpSessionRepository } from "../../repositories/memory/memory.mcp-session.repository.ts";
 import { RedisMcpOAuthTokenRepository } from "../../repositories/redis/redis.mcp-oauth-token.repository.ts";
 import type { AuthzMcpSessionGrantService } from "../../services/authz-mcp-session-grant.service.ts";
-import type { HeaderMcpClientAddressService } from "../../services/header-mcp-client-address.service.ts";
+import type {
+  HeaderMcpClientAddressService,
+  McpClientAddressSource,
+} from "../../services/header-mcp-client-address.service.ts";
 import type { McpHandler } from "../../services/mcp-endpoint.service.ts";
 import { McpEndpointService } from "../../services/mcp-endpoint.service.ts";
 import type {
   McpLiveProjectLookup,
   ProjectMcpProjectLookupService,
 } from "../../services/project-mcp-project-lookup.service.ts";
+import { answerMcpExchange } from "../mcp-endpoint.rest.ts";
 import { FakeCliSessions } from "./support/fake-cli-sessions.ts";
 
 class LoggingProjectLookup implements Pick<
@@ -69,8 +73,8 @@ class AlwaysGranted implements Pick<AuthzMcpSessionGrantService, "stillGranted">
 }
 
 class LoopbackAddress implements Pick<HeaderMcpClientAddressService, "clientIp"> {
-  clientIp(request: IncomingMessage): string {
-    return request.socket.remoteAddress ?? "127.0.0.1";
+  clientIp(request: McpClientAddressSource): string {
+    return request.remoteAddress ?? "127.0.0.1";
   }
 }
 
@@ -189,7 +193,9 @@ describe("Feature: MCP request logging", () => {
       address: new LoopbackAddress(),
       baseHost: "https://app.langwatch.ai",
     });
-    server = createServer((req, res) => handler.handleRequest(req, res));
+    server = createServer((request, response) =>
+      answerMcpExchange({ endpoint: handler, runner: handler.sessionRunner, request, response }),
+    );
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
     baseUrl = `http://127.0.0.1:${portOf(server)}`;
   });

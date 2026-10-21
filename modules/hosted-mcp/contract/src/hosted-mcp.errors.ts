@@ -5,6 +5,7 @@ export const MCP_STORE_RETRY_AFTER_MS = 5_000;
 
 /** A request to the MCP endpoint that presented no bearer token. */
 export class McpAuthorizationRequiredError extends HandledError {
+  static readonly code = "mcp_authorization_required" as const;
   declare readonly code: "mcp_authorization_required";
 
   constructor() {
@@ -18,6 +19,7 @@ export class McpAuthorizationRequiredError extends HandledError {
 
 /** A bearer that is not a live access token: unknown, expired, or not bound to a project. */
 export class McpInvalidTokenError extends HandledError {
+  static readonly code = "mcp_invalid_token" as const;
   declare readonly code: "mcp_invalid_token";
 
   constructor() {
@@ -28,6 +30,7 @@ export class McpInvalidTokenError extends HandledError {
 
 /** A project API key, passed as the bearer, that names no live project. */
 export class McpInvalidApiKeyError extends HandledError {
+  static readonly code = "mcp_invalid_api_key" as const;
   declare readonly code: "mcp_invalid_api_key";
 
   constructor() {
@@ -38,6 +41,7 @@ export class McpInvalidApiKeyError extends HandledError {
 
 /** The access the token was minted under is gone: the person left the project or organisation. */
 export class McpGrantRevokedError extends HandledError {
+  static readonly code = "mcp_grant_revoked" as const;
   declare readonly code: "mcp_grant_revoked";
 
   constructor() {
@@ -51,6 +55,7 @@ export class McpGrantRevokedError extends HandledError {
 
 /** A session this caller cannot reach; the MCP spec has the client initialize a new one. */
 export class McpSessionNotFoundError extends HandledError {
+  static readonly code = "mcp_session_not_found" as const;
   declare readonly code: "mcp_session_not_found";
 
   constructor() {
@@ -61,6 +66,7 @@ export class McpSessionNotFoundError extends HandledError {
 
 /** A path under the MCP endpoint that serves nothing. */
 export class McpRouteNotFoundError extends HandledError {
+  static readonly code = "mcp_route_not_found" as const;
   declare readonly code: "mcp_route_not_found";
 
   constructor() {
@@ -71,6 +77,7 @@ export class McpRouteNotFoundError extends HandledError {
 
 /** A discovery path this server claims but publishes no metadata document at. */
 export class McpMetadataUnpublishedError extends HandledError {
+  static readonly code = "mcp_metadata_unpublished" as const;
   declare readonly code: "mcp_metadata_unpublished";
 
   constructor() {
@@ -84,6 +91,7 @@ export class McpMetadataUnpublishedError extends HandledError {
 
 /** A request with no session id that is not an initialize request either. */
 export class McpSessionIdRequiredError extends HandledError {
+  static readonly code = "mcp_session_id_required" as const;
   declare readonly code: "mcp_session_id_required";
 
   constructor() {
@@ -98,6 +106,7 @@ export class McpSessionIdRequiredError extends HandledError {
 
 /** A method the MCP route does not answer. */
 export class McpMethodNotAllowedError extends HandledError {
+  static readonly code = "mcp_method_not_allowed" as const;
   declare readonly code: "mcp_method_not_allowed";
 
   constructor() {
@@ -108,6 +117,7 @@ export class McpMethodNotAllowedError extends HandledError {
 
 /** The key already holds as many open sessions as one key may. */
 export class McpSessionLimitReachedError extends HandledError {
+  static readonly code = "mcp_session_limit_reached" as const;
   declare readonly code: "mcp_session_limit_reached";
 
   constructor(input: { maxSessions: number }) {
@@ -123,6 +133,7 @@ export class McpSessionLimitReachedError extends HandledError {
 
 /** A store the request needs is down: worth a retry, never a reason to sign in again. */
 export class McpStoreUnavailableError extends HandledError {
+  static readonly code = "mcp_store_unavailable" as const;
   declare readonly code: "mcp_store_unavailable";
 
   constructor() {

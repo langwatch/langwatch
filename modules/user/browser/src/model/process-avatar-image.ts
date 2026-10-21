@@ -22,6 +22,7 @@ export abstract class AvatarImageError extends HandledError {}
 
 /** Not an image, or the decoder could not make sense of it. */
 export class AvatarImageUnreadableError extends AvatarImageError {
+  static readonly code = "avatar_image_unreadable" as const;
   declare readonly code: "avatar_image_unreadable";
 
   constructor(reason: "not_an_image" | "decode_failed" | "empty") {
@@ -36,6 +37,7 @@ export class AvatarImageUnreadableError extends AvatarImageError {
 
 /** Over {@link AVATAR_MAX_SOURCE_BYTES}. `meta.maxBytes` is the ceiling. */
 export class AvatarImageTooLargeError extends AvatarImageError {
+  static readonly code = "avatar_image_too_large" as const;
   declare readonly code: "avatar_image_too_large";
 
   constructor(maxBytes: number) {
@@ -53,6 +55,7 @@ export class AvatarImageTooLargeError extends AvatarImageError {
  * because it's a browser quirk, not a platform bug.
  */
 export class AvatarImageProcessingFailedError extends AvatarImageError {
+  static readonly code = "avatar_image_processing_failed" as const;
   declare readonly code: "avatar_image_processing_failed";
 
   constructor() {

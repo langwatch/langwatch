@@ -11,6 +11,7 @@ import { HandledError } from "@langwatch/handled-error";
  * A platform fault: the operator pressing the button supplied nothing wrong.
  */
 export class LicenseSigningNotConfiguredError extends HandledError {
+  static readonly code = "license_signing_not_configured" as const;
   declare readonly code: "license_signing_not_configured";
 
   constructor() {
@@ -25,6 +26,7 @@ export class LicenseSigningNotConfiguredError extends HandledError {
 
 /** A license asked to end at a moment already passed: 422, like a grant's past expiry. */
 export class LicenseExpiryInPastError extends HandledError {
+  static readonly code = "license_expiry_in_past" as const;
   declare readonly code: "license_expiry_in_past";
 
   constructor() {
@@ -38,6 +40,7 @@ export class LicenseExpiryInPastError extends HandledError {
 
 /** The registry has no license with that id. */
 export class IssuedLicenseNotFoundError extends HandledError {
+  static readonly code = "issued_license_not_found" as const;
   declare readonly code: "issued_license_not_found";
 
   constructor() {
@@ -51,6 +54,7 @@ export class IssuedLicenseNotFoundError extends HandledError {
 
 /** The pasted license is already in the registry. The existing row is untouched. */
 export class LicenseAlreadyRegisteredError extends HandledError {
+  static readonly code = "license_already_registered" as const;
   declare readonly code: "license_already_registered";
 
   constructor() {
@@ -67,6 +71,7 @@ export class LicenseAlreadyRegisteredError extends HandledError {
  * past its term. The admin console names the state in its copy.
  */
 export class IssuedLicenseNotActiveError extends HandledError {
+  static readonly code = "issued_license_not_active" as const;
   declare readonly code: "issued_license_not_active";
 
   constructor(status: "revoked" | "superseded" | "expired") {
@@ -84,6 +89,7 @@ export class IssuedLicenseNotActiveError extends HandledError {
  * that every license is replaced by one license at most.
  */
 export class LicenseAlreadyReissuedError extends HandledError {
+  static readonly code = "license_already_reissued" as const;
   declare readonly code: "license_already_reissued";
 
   constructor() {
@@ -98,6 +104,7 @@ export class LicenseAlreadyReissuedError extends HandledError {
 
 /** An overage maximum was given while on-demand overage is off. */
 export class LicenseOverageMaxRequiresOverageError extends HandledError {
+  static readonly code = "license_overage_max_requires_overage" as const;
   declare readonly code: "license_overage_max_requires_overage";
 
   constructor() {

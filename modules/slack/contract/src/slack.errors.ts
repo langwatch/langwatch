@@ -8,6 +8,7 @@ import type { SlackConnectionClaimant } from "./slack.schemas.ts";
  * code travels in `meta.slackError`; the presentation registry switches on it.
  */
 export class SlackIntegrationInvalidTokenError extends HandledError {
+  static readonly code = "slack_integration_invalid_token" as const;
   declare readonly code: "slack_integration_invalid_token";
 
   constructor(public readonly slackError: string) {
@@ -25,6 +26,7 @@ export class SlackIntegrationInvalidTokenError extends HandledError {
  * its own (ADR-093 §5a resolution). Customer fault: pick or add a connection.
  */
 export class SlackIntegrationMissingError extends HandledError {
+  static readonly code = "slack_integration_missing" as const;
   declare readonly code: "slack_integration_missing";
 
   constructor() {
@@ -43,6 +45,7 @@ export class SlackIntegrationMissingError extends HandledError {
  * The existing connection's name travels so the customer can pick it instead.
  */
 export class SlackConnectionExistsError extends HandledError {
+  static readonly code = "slack_connection_exists" as const;
   declare readonly code: "slack_connection_exists";
 
   constructor({ connectionId, connectionName }: { connectionId: string; connectionName: string }) {
@@ -60,6 +63,7 @@ export class SlackConnectionExistsError extends HandledError {
  * The count and the claimants travel so the client can say what stops delivering.
  */
 export class SlackConnectionInUseError extends HandledError {
+  static readonly code = "slack_connection_in_use" as const;
   declare readonly code: "slack_connection_in_use";
 
   constructor({
@@ -79,6 +83,7 @@ export class SlackConnectionInUseError extends HandledError {
 
 /** A Slack connection input was refused; the wire code matches main's automation refusal. */
 export class InvalidSlackConnectionInputError extends HandledError {
+  static readonly code = "invalid_action_params" as const;
   declare readonly code: "invalid_action_params";
 
   constructor(

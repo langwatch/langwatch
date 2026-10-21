@@ -1,10 +1,17 @@
-import type { IncomingMessage, ServerResponse } from "node:http";
-
 import { registerRoutePolicy } from "@langwatch/api";
 import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
-import { McpMethodNotAllowedError, McpRouteNotFoundError } from "@langwatch/hosted-mcp-contract";
+import {
+  type HostedMcpHandler,
+  type McpDoorAccessLog,
+  type McpDoorAnswer,
+  type McpDoorReply,
+  type McpDoorRequest,
+  type McpSessionRunner,
+  McpMethodNotAllowedError,
+  McpRouteNotFoundError,
+} from "@langwatch/hosted-mcp-contract";
 import { initConfig, tryGetConfig } from "@langwatch/mcp-server/config";
-import { classifyClient, createLogger, endpointClassOf } from "@langwatch/observability";
+import { classifyClient, endpointClassOf } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
 import type { McpOAuthClientRepository } from "../repositories/mcp-oauth-client.repository.ts";
@@ -19,33 +26,26 @@ import {
 } from "../rules/mcp-routes.rules.ts";
 import type { AuthzMcpSessionGrantService } from "./authz-mcp-session-grant.service.ts";
 import type { HeaderMcpClientAddressService } from "./header-mcp-client-address.service.ts";
+import { McpAnswerService, type McpRequest } from "./mcp-answer.service.ts";
 import { McpCallerAuthService } from "./mcp-caller-auth.service.ts";
-import { McpHttpService } from "./mcp-http.service.ts";
 import { McpOAuthEndpointService } from "./mcp-oauth-endpoint.service.ts";
 import { type McpCliSessions, McpOAuthTokenService } from "./mcp-oauth-token.service.ts";
 import { McpSessionService } from "./mcp-session.service.ts";
 import { McpStreamableTransportService } from "./mcp-streamable-transport.service.ts";
 import type { ProjectMcpProjectLookupService } from "./project-mcp-project-lookup.service.ts";
 
-const logger = createLogger("langwatch:mcp");
-
 const REAPER_INTERVAL_MS = 60 * 1000;
 
 /** Under the shortest idle timeout a proxy in front of us is likely to use (ALB and nginx: 60s). */
 const KEEPALIVE_INTERVAL_MS = 20 * 1000;
 
-/** The long-lived MCP HTTP surface one process mounts on its raw Node listener. */
-export interface McpHandler {
-  handleRequest: (req: IncomingMessage, res: ServerResponse) => void;
-  isMcpRoute: (pathname: string) => boolean;
+/**
+ * The long-lived MCP surface one process mounts: it decides each request's answer, and the raw
+ * HTTP door writes it.
+ */
+export interface McpHandler extends HostedMcpHandler {
   /** Whether this replica holds a live copy of the session (for testing). */
   holdsSession: (sessionId: string) => boolean;
-  /** Clear the in-memory OAuth token cache (for testing). */
-  clearTokenCache: () => void;
-  /** Clear the in-memory OAuth/auth-failure rate limiter state (for testing). */
-  clearRateLimiters: () => void;
-  /** Close this replica's copies at shutdown; the records stay so another replica takes over. */
-  closeAllSessions: () => Promise<void>;
 }
 
 type McpEndpointCollaborators = Readonly<{
@@ -61,7 +61,7 @@ type McpEndpointCollaborators = Readonly<{
   baseHost: string;
 }>;
 
-type RouteHandler = (req: IncomingMessage, res: ServerResponse) => void | Promise<void>;
+type RouteHandler = (request: McpRequest) => McpDoorAnswer | Promise<McpDoorAnswer>;
 
 /** A path answers per method, or the same whatever the method (health, the 404 documents). */
 type RouteVerbs =
@@ -70,10 +70,11 @@ type RouteVerbs =
 
 /**
  * The hosted MCP endpoint: the Streamable HTTP transport, OAuth discovery, registration
- * and token exchange, CORS, the access log, and the reaper that bounds abandoned state.
+ * and token exchange, CORS, and the reaper that bounds abandoned state. It answers in data;
+ * the raw HTTP door writes the answer and the access log line.
  */
 export class McpEndpointService implements McpHandler {
-  readonly #http: McpHttpService;
+  readonly #answers: McpAnswerService;
   readonly #auth: McpCallerAuthService;
   readonly #oauthTokens: McpOAuthTokenService;
   readonly #sessions: McpSessionService;
@@ -83,15 +84,15 @@ export class McpEndpointService implements McpHandler {
   readonly #keepalive: ReturnType<typeof setInterval>;
 
   private constructor(collaborators: McpEndpointCollaborators) {
-    const http = McpHttpService.create({ baseHost: collaborators.baseHost });
-    this.#http = http;
+    const answers = McpAnswerService.create({ baseHost: collaborators.baseHost });
+    this.#answers = answers;
     this.#oauthTokens = McpOAuthTokenService.create({
       repository: collaborators.oauthTokenRecords,
       issuer: collaborators.cliSessions,
     });
     const auth = McpCallerAuthService.create({
       ...collaborators,
-      http,
+      answers,
     });
     this.#auth = auth;
     this.#sessions = McpSessionService.create({
@@ -99,13 +100,13 @@ export class McpEndpointService implements McpHandler {
       sessionTools: collaborators.sessionTools,
     });
     this.#oauth = McpOAuthEndpointService.create({
-      http,
+      answers,
       auth,
       oauthTokens: this.#oauthTokens,
       clients: collaborators.oauthClients,
     });
     this.#routes = this.#routeTable(
-      McpStreamableTransportService.create({ http, auth, sessions: this.#sessions }),
+      McpStreamableTransportService.create({ answers, auth, sessions: this.#sessions }),
     );
     this.#reaper = setInterval(() => this.#reap(), REAPER_INTERVAL_MS);
     this.#keepalive = setInterval(() => this.#sessions.pingOpenStreams(), KEEPALIVE_INTERVAL_MS);
@@ -132,24 +133,33 @@ export class McpEndpointService implements McpHandler {
 
   isMcpRoute = (pathname: string): boolean => isMcpRoute(pathname);
 
-  handleRequest = (req: IncomingMessage, res: ServerResponse): void => {
-    const pathname = (req.url ?? "").split("?")[0] ?? "";
-    const method = req.method ?? "GET";
+  answer = async (doorRequest: McpDoorRequest): Promise<McpDoorReply> => {
+    const pathname = doorRequest.url.split("?")[0] ?? "";
+    const method = doorRequest.method;
+    // Only identifiers go in: MCP requests never reach the Hono stack's own access log.
+    const identifiers: Record<string, string> = {};
+    const request: McpRequest = {
+      ...doorRequest,
+      noteLogFields: (fields) => {
+        for (const [key, value] of Object.entries(fields)) {
+          if (value) identifiers[key] = value;
+        }
+      },
+    };
+    const headerSessionId = doorRequest.headers["mcp-session-id"];
+    if (typeof headerSessionId === "string") request.noteLogFields({ sessionId: headerSessionId });
 
-    this.#logOnCompletion({ req, res, pathname, method });
-    // CORS on every MCP route, error responses included.
-    this.#http.setCorsHeaders(res);
+    const answer = await this.#answerRequest({ request, pathname, method });
+    const accessLog = { ...accessLogOf({ request, pathname, method }), ...identifiers };
+    return { answer, accessLog };
+  };
 
-    if (method === "OPTIONS" && isMcpRoute(pathname)) {
-      res.writeHead(200);
-      res.end();
-      return;
-    }
+  answerFailure = (input: { error: unknown; url: string }): McpDoorAnswer =>
+    this.#answers.failure(input);
 
-    this.#dispatch({ req, res, pathname, method }).catch(async (err: unknown) => {
-      logger.error({ error: err, url: req.url }, "MCP handler error");
-      if (!res.headersSent) await this.#http.sendHandled(res, err);
-    });
+  /** Runs a stream answer's work as its session's key. */
+  readonly sessionRunner: McpSessionRunner = {
+    runAs: (apiKey, work) => this.#sessions.runAs(apiKey, work),
   };
 
   holdsSession = (sessionId: string): boolean => this.#sessions.streamable.has(sessionId);
@@ -169,27 +179,34 @@ export class McpEndpointService implements McpHandler {
     await this.#sessions.closeAll();
   };
 
-  async #dispatch(input: {
-    req: IncomingMessage;
-    res: ServerResponse;
+  async #answerRequest(input: {
+    request: McpRequest;
     pathname: string;
     method: string;
-  }): Promise<void> {
-    const { req, res, pathname, method } = input;
+  }): Promise<McpDoorAnswer> {
+    if (input.method === "OPTIONS" && isMcpRoute(input.pathname)) return this.#answers.preflight();
+    try {
+      return await this.#dispatch(input);
+    } catch (error: unknown) {
+      return this.answerFailure({ error, url: input.request.url });
+    }
+  }
+
+  async #dispatch(input: {
+    request: McpRequest;
+    pathname: string;
+    method: string;
+  }): Promise<McpDoorAnswer> {
+    const { request, pathname, method } = input;
     // RFC 9728 path-suffixed discovery, tried before the bare form by every current MCP client.
-    if (await this.#serveMetadataSubtree({ res, pathname, method })) return;
+    const metadata = this.#answerMetadataSubtree({ pathname, method });
+    if (metadata) return metadata;
 
     const verbs = this.#routes.get(pathname);
-    if (!verbs) {
-      await this.#http.sendHandled(res, new McpRouteNotFoundError());
-      return;
-    }
+    if (!verbs) return this.#answers.refusal(new McpRouteNotFoundError());
     const handle = "anyMethod" in verbs ? verbs.anyMethod : verbs.byMethod.get(method);
-    if (!handle) {
-      await this.#http.sendHandled(res, new McpMethodNotAllowedError());
-      return;
-    }
-    await handle(req, res);
+    if (!handle) return this.#answers.refusal(new McpMethodNotAllowedError());
+    return handle(request);
   }
 
   #routeTable(streamable: McpStreamableTransportService): ReadonlyMap<string, RouteVerbs> {
@@ -199,31 +216,25 @@ export class McpEndpointService implements McpHandler {
     });
     const streamableVerbs: RouteVerbs = {
       byMethod: new Map<string, RouteHandler>([
-        ["POST", (req, res) => streamable.handlePost(req, res)],
-        ["GET", (req, res) => streamable.handleGet(req, res)],
-        ["DELETE", (req, res) => streamable.handleDelete(req, res)],
+        ["POST", (request) => streamable.answerPost(request)],
+        ["GET", (request) => streamable.answerGet(request)],
+        ["DELETE", (request) => streamable.answerDelete(request)],
       ]),
     };
     return new Map<string, RouteVerbs>([
-      [
-        "/mcp/health",
-        { anyMethod: (_req, res) => this.#http.sendJson(res, 200, { status: "ok" }) },
-      ],
+      ["/mcp/health", { anyMethod: () => this.#answers.json(200, { status: "ok" }) }],
       [
         PROTECTED_RESOURCE_METADATA_PATH,
-        only("GET", (_req, res) => oauth.handleProtectedResourceMetadata(res)),
+        only("GET", () => oauth.answerProtectedResourceMetadata()),
       ],
       [
         AUTHORIZATION_SERVER_METADATA_PATH,
-        only("GET", (_req, res) => oauth.handleAuthorizationServerMetadata(res)),
+        only("GET", () => oauth.answerAuthorizationServerMetadata()),
       ],
       // Not an OpenID provider: claimed so the probe gets a JSON 404 rather than the app.
-      [
-        "/.well-known/openid-configuration",
-        { anyMethod: (_req, res) => oauth.handleUnpublishedMetadata(res) },
-      ],
-      ["/oauth/register", only("POST", (req, res) => oauth.handleRegister(req, res))],
-      ["/oauth/token", only("POST", (req, res) => oauth.handleToken(req, res))],
+      ["/.well-known/openid-configuration", { anyMethod: () => oauth.answerUnpublishedMetadata() }],
+      ["/oauth/register", only("POST", (request) => oauth.answerRegister(request))],
+      ["/oauth/token", only("POST", (request) => oauth.answerToken(request))],
       ["/mcp", streamableVerbs],
       // The SSE transport is retired; a client still configured with its URL is served the
       // Streamable HTTP transport there.
@@ -231,69 +242,16 @@ export class McpEndpointService implements McpHandler {
     ]);
   }
 
-  /** Whether the request belonged to a path-suffixed discovery subtree and has been answered. */
-  async #serveMetadataSubtree(input: {
-    res: ServerResponse;
-    pathname: string;
-    method: string;
-  }): Promise<boolean> {
+  /** The answer for a path-suffixed discovery subtree, or undefined outside every subtree. */
+  #answerMetadataSubtree(input: { pathname: string; method: string }): McpDoorAnswer | undefined {
     const path = classifyMetadataSubtreePath(input.pathname);
-    if (path.kind === "outside") return false;
-    if (input.method !== "GET") {
-      await this.#http.sendHandled(input.res, new McpMethodNotAllowedError());
-    } else if (path.kind === "unpublished") {
-      await this.#oauth.handleUnpublishedMetadata(input.res);
-    } else if (path.kind === "protected-resource") {
-      this.#oauth.handleProtectedResourceMetadata(input.res, path.resourceSuffix);
-    } else {
-      this.#oauth.handleAuthorizationServerMetadata(input.res);
+    if (path.kind === "outside") return undefined;
+    if (input.method !== "GET") return this.#answers.refusal(new McpMethodNotAllowedError());
+    if (path.kind === "unpublished") return this.#oauth.answerUnpublishedMetadata();
+    if (path.kind === "protected-resource") {
+      return this.#oauth.answerProtectedResourceMetadata(path.resourceSuffix);
     }
-    return true;
-  }
-
-  /** One access log line per request once the response is done; logging never breaks a request. */
-  #logOnCompletion(input: {
-    req: IncomingMessage;
-    res: ServerResponse;
-    pathname: string;
-    method: string;
-  }): void {
-    const { req, res } = input;
-    try {
-      const startedAt = nowInstant().epochMilliseconds;
-      const userAgent = req.headers["user-agent"] ?? null;
-      const attribution = {
-        endpointClass: endpointClassOf(input.pathname),
-        ...classifyClient((name) => {
-          const value = req.headers[name];
-          return Array.isArray(value) ? value[0] : value;
-        }),
-      };
-      res.once("close", () => {
-        try {
-          logger.info(
-            {
-              method: input.method,
-              path: input.pathname,
-              status: res.statusCode,
-              durationMs: nowInstant().epochMilliseconds - startedAt,
-              userAgent,
-              ...attribution,
-              ...this.#http.logFieldsOf(res),
-            },
-            "MCP request",
-          );
-        } catch {
-          // Logging must not break request handling.
-        }
-      });
-      const headerSessionId = req.headers["mcp-session-id"];
-      if (typeof headerSessionId === "string") {
-        this.#http.noteLogFields(res, { sessionId: headerSessionId });
-      }
-    } catch {
-      // Logging must not break request handling.
-    }
+    return this.#oauth.answerAuthorizationServerMetadata();
   }
 
   /** Bounds the memory of abandoned sessions and stale probes. */
@@ -302,5 +260,30 @@ export class McpEndpointService implements McpHandler {
     this.#sessions.reapIdle(now);
     this.#auth.sweep(now);
     this.#oauth.sweep();
+  }
+}
+
+/** What was asked and who asked: the request half of its access log line. */
+function accessLogOf(input: {
+  request: McpRequest;
+  pathname: string;
+  method: string;
+}): McpDoorAccessLog {
+  const { request } = input;
+  const base = { method: input.method, path: input.pathname };
+  try {
+    const userAgent = request.headers["user-agent"] ?? null;
+    return {
+      ...base,
+      userAgent,
+      endpointClass: endpointClassOf(input.pathname),
+      ...classifyClient((name) => {
+        const value = request.headers[name];
+        return typeof value === "string" ? value : value?.[0];
+      }),
+    };
+  } catch {
+    // Logging must not break request handling.
+    return base;
   }
 }

@@ -939,7 +939,7 @@ jobs:
         run: >-
           pnpm --filter @langwatch/architecture-enforcer lint --
           --no-declarations
-          --policies application-boundaries,default-test-lane,prisma-migration-access,prisma-table-ownership,service-projection-boundaries,workspace-seams,teaching-citations,deleted-spellings-in-teaching,lint-rule-skill-pointers,feature-configuration,rest-namespace-owners,cycles,architecture-records,browser-package-exports,manifests,browser-node-leak,migration-owners,eventing-table-access,feature-layout,service-ceilings,rerunnable-migrations
+          --policies application-boundaries,default-test-lane,prisma-migration-access,prisma-table-ownership,service-projection-boundaries,workspace-seams,teaching-citations,deleted-spellings-in-teaching,lint-rule-skill-pointers,feature-configuration,rest-namespace-owners,cycles,architecture-records,browser-package-exports,manifests,browser-node-leak,migration-owners,eventing-table-access,feature-layout,service-ceilings,rerunnable-migrations,foreign-error-code,owner-only-constant,contract-tuning-constant,runtime-dev-dependency
 
       # THE GATE. Oxlint over the whole governed tree, and a non-zero exit
       # fails the job. A config error and a lint violation both surface here.
@@ -1005,7 +1005,7 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha }}
         run: |
           if [ -n "$BASE" ] && git cat-file -e "$BASE" 2>/dev/null && ! git diff --name-only "$BASE" HEAD \
-            | grep -qE '^(\.oxlintrc(\.[a-z]+)?\.jsonc|packages/oxlint-rules/|pnpm-workspace\.yaml|nx\.json|tsconfig(\.[a-z]+)?\.json|dev/nx/)' \
+            | grep -qE '^(\.oxlintrc(\.[a-z]+)?\.jsonc|packages/architecture-enforcer/oxlint\.architecture\.jsonc|packages/oxlint-rules/|pnpm-workspace\.yaml|nx\.json|tsconfig(\.[a-z]+)?\.json|dev/nx/)' \
             && ! git diff "$BASE" HEAD -- pnpm-lock.yaml | grep -qE '^[-+].*oxlint'; then
             echo "base=$BASE" >> "$GITHUB_OUTPUT"
           fi
@@ -1340,6 +1340,9 @@ jobs:
       # guard. This job's gate already lists `.github/scripts/**`.
       - name: Test guard-deployment-impact.ts
         run: node --test --experimental-strip-types .github/scripts/guard-deployment-impact.test.ts
+
+      - name: Test guard-architecture-section.ts
+        run: node --test --experimental-strip-types .github/scripts/guard-architecture-section.test.ts
 
       - name: Test that every generated file is marked generated
         run: node --test --experimental-strip-types .github/scripts/generated-attributes.test.ts

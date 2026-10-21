@@ -13,10 +13,40 @@ import {
   type ProjectKeyedProbeRequest,
 } from "@langwatch/platform-health-contract";
 
+import type { LangyProbeAnswer, ProjectKeyedProbeAnswer } from "../rules/probe-answers.rules.ts";
+
 /** The operations the probe doors reach. */
 interface PlatformHealthProbeApi {
-  probeWithProjectKey(request: ProjectKeyedProbeRequest): Promise<Response>;
-  probeLangy(key: LangyKeyCaller): Promise<Response>;
+  probeWithProjectKey(request: ProjectKeyedProbeRequest): Promise<ProjectKeyedProbeAnswer>;
+  probeLangy(key: LangyKeyCaller): Promise<LangyProbeAnswer>;
+}
+
+/** A canary answer no cache may keep: a monitor must see each run's real result. */
+const NO_STORE = { "Cache-Control": "no-store" };
+
+/** A project-keyed probe's answer as the HTTP response: its body as JSON at its status. */
+export function projectKeyedProbeResponseOf(answer: ProjectKeyedProbeAnswer): Response {
+  return new Response(JSON.stringify(answer.body), {
+    status: answer.status,
+    headers: { "Content-Type": "application/json", ...(answer.noStore ? NO_STORE : {}) },
+  });
+}
+
+/**
+ * The Langy probe's answer as the HTTP response. A dark surface is Hono's own 404, byte-for-byte
+ * what an unmounted path returns, so it reveals nothing; a canary answer is uncacheable JSON.
+ */
+export function langyProbeResponseOf(answer: LangyProbeAnswer): Response {
+  if (answer.kind === "dark") {
+    return new Response("404 Not Found", {
+      status: 404,
+      headers: { "Content-Type": "text/plain;charset=UTF-8" },
+    });
+  }
+  return new Response(JSON.stringify(answer.body), {
+    status: answer.status,
+    headers: { "Content-Type": "application/json", ...NO_STORE },
+  });
 }
 
 const PlatformHealthProbeApi = moduleApi<PlatformHealthProbeApi>()("platform-health");
@@ -42,7 +72,11 @@ export const platformHealthProbeRest = defineRestRouter(PlatformHealthProbeApi)
   .withResponse("forwarded", FORWARDED)
   .withDocs({ hide: true })
   .handle(async ({ app, response, signal }, headers) =>
-    response.pass(await app.probeWithProjectKey({ check: "collector", headers, signal })),
+    response.pass(
+      projectKeyedProbeResponseOf(
+        await app.probeWithProjectKey({ check: "collector", headers, signal }),
+      ),
+    ),
   )
 
   .get("/api/health/evaluations", "probeEvaluationsHealth")
@@ -51,7 +85,11 @@ export const platformHealthProbeRest = defineRestRouter(PlatformHealthProbeApi)
   .withResponse("forwarded", FORWARDED)
   .withDocs({ hide: true })
   .handle(async ({ app, response, signal }, headers) =>
-    response.pass(await app.probeWithProjectKey({ check: "evaluations", headers, signal })),
+    response.pass(
+      projectKeyedProbeResponseOf(
+        await app.probeWithProjectKey({ check: "evaluations", headers, signal }),
+      ),
+    ),
   )
 
   .get("/api/health/processor", "probeProcessorHealth")
@@ -60,7 +98,11 @@ export const platformHealthProbeRest = defineRestRouter(PlatformHealthProbeApi)
   .withResponse("forwarded", FORWARDED)
   .withDocs({ hide: true })
   .handle(async ({ app, response, signal }, headers) =>
-    response.pass(await app.probeWithProjectKey({ check: "processor", headers, signal })),
+    response.pass(
+      projectKeyedProbeResponseOf(
+        await app.probeWithProjectKey({ check: "processor", headers, signal }),
+      ),
+    ),
   )
 
   .get("/api/health/triggers", "probeTriggersHealth")
@@ -71,12 +113,14 @@ export const platformHealthProbeRest = defineRestRouter(PlatformHealthProbeApi)
   .withDocs({ hide: true })
   .handle(async ({ app, input, response, signal }, headers) =>
     response.pass(
-      await app.probeWithProjectKey({
-        check: "triggers",
-        headers,
-        triggerId: input.triggerId,
-        signal,
-      }),
+      projectKeyedProbeResponseOf(
+        await app.probeWithProjectKey({
+          check: "triggers",
+          headers,
+          triggerId: input.triggerId,
+          signal,
+        }),
+      ),
     ),
   )
 
@@ -88,12 +132,14 @@ export const platformHealthProbeRest = defineRestRouter(PlatformHealthProbeApi)
   .withDocs({ hide: true })
   .handle(async ({ app, input, response, signal }, headers) =>
     response.pass(
-      await app.probeWithProjectKey({
-        check: "workflows",
-        headers,
-        workflowId: input.workflowId,
-        signal,
-      }),
+      projectKeyedProbeResponseOf(
+        await app.probeWithProjectKey({
+          check: "workflows",
+          headers,
+          workflowId: input.workflowId,
+          signal,
+        }),
+      ),
     ),
   )
 
@@ -105,7 +151,9 @@ export const platformHealthProbeRest = defineRestRouter(PlatformHealthProbeApi)
   .withDocs({ hide: true })
   .handle(async ({ app, input, response }, headers) =>
     response.pass(
-      await app.probeWithProjectKey({ check: "scenarios", headers, runPlanId: input.runPlanId }),
+      projectKeyedProbeResponseOf(
+        await app.probeWithProjectKey({ check: "scenarios", headers, runPlanId: input.runPlanId }),
+      ),
     ),
   )
   .build();
@@ -128,6 +176,6 @@ export const platformHealthLangyProbeRest = defineRestRouter(PlatformHealthProbe
   .withResponse("forwarded", LANGY_ANSWERS)
   .withDocs({ hide: true })
   .handle(async ({ app, actor, scope, response }) =>
-    response.pass(await app.probeLangy({ actor, projectId: scope.id })),
+    response.pass(langyProbeResponseOf(await app.probeLangy({ actor, projectId: scope.id }))),
   )
   .build();

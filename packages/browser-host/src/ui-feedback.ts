@@ -249,7 +249,7 @@ export class BrowserUiFeedback extends UiFeedback {
       title: copy.title,
       ...(copy.description ? { description: copy.description } : {}),
       type: "error",
-      duration: FAILURE_DURATION_MS,
+      duration: failure.sticky ? Number.POSITIVE_INFINITY : FAILURE_DURATION_MS,
       // The one way out, where the screen offered one. The Design System's
       // toast already draws this trigger — in the status accent, and
       // dismissing itself when the reader takes it — so the whole of the

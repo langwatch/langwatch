@@ -10,6 +10,7 @@ export class AutomationNotFoundError extends Error {
  *  automation belonging to another project: an id it may not read is an id
  *  that does not exist. */
 export class TriggerNotFoundError extends HandledError {
+  static readonly code = "trigger_not_found" as const;
   declare readonly code: "trigger_not_found";
 
   constructor() {
@@ -27,6 +28,7 @@ export class InvalidUnsubscribeTokenError extends Error {
 }
 
 export class TriggerFiltersRequiredError extends HandledError {
+  static readonly code = "trigger_filters_required" as const;
   declare readonly code: "trigger_filters_required";
 
   constructor() {
@@ -45,6 +47,7 @@ export class TriggerFiltersRequiredError extends HandledError {
  * conditions, they just cannot be acted on.
  */
 export class TriggerFiltersUnsupportedError extends HandledError {
+  static readonly code = "trigger_filters_unsupported" as const;
   declare readonly code: "trigger_filters_unsupported";
 
   constructor(public readonly unknownFields: string[]) {
@@ -64,6 +67,7 @@ export class TriggerFiltersUnsupportedError extends HandledError {
  * and stored delivery configuration to share one channel. Refused, not ignored.
  */
 export class TriggerActionImmutableError extends HandledError {
+  static readonly code = "trigger_action_immutable" as const;
   declare readonly code: "trigger_action_immutable";
 
   constructor(
@@ -86,6 +90,7 @@ export class TriggerActionImmutableError extends HandledError {
  * so converting one is a create and a delete, never an edit.
  */
 export class TriggerKindImmutableError extends HandledError {
+  static readonly code = "trigger_kind_immutable" as const;
   declare readonly code: "trigger_kind_immutable";
 
   constructor(
@@ -108,6 +113,7 @@ export class TriggerKindImmutableError extends HandledError {
  * rather than an edit. Refused, not quietly ignored.
  */
 export class TriggerGraphImmutableError extends HandledError {
+  static readonly code = "trigger_graph_immutable" as const;
   declare readonly code: "trigger_graph_immutable";
 
   constructor(
@@ -130,6 +136,7 @@ export class TriggerGraphImmutableError extends HandledError {
  * deliver nowhere, and an update replaces the stored configuration whole.
  */
 export class TriggerActionParamsUnknownFieldsError extends HandledError {
+  static readonly code = "trigger_action_params_unknown_fields" as const;
   declare readonly code: "trigger_action_params_unknown_fields";
 
   /** The fields this channel does not have, in the order they were sent. */
@@ -155,6 +162,7 @@ export class TriggerActionParamsUnknownFieldsError extends HandledError {
  * the stored rule overwrote them, so the save answered 200 and changed nothing.
  */
 export class TriggerRuleFieldsMisplacedError extends HandledError {
+  static readonly code = "trigger_rule_fields_misplaced" as const;
   declare readonly code: "trigger_rule_fields_misplaced";
 
   /** The rule fields that arrived in the wrong place. */
@@ -187,6 +195,7 @@ export class TriggerRuleFieldsMisplacedError extends HandledError {
  * from an API key; the cap is per project, the identity behind the call.
  */
 export class TriggerTestFireRateLimitedError extends HandledError {
+  static readonly code = "trigger_test_fire_rate_limited" as const;
   declare readonly code: "trigger_test_fire_rate_limited";
 
   constructor(
@@ -206,6 +215,7 @@ export class TriggerTestFireRateLimitedError extends HandledError {
 /** A graph alert was saved without something it needs to fire: the rule it
  *  fires by, the severity it fires at, or a channel that can notify. */
 export class GraphAlertIncompleteError extends HandledError {
+  static readonly code = "graph_alert_incomplete" as const;
   declare readonly code: "graph_alert_incomplete";
 
   /** What is missing or wrong: `graphAlert`, `alertType`, `action`. */
@@ -228,6 +238,7 @@ export class GraphAlertIncompleteError extends HandledError {
 /** The alert names a graph this project does not have. Also what a caller sees
  *  for a graph in another project. */
 export class GraphNotFoundError extends HandledError {
+  static readonly code = "graph_not_found" as const;
   declare readonly code: "graph_not_found";
 
   constructor() {
@@ -245,6 +256,7 @@ export class GraphNotFoundError extends HandledError {
  * report whose configuration can no longer be read.
  */
 export class ReportIncompleteError extends HandledError {
+  static readonly code = "report_incomplete" as const;
   declare readonly code: "report_incomplete";
 
   constructor() {
@@ -262,6 +274,7 @@ export class ReportIncompleteError extends HandledError {
  *  parser's own account stays in the thrower's log: it can name internal
  *  columns, and nothing on a handled error is allowed to. */
 export class TriggerFilterQueryInvalidError extends HandledError {
+  static readonly code = "trigger_filter_query_invalid" as const;
   declare readonly code: "trigger_filter_query_invalid";
 
   constructor() {
@@ -278,6 +291,7 @@ export class TriggerFilterQueryInvalidError extends HandledError {
 /** A keyed condition written as a bare list, e.g. `evaluations.passed` with no
  *  monitor. It names nothing to select by, so it would match no trace. */
 export class TriggerFilterKeyRequiredError extends HandledError {
+  static readonly code = "trigger_filter_key_required" as const;
   declare readonly code: "trigger_filter_key_required";
 
   constructor({ field, example }: { field: string; example: string }) {
@@ -295,6 +309,7 @@ export class TriggerFilterKeyRequiredError extends HandledError {
  *  the monitor that ran, so it would never match; the monitors using that
  *  evaluator are named so the caller can key by one of them. */
 export class TriggerFilterMonitorRequiredError extends HandledError {
+  static readonly code = "trigger_filter_monitor_required" as const;
   declare readonly code: "trigger_filter_monitor_required";
 
   constructor({
@@ -331,6 +346,7 @@ export class TriggerFilterMonitorRequiredError extends HandledError {
  * against and a public-API caller never held them: send them with the new one.
  */
 export class WebhookHeaderValuesRequiredError extends HandledError {
+  static readonly code = "webhook_header_values_required" as const;
   declare readonly code: "webhook_header_values_required";
 
   constructor() {
@@ -349,6 +365,7 @@ export class WebhookHeaderValuesRequiredError extends HandledError {
  * ADD_TO_DATASET and ADD_TO_ANNOTATION_QUEUE are unsupported.
  */
 export class TriggerActionUnsupportedError extends HandledError {
+  static readonly code = "trigger_action_unsupported" as const;
   declare readonly code: "trigger_action_unsupported";
 
   constructor(
@@ -365,6 +382,7 @@ export class TriggerActionUnsupportedError extends HandledError {
 }
 
 export class TemplateValidationError extends HandledError {
+  static readonly code = "template_validation_error" as const;
   declare readonly code: "template_validation_error";
 
   constructor(
@@ -380,6 +398,7 @@ export class TemplateValidationError extends HandledError {
 }
 
 export class TestFireUnavailableError extends HandledError {
+  static readonly code = "test_fire_unavailable" as const;
   declare readonly code: "test_fire_unavailable";
 
   constructor(
@@ -395,6 +414,7 @@ export class TestFireUnavailableError extends HandledError {
 }
 
 export class InvalidEmailRecipientError extends HandledError {
+  static readonly code = "invalid_email_recipient" as const;
   declare readonly code: "invalid_email_recipient";
 
   constructor(public readonly recipient: string) {
@@ -407,6 +427,7 @@ export class InvalidEmailRecipientError extends HandledError {
 }
 
 export class MissingSlackBotTokenError extends HandledError {
+  static readonly code = "missing_slack_bot_token" as const;
   declare readonly code: "missing_slack_bot_token";
 
   constructor() {
@@ -419,6 +440,7 @@ export class MissingSlackBotTokenError extends HandledError {
 }
 
 export class InvalidActionParamsError extends HandledError {
+  static readonly code = "invalid_action_params" as const;
   declare readonly code: "invalid_action_params";
 
   constructor(
@@ -434,6 +456,7 @@ export class InvalidActionParamsError extends HandledError {
 }
 
 export class MissingSlackWebhookError extends HandledError {
+  static readonly code = "missing_slack_webhook" as const;
   declare readonly code: "missing_slack_webhook";
 
   constructor() {
@@ -446,6 +469,7 @@ export class MissingSlackWebhookError extends HandledError {
 }
 
 export class NotificationDeliveryError extends HandledError {
+  static readonly code = "notification_delivery_error" as const;
   declare readonly code: "notification_delivery_error";
 
   constructor(message: string, options: { customerMessage?: string } = {}) {
@@ -460,6 +484,7 @@ export class NotificationDeliveryError extends HandledError {
 }
 
 export class MissingAnnotatorError extends HandledError {
+  static readonly code = "missing_annotator" as const;
   declare readonly code: "missing_annotator";
 
   constructor() {
@@ -473,6 +498,7 @@ export class MissingAnnotatorError extends HandledError {
 }
 
 export class ProjectNotFoundError extends HandledError {
+  static readonly code = "project_not_found" as const;
   declare readonly code: "project_not_found";
 
   constructor(public readonly projectId: string) {
@@ -492,6 +518,7 @@ export class ProjectNotFoundError extends HandledError {
 
 /** One automation, looked up in a project that does not have it. */
 export class AutomationNotInProjectError extends NotFoundError {
+  static readonly code = "automation_not_found" as const;
   declare readonly code: "automation_not_found";
 
   constructor(triggerId: string, projectId: string) {
@@ -506,6 +533,7 @@ export class AutomationNotInProjectError extends NotFoundError {
 
 /** The custom graph a graph alert names does not belong to the project. */
 export class GraphNotInProjectError extends NotFoundError {
+  static readonly code = "graph_not_found" as const;
   declare readonly code: "graph_not_found";
 
   constructor(customGraphId: string, projectId: string) {
@@ -520,6 +548,7 @@ export class GraphNotInProjectError extends NotFoundError {
  * provider-aware upsert.
  */
 export class AutomationWebhookUpsertRequiredError extends HandledError {
+  static readonly code = "automation_webhook_upsert_required" as const;
   declare readonly code: "automation_webhook_upsert_required";
 
   constructor() {
@@ -571,6 +600,7 @@ export class AutomationDatasetUnavailableError extends HandledError {
  * author could still see.
  */
 export class AutomationFiltersUnsupportedError extends HandledError {
+  static readonly code = "automation_filters_unsupported" as const;
   declare readonly code: "automation_filters_unsupported";
 
   constructor(unknownFields: readonly string[]) {
@@ -585,6 +615,7 @@ export class AutomationFiltersUnsupportedError extends HandledError {
 
 /** The author's trace-filter query does not compile. */
 export class AutomationTraceFilterInvalidError extends HandledError {
+  static readonly code = "automation_trace_filter_invalid" as const;
   declare readonly code: "automation_trace_filter_invalid";
 
   constructor(reason: string) {
@@ -598,6 +629,7 @@ export class AutomationTraceFilterInvalidError extends HandledError {
 
 /** Resuming a report whose stored schedule can no longer be read. */
 export class ReportScheduleMissingError extends HandledError {
+  static readonly code = "report_schedule_missing" as const;
   declare readonly code: "report_schedule_missing";
 
   constructor() {
@@ -612,6 +644,7 @@ export class ReportScheduleMissingError extends HandledError {
 
 /** A scheduled report was saved on a channel that cannot deliver one. */
 export class ReportChannelUnsupportedError extends HandledError {
+  static readonly code = "report_channel_unsupported" as const;
   declare readonly code: "report_channel_unsupported";
 
   constructor() {
@@ -626,6 +659,7 @@ export class ReportChannelUnsupportedError extends HandledError {
 
 /** A graph alert fires a notification; there is no "add to dataset on a breach". */
 export class GraphAlertChannelUnsupportedError extends HandledError {
+  static readonly code = "graph_alert_channel_unsupported" as const;
   declare readonly code: "graph_alert_channel_unsupported";
 
   constructor() {
@@ -640,6 +674,7 @@ export class GraphAlertChannelUnsupportedError extends HandledError {
 
 /** A graph alert without a threshold rule has no condition to fire on. */
 export class GraphAlertThresholdRequiredError extends HandledError {
+  static readonly code = "graph_alert_threshold_required" as const;
   declare readonly code: "graph_alert_threshold_required";
 
   constructor() {
@@ -654,6 +689,7 @@ export class GraphAlertThresholdRequiredError extends HandledError {
 
 /** A graph alert says how loud it is; without a severity it cannot be routed. */
 export class GraphAlertSeverityRequiredError extends HandledError {
+  static readonly code = "graph_alert_severity_required" as const;
   declare readonly code: "graph_alert_severity_required";
 
   constructor() {
@@ -670,6 +706,7 @@ export class GraphAlertSeverityRequiredError extends HandledError {
  * provider or on a customer's own webhook receiver (ADR-040 §4).
  */
 export class TestFireRateLimitedError extends HandledError {
+  static readonly code = "test_fire_rate_limited" as const;
   declare readonly code: "test_fire_rate_limited";
 
   constructor(message: string, resetAt: number) {
@@ -687,6 +724,7 @@ export class TestFireRateLimitedError extends HandledError {
  * Public, so it is a surface an attacker can hammer to brute-force tokens.
  */
 export class UnsubscribeRateLimitedError extends HandledError {
+  static readonly code = "unsubscribe_rate_limited" as const;
   declare readonly code: "unsubscribe_rate_limited";
 
   constructor() {
@@ -703,6 +741,7 @@ export class UnsubscribeRateLimitedError extends HandledError {
  * errors with the same remedy.
  */
 export class UnsubscribeLinkInvalidError extends HandledError {
+  static readonly code = "unsubscribe_link_invalid" as const;
   declare readonly code: "unsubscribe_link_invalid";
 
   constructor(message: string, httpStatus: 400 | 404) {
@@ -713,6 +752,7 @@ export class UnsubscribeLinkInvalidError extends HandledError {
 
 /** A capability the API process deliberately does not run, refused by name. */
 export class ApiAutomationUnavailableError extends HandledError {
+  static readonly code = "service_unavailable" as const;
   declare readonly code: "service_unavailable";
 
   constructor(capability: string) {

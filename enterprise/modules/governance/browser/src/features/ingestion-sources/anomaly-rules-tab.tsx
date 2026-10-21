@@ -359,7 +359,7 @@ function buildRulePayload({
     // nothing here crossed the wire, so it is safe to show verbatim.
     toaster.create({
       title: "Invalid JSON in config field",
-      description: parseFailure instanceof SyntaxError ? parseFailure.message : "", // no-raw-error-toast-ok
+      description: parseFailure instanceof SyntaxError ? parseFailure.message : "",
       type: "error",
     });
     return null;

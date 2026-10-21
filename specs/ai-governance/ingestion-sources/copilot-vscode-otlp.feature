@@ -40,7 +40,7 @@ Feature: VS Code Copilot Chat OTLP spans canonicalize on the unified substrate
 
   Rule: VS Code spans are separated from other copilot surfaces by source
 
-    @integration @unimplemented
+    @integration @unimplemented @issue:8803
     Scenario: VS Code spans are recorded under sourceType copilot_vscode
       Given a copilot-chat OTLP span
       When the span is ingested with the copilot_vscode ingest key
@@ -52,14 +52,14 @@ Feature: VS Code Copilot Chat OTLP spans canonicalize on the unified substrate
       When the receiver applies key provenance
       Then the foreign scopes are dropped and only Copilot's own scopes are recorded
 
-    @unit @unimplemented
+    @unit @unimplemented @issue:8803
     Scenario: Copilot Chat's copilot-chat scope counts as Copilot's own on a copilot_vscode key
       Given a copilot_vscode ingest key receives spans under the copilot-chat scope
       When the receiver applies key provenance
       Then the spans are recorded
       And a copilot_cli or copilot_app key still drops the copilot-chat scope
 
-    @integration @unimplemented
+    @integration @unimplemented @issue:8803
     Scenario: The source is stamped at the receiver, not taken from the payload
       Given a copilot-chat span whose payload claims sourceType "copilot_cli"
       When the span is ingested with the copilot_vscode ingest key
@@ -92,7 +92,7 @@ Feature: VS Code Copilot Chat OTLP spans canonicalize on the unified substrate
       When the canonicalisation chain runs
       Then the span is flagged to skip token accumulation
 
-    @unit @unimplemented
+    @unit @unimplemented @issue:8803
     Scenario: A VS Code hook run is not typed as a model call
       Given a redacted execute_hook span captured from VS Code Copilot Chat
       When the canonicalisation chain runs
@@ -100,7 +100,7 @@ Feature: VS Code Copilot Chat OTLP spans canonicalize on the unified substrate
 
   Rule: captured content is protected at the receiver
 
-    @integration @unimplemented
+    @integration @unimplemented @issue:8803
     Scenario: PII in captured content is redacted before storage
       Given a copilot-chat span whose captured content contains an email address
       When the span is ingested with the copilot_vscode ingest key
@@ -108,7 +108,7 @@ Feature: VS Code Copilot Chat OTLP spans canonicalize on the unified substrate
 
   Rule: v1 is tokens-only — no fabricated dollar cost
 
-    @unit @unimplemented
+    @unit @unimplemented @issue:8803
     Scenario: A VS Code turn is recorded without a fabricated dollar cost
       Given a copilot-chat span carrying copilot_usage_nano_aiu under an obfuscated model codename
       When the span is ingested with the copilot_vscode ingest key
@@ -117,7 +117,7 @@ Feature: VS Code Copilot Chat OTLP spans canonicalize on the unified substrate
 
   Rule: the VS Code path lands end-to-end
 
-    @e2e @unimplemented
+    @e2e @unimplemented @issue:8803
     Scenario: A real VS Code Chat turn appears in LangWatch with model, tokens, and content
       Given VS Code is connected via `langwatch code`
       When the user completes a Chat turn

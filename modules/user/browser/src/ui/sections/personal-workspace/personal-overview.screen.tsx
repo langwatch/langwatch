@@ -14,10 +14,10 @@ import {
 import { StatTile, StatTileFigure } from "@langwatch/design-system/stat-tile";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { formatBudgetUsd } from "@langwatch/gateway-contract";
+import { GuidedOnboardingOffer } from "@langwatch/onboarding-client";
 import numeral from "numeral";
 import { useState } from "react";
 
-import { GuidedOnboardingOffer } from "../../../behavior/lent-guided-onboarding-offer.tsx";
 import {
   type PersonalContext,
   usePersonalContext,

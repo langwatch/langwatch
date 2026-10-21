@@ -3,12 +3,12 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { AggregateReadOnlyNotice } from "@langwatch/error-views";
 import { isAggregateProjectKind } from "@langwatch/project-contract";
 import type { PromptConfigFormValues, runtimeInputsSchema } from "@langwatch/prompt-contract";
+import { ConversationThread } from "@langwatch/trace-client";
 import { type DisplayPart, flattenMessages } from "@langwatch/trace-contract/conversation";
 import { forwardRef, useCallback, useImperativeHandle, useMemo } from "react";
 import { LuCopy, LuTrash2 } from "react-icons/lu";
 import type { z } from "zod";
 
-import { ConversationThread } from "../../../../behavior/lent-trace.tsx";
 import {
   type PlaygroundMessage,
   usePromptExecution,

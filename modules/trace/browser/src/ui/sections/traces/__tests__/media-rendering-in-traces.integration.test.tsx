@@ -14,10 +14,10 @@ import { BlockStack } from "../../transcript/block-stack.tsx";
 import { RenderInputOutput } from "../render-input-output.tsx";
 import { TraceMediaPart } from "../trace-media-part.tsx";
 
-vi.mock(
-  "../../../../behavior/lent-media-part.tsx",
-  () => import("../../__tests__/lent-media-part.stand-in.tsx"),
-);
+vi.mock("@langwatch/scenario-client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  ...(await import("../../__tests__/media-part.stand-in.tsx")),
+}));
 
 vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "proj_test" } }),

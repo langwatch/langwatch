@@ -29,9 +29,16 @@ vi.mock("../../../../behavior/home-api.ts", () => ({
     },
   },
 }));
-vi.mock("../../../../behavior/lent-peers.tsx", () => ({
+vi.mock("@langwatch/organization-client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   PendingJoinRequests: () => null,
+}));
+vi.mock("@langwatch/ops-client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   UpgradeActionNeeded: () => null,
+}));
+vi.mock("@langwatch/onboarding-client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   GuidedOnboardingOffer: () => null,
 }));
 vi.mock("../components/langy-home-hero.tsx", () => ({

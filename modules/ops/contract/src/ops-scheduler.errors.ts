@@ -3,6 +3,7 @@ import { HandledError } from "@langwatch/handled-error";
 /** Stable operator-action refusals; members failures remain unhandled. */
 
 export class ScheduleNotFoundError extends HandledError {
+  static readonly code = "schedule_not_found" as const;
   declare readonly code: "schedule_not_found";
 
   constructor() {
@@ -15,6 +16,7 @@ export class ScheduleNotFoundError extends HandledError {
 }
 
 export class ScheduleInactiveError extends HandledError {
+  static readonly code = "schedule_inactive" as const;
   declare readonly code: "schedule_inactive";
 
   constructor() {
@@ -31,6 +33,7 @@ export class ScheduleInactiveError extends HandledError {
  * operator reading it and acting on it. Nothing was changed.
  */
 export class ScheduleAlreadyInFlightError extends HandledError {
+  static readonly code = "schedule_already_in_flight" as const;
   declare readonly code: "schedule_already_in_flight";
 
   constructor() {
@@ -51,6 +54,7 @@ export class ScheduleAlreadyInFlightError extends HandledError {
  * worker — the double-delivery ADR-091 exists to prevent.
  */
 export class ScheduleRunInProgressError extends HandledError {
+  static readonly code = "schedule_run_in_progress" as const;
   declare readonly code: "schedule_run_in_progress";
 
   constructor() {
@@ -67,6 +71,7 @@ export class ScheduleRunInProgressError extends HandledError {
 }
 
 export class ScheduleSlotNotStaleError extends HandledError {
+  static readonly code = "schedule_slot_not_stale" as const;
   declare readonly code: "schedule_slot_not_stale";
 
   constructor() {

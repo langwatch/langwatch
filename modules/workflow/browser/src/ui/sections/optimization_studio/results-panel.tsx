@@ -4,12 +4,12 @@ import { ExternalImage } from "@langwatch/design-system/external-image";
 import { HStack, type StackProps } from "@langwatch/design-system/primitives";
 import { slugify } from "@langwatch/design-system/slugify";
 import type { ExperimentRun } from "@langwatch/experiment-contract";
+import { TraceIdPeek } from "@langwatch/trace-client";
 import type { Entry, StudioWorkflow } from "@langwatch/workflow-contract";
 import { getWorkflowEntryOutputs } from "@langwatch/workflow-contract";
 import { useEffect, useState } from "react";
 
 import { useBatchRunSelection } from "../../../behavior/experiment/use-batch-run-selection.ts";
-import { TraceIdPeek } from "../../../behavior/lent-trace.tsx";
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 import { workflowApi } from "../../../behavior/workflow-api.ts";

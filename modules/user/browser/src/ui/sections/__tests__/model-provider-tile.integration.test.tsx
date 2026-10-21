@@ -104,12 +104,31 @@ describe("<ModelProviderTile />", () => {
   });
 
   describe("when the server refuses for another reason", () => {
-    it("shows the error", async () => {
+    it("says so in the generic words, never in the raw message", async () => {
       state.failWith = new Error("label already used");
       await issueKey();
 
-      expect(screen.getByText("label already used")).toBeInTheDocument();
+      expect(screen.queryByText(/label already used/)).not.toBeInTheDocument();
+      expect(
+        screen.getByText("Couldn't issue the key. We've been notified. Try again in a moment."),
+      ).toBeInTheDocument();
       expect(invalidations).toEqual([]);
+    });
+  });
+
+  describe("when the server refuses the label as invalid", () => {
+    it("names the label in the registry's words, not the schema's JSON", async () => {
+      state.failWith = Object.assign(new Error("validation_error"), {
+        code: "validation_error",
+        httpStatus: 400,
+        meta: { fieldErrors: { label: ["Invalid"] } },
+      });
+      await issueKey();
+
+      expect(
+        screen.getByText(/Check your input\. There's a problem with the label\./),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/validation_error/)).not.toBeInTheDocument();
     });
   });
 

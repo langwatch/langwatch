@@ -9,6 +9,7 @@ import {
   ExternalImageTooLargeError,
 } from "../../channels/external-image.channel.ts";
 import { MemoryExternalImageChannel } from "../../channels/memory/memory.external-image.channel.ts";
+import type { ImageProxyAnswer } from "../../rules/image-proxy-answer.rules.ts";
 import { ImageProxyService } from "../image-proxy.service.ts";
 
 const BYTES = new Uint8Array([137, 80, 78, 71]);
@@ -21,6 +22,12 @@ const upstream = (contentType: string): ExternalImageResponse => ({
   bytes: async () => BYTES,
 });
 
+/** The headers of an image answer; a refusal fails the test that expected a picture. */
+const imageHeaders = (answer: ImageProxyAnswer): Readonly<Record<string, string>> => {
+  if (answer.kind !== "image") throw new Error(`expected an image, got ${answer.kind}`);
+  return answer.headers;
+};
+
 const proxied = (url: string, contentType: string) =>
   ImageProxyService.create({
     images: MemoryExternalImageChannel.create({ [url]: upstream(contentType) }),
@@ -31,12 +38,12 @@ describe("ImageProxyService.proxy", () => {
     describe("when a browser loads that image through the proxy", () => {
       /** @scenario "A proxied image keeps its own media type and stays cacheable" */
       it("names the media type without the parameters and stays cacheable", async () => {
-        const response = await proxied("https://host.test/logo.png", "image/PNG; charset=binary");
+        const answer = await proxied("https://host.test/logo.png", "image/PNG; charset=binary");
 
-        expect(response.status).toBe(200);
-        expect(response.headers.get("content-type")).toBe("image/png");
-        expect(response.headers.get("cache-control")).toBe("public, max-age=31536000");
-        expect(response.headers.get("content-disposition")).toBe('inline; filename="logo.png"');
+        expect(answer.status).toBe(200);
+        expect(imageHeaders(answer)["Content-Type"]).toBe("image/png");
+        expect(imageHeaders(answer)["Cache-Control"]).toBe("public, max-age=31536000");
+        expect(imageHeaders(answer)["Content-Disposition"]).toBe('inline; filename="logo.png"');
       });
     });
   });
@@ -44,9 +51,9 @@ describe("ImageProxyService.proxy", () => {
   describe("given an upstream host that answers with a scriptable picture type", () => {
     describe("when a browser loads that image through the proxy", () => {
       it("relays the bytes as an opaque download", async () => {
-        const response = await proxied("https://host.test/logo.svg", "image/svg+xml");
+        const answer = await proxied("https://host.test/logo.svg", "image/svg+xml");
 
-        expect(response.headers.get("content-type")).toBe("application/octet-stream");
+        expect(imageHeaders(answer)["Content-Type"]).toBe("application/octet-stream");
       });
     });
   });
@@ -56,18 +63,18 @@ describe("ImageProxyService.proxy", () => {
       /** @scenario "A proxied filename cannot inject a response header" */
       it("holds only filename-safe characters in the disposition filename", async () => {
         const url = 'https://host.test/a"; x=y\r\nSet-Cookie: s=1';
-        const response = await proxied(url, "image/png");
+        const answer = await proxied(url, "image/png");
 
-        const disposition = response.headers.get("content-disposition") ?? "";
+        const disposition = imageHeaders(answer)["Content-Disposition"] ?? "";
         expect(disposition).toMatch(/^inline; filename="[A-Za-z0-9._-]+"$/);
         expect(disposition).not.toContain("Set-Cookie:");
       });
 
       /** @scenario "A proxied filename cannot inject a response header" */
       it("falls back to a fixed name when the URL names no file", async () => {
-        const response = await proxied("https://host.test/", "image/png");
+        const answer = await proxied("https://host.test/", "image/png");
 
-        expect(response.headers.get("content-disposition")).toBe('inline; filename="image"');
+        expect(imageHeaders(answer)["Content-Disposition"]).toBe('inline; filename="image"');
       });
     });
   });
@@ -75,8 +82,8 @@ describe("ImageProxyService.proxy", () => {
   describe("given an upstream host that answers with a picture over the size limit", () => {
     describe("when a browser loads that image through the proxy", () => {
       /** @scenario "A picture over the size limit is refused rather than relayed" */
-      it("answers 413 with the read headers", async () => {
-        const response = await ImageProxyService.create({
+      it("answers 413 with its refusal", async () => {
+        const answer = await ImageProxyService.create({
           images: {
             fetch: async () => {
               throw new ExternalImageTooLargeError();
@@ -84,9 +91,7 @@ describe("ImageProxyService.proxy", () => {
           },
         }).proxy({ url: "https://host.test/huge.png" });
 
-        expect(response.status).toBe(413);
-        expect(await response.json()).toEqual({ error: "Image is too large" });
-        expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+        expect(answer).toEqual({ kind: "refused", status: 413, error: "Image is too large" });
       });
     });
   });

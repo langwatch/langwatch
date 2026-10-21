@@ -23,6 +23,7 @@ import { fromDate } from "@langwatch/time";
 import { WorkflowApi } from "@langwatch/workflow-contract";
 
 import type { PlatformHealthChannels } from "../channels/platform-health.channels.ts";
+import type { LangyProbeAnswer, ProjectKeyedProbeAnswer } from "../rules/probe-answers.rules.ts";
 import { LangyCanaryService } from "../services/langy-canary.service.ts";
 import { PlatformHealthService } from "../services/platform-health.service.ts";
 import { ProjectKeyedProbeService } from "../services/project-keyed-probe.service.ts";
@@ -139,12 +140,12 @@ export class PlatformHealthModule implements PlatformHealthApiContract {
   }
 
   /** `/api/health/*`: one probe, run as the caller's own project key, answered in main's words. */
-  probeWithProjectKey(request: ProjectKeyedProbeRequest): Promise<Response> {
+  probeWithProjectKey(request: ProjectKeyedProbeRequest): Promise<ProjectKeyedProbeAnswer> {
     return this.#projectKeyed.probe(request);
   }
 
   /** `/api/health/langy`: one greeting turn as the key's owner, answered in main's words. */
-  probeLangy(key: LangyKeyCaller): Promise<Response> {
+  probeLangy(key: LangyKeyCaller): Promise<LangyProbeAnswer> {
     return this.#langyCanary.probe(key);
   }
 

@@ -1,9 +1,9 @@
 import type { PromptNodeOutput } from "@langwatch/prompt-client";
+import { LlmConfigField as LLMConfigField } from "@langwatch/prompt-client";
 import type { LLMConfig } from "@langwatch/workflow-contract";
 import { normalizeWorkflowLlmConfig } from "@langwatch/workflow-contract";
 import { useCallback } from "react";
 
-import { LLMConfigField } from "../../../../../behavior/lent-prompt.tsx";
 import { useStudioModelProviders } from "../../../../../behavior/studio-host/use-studio-model-providers.ts";
 import { useWorkflowStore } from "../../../../../behavior/use-workflow-store.ts";
 

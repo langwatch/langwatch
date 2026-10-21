@@ -102,6 +102,7 @@ export type UpdateGatewayGuardrailInput = z.infer<typeof updateGatewayGuardrailI
 export type ArchiveGatewayGuardrailInput = z.infer<typeof archiveGatewayGuardrailInputSchema>;
 
 export class GatewayGuardrailNotFoundError extends HandledError {
+  static readonly code = "gateway_guardrail_not_found" as const;
   declare readonly code: "gateway_guardrail_not_found";
 
   constructor() {
@@ -114,6 +115,7 @@ export class GatewayGuardrailNotFoundError extends HandledError {
 }
 
 export class GatewayGuardrailEvaluatorInvalidError extends HandledError {
+  static readonly code = "gateway_guardrail_evaluator_invalid" as const;
   declare readonly code: "gateway_guardrail_evaluator_invalid";
 
   constructor() {
@@ -127,6 +129,7 @@ export class GatewayGuardrailEvaluatorInvalidError extends HandledError {
 }
 
 export class GatewayGuardrailProjectNotFoundError extends HandledError {
+  static readonly code = "gateway_guardrail_project_not_found" as const;
   declare readonly code: "gateway_guardrail_project_not_found";
 
   constructor() {

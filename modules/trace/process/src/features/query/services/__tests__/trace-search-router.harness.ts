@@ -29,6 +29,7 @@ export const input = (
 });
 
 export class ProviderDisabled extends HandledError {
+  static readonly code = "model_provider_disabled" as const;
   declare readonly code: "model_provider_disabled";
   constructor() {
     super("model_provider_disabled", "The model's provider is disabled.", { httpStatus: 400 });
@@ -36,6 +37,7 @@ export class ProviderDisabled extends HandledError {
 }
 
 export class NoModel extends HandledError {
+  static readonly code = "model_not_configured" as const;
   declare readonly code: "model_not_configured";
   constructor() {
     super("model_not_configured", "No model configured.", { httpStatus: 400 });
@@ -44,6 +46,7 @@ export class NoModel extends HandledError {
 
 /** A provider that answered with a failure, which carries its code. */
 export class ProviderError extends HandledError {
+  static readonly code = "ai_query_provider_error" as const;
   declare readonly code: "ai_query_provider_error";
   constructor() {
     super("ai_query_provider_error", "The model provider failed.", {

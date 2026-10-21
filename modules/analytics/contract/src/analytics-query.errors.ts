@@ -5,6 +5,7 @@
 import { HandledError, remediation } from "@langwatch/handled-error";
 
 export class QueryTimeoutError extends HandledError {
+  static readonly code = "query_timeout" as const;
   declare readonly code: "query_timeout";
 
   constructor(durationMs: number, options: { hint?: string; reasons?: readonly Error[] } = {}) {
@@ -29,6 +30,7 @@ export class QueryTimeoutError extends HandledError {
 }
 
 export class QueryMemoryExceededError extends HandledError {
+  static readonly code = "query_memory_exceeded" as const;
   declare readonly code: "query_memory_exceeded";
 
   constructor(options: { reasons?: readonly Error[] } = {}) {
@@ -46,6 +48,7 @@ export class QueryMemoryExceededError extends HandledError {
  * distinct from memory, same remedy.
  */
 export class QueryScanLimitExceededError extends HandledError {
+  static readonly code = "query_scan_limit_exceeded" as const;
   declare readonly code: "query_scan_limit_exceeded";
 
   constructor(options: { reasons?: readonly Error[] } = {}) {
@@ -63,6 +66,7 @@ export class QueryScanLimitExceededError extends HandledError {
 }
 
 export class ClickHouseUnavailableError extends HandledError {
+  static readonly code = "clickhouse_unavailable" as const;
   declare readonly code: "clickhouse_unavailable";
 
   constructor(options: { reasons?: readonly Error[] } = {}) {
@@ -84,6 +88,7 @@ export class ClickHouseUnavailableError extends HandledError {
  * halves cannot be divided bucket by bucket. No `meta`: the evaluator logs it.
  */
 export class SeriesPercentageUnsupportedError extends HandledError {
+  static readonly code = "analytics_series_percentage_unsupported" as const;
   declare readonly code: "analytics_series_percentage_unsupported";
 
   constructor() {

@@ -2,6 +2,7 @@ import "../../model/ambient.d.ts";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Text, VStack } from "@langwatch/design-system/primitives";
 import { PASSWORD_REQUIREMENTS_HINT, describePasswordProblem } from "@langwatch/identity-contract";
+import { EmailAlreadyRegisteredError } from "@langwatch/user-contract";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -13,7 +14,6 @@ import { applyHandledErrorToForm } from "../../model/apply-handled-error-to-form
 import { authFailureMessage } from "../../model/auth-failure-message.ts";
 import { credentialSignInFailure } from "../../model/credential-sign-in.ts";
 import { rememberLastUsedMethod } from "../../model/last-used-method.ts";
-import { readHandledError } from "../../model/read-handled-error.ts";
 import { EmailPill } from "../elements/email-pill.tsx";
 import { FormServerError } from "../elements/form-server-error.tsx";
 
@@ -125,10 +125,7 @@ export function SignUpCredentialForm({
       // An address that already has an account is a wrong door, not a bad
       // field: the way on is to log in, with the address carried, and the
       // screen says so instead of rejecting the form.
-      if (
-        onAddressAlreadyRegistered &&
-        readHandledError(error)?.code === "email_already_registered"
-      ) {
+      if (onAddressAlreadyRegistered && EmailAlreadyRegisteredError.is(error)) {
         onAddressAlreadyRegistered();
         return;
       }
@@ -180,10 +177,7 @@ export function SignUpCredentialForm({
             false positive, not an exemption: `onSubmit`'s local assigned from
             `?.message` taints a literal title, which the raw-message scanner
             then flags — the identical alert on log-in, with no such local, isn't. */}
-        <HandledErrorAlert
-          error={passkeyError}
-          fallbackTitle="Could not create a passkey" // no-raw-error-toast-ok
-        />
+        <HandledErrorAlert error={passkeyError} fallbackTitle="Could not create a passkey" />
         {/* The address this is for, and the way back to change it. It is the
             last chance to notice a typo before it becomes an account. */}
         <EmailPill

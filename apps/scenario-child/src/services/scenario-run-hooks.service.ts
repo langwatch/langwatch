@@ -3,9 +3,13 @@
  * @see modules/scenario/specs/scenario-run-hooks.feature
  */
 
-import type { AgentHooks } from "@langwatch/agent-contract";
 import {
-  DEFAULT_HOOK_TIMEOUT_MS,
+  AgentCallTimeoutError,
+  AgentOfflineError,
+  type AgentHooks,
+} from "@langwatch/agent-contract";
+import {
+  hookTimeoutMsFor,
   type ScenarioHookResult,
   type ScenarioHookStatus,
   type ScenarioRunHooks,
@@ -50,10 +54,9 @@ export class ScenarioRunHooksError extends Error {
 const tracer = trace.getTracer("langwatch-scenario-child");
 
 function statusOf(error: unknown): ScenarioHookStatus {
-  const code = typeof error === "object" && error !== null && "code" in error ? error.code : null;
-  if (code === "agent_call_timeout") return "timed_out";
+  if (AgentCallTimeoutError.is(error)) return "timed_out";
   // No instance took the call, so the hook never ran.
-  if (code === "agent_offline") return "not_run";
+  if (AgentOfflineError.is(error)) return "not_run";
   return "failed";
 }
 
@@ -122,7 +125,8 @@ export class ScenarioRunHooksService {
 
   /** Calls one hook inside its own span; never throws, the outcome is the result. */
   private call(kind: HookKind): Promise<ScenarioHookResult> {
-    const { caller, timeoutMs = DEFAULT_HOOK_TIMEOUT_MS } = this.options;
+    const { caller } = this.options;
+    const timeoutMs = hookTimeoutMsFor({ declared: this.options.timeoutMs });
     const given = kind === "teardown" ? caller.runState : null;
     const startedAt = nowInstant().epochMilliseconds;
     return tracer.startActiveSpan(`scenario.${kind}`, async (span) => {

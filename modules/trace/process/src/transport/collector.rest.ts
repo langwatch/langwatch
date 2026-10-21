@@ -8,6 +8,7 @@ import {
   MANAGEMENT_API_VERSION,
   type RestProtocolRefusal,
 } from "@langwatch/api/rest";
+import { PlanLimitExceededError } from "@langwatch/entitlement-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { moduleApi } from "@langwatch/module";
 import { createLogger, validationMeta } from "@langwatch/observability";
@@ -122,7 +123,7 @@ function refusalAnswer(refusal: HandledError): CollectorAnswer {
  * Every other failure stays on the family's boundary.
  */
 export const ingestPlanLimitRefusal: RestProtocolRefusal = ({ failure, response }) =>
-  HandledError.isHandled(failure) && failure.code === "ERR_PLAN_LIMIT"
+  HandledError.isHandled(failure) && PlanLimitExceededError.is(failure)
     ? response.write({
         status: failure.httpStatus ?? 402,
         mediaType: PRODUCES_JSON,

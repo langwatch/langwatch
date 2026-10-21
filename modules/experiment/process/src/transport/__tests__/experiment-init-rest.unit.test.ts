@@ -43,6 +43,7 @@ const experiment: Experiment = {
  * same reason the door matches on the CODE.
  */
 class PlanLimitReached extends HandledError {
+  static readonly code = "resource_limit_exceeded" as const;
   declare readonly code: "resource_limit_exceeded";
 
   constructor() {
@@ -56,6 +57,7 @@ class PlanLimitReached extends HandledError {
 
 /** The key ceiling as the credential port raises it, declared here for the same reason. */
 class KeyCeilingDenied extends HandledError {
+  static readonly code = "api_key_permission_denied" as const;
   declare readonly code: "api_key_permission_denied";
 
   constructor(permission: string) {

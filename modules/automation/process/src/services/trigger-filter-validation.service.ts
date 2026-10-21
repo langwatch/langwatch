@@ -1,7 +1,7 @@
 import {
   findEvaluationFilterReferences,
   findUnkeyedFilterFields,
-} from "@langwatch/analytics-filters";
+} from "@langwatch/analytics-contract/filters";
 import {
   TriggerFilterKeyRequiredError,
   TriggerFilterMonitorRequiredError,

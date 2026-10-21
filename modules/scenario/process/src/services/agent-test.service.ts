@@ -3,8 +3,7 @@ import {
   AgentTestRefusedError,
   AgentOwnerOnlyError,
   connectedAgentSelectability,
-  DEFAULT_CALL_TIMEOUT_MS,
-  MAX_CALL_TIMEOUT_MS,
+  callTimeoutMsFor,
 } from "@langwatch/agent-contract";
 import type {
   AgentApi,
@@ -297,7 +296,7 @@ export class AgentTestService {
         id: input.agent.id,
         name: input.agent.name,
         environment: input.agent.environment ?? null,
-        timeoutMs: Math.min(config.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS, MAX_CALL_TIMEOUT_MS),
+        timeoutMs: callTimeoutMsFor({ declared: config.timeoutMs }),
         isSticky: config.sticky ?? false,
       },
       call: {

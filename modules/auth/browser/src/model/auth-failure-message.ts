@@ -1,6 +1,8 @@
 /**
  * Customer wording for sign-in/sign-up failures; better-auth codes here, platform from registry
  */
+import { UserNotFoundError } from "@langwatch/user-contract";
+
 import { explainErrorCode } from "./error-presentation.ts";
 
 const GENERIC = "Sign in did not go through. Please try again.";
@@ -25,7 +27,7 @@ const normalize = (value: string | undefined): string =>
 const CREDENTIAL_REJECTION_KEYS = new Set([
   "invalid_email_or_password",
   "credentialssignin",
-  "user_not_found",
+  UserNotFoundError.code,
   "identity_sign_in_refused",
 ]);
 

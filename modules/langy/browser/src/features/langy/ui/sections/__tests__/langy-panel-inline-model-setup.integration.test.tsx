@@ -74,8 +74,9 @@ vi.mock("../../elements/langy-model-pill.tsx", () => ({
 // onComplete -> refetch wiring are what this file drives; the form itself is
 // tested where it lives, and dragging its whole hook tree into jsdom would
 // test the model-provider feature instead.
-vi.mock("../../../../../behavior/lent-edit-model-provider-form.tsx", () => ({
-  LentEditModelProviderForm: ({
+vi.mock("@langwatch/model-provider-client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  EditModelProviderForm: ({
     onSaved,
     providerKey,
     embedded,

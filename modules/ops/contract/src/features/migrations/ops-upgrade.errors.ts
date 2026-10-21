@@ -2,6 +2,7 @@ import { HandledError } from "@langwatch/handled-error";
 
 /** Retry reopens only a failed background step (Alex, 2026-10-09, UPGRADE-CONSOLE D6). */
 export class UpgradeStepNotFailedError extends HandledError {
+  static readonly code = "upgrade_step_not_failed" as const;
   declare readonly code: "upgrade_step_not_failed";
 
   constructor({ stepId, status }: { stepId: string; status: string }) {

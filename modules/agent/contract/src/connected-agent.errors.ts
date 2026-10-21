@@ -24,6 +24,7 @@ const REFUSAL_STATUSES = {
 
 /** No live instance answered inside the first-turn grace. */
 export class AgentOfflineError extends HandledError {
+  static readonly code = "agent_offline" as const;
   declare readonly code: "agent_offline";
 
   constructor({ agentName, environment }: { agentName: string; environment: string | null }) {
@@ -44,6 +45,7 @@ export class AgentOfflineError extends HandledError {
 
 /** A personal development agent was targeted by someone other than its owner. */
 export class AgentOwnerOnlyError extends HandledError {
+  static readonly code = "agent_owner_only" as const;
   declare readonly code: "agent_owner_only";
 
   constructor({
@@ -73,6 +75,7 @@ export class AgentOwnerOnlyError extends HandledError {
 
 /** The instance did not answer before the call deadline. */
 export class AgentCallTimeoutError extends HandledError {
+  static readonly code = "agent_call_timeout" as const;
   declare readonly code: "agent_call_timeout";
 
   constructor({ timeoutMs }: { timeoutMs: number }) {
@@ -91,6 +94,7 @@ const MAX_REMOTE_ERROR_LENGTH = 1000;
 
 /** The function raised, and the SDK reported the error. */
 export class AgentCallFailedError extends HandledError {
+  static readonly code = "agent_call_failed" as const;
   declare readonly code: "agent_call_failed";
 
   constructor({ remoteCode, remoteMessage }: { remoteCode: string; remoteMessage: string }) {
@@ -113,6 +117,7 @@ export class AgentCallFailedError extends HandledError {
  * may have run.
  */
 export class AgentDisconnectedError extends HandledError {
+  static readonly code = "agent_disconnected" as const;
   declare readonly code: "agent_disconnected";
 
   constructor({ instanceId }: { instanceId: string }) {
@@ -132,6 +137,7 @@ export class AgentDisconnectedError extends HandledError {
 
 /** A sticky thread's pinned instance is gone. */
 export class AgentInstanceLostError extends HandledError {
+  static readonly code = "agent_instance_lost" as const;
   declare readonly code: "agent_instance_lost";
 
   constructor({ instanceId }: { instanceId: string }) {
@@ -151,6 +157,7 @@ export class AgentInstanceLostError extends HandledError {
 
 /** Every live instance is at its concurrency. */
 export class AgentBusyError extends HandledError {
+  static readonly code = "agent_busy" as const;
   declare readonly code: "agent_busy";
 
   constructor({ retryAfterMs }: { retryAfterMs: number }) {
@@ -176,6 +183,7 @@ function listEnvironments(environments: readonly string[]): string {
  * more than one environment besides development has a process connected.
  */
 export class AgentEnvironmentUnresolvedError extends HandledError {
+  static readonly code = "agent_environment_unresolved" as const;
   declare readonly code: "agent_environment_unresolved";
 
   constructor({
@@ -208,6 +216,7 @@ export class AgentEnvironmentUnresolvedError extends HandledError {
 
 /** A declared parameter, or a value for one, is not one the platform accepts. */
 export class AgentParameterInvalidError extends HandledError {
+  static readonly code = "agent_parameter_invalid" as const;
   declare readonly code: "agent_parameter_invalid";
 
   constructor({ name, reason }: { name: string | null; reason: string }) {
@@ -229,6 +238,7 @@ export class AgentParameterInvalidError extends HandledError {
 
 /** A register frame was refused; `meta.reason` is the code the SDK prints. */
 export class AgentRegisterRefusedError extends HandledError {
+  static readonly code = "agent_register_refused" as const;
   declare readonly code: "agent_register_refused";
 
   constructor({
@@ -261,6 +271,7 @@ export class AgentRegisterRefusedError extends HandledError {
 
 /** An HTTP poll or frame named an instance token the platform does not know. */
 export class AgentSessionUnknownError extends HandledError {
+  static readonly code = "agent_session_unknown" as const;
   declare readonly code: "agent_session_unknown";
 
   constructor() {
@@ -283,6 +294,7 @@ export class AgentSessionUnknownError extends HandledError {
  * another project's session.
  */
 export class AgentCallForeignProjectError extends HandledError {
+  static readonly code = "agent_call_foreign_project" as const;
   declare readonly code: "agent_call_foreign_project";
 
   constructor({ callId }: { callId: string }) {
@@ -298,6 +310,7 @@ export class AgentCallForeignProjectError extends HandledError {
 
 /** A body, a result, a session or a hook's state is above its cap. */
 export class AgentPayloadTooLargeError extends HandledError {
+  static readonly code = "agent_payload_too_large" as const;
   declare readonly code: "agent_payload_too_large";
 
   constructor({

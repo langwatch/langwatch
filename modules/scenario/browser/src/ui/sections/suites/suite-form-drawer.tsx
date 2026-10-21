@@ -21,9 +21,8 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { toaster } from "@langwatch/design-system/toaster";
-import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { generate } from "@langwatch/ksuid";
-import { MAX_SUITE_REPEAT_COUNT } from "@langwatch/suite-contract";
+import { MAX_SUITE_REPEAT_COUNT, SuiteNameTakenError } from "@langwatch/suite-contract";
 import { ChevronDown, ChevronRight, Play } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 import { Controller } from "react-hook-form";
@@ -553,7 +552,7 @@ function rejectSave({
   form: SuiteForm;
   fallbackTitle: string;
 }): void {
-  if (readHandledError(error)?.code === "suite_name_taken") {
+  if (SuiteNameTakenError.is(error)) {
     form.setError(
       "name",
       { type: "server", message: describeError({ error }) },

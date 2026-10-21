@@ -1,6 +1,7 @@
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
 
 export class AnnotationQueueNameReservedError extends HandledError {
+  static readonly code = "annotation_queue_name_reserved" as const;
   declare readonly code: "annotation_queue_name_reserved";
 
   constructor(slug: string) {
@@ -15,6 +16,7 @@ export class AnnotationQueueNameReservedError extends HandledError {
 }
 
 export class AnnotationQueueNameTakenError extends HandledError {
+  static readonly code = "annotation_queue_name_taken" as const;
   declare readonly code: "annotation_queue_name_taken";
 
   constructor(slug: string) {
@@ -29,6 +31,7 @@ export class AnnotationQueueNameTakenError extends HandledError {
 }
 
 export class AnnotationQueueItemNotFoundError extends NotFoundError {
+  static readonly code = "annotation_queue_item_not_found" as const;
   declare readonly code: "annotation_queue_item_not_found";
 
   constructor(queueItemId: string) {
@@ -45,6 +48,7 @@ export class AnnotationQueueItemNotFoundError extends NotFoundError {
 }
 
 export class AnnotationQueueNotFoundError extends NotFoundError {
+  static readonly code = "annotation_queue_not_found" as const;
   declare readonly code: "annotation_queue_not_found";
 
   constructor(queueId: string) {
@@ -58,6 +62,7 @@ export class AnnotationQueueNotFoundError extends NotFoundError {
 }
 
 export class AnnotationAnnotatorReferenceInvalidError extends HandledError {
+  static readonly code = "annotation_annotator_reference_invalid" as const;
   declare readonly code: "annotation_annotator_reference_invalid";
 
   constructor(annotator: string) {

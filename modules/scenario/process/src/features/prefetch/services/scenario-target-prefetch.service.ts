@@ -1,7 +1,6 @@
 import {
   AgentNotFoundError,
-  DEFAULT_CALL_TIMEOUT_MS,
-  MAX_CALL_TIMEOUT_MS,
+  callTimeoutMsFor,
   type Agent,
   type AgentApi,
 } from "@langwatch/agent-contract";
@@ -277,7 +276,7 @@ export class ScenarioTargetPrefetchService {
       type: "connected",
       agentId: agent.id,
       endpoint: this.options.langwatchEndpoint,
-      timeoutMs: Math.min(agent.config.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS, MAX_CALL_TIMEOUT_MS),
+      timeoutMs: callTimeoutMsFor({ declared: agent.config.timeoutMs }),
       ...(agent.config.hooks ? { hooks: agent.config.hooks } : {}),
     };
   }

@@ -1,7 +1,7 @@
-import { toaster } from "@langwatch/design-system/toaster";
+import { clipboardUnavailableError, toaster } from "@langwatch/browser-host/toaster";
 
 /**
- * Copy + toast pattern; uses design system toaster for trace-web compatibility.
+ * Copy + toast pattern; a refusal is a failure with a code, so the host words it.
  * Onboarding-only screens use OnboardingHostApi.copyToClipboard.
  */
 export async function copyToClipboard({
@@ -22,8 +22,8 @@ export async function copyToClipboard({
   } catch {
     toaster.create({
       title: "Failed to copy",
-      description: "Couldn't copy. Please try again.",
-      type: "error", // no-raw-error-toast-ok
+      error: clipboardUnavailableError(),
+      type: "error",
     });
     return false;
   }

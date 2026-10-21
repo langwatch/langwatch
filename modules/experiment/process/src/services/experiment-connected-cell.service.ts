@@ -5,9 +5,8 @@
  */
 
 import {
-  BUSY_RETRY_AFTER_MS,
-  DEFAULT_CALL_TIMEOUT_MS,
-  MAX_CALL_TIMEOUT_MS,
+  busyRetryAfterMsFor,
+  callTimeoutMsFor,
   AgentBusyError,
   type CallOutcome,
   type ConnectedAgentConfig,
@@ -122,7 +121,7 @@ export class ExperimentConnectedCellService {
       id: agent.id,
       name: agent.name,
       environment: agent.environment ?? null,
-      timeoutMs: Math.min(config.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS, MAX_CALL_TIMEOUT_MS),
+      timeoutMs: callTimeoutMsFor({ declared: config.timeoutMs }),
       // A workbench row is a conversation of one turn, so there is nothing to
       // pin: every row picks whichever instance is free.
       isSticky: false,
@@ -220,7 +219,7 @@ export class ExperimentConnectedCellService {
 
     const declared = error.meta?.retryAfterMs;
 
-    return typeof declared === "number" && declared > 0 ? declared : BUSY_RETRY_AFTER_MS;
+    return busyRetryAfterMsFor({ declared });
   }
 
   /**

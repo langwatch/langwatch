@@ -1,9 +1,9 @@
 // A read-only input field for copying values: toggle visibility, click to copy.
 // Uses lucide-react icons.
 
+import { clipboardUnavailableError, toaster } from "@langwatch/browser-host/toaster";
 import { InputGroup, type InputGroupProps } from "@langwatch/design-system/input-group";
 import { Input } from "@langwatch/design-system/primitives";
-import { toaster } from "@langwatch/design-system/toaster";
 import { Copy as FiCopy, Eye as FiEye, EyeOff as FiEyeOff } from "lucide-react";
 import { useState } from "react";
 
@@ -36,7 +36,8 @@ export function CopyInput(
 
         if (!navigator.clipboard) {
           toaster.create({
-            title: `Your browser does not support clipboard access, please copy the ${props.label} manually`,
+            title: `Couldn't copy the ${props.label}`,
+            error: clipboardUnavailableError(),
             type: "error",
             duration: 2000,
           });

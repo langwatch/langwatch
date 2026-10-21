@@ -4,6 +4,7 @@ import { HandledError } from "@langwatch/handled-error";
 // was mapped, so nothing was read. A generic message would not name which
 // evaluator or field is missing in a workbench with multiple evaluators.
 export class EvaluatorNoInputsResolvedError extends HandledError {
+  static readonly code = "evaluator_no_inputs_resolved" as const;
   declare readonly code: "evaluator_no_inputs_resolved";
 
   constructor(evaluatorName: string) {
@@ -20,6 +21,7 @@ export class EvaluatorNoInputsResolvedError extends HandledError {
 
 /** A cell whose worker stopped mid-cell, failed by the run's stall wake so the run can complete. */
 export class ExperimentCellLostError extends HandledError {
+  static readonly code = "experiment_cell_lost" as const;
   declare readonly code: "experiment_cell_lost";
 
   constructor() {

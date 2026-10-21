@@ -50,9 +50,12 @@ const opsInsightScheduleSchemaDefinition = z.object({
   lastRunAt: z.string().nullable(),
   lastRunOutcome: z.string().nullable(),
   lastRunReason: z.string().nullable(),
-  /** The scheduled days in a row whose run was skipped, and how many turn the schedule off. */
+  /**
+   * The scheduled days in a row whose run was skipped, and how many more skipped days turn the
+   * schedule off; null while it is off.
+   */
   consecutiveSkips: z.number(),
-  skippedDaysBeforeOff: z.number(),
+  daysUntilOff: z.number().nullable(),
 });
 export interface OpsInsightScheduleSchema extends Named<
   typeof opsInsightScheduleSchemaDefinition

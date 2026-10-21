@@ -1,9 +1,11 @@
 name: architecture-section-check
 
-# Fails when a code PR's description has no `## Architecture` section: the
-# conformance box ticked and a "Needs a human look" part filled in. What
-# counts as a code PR, and what a passing body looks like, is decided by
-# .github/scripts/guard-architecture-section.ts.
+# Fails when a code PR's description has no `## Architecture` section, or when
+# the diff makes a change no lint rule or enforcer policy decides and the
+# description does not record the human's decision and the rule that encodes it.
+# What counts as a code PR, which changes need a decision, and what a passing
+# body looks like, is decided by .github/scripts/guard-architecture-section.ts
+# and .github/scripts/architecture-decisions.ts.
 
 on:
   pull_request:
@@ -45,7 +47,8 @@ jobs:
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
           PR_BODY: ${{ github.event.pull_request.body }}
         run: |
-          # JSON, not newline-delimited names: a path may contain a newline.
+          # JSON, not newline-delimited names: a path may contain a newline. Each
+          # entry carries its patch, which is where the decisions are read from.
           gh api "repos/${REPO}/pulls/${PR_NUMBER}/files" --paginate --slurp \
             > "${RUNNER_TEMP}/changed-files.json"
           echo "Author: $PR_AUTHOR"

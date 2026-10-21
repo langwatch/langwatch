@@ -1,3 +1,4 @@
+import { describeError } from "@langwatch/browser-host/errors";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
@@ -200,7 +201,7 @@ function BugReportDrawer({ reportId, onClose }: { reportId: string | null; onClo
     >
       {report.error && (
         <Text color="fg.error" fontSize="sm">
-          {report.error.message}
+          {describeError({ error: report.error, fallbackTitle: "Couldn't load the bug report" })}
         </Text>
       )}
       {report.data && (

@@ -8,6 +8,7 @@ import { dirname, join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { lintDeadPathCitations } from "../src/policies/quality/dead-path-citations.ts";
 import {
   lintLintRuleSkillPointers,
   lintTeachingCitations,
@@ -151,6 +152,106 @@ describe("teaching-citations", () => {
       rmSync(join(root, RECORD));
 
       expect(() => page("§3")).toThrow(MissingAnchorError);
+    });
+  });
+});
+
+describe("teaching-citations over dev/docs/best_practices", () => {
+  function bestPractice(content: string) {
+    write({ path: "dev/docs/best_practices/teaching.md", content });
+
+    return lintTeachingCitations(snapshotOf({ root }));
+  }
+
+  describe("when a best-practices page cites a repository path that is not in the tree", () => {
+    /** @scenario "A best-practices page citing a path that is not in the tree fails" */
+    it("reports the path against the page and the line", () => {
+      const [finding, ...rest] = bestPractice(
+        "Intro.\n\nThe service is `modules/billing/process/src/billing.service.ts`.\n",
+      );
+
+      expect(rest).toEqual([]);
+      expect(finding?.specifier).toBe("path:modules/billing/process/src/billing.service.ts");
+      expect(finding?.file).toBe(join(root, "dev/docs/best_practices/teaching.md"));
+      expect(finding?.line).toBe(3);
+    });
+  });
+
+  describe("when a Was column, build output or a local-only file is cited", () => {
+    /** @scenario "A Was column, build output and local-only files are not citations" */
+    it("reports nothing for them, and still checks the other columns", () => {
+      const table = [
+        "| Was | Read as |",
+        "| --- | ------- |",
+        "| `platform/app/src/server/<feature>/**` | `modules/<feature>/process/src/**` |",
+        "| `platform/app/src/workers.ts` | `apps/worker/src/main.ts` |",
+        "",
+        "Build to `apps/ui/dist/client`, keep the key in `.claude/settings.local.json`.",
+      ].join("\n");
+
+      expect(bestPractice(table).map((finding) => finding.specifier)).toEqual([
+        "path:apps/worker/src/main.ts",
+      ]);
+    });
+  });
+
+  describe("when the check reports a dead citation", () => {
+    /** @scenario "A dead citation says what to cite instead" */
+    it("names the dead path and says to cite what exists today or drop it", () => {
+      const [finding] = bestPractice("See `modules/billing/meter.ts`.");
+
+      expect(finding?.message).toContain("`modules/billing/meter.ts`");
+      expect(finding?.allowed).toMatch(/Cite what exists today.*or drop the citation/);
+    });
+  });
+});
+
+describe("dead-path-citations", () => {
+  function deadPaths(): string[] {
+    return lintDeadPathCitations(snapshotOf({ root })).map(
+      (finding) => `${finding.file.slice(root.length + 1)}:${finding.line} ${finding.specifier}`,
+    );
+  }
+
+  describe("when a reference page, a product doc and a spec each cite a dead path", () => {
+    /** @scenario "A reference page, product doc or spec citing a path that is not in the tree is reported" */
+    it("reports each against its page", () => {
+      write({ path: "dev/docs/runbooks/deploy.md", content: "Run `dev/scripts/deploy.sh`.\n" });
+      write({ path: "docs/guide/setup.mdx", content: "Read `packages/langy`.\n" });
+      write({
+        path: "specs/billing/meter.feature",
+        content: "Feature: Meter\n  `modules/billing/process/src/meter.ts` counts it.\n",
+      });
+
+      expect(deadPaths()).toEqual([
+        "dev/docs/runbooks/deploy.md:1 path:dev/scripts/deploy.sh",
+        "docs/guide/setup.mdx:1 path:packages/langy",
+        "specs/billing/meter.feature:2 path:modules/billing/process/src/meter.ts",
+      ]);
+    });
+  });
+
+  describe("when dead paths are cited under adr, plans and best practices", () => {
+    /** @scenario "Decision records, plans and best practices are not read by the shrink check" */
+    it("reports none of them", () => {
+      for (const folder of ["adr", "plans", "best_practices"]) {
+        write({ path: `dev/docs/${folder}/page.md`, content: "See `modules/billing/meter.ts`.\n" });
+      }
+
+      expect(deadPaths()).toEqual([]);
+    });
+  });
+
+  describe("when a product doc names the customer's own files", () => {
+    /** @scenario "A product doc naming the customer's own files is not a citation" */
+    it("reports nothing", () => {
+      write({
+        path: "docs/agents/claude.mdx",
+        content:
+          "Add `.claude/settings.json` and `.github/workflows/sync.yml`; the client calls `tools/list`.\n",
+      });
+
+      expect(deadPaths()).toEqual([]);
     });
   });
 });

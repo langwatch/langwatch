@@ -488,7 +488,7 @@ Feature: Workflow service boundary
     Given a run dispatched to the Lambda fleet, whose invocation may last 900 seconds
     When its run key is minted or reused
     Then the key has at least 900 seconds plus a minute left when handed out
-    And a self-hosted dispatch's key has at least 15 minutes left
+    And a self-hosted dispatch asks for a fresh key, which has a full lifetime left
 
   @unit
   Scenario: A run fills a saved HTTP agent's credentials only at the agent's saved address
@@ -560,3 +560,22 @@ Feature: Workflow service boundary
     When it fails with a handled error the customer can act on, such as no model configured
     Then the failure is logged as a warning
     And a failure that is ours or a provider's is still logged as an error
+
+  @unit
+  Scenario: The engine's answer to a synchronous execution passes through as text
+    Given the workflow engine answered a synchronous execution with a status and a body
+    When the caller reads the answer
+    Then the status and body are the engine's, unchanged
+    And the body carries the plain-text content type it always has
+
+  @unit
+  Scenario: A synchronous execution past the turn ceiling is a 504 in JSON
+    Given the engine did not answer within the turn ceiling
+    When the caller reads the answer
+    Then it is a 504 with an error message as JSON
+
+  @unit
+  Scenario: A synchronous execution whose caller went away is a 408 in JSON
+    Given the caller went away before the engine answered
+    When the answer is written
+    Then it is a 408 with an error message as JSON

@@ -6,7 +6,10 @@ Feature: A connection registration stored before the arrival policy existed stil
   immutable history, so every read of such a registration, by identity's own
   fold, a peer's fold or a projection replay, reads it as the policy it meant.
 
-  # contract/src/features/sso-connection/connection.ts
+  # The version 1 schema and transform live in the contract
+  # (contract/src/features/sso-connection/sso-connection-registration-v1.ts); the upcast in
+  # process/src/features/sso-connection/rules/sso-connection-registration-upcast.rules.ts is declared
+  # on the connection pipeline with `.withUpcasts`, and every read seat reads through it.
 
   @unit
   Scenario: A registration that let unknown people in reads as admitting them

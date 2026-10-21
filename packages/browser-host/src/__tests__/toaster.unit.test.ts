@@ -1,7 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { UiFailureNotice, UiSuccessNotice } from "../capabilities.ts";
-import { setUiFeedbackHost, toaster } from "../toaster.ts";
+import {
+  type UiFailureNotice,
+  type UiSuccessNotice,
+  UNAVAILABLE_UI_FEEDBACK,
+} from "../capabilities.ts";
+import { reportUiFailure, setUiFeedbackHost, toaster } from "../toaster.ts";
 
 function recordingHost() {
   const succeeded: UiSuccessNotice[] = [];
@@ -89,6 +93,64 @@ describe("toaster", () => {
 
       expect(() => toaster.create({ title: "Couldn't save", type: "error" })).not.toThrow();
       expect(warn).toHaveBeenCalled();
+    });
+  });
+
+  describe("when the mounted host is the unavailable stand-in", () => {
+    /** @scenario A report with no working feedback host is logged, never thrown */
+    it.each([
+      ["an error", { title: "Couldn't copy", type: "error" as const }],
+      ["a success", { title: "Copied", type: "success" as const }],
+      ["a warning", { title: "Heads up", type: "warning" as const }],
+    ])("warns and drops %s rather than throwing", (_name, toast) => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      setUiFeedbackHost(UNAVAILABLE_UI_FEEDBACK);
+
+      expect(() => toaster.create(toast)).not.toThrow();
+      expect(warn).toHaveBeenCalledWith(expect.any(String), toast.title);
+    });
+  });
+});
+
+describe("reportUiFailure", () => {
+  describe("when a feedback host is mounted", () => {
+    it("hands it the failure untouched", () => {
+      const { failed, host } = recordingHost();
+      setUiFeedbackHost(host);
+
+      reportUiFailure({ error: new Error("x"), fallbackTitle: "Model unavailable", sticky: true });
+
+      expect(failed).toHaveLength(1);
+      expect(failed[0]?.sticky).toBe(true);
+    });
+  });
+
+  describe("when no feedback host is mounted", () => {
+    /** @scenario A report with no working feedback host is logged, never thrown */
+    it("warns with the failure's title and does not throw", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      expect(() =>
+        reportUiFailure({ error: new Error("x"), fallbackTitle: "Model unavailable" }),
+      ).not.toThrow();
+      expect(warn).toHaveBeenCalledWith(expect.any(String), "Model unavailable");
+    });
+  });
+
+  describe("when the mounted host is the unavailable stand-in", () => {
+    /** @scenario A report with no working feedback host is logged, never thrown */
+    it("warns with the failure's title and does not throw", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      setUiFeedbackHost(UNAVAILABLE_UI_FEEDBACK);
+
+      expect(() =>
+        reportUiFailure({
+          error: new Error("x"),
+          fallbackTitle: "Model unavailable",
+          title: "Gone",
+        }),
+      ).not.toThrow();
+      expect(warn).toHaveBeenCalledWith(expect.any(String), "Gone");
     });
   });
 });

@@ -81,7 +81,28 @@ describe("when the administrator presses the control", () => {
       await result.current.start();
     });
 
-    expect(result.current.failure?.detail).toBe("no test sign-in in this composition");
+    expect(result.current.failure?.detail).toBe(
+      "Something went wrong. We've been notified. Try again in a moment.",
+    );
+    expect(result.current.failure?.detail).not.toContain("no test sign-in");
+  });
+
+  it("reads a handled refusal in the registry's words, with its trace id, never its message", async () => {
+    const refusal = Object.assign(new Error("malformed_request"), {
+      code: "malformed_request",
+      httpStatus: 400,
+      traceId: "trace-123",
+    });
+    const host = new FakeSsoHost({ testSignIn: refusal });
+    const { result } = renderTestSignIn(host);
+
+    await act(async () => {
+      await result.current.start();
+    });
+
+    expect(result.current.failure?.detail).toBe(
+      "That request couldn't be read. Check the format of what was sent, then try again. (reference trace-123)",
+    );
   });
 });
 

@@ -1,5 +1,6 @@
 /** Organization's drawers and the cards it lends, by token (ARCHITECTURE.md §10.1). */
 
+import { lentComponent } from "@langwatch/browser-host/lent";
 import { uiTokens } from "@langwatch/module";
 import type {
   UiCreateProjectDrawerProps,
@@ -66,3 +67,7 @@ export const ProjectDepartmentFieldToken =
   organization.component<ProjectDepartmentFieldProps>("projectDepartmentField");
 export const PendingJoinRequestsToken =
   organization.component<PendingJoinRequestsProps>("pendingJoinRequests");
+
+/** The tokens above as ready components: a borrower imports these and writes no wrapper (§10.1). */
+export const PendingJoinRequests = lentComponent(PendingJoinRequestsToken);
+export const ProjectDepartmentField = lentComponent(ProjectDepartmentFieldToken);

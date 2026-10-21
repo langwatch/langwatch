@@ -63,8 +63,8 @@ P1 output contract & agent mode · P2 HandledError-driven errors · P3 discovera
 - Per-command hints: additive optional `surfaces.code.hints` map (command string →
   example invocation) on the 10 agent-critical groups (43 hints); `cli` stays a
   plain string array, so the app's `featureMap.ts` and Langy consumers are untouched.
-- Shipped to the SDK via the `copy-types.sh` precedent →
-  `sdks/typescript/src/internal/generated/cli/feature-map.generated.ts` (typed minimal
+- Shipped to the SDK via the `copy-types.sh` precedent → the build-generated
+  `feature-map.generated.ts` in the SDK's `src/internal/generated/cli/` (typed minimal
   shape: id/name + surfaces.code cli/hints/skill; everything else passes through).
 - One catalog builder (`sdks/typescript/src/cli/utils/commandCatalog.ts`) joins the
   live commander tree with the embedded map → `lw commands [--flat]` (JSON catalog:

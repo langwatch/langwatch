@@ -5,6 +5,8 @@
  */
 
 import { isHandledByGlobalHandler } from "@langwatch/browser-host/errors";
+import { BrowserUiFeedback } from "@langwatch/browser-host/feedback";
+import { setUiFeedbackHost } from "@langwatch/browser-host/toaster";
 import { installedModuleFailures } from "@langwatch/browser/application";
 import type { UiFailureHost } from "@langwatch/browser/feature-install";
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
@@ -31,8 +33,10 @@ beforeEach(() => {
   toaster.remove();
   mutate.mockClear();
   renderWithDesignSystem(<Toaster />);
+  setUiFeedbackHost(BrowserUiFeedback.create());
 });
 afterEach(() => {
+  setUiFeedbackHost(void 0);
   cleanup();
   toaster.remove();
 });

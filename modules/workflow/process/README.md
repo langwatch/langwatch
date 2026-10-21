@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Callable capability exposed by the composed Workflow application.
 
-Peers call these through the token, declared at `../contract/src/workflow.api.ts:171`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/workflow.api.ts:179`; nothing else in this package is public.
 
 #### `executeComponent`
 
@@ -217,7 +217,7 @@ postStudioEvent(input: { projectId: string; event: StudioClientEvent; onEvent: (
 One scenario turn relayed to the project's own engine: its status and body verbatim, a 504 past the turn ceiling, a 408 once `signal` aborts. `projectId` is the caller's key's project.
 
 ```typescript
-relayExecuteSync(input: { projectId: string; event: ExecuteSyncRelayEvent; signal: AbortSignal; }): Promise<Response>;
+relayExecuteSync(input: { projectId: string; event: ExecuteSyncRelayEvent; signal: AbortSignal; }): Promise<ExecuteSyncRelayAnswer>;
 ```
 
 #### `hasPerProjectEngines`
@@ -386,21 +386,21 @@ countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<Wo
 
 |             |                                                  |
 | ----------- | ------------------------------------------------ |
-| Declared at | `src/transport/workflow-execute-sync.rest.ts:13` |
+| Declared at | `src/transport/workflow-execute-sync.rest.ts:26` |
 | Base URL    | none: each route's path is its address           |
 | Addressing  | literal                                          |
 | Credential  | project                                          |
 
 #### `POST /api/scenario/execute-sync` · `postApiScenarioExecuteSync`
 
-Permission `scenarios:create`. Hidden from the OpenAPI document. Declared at `src/transport/workflow-execute-sync.rest.ts:19`.
+Permission `scenarios:create`. Hidden from the OpenAPI document. Declared at `src/transport/workflow-execute-sync.rest.ts:32`.
 
 Answers at `/api/scenario/execute-sync`.
 
 ```typescript
 // Body: executeSyncRelayEventSchema, ../contract/src/workflow-rest.schemas.ts:210
 type Body = Record<string, unknown>;
-// Response: inline, src/transport/workflow-execute-sync.rest.ts:28
+// Response: inline, src/transport/workflow-execute-sync.rest.ts:41
 type Response = unknown;
 ```
 
@@ -877,9 +877,9 @@ Declared at `src/eventing/workflow-nlp-lambda-cleanup.pipeline.ts:31`.
 
 | Kind   | Leaf                         | Environment variable                      | Declared at                             |
 | ------ | ---------------------------- | ----------------------------------------- | --------------------------------------- |
-| secret | `nlpLambdaFleet`             | `LANGWATCH_NLP_LAMBDA_CONFIG`             | `src/app/workflow.app.ts:501`           |
-| secret | `nlpInternal`                | `LANGWATCH_NLP_INTERNAL_SECRET`           | `src/app/workflow.app.ts:502`           |
-| secret | `s3KeySalt`                  | `S3_KEY_SALT`                             | `src/app/workflow.app.ts:503`           |
+| secret | `nlpLambdaFleet`             | `LANGWATCH_NLP_LAMBDA_CONFIG`             | `src/app/workflow.app.ts:502`           |
+| secret | `nlpInternal`                | `LANGWATCH_NLP_INTERNAL_SECRET`           | `src/app/workflow.app.ts:503`           |
+| secret | `s3KeySalt`                  | `S3_KEY_SALT`                             | `src/app/workflow.app.ts:504`           |
 | config | `nlpServiceUrl`              | `LANGWATCH_NLP_SERVICE`                   | `../contract/src/workflow.config.ts:82` |
 | config | `stagingThresholdBytes`      | `LANGEVALS_STAGING_THRESHOLD_BYTES`       | `../contract/src/workflow.config.ts:84` |
 | config | `stagingTtlSeconds`          | `LANGEVALS_STAGING_TTL_SECONDS`           | `../contract/src/workflow.config.ts:85` |

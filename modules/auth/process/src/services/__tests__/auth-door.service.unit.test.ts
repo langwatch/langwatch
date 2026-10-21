@@ -14,6 +14,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { IdTokenIssuerRefusalChannel } from "../../channels/http/http.id-token-issuer-refusal.channel.ts";
 import { OAuthProfileEmailChannel } from "../../channels/http/http.oauth-profile-email.channel.ts";
+import { authHandshakeResponseOf } from "../../transport/auth.rest.ts";
 import { AuthDoorService, type AuthDoorDeps } from "../auth-door.service.ts";
 
 const loggerSpies = vi.hoisted(() => ({
@@ -70,7 +71,21 @@ function door(overrides: Partial<AuthDoorDeps> = {}) {
     ...overrides,
   });
 
-  return { service, handler, revokeBrowserSession, verifyBrowserSession };
+  return { service: throughTheDoor(service), handler, revokeBrowserSession, verifyBrowserSession };
+}
+
+/**
+ * The service with its handshake answer written by the transport door, so each assertion reads
+ * the response the browser receives; the door's own mapping is pinned in auth.rest.unit.test.ts.
+ */
+function throughTheDoor(service: AuthDoorService) {
+  const answered: Omit<AuthDoorService, "betterAuthHandshake"> & {
+    betterAuthHandshake(request: Request): Promise<Response>;
+  } = Object.assign(Object.create(service) as AuthDoorService, {
+    betterAuthHandshake: async (request: Request) =>
+      authHandshakeResponseOf(await service.betterAuthHandshake(request)),
+  });
+  return answered;
 }
 
 const signIn = () =>

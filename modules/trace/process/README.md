@@ -1031,21 +1031,21 @@ findTraceCountsByAttribute(input: { projectId: string; sinceMs: number; attribut
 
 |             |                                        |
 | ----------- | -------------------------------------- |
-| Declared at | `src/transport/collector.rest.ts:289`  |
+| Declared at | `src/transport/collector.rest.ts:290`  |
 | Base URL    | none: each route's path is its address |
 | Addressing  | literal                                |
 | Credential  | project                                |
 
 #### `POST /api/collector` · `collectTrace`
 
-Public: Trace collection API key resolved in-handler, so the refusal carries the credential chain's own body; the route itself is gated on traces:create. Hidden from the OpenAPI document. Declared at `src/transport/collector.rest.ts:295`.
+Public: Trace collection API key resolved in-handler, so the refusal carries the credential chain's own body; the route itself is gated on traces:create. Hidden from the OpenAPI document. Declared at `src/transport/collector.rest.ts:296`.
 
 Answers at `/api/collector`.
 
 ```typescript
-// Body: inline, src/transport/collector.rest.ts:298
+// Body: inline, src/transport/collector.rest.ts:299
 type Body = Record<string, unknown>;
-// Response: inline, src/transport/collector.rest.ts:306
+// Response: inline, src/transport/collector.rest.ts:307
 type Response = unknown;
 ```
 

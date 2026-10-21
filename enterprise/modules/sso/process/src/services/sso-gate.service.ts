@@ -1,5 +1,5 @@
 import {
-  DENIED_SSO_GATE_TTL_MS,
+  isDeniedSsoGateStale,
   type LicensingApi,
   type PlatformLicenseInspection,
 } from "@langwatch/enterprise-licensing-contract";
@@ -40,7 +40,7 @@ class SsoGateTimeoutError extends Error {
 
 /**
  * ADR-027's Enterprise SSO gate, as amended in v9: an allow is kept for the
- * process, a deny is read again after `DENIED_SSO_GATE_TTL_MS` or as soon as
+ * process, a deny is read again once licensing calls it stale or as soon as
  * this process stores a license, and a failed read is never kept.
  */
 export class SsoGateService {
@@ -153,7 +153,7 @@ export class SsoGateService {
 
   /** A deny is stale after the TTL, or once this process stored a license since. */
   private async denyIsStale(denied: { at: number; revision: number | null }): Promise<boolean> {
-    if (this.now() - denied.at >= DENIED_SSO_GATE_TTL_MS) return true;
+    if (isDeniedSsoGateStale({ deniedAtMs: denied.at, nowMs: this.now() })) return true;
     if (denied.revision === null) return false;
     return (await this.readRevision()) !== denied.revision;
   }

@@ -1303,21 +1303,21 @@ type Output = {
 }[];
 
 // ops.listScheduledJobs
-// Input: opsListScheduledJobsInputSchema, ../contract/src/ops-scheduler.ts:131
+// Input: opsListScheduledJobsInputSchema, ../contract/src/ops-scheduler.ts:134
 interface Input {
   limit?: number;
 }
 // Output: opsScheduledJobSchema.array() (inline, ../contract/src/features/dashboard/ops-dashboard.trpc.ts:83)
 
 // ops.listPausedSchedules
-// Input: opsListPausedSchedulesInputSchema, ../contract/src/ops-scheduler.ts:149
+// Input: opsListPausedSchedulesInputSchema, ../contract/src/ops-scheduler.ts:152
 interface Input {
   limit?: number;
 }
 type Output = z.infer<typeof opsPausedSchedulesPageSchema>; // ../contract/src/ops.responses.ts:293
 
 // ops.listSchedulerActions
-// Input: opsListSchedulerActionsInputSchema, ../contract/src/ops-scheduler.ts:158
+// Input: opsListSchedulerActionsInputSchema, ../contract/src/ops-scheduler.ts:161
 interface Input {
   limit?: number;
 }
@@ -1332,14 +1332,14 @@ type Output = {
 }[];
 
 // ops.listInsightSchedules
-// Input: opsListInsightSchedulesInputSchema, ../contract/src/ops-scheduler.ts:140
+// Input: opsListInsightSchedulesInputSchema, ../contract/src/ops-scheduler.ts:143
 interface Input {
   limit?: number;
 }
 // Output: opsInsightScheduleSchema.array() (inline, ../contract/src/features/dashboard/ops-dashboard.trpc.ts:101)
 
 // ops.setScheduleActive
-// Input: opsSetScheduleActiveInputSchema, ../contract/src/ops-scheduler.ts:168
+// Input: opsSetScheduleActiveInputSchema, ../contract/src/ops-scheduler.ts:171
 interface Input {
   scheduleId: string;
   active: boolean;
@@ -1347,14 +1347,14 @@ interface Input {
 type Output = z.infer<typeof opsScheduledJobSchema>; // ../contract/src/ops-scheduler.ts:26
 
 // ops.clearScheduleSlot
-// Input: opsScheduleIdInputSchema, ../contract/src/ops-scheduler.ts:122
+// Input: opsScheduleIdInputSchema, ../contract/src/ops-scheduler.ts:125
 interface Input {
   scheduleId: string;
 }
 type Output = z.infer<typeof opsScheduledJobSchema>; // ../contract/src/ops-scheduler.ts:26
 
 // ops.runScheduleNow
-type Input = z.infer<typeof opsScheduleIdInputSchema>; // ../contract/src/ops-scheduler.ts:122
+type Input = z.infer<typeof opsScheduleIdInputSchema>; // ../contract/src/ops-scheduler.ts:125
 type Output = z.infer<typeof opsScheduledJobSchema>; // ../contract/src/ops-scheduler.ts:26
 ```
 

@@ -200,6 +200,7 @@ const CONFLICT_MESSAGES = {
  * key or a wait, not a corrected field.
  */
 export class IdempotencyConflictError extends HandledError {
+  static readonly code = "idempotency_error" as const;
   declare readonly code: "idempotency_error";
 
   constructor(reason: IdempotencyConflictReason) {

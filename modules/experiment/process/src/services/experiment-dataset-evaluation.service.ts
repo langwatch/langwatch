@@ -5,6 +5,7 @@
  */
 import {
   EvaluationRestExperimentNotFoundError,
+  EvaluatorNotFoundError,
   getEvaluatorDataForParams,
   getEvaluatorIncludingCustom,
   type EvaluationApi,
@@ -20,7 +21,6 @@ import type {
   DatasetEvaluationInput,
   DatasetEvaluationOutcome,
 } from "@langwatch/experiment-contract";
-import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { getWorkflowsRequiredFields } from "@langwatch/workflow-contract";
@@ -154,7 +154,7 @@ export class ExperimentDatasetEvaluationService {
         customEvaluators: getWorkflowsRequiredFields({ workflows: customEvaluators }),
       });
     } catch (error) {
-      if (HandledError.isHandled(error) && error.code === "evaluator_not_found") return undefined;
+      if (EvaluatorNotFoundError.is(error)) return undefined;
       throw error;
     }
   }

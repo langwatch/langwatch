@@ -72,6 +72,9 @@
       "path": "../../entitlement/contract/tsconfig.build.json"
     },
     {
+      "path": "../../dataset/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../authz/contract/tsconfig.build.json"
     },
     {

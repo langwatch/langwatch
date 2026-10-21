@@ -1,7 +1,7 @@
 import { HeroLeadPill } from "@langwatch/design-system/hero-lead-pill";
+import { AgentActionsMenu } from "@langwatch/trace-client";
 import { LuBot, LuSparkles, LuTerminal } from "react-icons/lu";
 
-import { AgentActionsMenu } from "../../../../behavior/lent-peers.tsx";
 import { useProjectHomeHost } from "../../../../model/project-home-host.ts";
 import { selfHostedEndpoint } from "../../../../model/self-hosted-endpoint.ts";
 

@@ -31,6 +31,7 @@ const TEAM = "team-1";
 
 /** The key's own ceiling refused it, exactly as the process's chain would. */
 class ApiKeyPermissionDeniedTestError extends HandledError {
+  static readonly code = "api_key_permission_denied" as const;
   declare readonly code: "api_key_permission_denied";
 
   constructor() {

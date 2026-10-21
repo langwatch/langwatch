@@ -215,6 +215,15 @@ export function extractClientIdFromBasicAuth(
   }
 }
 
-export function extractSessionIdHeader(header: string | string[] | undefined): string | undefined {
-  return typeof header === "string" ? header : undefined;
+export function extractSessionIdHeader(
+  header: string | readonly string[] | undefined,
+): string | undefined {
+  return extractSingleHeader(header);
+}
+
+/** A header read as one value; a repeated header names none. */
+export function extractSingleHeader(
+  value: string | readonly string[] | undefined,
+): string | undefined {
+  return typeof value === "string" ? value : undefined;
 }

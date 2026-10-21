@@ -19,7 +19,7 @@ import {
   type DashboardWidgetQuery,
   validateDashboardWidgetQueryParams,
 } from "@langwatch/analytics-contract/dashboard-widget-definition";
-import { explainAnyError } from "@langwatch/handled-error/presentation";
+import { resolveUiFailureCopy } from "@langwatch/browser-host/feedback";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { nowInstant } from "@langwatch/time";
 import { useCallback, useMemo, useState } from "react";
@@ -27,6 +27,7 @@ import { useCallback, useMemo, useState } from "react";
 import { analyticsApi } from "../../../behavior/analytics-api.ts";
 import type { ChartFrameExecuteQuery } from "../../../behavior/frame-bridge.ts";
 import { createLangWatchQLExecute } from "../../../behavior/lwql-execute.ts";
+import { chartQueryErrorFor } from "../../../model/dashboard-widget/chart-query-error-copy.ts";
 import type { LangWatchQLParameterValue } from "../../../model/lwql-request-state.ts";
 
 /** Widgets run against the last 24 hours at an hourly step — no toolbar. */
@@ -39,9 +40,11 @@ export interface QueryLastRun {
 }
 
 /** Maps whatever `execute` throws to the same shape a declared-param rejection carries. */
-function toChartQueryError(error: unknown): ChartQueryError {
-  // ADR-045: registry copy only, with the lwql_* code riding along.
-  const explained = explainAnyError(error);
+export function toChartQueryError(error: unknown): ChartQueryError {
+  // ADR-045: registry copy only, with the lwql_* code riding along. A code the registry cannot
+  // word yet still carries the server's first tip and the error id, so the reader is not left
+  // with a bare code.
+  const explained = resolveUiFailureCopy({ error, fallbackTitle: "" });
   const handled = readHandledError(error);
   // A refusal about what the reader may see, not about the query: the card says so.
   const missingGates =
@@ -52,6 +55,8 @@ function toChartQueryError(error: unknown): ChartQueryError {
     code: handled?.code ?? "unknown",
     title: explained.title,
     message: explained.description,
+    ...(explained.traceId ? { traceId: explained.traceId } : {}),
+    ...(handled ? { meta: handled.meta } : {}),
     ...(handled?.retryable === true ? { retryable: true } : {}),
     ...(missingGates.length > 0 ? { missingGates } : {}),
   };
@@ -127,18 +132,18 @@ export function useDashboardWidgetExecutor(
     async ({ queryName, params, signal }) => {
       const query = queries.find((q) => q.name === queryName);
       if (!query) {
-        const error: ChartQueryError = {
+        const error = chartQueryErrorFor({
           code: "dashboard_widget_query_not_found",
-          title: "Unknown query",
-          message: `This widget has no query named "${queryName}".`,
-        };
+          meta: { queryName },
+        });
         recordRun(queryName, { ranAt: nowInstant().epochMilliseconds, error });
         throw error;
       }
       const validation = validateDashboardWidgetQueryParams({ query, params });
       if (!validation.ok) {
-        recordRun(queryName, { ranAt: nowInstant().epochMilliseconds, error: validation.error });
-        throw validation.error;
+        const error = chartQueryErrorFor(validation.error);
+        recordRun(queryName, { ranAt: nowInstant().epochMilliseconds, error });
+        throw error;
       }
       try {
         const result = await runValidated(query, validation.params, signal);
@@ -165,7 +170,10 @@ export function useDashboardWidgetExecutor(
         params: {},
       });
       if (!validation.ok) {
-        recordRun(query.name, { ranAt: nowInstant().epochMilliseconds, error: validation.error });
+        recordRun(query.name, {
+          ranAt: nowInstant().epochMilliseconds,
+          error: chartQueryErrorFor(validation.error),
+        });
         return;
       }
       try {

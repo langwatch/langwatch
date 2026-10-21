@@ -9,24 +9,10 @@ import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 
 const turns: unknown[] = [];
 
-vi.mock("@langwatch/scenario-client", () => ({
-  scenarioClient: {
-    scenarios: {
-      testAgentTurn: {
-        useMutation: () => ({
-          mutate: (input: unknown) => turns.push(input),
-          data: undefined,
-          error: null,
-          isPending: false,
-        }),
-      },
-    },
-  },
-}));
-
-vi.mock("../../../behavior/lent-parameter-line-field.tsx", async () => {
+vi.mock("@langwatch/scenario-client", async (importOriginal) => {
   const { createElement } = await import("react");
   return {
+    ...(await importOriginal<object>()),
     ParameterLineField: (props: {
       value: string;
       onChange: (line: string) => void;
@@ -37,6 +23,18 @@ vi.mock("../../../behavior/lent-parameter-line-field.tsx", async () => {
         value: props.value,
         onChange: (event: { target: { value: string } }) => props.onChange(event.target.value),
       }),
+    scenarioClient: {
+      scenarios: {
+        testAgentTurn: {
+          useMutation: () => ({
+            mutate: (input: unknown) => turns.push(input),
+            data: undefined,
+            error: null,
+            isPending: false,
+          }),
+        },
+      },
+    },
   };
 });
 

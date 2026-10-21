@@ -11,7 +11,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ResourceLimitsDisplay } from "../resource-limits-display.tsx";
 
-vi.mock("../../../../behavior/lent-resource-limit-row.tsx", () => ({
+vi.mock("@langwatch/enterprise-licensing-client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   ResourceLimitRow: ({ label, current, max }: { label: string; current: number; max?: number }) => (
     <div data-testid={`limit-${label}`}>
       {max === undefined ? `${current}` : `${current} / ${max}`}

@@ -3,6 +3,7 @@ import { HandledError } from "@langwatch/handled-error";
 
 /** Asked of a deployment that is not LangWatch Cloud, which answers none of Cloud's own routes. */
 export class LangWatchCloudOnlyError extends HandledError {
+  static readonly code = "langwatch_cloud_only" as const;
   declare readonly code: "langwatch_cloud_only";
 
   constructor() {
@@ -16,6 +17,7 @@ export class LangWatchCloudOnlyError extends HandledError {
 
 /** One install, or everyone at once, posted more usage reports than the receiver takes. */
 export class UsageReportRateLimitedError extends HandledError {
+  static readonly code = "rate_limited" as const;
   declare readonly code: "rate_limited";
 
   constructor() {

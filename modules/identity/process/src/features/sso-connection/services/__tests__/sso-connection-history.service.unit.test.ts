@@ -4,6 +4,7 @@
  * attested domain never read as the customer's own proof (D05 amendment).
  * Corresponds to specs/identity/sso-connection-history.feature.
  */
+import { CONNECTION_REGISTERED_EVENT_TYPE } from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -19,7 +20,7 @@ function entry(
   overrides: Partial<SsoConnectionHistoryEntry> & { eventId: string },
 ): SsoConnectionHistoryEntry {
   return {
-    type: "lw.identity.connection_registered",
+    type: CONNECTION_REGISTERED_EVENT_TYPE,
     occurredAtMs: 1_700_000_000_000,
     source: "self-serve",
     domain: null,

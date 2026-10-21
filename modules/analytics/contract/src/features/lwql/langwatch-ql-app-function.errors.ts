@@ -11,6 +11,7 @@ import { HandledError, remediation } from "@langwatch/handled-error";
  * rest as raw ids looks complete, and an analytics caller cannot detect that.
  */
 export class LangWatchQLAppFunctionKeyCapError extends HandledError {
+  static readonly code = "lwql_app_function_key_cap" as const;
   declare readonly code: "lwql_app_function_key_cap";
 
   constructor({
@@ -49,6 +50,7 @@ export class LangWatchQLAppFunctionKeyCapError extends HandledError {
  * page under the cap can still name gigabytes of stored content.
  */
 export class LangWatchQLAppFunctionReadBudgetError extends HandledError {
+  static readonly code = "lwql_app_function_read_budget" as const;
   declare readonly code: "lwql_app_function_read_budget";
 
   constructor({
@@ -81,6 +83,7 @@ export class LangWatchQLAppFunctionReadBudgetError extends HandledError {
  * columns would read as "these conversations are empty".
  */
 export class LangWatchQLAppFunctionHydrationFailedError extends HandledError {
+  static readonly code = "lwql_app_function_hydration_failed" as const;
   declare readonly code: "lwql_app_function_hydration_failed";
 
   constructor(options: { reasons?: readonly Error[] } = {}) {
@@ -104,6 +107,7 @@ export class LangWatchQLAppFunctionHydrationFailedError extends HandledError {
  * provisioning's: that one is about a dataset's grants, and the copy differs.
  */
 export class LangWatchQLAppFunctionUnavailableError extends HandledError {
+  static readonly code = "lwql_app_function_unavailable" as const;
   declare readonly code: "lwql_app_function_unavailable";
 
   constructor(options: { reasons?: readonly Error[] } = {}) {

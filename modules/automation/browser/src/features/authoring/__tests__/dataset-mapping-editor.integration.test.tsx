@@ -16,8 +16,9 @@ const editor = vi.hoisted(() => {
   return state;
 });
 
-vi.mock("../../../behavior/lent-peers.tsx", () => ({
-  TracesMapping: (props: EvaluatorTracesMappingProps) => {
+vi.mock("@langwatch/trace-client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  EvaluatorTracesMapping: (props: EvaluatorTracesMappingProps) => {
     editor.props = props;
     // Like the real editor, report the derived mapping on opening, in a different key order.
     const reported = useRef(false);

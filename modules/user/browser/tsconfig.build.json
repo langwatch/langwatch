@@ -27,6 +27,9 @@
       "path": "../../../packages/time/tsconfig.build.json"
     },
     {
+      "path": "../../organization/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../onboarding/client/tsconfig.build.json"
     },
     {

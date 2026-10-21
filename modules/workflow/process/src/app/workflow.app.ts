@@ -11,7 +11,7 @@ import { AuthzApi } from "@langwatch/authz-contract";
  * arrives as an argument, never read from a session or a request, so one
  * operation serves a browser session, an API key and a background job alike.
  */
-import { DatasetApi } from "@langwatch/dataset-contract";
+import { DatasetApi, DatasetNotReadyError } from "@langwatch/dataset-contract";
 import type { EventingCommands, StaticPipelineDefinition } from "@langwatch/eventing";
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
@@ -39,6 +39,7 @@ import {
   type PublishWorkflowCommand,
   type RunWorkflowCommand,
   type StudioClientEvent,
+  type ExecuteSyncRelayAnswer,
   type ExecuteSyncRelayEvent,
   type StudioServerEvent,
   type StudioWorkflow,
@@ -1041,7 +1042,7 @@ export class WorkflowModule implements WorkflowApi, WorkflowBrowserApi {
     projectId: string;
     event: ExecuteSyncRelayEvent;
     signal: AbortSignal;
-  }): Promise<Response> {
+  }): Promise<ExecuteSyncRelayAnswer> {
     return this.#infrastructure.executeSyncRelay.relay(input);
   }
 
@@ -1459,7 +1460,10 @@ export interface WorkflowAgentMapping {
   recompute(input: { projectId: string; workflowId: string; dsl: StudioWorkflow }): Promise<void>;
 }
 
-/** Matched on the handled CODE: the dataset module's own class is not this module's to name. */
+/**
+ * A failure the caller can fix: a missing model, provider or permission, or a dataset still
+ * normalising.
+ */
 function isCallerFixable(error: unknown): boolean {
   if (
     error instanceof LlmModelNotSetError ||
@@ -1468,12 +1472,7 @@ function isCallerFixable(error: unknown): boolean {
   ) {
     return true;
   }
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    error.code === "dataset_not_ready"
-  );
+  return DatasetNotReadyError.is(error);
 }
 
 /**

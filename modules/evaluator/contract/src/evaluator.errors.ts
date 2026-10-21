@@ -1,6 +1,7 @@
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
 
 export class EvaluatorNotFoundError extends NotFoundError {
+  static readonly code = "evaluator_not_found" as const;
   declare readonly code: "evaluator_not_found";
   constructor(id: string) {
     super("evaluator_not_found", { resource: "Evaluator", id: id });
@@ -9,6 +10,7 @@ export class EvaluatorNotFoundError extends NotFoundError {
 }
 
 export class EvaluatorInvalidTypeError extends HandledError {
+  static readonly code = "evaluator_invalid_type" as const;
   declare readonly code: "evaluator_invalid_type";
   constructor(type: string) {
     super("evaluator_invalid_type", `Unsupported evaluator type: ${type}`, {
@@ -21,6 +23,7 @@ export class EvaluatorInvalidTypeError extends HandledError {
 }
 
 export class EvaluatorWorkflowAlreadyAssignedError extends HandledError {
+  static readonly code = "evaluator_workflow_already_assigned" as const;
   declare readonly code: "evaluator_workflow_already_assigned";
   constructor(workflowId: string) {
     super(
@@ -37,6 +40,7 @@ export class EvaluatorWorkflowAlreadyAssignedError extends HandledError {
 }
 
 export class EvaluatorIsNotCopyError extends HandledError {
+  static readonly code = "evaluator_is_not_copy" as const;
   declare readonly code: "evaluator_is_not_copy";
   constructor(evaluatorId: string) {
     super("evaluator_is_not_copy", "This evaluator is not a copy.", {
@@ -49,6 +53,7 @@ export class EvaluatorIsNotCopyError extends HandledError {
 }
 
 export class EvaluatorSourceNotFoundError extends NotFoundError {
+  static readonly code = "evaluator_source_not_found" as const;
   declare readonly code: "evaluator_source_not_found";
   constructor(sourceEvaluatorId: string) {
     super("evaluator_source_not_found", { resource: "Source evaluator", id: sourceEvaluatorId });
@@ -57,6 +62,7 @@ export class EvaluatorSourceNotFoundError extends NotFoundError {
 }
 
 export class EvaluatorCopySelectionError extends HandledError {
+  static readonly code = "evaluator_copy_selection_invalid" as const;
   declare readonly code: "evaluator_copy_selection_invalid";
   constructor(evaluatorId: string) {
     super("evaluator_copy_selection_invalid", "No valid evaluator copies were selected.", {
@@ -69,6 +75,7 @@ export class EvaluatorCopySelectionError extends HandledError {
 }
 
 export class EvaluatorWorkflowNotFoundError extends HandledError {
+  static readonly code = "evaluator_workflow_not_found" as const;
   declare readonly code: "evaluator_workflow_not_found";
 
   constructor(idOrSlug: string, workflowId: string) {
@@ -82,6 +89,7 @@ export class EvaluatorWorkflowNotFoundError extends HandledError {
 }
 
 export class EvaluatorInvalidConfigError extends HandledError {
+  static readonly code = "evaluator_config_invalid" as const;
   declare readonly code: "evaluator_config_invalid";
 
   constructor(idOrSlug: string) {
@@ -100,6 +108,7 @@ export class EvaluatorInvalidConfigError extends HandledError {
  * the caller's to act on: save a version first.
  */
 export class EvaluatorWorkflowVersionRequiredError extends HandledError {
+  static readonly code = "evaluator_workflow_version_required" as const;
   declare readonly code: "evaluator_workflow_version_required";
 
   constructor(evaluatorId: string) {
@@ -118,6 +127,7 @@ export class EvaluatorWorkflowVersionRequiredError extends HandledError {
  * `evaluators.create` has answered since shipping, and a client branches on it.
  */
 export class EvaluatorWorkflowEvaluatorExistsError extends HandledError {
+  static readonly code = "evaluator_workflow_evaluator_exists" as const;
   declare readonly code: "evaluator_workflow_evaluator_exists";
 
   constructor(input: { workflowId: string; evaluatorName: string }) {
@@ -136,6 +146,7 @@ export class EvaluatorWorkflowEvaluatorExistsError extends HandledError {
  * something else.
  */
 export class EvaluatorTypeImmutableError extends HandledError {
+  static readonly code = "evaluator_type_immutable" as const;
   declare readonly code: "evaluator_type_immutable";
 
   constructor(currentType: string) {
@@ -154,6 +165,7 @@ export class EvaluatorTypeImmutableError extends HandledError {
  * `AgentSourcePermissionDeniedError` keeps the same one for the same reason.
  */
 export class EvaluatorSourcePermissionDeniedError extends HandledError {
+  static readonly code = "evaluator_source_permission_denied" as const;
   declare readonly code: "evaluator_source_permission_denied";
 
   constructor(sourceProjectId: string) {

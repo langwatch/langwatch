@@ -15,10 +15,10 @@ vi.mock(
   "@langwatch/browser-host/drawer",
   async () => (await import("./voice-editor-doubles.test-helpers.tsx")).drawerDouble,
 );
-vi.mock(
-  "../../../behavior/lent-talk-to-it-panel.tsx",
-  async () => (await import("./voice-editor-doubles.test-helpers.tsx")).talkPanelDouble,
-);
+vi.mock("@langwatch/scenario-client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  ...(await import("./voice-editor-doubles.test-helpers.tsx")).talkPanelDouble,
+}));
 
 // This package runs without isolation: start from fresh modules, and leave none behind.
 vi.resetModules();

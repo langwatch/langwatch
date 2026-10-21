@@ -74,6 +74,7 @@ export class EventingSsoConnectionHistoryRepository extends SsoConnectionHistory
       aggregateType: SSO_CONNECTION_AGGREGATE_TYPE,
       aggregateId: connectionId,
     });
+    // The read seat applies the pipeline's upcasts: a version 1 registration answers as version 2.
     return events
       .filter(isSsoConnectionEvent)
       .map(toHistoryEntry)

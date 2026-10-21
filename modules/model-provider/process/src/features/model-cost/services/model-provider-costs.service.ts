@@ -11,6 +11,7 @@ import {
   type ModelCostListRow,
   type ModelCostWriteInput,
 } from "@langwatch/model-provider-contract";
+import { ProjectNotFoundError } from "@langwatch/project-contract";
 import { nowInstant, toDate } from "@langwatch/time";
 
 import type { ModelCostRepository } from "../../../repositories/model-cost.repository.ts";
@@ -104,7 +105,7 @@ export class ModelProviderCostsService {
     const organizationId = await this.options.scopes
       .getAnchorOrganizationId({ projectId: parsed.projectId })
       .catch((error: unknown) => {
-        if (HandledError.isHandled(error) && error.code === "project_not_found")
+        if (HandledError.isHandled(error) && ProjectNotFoundError.is(error))
           throw new ModelCostNotFoundError();
         throw error;
       });

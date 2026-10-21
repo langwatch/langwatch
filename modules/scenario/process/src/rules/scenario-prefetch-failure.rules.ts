@@ -1,3 +1,4 @@
+import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
 import type { ScenarioModelParametersFailureReason } from "@langwatch/scenario-contract";
 
 /**
@@ -10,7 +11,7 @@ const CUSTOMER_ACTIONABLE_PREFETCH_REASONS = new Set<ScenarioModelParametersFail
   "provider_not_found",
   "provider_not_enabled",
   "missing_params",
-  "model_not_configured",
+  ModelNotConfiguredError.code,
 ]);
 
 export function isCustomerActionablePrefetchFailure(

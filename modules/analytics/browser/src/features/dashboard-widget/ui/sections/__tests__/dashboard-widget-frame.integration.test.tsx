@@ -257,7 +257,11 @@ describe("given a widget on a board", () => {
       await run();
 
       expect(screen.getByText("Couldn't load Cost per trace")).toBeTruthy();
-      expect(screen.getByText(BROKEN.message)).toBeTruthy();
+      // The registry's words for the code, not the failure's own message.
+      expect(
+        screen.getByText("Check the column names against the dataset's columns."),
+      ).toBeTruthy();
+      expect(screen.queryByText(BROKEN.message)).toBeNull();
       const rendersBefore = frameProps.mock.calls.length;
 
       fireEvent.click(screen.getByRole("button", { name: "Retry" }));

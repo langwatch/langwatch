@@ -1,5 +1,6 @@
 /** Model-provider UI lent by token to screens that choose a model or connect a provider (§10.1). */
 
+import { lentComponent } from "@langwatch/browser-host/lent";
 import { uiTokens } from "@langwatch/module";
 
 /** What a screen hands model-provider's form for adding or editing one provider's credentials. */
@@ -51,3 +52,8 @@ export const ModelDisplayToken =
   uiTokens("model-provider").component<ModelDisplayProps>("modelDisplay");
 export const ModelSelectorToken =
   uiTokens("model-provider").component<ModelSelectorProps>("modelSelector");
+
+/** The tokens above as ready components: a borrower imports these and writes no wrapper (§10.1). */
+export const ModelDisplay = lentComponent(ModelDisplayToken);
+export const ModelSelector = lentComponent(ModelSelectorToken);
+export const EditModelProviderForm = lentComponent(EditModelProviderFormToken);

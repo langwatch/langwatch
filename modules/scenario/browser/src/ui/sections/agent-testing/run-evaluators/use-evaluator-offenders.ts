@@ -7,6 +7,7 @@
 
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { type EvaluatorAttachment, parseEvaluatorAttachments } from "@langwatch/scenario-contract";
+import { SuiteEvaluatorMappingsMissingError } from "@langwatch/suite-contract";
 import { useCallback, useMemo } from "react";
 
 import {
@@ -88,7 +89,7 @@ function resolveMappingsMissingTarget({
   | { kind: "extra"; attachment: EvaluatorAttachment }
   | null {
   const handled = readHandledError(error);
-  if (handled?.code !== "suite_evaluator_mappings_missing") return null;
+  if (!handled || !SuiteEvaluatorMappingsMissingError.is(error)) return null;
   const { suiteId, evaluatorId } = handled.meta;
   if (typeof evaluatorId !== "string") return null;
   const suite = testSuites.find((row) => row.id === suiteId);

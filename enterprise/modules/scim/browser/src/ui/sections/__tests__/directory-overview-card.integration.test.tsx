@@ -149,7 +149,7 @@ describe("given governance is on and the organization has departments", () => {
 
 describe("given a plan that does not include directory sync", () => {
   it("says it is an Enterprise feature rather than that the read failed", () => {
-    state.readError = { data: { error: { code: "enterprise_plan_required" } } };
+    state.readError = { data: { error: { code: "enterprise_plan_required", httpStatus: 402 } } };
 
     renderWithScimHost(<DirectoryOverviewCard organizationId="org-1" canReadMembership />);
 

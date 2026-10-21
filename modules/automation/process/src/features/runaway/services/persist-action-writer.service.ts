@@ -1,12 +1,18 @@
-import type { AnnotationApi } from "@langwatch/annotation-contract";
+import {
+  AnnotationAnnotatorReferenceInvalidError,
+  type AnnotationApi,
+} from "@langwatch/annotation-contract";
 import { AutomationDatasetUnavailableError } from "@langwatch/automation-contract";
-import type { DatasetApi, DatasetRecordEntry } from "@langwatch/dataset-contract";
+import {
+  type DatasetApi,
+  DatasetNotFoundError,
+  type DatasetRecordEntry,
+  InvalidColumnError,
+} from "@langwatch/dataset-contract";
 import { DispatchError } from "@langwatch/eventing";
 import { createLogger, type Logger } from "@langwatch/observability";
 
 import { AutomationPersistActionRepository } from "../../../repositories/automation-persist-action.repository.ts";
-
-const ANNOTATOR_REFERENCE_INVALID = "annotation_annotator_reference_invalid";
 
 type DatasetPeer = Pick<DatasetApi, "batchCreateRecords" | "findBySlugOrId">;
 
@@ -43,7 +49,7 @@ export class PersistActionWriterService extends AutomationPersistActionRepositor
       await this.peers.annotations.queueTraces(input);
     } catch (error) {
       // The annotator is saved on the automation, so a malformed one fails every redelivery.
-      if (readCode(error) !== ANNOTATOR_REFERENCE_INVALID) throw error;
+      if (!AnnotationAnnotatorReferenceInvalidError.is(error)) throw error;
       throw new DispatchError({
         message:
           "This automation names an annotator that parses as neither a queue nor a member, so a queue item " +
@@ -104,7 +110,7 @@ export class PersistActionWriterService extends AutomationPersistActionRepositor
       // A column refusal here means one was removed since the trim: a redelivery re-reads them.
       // It is a customer-fault handled error, which the outbox would retire as dead, so it is
       // rethrown as a retryable dispatch failure.
-      if (readCode(error) === "dataset_invalid_column") {
+      if (InvalidColumnError.is(error)) {
         throw new DispatchError({
           message:
             `The dataset "${input.datasetId}" this automation appends to lost a column while the ` +
@@ -113,7 +119,7 @@ export class PersistActionWriterService extends AutomationPersistActionRepositor
           cause: error,
         });
       }
-      if (readCode(error) !== "dataset_not_found") throw error;
+      if (!DatasetNotFoundError.is(error)) throw error;
       throw new AutomationDatasetUnavailableError({
         datasetId: input.datasetId,
         reason: "it is gone or archived",
@@ -139,10 +145,6 @@ function keepDefined({
   }
 
   return kept as DatasetRecordEntry;
-}
-
-function readCode(error: unknown): unknown {
-  return typeof error === "object" && error !== null && "code" in error ? error.code : undefined;
 }
 
 function holdsOnlyId(entry: Record<string, unknown>): boolean {

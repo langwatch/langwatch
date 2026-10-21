@@ -47,22 +47,6 @@ vi.mock("../../../model/agent-management-host.ts", () => ({
   }),
 }));
 
-vi.mock("@langwatch/scenario-client", () => ({
-  scenarioClient: {
-    scenarios: {
-      testAgentTurn: { useMutation: () => ({ mutate: vi.fn(), isPending: false, error: null }) },
-      testHttpAgent: {
-        useMutation: () => ({
-          mutateAsync: () => Promise.resolve({ success: true }),
-          mutate: vi.fn(),
-          isPending: false,
-          error: null,
-        }),
-      },
-    },
-  },
-}));
-
 vi.mock("../../../behavior/agent-api.ts", () => {
   const mutation = (mutateAsync: (input: unknown) => Promise<unknown>) => ({
     useMutation: () => ({ mutateAsync, mutate: vi.fn(), isPending: false, error: null }),
@@ -116,7 +100,8 @@ vi.mock("../../elements/workflow/code/workflow-code-editor.tsx", () => ({
   WorkflowCodeEditorModal: () => null,
 }));
 
-vi.mock("../../../behavior/lent-setup-with-agent-button.tsx", () => ({
+vi.mock("@langwatch/trace-client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   SetupWithAgentButton: ({ surface }: { surface: string }) => (
     <button type="button" data-testid="setup-with-agent" data-surface={surface}>
       Setup via Agent
@@ -129,7 +114,8 @@ vi.mock("../../../behavior/lent-setup-with-agent-button.tsx", () => ({
  * an add that names the row as the real editor does (first free `output`, `output_1`, ...)
  * and gives a JSON schema output its default schema.
  */
-vi.mock("../../../behavior/lent-outputs-section.tsx", () => ({
+vi.mock("@langwatch/prompt-client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   OutputsSection: ({
     title,
     outputs,
@@ -203,9 +189,25 @@ vi.mock("../../../behavior/lent-outputs-section.tsx", () => ({
   ),
 }));
 
-vi.mock("../../../behavior/lent-parameter-line-field.tsx", () => ({
-  ParameterLineField: () => null,
-}));
+vi.mock("@langwatch/scenario-client", async (importOriginal) => {
+  return {
+    ...(await importOriginal<object>()),
+    ParameterLineField: () => null,
+    scenarioClient: {
+      scenarios: {
+        testAgentTurn: { useMutation: () => ({ mutate: vi.fn(), isPending: false, error: null }) },
+        testHttpAgent: {
+          useMutation: () => ({
+            mutateAsync: () => Promise.resolve({ success: true }),
+            mutate: vi.fn(),
+            isPending: false,
+            error: null,
+          }),
+        },
+      },
+    },
+  };
+});
 
 vi.mock("@langwatch/design-system/shiki", () => ({
   useShikiAdapter: () => ({

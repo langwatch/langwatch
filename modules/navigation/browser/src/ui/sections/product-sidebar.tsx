@@ -1,12 +1,12 @@
 /** Sidebar column: product pages and utilities. Host and search palette integration. */
 
+import { SavedDashboards, StarredDashboards } from "@langwatch/analytics-client";
 import { RawKbd as Kbd } from "@langwatch/design-system/kbd";
 import { Badge, Box, VStack } from "@langwatch/design-system/primitives";
 import { ScrollEdgeFade, useScrollEdges } from "@langwatch/design-system/scroll-fade";
 import { ArrowLeft, ArrowUpRight, Search } from "lucide-react";
 import { useRef, useState } from "react";
 
-import { SavedDashboards, StarredDashboards } from "../../behavior/lent-saved-dashboards.tsx";
 import { useAdminMenu } from "../../behavior/use-admin-menu.ts";
 import { useLlmOpsProjectSlug } from "../../behavior/use-llm-ops-project-slug.ts";
 import { useMenuScrollPosition } from "../../behavior/use-menu-scroll-position.ts";

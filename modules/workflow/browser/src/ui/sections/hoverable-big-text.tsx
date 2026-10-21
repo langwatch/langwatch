@@ -3,9 +3,9 @@ import { Dialog } from "@langwatch/design-system/dialog";
 import { Box, type BoxProps, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { RenderInputOutput } from "@langwatch/trace-client";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { RenderInputOutput } from "../../behavior/lent-trace.tsx";
 import { isJson } from "../../model/is-json.ts";
 
 /** The expanded text: rendered JSON, rendered markdown, or the raw string. */

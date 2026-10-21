@@ -12,7 +12,7 @@ import { nowInstant } from "@langwatch/time";
 import {
   type SdkEvaluation,
   sdkEvaluationSchema,
-  STALE_TRACE_THRESHOLD_MS,
+  isStaleTraceEvent,
 } from "@langwatch/trace-contract";
 import { z } from "zod";
 
@@ -262,7 +262,8 @@ export function createTraceCustomEvaluationSync(
   span: Pick<OtlpSpan, "events">;
 }) => Promise<void> {
   return async ({ tenantId, traceId, occurredAt, span }) => {
-    if (occurredAt < nowInstant().epochMilliseconds - STALE_TRACE_THRESHOLD_MS) return;
+    if (isStaleTraceEvent({ occurredAtMs: occurredAt, nowMs: nowInstant().epochMilliseconds }))
+      return;
     const evaluations = extractEvaluationsFromSpan(span);
     if (evaluations.length === 0) return;
 

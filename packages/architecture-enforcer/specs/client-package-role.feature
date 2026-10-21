@@ -2,7 +2,7 @@
 
 Feature: A module's client package has its own role
   As a module owner
-  I want the linters to know a `<name>-client` package as a client, not a portable library
+  I want the linters to know a `<name>-client` package as a client, not an unknown module folder
   So that it holds the derived tRPC hooks and its owner's lent tokens, and only browsers read it
 
   @unit @architecture

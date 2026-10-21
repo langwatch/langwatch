@@ -5,6 +5,7 @@ import {
 } from "@langwatch/identity-contract";
 
 export class AuthValidateRateLimitedError extends HandledError {
+  static readonly code = "auth_validate_rate_limited" as const;
   declare readonly code: "auth_validate_rate_limited";
 
   constructor(input: { retryAfterSeconds?: number | undefined }) {
@@ -21,6 +22,7 @@ export class AuthValidateRateLimitedError extends HandledError {
 }
 
 export class AuthUnavailableError extends HandledError {
+  static readonly code = "service_unavailable" as const;
   declare readonly code: "service_unavailable";
 
   constructor(input: { capability: string; processName: string }) {
@@ -44,6 +46,7 @@ export class NoAddressToConfirmError extends HandledError {
 
 /** No email provider is configured, so no confirmation link can be sent (ADR-117). */
 export class EmailSendingUnavailableError extends HandledError {
+  static readonly code = "auth_email_sending_unavailable" as const;
   declare readonly code: "auth_email_sending_unavailable";
 
   constructor() {
@@ -57,6 +60,7 @@ export class EmailSendingUnavailableError extends HandledError {
 }
 
 export class FrontDoorRateLimitedError extends HandledError {
+  static readonly code = "auth_rate_limited" as const;
   declare readonly code: "auth_rate_limited";
 
   /** `retryAfterSeconds` is what `auth_rate_limited`'s presentation entry
@@ -79,6 +83,7 @@ export class FrontDoorRateLimitedError extends HandledError {
  * it — sign out — that the first does not.
  */
 export class SessionIsCurrentError extends HandledError {
+  static readonly code = "session_is_current" as const;
   declare readonly code: "session_is_current";
 
   constructor() {
@@ -97,6 +102,7 @@ export class SessionIsCurrentError extends HandledError {
  * credentials was right: either makes the screen an oracle.
  */
 export class SignInLockedOutError extends HandledError {
+  static readonly code = "identity_sign_in_locked_out" as const;
   declare readonly code: "identity_sign_in_locked_out";
 
   constructor(detail: string) {
@@ -116,6 +122,7 @@ export class SignInLockedOutError extends HandledError {
  * ceiling before it could ever go idle makes the idle timeout unreachable.
  */
 export class SessionMaxLifetimeTooShortError extends HandledError {
+  static readonly code = "identity_session_max_lifetime_too_short" as const;
   declare readonly code: "identity_session_max_lifetime_too_short";
 
   constructor(detail: string) {
@@ -136,6 +143,7 @@ export type CliDeviceFlowRefusal = Readonly<{ error: string; error_description: 
  * body released CLI builds parse. The route's refusal renderer writes it as is.
  */
 export class CliDeviceFlowRefusedError extends HandledError {
+  static readonly code = "cli_device_flow_refused" as const;
   declare readonly code: "cli_device_flow_refused";
   readonly refusal: CliDeviceFlowRefusal;
 
@@ -152,6 +160,7 @@ export class CliDeviceFlowRefusedError extends HandledError {
 
 /** No CLI session record at a key: never minted, expired, or already consumed. */
 export class CliSessionRecordNotFoundError extends HandledError {
+  static readonly code = "cli_session_record_not_found" as const;
   declare readonly code: "cli_session_record_not_found";
 
   constructor() {
@@ -165,6 +174,7 @@ export class CliSessionRecordNotFoundError extends HandledError {
 
 /** The password re-proof turning two-step verification off did not match; the code was fine. */
 export class TwoStepPasswordInvalidError extends HandledError {
+  static readonly code = "identity_mfa_password_invalid" as const;
   declare readonly code: "identity_mfa_password_invalid";
 
   constructor(detail: string) {
@@ -179,6 +189,7 @@ export class TwoStepPasswordInvalidError extends HandledError {
 
 /** Sign-up asked for a password account where the address's organization signs in through SSO. */
 export class DirectRegistrationUnavailableError extends HandledError {
+  static readonly code = "auth_direct_registration_unavailable" as const;
   declare readonly code: "auth_direct_registration_unavailable";
 
   constructor() {
@@ -192,6 +203,7 @@ export class DirectRegistrationUnavailableError extends HandledError {
 
 /** A sign-up request arrived from a web address other than the installation's configured one. */
 export class InvalidAuthOriginError extends HandledError {
+  static readonly code = "auth_invalid_origin" as const;
   declare readonly code: "auth_invalid_origin";
 
   constructor() {
@@ -206,6 +218,7 @@ export class InvalidAuthOriginError extends HandledError {
 
 /** A credential sign-in that did not check out; a wrong password and an unheld address match. */
 export class IdentitySignInRefusedError extends IdentityCommandRefusedError {
+  static readonly code = "identity_sign_in_refused" as const;
   declare readonly code: "identity_sign_in_refused";
 
   constructor(detail: string) {
@@ -220,6 +233,7 @@ export class IdentitySignInRefusedError extends IdentityCommandRefusedError {
 
 /** A password the policy will not take; type a different one. */
 export class IdentityPasswordRejectedError extends IdentityCommandRefusedError {
+  static readonly code = "identity_password_rejected" as const;
   declare readonly code: "identity_password_rejected";
 
   constructor(detail: string) {
@@ -234,6 +248,7 @@ export class IdentityPasswordRejectedError extends IdentityCommandRefusedError {
 
 /** A password-reset link that will not spend: expired, used or never issued, all alike. */
 export class IdentityResetLinkInvalidError extends IdentityCommandRefusedError {
+  static readonly code = "identity_reset_link_invalid" as const;
   declare readonly code: "identity_reset_link_invalid";
 
   constructor(detail: string) {
@@ -248,6 +263,7 @@ export class IdentityResetLinkInvalidError extends IdentityCommandRefusedError {
 
 /** The authenticator offered a passkey this account already holds; there is nothing to retry. */
 export class IdentityPasskeyAlreadyRegisteredError extends PasskeyCommandRefusedError {
+  static readonly code = "identity_passkey_already_registered" as const;
   declare readonly code: "identity_passkey_already_registered";
 
   constructor(detail: string) {

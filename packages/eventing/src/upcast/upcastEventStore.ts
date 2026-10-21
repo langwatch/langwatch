@@ -127,7 +127,7 @@ class UpcastingEventStore<EventType extends Event> implements EventStore<EventTy
 }
 
 /** The log's order, `EventTimestamp, EventId`, as ClickHouse and the memory repository read it. */
-function logOrder(left: Event, right: Event): number {
+export function logOrder(left: Event, right: Event): number {
   if (left.createdAt !== right.createdAt) return left.createdAt - right.createdAt;
   return compareOrdinal(left.id, right.id);
 }

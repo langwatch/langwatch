@@ -4,12 +4,12 @@
  */
 
 import { FrontendFlags } from "@langwatch/feature-flag-contract";
+import { InsightsNavCount } from "@langwatch/insight-client";
 import type { NavigationProject } from "@langwatch/navigation-contract";
 import { projectNavigation } from "@langwatch/project-contract";
 import { GitPullRequest, SquareTerminal } from "lucide-react";
 import React from "react";
 
-import { InsightsNavCount } from "../../behavior/lent-insights.tsx";
 import { navigationApi } from "../../behavior/navigation-api.ts";
 import {
   type CodingAgentLinks,

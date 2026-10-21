@@ -1,6 +1,5 @@
-import type { IncomingMessage, ServerResponse } from "node:http";
-
 import { HandledError } from "@langwatch/handled-error";
+import type { McpDoorAnswer } from "@langwatch/hosted-mcp-contract";
 import {
   McpAuthorizationRequiredError,
   McpGrantRevokedError,
@@ -11,10 +10,10 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
-import { extractBearerToken } from "../rules/mcp-routes.rules.ts";
+import { extractBearerToken, extractSingleHeader } from "../rules/mcp-routes.rules.ts";
 import type { AuthzMcpSessionGrantService } from "./authz-mcp-session-grant.service.ts";
 import type { HeaderMcpClientAddressService } from "./header-mcp-client-address.service.ts";
-import type { McpHttpService } from "./mcp-http.service.ts";
+import type { McpAnswerService, McpRequest } from "./mcp-answer.service.ts";
 import type { McpCliSessions } from "./mcp-oauth-token.service.ts";
 import { McpRateLimitService } from "./mcp-rate-limit.service.ts";
 import type {
@@ -55,17 +54,17 @@ type McpAccessTokenRead =
   | Readonly<{ kind: "invalid" }>
   | Readonly<{ kind: "unavailable" }>;
 
-/** An authenticated request's key and the project it belongs to, or a 401 already sent. */
+/** An authenticated request's key and the project it belongs to, or the refusal to answer. */
 type McpAuthentication =
   | Readonly<{ kind: "authenticated"; apiKey: string; projectId: string }>
-  | Readonly<{ kind: "answered" }>;
+  | Readonly<{ kind: "answered"; answer: McpDoorAnswer }>;
 
 type McpCallerAuthCollaborators = Readonly<{
   cliSessions: Pick<McpCliSessions, "getCliAccessSession">;
   projects: Pick<ProjectMcpProjectLookupService, "resolveLiveProjectByApiKey">;
   grants: Pick<AuthzMcpSessionGrantService, "stillGranted">;
   address: Pick<HeaderMcpClientAddressService, "clientIp">;
-  http: McpHttpService;
+  answers: McpAnswerService;
 }>;
 
 /** Who a bearer speaks for, whether its grant still holds, and each caller's failed-auth budget. */
@@ -83,17 +82,17 @@ export class McpCallerAuthService {
     return new McpCallerAuthService(collaborators);
   }
 
-  extractBearer(req: IncomingMessage): string | undefined {
-    return extractBearerToken(req.headers.authorization);
+  extractBearer(request: McpRequest): string | undefined {
+    return extractBearerToken(extractSingleHeader(request.headers.authorization));
   }
 
   /** The rate-limit bucket: the address the rest of the deployment limits on. */
-  clientIpOf(req: IncomingMessage): string {
-    return this.#collaborators.address.clientIp(req);
+  clientIpOf(request: McpRequest): string {
+    return this.#collaborators.address.clientIp(request);
   }
 
-  isAuthFailureBlocked(req: IncomingMessage): boolean {
-    return this.#authFailures.isBlocked(this.clientIpOf(req));
+  isAuthFailureBlocked(request: McpRequest): boolean {
+    return this.#authFailures.isBlocked(this.clientIpOf(request));
   }
 
   /**
@@ -118,17 +117,16 @@ export class McpCallerAuthService {
     return token ? this.resolveCaller(token) : { kind: "refused" };
   }
 
-  /** Answers a bearer that did not resolve: 503 while a store is down, else a counted 401. */
-  async answerUnresolved(
-    req: IncomingMessage,
-    res: ServerResponse,
-    input: { token: string; caller: Exclude<McpCallerLookup, { kind: "resolved" }> },
-  ): Promise<void> {
+  /** The answer to a bearer that did not resolve: 503 while a store is down, else a counted 401. */
+  answerUnresolved(input: {
+    request: McpRequest;
+    token: string;
+    caller: Exclude<McpCallerLookup, { kind: "resolved" }>;
+  }): McpDoorAnswer {
     if (input.caller.kind === "unavailable") {
-      await this.#collaborators.http.sendHandled(res, new McpStoreUnavailableError());
-      return;
+      return this.#collaborators.answers.refusal(new McpStoreUnavailableError());
     }
-    await this.refuseBearer(req, res, input.token);
+    return this.refuseBearer({ request: input.request, token: input.token });
   }
 
   /**
@@ -144,11 +142,10 @@ export class McpCallerAuthService {
   }
 
   /** Tracks the failure and refuses with the reason the client can act on. */
-  async refuseBearer(req: IncomingMessage, res: ServerResponse, token: string): Promise<void> {
-    this.#authFailures.track(this.clientIpOf(req));
-    await this.#collaborators.http.sendHandled(
-      res,
-      this.isGrantRevoked(token) ? new McpGrantRevokedError() : new McpInvalidTokenError(),
+  refuseBearer(input: { request: McpRequest; token: string }): McpDoorAnswer {
+    this.#authFailures.track(this.clientIpOf(input.request));
+    return this.#collaborators.answers.refusal(
+      this.isGrantRevoked(input.token) ? new McpGrantRevokedError() : new McpInvalidTokenError(),
     );
   }
 
@@ -158,36 +155,32 @@ export class McpCallerAuthService {
   }
 
   /** Bearer, then the key it resolves to, then the key's project: any miss answers 401. */
-  async authenticate(req: IncomingMessage, res: ServerResponse): Promise<McpAuthentication> {
-    const { http } = this.#collaborators;
-    const token = this.extractBearer(req);
+  async authenticate(request: McpRequest): Promise<McpAuthentication> {
+    const { answers } = this.#collaborators;
+    const token = this.extractBearer(request);
     if (!token) {
-      await http.sendHandled(res, new McpAuthorizationRequiredError());
-      return { kind: "answered" };
+      return { kind: "answered", answer: answers.refusal(new McpAuthorizationRequiredError()) };
     }
 
     const caller = await this.resolveCaller(token);
     if (caller.kind !== "resolved") {
-      await this.answerUnresolved(req, res, { token, caller });
-      return { kind: "answered" };
+      return { kind: "answered", answer: this.answerUnresolved({ request, token, caller }) };
     }
 
     const lookup = caller.projectId
       ? ({ kind: "live", project: { id: caller.projectId } } as const)
       : await this.#validateApiKey(caller.apiKey);
     if (lookup.kind === "unavailable") {
-      await http.sendHandled(res, new McpStoreUnavailableError());
-      return { kind: "answered" };
+      return { kind: "answered", answer: answers.refusal(new McpStoreUnavailableError()) };
     }
     if (lookup.kind === "unknown") {
-      this.#authFailures.track(this.clientIpOf(req));
-      await http.sendHandled(res, new McpInvalidApiKeyError());
-      return { kind: "answered" };
+      this.#authFailures.track(this.clientIpOf(request));
+      return { kind: "answered", answer: answers.refusal(new McpInvalidApiKeyError()) };
     }
     const projectId = lookup.project.id;
 
     // MCP runs outside the app's request context, so the access log carries the tenant instead.
-    http.noteLogFields(res, { projectId });
+    request.noteLogFields({ projectId });
     return { kind: "authenticated", apiKey: caller.apiKey, projectId };
   }
 

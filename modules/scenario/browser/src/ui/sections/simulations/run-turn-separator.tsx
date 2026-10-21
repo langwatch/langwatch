@@ -5,9 +5,9 @@
 
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { Box, Flex, HStack, Icon, Text } from "@langwatch/design-system/primitives";
+import { TracePreviewHoverCard } from "@langwatch/trace-client";
 import { LuListTree } from "react-icons/lu";
 
-import { TracePreviewHoverCard } from "../../../behavior/lent-trace.tsx";
 import { useTurnTrace } from "../../../behavior/simulations/use-turn-trace.ts";
 import { useTraceDetailsDrawer } from "../../../behavior/use-trace-details-drawer.ts";
 

@@ -189,7 +189,7 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 	// instead of swallowing it. Non-2xx still falls through so the
 	// caller sees the upstream status.
 	if readErr != nil && resp.StatusCode/100 == 2 {
-		return nil, fmt.Errorf("httpblock: read response body: %w", readErr)
+		return nil, fmt.Errorf("httpblock: read response body: %w: %w", ErrInvalidResponse, readErr)
 	}
 
 	result := &Result{
@@ -219,7 +219,7 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 	}
 	out, err := ExtractJSONPath(data, req.OutputPath)
 	if err != nil {
-		return result, err
+		return result, fmt.Errorf("%w: %w", ErrInvalidResponse, err)
 	}
 	result.Output = out
 	return result, nil

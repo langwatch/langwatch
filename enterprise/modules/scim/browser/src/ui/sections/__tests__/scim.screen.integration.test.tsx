@@ -246,7 +246,7 @@ describe("given no token has been generated yet", () => {
 
 describe("given the plan does not include provisioning", () => {
   it("says it is an Enterprise feature and offers no retry", () => {
-    state.tokensError = { data: { error: { code: "enterprise_plan_required" } } };
+    state.tokensError = { data: { error: { code: "enterprise_plan_required", httpStatus: 402 } } };
 
     renderWithScimHost(<ScimScreen />);
 

@@ -9,12 +9,12 @@ export interface StoredObjectsTelemetry {
   recordReadFailure(): void;
 }
 
-const storedObjectReadFailuresTotal = counter({
-  name: "stored_object_read_failures_total",
-  description: "Total getById calls where the storage get rejected the read",
-});
-
 export class StoredObjectsTelemetryService implements StoredObjectsTelemetry {
+  private readonly readFailures = counter({
+    name: "stored_object_read_failures_total",
+    description: "Total getById calls where the storage get rejected the read",
+  });
+
   static create(): StoredObjectsTelemetryService {
     return new StoredObjectsTelemetryService();
   }
@@ -22,6 +22,6 @@ export class StoredObjectsTelemetryService implements StoredObjectsTelemetry {
   private constructor() {}
 
   recordReadFailure(): void {
-    storedObjectReadFailuresTotal.inc();
+    this.readFailures.inc();
   }
 }

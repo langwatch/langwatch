@@ -6,11 +6,11 @@
 
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Box, Button, HStack, Spacer, Spinner, Text } from "@langwatch/design-system/primitives";
+import { TraceEditButton } from "@langwatch/trace-client";
 import { Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { RouterOutputs } from "../../behavior/annotation-api.ts";
-import { TraceEditButton } from "../../behavior/lent-trace.tsx";
 import { useAnnotationHost } from "../../model/annotation-host.ts";
 import {
   datasetToggleLabel,
