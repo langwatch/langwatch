@@ -85,9 +85,7 @@ export class MemoryBoardRepository implements BoardRepository {
   }
 
   async deleteBoard(input: { projectId: string; dashboardId: string }): Promise<BoardRecord> {
-    const board = this.#database.boards.find(
-      (row) => row.id === input.dashboardId && row.projectId === input.projectId,
-    );
+    const board = this.#findBoard(input);
     if (!board) throw new DashboardNotFoundError(input.projectId);
     const database = this.#database;
     const onBoard = (row: { projectId: string; dashboardId: string | null }) =>
@@ -196,11 +194,15 @@ export class MemoryBoardRepository implements BoardRepository {
     );
   }
 
-  /** The Prisma twin's `update` refuses an unmatched row; this does too. */
-  #requireBoard(input: { projectId: string; dashboardId: string }): BoardRecord {
-    const board = this.#database.boards.find(
+  #findBoard(input: { projectId: string; dashboardId: string }): BoardRecord | undefined {
+    return this.#database.boards.find(
       (row) => row.id === input.dashboardId && row.projectId === input.projectId,
     );
+  }
+
+  /** The Prisma twin's `update` refuses an unmatched row; this does too. */
+  #requireBoard(input: { projectId: string; dashboardId: string }): BoardRecord {
+    const board = this.#findBoard(input);
     if (!board) throw new Error("DashboardsV2 row not found");
     return board;
   }
