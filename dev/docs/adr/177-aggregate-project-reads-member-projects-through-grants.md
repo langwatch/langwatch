@@ -862,7 +862,9 @@ side keeps its existing guards until ADR-166's `prisma.as` lands.
   yet. Not moved: `trace_summaries` and `evaluation_runs` (the legacy
   builders), filter options, feedbacks and top documents keep their own
   tenant, so the Analytics pages stay hidden on an aggregate (decision 8)
-  until those are fenced too.
+  until those are fenced too. Superseded by v4.15: the legacy builders,
+  filter options, feedbacks and top documents now write the fence marker,
+  and the pages open on an aggregate.
 - v4.14 (2026-10-19, decision 8 changed: LangWatchQL on the aggregate).
   LangWatchQL becomes the way an aggregate reads analytics; the legacy
   Analytics pages are not fenced further and retire with that service. The
@@ -884,7 +886,8 @@ side keeps its existing guards until ADR-166's `prisma.as` lands.
   any read, and the audit row is the one the permission gate already writes
   when it mints the proof. A plain project's statement reaches the store as
   before. Not moved: the Analytics and Dashboards navigation stay hidden on
-  an aggregate until the Dashboards pages ship there.
+  an aggregate until the Dashboards pages ship there. Superseded by v4.15:
+  Analytics opens on an aggregate; Dashboards stays hidden.
   Spec: `specs/lwql/aggregate-reads.feature`.
 - v4.15 (2026-10-21, decision 8 changed again: Analytics pages on the
   aggregate). The aggregate's Analytics pages read the members the way a
@@ -928,4 +931,9 @@ side keeps its existing guards until ADR-166's `prisma.as` lands.
     maker and reads every member if it leaks; that is tasks#955.
   - A window's minute bucket edge keeps v4.13's rule: the bucket a grant's
     edge cuts through is dropped, not counted.
+  - A LangWatchQL run on an aggregate with a member shared up to a date is
+    refused naming that member, as a missing key is, instead of leaving the
+    member out of the total. No view can keep a read to before the end, and
+    the reconciler writes no end today. The rate limit is checked before
+    any member is looked up.
     Spec: `specs/governance/aggregate-project.feature`, section D.
