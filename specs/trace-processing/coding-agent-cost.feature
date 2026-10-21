@@ -78,6 +78,17 @@ Feature: Coding-agent cost, one formula on every surface
     When the Usage tab renders the session
     Then each saturated card states the value as a lower bound, not an exact count
 
+  # The Usage tab's per-call chart reads the transcript of the turn that is open,
+  # while its cards count the whole session. A chart of 2 calls under a card of
+  # 6 reads as the session's calls unless it says which ones it draws.
+
+  @unit
+  Scenario: The per-call chart says it draws the open turn of a longer session
+    Given a session of six model calls opened on a turn that made two
+    When the Usage tab renders the session
+    Then the chart says it draws the open turn's two calls of the session's six
+    And a session whose calls are all in the open turn carries no such note
+
   @unit
   Scenario: The terminal footer states the session total next to the running figure
     Given a session replay opened on one of many turns

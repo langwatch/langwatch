@@ -252,6 +252,34 @@ describe("SessionView", () => {
     });
   });
 
+  describe("given a session opened on a turn that made fewer of its calls", () => {
+    const call = (atMs: number): TranscriptEntry => ({
+      kind: "model_call",
+      atMs,
+      model: "gpt-6-luna",
+      tokens: 28,
+      costUsd: 0.0007,
+      durationMs: 1_000,
+      spanId: `chat-${atMs}`,
+      inputTokens: 3,
+      outputTokens: 25,
+      cacheReadTokens: 9_000,
+      cacheCreationTokens: 5_000,
+    });
+
+    /** @scenario "The per-call chart says it draws the open turn of a longer session" */
+    it("says the chart draws the open turn's calls of the session's", () => {
+      renderSession({ modelCalls: 6 }, [call(1_000), call(2_000)]);
+      expect(screen.getByText("This turn's 2 model calls of the session's 6")).toBeTruthy();
+    });
+
+    /** @scenario "The per-call chart says it draws the open turn of a longer session" */
+    it("adds no note when the open turn holds every call", () => {
+      renderSession({ modelCalls: 2 }, [call(1_000), call(2_000)]);
+      expect(screen.queryByText(/of the session's/)).toBeNull();
+    });
+  });
+
   describe("given transcript entries with a cache rebuild", () => {
     it("shows the timeline and names the prompt that triggered the rebuild", () => {
       const entries: TranscriptEntry[] = [
