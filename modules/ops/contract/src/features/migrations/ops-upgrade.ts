@@ -28,6 +28,11 @@ import {
   opsRunSystemMigrationForOrganizationInputSchema,
   opsSearchMigrationOrganizationsInputSchema,
 } from "./ops-system-migration.ts";
+import {
+  opsUpgradeDiagnosticsAvailabilitySchema,
+  opsUpgradeDiagnosticsReceiptSchema,
+  upgradeDiagnosticsBundleSchema,
+} from "./ops-upgrade-diagnostics.ts";
 
 const isoInstant = z.string();
 const countsSchema = z.record(z.string(), z.number().int());
@@ -208,6 +213,8 @@ export type OpsUpgradeTarget = z.infer<typeof opsUpgradeTargetSchema>;
 
 const opsUpgradeStepDetailSchemaDefinition = z.object({
   ...opsUpgradeStepSchema.shape,
+  /** The last attempt's log lines, redacted when written; only the step's own read carries them. */
+  logTail: z.array(z.string()),
   targets: z.array(opsUpgradeTargetSchema),
 });
 export interface OpsUpgradeStepDetailSchema extends Named<
@@ -313,6 +320,17 @@ export interface OpsUpgradeIdInputSchema extends Named<typeof opsUpgradeIdInputS
 export const opsUpgradeIdInputSchema: OpsUpgradeIdInputSchema = opsUpgradeIdInputSchemaDefinition;
 export type OpsUpgradeIdInput = z.infer<typeof opsUpgradeIdInputSchema>;
 
+/** The bundle an operator reviewed and confirmed: what Send to LangWatch sends. */
+const opsUpgradeSendDiagnosticsInputSchemaDefinition = z.object({
+  bundle: upgradeDiagnosticsBundleSchema,
+});
+export interface OpsUpgradeSendDiagnosticsInputSchema extends Named<
+  typeof opsUpgradeSendDiagnosticsInputSchemaDefinition
+> {}
+export const opsUpgradeSendDiagnosticsInputSchema: OpsUpgradeSendDiagnosticsInputSchema =
+  opsUpgradeSendDiagnosticsInputSchemaDefinition;
+export type OpsUpgradeSendDiagnosticsInput = z.infer<typeof opsUpgradeSendDiagnosticsInputSchema>;
+
 /**
  * One ClickHouse target: its latest done version, steps not done and latest failure, and whether
  * this process can reach it: a private target whose variable is missing or malformed is refused.
@@ -387,6 +405,20 @@ export const opsUpgradeTrpc = defineTrpcContract("ops.upgrade")
   .mutation("retryStep")
   .withInput(opsUpgradeIdInputSchema)
   .withOutput(opsUpgradeStepDetailSchema)
+
+  /** The step's redacted diagnostics bundle, as Copy, Download and Send to LangWatch use it. */
+  .query("getDiagnostics")
+  .withInput(opsUpgradeIdInputSchema)
+  .withOutput(upgradeDiagnosticsBundleSchema)
+
+  .query("diagnosticsAvailability")
+  .withInput(z.void())
+  .withOutput(opsUpgradeDiagnosticsAvailabilitySchema)
+
+  /** Sends the bundle the operator reviewed over Connect; refused by name without Connect. */
+  .mutation("sendDiagnostics")
+  .withInput(opsUpgradeSendDiagnosticsInputSchema)
+  .withOutput(opsUpgradeDiagnosticsReceiptSchema)
 
   /**
    * The in-place system migrations, per migration: the status rollup plus the

@@ -6339,6 +6339,20 @@ const presentations = {
     title: "Too many activation attempts",
     describe: () => "Too many activation attempts. Try again shortly.",
   },
+  upgrade_diagnostics_license_required: {
+    title: "A LangWatch licence is needed to send diagnostics",
+    describe: () =>
+      "Download the diagnostics from the step page and send them to support@langwatch.ai instead.",
+  },
+  upgrade_diagnostics_rate_limited: {
+    title: "Too many diagnostics sent today",
+    describe: () =>
+      "This install has sent its diagnostics allowance for today. Try again tomorrow.",
+  },
+  upgrade_diagnostics_not_found: {
+    title: "Diagnostics report not found",
+    describe: () => "This diagnostics report no longer exists. Reports are kept for 30 days.",
+  },
   self_hosted_instance_not_found: {
     title: "Install not found",
     describe: () => "We have not heard from a self-hosted install with that id.",

@@ -847,11 +847,62 @@ func (r *BifrostRouter) dispatchMessagesStream(
 	if berr != nil {
 		return nil, errFromBifrost(ctx, berr, bifrostResponseHeaders(bfCtx))
 	}
-	return &bifrostStreamIterator{
+	return openPassthroughStream(ctx, &bifrostStreamIterator{
 		ch:         ch,
 		rawFraming: true,
 		parseUsage: parseAnthropicPassthroughUsage,
-	}, nil
+	})
+}
+
+// maxPassthroughErrorBodyBytes bounds how much of a rejected passthrough
+// stream's error body the gateway holds to forward. Provider error bodies are
+// a few hundred bytes; anything past the cap is dropped, never buffered.
+const maxPassthroughErrorBodyBytes = 64 * 1024
+
+// openPassthroughStream waits for the first chunk, which carries the upstream
+// status. Bifrost streams a rejected request's error body as ordinary chunks,
+// so an Anthropic 400 (a spent credit balance) reached clients as a 200 event
+// stream of bare JSON, which SDKs retried as a stream that ended early. A
+// status of 400 or above becomes an UpstreamError, as on the non-stream lane.
+func openPassthroughStream(ctx context.Context, it *bifrostStreamIterator) (domain.StreamIterator, error) {
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case chunk, ok := <-it.ch:
+		if !ok {
+			it.done = true
+			return it, nil
+		}
+		first := chunk.BifrostPassthroughResponse
+		if chunk.BifrostError != nil || first == nil || first.StatusCode < http.StatusBadRequest {
+			it.pending = chunk
+			return it, nil
+		}
+		return nil, rejectedPassthroughStream(it.ch, first)
+	}
+}
+
+// rejectedPassthroughStream reads the rest of a rejected stream's error body
+// (bounded) and returns it as the upstream's own error. The channel is drained
+// to its end so Bifrost's sender never blocks on a reader that left.
+func rejectedPassthroughStream(ch chan *bfschemas.BifrostStreamChunk, first *bfschemas.BifrostPassthroughResponse) error {
+	body := append([]byte(nil), first.Body...)
+	for chunk := range ch {
+		if next := chunk.BifrostPassthroughResponse; next != nil && len(body) < maxPassthroughErrorBodyBytes {
+			body = append(body, next.Body...)
+		}
+	}
+	if len(body) > maxPassthroughErrorBodyBytes {
+		body = body[:maxPassthroughErrorBodyBytes]
+	}
+	return &domain.UpstreamError{
+		StatusCode: first.StatusCode,
+		Body:       body,
+		Message:    gjson.GetBytes(body, "error.message").String(),
+		ErrorType:  gjson.GetBytes(body, "error.type").String(),
+		ErrorCode:  gjson.GetBytes(body, "error.code").String(),
+		Headers:    forwardableUpstreamHeaders(first.Headers),
+	}
 }
 
 // dispatchResponsesStream is the streaming sibling of dispatchResponses.
@@ -950,7 +1001,7 @@ func (r *BifrostRouter) dispatchPassthroughStream(
 	if berr != nil {
 		return nil, errFromBifrost(ctx, berr, bifrostResponseHeaders(bfCtx))
 	}
-	return &bifrostStreamIterator{ch: ch, rawFraming: true}, nil
+	return openPassthroughStream(ctx, &bifrostStreamIterator{ch: ch, rawFraming: true})
 }
 
 // passthroughRequest builds the Bifrost-side passthrough request from
@@ -2093,11 +2144,18 @@ type bifrostStreamIterator struct {
 	// maxUsageTailBytes so a stream that never closes a frame cannot
 	// grow it without bound.
 	usageTail []byte
+	// pending is a chunk already taken off ch (openPassthroughStream reads
+	// the first one for its status), handed out before ch is read again.
+	pending *bfschemas.BifrostStreamChunk
 }
 
 func (it *bifrostStreamIterator) Next(ctx context.Context) bool {
 	if it.done {
 		return false
+	}
+	if chunk := it.pending; chunk != nil {
+		it.pending = nil
+		return it.take(chunk)
 	}
 	select {
 	case <-ctx.Done():
@@ -2109,118 +2167,98 @@ func (it *bifrostStreamIterator) Next(ctx context.Context) bool {
 			it.done = true
 			return false
 		}
-		if chunk.BifrostError != nil {
-			it.err = upstreamStreamError(chunk.BifrostError)
-			it.done = true
-			return false
+		return it.take(chunk)
+	}
+}
+
+// take makes one received chunk the iterator's current one.
+func (it *bifrostStreamIterator) take(chunk *bfschemas.BifrostStreamChunk) bool {
+	if chunk.BifrostError != nil {
+		it.err = upstreamStreamError(chunk.BifrostError)
+		it.done = true
+		return false
+	}
+	if chunk.BifrostChatResponse != nil {
+		it.ensureLeadingRoleDelta(chunk.BifrostChatResponse)
+		data := publicWireBody(chunk.BifrostChatResponse)
+		if chunk.BifrostChatResponse.Usage != nil {
+			it.usage = extractUsage(chunk.BifrostChatResponse)
+			// The usage-bearing final chunk carries the policy drop
+			// signal, mirroring extra_fields.params_dropped on sync
+			// responses.
+			data = injectParamsDropped(data, it.paramsDropped)
 		}
-		if chunk.BifrostChatResponse != nil {
-			it.ensureLeadingRoleDelta(chunk.BifrostChatResponse)
-			data := publicWireBody(chunk.BifrostChatResponse)
-			if chunk.BifrostChatResponse.Usage != nil {
-				it.usage = extractUsage(chunk.BifrostChatResponse)
-				// The usage-bearing final chunk carries the policy drop
-				// signal, mirroring extra_fields.params_dropped on sync
-				// responses.
-				data = injectParamsDropped(data, it.paramsDropped)
-			}
-			it.current = data
-		} else if chunk.BifrostResponsesStreamResponse != nil {
-			// Responses API stream frames (response.created /
-			// response.output_text.delta / response.completed / ...).
-			// Marshal verbatim — clients using the OpenAI Responses SDK
-			// decode these by `type`. Final usage appears on the
-			// response.completed event's nested Response object.
-			data := publicWireBody(chunk.BifrostResponsesStreamResponse)
-			it.current = data
-			//nolint:staticcheck // explicit embedded-field reference matches the parallel branches above for readability.
-			if resp := chunk.BifrostResponsesStreamResponse.Response; resp != nil && resp.Usage != nil {
-				it.usage = extractResponsesUsage(resp)
-			}
-		} else if chunk.BifrostPassthroughResponse != nil {
-			// Passthrough stream chunks carry the raw upstream bytes
-			// (Gemini streamGenerateContent already emits proper
-			// `event:/data:` SSE framing). Forward verbatim — the
-			// writer side knows not to re-wrap when rawFraming is set.
-			//nolint:staticcheck // explicit embedded-field reference matches the parallel branches above for readability.
-			it.current = chunk.BifrostPassthroughResponse.Body
-			// Parse Gemini-native usageMetadata out of the chunk body so
-			// the trace wrapper can stamp prompt/completion/cached
-			// tokens on the customer span. Bifrost's Passthrough adapter
-			// doesn't emit a typed Usage struct on these chunks (raw
-			// passthrough by design), so we crack the JSON here. Each
-			// non-final chunk omits usageMetadata; we keep the last
-			// non-zero values seen so the iterator's Usage() reports
-			// the FINAL token totals at stream close.
-			parser := it.parseUsage
-			if parser == nil {
-				parser = parseGeminiPassthroughUsage
-			}
-			// The chunk boundary is a socket-read boundary, not an SSE
-			// frame boundary, so a usage-bearing frame can arrive split
-			// across two chunks and a per-chunk parse would silently
-			// lose it (Anthropic's message_start, the only frame with
-			// input and cache counts, is the largest and most exposed).
-			// Prepend the unterminated remainder of the previous chunk
-			// so the frame parses whole once its closing bytes arrive.
-			//nolint:staticcheck // explicit embedded-field reference matches the parallel branches above for readability.
-			scan := chunk.BifrostPassthroughResponse.Body
-			if len(it.usageTail) > 0 {
-				scan = append(it.usageTail, scan...)
-			}
-			it.usageTail = passthroughUsageTail(scan)
-			if u, ok := parser(scan); ok {
-				// Merge — Anthropic streams emit prompt+cache tokens
-				// once on `message_start` and a stream of output token
-				// counters on `message_delta`, so a chunk-by-chunk
-				// replace would drop the message_start values. Gemini
-				// emits the full usageMetadata on every chunk that has
-				// it, so this merge is a no-op for it.
-				if u.PromptTokens > 0 {
-					it.usage.PromptTokens = u.PromptTokens
-				}
-				if u.CompletionTokens > 0 {
-					it.usage.CompletionTokens = u.CompletionTokens
-				}
-				if u.CacheReadTokens > 0 {
-					it.usage.CacheReadTokens = u.CacheReadTokens
-				}
-				if u.CacheCreationTokens > 0 {
-					it.usage.CacheCreationTokens = u.CacheCreationTokens
-				}
-				if u.CacheCreation1hTokens > 0 {
-					it.usage.CacheCreation1hTokens = u.CacheCreation1hTokens
-				}
-				// Audio tokens merge on the same rule. A chunk that
-				// reports none must not clear a count an earlier chunk
-				// already carried, or a streamed audio turn prices at the
-				// text rate.
-				if u.InputAudioTokens > 0 {
-					it.usage.InputAudioTokens = u.InputAudioTokens
-				}
-				if u.OutputAudioTokens > 0 {
-					it.usage.OutputAudioTokens = u.OutputAudioTokens
-				}
-				if u.ReasoningTokens > 0 {
-					it.usage.ReasoningTokens = u.ReasoningTokens
-				}
-				// Prefer the parser's reported total when non-zero —
-				// Gemini's `totalTokenCount` can exceed prompt+completion
-				// (reasoning / thinking tokens). Anthropic doesn't report
-				// a total on the wire, so the parser leaves it at 0 and
-				// we fall through to prompt+completion below.
-				if u.TotalTokens > 0 {
-					it.usage.TotalTokens = u.TotalTokens
-				} else if it.usage.PromptTokens > 0 || it.usage.CompletionTokens > 0 {
-					it.usage.TotalTokens = it.usage.PromptTokens + it.usage.CompletionTokens
-				}
-				// The two cache-write counters merge independently across
-				// chunks, so keep the running usage obeying the rule that the
-				// hour-long count is a portion of the total.
-				it.usage = it.usage.ReconcileCacheWrites()
-			}
+		it.current = data
+	} else if chunk.BifrostResponsesStreamResponse != nil {
+		// Responses API stream frames (response.created /
+		// response.output_text.delta / response.completed / ...).
+		// Marshal verbatim — clients using the OpenAI Responses SDK
+		// decode these by `type`. Final usage appears on the
+		// response.completed event's nested Response object.
+		data := publicWireBody(chunk.BifrostResponsesStreamResponse)
+		it.current = data
+		//nolint:staticcheck // explicit embedded-field reference matches the parallel branches above for readability.
+		if resp := chunk.BifrostResponsesStreamResponse.Response; resp != nil && resp.Usage != nil {
+			it.usage = extractResponsesUsage(resp)
 		}
-		return true
+	} else if chunk.BifrostPassthroughResponse != nil {
+		//nolint:staticcheck // explicit embedded-field reference matches the parallel branches above for readability.
+		it.takePassthrough(chunk.BifrostPassthroughResponse.Body)
+	}
+	return true
+}
+
+// takePassthrough forwards a passthrough chunk's raw upstream bytes verbatim
+// (the writer does not re-wrap them when rawFraming is set) and reads usage
+// off them. A chunk boundary is a socket read, not an SSE frame, so the
+// unterminated remainder of the previous chunk is prepended before parsing.
+func (it *bifrostStreamIterator) takePassthrough(body []byte) {
+	it.current = body
+	parser := it.parseUsage
+	if parser == nil {
+		parser = parseGeminiPassthroughUsage
+	}
+	scan := body
+	if len(it.usageTail) > 0 {
+		scan = append(it.usageTail, scan...)
+	}
+	it.usageTail = passthroughUsageTail(scan)
+	if u, ok := parser(scan); ok {
+		it.mergePassthroughUsage(u)
+	}
+}
+
+// mergePassthroughUsage keeps the last non-zero value of each counter:
+// Anthropic states prompt and cache tokens once on message_start and output
+// tokens on each message_delta, so replacing per chunk would drop the former.
+// Gemini states the full usage on every chunk that has it.
+func (it *bifrostStreamIterator) mergePassthroughUsage(u domain.Usage) {
+	keepNonZero(&it.usage.PromptTokens, u.PromptTokens)
+	keepNonZero(&it.usage.CompletionTokens, u.CompletionTokens)
+	keepNonZero(&it.usage.CacheReadTokens, u.CacheReadTokens)
+	keepNonZero(&it.usage.CacheCreationTokens, u.CacheCreationTokens)
+	keepNonZero(&it.usage.CacheCreation1hTokens, u.CacheCreation1hTokens)
+	// A chunk that reports no audio tokens must not clear an earlier count,
+	// or a streamed audio turn prices at the text rate.
+	keepNonZero(&it.usage.InputAudioTokens, u.InputAudioTokens)
+	keepNonZero(&it.usage.OutputAudioTokens, u.OutputAudioTokens)
+	keepNonZero(&it.usage.ReasoningTokens, u.ReasoningTokens)
+	// Prefer the parser's total: Gemini's totalTokenCount can exceed
+	// prompt+completion (thinking tokens). Anthropic reports none on the wire.
+	if u.TotalTokens > 0 {
+		it.usage.TotalTokens = u.TotalTokens
+	} else if it.usage.PromptTokens > 0 || it.usage.CompletionTokens > 0 {
+		it.usage.TotalTokens = it.usage.PromptTokens + it.usage.CompletionTokens
+	}
+	// The two cache-write counters merge independently across
+	// chunks, so keep the running usage obeying the rule that the
+	// hour-long count is a portion of the total.
+	it.usage = it.usage.ReconcileCacheWrites()
+}
+
+func keepNonZero(dst *int, v int) {
+	if v > 0 {
+		*dst = v
 	}
 }
 

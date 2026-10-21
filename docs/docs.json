@@ -569,7 +569,13 @@
               "integration/go/integrations/groq",
               "integration/go/integrations/grok",
               "integration/go/integrations/ollama",
-              "integration/go/integrations/openrouter",
+              {
+                "group": "OpenRouter",
+                "pages": [
+                  "integration/openrouter-broadcast",
+                  "integration/go/integrations/openrouter"
+                ]
+              },
               {
                 "group": "LiteLLM",
                 "pages": [
@@ -1740,7 +1746,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1792596875",
+      "source": "/ci/cache/busted/1792612073",
       "destination": "/introduction"
     },
     {

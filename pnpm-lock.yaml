@@ -3511,6 +3511,9 @@ importers:
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../../packages/module
+      '@langwatch/ops-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/ops/contract
       '@langwatch/plans':
         specifier: workspace:*
         version: link:../../../../packages/plans
@@ -3608,6 +3611,9 @@ importers:
       '@langwatch/user-contract':
         specifier: workspace:*
         version: link:../../../../modules/user/contract
+      '@slack/webhook':
+        specifier: 'catalog:'
+        version: 7.1.0(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
       '@trpc/server':
         specifier: 'catalog:'
         version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
@@ -18228,6 +18234,9 @@ importers:
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../process-stores
+      '@langwatch/redaction':
+        specifier: workspace:*
+        version: link:../redaction
       '@langwatch/redis-client':
         specifier: workspace:*
         version: link:../redis-client

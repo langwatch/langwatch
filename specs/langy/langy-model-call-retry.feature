@@ -46,6 +46,16 @@ Feature: Langy retries a transient model or tool failure inside the turn
       When the worker classifies the failure
       Then it is not retried and the turn fails with that error
 
+    # A spent Anthropic balance once reached the worker as a 200 stream with no
+    # events, read as "stream ended without a stop reason" and retried five
+    # times over 33 seconds before the card showed.
+    @unit
+    Scenario: A spent provider balance fails the turn on the first attempt
+      Given a model call fails because the provider account has no credit left
+      And the failure carries the gateway's "provider_account_exhausted" code, the gateway's exhausted-access message or the provider's credit balance message
+      When the worker classifies the failure
+      Then it is not retried and the turn fails with that error
+
     @unit
     Scenario: The error shows only after the last attempt
       Given every attempt of a model call fails with a transient error
