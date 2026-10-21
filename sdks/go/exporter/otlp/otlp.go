@@ -1,6 +1,6 @@
 // Package otlp sends LangWatch spans through the official otlptracehttp
-// exporter (OTLP/protobuf), for programs that already link gRPC or rely on
-// its OTEL_EXPORTER_OTLP_* variables or retry policy. It is its own module so
+// exporter, for programs that already link gRPC or rely on its
+// OTEL_EXPORTER_OTLP_* variables or retry policy. It is its own module so
 // the root SDK does not depend on gRPC. Use NewExporter, or WithTransport on
 // any langwatch constructor; the SDK README has examples.
 package otlp
@@ -36,9 +36,7 @@ func WithTransport(extra ...otlptracehttp.Option) langwatch.ExporterOption {
 }
 
 // NewExporter is langwatch.NewExporter sending through otlptracehttp: the
-// same options, environment fallbacks, filters and data capture, over
-// OTLP/protobuf. This is what langwatch.NewExporter did before it switched to
-// OTLP/JSON.
+// same options, environment fallbacks, filters and data capture.
 func NewExporter(ctx context.Context, opts ...langwatch.ExporterOption) (*langwatch.LangWatchExporter, error) {
 	return langwatch.NewExporter(ctx, withTransportLast(opts)...)
 }

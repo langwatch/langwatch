@@ -1,19 +1,18 @@
-// Package otlpjson encodes OpenTelemetry spans as an OTLP/JSON
-// ExportTraceServiceRequest and sends them over OTLP/HTTP. It depends only on
-// the standard library and the OpenTelemetry API and SDK, so it links neither
-// gRPC nor the generated OTLP protobuf packages.
-package otlpjson
+// Package otlphttp encodes OpenTelemetry spans as an OTLP/protobuf
+// ExportTraceServiceRequest and sends them over OTLP/HTTP. The protobuf is
+// written by hand from the opentelemetry-proto field numbers, so the package
+// depends only on the standard library and the OpenTelemetry API and SDK, and
+// links neither gRPC nor the generated OTLP protobuf packages.
+package otlphttp
 
 import (
-	"encoding/base64"
-	"encoding/json"
-	"io"
+	"encoding/binary"
 	"math"
-	"strconv"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/sdk/instrumentation"
+	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -31,30 +30,40 @@ const (
 	statusError = 2
 )
 
-// Marshal encodes spans as an OTLP/JSON ExportTraceServiceRequest. Spans are
-// grouped by resource and then by instrumentation scope, in the order they
-// first appear; nil spans are skipped.
-func Marshal(spans []sdktrace.ReadOnlySpan) ([]byte, error) {
-	return json.Marshal(buildRequest(spans))
+// Marshal encodes spans as an OTLP/protobuf ExportTraceServiceRequest.
+func Marshal(spans []sdktrace.ReadOnlySpan) []byte {
+	return AppendRequest(nil, spans)
 }
 
-// Encode writes the request Marshal would return to w, followed by a newline,
-// without building the whole body as a separate []byte first.
-func Encode(w io.Writer, spans []sdktrace.ReadOnlySpan) error {
-	return json.NewEncoder(w).Encode(buildRequest(spans))
+// AppendRequest appends the request for spans to b. Spans are grouped by
+// resource and then by instrumentation scope, in the order they first appear;
+// nil spans are skipped.
+func AppendRequest(b []byte, spans []sdktrace.ReadOnlySpan) []byte {
+	for _, rg := range group(spans) {
+		b = appendMessage(b, 1, func(b []byte) []byte { return appendResourceSpans(b, rg) })
+	}
+	return b
 }
 
-// buildRequest groups spans into resourceSpans/scopeSpans.
-func buildRequest(spans []sdktrace.ReadOnlySpan) exportRequest {
+type resourceGroup struct {
+	resource *resource.Resource
+	scopes   []scopeGroup
+}
+
+type scopeGroup struct {
+	scope instrumentation.Scope
+	spans []sdktrace.ReadOnlySpan
+}
+
+func group(spans []sdktrace.ReadOnlySpan) []resourceGroup {
 	type scopeKey struct {
 		resource attribute.Distinct
 		scope    instrumentation.Scope
 	}
-	// Indexes into req.ResourceSpans and into that entry's ScopeSpans.
 	resourceIndex := make(map[attribute.Distinct]int)
 	scopeIndex := make(map[scopeKey]int)
 
-	req := exportRequest{ResourceSpans: []resourceSpans{}}
+	var out []resourceGroup
 	for _, sd := range spans {
 		if sd == nil {
 			continue
@@ -63,90 +72,172 @@ func buildRequest(spans []sdktrace.ReadOnlySpan) exportRequest {
 		rKey := res.Equivalent()
 		ri, ok := resourceIndex[rKey]
 		if !ok {
-			ri = len(req.ResourceSpans)
+			ri = len(out)
 			resourceIndex[rKey] = ri
-			req.ResourceSpans = append(req.ResourceSpans, resourceSpans{
-				Resource:   otlpResource{Attributes: keyValues(res.Attributes())},
-				ScopeSpans: []scopeSpans{},
-				SchemaURL:  res.SchemaURL(),
-			})
+			out = append(out, resourceGroup{resource: res})
 		}
-		rs := &req.ResourceSpans[ri]
+		rg := &out[ri]
 
-		is := sd.InstrumentationScope()
-		sKey := scopeKey{resource: rKey, scope: is}
+		sKey := scopeKey{resource: rKey, scope: sd.InstrumentationScope()}
 		si, ok := scopeIndex[sKey]
 		if !ok {
-			si = len(rs.ScopeSpans)
+			si = len(rg.scopes)
 			scopeIndex[sKey] = si
-			rs.ScopeSpans = append(rs.ScopeSpans, scopeSpans{
-				Scope: scope{
-					Name:       is.Name,
-					Version:    is.Version,
-					Attributes: keyValues(is.Attributes.ToSlice()),
-				},
-				Spans:     []span{},
-				SchemaURL: is.SchemaURL,
-			})
+			rg.scopes = append(rg.scopes, scopeGroup{scope: sKey.scope})
 		}
-		ss := &rs.ScopeSpans[si]
-		ss.Spans = append(ss.Spans, encodeSpan(sd))
+		rg.scopes[si].spans = append(rg.scopes[si].spans, sd)
 	}
-	return req
+	return out
 }
 
-// encodeSpan converts one span, matching the official exporter's mapping.
-func encodeSpan(sd sdktrace.ReadOnlySpan) span {
+// ResourceSpans: 1 resource (Resource: 1 attributes), 2 scope_spans, 3 schema_url.
+func appendResourceSpans(b []byte, rg resourceGroup) []byte {
+	b = appendMessage(b, 1, func(b []byte) []byte { return appendKeyValues(b, 1, rg.resource.Attributes()) })
+	for _, sg := range rg.scopes {
+		b = appendMessage(b, 2, func(b []byte) []byte { return appendScopeSpans(b, sg) })
+	}
+	return appendStringField(b, 3, rg.resource.SchemaURL())
+}
+
+// ScopeSpans: 1 scope, 2 spans, 3 schema_url.
+func appendScopeSpans(b []byte, sg scopeGroup) []byte {
+	b = appendMessage(b, 1, func(b []byte) []byte { return appendScope(b, sg.scope) })
+	for _, sd := range sg.spans {
+		b = appendMessage(b, 2, func(b []byte) []byte { return appendSpan(b, sd) })
+	}
+	return appendStringField(b, 3, sg.scope.SchemaURL)
+}
+
+// InstrumentationScope: 1 name, 2 version, 3 attributes.
+func appendScope(b []byte, s instrumentation.Scope) []byte {
+	b = appendStringField(b, 1, s.Name)
+	b = appendStringField(b, 2, s.Version)
+	return appendKeyValues(b, 3, s.Attributes.ToSlice())
+}
+
+// appendSpan writes a Span, matching the official exporter's mapping: 1
+// trace_id, 2 span_id, 3 trace_state, 4 parent_span_id, 5 name, 6 kind, 7/8
+// start/end time, 9-14 attributes, events, links and their dropped counts, 15
+// status, 16 flags.
+func appendSpan(b []byte, sd sdktrace.ReadOnlySpan) []byte {
 	sc := sd.SpanContext()
-	out := span{
-		TraceID:                sc.TraceID().String(),
-		SpanID:                 sc.SpanID().String(),
-		TraceState:             sc.TraceState().String(),
-		Flags:                  spanFlags(sc.TraceFlags(), sd.Parent()),
-		Name:                   sd.Name(),
-		Kind:                   spanKind(sd.SpanKind()),
-		StartTimeUnixNano:      unixNano(sd.StartTime().UnixNano()),
-		EndTimeUnixNano:        unixNano(sd.EndTime().UnixNano()),
-		Attributes:             keyValues(sd.Attributes()),
-		DroppedAttributesCount: clampUint32(sd.DroppedAttributes()),
-		Events:                 events(sd.Events()),
-		DroppedEventsCount:     clampUint32(sd.DroppedEvents()),
-		Links:                  links(sd.Links()),
-		DroppedLinksCount:      clampUint32(sd.DroppedLinks()),
-		Status:                 spanStatus(sd.Status()),
-	}
+	traceID, spanID := sc.TraceID(), sc.SpanID()
+	b = appendBytesField(b, 1, traceID[:])
+	b = appendBytesField(b, 2, spanID[:])
+	b = appendStringField(b, 3, sc.TraceState().String())
 	if parent := sd.Parent().SpanID(); parent.IsValid() {
-		out.ParentSpanID = parent.String()
+		b = appendBytesField(b, 4, parent[:])
 	}
-	return out
+	b = appendStringField(b, 5, sd.Name())
+	b = appendVarintField(b, 6, spanKind(sd.SpanKind()))
+	b = appendFixed64Field(b, 7, unixNano(sd.StartTime().UnixNano()))
+	b = appendFixed64Field(b, 8, unixNano(sd.EndTime().UnixNano()))
+	b = appendKeyValues(b, 9, sd.Attributes())
+	b = appendVarintField(b, 10, clampUint32(sd.DroppedAttributes()))
+	for _, e := range sd.Events() {
+		b = appendMessage(b, 11, func(b []byte) []byte { return appendEvent(b, e) })
+	}
+	b = appendVarintField(b, 12, clampUint32(sd.DroppedEvents()))
+	for _, l := range sd.Links() {
+		b = appendMessage(b, 13, func(b []byte) []byte { return appendLink(b, l) })
+	}
+	b = appendVarintField(b, 14, clampUint32(sd.DroppedLinks()))
+	b = appendMessage(b, 15, func(b []byte) []byte { return appendStatus(b, sd.Status()) })
+	return appendFixed32Field(b, 16, spanFlags(sc.TraceFlags(), sd.Parent()))
 }
 
-func events(es []sdktrace.Event) []event {
-	out := make([]event, len(es))
-	for i, e := range es {
-		out[i] = event{
-			TimeUnixNano:           unixNano(e.Time.UnixNano()),
-			Name:                   e.Name,
-			Attributes:             keyValues(e.Attributes),
-			DroppedAttributesCount: clampUint32(e.DroppedAttributeCount),
-		}
-	}
-	return out
+// Event: 1 time_unix_nano, 2 name, 3 attributes, 4 dropped_attributes_count.
+func appendEvent(b []byte, e sdktrace.Event) []byte {
+	b = appendFixed64Field(b, 1, unixNano(e.Time.UnixNano()))
+	b = appendStringField(b, 2, e.Name)
+	b = appendKeyValues(b, 3, e.Attributes)
+	return appendVarintField(b, 4, clampUint32(e.DroppedAttributeCount))
 }
 
-func links(ls []sdktrace.Link) []link {
-	out := make([]link, len(ls))
-	for i, l := range ls {
-		out[i] = link{
-			TraceID:                l.SpanContext.TraceID().String(),
-			SpanID:                 l.SpanContext.SpanID().String(),
-			TraceState:             l.SpanContext.TraceState().String(),
-			Attributes:             keyValues(l.Attributes),
-			DroppedAttributesCount: clampUint32(l.DroppedAttributeCount),
-			Flags:                  spanFlags(l.SpanContext.TraceFlags(), l.SpanContext),
-		}
+// Link: 1 trace_id, 2 span_id, 3 trace_state, 4 attributes, 5
+// dropped_attributes_count, 6 flags.
+func appendLink(b []byte, l sdktrace.Link) []byte {
+	traceID, spanID := l.SpanContext.TraceID(), l.SpanContext.SpanID()
+	b = appendBytesField(b, 1, traceID[:])
+	b = appendBytesField(b, 2, spanID[:])
+	b = appendStringField(b, 3, l.SpanContext.TraceState().String())
+	b = appendKeyValues(b, 4, l.Attributes)
+	b = appendVarintField(b, 5, clampUint32(l.DroppedAttributeCount))
+	return appendFixed32Field(b, 6, spanFlags(l.SpanContext.TraceFlags(), l.SpanContext))
+}
+
+// Status: 2 message, 3 code.
+func appendStatus(b []byte, s sdktrace.Status) []byte {
+	b = appendStringField(b, 2, s.Description)
+	return appendVarintField(b, 3, statusCode(s.Code))
+}
+
+// appendKeyValues writes each KeyValue (1 key, 2 value) as field num.
+func appendKeyValues(b []byte, num int, kvs []attribute.KeyValue) []byte {
+	for _, kv := range kvs {
+		b = appendMessage(b, num, func(b []byte) []byte {
+			b = appendStringField(b, 1, string(kv.Key))
+			return appendMessage(b, 2, func(b []byte) []byte { return appendAnyValue(b, kv.Value) })
+		})
 	}
-	return out
+	return b
+}
+
+// appendAnyValue writes the AnyValue oneof: 1 string, 2 bool, 3 int, 4
+// double, 5 array, 7 bytes. A oneof member is written even when it holds its
+// zero value, so the receiver can tell false or "" from unset.
+func appendAnyValue(b []byte, v attribute.Value) []byte {
+	switch v.Type() {
+	case attribute.STRING:
+		return appendOneofString(b, 1, v.AsString())
+	case attribute.BOOL:
+		var n uint64
+		if v.AsBool() {
+			n = 1
+		}
+		return appendOneofVarint(b, 2, n)
+	case attribute.INT64:
+		return appendOneofVarint(b, 3, uint64(v.AsInt64()))
+	case attribute.FLOAT64:
+		return appendOneofDouble(b, 4, v.AsFloat64())
+	case attribute.BYTESLICE:
+		return appendOneofString(b, 7, string(v.AsByteSlice()))
+	case attribute.BOOLSLICE:
+		return appendArray(b, v.AsBoolSlice(), attribute.BoolValue)
+	case attribute.INT64SLICE:
+		return appendArray(b, v.AsInt64Slice(), attribute.Int64Value)
+	case attribute.FLOAT64SLICE:
+		return appendArray(b, v.AsFloat64Slice(), attribute.Float64Value)
+	case attribute.STRINGSLICE:
+		return appendArray(b, v.AsStringSlice(), attribute.StringValue)
+	case attribute.SLICE:
+		return appendArray(b, v.AsSlice(), func(v attribute.Value) attribute.Value { return v })
+	default:
+		return b
+	}
+}
+
+// appendArray writes AnyValue field 5, an ArrayValue (1 values) of items.
+func appendArray[T any](b []byte, items []T, conv func(T) attribute.Value) []byte {
+	return appendMessage(b, 5, func(b []byte) []byte {
+		for _, item := range items {
+			b = appendMessage(b, 1, func(b []byte) []byte { return appendAnyValue(b, conv(item)) })
+		}
+		return b
+	})
+}
+
+func appendOneofString(b []byte, num int, v string) []byte {
+	b = binary.AppendUvarint(appendTag(b, num, wireBytes), uint64(len(v)))
+	return append(b, v...)
+}
+
+func appendOneofVarint(b []byte, num int, v uint64) []byte {
+	return binary.AppendUvarint(appendTag(b, num, wireVarint), v)
+}
+
+func appendOneofDouble(b []byte, num int, v float64) []byte {
+	return binary.LittleEndian.AppendUint64(appendTag(b, num, wireFixed64), math.Float64bits(v))
 }
 
 // spanFlags carries the W3C trace flags in the low byte and records whether
@@ -159,7 +250,7 @@ func spanFlags(tf trace.TraceFlags, parent trace.SpanContext) uint32 {
 	return flags
 }
 
-func spanKind(kind trace.SpanKind) int {
+func spanKind(kind trace.SpanKind) uint64 {
 	switch kind {
 	case trace.SpanKindInternal:
 		return 1
@@ -176,86 +267,32 @@ func spanKind(kind trace.SpanKind) int {
 	}
 }
 
-func spanStatus(s sdktrace.Status) status {
-	var code int
-	switch s.Code {
+func statusCode(c codes.Code) uint64 {
+	switch c {
 	case codes.Ok:
-		code = statusOk
+		return statusOk
 	case codes.Error:
-		code = statusError
+		return statusError
 	default:
-		code = statusUnset
-	}
-	return status{Code: code, Message: s.Description}
-}
-
-func keyValues(kvs []attribute.KeyValue) []keyValue {
-	out := make([]keyValue, len(kvs))
-	for i, kv := range kvs {
-		out[i] = keyValue{Key: string(kv.Key), Value: value(kv.Value)}
-	}
-	return out
-}
-
-// value converts an attribute value to an AnyValue. Byte slices go as a
-// base64 stringValue: the LangWatch receiver accepts bytesValue only from
-// protobuf bodies, so an OTLP/JSON bytesValue would drop the span.
-func value(v attribute.Value) anyValue {
-	switch v.Type() {
-	case attribute.BOOL:
-		b := v.AsBool()
-		return anyValue{BoolValue: &b}
-	case attribute.INT64:
-		return intValue(v.AsInt64())
-	case attribute.FLOAT64:
-		d := double(v.AsFloat64())
-		return anyValue{DoubleValue: &d}
-	case attribute.STRING:
-		s := v.AsString()
-		return anyValue{StringValue: &s}
-	case attribute.BYTESLICE:
-		s := base64.StdEncoding.EncodeToString(v.AsByteSlice())
-		return anyValue{StringValue: &s}
-	case attribute.BOOLSLICE:
-		return array(v.AsBoolSlice(), func(b *bool) anyValue { return anyValue{BoolValue: b} })
-	case attribute.INT64SLICE:
-		return array(v.AsInt64Slice(), func(n *int64) anyValue { return intValue(*n) })
-	case attribute.FLOAT64SLICE:
-		return array(v.AsFloat64Slice(), func(f *float64) anyValue {
-			d := double(*f)
-			return anyValue{DoubleValue: &d}
-		})
-	case attribute.STRINGSLICE:
-		return array(v.AsStringSlice(), func(s *string) anyValue { return anyValue{StringValue: s} })
-	case attribute.SLICE:
-		return array(v.AsSlice(), func(item *attribute.Value) anyValue { return value(*item) })
-	default:
-		return anyValue{}
+		return statusUnset
 	}
 }
 
-// array converts each element of items, which the caller owns, to an
-// ArrayValue.
-func array[T any](items []T, conv func(*T) anyValue) anyValue {
-	vals := make([]anyValue, len(items))
-	for i := range items {
-		vals[i] = conv(&items[i])
+// unixNano clamps instants before the epoch to zero, as the official
+// exporter does.
+func unixNano(ns int64) uint64 {
+	if ns < 0 {
+		return 0
 	}
-	return anyValue{ArrayValue: &arrayValue{Values: vals}}
+	return uint64(ns)
 }
 
-// intValue encodes an int64 as OTLP/JSON's decimal string.
-func intValue(n int64) anyValue {
-	s := strconv.FormatInt(n, 10)
-	return anyValue{IntValue: &s}
-}
-
-func clampUint32(v int) uint32 {
+func clampUint32(v int) uint64 {
 	if v < 0 {
 		return 0
 	}
 	if int64(v) > math.MaxUint32 {
 		return math.MaxUint32
 	}
-	return uint32(v)
+	return uint64(v)
 }

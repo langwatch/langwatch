@@ -9,7 +9,7 @@ import (
 
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 
-	"github.com/langwatch/langwatch/sdks/go/internal/otlpjson"
+	"github.com/langwatch/langwatch/sdks/go/internal/otlphttp"
 )
 
 const (
@@ -25,8 +25,8 @@ var ErrNilTransportExporter = errors.New("langwatch: ExporterTransport returned 
 
 // LangWatchExporter exports spans to LangWatch with optional filtering.
 // It wraps an OTLP/HTTP trace exporter with auto-configuration and filter
-// support. By default spans are sent as gzipped OTLP/JSON by an exporter
-// built on the standard library, so the root package links neither gRPC nor
+// support. By default spans are sent as gzipped OTLP/protobuf by an exporter
+// that encodes it by hand, so the root package links neither gRPC nor
 // the generated OTLP protobuf packages; see WithTransport to swap it.
 type LangWatchExporter struct {
 	*FilteringExporter
@@ -48,8 +48,8 @@ type exporterConfig struct {
 // ExporterTransport builds the span exporter that carries spans to LangWatch,
 // given the traces URL (endpoint + TracesPath) and the auth and SDK headers.
 // Its result is wrapped with the filters and data-capture policy. The default
-// posts gzipped OTLP/JSON; the separate .../sdks/go/exporter/otlp module
-// provides one built on otlptracehttp (OTLP/protobuf).
+// posts gzipped OTLP/protobuf; the separate .../sdks/go/exporter/otlp module
+// provides one built on otlptracehttp.
 type ExporterTransport func(ctx context.Context, endpointURL string, headers map[string]string) (sdktrace.SpanExporter, error)
 
 // ExporterOption configures the LangWatchExporter.
@@ -164,7 +164,7 @@ func buildHeaders(apiKey, projectID string) map[string]string {
 
 // NewExporter creates a LangWatch exporter, reading LANGWATCH_API_KEY,
 // LANGWATCH_PROJECT_ID and LANGWATCH_ENDPOINT when options do not set them.
-// Spans go as gzipped OTLP/JSON to endpoint + TracesPath, retried as the
+// Spans go as gzipped OTLP/protobuf to endpoint + TracesPath, retried as the
 // README describes. Wrap it in sdktrace.NewBatchSpanProcessor to batch spans.
 func NewExporter(ctx context.Context, opts ...ExporterOption) (*LangWatchExporter, error) {
 	cfg := resolveConfig(opts...)
@@ -184,7 +184,7 @@ func NewExporter(ctx context.Context, opts ...ExporterOption) (*LangWatchExporte
 			return nil, ErrNilTransportExporter
 		}
 	} else {
-		transport = otlpjson.New(otlpjson.Config{
+		transport = otlphttp.New(otlphttp.Config{
 			URL:                endpointURL,
 			Headers:            headers,
 			HTTPClient:         cfg.httpClient,

@@ -3,7 +3,6 @@ package langwatch
 import (
 	"compress/gzip"
 	"context"
-	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -18,17 +17,17 @@ import (
 	"github.com/langwatch/langwatch/sdks/go/internal/testutil"
 )
 
-// otlpJSONReceiver stands in for LangWatch's /api/otel/v1/traces route,
-// decoding each gzipped OTLP/JSON body it receives.
-type otlpJSONReceiver struct {
-	t       *testing.T
-	mu      sync.Mutex
-	paths   []string
-	headers []http.Header
-	bodies  []map[string]any
+// otlpReceiver stands in for LangWatch's /api/otel/v1/traces route,
+// decoding each gzipped OTLP/protobuf body it receives.
+type otlpReceiver struct {
+	t        *testing.T
+	mu       sync.Mutex
+	paths    []string
+	headers  []http.Header
+	received []testutil.ReceivedSpan
 }
 
-func (r *otlpJSONReceiver) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+func (r *otlpReceiver) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	var body io.Reader = req.Body
 	if req.Header.Get("Content-Encoding") == "gzip" {
 		zr, err := gzip.NewReader(req.Body)
@@ -38,8 +37,13 @@ func (r *otlpJSONReceiver) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 		body = zr
 	}
-	var payload map[string]any
-	if !assert.NoError(r.t, json.NewDecoder(body).Decode(&payload)) {
+	raw, err := io.ReadAll(body)
+	if !assert.NoError(r.t, err) {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	spans, err := testutil.ReadOTLPSpans(raw)
+	if !assert.NoError(r.t, err) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -47,45 +51,27 @@ func (r *otlpJSONReceiver) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	r.mu.Lock()
 	r.paths = append(r.paths, req.URL.Path)
 	r.headers = append(r.headers, req.Header.Clone())
-	r.bodies = append(r.bodies, payload)
+	r.received = append(r.received, spans...)
 	r.mu.Unlock()
 	w.WriteHeader(http.StatusOK)
 }
 
-// spans returns every exported span object across the received bodies.
-func (r *otlpJSONReceiver) spans() []map[string]any {
+// spans returns every exported span across the received bodies.
+func (r *otlpReceiver) spans() []testutil.ReceivedSpan {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	var out []map[string]any
-	for _, b := range r.bodies {
-		for _, rs := range b["resourceSpans"].([]any) {
-			for _, ss := range rs.(map[string]any)["scopeSpans"].([]any) {
-				for _, sp := range ss.(map[string]any)["spans"].([]any) {
-					out = append(out, sp.(map[string]any))
-				}
-			}
-		}
-	}
-	return out
+	return append([]testutil.ReceivedSpan(nil), r.received...)
 }
 
-func startReceiver(t *testing.T) (*otlpJSONReceiver, string) {
+func startReceiver(t *testing.T) (*otlpReceiver, string) {
 	t.Helper()
-	rec := &otlpJSONReceiver{t: t}
+	rec := &otlpReceiver{t: t}
 	srv := httptest.NewServer(rec)
 	t.Cleanup(srv.Close)
 	return rec, srv.URL
 }
 
-func spanAttrKeys(sp map[string]any) []string {
-	var keys []string
-	for _, kv := range sp["attributes"].([]any) {
-		keys = append(keys, kv.(map[string]any)["key"].(string))
-	}
-	return keys
-}
-
-func TestNewExporter_DefaultTransportSendsOTLPJSON(t *testing.T) {
+func TestNewExporter_DefaultTransportSendsOTLPProtobuf(t *testing.T) {
 	rec, endpoint := startReceiver(t)
 
 	exporter, err := NewExporter(context.Background(),
@@ -103,7 +89,7 @@ func TestNewExporter_DefaultTransportSendsOTLPJSON(t *testing.T) {
 	require.Len(t, rec.headers, 1)
 	assert.Equal(t, TracesPath, rec.paths[0])
 	h := rec.headers[0]
-	assert.Equal(t, "application/json", h.Get("Content-Type"))
+	assert.Equal(t, "application/x-protobuf", h.Get("Content-Type"))
 	assert.Equal(t, "gzip", h.Get("Content-Encoding"))
 	assert.Equal(t, "Bearer pat-lw-secret", h.Get("Authorization"))
 	assert.Equal(t, "project-9", h.Get("X-Project-Id"))
@@ -113,8 +99,8 @@ func TestNewExporter_DefaultTransportSendsOTLPJSON(t *testing.T) {
 
 	spans := rec.spans()
 	require.Len(t, spans, 1)
-	assert.Equal(t, "llm.chat", spans[0]["name"])
-	assert.Contains(t, spanAttrKeys(spans[0]), "langwatch.input")
+	assert.Equal(t, "llm.chat", spans[0].Name)
+	assert.Contains(t, spans[0].AttributeKeys, "langwatch.input")
 }
 
 func TestNewExporter_DefaultTransportAppliesFiltersAndDataCapture(t *testing.T) {
@@ -135,8 +121,8 @@ func TestNewExporter_DefaultTransportAppliesFiltersAndDataCapture(t *testing.T) 
 
 	spans := rec.spans()
 	require.Len(t, spans, 1, "the HTTP span is filtered before it is encoded")
-	assert.Equal(t, "llm.chat", spans[0]["name"])
-	keys := spanAttrKeys(spans[0])
+	assert.Equal(t, "llm.chat", spans[0].Name)
+	keys := spans[0].AttributeKeys
 	assert.NotContains(t, keys, "langwatch.input")
 	assert.NotContains(t, keys, "langwatch.output")
 }

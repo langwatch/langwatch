@@ -1,4 +1,4 @@
-package otlpjson
+package otlphttp
 
 import (
 	"bytes"
@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"net/url"
 	"sync"
@@ -18,9 +19,8 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
-// ContentType is the media type of an OTLP/JSON body. The LangWatch receiver
-// compares it verbatim, so no charset parameter is appended.
-const ContentType = "application/json"
+// ContentType is the media type of an OTLP/protobuf body.
+const ContentType = "application/x-protobuf"
 
 // DefaultTimeout bounds one HTTP attempt when Config.HTTPClient is nil,
 // matching the official OTLP exporter's 10s default.
@@ -30,7 +30,7 @@ const DefaultTimeout = 10 * time.Second
 const maxErrorBody = 512
 
 // ErrShutdown is returned by ExportSpans after Shutdown.
-var ErrShutdown = errors.New("otlpjson: exporter is shut down")
+var ErrShutdown = errors.New("otlphttp: exporter is shut down")
 
 // Config configures an Exporter.
 type Config struct {
@@ -46,7 +46,7 @@ type Config struct {
 	Retry RetryConfig
 }
 
-// Exporter is an sdktrace.SpanExporter that posts OTLP/JSON over HTTP. It is
+// Exporter is an sdktrace.SpanExporter that posts OTLP/protobuf over HTTP. It is
 // safe for concurrent use; batching is left to sdktrace.BatchSpanProcessor.
 type Exporter struct {
 	url         string
@@ -110,7 +110,7 @@ func (e *Exporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlySpa
 
 	payload, err := e.encode(spans)
 	if err != nil {
-		return fmt.Errorf("otlpjson: encoding spans: %w", err)
+		return fmt.Errorf("otlphttp: encoding spans: %w", err)
 	}
 	encoding := ""
 	if e.compression {
@@ -176,7 +176,7 @@ func (e *Exporter) send(ctx context.Context, payload []byte, encoding string) er
 
 	switch {
 	case resp.StatusCode >= 200 && resp.StatusCode < 300:
-		reportPartialSuccess(body)
+		reportPartialSuccess(resp.Header.Get("Content-Type"), body)
 		return nil
 	case isRetryableStatus(resp.StatusCode):
 		return &retryableError{
@@ -221,53 +221,105 @@ func httpStatusError(resp *http.Response, body []byte) error {
 	if len(body) > maxErrorBody {
 		body = body[:maxErrorBody]
 	}
-	return fmt.Errorf("otlpjson: export failed with %s: %s", resp.Status, bytes.TrimSpace(body))
+	return fmt.Errorf("otlphttp: export failed with %s: %s", resp.Status, bytes.TrimSpace(body))
 }
 
 // reportPartialSuccess surfaces spans the receiver accepted the request for
 // but rejected, through the global OpenTelemetry error handler, as the
-// official exporter does.
-func reportPartialSuccess(body []byte) {
+// official exporter does. The answer may be OTLP/protobuf or OTLP/JSON.
+func reportPartialSuccess(contentType string, body []byte) {
 	if len(body) == 0 {
 		return
 	}
-	var answer struct {
-		PartialSuccess struct {
-			RejectedSpans json.Number `json:"rejectedSpans"`
-			ErrorMessage  string      `json:"errorMessage"`
-		} `json:"partialSuccess"`
+	var rejected int64
+	var message string
+	if mediaType, _, _ := mime.ParseMediaType(contentType); mediaType == ContentType {
+		var ok bool
+		if rejected, message, ok = decodePartialSuccess(body); !ok {
+			return
+		}
+	} else {
+		var answer struct {
+			PartialSuccess struct {
+				RejectedSpans json.Number `json:"rejectedSpans"`
+				ErrorMessage  string      `json:"errorMessage"`
+			} `json:"partialSuccess"`
+		}
+		if json.Unmarshal(body, &answer) != nil {
+			return
+		}
+		rejected, _ = answer.PartialSuccess.RejectedSpans.Int64()
+		message = answer.PartialSuccess.ErrorMessage
 	}
-	if json.Unmarshal(body, &answer) != nil {
-		return
-	}
-	ps := answer.PartialSuccess
-	rejected, _ := ps.RejectedSpans.Int64()
-	if rejected > 0 || ps.ErrorMessage != "" {
-		otel.Handle(fmt.Errorf("otlpjson: partial success: %d spans rejected: %s", rejected, ps.ErrorMessage))
+	if rejected > 0 || message != "" {
+		otel.Handle(fmt.Errorf("otlphttp: partial success: %d spans rejected: %s", rejected, message))
 	}
 }
 
-var gzipPool = sync.Pool{New: func() any { return gzip.NewWriter(io.Discard) }}
+// decodePartialSuccess reads ExportTraceServiceResponse (1 partial_success)
+// and its ExportTracePartialSuccess (1 rejected_spans, 2 error_message).
+func decodePartialSuccess(body []byte) (rejected int64, message string, ok bool) {
+	inner, err := subFields(body, 1)
+	if err != nil {
+		return 0, "", false
+	}
+	for _, g := range inner {
+		switch g.number {
+		case 1:
+			rejected = int64(g.num)
+		case 2:
+			message = string(g.data)
+		}
+	}
+	return rejected, message, true
+}
 
-// encode streams the OTLP/JSON request into one buffer, through a pooled gzip
-// writer when compression is on. The buffer is not pooled: the transport may
-// still read a request body after Do returns.
-func (e *Exporter) encode(spans []sdktrace.ReadOnlySpan) ([]byte, error) {
-	var buf bytes.Buffer
-	if !e.compression {
-		if err := Encode(&buf, spans); err != nil {
+// subFields reads the fields of every occurrence of message field num in b,
+// which protobuf merges into one message.
+func subFields(b []byte, num int) ([]field, error) {
+	fields, err := readFields(b)
+	if err != nil {
+		return nil, err
+	}
+	var out []field
+	for _, f := range fields {
+		if f.number != num {
+			continue
+		}
+		inner, err := readFields(f.data)
+		if err != nil {
 			return nil, err
 		}
-		return buf.Bytes(), nil
+		out = append(out, inner...)
+	}
+	return out, nil
+}
+
+var (
+	gzipPool = sync.Pool{New: func() any { return gzip.NewWriter(io.Discard) }}
+	bodyPool = sync.Pool{New: func() any { return new([]byte) }}
+)
+
+// encode marshals the request and, when compression is on, gzips it from a
+// pooled scratch buffer through a pooled writer. The returned body is never
+// pooled: the transport may still read a request body after Do returns.
+func (e *Exporter) encode(spans []sdktrace.ReadOnlySpan) ([]byte, error) {
+	if !e.compression {
+		return Marshal(spans), nil
 	}
 
+	scratch := bodyPool.Get().(*[]byte)
+	defer bodyPool.Put(scratch)
+	*scratch = AppendRequest((*scratch)[:0], spans)
+
+	var buf bytes.Buffer
 	zw := gzipPool.Get().(*gzip.Writer)
 	defer func() {
 		zw.Reset(io.Discard) // drop the reference to buf before pooling
 		gzipPool.Put(zw)
 	}()
 	zw.Reset(&buf)
-	if err := Encode(zw, spans); err != nil {
+	if _, err := zw.Write(*scratch); err != nil {
 		return nil, err
 	}
 	if err := zw.Close(); err != nil {

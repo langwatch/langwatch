@@ -105,20 +105,17 @@ exporter, err := langwatch.NewExporter(ctx,
 exporter, err := langwatch.NewDefaultExporter(ctx)
 ```
 
-The exporter sends gzipped OTLP/JSON to `<endpoint>/api/otel/v1/traces`,
+The exporter sends gzipped OTLP/protobuf to `<endpoint>/api/otel/v1/traces`,
 retrying throttled (429) and unavailable (502, 503, 504) requests and
 transient network errors with exponential backoff (honoring `Retry-After`)
 for up to a minute, bounded by the export context. Wrap it in
 `sdktrace.NewBatchSpanProcessor` (or `sdktrace.WithBatcher`) to batch spans.
-It is built on the standard library, so the root module does not depend on
-gRPC or the generated OTLP protobuf packages. Byte-slice attributes travel as
-base64 `stringValue`s: the LangWatch receiver accepts `bytesValue` only in
-protobuf bodies, so an OTLP/JSON `bytesValue` would drop the span.
+It writes the protobuf itself on the standard library, so the root module
+does not depend on gRPC or the generated OTLP protobuf packages.
 
-### OTLP/protobuf transport
+### otlptracehttp transport
 
-To send through the official `otlptracehttp` exporter instead (OTLP/protobuf,
-honoring the `OTEL_EXPORTER_OTLP_*` environment variables), use the
+To send through the official `otlptracehttp` exporter instead (honoring the `OTEL_EXPORTER_OTLP_*` environment variables), use the
 `exporter/otlp` module. It is a **separate Go module**, so only programs that
 import it link gRPC and protobuf, as `otlptracehttp` does:
 
@@ -523,9 +520,9 @@ langwatch.WithDataCaptureFunc(predicate DataCapturePredicate)
 langwatch.WithProjectID(projectID string)                  // required for pat-lw-* tokens
 langwatch.WithHTTPClient(client *http.Client)              // default transport only
 langwatch.WithCompression(enabled bool)                    // gzip, on by default
-langwatch.WithTransport(transport ExporterTransport)       // replace the OTLP/JSON transport
+langwatch.WithTransport(transport ExporterTransport)       // replace the default transport
 
-// OTLP/protobuf via otlptracehttp (separate module, links gRPC)
+// otlptracehttp transport (separate module, links gRPC)
 lwotlp.NewExporter(ctx, opts...)
 lwotlp.WithTransport(extra ...otlptracehttp.Option)
 

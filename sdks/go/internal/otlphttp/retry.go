@@ -1,4 +1,4 @@
-package otlpjson
+package otlphttp
 
 import (
 	"context"
@@ -94,7 +94,7 @@ func (c RetryConfig) do(ctx context.Context, attempt func(context.Context) error
 	case errors.As(err, &retryable) && c.Disabled:
 		return retryable.err
 	case errors.As(err, &retryable):
-		return fmt.Errorf("otlpjson: retry budget of %s exhausted: %w", c.MaxElapsedTime, retryable.err)
+		return fmt.Errorf("otlphttp: retry budget of %s exhausted: %w", c.MaxElapsedTime, retryable.err)
 	case last != nil && errors.Is(err, context.Cause(ctx)):
 		return fmt.Errorf("%w (last attempt: %w)", err, last.err)
 	default:

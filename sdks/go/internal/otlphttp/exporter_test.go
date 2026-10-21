@@ -1,9 +1,8 @@
-package otlpjson
+package otlphttp
 
 import (
 	"compress/gzip"
 	"context"
-	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -15,16 +14,40 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
+
+type errorRecorder struct{ errs []error }
+
+func (r *errorRecorder) Handle(err error) { r.errs = append(r.errs, err) }
+
+func TestReportPartialSuccess_ReadsProtobufAndJSONAnswers(t *testing.T) {
+	rec := &errorRecorder{}
+	previous := otel.GetErrorHandler()
+	otel.SetErrorHandler(rec)
+	t.Cleanup(func() { otel.SetErrorHandler(previous) })
+
+	protobufAnswer := appendMessage(nil, 1, func(b []byte) []byte {
+		return appendStringField(appendVarintField(b, 1, 3), 2, "too big")
+	})
+	reportPartialSuccess("application/x-protobuf", protobufAnswer)
+	reportPartialSuccess("application/json", []byte(`{"partialSuccess":{"rejectedSpans":"2","errorMessage":"late"}}`))
+	reportPartialSuccess("application/json", []byte(`{"partialSuccess":{"rejectedSpans":0,"errorMessage":""}}`))
+	reportPartialSuccess("application/x-protobuf", []byte{0xff})
+
+	require.Len(t, rec.errs, 2)
+	require.ErrorContains(t, rec.errs[0], "3 spans rejected: too big")
+	require.ErrorContains(t, rec.errs[1], "2 spans rejected: late")
+}
 
 // received is one request as the test server saw it.
 type received struct {
 	header http.Header
-	body   decoded
+	body   msg
 }
 
-// recorder is an OTLP/JSON receiver answering with the next scripted status.
+// recorder is an OTLP/protobuf receiver answering with the next scripted status.
 type recorder struct {
 	t        *testing.T
 	mu       sync.Mutex
@@ -46,8 +69,11 @@ func (r *recorder) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 		body = zr
 	}
-	var payload decoded
-	assert.NoError(r.t, json.NewDecoder(body).Decode(&payload))
+	raw, err := io.ReadAll(body)
+	assert.NoError(r.t, err)
+	fields, err := readFields(raw)
+	assert.NoError(r.t, err)
+	payload := msg(fields)
 
 	r.mu.Lock()
 	r.requests = append(r.requests, received{header: req.Header.Clone(), body: payload})
@@ -91,7 +117,8 @@ func oneSpan() []sdktrace.ReadOnlySpan {
 	return []sdktrace.ReadOnlySpan{richSpan().Snapshot()}
 }
 
-func TestExporter_PostsGzippedOTLPJSONWithHeaders(t *testing.T) {
+// @scenario "The Go SDK sends gzipped protobuf by default"
+func TestExporter_PostsGzippedOTLPProtobufWithHeaders(t *testing.T) {
 	rec := &recorder{}
 	exp := newTestExporter(t, rec, nil)
 
@@ -99,11 +126,11 @@ func TestExporter_PostsGzippedOTLPJSONWithHeaders(t *testing.T) {
 
 	require.Len(t, rec.requests, 1)
 	got := rec.requests[0]
-	assert.Equal(t, "application/json", got.header.Get("Content-Type"), "the receiver compares the media type verbatim")
+	assert.Equal(t, "application/x-protobuf", got.header.Get("Content-Type"))
 	assert.Equal(t, "gzip", got.header.Get("Content-Encoding"))
 	assert.Equal(t, "Bearer sk-lw-test", got.header.Get("Authorization"))
 	assert.Equal(t, "project-1", got.header.Get("X-Project-Id"))
-	assert.Equal(t, "llm.chat", path(t, got.body, "resourceSpans", 0, "scopeSpans", 0, "spans", 0, "name"))
+	assert.Equal(t, "llm.chat", got.body.sub(t, 1, 0).sub(t, 2, 0).sub(t, 2, 0).str(t, 5))
 }
 
 func TestExporter_PooledGzipWritersStayIndependent(t *testing.T) {
@@ -118,10 +145,11 @@ func TestExporter_PooledGzipWritersStayIndependent(t *testing.T) {
 
 	require.Len(t, rec.requests, 8)
 	for _, r := range rec.requests {
-		assert.Equal(t, "llm.chat", path(t, r.body, "resourceSpans", 0, "scopeSpans", 0, "spans", 0, "name"))
+		assert.Equal(t, "llm.chat", r.body.sub(t, 1, 0).sub(t, 2, 0).sub(t, 2, 0).str(t, 5))
 	}
 }
 
+// @scenario "The Go SDK sends uncompressed protobuf when compression is turned off"
 func TestExporter_UncompressedWhenDisabled(t *testing.T) {
 	rec := &recorder{}
 	exp := newTestExporter(t, rec, func(c *Config) { c.DisableCompression = true })
@@ -130,7 +158,7 @@ func TestExporter_UncompressedWhenDisabled(t *testing.T) {
 
 	require.Len(t, rec.requests, 1)
 	assert.Empty(t, rec.requests[0].header.Get("Content-Encoding"))
-	assert.NotNil(t, rec.requests[0].body["resourceSpans"])
+	assert.True(t, rec.requests[0].body.has(1))
 }
 
 func TestExporter_RetriesThrottlingAndServerErrors(t *testing.T) {
@@ -142,7 +170,7 @@ func TestExporter_RetriesThrottlingAndServerErrors(t *testing.T) {
 			require.NoError(t, exp.ExportSpans(context.Background(), oneSpan()))
 			assert.EqualValues(t, 3, rec.calls.Load())
 			for _, r := range rec.requests {
-				assert.NotNil(t, r.body["resourceSpans"], "every attempt resends the full body")
+				assert.True(t, r.body.has(1), "every attempt resends the full body")
 			}
 		})
 	}
@@ -337,13 +365,14 @@ func TestExporter_UnderBatchSpanProcessor(t *testing.T) {
 	require.NoError(t, tp.ForceFlush(context.Background()))
 	require.NoError(t, tp.Shutdown(context.Background()))
 
-	var names []any
+	var names []string
 	for _, r := range rec.requests {
-		for _, sp := range path(t, r.body, "resourceSpans", 0, "scopeSpans", 0, "spans").([]any) {
-			names = append(names, sp.(map[string]any)["name"])
+		ss := r.body.sub(t, 1, 0).sub(t, 2, 0)
+		for i := range ss.all(2) {
+			names = append(names, ss.sub(t, 2, i).str(t, 5))
 		}
 	}
-	assert.ElementsMatch(t, []any{"one", "two", "three"}, names)
+	assert.ElementsMatch(t, []string{"one", "two", "three"}, names)
 }
 
 func TestParseRetryAfter(t *testing.T) {
