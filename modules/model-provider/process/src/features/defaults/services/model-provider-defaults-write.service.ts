@@ -67,7 +67,7 @@ export class ModelProviderDefaultsWriteService {
       config: parsed.config ?? existing?.config ?? {},
       stored: existing?.config,
     });
-    if (Object.keys(config).length === 0 && droppedRestricted.length > 0) {
+    if (Object.keys(config).length === 0 && droppedRestricted) {
       throw new ModelDefaultValidationError(
         "Every model in this config is restricted to coding-assistant surfaces. Pick another model, or remove the config.",
       );

@@ -107,7 +107,7 @@ export abstract class ModelProviderCatalog {
   }
   /**
    * Drops unknown and empty keys, refuses a newly picked restricted model. A
-   * restricted model already stored is dropped (named in `droppedRestricted`):
+   * restricted model already stored is dropped (and `droppedRestricted` set):
    * it predates the restriction, and refusing it would block every other key.
    */
   sanitizeDefaultConfig({
@@ -116,7 +116,7 @@ export abstract class ModelProviderCatalog {
   }: {
     config: Record<string, unknown>;
     stored?: Record<string, string>;
-  }): { config: Record<string, string>; droppedRestricted: string[] } {
+  }): { config: Record<string, string>; droppedRestricted: boolean } {
     const valid = new Set<string>([
       "DEFAULT",
       "FAST",
@@ -125,7 +125,7 @@ export abstract class ModelProviderCatalog {
       ...allFeatures().map((feature) => feature.key),
     ]);
     const clean: Record<string, string> = {};
-    const droppedRestricted: string[] = [];
+    let droppedRestricted = false;
     for (const [key, value] of Object.entries(config)) {
       if (!valid.has(key) || typeof value !== "string" || value.length === 0) {
         continue;
@@ -138,7 +138,7 @@ export abstract class ModelProviderCatalog {
             isModelAllowedForFeature({ modelId: value, featureKey: key }),
           );
       if (!allowed && stored[key] === value) {
-        droppedRestricted.push(key);
+        droppedRestricted = true;
         continue;
       }
       if (!allowed) {
