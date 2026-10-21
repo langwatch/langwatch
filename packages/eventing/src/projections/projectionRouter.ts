@@ -1,4 +1,4 @@
-import type { ExhaustedOutcome } from "@langwatch/group-queue";
+import { isQueueStagingClosed, type ExhaustedOutcome } from "@langwatch/group-queue";
 import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
@@ -1145,14 +1145,14 @@ export class ProjectionRouter<
       try {
         await queueProcessor.sendBatch(filtered);
       } catch (error) {
-        this.logger.error(
-          {
+        this.logDispatchFailure({
+          error,
+          fields: {
             projectionName,
             eventCount: filtered.length,
-            error: error instanceof Error ? error.message : String(error),
           },
-          "Failed to dispatch batch of events to fold projection queue",
-        );
+          message: "Failed to dispatch batch of events to fold projection queue",
+        });
         failures.push({
           kind: "fold",
           lane: projectionName,
@@ -1251,14 +1251,14 @@ export class ProjectionRouter<
           this.sendToStateProjection({ name, projection: definition, matching, context, queued }),
         );
       } catch (error) {
-        this.logger.error(
-          {
+        this.logDispatchFailure({
+          error,
+          fields: {
             projectionName: name,
             eventCount: matching.length,
-            error: error instanceof Error ? error.message : String(error),
           },
-          "State projection dispatch failed",
-        );
+          message: "State projection dispatch failed",
+        });
         failures.push({ kind: "state", lane: name, events: matching, error: toError(error) });
       }
     }
@@ -1386,14 +1386,14 @@ export class ProjectionRouter<
       await queueProcessor.sendBatch(accepted);
       return [];
     } catch (error) {
-      this.logger.error(
-        {
+      this.logDispatchFailure({
+        error,
+        fields: {
           handlerName: name,
           eventCount: accepted.length,
-          error: error instanceof Error ? error.message : String(error),
         },
-        "Failed to dispatch batch of events to map projection queue",
-      );
+        message: "Failed to dispatch batch of events to map projection queue",
+      });
       return [{ kind: "map", lane: name, events: accepted, error: toError(error) }];
     }
   }
@@ -1562,6 +1562,34 @@ export class ProjectionRouter<
   }
 
   /**
+   * A drained queue's refusal is a shutdown whose consumer drain overran its budget; the caller
+   * keeps these events for re-drive, so it warns. Every other dispatch failure stays an error.
+   * Spec: specs/background/queue-drain-send-gate.feature
+   */
+  private logDispatchFailure({
+    error,
+    fields,
+    message,
+  }: {
+    error: unknown;
+    fields: Record<string, unknown>;
+    message: string;
+  }): void {
+    if (isQueueStagingClosed(error)) {
+      this.logger.warn(
+        {
+          ...fields,
+          error,
+          reason: "the queue's drain finished during shutdown; kept for re-drive",
+        },
+        message,
+      );
+      return;
+    }
+    this.logger.error({ ...fields, error }, message);
+  }
+
+  /**
    * Counts a failed staging. The caller records the hand-off for re-drive;
    * without this count a thrown filter/stage/send moved no series at all.
    */
@@ -1579,17 +1607,17 @@ export class ProjectionRouter<
       subscriberName: name,
       outcome: "failed",
     });
-    this.logger.error(
-      {
+    this.logDispatchFailure({
+      error,
+      fields: {
         subscriberName: name,
         eventId: event.id,
         eventType: event.type,
         aggregateId: String(event.aggregateId),
         tenantId: event.tenantId,
-        error: error instanceof Error ? error.message : String(error),
       },
-      "Event subscriber dispatch failed",
-    );
+      message: "Event subscriber dispatch failed",
+    });
   }
 
   private async handleSubscriber(
@@ -2269,15 +2297,15 @@ export class ProjectionRouter<
         try {
           await queueProcessor.send({ event, foldState });
         } catch (error) {
-          this.logger.error(
-            {
+          this.logDispatchFailure({
+            error,
+            fields: {
               subscriberName: subscriber.name,
               projectionName,
               eventId: event.id,
-              error: error instanceof Error ? error.message : String(error),
             },
-            "Failed to dispatch event to subscriber queue",
-          );
+            message: "Failed to dispatch event to subscriber queue",
+          });
           errors.push(toError(error));
         }
       } else {
