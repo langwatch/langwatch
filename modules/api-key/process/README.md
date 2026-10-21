@@ -6,13 +6,13 @@ The server half of [api-key](../README.md). API keys: creating and updating them
 
 ## Installation
 
-`defineProcessModule("api-key").withRepositories(apiKeyRepositories).withApi(ApiKeyModule).withTransports(apiKeyRest, apiKeyProjectsRest, apiKeyOrganizationsRest, apiKeyTrpcTransport).provideMiddlewareContext(…).withEventing(apiKeyEventing)`, `src/api-key.module.ts:23`.
+`defineProcessModule("api-key").withRepositories(apiKeyRepositories).withApi(ApiKeyModule).withTransports(apiKeyRest, apiKeyProjectsRest, apiKeyOrganizationsRest, apiKeyTrpcTransport, signingKeyTrpcTransport).provideMiddlewareContext(…).withEventing(apiKeyEventing)`, `src/api-key.module.ts:24`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
 ## Module API (`ApiKeyApi`)
 
-Peers call these through the token, declared at `../contract/src/api-key.api.ts:108`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/api-key.api.ts:118`; nothing else in this package is public.
 
 #### `create`
 
@@ -350,6 +350,46 @@ listOrganizationTeams(input: { organizationId: string }, by: ApiKeyManagementCal
 listOrganizationMembers(input: { organizationId: string }, by: ApiKeyManagementCaller): Promise<ApiKeyUser[]>;
 ```
 
+#### `findSigningKeys`
+
+ADR-183 §4: a project's braid signing keys with their last 24 hours; never a secret.
+
+```typescript
+findSigningKeys(input: FindSigningKeysInput): Promise<SigningKey[]>;
+```
+
+#### `createSigningKey`
+
+Issues a signing key; the answer is the only place its secret is ever returned.
+
+```typescript
+createSigningKey(input: CreateSigningKeyInput): Promise<IssuedSigningKey>;
+```
+
+#### `rotateSigningKey`
+
+Issues a replacement; the old key keeps verifying for `SIGNING_KEY_ROTATION_OVERLAP_MS`.
+
+```typescript
+rotateSigningKey(input: RotateSigningKeyInput): Promise<IssuedSigningKey>;
+```
+
+#### `revokeSigningKey`
+
+Ends a key at once, bounded by the lookup cache (`SIGNING_KEY_LOOKUP_CACHE_MS`).
+
+```typescript
+revokeSigningKey(input: RevokeSigningKeyInput): Promise<SigningKey>;
+```
+
+#### `verifyBraidSignature`
+
+Span admission's check of one `langwatch.signature`; the secret never leaves this module.
+
+```typescript
+verifyBraidSignature(input: VerifyBraidSignatureInput): Promise<BraidSignatureVerdict>;
+```
+
 ## REST transport
 
 ### `apiKeyOrganizationsRest`
@@ -674,6 +714,46 @@ type Output = {
 }[];
 ```
 
+### `signingKeys`
+
+Contract `../contract/src/signing-key.trpc.ts:15`, router `src/transport/signing-key.trpc.ts:13`.
+
+| Procedure            | Kind     | Gate                                                                    | Input                          | Output                   |
+| -------------------- | -------- | ----------------------------------------------------------------------- | ------------------------------ | ------------------------ |
+| `signingKeys.list`   | query    | Permission `braids:manage`                                              | `signingKeyProjectInputSchema` | inline                   |
+| `signingKeys.create` | mutation | Permission `braids:manage`; Entitlement `enterprise` (feature `BRAIDS`) | `createSigningKeyInputSchema`  | `issuedSigningKeySchema` |
+| `signingKeys.rotate` | mutation | Permission `braids:manage`; Entitlement `enterprise` (feature `BRAIDS`) | `signingKeyActionInputSchema`  | `issuedSigningKeySchema` |
+| `signingKeys.revoke` | mutation | Permission `braids:manage`; Entitlement `enterprise` (feature `BRAIDS`) | `signingKeyActionInputSchema`  | `signingKeySchema`       |
+
+```typescript
+// signingKeys.list
+// Input: signingKeyProjectInputSchema, ../contract/src/signing-key.ts:53
+interface Input {
+  projectId: string;
+}
+// Output: signingKeySchema.array() (inline, ../contract/src/signing-key.trpc.ts:18)
+
+// signingKeys.create
+// Input: createSigningKeyInputSchema, ../contract/src/signing-key.ts:63
+interface Input {
+  projectId: string;
+  name: string;
+}
+type Output = z.infer<typeof issuedSigningKeySchema>; // ../contract/src/signing-key.ts:45
+
+// signingKeys.rotate
+// Input: signingKeyActionInputSchema, ../contract/src/signing-key.ts:73
+interface Input {
+  projectId: string;
+  keyId: string;
+}
+type Output = z.infer<typeof issuedSigningKeySchema>; // ../contract/src/signing-key.ts:45
+
+// signingKeys.revoke
+type Input = z.infer<typeof signingKeyActionInputSchema>; // ../contract/src/signing-key.ts:73
+type Output = z.infer<typeof signingKeySchema>; // ../contract/src/signing-key.ts:35
+```
+
 ## Sockets
 
 None: this module declares no websocket, rawsocket or rawhttp door.
@@ -693,9 +773,9 @@ Declared at `src/eventing/api-key.pipeline.ts:90`.
 
 | Kind   | Leaf                 | Environment variable          | Declared at                  |
 | ------ | -------------------- | ----------------------------- | ---------------------------- |
-| secret | `pepper`             | `API_KEY_PEPPER`              | `src/app/api-key.app.ts:173` |
-| secret | `pepperFallback`     | `CREDENTIALS_SECRET`          | `src/app/api-key.app.ts:174` |
-| secret | `pepperLastFallback` | `NEXTAUTH_SECRET`             | `src/app/api-key.app.ts:175` |
-| secret | `pepperPrevious`     | `CREDENTIALS_SECRET_PREVIOUS` | `src/app/api-key.app.ts:177` |
+| secret | `pepper`             | `API_KEY_PEPPER`              | `src/app/api-key.app.ts:183` |
+| secret | `pepperFallback`     | `CREDENTIALS_SECRET`          | `src/app/api-key.app.ts:184` |
+| secret | `pepperLastFallback` | `NEXTAUTH_SECRET`             | `src/app/api-key.app.ts:185` |
+| secret | `pepperPrevious`     | `CREDENTIALS_SECRET_PREVIOUS` | `src/app/api-key.app.ts:187` |
 
 <!-- readme:generated:end -->

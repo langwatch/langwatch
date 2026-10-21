@@ -5456,6 +5456,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/api-key-client':
+        specifier: workspace:*
+        version: link:../client
       '@langwatch/api-key-contract':
         specifier: workspace:*
         version: link:../contract
@@ -5474,6 +5477,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
+      '@langwatch/handled-error':
+        specifier: workspace:*
+        version: link:../../../packages/handled-error
       '@langwatch/organization-client':
         specifier: workspace:*
         version: link:../../organization/client

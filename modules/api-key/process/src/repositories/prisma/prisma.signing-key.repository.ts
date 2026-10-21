@@ -1,3 +1,4 @@
+import { SigningKeyNotFoundError } from "@langwatch/api-key-contract";
 import { type PrismaModelClient, prismaTables } from "@langwatch/prisma-client";
 import type { SharedCredentialCipher } from "@langwatch/secrets/shared-credential";
 import { fromDate, type Instant, toDate } from "@langwatch/time";
@@ -79,16 +80,17 @@ export class PrismaSigningKeyRepository implements SigningKeyRepository {
     return rows.map(rowOf);
   }
 
-  async findById(input: {
+  async getById(input: {
     organizationId: string;
     projectId: string;
     id: string;
-  }): Promise<SigningKeyRow | undefined> {
+  }): Promise<SigningKeyRow> {
     const row = await this.database.signingKey.findFirst({
       where: { id: input.id, organizationId: input.organizationId, projectId: input.projectId },
       select: rowSelect,
     });
-    return row ? rowOf(row) : undefined;
+    if (!row) throw new SigningKeyNotFoundError(input.id);
+    return rowOf(row);
   }
 
   async create(input: SigningKeyCreateRecord): Promise<SigningKeyRow> {

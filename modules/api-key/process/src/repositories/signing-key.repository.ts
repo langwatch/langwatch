@@ -44,7 +44,8 @@ type ProjectKeyAddress = Readonly<{ organizationId: string; projectId: string; i
 
 export interface SigningKeyRepository {
   findByProject(input: { organizationId: string; projectId: string }): Promise<SigningKeyRow[]>;
-  findById(input: ProjectKeyAddress): Promise<SigningKeyRow | undefined>;
+  /** One key of the project; throws SigningKeyNotFoundError when it has no such key. */
+  getById(input: ProjectKeyAddress): Promise<SigningKeyRow>;
   create(input: SigningKeyCreateRecord): Promise<SigningKeyRow>;
   /** Starts a live key's overlap; false when it is not live (rotated, revoked or absent). */
   markRotated(

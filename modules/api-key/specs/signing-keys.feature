@@ -4,8 +4,9 @@
 # step 2.
 #
 # The server half is bound at unit level: the door's refusals and audit through the real
-# tRPC runtime with test decisions (signing-key.trpc.unit.test.ts). Still @unimplemented: the
-# screen (the keys panel) and the organisation's braid setting (authz).
+# tRPC runtime with test decisions (signing-key.trpc.unit.test.ts); the screen through the lent
+# keys panel (signing-keys-panel.integration.test.tsx). Still @unimplemented: the organisation's
+# braid setting (authz).
 
 @api-key @braids
 Feature: Signing keys
@@ -19,7 +20,7 @@ Feature: Signing keys
 
   Rule: A signing key's secret is shown once, when it is created
 
-    @integration @unimplemented
+    @integration
     Scenario: Creating a signing key shows its secret once
       When ana creates a signing key named "Production" for "orchestrator"
       Then the secret is returned by that create and by nothing else

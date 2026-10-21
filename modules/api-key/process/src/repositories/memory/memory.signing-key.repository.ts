@@ -1,3 +1,4 @@
+import { SigningKeyNotFoundError } from "@langwatch/api-key-contract";
 import { type Instant, nowInstant } from "@langwatch/time";
 
 import type {
@@ -42,13 +43,14 @@ export class MemorySigningKeyRepository implements SigningKeyRepository {
       .map(rowOf);
   }
 
-  async findById(input: {
+  async getById(input: {
     organizationId: string;
     projectId: string;
     id: string;
-  }): Promise<SigningKeyRow | undefined> {
+  }): Promise<SigningKeyRow> {
     const key = this.#find(input);
-    return key ? rowOf(key) : undefined;
+    if (!key) throw new SigningKeyNotFoundError(input.id);
+    return rowOf(key);
   }
 
   async create(input: SigningKeyCreateRecord): Promise<SigningKeyRow> {

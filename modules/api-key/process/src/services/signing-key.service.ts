@@ -88,8 +88,8 @@ export class SigningKeyService {
   }): Promise<IssuedSigningKey> {
     const { projectId, keyId } = input;
     const organizationId = await this.projects.getOrganizationId(projectId);
-    const current = await this.keys.findById({ organizationId, projectId, id: keyId });
-    if (!current || current.rotatedAt !== null || current.revokedAt !== null) {
+    const current = await this.keys.getById({ organizationId, projectId, id: keyId });
+    if (current.rotatedAt !== null || current.revokedAt !== null) {
       throw new SigningKeyNotFoundError(keyId);
     }
     const issued = await this.issue({
@@ -113,8 +113,7 @@ export class SigningKeyService {
   async revoke({ projectId, keyId }: { projectId: string; keyId: string }): Promise<SigningKey> {
     const organizationId = await this.projects.getOrganizationId(projectId);
     await this.keys.revoke({ organizationId, projectId, id: keyId, revokedAt: this.now() });
-    const row = await this.keys.findById({ organizationId, projectId, id: keyId });
-    if (!row) throw new SigningKeyNotFoundError(keyId);
+    const row = await this.keys.getById({ organizationId, projectId, id: keyId });
     this.braidSignatures.forget({ organizationId, publicId: row.publicId });
     const [revoked] = await this.listed({ rows: [row] });
     return revoked!;
