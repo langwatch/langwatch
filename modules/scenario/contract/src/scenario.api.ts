@@ -229,6 +229,8 @@ export interface QueueSimulationRunInput {
   judgeModel?: string | null | undefined;
   /** A suite run's evaluators, its test suite's and its plan's, pinned as the suite queues it. */
   evaluators?: RunEvaluators | undefined;
+  /** "Rerun and keep data": skip the agent's teardown for this one run (ADR-180). */
+  keepData?: boolean | undefined;
 }
 
 /**

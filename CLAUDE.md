@@ -149,6 +149,12 @@ them. Module code never reads `process.env`.
 - Every PR description fills `## Architecture` honestly: tick the box only after reading the
   sections of `dev/docs/ARCHITECTURE.md` the change touches, and list anything unusual under
   "Needs a human look" rather than leaving it for the reviewer to find.
+- Review feedback is one round per batch, never one push per comment. Read every
+  open thread, fix the real ones, reply to the wrong ones (leave those threads
+  open: the review bot only accepts a reply on an open thread), push once, then
+  ask for one re-review with `@coderabbitai review`. A lint, format or PR-body finding is CI's job: run the tool,
+  never hand-edit for it. Fix the PR description just before merge; editing it
+  needs no new review.
 - Commit messages are Conventional Commits (`feat(scope): …`, `fix: …`).
 - Branches: `issue123/slug` for issues, `feat/slug` for features.
 - Worktrees go in `.worktrees/<branch-with-slash-as-hyphen>` via

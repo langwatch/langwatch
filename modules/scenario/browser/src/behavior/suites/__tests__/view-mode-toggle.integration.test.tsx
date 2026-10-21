@@ -56,6 +56,7 @@ function makeGroupSummary(overrides: Partial<RunGroupSummary> = {}): RunGroupSum
     failedCount: 0,
     stalledCount: 0,
     cancelledCount: 0,
+    notScoredCount: 0,
     completedCount: 2,
     totalCount: 2,
     inProgressCount: 0,

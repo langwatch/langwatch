@@ -27,6 +27,7 @@ export { BlobSweeper } from "./blobSweeper.ts";
 export { CachedLuaScript, isNoScriptResult } from "./cachedLuaScript.ts";
 export {
   DISCARD_FROM_DLQ_LUA,
+  DLQ_INDEX_PRUNE_LUA,
   DLQ_TTL_SECONDS,
   dlqGroupKeys,
   dlqIndexKey,

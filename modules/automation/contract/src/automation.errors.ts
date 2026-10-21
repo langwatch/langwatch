@@ -1,4 +1,4 @@
-import { HandledError, NotFoundError } from "@langwatch/handled-error";
+import { HandledError, NotFoundError, remediation } from "@langwatch/handled-error";
 
 export class AutomationNotFoundError extends Error {
   constructor() {
@@ -529,6 +529,39 @@ export class AutomationWebhookUpsertRequiredError extends HandledError {
       { httpStatus: 400 },
     );
     this.name = "AutomationWebhookUpsertRequiredError";
+  }
+}
+
+/**
+ * An "add to dataset" automation's dataset is gone, archived, or has none of
+ * the mapped columns left. No redelivery changes that: the author re-saves the
+ * automation, so it is the customer's fault and is not retried.
+ */
+export class AutomationDatasetUnavailableError extends HandledError {
+  declare readonly code: "automation_dataset_unavailable";
+
+  constructor({
+    datasetId,
+    reason,
+    cause,
+  }: {
+    datasetId: string;
+    reason: string;
+    /** The dataset's own refusal, when it raced the write. */
+    cause?: Error;
+  }) {
+    super(
+      "automation_dataset_unavailable",
+      `The dataset "${datasetId}" this automation appends to refused the rows: ${reason}. ` +
+        "Re-save the automation with a dataset and mapping that exist.",
+      {
+        httpStatus: 422,
+        fault: "customer",
+        reasons: cause ? [cause] : [],
+        ...remediation("automation_dataset_unavailable"),
+      },
+    );
+    this.name = "AutomationDatasetUnavailableError";
   }
 }
 

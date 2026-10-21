@@ -88,6 +88,10 @@ class TestScenarioExecutionService extends ScenarioExecutionService {
   recordCutAtLimit(): Promise<void> {
     throw new Error("recordCutAtLimit unexpectedly called in simulation intent tests");
   }
+
+  recordHooks(): Promise<void> {
+    throw new Error("recordHooks unexpectedly called in simulation intent tests");
+  }
 }
 
 function executionService(submit: (job: ScenarioExecutionJob) => void): ScenarioExecutionService {
@@ -175,6 +179,16 @@ describe("createExecuteRunHandler", () => {
       expect(submit).toHaveBeenCalledWith(
         expect.objectContaining({ startedByUserId: "user_1", startedByApiKeyId: "pat_1" }),
       );
+    });
+
+    /** @scenario "Rerun and keep data skips teardown for that rerun" */
+    it("forwards keep data onto the pool job", async () => {
+      const submit = vi.fn();
+      const run = createExecuteRunHandler(executionService(submit));
+
+      await run(makeExecutePayload({ keepData: true }), makeContext());
+
+      expect(submit).toHaveBeenCalledWith(expect.objectContaining({ keepData: true }));
     });
 
     it("omits scenarioName when the intent carries no name", async () => {

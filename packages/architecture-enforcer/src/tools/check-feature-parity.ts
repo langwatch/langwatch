@@ -165,7 +165,7 @@ const DEFAULT_TEST_ROOTS: string[] = [
 
 /**
  * Roots scanned for `.bats` shell tests. Shell-driven dev-environment
- * behavior (compose overrides, boxd fork orchestration) is tested with
+ * behavior (compose overrides, worktree setup) is tested with
  * bats, not vitest — without this scan path, scenarios that describe
  * shell behavior would have no way to satisfy parity and would be stuck
  * on `@unimplemented` forever. Bats bindings use the same `@scenario`
@@ -334,9 +334,6 @@ const LEGACY_UNBOUND: string[] = [
  * spot.
  */
 const LEGACY_INERT: string[] = [
-  // 2026-10-12: the id index (dev/docs/plans/id-index-2026-10-10.md) is planned,
-  // not built; every scenario is @unimplemented. Remove with its first binding.
-  "specs/clickhouse/id-index-reads.feature",
   // 2026-09-30 port of #7532: design-only specs for ADRs 161-163, every
   // scenario @unimplemented until the ADR is accepted and built.
   "modules/authz/specs/access-reviews.feature",
@@ -1242,8 +1239,8 @@ function collectAllBindings(testRoots: string[]): CollectedBinding[] {
 /**
  * Bats binding form (line-oriented, comment-prefixed):
  *
- *   # @scenario "Stale localhost NEXTAUTH_URL is rewritten to the fork's proxy URL"
- *   @test "boxd_rewrite_env: rewrites NEXTAUTH_URL allowlist key" {
+ *   # @scenario "all-local overrides only DATABASE_URL, REDIS_URL, CLICKHOUSE_URL"
+ *   @test "all-local rewrites DATABASE_URL, REDIS_URL, CLICKHOUSE_URL only" {
  *     ...
  *   }
  *

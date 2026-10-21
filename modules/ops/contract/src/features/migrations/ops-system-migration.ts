@@ -1,5 +1,8 @@
 import type { Named } from "@langwatch/module";
-import type { TenantMigrationRecord, TenantMigrationStatus } from "@langwatch/system-migrations";
+import type {
+  TenantMigrationRecord,
+  TenantMigrationStatus,
+} from "@langwatch/system-migrations/types";
 /**
  * The input shapes the operator system-migrations surface parses. The
  * confirmations are typed strings, optional, because only migrations that

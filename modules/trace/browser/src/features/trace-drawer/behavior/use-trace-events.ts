@@ -17,10 +17,10 @@ interface TraceEventsResult {
  */
 export function useTraceEvents(): TraceEventsResult {
   const isReadOnly = useIsReadOnlyTrace();
-  const { isReady, hintReady, queryArgs } = useTraceQueryArgs();
+  const { isReady, queryArgs } = useTraceQueryArgs();
 
   const query = api.traces.traceEvents.useQuery(queryArgs, {
-    enabled: isReady && hintReady && !isReadOnly,
+    enabled: isReady && !isReadOnly,
   });
 
   return {
