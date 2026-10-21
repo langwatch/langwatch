@@ -271,14 +271,14 @@ export class InsightBoardHealthService {
   }): Promise<BoardHealthReport> {
     // One code failing most of what ran is ours, whatever it says: the check then files nothing.
     const platformWide = isPlatformWide(read.flatMap(({ outcomes }) => outcomes));
-    const health = read.map(({ widget, outcomes }) => {
+    const checked = read.map(({ widget, outcomes }) => {
       const result = widgetHealth(outcomes);
       const broken = result === "error" || result === "no_data";
-      const read: WidgetHealth = platformWide && broken ? "platform" : result;
-      return { widget, outcomes, health: read };
+      const health: WidgetHealth = platformWide && broken ? "platform" : result;
+      return { widget, outcomes, health };
     });
-    for (const { health: result } of health) this.members.metrics.boardHealthChecked({ result });
-    const broken = health.flatMap(({ widget, outcomes, health: result }) =>
+    for (const { health: result } of checked) this.members.metrics.boardHealthChecked({ result });
+    const broken = checked.flatMap(({ widget, outcomes, health: result }) =>
       brokenWidget({ widget, outcomes, health: result }),
     );
     if (broken.length === 0) return NO_BOARD_HEALTH;
@@ -291,7 +291,10 @@ export class InsightBoardHealthService {
       }
     } catch (error) {
       // The cards written before the failure stand; the rest wait for the next run.
-      logger.warn({ error, projectId: input.projectId }, "board check could not report");
+      logger.warn(
+        { error, projectId: input.projectId, written: written.length },
+        "board check reported only part of its cards",
+      );
       return reportOf({
         acts: written,
         reported: written.flatMap(({ card }) => card.widget ?? []),
