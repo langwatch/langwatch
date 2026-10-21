@@ -15,7 +15,7 @@
     // `target` governs EMIT and stays conservative: this package is published
     // and its output is downlevelled for whatever runtime a customer has.
     // `lib` describes the runtime the code may ASSUME, and this package's own
-    // `engines.node` is ">=22", where the ES2023 array copy methods
+    // `engines.node` starts at 22, where the ES2023 array copy methods
     // (toSorted, toReversed, toSpliced, with) have existed since Node 20.
     // Without this, `unicorn/no-array-sort`'s fix does not type-check here.
     "target": "es2017",

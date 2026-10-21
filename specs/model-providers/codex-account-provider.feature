@@ -251,6 +251,60 @@ Feature: Codex, the sign-in-with-OpenAI model provider
     Then the prefetch succeeds
     Because those target types never resolve the FAST-role coding default for the agent under test
 
+  # Topic clustering is a FAST-role feature, but it names its topics inside
+  # the evaluation service, which calls the provider itself. Codex is only
+  # reachable through the AI gateway, so clustering is the one fast assist
+  # Codex cannot serve. The skip happens when the model is resolved, so a
+  # project that already set Codex as its Fast default needs no data change.
+  @unit
+  Scenario: Topic clustering never runs on a Codex coding default
+    Given a project whose FAST role default is a codex model
+    When topic clustering resolves its model
+    Then it does not get the codex model
+    And it uses a model set for topic clustering at a wider scope, if there is one
+    And with nothing else set, it fails as "this model can't be used here", not as an unknown error
+
+  @unit
+  Scenario: A refused Codex clustering model logs as a customer setup issue
+    Given topic clustering is refused because its model is a codex model
+    When the clustering run handles the refusal
+    Then it is classified as the customer's to fix
+    And it logs at warning level, not as an error that pages anyone
+
+  @unit
+  Scenario: A clustering run refused for its Codex model is recorded as failed
+    Given topic clustering is refused because its model is a codex model
+    When the clustering run handles the refusal
+    Then the run is recorded as failed on its first attempt, without retries
+    And the run status carries a code the topic clustering settings page explains
+
+  @unit
+  Scenario: Saving model defaults still works over a stored Codex clustering model
+    Given a saved default-models config holds a codex model for topic clustering from before Codex was kept off it
+    When the whole config is saved again with another model changed
+    Then the save succeeds
+    And the codex model is dropped from topic clustering, which falls back to the cascade
+
+  @unit
+  Scenario: Saving a config whose only model is a stored Codex clustering model is refused, not deleted
+    Given a saved default-models config whose only model is a codex model for topic clustering
+    When the config is saved again without clearing it
+    Then the save is refused as a validation error asking for another model
+    And the config and its scopes are kept
+
+  @unit
+  Scenario: A config left with only retired keys is removed on save, not refused
+    Given a saved default-models config whose only model sits under a feature key that no longer exists
+    When the config is saved again
+    Then the config is removed, as any config with nothing left in it is
+    And no Codex restriction error is raised
+
+  @unit
+  Scenario: Newly picking a Codex model for topic clustering is still refused
+    Given a saved default-models config with no topic clustering model
+    When a codex model is picked for topic clustering and the config is saved
+    Then the save is refused as a validation error naming the restriction
+
   # ── Where Codex is reached ─────────────────────────────────────────────────
 
   Rule: Codex is reached at a configured base, the real vendor unless the deployment names another

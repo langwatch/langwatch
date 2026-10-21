@@ -25615,6 +25615,15 @@
           "isList": false,
           "isOptional": false,
           "documentation": "Hostname, which names the customer's own network and so has a switch of\nits own rather than travelling with its category."
+        },
+        {
+          "name": "upgradeDiagnosticsOptOut",
+          "columnName": "upgradeDiagnosticsOptOut",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "Sending a failed upgrade step's diagnostics to LangWatch on its own,\nswitched off by the operator (upgrade-diagnostics-via-connect, decision 4)."
         }
       ]
     },
@@ -25832,6 +25841,124 @@
           "isList": false,
           "isOptional": false,
           "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "SelfHostedInstanceDiagnostic",
+      "tableName": "SelfHostedInstanceDiagnostic",
+      "documentation": "One upgrade diagnostics bundle a self-hosted install sent over Connect, on\nLangWatch Cloud. The bytes live in object storage under\n`upgrade-diagnostics/` and expire at 30 days by a lifecycle rule; this row\npoints at them and feeds Cloud admin and the Slack signal. Plain column\nrefs, no relation, as the usage report rows.",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "instanceId",
+          "columnName": "instanceId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "The `SelfHostedInstance.instanceId` the licence caller presented."
+        },
+        {
+          "name": "stepId",
+          "columnName": "stepId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "stepDescription",
+          "columnName": "stepDescription",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "release",
+          "columnName": "release",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "attempt",
+          "columnName": "attempt",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "trigger",
+          "columnName": "trigger",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "`operator` or `automatic`."
+        },
+        {
+          "name": "byteLength",
+          "columnName": "byteLength",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "objectKey",
+          "columnName": "objectKey",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "receivedAt",
+          "columnName": "receivedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "expiresAt",
+          "columnName": "expiresAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "When the lifecycle rule removes the bundle; the row is listed until then."
+        },
+        {
+          "name": "slackAnnouncedAt",
+          "columnName": "slackAnnouncedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "Set on the report that posted this step and release's one Slack message."
         }
       ]
     },

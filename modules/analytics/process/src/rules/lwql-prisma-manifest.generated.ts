@@ -2432,6 +2432,7 @@ export interface LwqlPrismaRows {
     readonly lastReportError: "String?";
     readonly optionalMetricsOptOut: "Boolean";
     readonly hostnameOptOut: "Boolean";
+    readonly upgradeDiagnosticsOptOut: "Boolean";
   };
   readonly SelfHostedInstance: {
     readonly id: "String";
@@ -2457,6 +2458,20 @@ export interface LwqlPrismaRows {
     readonly raisedSignals: "String[]";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
+  };
+  readonly SelfHostedInstanceDiagnostic: {
+    readonly id: "String";
+    readonly instanceId: "String";
+    readonly stepId: "String";
+    readonly stepDescription: "String?";
+    readonly release: "String?";
+    readonly attempt: "Int";
+    readonly trigger: "String";
+    readonly byteLength: "Int";
+    readonly objectKey: "String";
+    readonly receivedAt: "DateTime";
+    readonly expiresAt: "DateTime";
+    readonly slackAnnouncedAt: "DateTime?";
   };
   readonly SelfHostedInstanceReport: {
     readonly id: "String";

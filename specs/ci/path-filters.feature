@@ -142,10 +142,11 @@ Feature: CI path filters skip unnecessary workflows on non-code changes
   # green rather than a red check.
 
   @unit
-  Scenario: A pull request's changed paths come from git, not the files API
-    Given a pull_request run of the change detector
+  Scenario: A pull request's changed paths are its own commits, diffed from the merge base
+    Given a pull_request run of the change detector on a branch that is behind main
     When it chooses where to read the changed paths from
-    Then it diffs the pull request's base commit against the checked-out merge commit
+    Then it diffs the merge base of the base and head commits against the head commit
+    And commits that reached main after the branch was cut do not count as changed
     And it does not ask the files API
 
   @unit
@@ -173,13 +174,13 @@ Feature: CI path filters skip unnecessary workflows on non-code changes
 
   @unit
   Scenario: Git pathspecs select the same changed paths as dorny's picomatch
-    Given the filters of every pull_request_target caller of the change detector
+    Given the filters of every pull_request and pull_request_target caller of the change detector
     When every tracked path, look-alikes of the patterns and paths beneath literal patterns are matched
     Then the git pathspecs select exactly the paths dorny's picomatch selects with dot files included
 
   @unit
-  Scenario: A pull_request_target filter may use neither braces nor negation
-    Given a workflow triggered by pull_request_target declares a change-detector filter
+  Scenario: A pull request filter may use neither braces nor negation
+    Given a workflow triggered by pull_request or pull_request_target declares a change-detector filter
     When an entry uses braces or starts with "!"
     Then the path-filter guard fails and names the entry
     And the change detector refuses the filter at run time by forcing every filter true
@@ -195,3 +196,5 @@ Feature: CI path filters skip unnecessary workflows on non-code changes
     Given a workflow step uses dorny/paths-filter outside the change detector
     When that step can run on a pull_request event
     Then it passes an empty token, which makes the filter diff with git
+    And it diffs from the first parent of the pull request's merge commit, not the event's base commit
+    And commits that reached main after the branch was cut do not count as changed
