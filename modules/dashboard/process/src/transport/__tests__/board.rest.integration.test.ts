@@ -191,17 +191,83 @@ describe("given a Reports board and a Dashboards board holding a widget", () => 
     });
 
     /** @scenario "AC199n Split: the public API creates and deletes Dashboards boards" */
-    it("deletes it, then answers it as not found", async () => {
-      const { send } = await projectWithBothBoards();
+    it("deletes it with its widgets, then answers it as not found", async () => {
+      const { widget, send } = await projectWithBothBoards();
       const created = await send("boards", BOARDS, { method: "POST", body: { name: "Gone" } });
+      const path = `${BOARDS}/${created.json?.id}`;
+      await send("widgets", `${WIDGETS}/${widget.id}/dashboard`, {
+        method: "POST",
+        body: { dashboardId: created.json?.id },
+      });
 
-      const deleted = await send("boards", `${BOARDS}/${created.json?.id}`, { method: "DELETE" });
-      const read = await send("boards", `${BOARDS}/${created.json?.id}`);
+      const deleted = await send("boards", path, { method: "DELETE" });
+      const read = await send("boards", path);
+      const deletedAgain = await send("boards", path, { method: "DELETE" });
+      const widgets = await send("widgets", WIDGETS);
 
-      expect({ deleted: deleted.status, body: deleted.json, read: read.status }).toEqual({
+      expect({
+        deleted: deleted.status,
+        body: deleted.json,
+        read: read.status,
+        deletedAgain: { status: deletedAgain.status, code: deletedAgain.json?.code },
+        widgetIds: widgets.json?.data?.map(({ id }: { id: string }) => id),
+      }).toEqual({
         deleted: 200,
         body: { id: created.json?.id, name: "Gone" },
         read: 404,
+        deletedAgain: { status: 404, code: "dashboard_not_found" },
+        widgetIds: [],
+      });
+    });
+
+    /** @scenario "AC199n Split: the public API creates and deletes Dashboards boards" */
+    it("answers a Reports board's id as not found and leaves that board there", async () => {
+      const { reports, send } = await projectWithBothBoards();
+
+      const refused = await send("boards", `${BOARDS}/${reports.id}`, { method: "DELETE" });
+      const reportsBoards = await send("dashboards", "/api/v1/dashboards");
+
+      expect({ status: refused.status, code: refused.json?.code }).toEqual({
+        status: 404,
+        code: "dashboard_not_found",
+      });
+      expect(reportsBoards.json?.data?.map(({ id }: { id: string }) => id)).toContain(reports.id);
+    });
+
+    /** @scenario "AC199n Split: the public API creates and deletes Dashboards boards" */
+    it("answers another project's board as not found", async () => {
+      const { app, send } = await projectWithBothBoards();
+      const foreign = await app.createBoard({ projectId: "project-2", name: "Theirs" });
+
+      const refused = await send("boards", `${BOARDS}/${foreign.id}`, { method: "DELETE" });
+
+      expect({ status: refused.status, code: refused.json?.code }).toEqual({
+        status: 404,
+        code: "dashboard_not_found",
+      });
+    });
+
+    /** @scenario "AC199n Split: the public API creates and deletes Dashboards boards" */
+    it("answers a member's Only me board as not found to a key that names nobody", async () => {
+      const { app, send } = await projectWithBothBoards();
+      const viewer = { userId: "user-2" };
+      const mine = await app.createBoard({
+        projectId: PROJECT,
+        name: "Private",
+        createdById: viewer.userId,
+      });
+      await app.setDashboardScope({
+        projectId: PROJECT,
+        dashboardId: mine.id,
+        scope: "PRIVATE",
+        viewer,
+      });
+
+      const refused = await send("boards", `${BOARDS}/${mine.id}`, { method: "DELETE" });
+
+      expect({ status: refused.status, code: refused.json?.code }).toEqual({
+        status: 404,
+        code: "dashboard_not_found",
       });
     });
   });

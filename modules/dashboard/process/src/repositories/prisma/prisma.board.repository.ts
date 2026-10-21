@@ -1,5 +1,6 @@
 import { DASHBOARD_SRCDOC_CHART_KIND } from "@langwatch/analytics-contract";
 import {
+  DashboardNotFoundError,
   dashboardSchema,
   type DashboardScope,
   type DashboardStar,
@@ -16,6 +17,9 @@ import type {
   BoardUpdate,
   MemberStars,
 } from "../board.repository.ts";
+
+const isRecordNotFound = (error: unknown): boolean =>
+  typeof error === "object" && error !== null && "code" in error && error.code === "P2025";
 
 /** The column a star matches on: the board id for a board, the template id for a template. */
 const starTarget = (star: DashboardStar) =>
@@ -149,9 +153,12 @@ export class PrismaBoardRepository
     const { projectId, dashboardId } = input;
     return this.transaction(async (transaction) => {
       // First, so an id only Reports holds is refused before anything else is touched.
-      const board = await transaction.dashboardsV2.delete({
-        where: { id: dashboardId, projectId },
-      });
+      // P2025 is a second delete that raced this one to the same row.
+      const board = await transaction.dashboardsV2
+        .delete({ where: { id: dashboardId, projectId } })
+        .catch((error: unknown) => {
+          throw isRecordNotFound(error) ? new DashboardNotFoundError(projectId) : error;
+        });
       await transaction.dashboardWidget.deleteMany({ where: { projectId, dashboardId } });
       await transaction.dashboardFavourite.deleteMany({ where: { projectId, dashboardId } });
       await transaction.customGraph.deleteMany({

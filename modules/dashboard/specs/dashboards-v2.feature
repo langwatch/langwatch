@@ -1096,6 +1096,8 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     When the key deletes the board
     Then it answers with the board's id and name, and the board and its widgets are gone
     And reading or deleting the board again is not found
+    And a widget added to a board that is not the project's is refused with dashboard_not_found
+    And deleting a Reports board, another project's board or a member's Only me board is not found
 
   @integration
   Scenario: AC199o Split: a member's REST create follows the board scope rules
