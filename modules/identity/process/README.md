@@ -723,12 +723,13 @@ Declared at `src/features/sso-connection/eventing/sso-connection.pipeline.ts:185
 | Kind   | Leaf                              | Environment variable                | Declared at                             |
 | ------ | --------------------------------- | ----------------------------------- | --------------------------------------- |
 | secret | `internalSlackSignupsWebhook`     | `SLACK_CHANNEL_SIGNUPS`             | `src/app/identity.app.ts:463`           |
-| config | `ssoDomainProofDnsServers`        | `SSO_DOMAIN_PROOF_DNS_SERVERS`      | `../contract/src/identity.config.ts:28` |
-| config | `isSaas`                          | `IS_SAAS`                           | `../contract/src/identity.config.ts:30` |
-| config | `publicBaseUrl`                   | `BASE_HOST`                         | `../contract/src/identity.config.ts:32` |
-| config | `passkeysEnabled`                 | `PASSKEYS_ENABLED`                  | `../contract/src/identity.config.ts:34` |
-| config | `mfaEnrollmentOpen`               | `MFA_ENROLLMENT_OPEN`               | `../contract/src/identity.config.ts:35` |
-| config | `localPasswords`                  | `LOCAL_PASSWORDS_ENABLED`           | `../contract/src/identity.config.ts:36` |
-| config | `identifierBackfillMaxQueuedJobs` | `IDENTITY_BACKFILL_MAX_QUEUED_JOBS` | `../contract/src/identity.config.ts:38` |
+| config | `ssoDomainProofDnsServers`        | `SSO_DOMAIN_PROOF_DNS_SERVERS`      | `../contract/src/identity.config.ts:29` |
+| config | `isSaas`                          | `IS_SAAS`                           | `../contract/src/identity.config.ts:31` |
+| config | `publicBaseUrl`                   | `BASE_HOST`                         | `../contract/src/identity.config.ts:33` |
+| config | `outboundProxy`                   | `HTTPS_PROXY`                       | `../contract/src/identity.config.ts:35` |
+| config | `passkeysEnabled`                 | `PASSKEYS_ENABLED`                  | `../contract/src/identity.config.ts:37` |
+| config | `mfaEnrollmentOpen`               | `MFA_ENROLLMENT_OPEN`               | `../contract/src/identity.config.ts:38` |
+| config | `localPasswords`                  | `LOCAL_PASSWORDS_ENABLED`           | `../contract/src/identity.config.ts:39` |
+| config | `identifierBackfillMaxQueuedJobs` | `IDENTITY_BACKFILL_MAX_QUEUED_JOBS` | `../contract/src/identity.config.ts:41` |
 
 <!-- readme:generated:end -->
