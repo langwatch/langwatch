@@ -88,17 +88,9 @@ export class EventingCodingAgentSessionStoreService implements FoldProjectionSto
     );
   }
 
-  /**
-   * Fire-and-forget by contract: the callback swallows its own failures, and
-   * a hook that rejects anyway must surface as nothing worse than a dropped
-   * stamp, never an unhandled rejection in the worker.
-   */
+  /** Fire-and-forget: a rejecting hook costs a dropped stamp, never an unhandled rejection. */
   private reportSessionsStored(sessions: StoredSession[]): void {
-    try {
-      void this.hooks.onSessionsStored?.(sessions).catch(() => undefined);
-    } catch {
-      // A hook that throws synchronously must not fail the committed row either.
-    }
+    void this.hooks.onSessionsStored?.(sessions).catch(() => undefined);
   }
 
   private toRow(

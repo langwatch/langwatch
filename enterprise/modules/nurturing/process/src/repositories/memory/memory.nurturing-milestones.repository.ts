@@ -76,7 +76,11 @@ export class MemoryNurturingMilestonesRepository
     first: boolean;
   }> {
     const organization = this.#organizations.get(organizationId);
-    if (!organization || organization.codingFirstSessionAt !== null) return { first: false };
+    if (!organization) return { first: false };
+    // A retry of the fact that set it answers first again, so a failed delivery is not lost.
+    if (organization.codingFirstSessionAt !== null) {
+      return { first: organization.codingFirstSessionAt === occurredAt };
+    }
     this.#organizations.set(organizationId, { ...organization, codingFirstSessionAt: occurredAt });
     return { first: true };
   }
@@ -109,7 +113,8 @@ export class MemoryNurturingMilestonesRepository
     if (!organization) return { changed: false, codingActiveDays: 0 };
     const last = organization.codingLastActiveDay;
     if (last !== null && last >= day) {
-      return { changed: false, codingActiveDays: organization.codingActiveDays };
+      // The day already counted answers changed again, so a failed delivery is not lost.
+      return { changed: last === day, codingActiveDays: organization.codingActiveDays };
     }
     const codingActiveDays = organization.codingActiveDays + 1;
     this.#organizations.set(organizationId, {

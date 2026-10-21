@@ -36,6 +36,8 @@ import type {
 import type { UserLifecycleEventData } from "@langwatch/user-contract";
 import type { WorkflowCreatedEventData } from "@langwatch/workflow-contract";
 
+import { utcDayOf } from "./nurturing-coding-signals.rules.ts";
+
 /** The signal a peer's event raises, keyed by the aggregate and instant the event carries. */
 type OwnerEvent<Data> = Readonly<{ data: Data; aggregateId: string }>;
 /** An owner's event whose data names no tenant: the delivery context's is the event's own. */
@@ -511,7 +513,7 @@ export function projectActiveDaySignal({
   organizationCreatedAt,
   onboardingVariant,
 }: ActiveDaySignal): NurturingSignal {
-  const day = Temporal.Instant.fromEpochMilliseconds(occurredAt).toString().slice(0, 10);
+  const day = utcDayOf(occurredAt);
   const daysSinceSignup =
     organizationCreatedAt == null
       ? null

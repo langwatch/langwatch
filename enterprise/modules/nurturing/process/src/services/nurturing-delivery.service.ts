@@ -7,17 +7,14 @@ import type {
 import type { UsageReportReceivedEventData } from "@langwatch/enterprise-saas-contract";
 import type { GuidedOnboardingTurnFailedEventData } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
-import { Temporal } from "@langwatch/time";
 import type { UserApi } from "@langwatch/user-contract";
 
 import type { PostHogChannel } from "../channels/posthog.channel.ts";
 import type { NurturingClaimRepository } from "../repositories/nurturing-claim.repository.ts";
 import { fire as fireActivity } from "../rules/nurturing-activity-tracking-service.rules.ts";
-import {
-  customerIoDebouncesOf,
-  fireCodingOrApp,
-  isCodingOrAppSignal,
-} from "../rules/nurturing-coding-delivery.rules.ts";
+import { fireCodingOrApp, isCodingOrAppSignal } from "../rules/nurturing-coding-delivery.rules.ts";
+import { isoOf } from "../rules/nurturing-coding-signals.rules.ts";
+import { pickCustomerIoDebounce } from "../rules/nurturing-delivery-debounce.rules.ts";
 import {
   fireExperimentRan,
   fireScenarioCreated,
@@ -41,6 +38,7 @@ import {
   evaluationsCompletedEvent,
 } from "../rules/nurturing-posthog-activation.rules.ts";
 import {
+  fireCodingAgentIntegrationMethod,
   fireIntegrationMethod,
   integrationMethodFor,
 } from "../rules/nurturing-product-interest-service.rules.ts";
@@ -68,12 +66,6 @@ function reportFailure(error: unknown): void {
 
 /** How long a delivered signal is remembered against a redelivered source event. */
 const DELIVERED_WINDOW_SECONDS = 7 * 24 * 60 * 60;
-
-function isoOf(epochMilliseconds: number): string {
-  return Temporal.Instant.fromEpochMilliseconds(epochMilliseconds).toString({
-    fractionalSecondDigits: 3,
-  });
-}
 
 /**
  * Sends each recorded signal once, as main sent it: Customer.io through the
@@ -104,6 +96,21 @@ export class NurturingDeliveryService {
     if (await this.withinCustomerIoDebounce(signal)) return this.toPostHogSafely(signal);
     this.toCustomerIo(signal);
     this.toPostHogSafely(signal);
+    await this.identifyCodingAgentMembers(signal);
+  }
+
+  /**
+   * A coding-agent organization's members each get integration_method once, claimed per person
+   * so a redelivery or a second organization of theirs does not send it again in the window.
+   */
+  private async identifyCodingAgentMembers(signal: NurturingSignal): Promise<void> {
+    if (signal.kind !== "coding_agent_first_session" || !this.deps.customerIo) return;
+    const unclaimed: string[] = [];
+    for (const userId of new Set(signal.memberUserIds)) {
+      const claimKey = `nurturing:integration_method:coding_agent:${userId}`;
+      if (await this.deps.claims.claim(claimKey, DELIVERED_WINDOW_SECONDS)) unclaimed.push(userId);
+    }
+    this.sendCustomerIoCalls(fireCodingAgentIntegrationMethod({ memberUserIds: unclaimed }));
   }
 
   /** Langy's failed guided turn: PostHog only, once per source event, never failing the fact. */
@@ -154,7 +161,7 @@ export class NurturingDeliveryService {
 
   /** True when this signal's debounce window already sent for its tenant or person. */
   private async withinCustomerIoDebounce(signal: NurturingSignal): Promise<boolean> {
-    const [debounce] = customerIoDebouncesOf(signal);
+    const debounce = pickCustomerIoDebounce(signal);
     if (!debounce) return false;
     return !(await this.deps.claims.claim(debounce.claimKey, debounce.seconds));
   }

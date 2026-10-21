@@ -4,7 +4,8 @@ import type {
   NurturingSignal,
   NurturingSignalOf,
 } from "@langwatch/enterprise-nurturing-contract";
-import { Temporal } from "@langwatch/time";
+
+import { isoOf } from "./nurturing-coding-signals.rules.ts";
 
 const CODING_AND_APP_KINDS = [
   "coding_session_stored",
@@ -20,12 +21,6 @@ type CodingOrAppSignal = NurturingSignalOf<(typeof CODING_AND_APP_KINDS)[number]
 
 export function isCodingOrAppSignal(signal: NurturingSignal): signal is CodingOrAppSignal {
   return (CODING_AND_APP_KINDS as readonly string[]).includes(signal.kind);
-}
-
-function isoOf(epochMilliseconds: number): string {
-  return Temporal.Instant.fromEpochMilliseconds(epochMilliseconds).toString({
-    fractionalSecondDigits: 3,
-  });
 }
 
 /**
@@ -75,43 +70,4 @@ export function fireCodingOrApp(signal: CodingOrAppSignal): CioBatchCall[] {
       return [];
     }
   }
-}
-
-type Debounce = Readonly<{ seconds: number; claimKey: string }>;
-
-/** The tenant's trace, simulation, evaluation or coding update: main's CRM contract, five minutes. */
-const TENANT_UPDATE_SECONDS = 5 * 60;
-const TENANT_UPDATE_KINDS: ReadonlySet<NurturingSignal["kind"]> = new Set([
-  "trace_received",
-  "simulation_run_finished",
-  "evaluation_completed",
-  "coding_session_stored",
-]);
-/** An app open names the person as its tenant, so the hour is spent per person across pods. */
-const PERSON_HOUR_SECONDS = 60 * 60;
-const PERSON_HOUR_KINDS: ReadonlySet<NurturingSignal["kind"]> = new Set([
-  "app_opened",
-  "sessions_page_viewed",
-]);
-
-/** The windows a Customer.io update waits out: one, or none for a kind that is never debounced. */
-export function customerIoDebouncesOf(signal: NurturingSignal): Debounce[] {
-  if (TENANT_UPDATE_KINDS.has(signal.kind)) {
-    // Main's key, unchanged for the kinds that existed before.
-    return [
-      {
-        seconds: TENANT_UPDATE_SECONDS,
-        claimKey: `nurturing:cio-sync:${signal.kind}:${signal.tenantId}`,
-      },
-    ];
-  }
-  if (PERSON_HOUR_KINDS.has(signal.kind)) {
-    return [
-      {
-        seconds: PERSON_HOUR_SECONDS,
-        claimKey: `nurturing:debounce:${signal.kind}:${signal.tenantId}`,
-      },
-    ];
-  }
-  return [];
 }

@@ -11,7 +11,7 @@ Signing in and staying signed in: the browser session, the signed-out front door
 | Classification | core (`modules/catalogue.json`)                                                            |
 | Subjects       | auth, cli-bootstrap, cli-session, cli-token                                                |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                   |
-| Api token      | `AuthApi` = `moduleApi<AuthApi>()("auth")`, `contract/src/auth.api.ts:422` (58 operations) |
+| Api token      | `AuthApi` = `moduleApi<AuthApi>()("auth")`, `contract/src/auth.api.ts:425` (58 operations) |
 | Other token    | `AuthCliDeviceFlowApi`, `process/src/transport/auth-cli-device-flow.rest.ts:42`            |
 | Other token    | `AuthDoorApi`, `process/src/transport/auth.rest.ts:47`                                     |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                 |

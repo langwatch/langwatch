@@ -24,16 +24,17 @@ Product analytics and lifecycle messaging: every owner tells nurturing through a
 | Stores required                |                                                                                                                                               | `process/src/channels/http/http.nurturing.channels.ts:13`                             |
 | Stores required                | prisma, redis                                                                                                                                 | `process/src/repositories/live/live.nurturing.repositories.ts:11`                     |
 | Stores required                | ≈ `ownedRepositories.requires`                                                                                                                | `process/src/repositories/prisma/prisma.nurturing.repositories.ts:16`                 |
-| Secrets                        | CUSTOMER_IO_API_KEY                                                                                                                           | `process/src/app/nurturing.app.ts:33`                                                 |
+| Secrets                        | CUSTOMER_IO_API_KEY                                                                                                                           | `process/src/app/nurturing.app.ts:34`                                                 |
 | Config                         | `customerIoRegion` (CUSTOMER_IO_REGION), `customerIoBaseUrl` (CUSTOMER_IO_BASE_URL), `posthogKey` (POSTHOG_KEY), `posthogHost` (POSTHOG_HOST) | `contract/src/nurturing.config.ts:8`                                                  |
 
 Anything else nurturing needs belongs to another module and is reached through its `*Api`.
 
 ## Peers (static dependencies)
 
-| Name    | Token     | Module                                  |
-| ------- | --------- | --------------------------------------- |
-| `users` | `UserApi` | [user](../../../modules/user/README.md) |
+| Name            | Token             | Module                                                  |
+| --------------- | ----------------- | ------------------------------------------------------- |
+| `organizations` | `OrganizationApi` | [organization](../../../modules/organization/README.md) |
+| `users`         | `UserApi`         | [user](../../../modules/user/README.md)                 |
 
 ## Who depends on nurturing
 

@@ -619,7 +619,7 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
     };
   }
 
-  /** Whether the tenant holds a session besides the one named. */
+  /** Whether the tenant holds a main-thread session besides the one named; helpers never count. */
   async hasOtherSession({
     tenantId,
     excludeSessionId,
@@ -636,10 +636,12 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
       table: TABLE_NAME,
       kind: "read",
       sql: `
-        SELECT 1 AS found
+        SELECT SessionId
         FROM ${TABLE_NAME}
         WHERE TenantId = {tenantId:String}
           AND SessionId != {excludeSessionId:String}
+        GROUP BY SessionId
+        HAVING max(toUInt8(Auxiliary)) = 0
         LIMIT 1
       `,
       params: { tenantId, excludeSessionId },

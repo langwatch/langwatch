@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { CodingAgentSessionStoredEventData } from "@langwatch/coding-agent-contract";
 import type { NurturingSignal } from "@langwatch/enterprise-nurturing-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 
 import type {
   NurturingCodingMilestonesRepository,
@@ -22,6 +23,8 @@ type Fact = CodingAgentSessionStoredEventData;
 type CodingDependencies = Readonly<{
   milestones: NurturingCodingMilestonesRepository;
   projects: NurturingProjectDirectoryRepository;
+  /** The one nurturing -> organization edge: who to tell integration_method on a first session. */
+  organizations: Pick<OrganizationApi, "getAllMembers">;
 }>;
 
 /** The fact that happened last; the earliest in order wins a tie. */
@@ -31,10 +34,8 @@ function latestOf(facts: readonly Fact[]): Fact {
 
 /**
  * What nurturing decides from coding-agent's session-stored fact (§9), per project: the last
- * session, the first session of the organization, its agent types and its UTC active days. Each
- * step is one guarded write on the organization row, so a redelivery or a second pod changes
- * nothing and raises no second signal. Organizations nurturing never learned, and those with no
- * admin, raise nothing.
+ * session, first session, agent types and UTC active days. Each step is a guarded write that
+ * answers a retry of the same fact again, and delivery's claims send each signal once.
  */
 export class NurturingCodingMilestonesService {
   static create(dependencies: CodingDependencies): NurturingCodingMilestonesService {
@@ -60,31 +61,24 @@ export class NurturingCodingMilestonesService {
     const organization = await this.organizationOf(latest.projectId);
     const adminUserId = organization?.row.adminUserId;
     if (!organization || !adminUserId) return;
-    const { organizationId, row } = organization;
+    const { organizationId } = organization;
     const common = { adminUserId, organizationId };
 
     await deliver(codingSessionStoredSignal({ data: latest, adminUserId }));
 
-    // First session, then agent types, then the day: the order the signals are raised in.
-    let agentTypes = row.codingAgentTypes;
+    // Every type first, so the first-session signal names them all; then first session, then day.
+    const agentTypes = await this.addAgentTypes({ organizationId, facts });
     let sentFirst = false;
     const first = facts.find((fact) => fact.firstForProject);
-    if (first && !organization.seeded) {
-      const { first: isFirst } = await this.dependencies.milestones.recordCodingFirstSession({
-        organizationId,
-        occurredAt: first.occurredAt,
-      });
-      if (isFirst) {
-        agentTypes = (await this.addAgentTypes({ organizationId, facts: [first] })).agentTypes;
-        await deliver(codingAgentFirstSessionSignal({ data: first, agentTypes, ...common }));
-        sentFirst = true;
-      }
-    }
-    const added = await this.addAgentTypes({ organizationId, facts });
-    if (added.changed && !sentFirst) {
+    if (first && (await this.isFirstSession({ organization, first }))) {
+      const memberUserIds = await this.memberUserIdsOf(organizationId);
       await deliver(
-        codingAgentTypesSignal({ data: latest, agentTypes: added.agentTypes, ...common }),
+        codingAgentFirstSessionSignal({ data: first, agentTypes, memberUserIds, ...common }),
       );
+      sentFirst = true;
+    }
+    if (!sentFirst) {
+      await deliver(codingAgentTypesSignal({ data: latest, agentTypes, ...common }));
     }
 
     const day = utcDayOf(latest.occurredAt);
@@ -104,46 +98,65 @@ export class NurturingCodingMilestonesService {
     }
   }
 
-  /** Adds each distinct agent type once; `changed` when any was new, with the list as it stands. */
+  /** Reads the owners' first project only here: a seeded organization never had a first session. */
+  private async isFirstSession({
+    organization: { organizationId, row },
+    first,
+  }: Readonly<{
+    organization: { organizationId: string; row: NurturingOrganizationRow };
+    first: Fact;
+  }>): Promise<boolean> {
+    const firstProject = await this.dependencies.projects.getFirstProjectCreatedAt({
+      organizationId,
+    });
+    if (seededAtRead({ ...row, ...firstProject })) return false;
+    const { first: isFirst } = await this.dependencies.milestones.recordCodingFirstSession({
+      organizationId,
+      occurredAt: first.occurredAt,
+    });
+    return isFirst;
+  }
+
+  private memberUserIdsOf(organizationId: string): Promise<string[]> {
+    return this.dependencies.organizations
+      .getAllMembers({ organizationId })
+      .then((users) => users.map(({ id }) => id));
+  }
+
+  /** Adds each distinct agent type once; returns the list as it stands. */
   private async addAgentTypes({
     organizationId,
     facts,
-  }: Readonly<{ organizationId: string; facts: readonly Fact[] }>): Promise<{
-    changed: boolean;
-    agentTypes: string[];
-  }> {
-    let changed = false;
+  }: Readonly<{ organizationId: string; facts: readonly Fact[] }>): Promise<string[]> {
     let agentTypes: string[] = [];
     for (const agentType of new Set(facts.map((fact) => fact.agentType))) {
       const result = await this.dependencies.milestones.addCodingAgentType({
         organizationId,
         agentType,
       });
-      changed ||= result.changed;
       agentTypes = result.codingAgentTypes;
     }
-    return { changed, agentTypes };
+    return agentTypes;
   }
 
   /** Null when the owners hold no such project or nurturing never learned its organization. */
   private async organizationOf(
     projectId: string,
-  ): Promise<{ organizationId: string; row: NurturingOrganizationRow; seeded: boolean } | null> {
+  ): Promise<{ organizationId: string; row: NurturingOrganizationRow } | null> {
     const placement = await this.dependencies.projects.getPlacement({ projectId });
     if (placement.outcome === "unknown") return null;
     const { organizationId } = placement;
     const [row] = await this.dependencies.milestones.findOrganization({ organizationId });
-    if (!row) return null;
-    const firstProject = await this.dependencies.projects.getFirstProjectCreatedAt({
-      organizationId,
-    });
-    return { organizationId, row, seeded: seededAtRead({ ...row, ...firstProject }) };
+    return row ? { organizationId, row } : null;
   }
 }
 
 function groupedByProject(facts: readonly Fact[]): Fact[][] {
   const groups = new Map<string, Fact[]>();
-  for (const fact of facts)
-    groups.set(fact.projectId, [...(groups.get(fact.projectId) ?? []), fact]);
+  for (const fact of facts) {
+    const group = groups.get(fact.projectId);
+    if (group) group.push(fact);
+    else groups.set(fact.projectId, [fact]);
+  }
   return [...groups.values()];
 }

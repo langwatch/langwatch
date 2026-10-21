@@ -31,6 +31,16 @@ describe("MemoryNurturingMilestonesRepository coding signals", () => {
       expect(results).toEqual([{ first: true }, { first: false }]);
     });
 
+    /** @scenario "A failed delivery is not lost when the fact is redelivered" */
+    it("reports first again for a retry of the fact that set it", async () => {
+      const repository = await learned();
+      await repository.recordCodingFirstSession({ organizationId: "org-1", occurredAt: 100 });
+
+      await expect(
+        repository.recordCodingFirstSession({ organizationId: "org-1", occurredAt: 100 }),
+      ).resolves.toEqual({ first: true });
+    });
+
     it("keeps the first call's time", async () => {
       const repository = await learned();
 
@@ -90,13 +100,13 @@ describe("MemoryNurturingMilestonesRepository coding signals", () => {
       ).resolves.toEqual({ changed: true, codingActiveDays: 1 });
     });
 
-    it("does not count the same day twice", async () => {
+    it("counts the same day once and answers it again as changed", async () => {
       const repository = await learned();
       await repository.recordCodingActiveDay({ organizationId: "org-1", day: "2026-10-20" });
 
       await expect(
         repository.recordCodingActiveDay({ organizationId: "org-1", day: "2026-10-20" }),
-      ).resolves.toEqual({ changed: false, codingActiveDays: 1 });
+      ).resolves.toEqual({ changed: true, codingActiveDays: 1 });
     });
 
     it("counts a later day", async () => {

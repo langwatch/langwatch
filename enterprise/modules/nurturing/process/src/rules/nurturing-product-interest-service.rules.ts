@@ -41,3 +41,17 @@ export function fireIntegrationMethod({
     },
   ];
 }
+
+/**
+ * A CLI sign-up skips the product page, so a coding-agent organization's members are told
+ * integration_method coding_agent here: one identify per distinct member.
+ */
+export function fireCodingAgentIntegrationMethod({
+  memberUserIds,
+}: {
+  memberUserIds: readonly string[];
+}): CioBatchCall[] {
+  return [...new Set(memberUserIds)].flatMap((userId) =>
+    fireIntegrationMethod({ userId, integrationMethod: "coding_agent" }),
+  );
+}

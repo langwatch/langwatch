@@ -108,7 +108,7 @@ import {
 import { z } from "zod";
 
 import type { NurturingModule } from "../app/nurturing.app.ts";
-import { appOpenedSignals } from "../rules/nurturing-coding-signals.rules.ts";
+import { appOpenedSignals } from "../rules/nurturing-app-opened.rules.ts";
 import {
   checkoutCompletedSignal,
   evaluationRanSignal,

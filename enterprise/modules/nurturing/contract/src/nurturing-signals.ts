@@ -322,6 +322,8 @@ const nurturingSignalSchemaDefinition = z.discriminatedUnion("kind", [
     projectId: id,
     agentType: id,
     agentTypes: z.array(id).min(1),
+    /** Every active member of the organization: each gets integration_method coding_agent. */
+    memberUserIds: z.array(id).default([]),
   }),
   z.object({
     /** The opening person's own profile, not the organization admin's. */

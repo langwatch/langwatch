@@ -252,7 +252,12 @@ export const authTrpcTransport: TrpcRouterDeclaration<AuthApi, typeof authTrpc> 
   .withMiddlewareContext(browserSessionContext)
   .noPermission({ reason: OWN_ACCOUNT })
   .handle(({ app, actor, input }, browserSession) =>
-    app.recordPageOpened({ userId: actor.id, browserSessionId: browserSession, page: input.page }),
+    app.recordPageOpened({
+      userId: actor.id,
+      browserSessionId: browserSession,
+      page: input.page,
+      impersonatorId: actor.impersonatorId,
+    }),
   )
 
   // `register` predates the account it creates, so it runs with no caller at all and the

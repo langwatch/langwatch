@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * @vitest-environment node
- * What nurturing decides from coding-agent's session-stored fact: the first-session guard, the
- * agent-type union and the UTC-day count, in that order, each guarded in the repository.
  * @see enterprise/modules/nurturing/specs/coding-agent-signals.feature
  */
 import type { CodingAgentSessionStoredEventData } from "@langwatch/coding-agent-contract";
 import type { NurturingSignal } from "@langwatch/enterprise-nurturing-contract";
-import { beforeEach, describe, expect, it } from "vitest";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { nurturingSignalKey } from "../../eventing/nurturing-signal.commands.ts";
 import { MemoryNurturingMilestonesRepository } from "../../repositories/memory/memory.nurturing-milestones.repository.ts";
 import { MemoryNurturingProjectDirectoryRepository } from "../../repositories/memory/memory.nurturing-project-directory.repository.ts";
 import { NurturingCodingMilestonesService } from "../nurturing-coding-milestones.service.ts";
@@ -31,27 +32,47 @@ const fact = (
 async function serviceOver({
   adminUserId = "admin-1",
   seeded = false,
-}: { adminUserId?: string | null; seeded?: boolean } = {}) {
+  failFirstDeliveryOf,
+}: {
+  adminUserId?: string | null;
+  seeded?: boolean;
+  failFirstDeliveryOf?: NurturingSignal["kind"];
+} = {}) {
   const milestones = MemoryNurturingMilestonesRepository.create();
   await milestones.recordOrganization({ organizationId: "org-1", adminUserId, seeded });
+  const projects = MemoryNurturingProjectDirectoryRepository.create({
+    placed: new Map([
+      ["project-1", "org-1"],
+      ["project-2", "org-1"],
+    ]),
+  });
+  const firstProjectRead = vi.spyOn(projects, "getFirstProjectCreatedAt");
   const service = NurturingCodingMilestonesService.create({
     milestones,
-    projects: MemoryNurturingProjectDirectoryRepository.create({
-      placed: new Map([
-        ["project-1", "org-1"],
-        ["project-2", "org-1"],
-      ]),
+    projects,
+    organizations: createApiFixture<OrganizationApi>({
+      getAllMembers: async () => [{ id: "admin-1" }, { id: "member-2" }] as never,
     }),
   });
   const delivered: NurturingSignal[] = [];
+  const claimed = new Set<string>();
+  let failed = false;
+  // Delivery's own claim: a signal already sent is not sent again.
+  const deliver = async (signal: NurturingSignal) => {
+    if (signal.kind === failFirstDeliveryOf && !failed) {
+      failed = true;
+      throw new Error("delivery failed");
+    }
+    const key = nurturingSignalKey(signal);
+    if (claimed.has(key)) return;
+    claimed.add(key);
+    delivered.push(signal);
+  };
   const send = (sessions: CodingAgentSessionStoredEventData[]) =>
-    service.sessionsStored({
-      sessions,
-      deliver: async (signal) => void delivered.push(signal),
-    });
+    service.sessionsStored({ sessions, deliver });
   const ofKind = (kind: NurturingSignal["kind"]) =>
     delivered.filter((signal) => signal.kind === kind);
-  return { send, delivered, ofKind };
+  return { send, delivered, ofKind, firstProjectRead };
 }
 
 describe("NurturingCodingMilestonesService", () => {
@@ -97,6 +118,70 @@ describe("NurturingCodingMilestonesService", () => {
       await send([fact()]);
 
       expect(ofKind("coding_active_days")).toMatchObject([{ codingActiveDays: 1 }]);
+    });
+  });
+
+  describe("when the first batch holds sessions of two agents", () => {
+    /** @scenario "The first session names every agent type of its batch" */
+    it("names both agent types on the first-session signal", async () => {
+      const { send, ofKind } = await serviceOver();
+
+      await send([fact(), fact({ sessionId: "session-2", agentType: "codex" })]);
+
+      expect(ofKind("coding_agent_first_session")).toMatchObject([
+        { agentTypes: ["claude_code", "codex"] },
+      ]);
+    });
+  });
+
+  describe("when the first session is raised", () => {
+    /** @scenario "The first session carries every active member of the organization" */
+    it("carries the organization's members for integration_method", async () => {
+      const { send, ofKind } = await serviceOver();
+
+      await send([fact()]);
+
+      expect(ofKind("coding_agent_first_session")).toMatchObject([
+        { memberUserIds: ["admin-1", "member-2"] },
+      ]);
+    });
+  });
+
+  describe("when delivering the first-session signal fails once", () => {
+    /** @scenario "A failed delivery is not lost when the fact is redelivered" */
+    it("sends the first-session signal exactly once after the redelivery", async () => {
+      const { send, ofKind } = await serviceOver({
+        failFirstDeliveryOf: "coding_agent_first_session",
+      });
+
+      await expect(send([fact()])).rejects.toThrow("delivery failed");
+      await send([fact()]);
+      await send([fact()]);
+
+      expect(ofKind("coding_agent_first_session")).toHaveLength(1);
+    });
+  });
+
+  describe("when delivering the active-day signal fails once", () => {
+    /** @scenario "A failed delivery is not lost when the fact is redelivered" */
+    it("sends the active-day signal exactly once after the redelivery", async () => {
+      const { send, ofKind } = await serviceOver({ failFirstDeliveryOf: "coding_active_days" });
+
+      await expect(send([fact()])).rejects.toThrow("delivery failed");
+      await send([fact()]);
+
+      expect(ofKind("coding_active_days")).toMatchObject([{ codingActiveDays: 1 }]);
+    });
+  });
+
+  describe("when no fact says first for its project", () => {
+    /** @scenario "The owners' first project is read only for a first session" */
+    it("never reads the organization's first project", async () => {
+      const { send, firstProjectRead } = await serviceOver();
+
+      await send([fact({ firstForProject: false })]);
+
+      expect(firstProjectRead).not.toHaveBeenCalled();
     });
   });
 

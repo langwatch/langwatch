@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * @vitest-environment node
- * The coding-agent and app-open signals as Customer.io receives them, and the debounces
- * that keep a busy project or a refreshing tab from writing on every event.
  * @see enterprise/modules/nurturing/specs/coding-agent-signals.feature
  * @see enterprise/modules/nurturing/specs/app-opened.feature
  */
@@ -99,6 +97,7 @@ const firstSession: NurturingSignal = {
   ...codingSource,
   agentType: "claude_code",
   agentTypes: ["claude_code"],
+  memberUserIds: [],
 };
 const appOpened = (occurredAt: number, userId = "user-1"): NurturingSignal => ({
   kind: "app_opened",
@@ -248,6 +247,39 @@ describe("NurturingDeliveryService coding-agent signals", () => {
           properties: expect.objectContaining({ agent_type: "claude_code" }),
         }),
       ]);
+    });
+
+    /** @scenario "A CLI sign-up who picked LLMOps and then sends a coding-agent session gets integration_method=coding_agent in Customer.io" */
+    it("identifies every member with integration_method coding_agent, once per person", async () => {
+      const { delivery, cio } = deliveryOver(new ClockedClaims());
+      const withMembers = { ...firstSession, memberUserIds: ["admin-1", "member-2", "member-2"] };
+
+      await deliver(delivery, withMembers);
+      await deliver(delivery, withMembers);
+      await settle();
+
+      expect(
+        cio
+          .identifies()
+          .filter((call) => JSON.stringify(call.traits) === '{"integration_method":"coding_agent"}')
+          .map((call) => call.userId),
+      ).toEqual(["admin-1", "member-2"]);
+    });
+
+    it("sends a member of two organizations the trait once", async () => {
+      const { delivery, cio } = deliveryOver(new ClockedClaims());
+
+      await deliver(delivery, { ...firstSession, memberUserIds: ["member-2"] });
+      await deliver(delivery, {
+        ...firstSession,
+        sourceEventId: "org-2",
+        memberUserIds: ["member-2"],
+      });
+      await settle();
+
+      expect(
+        cio.identifies().filter((call) => "integration_method" in (call.traits as object)),
+      ).toHaveLength(1);
     });
 
     it("delivers a redelivered first-session signal once", async () => {

@@ -124,7 +124,9 @@ export class RecordSignedUpCommand implements CommandHandler<
   }
 }
 
-/** Records a page open; one event per person, page and instant. */
+const HOUR_MILLISECONDS = 60 * 60 * 1000;
+
+/** Records a page open; at most one event per person and page per UTC hour, whatever the client. */
 export class RecordAppPageOpenedCommand implements CommandHandler<
   Command<RecordAppPageOpenedCommandData>,
   AppPageOpenedEvent
@@ -146,7 +148,7 @@ export class RecordAppPageOpenedCommand implements CommandHandler<
         version: AUTH_LIFECYCLE_EVENT_VERSION,
         data,
         occurredAt: data.occurredAt,
-        idempotencyKey: `${data.userId}:app_page_opened:${data.page}:${data.occurredAt}`,
+        idempotencyKey: `${data.userId}:app_page_opened:${data.page}:${Math.floor(data.occurredAt / HOUR_MILLISECONDS)}`,
       }),
     ];
   }

@@ -1,7 +1,5 @@
 /**
  * @vitest-environment node
- * Whether a page open is auth's to announce: only a browser login session of a person who
- * belongs to an organization, and never at the cost of the page.
  * @see modules/auth/specs/app-page-opened.feature
  */
 import { describe, expect, it } from "vitest";
@@ -43,6 +41,22 @@ describe("AppPageOpenedService", () => {
       });
 
       expect(opened).toEqual([{ userId: "user_ada", page: "me_sessions" }]);
+    });
+  });
+
+  describe("given an operator impersonating the person", () => {
+    /** @scenario "An impersonated session records nothing" */
+    it("records nothing", async () => {
+      const { service, opened } = serviceOver();
+
+      await service.record({
+        userId: "user_ada",
+        browserSessionId: "session-1",
+        page: "me_sessions",
+        impersonatorId: "operator-9",
+      });
+
+      expect(opened).toEqual([]);
     });
   });
 

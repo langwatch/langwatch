@@ -7,6 +7,7 @@ import {
   type NurturingSignal,
 } from "@langwatch/enterprise-nurturing-contract";
 import type { EventingCommands } from "@langwatch/eventing";
+import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { UserApi } from "@langwatch/user-contract";
 
@@ -25,10 +26,10 @@ type NurturingSetup = FeatureSetup<
   NurturingChannels
 >;
 
-/** Owners tell nurturing; it names no peer, so it can never close a cycle (§9). */
+/** Owners tell nurturing; no module names it as a peer, so it can never close a cycle (§9). */
 export class NurturingModule implements NurturingApi {
   static readonly contract = NurturingApi;
-  static readonly dependencies = { users: UserApi };
+  static readonly dependencies = { users: UserApi, organizations: OrganizationApi };
   static readonly config = nurturingConfig;
   static readonly secrets = nurturingSecrets;
 
@@ -65,6 +66,7 @@ export class NurturingModule implements NurturingApi {
     const codingMilestones = NurturingCodingMilestonesService.create({
       milestones: repositories.milestones,
       projects: repositories.projects,
+      organizations: dependencies.organizations,
     });
     return new NurturingModule(
       buildNurturingPipeline({

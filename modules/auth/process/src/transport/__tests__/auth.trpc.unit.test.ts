@@ -223,6 +223,24 @@ describe("the signed-out front door", () => {
       });
     });
 
+    /** @scenario "An impersonated session records nothing" */
+    it("hands auth the impersonator, so an operator's browsing is not recorded", async () => {
+      recordPageOpened.mockResolvedValue(undefined);
+      const operator = router.createCaller({
+        actor: { id: "user-1", impersonatorId: "operator-9" },
+        sessionId: "session-0",
+      });
+
+      await operator.recordPageOpened({ page: "me_sessions" });
+
+      expect(recordPageOpened).toHaveBeenCalledWith({
+        userId: "user-1",
+        browserSessionId: "session-0",
+        page: "me_sessions",
+        impersonatorId: "operator-9",
+      });
+    });
+
     /** @scenario "A call without a browser session records nothing" */
     it("hands auth no browser session for a caller that carries none, so nothing is recorded", async () => {
       recordPageOpened.mockResolvedValue(undefined);

@@ -1,7 +1,5 @@
 /**
  * @vitest-environment node
- * The owner side of the session-stored fact: which stored sessions raise it, and whether it
- * says the project's first. coding-agent never names a consumer.
  * @see modules/coding-agent/specs/coding-agent-session-stored.feature
  */
 import type { CodingAgentSessionStoredEventData } from "@langwatch/coding-agent-contract";

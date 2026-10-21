@@ -1020,6 +1020,7 @@ export class AuthModule implements AuthApiContract {
     userId: string;
     browserSessionId: string | null;
     page: AppPage;
+    impersonatorId?: string | undefined;
   }): Promise<void> {
     return this.#appPageOpened.record(input);
   }

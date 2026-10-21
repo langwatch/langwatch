@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * @vitest-environment node
- * The conditional updateMany guards for coding signals: Postgres re-checks each WHERE under the
- * row lock, so two writers at once change the row once.
  * @see enterprise/modules/nurturing/specs/coding-agent-signals.feature
  */
 import { randomUUID } from "node:crypto";
@@ -62,6 +60,17 @@ describe.skipIf(!databaseUrl)("given nurturing's organizations table and coding 
       );
 
       expect(results.filter(({ first }) => first)).toHaveLength(1);
+    });
+  });
+
+  describe("when the fact that set the first session is retried", () => {
+    it("reports first again", async () => {
+      const organizationId = await learned("retry");
+      await repository.recordCodingFirstSession({ organizationId, occurredAt: 5_000 });
+
+      await expect(
+        repository.recordCodingFirstSession({ organizationId, occurredAt: 5_000 }),
+      ).resolves.toEqual({ first: true });
     });
   });
 

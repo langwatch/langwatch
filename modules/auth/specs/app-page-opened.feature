@@ -17,6 +17,12 @@ Feature: Auth records an app-page-opened fact
     Then no fact is recorded
 
   @unit
+  Scenario: An impersonated session records nothing
+    Given an operator impersonating a person with a browser session and an organization
+    When the page is opened
+    Then no fact is recorded
+
+  @unit
   Scenario: A person with no organization membership records nothing
     Given a person with a browser session and no organization membership
     When the page is opened
@@ -34,6 +40,7 @@ Feature: Auth records an app-page-opened fact
     Then its keys are tenantId, userId, page and occurredAt
 
   @unit
-  Scenario: A repeated page open at one instant is one event
-    Given the same open recorded twice
+  Scenario: A repeated page open inside an hour is one event
+    Given two opens of one page by one person inside the same UTC hour
     Then both carry one idempotency key
+    And an open in the next hour carries another

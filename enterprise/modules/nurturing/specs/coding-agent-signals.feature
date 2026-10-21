@@ -28,6 +28,34 @@ Feature: Coding-agent session signals reach Customer.io
     And no second first-session signal is raised
 
   @unit
+  Scenario: The first session names every agent type of its batch
+    When one batch holds sessions of claude_code and codex and the first is the project's first
+    Then the first-session signal names claude_code and codex
+
+  @unit
+  Scenario: The first session carries every active member of the organization
+    When the first coding-agent session is raised
+    Then the first-session signal carries every active member of the organization
+
+  @unit
+  Scenario: A failed delivery is not lost when the fact is redelivered
+    Given delivering a signal fails once
+    When the same session-stored fact is delivered again
+    Then the signal is sent exactly once
+
+  @unit
+  Scenario: The owners' first project is read only for a first session
+    When a session-stored fact says first is false
+    Then the organization's first project is not read
+
+  @unit
+  Scenario: A CLI sign-up who picked LLMOps and then sends a coding-agent session gets integration_method=coding_agent in Customer.io
+    Given the first-session signal carries the members admin-1 and member-2
+    When the first-session signal is delivered, then delivered again
+    Then Customer.io identifies integration_method=coding_agent for each member once
+    And a member of a second organization is identified once too
+
+  @unit
   Scenario: A seeded organization never gets the first-session signal
     Given the organization was learned from project's backfill
     When a session-stored fact says first

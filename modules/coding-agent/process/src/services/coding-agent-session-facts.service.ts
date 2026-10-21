@@ -3,10 +3,10 @@ import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 
 import type { CodingAgentSessionRepository } from "../repositories/coding-agent-session.repository.ts";
+import { CODING_AGENT_SESSION_SEEN_WINDOW_MS } from "./coding-agent-session-seen.service.ts";
 import type { StoredSession } from "./coding-agent-session-store.service.ts";
 
 const logger = createLogger("langwatch:coding-agent:session-facts");
-const HOLD_MS = 5 * 60 * 1000;
 const HOLD_SWEEP_THRESHOLD = 10_000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -72,7 +72,7 @@ export class CodingAgentSessionFactsService {
       if (session.auxiliary || agent === null) continue;
       const key = holdKey(session);
       if ((this.heldUntil.get(key) ?? 0) > now || due.has(key)) continue;
-      this.heldUntil.set(key, now + HOLD_MS);
+      this.heldUntil.set(key, now + CODING_AGENT_SESSION_SEEN_WINDOW_MS);
       due.set(key, { ...session, agent });
     }
     return [...due.values()];
@@ -87,7 +87,7 @@ export class CodingAgentSessionFactsService {
     now: number;
     projectIsStamped: Map<string, Promise<boolean>>;
   }): Promise<void> {
-    const holdSetTo = now + HOLD_MS;
+    const holdSetTo = now + CODING_AGENT_SESSION_SEEN_WINDOW_MS;
     try {
       await this.dependencies.recorder.recordSessionStored({
         tenantId: session.tenantId,

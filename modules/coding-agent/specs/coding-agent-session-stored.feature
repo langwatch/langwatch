@@ -53,6 +53,12 @@ Feature: Coding-agent records a session-stored fact
     Then the fact says firstForProject is false
 
   @unit
+  Scenario: A helper-thread session in the history never blocks the first
+    Given an unstamped project whose only other session is a helper thread
+    When its main session is reported
+    Then the fact says firstForProject is true
+
+  @unit
   Scenario: A failing history check fails closed
     Given an unstamped project whose history check throws
     When its session is reported

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * @vitest-environment node
- * Nurturing's peer subscribers on coding-agent's session-stored fact and auth's app-opened fact.
  * @see enterprise/modules/nurturing/specs/coding-agent-signals.feature
  * @see enterprise/modules/nurturing/specs/app-opened.feature
  */

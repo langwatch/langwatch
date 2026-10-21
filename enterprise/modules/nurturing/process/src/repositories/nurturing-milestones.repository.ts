@@ -54,15 +54,15 @@ export interface NurturingCodingMilestonesRepository {
   findOrganization(
     input: Readonly<{ organizationId: string }>,
   ): Promise<NurturingOrganizationRow[]>;
-  /** Sets the first coding session once; `first` is true for exactly one caller, ever. */
+  /** Sets the first coding session once; `first` is true for the setter and a retry of its `occurredAt`. */
   recordCodingFirstSession(
     input: Readonly<{ organizationId: string; occurredAt: number }>,
   ): Promise<{ first: boolean }>;
-  /** Adds the agent type once; `changed` is false for a known type or an unlearned organization. */
+  /** Adds the agent type once; the list is always the current one, `changed` only for a new type. */
   addCodingAgentType(
     input: Readonly<{ organizationId: string; agentType: string }>,
   ): Promise<{ changed: boolean; codingAgentTypes: string[] }>;
-  /** Counts the UTC `day` only when it is later than the last counted one. */
+  /** Counts the UTC `day` when later than the last one; `changed` stays true for that same day. */
   recordCodingActiveDay(
     input: Readonly<{ organizationId: string; day: string }>,
   ): Promise<{ changed: boolean; codingActiveDays: number }>;

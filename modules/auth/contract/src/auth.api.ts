@@ -205,12 +205,15 @@ export interface AuthApi {
   }): Promise<{ ended: number }>;
   /**
    * Announces that this person opened an app page, for peers that react to it (§9). Records
-   * nothing without a browser session or an organization; a failure never reaches the caller.
+   * nothing without a browser session or an organization, or when impersonated; a failure
+   * never reaches the caller.
    */
   recordPageOpened(input: {
     userId: string;
     browserSessionId: string | null;
     page: AppPage;
+    /** Set when an operator acts as this person; nothing is recorded then. */
+    impersonatorId?: string | undefined;
   }): Promise<void>;
   /** Ends every one of this person's sessions one sign-in method minted, and no others. */
   endBrowserSessionsForIdentifier(input: {

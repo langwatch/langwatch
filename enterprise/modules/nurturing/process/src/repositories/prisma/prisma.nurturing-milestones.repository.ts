@@ -92,7 +92,13 @@ export class PrismaNurturingMilestonesRepository
       where: { organizationId, codingFirstSessionAt: null },
       data: { codingFirstSessionAt: new Date(occurredAt) },
     });
-    return { first: count === 1 };
+    if (count === 1) return { first: true };
+    // A retry of the fact that set it answers first again, so a failed delivery is not lost.
+    const organization = await this.prisma.nurturingOrganization.findUnique({
+      where: { organizationId },
+      select: { codingFirstSessionAt: true },
+    });
+    return { first: organization?.codingFirstSessionAt?.getTime() === occurredAt };
   }
 
   async addCodingAgentType({
@@ -129,9 +135,13 @@ export class PrismaNurturingMilestonesRepository
     });
     const organization = await this.prisma.nurturingOrganization.findUnique({
       where: { organizationId },
-      select: { codingActiveDays: true },
+      select: { codingActiveDays: true, codingLastActiveDay: true },
     });
-    return { changed: count === 1, codingActiveDays: organization?.codingActiveDays ?? 0 };
+    // The day already counted answers changed again, so a failed delivery is not lost.
+    return {
+      changed: count === 1 || organization?.codingLastActiveDay === day,
+      codingActiveDays: organization?.codingActiveDays ?? 0,
+    };
   }
 
   /** Empty when nurturing never learned the organization. */

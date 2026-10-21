@@ -97,6 +97,23 @@ describe.each(backends)("given the $name coding-agent repositories", ({ create }
       ).resolves.toBe(false);
     });
 
+    /** @scenario "A helper-thread session in the history never blocks the first" */
+    it("answers no when the only other session is a helper thread", async () => {
+      const repositories = create();
+      await repositories.sessions.upsert(
+        session({ tenantId: "project-1", sessionId: "helper-1", auxiliary: true }),
+        30,
+        [],
+      );
+
+      await expect(
+        repositories.sessions.hasOtherSession({
+          tenantId: "project-1",
+          excludeSessionId: "session-1",
+        }),
+      ).resolves.toBe(false);
+    });
+
     it("answers no when only another tenant holds sessions", async () => {
       const repositories = create();
       await repositories.sessions.upsert(

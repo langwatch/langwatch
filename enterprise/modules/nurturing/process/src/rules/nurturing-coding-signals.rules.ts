@@ -1,12 +1,18 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { AppPageOpenedEventData } from "@langwatch/auth-contract";
 import type { CodingAgentSessionStoredEventData } from "@langwatch/coding-agent-contract";
-import type { NurturingSignal, NurturingSignalOf } from "@langwatch/enterprise-nurturing-contract";
+import type { NurturingSignalOf } from "@langwatch/enterprise-nurturing-contract";
 import { Temporal } from "@langwatch/time";
 
 /** The UTC calendar day of an instant, `YYYY-MM-DD`: the unit an active day is counted in. */
 export function utcDayOf(epochMilliseconds: number): string {
   return Temporal.Instant.fromEpochMilliseconds(epochMilliseconds).toString().slice(0, 10);
+}
+
+/** An instant as ISO-8601 with milliseconds, the form Customer.io traits take. */
+export function isoOf(epochMilliseconds: number): string {
+  return Temporal.Instant.fromEpochMilliseconds(epochMilliseconds).toString({
+    fractionalSecondDigits: 3,
+  });
 }
 
 type AdminFact = Readonly<{
@@ -82,10 +88,13 @@ export function codingAgentFirstSessionSignal({
   adminUserId,
   organizationId,
   agentTypes,
+  memberUserIds,
 }: AdminFact &
   Readonly<{
     organizationId: string;
     agentTypes: readonly string[];
+    /** Every active member of the organization, for their integration_method. */
+    memberUserIds: readonly string[];
   }>): NurturingSignalOf<"coding_agent_first_session"> {
   return {
     kind: "coding_agent_first_session",
@@ -96,17 +105,6 @@ export function codingAgentFirstSessionSignal({
     projectId: data.projectId,
     agentType: data.agentType,
     agentTypes: [...agentTypes].toSorted(),
+    memberUserIds: [...memberUserIds],
   };
-}
-
-/** A page open, against the opening person's own profile, never the organization admin's. */
-export function appOpenedSignals({
-  data,
-}: Readonly<{ data: AppPageOpenedEventData }>): NurturingSignal[] {
-  const { userId, tenantId, occurredAt, page } = data;
-  const base = { sourceEventId: `${userId}:${occurredAt}`, tenantId, occurredAt, userId, page };
-  return [
-    { kind: "app_opened", ...base },
-    { kind: "sessions_page_viewed", ...base },
-  ];
 }

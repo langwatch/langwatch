@@ -162,10 +162,10 @@ endBrowserSession(input: { userId: string; sessionId: string; currentSessionId?:
 
 #### `recordPageOpened`
 
-Announces that this person opened an app page, for peers that react to it (§9). Records nothing without a browser session or an organization; a failure never reaches the caller.
+Announces that this person opened an app page, for peers that react to it (§9). Records nothing without a browser session or an organization, or when impersonated; a failure never reaches the caller.
 
 ```typescript
-recordPageOpened(input: { userId: string; browserSessionId: string | null; page: AppPage; }): Promise<void>;
+recordPageOpened(input: { userId: string; browserSessionId: string | null; page: AppPage; /** Set when an operator acts as this person; nothing is recorded then. */ impersonatorId?: string | undefined; }): Promise<void>;
 ```
 
 #### `endBrowserSessionsForIdentifier`

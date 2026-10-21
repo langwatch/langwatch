@@ -64,7 +64,10 @@ export class MemoryCodingAgentSessionRepository extends CodingAgentSessionReposi
 
   async hasOtherSession(input: { tenantId: string; excludeSessionId: string }): Promise<boolean> {
     return this.rows().some(
-      (row) => row.tenantId === input.tenantId && row.sessionId !== input.excludeSessionId,
+      (row) =>
+        row.tenantId === input.tenantId &&
+        row.sessionId !== input.excludeSessionId &&
+        !row.auxiliary,
     );
   }
 

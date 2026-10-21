@@ -1,8 +1,8 @@
+import type { AppPage } from "@langwatch/auth-contract";
 import { useEffect } from "react";
 
 import { api } from "./personal-workspace-api.ts";
 
-type Page = "me_sessions";
 type KeyValueStorage = Pick<Storage, "getItem" | "setItem">;
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -18,10 +18,10 @@ export async function recordPageOpenedOncePerHour({
   now,
   send,
 }: {
-  page: Page;
+  page: AppPage;
   storage: KeyValueStorage;
   now: () => number;
-  send: (page: Page) => Promise<unknown>;
+  send: (page: AppPage) => Promise<unknown>;
 }): Promise<void> {
   const key = `langwatch:page-opened:${page}`;
   try {
@@ -39,7 +39,7 @@ export async function recordPageOpenedOncePerHour({
 }
 
 /** Announces once per mount that the person opened this page. */
-export function useRecordPageOpened({ page }: { page: Page }): void {
+export function useRecordPageOpened({ page }: { page: AppPage }): void {
   const { mutateAsync } = api.auth.recordPageOpened.useMutation();
 
   useEffect(() => {
