@@ -11,6 +11,11 @@ Feature: App opens reach Customer.io on the opening user
     And tracks sessions_page_viewed on user-1
 
   @unit
+  Scenario: Only the sessions page raises sessions_page_viewed
+    When auth records an app open for a page other than the sessions page
+    Then app_opened is raised and sessions_page_viewed is not
+
+  @unit
   Scenario: Repeated opens inside an hour send once per user
     When the same user opens the page twice inside an hour
     Then one identify and one track are sent

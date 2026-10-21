@@ -2,6 +2,7 @@
 import type { CodingAgentSessionStoredEventData } from "@langwatch/coding-agent-contract";
 import type { NurturingSignal } from "@langwatch/enterprise-nurturing-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
+import { nowInstant } from "@langwatch/time";
 
 import type {
   NurturingCodingMilestonesRepository,
@@ -16,6 +17,12 @@ import {
 } from "../rules/nurturing-coding-signals.rules.ts";
 import { seededAtRead } from "../rules/nurturing-owner-signals.rules.ts";
 import { utcDayOf } from "../rules/nurturing-time.rules.ts";
+
+const MAX_FUTURE_MS = 24 * 60 * 60 * 1000;
+
+/** A client-supplied time is never trusted past tomorrow, so one far-future span cannot freeze the day count. */
+const clampedToTomorrow = (epochMilliseconds: number): number =>
+  Math.min(epochMilliseconds, nowInstant().epochMilliseconds + MAX_FUTURE_MS);
 
 type Deliver = (signal: NurturingSignal) => Promise<void>;
 type Fact = CodingAgentSessionStoredEventData;
@@ -68,20 +75,17 @@ export class NurturingCodingMilestonesService {
 
     // Every type first, so the first-session signal names them all; then first session, then day.
     const agentTypes = await this.addAgentTypes({ organizationId, facts });
-    let sentFirst = false;
     const first = facts.find((fact) => fact.firstForProject);
     if (first && (await this.isFirstSession({ organization, first }))) {
       const memberUserIds = await this.memberUserIdsOf(organizationId);
       await deliver(
         codingAgentFirstSessionSignal({ data: first, agentTypes, memberUserIds, ...common }),
       );
-      sentFirst = true;
-    }
-    if (!sentFirst) {
+    } else {
       await deliver(codingAgentTypesSignal({ data: latest, agentTypes, ...common }));
     }
 
-    const day = utcDayOf(latest.occurredAt);
+    const day = utcDayOf(clampedToTomorrow(latest.occurredAt));
     const counted = await this.dependencies.milestones.recordCodingActiveDay({
       organizationId,
       day,
@@ -112,15 +116,14 @@ export class NurturingCodingMilestonesService {
     if (seededAtRead({ ...row, ...firstProject })) return false;
     const { first: isFirst } = await this.dependencies.milestones.recordCodingFirstSession({
       organizationId,
-      occurredAt: first.occurredAt,
+      occurredAt: clampedToTomorrow(first.occurredAt),
     });
     return isFirst;
   }
 
-  private memberUserIdsOf(organizationId: string): Promise<string[]> {
-    return this.dependencies.organizations
-      .getAllMembers({ organizationId })
-      .then((users) => users.map(({ id }) => id));
+  private async memberUserIdsOf(organizationId: string): Promise<string[]> {
+    const users = await this.dependencies.organizations.getAllMembers({ organizationId });
+    return users.map(({ id }) => id);
   }
 
   /** Adds each distinct agent type once; returns the list as it stands. */

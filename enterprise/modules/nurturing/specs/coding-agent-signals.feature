@@ -100,6 +100,12 @@ Feature: Coding-agent session signals reach Customer.io
     Then no active-day signal is raised
 
   @unit
+  Scenario: A far-future session time counts as at most tomorrow
+    Given a session dated a year ahead
+    When it arrives and a real later day follows
+    Then the day counted is at most tomorrow and the later day still increments
+
+  @unit
   Scenario: An organization with no admin raises nothing
     Given the organization has no admin
     When a session-stored fact arrives

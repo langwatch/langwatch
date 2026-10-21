@@ -8,8 +8,7 @@ export function appOpenedSignals({
 }: Readonly<{ data: AppPageOpenedEventData }>): NurturingSignal[] {
   const { userId, tenantId, occurredAt, page } = data;
   const base = { sourceEventId: `${userId}:${occurredAt}`, tenantId, occurredAt, userId, page };
-  return [
-    { kind: "app_opened", ...base },
-    { kind: "sessions_page_viewed", ...base },
-  ];
+  const signals: NurturingSignal[] = [{ kind: "app_opened", ...base }];
+  if (page === "me_sessions") signals.push({ kind: "sessions_page_viewed", ...base });
+  return signals;
 }

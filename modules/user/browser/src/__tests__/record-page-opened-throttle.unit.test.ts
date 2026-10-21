@@ -1,7 +1,6 @@
 /**
  * @vitest-environment node
- * The browser sends at most one page-opened mutation an hour per page from one tab's storage;
- * nurturing's claim stays the authority across devices.
+ * The browser sends at most one page-opened mutation an hour per page from one tab's storage.
  * @see enterprise/modules/nurturing/specs/app-opened.feature
  */
 import { describe, expect, it } from "vitest";

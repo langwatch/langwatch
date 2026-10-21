@@ -98,6 +98,17 @@ describe("CodingAgentSessionFactsService", () => {
     });
   });
 
+  describe("given a session with no named coding agent", () => {
+    /** @scenario "A stored session with no named coding agent records no fact" */
+    it("records nothing", async () => {
+      const { service, recorded } = factsOver();
+
+      await service.record([stored({ agent: null })]);
+
+      expect(recorded).toEqual([]);
+    });
+  });
+
   describe("when deciding whether the session is the project's first", () => {
     /** @scenario "The first session of a project is flagged" */
     it("flags it when the project is unstamped and holds no other session", async () => {

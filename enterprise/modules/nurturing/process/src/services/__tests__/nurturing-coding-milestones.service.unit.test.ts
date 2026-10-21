@@ -338,6 +338,28 @@ describe("NurturingCodingMilestonesService", () => {
     });
   });
 
+  describe("when a session is dated far in the future", () => {
+    /** @scenario "A far-future session time counts as at most tomorrow" */
+    it("counts it as at most tomorrow and still counts a later real day", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      try {
+        vi.setSystemTime(DAY);
+        const { send, ofKind } = await serviceOver();
+
+        await send([fact({ firstForProject: false, occurredAt: DAY + 365 * 24 * HOUR })]);
+        vi.setSystemTime(DAY + 72 * HOUR);
+        await send([
+          fact({ sessionId: "s-2", firstForProject: false, occurredAt: DAY + 72 * HOUR }),
+        ]);
+
+        const days = ofKind("coding_active_days");
+        expect(days.map((s) => s.sourceEventId)).toEqual(["org-1:2026-10-21", "org-1:2026-10-23"]);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
   describe("when the organization has no admin", () => {
     /** @scenario "An organization with no admin raises nothing" */
     it("raises no signal", async () => {

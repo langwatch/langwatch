@@ -8,7 +8,7 @@ const codingAgentSessionStoredEventDataSchemaDefinition = z
   .object({
     tenantId: z.string().min(1),
     projectId: z.string().min(1),
-    sessionId: z.string().min(1),
+    sessionId: z.string().min(1).max(256),
     /** The product id (`claude_code`, `codex`), not a sub-agent type. */
     agentType: z.string().min(1),
     /** True only for the project's first session; the owner decides it, never a peer. */

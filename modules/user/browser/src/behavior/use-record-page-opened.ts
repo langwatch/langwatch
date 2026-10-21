@@ -9,8 +9,8 @@ const HOUR_MS = 60 * 60 * 1000;
 
 /**
  * Sends the page-opened mutation at most once an hour per page from this tab's storage, so a
- * refresh does not write an event; nurturing's claim stays the authority across devices. Storage
- * that throws or a send that fails never reaches the page.
+ * refresh does not write an event; the server-side hourly claim stays the authority across
+ * devices. Storage that throws or a send that fails never reaches the page.
  */
 export async function recordPageOpenedOncePerHour({
   page,
