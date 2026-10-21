@@ -206,3 +206,27 @@ describe("given the memory twin of the file channel", () => {
     expect(channel.asked).toHaveLength(2);
   });
 });
+
+describe("given a deployment that reaches the internet only through an outbound proxy", () => {
+  /** @scenario "The file is fetched through the deployment's outbound proxy" */
+  it("judges the address first, then hands the proxy to the fetch", async () => {
+    const proxy = { httpsProxy: "http://proxy.corp.example:3128" };
+    const steps: string[] = [];
+    const channel = HttpsSsoDomainProofFileChannel.create({
+      policy: POLICY,
+      proxy,
+      validate: async (url) => {
+        steps.push("judged");
+        return admitted(url);
+      },
+      fetchValidated: async (_validated, init) => {
+        steps.push("fetched");
+        expect(init.proxy).toEqual(proxy);
+        return respond(200, "lw-token-123");
+      },
+    });
+
+    expect(await fetchFile(channel)).toEqual({ outcome: "served", values: ["lw-token-123"] });
+    expect(steps).toEqual(["judged", "fetched"]);
+  });
+});
