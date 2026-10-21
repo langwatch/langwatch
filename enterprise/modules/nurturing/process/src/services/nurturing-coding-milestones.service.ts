@@ -20,7 +20,10 @@ import { utcDayOf } from "../rules/nurturing-time.rules.ts";
 
 const MAX_FUTURE_MS = 24 * 60 * 60 * 1000;
 
-/** A client-supplied time is never trusted past tomorrow, so one far-future span cannot freeze the day count. */
+/**
+ * A client-supplied time is never trusted past tomorrow, so one far-future span cannot freeze
+ * the day count. Applied once on entry: every signal and stored time sees the clamped time.
+ */
 const clampedToTomorrow = (epochMilliseconds: number): number =>
   Math.min(epochMilliseconds, nowInstant().epochMilliseconds + MAX_FUTURE_MS);
 
@@ -61,9 +64,13 @@ export class NurturingCodingMilestonesService {
   }
 
   private async projectSessionsStored({
-    facts,
+    facts: received,
     deliver,
   }: Readonly<{ facts: readonly Fact[]; deliver: Deliver }>): Promise<void> {
+    const facts = received.map((fact) => ({
+      ...fact,
+      occurredAt: clampedToTomorrow(fact.occurredAt),
+    }));
     const latest = latestOf(facts);
     const organization = await this.organizationOf(latest.projectId);
     const adminUserId = organization?.row.adminUserId;
@@ -85,7 +92,7 @@ export class NurturingCodingMilestonesService {
       await deliver(codingAgentTypesSignal({ data: latest, agentTypes, ...common }));
     }
 
-    const day = utcDayOf(clampedToTomorrow(latest.occurredAt));
+    const day = utcDayOf(latest.occurredAt);
     const counted = await this.dependencies.milestones.recordCodingActiveDay({
       organizationId,
       day,
@@ -116,7 +123,7 @@ export class NurturingCodingMilestonesService {
     if (seededAtRead({ ...row, ...firstProject })) return false;
     const { first: isFirst } = await this.dependencies.milestones.recordCodingFirstSession({
       organizationId,
-      occurredAt: clampedToTomorrow(first.occurredAt),
+      occurredAt: first.occurredAt,
     });
     return isFirst;
   }

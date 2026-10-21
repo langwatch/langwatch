@@ -1,4 +1,7 @@
-import type { CodingAgentSessionStoredEventData } from "@langwatch/coding-agent-contract";
+import {
+  type CodingAgentSessionStoredEventData,
+  MAX_SESSION_ID_LENGTH,
+} from "@langwatch/coding-agent-contract";
 import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 
@@ -70,6 +73,8 @@ export class CodingAgentSessionFactsService {
     for (const session of sessions) {
       const { agent } = session;
       if (session.auxiliary || agent === null) continue;
+      // The fact's schema refuses a longer id, so recording it would only fail and retry.
+      if (session.sessionId.length > MAX_SESSION_ID_LENGTH) continue;
       const key = holdKey(session);
       if ((this.heldUntil.get(key) ?? 0) > now || due.has(key)) continue;
       this.heldUntil.set(key, now + CODING_AGENT_SESSION_SEEN_WINDOW_MS);

@@ -2,10 +2,13 @@
  * @vitest-environment node
  * @see modules/coding-agent/specs/coding-agent-session-stored.feature
  */
-import type { CodingAgentSessionStoredEventData } from "@langwatch/coding-agent-contract";
+import {
+  type CodingAgentSessionStoredEventData,
+  MAX_SESSION_ID_LENGTH,
+} from "@langwatch/coding-agent-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { projectRow } from "../../__tests__/fixtures/coding-agent.fixture.ts";
 import { CodingAgentSessionFactsService } from "../coding-agent-session-facts.service.ts";
@@ -106,6 +109,19 @@ describe("CodingAgentSessionFactsService", () => {
       await service.record([stored({ agent: null })]);
 
       expect(recorded).toEqual([]);
+    });
+  });
+
+  describe("given a session with an over-long id", () => {
+    /** @scenario "A stored session with an over-long id records no fact" */
+    it("records nothing and does not call the recorder", async () => {
+      const record = vi.fn(async () => {});
+      const { service, recorded } = factsOver({ record });
+
+      await service.record([stored({ sessionId: "s".repeat(MAX_SESSION_ID_LENGTH + 1) })]);
+
+      expect(recorded).toEqual([]);
+      expect(record).not.toHaveBeenCalled();
     });
   });
 

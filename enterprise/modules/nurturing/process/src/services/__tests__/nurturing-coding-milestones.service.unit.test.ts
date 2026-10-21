@@ -358,6 +358,24 @@ describe("NurturingCodingMilestonesService", () => {
         vi.useRealTimers();
       }
     });
+
+    /** @scenario "A far-future session time counts as at most tomorrow" */
+    it("sends the stored and first-session signals with the clamped time", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      try {
+        vi.setSystemTime(DAY);
+        const { send, ofKind } = await serviceOver();
+
+        await send([fact({ occurredAt: DAY + 365 * 24 * HOUR })]);
+
+        expect(ofKind("coding_session_stored")).toMatchObject([{ occurredAt: DAY + 24 * HOUR }]);
+        expect(ofKind("coding_agent_first_session")).toMatchObject([
+          { occurredAt: DAY + 24 * HOUR },
+        ]);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 
   describe("when the organization has no admin", () => {
