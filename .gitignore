@@ -48,6 +48,7 @@ langwatch_server/
 # # CLI Testing files
 prompts-lock.json
 prompts.json
+!services/nlpgo/modules/evaluators/rules/testdata/clustering/prompts.json
 prompts/**
 
 # SpecStory
