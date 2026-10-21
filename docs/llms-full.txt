@@ -42924,7 +42924,7 @@ LIMIT 200
 ```
 
 ```bash
-langwatch query --sql-file transcripts.sql -f jsonl --out transcripts.jsonl
+langwatch query --sql-file transcripts.sql --format jsonl --out transcripts.jsonl
 ```
 
 ## What are eval functions
@@ -43142,7 +43142,7 @@ description: How many rows a query returns, how large and long it can be, how ma
 | Threads | 4 per query | |
 | Queries running at once | 10 | 503 `lwql_busy` |
 
-Adding `LIMIT 10000` is the only change LangWatch makes to your statement. The server limits are fixed for every query, and a `SETTINGS` clause that tries to change them is refused.
+Adding `LIMIT 10000` is the only change LangWatch makes to your statement. The server limits are the shipped defaults, which LangWatch Cloud uses. A `SETTINGS` clause that tries to change them is refused.
 
 ## How many queries can I run per minute
 
@@ -43176,8 +43176,6 @@ From the REST API, page with `LIMIT` and `OFFSET` and an `ORDER BY`. In a `UNION
 ## What does a query cost
 
 Eval functions (`eval`, `eval_passed`, `eval_score` and the others) are metered and charged per query. The [extraction functions reference](/api-reference/query/extraction-functions#what-one-query-costs) has the details.
-
-These docs do not state a charge for a plain SQL query without eval functions.
 
 ## Error codes
 
@@ -43215,7 +43213,7 @@ description: Read-only SQL over your traces, spans, evaluations, simulations and
 
 LangWatchQL is the ClickHouse SQL dialect that LangWatch accepts over its analytics views. You send one `SELECT` statement, optionally with a `WITH` clause, and you get back columns and rows. The database runs it with `readonly = 1`, so a statement cannot change your data.
 
-On LangWatch Cloud the views are in the `langwatch` database, for example `langwatch.traces` or `langwatch.trace_metrics_by_minute`, and the examples in this guide use that name. A self-hosted deployment uses `analytics` unless `LWQL_DATABASE` sets another name. The full list, with every column and the permission it needs, is in the [Query API reference](/api-reference/query/overview#queryable-views), and `GET /api/v1/query/schema` returns the list your key can query today.
+On LangWatch Cloud the views are in the `langwatch` database, for example `langwatch.traces` or `langwatch.trace_metrics_by_minute`, and the examples in this guide use that name. A self-hosted deployment uses the database named in its `CLICKHOUSE_URL`, and `analytics` when that URL names none. The full list, with every column and the permission it needs, is in the [Query API reference](/api-reference/query/overview#queryable-views), and `GET /api/v1/query/schema` returns the list your key can query today.
 
 ## When to use LangWatchQL instead of dashboards
 
@@ -43243,7 +43241,7 @@ You can send the same statement three ways. All three need an API key with the `
 
   ### CLI
 
-    `langwatch query` runs a statement and prints a table. Add `-f json`, `jsonl` or `csv` for other formats, and `--out` to write a file.
+    `langwatch query` runs a statement and prints a table. Add `--format json`, `jsonl` or `csv` for other formats, and `--out` to write a file.
 
     ```bash
     npm install -g langwatch

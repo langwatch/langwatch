@@ -9,7 +9,7 @@ description: Read-only SQL over your traces, spans, evaluations, simulations and
 
 LangWatchQL is the ClickHouse SQL dialect that LangWatch accepts over its analytics views. You send one `SELECT` statement, optionally with a `WITH` clause, and you get back columns and rows. The database runs it with `readonly = 1`, so a statement cannot change your data.
 
-On LangWatch Cloud the views are in the `langwatch` database, for example `langwatch.traces` or `langwatch.trace_metrics_by_minute`, and the examples in this guide use that name. A self-hosted deployment uses `analytics` unless `LWQL_DATABASE` sets another name. The full list, with every column and the permission it needs, is in the [Query API reference](/api-reference/query/overview#queryable-views), and `GET /api/v1/query/schema` returns the list your key can query today.
+On LangWatch Cloud the views are in the `langwatch` database, for example `langwatch.traces` or `langwatch.trace_metrics_by_minute`, and the examples in this guide use that name. A self-hosted deployment uses the database named in its `CLICKHOUSE_URL`, and `analytics` when that URL names none. The full list, with every column and the permission it needs, is in the [Query API reference](/api-reference/query/overview#queryable-views), and `GET /api/v1/query/schema` returns the list your key can query today.
 
 ## When to use LangWatchQL instead of dashboards
 
@@ -35,7 +35,7 @@ You can send the same statement three ways. All three need an API key with the `
     Send `projectId` in the body to read one project only. Request fields, auth headers and status codes are in [Run a LangWatchQL query](/api-reference/query/run-a-langwatchql-query).
   </Tab>
   <Tab title="CLI">
-    `langwatch query` runs a statement and prints a table. Add `-f json`, `jsonl` or `csv` for other formats, and `--out` to write a file.
+    `langwatch query` runs a statement and prints a table. Add `--format json`, `jsonl` or `csv` for other formats, and `--out` to write a file.
 
     ```bash
     npm install -g langwatch
