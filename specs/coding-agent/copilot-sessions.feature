@@ -172,6 +172,13 @@ Rule: Pull-request cost keeps AI units apart from dollars
     Then that model's AI units read as not known rather than zero
 
   @integration
+  Scenario: The detail marks a model whose figures are not known
+    Given a pull request detail with a model whose figures are not known
+    When the detail is opened
+    Then that model's line says its figures are not known and why, rather than naming it bare
+    And the pull requests table says the same of it
+
+  @integration
   Scenario: The per-model usage round-trips through the session row
     Given a session that used two models, one of them unpriced, and consumed AI units
     When the session row is written and read back

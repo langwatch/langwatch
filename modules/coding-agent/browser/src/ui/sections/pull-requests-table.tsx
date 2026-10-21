@@ -32,6 +32,7 @@ import {
   encodePullRequestRef,
   PULL_REQUEST_QUERY_KEY,
 } from "../../model/pull-request-detail-address.ts";
+import { MODEL_FIGURES_NOT_KNOWN } from "../../model/pull-request-detail.ts";
 import {
   derivePullRequestStatus,
   type PullRequestStatus,
@@ -750,7 +751,7 @@ function modelUsageSummary(model: ModelUsage): string {
 
 /**
  * The leading model, and how many others rode along. An entry whose totals
- * are not known carries its name alone — this cell only draws the answer the
+ * are not known says so beside its name — this cell only draws the answer the
  * read already computed.
  */
 const ModelsCell: React.FC<{ models: ModelUsage[] }> = ({ models }) => {
@@ -769,7 +770,7 @@ const ModelsCell: React.FC<{ models: ModelUsage[] }> = ({ models }) => {
           {models.map((model) => (
             <Text key={model.model}>
               {model.model}
-              {model.tokensKnown ? `: ${modelUsageSummary(model)}` : ""}
+              {`: ${model.tokensKnown ? modelUsageSummary(model) : MODEL_FIGURES_NOT_KNOWN.toLowerCase()}`}
             </Text>
           ))}
         </VStack>

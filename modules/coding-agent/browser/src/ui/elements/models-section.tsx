@@ -6,9 +6,14 @@ import {
 import { FormattedNumber } from "@langwatch/design-system/formatted-number";
 import { type EmptyNext, NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import type React from "react";
 
-import type { DetailPayload } from "../../model/pull-request-detail.ts";
+import {
+  type DetailPayload,
+  MODEL_FIGURES_NOT_KNOWN,
+  MODEL_FIGURES_NOT_KNOWN_REASON,
+} from "../../model/pull-request-detail.ts";
 import { MISSING_VALUE } from "./cells/missing-value.tsx";
 import { Section } from "./detail-section.tsx";
 
@@ -27,8 +32,8 @@ const AiUnitsText: React.FC<{ aiUnits: number | null }> = ({ aiUnits }) =>
 
 /**
  * One model's line: what it consumed, and a bar scaled against the heaviest
- * model on the pull request. An entry with unknown totals is named and
- * nothing more — drawing a figure or bar would claim what the read didn't.
+ * model on the pull request. An entry with unknown totals says so, with why on
+ * hover — drawing a figure or bar would claim what the read didn't.
  */
 const ModelRow: React.FC<{ model: ModelUsage; peak: number }> = ({ model, peak }) => (
   <VStack align="stretch" gap={1}>
@@ -55,7 +60,13 @@ const ModelRow: React.FC<{ model: ModelUsage; peak: number }> = ({ model, peak }
             )}
           </Text>
         </HStack>
-      ) : null}
+      ) : (
+        <Tooltip content={MODEL_FIGURES_NOT_KNOWN_REASON} positioning={{ placement: "left" }}>
+          <Text fontSize="sm" color="fg.subtle" cursor="help" tabIndex={0} flexShrink={0}>
+            {MODEL_FIGURES_NOT_KNOWN}
+          </Text>
+        </Tooltip>
+      )}
     </HStack>
     {model.tokensKnown ? (
       <Box height="3px" bg="border.subtle" borderRadius="full" overflow="hidden">

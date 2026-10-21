@@ -6,7 +6,7 @@
  * @see specs/coding-agent/pull-request-linkage.feature
  */
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -423,6 +423,39 @@ describe("the pull request detail drawer", () => {
       expect(screen.getByText("claude-opus-5")).toBeInTheDocument();
       expect(screen.getByText("gpt-5")).toBeInTheDocument();
       expect(screen.queryByText("No model data for this pull request yet")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given a model whose figures are not known beside one whose figures are", () => {
+    /** @scenario "The detail marks a model whose figures are not known" */
+    it("says that model's figures are not known, and why on hover", async () => {
+      pinDetail(
+        detailPayload({
+          modelBreakdown: [
+            {
+              model: "gpt-6-luna",
+              inputTokens: 13,
+              outputTokens: 50,
+              cacheReadTokens: 0,
+              cacheCreationTokens: 0,
+              totalTokens: 63,
+              costUsd: 0.01,
+              tokensKnown: true,
+              aiUnits: 1,
+            },
+            { model: "gpt-6-sol", tokensKnown: false, costUsd: null, aiUnits: null },
+          ],
+        }),
+      );
+      const user = userEvent.setup();
+
+      renderDrawer();
+
+      const line = screen.getByText("gpt-6-sol").parentElement!;
+      expect(line).toHaveTextContent("Not known");
+      expect(screen.getByText("gpt-6-luna").parentElement).not.toHaveTextContent("Not known");
+      await user.hover(within(line).getByText("Not known"));
+      expect(await screen.findByText(/without recording per-model figures/)).toBeInTheDocument();
     });
   });
 
