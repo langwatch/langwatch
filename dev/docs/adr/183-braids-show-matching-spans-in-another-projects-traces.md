@@ -307,9 +307,10 @@ The braid dialog previews what the reader will see before anything is saved.
 
 ### 9. Enterprise, and leaving it
 
-Every route that writes a braid, a signing key or the organisation setting, and the preview, declares
-`withEntitlement("enterprise", { feature: "BRAIDS" })` and refuses 402 `enterprise_plan_required` below
-Enterprise; the lists stay open (§2). Most of these routes are scoped to a project, and the door reads
+Every route that creates or changes a braid, writes a signing key or the organisation setting, and the
+preview, declares `withEntitlement("enterprise", { feature: "BRAIDS" })` and refuses 402
+`enterprise_plan_required` below Enterprise; the lists stay open (§2), and so does removing a braid, so an
+admin can always stop sharing. Most of these routes are scoped to a project, and the door reads
 that project's organisation for the plan gate (today a project-scoped plan gate throws). The screen shows
 what Braids does and offers a conversation. After a downgrade, braids **pause** and are kept (decided by
 Alex, 2026-10-21): the trace module, which owns the merged read, asks `EntitlementApi` (cached per
@@ -388,7 +389,7 @@ per-braid option.
 | Detail read keeps braids                         | Yes                         | Large: cross-project content     | "only matching spans leave the owner" integration test per read; aggregates still narrow to one member  |
 | Privacy per owning project                       | Yes                         | Large: personal data             | Test with a strict owner and a loose reader in one trace                                                |
 | Verification at ingest                           | Yes                         | Medium: a forged condition match | Forged-mark strip test, cross-trace replay test, revoked-key test                                       |
-| Signing key and setting table migrations         | Yes                         | Small                            | Tested down paths (drop table)                                                                          |
+| Signing key and setting table migrations         | Yes                         | Small                            | Forward-only: the tables are created, never dropped by a migration (repository rule)                    |
 | A failed epoch bump is reported                  | Yes                         | Medium: every grant change       | Unit test with a failing epoch store: the revoke is durable, reported as failed, and a repeat completes |
 
 ## Schema
@@ -430,8 +431,8 @@ model AuthzOrganizationPolicy {
 ```
 
 `Grant.condition` is JSON already, so the braid shape needs no migration; the condition schema gains the
-optional `compiledWhere`. `SigningKey` and `AuthzOrganizationPolicy` are new tables, each with a
-drop-table down path; an organisation with no row has the setting off. The new source and
+optional `compiledWhere`. `SigningKey` and `AuthzOrganizationPolicy` are new tables, created by one forward-only
+migration (a migration never drops a table here); an organisation with no row has the setting off. The new source and
 grant shape need no event version and no upcast, but an older worker would refuse an event it cannot parse:
 the schemas that read `braid` and `compiledWhere` ship one release before any route writes them.
 
@@ -526,3 +527,7 @@ the schemas that read `braid` and `compiledWhere` ship one release before any ro
   is letters and digits only, and a signed value never holds a line break (§4). The copy processor is the
   SDK's own. API keys never hold `braids:manage`: the authz engine refuses it for a key at decision time,
   since a key granted every permission by an admin would otherwise hold it (§2).
+- v1.6 (2026-10-21, from building, no decision of Alex's changed). The two new tables come from forward-only
+  migrations, as every migration here is; none drops a table. Removing a braid needs no Enterprise plan, so
+  an admin can stop sharing after a downgrade (§9). A compiled condition is one flat, deduplicated, sorted
+  conjunction, so equal conditions share one digest and count once towards the reader's limit (§3).
