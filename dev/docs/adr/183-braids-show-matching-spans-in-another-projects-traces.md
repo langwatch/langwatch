@@ -113,6 +113,9 @@ each project, named by route parameters:
   admin of every project in that team, so "braid out of your own project" means "out of any project in a
   team you administer". An organisation admin holds it everywhere; a role bound to one project, or a custom
   role listing `braids:manage`, holds it there only. Members and viewers do not.
+- **A person braids; a key or an agent never does.** API keys and Langy are never offered `braids:manage`,
+  and the authz engine refuses it for an API key at decision time, as it refuses platform permissions, so
+  a key created with every permission by an admin still cannot braid or manage signing keys.
 - **Nobody braids into a project they cannot read.** The door asks `traces:view` at the reader, so a team
   admin cannot send their team's spans to a team they have no view of; braiding across teams takes an
   organisation admin or someone the reader's team lets read its traces. The preview asks the same (§7),
@@ -207,10 +210,14 @@ organisation. Signing lets a braid require that the reader really made the call.
   **Revocation** ends a key at once, bounded by the key lookup cache (60 s, record §7).
 - **The SDK helper** (TypeScript, Python, Go). On the calling side it signs the baggage entries it names:
   an HMAC-SHA256, under the key, over the trace id and the sorted entries, carried with the key's public id
-  in one baggage entry. On the called side it copies the named entries and the signature onto each span, by
-  wrapping OpenTelemetry's own baggage span processor. The wire format is below.
+  in one baggage entry. On the called side a small span processor of the SDK's own (none of the three
+  SDKs depends on a baggage processor) copies the named entries and the signature onto each span. The
+  wire format is below.
 - **The wire format, version 1.** The secret is one string, `lwsk_<publicId>_<secret>`, and the HMAC key is
-  its UTF-8 bytes. An entry key matches `[A-Za-z0-9._-]{1,128}`; values are the decoded baggage strings.
+  its UTF-8 bytes. A publicId matches `[A-Za-z0-9]+`, so the first `_` after `lwsk_` ends it; an empty
+  publicId or secret is malformed. An entry key matches `[A-Za-z0-9._-]{1,128}`; values are the decoded
+  baggage strings and never hold `\n` or `\r`, which would let one value sign a second entry. Signing
+  refuses both, and verification treats either as a failed signature.
   The signed message is `langwatch-braid-signature-v1`, the trace id in lower-case hex, then one
   `<key>=<value>` per entry in ascending code-point order of key, all joined by `\n`. The signature travels
   as the baggage entry, and the span attribute, `langwatch.signature`: base64url without padding of the JSON
@@ -515,3 +522,7 @@ the schemas that read `braid` and `compiledWhere` ship one release before any ro
   Conditions render through a marker of their own on the outer select, since the latest-version subquery
   carries the tenant marker too. The signed-call wire format is fixed (§4). The door reads a project's
   organisation for a project-scoped plan gate.
+- v1.5 (2026-10-21, from building the SDKs and the permission, no decision of Alex's changed). A publicId
+  is letters and digits only, and a signed value never holds a line break (§4). The copy processor is the
+  SDK's own. API keys never hold `braids:manage`: the authz engine refuses it for a key at decision time,
+  since a key granted every permission by an admin would otherwise hold it (§2).
