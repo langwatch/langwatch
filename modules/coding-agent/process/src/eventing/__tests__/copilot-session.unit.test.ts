@@ -94,11 +94,11 @@ function lift(captured: CapturedSpan) {
   });
 }
 
-function makeProjection() {
+function makeProjection(modelProviders = new TestModelProviderService(() => PRICE_PER_CALL_USD)) {
   return CodingAgentSessionFoldProjection.create({
     store: { store: async () => {}, get: async () => ({ kind: "empty" as const }) },
     traceCanonicalisation: ClaudeAnswersTraceCanonicalisation.create(),
-    modelProviders: new TestModelProviderService(() => PRICE_PER_CALL_USD),
+    modelProviders,
   });
 }
 
@@ -106,8 +106,8 @@ function makeProjection() {
 function foldSessions(
   spans: CapturedSpan[],
   initial?: CodingAgentSessionState,
+  projection = makeProjection(),
 ): Map<string, CodingAgentSessionState> {
-  const projection = makeProjection();
   const sessions = new Map<string, CodingAgentSessionState>();
   for (const captured of spans) {
     const lifted = lift(captured);
@@ -451,6 +451,81 @@ describe("Copilot session fold", () => {
     });
   });
 
+  describe("given a Copilot CLI conversation that called two models, one with no price", () => {
+    const UNPRICED_MODEL = "oswe-vscode-prime";
+    const unpricedCall: CapturedSpan = {
+      ...secondCall,
+      name: `chat ${UNPRICED_MODEL}`,
+      attributes: { ...secondCall.attributes, "gen_ai.request.model": UNPRICED_MODEL },
+    };
+    const projection = makeProjection(
+      new TestModelProviderService(
+        (input) => (input.model === UNPRICED_MODEL ? 0 : PRICE_PER_CALL_USD),
+        (input) => input.model !== UNPRICED_MODEL,
+      ),
+    );
+    const usageOf = (state: CodingAgentSessionState | undefined) =>
+      Object.values(state?.usageByModel ?? {}).toSorted((a, b) => a.model.localeCompare(b.model));
+
+    describe("when they are folded", () => {
+      const row = foldSessions([firstCall, unpricedCall], undefined, projection).get(
+        CLI_CONVERSATION,
+      );
+
+      /** @scenario "Each Copilot model on a pull request has known tokens" */
+      /** @scenario "AI units are their own count and never enter the dollar total" */
+      /** @scenario "A model with no price shows its tokens and an unknown cost" */
+      it("keeps each model's own tokens, cost and AI units, and marks the unpriced one", () => {
+        const unstamped = {
+          repositoryHost: "",
+          repositoryOwner: "",
+          repositoryName: "",
+          branch: "",
+        };
+        expect(usageOf(row)).toEqual([
+          {
+            ...unstamped,
+            model: "gpt-6-luna",
+            inputTokens: 3,
+            outputTokens: 38,
+            cacheReadTokens: 0,
+            cacheCreationTokens: 17039,
+            costUsd: expect.closeTo(PRICE_PER_CALL_USD, 9),
+            aiUnits: expect.closeTo(0.2149175, 9),
+            priced: true,
+          },
+          {
+            ...unstamped,
+            model: UNPRICED_MODEL,
+            inputTokens: 13,
+            outputTokens: 50,
+            cacheReadTokens: 17039,
+            cacheCreationTokens: 0,
+            costUsd: 0,
+            aiUnits: expect.closeTo(0.038424, 9),
+            priced: false,
+          },
+        ]);
+        expect(row?.costUsd).toBeCloseTo(PRICE_PER_CALL_USD, 9);
+      });
+    });
+
+    describe("when they fold onto a state cached before the per-model column", () => {
+      const { usageByModel: _addedLater, ...beforeColumn } = projection.init();
+      const cached = decodeFoldCacheEntry<CodingAgentSessionState>(
+        encodeFoldCacheEntry({ state: beforeColumn, updatedAt: 1, appliedEventIds: [] }),
+      ).state;
+
+      /** @scenario "Each Copilot model on a pull request has known tokens" */
+      it("starts the per-model record empty rather than failing", () => {
+        const row = foldSessions([firstCall, unpricedCall], cached, projection).get(
+          CLI_CONVERSATION,
+        );
+        expect(usageOf(row).map((usage) => usage.model)).toEqual(["gpt-6-luna", UNPRICED_MODEL]);
+      });
+    });
+  });
+
   describe("given a VS Code title call, which carries no conversation id", () => {
     const titleCall: CapturedSpan = {
       name: "chat gpt-4o-mini-2024-07-18",
@@ -541,6 +616,12 @@ describe("Copilot session fold", () => {
         expect(claudeRow?.agent).toBe("claude_code");
         expect(claudeRow?.aiUnits).toBe(0);
         expect(codexRow?.aiUnits).toBe(0);
+      });
+
+      /** @scenario Claude Code and Codex rows are unchanged by the Copilot declarations */
+      it("keeps no per-model record on either row, so their pull-request reads are unchanged", () => {
+        expect(claudeRow?.usageByModel).toEqual({});
+        expect(codexRow?.usageByModel).toEqual({});
       });
 
       /** @scenario Claude Code and Codex rows are unchanged by the Copilot declarations */

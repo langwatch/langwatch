@@ -253,7 +253,7 @@ export class CodingAgentPullRequestReadService {
     // the neighbours to know where this one's era ends, plus the pull requests
     // of every other branch the candidates drove, so a session is attributed
     // here exactly as the personal page attributes it.
-    const [modelTotals, attributable] = await Promise.all([
+    const [eventTotals, attributable] = await Promise.all([
       this.dependencies.sessionEvents.sumTokensByModelPerSession({
         tenantIds: query.permittedProjectIds,
         sessionIds: candidates.sessions.map((session) => session.sessionId),
@@ -276,7 +276,10 @@ export class CodingAgentPullRequestReadService {
       prNumber: target.prNumber,
       repositoryHost: target.repositoryHost,
       repositoryFullName: target.repositoryFullName,
-      modelTotals,
+      modelTotals: this.dependencies.usage.modelTotalsOf({
+        sessions: candidates.sessions,
+        eventTotals,
+      }),
     });
     const attached = attribution.sessions;
     const costProjects = new Set(query.costProjectIds);

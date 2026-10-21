@@ -6,6 +6,7 @@ import {
   LOGS_ONLY_AGENT_IDS,
   type SessionWorkingContext,
 } from "@langwatch/coding-agent-contract";
+import type { ModelCostEstimateInput } from "@langwatch/model-provider-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
 
 import type { CodingAgentCostEstimator } from "../services/model-catalog-cost-estimator.service.ts";
@@ -274,7 +275,7 @@ export class CodingAgentSessionSpanProjection {
     const facts = this.genAiTokenFacts(span.attrs);
     // A chat span wraps one request and no tools, so its wall time is the call's latency.
     const folded = this.stateProjection.foldModelCall(before, facts, durationMs);
-    return this.stateProjection.chargeContextUsage({
+    const charged = this.stateProjection.chargeContextUsage({
       before,
       after: {
         ...folded,
@@ -286,18 +287,30 @@ export class CodingAgentSessionSpanProjection {
       },
       context,
     });
+    // These calls never reach the per-call fact table, so the row keeps their per-model split.
+    return this.stateProjection.chargeModelUsage({
+      before,
+      after: charged,
+      context,
+      model: this.stateProjection.coerceString(facts.model),
+      priced: this.modelProviders.isPriced(this.costInput(facts)),
+    });
   }
 
   private pricedFromTokens(
     facts: Record<string, unknown>,
     modelProviders: CodingAgentCostEstimator,
   ): number {
-    return modelProviders.estimateCost({
+    return modelProviders.estimateCost(this.costInput(facts));
+  }
+
+  private costInput(facts: Record<string, unknown>): ModelCostEstimateInput {
+    return {
       attrs: facts,
       model: this.stateProjection.coerceString(facts.model) ?? undefined,
       promptTokens: this.stateProjection.number(facts.input_tokens),
       completionTokens: this.stateProjection.number(facts.output_tokens),
-    });
+    };
   }
 
   private claudeCallTokenFacts(

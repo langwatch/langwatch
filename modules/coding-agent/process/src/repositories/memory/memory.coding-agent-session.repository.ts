@@ -193,6 +193,7 @@ function branchRecord(row: CodingAgentSession): CodingAgentSessionBranchRecord {
     gitBranch: row.gitBranch,
     gitBranches: [...row.gitBranches],
     usageByContext: row.usageByContext,
+    usageByModel: row.usageByModel,
     title: row.title,
   };
 }

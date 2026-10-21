@@ -155,6 +155,7 @@ export class CodingAgentPersonalPullRequestValuesService {
       totalTokens: 0,
       costUsd: null,
       tokensKnown: false,
+      aiUnits: 0,
     }));
   }
 }

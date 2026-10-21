@@ -1,4 +1,8 @@
-import { formatCost, formatTokens } from "@langwatch/design-system/display-formatters";
+import {
+  compactNumber,
+  formatCost,
+  formatTokens,
+} from "@langwatch/design-system/display-formatters";
 import { FormattedNumber } from "@langwatch/design-system/formatted-number";
 import { type EmptyNext, NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
@@ -9,6 +13,17 @@ import { MISSING_VALUE } from "./cells/missing-value.tsx";
 import { Section } from "./detail-section.tsx";
 
 type ModelUsage = DetailPayload["modelBreakdown"][number];
+
+/** The AI units a model consumed (Copilot's meter): a count beside its cost, never part of it. */
+const AiUnitsText: React.FC<{ aiUnits: number }> = ({ aiUnits }) =>
+  aiUnits > 0 ? (
+    <Text fontSize="sm" color="fg.muted">
+      <FormattedNumber value={aiUnits} unit="AI units">
+        {compactNumber({ value: aiUnits })}
+      </FormattedNumber>{" "}
+      AI units
+    </Text>
+  ) : null;
 
 /**
  * One model's line: what it consumed, and a bar scaled against the heaviest
@@ -29,6 +44,7 @@ const ModelRow: React.FC<{ model: ModelUsage; peak: number }> = ({ model, peak }
             </FormattedNumber>{" "}
             tokens
           </Text>
+          <AiUnitsText aiUnits={model.aiUnits} />
           <Text fontSize="sm" color="fg.muted">
             {model.costUsd === null ? (
               MISSING_VALUE

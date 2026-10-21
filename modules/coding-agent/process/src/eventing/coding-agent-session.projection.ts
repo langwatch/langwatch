@@ -2,6 +2,7 @@ import {
   type LogFactsContributedEvent,
   logFactsContributedEventSchema,
   type CodingAgentSessionContextUsage,
+  type CodingAgentSessionModelUsage,
   extractStampedContext,
   type MetricFactsContributedEvent,
   metricFactsContributedEventSchema,
@@ -340,6 +341,8 @@ export interface CodingAgentSessionRow {
    * column, whose whole usage then reads as spent before any declaration.
    */
   usageByContext: CodingAgentSessionContextUsage[];
+  /** The per-model split (migration 00123); empty for log-fed agents and older rows. */
+  usageByModel: CodingAgentSessionModelUsage[];
 
   modelCallMs: number;
   toolMs: number;

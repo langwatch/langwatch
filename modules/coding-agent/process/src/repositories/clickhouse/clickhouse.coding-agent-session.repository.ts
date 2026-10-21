@@ -11,6 +11,7 @@ import type {
   CodingAgentSession,
   CodingAgentSessionBranchRecord,
   CodingAgentSessionContextUsage,
+  CodingAgentSessionModelUsage,
   CodingAgentUsageCount,
 } from "@langwatch/coding-agent-contract";
 import { EventUtils, SecurityError } from "@langwatch/eventing";
@@ -74,6 +75,7 @@ const BRANCH_SESSION_COLUMNS = `
   GitBranch,
   GitBranches,
   UsageByContext,
+  UsageByModel,
   Title,
   LastEventOccurredAt,
   ModelCalls,
@@ -150,6 +152,22 @@ interface ClickHouseWriteRecord {
   // InputTokens, OutputTokens, CacheReadTokens, CacheCreationTokens, CostUsd));
   // the UInt64 members ride as strings like every other UInt64 column.
   UsageByContext: [string, string, string, string, string, string, string, string, number][];
+  // Array(Tuple(RepositoryHost, RepositoryOwner, RepositoryName, Branch, Model, InputTokens,
+  // OutputTokens, CacheReadTokens, CacheCreationTokens, CostUsd, AiUnits, Priced)), 00123.
+  UsageByModel: [
+    string,
+    string,
+    string,
+    string,
+    string,
+    string,
+    string,
+    string,
+    string,
+    number,
+    number,
+    boolean,
+  ][];
 
   ModelCallMs: string;
   ToolMs: string;
@@ -239,6 +257,7 @@ function toBranchSessionRow(record: Record<string, unknown>): CodingAgentBranchS
     gitBranch: asString(record.GitBranch),
     gitBranches: asStringArray(record.GitBranches),
     usageByContext: asContextUsageRows(record.UsageByContext),
+    usageByModel: asModelUsageRows(record.UsageByModel),
     title: asString(record.Title),
   };
 }
@@ -292,6 +311,20 @@ function toRecord({
       big(usage.cacheReadTokens),
       big(usage.cacheCreationTokens),
       usage.costUsd,
+    ]),
+    UsageByModel: row.usageByModel.map((usage) => [
+      usage.repositoryHost,
+      usage.repositoryOwner,
+      usage.repositoryName,
+      usage.branch,
+      usage.model,
+      big(usage.inputTokens),
+      big(usage.outputTokens),
+      big(usage.cacheReadTokens),
+      big(usage.cacheCreationTokens),
+      usage.costUsd,
+      usage.aiUnits,
+      usage.priced,
     ]),
     GitWorktree: row.gitWorktree,
     Title: row.title,
@@ -1101,6 +1134,28 @@ const asContextUsageRows = (value: unknown): CodingAgentSessionContextUsage[] =>
       })
     : [];
 
+/** Parse the `UsageByModel` Array(Tuple(...)); a row from before 00123 reads its default []. */
+const asModelUsageRows = (value: unknown): CodingAgentSessionModelUsage[] =>
+  Array.isArray(value)
+    ? value.map((entry) => {
+        const tuple: unknown[] = Array.isArray(entry) ? entry : [];
+        return {
+          repositoryHost: asString(tuple[0]),
+          repositoryOwner: asString(tuple[1]),
+          repositoryName: asString(tuple[2]),
+          branch: asString(tuple[3]),
+          model: asString(tuple[4]),
+          inputTokens: asNumber(tuple[5]),
+          outputTokens: asNumber(tuple[6]),
+          cacheReadTokens: asNumber(tuple[7]),
+          cacheCreationTokens: asNumber(tuple[8]),
+          costUsd: asNumber(tuple[9]),
+          aiUnits: asNumber(tuple[10]),
+          priced: Boolean(tuple[11]),
+        };
+      })
+    : [];
+
 const asNumberMap = (value: unknown): Record<string, number> => {
   const parsed = numberMapSchema.safeParse(value);
   if (!parsed.success) {
@@ -1199,6 +1254,7 @@ function fromRecord(record: Record<string, unknown>): CodingAgentSessionRow {
     repositoryName: asString(record.RepositoryName),
     gitBranch: asString(record.GitBranch),
     usageByContext: asContextUsageRows(record.UsageByContext),
+    usageByModel: asModelUsageRows(record.UsageByModel),
     gitBranches: asStringArray(record.GitBranches),
     gitWorktree: asString(record.GitWorktree),
     title: asString(record.Title),

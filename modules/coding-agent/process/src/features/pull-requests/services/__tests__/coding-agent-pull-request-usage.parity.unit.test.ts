@@ -1089,6 +1089,7 @@ describe("PullRequestUsageService", () => {
           totalTokens: 180,
           costUsd: 1.5,
           tokensKnown: true,
+          aiUnits: 0,
         },
         {
           model: "gpt-5-mini",
@@ -1099,6 +1100,7 @@ describe("PullRequestUsageService", () => {
           totalTokens: 4,
           costUsd: 0.25,
           tokensKnown: true,
+          aiUnits: 0,
         },
       ]);
     });

@@ -426,6 +426,39 @@ describe("the pull request detail drawer", () => {
     });
   });
 
+  describe("given a Copilot model that consumed AI units and has no price", () => {
+    /** @scenario "AI units are their own count and never enter the dollar total" */
+    /** @scenario "A model with no price shows its tokens and an unknown cost" */
+    it("shows its tokens and AI units, and a missing cost rather than zero dollars", () => {
+      pinDetail(
+        detailPayload({
+          modelBreakdown: [
+            {
+              model: "oswe-vscode-prime",
+              inputTokens: 13,
+              outputTokens: 50,
+              cacheReadTokens: 0,
+              cacheCreationTokens: 0,
+              totalTokens: 63,
+              costUsd: null,
+              tokensKnown: true,
+              aiUnits: 5,
+            },
+          ],
+        }),
+      );
+
+      renderDrawer();
+
+      const modelName = screen.getByText("oswe-vscode-prime");
+      const line = modelName.parentElement!;
+      expect(line).toHaveTextContent("63 tokens");
+      expect(line).toHaveTextContent("5 AI units");
+      expect(line).toHaveTextContent("—");
+      expect(line).not.toHaveTextContent("$0");
+    });
+  });
+
   describe("given the read is still in flight", () => {
     it("shows placeholders rather than an empty drawer", () => {
       queryImpls["codingAgents.pullRequestDetail"] = () => ({

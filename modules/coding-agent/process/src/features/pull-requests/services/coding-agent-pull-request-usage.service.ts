@@ -39,6 +39,16 @@ export type CodingAgentModelUsage = {
   totalTokens: number;
   costUsd: number | null;
   tokensKnown: boolean;
+  aiUnits: number;
+};
+
+/**
+ * One (session, model, context) total the pull-request reads price: a per-call fact table row, or
+ * a span-fed session's own per-model record. AI units are a count; `priced` false is unknown cost.
+ */
+export type PullRequestModelTotalsRow = SessionModelTotalsRow & {
+  aiUnits: number;
+  priced: boolean;
 };
 
 type CodingAgentUsageTotals = {
@@ -218,47 +228,93 @@ export class CodingAgentPullRequestUsageService {
     );
   }
 
+  /**
+   * Every session's per-model totals: its per-call fact rows where it has any, else its own
+   * per-model record, so a session is never counted from both.
+   */
+  modelTotalsOf({
+    sessions,
+    eventTotals,
+  }: {
+    sessions: readonly CodingAgentSessionBranchRecord[];
+    eventTotals: readonly SessionModelTotalsRow[];
+  }): PullRequestModelTotalsRow[] {
+    const logged = new Set(eventTotals.map((total) => `${total.tenantId}\0${total.sessionId}`));
+    const recorded = sessions
+      .filter((session) => !logged.has(`${session.tenantId}\0${session.sessionId}`))
+      .flatMap((session) =>
+        session.usageByModel.map((usage) => ({
+          ...usage,
+          tenantId: session.tenantId,
+          sessionId: session.sessionId,
+        })),
+      );
+
+    return [...eventTotals.map((total) => ({ ...total, aiUnits: 0, priced: true })), ...recorded];
+  }
+
   modelUsage(
     sessions: readonly CodingAgentSessionBranchRecord[],
-    totals: readonly SessionModelTotalsRow[],
+    totals: readonly PullRequestModelTotalsRow[],
     costProjects: ReadonlySet<string>,
   ): CodingAgentModelUsage[] {
     const attached = new Set(
       sessions.map((session) => `${session.tenantId}\0${session.sessionId}`),
     );
     const byModel = new Map<string, CodingAgentModelUsage>();
+    const unpriced = new Set<string>();
+    const withTotals = new Set<string>();
     for (const total of totals) {
-      if (!attached.has(`${total.tenantId}\0${total.sessionId}`) || total.model === "") {
+      const sessionKey = `${total.tenantId}\0${total.sessionId}`;
+      if (!attached.has(sessionKey) || total.model === "") {
         continue;
       }
 
-      const existing = byModel.get(total.model) ?? {
-        model: total.model,
-        inputTokens: 0,
-        outputTokens: 0,
-        cacheReadTokens: 0,
-        cacheCreationTokens: 0,
-        totalTokens: 0,
-        costUsd: null,
-        tokensKnown: true,
-      };
-      existing.inputTokens += total.inputTokens;
-      existing.outputTokens += total.outputTokens;
-      existing.cacheReadTokens += total.cacheReadTokens;
-      existing.cacheCreationTokens += total.cacheCreationTokens;
-      existing.totalTokens += this.tokenTotal(total);
-      if (costProjects.has(total.tenantId)) {
-        existing.costUsd = (existing.costUsd ?? 0) + total.costUsd;
+      withTotals.add(sessionKey);
+      if (!total.priced) {
+        unpriced.add(total.model);
       }
-
-      byModel.set(total.model, existing);
+      byModel.set(
+        total.model,
+        this.addModelTotal({
+          usage: byModel.get(total.model) ?? emptyModelUsage(total.model),
+          total,
+          costed: costProjects.has(total.tenantId),
+        }),
+      );
     }
 
-    if (byModel.size > 0) {
-      return [...byModel.values()].toSorted((a, b) => b.totalTokens - a.totalTokens);
-    }
+    const known = [...byModel.values()]
+      .map((usage) => (unpriced.has(usage.model) ? { ...usage, costUsd: null } : usage))
+      .toSorted((a, b) => b.totalTokens - a.totalTokens);
+    const knownModels = new Set(byModel.keys());
+    const unrecorded = this.unknownModels(
+      sessions.filter((session) => !withTotals.has(`${session.tenantId}\0${session.sessionId}`)),
+    ).filter((usage) => !knownModels.has(usage.model));
 
-    return this.unknownModels(sessions);
+    return [...known, ...unrecorded];
+  }
+
+  /** One total added onto its model's running usage; AI units never touch the dollar figure. */
+  private addModelTotal({
+    usage,
+    total,
+    costed,
+  }: {
+    usage: CodingAgentModelUsage;
+    total: PullRequestModelTotalsRow;
+    costed: boolean;
+  }): CodingAgentModelUsage {
+    return {
+      ...usage,
+      inputTokens: usage.inputTokens + total.inputTokens,
+      outputTokens: usage.outputTokens + total.outputTokens,
+      cacheReadTokens: usage.cacheReadTokens + total.cacheReadTokens,
+      cacheCreationTokens: usage.cacheCreationTokens + total.cacheCreationTokens,
+      totalTokens: usage.totalTokens + this.tokenTotal(total),
+      costUsd: costed ? (usage.costUsd ?? 0) + total.costUsd : usage.costUsd,
+      aiUnits: usage.aiUnits + total.aiUnits,
+    };
   }
 
   latestActivity(sessions: readonly CodingAgentSessionBranchRecord[]): number {
@@ -310,8 +366,23 @@ export class CodingAgentPullRequestUsageService {
       totalTokens: 0,
       costUsd: null,
       tokensKnown: false,
+      aiUnits: 0,
     }));
   }
+}
+
+function emptyModelUsage(model: string): CodingAgentModelUsage {
+  return {
+    model,
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheReadTokens: 0,
+    cacheCreationTokens: 0,
+    totalTokens: 0,
+    costUsd: null,
+    tokensKnown: true,
+    aiUnits: 0,
+  };
 }
 
 function billedShareOf(costUsd: number, applies: boolean): number {

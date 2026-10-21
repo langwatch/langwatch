@@ -116,20 +116,20 @@ Rule: The session context links a Copilot session to its pull request
 
 Rule: Pull-request cost keeps AI units apart from dollars
 
-  @unit @unimplemented
+  @unit
   Scenario: Each Copilot model on a pull request has known tokens
     Given a pull request fed by one Copilot session that used two models
     When its usage is read
     Then each model shows its own known token counts
 
-  @unit @unimplemented
+  @unit
   Scenario: AI units are their own count and never enter the dollar total
     Given a Copilot session that consumed AI units
     When the pull request cost is shown
     Then the AI units appear as a count
     And the dollar total excludes them
 
-  @unit @unimplemented
+  @unit
   Scenario: A model with no price shows its tokens and an unknown cost
     Given a Copilot model call on a model with no price
     When the pull request cost is shown

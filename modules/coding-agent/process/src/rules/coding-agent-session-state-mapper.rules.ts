@@ -5,7 +5,7 @@ import type {
   CodingAgentSessionRow,
   CodingAgentSessionState,
 } from "../eventing/coding-agent-session.projection.ts";
-import { contextUsageKey } from "./coding-agent-session-usage-key.rules.ts";
+import { contextUsageKey, modelUsageKey } from "./coding-agent-session-usage-key.rules.ts";
 
 /**
  * Who set the session's `title`, in rank order: harness session name beats
@@ -96,6 +96,9 @@ export function codingAgentSessionStateFromRow(
     aiUnits: row.aiUnits,
     usageByContext: Object.fromEntries(
       row.usageByContext.map((usage) => [contextUsageKey(usage), usage]),
+    ),
+    usageByModel: Object.fromEntries(
+      row.usageByModel.map((usage) => [modelUsageKey(usage), usage]),
     ),
 
     modelCallMs: row.modelCallMs,

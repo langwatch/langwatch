@@ -8,10 +8,7 @@ import {
 import type { GithubPullRequest, GithubApi } from "@langwatch/github-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 
-import type {
-  CodingAgentSessionEventRepository,
-  SessionModelTotalsRow,
-} from "../../../repositories/coding-agent-session-event.repository.ts";
+import type { CodingAgentSessionEventRepository } from "../../../repositories/coding-agent-session-event.repository.ts";
 import {
   assignablePullRequests,
   pullRequestIdentity,
@@ -25,7 +22,10 @@ import type {
 } from "./coding-agent-personal-pull-request-values.service.ts";
 import type { CodingAgentPullRequestAssignmentService } from "./coding-agent-pull-request-assignment.service.ts";
 import type { CodingAgentPullRequestShareService } from "./coding-agent-pull-request-share.service.ts";
-import type { CodingAgentPullRequestUsageService } from "./coding-agent-pull-request-usage.service.ts";
+import type {
+  CodingAgentPullRequestUsageService,
+  PullRequestModelTotalsRow,
+} from "./coding-agent-pull-request-usage.service.ts";
 
 export const USAGE_SESSION_WINDOW_MS = 180 * 24 * 60 * 60 * 1000;
 const PERSONAL_SESSION_WINDOW_MS = 90 * 24 * 60 * 60 * 1000;
@@ -186,7 +186,7 @@ export class CodingAgentPersonalPullRequestReadService {
       input.organizationId,
       candidates.sessions.map((session) => session.agent),
     );
-    const [modelTotals, attributable] = await Promise.all([
+    const [eventTotals, attributable] = await Promise.all([
       this.dependencies.sessionEvents.sumTokensByModelPerSession({
         tenantIds: input.query.permittedProjectIds,
         sessionIds: candidates.sessions.map((session) => session.sessionId),
@@ -202,6 +202,10 @@ export class CodingAgentPersonalPullRequestReadService {
       }),
     ]);
     const costProjects = new Set(input.query.costProjectIds);
+    const modelTotals = this.dependencies.usage.modelTotalsOf({
+      sessions: candidates.sessions,
+      eventTotals,
+    });
 
     return input.discovered.map((pullRequest) =>
       this.personalPullRequestRow({
@@ -234,7 +238,7 @@ export class CodingAgentPersonalPullRequestReadService {
       rowMatchedSessionKeys: ReadonlySet<string>;
     };
     attributable: GithubPullRequest[];
-    modelTotals: readonly SessionModelTotalsRow[];
+    modelTotals: readonly PullRequestModelTotalsRow[];
     costProjects: Set<string>;
     nonBillableAgents: ReadonlySet<string>;
     projects: Record<string, CodingAgentContributorProject>;
