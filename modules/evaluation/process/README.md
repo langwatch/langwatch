@@ -402,21 +402,25 @@ Declared at `src/eventing/evaluation-processing-definition.pipeline.ts:150`. Eve
 
 ## Configuration
 
-| Kind   | Leaf                             | Environment variable                       | Declared at                               |
-| ------ | -------------------------------- | ------------------------------------------ | ----------------------------------------- |
-| secret | `openAi`                         | `OPENAI_API_KEY`                           | `src/app/evaluation.app.ts:275`           |
-| secret | `azureContentSafety`             | `AZURE_CONTENT_SAFETY_KEY`                 | `src/app/evaluation.app.ts:276`           |
-| config | `langevalsEndpoint`              | `LANGEVALS_ENDPOINT`                       | `../contract/src/evaluation.config.ts:43` |
-| config | `stagingThresholdBytes`          | `LANGEVALS_STAGING_THRESHOLD_BYTES`        | `../contract/src/evaluation.config.ts:44` |
-| config | `stagingTtlSeconds`              | `LANGEVALS_STAGING_TTL_SECONDS`            | `../contract/src/evaluation.config.ts:45` |
-| config | `evaluationMaxPayloadBytes`      | `EVAL_MAX_PAYLOAD_BYTES`                   | `../contract/src/evaluation.config.ts:46` |
-| config | `topicClusteringMaxPayloadBytes` | `TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES`       | `../contract/src/evaluation.config.ts:47` |
-| config | `inputsInlineMaxBytes`           | `LANGWATCH_EVAL_INPUTS_INLINE_MAX_BYTES`   | `../contract/src/evaluation.config.ts:51` |
-| config | `inputsHardCeilingBytes`         | `LANGWATCH_EVAL_INPUTS_HARD_CEILING_BYTES` | `../contract/src/evaluation.config.ts:55` |
-| config | `azureContentSafetyEndpoint`     | `AZURE_CONTENT_SAFETY_ENDPOINT`            | `../contract/src/evaluation.config.ts:59` |
-| config | `enablePresidio`                 | `LANGWATCH_ENABLE_PRESIDIO`                | `../contract/src/evaluation.config.ts:60` |
-| config | `enableLingua`                   | `LANGWATCH_ENABLE_LINGUA`                  | `../contract/src/evaluation.config.ts:61` |
-| config | `evaluatorRetryWindowMinutes`    | `LANGWATCH_EVALUATOR_RETRY_WINDOW_MINUTES` | `../contract/src/evaluation.config.ts:65` |
-| config | `foldCacheTtlSeconds`            | `LANGWATCH_FOLD_CACHE_TTL_SECONDS`         | `../contract/src/evaluation.config.ts:69` |
+| Kind   | Leaf                               | Environment variable                       | Declared at                               |
+| ------ | ---------------------------------- | ------------------------------------------ | ----------------------------------------- |
+| secret | `openAi`                           | `OPENAI_API_KEY`                           | `src/app/evaluation.app.ts:277`           |
+| secret | `azureContentSafety`               | `AZURE_CONTENT_SAFETY_KEY`                 | `src/app/evaluation.app.ts:278`           |
+| secret | `nlpgoInternal`                    | `NLPGO_INTERNAL_SECRET`                    | `src/app/evaluation.app.ts:279`           |
+| config | `langevalsEndpoint`                | `LANGEVALS_ENDPOINT`                       | `../contract/src/evaluation.config.ts:67` |
+| config | `stagingThresholdBytes`            | `LANGEVALS_STAGING_THRESHOLD_BYTES`        | `../contract/src/evaluation.config.ts:68` |
+| config | `stagingTtlSeconds`                | `LANGEVALS_STAGING_TTL_SECONDS`            | `../contract/src/evaluation.config.ts:69` |
+| config | `evaluationMaxPayloadBytes`        | `EVAL_MAX_PAYLOAD_BYTES`                   | `../contract/src/evaluation.config.ts:70` |
+| config | `topicClusteringMaxPayloadBytes`   | `TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES`       | `../contract/src/evaluation.config.ts:71` |
+| config | `inputsInlineMaxBytes`             | `LANGWATCH_EVAL_INPUTS_INLINE_MAX_BYTES`   | `../contract/src/evaluation.config.ts:75` |
+| config | `inputsHardCeilingBytes`           | `LANGWATCH_EVAL_INPUTS_HARD_CEILING_BYTES` | `../contract/src/evaluation.config.ts:79` |
+| config | `azureContentSafetyEndpoint`       | `AZURE_CONTENT_SAFETY_ENDPOINT`            | `../contract/src/evaluation.config.ts:83` |
+| config | `enablePresidio`                   | `LANGWATCH_ENABLE_PRESIDIO`                | `../contract/src/evaluation.config.ts:84` |
+| config | `enableLingua`                     | `LANGWATCH_ENABLE_LINGUA`                  | `../contract/src/evaluation.config.ts:85` |
+| config | `evaluatorRetryWindowMinutes`      | `LANGWATCH_EVALUATOR_RETRY_WINDOW_MINUTES` | `../contract/src/evaluation.config.ts:89` |
+| config | `foldCacheTtlSeconds`              | `LANGWATCH_FOLD_CACHE_TTL_SECONDS`         | `../contract/src/evaluation.config.ts:93` |
+| config | `evaluatorRuntime.endpoint`        | `EVALUATOR_RUNTIME_ENDPOINT`               | `../contract/src/evaluation.config.ts:96` |
+| config | `evaluatorRuntime.engine`          | `EVALUATOR_RUNTIME_ENGINE`                 | `../contract/src/evaluation.config.ts:97` |
+| config | `evaluatorRuntime.engineOverrides` | `EVALUATOR_RUNTIME_ENGINE_OVERRIDES`       | `../contract/src/evaluation.config.ts:98` |
 
 <!-- readme:generated:end -->

@@ -31,15 +31,15 @@ the parity numbers come from a throwaway Go prototype run against scipy on the s
 
 `POST /topics/batch_clustering`, `POST /topics/incremental_clustering`, JSON, one response shape.
 
-| Field | Batch | Incremental | Notes |
-|---|---|---|---|
-| `project_id` | yes | yes | log context only |
-| `traces[]` | yes | yes | `{trace_id, input, topic_id, subtopic_id}`; at most 2,000; input at most 8,192 chars |
-| `topics[]` | | yes | `{id, name, centroid[1536], p95_distance}` |
-| `subtopics[]` | | yes | as topics plus `parent_id` |
-| `litellm_params` | yes | yes | chat model and credentials, strings |
-| `embeddings_litellm_params` | yes | yes | embedding model, credentials, `dimensions: 1536` (always, from TS) |
-| `deployment_name` | optional | optional | never sent by TS; the Azure rewrite it drives is also never used (the rewritten `model` is not read by naming). Drop. |
+| Field                       | Batch    | Incremental | Notes                                                                                                                 |
+| --------------------------- | -------- | ----------- | --------------------------------------------------------------------------------------------------------------------- |
+| `project_id`                | yes      | yes         | log context only                                                                                                      |
+| `traces[]`                  | yes      | yes         | `{trace_id, input, topic_id, subtopic_id}`; at most 2,000; input at most 8,192 chars                                  |
+| `topics[]`                  |          | yes         | `{id, name, centroid[1536], p95_distance}`                                                                            |
+| `subtopics[]`               |          | yes         | as topics plus `parent_id`                                                                                            |
+| `litellm_params`            | yes      | yes         | chat model and credentials, strings                                                                                   |
+| `embeddings_litellm_params` | yes      | yes         | embedding model, credentials, `dimensions: 1536` (always, from TS)                                                    |
+| `deployment_name`           | optional | optional    | never sent by TS; the Azure rewrite it drives is also never used (the rewritten `model` is not read by naming). Drop. |
 
 Response: `{topics[], subtopics[], traces[{trace_id, topic_id|null, subtopic_id|null}], cost{amount, currency:"USD"}}`.
 Any exception becomes HTTP 500 `"Batch clustering failed"` / `"Incremental clustering failed"`;
@@ -99,7 +99,7 @@ Then naming (§2.6), then `build_response`:
    subtopics. Traces with a topic are emitted `{trace_id, topic_id, subtopic_id|null}`.
 3. **New topics**: collect traces still without a topic. If **more than 100**
    (`MINIMUM_UNASSIGNED_TRACES_TO_CREATE_NEW_TOPIC`): `build_hierarchy(t=4, max_p95 = mean of the
-   existing topics' p95, with_subtopics=True)`, name with `existing = existing topic names`,
+existing topics' p95, with_subtopics=True)`, name with `existing = existing topic names`,
    `build_response`. If 100 or fewer, the unassigned traces are emitted **as they are**, with
    null ids (defect 2, §9).
 4. **New subtopics**: group traces that matched an existing topic but no subtopic. For each topic
@@ -159,19 +159,19 @@ The prompts, rendered from the source (each backslash line continuation keeps th
 indentation, so the runs of spaces are part of the prompt):
 
 - **P1** (system): `You are a highly knowledgeable assistant tasked with taxonomy for naming topics`
-  + 17 spaces + `based on a list of examples. Provide a single, descriptive name for each topic.`
-  + 17 spaces + `Avoid using "and" or "&" in the name, try to summarize it with a single concept.`
-  + 17 spaces + `Topic names should not be similar to each other, as the data is already organized,`
-  + 17 spaces + `the disambiguation between two similar topics should be clear from the name alone.`
-  + 20 spaces + `{P2 or ""}`.
+  - 17 spaces + `based on a list of examples. Provide a single, descriptive name for each topic.`
+  - 17 spaces + `Avoid using "and" or "&" in the name, try to summarize it with a single concept.`
+  - 17 spaces + `Topic names should not be similar to each other, as the data is already organized,`
+  - 17 spaces + `the disambiguation between two similar topics should be clear from the name alone.`
+  - 20 spaces + `{P2 or ""}`.
 - **P2**: `\n\nThose are the topics that already exist, avoid using any names that may overlap`
-  + 9 spaces + `in meaning with them, think how the current sample data is unique and different from those instead:\n\n`
-  + 12 spaces + existing names joined by `"\n"`.
+  - 9 spaces + `in meaning with them, think how the current sample data is unique and different from those instead:\n\n`
+  - 12 spaces + existing names joined by `"\n"`.
 - **P3** (system): `You are a highly knowledgeable assistant tasked with taxonomy for naming topics,`
-  + 21 spaces + `right now we have two topics with very similar names, and we need to disambiguate between them,`
-  + 21 spaces + `to have a better name that really contrasts what one topic is about versus the other.`
-  + 21 spaces + `Please look at the topics A and B and come up with a new, concise but constrasting name for each,`
-  + 21 spaces + `based on their examples.`
+  - 21 spaces + `right now we have two topics with very similar names, and we need to disambiguate between them,`
+  - 21 spaces + `to have a better name that really contrasts what one topic is about versus the other.`
+  - 21 spaces + `Please look at the topics A and B and come up with a new, concise but constrasting name for each,`
+  - 21 spaces + `based on their examples.`
 - **Tool description** (both tools): `use this function to name the topics based on the examples provided, avoid using "and" or "&" in the name, try to name it with a single 2-3 words concept.`
 
 The Go port generates these three templates from the Python source once (an `ast` render, as done
@@ -184,17 +184,17 @@ up to 63 disambiguation, up to 63 name-embedding calls, plus 100 trace-embedding
 
 ## 3. The numerics Go must reproduce
 
-| Python call | What Go reproduces |
-|---|---|
-| `pdist(X, "euclidean")` | For each pair i<j in row-major condensed order: `s += (a-b)²` in index order, `sqrt(s)`. scipy's C++ loop unrolls across 4 pairs, never within a pair, so the per-pair order is sequential. |
-| `linkage(y, "ward")` → `_hierarchy.nn_chain` | Chain starts at the lowest live index; the previous chain element is the initial minimum (ties keep it, which stops cycles); scan i = 0..n-1 with strict `<`; merge when the nearest neighbour is the previous element; order the pair so x < y; record `[x, y, d, nx+ny]`; the merged cluster lives in slot y, x dies; update every live i with Lance–Williams Ward on **non-squared** distances: `sqrt((ni+nx)·t·dxi² + (ni+ny)·t·dyi² − ni·t·dxy²)`, `t = 1/(nx+ny+ni)`, evaluated left to right. |
-| (inside `nn_chain`) | `argsort(Z[:,2], kind="mergesort")`, a **stable** sort by height, then `label()`: a union-find over 2n−1 slots with path compression renames each row to its current roots (smaller first) and writes the merged size; new cluster ids are n, n+1, ... in sorted-row order. |
-| `fcluster(Z, t, "distance")` → `cluster_dist` | `get_max_dist_for_each_cluster`: iterative post-order DFS from the root (id 2n−2), left child (`Z[:,0]`) first, MD = max of own height and children's MD. `cluster_monocrit`: the same DFS; the first node on the way down with `MD <= t` becomes a leader and opens cluster `++k`; leaves under no leader each open their own cluster. Labels are 1..k in DFS order, int32. |
-| `fcluster(..., "maxclust")` | Not used by langevals; not ported. |
-| `np.mean(axis=0)` | sequential sum per dimension, then divide by n |
-| `cdist(..., "cosine")` | §2.5, including the ±1 clip |
-| `np.percentile(q=95)` | §2.5, numpy 1.26 `linear` with the `g >= 0.5` branch, NaN in → NaN out |
-| `np.dot` / `np.linalg.norm` (name de-duplication) | BLAS sums; only compared with 0.6 and for the argmin, so plain Go loops are enough |
+| Python call                                       | What Go reproduces                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pdist(X, "euclidean")`                           | For each pair i<j in row-major condensed order: `s += (a-b)²` in index order, `sqrt(s)`. scipy's C++ loop unrolls across 4 pairs, never within a pair, so the per-pair order is sequential.                                                                                                                                                                                                                                                                                                          |
+| `linkage(y, "ward")` → `_hierarchy.nn_chain`      | Chain starts at the lowest live index; the previous chain element is the initial minimum (ties keep it, which stops cycles); scan i = 0..n-1 with strict `<`; merge when the nearest neighbour is the previous element; order the pair so x < y; record `[x, y, d, nx+ny]`; the merged cluster lives in slot y, x dies; update every live i with Lance–Williams Ward on **non-squared** distances: `sqrt((ni+nx)·t·dxi² + (ni+ny)·t·dyi² − ni·t·dxy²)`, `t = 1/(nx+ny+ni)`, evaluated left to right. |
+| (inside `nn_chain`)                               | `argsort(Z[:,2], kind="mergesort")`, a **stable** sort by height, then `label()`: a union-find over 2n−1 slots with path compression renames each row to its current roots (smaller first) and writes the merged size; new cluster ids are n, n+1, ... in sorted-row order.                                                                                                                                                                                                                          |
+| `fcluster(Z, t, "distance")` → `cluster_dist`     | `get_max_dist_for_each_cluster`: iterative post-order DFS from the root (id 2n−2), left child (`Z[:,0]`) first, MD = max of own height and children's MD. `cluster_monocrit`: the same DFS; the first node on the way down with `MD <= t` becomes a leader and opens cluster `++k`; leaves under no leader each open their own cluster. Labels are 1..k in DFS order, int32.                                                                                                                         |
+| `fcluster(..., "maxclust")`                       | Not used by langevals; not ported.                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `np.mean(axis=0)`                                 | sequential sum per dimension, then divide by n                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `cdist(..., "cosine")`                            | §2.5, including the ±1 clip                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `np.percentile(q=95)`                             | §2.5, numpy 1.26 `linear` with the `g >= 0.5` branch, NaN in → NaN out                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `np.dot` / `np.linalg.norm` (name de-duplication) | BLAS sums; only compared with 0.6 and for the argmin, so plain Go loops are enough                                                                                                                                                                                                                                                                                                                                                                                                                   |
 
 **Validation**: `linkage` raises on non-finite distances and on fewer than 2 observations (empty
 condensed matrix). Batch with fewer than 2 embedded traces is therefore a 500 today; keep it an
@@ -209,21 +209,20 @@ candidate distances in the chain tie to the last bit; none occurred in the runs 
 **Libraries**: gonum has no hierarchical clustering (`stat` has none; `graph/community` is
 modularity-based). `knightjdr/hclust` (MIT, 21 stars, last push 2023) has Ward via NN-chain but not
 scipy's `label()` renumbering, stable height sort or `fcluster`, so it would need the same parity
-work plus a dependency. `diffeo/kodama` is Rust behind cgo. `cipepser/goClustering` is dormant since
-2018. Hand-writing wins: the prototype's linkage, label and fcluster are ~190 lines.
+work plus a dependency. `diffeo/kodama` is Rust behind cgo. `cipepser/goClustering` is dormant since 2018. Hand-writing wins: the prototype's linkage, label and fcluster are ~190 lines.
 
 **float32?** No. At n ≤ 2,000 the condensed matrix is 16 MB in float64; float32 would move
 heights by ~1e-7 relative and could reorder near-ties in the chain for no saving that matters.
 
 **Memory** (float64; Python needs several times this in boxed floats, hence its measured 2.7 GB):
 
-| n | condensed matrix n(n−1)/2 × 8 | embeddings n × 1536 × 8 |
-|---|---|---|
-| 1,000 | 4.0 MB | 12.3 MB |
-| 2,000 (the cap) | 16.0 MB | 24.6 MB |
-| 5,000 | 100 MB | 61 MB |
-| 10,000 | 400 MB | 123 MB |
-| 20,000 | 1.6 GB | 246 MB |
+| n               | condensed matrix n(n−1)/2 × 8 | embeddings n × 1536 × 8 |
+| --------------- | ----------------------------- | ----------------------- |
+| 1,000           | 4.0 MB                        | 12.3 MB                 |
+| 2,000 (the cap) | 16.0 MB                       | 24.6 MB                 |
+| 5,000           | 100 MB                        | 61 MB                   |
+| 10,000          | 400 MB                        | 123 MB                  |
+| 20,000          | 1.6 GB                        | 246 MB                  |
 
 Go updates the distance matrix in place (scipy copies it), so the matrix counts once.
 
@@ -234,28 +233,28 @@ subtopics, per-point noise, float32-rounded like provider output, a fraction of 
 and ran `linkage`, `fcluster` at 4 and 2, centroid and p95 per topic, and the per-trace `cdist`
 assignment loop exactly as the service does; `main.go` did the same in Go and compared.
 
-| n | duplicates | Z rows with different ids/sizes | max \|Δheight\| | max rel Δheight | labels differing t=4 / t=2 | clusters t=4 | max \|Δp95\| | max \|Δcentroid\| |
-|---|---|---|---|---|---|---|---|---|
-| 200 | 5% | 0 | 1.8e-15 | 4.3e-16 | 0 / 0 | 10 | 2.2e-16 | 0 |
-| 300 | 90% | 0 | 2.7e-15 | 4.7e-16 | 0 / 0 | 12 | 2.2e-16 | 0 |
-| 500 | 5% | 0 | 1.8e-15 | 4.6e-16 | 0 / 0 | 12 | 3.3e-16 | 0 |
-| 1,000 | 5% | 0 | 3.6e-15 | 8.4e-16 | 0 / 0 | 34 | 3.3e-16 | 0 |
-| 1,500 | 5% | 0 | 1.8e-15 | 1.1e-15 | 0 / 0 | 36 | 2.2e-16 | 0 |
-| 2,000 | 5% | 0 | 3.6e-15 | 1.3e-15 | 0 / 0 | 36 | 2.2e-16 | 0 |
-| 2,000 | 5% | 0 | 5.3e-15 | 9.0e-16 | 0 / 0 | 36 | 2.2e-16 | 0 |
-| 2,000 | 60% | 0 | 7.1e-15 | 7.3e-16 | 0 / 0 | 36 | 3.3e-16 | 0 |
-| 5,000 | 5% | 0 | 1.1e-14 | 1.9e-15 | 0 / 0 | 36 | 1.9e-16 | 0 |
+| n     | duplicates | Z rows with different ids/sizes | max \|Δheight\| | max rel Δheight | labels differing t=4 / t=2 | clusters t=4 | max \|Δp95\| | max \|Δcentroid\| |
+| ----- | ---------- | ------------------------------- | --------------- | --------------- | -------------------------- | ------------ | ------------ | ----------------- |
+| 200   | 5%         | 0                               | 1.8e-15         | 4.3e-16         | 0 / 0                      | 10           | 2.2e-16      | 0                 |
+| 300   | 90%        | 0                               | 2.7e-15         | 4.7e-16         | 0 / 0                      | 12           | 2.2e-16      | 0                 |
+| 500   | 5%         | 0                               | 1.8e-15         | 4.6e-16         | 0 / 0                      | 12           | 3.3e-16      | 0                 |
+| 1,000 | 5%         | 0                               | 3.6e-15         | 8.4e-16         | 0 / 0                      | 34           | 3.3e-16      | 0                 |
+| 1,500 | 5%         | 0                               | 1.8e-15         | 1.1e-15         | 0 / 0                      | 36           | 2.2e-16      | 0                 |
+| 2,000 | 5%         | 0                               | 3.6e-15         | 1.3e-15         | 0 / 0                      | 36           | 2.2e-16      | 0                 |
+| 2,000 | 5%         | 0                               | 5.3e-15         | 9.0e-16         | 0 / 0                      | 36           | 2.2e-16      | 0                 |
+| 2,000 | 60%        | 0                               | 7.1e-15         | 7.3e-16         | 0 / 0                      | 36           | 3.3e-16      | 0                 |
+| 5,000 | 5%         | 0                               | 1.1e-14         | 1.9e-15         | 0 / 0                      | 36           | 1.9e-16      | 0                 |
 
 Label agreement is exact, not merely up to relabelling: Go reproduces scipy's cluster numbers.
 
 Timings (Apple M-series, 10 cores; scipy is single-threaded):
 
-| Step | scipy n=2,000 | Go n=2,000 (10 cores / 1 core) | scipy n=5,000 | Go n=5,000 (10 / 1) |
-|---|---|---|---|---|
-| pdist + linkage | 1.00 to 1.28 s | 0.18 to 0.35 s / 1.26 s | 8.19 s | 1.75 s / 8.6 s |
-| of which linkage only | | 26 to 62 ms | | 0.27 to 0.34 s |
-| fcluster | 0.6 ms | 0.08 ms | 1.3 ms | 0.2 ms |
-| assignment, n traces × 36 centroids | 0.38 to 0.49 s | 0.11 to 0.17 s | 1.02 s | 0.30 to 0.37 s |
+| Step                                | scipy n=2,000  | Go n=2,000 (10 cores / 1 core) | scipy n=5,000 | Go n=5,000 (10 / 1) |
+| ----------------------------------- | -------------- | ------------------------------ | ------------- | ------------------- |
+| pdist + linkage                     | 1.00 to 1.28 s | 0.18 to 0.35 s / 1.26 s        | 8.19 s        | 1.75 s / 8.6 s      |
+| of which linkage only               |                | 26 to 62 ms                    |               | 0.27 to 0.34 s      |
+| fcluster                            | 0.6 ms         | 0.08 ms                        | 1.3 ms        | 0.2 ms              |
+| assignment, n traces × 36 centroids | 0.38 to 0.49 s | 0.11 to 0.17 s                 | 1.02 s        | 0.30 to 0.37 s      |
 
 `pdist` is 95% of the cost: a goroutine per row band plus four pairs per pass sharing the load of
 `a[t]` (each pair still summed in index order). The assignment loop is O(n·T·1536) and negligible.
@@ -327,7 +326,7 @@ The service sequence (batch):
 2. `rules.BuildHierarchy(vectors, 4, 1.0)`; if empty, answer empty with zero cost.
 3. Naming: one topic task plus one subtopic task per topic, concurrently (errgroup, limit ~8), each
    `split → Complete → rules.ParseNames` with retries, then up to 3 rounds of `Embed(names) →
-   rules.ClosestPair → Complete(pair)`.
+rules.ClosestPair → Complete(pair)`.
 4. `rules.BuildResponse(hierarchy, names, ids)`; cost summed.
 
 Incremental adds `rules.AssignTrace` per trace and the two creation steps from §2.4.
@@ -360,14 +359,14 @@ spend for those projects, so sample.
 Record once from Python, commit under `services/nlpgo/modules/evaluators/rules/testdata/clustering/`
 and `.../services/testdata/clustering/`:
 
-| Fixture | Content | Asserted by |
-|---|---|---|
-| synthetic vectors | a SplitMix64 + Box–Muller generator written identically in Python and Go (~20 lines each), so no vectors are committed; seeds for n = 50, 500, 2,000 with 5% and 60% duplicates | Z ids and sizes exact, heights 1e-12 relative, labels at 4 and 2 exact, centroids and p95 1e-12 |
-| real embeddings | ~300 synthetic but realistic prompts across ~8 themes, embedded once with text-embedding-3-small; stored as float32 (≈1.8 MB, or gzip) keyed by input text | `BuildHierarchy` membership exact (topic → subtopic → trace ids) against Python's `build_hierarchy` output |
-| incremental case | the same 300 plus 150 new texts, existing topics/subtopics from a Python batch run | assignments exact; new-topic and new-subtopic membership exact; the 100/50 thresholds straddled (99/100/101, 49/50) |
-| edge vectors | zero vector, a single trace, all-identical vectors, NaN p95 path | error vs value exactly as Python |
-| prompts | the three rendered templates | byte-exact |
-| naming plan | scripted `LLMChannel` twin answering by tool key (`topic_i`, `topic_a/b`) and scripted name embeddings | call count per split, sample limits, existing-names suffix, missing-key retry then `None`, disambiguation stops at 0.6 and after 3 rounds, cost sum |
+| Fixture           | Content                                                                                                                                                                         | Asserted by                                                                                                                                         |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| synthetic vectors | a SplitMix64 + Box–Muller generator written identically in Python and Go (~20 lines each), so no vectors are committed; seeds for n = 50, 500, 2,000 with 5% and 60% duplicates | Z ids and sizes exact, heights 1e-12 relative, labels at 4 and 2 exact, centroids and p95 1e-12                                                     |
+| real embeddings   | ~300 synthetic but realistic prompts across ~8 themes, embedded once with text-embedding-3-small; stored as float32 (≈1.8 MB, or gzip) keyed by input text                      | `BuildHierarchy` membership exact (topic → subtopic → trace ids) against Python's `build_hierarchy` output                                          |
+| incremental case  | the same 300 plus 150 new texts, existing topics/subtopics from a Python batch run                                                                                              | assignments exact; new-topic and new-subtopic membership exact; the 100/50 thresholds straddled (99/100/101, 49/50)                                 |
+| edge vectors      | zero vector, a single trace, all-identical vectors, NaN p95 path                                                                                                                | error vs value exactly as Python                                                                                                                    |
+| prompts           | the three rendered templates                                                                                                                                                    | byte-exact                                                                                                                                          |
+| naming plan       | scripted `LLMChannel` twin answering by tool key (`topic_i`, `topic_a/b`) and scripted name embeddings                                                                          | call count per split, sample limits, existing-names suffix, missing-key retry then `None`, disambiguation stops at 0.6 and after 3 rounds, cost sum |
 
 Naming answers cannot be keyed by prompt text (the samples are random), so the memory twin keys by
 the tool's property set and call order, and throws on anything unscripted. The recorder is a Python
@@ -407,17 +406,17 @@ to nlpgo). New `specs/evaluators/topic-clustering-go.feature`, each `@unimplemen
 
 ## 9. Defects and open questions
 
-| # | Question | Decision or recommendation |
-|---|---|---|
-| Q1 | **Defect 1**: new subtopics from the incremental path are re-parented to the real topic, but their traces are returned with the throwaway `"New Sub Topics"` topic id, which is never created; TS then assigns those traces to a missing topic with a null name. Port or fix? | **Decided (Alex, 2026-09-30): fix in Go.** Emit the real parent topic id; a spec scenario states it; excluded from the membership comparison. |
-| Q2 | **Defect 2**: with 100 or fewer unassigned traces, the raw unassigned traces are appended to `traces` with null ids (FastAPI drops the extra keys), so TS sends a null assignment for each. | **Decided: fix in Go** (with Q1): no null-id rows; confirm how `assignTopic` treats the absence. |
-| Q3 | **Defect 3**: a trace matched to a topic without a subtopic appears twice when that topic gets new subtopics (once topic-only, once with the new subtopic); TS applies both in `Promise.all`. | **Decided: fix in Go** (with Q1): one row per trace, the later one winning. |
-| Q4 | Embedding calls are never costed. | **Decided:** price embeddings through the gateway's pricing, behind a switch that starts off, so the cost reported stays as today until it is turned on. |
-| Q5 | An unpriced chat model makes naming fail and yields no topics. | **Decided:** price at 0 and name anyway, with a warning log; the spec states the improvement. |
-| Q6 | Fewer than 2 usable traces raises inside scipy (500). | Keep an error, as a named code so TS logs it plainly. |
-| Q7 | Sequential embedding batches (100 calls for 2,000 traces). | **Decided:** 4 batches in flight. |
-| Q8 | `AZURE_API_VERSION=2024-02-01` and `AZURE_EMBEDDINGS_DEPLOYMENT_NAME` come from process env today. | Default the Azure version in `pkg/litellmparams` when the params omit it; the deployment override arrives from TS or is dropped (the module never reads env). |
-| Q9 | Should the Go API expose one `ClusterTopics` or two methods? | One, as the plan's contract lists (a mode field); no new operation. |
+| #   | Question                                                                                                                                                                                                                                                                      | Decision or recommendation                                                                                                                                    |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Q1  | **Defect 1**: new subtopics from the incremental path are re-parented to the real topic, but their traces are returned with the throwaway `"New Sub Topics"` topic id, which is never created; TS then assigns those traces to a missing topic with a null name. Port or fix? | **Decided (Alex, 2026-09-30): fix in Go.** Emit the real parent topic id; a spec scenario states it; excluded from the membership comparison.                 |
+| Q2  | **Defect 2**: with 100 or fewer unassigned traces, the raw unassigned traces are appended to `traces` with null ids (FastAPI drops the extra keys), so TS sends a null assignment for each.                                                                                   | **Decided: fix in Go** (with Q1): no null-id rows; confirm how `assignTopic` treats the absence.                                                              |
+| Q3  | **Defect 3**: a trace matched to a topic without a subtopic appears twice when that topic gets new subtopics (once topic-only, once with the new subtopic); TS applies both in `Promise.all`.                                                                                 | **Decided: fix in Go** (with Q1): one row per trace, the later one winning.                                                                                   |
+| Q4  | Embedding calls are never costed.                                                                                                                                                                                                                                             | **Decided:** price embeddings through the gateway's pricing, behind a switch that starts off, so the cost reported stays as today until it is turned on.      |
+| Q5  | An unpriced chat model makes naming fail and yields no topics.                                                                                                                                                                                                                | **Decided:** price at 0 and name anyway, with a warning log; the spec states the improvement.                                                                 |
+| Q6  | Fewer than 2 usable traces raises inside scipy (500).                                                                                                                                                                                                                         | Keep an error, as a named code so TS logs it plainly.                                                                                                         |
+| Q7  | Sequential embedding batches (100 calls for 2,000 traces).                                                                                                                                                                                                                    | **Decided:** 4 batches in flight.                                                                                                                             |
+| Q8  | `AZURE_API_VERSION=2024-02-01` and `AZURE_EMBEDDINGS_DEPLOYMENT_NAME` come from process env today.                                                                                                                                                                            | Default the Azure version in `pkg/litellmparams` when the params omit it; the deployment override arrives from TS or is dropped (the module never reads env). |
+| Q9  | Should the Go API expose one `ClusterTopics` or two methods?                                                                                                                                                                                                                  | One, as the plan's contract lists (a mode field); no new operation.                                                                                           |
 
 **Risks**
 
@@ -430,23 +429,23 @@ to nlpgo). New `specs/evaluators/topic-clustering-go.feature`, each `@unimplemen
 
 ## 10. Estimate
 
-| File | Go lines |
-|---|---|
-| `rules/ward_linkage.go` | 200 |
-| `rules/cosine.go` (centroid, p95, cosine) | 70 |
-| `rules/topic_hierarchy.go` | 110 |
-| `rules/topic_assignment.go` + `topic_increment.go` | 110 |
-| `rules/topic_response.go` | 100 |
-| `rules/topic_naming.go` + 3 templates | 230 |
-| `services/topic_clustering.go` | 330 |
-| contract types, errors, API method | 70 |
-| transport routes + staging wrapper move | 60 |
-| **Production** | **~1,280** |
-| rules tests (linkage, fcluster, cosine, hierarchy, naming rules) | 450 |
-| service tests over memory twins (batch, incremental, retries, cost, deadline) | 400 |
-| fixture generator (Go + Python) and recorder | 200 |
-| transport test (auth, 413, staged) | 80 |
-| **Tests and fixtures** | **~1,130** |
+| File                                                                          | Go lines   |
+| ----------------------------------------------------------------------------- | ---------- |
+| `rules/ward_linkage.go`                                                       | 200        |
+| `rules/cosine.go` (centroid, p95, cosine)                                     | 70         |
+| `rules/topic_hierarchy.go`                                                    | 110        |
+| `rules/topic_assignment.go` + `topic_increment.go`                            | 110        |
+| `rules/topic_response.go`                                                     | 100        |
+| `rules/topic_naming.go` + 3 templates                                         | 230        |
+| `services/topic_clustering.go`                                                | 330        |
+| contract types, errors, API method                                            | 70         |
+| transport routes + staging wrapper move                                       | 60         |
+| **Production**                                                                | **~1,280** |
+| rules tests (linkage, fcluster, cosine, hierarchy, naming rules)              | 450        |
+| service tests over memory twins (batch, incremental, retries, cost, deadline) | 400        |
+| fixture generator (Go + Python) and recorder                                  | 200        |
+| transport test (auth, 413, staged)                                            | 80         |
+| **Tests and fixtures**                                                        | **~1,130** |
 
 The plan's ~1,500-line budget holds. The numerics are one day; the orchestration, naming and
 fixtures are the rest of the phase.
