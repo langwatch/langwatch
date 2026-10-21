@@ -204,6 +204,25 @@ afterAll(async () => {
 });
 
 describe("legacy trace summaries read under an aggregate's proof", () => {
+  describe("given two members each shared for their whole history", () => {
+    /** @scenario "Analytics aggregate across members" */
+    it("counts both members' traces and the aggregate's own, never a foreign one", async () => {
+      const result = await read({
+        authorization: analyticsProof({
+          projectId: AGGREGATE,
+          shared: [
+            { projectId: WHOLE_HISTORY_MEMBER, from: 0 },
+            { projectId: LATE_MEMBER, from: 0 },
+          ],
+        }),
+        table: "trace_summaries",
+        series: COST_SERIES,
+      });
+
+      expect(seriesTotal(result, COST_SERIES)).toBe(1 + 2 + 4 + 8 + 32);
+    });
+  });
+
   describe("given one member shared for its whole history and one from a later start", () => {
     /** @scenario "The aggregate's trace summaries count members inside their windows" */
     it("counts the first member's every trace, the second's from its start, never a foreign one", async () => {
