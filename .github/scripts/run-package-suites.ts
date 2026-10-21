@@ -321,38 +321,62 @@ export const runJobs = async ({
   const queue = [...jobs];
   const busy = new Set<string>();
   const running = new Set<Promise<void>>();
-  const holds = (job: SuiteJob) => {
-    const lane = laneOf(job.script);
-    return [`package:${job.pkg.name}`, ...(lane === "shared" ? [] : [lane])];
-  };
   const start = (job: SuiteJob) => {
-    if (isHeavy(job.pkg)) busy.add("heavy");
-    for (const key of holds(job)) busy.add(key);
+    const keys = keysOf(job, isHeavy);
+    for (const key of keys) busy.add(key);
     const settled: Promise<void> = run(job)
       .catch(() => 1)
       .then((status) => {
         statuses.set(job, status);
-        for (const key of holds(job)) busy.delete(key);
-        if (isHeavy(job.pkg)) busy.delete("heavy");
+        for (const key of keys) busy.delete(key);
         running.delete(settled);
       });
     running.add(settled);
   };
-  // Only a package's earliest queued script may start, so a later lane never
-  // overtakes an earlier one that is waiting for its slot.
-  const earliest = (job: SuiteJob) =>
-    queue.find((queued) => queued.pkg.name === job.pkg.name) === job;
-  // A heavy job waits for the shard to drain, and nothing light starts meanwhile.
-  const heavyWaiting = () => queue.some((queued) => isHeavy(queued.pkg) && earliest(queued));
-  const alone = (job: SuiteJob) =>
-    isHeavy(job.pkg) ? running.size === 0 : !busy.has("heavy") && !heavyWaiting();
   const startable = (job: SuiteJob) =>
-    earliest(job) && alone(job) && holds(job).every((key) => !busy.has(key));
+    canStart({ job, queue, busy, running: running.size, isHeavy });
   while (queue.length > 0 || running.size > 0) {
     startReady({ queue, concurrency, running, startable, start });
     await Promise.race(running);
   }
   return statuses;
+};
+
+/** The shard-wide keys a job holds while it runs: its package, its lane, and heavy. */
+const keysOf = (job: SuiteJob, isHeavy: (pkg: DiscoveredPackage) => boolean): string[] => {
+  const lane = laneOf(job.script);
+  return [
+    `package:${job.pkg.name}`,
+    ...(lane === "shared" ? [] : [lane]),
+    ...(isHeavy(job.pkg) ? ["heavy"] : []),
+  ];
+};
+
+/** Only a package's earliest queued script may start, so its lanes keep their order. */
+const isEarliest = (job: SuiteJob, queue: readonly SuiteJob[]) =>
+  queue.find((queued) => queued.pkg.name === job.pkg.name) === job;
+
+/**
+ * Whether `job` may start now. A heavy job waits for the shard to drain; while one
+ * runs or waits as its package's next script, nothing light starts.
+ */
+const canStart = ({
+  job,
+  queue,
+  busy,
+  running,
+  isHeavy,
+}: {
+  job: SuiteJob;
+  queue: readonly SuiteJob[];
+  busy: ReadonlySet<string>;
+  running: number;
+  isHeavy: (pkg: DiscoveredPackage) => boolean;
+}): boolean => {
+  if (!isEarliest(job, queue)) return false;
+  if (isHeavy(job.pkg)) return running === 0;
+  const heavyWaiting = queue.some((queued) => isHeavy(queued.pkg) && isEarliest(queued, queue));
+  return !heavyWaiting && keysOf(job, isHeavy).every((key) => !busy.has(key)) && !busy.has("heavy");
 };
 
 /** A package's single verdict from its scripts' exit codes. */
