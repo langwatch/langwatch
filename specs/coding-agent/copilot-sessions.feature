@@ -69,6 +69,13 @@ Rule: One row per conversation, every number from the model calls
     Then the row is named by the first prompt's own words, without the date block
     And the later prompt does not rename it
 
+  @integration
+  Scenario: A Copilot prompt in the Conversation tab opens with the user's own words
+    Given a Copilot turn whose user message opens with Copilot's injected date block
+    When the Conversation tab renders the turn
+    Then the user message shows the prompt's own words
+    And the date block is folded away as hidden context, the way the Terminal tab folds it
+
   @unit
   Scenario: Tool runs are counted with their names
     Given a Copilot session with three execute_tool spans
