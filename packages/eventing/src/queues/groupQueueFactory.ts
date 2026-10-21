@@ -163,8 +163,8 @@ function consumerDependencies({
 
 /**
  * Consumers first: a draining job sends its fan-out through THIS producer, whose gate shuts
- * once its own close ends. Every consumer settles, even if one fails, before the producer
- * closes; the first failure is rethrown. Spec: specs/background/queue-drain-send-gate.feature
+ * once its own close ends. Every consumer settles before the producer closes; the first drain
+ * failure wins over a producer-close failure. Spec: specs/background/queue-drain-send-gate.feature
  */
 async function closeConsumersThenProducer({
   consumers,
@@ -173,15 +173,11 @@ async function closeConsumersThenProducer({
   consumers: readonly { close: () => Promise<void> }[];
   producer: { close: () => Promise<void> };
 }): Promise<void> {
-  try {
-    const drained = await Promise.allSettled(consumers.map((each) => each.close()));
-    const failed = drained.find(
-      (each): each is PromiseRejectedResult => each.status === "rejected",
-    );
-    if (failed) throw failed.reason;
-  } finally {
-    await producer.close();
-  }
+  const drained = await Promise.allSettled(consumers.map((each) => each.close()));
+  const failed = drained.find((each): each is PromiseRejectedResult => each.status === "rejected");
+  const [producerClosed] = await Promise.allSettled([producer.close()]);
+  if (failed) throw failed.reason;
+  if (producerClosed?.status === "rejected") throw producerClosed.reason;
 }
 
 /**

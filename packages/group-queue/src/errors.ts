@@ -46,7 +46,13 @@ export class GroupQueueConfigurationError extends GroupQueueError {
  * keeps the work for re-drive, so callers may log it below error level.
  */
 export class QueueStagingClosedError extends GroupQueueError {
-  constructor({ queueName, operation }: { queueName: string; operation: "send" | "sendBatch" | "sendEach" }) {
+  constructor({
+    queueName,
+    operation,
+  }: {
+    queueName: string;
+    operation: "send" | "sendBatch" | "sendEach";
+  }) {
     super({ queueName, operation, message: "Cannot send to queue after its drain has finished" });
     this.name = "QueueStagingClosedError";
   }

@@ -150,7 +150,7 @@ describe("GroupQueueProcessor staging gate during shutdown", () => {
       );
     });
 
-    /** @scenario A dispatch refused because the drain already ended is a warning */
+    /** @scenario A refusal after the drain is typed, and recognised across package copies */
     it("refuses with a QueueStagingClosedError that isQueueStagingClosed recognises", async () => {
       const refusal = await processor.send({ id: "a", groupId: "g" }).then(
         () => undefined,
@@ -163,7 +163,7 @@ describe("GroupQueueProcessor staging gate during shutdown", () => {
 
   describe("given an error from another copy of this package", () => {
     describe("when it carries the QueueStagingClosedError name", () => {
-      /** @scenario A dispatch refused because the drain already ended is a warning */
+      /** @scenario A refusal after the drain is typed, and recognised across package copies */
       it("is still recognised as a drained-queue refusal", () => {
         const foreign = Object.assign(new Error("drained"), { name: "QueueStagingClosedError" });
         expect(isQueueStagingClosed(foreign)).toBe(true);

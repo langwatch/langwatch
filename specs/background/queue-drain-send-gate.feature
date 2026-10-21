@@ -99,7 +99,7 @@ Feature: A queue drain accepts the work it is producing
   # order is pinned in worker-graceful-shutdown.feature ("The queue drain
   # completes before any connection is closed").
 
-  @integration @drain-send-gate
+  @integration @regression @drain-send-gate
   Scenario: A job still draining at shutdown stages its fan-out through the same queue
     Given an eventing queue whose consumer holds a job that is still running
     When the queue closes
@@ -107,22 +107,40 @@ Feature: A queue drain accepts the work it is producing
     Then the work is staged rather than refused
     So that a rollout cannot drop the fan-out of the work it is draining
 
-  @unit @drain-send-gate
+  @unit @regression @drain-send-gate
   Scenario: The producer closes only after every consumer has drained
     Given an eventing queue with a consumer that is still draining
     When the queue closes
     Then the producer is not closed until the consumer's drain has finished
-    And a consumer drain that fails still closes the producer
-    And a failed drain does not close the producer while another consumer is still draining
 
-  @unit @drain-send-gate
+  @unit @regression @drain-send-gate
+  Scenario: A consumer drain that fails still closes the producer
+    Given an eventing queue whose consumer drain fails
+    When the queue closes
+    Then the producer is still closed
+    And the close reports the drain failure, even if the producer's own close also fails
+
+  @unit @regression @drain-send-gate
+  Scenario: A failed drain does not close the producer while another consumer drains
+    Given an eventing queue with one consumer whose drain fails and another still draining
+    When the queue closes
+    Then the producer is not closed until the other consumer's drain has finished
+
+  @unit @regression @drain-send-gate
+  Scenario: A refusal after the drain is typed, and recognised across package copies
+    Given a queue whose drain has finished
+    When anything tries to stage more work
+    Then the refusal is a QueueStagingClosedError
+    And an error carrying that name from another copy of the package is recognised too
+
+  @unit @regression @drain-send-gate
   Scenario: A dispatch refused because the drain already ended is a warning
     Given a queue whose drain has finished during shutdown
     When the projection router dispatches events to it
     Then the refusal is logged at warning level with the reason
     And the events are still kept for re-drive
 
-  @unit @drain-send-gate
+  @unit @regression @drain-send-gate
   Scenario: Any other dispatch failure is still an error
     Given a queue that refuses a dispatch for any other reason
     When the projection router dispatches events to it
