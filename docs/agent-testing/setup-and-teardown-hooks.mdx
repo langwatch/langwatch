@@ -114,7 +114,7 @@ The simulated user and the judge get the current state on every turn, as a syste
 | The turns pass or fail | Teardown runs either way. |
 | Teardown fails, times out, or does not run | The score does not change. The run shows the error, the state teardown was given, and "Test data may be left behind." |
 | Live instances of the agent exist, but none declared the hook | The call fails with `hook_not_declared`, and the agent function does not run. |
-| A state, or teardown's returned object, is over 64 KiB | The call fails with `agent_payload_too_large`. The cap applies to a turn's state update too. |
+| A state, or teardown's returned object, is over 64 kilobytes | The call fails with `agent_payload_too_large`. The cap applies to a turn's state update too. |
 
 Each hook has a 60 second timeout. The agent's per-turn timeout does not apply to hooks, and you cannot change the hook timeout per scenario.
 
@@ -122,7 +122,7 @@ A failed setup is not scored because a fault in your test data is not the agent 
 
 ## Where to see what a hook did
 
-Open the run in **Agent Testing** or in **Simulations**. For each hook, the run shows its status (`ok`, `failed`, `timed_out`, `skipped` or `not_run`), duration, state or returned object, and error, with a **Trace** button for the hook's own trace. The run keeps the first 1,000 characters of an error, and keeps no copy of a state over 64 KiB.
+Open the run in **Agent Testing** or in **Simulations**. For each hook, the run shows its status (`ok`, `failed`, `timed_out`, `skipped` or `not_run`), duration, state or returned object, and error, with a **Trace** button for the hook's own trace. The run keeps the first 1,000 characters of an error, and keeps no copy of a state over 64 kilobytes.
 
 ### Rerun and keep the test data
 
@@ -139,7 +139,7 @@ To inspect the data a run made, open the run in **Simulations** and choose **Rer
 
 **Create test data in setup and remove it in teardown.** Data made anywhere else, such as inside a turn, is not in the state, so teardown cannot know about it.
 
-**Return references, not data.** Put ids and URLs in the state, never whole records or secrets. The state goes into every call, into the prompts of the simulated user and the judge, and into the run record, and it is capped at 64 KiB.
+**Return references, not data.** Put ids and URLs in the state, never whole records or secrets. The state goes into every call, into the prompts of the simulated user and the judge, and into the run record, and it is capped at 64 kilobytes.
 
 **Name all test data with the run id.** Use `run.scenarioRunId` (`run.scenario_run_id` in Python) in a name or a tag, as the setup above does with `label`. Runs of a suite can overlap, so a unique name keeps one run's data apart from another's, and lets you find leftovers by name if a teardown is missed.
 
