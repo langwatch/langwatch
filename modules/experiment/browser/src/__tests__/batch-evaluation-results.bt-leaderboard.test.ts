@@ -25,6 +25,14 @@ const ties = (a: string, b: string, times = 1): PairwiseComparison[] => {
   return out;
 };
 
+/** Largest |actual − expected| / |expected| across two equally long lists. */
+const largestRelativeGap = (actual: number[], expected: number[]): number => {
+  if (actual.length !== expected.length) return Infinity;
+  return Math.max(
+    ...actual.map((value, i) => Math.abs(value - expected[i]!) / Math.abs(expected[i]!)),
+  );
+};
+
 describe("computeBTLeaderboard", () => {
   it("returns empty leaderboard for empty input", () => {
     const result = computeBTLeaderboard({
@@ -221,9 +229,9 @@ describe("computeBTLeaderboard", () => {
   });
 
   describe("given the default thousand resamples and seed", () => {
-    // Recorded from the fit before it moved onto typed arrays. The faster solver
-    // performs the same floating point operations in the same order, so a reader
-    // reopening a run sees the same scores and intervals to the last digit.
+    // Recorded from the fit before it moved onto typed arrays, which performs the same
+    // operations in the same order. Math.log and Math.exp differ in the last digit
+    // between platforms, so the pin is 1e-9 of each value rather than exact.
     const comparisons: PairwiseComparison[] = [
       ...wins("A", ["B"], 9),
       ...wins("B", ["A"], 5),
@@ -243,36 +251,53 @@ describe("computeBTLeaderboard", () => {
       })),
     ];
 
-    it("keeps every score and interval exactly as recorded", () => {
+    it("keeps every score and interval as recorded", () => {
       const result = computeBTLeaderboard({ comparisons, variantIds: ["A", "B", "C", "D"] });
+      const differences = result.scoreDifferenceCI!;
 
-      expect(result.entries.map((e) => [e.variantId, e.score, e.scoreCI])).toEqual([
-        ["A", 114.14701602253214, [28.259283108064963, 220.7461236679491]],
-        ["B", 18.9145034769108, [-84.87384285943924, 123.88630846314871]],
-        ["C", -59.163494891806444, [-162.7774568453376, 33.16015155773397]],
-        ["D", -73.89802460763654, [-225.76971323082347, 42.995436912312016]],
-      ]);
-      expect(result.scoreDifferenceCI!.A).toEqual({
-        B: [-37.51742624635518, 237.63031467781698],
-        C: [40.230066879197175, 352.911154739249],
-        D: [16.594535275844542, 423.6238186793849],
-      });
-      expect(result.scoreDifferenceCI!.C!.D).toEqual([-158.91875063816465, 210.3365772619937]);
+      expect(result.entries.map((e) => e.variantId)).toEqual(["A", "B", "C", "D"]);
+      expect(
+        largestRelativeGap(
+          [
+            ...result.entries.flatMap((e) => [e.score, ...e.scoreCI!]),
+            ...differences.A!.B!,
+            ...differences.A!.C!,
+            ...differences.A!.D!,
+            ...differences.C!.D!,
+          ],
+          [
+            114.14701602253214, 28.259283108064963, 220.7461236679491, 18.9145034769108,
+            -84.87384285943924, 123.88630846314871, -59.163494891806444, -162.7774568453376,
+            33.16015155773397, -73.89802460763654, -225.76971323082347, 42.995436912312016,
+            -37.51742624635518, 237.63031467781698, 40.230066879197175, 352.911154739249,
+            16.594535275844542, 423.6238186793849, -158.91875063816465, 210.3365772619937,
+          ],
+        ),
+      ).toBeLessThan(1e-9);
       expect(result.bootstrapNonConvergence).toBe(0);
     });
 
-    it("keeps a smoothed, degenerate field's intervals exactly as recorded", () => {
+    it("keeps a smoothed, degenerate field's intervals as recorded", () => {
       const result = computeBTLeaderboard({
         comparisons: [...wins("A", ["B", "C"], 6), ...wins("B", ["C"], 4), ...wins("C", ["B"], 3)],
         variantIds: ["A", "B", "C"],
       });
 
-      expect(result.entries.map((e) => [e.variantId, e.score, e.scoreCI])).toEqual([
-        ["B", -129.30223094297995, [-255.07197502055595, -20.89813360122564]],
-        ["C", -168.37554914048062, [-299.5007664095226, -58.726263603871864]],
-        ["A", 297.6777800834606, [251.49186241711848, 346.0864130089249]],
-      ]);
-      expect(result.scoreDifferenceCI!.B!.C).toEqual([-189.5404787251107, 272.11856363269874]);
+      expect(result.entries.map((e) => e.variantId)).toEqual(["B", "C", "A"]);
+      expect(
+        largestRelativeGap(
+          [
+            ...result.entries.flatMap((e) => [e.score, ...e.scoreCI!]),
+            ...result.scoreDifferenceCI!.B!.C!,
+          ],
+          [
+            -129.30223094297995, -255.07197502055595, -20.89813360122564, -168.37554914048062,
+            -299.5007664095226, -58.726263603871864, 297.6777800834606, 251.49186241711848,
+            346.0864130089249, -189.5404787251107, 272.11856363269874,
+          ],
+        ),
+      ).toBeLessThan(1e-9);
+      expect(result.bootstrapNonConvergence).toBe(0);
     });
   });
 
