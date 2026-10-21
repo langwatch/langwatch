@@ -54,7 +54,7 @@ interface Response {
 
 #### `POST /api/connect/v1/stats` · `receiveConnectUsageReport`
 
-Public: anonymous product telemetry: a self-hosted install presents no credential. Hidden from the OpenAPI document. Declared at `src/transport/usage-report.rest.ts:38`.
+Public: anonymous product telemetry: a self-hosted install presents no credential. Hidden from the OpenAPI document. Declared at `src/transport/usage-report.rest.ts:39`.
 
 Answers at `/api/connect/v1/stats`.
 

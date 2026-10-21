@@ -8,6 +8,7 @@ import { defineProcessModule, type PublishedProcessModule } from "@langwatch/pro
 
 import { CodingAgentModule } from "./app/coding-agent.app.ts";
 import { codingAgentEventing } from "./eventing/coding-agent-processing.pipeline.ts";
+import { CODING_AGENT_ID_INDEXES } from "./repositories/clickhouse/clickhouse.coding-agent-id-indexes.database.ts";
 import { codingAgentRepositories } from "./repositories/coding-agent-repositories.registry.ts";
 import { codingAgentV1Rest } from "./transport/coding-agent-v1.rest.ts";
 import { codingAgentRest, codingAgentRollupRest } from "./transport/coding-agent.rest.ts";
@@ -50,4 +51,9 @@ export const codingAgentProcessModule: PublishedProcessModule<
         actorId: credential.userId ?? `apikey:${credential.apiKeyId}`,
       };
     },
+  })
+  .withIdIndexes(CODING_AGENT_ID_INDEXES, {
+    after: ["suite:fill-id-indexes"],
+    description:
+      "Fills the id indexes of coding-agent sessions, events and trace mappings from older rows, then marks them ready on each ClickHouse target.",
   });

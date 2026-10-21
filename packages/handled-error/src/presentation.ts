@@ -4185,6 +4185,13 @@ const presentations = {
     describe: () =>
       "Set this one up on the automations page, where the destination is checked before it's saved.",
   },
+  automation_dataset_unavailable: {
+    // Raised at dispatch, not on save: the automation was valid when saved and
+    // its dataset has since gone, or lost every column the mapping names.
+    title: "This automation's dataset is unavailable",
+    describe: () =>
+      "The dataset it adds traces to was removed, or no longer has the columns it maps. Edit the automation to pick a dataset and mapping that exist.",
+  },
   automation_filters_unsupported: {
     // `meta.fields` holds the field names that no longer match anything. They
     // are our vocabulary, not the author's, so the copy says the shape of the
@@ -4645,6 +4652,11 @@ const presentations = {
     title: "This model cannot skip permission checks",
     describe: () =>
       "Check the allowed models list in the provider settings, or answer each card as it comes.",
+  },
+  langy_confirmation_required: {
+    title: "Waiting for your confirmation",
+    describe: () =>
+      "Langy asked to remove or turn off something. It runs only after you choose Yes on the card in the conversation.",
   },
   langy_wait_expired: {
     title: "That card is not waiting any more",

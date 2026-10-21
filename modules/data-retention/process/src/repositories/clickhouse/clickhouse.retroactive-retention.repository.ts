@@ -1,8 +1,14 @@
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import {
+  type ClickHouseQueryClient,
+  ID_INDEX_RETENTION_RAISE,
+  idIndexRetentionDays,
+  idIndexRetentionRaises,
+} from "@langwatch/clickhouse-client";
 import {
   RetroactiveMutationInProgressError,
   retentionCategorySchema,
   retroactiveMutationProgressSchema,
+  type ResolvedRetention,
   type RetentionCategory,
   type RetroactiveMutationProgress,
 } from "@langwatch/data-retention-contract";
@@ -11,6 +17,7 @@ import { EventLogRetention } from "@langwatch/eventing/server";
 import { z } from "zod";
 
 import { EVENT_LOG_RETENTION_CLASSIFICATION } from "../../rules/event-log-retention.rules.ts";
+import { idIndexCategories } from "../../rules/id-index-categories.rules.ts";
 import {
   keepForeverRewriteSchema,
   type ClickHouseTarget,
@@ -53,6 +60,9 @@ const keepForeverRowsSchema = z.array(
 
 const tenantFilterSql = "position(command, {tenantFilterNeedle:String}) > 0";
 
+const tableNameRowsSchema = z.array(z.object({ name: z.string() }));
+const tenantRowsSchema = z.array(z.object({ TenantId: z.string() }));
+
 // ClickHouse stores the command as `WHERE (TenantId = '..')` (25.x), so the needle omits WHERE.
 function tenantFilterParams(projectId: string): Record<string, string> {
   const escapedProjectId = projectId.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
@@ -80,6 +90,17 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
     private readonly eventLogRetention: EventLogRetention,
   ) {}
 
+  /**
+   * Each id index this repository rewrites itself, with its source's category: the client's
+   * declarations, which every installed module made at composition, read when asked.
+   */
+  private idIndexCategories(): ReadonlyMap<string, RetentionCategory> {
+    return idIndexCategories({
+      declarations: this.clickhouse.idIndexes().declarations(),
+      eventLogIndex: this.eventLogRetention.idIndexTable,
+    });
+  }
+
   private isEventingTable(table: string): boolean {
     return this.eventLogRetention.tables.includes(table);
   }
@@ -92,8 +113,13 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
     const categoryTables = Object.entries(RETENTION_TABLE_CATEGORY_MAP)
       .filter(([, category]) => category === input.category)
       .map(([table]) => table);
+    const categoryIndexes = [...this.idIndexCategories()]
+      .filter(([, category]) => category === input.category)
+      .map(([index]) => index);
     // Eventing's tables are classified per row, so every category visits them.
-    const tables = [...new Set([...categoryTables, ...this.eventLogRetention.tables])];
+    const tables = [
+      ...new Set([...categoryTables, ...categoryIndexes, ...this.eventLogRetention.tables]),
+    ];
 
     const activeMutations = await this.getActiveMutations({
       projectId: input.projectId,
@@ -105,15 +131,20 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
       throw new RetroactiveMutationInProgressError(activeMutations);
     }
 
-    for (const table of tables) {
-      if (this.isEventingTable(table)) {
-        await this.eventLogRetention.retainCategory({
-          tenantId: input.projectId,
-          category: input.category,
-          retentionDays: input.newRetentionDays,
-        });
-        continue;
-      }
+    // Once for both of eventing's tables: it raises its own index where the target holds it.
+    const eventingTables = await this.eventLogRetention.retainCategory({
+      tenantId: input.projectId,
+      category: input.category,
+      retentionDays: input.newRetentionDays,
+    });
+    // A later migration creates each index, so a target without one yet skips it.
+    const heldIndexes = await this.findHeldTables({
+      tenantId: input.projectId,
+      tables: categoryIndexes,
+    });
+
+    for (const table of categoryTables) {
+      if (this.isEventingTable(table)) continue;
 
       await this.clickhouse.command({
         tenantId: input.projectId,
@@ -131,7 +162,25 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
       });
     }
 
-    return { tables };
+    // An index row spans rows of differing retention, so a rewrite only ever raises it.
+    for (const index of heldIndexes) {
+      await this.clickhouse.command({
+        tenantId: input.projectId,
+        table: index,
+        kind: "write",
+        sql:
+          `ALTER TABLE ${index} ` +
+          "UPDATE _retention_days = {retentionDays:UInt16} " +
+          "WHERE TenantId = {tenantId:String} " +
+          "AND _retention_days < {retentionDays:UInt16}",
+        params: {
+          tenantId: input.projectId,
+          retentionDays: idIndexRetentionDays(input.newRetentionDays),
+        },
+      });
+    }
+
+    return { tables: [...new Set([...categoryTables, ...heldIndexes, ...eventingTables])] };
   }
 
   async findMutationProgress(input: { projectId: string }): Promise<RetroactiveMutationProgress[]> {
@@ -224,6 +273,131 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
     await this.eventLogRetention.keepIndefiniteRows(input);
   }
 
+  async findHeldIdIndexes(
+    input: ClickHouseTarget & { indexes: readonly string[] },
+  ): Promise<string[]> {
+    const { indexes, ...target } = input;
+    return this.findHeldTables({
+      tenantId: "",
+      ...target,
+      tables: this.governedIdIndexes({ indexes, categories: this.idIndexCategories() }),
+    });
+  }
+
+  async findIdIndexTenantIds(
+    input: ClickHouseTarget & { indexes: readonly string[] },
+  ): Promise<string[]> {
+    const { indexes, ...target } = input;
+    const tenantIds = new Set<string>();
+    for (const index of this.governedIdIndexes({ indexes, categories: this.idIndexCategories() })) {
+      const { rows } = await this.clickhouse.query<unknown>({
+        tenantId: "",
+        ...target,
+        table: index,
+        kind: "read",
+        sql: `SELECT DISTINCT TenantId FROM ${index}`,
+        // Raising a target's index is one pass over every tenant on it, so it lists them all.
+        SKIP_TENANT_CHECK: true,
+      });
+      for (const { TenantId } of tenantRowsSchema.parse(rows)) tenantIds.add(TenantId);
+    }
+    return [...tenantIds].toSorted((left, right) => left.localeCompare(right));
+  }
+
+  async raiseIdIndexRetention(
+    input: ClickHouseTarget & {
+      indexes: readonly string[];
+      retentionByTenant: ReadonlyMap<string, ResolvedRetention>;
+    },
+  ): Promise<string[]> {
+    const { indexes, retentionByTenant, ...target } = input;
+    const raised: string[] = [];
+    const categories = this.idIndexCategories();
+    for (const index of this.governedIdIndexes({ indexes, categories })) {
+      if (index === this.eventLogRetention.idIndexTable) {
+        raised.push(
+          ...(await this.eventLogRetention.raiseIdIndexRetention({ ...target, retentionByTenant })),
+        );
+        continue;
+      }
+      const category = categories.get(index);
+      if (category === undefined) continue;
+      await this.raiseCategoryIdIndex({ target, index, category, retentionByTenant });
+      raised.push(index);
+    }
+    return raised;
+  }
+
+  /**
+   * One raise over every tenant on the target, each to its own days, never lower; split only when
+   * the tenant list passes the URL budget. Each raise rewrites every part of the index.
+   */
+  private async raiseCategoryIdIndex({
+    target,
+    index,
+    category,
+    retentionByTenant,
+  }: {
+    target: ClickHouseTarget;
+    index: string;
+    category: RetentionCategory;
+    retentionByTenant: ReadonlyMap<string, ResolvedRetention>;
+  }): Promise<void> {
+    const daysByTenant = new Map(
+      [...retentionByTenant].map(([tenantId, retention]) => [tenantId, retention[category]]),
+    );
+    for (const params of idIndexRetentionRaises({ daysByTenant })) {
+      await this.clickhouse.command({
+        tenantId: "",
+        ...target,
+        table: index,
+        kind: "write",
+        sql: `ALTER TABLE ${index} ${ID_INDEX_RETENTION_RAISE}`,
+        params,
+        // One raise per ClickHouse target over the tenants it names, which span organizations.
+        SKIP_TENANT_CHECK: true,
+      });
+    }
+  }
+
+  /** The named indexes this module raises, in the order named; any other name is dropped. */
+  private governedIdIndexes({
+    indexes,
+    categories,
+  }: {
+    indexes: readonly string[];
+    categories: ReadonlyMap<string, RetentionCategory>;
+  }): string[] {
+    return [...new Set(indexes)].filter(
+      (index) => index === this.eventLogRetention.idIndexTable || categories.has(index),
+    );
+  }
+
+  /** The subset of `tables` the routed server holds. */
+  private async findHeldTables({
+    tables,
+    ...route
+  }: {
+    tenantId: string;
+    organizationId?: string;
+    tables: readonly string[];
+  }): Promise<string[]> {
+    if (tables.length === 0) return [];
+    const { rows } = await this.clickhouse.query<unknown>({
+      ...route,
+      table: "system.tables",
+      kind: "read",
+      sql:
+        "SELECT name FROM system.tables " +
+        "WHERE database = currentDatabase() AND name IN {tables:Array(String)}",
+      params: { tables },
+      // System.tables carries no tenant column: this asks what the routed server holds.
+      SKIP_TENANT_CHECK: true,
+    });
+    const held = new Set(tableNameRowsSchema.parse(rows).map(({ name }) => name));
+    return tables.filter((table) => held.has(table));
+  }
+
   private async getActiveMutations(input: {
     projectId: string;
     tables: string[];
@@ -292,7 +466,9 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
 
   private categoryForTable(table: string): RetentionCategory | null {
     return (
-      Object.entries(RETENTION_TABLE_CATEGORY_MAP).find(([name]) => name === table)?.[1] ?? null
+      Object.entries(RETENTION_TABLE_CATEGORY_MAP).find(([name]) => name === table)?.[1] ??
+      this.idIndexCategories().get(table) ??
+      null
     );
   }
 }

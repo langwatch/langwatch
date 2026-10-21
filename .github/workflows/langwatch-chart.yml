@@ -127,12 +127,21 @@ jobs:
       # deploy: the charts, the images, or how the workspace installs. A
       # lockfile, package.json or config-declaration change still runs every
       # render assertion here, and main runs the kind legs on every merge.
+
+      # dorny diffs a pull request from the event's base commit, which can be
+      # older than the main this merge commit is built on, and so counts main's
+      # newer commits as changed. Diff from the merge commit's first parent.
+      - name: Diff from the main the merge commit is built on
+        if: github.event_name == 'pull_request'
+        id: diff-base
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/pull-request-diff-base.sh" >> "$GITHUB_OUTPUT"
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         if: github.event_name == 'pull_request'
         id: e2e-paths
         with:
           # Empty: diff with git, never the files API (specs/ci/path-filters.feature).
           token: ""
+          base: ${{ steps.diff-base.outputs.sha }}
           filters: |
             e2e:
               - "charts/langwatch/**"
@@ -217,6 +226,10 @@ jobs:
         if: "!cancelled()"
         run: ./tests/langevals-sizing.sh
 
+      - name: "assert the redis-valkey overlay swaps only the image"
+        if: "!cancelled()"
+        run: ./tests/redis-valkey.sh
+
       # Static on purpose, and helm being installed here changes nothing.
       # Every `lookup` in the render step runs against no cluster and so
       # returns empty, which is exactly what a lookup the installer is
@@ -258,6 +271,13 @@ jobs:
       - name: "assert ClickHouse pool sizing follows fleet capacity"
         if: "!cancelled()"
         run: ./tests/clickhouse-pool-sizing.sh
+
+      # Redis is started with a memory ceiling at half its limit so a snapshot
+      # fits under the container limit. Only the render shows the byte count,
+      # and a number written in a values file arrives as a float.
+      - name: "assert Redis memory ceiling is half the limit"
+        if: "!cancelled()"
+        run: ./tests/redis-maxmemory.sh
 
       # In local-filesystem mode the app and the workers mount one ReadWriteOnce
       # PVC, and a helm upgrade rolls both Deployments at once. The pre-upgrade

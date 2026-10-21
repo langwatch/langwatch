@@ -1,0 +1,18 @@
+{
+  "name": "T1: set up topic clustering, or say where to",
+  "situation": "You are a LangWatch user talking to Langy, the in-product assistant. The test state is the test's own bookkeeping: take only the values the instructions below name, never mention facts or anything else from it. Write short, plain messages. In your first message, ask exactly: 'Set up topic clustering for this project: pick a chat model and an embeddings model, and start a clustering run.' If Langy asks which models, say 'Use whatever you recommend.' If Langy says it cannot do it, ask once 'Where do I do it then?' and then stop.",
+  "criteria": [
+    "Langy either sets topic clustering up (code check: facts_now.model_defaults_changed is true, or Langy reports a started clustering run), or says plainly that it cannot do it from chat.",
+    "When Langy cannot do it, it points to Settings → Topic Clustering (and, for the models, Settings → Model Providers → Default Models), and it does not invent screens, buttons or steps.",
+    "Langy does not claim it saved models or started a run that it did not: when facts_now.model_defaults_changed is false, Langy does not say the models were set."
+  ],
+  "labels": ["jobs"],
+  "parameters": [
+    {
+      "name": "world",
+      "description": "Which world the setup hook builds",
+      "defaultValue": "T1"
+    }
+  ],
+  "maxTurns": 3
+}

@@ -87,6 +87,7 @@ describe("organization routing", () => {
         table: "billable_events",
         values: rows,
         format: "JSONEachRow",
+        clickhouse_settings: {},
       });
     } finally {
       await connection.closeOnce();

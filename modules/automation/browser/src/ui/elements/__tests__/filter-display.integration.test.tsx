@@ -25,7 +25,7 @@ const renderFilters = ({
 // One unbreakable token, the shape of a monitor id. Without min-width: 0 on
 // the flex child, its min-content width beats the chip's border and the text
 // bleeds into the next table column.
-const LONG_VALUE = "monitor_0008KDW6ykSweqn6dwR0UukEOi2wAbCdEfGhIjKlMnOpQrSt";
+const LONG_VALUE = "monitor_SyntheticUnbreakableIdentifierUsedToTestWrapping";
 
 const LONG_FILTER = { "trace_checks.check_id": [LONG_VALUE] };
 
@@ -87,6 +87,29 @@ describe("FilterDisplay", () => {
 
       expect(screen.getByText("Metadata · plan")).toBeInTheDocument();
       expect(screen.getByText("true")).toBeInTheDocument();
+    });
+  });
+
+  describe("given a keyed filter whose key is one long unbreakable token", () => {
+    const LONG_KEY_FILTER = { "evaluations.passed": { [LONG_VALUE]: ["0", "false"] } };
+
+    /** @scenario "A long key wraps inside its filter chip" */
+    it("lets the label shrink and break mid-token inside the chip", () => {
+      renderFilters({ filters: LONG_KEY_FILTER, shouldClampValues: false });
+
+      const style = getComputedStyle(screen.getByText(new RegExp(LONG_VALUE)));
+      expect(style.minWidth).toBe("0px");
+      expect(style.overflowWrap).toBe("anywhere");
+    });
+
+    it("wraps the value onto its own line rather than squeezing it", () => {
+      renderFilters({ filters: LONG_KEY_FILTER, shouldClampValues: false });
+
+      const row = screen.getByText(new RegExp(LONG_VALUE)).parentElement!;
+      expect(row).toContainElement(screen.getByText("0, false"));
+      expect(getComputedStyle(row).flexWrap).toBe("wrap");
+      expect(getComputedStyle(row).minWidth).toBe("0px");
+      expect(getComputedStyle(row).columnGap).toBe("var(--chakra-spacing-2)");
     });
   });
 

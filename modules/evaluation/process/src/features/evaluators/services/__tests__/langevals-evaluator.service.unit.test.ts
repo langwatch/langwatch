@@ -93,8 +93,50 @@ describe("LangevalsEvaluatorService", () => {
 
         expect(error.meta).toEqual({
           evaluatorType: "langevals/llm_boolean",
+          retryAfterMs: 5_000,
         });
         expect(JSON.stringify(error)).not.toContain("cluster.local");
+      });
+    });
+  });
+
+  describe("given the evaluator service is not up yet", () => {
+    describe("when it cannot be reached", () => {
+      /** @scenario "An evaluator called before the evaluator service is up is retried, not recorded as a failure" */
+      it("fails retryable with 503 and the evaluator execution code", async () => {
+        failFetchWith(new Error("fetch failed"));
+
+        const error = await evaluationFailure();
+
+        expect(error).toMatchObject({
+          code: "evaluator_execution_error",
+          httpStatus: 503,
+          retryable: true,
+          meta: { retryAfterMs: 5_000 },
+        });
+      });
+    });
+
+    describe("when it answers 503 while it starts", () => {
+      /** @scenario "An evaluator called before the evaluator service is up is retried, not recorded as a failure" */
+      it("fails retryable with 503, while another 5xx stays a recorded failure", async () => {
+        vi.stubGlobal(
+          "fetch",
+          vi.fn(() => Promise.resolve(new Response("starting", { status: 503 }))),
+        );
+        const starting = await evaluationFailure();
+        vi.stubGlobal(
+          "fetch",
+          vi.fn(() => Promise.resolve(new Response("boom", { status: 500 }))),
+        );
+        const broken = await evaluationFailure();
+
+        expect(starting).toMatchObject({
+          code: "evaluator_execution_error",
+          httpStatus: 503,
+          retryable: true,
+        });
+        expect(broken).toMatchObject({ httpStatus: 502, retryable: false });
       });
     });
   });

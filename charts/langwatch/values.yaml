@@ -2235,11 +2235,11 @@ redis:
       secretKeyRef: { name: "", key: "" }
 
   # Redis container image (official Docker Hub image)
-  ## @extra redis.image Redis container image.
+  ## @extra redis.image Redis container image. Valkey 9.1 via examples/overlays/redis-valkey.yaml.
   image:
-    ## @param redis.image.repository [string, default: redis] Image repository.
+    ## @param redis.image.repository [string, default: redis] Image repository (valkey/valkey for Valkey).
     repository: redis
-    ## @param redis.image.tag [string, default: "8.0"] Image tag.
+    ## @param redis.image.tag [string, default: "8.0"] Image tag ("9.1" with valkey/valkey).
     tag: "8.0"
     ## @param redis.image.pullPolicy [string, default: IfNotPresent] Image pull policy.
     pullPolicy: IfNotPresent
@@ -2267,13 +2267,16 @@ redis:
       size: 10Gi
       storageClass: ""
 
+    ## @param redis.master.maxmemory [string] Explicit --maxmemory (bytes, or a k, M, G, T, Ki, Mi, Gi, Ti size). Empty means half of redis.master.resources.limits.memory, so a snapshot's copied pages still fit under the container limit.
+    maxmemory: ""
+
     # Resource requirements for Redis
     # See: https://kubespec.dev/v1/Pod#spec.containers.resources
     ## @extra redis.master.resources Resource requests and limits.
     ## @param redis.master.resources.requests.cpu [string, default: 250m] Requested CPU.
     ## @param redis.master.resources.requests.memory [string, default: 256Mi] Requested memory.
     ## @param redis.master.resources.limits.cpu [string, default: 500m] CPU limit.
-    ## @param redis.master.resources.limits.memory [string, default: 512Mi] Memory limit.
+    ## @param redis.master.resources.limits.memory [string, default: 512Mi] Memory limit. Redis starts with --maxmemory at half of this, because a background snapshot copies changed pages and memory briefly approaches double; with noeviction Redis then refuses writes well before the limit, which makes an OOM kill much less likely. With no memory limit and no redis.master.maxmemory, Redis starts without a ceiling.
     resources:
       requests:
         cpu: 250m
@@ -2330,11 +2333,13 @@ gateway:
   ## @param gateway.security.blockLocalHTTPCalls [default: false] Reject tenant-supplied provider endpoints resolving to local/private networks. Keep false for local/self-hosted installs that intentionally use private services; set true for SaaS together with a restrictive gateway NetworkPolicy.
   ## @param gateway.security.requireHTTPSCustomEndpoints [default: false] Require HTTPS for customer-configured provider endpoints. Hosted-cloud hardening; disabled by default for self-hosted compatibility.
   ## @param gateway.security.allowedProxyHosts [array, default: []] Exact private endpoint hostnames allowed when blockLocalHTTPCalls is enabled. Cloud metadata remains blocked.
+  ## @param gateway.security.extraCACertsConfigMap [string, default: ""] ConfigMap of extra PEM CA certificates the gateway trusts beside the public roots, for provider endpoints on a private CA. Mounted at /etc/langwatch/ca and named in SSL_CERT_DIR.
   ## @param gateway.security.corsAllowedOrigins [array, default: []] Browser origins allowed to call the gateway /v1 routes directly (CORS). Exact origins such as https://app.example.com, or a single "*". Empty sends no CORS headers.
   security:
     blockLocalHTTPCalls: false
     requireHTTPSCustomEndpoints: false
     allowedProxyHosts: []
+    extraCACertsConfigMap: ""
     corsAllowedOrigins: []
 
   # Trace export is OFF by default to keep the chart safe to install

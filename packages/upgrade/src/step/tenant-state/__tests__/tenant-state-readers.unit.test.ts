@@ -43,3 +43,30 @@ describe("the tenant step state's operator readers", () => {
     ).resolves.toBe(true);
   });
 });
+
+describe("the attention readers over tenants waiting on a person", () => {
+  /** @scenario "Ops lists a step's held tenants without those waiting on a person, and counts those apart" */
+  it("lists held and parked tenants, counts those waiting on a person apart", async () => {
+    const state = MemoryTenantStepStateRepository.create();
+    const step = "identity:identifier-backfill";
+    const rows = [
+      { tenantId: "user-proof", status: "migrated", heldReason: "proof" },
+      { tenantId: "user-parked", status: "parked" },
+      { tenantId: "user-sam", status: "migrated", heldReason: "person" },
+      { tenantId: "user-kim", status: "migrated", heldReason: "person" },
+    ] as const;
+    for (const row of rows) await state.upsertRecord({ migrationName: step, report: null, ...row });
+
+    const attention = await state.findRecordsByStatus({
+      migrationName: step,
+      statuses: ["migrated", "parked"],
+      exceptHeldReason: "person",
+      limit: 10,
+    });
+    expect(attention.map((row) => row.tenantId).toSorted()).toEqual(["user-parked", "user-proof"]);
+    await expect(state.countHeld({ migrationName: step, heldReason: "person" })).resolves.toBe(2);
+    await expect(
+      state.findRecordsByStatus({ statuses: ["migrated"], heldReason: "pending", limit: 1 }),
+    ).resolves.toEqual([]);
+  });
+});

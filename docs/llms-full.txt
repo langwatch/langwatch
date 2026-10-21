@@ -10601,7 +10601,7 @@ A gateway whose `ENVIRONMENT` is set to anything other than `local` refuses to s
 | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | `BLOCK_LOCAL_HTTP_CALLS`         | Refuses a customer-configured provider endpoint that resolves to a private or link-local address                              |
 | `REQUIRE_HTTPS_CUSTOM_ENDPOINTS` | Refuses a customer-configured provider endpoint that is plain HTTP                                                            |
-| `ALLOWED_PROXY_HOSTS`            | Exact hostnames that may use a private address while the guard is on. Cloud metadata and link-local destinations stay refused |
+| `ALLOWED_PROXY_HOSTS`            | Exact hostnames that pass the endpoint check on a private address while the guard is on. Chat dispatch still refuses private addresses until the guard is off. Cloud metadata and link-local destinations stay refused |
 
 ## Calling the gateway from a browser
 
@@ -10697,7 +10697,8 @@ These apply to the base URLs customers configure on their own provider credentia
 | -------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | `BLOCK_LOCAL_HTTP_CALLS`         | `false` | Refuse a provider endpoint that resolves to a private, loopback or otherwise non-public address                                     |
 | `REQUIRE_HTTPS_CUSTOM_ENDPOINTS` | `false` | Refuse a provider endpoint with an `http://` scheme                                                                                 |
-| `ALLOWED_PROXY_HOSTS`            | empty   | Comma-separated hostnames, matched case-insensitively, allowed to resolve to a private address while `BLOCK_LOCAL_HTTP_CALLS` is on |
+| `ALLOWED_PROXY_HOSTS`            | empty   | Comma-separated hostnames, matched case-insensitively, allowed past the endpoint check on a private address while `BLOCK_LOCAL_HTTP_CALLS` is on. Chat dispatch still refuses private addresses until the block is off |
+| `SSL_CERT_DIR`                   | unset   | Colon-separated directories of PEM CA certificates trusted beside the public roots, for provider endpoints on a private CA            |
 
 ## Browser access
 
@@ -11019,9 +11020,25 @@ TLS in front of the gateway is one boundary. The other is the provider endpoints
 | -------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------- |
 | `security.requireHTTPSCustomEndpoints` | `REQUIRE_HTTPS_CUSTOM_ENDPOINTS` | Refuse a provider base URL with an `http://` scheme                                         |
 | `security.blockLocalHTTPCalls`         | `BLOCK_LOCAL_HTTP_CALLS`         | Refuse a provider base URL that resolves to a private, loopback or other non-public address |
-| `security.allowedProxyHosts`           | `ALLOWED_PROXY_HOSTS`            | Hostnames that may resolve to a private address while the block is on                       |
+| `security.allowedProxyHosts`           | `ALLOWED_PROXY_HOSTS`            | Hostnames that pass the endpoint check on a private address while the block is on. Chat dispatch still refuses them |
 
 Both switches default to `false`, so a self-hosted install can route to a model server on the cluster network. Cloud metadata addresses, `0.0.0.0`, `::` and link-local ranges are refused with every setting. Setting `ENVIRONMENT` to anything other than `local` requires both switches to be `true`.
+
+### Provider endpoints on a private CA
+
+When a provider endpoint serves TLS from your own certificate authority, put the CA certificates (PEM) in a ConfigMap and name it in `gateway.security.extraCACertsConfigMap`:
+
+```bash
+kubectl -n langwatch create configmap internal-ca --from-file=internal-ca.pem
+```
+
+```yaml
+gateway:
+  security:
+    extraCACertsConfigMap: internal-ca
+```
+
+The chart mounts it at `/etc/langwatch/ca` and sets `SSL_CERT_DIR` to that path. The gateway then trusts those certificates beside the public roots for every outbound call. Outside the chart, mount a directory of PEM files and set `SSL_CERT_DIR` yourself.
 
 ## Common failures
 
@@ -11031,7 +11048,8 @@ Both switches default to `false`, so a self-hosted install can route to a model 
 | Streamed responses arrive all at once | Buffering is on at the proxy | With `ingress.className: nginx` the chart adds `proxy-buffering: "off"` to the gateway Ingress; on another controller, set the equivalent in `ingress.gateway.annotations` |
 | A long stream stops at 60 seconds | The load balancer idle timeout is shorter than the stream | Raise the controller's idle or read timeout |
 | CLI users get `http://localhost:5563` as the gateway URL | The control plane has no `LW_GATEWAY_PUBLIC_URL` | Set `ingress.gateway.host`, or `gateway.publicUrl` |
-| A provider credential with a private base URL fails to dispatch | `BLOCK_LOCAL_HTTP_CALLS` is on | Add the hostname to `ALLOWED_PROXY_HOSTS` |
+| A provider credential with a private base URL fails to dispatch | `BLOCK_LOCAL_HTTP_CALLS` is on | Set `BLOCK_LOCAL_HTTP_CALLS` to `false`. `ALLOWED_PROXY_HOSTS` gets the host past the endpoint check, but chat dispatch refuses private addresses while the block is on |
+| A provider call fails with `x509: certificate signed by unknown authority` | The endpoint's certificate comes from a private CA | Set `gateway.security.extraCACertsConfigMap` (see [Provider endpoints on a private CA](#provider-endpoints-on-a-private-ca)) |
 
 More symptoms are on [Troubleshooting](/ai-gateway/troubleshooting).
 
@@ -11253,6 +11271,7 @@ gateway:
     blockLocalHTTPCalls: false
     requireHTTPSCustomEndpoints: false
     allowedProxyHosts: []
+    extraCACertsConfigMap: "" # ConfigMap of PEM CA certificates to trust
     corsAllowedOrigins: [] # browser origins allowed to call /v1
 
   # OTLP/HTTP endpoint for the gateway's own spans. Empty disables export.
@@ -11324,6 +11343,7 @@ The chart passes these environment variables to the container. Every other key i
 | `BLOCK_LOCAL_HTTP_CALLS`                               | `security.blockLocalHTTPCalls`                                       | Refuse provider endpoints on private addresses |
 | `REQUIRE_HTTPS_CUSTOM_ENDPOINTS`                       | `security.requireHTTPSCustomEndpoints`                               | Refuse `http://` provider endpoints            |
 | `ALLOWED_PROXY_HOSTS`                                  | `security.allowedProxyHosts`, comma-joined                           | Private hostnames exempt from the block        |
+| `SSL_CERT_DIR`                                         | set to `/etc/langwatch/ca` when `security.extraCACertsConfigMap` is set | Extra CA certificates to trust              |
 | `LW_GATEWAY_CORS_ALLOWED_ORIGINS`                      | `security.corsAllowedOrigins`, comma-joined                          | Browser origins allowed to call `/v1`          |
 | `LW_GATEWAY_INTERNAL_SECRET`                           | Secret `secrets.existingSecretName`, key `secrets.internalSecretKey` | HMAC secret for control plane calls            |
 | `LW_GATEWAY_JWT_SECRET`                                | Secret `secrets.existingSecretName`, key `secrets.jwtSecretKey`      | JWT verification secret                        |
@@ -21282,8 +21302,7 @@ You can pass an instance of the CrewAI instrumentor to the `instrumentors` list 
 ```python openinference_setup.py
 import langwatch
 from crewai import Agent, Task, Crew
-import os
-from openinference.instrumentation.crewai import CrewAIInstrumentor # Assuming this is the correct import
+from openinference.instrumentation.crewai import CrewAIInstrumentor
 
 # Ensure LANGWATCH_API_KEY is set in your environment, or set it in `setup`
 langwatch.setup(
@@ -21302,14 +21321,22 @@ writer = Agent(
   backstory='A wordsmith who can make complex AI topics accessible and engaging.'
 )
 
-task1 = Task(description='Investigate the latest advancements in LLM prompting techniques.', agent=researcher)
-task2 = Task(description='Write a blog post summarizing the findings.', agent=writer)
+task1 = Task(
+  description='Investigate the latest advancements in LLM prompting techniques.',
+  expected_output='A bullet list of the key advancements.',
+  agent=researcher
+)
+task2 = Task(
+  description='Write a blog post summarizing the findings.',
+  expected_output='A short blog post in markdown.',
+  agent=writer
+)
 
 # Create and run the crew
 crew = Crew(
   agents=[researcher, writer],
   tasks=[task1, task2],
-  verbose=2
+  verbose=True
 )
 
 @langwatch.trace(name="CrewAI Execution with OpenInference")
@@ -21327,8 +21354,7 @@ if __name__ == "__main__":
 ```python openllmetry_setup.py
 import langwatch
 from crewai import Agent, Task, Crew
-import os
-from opentelemetry_instrumentation_crewai import CrewAIInstrumentor # Assuming this is the correct import
+from opentelemetry.instrumentation.crewai import CrewAIInstrumentor
 
 # Ensure LANGWATCH_API_KEY is set in your environment, or set it in `setup`
 langwatch.setup(
@@ -21347,14 +21373,22 @@ writer = Agent(
   backstory='A wordsmith who can make complex AI topics accessible and engaging.'
 )
 
-task1 = Task(description='Investigate the latest advancements in LLM prompting techniques.', agent=researcher)
-task2 = Task(description='Write a blog post summarizing the findings.', agent=writer)
+task1 = Task(
+  description='Investigate the latest advancements in LLM prompting techniques.',
+  expected_output='A bullet list of the key advancements.',
+  agent=researcher
+)
+task2 = Task(
+  description='Write a blog post summarizing the findings.',
+  expected_output='A short blog post in markdown.',
+  agent=writer
+)
 
 # Create and run the crew
 crew = Crew(
   agents=[researcher, writer],
   tasks=[task1, task2],
-  verbose=2
+  verbose=True
 )
 
 @langwatch.trace(name="CrewAI Execution with OpenLLMetry")
@@ -21372,10 +21406,10 @@ if __name__ == "__main__":
 </CodeGroup>
 
 <Note>
-  Ensure you have the respective community instrumentation library installed: - For OpenLLMetry:
-  `pip install opentelemetry-instrumentation-crewai` - For OpenInference: `pip install
-  openinference-instrumentation-crewai` Consult the specific library's documentation for the exact
-  package name and instrumentor class if the above assumptions are incorrect.
+  Install the instrumentation library for the instrumentor you use:
+
+  - OpenLLMetry: `pip install opentelemetry-instrumentation-crewai`
+  - OpenInference: `pip install openinference-instrumentation-crewai`
 </Note>
 
 ### 2. Direct Instrumentation
@@ -21387,8 +21421,7 @@ If you have an existing OpenTelemetry `TracerProvider` configured in your applic
 ```python openinference_direct.py
 import langwatch
 from crewai import Agent, Task, Crew
-import os
-from openinference.instrumentation.crewai import CrewAIInstrumentor # Assuming this is the correct import
+from openinference.instrumentation.crewai import CrewAIInstrumentor
 # from opentelemetry.sdk.trace import TracerProvider # If managing your own provider
 # from opentelemetry.sdk.trace.export import SimpleSpanProcessor, ConsoleSpanExporter # If managing your own provider
 
@@ -21402,7 +21435,11 @@ planner = Agent(
   goal='Plan an engaging tech conference',
   backstory='An experienced planner with a passion for technology events.'
 )
-task_planner = Task(description='Outline the agenda for a 3-day AI conference.', agent=planner)
+task_planner = Task(
+  description='Outline the agenda for a 3-day AI conference.',
+  expected_output='A day-by-day agenda.',
+  agent=planner
+)
 conference_crew = Crew(agents=[planner], tasks=[task_planner])
 
 @langwatch.trace(name="CrewAI Direct Instrumentation with OpenInference")
@@ -21420,8 +21457,7 @@ if __name__ == "__main__":
 ```python openllmetry_direct.py
 import langwatch
 from crewai import Agent, Task, Crew
-import os
-from opentelemetry_instrumentation_crewai import CrewAIInstrumentor # Assuming this is the correct import
+from opentelemetry.instrumentation.crewai import CrewAIInstrumentor
 # from opentelemetry.sdk.trace import TracerProvider # If managing your own provider
 # from opentelemetry.sdk.trace.export import SimpleSpanProcessor, ConsoleSpanExporter # If managing your own provider
 
@@ -21435,7 +21471,11 @@ planner = Agent(
   goal='Plan an engaging tech conference',
   backstory='An experienced planner with a passion for technology events.'
 )
-task_planner = Task(description='Outline the agenda for a 3-day AI conference.', agent=planner)
+task_planner = Task(
+  description='Outline the agenda for a 3-day AI conference.',
+  expected_output='A day-by-day agenda.',
+  agent=planner
+)
 conference_crew = Crew(agents=[planner], tasks=[task_planner])
 
 @langwatch.trace(name="CrewAI Direct Instrumentation with OpenLLMetry")
@@ -23520,11 +23560,11 @@ LangWatch captures traces generated by SmolAgents through its built-in OpenTelem
 2.  **Install SmolAgents and OpenInference instrumentor**:
 
     ```bash
-    pip install smolagents openinference-instrumentation-smolagents
+    pip install "smolagents[litellm]" openinference-instrumentation-smolagents
     ```
 
 3.  **Set up your LLM provider**:
-    You'll need to configure your preferred LLM provider (OpenAI, Anthropic, etc.) with the appropriate API keys.
+    The samples below use `LiteLLMModel` with OpenAI, so set `OPENAI_API_KEY` in your environment. LiteLLM also supports Anthropic and other providers through the `model_id`, for example `anthropic/claude-sonnet-4-5`.
 
 ## Instrumentation with OpenInference
 
@@ -23536,23 +23576,23 @@ Here's the simplest way to instrument your application:
 
 ```python
 import langwatch
-from smolagents import Agent
+from smolagents import CodeAgent, LiteLLMModel
 from openinference.instrumentation.smolagents import SmolagentsInstrumentor
-import os
 
 # Initialize LangWatch with the SmolAgents instrumentor
 langwatch.setup(
     instrumentors=[SmolagentsInstrumentor()]
 )
 
-# Set up environment variables
-os.environ["OPENAI_API_KEY"] = "your-openai-api-key"
+# LiteLLMModel reads OPENAI_API_KEY from the environment
+model = LiteLLMModel(model_id="openai/gpt-5")
 
 # Create your agent
-agent = Agent(
+agent = CodeAgent(
+    tools=[],
+    model=model,
     name="hello_agent",
-    model="gpt-5",
-    instruction="You are a helpful assistant. Always be friendly and concise.",
+    instructions="You are a helpful assistant. Always be friendly and concise.",
 )
 
 # Use the agent as usual, traces are sent to LangWatch automatically
@@ -23576,15 +23616,19 @@ If you want to add additional context or metadata to your traces, you can option
 
 ```python
 import langwatch
-from smolagents import Agent
+from smolagents import CodeAgent, LiteLLMModel
 from openinference.instrumentation.smolagents import SmolagentsInstrumentor
-import os
 
 langwatch.setup(
     instrumentors=[SmolagentsInstrumentor()]
 )
 
-# ... agent setup code ...
+agent = CodeAgent(
+    tools=[],
+    model=LiteLLMModel(model_id="openai/gpt-5"),
+    name="hello_agent",
+    instructions="You are a helpful assistant. Always be friendly and concise.",
+)
 
 @langwatch.trace(name="SmolAgents Run")
 def run_agent_interaction(user_message: str):
@@ -23637,7 +23681,7 @@ You can use this integration together with the LangWatch Python SDK to add addit
 
 ```python
 import langwatch
-from smolagents import Agent
+from smolagents import CodeAgent, LiteLLMModel
 from openinference.instrumentation.smolagents import SmolagentsInstrumentor
 
 langwatch.setup(
@@ -23647,10 +23691,11 @@ langwatch.setup(
 @langwatch.trace(name="Custom SmolAgents Agent")
 def my_custom_agent(input_message: str):
     # Your SmolAgents code here
-    agent = Agent(
+    agent = CodeAgent(
+        tools=[],
+        model=LiteLLMModel(model_id="openai/gpt-5"),
         name="custom_agent",
-        model="gpt-5",
-        instruction="Your custom instructions",
+        instructions="Your custom instructions",
     )
 
     # Update the current trace with additional metadata
@@ -52997,7 +53042,7 @@ After creation, verify the saved resource:
 
 ```bash
 langwatch monitor list --format json
-langwatch monitor get <monitor-id> --format json
+langwatch monitor get <idOrSlugOrName> --format json
 ```
 
 The task is complete only when the created monitor appears with the intended evaluator, execution mode, level, sample rate, and enabled state.
@@ -56671,7 +56716,7 @@ After creation, verify the saved resource:
 
 ```bash
 langwatch monitor list --format json
-langwatch monitor get <monitor-id> --format json
+langwatch monitor get <idOrSlugOrName> --format json
 ```
 
 The task is complete only when the created monitor appears with the intended evaluator, execution mode, level, sample rate, and enabled state.
@@ -58564,7 +58609,7 @@ Production quality signals live in monitors (online evaluation) and their evalua
 
 ```bash
 langwatch monitor list -o json           # which monitors exist, are they enabled/firing?
-langwatch monitor get <id> -o json       # one monitor's config and recent state
+langwatch monitor get <idOrSlugOrName> -o json     # one monitor's config and recent state
 langwatch evaluator list -o json         # the evaluators the monitors run
 ```
 
@@ -58704,7 +58749,7 @@ For each failing row, note the input, the expected output (from the dataset), an
 
 ```bash
 langwatch evaluator list -o json
-langwatch evaluator get <idOrSlug> -o json
+langwatch evaluator get <idOrSlugOrName> -o json
 ```
 
 Before blaming the agent, rule out the scorer:
@@ -59718,7 +59763,7 @@ With no `--grid-row`, the platform allocates the next free row, so it never land
 langwatch chart list -f json
 langwatch chart get <chart-id> -f json    # SQL, parameters, spec, placement
 langwatch chart update <chart-id> --sql-file query.sql
-langwatch chart delete <chart-id>
+langwatch chart delete <chart-id>   # destructive: confirm on a choices card first
 ```
 
 ## Failure modes worth knowing
@@ -63809,6 +63854,7 @@ The restriction applies to email and password sign-up, passkey sign-up, and firs
 | `LANGWATCH_NLP_SERVICE`         | URL of the NLP service. Required                                                                                                                                                                                                                | - (Docker Compose: `http://langwatch_nlp:5561`, Helm: `http://<release>-langwatch-nlp:5561`) |
 | `LANGWATCH_NLP_INTERNAL_SECRET` | Shared credential for the app to NLP service hop. The app sends it on every NLP request and the NLP service refuses requests that do not carry it, so set the same value on both. Unset on the NLP service, it accepts unauthenticated requests | -                                                                                            |
 | `LANGEVALS_ENDPOINT`            | URL of the LangEvals service                                                                                                                                                                                                                    | - (Docker Compose: `http://langevals:5562`, Helm: `http://<release>-langevals:5562`)         |
+| `LANGWATCH_EVALUATOR_RETRY_WINDOW_MINUTES` | How long an evaluation keeps retrying while LangEvals is unreachable or starting before it is recorded as an error, in minutes (at most 120) | `120` |
 
 `LANGWATCH_NLP_INTERNAL_SECRET` is optional, and how you provide it depends on the deployment:
 
@@ -64493,9 +64539,9 @@ For production with single-node ClickHouse.
 - Langy: 1 replica, 500m/2 CPU, 1Gi/4Gi memory
 - ClickHouse: 4 CPU, 8Gi memory, 100Gi storage
 - PostgreSQL: 250m/1 CPU, 512Mi/1Gi memory, 20Gi storage
-- Redis: 250m/500m CPU, 256Mi/512Mi memory, 5Gi storage
+- Redis: 500m/1 CPU, 1Gi/3Gi memory, 5Gi storage
 - Prometheus: 200m/500m CPU, 512Mi/2Gi memory, 30d retention, 20Gi storage
-- Total: ~8.9 CPU, ~23 Gi RAM requests
+- Total: ~9.1 CPU, ~23.8 Gi RAM requests
 
 ```bash
 helm install langwatch langwatch/langwatch \
@@ -64516,9 +64562,9 @@ For production with replicated ClickHouse.
 - ClickHouse: 3 nodes, 4 CPU, 16Gi memory, 300Gi storage each
 - ClickHouse Keeper: 3 nodes, 250m/1 CPU, 512Mi/1Gi memory
 - PostgreSQL: 250m/1 CPU, 512Mi/1Gi memory, 50Gi storage
-- Redis: 250m/500m CPU, 256Mi/512Mi memory, 10Gi storage
+- Redis: 500m/1 CPU, 1Gi/3Gi memory, 10Gi storage
 - Prometheus: 200m/500m CPU, 512Mi/2Gi memory, 60d retention, 50Gi storage
-- Total: ~22.9 CPU, ~84.8 Gi RAM requests
+- Total: ~23.1 CPU, ~85.6 Gi RAM requests
 
 ```bash
 helm install langwatch langwatch/langwatch \
@@ -65901,7 +65947,7 @@ This configures smaller resource limits, single replicas, and disables evaluator
 
 For production, you should:
 
-1. Use external managed databases (PostgreSQL, Redis)
+1. Use external managed databases (PostgreSQL, and Redis 7.0 or later or Valkey 7.2 or later)
 2. Provide Kubernetes Secrets from your secret manager
 3. Expose via Ingress with TLS
 4. Disable auto-generation
@@ -66211,6 +66257,7 @@ The chart ships with composable overlay files in `examples/overlays/`. Combine t
 | ---------------------------- | -------------------------------------------- |
 | `postgres-external.yaml`     | External PostgreSQL (RDS, Cloud SQL)         |
 | `redis-external.yaml`        | External Redis (ElastiCache, Memorystore)    |
+| `redis-valkey.yaml`          | Valkey 9.1 as the chart-managed Redis, fresh installs |
 | `clickhouse-external.yaml`   | External ClickHouse instance                 |
 | `clickhouse-replicated.yaml` | 3-node replicated ClickHouse                 |
 | `cold-storage-s3.yaml`       | S3 cold storage + backups                    |
@@ -69759,7 +69806,7 @@ Roughly 1 KB per span (compressed). See [Sizing & Scaling](/self-hosting/configu
 
 ### Can I use an existing PostgreSQL, Redis?
 
-Yes. Use the external database overlays:
+Yes. Redis must be 7.0 or later (or Valkey 7.2 or later); LangWatch refuses to start when the server reports an older version (a server that does not report its version starts with a warning). Use the external database overlays:
 
 ```bash
 helm install langwatch langwatch/langwatch \

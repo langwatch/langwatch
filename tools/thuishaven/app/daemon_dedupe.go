@@ -3,7 +3,9 @@ package app
 import (
 	"context"
 	"fmt"
+	"maps"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -214,7 +216,9 @@ func (o *Orchestrator) judgeInfra(ctx context.Context, view procView) ([]domain.
 	trees := infraTrees(view)
 	var instances []domain.InfraInstance
 	var unreferenced []int
-	for _, t := range trees {
+	// By root pid: a map's order changes run to run, and the report lists them in this order.
+	for _, pid := range slices.Sorted(maps.Keys(trees)) {
+		t := trees[pid]
 		inst := o.hostInstance(t, view.byPID, refPIDs)
 		inst.Protected = protected[t.root.PID]
 		if !inst.Referenced {

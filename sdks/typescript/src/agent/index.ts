@@ -14,6 +14,10 @@ export type {
   ConnectedAgent,
   DirectAgentCall,
   InferParameters,
+  ScenarioHooks,
+  ScenarioRun,
+  SetupHook,
+  TeardownHook,
 } from "./define";
 export { AgentParameterError, toParameterSchema, parameterSpecsFromSchema } from "./schema";
 export type {
@@ -25,7 +29,14 @@ export type {
   StandardJsonSchema,
 } from "./schema";
 export { PROTOCOL_VERSION } from "./protocol";
-export type { AgentMessage, AgentParameterValue, JsonSchemaObject } from "./protocol";
+export type {
+  AgentHooks,
+  AgentMessage,
+  AgentParameterValue,
+  JsonSchemaObject,
+  ScenarioState,
+} from "./protocol";
+export { AgentStateError, STATE_MAX_BYTES } from "./state";
 export {
   resolveEnvironment,
   sanitizeEnvironment,

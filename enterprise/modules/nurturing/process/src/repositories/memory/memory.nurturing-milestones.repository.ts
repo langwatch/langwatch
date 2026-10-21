@@ -28,20 +28,22 @@ export class MemoryNurturingMilestonesRepository implements NurturingMilestonesR
 
   async countEvaluation({
     organizationId,
-  }: Readonly<{ organizationId: string }>): Promise<NurturingOrganizationCounts[]> {
+    by,
+  }: Readonly<{ organizationId: string; by: number }>): Promise<NurturingOrganizationCounts[]> {
     const organization = this.#organizations.get(organizationId);
     if (!organization) return [];
-    const counted = { ...organization, evaluationCount: organization.evaluationCount + 1 };
+    const counted = { ...organization, evaluationCount: organization.evaluationCount + by };
     this.#organizations.set(organizationId, counted);
     return [counted];
   }
 
   async countSimulationRun({
     organizationId,
-  }: Readonly<{ organizationId: string }>): Promise<NurturingOrganizationCounts[]> {
+    by,
+  }: Readonly<{ organizationId: string; by: number }>): Promise<NurturingOrganizationCounts[]> {
     const organization = this.#organizations.get(organizationId);
     if (!organization) return [];
-    const counted = { ...organization, simulationRunCount: organization.simulationRunCount + 1 };
+    const counted = { ...organization, simulationRunCount: organization.simulationRunCount + by };
     this.#organizations.set(organizationId, counted);
     return [counted];
   }
