@@ -4,7 +4,10 @@ import type {
 } from "@langwatch/coding-agent-contract";
 
 import type { SessionModelTotalsRow } from "../../../repositories/coding-agent-session-event.repository.ts";
-import { isCostUnknown } from "../../../rules/coding-agent-pull-request.rules.ts";
+import {
+  isCostUnknown,
+  isModelRecordComplete,
+} from "../../../rules/coding-agent-pull-request.rules.ts";
 
 export type CodingAgentUsageRow = {
   projectId: string;
@@ -262,8 +265,9 @@ export class CodingAgentPullRequestUsageService {
   }
 
   /**
-   * Every session's per-model totals: its per-call fact rows where it has any, else its own
-   * per-model record, so a session is never counted from both.
+   * Every session's per-model totals: its own per-model record where it holds every token, since
+   * it prices them as the session's cost does; else its per-call rows, whose cost is the one the
+   * agent reported; else whatever record it has. A session is never counted from both.
    */
   modelTotalsOf({
     sessions,
@@ -272,18 +276,25 @@ export class CodingAgentPullRequestUsageService {
     sessions: readonly CodingAgentSessionBranchRecord[];
     eventTotals: readonly SessionModelTotalsRow[];
   }): PullRequestModelTotalsRow[] {
-    const logged = new Set(eventTotals.map((total) => `${total.tenantId}\0${total.sessionId}`));
-    const recorded = sessions
-      .filter((session) => !logged.has(`${session.tenantId}\0${session.sessionId}`))
-      .flatMap((session) =>
-        session.usageByModel.map((usage) => ({
-          ...usage,
-          tenantId: session.tenantId,
-          sessionId: session.sessionId,
-        })),
-      );
+    const keyOf = (row: { tenantId: string; sessionId: string }) =>
+      `${row.tenantId}\0${row.sessionId}`;
+    const logged = new Set(eventTotals.map(keyOf));
+    const fromRecord = sessions.filter(
+      (session) => isModelRecordComplete(session) || !logged.has(keyOf(session)),
+    );
+    const recordedKeys = new Set(fromRecord.map(keyOf));
+    const recorded = fromRecord.flatMap((session) =>
+      session.usageByModel.map((usage) => ({
+        ...usage,
+        tenantId: session.tenantId,
+        sessionId: session.sessionId,
+      })),
+    );
 
-    return [...eventTotals.map((total) => ({ ...total, aiUnits: 0, priced: true })), ...recorded];
+    const fromEvents = eventTotals
+      .filter((total) => !recordedKeys.has(keyOf(total)))
+      .map((total) => ({ ...total, aiUnits: 0, priced: true }));
+    return [...fromEvents, ...recorded];
   }
 
   modelUsage(

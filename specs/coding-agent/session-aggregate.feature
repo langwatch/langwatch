@@ -183,6 +183,11 @@ Feature: Coding-agent sessions
     # its traces cannot disagree; the reported one tells us when either our
     # price registry or the agent's own pricing went stale.
 
+  Scenario: a span-fed session keeps its computed cost per model
+    When a session's model-call spans run two models
+    Then the session records each model's tokens and the cost computed from them
+    And the per-model costs add up to the session's cost
+
   Scenario: a codex shell command counts once despite its sandbox outcome event
     When a codex session runs one shell command that reports a tool result and a sandbox outcome
     Then the session counts one tool run

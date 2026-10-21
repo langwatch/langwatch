@@ -197,18 +197,40 @@ export class CodingAgentSessionSpanProjection {
     // cache-write lifetime the trace pipeline applies to the identical span,
     // so the session and its traces state one figure. The cost the agent
     // reports about itself lands on agentReportedCostUsd instead.
-    return this.stateProjection.chargeContextUsage({
+    return this.chargePricedCall({
+      before,
+      folded,
+      facts: this.claudeCallTokenFacts(attrs, this.traceCanonicalisation),
+      context,
+    });
+  }
+
+  /** One priced model call charged to its context and, at the same computed cost, its model. */
+  private chargePricedCall({
+    before,
+    folded,
+    facts,
+    context,
+  }: {
+    before: CodingAgentSessionData;
+    folded: CodingAgentSessionData;
+    facts: Record<string, unknown>;
+    context: NonNullable<CodingAgentSessionSpanProjectionInput["context"]> | null;
+  }): CodingAgentSessionData {
+    const charged = this.stateProjection.chargeContextUsage({
       before,
       after: {
         ...folded,
-        costUsd:
-          folded.costUsd +
-          this.pricedFromTokens(
-            this.claudeCallTokenFacts(attrs, this.traceCanonicalisation),
-            this.modelProviders,
-          ),
+        costUsd: folded.costUsd + this.pricedFromTokens(facts, this.modelProviders),
       },
       context,
+    });
+    return this.stateProjection.chargeModelUsage({
+      before,
+      after: charged,
+      context,
+      model: this.stateProjection.coerceString(facts.model),
+      priced: this.modelProviders.isPriced(this.costInput(facts)),
     });
   }
 
@@ -234,14 +256,7 @@ export class CodingAgentSessionSpanProjection {
     // tools that ran inside it, and zero reads honestly as "not measured".
     const before = this.stateProjection.withIdentity(state, attrs);
     const folded = this.stateProjection.foldModelCall(before, facts, 0);
-    return this.stateProjection.chargeContextUsage({
-      before,
-      after: {
-        ...folded,
-        costUsd: folded.costUsd + this.pricedFromTokens(facts, this.modelProviders),
-      },
-      context,
-    });
+    return this.chargePricedCall({ before, folded, facts, context });
   }
 
   /**
