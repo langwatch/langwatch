@@ -51,7 +51,7 @@ const FilterContainer = ({
       )}
     </Box>
     {/* Wraps, so a value that cannot fit beside a long label takes its own line. */}
-    <Flex flex="1" minWidth={0} wrap="wrap">
+    <Flex flex="1" minWidth={0} wrap="wrap" columnGap={2}>
       {children}
     </Flex>
   </HStack>

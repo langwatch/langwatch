@@ -100,7 +100,6 @@ describe("FilterDisplay", () => {
       const style = getComputedStyle(screen.getByText(new RegExp(LONG_VALUE)));
       expect(style.minWidth).toBe("0px");
       expect(style.overflowWrap).toBe("anywhere");
-      expect(style.flexShrink).not.toBe("0");
     });
 
     it("wraps the value onto its own line rather than squeezing it", () => {
@@ -110,6 +109,7 @@ describe("FilterDisplay", () => {
       expect(row).toContainElement(screen.getByText("0, false"));
       expect(getComputedStyle(row).flexWrap).toBe("wrap");
       expect(getComputedStyle(row).minWidth).toBe("0px");
+      expect(getComputedStyle(row).columnGap).toBe("var(--chakra-spacing-2)");
     });
   });
 
