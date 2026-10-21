@@ -4,7 +4,7 @@
  * @see enterprise/modules/nurturing/specs/coding-agent-signals.feature
  * @see enterprise/modules/nurturing/specs/app-opened.feature
  */
-import type { NurturingSignal } from "@langwatch/enterprise-nurturing-contract";
+import type { NurturingSignal, NurturingSignalOf } from "@langwatch/enterprise-nurturing-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -70,7 +70,10 @@ async function settle(): Promise<void> {
 }
 
 const codingSource = { tenantId: "project-1", userId: "admin-1", projectId: "project-1" };
-const sessionStored = (sourceEventId: string, occurredAt: number): NurturingSignal => ({
+const sessionStored = (
+  sourceEventId: string,
+  occurredAt: number,
+): NurturingSignalOf<"coding_session_stored"> => ({
   kind: "coding_session_stored",
   sourceEventId,
   occurredAt,
