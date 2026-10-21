@@ -63,6 +63,7 @@ export const APP_ERROR_CODES = [
   "ai_call_failed",
   "ai_query_provider_error",
   "already_organization_member",
+  "analytics_aggregate_unattended_read",
   "analytics_series_percentage_unsupported",
   "annotation_annotator_reference_invalid",
   "annotation_not_found",

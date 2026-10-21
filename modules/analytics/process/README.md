@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The callable analytics capability shared by process peers.
 
-Peers call these through the token, declared at `../contract/src/analytics.api.ts:75`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/analytics.api.ts:78`; nothing else in this package is public.
 
 #### `getTimeseries`
 
@@ -24,8 +24,10 @@ getTimeseries(input: AnalyticsTimeseriesInput, options?: AnalyticsTimeseriesRead
 
 #### `getFeedbacks`
 
+The cost-gated reads below take the route's `cost:view` proof, as a series takes its own.
+
 ```typescript
-getFeedbacks(input: AnalyticsReadInput): Promise<AnalyticsFeedbacksResult>;
+getFeedbacks(input: AnalyticsReadInput, options: CostReadOptions): Promise<AnalyticsFeedbacksResult>;
 ```
 
 #### `getFeedbacksPage`
@@ -33,19 +35,19 @@ getFeedbacks(input: AnalyticsReadInput): Promise<AnalyticsFeedbacksResult>;
 The same feedbacks as {@link getFeedbacks}, newest first, one bounded page at a time. Refuses a cursor from another project or filter set with `validation_error`.
 
 ```typescript
-getFeedbacksPage(input: AnalyticsReadInput & AnalyticsFeedbacksPageParams): Promise<AnalyticsFeedbacksPageResult>;
+getFeedbacksPage(input: AnalyticsReadInput & AnalyticsFeedbacksPageParams, options: CostReadOptions): Promise<AnalyticsFeedbacksPageResult>;
 ```
 
 #### `getTopUsedDocuments`
 
 ```typescript
-getTopUsedDocuments(input: AnalyticsReadInput): Promise<AnalyticsTopDocumentsResult>;
+getTopUsedDocuments(input: AnalyticsReadInput, options: CostReadOptions): Promise<AnalyticsTopDocumentsResult>;
 ```
 
 #### `filterOptions`
 
 ```typescript
-filterOptions(input: { readonly projectId: string; readonly field: string; readonly startDate: number; readonly endDate: number; readonly query?: string; readonly key?: string; readonly subkey?: string; readonly filters?: Record<string, unknown>; }): Promise<AnalyticsFilterOption[]>;
+filterOptions(input: { readonly projectId: string; readonly field: string; readonly startDate: number; readonly endDate: number; readonly query?: string; readonly key?: string; readonly subkey?: string; readonly filters?: Record<string, unknown>; }, options: { readonly authorization: Authorization }): Promise<AnalyticsFilterOption[]>;
 ```
 
 #### `assertDashboardWidgetsEnabled`
@@ -486,8 +488,8 @@ Declared at `src/eventing/analytics-lwql-reconvergence.pipeline.ts:53`.
 
 | Kind   | Leaf                              | Environment variable                      | Declared at                              |
 | ------ | --------------------------------- | ----------------------------------------- | ---------------------------------------- |
-| secret | `lwqlClickHousePassword`          | `LWQL_CLICKHOUSE_PASSWORD`                | `src/app/analytics.app.ts:408`           |
-| secret | `lwqlPostgresReaderPassword`      | `LWQL_POSTGRES_READER_PASSWORD`           | `src/app/analytics.app.ts:409`           |
+| secret | `lwqlClickHousePassword`          | `LWQL_CLICKHOUSE_PASSWORD`                | `src/app/analytics.app.ts:410`           |
+| secret | `lwqlPostgresReaderPassword`      | `LWQL_POSTGRES_READER_PASSWORD`           | `src/app/analytics.app.ts:411`           |
 | config | `langwatchQl.url`                 | `LWQL_CLICKHOUSE_URL`                     | `../contract/src/analytics.config.ts:11` |
 | config | `langwatchQl.username`            | `LWQL_CLICKHOUSE_USER`                    | `../contract/src/analytics.config.ts:12` |
 | config | `langwatchQl.database`            | `LWQL_DATABASE`                           | `../contract/src/analytics.config.ts:13` |

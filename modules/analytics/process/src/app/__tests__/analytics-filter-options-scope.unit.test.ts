@@ -78,11 +78,11 @@ describe("AnalyticsModule.filterOptions", () => {
 
       await app.filterOptions(
         {
-        projectId: "project-1",
-        field: "metadata.user_id",
-        startDate: 1,
-        endDate: 2,
-        filters: { "metadata.user_id": ["u-1"], "traces.error": ["true"] },
+          projectId: "project-1",
+          field: "metadata.user_id",
+          startDate: 1,
+          endDate: 2,
+          filters: { "metadata.user_id": ["u-1"], "traces.error": ["true"] },
         },
         { authorization: analyticsProof({ projectId: "project-1" }) },
       );
@@ -99,11 +99,11 @@ describe("AnalyticsModule.filterOptions", () => {
 
       await app.filterOptions(
         {
-        projectId: "project-1",
-        field: "metadata.user_id",
-        startDate: 1,
-        endDate: 2,
-        filters: { "traces.error": ["true"] },
+          projectId: "project-1",
+          field: "metadata.user_id",
+          startDate: 1,
+          endDate: 2,
+          filters: { "traces.error": ["true"] },
         },
         { authorization: analyticsProof({ projectId: "project-1" }) },
       );

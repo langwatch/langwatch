@@ -641,10 +641,10 @@ translateTraceFilter(input: { query: string; tenantId: string; timeRange: { from
 
 #### `translateLegacyFilters`
 
-A legacy `filters` document compiled to parameterized ClickHouse conditions over `trace_summaries ts`. Trace owns the grammar because it owns the tables.
+A legacy `filters` document compiled to parameterized ClickHouse conditions over `trace_summaries ts`; Trace owns the grammar because it owns the tables. `fenced` writes side-table subqueries for a statement read through a proof's fence (ADR-177).
 
 ```typescript
-translateLegacyFilters(input: { filters: Readonly<Record<string, unknown>>; window?: { startDate?: number; endDate?: number }; }): { conditions: string[]; params: Record<string, unknown>; hasUnsupportedFilters: boolean };
+translateLegacyFilters(input: { filters: Readonly<Record<string, unknown>>; window?: { startDate?: number; endDate?: number }; fenced?: boolean; }): { conditions: string[]; params: Record<string, unknown>; hasUnsupportedFilters: boolean };
 ```
 
 #### `compileExplorerTraceFilter`

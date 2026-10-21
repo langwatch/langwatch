@@ -928,4 +928,4 @@ side keeps its existing guards until ADR-166's `prisma.as` lands.
     maker and reads every member if it leaks; that is tasks#955.
   - A window's minute bucket edge keeps v4.13's rule: the bucket a grant's
     edge cuts through is dropped, not counted.
-  Spec: `specs/governance/aggregate-project.feature`, section D.
+    Spec: `specs/governance/aggregate-project.feature`, section D.
