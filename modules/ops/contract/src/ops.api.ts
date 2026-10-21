@@ -30,7 +30,11 @@ import type {
   StartImpersonationInput,
   StopImpersonationInput,
 } from "./features/admin/admin.ts";
-import type { CheckupAnswer, UsageReportAnswer } from "./features/checkup/checkup.trpc.ts";
+import type {
+  CheckupAnswer,
+  UpgradeDiagnosticsAutoSendAnswer,
+  UsageReportAnswer,
+} from "./features/checkup/checkup.trpc.ts";
 import type {
   CheckupResult,
   ExplicitCheckInput,
@@ -700,8 +704,17 @@ export interface OpsApi {
     operator: OpsOperator | null;
     optionalMetricsOptOut?: boolean;
     hostnameOptOut?: boolean;
-    upgradeDiagnosticsOptOut?: boolean;
   }): Promise<UsageReportAnswer>;
+  /** Install-wide: whether the hourly check sends a failed step's diagnostics by itself. */
+  getUpgradeDiagnosticsAutoSend(input: {
+    organizationId: string;
+    operator: OpsOperator | null;
+  }): Promise<UpgradeDiagnosticsAutoSendAnswer>;
+  setUpgradeDiagnosticsAutoSend(input: {
+    organizationId: string;
+    operator: OpsOperator | null;
+    enabled: boolean;
+  }): Promise<UpgradeDiagnosticsAutoSendAnswer>;
   /** What `langwatch doctor` reads over a project key, which is never an install admin. */
   getProjectCheckup(input: { projectId: string }): Promise<ProjectCheckupReport>;
   /** The paid checks over a project key; refused on LangWatch Cloud. */

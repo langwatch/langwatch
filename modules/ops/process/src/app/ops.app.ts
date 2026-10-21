@@ -66,6 +66,7 @@ import {
   type ExplicitCheckInput,
   type ProjectCheckupReport,
   OpsCapabilityUnavailableError,
+  type UpgradeDiagnosticsAutoSendAnswer,
   type UsageReportAnswer,
   opsBrowserConfig,
   opsConfig,
@@ -1998,13 +1999,39 @@ export class OpsModule implements OpsApi {
     operator: OpsOperator | null;
     optionalMetricsOptOut?: boolean;
     hostnameOptOut?: boolean;
-    upgradeDiagnosticsOptOut?: boolean;
   }): Promise<UsageReportAnswer> {
     const checkup = this.#checkup;
     if (checkup.isSaas) return { deployment: "saas" };
     await this.admitOperator(operator, "ops:manage");
     const report = await checkup.setUsageReportSwitches(switches);
     return { deployment: "self-hosted", ...report };
+  }
+
+  async getUpgradeDiagnosticsAutoSend({
+    organizationId: _installWide,
+    operator,
+  }: {
+    organizationId: string;
+    operator: OpsOperator | null;
+  }): Promise<UpgradeDiagnosticsAutoSendAnswer> {
+    if (this.#checkup.isSaas) return { deployment: "saas" };
+    await this.admitOperator(operator, "ops:manage");
+    return { deployment: "self-hosted", ...(await this.#upgradeDiagnostics.getAutoSend()) };
+  }
+
+  async setUpgradeDiagnosticsAutoSend({
+    organizationId: _installWide,
+    operator,
+    enabled,
+  }: {
+    organizationId: string;
+    operator: OpsOperator | null;
+    enabled: boolean;
+  }): Promise<UpgradeDiagnosticsAutoSendAnswer> {
+    if (this.#checkup.isSaas) return { deployment: "saas" };
+    await this.admitOperator(operator, "ops:manage");
+    const autoSend = await this.#upgradeDiagnostics.setAutoSend({ enabled });
+    return { deployment: "self-hosted", ...autoSend };
   }
 
   /** A project key has no person behind it, so it reads its organization's verdicts only. */

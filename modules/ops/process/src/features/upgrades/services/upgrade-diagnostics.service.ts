@@ -2,6 +2,7 @@ import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import {
   type OpsUpgradeDiagnosticsAvailability,
   type OpsUpgradeDiagnosticsReceipt,
+  type UpgradeDiagnosticsAutoSend,
   type UpgradeDiagnosticsBundle,
   UpgradeStepNotFailedError,
 } from "@langwatch/ops-contract";
@@ -17,7 +18,10 @@ import {
 
 type Licensing = Pick<
   LicensingApi,
-  "findInstanceIdentity" | "getUpgradeDiagnosticsAvailability" | "sendUpgradeDiagnostics"
+  | "findInstanceIdentity"
+  | "getUpgradeDiagnosticsAvailability"
+  | "sendUpgradeDiagnostics"
+  | "setUpgradeDiagnosticsOptOut"
 >;
 
 /**
@@ -60,6 +64,17 @@ export class UpgradeDiagnosticsService {
     ]);
     const optedOut = this.deps.automaticDisabled || (identity?.upgradeDiagnosticsOptOut ?? false);
     return { ...availability, automatic: availability.available && !optedOut };
+  }
+
+  /** The operator's switch for automatic sending, apart from the environment variable. */
+  async getAutoSend(): Promise<UpgradeDiagnosticsAutoSend> {
+    const [identity] = await this.deps.licensing.findInstanceIdentity();
+    return { enabled: !(identity?.upgradeDiagnosticsOptOut ?? false) };
+  }
+
+  async setAutoSend({ enabled }: { enabled: boolean }): Promise<UpgradeDiagnosticsAutoSend> {
+    await this.deps.licensing.setUpgradeDiagnosticsOptOut({ optOut: !enabled });
+    return this.getAutoSend();
   }
 
   /**

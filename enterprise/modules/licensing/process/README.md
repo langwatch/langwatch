@@ -337,7 +337,15 @@ recordUsageReportOutcome(input: { error?: string }): Promise<void>;
 What a customer switched off in the usage report; an absent switch is left alone.
 
 ```typescript
-setUsageReportSwitches(input: { optionalMetricsOptOut?: boolean; hostnameOptOut?: boolean; upgradeDiagnosticsOptOut?: boolean; }): Promise<void>;
+setUsageReportSwitches(input: { optionalMetricsOptOut?: boolean; hostnameOptOut?: boolean; }): Promise<void>;
+```
+
+#### `setUpgradeDiagnosticsOptOut`
+
+Keeps the hourly check from sending a failed upgrade step's diagnostics by itself.
+
+```typescript
+setUpgradeDiagnosticsOptOut(input: { optOut: boolean }): Promise<void>;
 ```
 
 #### `getContractTerms`

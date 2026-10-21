@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`OpsApi`)
 
-Peers call these through the token, declared at `../contract/src/ops.api.ts:436`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/ops.api.ts:440`; nothing else in this package is public.
 
 #### `startAdminImpersonation`
 
@@ -829,7 +829,21 @@ getUsageReport(input: { organizationId: string; operator: OpsOperator | null; })
 #### `setUsageReportSwitches`
 
 ```typescript
-setUsageReportSwitches(input: { organizationId: string; operator: OpsOperator | null; optionalMetricsOptOut?: boolean; hostnameOptOut?: boolean; upgradeDiagnosticsOptOut?: boolean; }): Promise<UsageReportAnswer>;
+setUsageReportSwitches(input: { organizationId: string; operator: OpsOperator | null; optionalMetricsOptOut?: boolean; hostnameOptOut?: boolean; }): Promise<UsageReportAnswer>;
+```
+
+#### `getUpgradeDiagnosticsAutoSend`
+
+Install-wide: whether the hourly check sends a failed step's diagnostics by itself.
+
+```typescript
+getUpgradeDiagnosticsAutoSend(input: { organizationId: string; operator: OpsOperator | null; }): Promise<UpgradeDiagnosticsAutoSendAnswer>;
+```
+
+#### `setUpgradeDiagnosticsAutoSend`
+
+```typescript
+setUpgradeDiagnosticsAutoSend(input: { organizationId: string; operator: OpsOperator | null; enabled: boolean; }): Promise<UpgradeDiagnosticsAutoSendAnswer>;
 ```
 
 #### `getProjectCheckup`
@@ -1096,40 +1110,61 @@ type Response = unknown;
 
 ### `checkup`
 
-Contract `../contract/src/features/checkup/checkup.trpc.ts:38`, router `src/transport/checkup.trpc.ts:12`.
+Contract `../contract/src/features/checkup/checkup.trpc.ts:55`, router `src/transport/checkup.trpc.ts:12`.
 
-| Procedure                        | Kind     | Gate                             | Input               | Output              |
-| -------------------------------- | -------- | -------------------------------- | ------------------- | ------------------- |
-| `checkup.status`                 | query    | Permission `organization:view`   | `organizationInput` | `checkupAnswer`     |
-| `checkup.run`                    | mutation | Permission `organization:manage` | inline              | `checkupAnswer`     |
-| `checkup.usageReport`            | query    | Permission `organization:view`   | `organizationInput` | `usageReportAnswer` |
-| `checkup.setUsageReportSwitches` | mutation | Platform permission `ops:manage` | inline              | `usageReportAnswer` |
+| Procedure                               | Kind     | Gate                             | Input               | Output                                   |
+| --------------------------------------- | -------- | -------------------------------- | ------------------- | ---------------------------------------- |
+| `checkup.status`                        | query    | Permission `organization:view`   | `organizationInput` | `checkupAnswer`                          |
+| `checkup.run`                           | mutation | Permission `organization:manage` | inline              | `checkupAnswer`                          |
+| `checkup.usageReport`                   | query    | Permission `organization:view`   | `organizationInput` | `usageReportAnswer`                      |
+| `checkup.setUsageReportSwitches`        | mutation | Platform permission `ops:manage` | inline              | `usageReportAnswer`                      |
+| `checkup.upgradeDiagnosticsAutoSend`    | query    | Platform permission `ops:manage` | `organizationInput` | `upgradeDiagnosticsAutoSendAnswerSchema` |
+| `checkup.setUpgradeDiagnosticsAutoSend` | mutation | Platform permission `ops:manage` | inline              | `upgradeDiagnosticsAutoSendAnswerSchema` |
 
 ```typescript
 // checkup.status
-// Input: organizationInput, ../contract/src/features/checkup/checkup.trpc.ts:11
+// Input: organizationInput, ../contract/src/features/checkup/checkup.trpc.ts:14
 interface Input {
   organizationId: string;
 }
-type Output = z.infer<typeof checkupAnswer>; // ../contract/src/features/checkup/checkup.trpc.ts:35
+type Output = z.infer<typeof checkupAnswer>; // ../contract/src/features/checkup/checkup.trpc.ts:52
 
 // checkup.run
-// Input: z.object({ ...organizationInput.shape, ...explicitCheckInputSchema.shape }) (inline, ../contract/src/features/checkup/checkup.trpc.ts:44)
-type Output = z.infer<typeof checkupAnswer>; // ../contract/src/features/checkup/checkup.trpc.ts:35
+// Input: z.object({ ...organizationInput.shape, ...explicitCheckInputSchema.shape }) (inline, ../contract/src/features/checkup/checkup.trpc.ts:61)
+type Output = z.infer<typeof checkupAnswer>; // ../contract/src/features/checkup/checkup.trpc.ts:52
 
 // checkup.usageReport
-type Input = z.infer<typeof organizationInput>; // ../contract/src/features/checkup/checkup.trpc.ts:11
-type Output = z.infer<typeof usageReportAnswer>; // ../contract/src/features/checkup/checkup.trpc.ts:36
+type Input = z.infer<typeof organizationInput>; // ../contract/src/features/checkup/checkup.trpc.ts:14
+type Output = z.infer<typeof usageReportAnswer>; // ../contract/src/features/checkup/checkup.trpc.ts:53
 
 // checkup.setUsageReportSwitches
-// Input: inline, ../contract/src/features/checkup/checkup.trpc.ts:53
+// Input: inline, ../contract/src/features/checkup/checkup.trpc.ts:70
 interface Input {
   organizationId: string;
   optionalMetricsOptOut?: boolean;
   hostnameOptOut?: boolean;
-  upgradeDiagnosticsOptOut?: boolean;
 }
-type Output = z.infer<typeof usageReportAnswer>; // ../contract/src/features/checkup/checkup.trpc.ts:36
+type Output = z.infer<typeof usageReportAnswer>; // ../contract/src/features/checkup/checkup.trpc.ts:53
+
+// checkup.upgradeDiagnosticsAutoSend
+type Input = z.infer<typeof organizationInput>; // ../contract/src/features/checkup/checkup.trpc.ts:14
+// Output: upgradeDiagnosticsAutoSendAnswerSchema, ../contract/src/features/checkup/checkup.trpc.ts:47
+type Output =
+  | {
+      deployment: "saas";
+    }
+  | {
+      enabled: boolean;
+      deployment: "self-hosted";
+    };
+
+// checkup.setUpgradeDiagnosticsAutoSend
+// Input: inline, ../contract/src/features/checkup/checkup.trpc.ts:84
+interface Input {
+  organizationId: string;
+  enabled: boolean;
+}
+type Output = z.infer<typeof upgradeDiagnosticsAutoSendAnswerSchema>; // ../contract/src/features/checkup/checkup.trpc.ts:47
 ```
 
 ### `bugReports`
@@ -2345,12 +2380,12 @@ type Output = z.infer<typeof opsUpgradeStepDetailSchema>; // ../contract/src/fea
 
 // ops.upgrade.getDiagnostics
 type Input = z.infer<typeof opsUpgradeIdInputSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:320
-type Output = z.infer<typeof upgradeDiagnosticsBundleSchema>; // ../contract/src/features/migrations/ops-upgrade-diagnostics.ts:56
+type Output = z.infer<typeof upgradeDiagnosticsBundleSchema>; // ../contract/src/features/migrations/ops-upgrade-diagnostics.ts:68
 
 // ops.upgrade.diagnosticsAvailability
 // Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:415
 type Input = unknown;
-// Output: opsUpgradeDiagnosticsAvailabilitySchema, ../contract/src/features/migrations/ops-upgrade-diagnostics.ts:70
+// Output: opsUpgradeDiagnosticsAvailabilitySchema, ../contract/src/features/migrations/ops-upgrade-diagnostics.ts:82
 interface Output {
   available: boolean;
   reason: "connect_disabled" | "no_licence" | null;
@@ -2359,7 +2394,7 @@ interface Output {
 
 // ops.upgrade.sendDiagnostics
 type Input = z.infer<typeof opsUpgradeSendDiagnosticsInputSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:331
-// Output: opsUpgradeDiagnosticsReceiptSchema, ../contract/src/features/migrations/ops-upgrade-diagnostics.ts:84
+// Output: opsUpgradeDiagnosticsReceiptSchema, ../contract/src/features/migrations/ops-upgrade-diagnostics.ts:96
 interface Output {
   reportId: string;
   receivedAt: string;
@@ -2595,11 +2630,11 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                                 | Environment variable                    | Declared at                        |
 | ------ | ------------------------------------ | --------------------------------------- | ---------------------------------- |
-| secret | `licensePrivateKey`                  | `LANGWATCH_LICENSE_PRIVATE_KEY`         | `src/app/ops.app.ts:818`           |
-| secret | `slackBugReportsBotToken`            | `SLACK_BUG_REPORTS_BOT_TOKEN`           | `src/app/ops.app.ts:819`           |
-| secret | `credentials`                        | `CREDENTIALS_SECRET`                    | `src/app/ops.app.ts:821`           |
-| secret | `credentialsFallback`                | `NEXTAUTH_SECRET`                       | `src/app/ops.app.ts:822`           |
-| secret | `credentialsPrevious`                | `CREDENTIALS_SECRET_PREVIOUS`           | `src/app/ops.app.ts:823`           |
+| secret | `licensePrivateKey`                  | `LANGWATCH_LICENSE_PRIVATE_KEY`         | `src/app/ops.app.ts:819`           |
+| secret | `slackBugReportsBotToken`            | `SLACK_BUG_REPORTS_BOT_TOKEN`           | `src/app/ops.app.ts:820`           |
+| secret | `credentials`                        | `CREDENTIALS_SECRET`                    | `src/app/ops.app.ts:822`           |
+| secret | `credentialsFallback`                | `NEXTAUTH_SECRET`                       | `src/app/ops.app.ts:823`           |
+| secret | `credentialsPrevious`                | `CREDENTIALS_SECRET_PREVIOUS`           | `src/app/ops.app.ts:824`           |
 | config | `apiKey`                             | `LANGWATCH_OPS_API_KEY`                 | `../contract/src/ops.config.ts:30` |
 | config | `clickhouseOpsUrl`                   | `CLICKHOUSE_OPS_URL`                    | `../contract/src/ops.config.ts:32` |
 | config | `usageStats.disabled`                | `DISABLE_USAGE_STATS`                   | `../contract/src/ops.config.ts:34` |

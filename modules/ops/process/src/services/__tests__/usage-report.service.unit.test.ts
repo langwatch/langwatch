@@ -67,7 +67,6 @@ class InstallStandIn implements UsageReportInstall {
   async setUsageReportSwitches(input: {
     optionalMetricsOptOut?: boolean;
     hostnameOptOut?: boolean;
-    upgradeDiagnosticsOptOut?: boolean;
   }): Promise<void> {
     await this.getInstanceId();
     if (this.identity) this.identity = { ...this.identity, ...input };
@@ -332,7 +331,6 @@ describe("the usage report preview", () => {
       expect(preview.switches).toEqual({
         optional: false,
         hostname: true,
-        upgradeDiagnostics: true,
       });
       expect(preview.payload.user_email_domains).toBeUndefined();
       expect(preview.payload.totalTraces).toBeUndefined();
@@ -341,17 +339,14 @@ describe("the usage report preview", () => {
   });
 
   describe("when the identity row has opted out of upgrade diagnostics", () => {
-    it("carries upgradeDiagnostics false in the preview's switches", async () => {
+    it("leaves that switch out of the report's switches, which name only what the report sends", async () => {
       await install.getInstanceId();
-      await install.setUsageReportSwitches({ upgradeDiagnosticsOptOut: true });
+      if (install.identity)
+        install.identity = { ...install.identity, upgradeDiagnosticsOptOut: true };
 
       const preview = await service().preview();
 
-      expect(preview.switches).toEqual({
-        optional: true,
-        hostname: true,
-        upgradeDiagnostics: false,
-      });
+      expect(preview.switches).toEqual({ optional: true, hostname: true });
     });
   });
 

@@ -3,7 +3,7 @@ import { Card } from "@langwatch/design-system/card";
 import { CopyButton } from "@langwatch/design-system/copy-button";
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Switch } from "@langwatch/design-system/switch";
-import type { UsageReportPreview } from "@langwatch/ops-contract";
+import type { UpgradeDiagnosticsAutoSend, UsageReportPreview } from "@langwatch/ops-contract";
 import { ExternalLink, Send } from "lucide-react";
 
 import { CheckupSection, CheckupSectionRow } from "../elements/checkup-section.tsx";
@@ -14,24 +14,28 @@ const DOCS_URL = "https://docs.langwatch.ai/self-hosting/data-and-telemetry";
 export type UsageReportSwitchChange = {
   optionalMetricsOptOut?: boolean;
   hostnameOptOut?: boolean;
-  upgradeDiagnosticsOptOut?: boolean;
 };
 
 /**
- * What we send: the exact report the sender posts, the two switches and a
- * copy button, so a security review reads the payload rather than a sentence
- * about it. Spec: specs/self-hosting/checkup/checkup.feature, "What we send".
+ * What we send: the exact report the sender posts, its two switches (plus the automatic upgrade
+ * diagnostics one) and a copy button, so a security review reads the payload rather than a
+ * sentence about it. Spec: specs/self-hosting/checkup/checkup.feature, "What we send".
  */
 export function UsageReportSection({
   report,
   canManage,
   isSaving,
   onSwitch,
+  autoSend,
+  onAutoSend,
 }: {
   report: UsageReportPreview;
   canManage: boolean;
   isSaving: boolean;
   onSwitch: (change: UsageReportSwitchChange) => void;
+  /** Absent for anyone but an install admin, and until it has loaded. */
+  autoSend?: UpgradeDiagnosticsAutoSend | undefined;
+  onAutoSend: (enabled: boolean) => void;
 }) {
   const pretty = JSON.stringify(report.payload, null, 2);
   const { switches } = report;
@@ -54,6 +58,14 @@ export function UsageReportSection({
             canManage={canManage}
             isSaving={isSaving}
             onSwitch={onSwitch}
+          />
+        ) : null}
+        {switches && autoSend ? (
+          <UpgradeDiagnosticsAutoSendRow
+            autoSend={autoSend}
+            canManage={canManage}
+            isSaving={isSaving}
+            onAutoSend={onAutoSend}
           />
         ) : null}
 
@@ -136,26 +148,45 @@ function UsageReportSwitchRows({
           />
         </HStack>
       </CheckupSectionRow>
-      <CheckupSectionRow testId="checkup-switch-upgrade-diagnostics">
-        <HStack width="full" justify="space-between" align="start" gap={4}>
-          <VStack align="start" gap={0}>
-            <Text fontWeight="medium">Upgrade diagnostics</Text>
-            <Text fontSize="sm" color="fg.muted">
-              When an upgrade step fails, send its details to the LangWatch team so we can fix it.
-              Secrets are masked, but the step's error, report and log lines can still mention an
-              identifier such as a project id. Off, you can still send them from the step.
-            </Text>
-          </VStack>
-          <Switch
-            checked={switches.upgradeDiagnostics}
-            disabled={!canManage || isSaving}
-            aria-label="Always send upgrade diagnostics to LangWatch"
-            inputProps={{ "data-testid": "checkup-switch-upgrade-diagnostics-input" }}
-            onCheckedChange={(event) => onSwitch({ upgradeDiagnosticsOptOut: !event.checked })}
-          />
-        </HStack>
-      </CheckupSectionRow>
     </>
+  );
+}
+
+/**
+ * The automatic upgrade diagnostics switch. Not part of the report: it has its own query and
+ * mutation, and sits here because it is also something this install sends.
+ */
+function UpgradeDiagnosticsAutoSendRow({
+  autoSend,
+  canManage,
+  isSaving,
+  onAutoSend,
+}: {
+  autoSend: UpgradeDiagnosticsAutoSend;
+  canManage: boolean;
+  isSaving: boolean;
+  onAutoSend: (enabled: boolean) => void;
+}) {
+  return (
+    <CheckupSectionRow testId="checkup-switch-upgrade-diagnostics">
+      <HStack width="full" justify="space-between" align="start" gap={4}>
+        <VStack align="start" gap={0}>
+          <Text fontWeight="medium">Upgrade diagnostics</Text>
+          <Text fontSize="sm" color="fg.muted">
+            When an upgrade step fails, send its details to the LangWatch team so we can fix it.
+            Secrets are masked, but the step's error, report and log lines can still mention an
+            identifier such as a project id. Off, you can still send them from the step.
+          </Text>
+        </VStack>
+        <Switch
+          checked={autoSend.enabled}
+          disabled={!canManage || isSaving}
+          aria-label="Always send upgrade diagnostics to LangWatch"
+          inputProps={{ "data-testid": "checkup-switch-upgrade-diagnostics-input" }}
+          onCheckedChange={(event) => onAutoSend(event.checked)}
+        />
+      </HStack>
+    </CheckupSectionRow>
   );
 }
 

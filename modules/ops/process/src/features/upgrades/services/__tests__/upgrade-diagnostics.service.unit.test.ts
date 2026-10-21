@@ -15,7 +15,10 @@ import { UpgradeDiagnosticsService } from "../upgrade-diagnostics.service.ts";
 
 type Licensing = Pick<
   LicensingApi,
-  "findInstanceIdentity" | "getUpgradeDiagnosticsAvailability" | "sendUpgradeDiagnostics"
+  | "findInstanceIdentity"
+  | "getUpgradeDiagnosticsAvailability"
+  | "sendUpgradeDiagnostics"
+  | "setUpgradeDiagnosticsOptOut"
 >;
 
 const NOW = "2026-10-20T10:00:00.000Z";
@@ -57,6 +60,12 @@ function setup({
         sent.push({ trigger, bundle });
         return RECEIPT;
       },
+      setUpgradeDiagnosticsOptOut: async ({ optOut }) => {
+        identities.splice(0, 1, {
+          ...(identities[0] ?? identity()),
+          upgradeDiagnosticsOptOut: optOut,
+        });
+      },
     }),
     deployment: { imageRelease: "3.23.0", chartVersion: "1.4.2", installMethod: "helm" },
     automaticDisabled,
@@ -66,6 +75,25 @@ function setup({
 }
 
 describe("UpgradeDiagnosticsService", () => {
+  describe("when an operator switches automatic sending", () => {
+    describe("given it was on", () => {
+      it("records the opt-out, reads it back off, and the hourly check stops sending", async () => {
+        const { service } = setup();
+        expect(await service.getAutoSend()).toEqual({ enabled: true });
+
+        expect(await service.setAutoSend({ enabled: false })).toEqual({ enabled: false });
+        expect((await service.getAvailability()).automatic).toBe(false);
+      });
+    });
+
+    describe("given the environment variable switched automatic sending off", () => {
+      it("still reads the operator's own switch", async () => {
+        const { service } = setup({ automaticDisabled: true });
+        expect(await service.getAutoSend()).toEqual({ enabled: true });
+      });
+    });
+  });
+
   describe("when getting a bundle", () => {
     describe("given the install has an identity", () => {
       it("carries the instance id with the deployment facts", async () => {

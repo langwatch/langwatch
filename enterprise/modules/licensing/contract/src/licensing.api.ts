@@ -232,8 +232,9 @@ export interface LicensingApi {
   setUsageReportSwitches(input: {
     optionalMetricsOptOut?: boolean;
     hostnameOptOut?: boolean;
-    upgradeDiagnosticsOptOut?: boolean;
   }): Promise<void>;
+  /** Keeps the hourly check from sending a failed upgrade step's diagnostics by itself. */
+  setUpgradeDiagnosticsOptOut(input: { optOut: boolean }): Promise<void>;
 
   /** What a customer's licenses add up to commercially, right now. */
   getContractTerms(input: { organizationId: string }): Promise<ContractTerms>;

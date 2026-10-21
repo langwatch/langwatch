@@ -12,8 +12,6 @@ const usageReportSwitchesSchemaDefinition = z.object({
   optional: z.boolean(),
   /** Hostname, which names the customer's own network. */
   hostname: z.boolean(),
-  /** A failed upgrade step's diagnostics, sent by the hourly check (not part of the report). */
-  upgradeDiagnostics: z.boolean(),
 });
 export interface UsageReportSwitchesSchema extends Named<
   typeof usageReportSwitchesSchemaDefinition
@@ -25,8 +23,23 @@ export type UsageReportSwitches = z.infer<typeof usageReportSwitchesSchema>;
 export const USAGE_REPORT_SWITCHES_ON: UsageReportSwitches = {
   optional: true,
   hostname: true,
-  upgradeDiagnostics: true,
 };
+
+/**
+ * Whether the hourly check sends a failed upgrade step's diagnostics by itself. Not part of the
+ * usage report; the checkup page shows it beside the report's switches.
+ * Spec: modules/ops/specs/upgrade-alerts.feature
+ */
+const upgradeDiagnosticsAutoSendSchemaDefinition = z.object({
+  /** The operator's switch: on unless someone switched it off. */
+  enabled: z.boolean(),
+});
+export interface UpgradeDiagnosticsAutoSendSchema extends Named<
+  typeof upgradeDiagnosticsAutoSendSchemaDefinition
+> {}
+export const upgradeDiagnosticsAutoSendSchema: UpgradeDiagnosticsAutoSendSchema =
+  upgradeDiagnosticsAutoSendSchemaDefinition;
+export type UpgradeDiagnosticsAutoSend = z.infer<typeof upgradeDiagnosticsAutoSendSchema>;
 
 /** Where an install that has never reported shows its identity: the page reads and never mints. */
 export const INSTANCE_ID_NOT_MINTED = "(minted on the first report)";

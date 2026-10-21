@@ -41,7 +41,6 @@ export type UsageReportInstall = Pick<
 export type UsageReportSwitchChange = Readonly<{
   optionalMetricsOptOut?: boolean;
   hostnameOptOut?: boolean;
-  upgradeDiagnosticsOptOut?: boolean;
 }>;
 
 type UsageReportSendOutcome =
@@ -215,6 +214,5 @@ function switchesOf(identity: InstanceIdentityView | undefined): UsageReportSwit
   return {
     optional: !identity?.optionalMetricsOptOut,
     hostname: !identity?.hostnameOptOut,
-    upgradeDiagnostics: !identity?.upgradeDiagnosticsOptOut,
   };
 }

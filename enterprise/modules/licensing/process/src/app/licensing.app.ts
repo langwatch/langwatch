@@ -693,9 +693,12 @@ export class LicensingModule implements LicensingApiContract {
   setUsageReportSwitches(input: {
     optionalMetricsOptOut?: boolean;
     hostnameOptOut?: boolean;
-    upgradeDiagnosticsOptOut?: boolean;
   }): Promise<void> {
     return this.#identity.setReportSwitches(input);
+  }
+
+  setUpgradeDiagnosticsOptOut({ optOut }: { optOut: boolean }): Promise<void> {
+    return this.#identity.setReportSwitches({ upgradeDiagnosticsOptOut: optOut });
   }
 
   isConnectServiceEnabled(input: {

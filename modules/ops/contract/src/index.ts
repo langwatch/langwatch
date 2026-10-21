@@ -125,9 +125,12 @@ export * from "./features/checkup/checkup-usage-report.ts";
 export {
   checkupAnswerSchema,
   checkupTrpc,
+  upgradeDiagnosticsAutoSendAnswerSchema,
   usageReportAnswerSchema,
   type CheckupAnswer,
+  type UpgradeDiagnosticsAutoSendAnswer,
   type UsageReportAnswer,
   type CheckupAnswerSchema,
+  type UpgradeDiagnosticsAutoSendAnswerSchema,
   type UsageReportAnswerSchema,
 } from "./features/checkup/checkup.trpc.ts";
