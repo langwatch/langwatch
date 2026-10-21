@@ -41,6 +41,8 @@ const modelUsageSchema = z.object({
   costUsd: z.number().nullable(),
   /** False when only the model's name is known: the totals above are not real. */
   tokensKnown: z.boolean(),
+  /** AI units the model's calls consumed: a count of its own, never part of `costUsd`. */
+  aiUnits: z.number(),
 });
 
 export const pullRequestUsageResponseSchema = z.object({

@@ -166,13 +166,13 @@ Authenticated: authentication is the organization key; the authorization is the 
 Answers at `/api/v1/coding-agent/pull-request-usage`.
 
 ```typescript
-// Query: pullRequestUsageQuerySchema, src/rules/pull-request-usage-wire.rules.ts:73
+// Query: pullRequestUsageQuerySchema, src/rules/pull-request-usage-wire.rules.ts:75
 interface Query {
   repository: string;
   pullRequest: number;
   host?: string;
 }
-type Response = z.infer<typeof pullRequestUsageResponseSchema>; // src/rules/pull-request-usage-wire.rules.ts:46
+type Response = z.infer<typeof pullRequestUsageResponseSchema>; // src/rules/pull-request-usage-wire.rules.ts:48
 ```
 
 ### `codingAgentRest`
@@ -227,8 +227,8 @@ Permission `traces:view`. Declared at `src/transport/coding-agent.rest.ts:95`.
 Answers at `/api/coding-agent/pull-request-usage`.
 
 ```typescript
-type Query = z.infer<typeof pullRequestUsageQuerySchema>; // src/rules/pull-request-usage-wire.rules.ts:73
-type Response = z.infer<typeof pullRequestUsageResponseSchema>; // src/rules/pull-request-usage-wire.rules.ts:46
+type Query = z.infer<typeof pullRequestUsageQuerySchema>; // src/rules/pull-request-usage-wire.rules.ts:75
+type Response = z.infer<typeof pullRequestUsageResponseSchema>; // src/rules/pull-request-usage-wire.rules.ts:48
 ```
 
 ## tRPC transport

@@ -28645,6 +28645,9 @@
                           },
                           "tokensKnown": {
                             "type": "boolean"
+                          },
+                          "aiUnits": {
+                            "type": "number"
                           }
                         },
                         "required": [
@@ -28655,7 +28658,8 @@
                           "cacheCreationTokens",
                           "totalTokens",
                           "costUsd",
-                          "tokensKnown"
+                          "tokensKnown",
+                          "aiUnits"
                         ],
                         "additionalProperties": false
                       }
@@ -29046,6 +29050,9 @@
                           },
                           "tokensKnown": {
                             "type": "boolean"
+                          },
+                          "aiUnits": {
+                            "type": "number"
                           }
                         },
                         "required": [
@@ -29056,7 +29063,8 @@
                           "cacheCreationTokens",
                           "totalTokens",
                           "costUsd",
-                          "tokensKnown"
+                          "tokensKnown",
+                          "aiUnits"
                         ],
                         "additionalProperties": false
                       }
