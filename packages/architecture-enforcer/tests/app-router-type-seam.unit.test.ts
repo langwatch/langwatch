@@ -15,10 +15,8 @@ import { createWorkspaceModuleResolver, moduleImports } from "../src/workspace/m
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
 /**
- * Measured once the ops contract imported system-migrations types only (no
- * eventing or group-queue files). A ceiling, not a target. Lower it when earned;
- * never raise it without saying why.
- * The count depends on `pnpm ensure:built`: https://github.com/langwatch/langwatch/issues/8795
+ * 1,540 with `pnpm ensure:built` (#8795) once ops imports system-migrations types only.
+ * A ceiling, not a target. Lower it when earned; never raise it without saying why.
  */
 const CEILING = 1_560;
 

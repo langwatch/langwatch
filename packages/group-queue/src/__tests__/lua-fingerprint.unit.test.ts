@@ -59,12 +59,16 @@ const EXPECTED_CACHED_SCRIPT_SOURCES = [
   "TRANSFER_LUA",
 ].toSorted((a, b) => a.localeCompare(b));
 
+/** Variable names of every `new CachedLuaScript(`...`)` built from an inline template. */
+const EXPECTED_INLINE_CACHED_SCRIPTS = ["groupRoutingLabelsScript"];
+
 /**
  * Exported `*_LUA` constants not reachable from a package entry;
  * hashed through their composers.
  */
 const EXPECTED_UNREACHABLE_EXPORTED_LUA = [
   "BLOB_LEASE_HELPER_LUA",
+  "CLAIM_MARKER_HELPER_LUA",
   "CLAIMED_RECORD_HELPER_LUA",
   "GQ_BLOB_GRACE_LUA",
   "ROUTING_META_HELPER_LUA",
@@ -125,11 +129,17 @@ describe("group-queue Lua fingerprint", () => {
     /** @scenario "A Lua script added without being named fails the guard" */
     it("names every CachedLuaScript built in source", () => {
       expect(scan(/new CachedLuaScript\((\w+)\)/g)).toEqual(EXPECTED_CACHED_SCRIPT_SOURCES);
+      expect(scan(/(\w+) = new CachedLuaScript\(`/g)).toEqual(EXPECTED_INLINE_CACHED_SCRIPTS);
+      expect(scan(/(new CachedLuaScript)\(/g)).toHaveLength(
+        EXPECTED_CACHED_SCRIPT_SOURCES.length + EXPECTED_INLINE_CACHED_SCRIPTS.length,
+      );
     });
 
     /** @scenario "A Lua script added without being named fails the guard" */
     it("builds exactly one distinct script per named site at runtime", () => {
-      expect(built).toHaveLength(EXPECTED_CACHED_SCRIPT_SOURCES.length);
+      expect(built).toHaveLength(
+        EXPECTED_CACHED_SCRIPT_SOURCES.length + EXPECTED_INLINE_CACHED_SCRIPTS.length,
+      );
     });
 
     /** @scenario "A Lua script added without being named fails the guard" */

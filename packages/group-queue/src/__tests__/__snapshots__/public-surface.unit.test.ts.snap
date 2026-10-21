@@ -3,18 +3,22 @@
 exports[`group-queue public surface > given the package exports map > keeps the runtime surface of entry . 1`] = `
 {
   "EXHAUSTED_OUTCOMES": "object",
+  "GROUP_QUEUE_CONFIG": "object",
   "GroupQueueConfigurationError": "function",
   "GroupQueueConsumer": "function [handle, handleBatch, start]",
   "GroupQueueDependenciesAdapter": "function [dependencies]",
   "GroupQueueError": "function",
-  "GroupQueueProcessor": "function [activatePreflightGroup, assertTargetsSucceeded, blockClaimedJob, captureContext, claimedJobFrom, close, coalescedBatch, completeClaimedJob, customSpanAttributes, deadLetterClaimedJob, decodeClaimedJob, drainAndDisconnect, drainMatchingSiblings, dropStagedJob, exhaustClaimedJob, failClaimedJob, failureDecision, generateStagedJobId, handBackClaimedJob, handleExhaustedRetries, handleTransientDecode, linkProducerSpan, logHeldFromBefore, parkPoisonGroup, parseDrainedPayload, pause, processBatchBisecting, processClaimedJob, processWithRetries, quarantineErrors, readGroupAttempt, recordDrop, recordJobLatency, recordStaged, refuseUnsettledList, registerPreflightGroup, registerPreflightGroups, reportBisectedIsolate, resolveScore, restageDrainedSiblings, restageScore, resume, retryClaimedJob, runAudit, runAuditAll, runClaimedJobSpan, runInContext, runListedWork, send, sendBatch, setConcurrency, settlePastDrainTimeout, splitFailedBatch, startActiveKeyHeartbeat, startLivenessBeacon, stripInternalFields, targetsHaveSettled, waitForListRoom, waitForTargets, waitUntilPreflightIdle, waitUntilReady]",
-  "GroupQueueProducer": "function [close, registerPreflightGroups, runListedWork, send, sendBatch, waitUntilPreflightIdle, waitUntilReady]",
+  "GroupQueueProcessor": "function [activatePreflightGroup, assertStagingOpen, assertTargetsSucceeded, auditEnqueue, beatGroupBatch, blockClaimedJob, captureContext, claimGuardWorkerId, claimedJobFrom, close, coalescedBatch, completeClaimedJob, customSpanAttributes, deadLetterClaimedJob, decodeClaimedJob, drainAndDisconnect, drainMatchingSiblings, dropStagedJob, exhaustClaimedJob, failClaimedJob, failureDecision, generateStagedJobId, groupAttemptOf, groupBatching, guardClaim, handBackClaimedJob, handleExhaustedRetries, handleTransientDecode, linkProducerSpan, logHeldFromBefore, parkPoisonGroup, parseDrainedPayload, pause, prepareClaimedJob, prepareSend, processBatchBisecting, processClaimedJob, processGroupBatch, processMeasured, processWithRetries, quarantineErrors, readGroupAttempt, recordClaim, recordDrop, recordStaged, recordStagedEach, refuseUnsettledList, registerPreflightGroup, registerPreflightGroups, reportBisectedIsolate, resolveScore, restageDrainedSiblings, restageScore, resume, retryClaimedJob, runAudit, runAuditAll, runClaimedJob, runClaimedJobSpan, runGroupBatchIn, runGroupJobs, runGroupJobsSpan, runInContext, runJobHandler, runListedWork, send, sendBatch, sendContext, sendEach, setConcurrency, settlePastDrainTimeout, settlingFor, splitFailedBatch, stageEachBatch, startActiveKeyHeartbeat, startGroupBatchHeartbeat, startJobHeartbeat, startLivenessBeacon, stripInternalFields, targetsHaveSettled, waitForListRoom, waitForTargets, waitUntilPreflightIdle, waitUntilReady, warnHeartbeat]",
+  "GroupQueueProducer": "function [close, registerPreflightGroups, runListedWork, send, sendBatch, sendEach, waitUntilPreflightIdle, waitUntilReady]",
   "HandBackGroupQueueError": "function",
   "NonRetryableGroupQueueError": "function",
+  "QueueStagingClosedError": "function",
   "RunningGroupQueueConsumer": "function [close, pause, resume, setConcurrency, waitUntilReady]",
   "defineGroupQueue": "function",
+  "isQueueStagingClosed": "function",
   "refusesRetry": "function",
   "resolveGroupQueuePolicyFromEnv": "function",
+  "sendPreparedInOrder": "function",
 }
 `;
 
@@ -35,10 +39,11 @@ exports[`group-queue public surface > given the package exports map > keeps the 
   "CachedLuaScript": "function [queue, run, runCancellable]",
   "DEFAULT_GROUP_QUEUE_KEY_PREFIX": "string",
   "DISCARD_FROM_DLQ_LUA": "string",
+  "DLQ_INDEX_PRUNE_LUA": "string",
   "DLQ_TTL_SECONDS": "number",
   "DecodeFailureError": "function",
   "GROUP_QUEUE_REGISTRY_KEY": "string",
-  "GroupStagingScripts": "function [addPauseKey, claimMarkerKey, claimedKey, clearGroupFailures, closeGroupList, complete, countListedOutstanding, discardClaim, dispatch, dispatchBatch, drainGroupReady, failStreakKey, findOpenGroupLists, getConfirmedDeaths, getEarliestCandidateScore, getEarliestReadyScore, getGroupError, getKeyPrefix, getPausedKeys, getReadySize, getSignalKey, groupAttemptKey, inspectPreflightPage, inspectPreflightTargets, openGroupList, openGroupListsKey, recordClaim, recordGroupFailure, recordWorkerAlive, refreshActiveKey, registerPreflightTargets, registerQueue, releaseClaim, removePauseKey, restageAndBlock, retireWorker, retryRestage, stage, stageBatch, workerBeaconKey]",
+  "GroupStagingScripts": "function [addPauseKey, claimMarkerKey, claimedKey, clearGroupFailures, closeGroupList, complete, completeCall, completeMany, countListedOutstanding, discardClaim, dispatch, dispatchBatch, drainGroupReady, failStreakKey, findOpenGroupLists, getConfirmedDeaths, getEarliestCandidateScore, getEarliestReadyScore, getGroupError, getKeyPrefix, getPausedKeys, getReadySize, getSignalKey, groupAttemptKey, heartbeatMany, inspectPreflightPage, inspectPreflightTargets, openGroupList, openGroupListsKey, recordClaim, recordGroupFailure, recordWorkerAlive, refreshActiveKey, refreshCall, registerPreflightTargets, registerQueue, releaseClaim, removePauseKey, restageAndBlock, retireWorker, retryRestage, retryRestageCall, retryRestageMany, runPipelined, runPipelinedChunk, stage, stageBatch, workerBeaconKey]",
   "LEGACY_HOLDER_LEASE_GUARD": "string",
   "MAX_BLOB_BYTES": "number",
   "MOVE_TO_DLQ_LUA": "string",
