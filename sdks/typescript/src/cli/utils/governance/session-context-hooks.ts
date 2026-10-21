@@ -1,7 +1,7 @@
 /**
  * The hooks that make a session report its repository. An entry is ours only
  * when its command is ours; others are written back untouched. In a folder of
- * hook files (Copilot) we own one file and never open the user's.
+ * hook files (Copilot) we own one file, and only while it holds nothing else.
  */
 
 import * as fs from "node:fs";
@@ -12,6 +12,7 @@ import {
   writeAppSettingsFile,
 } from "./app-settings";
 import {
+  hasOwnedHookFile,
   type HookedTool,
   type HooksTarget,
   ownedHookFileToolForCommand,
@@ -59,11 +60,6 @@ export function sessionContextHookCommand(tool: HookedTool): string {
 /** Where a tool's hooks live, for the logout scan's label. */
 export function sessionContextHooksTarget(tool: HookedTool): HooksTarget {
   return SESSION_CONTEXT_AGENTS[tool].hookTarget.resolve();
-}
-
-/** Whether the tool's hooks are a whole file of ours rather than entries in one of theirs. */
-function hasOwnedHookFile(tool: HookedTool): boolean {
-  return SESSION_CONTEXT_AGENTS[tool].hookTarget.kind === "owned-file";
 }
 
 export type SessionContextHooksAction = "created" | "updated" | "unchanged";
@@ -141,7 +137,7 @@ export function hasSessionContextHooks({
   filePath?: string;
 }): boolean {
   const target = resolveTarget({ tool, filePath });
-  if (hasOwnedHookFile(tool)) return readOwnedHookFile(target.path) !== null;
+  if (hasOwnedHookFile(tool)) return readOwnedHookFile({ tool, filePath: target.path }) !== null;
   const document = readAppSettingsFile(target.path);
   if (!isPlainObject(document.hooks)) return false;
   return Object.values(document.hooks).some(
@@ -162,7 +158,7 @@ export function removeSessionContextHooks({
   filePath?: string;
 }): boolean {
   const target = resolveTarget({ tool, filePath });
-  if (hasOwnedHookFile(tool)) return removeOwnedHookFile(target.path);
+  if (hasOwnedHookFile(tool)) return removeOwnedHookFile({ tool, filePath: target.path });
 
   let raw: string;
   try {
@@ -281,9 +277,8 @@ function resolveTarget({
 }
 
 /**
- * Write the tool's own hook file. A file at our path that is not ours (it
- * runs none of our commands, or is not JSON) is left exactly as it is and
- * reported `unchanged`, the same as a file already up to date.
+ * Write the tool's own hook file. A file at our path that is not ours (see
+ * `readOwnedHookFile`) is left exactly as it is and reported `unchanged`.
  */
 function installOwnedHookFile({
   tool,
@@ -298,7 +293,7 @@ function installOwnedHookFile({
   } catch {
     existing = null;
   }
-  if (existing !== null && readOwnedHookFile(target.path) === null) {
+  if (existing !== null && readOwnedHookFile({ tool, filePath: target.path }) === null) {
     return { action: "unchanged", ...target };
   }
 
@@ -326,11 +321,24 @@ function copilotHookFileDocument(tool: HookedTool): Record<string, unknown> {
   };
 }
 
+/** The keys an entry of ours carries, in what `copilotHookFileDocument` writes or wrote. */
+const OWNED_ENTRY_KEYS: ReadonlySet<string> = new Set(["type", "bash", "timeoutSec"]);
+
+/** The top-level keys a hook file of ours carries. */
+const OWNED_FILE_KEYS: ReadonlySet<string> = new Set(["version", "hooks"]);
+
 /**
- * The owned hook file's document when it is ours: valid JSON whose hooks run
- * one of our commands. Null when it is missing, malformed or somebody else's.
+ * The owned hook file when it holds nothing but entries running our command.
+ * Running it is not enough: a user may write it beside hooks of their own,
+ * which a rewrite or delete would lose. Null when missing, malformed or theirs.
  */
-function readOwnedHookFile(filePath: string): Record<string, unknown> | null {
+function readOwnedHookFile({
+  tool,
+  filePath,
+}: {
+  tool: HookedTool;
+  filePath: string;
+}): Record<string, unknown> | null {
   let parsed: unknown;
   try {
     parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
@@ -338,17 +346,24 @@ function readOwnedHookFile(filePath: string): Record<string, unknown> | null {
     return null;
   }
   if (!isPlainObject(parsed) || !isPlainObject(parsed.hooks)) return null;
-  const runsOurCommand = Object.values(parsed.hooks).some(
-    (entries) =>
-      Array.isArray(entries) &&
-      entries.some((entry) => isPlainObject(entry) && isOwnedCommand(entry.bash)),
-  );
-  return runsOurCommand ? parsed : null;
+  const onlyOurKeys = Object.keys(parsed).every((key) => OWNED_FILE_KEYS.has(key));
+  if (!onlyOurKeys) return null;
+  const events = Object.values(parsed.hooks);
+  const command = sessionContextHookCommand(tool);
+  const isOurEntry = (entry: unknown): boolean => {
+    if (!isPlainObject(entry) || entry.bash !== command) return false;
+    return Object.keys(entry).every((key) => OWNED_ENTRY_KEYS.has(key));
+  };
+  const isOnlyOurs = (entries: unknown): boolean => {
+    if (!Array.isArray(entries) || entries.length === 0) return false;
+    return entries.every(isOurEntry);
+  };
+  return events.length > 0 && events.every(isOnlyOurs) ? parsed : null;
 }
 
 /** Delete the owned hook file when it is ours. Returns whether it was removed. */
-function removeOwnedHookFile(filePath: string): boolean {
-  if (readOwnedHookFile(filePath) === null) return false;
+function removeOwnedHookFile({ tool, filePath }: { tool: HookedTool; filePath: string }): boolean {
+  if (readOwnedHookFile({ tool, filePath }) === null) return false;
   try {
     fs.unlinkSync(filePath);
     return true;

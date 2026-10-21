@@ -395,4 +395,33 @@ describe("the copilot ingestion install", () => {
       expect(fs.readdirSync(copilotHooksDir)).toEqual(["my-hooks.json"]);
     });
   });
+
+  describe("given a langwatch.json the user wrote that runs our command beside their own hooks", () => {
+    const langwatchFile = () => path.join(copilotHooksDir, COPILOT_HOOK_FILE_NAME);
+    const userBytes = JSON.stringify({
+      hooks: {
+        sessionStart: [{ bash: "langwatch ingest hook copilot" }, { bash: "echo mine" }],
+        preToolUse: [{ bash: "echo guard" }],
+      },
+    });
+
+    beforeEach(() => {
+      fs.mkdirSync(copilotHooksDir, { recursive: true });
+      fs.writeFileSync(langwatchFile(), userBytes);
+    });
+
+    /** @scenario "A langwatch.json the user wrote around the LangWatch command is never rewritten or removed" */
+    it("keeps it byte for byte through install and logout, and logout never lists it", async () => {
+      await runCopilotInstall();
+      expect(fs.readFileSync(langwatchFile(), "utf8")).toBe(userBytes);
+
+      const copilotTarget = scanTelemetryTargets({ cwd: tmpDir }).find((target) =>
+        target.label.startsWith("copilot session hooks"),
+      );
+      expect(copilotTarget?.present).toBe(false);
+
+      removeTelemetryTargets();
+      expect(fs.readFileSync(langwatchFile(), "utf8")).toBe(userBytes);
+    });
+  });
 });

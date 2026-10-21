@@ -600,6 +600,21 @@ Rule: Copilot reports through one hook file LangWatch owns
     Then the user's hook file is unchanged throughout
     And the LangWatch hook file is gone after logout
 
+  # Running the LangWatch command does not make a file LangWatch's: only a file
+  # holding nothing but LangWatch's own entries is, so no user hook is lost.
+  @unit
+  Scenario: A langwatch.json the user wrote around the LangWatch command is never rewritten or removed
+    Given a Copilot langwatch.json that runs the LangWatch hook command beside the user's own hooks
+    When the copilot ingestion install runs and logout then removes the telemetry targets
+    Then the file is unchanged throughout
+    And logout does not offer to remove it
+
+  @unit
+  Scenario: A Copilot hook file holding only LangWatch's entries is brought up to date
+    Given a langwatch.json an older CLI wrote, holding only LangWatch's entries in another shape
+    When the copilot ingestion install runs
+    Then the file is rewritten to the current LangWatch hook file
+
   # A user who only ever runs `langwatch copilot` or `langwatch code` never runs
   # the install, so the wrapper's offer to keep capturing writes the file too.
   # Its question names the file, because a bare Enter is a yes.

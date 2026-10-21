@@ -149,7 +149,8 @@ export type OwnedHookFileTool = {
     : never;
 }[SessionContextAgentId];
 
-function hasOwnedHookFile(id: SessionContextAgentId): id is OwnedHookFileTool {
+/** Whether the agent's hook is a whole file of ours rather than entries in one of the user's. */
+export function hasOwnedHookFile(id: SessionContextAgentId): id is OwnedHookFileTool {
   return SESSION_CONTEXT_AGENTS[id].hookTarget.kind === "owned-file";
 }
 

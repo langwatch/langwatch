@@ -343,6 +343,7 @@ describe("the Copilot hook file LangWatch owns", () => {
       );
     });
 
+    /** @scenario "A Copilot hook file holding only LangWatch's entries is brought up to date" */
     it("rewrites a file of ours an older CLI left in another shape", () => {
       fs.mkdirSync(path.dirname(copilotFile()), { recursive: true });
       fs.writeFileSync(
@@ -375,6 +376,46 @@ describe("the Copilot hook file LangWatch owns", () => {
       expect(remove("copilot")).toBe(false);
       expect(fs.readFileSync(copilotFile(), "utf8")).toBe(theirs);
     });
+  });
+
+  describe("given a file at our path that runs our command and anything else", () => {
+    const cases = {
+      "a user hook beside ours in the same event": {
+        hooks: {
+          sessionStart: [{ bash: "langwatch ingest hook copilot" }, { bash: "echo mine" }],
+        },
+      },
+      "a user hook in an event of its own": {
+        hooks: {
+          sessionStart: [{ type: "command", bash: "langwatch ingest hook copilot" }],
+          preToolUse: [{ type: "command", bash: "echo guard" }],
+        },
+      },
+      "our command chained to the user's": {
+        hooks: { sessionStart: [{ bash: "langwatch ingest hook copilot && echo mine" }] },
+      },
+      "a setting of the user's on our entry": {
+        hooks: { sessionStart: [{ bash: "langwatch ingest hook copilot", cwd: "/work" }] },
+      },
+      "a key of the user's beside the hooks": {
+        version: 1,
+        disableAllHooks: false,
+        hooks: { sessionStart: [{ bash: "langwatch ingest hook copilot" }] },
+      },
+    };
+
+    for (const [shape, document] of Object.entries(cases)) {
+      it(`treats ${shape} as the user's: never rewritten, listed or removed`, () => {
+        const theirs = JSON.stringify(document);
+        fs.mkdirSync(path.dirname(copilotFile()), { recursive: true });
+        fs.writeFileSync(copilotFile(), theirs);
+
+        install({ tool: "copilot" });
+        expect(has("copilot")).toBe(false);
+        expect(remove("copilot")).toBe(false);
+        expect(fs.readFileSync(copilotFile(), "utf8")).toBe(theirs);
+      });
+    }
   });
 
   describe("given a file at our path that is not JSON", () => {
