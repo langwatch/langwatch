@@ -24,7 +24,7 @@ const REPLAY = {
 
 describe("given a file request", () => {
   describe("when its tone is good", () => {
-    /** @scenario "filing a good insight directly is refused" */
+    /** @scenario "Filing a good insight directly is refused" */
     it("refuses it with a field error on the tone, while a stored good entry still parses", () => {
       const result = fileInsightInputSchema.safeParse({ ...FILING, tone: "good" });
 

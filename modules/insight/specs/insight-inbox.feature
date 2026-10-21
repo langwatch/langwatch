@@ -41,7 +41,7 @@ Feature: The insights inbox
       Then it is refused with a field error on the title
 
     @unit
-    Scenario: filing a good insight directly is refused
+    Scenario: Filing a good insight directly is refused
       Given a file request with the good tone
       When the request is validated
       Then it is refused with a field error on the tone
