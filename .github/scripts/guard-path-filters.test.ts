@@ -387,6 +387,17 @@ void describe("given a pull request workflow's gate filter", () => {
     }
   });
 
+  void it("reports R4 for a quoted name in a flow list of events", () => {
+    const source = targetGated("pull_request", ["sdks/{go,python}/**"]).replace(
+      "on:\n  pull_request:\n    types: [opened]",
+      "on: ['push', 'pull_request']",
+    );
+    assert.deepEqual(
+      inspect("example.yml", source).map((issue) => issue.rule),
+      ["R4"],
+    );
+  });
+
   void it("leaves a step that calls dorny directly alone, since picomatch reads braces", () => {
     const source = targetGated("pull_request", ["sdks/{go,python}/**", "!sdks/go/x"]).replace(
       "uses: ./.github/actions/detect-changes",

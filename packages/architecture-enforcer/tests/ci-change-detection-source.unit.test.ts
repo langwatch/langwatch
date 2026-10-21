@@ -31,10 +31,8 @@ interface Workflow {
 
 const DORNY = "dorny/paths-filter@";
 /**
- * The dorny release whose pull request path was read for the `base` input:
- * with an empty token, src/main.ts diffs `base || pull_request.base.sha`
- * against the checked-out commit (v4.0.3). A bump fails the test below until
- * someone reads that path again and updates this pin.
+ * v4.0.3, read for `base`: with an empty token its src/main.ts diffs
+ * `base || pull_request.base.sha` on a pull request. A bump fails until re-read.
  */
 const DORNY_READ_FOR_BASE = "dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d";
 /** A step `if` that pins one event other than a pull request. */

@@ -320,7 +320,7 @@ const triggersOnPullRequest = (source: string): boolean =>
   source
     .split("\n")
     .some((line) =>
-      /(^|[{,\s[])(pull_request(_target)?\s*(:|,|\]|$)|(["'])pull_request(_target)?\5\s*:)/.test(
+      /(^|[{,\s[])(pull_request(_target)?\s*(:|,|\]|$)|(["'])pull_request(_target)?\5\s*(:|,|\]))/.test(
         stripComment(line).trim(),
       ),
     );

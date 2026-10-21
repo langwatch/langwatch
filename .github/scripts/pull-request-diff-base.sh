@@ -1,13 +1,8 @@
 #!/usr/bin/env bash
-# Prints `sha=<first parent of HEAD>`: the main a pull request's checked-out
-# merge commit is built on. A workflow that calls dorny/paths-filter directly
-# passes it as `base`, so the diff counts only what the pull request changes.
-# dorny's default, the event's base SHA, can be older than that main, and
-# diffing it against the merge commit counted main's newer commits as changed.
-#
-# Reads the parent from the commit object, so a depth-one checkout is enough.
-# Prints nothing when HEAD is not a merge commit: dorny then falls back to the
-# event's base SHA, which over-reports but never under-reports.
+# Prints `sha=<first parent of HEAD>`, the main a pull request's merge commit is
+# built on, as dorny/paths-filter's `base`: the event's base SHA can be older.
+# Reads the commit object, so depth one is enough. Not a merge: prints nothing,
+# and dorny falls back to the event's base SHA (over-reports, never under).
 # Spec: specs/ci/path-filters.feature
 
 set -euo pipefail
