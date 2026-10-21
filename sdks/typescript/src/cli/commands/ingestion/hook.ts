@@ -29,6 +29,7 @@ import {
   sessionContextFingerprint,
 } from "@/cli/utils/governance/session-context";
 import {
+  HOOK_TIMEOUT_SECONDS,
   type SessionContextAgent,
   sessionContextAgentFor,
 } from "@/cli/utils/governance/session-context-agents";
@@ -38,11 +39,18 @@ import { LANGWATCH_SDK_VERSION } from "@/internal/constants";
 import { resolveLogsEndpoint } from "@/internal/endpoint";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
+import { endProcessWhenDone } from "./end-process";
 import { type GitRunner, readSessionContext, runGitCommand } from "./git-context";
 import { parseHookInput, readStdin } from "./hook-input";
 
 /** How long the collector has to accept the record before we give up on it. */
 const POST_TIMEOUT_MS = 3_000;
+
+/**
+ * The whole hook's time. Three of the agent's seconds stay spare: node has to
+ * start, and a git call running when the budget ends blocks until it returns.
+ */
+export const HOOK_BUDGET_MS = (HOOK_TIMEOUT_SECONDS - 3) * 1_000;
 
 export interface HookCommandOptions {
   /**
@@ -126,6 +134,21 @@ export async function hookCommand({
   } catch (error) {
     debug({ message: `hook failed: ${(error as Error).message}`, env });
   }
+}
+
+/**
+ * The hook as the process an agent spawns: it ends itself once the work is
+ * done or its budget is spent, so nothing left open outlives the agent's timeout.
+ */
+export async function runHookProcess({
+  budgetMs = HOOK_BUDGET_MS,
+  exit,
+  ...options
+}: HookCommandOptions & {
+  budgetMs?: number;
+  exit?: (code: number) => void;
+}): Promise<void> {
+  await endProcessWhenDone({ work: () => hookCommand(options), budgetMs, exit });
 }
 
 async function runHook({

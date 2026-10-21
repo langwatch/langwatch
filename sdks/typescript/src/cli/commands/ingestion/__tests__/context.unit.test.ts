@@ -16,7 +16,7 @@ import {
   spoolFilePath,
 } from "@/cli/utils/governance/session-context-spool";
 
-import { contextCommand } from "../context";
+import { contextCommand, runContextProcess } from "../context";
 import { hookCommand } from "../hook";
 import {
   attributesOf,
@@ -439,6 +439,35 @@ describe("the declare command's refusals", () => {
     expect(lines).toHaveLength(1);
     expect(lines[0]).toContain("Queued");
     expect(lines[0]).toContain("next reports");
+  });
+
+  /** @scenario "A declaration that cannot be delivered does not hold the agent's shell" */
+  it("ends the process with exit code zero after its one line", async () => {
+    const exits: number[] = [];
+    // The post fails at once, but the connection attempt behind it stays open.
+    const connecting = setInterval(() => undefined, 60_000);
+    try {
+      await runContextProcess({
+        env: { OTEL_EXPORTER_OTLP_ENDPOINT: ENDPOINT, ...CLAUDE_ENV },
+        cwd: "/repo/worktrees/review",
+        runGit: gitRunner(WORKTREE_GIT),
+        fetchImpl: unreachableCollector,
+        now: () => NOW,
+        stateDir,
+        claudeRegistryDir: path.join(stateDir, "claude-sessions"),
+        codexSessionsRoot: sessionsRoot,
+        ancestorStartPid: 100,
+        ancestorProbe: NO_ANCESTOR,
+        readCliConfig: () => ({}),
+        writeLine: (line) => lines.push(line),
+        exit: (code) => exits.push(code),
+      });
+    } finally {
+      clearInterval(connecting);
+    }
+
+    expect(lines).toHaveLength(1);
+    expect(exits).toEqual([0]);
   });
 
   /** @scenario "A successful declaration queues nothing" */

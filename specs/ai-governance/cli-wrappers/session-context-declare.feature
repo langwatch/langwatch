@@ -209,6 +209,12 @@ Rule: The agent can declare its working context itself
     And the command says the declaration is queued
     And the exit code is zero
 
+  @unit
+  Scenario: A declaration that cannot be delivered does not hold the agent's shell
+    Given a collector the declare command cannot reach, its connection attempt still open
+    When the declaration has been queued
+    Then the command ends itself with exit code zero after its one line
+
   # Codex's sandbox refuses every write under the home directory, including
   # into a directory that already exists, and allows the temp directory. The
   # queue has to reach wherever the agent is allowed to write, or it is empty

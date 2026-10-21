@@ -3,6 +3,7 @@
 # Implementation:
 #   sdks/typescript/src/cli/commands/ingestion/hook.ts                 (the hook command, shared by every agent)
 #   sdks/typescript/src/cli/commands/ingestion/hook-input.ts           (the payload the agent writes to its stdin)
+#   sdks/typescript/src/cli/commands/ingestion/end-process.ts          (ends the hook process inside its time budget)
 #   sdks/typescript/src/cli/commands/ingestion/git-context.ts          (what git says about the session's directory)
 #   sdks/typescript/src/cli/commands/ingestion/hook-state.ts           (the per-session fingerprint store)
 #   sdks/typescript/src/cli/commands/ingestion/install.ts              (each tool's seam wired at install)
@@ -271,6 +272,22 @@ Rule: The hook never disturbs the session
     Given a hook invocation whose telemetry endpoint is unreachable
     When the hook runs
     Then stdout stays empty and the exit code is zero
+
+  # A post given up at its own deadline still leaves the connection attempt
+  # open until the system abandons it, about ten seconds on, and that alone
+  # kept the process past the ten seconds every agent allows a hook.
+  @unit
+  Scenario: The hook process ends once its work is done, with a connection still open
+    Given a hook whose post was given up with its connection attempt still open
+    When the hook's work is done
+    Then the process ends itself with exit code zero and nothing on stdout
+
+  @unit
+  Scenario: The hook process ends inside the agent's hook timeout whatever it waits on
+    Given a hook still waiting on the collector when its time budget runs out
+    When the budget ends
+    Then the process ends with exit code zero and nothing on stdout
+    And the budget leaves room for the process to start inside the agent's ten seconds
 
 Rule: A tool pinned to a project reports with the pinned key
 

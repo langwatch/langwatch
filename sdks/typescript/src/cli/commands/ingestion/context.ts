@@ -34,6 +34,7 @@ import { LANGWATCH_SDK_VERSION } from "@/internal/constants";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 import { type ResolvedSession, resolveSession } from "./context-session.ts";
+import { endProcessWhenDone } from "./end-process.ts";
 import { type GitRunner, readSessionContext, runGitCommand } from "./git-context.ts";
 import { type CliTelemetryConfig, postSessionContext, resolveTarget } from "./hook.ts";
 
@@ -58,6 +59,17 @@ export interface ContextCommandOptions {
   readCliConfig?: () => CliTelemetryConfig;
   /** One line to whoever ran the command. Defaults to stdout. */
   writeLine?: (line: string) => void;
+}
+
+/**
+ * The declaration as the process the agent's shell runs: it ends itself after
+ * its one line, so a post given up at its deadline cannot hold the shell.
+ */
+export async function runContextProcess({
+  exit,
+  ...options
+}: ContextCommandOptions & { exit?: (code: number) => void } = {}): Promise<void> {
+  await endProcessWhenDone({ work: () => contextCommand(options), exit });
 }
 
 /**

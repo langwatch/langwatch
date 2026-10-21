@@ -13,6 +13,7 @@ import {
 } from "./app-settings";
 import {
   hasOwnedHookFile,
+  HOOK_TIMEOUT_SECONDS,
   type HookedTool,
   type HooksTarget,
   ownedHookFileToolForCommand,
@@ -48,9 +49,6 @@ const COPILOT_HOOK_EVENTS = ["sessionStart", "agentStop"] as const;
 
 /** The only version of the Copilot hook file format there is. */
 const COPILOT_HOOK_FILE_VERSION = 1;
-
-/** Seconds the agent gives the hook before it kills it. */
-const HOOK_TIMEOUT_SECONDS = 10;
 
 /** The command an installed hook entry runs, for one agent. */
 export function sessionContextHookCommand(tool: HookedTool): string {

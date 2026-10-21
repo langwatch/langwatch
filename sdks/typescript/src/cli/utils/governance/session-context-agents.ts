@@ -70,6 +70,9 @@ function copilotHookFile(): HooksTarget {
   };
 }
 
+/** Seconds every hook file we write gives the hook before the agent kills it. */
+export const HOOK_TIMEOUT_SECONDS = 10;
+
 /** The name of LangWatch's own file in the Copilot hook folder. */
 export const COPILOT_HOOK_FILE_NAME = "langwatch.json";
 
