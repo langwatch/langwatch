@@ -124,8 +124,7 @@
                   "agent-testing/scenarios",
                   "agent-testing/test-suites",
                   "agent-testing/evaluators",
-                  "agent-testing/run-parameters",
-                  "agent-testing/setup-and-teardown-hooks"
+                  "agent-testing/run-parameters"
                 ]
               },
               {
