@@ -13,6 +13,7 @@ import { useAnchoredAnnotations } from "../../../../../features/annotation/behav
 import { useSpanLangwatchSignals } from "../../../../../features/span/behavior/use-span-langwatch-signals.ts";
 import { useSpanLogs } from "../../../../../features/span/behavior/use-span-logs.ts";
 import { useSpanPulseStore } from "../../../../../features/trace-drawer/behavior/span-pulse.store.ts";
+import { braidStrandFor, spanNodeKey } from "../../../../../model/braids/braided-span.ts";
 import { GroupRow } from "./group-row.tsx";
 import { GroupTimelineBar, TimelineBar } from "./timeline-bar.tsx";
 import { TreeRow } from "./tree-row.tsx";
@@ -93,6 +94,7 @@ export const WaterfallView = memo(function WaterfallView({
   promptSpanIds,
   onSelectSpan,
   onClearSpan,
+  braidedOwners,
 }: WaterfallViewProps) {
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
@@ -338,6 +340,7 @@ export const WaterfallView = memo(function WaterfallView({
             {virtualizer.getVirtualItems().map((virtualRow) => (
               <WaterfallVirtualRow
                 key={virtualRowKey(flatRows[virtualRow.index]!)}
+                braidedOwners={braidedOwners}
                 collapsedIds={collapsedIds}
                 commentsFor={commentsFor}
                 correctedSpanIds={correctedSpanIds}
@@ -372,6 +375,7 @@ export const WaterfallView = memo(function WaterfallView({
           COLLAPSE_TIMELINE_BELOW_PX; nothing to divide or show. */}
       {showTimeline && (
         <TimelinePanel
+          braidedOwners={braidedOwners}
           flatRows={flatRows}
           onDividerStart={handleDividerStart}
           onSelectSpan={handleSelectSpan}
@@ -574,7 +578,7 @@ function parentSpanIdsByDepth(tree: ReturnType<typeof buildTree>): Map<number, s
     for (const node of nodes) {
       if (node.children.length === 0) continue;
       const list = map.get(node.depth) ?? [];
-      list.push(node.span.spanId);
+      list.push(spanNodeKey(node.span));
       map.set(node.depth, list);
       walk(node.children);
     }
@@ -640,11 +644,12 @@ function listenForDividerDrag({
 
 /** A virtual row's React key: group rows key by their sibling group, spans by id. */
 function virtualRowKey(row: ReturnType<typeof flattenTree>[number]): string {
-  return row.kind === "group" ? `group-${siblingGroupKey(row)}` : row.node.span.spanId;
+  return row.kind === "group" ? `group-${siblingGroupKey(row)}` : spanNodeKey(row.node.span);
 }
 
 /** One virtualized waterfall row: a sibling group header, or a span. */
 function WaterfallVirtualRow({
+  braidedOwners,
   collapsedIds,
   commentsFor,
   correctedSpanIds,
@@ -670,6 +675,7 @@ function WaterfallVirtualRow({
   size,
   start,
 }: {
+  braidedOwners: WaterfallViewProps["braidedOwners"];
   collapsedIds: Set<string>;
   commentsFor: (spanId: string) => AnnotationByTrace[];
   correctedSpanIds: Set<string>;
@@ -712,7 +718,7 @@ function WaterfallVirtualRow({
   const showSeparator = isRoot && rootCount > 1 && index > 0;
   return (
     <Box
-      key={node.span.spanId}
+      key={spanNodeKey(node.span)}
       position="absolute"
       top={0}
       left={0}
@@ -744,9 +750,12 @@ function WaterfallVirtualRow({
         isSelected={node.span.spanId === selectedSpanId}
         isPrompt={promptSpanIds?.has(node.span.spanId) ?? false}
         logCount={logsBySpanId.get(node.span.spanId)?.length ?? 0}
-        isCollapsed={collapsedIds.has(node.span.spanId)}
+        isCollapsed={collapsedIds.has(spanNodeKey(node.span))}
         hasChildren={node.children.length > 0}
-        hiddenDescendantCount={collapsedIds.has(node.span.spanId) ? countDescendants(node) : 0}
+        hiddenDescendantCount={
+          collapsedIds.has(spanNodeKey(node.span)) ? countDescendants(node) : 0
+        }
+        braid={braidStrandFor({ ownerProjectId: node.span.ownerProjectId, owners: braidedOwners })}
         isDimmed={selectedSpanId !== null && node.span.spanId !== selectedSpanId}
         signals={signalsBySpanId.get(node.span.spanId) ?? EMPTY_SIGNALS}
         traceId={rowTraceId}
@@ -769,6 +778,7 @@ function WaterfallVirtualRow({
  * below COLLAPSE_TIMELINE_BELOW_PX — there is nothing left to divide or show.
  */
 function TimelinePanel({
+  braidedOwners,
   flatRows,
   onDividerStart,
   onSelectSpan,
@@ -782,6 +792,7 @@ function TimelinePanel({
   virtualItems,
   visibleTimeMarkers,
 }: {
+  braidedOwners: WaterfallViewProps["braidedOwners"];
   flatRows: ReturnType<typeof flattenTree>;
   onDividerStart: (e: React.MouseEvent) => void;
   onSelectSpan: (spanId: string) => void;
@@ -936,7 +947,7 @@ function TimelinePanel({
               const { node } = row;
               return (
                 <Box
-                  key={node.span.spanId}
+                  key={spanNodeKey(node.span)}
                   position="absolute"
                   top={0}
                   left={0}
@@ -946,6 +957,12 @@ function TimelinePanel({
                 >
                   <TimelineBar
                     span={node.span}
+                    colour={
+                      braidStrandFor({
+                        ownerProjectId: node.span.ownerProjectId,
+                        owners: braidedOwners,
+                      })?.colour
+                    }
                     rootStart={rootStart}
                     rootDuration={rootDuration}
                     rowHeight={virtualRow.size}

@@ -9,11 +9,13 @@ import {
   useAnchoredAnnotations,
 } from "../../../../features/annotation/behavior/use-anchored-annotations.ts";
 import type { useTextTranslation } from "../../../../features/trace-drawer/behavior/use-text-translation.ts";
+import { BRAIDED_ACTION_DISABLED_REASON } from "../../../../model/braids/braided-span.ts";
 import { FieldCommentButton } from "./anchored-comments/field-comment-button.tsx";
 import {
   PlaygroundButton,
   SuggestCorrectionButton,
   TranslateButton,
+  UnavailableActionButton,
 } from "./io-toolbar-buttons.tsx";
 
 /** One toolbar action: its inline rendering and its overflow-menu row. */
@@ -36,6 +38,7 @@ function buildIOActions({
   showComment,
   showSuggest,
   playgroundHref,
+  isBraided,
 }: {
   translation: ReturnType<typeof useTextTranslation>;
   traceId: string | undefined;
@@ -44,6 +47,7 @@ function buildIOActions({
   showComment: boolean;
   showSuggest: boolean;
   playgroundHref: string;
+  isBraided: boolean;
 }): IOAction[] {
   const settledTranslationLabel = translation.isActive ? "Show original" : "Translate";
   const translationLabel = translation.isLoading ? "Translating…" : settledTranslationLabel;
@@ -63,6 +67,8 @@ function buildIOActions({
       ),
     },
   ];
+
+  if (isBraided) return [...actions, ...unavailableOnBraidedSpan({ playgroundHref })];
 
   if (traceId && fieldAnchor && showComment) {
     actions.push({
@@ -97,6 +103,24 @@ function buildIOActions({
   }
 
   return actions;
+}
+
+/** A braided span is another project's data: annotating it and the playground are off. */
+function unavailableOnBraidedSpan({ playgroundHref }: { playgroundHref: string }): IOAction[] {
+  const unavailable = [
+    { id: "comment", label: "Comment", icon: LuMessageSquare },
+    { id: "suggest", label: "Suggest edit", icon: LuLightbulb },
+    ...(playgroundHref ? [{ id: "playground", label: "Open in Playground", icon: LuPlay }] : []),
+  ];
+  return unavailable.map(({ id, label, icon }) => ({
+    id,
+    menuLabel: label,
+    menuIcon: icon,
+    disabled: true,
+    render: () => (
+      <UnavailableActionButton icon={icon} label={label} reason={BRAIDED_ACTION_DISABLED_REASON} />
+    ),
+  }));
 }
 
 /**
@@ -142,6 +166,7 @@ export function useIOActions({
   mode,
   fieldAnchor,
   originalContent,
+  isBraided = false,
 }: {
   translation: ReturnType<typeof useTextTranslation>;
   traceId: string | undefined;
@@ -150,6 +175,8 @@ export function useIOActions({
   mode: "input" | "output";
   fieldAnchor: TraceAnchor | null;
   originalContent: string;
+  /** A span braided in from another project, whose data this reader may not act on. */
+  isBraided?: boolean;
 }): IOAction[] {
   const { showComment, showSuggest, playgroundHref } = useIOActionGates({
     fieldAnchor,
@@ -168,7 +195,17 @@ export function useIOActions({
         showComment,
         showSuggest,
         playgroundHref,
+        isBraided,
       }),
-    [translation, traceId, fieldAnchor, originalContent, showComment, showSuggest, playgroundHref],
+    [
+      translation,
+      traceId,
+      fieldAnchor,
+      originalContent,
+      showComment,
+      showSuggest,
+      playgroundHref,
+      isBraided,
+    ],
   );
 }

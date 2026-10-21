@@ -19,6 +19,7 @@ export const TimelineBar = memo(function TimelineBar({
   isSelected,
   isDimmed,
   onSelect,
+  colour,
 }: {
   span: SpanTreeNode;
   rootStart: number;
@@ -27,6 +28,8 @@ export const TimelineBar = memo(function TimelineBar({
   isSelected: boolean;
   isDimmed: boolean;
   onSelect: (spanId: string) => void;
+  /** A braided span's strand colour, in place of its type's colour. */
+  colour?: string;
 }) {
   // Hover highlight comes from a store with a per-row boolean selector
   // so a hover change re-renders only the two affected rows (this bar
@@ -44,7 +47,7 @@ export const TimelineBar = memo(function TimelineBar({
   // Mirrors TreeRow's purple skill accent so the tree/timeline twins of a
   // skill invocation agree — the timeline pane is the wider (default 62%)
   // half of the split view, so leaving it unstyled undersells the promotion.
-  const color = getSpanBarColor(span.type, span.name);
+  const color = colour ?? getSpanBarColor(span.type, span.name);
   const hoverBackground = isHovered ? "bg.muted" : undefined;
   const rowBackground = isSelected
     ? { base: "bg.emphasized", _dark: "blue.subtle" }

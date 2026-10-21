@@ -20,6 +20,7 @@ import {
   summarizeLogEvent,
 } from "../../../../../model/explorer/trace-drawer/trace-accordions/log-summary.ts";
 import { countFlatLeaves } from "../../../../../model/explorer/trace-drawer/trace-accordions/utils.ts";
+import { BraidedSpanCallout } from "../../../../blocks/explorer/trace-drawer/braids/braided-span-callout.tsx";
 import {
   EmptyEventsState,
   EmptyHint,
@@ -172,7 +173,8 @@ export function SpanAccordions({
 
   return (
     <Box ref={containerRef}>
-      {isEditing && detail && (
+      {detail?.braid ? <BraidedSpanCallout braid={detail.braid} ownerHref={null} /> : null}
+      {isEditing && detail && !detail.braid && (
         <SpanNameTypeEditor
           spanId={span.spanId}
           capturedName={detail.name}
@@ -279,7 +281,7 @@ function SpanIOField({
   const label = mode === "input" ? "Input" : "Output";
   const content = detail[mode];
 
-  if (isEditing) {
+  if (isEditing && !detail.braid) {
     return (
       <SpanEditableIO
         spanId={detail.spanId}
@@ -301,6 +303,7 @@ function SpanIOField({
         traceId={traceId}
         spanId={detail.spanId}
         spanType={detail.type}
+        isBraided={detail.braid != null}
       />
     </MaybeCorrected>
   );

@@ -1,5 +1,6 @@
 import type { SpanTreeNode } from "@langwatch/trace-contract";
 
+import { spanNodeKey } from "../../../../../model/braids/braided-span.ts";
 import {
   COLLAPSE_TIMELINE_BELOW_PX,
   type FlatRow,
@@ -18,36 +19,42 @@ export function shouldShowTimeline(containerWidthPx: number): boolean {
 }
 
 export function buildTree(spans: SpanTreeNode[]): WaterfallTreeNode[] {
-  const byId = new Map<string, SpanTreeNode>();
-  for (const span of spans) {
-    byId.set(span.spanId, span);
-  }
+  const keys = new Set(spans.map(spanNodeKey));
 
   const childrenMap = new Map<string | null, SpanTreeNode[]>();
   for (const span of spans) {
-    // Determine if this span's parent exists in the trace
-    const parentExists = span.parentSpanId ? byId.has(span.parentSpanId) : true;
-    const key = parentExists ? span.parentSpanId : null;
+    const key = parentNodeKey({ span, keys });
     const list = childrenMap.get(key) ?? [];
     list.push(span);
     childrenMap.set(key, list);
   }
 
-  function buildNodes(parentId: string | null, depth: number): WaterfallTreeNode[] {
-    const children = childrenMap.get(parentId) ?? [];
+  function buildNodes(parentKey: string | null, depth: number): WaterfallTreeNode[] {
+    const children = childrenMap.get(parentKey) ?? [];
     const sorted = [...children].toSorted((a, b) => a.startTimeMs - b.startTimeMs);
-    return sorted.map((span) => {
-      const isOrphaned = span.parentSpanId !== null && !byId.has(span.parentSpanId);
-      return {
-        span,
-        children: buildNodes(span.spanId, depth + 1),
-        depth,
-        isOrphaned,
-      };
-    });
+    return sorted.map((span) => ({
+      span,
+      children: buildNodes(spanNodeKey(span), depth + 1),
+      depth,
+      isOrphaned: Boolean(span.parentSpanId) && parentNodeKey({ span, keys }) === null,
+    }));
   }
 
   return buildNodes(null, 0);
+}
+
+/**
+ * The tree key of a span's parent, or null when it sits at the top. A braided
+ * span looks among its owner's spans first, then the reader's own; one not
+ * found sits at the top, as an orphan does (ADR-183 §5).
+ */
+function parentNodeKey({ span, keys }: { span: SpanTreeNode; keys: Set<string> }): string | null {
+  const parentSpanId = span.parentSpanId;
+  if (!parentSpanId) return null;
+  const candidates = span.ownerProjectId
+    ? [spanNodeKey({ spanId: parentSpanId, ownerProjectId: span.ownerProjectId }), parentSpanId]
+    : [parentSpanId];
+  return candidates.find((candidate) => keys.has(candidate)) ?? null;
 }
 
 export function groupSiblings(children: WaterfallTreeNode[]): (WaterfallTreeNode | SiblingGroup)[] {
@@ -64,6 +71,7 @@ export function groupSiblings(children: WaterfallTreeNode[]): (WaterfallTreeNode
       child.span.name,
       child.span.type ?? "span",
       child.span.toolName ?? "",
+      ...(child.span.ownerProjectId ? [child.span.ownerProjectId] : []),
     ]);
     if (!nameGroups.has(key)) {
       nameGroups.set(key, []);
@@ -94,6 +102,7 @@ export function groupSiblings(children: WaterfallTreeNode[]): (WaterfallTreeNode
         maxEnd: Math.max(...spans.map((s) => s.endTimeMs)),
         depth: group[0]!.depth,
         parentSpanId: group[0]!.span.parentSpanId,
+        ...(group[0]!.span.ownerProjectId ? { ownerProjectId: group[0]!.span.ownerProjectId } : {}),
       });
     } else {
       result.push(...group);
@@ -110,8 +119,16 @@ export function siblingGroupKey(group: {
   name: string;
   type: string;
   toolName: string | null;
+  ownerProjectId?: string | null;
 }): string {
-  return JSON.stringify([group.parentSpanId, group.name, group.type, group.toolName ?? ""]);
+  const owner = group.ownerProjectId ? [group.ownerProjectId] : [];
+  return JSON.stringify([
+    group.parentSpanId,
+    group.name,
+    group.type,
+    group.toolName ?? "",
+    ...owner,
+  ]);
 }
 
 function isSiblingGroup(item: WaterfallTreeNode | SiblingGroup): item is SiblingGroup {
@@ -159,7 +176,7 @@ export function flattenTree(
       }
 
       result.push({ kind: "span", node: item });
-      if (!collapsedIds.has(item.span.spanId) && item.children.length > 0) {
+      if (!collapsedIds.has(spanNodeKey(item.span)) && item.children.length > 0) {
         walk(item.children);
       }
     }

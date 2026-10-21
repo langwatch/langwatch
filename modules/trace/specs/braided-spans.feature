@@ -106,14 +106,14 @@ Feature: Braided spans in the reader's traces
       Then each braided span carries a badge reading "Specialists"
       And the trace header says it includes spans from "specialists"
 
-    @unit @unimplemented
+    @unit
     Scenario: A braided span whose parent was not braided is shown at the top of the trace
       Given a matching "specialists" span whose parent span does not match the condition
       When the trace's span tree is built for "orchestrator"
       Then the span is shown at the top of the trace, as a span with a missing parent is
       And nothing about the parent that was not braided is read to place it
 
-    @unit @unimplemented
+    @unit
     Scenario: A braided span whose parent the reader can see hangs under it
       Given a matching "specialists" span whose parent is an "orchestrator" span
       When the trace's span tree is built for "orchestrator"

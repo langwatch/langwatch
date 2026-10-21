@@ -344,7 +344,6 @@ const LEGACY_INERT: string[] = [
   // deletes its entry here.
   "modules/api-key/specs/signing-keys.feature",
   "modules/authz/specs/braids-screen.feature",
-  "modules/trace/specs/braided-spans.feature",
   "modules/trace/specs/signed-calls.feature",
   // 2026-09-06 core-logic audit: these five ship ahead of the tests that
   // would bind them (packages/architecture-enforcer's unspecced-core report),
