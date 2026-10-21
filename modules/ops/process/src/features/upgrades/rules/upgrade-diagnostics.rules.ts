@@ -2,7 +2,7 @@ import {
   UPGRADE_DIAGNOSTICS_MAX_BYTES,
   type UpgradeDiagnosticsBundle,
 } from "@langwatch/ops-contract";
-import { isSensitiveAttributeKey, redactSecretsInText } from "@langwatch/redaction";
+import { isSensitiveAttributeKey } from "@langwatch/redaction";
 import type { UpgradeStepDetail } from "@langwatch/upgrade/reader";
 import { redactSecrets } from "@langwatch/upgrade/runner";
 import { ledgerText } from "@langwatch/upgrade/step";
@@ -15,10 +15,7 @@ export type DiagnosticsDeployment = UpgradeDiagnosticsBundle["deployment"];
 /** Room left under the licence host's body cap for the submission around the bundle. */
 const BUNDLE_MAX_BYTES = UPGRADE_DIAGNOSTICS_MAX_BYTES - 1024;
 
-/** The upgrade redactor, then the shared one, which also knows provider key and token shapes. */
-const redactOutbound = (text: string) => redactSecretsInText({ text: redactSecrets(text) }).text;
-
-const scrubText = (text: string) => ledgerText({ text, redact: redactOutbound });
+const scrubText = (text: string) => ledgerText({ text, redact: redactSecrets });
 
 /** Every string redacted and cut; each quoted or secret-named value dropped, named in `omitted`. */
 function scrub({
@@ -50,34 +47,53 @@ function scrub({
 const byteLengthOf = (bundle: UpgradeDiagnosticsBundle) =>
   Buffer.byteLength(JSON.stringify(bundle), "utf8");
 
-/** Drops the oldest log lines, then the report, then the last targets, until the bundle fits. */
+/** Room kept for the `omitted` entry that names a cut, so writing it cannot tip the bundle over. */
+const OMITTED_NOTE_BYTES = 64;
+
+const fits = (bundle: UpgradeDiagnosticsBundle) => byteLengthOf(bundle) <= BUNDLE_MAX_BYTES;
+
+/** The bytes a cut must free: past the cap, plus room for the entry naming the cut. */
+const overflowOf = (bundle: UpgradeDiagnosticsBundle) =>
+  byteLengthOf(bundle) + OMITTED_NOTE_BYTES - BUNDLE_MAX_BYTES;
+
+/** How many items, taken in order, carry at least `bytes` of JSON with their separators. */
+function countCovering(items: readonly unknown[], bytes: number): number {
+  let covered = 0;
+  for (const [index, item] of items.entries()) {
+    covered += Buffer.byteLength(JSON.stringify(item), "utf8") + 1;
+    if (covered >= bytes) return index + 1;
+  }
+  return items.length;
+}
+
+/**
+ * Drops the oldest log lines, then the report, then the last targets, until the bundle fits;
+ * each cut is one slice sized from the overflow, not one line per pass.
+ */
 function fitted(bundle: UpgradeDiagnosticsBundle): UpgradeDiagnosticsBundle {
   let fitting = bundle;
-  let dropped = 0;
-  while (byteLengthOf(fitting) > BUNDLE_MAX_BYTES && fitting.step.logTail.length > 0) {
-    dropped += 1;
-    fitting = { ...fitting, step: { ...fitting.step, logTail: fitting.step.logTail.slice(1) } };
-  }
-  if (dropped > 0) {
+  if (!fits(fitting) && fitting.step.logTail.length > 0) {
+    const dropped = countCovering(fitting.step.logTail, overflowOf(fitting));
     fitting = {
       ...fitting,
+      step: { ...fitting.step, logTail: fitting.step.logTail.slice(dropped) },
       omitted: [...fitting.omitted, `step.logTail: ${dropped} oldest lines`],
     };
   }
-  if (byteLengthOf(fitting) > BUNDLE_MAX_BYTES && fitting.step.report !== null) {
+  if (!fits(fitting) && fitting.step.report !== null) {
     fitting = {
       ...fitting,
       step: { ...fitting.step, report: null },
       omitted: [...fitting.omitted, "step.report"],
     };
   }
-  let shed = 0;
-  while (byteLengthOf(fitting) > BUNDLE_MAX_BYTES && fitting.targets.length > 0) {
-    shed += 1;
-    fitting = { ...fitting, targets: fitting.targets.slice(0, -1) };
-  }
-  if (shed > 0) {
-    fitting = { ...fitting, omitted: [...fitting.omitted, `targets: ${shed} of them`] };
+  if (!fits(fitting) && fitting.targets.length > 0) {
+    const shed = countCovering(fitting.targets.toReversed(), overflowOf(fitting));
+    fitting = {
+      ...fitting,
+      targets: fitting.targets.slice(0, fitting.targets.length - shed),
+      omitted: [...fitting.omitted, `targets: ${shed} of them`],
+    };
   }
   return fitting;
 }

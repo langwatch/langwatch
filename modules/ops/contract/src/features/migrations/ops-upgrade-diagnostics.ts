@@ -7,12 +7,18 @@ import { z } from "zod";
 
 /** The largest bundle an install builds and the licence host accepts. */
 export const UPGRADE_DIAGNOSTICS_MAX_BYTES = 64 * 1024;
+/** The most log lines a bundle carries; matches the ledger's `STEP_LOG_TAIL_LINES`. */
+export const UPGRADE_DIAGNOSTICS_LOG_TAIL_MAX_LINES = 200;
+/** The longest error or log line a bundle carries; matches the ledger's `LEDGER_TEXT_MAX_CHARS`. */
+export const UPGRADE_DIAGNOSTICS_TEXT_MAX_CHARS = 4096;
+
+const diagnosticsText = z.string().max(UPGRADE_DIAGNOSTICS_TEXT_MAX_CHARS);
 
 const upgradeDiagnosticsTargetSchemaDefinition = z.object({
   target: z.string(),
   status: z.string(),
   version: z.string().nullable(),
-  lastError: z.string().nullable(),
+  lastError: diagnosticsText.nullable(),
 });
 export interface UpgradeDiagnosticsTargetSchema extends Named<
   typeof upgradeDiagnosticsTargetSchemaDefinition
@@ -20,35 +26,41 @@ export interface UpgradeDiagnosticsTargetSchema extends Named<
 export const upgradeDiagnosticsTargetSchema: UpgradeDiagnosticsTargetSchema =
   upgradeDiagnosticsTargetSchemaDefinition;
 
-const upgradeDiagnosticsBundleSchemaDefinition = z.object({
-  /** Bumped when a field changes meaning; Cloud reads every version it ever accepted. */
-  format: z.literal(1),
-  generatedAt: z.string(),
-  step: z.object({
-    id: z.string(),
-    kind: z.string(),
-    mode: z.string(),
-    description: z.string().nullable(),
-    release: z.string().nullable(),
-    status: z.string(),
-    attempt: z.number().int(),
-    startedAt: z.string().nullable(),
-    finishedAt: z.string().nullable(),
-    updatedAt: z.string().nullable(),
-    lastError: z.string().nullable(),
-    report: z.record(z.string(), z.unknown()).nullable(),
-    logTail: z.array(z.string()),
-  }),
-  targets: z.array(upgradeDiagnosticsTargetSchema),
-  deployment: z.object({
-    imageRelease: z.string().nullable(),
-    chartVersion: z.string().nullable(),
-    installMethod: z.string(),
-    instanceId: z.string().nullable(),
-  }),
-  /** What the size cap or the redaction left out, so a reader knows the bundle is partial. */
-  omitted: z.array(z.string()),
-});
+const upgradeDiagnosticsBundleSchemaDefinition = z
+  .object({
+    /** Bumped when a field changes meaning; Cloud reads every version it ever accepted. */
+    format: z.literal(1),
+    generatedAt: z.string(),
+    step: z.object({
+      id: z.string(),
+      kind: z.string(),
+      mode: z.string(),
+      description: z.string().nullable(),
+      release: z.string().nullable(),
+      status: z.string(),
+      attempt: z.number().int(),
+      startedAt: z.string().nullable(),
+      finishedAt: z.string().nullable(),
+      updatedAt: z.string().nullable(),
+      lastError: diagnosticsText.nullable(),
+      report: z.record(z.string(), z.unknown()).nullable(),
+      logTail: z.array(diagnosticsText).max(UPGRADE_DIAGNOSTICS_LOG_TAIL_MAX_LINES),
+    }),
+    targets: z.array(upgradeDiagnosticsTargetSchema),
+    deployment: z.object({
+      imageRelease: z.string().nullable(),
+      chartVersion: z.string().nullable(),
+      installMethod: z.string(),
+      instanceId: z.string().nullable(),
+    }),
+    /** What the size cap or the redaction left out, so a reader knows the bundle is partial. */
+    omitted: z.array(z.string()),
+  })
+  .refine(
+    (bundle) =>
+      new TextEncoder().encode(JSON.stringify(bundle)).length <= UPGRADE_DIAGNOSTICS_MAX_BYTES,
+    { message: `a diagnostics bundle is at most ${UPGRADE_DIAGNOSTICS_MAX_BYTES} bytes` },
+  );
 export interface UpgradeDiagnosticsBundleSchema extends Named<
   typeof upgradeDiagnosticsBundleSchemaDefinition
 > {}

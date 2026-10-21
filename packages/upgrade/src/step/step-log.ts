@@ -4,7 +4,7 @@
  */
 import { nowInstant } from "@langwatch/time";
 
-import { redactSecrets } from "../runner/run-log.ts";
+import { redactSecrets, redactValue } from "../runner/run-log.ts";
 
 /** How many of an attempt's last lines the step row keeps (plan decision 3). */
 export const STEP_LOG_TAIL_LINES = 200;
@@ -22,7 +22,7 @@ export interface MigrationStepLog {
 
 export type LedgerTextRedactor = (text: string) => string;
 
-/** Masks each secret value the process holds, then the URL passwords and `key=value` secrets. */
+/** Masks each secret value the process holds, then everything {@link redactSecrets} masks. */
 export function ledgerRedactor({
   secretValues,
 }: {
@@ -103,7 +103,7 @@ export class StepLogTail implements MigrationStepLog {
       this.options.forward(
         level,
         this.options.redact(message),
-        redactFields({ value: fields, redact: this.options.redact }) as Record<string, unknown>,
+        redactValue({ value: fields, redact: this.options.redact }) as Record<string, unknown>,
       );
     }
     const extra = Object.keys(fields).length > 0 ? ` ${safeJson(fields)}` : "";
@@ -111,35 +111,6 @@ export class StepLogTail implements MigrationStepLog {
     this.lines.push(ledgerText({ text: line, redact: this.options.redact }));
     this.lines.splice(0, Math.max(0, this.lines.length - STEP_LOG_TAIL_LINES));
   }
-}
-
-const CYCLE_MARK = "[cycle]";
-
-/** `seen` holds the objects on the current path, so a self-reference forwards a mark. */
-function redactFields({
-  value,
-  redact,
-  seen = new WeakSet<object>(),
-}: {
-  value: unknown;
-  redact: LedgerTextRedactor;
-  seen?: WeakSet<object>;
-}): unknown {
-  if (typeof value === "string") return redact(value);
-  if (value instanceof Error) return redact(value.message);
-  if (value === null || typeof value !== "object") return value;
-  if (seen.has(value)) return CYCLE_MARK;
-  seen.add(value);
-  const redacted = Array.isArray(value)
-    ? value.map((each: unknown) => redactFields({ value: each, redact, seen }))
-    : Object.fromEntries(
-        Object.entries(value).map(([key, each]) => [
-          key,
-          redactFields({ value: each, redact, seen }),
-        ]),
-      );
-  seen.delete(value);
-  return redacted;
 }
 
 function safeJson(fields: Record<string, unknown>): string {

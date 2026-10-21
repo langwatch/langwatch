@@ -52,6 +52,24 @@ describe("StepLogTail", () => {
     });
   });
 
+  describe("when a line carries a provider key with no secret name beside it", () => {
+    /** @scenario "A provider key in a step's log line is masked before the ledger stores it" */
+    it("keeps the line with the key masked", () => {
+      const providerKey = `sk-ant-api03-${"synthetic".repeat(5)}`;
+      const log = StepLogTail.create({
+        redact: ledgerRedactor({ secretValues: [] }),
+        forward: () => undefined,
+        now: () => "2026-10-21T00:00:00Z",
+      });
+
+      log.warn(`provider rejected ${providerKey}`);
+
+      expect(log.tail()).toHaveLength(1);
+      expect(log.tail()[0]).toMatch(/provider rejected /);
+      expect(log.tail()[0]).not.toContain("synthetic");
+    });
+  });
+
   describe("when a line's fields refer to themselves", () => {
     it("forwards and keeps the line, marking the cycle", () => {
       const forwarded: Record<string, unknown>[] = [];

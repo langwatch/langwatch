@@ -36,6 +36,12 @@ Feature: Upgrade step diagnostics
     Then the bundle is at most 64 KB and says what it left out
 
   @unit
+  Scenario: A reviewed bundle past the size cap is refused before it is resealed
+    Given a reviewed bundle past 64 KB, with more than 200 log lines, or with a line past 4 KB
+    When an operator sends it to LangWatch
+    Then it is refused before it is resealed or sent
+
+  @unit
   Scenario: Diagnostics for an unknown step are refused by name
     Given no step with the id asked for
     When an operator asks for its diagnostics

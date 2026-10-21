@@ -1,8 +1,11 @@
-import { UPGRADE_DIAGNOSTICS_MAX_BYTES } from "@langwatch/ops-contract";
+import {
+  UPGRADE_DIAGNOSTICS_MAX_BYTES,
+  upgradeDiagnosticsBundleSchema,
+} from "@langwatch/ops-contract";
 import type { UpgradeStepDetail } from "@langwatch/upgrade/reader";
 import { describe, expect, it } from "vitest";
 
-import { upgradeDiagnosticsOf } from "../upgrade-diagnostics.rules.ts";
+import { resealedDiagnosticsOf, upgradeDiagnosticsOf } from "../upgrade-diagnostics.rules.ts";
 
 const DEPLOYMENT = {
   imageRelease: "3.23.0",
@@ -200,6 +203,32 @@ describe("upgradeDiagnosticsOf", () => {
       );
       expect(bundle.targets.length).toBeLessThan(40);
       expect(bundle.omitted).toContain(`targets: ${40 - bundle.targets.length} of them`);
+    });
+  });
+
+  describe("given a bundle it built at the size cap", () => {
+    /** @scenario "A diagnostics bundle stays under its size cap" */
+    it("passes the bundle schema and comes back unchanged when resealed", () => {
+      const lines = Array.from({ length: 200 }, (_, line) => `${line}:`.padEnd(4000, "l"));
+      const bundle = bundleOf(stepDetail({ logTail: lines }));
+
+      expect(upgradeDiagnosticsBundleSchema.validate(bundle)).toBe(true);
+      expect(resealedDiagnosticsOf(bundle)).toEqual(bundle);
+    });
+  });
+});
+
+describe("upgradeDiagnosticsBundleSchema", () => {
+  describe("given a reviewed bundle past the size cap", () => {
+    /** @scenario "A reviewed bundle past the size cap is refused before it is resealed" */
+    it("refuses it, and refuses a log past 200 lines or a line past 4 KB", () => {
+      const built = bundleOf(stepDetail());
+      const withLog = (logTail: string[]) => ({ ...built, step: { ...built.step, logTail } });
+
+      expect(upgradeDiagnosticsBundleSchema.validate(withLog(Array(201).fill("l")))).toBe(false);
+      expect(upgradeDiagnosticsBundleSchema.validate(withLog(["l".repeat(4097)]))).toBe(false);
+      const oversized = { ...built, step: { ...built.step, report: { blob: "r".repeat(70_000) } } };
+      expect(upgradeDiagnosticsBundleSchema.validate(oversized)).toBe(false);
     });
   });
 });

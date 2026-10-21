@@ -47,6 +47,12 @@ Feature: The ledger keeps a redacted error and log for each step
     Then neither the message nor any field, nested or an error, carries the secret
 
   @unit
+  Scenario: A provider key in a step's log line is masked before the ledger stores it
+    Given a step that logs a line carrying a provider key with no secret name beside it
+    When the line is kept in the step's log tail
+    Then the kept line reads the rest of the message but not the key
+
+  @unit
   Scenario: A step's log tail keeps only the last lines of an attempt
     Given a background step that logs 500 lines in one attempt
     When the attempt ends

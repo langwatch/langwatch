@@ -18222,6 +18222,9 @@ importers:
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../process-stores
+      '@langwatch/redaction':
+        specifier: workspace:*
+        version: link:../redaction
       '@langwatch/redis-client':
         specifier: workspace:*
         version: link:../redis-client

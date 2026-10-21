@@ -1,3 +1,5 @@
+import { redactSecretsInText } from "@langwatch/redaction";
+
 import type { UpgradePlan } from "../plan/plan-upgrade.ts";
 import type { UpgradePhaseChange, UpgradePhaseName } from "./run-phases.ts";
 import type { UpgradeRunnerLog } from "./schema-applier.ts";
@@ -34,14 +36,21 @@ const WAITING_ON: Readonly<Record<UpgradePhaseName, string>> = {
   reconcile: "the reconcilers: ClickHouse TTL, LangWatchQL and the system-migrations pass request",
 };
 
-const URL_CREDENTIALS = /([a-z][a-z0-9+.-]*:\/\/[^\s:/@]*):[^\s@/]*@/gi;
-const SECRET_NAME = String.raw`[\w.-]*?(?:password|passwd|pwd|token|secret|api[_-]?key|access[_-]?key|private[_-]?key|auth|authorization|credentials?|cookie)`;
+/**
+ * `scheme://user:password@`; the scheme sits in a lookbehind so the engine anchors on `://`
+ * instead of retrying from every letter, which on a long run of letters cost time quadratic in
+ * the line length.
+ */
+const URL_CREDENTIALS = /(?<=[a-z][a-z0-9+.-]{0,30})(:\/\/[^\s:/@]*):[^\s@/]*@/gi;
+const SECRET_NAME = String.raw`[\w.-]{0,40}?(?:password|passwd|pwd|token|secret|api[_-]?key|access[_-]?key|private[_-]?key|auth|authorization|credentials?|cookie)`;
 /** `key=value`, `key: value` and `"key":"value"`; a `Bearer`-style scheme stays, its value goes. */
 const SECRET_PAIRS = new RegExp(
   String.raw`(["']?\b${SECRET_NAME}["']?\s*[=:]\s*(?:(?:bearer|basic|token)\s+)?)("[^"]*"|'[^']*'|[^\s&;,"']+)`,
   "gi",
 );
 const AUTH_SCHEMES = /\b(bearer|basic)\s+[\w.~+/=-]{8,}/gi;
+/** The shared rule this file applies itself, keeping `user:***@host` rather than a second mark. */
+const SHARED_RULES_ALREADY_APPLIED = ["url_credentials"];
 
 /** A masked value keeps the quotes it was written in. */
 const masked = (value: string) => {
@@ -50,24 +59,48 @@ const masked = (value: string) => {
 };
 
 /**
- * A URL's password, every secret-named value in `key=value`, `key: value` or JSON form, and
- * every bearer or basic credential masked; the user, host and path stay.
+ * A URL's password, every secret-named value in `key=value`, `key: value` or JSON form, every
+ * bearer or basic credential, then the shared secret rules' provider keys and tokens, masked;
+ * the user, host and path stay.
  */
 export function redactSecrets(text: string): string {
-  return text
+  const named = text
     .replace(URL_CREDENTIALS, "$1:***@")
     .replace(SECRET_PAIRS, (_match, key: string, value: string) => `${key}${masked(value)}`)
     .replace(AUTH_SCHEMES, "$1 ***");
+  return redactSecretsInText({ text: named, skipRuleIds: SHARED_RULES_ALREADY_APPLIED }).text;
 }
 
-function redactValue(value: unknown): unknown {
-  if (typeof value === "string") return redactSecrets(value);
-  if (Array.isArray(value)) return value.map(redactValue);
-  if (value instanceof Error) return redactSecrets(value.message);
-  if (value !== null && typeof value === "object") {
-    return Object.fromEntries(Object.entries(value).map(([key, each]) => [key, redactValue(each)]));
-  }
-  return value;
+const CYCLE_MARK = "[cycle]";
+
+/**
+ * Every string in a log line's fields redacted, an Error by its message. `seen` holds the
+ * objects on the current path, so a self-reference becomes a mark.
+ */
+export function redactValue({
+  value,
+  redact = redactSecrets,
+  seen = new WeakSet<object>(),
+}: {
+  value: unknown;
+  redact?: (text: string) => string;
+  seen?: WeakSet<object>;
+}): unknown {
+  if (typeof value === "string") return redact(value);
+  if (value instanceof Error) return redact(value.message);
+  if (value === null || typeof value !== "object") return value;
+  if (seen.has(value)) return CYCLE_MARK;
+  seen.add(value);
+  const redacted = Array.isArray(value)
+    ? value.map((each: unknown) => redactValue({ value: each, redact, seen }))
+    : Object.fromEntries(
+        Object.entries(value).map(([key, each]) => [
+          key,
+          redactValue({ value: each, redact, seen }),
+        ]),
+      );
+  seen.delete(value);
+  return redacted;
 }
 
 /** The command that marks a failed Prisma migration rolled back, as an operator would type it. */
@@ -322,7 +355,7 @@ export class UpgradeRunLog implements UpgradeRunnerLog {
   }
 
   private fields(fields: Record<string, unknown> | undefined): Record<string, unknown> {
-    const redacted = (redactValue(fields ?? {}) as Record<string, unknown>) ?? {};
+    const redacted = (redactValue({ value: fields ?? {} }) as Record<string, unknown>) ?? {};
     return { elapsedMs: elapsedSince(this.startedAt), ...redacted };
   }
 }
