@@ -298,6 +298,25 @@ const LANES: Record<string, "integration" | "browser"> = {
 export const laneOf = (script: string): "integration" | "browser" | "shared" =>
   LANES[script] ?? "shared";
 
+/** The scripts nx.json caches. They run through Nx, so an unchanged suite replays its pass. */
+const CACHED_SCRIPTS = new Set(["test", "test:unit"]);
+
+/** The pnpm arguments that run a job; dependencies are built by an earlier step. */
+export const commandFor = (job: SuiteJob): string[] =>
+  CACHED_SCRIPTS.has(job.script)
+    ? [
+        "exec",
+        "nx",
+        "run-many",
+        "--targets",
+        job.script,
+        "--projects",
+        job.pkg.name,
+        "--excludeTaskDependencies",
+        "--outputStyle=stream-without-prefixes",
+      ]
+    : ["--filter", job.pkg.name, "run", job.script];
+
 /**
  * Parses `PACKAGE_SUITES_CONCURRENCY`. Absent means one suite at a time; a
  * malformed value is an error, never a silent guess.
@@ -719,16 +738,17 @@ if (isEntrypoint()) {
   // outrank it, and an integration suite's serial files would then overlap.
   const live = concurrency === 1;
   console.log(`Running up to ${concurrency} suite(s) at once.`);
+  const huntCommandFor = (job: SuiteJob): string[] | undefined => {
+    const extra = extraArgsFor(job.pkg, job.script) ?? [];
+    return extra.length > 0 ? ["--filter", job.pkg.name, "run", job.script, ...extra] : undefined;
+  };
   const runner = createSuiteRunner({
     live,
     start: (job) =>
-      spawn(
-        "pnpm",
-        ["--filter", job.pkg.name, "run", job.script, ...(extraArgsFor(job.pkg, job.script) ?? [])],
-        {
-          stdio: live ? "inherit" : ["ignore", "pipe", "pipe"],
-        },
-      ),
+      // The hunt skips nx, whose cache would replay a result instead of rerunning under the seed.
+      spawn("pnpm", huntCommandFor(job) ?? commandFor(job), {
+        stdio: live ? "inherit" : ["ignore", "pipe", "pipe"],
+      }),
     log: (line) => console.log(line),
     write: (output) => process.stdout.write(output),
   });

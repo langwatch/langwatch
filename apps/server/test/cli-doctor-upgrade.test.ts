@@ -14,7 +14,10 @@ async function runDoctor({ home }: { home: string }) {
   const result = await execa(
     "node",
     ["--experimental-transform-types", cliSource, "doctor", "--port-base", String(PORT_BASE)],
-    { env: { ...process.env, LANGWATCH_HOME: home, NO_COLOR: "1" }, reject: false },
+    {
+      env: { ...process.env, LANGWATCH_HOME: home, NO_COLOR: "1", FORCE_COLOR: undefined },
+      reject: false,
+    },
   );
   return { stdout: result.stdout, exitCode: result.exitCode };
 }

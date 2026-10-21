@@ -50,7 +50,7 @@ RUN --mount=type=cache,target=/go/pkg/mod,id=go-mod-${TARGETARCH} \
 # Every member's package.json and nothing else. This stage re-runs on any
 # source edit, but its output changes only when a manifest does, so the
 # install layer below stays cached across source-only commits.
-FROM node:24-alpine AS manifests
+FROM node:24.22.1-alpine AS manifests
 WORKDIR /src
 COPY mcp/typescript ./mcp/typescript
 COPY packages ./packages
@@ -65,7 +65,7 @@ RUN find . ! -type d ! -name package.json -delete && find . -depth -type d -empt
 # script (allowBuilds in pnpm-workspace.yaml: bcrypt, node-pty and the rest) falls back to.
 # The pnpm store sits in a BuildKit cache mount at this path on every install,
 # so a lockfile change downloads only what is new.
-FROM node:24-alpine AS node-toolchain
+FROM node:24.22.1-alpine AS node-toolchain
 RUN apk --no-cache add curl python3 make gcc g++ openssl bash
 RUN npm install -g pnpm@12.6.0 && npm cache clean --force
 ENV pnpm_config_store_dir=/root/.local/share/pnpm/store
@@ -236,7 +236,7 @@ FROM scratch AS ui-assets
 COPY --from=builder /app/apps/ui/dist/client/assets /assets
 
 # ── Stage 3: runtime ───────────────────────────────────────────────
-FROM node:24-alpine
+FROM node:24.22.1-alpine
 RUN apk --no-cache add curl openssl bash
 RUN npm install -g pnpm@12.6.0 && npm cache clean --force
 
