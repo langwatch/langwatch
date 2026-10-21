@@ -14,6 +14,7 @@ import {
   type AnalyticsFilterOption,
   type AnalyticsMetricSource,
   type AnalyticsReadInput,
+  type CostReadOptions,
   type AnalyticsTimeseriesInput,
   type AnalyticsTimeseriesReadOptions,
   type AnalyticsTimeseriesResult,
@@ -593,20 +594,27 @@ export class AnalyticsModule
   }
 
   /** The retrieval documents a project's traces cite most. */
-  getTopUsedDocuments(input: AnalyticsReadInput): Promise<AnalyticsTopDocumentsResult> {
-    return this.#dependencies.analytics.getTopUsedDocuments(input);
+  getTopUsedDocuments(
+    input: AnalyticsReadInput,
+    options: CostReadOptions,
+  ): Promise<AnalyticsTopDocumentsResult> {
+    return this.#dependencies.analytics.getTopUsedDocuments(input, options);
   }
 
   /** The thumbs and comments left on the project's messages. */
-  getFeedbacks(input: AnalyticsReadInput): Promise<AnalyticsFeedbacksResult> {
-    return this.#dependencies.analytics.getFeedbacks(input);
+  getFeedbacks(
+    input: AnalyticsReadInput,
+    options: CostReadOptions,
+  ): Promise<AnalyticsFeedbacksResult> {
+    return this.#dependencies.analytics.getFeedbacks(input, options);
   }
 
   /** The same feedbacks, newest first, one bounded page at a time. */
   getFeedbacksPage(
     input: AnalyticsReadInput & AnalyticsFeedbacksPageParams,
+    options: CostReadOptions,
   ): Promise<AnalyticsFeedbacksPageResult> {
-    return this.#dependencies.analytics.getFeedbacksPage(input);
+    return this.#dependencies.analytics.getFeedbacksPage(input, options);
   }
 
   /**

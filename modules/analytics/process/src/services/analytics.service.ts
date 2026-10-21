@@ -10,6 +10,7 @@ import {
   type AnalyticsFeedbacksPageResult,
   type AnalyticsFeedbacksResult,
   type AnalyticsReadInput,
+  type CostReadOptions,
   type AnalyticsTopDocumentsResult,
   type AnalyticsTimeseriesInput,
   type AnalyticsTimeseriesReadOptions,
@@ -200,6 +201,11 @@ type AnalyticsServiceDeps = {
   tripwire?: LoggingAnalyticsTripwireService;
 };
 
+/** A cost-gated read's proof, refused when forged or expired before any read. */
+function costProof({ authorization }: CostReadOptions): Authorization {
+  return usableAuthorization({ authorization, now: nowInstant().epochMilliseconds });
+}
+
 export class AnalyticsService {
   static create(options: AnalyticsServiceDeps): AnalyticsService {
     return new AnalyticsService(options);
@@ -349,8 +355,12 @@ export class AnalyticsService {
     });
   }
 
-  async getFeedbacks(input: AnalyticsReadInput): Promise<AnalyticsFeedbacksResult> {
+  async getFeedbacks(
+    input: AnalyticsReadInput,
+    options: CostReadOptions,
+  ): Promise<AnalyticsFeedbacksResult> {
     const parsed = {
+      authorization: costProof(options),
       projectId: input.projectId,
       startDate: input.startDate,
       endDate: input.endDate,
@@ -380,7 +390,9 @@ export class AnalyticsService {
 
   async getFeedbacksPage(
     input: AnalyticsReadInput & AnalyticsFeedbacksPageParams,
+    options: CostReadOptions,
   ): Promise<AnalyticsFeedbacksPageResult> {
+    const authorization = costProof(options);
     const page = analyticsFeedbacksPageParamsSchema.safeParse({
       cursor: input.cursor,
       limit: input.limit,
@@ -398,6 +410,7 @@ export class AnalyticsService {
     return context.with(activeContext, async (): Promise<AnalyticsFeedbacksPageResult> => {
       try {
         const read = await this.repository.findFeedbackEventsPage({
+          authorization,
           projectId: input.projectId,
           startDate: input.startDate,
           endDate: input.endDate,
@@ -422,8 +435,12 @@ export class AnalyticsService {
     });
   }
 
-  async getTopUsedDocuments(input: AnalyticsReadInput): Promise<AnalyticsTopDocumentsResult> {
+  async getTopUsedDocuments(
+    input: AnalyticsReadInput,
+    options: CostReadOptions,
+  ): Promise<AnalyticsTopDocumentsResult> {
     const parsed = {
+      authorization: costProof(options),
       projectId: input.projectId,
       startDate: input.startDate,
       endDate: input.endDate,

@@ -1,9 +1,9 @@
 import { tenantScope, tenantSet } from "@langwatch/clickhouse-client";
 
 /**
- * How a legacy trace_summaries statement names its tenants. A timeseries reads through the
- * proof (ADR-177): the window applies once, on `OccurredAt`, and a side table read beside a
- * fenced trace takes the set. Top documents and feedbacks read the own project by hand.
+ * How a legacy trace_summaries statement names its tenants. A timeseries, top documents and
+ * feedbacks read through the proof (ADR-177): the window applies once, on `OccurredAt`, and a
+ * side table read beside a fenced trace takes the set.
  */
 export type TenantSql = {
   /** The predicate on trace_summaries. */

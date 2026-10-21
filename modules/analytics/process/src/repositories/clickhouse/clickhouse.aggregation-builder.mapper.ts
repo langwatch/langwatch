@@ -3427,12 +3427,10 @@ const RAG_CONTEXTS_ATTRIBUTE = "langwatch.rag.contexts";
  * Build a query for top used documents (RAG analytics)
  */
 export function buildTopDocumentsQuery({
-  projectId,
   startDate,
   endDate,
   filters,
 }: {
-  projectId: string;
   startDate: Date;
   endDate: Date;
   filters?: Partial<
@@ -3448,6 +3446,7 @@ export function buildTopDocumentsQuery({
   // Translate filters
   const filterTranslation = translateAllFilters(filters ?? {}, {
     spanTimePredicate: SPAN_TIME_FILTER_START_END,
+    tenant: FENCED_TENANT_SQL,
   });
   const filterWhere =
     filterTranslation.whereClause !== "1=1" ? `AND ${filterTranslation.whereClause}` : "";
@@ -3470,6 +3469,7 @@ export function buildTopDocumentsQuery({
     table: "stored_spans",
     requiredColumns: new Set([spanAttributesNarrowProjection([RAG_CONTEXTS_ATTRIBUTE])]),
     spanTimeFilter: `${SPAN_TIME_FILTER_START_END} AND SpanAttributes['${RAG_CONTEXTS_ATTRIBUTE}'] != ''`,
+    tenant: FENCED_TENANT_SQL,
   });
 
   // One statement: the top documents and the distinct-document total come
@@ -3481,11 +3481,10 @@ export function buildTopDocumentsQuery({
         ${ts}.TraceId,
         toString(context.document_id) AS document_id,
         toString(context.content) AS content
-      FROM ${dedupedTraceSummaries({ alias: ts, tenant: OWN_TENANT_SQL, columns: traceColumns, dateFilter: DATE_FILTER_START_END })}
+      FROM ${dedupedTraceSummaries({ alias: ts, tenant: FENCED_TENANT_SQL, columns: traceColumns, dateFilter: DATE_FILTER_START_END })}
       ${spanJoin}
       ARRAY JOIN JSONExtract(${ss}.SpanAttributes['${RAG_CONTEXTS_ATTRIBUTE}'], 'Array(JSON)') AS context
-      WHERE ${ts}.TenantId = {tenantId:String}
-        AND ${ts}.OccurredAt >= {startDate:DateTime64(3)}
+      WHERE ${ts}.OccurredAt >= {startDate:DateTime64(3)}
         AND ${ts}.OccurredAt < {endDate:DateTime64(3)}
         ${filterWhere}
     )
@@ -3505,7 +3504,6 @@ export function buildTopDocumentsQuery({
   return {
     sql,
     params: {
-      tenantId: projectId,
       startDate,
       endDate,
       ...filterTranslation.params,
@@ -3521,16 +3519,14 @@ type FeedbackQueryFilters = Partial<
 >;
 
 /**
- * The part of a feedbacks read both the capped list and the paged list share: the tenant and
- * window, the translated filters, and the pruned trace and span sources the events come from.
+ * The part of a feedbacks read both the capped list and the paged list share: the window, the
+ * translated filters, and the fenced, pruned trace and span sources the events come from.
  */
 function feedbackQueryParts({
-  projectId,
   startDate,
   endDate,
   filters,
 }: {
-  projectId: string;
   startDate: Date;
   endDate: Date;
   filters?: FeedbackQueryFilters;
@@ -3540,6 +3536,7 @@ function feedbackQueryParts({
   // Translate filters
   const filterTranslation = translateAllFilters(filters ?? {}, {
     spanTimePredicate: SPAN_TIME_FILTER_START_END,
+    tenant: FENCED_TENANT_SQL,
   });
   const filterWhere =
     filterTranslation.whereClause !== "1=1" ? `AND ${filterTranslation.whereClause}` : "";
@@ -3560,14 +3557,14 @@ function feedbackQueryParts({
     table: "stored_spans",
     requiredColumns: new Set(['"Events.Timestamp"', '"Events.Name"', '"Events.Attributes"']),
     spanTimeFilter: SPAN_TIME_FILTER_START_END,
+    tenant: FENCED_TENANT_SQL,
   });
 
   return {
-    fromClause: `${dedupedTraceSummaries({ alias: ts, tenant: OWN_TENANT_SQL, columns: traceColumns, dateFilter: DATE_FILTER_START_END })}
+    fromClause: `${dedupedTraceSummaries({ alias: ts, tenant: FENCED_TENANT_SQL, columns: traceColumns, dateFilter: DATE_FILTER_START_END })}
     ${spanJoin}`,
     filterWhere,
     params: {
-      tenantId: projectId,
       startDate,
       endDate,
       ...filterTranslation.params,
@@ -3579,12 +3576,10 @@ function feedbackQueryParts({
  * Build a query for feedbacks
  */
 export function buildFeedbacksQuery({
-  projectId,
   startDate,
   endDate,
   filters,
 }: {
-  projectId: string;
   startDate: Date;
   endDate: Date;
   filters?: FeedbackQueryFilters;
@@ -3592,7 +3587,6 @@ export function buildFeedbacksQuery({
   const ts = tableAliases.trace_summaries;
   const ss = tableAliases.stored_spans;
   const { fromClause, filterWhere, params } = feedbackQueryParts({
-    projectId,
     startDate,
     endDate,
     filters,
@@ -3610,8 +3604,7 @@ export function buildFeedbacksQuery({
       ${ss}."Events.Timestamp" AS event_timestamp,
       ${ss}."Events.Name" AS event_name,
       ${ss}."Events.Attributes" AS event_attrs
-    WHERE ${ts}.TenantId = {tenantId:String}
-      AND ${ts}.OccurredAt >= {startDate:DateTime64(3)}
+    WHERE ${ts}.OccurredAt >= {startDate:DateTime64(3)}
       AND ${ts}.OccurredAt < {endDate:DateTime64(3)}
       AND event_name = 'thumbs_up_down'
       AND mapContains(event_attrs, 'event.metrics.vote')
@@ -3629,14 +3622,12 @@ export function buildFeedbacksQuery({
  * repeat nor vanish across pages. It asks for one row more than `limit` to know another follows.
  */
 export function buildFeedbacksPageQuery({
-  projectId,
   startDate,
   endDate,
   filters,
   after,
   limit,
 }: {
-  projectId: string;
   startDate: Date;
   endDate: Date;
   filters?: FeedbackQueryFilters;
@@ -3646,7 +3637,6 @@ export function buildFeedbacksPageQuery({
   const ts = tableAliases.trace_summaries;
   const ss = tableAliases.stored_spans;
   const { fromClause, filterWhere, params } = feedbackQueryParts({
-    projectId,
     startDate,
     endDate,
     filters,
@@ -3670,8 +3660,7 @@ export function buildFeedbacksPageQuery({
       arrayEnumerate(${ss}."Events.Timestamp") AS event_index,
       ${ss}."Events.Name" AS event_name,
       ${ss}."Events.Attributes" AS event_attrs
-    WHERE ${ts}.TenantId = {tenantId:String}
-      AND ${ts}.OccurredAt >= {startDate:DateTime64(3)}
+    WHERE ${ts}.OccurredAt >= {startDate:DateTime64(3)}
       AND ${ts}.OccurredAt < {endDate:DateTime64(3)}
       AND event_name = 'thumbs_up_down'
       AND mapContains(event_attrs, 'event.metrics.vote')

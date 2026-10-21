@@ -71,21 +71,32 @@ export interface DashboardWidgetDefinitionInput {
   readonly source?: DashboardWidgetSource;
 }
 
+/** The proof a cost-gated read runs under (ADR-177 v4.15). */
+export type CostReadOptions = { readonly authorization: Authorization };
+
 /** The callable analytics capability shared by process peers. */
 export interface AnalyticsApi {
   getTimeseries(
     input: AnalyticsTimeseriesInput,
     options?: AnalyticsTimeseriesReadOptions,
   ): Promise<AnalyticsTimeseriesResult>;
-  getFeedbacks(input: AnalyticsReadInput): Promise<AnalyticsFeedbacksResult>;
+  /** The cost-gated reads below take the route's `cost:view` proof, as a series takes its own. */
+  getFeedbacks(
+    input: AnalyticsReadInput,
+    options: CostReadOptions,
+  ): Promise<AnalyticsFeedbacksResult>;
   /**
    * The same feedbacks as {@link getFeedbacks}, newest first, one bounded page at a time.
    * Refuses a cursor from another project or filter set with `validation_error`.
    */
   getFeedbacksPage(
     input: AnalyticsReadInput & AnalyticsFeedbacksPageParams,
+    options: CostReadOptions,
   ): Promise<AnalyticsFeedbacksPageResult>;
-  getTopUsedDocuments(input: AnalyticsReadInput): Promise<AnalyticsTopDocumentsResult>;
+  getTopUsedDocuments(
+    input: AnalyticsReadInput,
+    options: CostReadOptions,
+  ): Promise<AnalyticsTopDocumentsResult>;
   filterOptions(
     input: {
       readonly projectId: string;

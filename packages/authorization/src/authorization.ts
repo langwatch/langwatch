@@ -313,13 +313,14 @@ export function usableAuthorization({
 }
 
 /**
- * The permissions a route's permission check mints a proof for: the trace read's and the
- * analytics read's, the two a shared grant's window applies to. Minting for any other would
- * cost an engine pass nothing consumes.
+ * The permissions a route's permission check mints a proof for: the trace read's, the
+ * analytics read's and the cost read's, the three a shared grant's window applies to. Minting
+ * for any other would cost an engine pass nothing consumes.
  */
 const PROOF_BEARING = [
   "traces:view",
   "analytics:view",
+  "cost:view",
 ] as const satisfies readonly AuthzPermission[];
 /** A permission whose route check hands the handler its proof, typed so a door can say so. */
 export type ProofBearingPermission = (typeof PROOF_BEARING)[number];

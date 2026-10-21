@@ -176,7 +176,6 @@ const IN_WINDOWS = 1 + 2 + 8 + 32;
 beforeAll(async () => {
   client = (await startMigratedClickHouse()).client;
   repository = ClickHouseAnalyticsRepository.create({
-    resolveClient: async () => client,
     clickhouse: clickHouseQueryClientOver(client),
   });
   const settings = { async_insert: 0, wait_for_async_insert: 0 } as const;

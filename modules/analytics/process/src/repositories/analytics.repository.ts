@@ -28,6 +28,8 @@ export interface AnalyticsTimeseriesQuery {
 
 export interface AnalyticsLegacyReadInput {
   readonly projectId: string;
+  /** The route's `cost:view` proof (ADR-177 v4.15); its fence picks the tenants read. */
+  readonly authorization: Authorization;
   readonly startDate: number;
   readonly endDate: number;
   readonly filters?: AnalyticsFilters;

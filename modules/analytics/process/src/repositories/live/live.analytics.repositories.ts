@@ -38,7 +38,7 @@ export class LiveAnalyticsRepositories {
     const resolveClient = (tenantId: string) => sessions.resolve(tenantId);
     return {
       sessions,
-      analytics: ClickHouseAnalyticsRepository.create({ resolveClient, clickhouse }),
+      analytics: ClickHouseAnalyticsRepository.create({ clickhouse }),
       filterOptions: FilterOptionsClickHouseRepository.create({ clickhouse }),
       evaluations: {
         open: ({ defaultRetentionDays }) =>

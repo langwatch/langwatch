@@ -154,7 +154,6 @@ function bucketFor(result: AnalyticsTimeseriesResult, day: string) {
 beforeAll(async () => {
   client = (await startMigratedClickHouse()).client;
   repository = ClickHouseAnalyticsRepository.create({
-    resolveClient: async () => client,
     clickhouse: clickHouseQueryClientOver(client),
   });
 

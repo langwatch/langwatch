@@ -1736,23 +1736,23 @@ describe("aggregation-builder", () => {
   });
 
   describe("buildTopDocumentsQuery()", () => {
-    const projectId = "test-project";
     const startDate = new Date("2024-01-01T00:00:00Z");
     const endDate = new Date("2024-01-02T00:00:00Z");
 
     it("builds query for top documents", () => {
-      const result = buildTopDocumentsQuery({ projectId, startDate, endDate });
+      const result = buildTopDocumentsQuery({ startDate, endDate });
 
       expect(result.sql).toContain("documentId");
       expect(result.sql).toContain("count");
       expect(result.sql).toContain("traceId");
       expect(result.sql).toContain("content");
       expect(result.sql).toContain("langwatch.rag.contexts");
-      expect(result.params.tenantId).toBe(projectId);
+      expect(result.sql).toContain("{{tenantScope:OccurredAt}}");
+      expect(result.sql).not.toContain("{tenantId:String}");
     });
 
     it("joins a stored_spans subquery narrowed to the rag.contexts value", () => {
-      const result = buildTopDocumentsQuery({ projectId, startDate, endDate });
+      const result = buildTopDocumentsQuery({ startDate, endDate });
 
       expect(result.sql).not.toContain("JOIN stored_spans ");
       expect(result.sql).not.toMatch(/SELECT\s+\*\s+FROM\s+stored_spans/);
@@ -1765,12 +1765,12 @@ describe("aggregation-builder", () => {
       );
       // ...and only for the spans that have one.
       expect(result.sql).toMatch(
-        /FROM stored_spans WHERE TenantId = \{tenantId:String\}[^\n]*?AND SpanAttributes\['langwatch\.rag\.contexts'\] != ''/,
+        /FROM stored_spans WHERE \{\{tenantSet\}\}[^\n]*?AND SpanAttributes\['langwatch\.rag\.contexts'\] != ''/,
       );
     });
 
     it("prunes the stored_spans join to the StartTime partition window", () => {
-      const result = buildTopDocumentsQuery({ projectId, startDate, endDate });
+      const result = buildTopDocumentsQuery({ startDate, endDate });
 
       // stored_spans is partitioned by toYearWeek(StartTime); without a
       // StartTime bound the join scans every weekly partition (incl. cold S3).
@@ -1786,7 +1786,7 @@ describe("aggregation-builder", () => {
     });
 
     it("counts the distinct documents in the same statement as the top 10", () => {
-      const result = buildTopDocumentsQuery({ projectId, startDate, endDate });
+      const result = buildTopDocumentsQuery({ startDate, endDate });
 
       // One scan and one join serve both figures: the total is the number of
       // document groups, counted before the LIMIT.
@@ -1798,19 +1798,19 @@ describe("aggregation-builder", () => {
       const filters = {
         "topics.topics": ["topic-1"],
       };
-      const result = buildTopDocumentsQuery({ projectId, startDate, endDate, filters });
+      const result = buildTopDocumentsQuery({ startDate, endDate, filters });
 
       expect(result.sql).toContain("ts.TopicId IN");
     });
 
     it("limits results to top 10", () => {
-      const result = buildTopDocumentsQuery({ projectId, startDate, endDate });
+      const result = buildTopDocumentsQuery({ startDate, endDate });
 
       expect(result.sql).toContain("LIMIT 10");
     });
 
     it("prunes the deduped trace_summaries read to identity columns", () => {
-      const result = buildTopDocumentsQuery({ projectId, startDate, endDate });
+      const result = buildTopDocumentsQuery({ startDate, endDate });
 
       // The document payload comes from the stored_spans ARRAY JOIN, so the
       // deduped trace_summaries subquery only needs identity/date columns and
@@ -1820,7 +1820,6 @@ describe("aggregation-builder", () => {
 
     it("adds filter-referenced columns to the deduped read so filtered queries stay valid", () => {
       const result = buildTopDocumentsQuery({
-        projectId,
         startDate,
         endDate,
         filters: {
@@ -1836,13 +1835,12 @@ describe("aggregation-builder", () => {
   });
 
   describe("buildFeedbacksPageQuery()", () => {
-    const projectId = "test-project";
     const startDate = new Date("2024-01-01T00:00:00Z");
     const endDate = new Date("2024-01-02T00:00:00Z");
 
     /** @scenario "The paged query orders by a persisted identity and resumes strictly after the cursor" */
     it("orders by timestamp, trace, span and event position, all newest first", () => {
-      const result = buildFeedbacksPageQuery({ projectId, startDate, endDate, limit: 25 });
+      const result = buildFeedbacksPageQuery({ startDate, endDate, limit: 25 });
 
       expect(result.sql).toMatch(
         /ORDER BY event_timestamp DESC, ts\.TraceId DESC, ss\.SpanId DESC, event_index DESC/,
@@ -1851,14 +1849,14 @@ describe("aggregation-builder", () => {
     });
 
     it("asks for one row more than the page size, as a bound parameter", () => {
-      const result = buildFeedbacksPageQuery({ projectId, startDate, endDate, limit: 25 });
+      const result = buildFeedbacksPageQuery({ startDate, endDate, limit: 25 });
 
       expect(result.sql).toContain("LIMIT {pageLimit:UInt32}");
       expect(result.params.pageLimit).toBe(26);
     });
 
     it("has no position condition for the first page", () => {
-      const result = buildFeedbacksPageQuery({ projectId, startDate, endDate, limit: 25 });
+      const result = buildFeedbacksPageQuery({ startDate, endDate, limit: 25 });
 
       expect(result.sql).not.toContain("afterStartedAt");
       expect(Object.keys(result.params)).not.toContain("afterTraceId");
@@ -1866,7 +1864,6 @@ describe("aggregation-builder", () => {
 
     it("resumes strictly after the cursor position with every part bound", () => {
       const result = buildFeedbacksPageQuery({
-        projectId,
         startDate,
         endDate,
         limit: 25,
@@ -1891,10 +1888,11 @@ describe("aggregation-builder", () => {
     });
 
     it("fences the tenant and the window and keeps the thumbs vote filter", () => {
-      const result = buildFeedbacksPageQuery({ projectId, startDate, endDate, limit: 25 });
+      const result = buildFeedbacksPageQuery({ startDate, endDate, limit: 25 });
 
-      expect(result.sql).toContain("ts.TenantId = {tenantId:String}");
-      expect(result.params).toMatchObject({ tenantId: projectId, startDate, endDate });
+      expect(result.sql).toContain("{{tenantScope:OccurredAt}}");
+      expect(result.sql).not.toContain("{tenantId:String}");
+      expect(result.params).toMatchObject({ startDate, endDate });
       expect(result.sql).toContain("event_name = 'thumbs_up_down'");
       expect(result.sql).toContain("mapContains(event_attrs, 'event.metrics.vote')");
     });
@@ -1902,9 +1900,9 @@ describe("aggregation-builder", () => {
     it("applies the same filters as the unpaged query, parameterised", () => {
       resetParamCounter();
       const filters = { "metadata.user_id": ["user-1"] };
-      const page = buildFeedbacksPageQuery({ projectId, startDate, endDate, filters, limit: 25 });
+      const page = buildFeedbacksPageQuery({ startDate, endDate, filters, limit: 25 });
       resetParamCounter();
-      const unpaged = buildFeedbacksQuery({ projectId, startDate, endDate, filters });
+      const unpaged = buildFeedbacksQuery({ startDate, endDate, filters });
 
       expect(page.sql).not.toContain("user-1");
       for (const key of Object.keys(unpaged.params)) {
@@ -1914,7 +1912,7 @@ describe("aggregation-builder", () => {
 
     /** @scenario "The existing feedback read keeps its query and result" */
     it("leaves the unpaged query ordering by timestamp and capped at 100", () => {
-      const result = buildFeedbacksQuery({ projectId, startDate, endDate });
+      const result = buildFeedbacksQuery({ startDate, endDate });
 
       expect(result.sql).toMatch(/ORDER BY event_timestamp DESC\s+LIMIT 100\s*$/);
       expect(result.sql).not.toContain("event_index");
@@ -1923,35 +1921,35 @@ describe("aggregation-builder", () => {
   });
 
   describe("buildFeedbacksQuery()", () => {
-    const projectId = "test-project";
     const startDate = new Date("2024-01-01T00:00:00Z");
     const endDate = new Date("2024-01-02T00:00:00Z");
 
     it("builds query for feedbacks", () => {
-      const result = buildFeedbacksQuery({ projectId, startDate, endDate });
+      const result = buildFeedbacksQuery({ startDate, endDate });
 
       expect(result.sql).toContain("trace_id");
       expect(result.sql).toContain("event_id");
       expect(result.sql).toContain("started_at");
       expect(result.sql).toContain("event_type");
       expect(result.sql).toContain("attributes");
-      expect(result.params.tenantId).toBe(projectId);
+      expect(result.sql).toContain("{{tenantScope:OccurredAt}}");
+      expect(result.sql).not.toContain("{tenantId:String}");
     });
 
     it("filters for thumbs_up_down events", () => {
-      const result = buildFeedbacksQuery({ projectId, startDate, endDate });
+      const result = buildFeedbacksQuery({ startDate, endDate });
 
       expect(result.sql).toContain("event_name = 'thumbs_up_down'");
     });
 
     it("filters for thumbs_up_down events with vote metric", () => {
-      const result = buildFeedbacksQuery({ projectId, startDate, endDate });
+      const result = buildFeedbacksQuery({ startDate, endDate });
 
       expect(result.sql).toContain("mapContains(event_attrs, 'event.metrics.vote')");
     });
 
     it("includes ARRAY JOIN for event arrays", () => {
-      const result = buildFeedbacksQuery({ projectId, startDate, endDate });
+      const result = buildFeedbacksQuery({ startDate, endDate });
 
       expect(result.sql).toContain("ARRAY JOIN");
       expect(result.sql).toContain('Events.Timestamp"');
@@ -1960,7 +1958,7 @@ describe("aggregation-builder", () => {
     });
 
     it("prunes the stored_spans join to the StartTime partition window", () => {
-      const result = buildFeedbacksQuery({ projectId, startDate, endDate });
+      const result = buildFeedbacksQuery({ startDate, endDate });
 
       // Same partition-pruning rationale as the documents query, now pushed
       // into the pruned subquery instead of the outer ss alias. The subquery
@@ -1989,7 +1987,7 @@ describe("aggregation-builder", () => {
       const filters = {
         "metadata.user_id": ["user-1"],
       };
-      const result = buildFeedbacksQuery({ projectId, startDate, endDate, filters });
+      const result = buildFeedbacksQuery({ startDate, endDate, filters });
 
       // Filter values are now parameterized, key is in params
       expect(result.sql).toContain("ts.Attributes[{metaValues_");
@@ -1998,19 +1996,19 @@ describe("aggregation-builder", () => {
     });
 
     it("limits results to 100", () => {
-      const result = buildFeedbacksQuery({ projectId, startDate, endDate });
+      const result = buildFeedbacksQuery({ startDate, endDate });
 
       expect(result.sql).toContain("LIMIT 100");
     });
 
     it("orders by timestamp descending", () => {
-      const result = buildFeedbacksQuery({ projectId, startDate, endDate });
+      const result = buildFeedbacksQuery({ startDate, endDate });
 
       expect(result.sql).toContain("ORDER BY event_timestamp DESC");
     });
 
     it("prunes the deduped trace_summaries read to identity columns", () => {
-      const result = buildFeedbacksQuery({ projectId, startDate, endDate });
+      const result = buildFeedbacksQuery({ startDate, endDate });
 
       // Feedback payload comes from the stored_spans Events arrays, so the
       // deduped trace_summaries subquery only needs identity/date columns.
@@ -2019,7 +2017,6 @@ describe("aggregation-builder", () => {
 
     it("adds a filter-referenced Attributes read to the deduped subquery", () => {
       const result = buildFeedbacksQuery({
-        projectId,
         startDate,
         endDate,
         filters: {

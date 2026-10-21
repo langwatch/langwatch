@@ -21,13 +21,13 @@ export const analyticsTrpcTransport: TrpcRouterDeclaration<AnalyticsApi, typeof 
 
     .procedure("topUsedDocuments")
     .withPermission("cost:view")
-    .handle(({ app, input }) => app.getTopUsedDocuments(input))
+    .handle(({ app, input, authorization }) => app.getTopUsedDocuments(input, { authorization }))
 
     .procedure("feedbacks")
     .withPermission("cost:view")
-    .handle(({ app, input }) => app.getFeedbacks(input))
+    .handle(({ app, input, authorization }) => app.getFeedbacks(input, { authorization }))
 
     .procedure("feedbacksPage")
     .withPermission("cost:view")
-    .handle(({ app, input }) => app.getFeedbacksPage(input))
+    .handle(({ app, input, authorization }) => app.getFeedbacksPage(input, { authorization }))
     .build();

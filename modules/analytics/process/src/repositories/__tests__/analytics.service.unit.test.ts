@@ -32,13 +32,17 @@ const tenantLimiter = ({ maxConcurrent = 4 }: { maxConcurrent?: number } = {}) =
     overloadErrorFactory: { create: ({ cause }: { cause: unknown }) => cause },
   });
 
+/** A cost-gated read's proof for the one project these reads ask about. */
+const COST = {
+  authorization: analyticsProof({ projectId: "project-1", permission: "cost:view" }),
+};
+
 const serviceOver = (options: {
   resolveClient: (tenantId: string) => Promise<ClickHouseClient | null>;
   clickhouseEnabled: boolean;
 }): AnalyticsService =>
   AnalyticsService.create({
     repository: ClickHouseAnalyticsRepository.create({
-      resolveClient: options.resolveClient,
       clickhouse: clickHouseQueryClientOver(options.resolveClient),
     }),
     evaluationRepository: options.clickhouseEnabled
@@ -196,7 +200,7 @@ describe("AnalyticsService", () => {
     const service = createService(new RecordingRepository(), limiter);
 
     await service.getTimeseries(input());
-    await service.getTopUsedDocuments({ projectId: "project-1", startDate: 0, endDate: 1 });
+    await service.getTopUsedDocuments({ projectId: "project-1", startDate: 0, endDate: 1 }, COST);
 
     expect(run.mock.calls.map(([call]) => call.tenantId)).toEqual(["project-1", "project-1"]);
   });
@@ -319,28 +323,36 @@ describe("AnalyticsService", () => {
     const filters = { "metadata.user_id": ["user-1"] };
 
     await expect(
-      service.getFeedbacks({
-        projectId: "project-1",
-        startDate: 10,
-        endDate: 20,
-        filters,
-      }),
+      service.getFeedbacks(
+        {
+          projectId: "project-1",
+          startDate: 10,
+          endDate: 20,
+          filters,
+        },
+        COST,
+      ),
     ).resolves.toEqual({ events: [] });
     await expect(
-      service.getTopUsedDocuments({
-        projectId: "project-1",
-        startDate: 10,
-        endDate: 20,
-        filters,
-      }),
+      service.getTopUsedDocuments(
+        {
+          projectId: "project-1",
+          startDate: 10,
+          endDate: 20,
+          filters,
+        },
+        COST,
+      ),
     ).resolves.toEqual({ topDocuments: [], totalUniqueDocuments: 0 });
     expect(repository.lastFeedbackInput).toEqual({
+      authorization: COST.authorization,
       projectId: "project-1",
       startDate: 10,
       endDate: 20,
       filters,
     });
     expect(repository.lastDocumentsInput).toEqual({
+      authorization: COST.authorization,
       projectId: "project-1",
       startDate: 10,
       endDate: 20,
@@ -360,10 +372,16 @@ describe("AnalyticsService", () => {
       query: "refund",
       negateFilters: true,
     };
-    const expected = { projectId: "project-1", startDate: 10, endDate: 20, filters: {} };
+    const expected = {
+      authorization: COST.authorization,
+      projectId: "project-1",
+      startDate: 10,
+      endDate: 20,
+      filters: {},
+    };
 
-    await expect(service.getFeedbacks(toolbarRead)).resolves.toEqual({ events: [] });
-    await expect(service.getTopUsedDocuments(toolbarRead)).resolves.toEqual({
+    await expect(service.getFeedbacks(toolbarRead, COST)).resolves.toEqual({ events: [] });
+    await expect(service.getTopUsedDocuments(toolbarRead, COST)).resolves.toEqual({
       topDocuments: [],
       totalUniqueDocuments: 0,
     });
@@ -410,12 +428,15 @@ describe("AnalyticsService", () => {
     });
 
     await expect(
-      service.getFeedbacks({
-        projectId: "project-1",
-        startDate: 10,
-        endDate: 20,
-        filters: {},
-      }),
+      service.getFeedbacks(
+        {
+          projectId: "project-1",
+          startDate: 10,
+          endDate: 20,
+          filters: {},
+        },
+        COST,
+      ),
     ).resolves.toEqual({
       events: [
         {
@@ -434,12 +455,15 @@ describe("AnalyticsService", () => {
       ],
     });
     await expect(
-      service.getTopUsedDocuments({
-        projectId: "project-1",
-        startDate: 10,
-        endDate: 20,
-        filters: {},
-      }),
+      service.getTopUsedDocuments(
+        {
+          projectId: "project-1",
+          startDate: 10,
+          endDate: 20,
+          filters: {},
+        },
+        COST,
+      ),
     ).resolves.toEqual({
       topDocuments: [{ documentId: "doc-1", count: 3, traceId: "trace-1", content: "hello" }],
       totalUniqueDocuments: 7,
