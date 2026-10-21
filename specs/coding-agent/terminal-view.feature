@@ -236,6 +236,18 @@ Rule: The terminal reads back the whole session
     When the reader reads the bottom bar
     Then the cost and tokens cover every call of the loaded window
 
+  # A turn can end on model calls that draw nothing after its last line (a reply
+  # the agent did not send, a call that only read the context). At the last line
+  # they have happened, so the bar counts them; a running figure that differs
+  # from the session total is stated beside it however small the gap.
+
+  @integration
+  Scenario: The footer at the last line counts the calls after it
+    Given the loaded window ends on model calls that come after its last line
+    When the reader is at the last line
+    Then the cost and tokens cover every call of the loaded window
+    And a running cost short of the session total is stated beside that total
+
   @integration
   Scenario: A reader who may not see cost still reads the session's tokens
     Given the session's earlier turns carry tokens but no cost
