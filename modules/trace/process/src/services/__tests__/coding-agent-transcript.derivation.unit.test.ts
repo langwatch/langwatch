@@ -747,7 +747,7 @@ describe("buildCodingAgentTranscript for non-claude agents", () => {
         spans: [
           spanDetail({
             spanId: stored.span_id,
-            name: stored.name,
+            name: storedCopilotBashRow.SpanName,
             startTimeMs: stored.timestamps.started_at,
             endTimeMs: stored.timestamps.finished_at,
             params: stored.params,
