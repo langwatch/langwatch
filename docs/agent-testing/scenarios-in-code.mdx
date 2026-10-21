@@ -20,8 +20,8 @@ For advanced use cases, see the [`scenario` library documentation](https://githu
 Install the `scenario` library in your project:
 
 <Tabs>
-  <Tab title="Python">```bash uv add langwatch-scenario ```</Tab>
-  <Tab title="TypeScript">```bash npm install @langwatch/scenario ```</Tab>
+  <Tab title="Python">```bash uv add langwatch-scenario pytest pytest-asyncio litellm ```</Tab>
+  <Tab title="TypeScript">```bash npm install @langwatch/scenario ai @ai-sdk/openai zod && npm install -D vitest ```</Tab>
 </Tabs>
 
 ## 2. Configure Environment Variables
@@ -31,6 +31,7 @@ Create a `.env` file in the root of your project:
 ```bash title=".env"
 LANGWATCH_API_KEY="your-api-key"
 LANGWATCH_ENDPOINT="https://app.langwatch.ai"
+OPENAI_API_KEY="your-openai-key" # used by the simulated user, the judge and the example agent
 ```
 
 You can find your `LANGWATCH_API_KEY` in your [LangWatch project settings](https://app.langwatch.ai/settings).

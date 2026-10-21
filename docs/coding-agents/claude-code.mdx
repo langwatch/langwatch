@@ -196,7 +196,7 @@ export OTEL_RESOURCE_ATTRIBUTES="service.name=claude-code"
 claude
 ```
 
-The header takes an ingest key (`ik-lw-…`), which can create traces and no other requests. Keep a full project API key (`sk-lw-…`) out of the configuration of a coding agent: it can read and change your project data, and a coding agent has no use for that.
+The header takes an ingest key (`ik-lw-…`), which can create traces and no other requests. Keep a full project API key (`sk-lw-…`) out of the configuration of a coding agent: it can read and change your project data, and a coding agent has no use for that. To get an ingest key, open the [ingestion template](/ai-governance/ingestion-templates) install drawer, which mints one scoped to the project it should report to.
 
 For a self-hosted instance, replace the endpoint with the address of your instance followed by `/api/otel`. Claude Code appends `/v1/traces`, `/v1/logs` and `/v1/metrics` on its own. Never write the per-signal path yourself.
 

@@ -1711,7 +1711,7 @@
       "anchors": [
         {
           "anchor": "Get Support",
-          "href": "https://docs.langwatch.ai/support#email-support",
+          "href": "https://langwatch.ai/docs/support#email-support",
           "icon": "life-ring"
         }
       ]
@@ -1721,7 +1721,7 @@
     "links": [
       {
         "label": "llms.txt",
-        "href": "https://docs.langwatch.ai/llms.txt"
+        "href": "https://langwatch.ai/llms.txt"
       },
       {
         "label": "Sign In",
