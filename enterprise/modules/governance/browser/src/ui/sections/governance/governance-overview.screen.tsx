@@ -76,7 +76,7 @@ function GovernanceOverviewPage() {
 
           <GovernanceHomeSections
             canSetUpInsights={canSetUpInsights}
-            canViewSources={canReadSources}
+            canManageSources={canManageSources}
             sample={sample.active}
           />
         </VStack>

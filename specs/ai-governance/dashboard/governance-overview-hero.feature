@@ -146,8 +146,8 @@ Feature: The governance overview opens with a hero and nothing else
     Then its column is the design system's narrow page body, centred in the page
     And the screen sets no width or margin of its own
     And each empty list is the design system's one-line empty state
-    And the empty Insights line points at connecting a source, for whoever may see sources
-    And the empty Recent activity line points at the inventory
+    And the empty Insights line offers connecting a source, to whoever may add one
+    But the empty Recent activity line points nowhere, since it fills as the reader works
 
   # The overview starts empty. Both lists fill only after samples are enabled.
 

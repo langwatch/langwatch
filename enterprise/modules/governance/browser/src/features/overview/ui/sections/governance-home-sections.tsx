@@ -19,29 +19,26 @@ import type React from "react";
 import { useGovernanceHost } from "../../../../model/governance-host.ts";
 import { Link } from "../../../../ui/elements/governance-link.tsx";
 import type { SampleActivityRow, SampleInsight } from "../../model/sample-home-rows.ts";
-import { INVENTORY_SOURCES_HREF } from "./governance-hero.tsx";
-
-/** Where Recent activity's empty line sends the reader: the inventory every reader may open. */
-const INVENTORY_HREF = "/governance/inventory";
 import {
   INSIGHTS_HREF,
   SAMPLE_ACTIVITY,
   SAMPLE_INSIGHTS,
   SEVERITIES,
 } from "../../model/sample-home-rows.ts";
+import { INVENTORY_SOURCES_HREF } from "./governance-hero.tsx";
 
 /** Wide enough for the longest of the three labels, so headlines line up. */
 const SEVERITY_COLUMN = "104px";
 
 export function GovernanceHomeSections({
   canSetUpInsights,
-  canViewSources,
+  canManageSources,
   sample,
 }: {
   /** Whether Insights is offered; also filters which sample rows draw. */
   canSetUpInsights: boolean;
-  /** Holds `ingestionSources:view`, so the empty Insights line may point at the sources. */
-  canViewSources: boolean;
+  /** Holds `ingestionSources:manage`, so the empty Insights line may offer connecting one. */
+  canManageSources: boolean;
   /** Whether the two lists carry invented rows rather than empty lines. */
   sample: boolean;
 }) {
@@ -62,7 +59,7 @@ export function GovernanceHomeSections({
           <NoDataInfoBlock
             size="line"
             title="Nothing to report yet. Insights appear here once sources are pulling."
-            {...(canViewSources && {
+            {...(canManageSources && {
               next: [
                 {
                   kind: "setting",
@@ -91,13 +88,8 @@ export function GovernanceHomeSections({
             ))}
           </RowList>
         ) : (
-          <NoDataInfoBlock
-            size="line"
-            title="Your recent screens will show up here."
-            next={[
-              { kind: "setting", label: "Open the inventory", href: INVENTORY_HREF, onNavigate },
-            ]}
-          />
+          // Points nowhere: the list fills as the reader works, so there is nothing to start.
+          <NoDataInfoBlock size="line" title="Your recent screens will show up here." />
         )}
       </HomeSection>
     </Grid>
