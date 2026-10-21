@@ -28647,7 +28647,10 @@
                             "type": "boolean"
                           },
                           "aiUnits": {
-                            "type": "number"
+                            "type": [
+                              "number",
+                              "null"
+                            ]
                           }
                         },
                         "required": [
@@ -29052,7 +29055,10 @@
                             "type": "boolean"
                           },
                           "aiUnits": {
-                            "type": "number"
+                            "type": [
+                              "number",
+                              "null"
+                            ]
                           }
                         },
                         "required": [

@@ -20,7 +20,7 @@ class GetApiCodingAgentPullRequestUsageResponse200ModelBreakdownItem:
         total_tokens (float):
         cost_usd (float | None):
         tokens_known (bool):
-        ai_units (float):
+        ai_units (float | None):
     """
 
     model: str
@@ -31,7 +31,7 @@ class GetApiCodingAgentPullRequestUsageResponse200ModelBreakdownItem:
     total_tokens: float
     cost_usd: float | None
     tokens_known: bool
-    ai_units: float
+    ai_units: float | None
 
     def to_dict(self) -> dict[str, Any]:
         model = self.model
@@ -51,6 +51,7 @@ class GetApiCodingAgentPullRequestUsageResponse200ModelBreakdownItem:
 
         tokens_known = self.tokens_known
 
+        ai_units: float | None
         ai_units = self.ai_units
 
         field_dict: dict[str, Any] = {}
@@ -95,7 +96,12 @@ class GetApiCodingAgentPullRequestUsageResponse200ModelBreakdownItem:
 
         tokens_known = d.pop("tokensKnown")
 
-        ai_units = d.pop("aiUnits")
+        def _parse_ai_units(data: object) -> float | None:
+            if data is None:
+                return data
+            return cast(float | None, data)
+
+        ai_units = _parse_ai_units(d.pop("aiUnits"))
 
         get_api_coding_agent_pull_request_usage_response_200_model_breakdown_item = cls(
             model=model,

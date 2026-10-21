@@ -638,8 +638,8 @@ const codingAgentModelUsageSchemaDefinition = z
     totalTokens: z.number(),
     costUsd: z.number().nullable(),
     tokensKnown: z.boolean(),
-    /** AI units the model's calls consumed: a count of its own, never part of `costUsd`. */
-    aiUnits: z.number(),
+    /** AI units the model's calls consumed, never part of `costUsd`; null when not known. */
+    aiUnits: z.number().nullable(),
   })
   .strict();
 export interface CodingAgentModelUsageSchema extends Named<

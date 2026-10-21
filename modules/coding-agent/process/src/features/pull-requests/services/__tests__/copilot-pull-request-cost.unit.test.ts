@@ -347,7 +347,8 @@ describe("Copilot pull-request cost", () => {
 
     describe("when its usage is read", () => {
       /** @scenario "A model an older session also ran reads as not fully known" */
-      it("reads that model's tokens as not known and still totals both sessions", async () => {
+      /** @scenario "A model whose figures are not known reads its AI units as not known, not zero" */
+      it("reads that model's tokens and AI units as not known and still totals both sessions", async () => {
         const sessions = new TestSessions();
         sessions.branchRows = [copilotSession(), older];
 
@@ -357,7 +358,11 @@ describe("Copilot pull-request cost", () => {
           tokensKnown: false,
           totalTokens: 0,
           costUsd: null,
+          aiUnits: null,
         });
+        expect(
+          result.modelBreakdown.find((each) => each.model === UNPRICED_MODEL)?.aiUnits,
+        ).toBeGreaterThan(0);
         expect(result.modelBreakdown.find((each) => each.model === UNPRICED_MODEL)).toMatchObject({
           tokensKnown: true,
           inputTokens: 13,
@@ -452,7 +457,7 @@ describe("Copilot pull-request cost", () => {
           tokensKnown: false,
           totalTokens: 0,
           costUsd: null,
-          aiUnits: 0,
+          aiUnits: null,
         });
         expect(result.totals).toMatchObject({ inputTokens: 40 + 16, outputTokens: 2 + 88 });
         expect(result.totals.costUsd).toBeCloseTo(0.25 + 0.002, 9);

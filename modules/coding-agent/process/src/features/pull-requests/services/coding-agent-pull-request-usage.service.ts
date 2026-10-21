@@ -43,7 +43,8 @@ export type CodingAgentModelUsage = {
   totalTokens: number;
   costUsd: number | null;
   tokensKnown: boolean;
-  aiUnits: number;
+  /** Null when the model's figures are not known, as its tokens are. */
+  aiUnits: number | null;
 };
 
 /**
@@ -360,7 +361,7 @@ export class CodingAgentPullRequestUsageService {
       cacheCreationTokens: usage.cacheCreationTokens + total.cacheCreationTokens,
       totalTokens: usage.totalTokens + this.tokenTotal(total),
       costUsd: costed ? (usage.costUsd ?? 0) + total.costUsd : usage.costUsd,
-      aiUnits: usage.aiUnits + total.aiUnits,
+      aiUnits: (usage.aiUnits ?? 0) + total.aiUnits,
     };
   }
 
@@ -413,7 +414,7 @@ export class CodingAgentPullRequestUsageService {
       totalTokens: 0,
       costUsd: null,
       tokensKnown: false,
-      aiUnits: 0,
+      aiUnits: null,
     }));
   }
 }

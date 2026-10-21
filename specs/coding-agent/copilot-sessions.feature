@@ -165,6 +165,12 @@ Rule: Pull-request cost keeps AI units apart from dollars
     Then that model's tokens read as not known rather than the newer session's alone
     And the pull request totals still count both sessions
 
+  @unit
+  Scenario: A model whose figures are not known reads its AI units as not known, not zero
+    Given a pull request fed by a Copilot session that consumed AI units but kept no per-model figures
+    When its usage is read
+    Then that model's AI units read as not known rather than zero
+
   @integration
   Scenario: The per-model usage round-trips through the session row
     Given a session that used two models, one of them unpriced, and consumed AI units

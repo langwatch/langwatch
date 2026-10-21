@@ -741,7 +741,9 @@ const StatusCell: React.FC<{
 function modelUsageSummary(model: ModelUsage): string {
   return [
     `${formatTokens(model.totalTokens)} tokens`,
-    ...(model.aiUnits > 0 ? [`${compactNumber({ value: model.aiUnits })} AI units`] : []),
+    ...(model.aiUnits !== null && model.aiUnits > 0
+      ? [`${compactNumber({ value: model.aiUnits })} AI units`]
+      : []),
     ...(model.costUsd === null ? [] : [formatCost(model.costUsd)]),
   ].join(", ");
 }

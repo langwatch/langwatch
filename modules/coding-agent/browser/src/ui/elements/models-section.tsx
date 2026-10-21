@@ -15,8 +15,8 @@ import { Section } from "./detail-section.tsx";
 type ModelUsage = DetailPayload["modelBreakdown"][number];
 
 /** The AI units a model consumed (Copilot's meter): a count beside its cost, never part of it. */
-const AiUnitsText: React.FC<{ aiUnits: number }> = ({ aiUnits }) =>
-  aiUnits > 0 ? (
+const AiUnitsText: React.FC<{ aiUnits: number | null }> = ({ aiUnits }) =>
+  aiUnits !== null && aiUnits > 0 ? (
     <Text fontSize="sm" color="fg.muted">
       <FormattedNumber value={aiUnits} unit="AI units">
         {compactNumber({ value: aiUnits })}
