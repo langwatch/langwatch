@@ -2,7 +2,15 @@
  * Freezes the exported names of every package entry so a refactor cannot add,
  * drop or reshape a public export without the snapshot saying so.
  */
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { describe, expect, it } from "vitest";
+
+const packageJson = JSON.parse(
+  readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../../package.json"), "utf8"),
+) as { exports: Record<string, unknown> };
 
 const ENTRIES = {
   ".": () => import("../index.ts"),
@@ -30,6 +38,13 @@ function surfaceOf(moduleExports: Record<string, unknown>): string[] {
 }
 
 describe("the @langwatch/eventing public surface", () => {
+  describe("given the package exports map", () => {
+    /** @scenario "Every package entry exposes a recorded public surface" */
+    it("has exactly the entries this test covers", () => {
+      expect(Object.keys(packageJson.exports).toSorted()).toEqual(Object.keys(ENTRIES).toSorted());
+    });
+  });
+
   describe.each(Object.entries(ENTRIES))("given the %s entry", (entry, load) => {
     /** @scenario "Every package entry exposes a recorded public surface" */
     it("exports exactly the recorded names and kinds", async () => {

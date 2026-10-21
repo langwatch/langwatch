@@ -221,7 +221,12 @@ const framework = createFixtureWorkspace({
     "packages/relay/src/index.ts": [
       'export { GroupStagingScripts } from "./features/keyspace/repositories/redis/redis.group-staging.repository.ts";',
       'export * from "./app/relay.app.ts";',
+      'export type { TypedService } from "./features/typed/services/typed.service.ts";',
+      'export * as spaced from "./features/spaced/services/spaced.service.ts";',
+      'export { type MixedService } from "./features/mixed/services/mixed.service.ts";',
     ].join("\n"),
+    "packages/relay/src/features/spaced/services/spaced.service.ts":
+      "export class SpacedService {\n  constructor() {}\n  static create() { return new SpacedService(); }\n}\n",
     "packages/relay/src/app/relay.app.ts":
       "export class RelayProcessor {\n  constructor(readonly name: string) {}\n}\n",
   },
@@ -279,6 +284,38 @@ describe("given an opted-in framework package", () => {
       expect(frameworkReport(processor, `${RELAY}/app/relay.app.ts`)).toEqual([]);
     });
   });
+  describe("when an entry re-exports the class's file as a namespace", () => {
+    /** @scenario "A framework class takes the module's shape unless an entry publishes it" */
+    it("publishes the namespace name, not the class", () => {
+      const code = [
+        "export class SpacedService {",
+        "  constructor() {}",
+        "  static create() { return new SpacedService(); }",
+        "}",
+      ].join("\n");
+      expect(frameworkReport(code, `${RELAY}/features/spaced/services/spaced.service.ts`)).toEqual([
+        ["publicConstructor", 2],
+      ]);
+    });
+  });
+
+  describe("when an entry exports the class as a type only", () => {
+    /** @scenario "A framework class takes the module's shape unless an entry publishes it" */
+    it("still holds it to the module's shape", () => {
+      for (const name of ["typed", "mixed"]) {
+        const className = `${name[0].toUpperCase()}${name.slice(1)}Service`;
+        const code = [
+          `export class ${className} {`,
+          "  constructor() {}",
+          `  static create() { return new ${className}(); }`,
+          "}",
+        ].join("\n");
+        const filename = `${RELAY}/features/${name}/services/${name}.service.ts`;
+        expect(frameworkReport(code, filename)).toEqual([["publicConstructor", 2]]);
+      }
+    });
+  });
+
   describe("when an entry starts publishing the class after a first lint", () => {
     /** @scenario "A framework class takes the module's shape unless an entry publishes it" */
     it("reads the entry again instead of reusing the names it read before", () => {

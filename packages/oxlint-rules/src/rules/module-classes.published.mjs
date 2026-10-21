@@ -36,16 +36,23 @@ function declaredName(declaration) {
 }
 
 function specifierNames(statement) {
-  return statement.specifiers.map((item) => item.local?.name ?? item.local?.value);
+  return statement.specifiers
+    .filter((item) => item.exportKind !== "type")
+    .map((item) => item.local?.name ?? item.local?.value);
 }
 
 function addStatementExports({ filename, statement, names, visited }) {
   if (statement.type === "ExportAllDeclaration") {
+    if (statement.exportKind === "type") return;
+    if (statement.exported) {
+      names.add(statement.exported.name ?? statement.exported.value);
+      return;
+    }
     const target = resolveRelative({ from: filename, specifier: statement.source.value });
     if (target) collectExports({ filename: target, names, visited });
     return;
   }
-  if (statement.type !== "ExportNamedDeclaration") return;
+  if (statement.type !== "ExportNamedDeclaration" || statement.exportKind === "type") return;
   const found = statement.declaration
     ? declaredName(statement.declaration)
     : specifierNames(statement);

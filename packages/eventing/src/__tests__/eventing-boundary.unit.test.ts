@@ -38,11 +38,7 @@ describe("the @langwatch/eventing package boundary", () => {
       expect(files.length).toBeGreaterThan(0);
 
       const offences = files.flatMap((file) => {
-        const source = readFileSync(file, "utf8");
-        const specifiers = [...source.matchAll(/(?:from|import)\s*\(?\s*["']([^"']+)["']/g)].map(
-          (match) => match[1] ?? "",
-        );
-        return specifiers.flatMap((specifier) =>
+        return specifiersOf(readFileSync(file, "utf8")).flatMap((specifier) =>
           FORBIDDEN.filter(({ pattern }) => pattern.test(specifier)).map(
             ({ name }) => `${file.slice(packageRoot.length + 1)} imports ${name}: ${specifier}`,
           ),
@@ -76,6 +72,9 @@ describe("the @langwatch/eventing package boundary", () => {
       expect(TIER_PATH.test("repositories/prisma/x.ts")).toBe(true);
       expect(TIER_PATH.test("repositories/clickhouse/x.ts")).toBe(true);
       expect(TIER_PATH.test("stores/repositories/eventRepositoryMemory.ts")).toBe(false);
+      expect(relative(sourceRoot, resolveOwnExport("@langwatch/eventing/server") ?? "")).toBe(
+        "server/index.ts",
+      );
       expect(TIER_CLIENT.test("@prisma/client")).toBe(true);
       expect(TIER_CLIENT.test("@clickhouse/client")).toBe(true);
       expect(TIER_CLIENT.test("@langwatch/prisma-client")).toBe(true);
@@ -102,6 +101,19 @@ function resolveRelative(from: string, specifier: string): string | undefined {
   );
 }
 
+const ownExports = JSON.parse(readFileSync(join(packageRoot, "package.json"), "utf8")) as {
+  name: string;
+  exports: Record<string, { default: string }>;
+};
+
+/** A self-reference such as `@langwatch/eventing/server`, resolved to its source file. */
+function resolveOwnExport(specifier: string): string | undefined {
+  if (specifier !== ownExports.name && !specifier.startsWith(`${ownExports.name}/`)) return;
+  const subpath = `.${specifier.slice(ownExports.name.length)}`;
+  const target = ownExports.exports[subpath]?.default;
+  return target ? join(packageRoot, target) : undefined;
+}
+
 function walkFrom(entry: string): {
   files: string[];
   externals: { from: string; specifier: string }[];
@@ -114,6 +126,11 @@ function walkFrom(entry: string): {
     if (seen.has(file)) continue;
     seen.add(file);
     for (const specifier of specifiersOf(readFileSync(file, "utf8"))) {
+      const own = resolveOwnExport(specifier);
+      if (own) {
+        queue.push(own);
+        continue;
+      }
       if (!specifier.startsWith(".")) {
         externals.push({ from: relative(packageRoot, file), specifier });
         continue;
