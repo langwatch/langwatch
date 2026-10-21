@@ -3238,6 +3238,7 @@ export function buildDataForFilterQuery({
   // Translate filters if provided
   const filterTranslation = translateAllFilters(filters ?? {}, {
     spanTimePredicate: SPAN_TIME_FILTER_START_END,
+    tenant: OWN_TENANT_SQL,
   });
   const filterWhere =
     filterTranslation.whereClause !== "1=1" ? `AND ${filterTranslation.whereClause}` : "";
@@ -3252,6 +3253,7 @@ export function buildDataForFilterQuery({
         requiredColumns,
         spanTimeFilter: SPAN_TIME_FILTER_START_END,
         evalTimeFilter: EVAL_TIME_FILTER_START_END,
+        tenant: OWN_TENANT_SQL,
       });
     })
     .join("\n");
@@ -3348,6 +3350,7 @@ export function buildDataForFilterQuery({
         table: "stored_spans",
         requiredColumns: new Set([spanAttributesNarrowProjection(["gen_ai.request.model"])]),
         spanTimeFilter: SPAN_TIME_FILTER_START_END,
+        tenant: OWN_TENANT_SQL,
       });
       sql = `
         SELECT
@@ -3374,6 +3377,7 @@ export function buildDataForFilterQuery({
         table: "stored_spans",
         requiredColumns: new Set([spanAttributesNarrowProjection(["langwatch.span.type"])]),
         spanTimeFilter: SPAN_TIME_FILTER_START_END,
+        tenant: OWN_TENANT_SQL,
       });
       sql = `
         SELECT
@@ -3400,6 +3404,7 @@ export function buildDataForFilterQuery({
       joins = buildJoinClause({
         table: "evaluation_runs",
         evalTimeFilter: EVAL_TIME_FILTER_START_END,
+        tenant: OWN_TENANT_SQL,
       });
       sql = `
         SELECT

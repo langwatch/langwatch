@@ -11,7 +11,7 @@ import {
 } from "@langwatch/trace-contract";
 
 import { type CHTable, tableAliases } from "./clickhouse.field-mappings.mapper.ts";
-import { OWN_TENANT_SQL, type TenantSql } from "./clickhouse.tenant-predicate.mapper.ts";
+import type { TenantSql } from "./clickhouse.tenant-predicate.mapper.ts";
 
 /**
  * Result of translating an ES filter to CH WHERE clause
@@ -168,15 +168,15 @@ export function translateFilter({
   key,
   subkey,
   spanTimePredicate,
-  tenant = OWN_TENANT_SQL,
+  tenant,
 }: {
   field: FilterField;
   values: string[];
   key?: string;
   subkey?: string;
   spanTimePredicate?: string;
-  /** How a side-table subquery names its tenants; the own project's when omitted. */
-  tenant?: TenantSql;
+  /** How a side-table subquery names its tenants. */
+  tenant: TenantSql;
 }): FilterTranslation {
   if (values.length === 0) {
     return noOpFilter;
@@ -848,16 +848,13 @@ function translateNestedFilter({
 
 /**
  * Translate all filters from a filter object. `tenant` names the side-table subqueries'
- * tenants; the own project's when omitted.
+ * tenants.
  */
 export function translateAllFilters(
   filters: Partial<
     Record<string, string[] | Record<string, string[]> | Record<string, Record<string, string[]>>>
   >,
-  {
-    spanTimePredicate,
-    tenant = OWN_TENANT_SQL,
-  }: { spanTimePredicate?: string; tenant?: TenantSql } = {},
+  { spanTimePredicate, tenant }: { spanTimePredicate?: string; tenant: TenantSql },
 ): FilterTranslation {
   const translations: FilterTranslation[] = [];
 

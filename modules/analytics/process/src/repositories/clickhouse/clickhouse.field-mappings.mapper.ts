@@ -3,7 +3,7 @@
  * access.
  */
 
-import { OWN_TENANT_SQL, type TenantSql } from "./clickhouse.tenant-predicate.mapper.ts";
+import type { TenantSql } from "./clickhouse.tenant-predicate.mapper.ts";
 
 /**
  * Identity columns always included in trace_summaries dedup subqueries.
@@ -470,20 +470,20 @@ export function getTableAlias(table: CHTable): string {
  * @param requiredColumns optional column subset (defaults to all analytics columns).
  * @param spanTimeFilter `stored_spans` partition bound; omitted, it cold-scans every partition.
  * @param evalTimeFilter `evaluation_runs` partition bound; omitted, it cold-scans every partition.
- * @param tenant how the joined subquery names its tenants; the own project's when omitted.
+ * @param tenant how the joined subquery names its tenants.
  */
 export function buildJoinClause({
   table,
   requiredColumns,
   spanTimeFilter,
   evalTimeFilter,
-  tenant = OWN_TENANT_SQL,
+  tenant,
 }: {
   table: CHTable;
   requiredColumns?: ReadonlySet<string>;
   spanTimeFilter?: string;
   evalTimeFilter?: string;
-  tenant?: TenantSql;
+  tenant: TenantSql;
 }): string {
   const alias = tableAliases[table];
   const baseAlias = tableAliases.trace_summaries;
