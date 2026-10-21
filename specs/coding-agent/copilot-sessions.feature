@@ -62,6 +62,14 @@ Rule: One row per conversation, every number from the model calls
     Then the row starts when the session root started
 
   @unit
+  Scenario: A Copilot session is named by its first prompt
+    Given a Copilot session root whose user message opens with Copilot's injected date block
+    And a later session root with another prompt
+    When the session is folded
+    Then the row is named by the first prompt's own words, without the date block
+    And the later prompt does not rename it
+
+  @unit
   Scenario: Tool runs are counted with their names
     Given a Copilot session with three execute_tool spans
     When the session is folded

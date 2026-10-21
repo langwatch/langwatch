@@ -451,6 +451,44 @@ describe("Copilot session fold", () => {
     });
   });
 
+  describe("given two Copilot session roots, each carrying its turn's user message", () => {
+    /** The root's input as the CLI sends it: the prompt behind Copilot's injected date block. */
+    function rootWithPrompt({ startMs, prompt }: { startMs: number; prompt: string }) {
+      return {
+        ...cliRoot,
+        startMs,
+        endMs: startMs + 5_000,
+        attributes: {
+          ...cliRoot.attributes,
+          "gen_ai.input.messages": JSON.stringify([
+            {
+              role: "user",
+              parts: [
+                {
+                  type: "text",
+                  content: `<current_datetime>2026-10-21T15:36:06.315+02:00</current_datetime>\n\n${prompt}`,
+                },
+              ],
+            },
+          ]),
+        },
+      };
+    }
+
+    describe("when the session is folded", () => {
+      const row = foldSessions([
+        rootWithPrompt({ startMs: 1_000, prompt: "Count the files in this folder" }),
+        rootWithPrompt({ startMs: 30_000, prompt: "Now list them by size" }),
+      ]).get(CLI_CONVERSATION);
+
+      /** @scenario "A Copilot session is named by its first prompt" */
+      it("names the row by the first prompt's own words, without the date block", () => {
+        expect(row?.title).toBe("Count the files in this folder");
+        expect(row?.titleSource).toBe("prompt");
+      });
+    });
+  });
+
   describe("given a Copilot CLI conversation that called two models, one with no price", () => {
     const UNPRICED_MODEL = "oswe-vscode-prime";
     const unpricedCall: CapturedSpan = {

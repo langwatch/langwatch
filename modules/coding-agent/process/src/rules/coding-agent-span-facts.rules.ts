@@ -49,6 +49,7 @@ export function liftSpanContribution({
     }),
     ...declaredSpanSessionFacts({
       agent,
+      name: span.name,
       attributes: span.spanAttributes,
       resourceAttributes: span.resourceAttributes,
     }),

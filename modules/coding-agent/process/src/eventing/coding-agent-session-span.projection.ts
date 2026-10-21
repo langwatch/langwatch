@@ -4,6 +4,7 @@ import {
   genAiOperationRoleOf,
   type GenAiOperationRole,
   LOGS_ONLY_AGENT_IDS,
+  SESSION_TITLE_FALLBACK_FACT_KEY,
   type SessionWorkingContext,
 } from "@langwatch/coding-agent-contract";
 import type { ModelCostEstimateInput } from "@langwatch/model-provider-contract";
@@ -261,7 +262,14 @@ export class CodingAgentSessionSpanProjection {
     context: NonNullable<CodingAgentSessionSpanProjectionInput["context"]> | null;
   }): CodingAgentSessionData {
     const before = this.stateProjection.withIdentity(state, span.attrs);
-    if (role === "session") return before;
+    if (role === "session") {
+      // The root's prompt names an unnamed session, as a Claude Code prompt event does.
+      return this.stateProjection.withTitle({
+        state: before,
+        value: this.stateProjection.coerceString(span.attrs[SESSION_TITLE_FALLBACK_FACT_KEY]),
+        source: "prompt",
+      });
+    }
 
     if (role === "toolRun") {
       return this.stateProjection.foldToolInvocation(before, {

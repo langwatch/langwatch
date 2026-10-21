@@ -2,6 +2,7 @@
 // shared detection, prefix-stripping and alias tables; downstream code never
 // compares vendor literals.
 
+import { splitLeadingContextBlocks } from "../leading-context.ts";
 import type {
   CodingAgent,
   CodingAgentEvent,
@@ -355,12 +356,12 @@ export const WITHHELD_PROMPT_TEXT = "[REDACTED]";
 const MAX_PROMPT_TITLE_CHARS = 120;
 
 /**
- * A session name out of a prompt's text, or null when it can't name one: withheld text, an
- * empty string, or a machine-injected turn (agents wrap notifications as user turns, and a
- * session named `<task-notification>` names nothing). Otherwise the first line, capped.
+ * A session name out of a prompt's first line, or null for withheld text, nothing, or a
+ * machine-injected turn (`<task-notification>` names nothing). Complete context blocks put
+ * before the human's words (Copilot's `<current_datetime>`) are peeled first.
  */
 export function deriveSessionTitleFromPrompt(text: string): string | null {
-  const trimmed = text.trim();
+  const trimmed = splitLeadingContextBlocks(text).body.trim();
   if (trimmed === "" || trimmed === WITHHELD_PROMPT_TEXT) return null;
   if (trimmed.startsWith("<")) return null;
   const firstLine = trimmed.split(/\r?\n/, 1)[0] ?? "";
