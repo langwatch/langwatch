@@ -2,9 +2,8 @@ import { moduleApi } from "@langwatch/module";
 
 import type { NurturingSignal } from "./nurturing-signals.ts";
 /**
- * Customer.io trait schema contract: the complete data model pushed to
- * Customer.io by nurturing integrations, typed instead of ad-hoc
- * `Record<string, unknown>`.
+ * The complete data model nurturing pushes to Customer.io. Every date is Unix
+ * seconds: Customer.io's timestamp conditions match nothing else.
  */
 
 // ---------------------------------------------------------------------------
@@ -22,7 +21,7 @@ export interface CioPersonTraits {
   signup_feature_usage: string;
   utm_campaign: string;
   how_heard: string;
-  createdAt: string;
+  createdAt: number;
   integration_method: string;
   /**
    * ADR-038 org intent ("agent_governance" | "llm_ops") for
@@ -46,14 +45,14 @@ export interface CioPersonTraits {
   has_traces: boolean;
   sdk_language?: string;
   sdk_framework?: string;
-  first_trace_at?: string;
-  last_trace_at?: string;
+  first_trace_at?: number;
+  last_trace_at?: number;
 
   // Evaluation milestones
   has_evaluations: boolean;
   evaluation_count?: number;
-  first_evaluation_at?: string;
-  last_evaluation_at?: string;
+  first_evaluation_at?: number;
+  last_evaluation_at?: number;
 
   // Prompt milestones (prompt creation hook)
   has_prompts: boolean;
@@ -62,8 +61,8 @@ export interface CioPersonTraits {
   // Simulation milestones
   has_simulations: boolean;
   simulation_count?: number;
-  first_simulation_at?: string;
-  last_simulation_at?: string;
+  first_simulation_at?: number;
+  last_simulation_at?: number;
 
   // Feature adoption
   team_member_count: number;
@@ -71,7 +70,7 @@ export interface CioPersonTraits {
   scenario_count: number;
 
   // Activity tracking
-  last_active_at: string;
+  last_active_at: number;
 
   // Billing
   plan: string;
@@ -88,7 +87,7 @@ export interface CioPersonTraits {
   guided_onboarding_tour?: string;
   // Comma list of the paths whose setup completed.
   guided_onboarding_completed_paths?: string;
-  guided_onboarding_completed_at?: string;
+  guided_onboarding_completed_at?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -114,8 +113,8 @@ export interface CioOrgTraits {
   self_hosted_projects?: number;
   self_hosted_traces_28d?: number;
   self_hosted_active_users_28d?: number;
-  self_hosted_first_seen_at?: string;
-  self_hosted_last_report_at?: string;
+  self_hosted_first_seen_at?: number;
+  self_hosted_last_report_at?: number;
   /** Comma list of the signals raised so far, in the order they were raised. */
   self_hosted_signals?: string;
 }

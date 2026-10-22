@@ -216,6 +216,18 @@ Feature: Customer.io nurturing integration
     And the error is captured without resetting the debounce
 
   # ---------------------------------------------------------------------------
+  # Date attributes: Customer.io timestamp conditions only match Unix seconds
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: Customer.io date attributes are sent as Unix seconds
+    Given a signal that happened at 1792664000123 milliseconds since the epoch
+    When nurturing sends a date attribute for it to Customer.io
+    Then the attribute is the integer 1792664000
+    And this holds for createdAt, last_active_at, first_trace_at, last_trace_at, first_simulation_at, last_simulation_at, first_evaluation_at, last_evaluation_at, guided_onboarding_completed_at and the self-hosted report dates
+    And PostHog still receives the same date as an ISO-8601 string
+
+  # ---------------------------------------------------------------------------
   # Journey traits and hooks
   # ---------------------------------------------------------------------------
 
