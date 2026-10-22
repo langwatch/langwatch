@@ -4,7 +4,7 @@
  * tight memory budget the gated read completes where the former single-pass read fails.
  * @see specs/traces-v2/search.feature */
 
-import type { ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseClient, ClickHouseSettings } from "@clickhouse/client";
 import { EVENT_METRIC_SEP, EVENT_METRICS_PREFIX } from "@langwatch/trace-contract";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -65,7 +65,7 @@ const DOWN_VOTES = VOTING_SPANS - UP_VOTES;
 // thread: the split read peaks near 5.8 MiB, the former single pass near 29 MiB.
 const MEMORY_CAP = "16000000"; // 16 MB
 /** One thread, so peak read memory doesn't scale with the runner's core count. */
-const BUDGET = { max_memory_usage: MEMORY_CAP, max_threads: "1" };
+const BUDGET = { max_memory_usage: MEMORY_CAP, max_threads: 1 };
 
 type FacetRow = {
   facet_value: string;
@@ -269,7 +269,7 @@ describe.skipIf(!clickHouseConfigured)("events facet integration", () => {
   };
 
   async function runFacet(
-    settings: Record<string, string> = {},
+    settings: ClickHouseSettings = {},
     filterWhere?: { sql: string; params: Record<string, unknown> },
   ): Promise<FacetRow[]> {
     const built = EVENT_FACET.queryBuilder({ ...ctx, ...(filterWhere ? { filterWhere } : {}) });
