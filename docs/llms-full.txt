@@ -65804,6 +65804,10 @@ NEXTAUTH_SECRET=your-session-secret
 # Encrypts stored credentials and peppers API key hashes.
 # Must be exactly 64 hex characters. Generate with: openssl rand -hex 32
 CREDENTIALS_SECRET=your-64-hex-character-key
+# Password of ClickHouse's default user. Keep it URL-safe. Generate with:
+# openssl rand -hex 24. Unset, compose falls back to the published `langwatch`
+# (deprecated, warned at every boot, removed in the next major release).
+CLICKHOUSE_PASSWORD=your-clickhouse-password
 
 # Optional: shared credential the app authenticates to the NLP service with.
 # Every container in the stack reads this file, so one value covers both sides.
@@ -70325,6 +70329,12 @@ Add ClickHouse to your existing infrastructure. Your Elasticsearch instance stay
 
 ### Docker Compose
 
+Set a password for ClickHouse's `default` user in your `.env`. Keep it URL-safe, because the app carries it inside `CLICKHOUSE_URL`. Without one the file below falls back to the published `langwatch`, which ClickHouse warns about at every boot and the next major release removes:
+
+```bash
+echo "CLICKHOUSE_PASSWORD=$(openssl rand -hex 24)" >> .env
+```
+
 Add the ClickHouse service to your `compose.yml`:
 
 ```yaml
@@ -70332,7 +70342,7 @@ services:
   clickhouse:
     image: langwatch/clickhouse-serverless:0.2.0
     environment:
-      CLICKHOUSE_PASSWORD: langwatch
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-langwatch}
     ports:
       - "8123:8123"
     volumes:
@@ -70367,10 +70377,10 @@ Add `CLICKHOUSE_URL` to your app and workers environment in `compose.yml`:
 services:
   app:
     environment:
-      CLICKHOUSE_URL: http://default:langwatch@clickhouse:8123/langwatch
+      CLICKHOUSE_URL: http://default:${CLICKHOUSE_PASSWORD:-langwatch}@clickhouse:8123/langwatch
   workers:
     environment:
-      CLICKHOUSE_URL: http://default:langwatch@clickhouse:8123/langwatch
+      CLICKHOUSE_URL: http://default:${CLICKHOUSE_PASSWORD:-langwatch}@clickhouse:8123/langwatch
 ```
 
 Then pull and restart:
@@ -70432,7 +70442,7 @@ Set the required environment variables:
 
 ```bash
 export ELASTICSEARCH_NODE_URL="http://localhost:9200"
-export CLICKHOUSE_URL="http://default:langwatch@localhost:8123/langwatch"
+export CLICKHOUSE_URL="http://default:${CLICKHOUSE_PASSWORD}@localhost:8123/langwatch"
 
 # If your Elasticsearch requires authentication
 export ELASTICSEARCH_API_KEY="your-api-key"
