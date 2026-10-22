@@ -108,13 +108,13 @@ describe("braidAuditHref", () => {
 });
 
 describe("the Braids page's tab in the URL", () => {
+  /** @scenario A link opens the Braids page on its Signing keys tab */
   it.each([
     ["keys", "keys"],
     ["from", "from"],
     [undefined, "into"],
     ["nonsense", "into"],
   ] as const)("opens %s as %s", (value, tab) => {
-    // @scenario A link opens the Braids page on its Signing keys tab
     expect(braidsTabOf(value)).toBe(tab);
   });
 
