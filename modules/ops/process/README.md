@@ -6,7 +6,7 @@ The server half of [ops](../README.md). Platform administration for every deploy
 
 ## Installation
 
-`defineProcessModule("ops").withRepositories(opsRepositories).withChannels(opsChannels).withApi(OpsModule).withTransports(adminRest, opsBugReportRest, opsClickHouseExplainRest, opsTrpcTransport, opsUpgradeTrpcTransport, opsBugReportTrpcTransport, checkupTrpcTransport, checkupRest).provideMiddlewareBindings(…).provideMiddlewareContext(…).withEventing(usageReportEventing).withEventing(anomalyDetectionEventing).withEventing(storageStatsEventing).withEventing(groupQueueReaperEventing).withEventing(upgradeAlertsEventing).withEventing(projectionReplayEventing).withEventing(systemMigrationsEventing).withEventing(platformOperatorSeedEventing).withTasks(…).withMigrations(…).withIdIndexes(…, …)`, `src/ops.module.ts:41`.
+`defineProcessModule("ops").withRepositories(opsRepositories).withChannels(opsChannels).withApi(OpsModule).withTransports(adminRest, opsBugReportRest, opsClickHouseExplainRest, opsTrpcTransport, opsUpgradeTrpcTransport, opsBugReportTrpcTransport, checkupTrpcTransport, checkupRest).provideMiddlewareBindings(…).provideMiddlewareContext(…).withEventing(usageReportEventing).withEventing(anomalyDetectionEventing).withEventing(storageStatsEventing).withEventing(groupQueueReaperEventing).withEventing(upgradeAlertsEventing).withEventing(projectionReplayEventing).withEventing(systemMigrationsEventing).withEventing(platformOperatorSeedEventing).withTasks(…).withMigrations(…).withIdIndexes(…, …)`, `src/ops.module.ts:45`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -531,7 +531,7 @@ submitBugReport(input: { report: SubmitBugReport; callerKey: string; /** The pro
 One report as the intake door received it, answered in the bodies released builds read.
 
 ```typescript
-receiveBugReport(input: { report: SubmitBugReport; forwardedFor: string | null; linkedProjectId: string | null; }): Promise<OpsDoorAnswer>;
+receiveBugReport(input: { report: SubmitBugReport; /** The address the door resolved for the caller; null shares the one unknown bucket. */ callerAddress: string | null; linkedProjectId: string | null; }): Promise<OpsDoorAnswer>;
 ```
 
 #### `findDashboardData`
@@ -1047,7 +1047,7 @@ type Response = z.infer<typeof checkupResultSchema>; // ../contract/src/features
 
 |             |                                           |
 | ----------- | ----------------------------------------- |
-| Declared at | `src/transport/ops-bug-report.rest.ts:43` |
+| Declared at | `src/transport/ops-bug-report.rest.ts:40` |
 | Base URL    | none: each route's path is its address    |
 | Addressing  | literal                                   |
 | Credential  | project                                   |
@@ -1056,12 +1056,12 @@ type Response = z.infer<typeof checkupResultSchema>; // ../contract/src/features
 
 File an issue report from a coding agent
 
-Optional credential: the reporter may be struggling precisely because setup failed, so filing a report must never require a working login; a project credential only enriches the report. Declared at `src/transport/ops-bug-report.rest.ts:48`.
+Optional credential: the reporter may be struggling precisely because setup failed, so filing a report must never require a working login; a project credential only enriches the report. Declared at `src/transport/ops-bug-report.rest.ts:45`.
 
 Answers at `/api/bug-reports`, `/api/v1/bug-reports`.
 
 ```typescript
-// Body: submitBugReportSchema, ../contract/src/ops-bug-report.ts:152
+// Body: submitBugReportSchema, ../contract/src/ops-bug-report.ts:142
 interface Body {
   source: "cli" | "mcp";
   kind: "summary" | "full_session";
@@ -1074,8 +1074,7 @@ interface Body {
   cliVersion?: string;
   metadata?: Record<string, string | number | boolean>;
 }
-type Headers = z.infer<typeof bugReportIntakeHeadersSchema>; // ../contract/src/ops-bug-report.ts:125
-// Response: inline, src/transport/ops-bug-report.rest.ts:67
+// Response: inline, src/transport/ops-bug-report.rest.ts:63
 type Response = unknown;
 ```
 

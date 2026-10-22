@@ -1892,13 +1892,13 @@ export class OpsModule implements OpsApi {
   /** The intake door's whole answer, in the bodies released CLI and MCP builds read. */
   async receiveBugReport(input: {
     report: SubmitBugReport;
-    forwardedFor: string | null;
+    callerAddress: string | null;
     linkedProjectId: string | null;
   }): Promise<OpsDoorAnswer> {
     try {
       const { id } = await this.submitBugReport({
         report: input.report,
-        callerKey: toCallerKey(input.forwardedFor),
+        callerKey: toCallerKey(input.callerAddress),
         linkedProjectId: input.linkedProjectId,
       });
 

@@ -1,32 +1,19 @@
 import type { IncomingMessage } from "node:http";
 
-/**
- * Reads forwarding headers in priority order (cf-connecting-ip first as edge-authored).
- * Returns 'unknown' if no address found, so rate limiter fails safe.
- */
-export class HeaderMcpClientAddressService {
-  private static readonly HEADERS = [
-    "cf-connecting-ip",
-    "true-client-ip",
-    "x-real-ip",
-    "x-forwarded-for",
-  ] as const;
+import { ClientAddress } from "@langwatch/api/policy";
 
+/**
+ * The address the process resolved for this raw request (ClientAddress), else its socket peer.
+ * No forwarding header is read here. 'unknown' when neither exists, so the limiter fails safe.
+ */
+export class ResolvedMcpClientAddressService {
   private constructor() {}
 
-  static create(): HeaderMcpClientAddressService {
-    return new HeaderMcpClientAddressService();
+  static create(): ResolvedMcpClientAddressService {
+    return new ResolvedMcpClientAddressService();
   }
 
   clientIp(request: IncomingMessage): string {
-    for (const header of HeaderMcpClientAddressService.HEADERS) {
-      const value = request.headers[header];
-      const raw = Array.isArray(value) ? value[0] : value;
-      // `x-forwarded-for` is a list; the client is its first entry, and every
-      // entry after it was appended by a proxy on the way in.
-      const first = raw?.split(",")[0]?.trim();
-      if (first) return first;
-    }
-    return request.socket.remoteAddress ?? "unknown";
+    return ClientAddress.resolvedFor(request) ?? request.socket.remoteAddress ?? "unknown";
   }
 }

@@ -15,7 +15,6 @@ import { nowInstant } from "@langwatch/time";
 import type { SaasUsageReportPipeline } from "../eventing/saas-usage-report.pipeline.ts";
 import type { SaasRateLimitRepository } from "../repositories/saas-rate-limit.repository.ts";
 import {
-  senderAddressesOf,
   USAGE_REPORT_GLOBAL_KEY,
   USAGE_REPORT_GLOBAL_LIMIT,
   USAGE_REPORT_PER_ADDRESS_LIMIT,
@@ -73,13 +72,13 @@ export class UsageReportReceiverService {
 
   async receive({
     report,
-    addressHeaders,
+    callerAddress,
   }: IncomingUsageReportRequest): Promise<UsageReportReceipt> {
     this.#cloud.assertCloud();
 
     await this.#admit(USAGE_REPORT_GLOBAL_KEY, USAGE_REPORT_GLOBAL_LIMIT);
-    for (const address of senderAddressesOf(addressHeaders)) {
-      await this.#admit(usageReportAddressKey(address), USAGE_REPORT_PER_ADDRESS_LIMIT);
+    if (callerAddress !== null) {
+      await this.#admit(usageReportAddressKey(callerAddress), USAGE_REPORT_PER_ADDRESS_LIMIT);
     }
 
     const unknownFields = countUnknownUsageFields(report);

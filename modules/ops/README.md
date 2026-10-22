@@ -11,7 +11,7 @@ Platform administration for every deployment: admin operations, impersonation, b
 | Classification | core (`modules/catalogue.json`)                                                             |
 | Subjects       | admin, impersonation, ops                                                                   |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser) · [client](client) |
-| Api token      | `OpsApi` = `moduleApi<OpsApi>()("ops")`, `contract/src/ops.api.ts:745` (144 operations)     |
+| Api token      | `OpsApi` = `moduleApi<OpsApi>()("ops")`, `contract/src/ops.api.ts:746` (144 operations)     |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                  |
 
 ## What ops owns
