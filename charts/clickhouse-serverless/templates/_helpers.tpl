@@ -89,6 +89,22 @@ app.kubernetes.io/component: keeper
     {{- fail "replicas must be odd when greater than 1 (required for Keeper raft quorum)" }}
   {{- end }}
   {{- include "clickhouse-serverless.validateTransition" . }}
+  {{- if and .Values.access.enabled (not .Values.access.existingConfigMap) (empty .Values.access.config) }}
+    {{- fail "access.enabled needs access.config or access.existingConfigMap" }}
+  {{- end }}
+{{- end -}}
+
+{{/* Access file and password Secrets, mounted read-only into ClickHouse (for
+     ch-config generate at startup) and the sidecar (for every later sync). */}}
+{{- define "clickhouse-serverless.accessMounts" -}}
+- name: access-config
+  mountPath: /etc/clickhouse-access/config
+  readOnly: true
+{{- range $i, $name := .Values.access.passwordSecrets }}
+- name: access-secret-{{ $i }}
+  mountPath: /etc/clickhouse-access/secrets/{{ $name }}
+  readOnly: true
+{{- end }}
 {{- end -}}
 
 {{/* Transition guard: refuse to scale an EXISTING single-node release into a

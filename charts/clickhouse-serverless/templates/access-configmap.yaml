@@ -1,0 +1,12 @@
+{{- if and .Values.access.enabled (not .Values.access.existingConfigMap) }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "clickhouse-serverless.fullname" . }}-access
+  labels:
+    {{- include "clickhouse-serverless.selectorLabels" . | nindent 4 }}
+    {{- include "clickhouse-serverless.labels" . | nindent 4 }}
+data:
+  access.yaml: |
+    {{- toYaml .Values.access.config | nindent 4 }}
+{{- end }}

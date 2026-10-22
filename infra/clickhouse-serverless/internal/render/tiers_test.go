@@ -1,11 +1,14 @@
 package render_test
 
 import (
+	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/config"
+	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/render"
 )
 
 func roleGrants(t *testing.T, tiers map[string]any, role string) []any {
@@ -79,4 +82,60 @@ func TestRenderAll_TierExecutionTimeFollowsEnv(t *testing.T) {
 	renderInto(t, input, dir)
 	profile := section(t, section(t, readYAML(t, dir, "users.d/access-tiers.yaml"), "profiles"), "tier_read")
 	assertValue(t, "tier_read", profile, "max_execution_time", 60)
+}
+
+func writeAccessFixture(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	secrets := filepath.Join(root, "metabase")
+	if err := os.MkdirAll(secrets, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(secrets, "current"), []byte("current-password-0123"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(root, "access.yaml")
+	body := "issuers: [{name: staff, url: 'https://idp.example'}]\nusers:\n" +
+		"  - {name: metabase, tier: read, databases: [analytics], login: {rolling: {dir: " + secrets + "}}}\n" +
+		"  - {name: alice, tier: inspect, login: {token: {issuer: staff}}}\n"
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+// @scenario "Turning the access file off removes what it rendered"
+func TestRenderAll_AccessFileOnThenOff(t *testing.T) {
+	dir := t.TempDir()
+	input := testInput()
+	input.AccessFile = writeAccessFixture(t)
+	input.AccessListen = "127.0.0.1:8124"
+	renderInto(t, input, dir)
+
+	users := section(t, readYAML(t, dir, "users.d/access-users.yaml"), "users")
+	for _, name := range []string{"metabase", "alice"} {
+		section(t, users, name)
+	}
+	server := section(t, section(t, readYAML(t, dir, "config.d/access-auth.yaml"), "http_authentication_servers"), "access")
+	assertValue(t, "auth server", server, "uri", "http://127.0.0.1:8124/verify")
+
+	input.AccessFile = ""
+	renderInto(t, input, dir)
+	assertExists(t, filepath.Join(dir, "users.d", "access-users.yaml"), false)
+	assertExists(t, filepath.Join(dir, "config.d", "access-auth.yaml"), false)
+	assertExists(t, filepath.Join(dir, "users.d", "access-tiers.yaml"), true)
+}
+
+func TestRenderAll_InvalidAccessFileFails(t *testing.T) {
+	input := testInput()
+	input.AccessFile = writeAccessFixture(t)
+	input.AccessListen = "127.0.0.1:8124"
+	if err := os.RemoveAll(filepath.Join(filepath.Dir(input.AccessFile), "metabase")); err != nil {
+		t.Fatal(err)
+	}
+	computed := config.ComputeFromResources(input.CPU, input.RAMBytes, input)
+	err := render.RenderAll(testLogger(), input, computed, t.TempDir())
+	if err == nil || !strings.Contains(err.Error(), `user "metabase"`) {
+		t.Errorf("RenderAll = %v, want it to refuse the missing password directory", err)
+	}
 }

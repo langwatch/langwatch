@@ -15,6 +15,7 @@ func validInput() *Input {
 		GroupByOverflowMode: "throw",
 	}
 	i.ReadTierMaxExecutionTime = 300
+	i.AccessSidecar = "embedded"
 	return i
 }
 
@@ -159,5 +160,20 @@ func TestValidate_TieredMoveFactor(t *testing.T) {
 				t.Errorf("unexpected error: %v", err)
 			}
 		})
+	}
+}
+
+// @scenario "The sidecar listens on loopback only"
+func TestValidate_AccessListenMustBeLoopback(t *testing.T) {
+	i := validInput()
+	i.AccessFile = "/etc/clickhouse-access/access.yaml"
+	i.AccessListen = "0.0.0.0:8124"
+	i.AccessSidecar = "embedded"
+	if err := i.Validate(); err == nil || !strings.Contains(err.Error(), "CLICKHOUSE_ACCESS_LISTEN") {
+		t.Errorf("expected a loopback error, got: %v", err)
+	}
+	i.AccessListen = "127.0.0.1:8124"
+	if err := i.Validate(); err != nil {
+		t.Errorf("loopback listen refused: %v", err)
 	}
 }

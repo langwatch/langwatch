@@ -1,0 +1,23 @@
+autogen:
+  enabled: true
+access:
+  enabled: true
+  passwordSecrets: [metabase-passwords]
+  config:
+    issuers:
+      - name: cluster
+        url: https://oidc.example.com/cluster
+    users:
+      - name: metabase
+        tier: read
+        databases: [langwatch]
+        login:
+          rolling:
+            dir: /etc/clickhouse-access/secrets/metabase-passwords
+      - name: grafana
+        tier: read
+        databases: [langwatch]
+        login:
+          token:
+            issuer: cluster
+            subject: system:serviceaccount:monitoring:grafana

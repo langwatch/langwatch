@@ -116,6 +116,13 @@ spec:
 
             - name: CLICKHOUSE_PASSWORD_FILE
               value: "/mnt/secrets/password"
+            {{- if .Values.access.enabled }}
+            - name: CLICKHOUSE_ACCESS_FILE
+              value: /etc/clickhouse-access/config/access.yaml
+            # The sidecar container below runs it; not the entrypoint as well.
+            - name: CLICKHOUSE_ACCESS_SIDECAR
+              value: external
+            {{- end }}
 
             {{- if gt $replicas 1 }}
             - name: CLICKHOUSE_CLUSTER_SECRET_FILE
@@ -272,6 +279,9 @@ spec:
               subPath: lwql-named-collection.yaml
               readOnly: true
             {{- end }}
+            {{- if .Values.access.enabled }}
+            {{- include "clickhouse-serverless.accessMounts" . | nindent 12 }}
+            {{- end }}
             {{- /* Generic passthrough for operator-supplied mounts (e.g. an
                    umbrella chart delivering extra server config into config.d /
                    users.d). tpl-rendered so values may reference .Release.Name.
@@ -279,6 +289,33 @@ spec:
             {{- with .Values.extraVolumeMounts }}
             {{- tpl (toYaml .) $ | nindent 12 }}
             {{- end }}
+
+        {{- if .Values.access.enabled }}
+        # Keeps users.d/access-users.yaml current and verifies token logins on
+        # loopback (ADR-184). Same image; it never sees the default password.
+        - name: access
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["ch-config", "sidecar", "/etc/clickhouse-server"]
+          securityContext:
+            runAsUser: 101
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          env:
+            - name: CLICKHOUSE_ACCESS_FILE
+              value: /etc/clickhouse-access/config/access.yaml
+            - name: CLICKHOUSE_ACCESS_LISTEN
+              value: {{ .Values.env.CLICKHOUSE_ACCESS_LISTEN | default "127.0.0.1:8124" | quote }}
+          resources:
+            {{- toYaml .Values.access.sidecar.resources | nindent 12 }}
+          volumeMounts:
+            - name: users-d
+              mountPath: /etc/clickhouse-server/users.d
+            {{- include "clickhouse-serverless.accessMounts" . | nindent 12 }}
+        {{- end }}
 
       volumes:
         - name: config-d
@@ -318,7 +355,21 @@ spec:
             secretName: {{ tpl .Values.lwqlAccess.secretName $ }}
             optional: false
         {{- end }}
-        {{- /* Generic passthrough (see extraVolumeMounts above). */}}
+        {{- if .Values.access.enabled }}
+        - name: access-config
+          configMap:
+            name: {{ .Values.access.existingConfigMap | default (printf "%s-access" (include "clickhouse-serverless.fullname" .)) }}
+            items:
+              - key: access.yaml
+                path: access.yaml
+        {{- range $i, $name := .Values.access.passwordSecrets }}
+        - name: access-secret-{{ $i }}
+          secret:
+            secretName: {{ $name }}
+            defaultMode: 0440
+        {{- end }}
+        {{- end }}
+        {{- /* Generic passthrough (see extraVolumes above). */}}
         {{- with .Values.extraVolumes }}
         {{- tpl (toYaml .) $ | nindent 8 }}
         {{- end }}
