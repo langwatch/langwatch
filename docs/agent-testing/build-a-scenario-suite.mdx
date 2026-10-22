@@ -13,7 +13,7 @@ This page covers how to organise, run and maintain that set. For which cases to 
 
 ## What to test first and how big
 
-Start from product risk, with ten to twenty scenarios, and grow from there. See [Which cases to write](/agent-testing/designing-a-suite#which-cases-to-write). For example, the suite LangWatch runs against Langy, its in-product assistant, has ten scenarios: seven about building, editing and reading dashboards, one for Topic Clustering setup, one for an empty time range and one for a cost question. Each file names its row, its labels and the run parameter its setup reads ([the suite on GitHub](https://github.com/langwatch/langwatch/tree/main/dev/dogfood/langy/scenarios)).
+Which cases to write and how many to start with is covered in [Which cases to write](/agent-testing/designing-a-suite#which-cases-to-write). For example, the suite LangWatch runs against Langy, its in-product assistant, has ten scenarios: seven about building, editing and reading dashboards, one for Topic Clustering setup, one for an empty time range and one for a cost question. Each file names its row, its labels and the run parameter its setup reads ([the suite on GitHub](https://github.com/langwatch/langwatch/tree/main/dev/dogfood/langy/scenarios)).
 
 ## How to organise scenarios
 
@@ -47,7 +47,7 @@ langwatch run-plan run --all --target connected:support-agent \
   --name "Support nightly" --repeat 3 --wait
 ```
 
-A run plan is a name and a configuration: the scope (test suites, labels or specific scenarios), the targets, the repeat count from 1 to 5, and the simulator and judge models. Every run under the same name joins one pass rate history on [Results](/agent-testing/results). For the refund agent:
+A run plan is a name and a configuration: the scope (test suites, labels or specific scenarios), the targets, the repeat count from 1 to 5 (for how many to use, see [How many times to repeat a scenario](/agent-testing/designing-a-suite#how-many-times-to-repeat-a-scenario)), and the simulator and judge models. Every run under the same name joins one pass rate history on [Results](/agent-testing/results). For the refund agent:
 
 | Run plan | Scope | Target | Repeats | When | Pass bar |
 |---|---|---|---|---|---|
@@ -73,7 +73,9 @@ LangWatch does not schedule runs itself: a run plan has no schedule or cron sett
 
 ## Isolate scenarios with setup and teardown hooks
 
-A scenario that reads or writes real data needs that data to exist before the first turn and to be gone after the last, or one run changes what the next one sees. Setup and teardown hooks on a connected agent create the test data for each run and remove it afterwards. You declare them on the connected agent in the SDK. In Python, use the `@agent.scenario.setup` and `@agent.scenario.teardown` decorators. In TypeScript, call `agent.scenario.setup(...)` and `agent.scenario.teardown(...)`. See [Connect your agent](/agent-testing/connect-your-agent).
+A scenario that reads or writes real data needs that data to exist before the first turn and to be gone after the last, or one run changes what the next one sees. Setup and teardown hooks on a connected agent create the test data for each run and remove it afterwards.
+
+You declare them on the connected agent in the SDK. In Python, decorate the functions with `@support_agent.scenario.setup` and `@support_agent.scenario.teardown`, where `support_agent` is the object `connect_agent` returns. In TypeScript, call `supportAgent.scenario.setup(...)` and `supportAgent.scenario.teardown(...)` on the agent you defined with `connectAgent`. See [Connect your agent](/agent-testing/connect-your-agent).
 
 Give each run its own names for the data it makes, such as a trace name or a board name with the run id in it. Runs of one plan share a project, so counting "every trace named `checkout`" includes what other runs left behind. For example, the Langy suite gives every run its own trace name so its totals stay exact, because traces have no delete route and teardown cannot remove them.
 
@@ -89,12 +91,12 @@ What the platform shows, per run and per plan:
 
 | Where                                    | What it shows                                                                  |
 | ---------------------------------------- | ------------------------------------------------------------------------------ |
-| Run header, hover                        | **Total Duration**, **Total Cost**, **Avg Agent Latency** and **Avg Agent Cost**, the averages with a p95 |
+| Run header, hover                        | **Total duration**, **Total cost**, **Avg agent latency** and **Avg agent cost**, the averages with a p95 |
 | Result row                               | **Time · cost** for that conversation                                          |
 | Results tab, **Charts**                  | **Cost** for the period, next to **Executions** and **Pass rate**              |
 | A turn, **View trace**                   | The trace of that turn, with its spans                                         |
 
-What it does not show: a cost estimate before a run starts, a token count on a run, and a cost budget or cap on a run plan. The cost comes from the spans in each run's trace that carry a cost, and **Avg Agent Cost** counts only the spans of your agent. A run whose trace never arrives shows no cost.
+What it does not show: a cost estimate before a run starts, a token count on a run, and a cost budget or cap on a run plan. The cost comes from the spans in each run's trace that carry a cost, and **Avg agent cost** counts only the spans of your agent. A run whose trace never arrives shows no cost.
 
 Runtime follows the same arithmetic. The scenario workers run a fixed number of conversations at a time, so a plan of many long conversations queues behind itself and takes longer than its slowest run. `langwatch run-plan run --wait` waits up to 45 minutes by default; pass `--wait 90` for a longer suite.
 

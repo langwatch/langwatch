@@ -114,7 +114,6 @@
                   "agent-testing/targets",
                   "agent-testing/environments",
                   "agent-testing/linking-your-traces",
-                  "agent-testing/check-the-world",
                   "agent-testing/authenticated-agents",
                   "agent-testing/other-ways-to-connect"
                 ]
@@ -125,6 +124,7 @@
                   "agent-testing/scenarios",
                   "agent-testing/test-suites",
                   "agent-testing/designing-a-suite",
+                  "agent-testing/check-the-world",
                   "agent-testing/build-a-scenario-suite",
                   "agent-testing/evaluators",
                   "agent-testing/run-parameters"

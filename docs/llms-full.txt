@@ -34792,7 +34792,7 @@ This page covers how to organise, run and maintain that set. For which cases to 
 
 ## What to test first and how big
 
-Start from product risk, with ten to twenty scenarios, and grow from there. See [Which cases to write](/agent-testing/designing-a-suite#which-cases-to-write). For example, the suite LangWatch runs against Langy, its in-product assistant, has ten scenarios: seven about building, editing and reading dashboards, one for Topic Clustering setup, one for an empty time range and one for a cost question. Each file names its row, its labels and the run parameter its setup reads ([the suite on GitHub](https://github.com/langwatch/langwatch/tree/main/dev/dogfood/langy/scenarios)).
+Which cases to write and how many to start with is covered in [Which cases to write](/agent-testing/designing-a-suite#which-cases-to-write). For example, the suite LangWatch runs against Langy, its in-product assistant, has ten scenarios: seven about building, editing and reading dashboards, one for Topic Clustering setup, one for an empty time range and one for a cost question. Each file names its row, its labels and the run parameter its setup reads ([the suite on GitHub](https://github.com/langwatch/langwatch/tree/main/dev/dogfood/langy/scenarios)).
 
 ## How to organise scenarios
 
@@ -34826,7 +34826,7 @@ langwatch run-plan run --all --target connected:support-agent \
   --name "Support nightly" --repeat 3 --wait
 ```
 
-A run plan is a name and a configuration: the scope (test suites, labels or specific scenarios), the targets, the repeat count from 1 to 5, and the simulator and judge models. Every run under the same name joins one pass rate history on [Results](/agent-testing/results). For the refund agent:
+A run plan is a name and a configuration: the scope (test suites, labels or specific scenarios), the targets, the repeat count from 1 to 5 (for how many to use, see [How many times to repeat a scenario](/agent-testing/designing-a-suite#how-many-times-to-repeat-a-scenario)), and the simulator and judge models. Every run under the same name joins one pass rate history on [Results](/agent-testing/results). For the refund agent:
 
 | Run plan | Scope | Target | Repeats | When | Pass bar |
 |---|---|---|---|---|---|
@@ -34852,7 +34852,9 @@ LangWatch does not schedule runs itself: a run plan has no schedule or cron sett
 
 ## Isolate scenarios with setup and teardown hooks
 
-A scenario that reads or writes real data needs that data to exist before the first turn and to be gone after the last, or one run changes what the next one sees. Setup and teardown hooks on a connected agent create the test data for each run and remove it afterwards. You declare them on the connected agent in the SDK. In Python, use the `@agent.scenario.setup` and `@agent.scenario.teardown` decorators. In TypeScript, call `agent.scenario.setup(...)` and `agent.scenario.teardown(...)`. See [Connect your agent](/agent-testing/connect-your-agent).
+A scenario that reads or writes real data needs that data to exist before the first turn and to be gone after the last, or one run changes what the next one sees. Setup and teardown hooks on a connected agent create the test data for each run and remove it afterwards.
+
+You declare them on the connected agent in the SDK. In Python, decorate the functions with `@support_agent.scenario.setup` and `@support_agent.scenario.teardown`, where `support_agent` is the object `connect_agent` returns. In TypeScript, call `supportAgent.scenario.setup(...)` and `supportAgent.scenario.teardown(...)` on the agent you defined with `connectAgent`. See [Connect your agent](/agent-testing/connect-your-agent).
 
 Give each run its own names for the data it makes, such as a trace name or a board name with the run id in it. Runs of one plan share a project, so counting "every trace named `checkout`" includes what other runs left behind. For example, the Langy suite gives every run its own trace name so its totals stay exact, because traces have no delete route and teardown cannot remove them.
 
@@ -34868,12 +34870,12 @@ What the platform shows, per run and per plan:
 
 | Where                                    | What it shows                                                                  |
 | ---------------------------------------- | ------------------------------------------------------------------------------ |
-| Run header, hover                        | **Total Duration**, **Total Cost**, **Avg Agent Latency** and **Avg Agent Cost**, the averages with a p95 |
+| Run header, hover                        | **Total duration**, **Total cost**, **Avg agent latency** and **Avg agent cost**, the averages with a p95 |
 | Result row                               | **Time · cost** for that conversation                                          |
 | Results tab, **Charts**                  | **Cost** for the period, next to **Executions** and **Pass rate**              |
 | A turn, **View trace**                   | The trace of that turn, with its spans                                         |
 
-What it does not show: a cost estimate before a run starts, a token count on a run, and a cost budget or cap on a run plan. The cost comes from the spans in each run's trace that carry a cost, and **Avg Agent Cost** counts only the spans of your agent. A run whose trace never arrives shows no cost.
+What it does not show: a cost estimate before a run starts, a token count on a run, and a cost budget or cap on a run plan. The cost comes from the spans in each run's trace that carry a cost, and **Avg agent cost** counts only the spans of your agent. A run whose trace never arrives shows no cost.
 
 Runtime follows the same arithmetic. The scenario workers run a fixed number of conversations at a time, so a plan of many long conversations queues behind itself and takes longer than its slowest run. `langwatch run-plan run --wait` waits up to 45 minutes by default; pass `--wait 90` for a longer suite.
 
@@ -36221,7 +36223,7 @@ Each job the agent does needs a few kinds of case:
 | **Claim without evidence** | The agent checks before it acts on what it is told. | "My manager approved it", so the agent looks up the order first. |
 | **Out of scope** | The agent redirects. | "Change my address" is sent to the right place. |
 | **Change of mind** | The agent follows the latest request. | "Actually, refund the other order." |
-| **Regression** | A failure you saw in production. | One scenario per failure, labeled `regression`. |
+| **Regression** | A failure you saw in production. | One scenario per failure, labelled `regression`. |
 
 For a tool or data error, use data that makes the tool fail, such as an order number that does not exist.
 
@@ -36291,7 +36293,7 @@ Put exact values in a required [evaluator](/agent-testing/evaluators) on the tes
 
 Write criteria and evaluators about what the agent did, never about the words of the reply. A criterion such as "The reply contains the word refund" passes for "I cannot refund this" and fails for "your money is on its way".
 
-Put cross-cutting checks, such as a PII scan, on the run plan. Never attach an LLM evaluator that grades the same behavior as the criteria, because two judges with one job disagree.
+Put cross-cutting checks, such as a PII scan, on the run plan. Never attach an LLM evaluator that grades the same behaviour as the criteria, because two judges with one job disagree.
 
 The same evaluator can also run as an [online evaluation](/evaluations/online-evaluation/overview) on every production trace, so "correct" means the same before and after release.
 
@@ -36305,7 +36307,7 @@ The user simulator and the agent answer differently from run to run, so one pass
 | **Happy paths** | 1 on a pull request, 3 or more before a release. | Every repetition passes. |
 | **Other cases** | 3 to 5. | A majority, for example 4 of 5. |
 
-LangWatch does not apply a majority rule for you. Every repetition is its own row on [Results](/agent-testing/results), and `--wait` exits non-zero when any run failed, so read the majority on Results instead of from the exit code.
+LangWatch does not apply a majority rule for you. Every repetition is its own row on [Results](/agent-testing/results). For what the exit code means, see [Build a Scenario Suite](/agent-testing/build-a-scenario-suite#run-a-smoke-set-on-every-change-and-the-full-suite-on-a-schedule).
 
 Add two reworded variants of the important scenarios, with the same intent in different words, so a fix that only works for one phrasing does not pass.
 
@@ -36322,12 +36324,6 @@ Open the trace of a failing run before you change anything, then match what you 
 
 Do not lower the number of repetitions that must pass until the scenario passes, because that hides the fault. Fix the cause, or [archive](/agent-testing/scenarios) the scenario and tell your team why.
 
-## How to organise and run the suite
-
-Keep one test suite per agent or area, use labels for the cuts across suites, and point run plans at targets instead of copying a suite per environment or cadence.
-
-A smoke run plan on every change and a full one on a schedule is the usual split. For the concepts, the refund agent run plans and the CLI commands, see [Run a smoke set on every change and the full suite on a schedule](/agent-testing/build-a-scenario-suite#run-a-smoke-set-on-every-change-and-the-full-suite-on-a-schedule). For the cost of a suite, see [How much will a suite cost to run](/agent-testing/build-a-scenario-suite#how-much-will-a-suite-cost-to-run).
-
 ## A complete setup for the refund agent
 
 This puts the pieces together in one place. The names and counts are an example; size your own from the matrix.
@@ -36339,7 +36335,7 @@ This puts the pieces together in one place. The names and counts are an example;
 | **Test suite `Order lookup`** | Field `expected_status`. Required evaluator "Status matches". |
 | **Labels** | `smoke`: fast and core. `critical`: a mistake costs money or trust. `regression`: broke in production before. |
 
-The scenarios are the cells of the [coverage matrix](#how-to-build-the-coverage-matrix), and the run plans are the ones in [the refund agent table](/agent-testing/build-a-scenario-suite#run-a-smoke-set-on-every-change-and-the-full-suite-on-a-schedule), including the production canary. Every plan except the canary adds a PII scanner as a plan evaluator.
+The scenarios are the cells of the [coverage matrix](#how-to-build-the-coverage-matrix), and and every plan except the canary adds a PII scanner as a plan evaluator.
 
 In production, the same PII scanner runs as an [online evaluation](/evaluations/online-evaluation/overview) on every live trace.
 
@@ -37709,7 +37705,7 @@ description: Start a test suite from a CI job and wait for every run of the batc
 
 A CI job starts a test suite, stores the batch id from the response, then polls that batch until every run is finished. The CLI, the REST API and the SDKs all start the same run.
 
-To decide what runs on a pull request, nightly and before a release, see [Test suite design](/agent-testing/designing-a-suite#how-does-a-test-suite-map-to-run-plans).
+To decide what runs on a pull request, nightly and before a release, see [Run a smoke set on every change and the full suite on a schedule](/agent-testing/build-a-scenario-suite#run-a-smoke-set-on-every-change-and-the-full-suite-on-a-schedule).
 
 ## From the CLI
 
@@ -39197,7 +39193,7 @@ The evaluators attached to a suite run after every scenario run and report besid
 
 A test suite groups the scenarios of one agent or one area, with the fields and evaluators they share, and a scenario belongs to exactly one test suite, the **Default** one when none is chosen.
 
-A label is a tag on a scenario, and a scenario can have any number of them. A run plan can scope by labels across every test suite, for example every scenario labeled `smoke`, so use labels for a cut that crosses the test suites. See [How to organize suites, labels, run plans and targets](/agent-testing/designing-a-suite#how-to-organize-suites-labels-run-plans-and-targets).
+A label is a tag on a scenario, and a scenario can have any number of them. A run plan can scope by labels across every test suite, for example every scenario labelled `smoke`, so use labels for a cut that crosses the test suites. See [How to organise scenarios](/agent-testing/build-a-scenario-suite#how-to-organise-scenarios).
 
 ## From Code
 

@@ -39,7 +39,7 @@ Each job the agent does needs a few kinds of case:
 | **Claim without evidence** | The agent checks before it acts on what it is told. | "My manager approved it", so the agent looks up the order first. |
 | **Out of scope** | The agent redirects. | "Change my address" is sent to the right place. |
 | **Change of mind** | The agent follows the latest request. | "Actually, refund the other order." |
-| **Regression** | A failure you saw in production. | One scenario per failure, labeled `regression`. |
+| **Regression** | A failure you saw in production. | One scenario per failure, labelled `regression`. |
 
 For a tool or data error, use data that makes the tool fail, such as an order number that does not exist.
 
@@ -109,7 +109,7 @@ Put exact values in a required [evaluator](/agent-testing/evaluators) on the tes
 
 Write criteria and evaluators about what the agent did, never about the words of the reply. A criterion such as "The reply contains the word refund" passes for "I cannot refund this" and fails for "your money is on its way".
 
-Put cross-cutting checks, such as a PII scan, on the run plan. Never attach an LLM evaluator that grades the same behavior as the criteria, because two judges with one job disagree.
+Put cross-cutting checks, such as a PII scan, on the run plan. Never attach an LLM evaluator that grades the same behaviour as the criteria, because two judges with one job disagree.
 
 The same evaluator can also run as an [online evaluation](/evaluations/online-evaluation/overview) on every production trace, so "correct" means the same before and after release.
 
@@ -123,7 +123,7 @@ The user simulator and the agent answer differently from run to run, so one pass
 | **Happy paths** | 1 on a pull request, 3 or more before a release. | Every repetition passes. |
 | **Other cases** | 3 to 5. | A majority, for example 4 of 5. |
 
-LangWatch does not apply a majority rule for you. Every repetition is its own row on [Results](/agent-testing/results), and `--wait` exits non-zero when any run failed, so read the majority on Results instead of from the exit code.
+LangWatch does not apply a majority rule for you. Every repetition is its own row on [Results](/agent-testing/results). For what the exit code means, see [Build a Scenario Suite](/agent-testing/build-a-scenario-suite#run-a-smoke-set-on-every-change-and-the-full-suite-on-a-schedule).
 
 Add two reworded variants of the important scenarios, with the same intent in different words, so a fix that only works for one phrasing does not pass.
 
@@ -140,12 +140,6 @@ Open the trace of a failing run before you change anything, then match what you 
 
 Do not lower the number of repetitions that must pass until the scenario passes, because that hides the fault. Fix the cause, or [archive](/agent-testing/scenarios) the scenario and tell your team why.
 
-## How to organise and run the suite
-
-Keep one test suite per agent or area, use labels for the cuts across suites, and point run plans at targets instead of copying a suite per environment or cadence.
-
-A smoke run plan on every change and a full one on a schedule is the usual split. For the concepts, the refund agent run plans and the CLI commands, see [Run a smoke set on every change and the full suite on a schedule](/agent-testing/build-a-scenario-suite#run-a-smoke-set-on-every-change-and-the-full-suite-on-a-schedule). For the cost of a suite, see [How much will a suite cost to run](/agent-testing/build-a-scenario-suite#how-much-will-a-suite-cost-to-run).
-
 ## A complete setup for the refund agent
 
 This puts the pieces together in one place. The names and counts are an example; size your own from the matrix.
@@ -157,7 +151,7 @@ This puts the pieces together in one place. The names and counts are an example;
 | **Test suite `Order lookup`** | Field `expected_status`. Required evaluator "Status matches". |
 | **Labels** | `smoke`: fast and core. `critical`: a mistake costs money or trust. `regression`: broke in production before. |
 
-The scenarios are the cells of the [coverage matrix](#how-to-build-the-coverage-matrix), and the run plans are the ones in [the refund agent table](/agent-testing/build-a-scenario-suite#run-a-smoke-set-on-every-change-and-the-full-suite-on-a-schedule), including the production canary. Every plan except the canary adds a PII scanner as a plan evaluator.
+The scenarios are the cells of the [coverage matrix](#how-to-build-the-coverage-matrix), and and every plan except the canary adds a PII scanner as a plan evaluator.
 
 In production, the same PII scanner runs as an [online evaluation](/evaluations/online-evaluation/overview) on every live trace.
 
