@@ -1,9 +1,11 @@
 import {
   type Authorization,
+  braidConditionTermsOf,
   isSpanBraidGrant,
   ownProjectIdReadBy,
   VERIFIED_ATTRIBUTE_PREFIX,
 } from "@langwatch/authorization";
+import { compileBraidCondition } from "@langwatch/authz-contract";
 
 /** Whether a proof reads any owner's spans through a braid (ADR-183 §5). */
 export function readsBraidedSpans(authorization: Authorization): boolean {
@@ -111,21 +113,31 @@ export function selectedSpanOwnerOf({
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-const stringLeavesOf = (value: unknown): string[] => {
-  if (typeof value === "string") return [value];
-  return isRecord(value) ? Object.values(value).flatMap(stringLeavesOf) : [];
+const stringLeavesAt = ({ value, path }: { value: unknown; path: string }): string[][] => {
+  if (typeof value === "string") return [[path, value]];
+  if (!isRecord(value)) return [];
+  return Object.entries(value).flatMap(([key, child]) =>
+    stringLeavesAt({ value: child, path: path === "" ? key : `${path}.${key}` }),
+  );
 };
 
-/** The projects a span's verified marks name (ADR-183 §4), read from its unflattened `params`. */
-export function signingProjectIdsOf({ params }: { params: unknown }): string[] {
-  if (!isRecord(params)) return [];
-  const flat = Object.entries(params).flatMap(([key, value]) =>
-    key.startsWith(VERIFIED_ATTRIBUTE_PREFIX) ? stringLeavesOf(value) : [],
+/** One verified mark (ADR-183 §4): the signed entry key and the project it names. */
+export interface VerifiedMark {
+  key: string;
+  projectId: string;
+}
+
+/** A span's verified marks, read from its `params` however far they are unflattened. */
+export function verifiedMarksOf({ params }: { params: unknown }): VerifiedMark[] {
+  const marks = stringLeavesAt({ value: params, path: "" }).flatMap(
+    ([path = "", projectId = ""]) =>
+      path.startsWith(VERIFIED_ATTRIBUTE_PREFIX)
+        ? [{ key: path.slice(VERIFIED_ATTRIBUTE_PREFIX.length), projectId }]
+        : [],
   );
-  const nested = VERIFIED_ATTRIBUTE_PREFIX.split(".")
-    .filter(Boolean)
-    .reduce<unknown>((node, key) => (isRecord(node) ? node[key] : undefined), params);
-  return [...new Set([...flat, ...stringLeavesOf(nested)])];
+  return [
+    ...new Map(marks.map((mark) => [JSON.stringify([mark.key, mark.projectId]), mark])).values(),
+  ];
 }
 
 /** A live braid as the span panel needs it: its condition text and the earliest span it shows. */
@@ -135,19 +147,38 @@ export interface BraidTerms {
   fromMs: number;
 }
 
-/** The conditions a braided span shows under; empty when a braid in its window shows every span. */
+/** The keys a condition's `Verified("k")` terms name; none for an empty or refused one. */
+function verifiedKeysIn(where: string | null): string[] {
+  const compiled = compileBraidCondition({ text: where ?? "" });
+  if (!compiled.ok || compiled.compiledWhere === undefined) return [];
+  return braidConditionTermsOf(compiled.compiledWhere.tree).flatMap((term) =>
+    term.kind === "verified" ? [term.key] : [],
+  );
+}
+
+/**
+ * The conditions a braided span shows under; empty when a braid in its window shows every span.
+ * A condition is joined by `and` only, so one naming `Verified("k")` shows a span only when the
+ * span's mark under k names the reader (ADR-183 §4); the others are left out.
+ */
 export function braidConditionsShownFor({
   braids,
   ownerProjectId,
   spanStartedAtMs,
+  signedKeys,
 }: {
   braids: readonly BraidTerms[];
   ownerProjectId: string;
   spanStartedAtMs: number;
+  /** The keys of the span's verified marks that name the reader. */
+  signedKeys: ReadonlySet<string>;
 }): string[] {
   const inWindow = braids.filter(
     (braid) => braid.ownerProjectId === ownerProjectId && braid.fromMs <= spanStartedAtMs,
   );
-  const conditions = inWindow.map((braid) => braid.where?.trim() ?? "");
+  const held = inWindow.filter((braid) =>
+    verifiedKeysIn(braid.where).every((key) => signedKeys.has(key)),
+  );
+  const conditions = (held.length > 0 ? held : inWindow).map((braid) => braid.where?.trim() ?? "");
   return conditions.includes("") ? [] : [...new Set(conditions)];
 }

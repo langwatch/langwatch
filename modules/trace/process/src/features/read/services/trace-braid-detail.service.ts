@@ -4,7 +4,10 @@ import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { BraidedOwner, SpanBraid } from "@langwatch/trace-contract";
 
-import { braidConditionsShownFor } from "../../../rules/braided-span-owner.rules.ts";
+import {
+  braidConditionsShownFor,
+  type VerifiedMark,
+} from "../../../rules/braided-span-owner.rules.ts";
 
 /** The peers a braided read asks about owners and audits through (ADR-183 §5, §8). */
 export interface TraceBraidDirectory {
@@ -31,17 +34,18 @@ export class TraceBraidDetailService {
     ownerProjectId,
     viewerUserId,
     spanStartedAtMs,
-    signingProjectIds = [],
+    verifiedMarks = [],
   }: {
     readerProjectId: string;
     ownerProjectId: string;
     viewerUserId: string;
     spanStartedAtMs: number;
-    /** The projects the span's verified marks name (ADR-183 §4). */
-    signingProjectIds?: readonly string[];
+    /** The span's verified marks (ADR-183 §4). */
+    verifiedMarks?: readonly VerifiedMark[];
   }): Promise<SpanBraid> {
     const directory = this.#directory;
-    const signedBy = await this.#signedByReader({ readerProjectId, signingProjectIds });
+    const signedKeys = signedKeysOf({ verifiedMarks, readerProjectId });
+    const signedBy = await this.#signedByReader({ readerProjectId, signed: signedKeys.size > 0 });
     if (directory === null) {
       return {
         ownerProjectId,
@@ -71,6 +75,7 @@ export class TraceBraidDetailService {
         braids: braids.fromOtherProjects,
         ownerProjectId,
         spanStartedAtMs,
+        signedKeys,
       }),
       signedBy,
     };
@@ -79,12 +84,12 @@ export class TraceBraidDetailService {
   /** The reader, named, when one of the span's verified marks names it; otherwise null. */
   async #signedByReader({
     readerProjectId,
-    signingProjectIds,
+    signed,
   }: {
     readerProjectId: string;
-    signingProjectIds: readonly string[];
+    signed: boolean;
   }): Promise<SpanBraid["signedBy"]> {
-    if (!signingProjectIds.includes(readerProjectId)) return null;
+    if (!signed) return null;
     const reader = await this.#directory?.projects.findSummaryById(readerProjectId);
     return { projectId: readerProjectId, name: reader?.name ?? readerProjectId };
   }
@@ -131,15 +136,18 @@ export class TraceBraidDetailService {
     spans: readonly {
       ownerProjectId?: string | undefined;
       startedAtMs: number;
-      signingProjectIds?: readonly string[];
+      verifiedMarks?: readonly VerifiedMark[];
     }[];
   }): Promise<(SpanBraid | null)[]> {
     const ownerProjectIds = [
       ...new Set(spans.flatMap((span) => (span.ownerProjectId ? [span.ownerProjectId] : []))),
     ];
     if (ownerProjectIds.length === 0) return spans.map(() => null);
+    const signedKeysBySpan = spans.map(({ verifiedMarks = [] }) =>
+      signedKeysOf({ verifiedMarks, readerProjectId }),
+    );
     const signed = spans.some(
-      (span) => !!span.ownerProjectId && span.signingProjectIds?.includes(readerProjectId),
+      (span, index) => !!span.ownerProjectId && signedKeysBySpan[index]!.size > 0,
     );
     const [owners, braids, signedBy] = await Promise.all([
       this.describeOwners({ ownerProjectIds, viewerUserId }),
@@ -148,11 +156,12 @@ export class TraceBraidDetailService {
         : this.#directory.authz
             .listBraids({ projectId: readerProjectId })
             .then((listed) => listed.fromOtherProjects),
-      this.#signedByReader({ readerProjectId, signingProjectIds: signed ? [readerProjectId] : [] }),
+      this.#signedByReader({ readerProjectId, signed }),
     ]);
     const ownerById = new Map(owners.map((owner) => [owner.projectId, owner]));
-    return spans.map(({ ownerProjectId, startedAtMs, signingProjectIds = [] }) => {
+    return spans.map(({ ownerProjectId, startedAtMs }, index) => {
       if (!ownerProjectId) return null;
+      const signedKeys = signedKeysBySpan[index]!;
       const owner = ownerById.get(ownerProjectId);
       return {
         ownerProjectId,
@@ -163,8 +172,9 @@ export class TraceBraidDetailService {
           braids,
           ownerProjectId,
           spanStartedAtMs: startedAtMs,
+          signedKeys,
         }),
-        signedBy: signingProjectIds.includes(readerProjectId) ? signedBy : null,
+        signedBy: signedKeys.size > 0 ? signedBy : null,
       };
     });
   }
@@ -190,4 +200,17 @@ export class TraceBraidDetailService {
       this.#logger.warn({ error, readerProjectId }, "braided spans view was not audited");
     }
   }
+}
+
+/** The keys of the marks that name the reader: what its `Verified("k")` terms ask for. */
+function signedKeysOf({
+  verifiedMarks,
+  readerProjectId,
+}: {
+  verifiedMarks: readonly VerifiedMark[];
+  readerProjectId: string;
+}): ReadonlySet<string> {
+  return new Set(
+    verifiedMarks.filter((mark) => mark.projectId === readerProjectId).map((mark) => mark.key),
+  );
 }

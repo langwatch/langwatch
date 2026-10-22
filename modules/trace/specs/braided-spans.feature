@@ -146,6 +146,13 @@ Feature: Braided spans in the reader's traces
       Then the span says it was signed by "orchestrator"
       And a span with no mark, or with a mark naming another project, says nothing about signing
 
+    @unit
+    Scenario: An unsigned braided span does not claim a condition that needs a signature
+      Given a second live braid from "specialists" into "orchestrator" whose condition also requires calls signed by "orchestrator"
+      And a matching "specialists" span with no verified mark naming "orchestrator"
+      When sam selects it
+      Then the span gives only the first braid's condition as the reason it is shown
+
     @integration
     Scenario: Actions that would act on the owner's data are off on a braided span, with a reason
       When sam selects a braided span

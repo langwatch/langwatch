@@ -95,18 +95,19 @@ describe("TraceBraidDetailService signing", () => {
       }),
     },
   });
-  const span = (signingProjectIds?: string[]) => ({
+  const mark = (projectId: string) => [{ key: "orchestrator", projectId }];
+  const span = (verifiedMarks?: { key: string; projectId: string }[]) => ({
     readerProjectId: "proj_orchestrator",
     ownerProjectId: "proj_specialists",
     viewerUserId: "sam",
     spanStartedAtMs: 1,
-    ...(signingProjectIds === undefined ? {} : { signingProjectIds }),
+    ...(verifiedMarks === undefined ? {} : { verifiedMarks }),
   });
 
   describe("given a braided span whose verified mark names the reader", () => {
     /** @scenario "A braided span from a signed call says who signed it" */
     it("says the reader signed it, by name", async () => {
-      const braid = await signing.describe(span(["proj_orchestrator"]));
+      const braid = await signing.describe(span(mark("proj_orchestrator")));
 
       expect(braid.signedBy).toEqual({ projectId: "proj_orchestrator", name: "Orchestrator" });
     });
@@ -119,7 +120,7 @@ describe("TraceBraidDetailService signing", () => {
           {
             ownerProjectId: "proj_specialists",
             startedAtMs: 1,
-            signingProjectIds: ["proj_orchestrator"],
+            verifiedMarks: mark("proj_orchestrator"),
           },
         ],
       });
@@ -132,7 +133,7 @@ describe("TraceBraidDetailService signing", () => {
     /** @scenario "A braided span from a signed call says who signed it" */
     it("says nothing about signing", async () => {
       expect((await signing.describe(span())).signedBy).toBeNull();
-      expect((await signing.describe(span(["proj_elsewhere"]))).signedBy).toBeNull();
+      expect((await signing.describe(span(mark("proj_elsewhere")))).signedBy).toBeNull();
     });
   });
 });

@@ -6,7 +6,11 @@
 import type { Protections, SpanSummaryRow } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { protectByOwner, signingProjectIdsOf } from "../braided-span-owner.rules.ts";
+import {
+  braidConditionsShownFor,
+  protectByOwner,
+  verifiedMarksOf,
+} from "../braided-span-owner.rules.ts";
 import { mapLegacySpanSummaryToTreeNode } from "../trace-read-mappers.rules.ts";
 import { gateResources } from "../trace-view-gates.rules.ts";
 
@@ -57,25 +61,70 @@ describe("protectByOwner", () => {
   });
 });
 
-describe("signingProjectIdsOf", () => {
+describe("verifiedMarksOf", () => {
   describe("given a span whose attributes carry verified marks", () => {
     /** @scenario "A braided span from a signed call says who signed it" */
-    it("names the projects the marks name, nested or flat", () => {
+    it("reads each key and the project it names, nested or flat", () => {
       expect(
-        signingProjectIdsOf({
+        verifiedMarksOf({
           params: {
             langwatch: { reserved: { verified: { orchestrator: "proj_orchestrator" } } },
             "langwatch.reserved.verified.web": "proj_web",
+            "langwatch.reserved": { "verified.team.a": "proj_team" },
           },
         }),
-      ).toEqual(["proj_web", "proj_orchestrator"]);
+      ).toEqual([
+        { key: "orchestrator", projectId: "proj_orchestrator" },
+        { key: "web", projectId: "proj_web" },
+        { key: "team.a", projectId: "proj_team" },
+      ]);
     });
   });
 
   describe("given a span with no verified mark", () => {
-    it("names no project", () => {
-      expect(signingProjectIdsOf({ params: { orchestrator: "web" } })).toEqual([]);
-      expect(signingProjectIdsOf({ params: null })).toEqual([]);
+    it("reads none", () => {
+      expect(verifiedMarksOf({ params: { orchestrator: "web" } })).toEqual([]);
+      expect(verifiedMarksOf({ params: null })).toEqual([]);
+    });
+  });
+});
+
+describe("braidConditionsShownFor", () => {
+  const braids = [
+    { ownerProjectId: "proj_specialists", where: 'attributes["orchestrator"] == "web"', fromMs: 0 },
+    {
+      ownerProjectId: "proj_specialists",
+      where: 'attributes["orchestrator"] == "web" and Verified("orchestrator")',
+      fromMs: 0,
+    },
+  ];
+
+  describe("given a span signed for the reader under the condition's key", () => {
+    it("lists both conditions", () => {
+      expect(
+        braidConditionsShownFor({
+          braids,
+          ownerProjectId: "proj_specialists",
+          spanStartedAtMs: 1,
+          signedKeys: new Set(["orchestrator"]),
+        }),
+      ).toEqual([braids[0]!.where, braids[1]!.where]);
+    });
+  });
+
+  describe("given a span with no mark naming the reader, or one under another key", () => {
+    /** @scenario "An unsigned braided span does not claim a condition that needs a signature" */
+    it("leaves out the condition that needs a signature", () => {
+      for (const signedKeys of [new Set<string>(), new Set(["web"])]) {
+        expect(
+          braidConditionsShownFor({
+            braids,
+            ownerProjectId: "proj_specialists",
+            spanStartedAtMs: 1,
+            signedKeys,
+          }),
+        ).toEqual([braids[0]!.where]);
+      }
     });
   });
 });

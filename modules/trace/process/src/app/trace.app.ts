@@ -385,7 +385,7 @@ import type { TraceRepositories } from "../repositories/trace.repositories.ts";
 import {
   readsBraidedSpans,
   selectedSpanOwnerOf,
-  signingProjectIdsOf,
+  verifiedMarksOf,
 } from "../rules/braided-span-owner.rules.ts";
 import { braidedTraceSummaryOf } from "../rules/braided-trace-totals.rules.ts";
 import { gateEvaluationContent } from "../rules/evaluation-content-gate.rules.ts";
@@ -2048,7 +2048,7 @@ export class TraceModule implements TraceApi, CollectorApp {
         ownerProjectId: braidOwner,
         viewerUserId: input.viewerUserId,
         spanStartedAtMs: span.timestamps.started_at,
-        signingProjectIds: signingProjectIdsOf({ params: span.params }),
+        verifiedMarks: verifiedMarksOf({ params: span.params }),
       });
       await this.#braidDetail.recordView({
         authorization: input.authorization,
@@ -3005,7 +3005,7 @@ export class TraceModule implements TraceApi, CollectorApp {
       spans: input.spans.map(({ ownerProjectId, startedAtMs, params }) => ({
         ownerProjectId,
         startedAtMs,
-        signingProjectIds: signingProjectIdsOf({ params }),
+        verifiedMarks: verifiedMarksOf({ params }),
       })),
     });
   }
