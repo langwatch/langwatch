@@ -14,6 +14,8 @@
     "test": "vitest run",
     "test:smoke": "node scripts/smoke.test.mjs",
     "test:links": "node src/site/check-links.ts",
+    "test:links:live": "node src/site/check-links.ts --live",
+    "test:links:external": "node src/site/check-links.ts --external",
     "test:session": "node scripts/session.smoke.test.mjs",
     "test:performance": "node scripts/performance.smoke.test.mjs",
     "size": "node scripts/performance-report.mjs",
@@ -21,7 +23,9 @@
     "test:polish": "node scripts/polish.smoke.test.mjs",
     "test:news": "node scripts/news.smoke.test.mjs",
     "test:refinement": "node scripts/refinement.smoke.test.mjs",
-    "test:mount": "node scripts/mount.smoke.test.mjs"
+    "test:mount": "node scripts/mount.smoke.test.mjs",
+    "audit:site": "node src/site/audit/run.ts",
+    "test:audit": "node scripts/audit.smoke.test.mjs"
   },
   "dependencies": {
     "@langwatch/design-system": "workspace:*",
@@ -40,6 +44,7 @@
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "catalog:",
+    "lighthouse": "catalog:",
     "mermaid": "catalog:",
     "oxc-transform-react": "catalog:",
     "playwright": "catalog:",

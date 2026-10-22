@@ -1,0 +1,252 @@
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
+
+import { DOCS_URL, docsUrl, stripBasePath } from "../../lib/site-path.ts";
+import type { Budgets } from "./budgets.ts";
+
+export type SeoIssue = { page: string; code: string; detail: string };
+type Range = Budgets["seo"]["title"];
+type SeoBudgets = Pick<Budgets["seo"], "title" | "description">;
+
+function decodeEntities(text: string) {
+  return text
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">")
+    .replaceAll("&quot;", '"')
+    .replaceAll("&#39;", "'")
+    .replaceAll("&amp;", "&");
+}
+
+function tagAttributes({ tag }: { tag: string }) {
+  return Object.fromEntries(
+    [...tag.matchAll(/([a-zA-Z:-]+)=(?:"([^"]*)"|'([^']*)')/g)].map((match) => [
+      match[1].toLowerCase(),
+      decodeEntities(match[2] ?? match[3]),
+    ]),
+  );
+}
+
+/** The `<head>` facts the checks read, from markup this build itself wrote. */
+export function readHead({ html }: { html: string }) {
+  const head = html.slice(0, html.search(/<\/head>/i) + 1 || html.length);
+  const metas = [...head.matchAll(/<meta\b[^>]*>/gi)].map((match) =>
+    tagAttributes({ tag: match[0] }),
+  );
+  const links = [...head.matchAll(/<link\b[^>]*>/gi)].map((match) =>
+    tagAttributes({ tag: match[0] }),
+  );
+  const meta = (key: string, value: string) =>
+    metas.find((attributes) => attributes[key]?.toLowerCase() === value)?.content;
+  const title = /<title>([\s\S]*?)<\/title>/i.exec(head)?.[1];
+  const body = html.replace(/<script\b[\s\S]*?<\/script>/gi, "");
+  return {
+    title: title === undefined ? undefined : decodeEntities(title).trim(),
+    description: meta("name", "description"),
+    robots: meta("name", "robots"),
+    ogTitle: meta("property", "og:title"),
+    ogDescription: meta("property", "og:description"),
+    ogImage: meta("property", "og:image"),
+    canonical: links.find((attributes) => attributes.rel === "canonical")?.href,
+    markdown: links.find(
+      (attributes) => attributes.rel === "alternate" && attributes.type === "text/markdown",
+    )?.href,
+    jsonLd: [
+      ...html.matchAll(/<script\b[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi),
+    ].map((match) => match[1]),
+    headings: (body.match(/<h1[\s>]/gi) ?? []).length,
+  };
+}
+
+function isAbsoluteHttps(url: string | undefined) {
+  if (!url) return false;
+  try {
+    return new URL(url).protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function lengthIssue({ name, value, range }: { name: string; value?: string; range: Range }) {
+  if (!value) return { code: `missing-${name}`, detail: `no ${name}` };
+  if (value.length < range.min || value.length > range.max)
+    return {
+      code: `${name}-length`,
+      detail: `${value.length} characters, budget ${range.min} to ${range.max}: "${value}"`,
+    };
+  return null;
+}
+
+/** Every sitemap `<loc>`, the build's list of navigable pages. */
+export function sitemapPages({ outDir }: { outDir: string }) {
+  const sitemap = readFileSync(path.join(outDir, "sitemap.xml"), "utf8");
+  return [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => decodeEntities(match[1]));
+}
+
+function pageFile({ outDir, url }: { outDir: string; url: string }) {
+  if (url !== DOCS_URL && !url.startsWith(`${DOCS_URL}/`)) return null;
+  const sitePathname = url.slice(DOCS_URL.length) || "/";
+  return path.join(outDir, `.${sitePathname}`, "index.html");
+}
+
+function checkPage({
+  outDir,
+  basePath,
+  url,
+  llms,
+  seo,
+  exports,
+}: {
+  outDir: string;
+  basePath: string;
+  url: string;
+  llms: Set<string>;
+  seo: SeoBudgets;
+  exports: string[];
+}): Omit<SeoIssue, "page">[] {
+  const file = pageFile({ outDir, url });
+  if (!file) return [{ code: "foreign-sitemap-url", detail: `not under ${DOCS_URL}` }];
+  if (!existsSync(file)) return [{ code: "missing-page", detail: path.relative(outDir, file) }];
+  const head = readHead({ html: readFileSync(file, "utf8") });
+  const issues: Omit<SeoIssue, "page">[] = [];
+  if (head.headings !== 1)
+    issues.push({ code: "h1-count", detail: `${head.headings} <h1> elements, expected 1` });
+  for (const issue of [
+    lengthIssue({ name: "title", value: head.title, range: seo.title }),
+    lengthIssue({ name: "description", value: head.description, range: seo.description }),
+  ])
+    if (issue) issues.push(issue);
+  if (!head.canonical) issues.push({ code: "missing-canonical", detail: "no canonical link" });
+  else if (!isAbsoluteHttps(head.canonical))
+    issues.push({ code: "relative-canonical", detail: head.canonical });
+  else if (head.canonical !== url)
+    issues.push({ code: "canonical-mismatch", detail: `${head.canonical} is not ${url}` });
+  for (const [name, value] of [
+    ["og:title", head.ogTitle],
+    ["og:description", head.ogDescription],
+  ] as const)
+    if (!value) issues.push({ code: "missing-open-graph", detail: `no ${name}` });
+  if (!isAbsoluteHttps(head.ogImage))
+    issues.push({ code: "open-graph-image", detail: `og:image ${head.ogImage ?? "missing"}` });
+  if (head.jsonLd.length === 0) issues.push({ code: "missing-json-ld", detail: "no JSON-LD" });
+  for (const data of head.jsonLd) {
+    try {
+      JSON.parse(data);
+    } catch (error) {
+      issues.push({ code: "invalid-json-ld", detail: (error as Error).message });
+    }
+  }
+  if (head.robots?.toLowerCase().includes("noindex"))
+    issues.push({ code: "noindex", detail: `robots "${head.robots}" on a sitemap page` });
+  const markdown = head.markdown ? stripBasePath({ pathname: head.markdown, basePath }) : null;
+  if (!head.markdown || !markdown)
+    issues.push({ code: "missing-markdown-link", detail: "no text/markdown link" });
+  else {
+    exports.push(head.markdown);
+    const markdownFile = path.join(outDir, `.${markdown}`);
+    if (!existsSync(markdownFile) || readFileSync(markdownFile, "utf8").trim() === "")
+      issues.push({ code: "empty-markdown-export", detail: markdown });
+  }
+  const listed = [url, `${url}.md`, markdown && docsUrl({ path: markdown })];
+  if (!listed.some((candidate) => candidate && llms.has(candidate)))
+    issues.push({ code: "missing-from-llms-txt", detail: `${url} (or its .md) is not linked` });
+  return issues;
+}
+
+function checkRobots({ outDir }: { outDir: string }): SeoIssue[] {
+  const file = path.join(outDir, "robots.txt");
+  if (!existsSync(file)) return [{ page: "robots.txt", code: "missing-robots", detail: "absent" }];
+  const lines = readFileSync(file, "utf8")
+    .split("\n")
+    .map((line) => line.replace(/#.*/, "").trim())
+    .filter(Boolean);
+  const issues: SeoIssue[] = [];
+  let everyone = false;
+  for (const line of lines) {
+    const [field, ...rest] = line.split(":");
+    const value = rest.join(":").trim();
+    if (/^user-agent$/i.test(field)) everyone = value === "*";
+    else if (everyone && /^disallow$/i.test(field) && value === "/")
+      issues.push({ page: "robots.txt", code: "robots-blocks-site", detail: line });
+  }
+  const sitemap = docsUrl({ path: "/sitemap.xml" });
+  if (!lines.some((line) => /^sitemap:/i.test(line) && line.slice(8).trim() === sitemap))
+    issues.push({
+      page: "robots.txt",
+      code: "robots-missing-sitemap",
+      detail: `no Sitemap: ${sitemap}`,
+    });
+  return issues;
+}
+
+function checkNotFound({ outDir }: { outDir: string }): SeoIssue[] {
+  const file = path.join(outDir, "404.html");
+  if (!existsSync(file)) return [{ page: "404.html", code: "missing-not-found", detail: "absent" }];
+  const { robots } = readHead({ html: readFileSync(file, "utf8") });
+  return robots?.toLowerCase().includes("noindex")
+    ? []
+    : [{ page: "404.html", code: "not-found-indexable", detail: "no noindex robots meta" }];
+}
+
+/** A page as the known-issue list names it: its site path, or the file for site-wide checks. */
+function pageKey({ page }: { page: string }) {
+  return page.startsWith(DOCS_URL) ? page.slice(DOCS_URL.length) || "/" : page;
+}
+
+/** Splits issues into new ones (failures) and known entries that no longer occur (fixed). */
+export function applyKnownIssues({
+  issues,
+  known,
+}: {
+  issues: SeoIssue[];
+  known: Budgets["seo"]["known"];
+}) {
+  const seen = new Set(issues.map((issue) => `${issue.code} ${pageKey(issue)}`));
+  const failures = issues.filter((issue) => !known[issue.code]?.includes(pageKey(issue)));
+  const fixed = Object.entries(known).flatMap(([code, pages]) =>
+    pages
+      .filter((page) => !seen.has(`${code} ${page}`))
+      .map((page) => ({ page, code, detail: "no longer occurs" })),
+  );
+  return { failures, fixed, known: issues.length - failures.length };
+}
+
+/** The known-issue list that tolerates exactly these issues, sorted for a stable diff. */
+export function knownIssuesOf({ issues }: { issues: SeoIssue[] }) {
+  const known: Record<string, string[]> = {};
+  for (const issue of issues) (known[issue.code] ??= []).push(pageKey(issue));
+  return Object.fromEntries(
+    Object.entries(known)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([code, pages]) => [code, [...new Set(pages)].sort()]),
+  );
+}
+
+/**
+ * Static search and agent-readiness checks over every sitemap page; no browser, no server.
+ * `exports` are the Markdown export paths the pages link, for a served Content-Type check.
+ */
+export function checkSeo({
+  outDir,
+  basePath,
+  seo,
+}: {
+  outDir: string;
+  basePath: string;
+  seo: SeoBudgets;
+}) {
+  const llmsFile = path.join(outDir, "llms.txt");
+  const llms = new Set(
+    existsSync(llmsFile)
+      ? [...readFileSync(llmsFile, "utf8").matchAll(/\]\((https?:\/\/[^)\s]+)\)/g)].map((m) => m[1])
+      : [],
+  );
+  const pages = sitemapPages({ outDir });
+  const issues: SeoIssue[] = [...checkRobots({ outDir }), ...checkNotFound({ outDir })];
+  if (llms.size === 0)
+    issues.push({ page: "llms.txt", code: "missing-llms-txt", detail: "no links" });
+  const exports: string[] = [];
+  for (const url of pages)
+    for (const issue of checkPage({ outDir, basePath, url, llms, seo, exports }))
+      issues.push({ page: url, ...issue });
+  return { pages: pages.length, issues, exports };
+}
