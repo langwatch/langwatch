@@ -4,7 +4,7 @@ description: >-
   ClickHouse with auto-tuning from CPU/RAM, tiered storage, and optional
   replication via embedded Keeper
 type: application
-appVersion: 26.8.31.2
+appVersion: 26.8.34.13
 version: 0.4.0
 home: https://github.com/langwatch/langwatch
 sources:

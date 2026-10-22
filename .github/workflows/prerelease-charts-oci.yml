@@ -173,7 +173,7 @@ jobs:
             helm lint "$chart_dir" >/dev/null
             helm template smoke "$chart_dir" --set autogen.enabled=true >/dev/null
             # --app-version deliberately NOT set: clickhouse-serverless declares
-            # appVersion "25.10.2.65" (the actual ClickHouse release), and
+            # appVersion "26.8.34.13" (the actual ClickHouse release), and
             # overwriting it with a git sha both destroys that and claims a
             # correspondence the chart does not have — its image tags come from
             # values.yaml, not appVersion. The sha is already in the version.

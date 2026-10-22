@@ -53,7 +53,7 @@ docker run -d \
   -e CLICKHOUSE_USER=default \
   -e CLICKHOUSE_PASSWORD="${CLICKHOUSE_PASSWORD}" \
   -v /tmp/storage_policy.xml:/etc/clickhouse-server/config.d/storage_policy.xml:ro \
-  clickhouse/clickhouse-server:25.10.2.65
+  clickhouse/clickhouse-server:26.8.34.13
 
 # ---------------------------------------------------------------------------
 # Step 3: Readiness loop — wait for ClickHouse HTTP interface to respond
