@@ -52,6 +52,19 @@ export function customPropertyNames({ text }: { text: string }) {
 
 const CUSTOM_DECLARATION = /^(--(?:\\[\s\S]|[^:\\])+):([\s\S]*)$/;
 
+/* Grows `used` with every custom property the values of a used custom property read. */
+function markReadValues({ used, values }: { used: Set<string>; values: Map<string, string[]> }) {
+  const pending = [...used];
+  while (pending.length > 0) {
+    for (const value of values.get(pending.pop() ?? "") ?? [])
+      for (const name of customPropertyNames({ text: value }))
+        if (!used.has(name)) {
+          used.add(name);
+          pending.push(name);
+        }
+  }
+}
+
 /* Drops custom property declarations nothing reads: no var() in the kept rules, no mention in
    the page or a client bundle, and no kept custom property whose value reads them. */
 function pruneCustomProperties({ nodes, mentioned }: { nodes: CssNode[]; mentioned: Set<string> }) {
@@ -76,15 +89,7 @@ function pruneCustomProperties({ nodes, mentioned }: { nodes: CssNode[]; mention
     }
   };
   collect(nodes);
-  const pending = [...used];
-  while (pending.length > 0) {
-    for (const value of values.get(pending.pop() ?? "") ?? [])
-      for (const name of customPropertyNames({ text: value }))
-        if (!used.has(name)) {
-          used.add(name);
-          pending.push(name);
-        }
-  }
+  markReadValues({ used, values });
   return mapRuleBodies({
     nodes,
     body: ({ body }) =>

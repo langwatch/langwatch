@@ -3,6 +3,7 @@ import { Sparkles, Terminal, ChevronDown } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { CopyAction } from "../../code/ui/code-parts.tsx";
+import { PROMPT_BODY_ATTRIBUTE } from "./prompt-attributes.ts";
 
 function Command({ label, value }: { label: string; value: string }) {
   if (!value) return null;
@@ -96,6 +97,7 @@ export function SkillCard({
               View prompt <ChevronDown size={16} aria-hidden="true" />
             </summary>
             <Box
+              {...{ [PROMPT_BODY_ATTRIBUTE]: "" }}
               className="docs-skill-body docs-prose"
               fontSize="14px"
               lineHeight="24px"

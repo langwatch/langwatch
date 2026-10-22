@@ -62,22 +62,26 @@ export function parseStylesheet({ css }: { css: string }): CssNode[] {
       continue;
     }
     if (cursor >= css.length) break;
-    const boundary = findBoundary({ css, index: cursor });
-    const prelude = css.slice(cursor, boundary).trim();
-    if (css[boundary] !== "{") {
-      if (prelude) nodes.push({ kind: "verbatim", text: `${prelude};` });
-      cursor = boundary + 1;
-      continue;
-    }
-    const close = closingBrace({ css, open: boundary });
-    const body = css.slice(boundary + 1, close);
-    if (GROUPING.test(prelude))
-      nodes.push({ kind: "group", prelude, children: parseStylesheet({ css: body }) });
-    else if (prelude.startsWith("@")) nodes.push({ kind: "verbatim", text: `${prelude}{${body}}` });
-    else nodes.push({ kind: "rule", selector: prelude, body });
-    cursor = close + 1;
+    cursor = readStatement({ css, start: cursor, nodes });
   }
   return nodes;
+}
+
+/** Reads the statement or block starting at `start` into `nodes`; returns where it ends. */
+function readStatement({ css, start, nodes }: { css: string; start: number; nodes: CssNode[] }) {
+  const boundary = findBoundary({ css, index: start });
+  const prelude = css.slice(start, boundary).trim();
+  if (css[boundary] !== "{") {
+    if (prelude) nodes.push({ kind: "verbatim", text: `${prelude};` });
+    return boundary + 1;
+  }
+  const close = closingBrace({ css, open: boundary });
+  const body = css.slice(boundary + 1, close);
+  if (GROUPING.test(prelude))
+    nodes.push({ kind: "group", prelude, children: parseStylesheet({ css: body }) });
+  else if (prelude.startsWith("@")) nodes.push({ kind: "verbatim", text: `${prelude}{${body}}` });
+  else nodes.push({ kind: "rule", selector: prelude, body });
+  return close + 1;
 }
 
 export function serializeStylesheet({ nodes }: { nodes: CssNode[] }): string {
@@ -179,6 +183,6 @@ export function requiredNames({ selector }: { selector: string }) {
     cursor = next;
   }
   return [
-    ...outside.matchAll(/([.#])((?:\\[0-9a-fA-F]{1,6}\s?|\\[\s\S]|[\w-]|[^\x00-\x7f])+)/g),
+    ...outside.matchAll(/([.#])((?:\\[0-9a-fA-F]{1,6}\s?|\\[\s\S]|[\w-]|[\u0080-\uffff])+)/g),
   ].map((match) => `${match[1]}${unescapeIdentifier({ name: match[2] ?? "" })}`);
 }

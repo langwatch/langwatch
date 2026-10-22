@@ -74,9 +74,9 @@ export function parseInline({ source }: { source: string }): Inline[] {
   const scan: Scan = { nodes: [], text: "", index: 0 };
   while (scan.index < source.length) {
     const rest = source.slice(scan.index);
-    if (scanStrong({ scan, rest }) || scanCode({ scan, rest }) || scanLink({ scan, source })) {
-      continue;
-    }
+    if (scanStrong({ scan, rest })) continue;
+    if (scanCode({ scan, rest })) continue;
+    if (scanLink({ scan, source })) continue;
     scan.text += source[scan.index];
     scan.index += 1;
   }

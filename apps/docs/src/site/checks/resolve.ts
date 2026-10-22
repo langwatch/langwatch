@@ -103,7 +103,8 @@ export function checkTarget({
   const page = EXPORT_EXTENSION.test(file) ? exportPage({ outDir, file }) : file;
   const facts = index.html.get(page);
   if (!facts) return null;
-  return facts.ids.has(decodeURIComponent(url.hash.slice(1))) ? null : "missing-fragment";
+  const fragment = decodeURIComponent(url.hash.slice(1));
+  return facts.ids.has(fragment) ? null : "missing-fragment";
 }
 
 /** Resolves and checks one link; null when it reaches a page, a file or leaves the site. */

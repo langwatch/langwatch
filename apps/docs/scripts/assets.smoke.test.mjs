@@ -9,8 +9,8 @@ const { values } = parseArgs({ options: { "out-dir": { type: "string" } } });
 const outDir = path.resolve(values["out-dir"] ?? "dist");
 const FONT_DELAY_MS = 1200;
 
-/** Layout shift summed over a load whose web fonts arrive well after first paint. */
-async function shiftWithLateFonts({ browser, base, slug, width }) {
+/** Layout shift summed over a load whose web fonts (and, if asked, scripts) arrive late. */
+async function shiftWithLateFonts({ browser, base, slug, width, lateScripts = false }) {
   const context = await browser.newContext({ viewport: { width, height: 900 } });
   try {
     const page = await context.newPage();
@@ -21,7 +21,7 @@ async function shiftWithLateFonts({ browser, base, slug, width }) {
           if (!entry.hadRecentInput) window.docsShift += entry.value;
       }).observe({ type: "layout-shift", buffered: true });
     });
-    await page.route("**/*.woff2", async (route) => {
+    await page.route(lateScripts ? /\.(woff2|js)(\?|$)/ : "**/*.woff2", async (route) => {
       await new Promise((resolve) => setTimeout(resolve, FONT_DELAY_MS));
       await route.continue();
     });
@@ -58,6 +58,21 @@ await it("keeps a section index and a guide in place when the fonts swap in", as
   });
 });
 
+/** @scenario "Keep an API reference in place while the page starts" */
+await it("keeps the endpoint reference in place when the examples settle", async () => {
+  await withPreviewBrowser({
+    outDir,
+    run: async ({ browser, base }) => {
+      const slug = "api-reference/traces/get-trace";
+      for (const width of [1440, 1280, 390]) {
+        const late = { browser, base, slug, width, lateScripts: true };
+        const { shift } = await shiftWithLateFonts(late);
+        assert.ok(shift <= 0.01, `${slug} at ${width}px shifts ${shift.toFixed(4)} on load`);
+      }
+    },
+  });
+});
+
 /** @scenario "Fetch only the fonts an English page draws" */
 await it("preloads the body and title fonts and never fetches extended Latin", async () => {
   await withPreviewBrowser({
@@ -84,7 +99,7 @@ await it("preloads the body and title fonts and never fetches extended Latin", a
                 .filter((entry) => entry.name.endsWith(".woff2") && entry.initiatorType === "link")
                 .map((entry) => entry.name.split("/").pop()),
             );
-            assert.deepEqual(preloaded.sort(), [
+            assert.deepEqual(preloaded.toSorted(), [
               "Inter-Variable-latin.woff2",
               "Sentient-Regular.woff2",
             ]);

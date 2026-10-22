@@ -1,29 +1,35 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod/mini";
 
-import { indexEntries, searchEntrySchema, searchIndex } from "../model/search-entry.ts";
+import { publishSearchIndex } from "../compile/search-index.ts";
+import { decodeSearchIndex, searchIndex } from "../model/search-engine.ts";
+import { searchEntrySchema } from "../model/search-entry.ts";
 
-const index = indexEntries({
-  entries: z.array(searchEntrySchema).parse([
-    {
-      slug: "integration/python/guide",
-      title: "Python Integration Guide",
-      section: "Integrations",
-      description: "Capture traces from Python",
-      trail: "Integrations › Python",
-      body: "Install the SDK. Set LANGWATCH_API_KEY before you run the evaluator harness.",
-      headings: [{ id: "batch-evaluation", text: "Batch Evaluation" }],
-    },
-    {
-      slug: "api-reference/traces/search",
-      method: "POST",
-      title: "Search traces",
-      section: "API reference",
-      description: "Query recorded traces",
-      body: "POST /api/traces/search pageSize integer The page size. scrollId string",
-      headings: [],
-    },
-  ]),
+const index = decodeSearchIndex({
+  data: JSON.parse(
+    publishSearchIndex({
+      entries: [
+        {
+          slug: "integration/python/guide",
+          title: "Python Integration Guide",
+          section: "Integrations",
+          description: "Capture traces from Python",
+          trail: "Integrations › Python",
+          body: "Install the SDK. Set LANGWATCH_API_KEY before you run the evaluator harness.",
+          headings: [{ id: "batch-evaluation", text: "Batch Evaluation" }],
+        },
+        {
+          slug: "api-reference/traces/search",
+          method: "POST",
+          title: "Search traces",
+          section: "API reference",
+          description: "Query recorded traces",
+          body: "POST /api/traces/search pageSize integer The page size. scrollId string",
+          headings: [],
+        },
+      ],
+    }),
+  ),
 });
 const slugs = ({ query }: { query: string }) =>
   searchIndex({ index, query }).map((result) => result.entry.slug);

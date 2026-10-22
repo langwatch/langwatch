@@ -14,7 +14,10 @@ export function AgentLauncher() {
         <Terminal size={16} aria-hidden="true" />
         <code className="docs-agent-command">npx langwatch</code>
         <span className="docs-agent-pick">
-          {/* Names are drawn from data-agent by CSS: decoration, so the faded ones need no contrast. */}
+          {/*
+            Names are drawn from data-agent by CSS: decoration, so the faded ones need no
+            contrast.
+          */}
           <span className="docs-agent-wheel" aria-hidden="true">
             {CODING_AGENTS.map((agent, index) => {
               const offset = wheelOffset({ index, chosen: CODING_AGENTS.indexOf(START) });

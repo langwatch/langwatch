@@ -4,6 +4,7 @@ import path from "node:path";
 
 import { z } from "zod";
 
+import { PROMPT_FRAGMENT_FILE } from "../features/content/compile/skill-prompts.ts";
 import { readDocsConfig, type DocsItem } from "../features/navigation/compile/nav.ts";
 import {
   isStaticRedirect,
@@ -40,8 +41,21 @@ export async function assertBuild({ outDir }: { outDir: string }) {
     .map((source) => redirectTarget({ source }))
     .filter((target) => !expectedHtml.includes(target));
   expectedHtml.push(...redirectPages);
-  const actualHtml = (await readdir(outDir, { recursive: true })).filter((file) =>
-    file.endsWith(".html"),
+  const builtHtml = (await readdir(outDir, { recursive: true }))
+    .filter((file) => file.endsWith(".html"))
+    .map((file) => file.split(path.sep).join("/"));
+  const actualHtml = builtHtml.filter((file) => !PROMPT_FRAGMENT_FILE.test(file));
+  const fragments = builtHtml.filter((file) => PROMPT_FRAGMENT_FILE.test(file));
+  const named = new Set<string>();
+  for (const file of actualHtml)
+    for (const match of (await readFile(path.join(outDir, file), "utf8")).matchAll(
+      /\sdata-docs-prompt-fragment="[^"]*\/(assets\/skill-prompt-[0-9a-f]{16}\.html)"/g,
+    ))
+      named.add(match[1]);
+  assert.deepEqual(
+    fragments.toSorted(),
+    [...named].toSorted(),
+    "Every skill prompt fragment must be named by a published page, and exist",
   );
   assert.deepEqual(
     actualHtml.toSorted(),

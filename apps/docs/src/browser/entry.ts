@@ -60,6 +60,7 @@ document.addEventListener("click", (event) => {
     ["[data-docs-mobile], [data-docs-mobile-close]", "menus"],
     ["[data-docs-video]", "media"],
     ["[data-scope=accordion] button, [data-docs-tooltip]", "disclosures"],
+    [".docs-skill-prompt", "skill-prompts"],
     [
       '[data-docs-agent], [aria-label="Dismiss announcement"], [data-docs-dismiss], nav[aria-label="Page navigation"] button[aria-expanded]',
       "controls",

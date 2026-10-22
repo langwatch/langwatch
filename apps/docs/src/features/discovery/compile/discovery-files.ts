@@ -1,5 +1,7 @@
 import { canonicalUrl, docsUrl, publicSlug } from "../../../lib/site-path.ts";
 import { flatPages, type Section } from "../../navigation/model/nav.ts";
+import { agentCard, agentSkillsIndex, skillFile } from "./agent-discovery.ts";
+import type { AgentSkill } from "./agent-discovery.ts";
 
 /** The slice of the navigation the directory files list. */
 type DirectoryNav = {
@@ -64,9 +66,11 @@ export function llmsFull({ nav, exports }: { nav: DirectoryNav; exports: string[
 export function discoveryFiles({
   nav,
   lastModified = new Map(),
+  skills = [],
 }: {
   nav: DirectoryNav;
   lastModified?: ReadonlyMap<string, string>;
+  skills?: AgentSkill[];
 }): Record<string, string> {
   const entries = Object.keys(nav.pages).map((slug) => {
     const date = lastModified.get(slug);
@@ -74,8 +78,11 @@ export function discoveryFiles({
     return `<url>${loc}${date ? `<lastmod>${date}</lastmod>` : ""}</url>`;
   });
   return {
+    ...Object.fromEntries(skills.map((skill) => [skillFile({ name: skill.name }), skill.contents])),
+    ".well-known/agent-skills/index.json": `${JSON.stringify(agentSkillsIndex({ skills }))}\n`,
+    ".well-known/agent-card.json": `${JSON.stringify(agentCard({ skills, description: DIRECTORY_SUMMARY }))}\n`,
     "llms.txt": llmsDirectory({ nav }),
-    "robots.txt": `User-agent: *\nAllow: /\nSitemap: ${docsUrl({ path: "/sitemap.xml" })}\n`,
+    "robots.txt": `User-agent: *\nContent-Signal: ai-train=yes, search=yes, ai-input=yes\nAllow: /\nSitemap: ${docsUrl({ path: "/sitemap.xml" })}\n`,
     "humans.txt": `LangWatch B.V.\nBuilt in Amsterdam.\nSource: https://github.com/langwatch/langwatch\nDocumentation contributions: https://github.com/langwatch/langwatch/issues\n`,
     "agents.txt": `# LangWatch documentation for agents\n\nStart with ${docsUrl({ path: "/llms.txt" })} for the page directory.\nEvery page has .md, .claude and .agent plain-text exports. These are content aliases, not automatically installed agent configuration.\nThe whole documentation is one file at ${docsUrl({ path: "/llms-full.txt" })}.\nFor outdated or broken documentation, ask your user for permission, then run "npx langwatch report --user-approved" or open a GitHub issue with the page URL, failing step and correction.\nNever include API keys or private session data.\n`,
     "sitemap.xml": `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${entries.join("")}</urlset>\n`,

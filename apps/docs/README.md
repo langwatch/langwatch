@@ -37,7 +37,7 @@ current navigation and source, so it works before a production build exists.
 Invalid MDX shows Vite's error overlay and recovers when corrected.
 
 The development server exposes a source search index without heading anchors.
-The production index includes rendered article text and heading anchors.
+The production index lists each rendered article word once, with the pages it appears on, plus heading anchors.
 
 ## Build
 
@@ -52,7 +52,7 @@ page into `apps/docs/dist`. It emits:
   Configured `section/index` pages also have a `/section` alias.
 - Identical `/path.md`, `/path.claude` and `/path.agent` content exports.
 - Hashed JavaScript and CSS under `assets/`, fonts, posters and docs media.
-- `search-index.json` with article text, navigation trails and headings, plus
+- `search-index.json` with each article word written once with the pages it appears on, navigation trails and headings, plus
   lossless `.br` and `.gz` variants for hosts supporting precompressed delivery.
 - `llms.txt`, a directory of configured pages linking to their Markdown, and
   `llms-full.txt`, every page's Markdown in reading order.

@@ -34,7 +34,10 @@ function copyText({ button }: { button: HTMLButtonElement }): string | Promise<s
   return button.dataset.docsCopyPrompt || button.dataset.docsCopy || blockCode({ button });
 }
 
-/** Fetched text goes through a promised clipboard item, so the click still counts as the gesture. */
+/**
+ * Fetched text goes through a promised clipboard item, so the click still counts as the
+ * gesture.
+ */
 async function writeClipboard({ text }: { text: string | Promise<string> }) {
   if (typeof text !== "string" && typeof ClipboardItem === "function") {
     const blob = text.then((value) => new Blob([value], { type: "text/plain" }));

@@ -9,7 +9,11 @@ import { z } from "zod";
 
 import { render } from "../app/entry-server.tsx";
 import { SPEC_FILES } from "../features/api-reference/compile/openapi.ts";
-import { extractSkillPrompts } from "../features/content/compile/skill-prompts.ts";
+import {
+  extractPromptBodies,
+  extractSkillPrompts,
+} from "../features/content/compile/skill-prompts.ts";
+import { readAgentSkills } from "../features/discovery/compile/agent-skills.ts";
 import {
   discoveryFiles,
   llmsFull,
@@ -26,7 +30,7 @@ import {
   redirectTarget,
 } from "../features/navigation/compile/redirects.ts";
 import type { Nav } from "../features/navigation/model/nav.ts";
-import { searchEntry } from "../features/search/compile/search-index.ts";
+import { publishSearchIndex, searchEntry } from "../features/search/compile/search-index.ts";
 import { publicSlug, withBasePath } from "../lib/site-path.ts";
 import { docsRoot, readBuildOptions } from "../paths.ts";
 import { compressedSearchIndex } from "./compressed-index.ts";
@@ -317,6 +321,8 @@ async function generate() {
   const notFound = skipped.find((entry) => entry.slug === "404");
   if (notFound) throw new Error(`The 404 page failed to render: ${notFound.reason}`);
   for (const [name, contents] of extractSkillPrompts({ pages })) files.set(name, contents);
+  for (const [name, contents] of extractPromptBodies({ pages, basePath }))
+    files.set(name, contents);
 
   const redirects = siteRedirects({ docsRoot, slugs: Object.keys(context.nav.pages) });
   files.set("redirects.json", JSON.stringify(redirects));
@@ -324,11 +330,12 @@ async function generate() {
     discoveryFiles({
       nav: context.nav,
       lastModified: pageLastModified({ docsRoot }),
+      skills: readAgentSkills(),
     }),
   ))
     files.set(name, contents);
   files.set("llms-full.txt", llmsFull({ nav: context.nav, exports: markdown }));
-  const searchJson = JSON.stringify(searchIndex);
+  const searchJson = publishSearchIndex({ entries: searchIndex });
   files.set("search-index.json", searchJson);
   for (const [name, contents] of await compressedSearchIndex({
     json: searchJson,

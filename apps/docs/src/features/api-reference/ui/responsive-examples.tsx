@@ -2,8 +2,9 @@ import { Flex } from "@langwatch/design-system/primitives";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 
+/** Prerendered closed so narrow screens never shift; the bootstrap opens it on wide ones. */
 export function ResponsiveExamples({ children }: { children: ReactNode }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   useEffect(() => {
     const media = window.matchMedia("(min-width: 90rem)");
     const update = () => setOpen(media.matches);

@@ -13,6 +13,14 @@ import {
 /* The body font and the title font paint above the fold on every page; the rest load on demand. */
 const ABOVE_THE_FOLD_FONTS = ["/fonts/Inter-Variable-latin.woff2", "/fonts/Sentient-Regular.woff2"];
 
+/* Absolute links to the agent discovery files, the same on every page. */
+const DISCOVERY_LINKS = [
+  { rel: "llms-txt", path: "/llms.txt" },
+  { rel: "llms-full-txt", path: "/llms-full.txt" },
+  { rel: "agent-card", path: "/.well-known/agent-card.json" },
+  { rel: "agent-skills", path: "/.well-known/agent-skills/index.json" },
+];
+
 /** The docs.json settings a page head reads. */
 export type HeadSettings = {
   description: string;
@@ -171,6 +179,7 @@ export function pageHead({
     `<link rel="canonical" href="${escapeAttribute(url)}">`,
     `<link rel="alternate" type="text/markdown" href="${sitePath({ path: `/${slug}.md` })}">`,
     `<link rel="describedby" type="text/plain" href="${sitePath({ path: "/llms.txt" })}">`,
+    ...DISCOVERY_LINKS.map(({ rel, path }) => `<link rel="${rel}" href="${docsUrl({ path })}">`),
     ...ABOVE_THE_FOLD_FONTS.map(
       (path) =>
         `<link rel="preload" href="${sitePath({ path })}" as="font" type="font/woff2" crossorigin>`,

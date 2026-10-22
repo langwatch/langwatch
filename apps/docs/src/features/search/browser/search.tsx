@@ -5,6 +5,10 @@ import { createRoot } from "react-dom/client";
 
 import { docsIslandSystem } from "../../../app/island-theme.ts";
 import { SearchContent } from "./search-content.tsx";
+import { currentBuild, loadSearchIndex } from "./search-index-store.ts";
+
+/* The index starts downloading as soon as the island runs, before the dialog first renders. */
+loadSearchIndex({ build: currentBuild() }).catch(() => {});
 
 const host = document.createElement("div");
 document.body.append(host);

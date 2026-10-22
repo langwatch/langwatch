@@ -43,7 +43,10 @@ function copyAnnouncement({ state }: { state: CopyState }) {
   return "";
 }
 
-/** Where a static page's copy handler finds the text: the code block, the button, or a prompt file. */
+/**
+ * Where a static page's copy handler finds the text: the code block, the button, or a prompt
+ * file.
+ */
 type CopySource = "block" | "button" | "prompt";
 
 export function CopyAction({

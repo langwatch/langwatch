@@ -213,13 +213,18 @@ function checkRobots({ outDir }: { outDir: string }): SeoIssue[] {
       issues.push({ page: "robots.txt", code: "robots-blocks-site", detail: line });
   }
   const sitemap = docsUrl({ path: "/sitemap.xml" });
-  if (!lines.some((line) => /^sitemap:/i.test(line) && line.slice(8).trim() === sitemap))
+  const declaresSitemap = lines.some((line) => isSitemapLine({ line, sitemap }));
+  if (!declaresSitemap)
     issues.push({
       page: "robots.txt",
       code: "robots-missing-sitemap",
       detail: `no Sitemap: ${sitemap}`,
     });
   return issues;
+}
+
+function isSitemapLine({ line, sitemap }: { line: string; sitemap: string }) {
+  return /^sitemap:/i.test(line) && line.slice(8).trim() === sitemap;
 }
 
 function checkNotFound({ outDir }: { outDir: string }): SeoIssue[] {

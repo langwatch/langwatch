@@ -149,7 +149,8 @@
 :root {
   --chakra-fonts-body: Inter, "Inter Fallback", ui-sans-serif, system-ui, sans-serif;
   --chakra-fonts-heading:
-    Sentient, "Sentient Fallback", "Sentient Fallback Liberation", Charter, "Source Serif Pro", ui-serif, Georgia, serif;
+    Sentient, "Sentient Fallback", "Sentient Fallback Liberation", Charter, "Source Serif Pro",
+    ui-serif, Georgia, serif;
   --chakra-fonts-mono:
     "JetBrains Mono", "JetBrains Mono Fallback", ui-monospace, SFMono-Regular, monospace;
 }
@@ -756,7 +757,7 @@ body {
   margin-bottom: 16px;
 }
 @media (min-width: 90rem) {
-  .docs-examples > summary {
+  .docs-examples[open] > summary {
     display: none;
   }
 }

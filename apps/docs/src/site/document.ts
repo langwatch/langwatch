@@ -12,6 +12,7 @@ export const ISLANDS = {
   media: "src/features/content/browser/media.ts",
   toc: "src/features/shell/browser/toc.ts",
   disclosures: "src/features/content/browser/disclosures.ts",
+  "skill-prompts": "src/features/content/browser/skill-prompts.ts",
   search: "src/features/search/browser/search.tsx",
   playground: "src/features/api-reference/browser/playground.tsx",
   reading: "src/browser/reading.ts",
@@ -50,7 +51,7 @@ export function pageData({ slug, operation }: { slug: string; operation: Operati
 export const themeScript = `<script>try{var t=localStorage.getItem("theme");var d=t==="dark"||(!t||t==="system")&&matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.classList.add(d?"dark":"light");document.documentElement.style.colorScheme=d?"dark":"light"}catch{}</script>`;
 
 export const NOT_FOUND_HEAD =
-  '<title>Page not found | LangWatch Docs</title><meta name="robots" content="noindex"><meta name="docs-not-found" content="">';
+  '<title>Page not found - LangWatch</title><meta name="robots" content="noindex"><meta name="docs-not-found" content="">';
 
 /** Fills the index.html template's three slots and appends the inert page data. */
 export function composeDocument({

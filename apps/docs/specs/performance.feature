@@ -192,6 +192,13 @@ Feature: Static documentation with progressive interaction
     And the page shifts by no more than 0.01 when the fonts swap in
 
   @e2e
+  Scenario: Keep an API reference in place while the page starts
+    Given a reader opens an API reference on a phone or a desktop
+    When the page's script starts after the first paint
+    Then the request and response examples keep the state they painted in
+    And the page shifts by no more than 0.01
+
+  @e2e
   Scenario: Fetch only the fonts an English page draws
     When a reader opens an English page
     Then the body and title fonts are requested before the stylesheet asks for them
@@ -235,3 +242,49 @@ Feature: Static documentation with progressive interaction
     Then the page renders in the dark theme, theme-paired images included
     And a reader preferring light still sees the light theme
     And readers with JavaScript download no extra stylesheet for it
+
+  @integration
+  Scenario: Ship a skill prompt's rendered body as its own fragment
+    When the build publishes a page with skill cards
+    Then each card's prompt disclosure carries a short preview and a link to the prompt's Markdown file
+    And the full rendered body is written once to a content-hashed fragment that caches like other hashed assets
+    And a page served without that step still carries the full rendered body
+    And the link check and the published inventory read each fragment as part of the page that names it
+
+  @integration
+  Scenario: Fill a skill prompt from its fragment the first time it opens
+    Given JavaScript is enabled
+    When a reader opens a skill prompt's disclosure, before or after its script has loaded
+    Then the rendered body is fetched once and replaces the preview while the disclosure stays open
+    And the copy buttons of its code blocks work like the rest of the page's
+    And a failed fetch keeps the preview and link and is retried on the next open
+
+  @unit
+  Scenario: Publish the search index with each article word once
+    Given every page's rendered search entry
+    When the build publishes search-index.json
+    Then it holds one entry per page in navigation order, with no article text written out in full
+    And each distinct article word is written once for the whole site, with the pages it appears on
+    And a word already in the page's title, description, address or headings is not repeated for that page
+    And a heading carries its anchor only when the anchor differs from the one its text implies
+    And the published index is a fraction of the size of the article text it replaces
+
+  @unit
+  Scenario: Find the same pages from the compact index
+    Given the published search index
+    When a reader searches a title, a heading, a word or word prefix only in the article, an API path, an environment variable, a property or a misspelling
+    Then the same pages are found, ranked as before, with the heading anchor for heading matches
+    And punctuation around a term is ignored, but punctuation inside it, as in an API path or a dotted name, must match
+    But a page missing any query term is not found
+
+  @unit
+  Scenario: Load the search engine without a schema library
+    When a reader opens search
+    Then the search island and the code it loads include no schema validation library
+    And a malformed or truncated search index fails to load, so Retry can fetch it again
+
+  @unit
+  Scenario: Keep a page's own heading anchors when a skill prompt repeats a heading
+    When a page's skill prompt has a heading named like one of the page's own sections
+    Then the page's section keeps the plain anchor its links point at
+    And the prompt's heading takes a numbered anchor

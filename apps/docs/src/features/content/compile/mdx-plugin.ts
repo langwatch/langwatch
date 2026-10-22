@@ -1,7 +1,6 @@
 import path from "node:path";
 
 import mdx from "@mdx-js/rollup";
-import rehypeSlug from "rehype-slug";
 import remarkFrontmatter from "remark-frontmatter";
 import remarkGfm from "remark-gfm";
 import remarkMdxFrontmatter from "remark-mdx-frontmatter";
@@ -10,7 +9,7 @@ import type { Plugin } from "vite";
 import { closeDiagrams } from "../../code/compile/diagrams.ts";
 import { rehypeDocsCode } from "../../code/compile/rehype-code.ts";
 import { changelogPath, withReleaseNotes } from "../../releases/compile/releases.ts";
-import { rehypeDocsHeadings, rehypeDocsMedia } from "./rehype-content.ts";
+import { rehypeDocsHeadings, rehypeDocsMedia, rehypeDocsSlugs } from "./rehype-content.ts";
 import { remarkDocsContent } from "./remark-content.ts";
 import { remarkDocsLinks } from "./remark-links.ts";
 
@@ -26,7 +25,7 @@ export function docsMdxPlugin({ docsRoot }: { docsRoot: string }): Plugin {
       [remarkDocsLinks, { docsRoot }],
     ],
     rehypePlugins: [
-      rehypeSlug,
+      rehypeDocsSlugs,
       [rehypeDocsMedia, { docsRoot }],
       rehypeDocsCode,
       rehypeDocsHeadings,

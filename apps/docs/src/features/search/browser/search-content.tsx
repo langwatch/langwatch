@@ -10,22 +10,21 @@ import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
 
 import { pagePath } from "../../../lib/site-path.ts";
-import { searchIndex } from "../model/search-entry.ts";
-import type { IndexedEntry } from "../model/search-entry.ts";
+import { searchIndex, type SearchIndex } from "../model/search-engine.ts";
 import { QUICK_ACTIONS, runQuickAction } from "./search-actions.ts";
 import { currentBuild, loadSearchIndex } from "./search-index-store.ts";
 
 function useSearchIndex() {
-  const [index, setIndex] = useState<IndexedEntry[]>([]);
+  const [index, setIndex] = useState<SearchIndex | null>(null);
   const [state, setState] = useState("loading");
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let current = true;
     setState("loading");
     loadSearchIndex({ build: currentBuild() })
-      .then((entries) => {
+      .then((loadedIndex) => {
         if (!current) return;
-        setIndex(entries);
+        setIndex(loadedIndex);
         setState("ready");
       })
       .catch(() => {
@@ -37,8 +36,8 @@ function useSearchIndex() {
   }, [attempt]);
   return { index, state, retry: () => setAttempt(attempt + 1) };
 }
-function commandRows({ index, query }: { index: IndexedEntry[]; query: string }) {
-  const results = searchIndex({ index, query });
+function commandRows({ index, query }: { index: SearchIndex | null; query: string }) {
+  const results = index ? searchIndex({ index, query }) : [];
   const pages = results.map(({ entry, heading }) => ({
     id: `${entry.slug}#${heading?.id ?? ""}`,
     title: entry.title,

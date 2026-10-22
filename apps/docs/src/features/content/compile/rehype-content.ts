@@ -1,5 +1,7 @@
 import path from "node:path";
 
+import rehypeSlug from "rehype-slug";
+
 import { idOf, textOf, visitTree, type TreeNode } from "../../../lib/syntax-tree.ts";
 import { readImageSize } from "./image-size.ts";
 
@@ -92,6 +94,35 @@ function headingsExport({ headings }: { headings: Heading[] }): TreeNode {
         ],
       },
     },
+  };
+}
+
+function skillCardsOf({ node }: { node: TreeNode }): { parent: TreeNode; node: TreeNode }[] {
+  return (node.children ?? []).flatMap((child) =>
+    child.type === "mdxJsxFlowElement" && child.name === "SkillCard"
+      ? [{ parent: node, node: child }]
+      : skillCardsOf({ node: child }),
+  );
+}
+
+/**
+ * rehype-slug, with the page's own headings slugged before skill prompt headings: a prompt
+ * repeating a section's title must not take the anchor the page's links and contents expect.
+ * Each card is moved to the end of the tree for the one slugging pass, then put back.
+ */
+export function rehypeDocsSlugs() {
+  const slug = rehypeSlug();
+  return (tree: TreeNode) => {
+    const cards = skillCardsOf({ node: tree }).map(({ parent, node }) => ({
+      parent,
+      node,
+      index: parent.children?.indexOf(node) ?? -1,
+    }));
+    for (const { parent, index } of cards.toReversed()) parent.children?.splice(index, 1);
+    tree.children?.push(...cards.map(({ node }) => node));
+    slug(tree as unknown as Parameters<typeof slug>[0]);
+    tree.children?.splice(tree.children.length - cards.length, cards.length);
+    for (const { parent, node, index } of cards) parent.children?.splice(index, 0, node);
   };
 }
 

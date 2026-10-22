@@ -1,6 +1,10 @@
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 
+import {
+  namedFragments,
+  PROMPT_FRAGMENT_FILE,
+} from "../../features/content/compile/skill-prompts.ts";
 import { readBuiltRedirects, type Redirects } from "../../features/navigation/compile/redirects.ts";
 
 /** What the checks need from one built HTML file, read once. */
@@ -92,8 +96,19 @@ function pagePathOf({ served }: { served: string }) {
 export function readBuildIndex({ outDir, basePath }: { outDir: string; basePath: string }) {
   const html = new Map<string, HtmlFacts>();
   const pages: string[] = [];
+  const isFragment = (file: string) =>
+    PROMPT_FRAGMENT_FILE.test(path.relative(outDir, file).split(path.sep).join("/"));
   for (const file of filesUnder({ directory: outDir, keep: (name) => name.endsWith(".html") })) {
-    const facts = htmlFacts({ html: readFileSync(file, "utf8") });
+    if (isFragment(file)) continue;
+    const markup = readFileSync(file, "utf8");
+    const facts = htmlFacts({ html: markup });
+    /* A prompt fragment is filled into the page naming it: its ids and links are that page's. */
+    for (const name of namedFragments({ html: markup, basePath })) {
+      const fragment = htmlFacts({ html: readFileSync(path.join(outDir, name), "utf8") });
+      for (const id of fragment.ids) facts.ids.add(id);
+      facts.hrefs = [...new Set([...facts.hrefs, ...fragment.hrefs])];
+      facts.media = [...new Set([...facts.media, ...fragment.media])];
+    }
     html.set(file, facts);
     if (path.basename(file) === "index.html" && !facts.isRedirect)
       pages.push(pagePathOf({ served: servedPath({ outDir, file }) }));

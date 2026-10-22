@@ -67,3 +67,29 @@ describe("when built pages contain local links and redirects", () => {
     }
   });
 });
+
+describe("when a page names a skill prompt fragment", () => {
+  /** @scenario "Ship a skill prompt's rendered body as its own fragment" */
+  it("checks the fragment's links against the page and never as a page of its own", () => {
+    const fixture = docsFixture({ config: {} });
+    try {
+      mkdirSync(path.join(fixture.docsRoot, "assets"));
+      writeFileSync(path.join(fixture.docsRoot, "redirects.json"), "{}");
+      writeFileSync(
+        path.join(fixture.docsRoot, "assets/skill-prompt-0123456789abcdef.html"),
+        '<h2 id="step">Step</h2><a href="#intro">Intro</a><a href="#elsewhere">Gone</a>',
+      );
+      writeFileSync(
+        path.join(fixture.docsRoot, "index.html"),
+        '<h1 id="intro">Intro</h1><a href="#step">Step</a><details><div data-docs-prompt-fragment="/assets/skill-prompt-0123456789abcdef.html"></div></details>',
+      );
+      const report = checkLinks({ outDir: fixture.docsRoot });
+      expect(report.pages).toBe(1);
+      expect(report.issues).toEqual([
+        { source: "/", href: "#elsewhere", code: "missing-fragment" },
+      ]);
+    } finally {
+      fixture.dispose();
+    }
+  });
+});
