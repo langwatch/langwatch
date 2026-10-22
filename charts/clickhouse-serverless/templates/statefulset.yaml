@@ -309,6 +309,13 @@ spec:
               value: /etc/clickhouse-access/config/access.yaml
             - name: CLICKHOUSE_ACCESS_LISTEN
               value: {{ .Values.env.CLICKHOUSE_ACCESS_LISTEN | default "127.0.0.1:8124" | quote }}
+          # It listens on loopback only, which the kubelet cannot reach.
+          livenessProbe:
+            exec:
+              command: ["curl", "-sf", "http://{{ .Values.env.CLICKHOUSE_ACCESS_LISTEN | default "127.0.0.1:8124" }}/healthz"]
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
           resources:
             {{- toYaml .Values.access.sidecar.resources | nindent 12 }}
           volumeMounts:
