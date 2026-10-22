@@ -74,12 +74,18 @@ type AgentTestServiceOptions = {
   nlpTimeouts: AgentTestTurnJob["nlpTimeouts"];
 };
 
-/** The per-call timeout the agent declared in its config, where its kind has one. */
-function declaredTimeoutMs(agent: AgentWithFields): number | undefined {
+/** Agent's call budget for this agent: the timeout its config declares, where its kind has one. */
+function callBudgetMsOf(agent: AgentWithFields): number {
   const config: unknown = agent.config;
-  if (typeof config !== "object" || config === null || !("timeoutMs" in config)) return undefined;
+  const declared =
+    typeof config === "object" &&
+    config !== null &&
+    "timeoutMs" in config &&
+    typeof config.timeoutMs === "number"
+      ? config.timeoutMs
+      : null;
 
-  return typeof config.timeoutMs === "number" ? config.timeoutMs : undefined;
+  return callTimeoutMsFor({ declared });
 }
 
 /** The deadlines the child can carry: JSON has no NaN, and an unset one takes the default there. */
@@ -271,7 +277,7 @@ export class AgentTestService {
         executeSyncRoute: prefetch.data.executeSyncRoute,
         parameters: input.params ?? {},
         message: input.message,
-        timeoutMs: callTimeoutMsFor({ declared: declaredTimeoutMs(input.agent) }),
+        timeoutMs: callBudgetMsOf(input.agent),
         nlpTimeouts: usableTimeouts(this.options.nlpTimeouts),
       },
       environment: { labels: prefetch.data.scenario.labels, telemetry: prefetch.telemetry },
