@@ -8,7 +8,7 @@ Feature: Force a password reset for a set of users
 
   The mark is User.passwordResetRequiredAt. The auth module's
   require-password-reset task sets it through the user module and ends the
-  marked users' browser sessions; any password write that replaces the stored
+  marked users' browser sessions and CLI logins; any password write that replaces the stored
   hash clears it.
 
   # --- Sign-in ---
@@ -118,14 +118,14 @@ Feature: Force a password reset for a set of users
     When the operator runs require-password-reset with --all-credential-users --dry-run
     Then the task reports how many users would be marked
     And no user is marked
-    And no session is ended
+    And no session or CLI login is ended
 
   @unit
   Scenario: Marking a user ends their sessions
     Given users with a credential password, one of them marked by an earlier run
     When the operator runs require-password-reset for them
-    Then every matched user's browser sessions are ended
-    And the task reports how many users had their sessions ended
+    Then every matched user's browser sessions and CLI logins are ended
+    And the task reports how many users had their sessions ended and how many CLI tokens were revoked
 
   @unit
   Scenario: A misspelled flag is refused before anyone is marked

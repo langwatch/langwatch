@@ -55,17 +55,17 @@ export function parsePasswordResetSelector(args: readonly string[]): PasswordRes
 
 /**
  * `pnpm --filter @langwatch/tasks task require-password-reset -- --all-credential-users`: marks
- * passwords as no longer trusted and ends the holders' browser sessions, so each person must
- * choose a new password by reset link.
+ * passwords as no longer trusted and ends the holders' browser sessions and CLI logins, so each
+ * person must choose a new password by reset link.
  */
 export class RequirePasswordResetTask extends Task {
   readonly name = "require-password-reset";
   readonly description =
-    "Marks users' passwords as requiring a reset and ends their browser sessions. Pass --all-credential-users or --email <address>, and --dry-run to count only.";
+    "Marks users' passwords as requiring a reset and ends their browser sessions and CLI logins. Pass --all-credential-users or --email <address>, and --dry-run to count only.";
 
   private constructor(
     private readonly users: Pick<UserApi, "findPasswordHolders" | "markPasswordResetRequired">,
-    private readonly sessions: Pick<AuthApi, "revokeAllBrowserSessions">,
+    private readonly sessions: Pick<AuthApi, "revokeAllBrowserSessions" | "revokeCliTokens">,
   ) {
     super();
   }
@@ -75,7 +75,7 @@ export class RequirePasswordResetTask extends Task {
     sessions,
   }: {
     users: Pick<UserApi, "findPasswordHolders" | "markPasswordResetRequired">;
-    sessions: Pick<AuthApi, "revokeAllBrowserSessions">;
+    sessions: Pick<AuthApi, "revokeAllBrowserSessions" | "revokeCliTokens">;
   }): RequirePasswordResetTask {
     return new RequirePasswordResetTask(users, sessions);
   }

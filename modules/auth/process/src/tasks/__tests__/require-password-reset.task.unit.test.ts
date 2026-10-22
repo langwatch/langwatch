@@ -25,6 +25,7 @@ function world(seeds: readonly Seed[]) {
   }));
   const markCalls: string[][] = [];
   const revoked: string[] = [];
+  const cliRevoked: string[] = [];
   const users = createApiFixture<UserApi>({
     findPasswordHolders: async ({ emails }) => {
       const wanted = emails === null ? null : new Set(emails.map((e) => e.toLowerCase()));
@@ -43,10 +44,14 @@ function world(seeds: readonly Seed[]) {
     revokeAllBrowserSessions: async ({ userId }) => {
       revoked.push(userId);
     },
+    revokeCliTokens: async ({ userId }) => {
+      cliRevoked.push(userId);
+      return { revokedCount: 2 };
+    },
   });
   const task = RequirePasswordResetTask.create({ users, sessions });
   const marked = () => holders.filter((h) => h.markedForReset).map((h) => h.id);
-  return { task, markCalls, revoked, marked };
+  return { task, markCalls, revoked, cliRevoked, marked };
 }
 
 describe("the require-password-reset selector", () => {
@@ -128,7 +133,7 @@ describe("the require-password-reset task", () => {
 
   /** @scenario "A dry run counts and writes nothing" */
   it("counts the users it would mark and neither marks nor ends a session", async () => {
-    const { task, markCalls, revoked } = world([
+    const { task, markCalls, revoked, cliRevoked } = world([
       { id: "u1", email: "a@acme.test" },
       { id: "u2", email: "b@acme.test", markedForReset: true },
     ]);
@@ -141,23 +146,31 @@ describe("the require-password-reset task", () => {
       newlyMarked: 1,
       alreadyMarked: 1,
       sessionsRevokedFor: 0,
+      cliTokensRevoked: 0,
       notMarkedEmails: [],
     });
     expect(markCalls).toEqual([]);
     expect(revoked).toEqual([]);
+    expect(cliRevoked).toEqual([]);
   });
 
   /** @scenario "Marking a user ends their sessions" */
-  it("ends the browser sessions of every matched user, already marked ones too", async () => {
-    const { task, revoked } = world([
+  it("ends the browser sessions and CLI logins of every matched user, already marked ones too", async () => {
+    const { task, revoked, cliRevoked } = world([
       { id: "fresh", email: "fresh@acme.test" },
       { id: "earlier", email: "earlier@acme.test", markedForReset: true },
     ]);
 
     const report = await task.markForReset({ args: ["--all-credential-users"] });
 
-    expect(report).toMatchObject({ newlyMarked: 1, alreadyMarked: 1, sessionsRevokedFor: 2 });
+    expect(report).toMatchObject({
+      newlyMarked: 1,
+      alreadyMarked: 1,
+      sessionsRevokedFor: 2,
+      cliTokensRevoked: 4,
+    });
     expect(revoked.toSorted()).toEqual(["earlier", "fresh"]);
+    expect(cliRevoked.toSorted()).toEqual(["earlier", "fresh"]);
   });
 
   /** @scenario "Running the task again keeps the first mark" */
