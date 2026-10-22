@@ -13,6 +13,12 @@ members = ["sdks/python", "packages/ksuid-python"]
 [tool.uv]
 exclude-newer = "7 days"
 
+# Security fixes released inside the 7-day window above. Each entry admits one
+# package up to a fixed date, so the rest of the tree keeps the cooldown. Drop
+# an entry once its date is more than 7 days old. streamlit is here because
+# 1.66.1 is its first release that accepts Pillow 13.
+exclude-newer-package = { certifi = "2026-10-22T00:00:00Z", pillow = "2026-10-22T00:00:00Z", pypdf = "2026-10-22T00:00:00Z", streamlit = "2026-10-22T00:00:00Z" }
+
 # Transitive-dependency security pins. Keep these even when the importing
 # package isn't a direct dependency, so a future re-resolution can't silently
 # pull a vulnerable version back in.
@@ -38,5 +44,7 @@ constraint-dependencies = [
   "notebook>=7.6.3", # security: notebook advisory covering 7.5.0-7.6.2 (#2815)
   "multidict>=6.9.1", # security: multidict advisory covering 6.7.0-6.9.0 (#2818)
   "aiohttp>=3.14.4", # security: aiohttp advisories covering <=3.14.3, two HIGH (#2854-#2856)
+  "certifi>=2026.10.19", # security: certifi advisory covering <2026.10.19 (#2949)
+  "pillow>=13.0.0", # security: Pillow advisories covering <13.0.0, three CRITICAL (#2955-#2963, #3038-#3075)
   "mcp>=1.30.0,!=2.0.*,!=2.1.*", # security: MCP SDK unbounded StreamableHTTP sessions, fixed in 1.30.0 and 2.2.0 (#2829)
 ]

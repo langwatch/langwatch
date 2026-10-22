@@ -121,12 +121,22 @@ examples = [
   "fonttools>=4.63.0", # security: CVE-2025-66034 (#328)
   "jupyterlab>=4.6.4", # security: CVE-2025-59842 (#319) and advisories covering 4.6.0-4.6.3 (#2831)
   "langsmith>=0.10.18", # security: CVE-2026-45134 (#1175)
-  "pypdf>=6.20.1", # security: pypdf advisories (#543, #2198-#2200, #2807-#2813, and two fixed in 6.20.0 and 6.20.1)
+  "pypdf>=6.21.1", # security: pypdf advisories (#543, #2198-#2200, #2807-#2813, #3037)
   "strands-agents[otel]>=1.51.0,<2.0.0",
-  "nltk>=3.10.3", # security: nltk advisories (#2155, #2157, #2204, #2206, #2208, #2212, #2214, #2217, #2256)
-  "unstructured[pdf]>=0.18.18",
 ]
+# unstructured[pdf] (and the nltk it pulls) is not in the examples group:
+# the fixed unstructured (>=0.24.1, #2786, #2830) needs wrapt 2, which
+# langwatch-scenario in the dev group caps below, and nltk has an unfixed
+# advisory (#2785). Only examples/pdf_parsing_evaluation.ipynb uses it, and
+# it installs it itself.
 tests = ["factory-boy>=3.3.3", "pytest-asyncio>=1.4.0", "python-dotenv==1.2.2"]
+
+# The examples group resolves for Python 3.11+ only. Pillow 13 (#2955-#2963,
+# #3038-#3075) dropped 3.10, and the group is never installed on 3.10: CI
+# syncs it on the pinned 3.11 and the interpreter-range job skips it. The
+# published package still supports 3.10.
+[tool.uv.dependency-groups]
+examples = { requires-python = ">=3.11" }
 
 # Resolution settings ([tool.uv] exclude-newer, constraint-dependencies) live
 # at the workspace root pyproject.toml — uv ignores them on members.

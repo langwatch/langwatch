@@ -13,10 +13,14 @@ resolution-markers = [
 exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for backwards compatibility when using relative exclude-newer values.
 exclude-newer-span = "P7D"
 
+[options.exclude-newer-package]
+certifi = "2026-10-22T00:00:00Z"
+
 [manifest]
 constraints = [
     { name = "aiohttp", specifier = ">=3.14.4" },
     { name = "anyio", specifier = ">=4.14.2" },
+    { name = "certifi", specifier = ">=2026.10.19" },
     { name = "fsspec", specifier = ">=2026.6.0" },
     { name = "httpx2", specifier = ">=2.12.0" },
     { name = "litellm", specifier = ">=1.96.2" },
@@ -270,11 +274,11 @@ wheels = [
 
 [[package]]
 name = "certifi"
-version = "2025.8.3"
+version = "2026.10.19"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/dc/67/960ebe6bf230a96cda2e0abcf73af550ec4f090005363542f0765df162e0/certifi-2025.8.3.tar.gz", hash = "sha256:e564105f78ded564e3ae7c923924435e1daa7463faeab5bb932bc53ffae63407", size = 162386, upload-time = "2025-08-03T03:07:47.08Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a6/bd/1436c50cc46699de0230fbaacc1d1de7bfec413176099949e9d5112e88f2/certifi-2026.10.19.tar.gz", hash = "sha256:035c1e85572b141bf1c3a3eff0e33a8eb74917522f2559075ff8d2fea780a1ae", size = 137598, upload-time = "2026-10-20T02:24:16.604Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e5/48/1549795ba7742c948d2ad169c1c8cdbae65bc450d6cd753d124b17c8cd32/certifi-2025.8.3-py3-none-any.whl", hash = "sha256:f6c12493cfb1b06ba2ff328595af9350c65d6644968e5d3a2ffd78699af217a5", size = 161216, upload-time = "2025-08-03T03:07:45.777Z" },
+    { url = "https://files.pythonhosted.org/packages/c4/51/29046e48f693c54e5b7412216d447a1d8362c9653148d98c02cdf65fa733/certifi-2026.10.19-py3-none-any.whl", hash = "sha256:42d35340cc5b9ba78e818ddbff0c5b1c2b779de448a340fd1b989f5fa8670e1b", size = 136464, upload-time = "2026-10-20T02:24:15.072Z" },
 ]
 
 [[package]]
@@ -1115,41 +1119,39 @@ dev = [
     { name = "langwatch-scenario", specifier = ">=1.3.0" },
 ]
 examples = [
-    { name = "anthropic", specifier = ">=0.36.0,<0.122.0" },
-    { name = "chainlit", specifier = ">=2.12.0,<3" },
-    { name = "cloudpickle", specifier = ">=3.1.2" },
-    { name = "dspy-ai", specifier = ">=3.3.0,<4" },
-    { name = "faiss-cpu", specifier = ">=1.15.0,<2.0.0" },
-    { name = "fastapi", specifier = ">=0.141.1" },
-    { name = "fonttools", specifier = ">=4.63.0" },
-    { name = "haystack-ai", specifier = ">=3.0.0,<4.0.0" },
-    { name = "json-repair", specifier = ">=0.63.0" },
-    { name = "jupyter", specifier = ">=1.1.1,<2.0.0" },
-    { name = "jupyterlab", specifier = ">=4.6.3" },
-    { name = "langchain", specifier = ">=1.0.0,<2.0.0" },
-    { name = "langchain-community", specifier = ">=0.4.2,<1.0.0" },
-    { name = "langchain-google-vertexai", specifier = ">=2.0.0,<4.0.0" },
-    { name = "langchain-openai", specifier = ">=1.4.3,<2.0.0" },
-    { name = "langchain-text-splitters", specifier = ">=1.1.2,<2.0.0" },
-    { name = "langgraph", specifier = ">=1.0.0,<2.0.0" },
-    { name = "langsmith", specifier = ">=0.10.18" },
-    { name = "litellm", specifier = ">=1.96.2" },
-    { name = "nltk", specifier = ">=3.10.3" },
-    { name = "openai", specifier = ">=1.68.2,<2.55.0" },
-    { name = "openinference-instrumentation-dspy", specifier = ">=0.1.39,<0.2.0" },
-    { name = "openinference-instrumentation-litellm", specifier = ">=0.1.36" },
-    { name = "openinference-instrumentation-openai", specifier = ">=0.1.30" },
-    { name = "opentelemetry-instrumentation-fastapi", specifier = ">=0.65b0" },
-    { name = "opentelemetry-instrumentation-langchain", specifier = ">=0.62.3" },
-    { name = "pandas", specifier = ">=2.2.3" },
-    { name = "pydantic", specifier = ">=2.11.0" },
-    { name = "pypdf", specifier = ">=6.19.0" },
-    { name = "pytest", specifier = ">=9.1.1,<10.0.0" },
-    { name = "python-dotenv", specifier = "==1.2.2" },
-    { name = "strands-agents", extras = ["otel"], specifier = ">=1.51.0,<2.0.0" },
-    { name = "streamlit", specifier = ">=1.61.1,<2.0.0" },
-    { name = "unstructured", extras = ["pdf"], specifier = ">=0.18.18" },
-    { name = "uvicorn", specifier = ">=0.38.0,<0.53.0" },
+    { name = "anthropic", marker = "python_full_version >= '3.11'", specifier = ">=0.36.0,<0.122.0" },
+    { name = "chainlit", marker = "python_full_version >= '3.11'", specifier = ">=2.12.0,<3" },
+    { name = "cloudpickle", marker = "python_full_version >= '3.11'", specifier = ">=3.1.2" },
+    { name = "dspy-ai", marker = "python_full_version >= '3.11'", specifier = ">=3.3.0,<4" },
+    { name = "faiss-cpu", marker = "python_full_version >= '3.11'", specifier = ">=1.15.0,<2.0.0" },
+    { name = "fastapi", marker = "python_full_version >= '3.11'", specifier = ">=0.141.1" },
+    { name = "fonttools", marker = "python_full_version >= '3.11'", specifier = ">=4.63.0" },
+    { name = "haystack-ai", marker = "python_full_version >= '3.11'", specifier = ">=3.0.0,<4.0.0" },
+    { name = "json-repair", marker = "python_full_version >= '3.11'", specifier = ">=0.63.0" },
+    { name = "jupyter", marker = "python_full_version >= '3.11'", specifier = ">=1.1.1,<2.0.0" },
+    { name = "jupyterlab", marker = "python_full_version >= '3.11'", specifier = ">=4.6.4" },
+    { name = "langchain", marker = "python_full_version >= '3.11'", specifier = ">=1.0.0,<2.0.0" },
+    { name = "langchain-community", marker = "python_full_version >= '3.11'", specifier = ">=0.4.2,<1.0.0" },
+    { name = "langchain-google-vertexai", marker = "python_full_version >= '3.11'", specifier = ">=2.0.0,<4.0.0" },
+    { name = "langchain-openai", marker = "python_full_version >= '3.11'", specifier = ">=1.4.3,<2.0.0" },
+    { name = "langchain-text-splitters", marker = "python_full_version >= '3.11'", specifier = ">=1.1.2,<2.0.0" },
+    { name = "langgraph", marker = "python_full_version >= '3.11'", specifier = ">=1.0.0,<2.0.0" },
+    { name = "langsmith", marker = "python_full_version >= '3.11'", specifier = ">=0.10.18" },
+    { name = "litellm", marker = "python_full_version >= '3.11'", specifier = ">=1.96.2" },
+    { name = "openai", marker = "python_full_version >= '3.11'", specifier = ">=1.68.2,<2.55.0" },
+    { name = "openinference-instrumentation-dspy", marker = "python_full_version >= '3.11'", specifier = ">=0.1.39,<0.2.0" },
+    { name = "openinference-instrumentation-litellm", marker = "python_full_version >= '3.11'", specifier = ">=0.1.36" },
+    { name = "openinference-instrumentation-openai", marker = "python_full_version >= '3.11'", specifier = ">=0.1.30" },
+    { name = "opentelemetry-instrumentation-fastapi", marker = "python_full_version >= '3.11'", specifier = ">=0.65b0" },
+    { name = "opentelemetry-instrumentation-langchain", marker = "python_full_version >= '3.11'", specifier = ">=0.62.3" },
+    { name = "pandas", marker = "python_full_version >= '3.11'", specifier = ">=2.2.3" },
+    { name = "pydantic", marker = "python_full_version >= '3.11'", specifier = ">=2.11.0" },
+    { name = "pypdf", marker = "python_full_version >= '3.11'", specifier = ">=6.21.1" },
+    { name = "pytest", marker = "python_full_version >= '3.11'", specifier = ">=9.1.1,<10.0.0" },
+    { name = "python-dotenv", marker = "python_full_version >= '3.11'", specifier = "==1.2.2" },
+    { name = "strands-agents", extras = ["otel"], marker = "python_full_version >= '3.11'", specifier = ">=1.51.0,<2.0.0" },
+    { name = "streamlit", marker = "python_full_version >= '3.11'", specifier = ">=1.61.1,<2.0.0" },
+    { name = "uvicorn", marker = "python_full_version >= '3.11'", specifier = ">=0.38.0,<0.53.0" },
 ]
 tests = [
     { name = "factory-boy", specifier = ">=3.3.3" },
@@ -1329,8 +1331,8 @@ dependencies = [
 requires-dist = [
     { name = "ipykernel", specifier = ">=7.3.0" },
     { name = "langwatch", editable = "../../sdks/python" },
-    { name = "litellm", specifier = ">=1.96.0" },
-    { name = "mcp", extras = ["cli"], specifier = ">=2.0.0" },
+    { name = "litellm", specifier = ">=1.96.2" },
+    { name = "mcp", extras = ["cli"], specifier = ">=2.2.0" },
     { name = "pandas", specifier = ">=2.3.2" },
     { name = "tenacity", specifier = ">=9.1.4" },
 ]
@@ -1818,7 +1820,7 @@ name = "pexpect"
 version = "4.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "ptyprocess", marker = "python_full_version < '3.12' or sys_platform != 'win32'" },
+    { name = "ptyprocess" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/42/92/cc564bf6381ff43ce1f4d06852fc19a2f11d180f23dc32d9588bee2f149d/pexpect-4.9.0.tar.gz", hash = "sha256:ee7d41123f3c9911050ea2c2dac107568dc43b2d3b0c7557a33212c398ead30f", size = 166450, upload-time = "2023-11-25T09:07:26.339Z" }
 wheels = [
