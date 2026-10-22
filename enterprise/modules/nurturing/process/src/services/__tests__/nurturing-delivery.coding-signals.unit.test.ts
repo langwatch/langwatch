@@ -252,8 +252,8 @@ describe("NurturingDeliveryService coding-agent signals", () => {
       ]);
     });
 
-    /** @scenario "A CLI sign-up who picked LLMOps and then sends a coding-agent session gets integration_method=coding_agent in Customer.io" */
-    it("identifies every member with integration_method coding_agent, once per person", async () => {
+    /** @scenario "Every member of an organization that sends a coding-agent session gets uses_coding_agent in Customer.io" */
+    it("identifies every member with uses_coding_agent, once per person", async () => {
       const { delivery, cio } = deliveryOver(new ClockedClaims());
       const withMembers = { ...firstSession, memberUserIds: ["admin-1", "member-2", "member-2"] };
 
@@ -264,7 +264,7 @@ describe("NurturingDeliveryService coding-agent signals", () => {
       expect(
         cio
           .identifies()
-          .filter((call) => JSON.stringify(call.traits) === '{"integration_method":"coding_agent"}')
+          .filter((call) => JSON.stringify(call.traits) === '{"uses_coding_agent":true}')
           .map((call) => call.userId),
       ).toEqual(["admin-1", "member-2"]);
     });
@@ -281,12 +281,12 @@ describe("NurturingDeliveryService coding-agent signals", () => {
       await settle();
 
       expect(
-        cio.identifies().filter((call) => "integration_method" in (call.traits as object)),
+        cio.identifies().filter((call) => "uses_coding_agent" in (call.traits as object)),
       ).toHaveLength(1);
     });
 
-    /** @scenario "A member who chose another integration method in onboarding is still identified as coding_agent" */
-    it("identifies a member who chose platform earlier as coding_agent too", async () => {
+    /** @scenario "A member who chose another integration method in onboarding keeps it" */
+    it("leaves a member's onboarding integration_method and adds uses_coding_agent", async () => {
       const { delivery, cio } = deliveryOver(new ClockedClaims());
 
       await deliver(delivery, {
@@ -305,7 +305,7 @@ describe("NurturingDeliveryService coding-agent signals", () => {
           .identifies()
           .filter((call) => call.userId === "member-2")
           .map((call) => call.traits),
-      ).toEqual([{ integration_method: "platform" }, { integration_method: "coding_agent" }]);
+      ).toEqual([{ integration_method: "platform" }, { uses_coding_agent: true }]);
     });
 
     /** @scenario "A member claim that fails never strands a member already claimed" */
@@ -326,7 +326,7 @@ describe("NurturingDeliveryService coding-agent signals", () => {
       expect(
         cio
           .identifies()
-          .filter((call) => "integration_method" in (call.traits as object))
+          .filter((call) => "uses_coding_agent" in (call.traits as object))
           .map((call) => call.userId),
       ).toEqual(["member-2"]);
     });

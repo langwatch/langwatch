@@ -49,10 +49,10 @@ Feature: Coding-agent session signals reach Customer.io
     Then the organization's first project is not read
 
   @unit
-  Scenario: A CLI sign-up who picked LLMOps and then sends a coding-agent session gets integration_method=coding_agent in Customer.io
+  Scenario: Every member of an organization that sends a coding-agent session gets uses_coding_agent in Customer.io
     Given the first-session signal carries the members admin-1 and member-2
     When the first-session signal is delivered, then delivered again
-    Then Customer.io identifies integration_method=coding_agent for each member once
+    Then Customer.io identifies uses_coding_agent=true for each member once
     And a member of a second organization is identified once too
     # Known limit: the member list is read once, so a member who joins later is not identified.
     # Known limit: a member whose own claim throws is not retried; the delivery claim drops the redelivery.
@@ -61,14 +61,14 @@ Feature: Coding-agent session signals reach Customer.io
   Scenario: A member claim that fails never strands a member already claimed
     Given the claim for the second member throws
     When the first-session signal carrying two members is delivered
-    Then the first member is still identified with integration_method=coding_agent
+    Then the first member is still identified with uses_coding_agent=true
 
   @unit
-  Scenario: A member who chose another integration method in onboarding is still identified as coding_agent
+  Scenario: A member who chose another integration method in onboarding keeps it
     Given member-2 chose the platform integration method in onboarding
-    And the app keeps no record of that choice, only the event sent to Customer.io
     When the first-session signal carrying member-2 is delivered
-    Then Customer.io identifies member-2 with integration_method=coding_agent after the earlier platform identify
+    Then Customer.io identifies member-2 with uses_coding_agent=true
+    And integration_method is never sent for member-2 again, so it stays platform
 
   @unit
   Scenario: A seeded organization never gets the first-session signal

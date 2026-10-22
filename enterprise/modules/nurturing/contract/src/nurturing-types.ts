@@ -54,6 +54,7 @@ export interface CioPersonTraits {
   coding_last_session_at?: string;
   coding_active_days?: number;
   coding_agent_types?: string[];
+  uses_coding_agent?: boolean;
 
   // The person's own last page open
   app_last_opened_at?: string;

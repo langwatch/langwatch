@@ -80,7 +80,7 @@ export function codingAgentFirstSessionSignal({
   Readonly<{
     organizationId: string;
     agentTypes: readonly string[];
-    /** Every active member of the organization, for their integration_method. */
+    /** Every active member of the organization, for their uses_coding_agent. */
     memberUserIds: readonly string[];
   }>): NurturingSignalOf<"coding_agent_first_session"> {
   return {

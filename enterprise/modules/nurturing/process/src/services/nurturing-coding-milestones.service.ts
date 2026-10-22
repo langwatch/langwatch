@@ -23,7 +23,7 @@ type Fact = CodingAgentSessionStoredEventData;
 type CodingDependencies = Readonly<{
   milestones: NurturingCodingMilestonesRepository;
   projects: NurturingProjectDirectoryRepository;
-  /** The one nurturing -> organization edge: who to tell integration_method on a first session. */
+  /** The one nurturing -> organization edge: who to tell uses_coding_agent on a first session. */
   organizations: Pick<OrganizationApi, "getAllMembers">;
 }>;
 

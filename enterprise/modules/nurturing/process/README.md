@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Every owner tells nurturing through a subscriber on its own pipeline (§9); nurturing names no peer.
 
-Peers call these through the token, declared at `../contract/src/nurturing-types.ts:193`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/nurturing-types.ts:194`; nothing else in this package is public.
 
 #### `recordSignal`
 

@@ -41,11 +41,3 @@ export function fireIntegrationMethod({
     },
   ];
 }
-
-/**
- * A CLI sign-up skips the product page, so a coding-agent member is told integration_method
- * coding_agent here.
- */
-export function fireCodingAgentIntegrationMethod({ userId }: { userId: string }): CioBatchCall[] {
-  return fireIntegrationMethod({ userId, integrationMethod: "coding_agent" });
-}

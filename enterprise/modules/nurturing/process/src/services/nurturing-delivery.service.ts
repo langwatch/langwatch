@@ -12,7 +12,11 @@ import type { UserApi } from "@langwatch/user-contract";
 import type { PostHogChannel } from "../channels/posthog.channel.ts";
 import type { NurturingClaimRepository } from "../repositories/nurturing-claim.repository.ts";
 import { fire as fireActivity } from "../rules/nurturing-activity-tracking-service.rules.ts";
-import { fireCodingOrApp, isCodingOrAppSignal } from "../rules/nurturing-coding-delivery.rules.ts";
+import {
+  fireCodingOrApp,
+  fireUsesCodingAgent,
+  isCodingOrAppSignal,
+} from "../rules/nurturing-coding-delivery.rules.ts";
 import { pickCustomerIoDebounce } from "../rules/nurturing-delivery-debounce.rules.ts";
 import {
   fireExperimentRan,
@@ -37,7 +41,6 @@ import {
   evaluationsCompletedEvent,
 } from "../rules/nurturing-posthog-activation.rules.ts";
 import {
-  fireCodingAgentIntegrationMethod,
   fireIntegrationMethod,
   integrationMethodFor,
 } from "../rules/nurturing-product-interest-service.rules.ts";
@@ -103,16 +106,16 @@ export class NurturingDeliveryService {
   }
 
   /**
-   * A coding-agent organization's members each get integration_method once, claimed per person
+   * A coding-agent organization's members each get uses_coding_agent once, claimed per person
    * so a redelivery or a second organization of theirs does not send it again in the window.
    */
   private async identifyCodingAgentMembers(signal: NurturingSignal): Promise<void> {
     if (signal.kind !== "coding_agent_first_session" || !this.deps.customerIo) return;
     for (const userId of new Set(signal.memberUserIds)) {
-      const claimKey = `nurturing:integration_method:coding_agent:${userId}`;
+      const claimKey = `nurturing:uses_coding_agent:${userId}`;
       if (!(await this.deps.claims.claim(claimKey, DELIVERED_WINDOW_SECONDS))) continue;
       // Sent at once, so a later member's claim failing never strands one already claimed.
-      this.sendCustomerIoCalls(fireCodingAgentIntegrationMethod({ userId }));
+      this.sendCustomerIoCalls(fireUsesCodingAgent({ userId }));
     }
   }
 

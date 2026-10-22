@@ -27,6 +27,14 @@ export function isCodingOrAppSignal(signal: NurturingSignal): signal is CodingOr
  * What Customer.io is told for a coding-agent or app-open signal. The first session is the only
  * one that also tracks an event; a new kind in the list above fails to compile here until handled.
  */
+/**
+ * A member of an organization that sends coding-agent sessions. A trait of its own, so the
+ * integration_method a member chose in onboarding is never overwritten.
+ */
+export function fireUsesCodingAgent({ userId }: { userId: string }): CioBatchCall[] {
+  return [{ type: "identify", userId, traits: { uses_coding_agent: true } }];
+}
+
 export function fireCodingOrApp(signal: CodingOrAppSignal): CioBatchCall[] {
   const { userId } = signal;
   switch (signal.kind) {

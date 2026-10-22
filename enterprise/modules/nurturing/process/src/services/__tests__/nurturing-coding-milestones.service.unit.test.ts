@@ -136,7 +136,7 @@ describe("NurturingCodingMilestonesService", () => {
 
   describe("when the first session is raised", () => {
     /** @scenario "The first session carries every active member of the organization" */
-    it("carries the organization's members for integration_method", async () => {
+    it("carries the organization's members for uses_coding_agent", async () => {
       const { send, ofKind } = await serviceOver();
 
       await send([fact()]);
