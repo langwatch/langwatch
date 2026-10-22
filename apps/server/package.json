@@ -1,6 +1,6 @@
 {
   "name": "@langwatch/server",
-  "version": "3.20.1",
+  "version": "3.21.0",
   "description": "Run LangWatch locally with one command — `npx @langwatch/server`. Complete LangWatch stack: observability, evaluations, AI gateway, agent simulations.",
   "keywords": [
     "ai",
@@ -71,7 +71,7 @@
     "vitest": "catalog:"
   },
   "engines": {
-    "node": ">=24",
+    "node": "^24.22.1 || >=26.12.1",
     "pnpm": ">=10"
   },
   "packageManager": "pnpm@12.6.0"
