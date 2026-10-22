@@ -45,7 +45,7 @@ func runOK(t *testing.T, e *codeblock.Executor, req codeblock.Request) map[strin
 	return res.Outputs
 }
 
-// @scenario "a code block cannot leave a process running after its execution"
+// @scenario "on the wasm runtime, a code block cannot start a process or a thread"
 func TestWasm_NoProcessOutlivesARun(t *testing.T) {
 	e := newWasmExec(t, codeblock.Options{})
 	out := runOK(t, e, codeblock.Request{
@@ -79,7 +79,7 @@ def execute():
 	assert.NotRegexp(t, `^\d+$`, out["fork"], "a wasm run forked")
 }
 
-// @scenario "user code cannot change what a later execution runs"
+// @scenario "on the wasm runtime, the runner and its libraries are read-only"
 func TestWasm_RunnerMountIsReadOnly(t *testing.T) {
 	e := newWasmExec(t, codeblock.Options{})
 	out := runOK(t, e, codeblock.Request{
@@ -126,7 +126,7 @@ def execute():
 	assert.Empty(t, second["host_paths"], "the guest sees host paths beyond its own mounts")
 }
 
-// @scenario "a code block cannot read the engine's environment or process table"
+// @scenario "on the wasm runtime, user code sees no engine environment and no process table"
 func TestWasm_EngineEnvironmentAndProcIsUnreachable(t *testing.T) {
 	t.Setenv("AWS_SECRET_ACCESS_KEY", "CANARY_AWS_SECRET_DO_NOT_LEAK")
 	t.Setenv("LANGWATCH_NLP_INTERNAL_SECRET", "CANARY_INTERNAL_DO_NOT_LEAK")
@@ -162,6 +162,7 @@ func TestWasm_SandboxCredentialIsTheOnlyCredentialInTheEnvironment(t *testing.T)
 	assert.Equal(t, "https://lw.example", out["endpoint"])
 }
 
+// @scenario "on the wasm runtime, requests and httpx reach a permitted host"
 func TestWasm_RequestsAndHttpxReachAPermittedHost(t *testing.T) {
 	var mu sync.Mutex
 	var seen []string
@@ -202,7 +203,7 @@ def execute(url):
 	assert.Contains(t, seen, "PUT /c httpx")
 }
 
-// @scenario "a code block's outbound requests follow the deployment's egress policy"
+// @scenario "on the wasm runtime, outbound requests follow the deployment's egress policy"
 func TestWasm_EgressPolicyRefusesPrivateAndMetadataAddresses(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte("reached"))
@@ -237,6 +238,7 @@ def execute(urls):
 	}
 }
 
+// @scenario "on the wasm runtime, a run is stopped at its deadline"
 func TestWasm_SleepEndsAtTheRunsDeadline(t *testing.T) {
 	e := newWasmExec(t, codeblock.Options{DefaultTimeout: 30 * time.Second})
 	start := time.Now()
@@ -249,6 +251,7 @@ func TestWasm_SleepEndsAtTheRunsDeadline(t *testing.T) {
 	assert.Less(t, time.Since(start), 3*time.Second)
 }
 
+// @scenario "on the wasm runtime, a run is stopped at its deadline"
 func TestWasm_BusyLoopEndsAtTheRunsDeadline(t *testing.T) {
 	e := newWasmExec(t, codeblock.Options{DefaultTimeout: 30 * time.Second})
 	start := time.Now()
@@ -263,6 +266,7 @@ func TestWasm_BusyLoopEndsAtTheRunsDeadline(t *testing.T) {
 	assert.Less(t, time.Since(start), 3*time.Second)
 }
 
+// @scenario "on the wasm runtime, a run is held to its memory ceiling"
 func TestWasm_MemoryCeilingStopsARunawayAllocation(t *testing.T) {
 	e := newWasmExec(t, codeblock.Options{WasmMemoryMiB: 128})
 	res, err := e.Execute(context.Background(), codeblock.Request{

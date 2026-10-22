@@ -79,7 +79,7 @@ type Options struct {
 	// failure it cannot read.
 	SandboxEndpoint string
 	// Runtime picks where user code runs: RuntimeSubprocess (the default) or
-	// RuntimeWasm, a WASI CPython inside the engine; see ADR-181.
+	// RuntimeWasm, a WASI CPython inside the engine; see ADR-183.
 	Runtime string
 	// PythonWasmHome holds python.wasm and lib/; scripts/fetch-python-wasm.sh.
 	PythonWasmHome string

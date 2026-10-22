@@ -113,7 +113,7 @@ type EngineConfig struct {
 	// accepts as a fallback.
 	SandboxPython string `env:"SANDBOX_PYTHON"`
 	// CodeBlockRuntime — where user code runs: "subprocess" (default) or
-	// "wasm", a WASI CPython inside the engine (ADR-181).
+	// "wasm", a WASI CPython inside the engine (ADR-183).
 	CodeBlockRuntime string `env:"CODE_BLOCK_RUNTIME"`
 	// PythonWasmHome — python.wasm and its stdlib, for the wasm runtime.
 	PythonWasmHome string `env:"PYTHON_WASM_HOME"`

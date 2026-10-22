@@ -67,7 +67,7 @@ RUN set -eux; \
 
 # ─── Code-block wasm runtime ───────────────────────────────────────────────────
 # CPython 3.14 for WASI plus its precompiled stdlib, run inside nlpgo by the wasm
-# code-block runtime (NLPGO_ENGINE_CODE_BLOCK_RUNTIME=wasm, ADR-181). Pinned by
+# code-block runtime (NLPGO_ENGINE_CODE_BLOCK_RUNTIME=wasm, ADR-183). Pinned by
 # checksum in the script. Arch-independent: python.wasm is the same everywhere.
 FROM --platform=$BUILDPLATFORM python:3.14-slim-bookworm AS python-wasm
 RUN apt-get update && apt-get install -y --no-install-recommends curl unzip ca-certificates \

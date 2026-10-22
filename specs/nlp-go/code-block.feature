@@ -201,6 +201,59 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       Then the second execution does not see the file the first one wrote
       And no execution directory is left behind once the executor is done
 
+  Rule: The wasm runtime runs each execution in its own WebAssembly instance
+
+    # NLPGO_ENGINE_CODE_BLOCK_RUNTIME=wasm runs user code in a WASI CPython
+    # inside the engine (ADR-183). Every execution is a fresh instance with
+    # its own memory; the stdlib and runner are read-only mounts and /work is
+    # the execution's own. The whole suite above also runs on this runtime.
+
+    @unit
+    Scenario: on the wasm runtime, a code block cannot start a process or a thread
+      Given the code executor runs on the wasm runtime
+      And a code node whose body tries to fork, spawn a process and start a thread
+      When the executor runs the request
+      Then none of the attempts starts anything
+
+    @unit
+    Scenario: on the wasm runtime, user code sees no engine environment and no process table
+      Given the code executor runs on the wasm runtime
+      And the engine's environment holds a credential
+      When a code node reads its environment and /proc
+      Then the credential is not in its environment
+      And no process environment is readable through /proc
+
+    @unit
+    Scenario: on the wasm runtime, the runner and its libraries are read-only
+      Given the code executor runs on the wasm runtime
+      When a code node tries to rewrite the runner, the dspy stand-in or the HTTP stand-ins
+      Then every write is refused
+
+    @unit
+    Scenario: on the wasm runtime, outbound requests follow the deployment's egress policy
+      Given the code executor runs on the wasm runtime with the default egress policy
+      When a code node requests a private address and a cloud metadata endpoint
+      Then each request is refused as not permitted
+
+    @unit
+    Scenario: on the wasm runtime, requests and httpx reach a permitted host
+      Given the code executor runs on the wasm runtime
+      And an HTTP server the egress policy permits
+      When a code node calls it through requests, a requests Session, httpx.Client and httpx.AsyncClient
+      Then every call reaches the server with its method, query and headers
+
+    @unit
+    Scenario: on the wasm runtime, a run is stopped at its deadline
+      Given the code executor runs on the wasm runtime
+      When a code node sleeps or loops past its timeout
+      Then the result is marked timed out within moments of the deadline
+
+    @unit
+    Scenario: on the wasm runtime, a run is held to its memory ceiling
+      Given the code executor runs on the wasm runtime with a 128 MiB ceiling
+      When a code node allocates 512 MiB
+      Then the node fails with MemoryError
+
   Rule: Container packages a stable Python toolchain for user code
 
     @integration
