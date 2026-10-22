@@ -1,3 +1,4 @@
+import { featureProjectColour } from "@langwatch/design-system/feature-project-colour";
 import type { BraidedOwner, SpanTreeNode } from "@langwatch/trace-contract";
 
 /** How a braided span is drawn: the owner's name and its strand colour token. */
@@ -7,6 +8,7 @@ export interface BraidStrand {
   colour: string;
 }
 
+/** The Braids brand's project colours (`projectColours` on its brand). */
 const STRAND_COUNT = 3;
 
 export const BRAIDED_ACTION_DISABLED_REASON = "Not available on spans braided from another project";
@@ -20,7 +22,30 @@ export function spanNodeKey(span: Pick<SpanTreeNode, "spanId" | "ownerProjectId"
   return span.ownerProjectId ? JSON.stringify([span.ownerProjectId, span.spanId]) : span.spanId;
 }
 
-/** A braided span's strand, by its owner's order in the header; null on the reader's own span. */
+/**
+ * Each owner's colour, in header order: the colour the Braids page gives its project, else, when
+ * an earlier owner holds it, the next one free. Past three owners colours repeat.
+ */
+export function braidColourIndexes(
+  owners: readonly Pick<BraidedOwner, "projectId">[],
+): Map<string, number> {
+  const indexes = new Map<string, number>();
+  const taken = new Set<number>();
+  for (const { projectId } of owners) {
+    if (indexes.has(projectId)) continue;
+    const own = featureProjectColour({ feature: "braids", projectId }).index;
+    const free = Array.from(
+      { length: STRAND_COUNT },
+      (_, step) => ((own - 1 + step) % STRAND_COUNT) + 1,
+    ).find((index) => !taken.has(index));
+    const index = free ?? own;
+    taken.add(index);
+    indexes.set(projectId, index);
+  }
+  return indexes;
+}
+
+/** A braided span's strand: its owner's name and colour from the header; null on an own span. */
 export function braidStrandFor({
   ownerProjectId,
   owners,
@@ -29,13 +54,43 @@ export function braidStrandFor({
   owners: readonly BraidedOwner[] | null | undefined;
 }): BraidStrand | null {
   if (!ownerProjectId) return null;
-  const index = owners?.findIndex((owner) => owner.projectId === ownerProjectId) ?? -1;
-  const strand = (Math.max(index, 0) % STRAND_COUNT) + 1;
+  const index =
+    braidColourIndexes(owners ?? []).get(ownerProjectId) ??
+    featureProjectColour({ feature: "braids", projectId: ownerProjectId }).index;
   return {
     ownerProjectId,
-    ownerName: owners?.[index]?.name ?? "another project",
-    colour: `feature.braids.project.${strand}`,
+    ownerName:
+      owners?.find((owner) => owner.projectId === ownerProjectId)?.name ?? "another project",
+    colour: `feature.braids.project.${index}`,
   };
+}
+
+/** Rough text widths in the tree's type sizes, and what a row and a badge spend around them. */
+const SPAN_NAME_CHAR_PX = 7;
+const OWNER_NAME_CHAR_PX = 6;
+const BADGE_CHROME_PX = 36;
+const ROW_CHROME_PX = 80;
+const INDENT_PX = 20;
+
+/**
+ * Whether a row's badge is the mark alone: when the span's name and the owner's whole name do not
+ * both fit. The span's name comes first and neither name is cut short for the badge.
+ */
+export function braidBadgeIsCompact({
+  treeWidthPx,
+  depth,
+  spanName,
+  ownerName,
+}: {
+  treeWidthPx: number;
+  depth: number;
+  spanName: string;
+  ownerName: string;
+}): boolean {
+  const room = treeWidthPx - depth * INDENT_PX - ROW_CHROME_PX;
+  const needed =
+    spanName.length * SPAN_NAME_CHAR_PX + ownerName.length * OWNER_NAME_CHAR_PX + BADGE_CHROME_PX;
+  return room < needed;
 }
 
 /** "A", "A and B", "A, B and C". */

@@ -2,7 +2,7 @@ import { type Authorization, ownProjectIdReadBy } from "@langwatch/authorization
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
-import type { SpanBraid } from "@langwatch/trace-contract";
+import type { BraidedOwner, SpanBraid } from "@langwatch/trace-contract";
 
 import { braidConditionsShownFor } from "../../../rules/braided-span-owner.rules.ts";
 
@@ -70,6 +70,37 @@ export class TraceBraidDetailService {
       }),
       signedBy: null,
     };
+  }
+
+  /** The header's owners, in the order given: the slug only for a viewer who may open one. */
+  async describeOwners({
+    ownerProjectIds,
+    viewerUserId,
+  }: {
+    ownerProjectIds: readonly string[];
+    viewerUserId: string;
+  }): Promise<BraidedOwner[]> {
+    const directory = this.#directory;
+    return Promise.all(
+      ownerProjectIds.map(async (projectId): Promise<BraidedOwner> => {
+        if (directory === null) return { projectId, name: projectId, canOpen: false, slug: null };
+        const [owner, canRead] = await Promise.all([
+          directory.projects.findSummaryById(projectId),
+          directory.authz.hasPermission({
+            userId: viewerUserId,
+            permission: "traces:view",
+            projectId,
+          }),
+        ]);
+        const canOpen = canRead && owner !== null;
+        return {
+          projectId,
+          name: owner?.name ?? projectId,
+          canOpen,
+          slug: canOpen ? owner.slug : null,
+        };
+      }),
+    );
   }
 
   /** One audit call for a read that returned owner spans; an audit failure never fails the read. */

@@ -58,6 +58,7 @@ export const TreeRow = memo(function TreeRow({
   onToggleCollapse,
   onSelect,
   braid = null,
+  compactBraidBadge = false,
 }: {
   node: WaterfallTreeNode;
   rootStart: number;
@@ -110,6 +111,8 @@ export const TreeRow = memo(function TreeRow({
   onSelect: (spanId: string) => void;
   /** Set on a span braided in from another project: its badge, and no actions on it. */
   braid?: BraidStrand | null;
+  /** The badge as the mark alone, where the span's name needs the room. */
+  compactBraidBadge?: boolean;
 }) {
   const { span, depth } = node;
   // Hover highlight comes from a store with a per-row boolean selector
@@ -275,7 +278,7 @@ export const TreeRow = memo(function TreeRow({
                 isDeletedByCorrection={isDeletedByCorrection}
                 hiddenCount={isCollapsed ? hiddenDescendantCount : 0}
               />
-              <BraidedSpanBadge strand={braid} />
+              <BraidedSpanBadge strand={braid} compact={compactBraidBadge} />
             </HStack>
             {(isLlm || isNamedTool) && (
               <KindPill

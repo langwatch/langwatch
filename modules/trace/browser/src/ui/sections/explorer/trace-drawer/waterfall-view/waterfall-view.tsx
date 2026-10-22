@@ -13,7 +13,11 @@ import { useAnchoredAnnotations } from "../../../../../features/annotation/behav
 import { useSpanLangwatchSignals } from "../../../../../features/span/behavior/use-span-langwatch-signals.ts";
 import { useSpanLogs } from "../../../../../features/span/behavior/use-span-logs.ts";
 import { useSpanPulseStore } from "../../../../../features/trace-drawer/behavior/span-pulse.store.ts";
-import { braidStrandFor, spanNodeKey } from "../../../../../model/braids/braided-span.ts";
+import {
+  braidBadgeIsCompact,
+  braidStrandFor,
+  spanNodeKey,
+} from "../../../../../model/braids/braided-span.ts";
 import { GroupRow } from "./group-row.tsx";
 import { GroupTimelineBar, TimelineBar } from "./timeline-bar.tsx";
 import { TreeRow } from "./tree-row.tsx";
@@ -186,6 +190,11 @@ export const WaterfallView = memo(function WaterfallView({
 
   // Horizontal-scroll floor for the tree pane.
   const treeContentMinWidthPx = useMemo(() => treeMinWidthPx(flatRows), [flatRows]);
+  // The width a row lays out in: the tree pane, or its scroll floor when that is wider.
+  const treeWidthPx = Math.max(
+    showTimeline ? Math.max(MIN_TREE_WIDTH, treePct * containerWidth) : containerWidth,
+    treeContentMinWidthPx,
+  );
 
   // Detect multi-root (forest)
   const rootCount = useMemo(() => tree.length, [tree]);
@@ -365,6 +374,7 @@ export const WaterfallView = memo(function WaterfallView({
                 signalsBySpanId={signalsBySpanId}
                 size={virtualRow.size}
                 start={virtualRow.start}
+                treeWidthPx={treeWidthPx}
               />
             ))}
           </Box>
@@ -674,6 +684,7 @@ function WaterfallVirtualRow({
   signalsBySpanId,
   size,
   start,
+  treeWidthPx,
 }: {
   braidedOwners: WaterfallViewProps["braidedOwners"];
   collapsedIds: Set<string>;
@@ -700,6 +711,7 @@ function WaterfallVirtualRow({
   signalsBySpanId: ReturnType<typeof useSpanLangwatchSignals>["signalsBySpanId"];
   size: number;
   start: number;
+  treeWidthPx: number;
 }) {
   if (row.kind === "group") {
     return (
@@ -714,6 +726,7 @@ function WaterfallVirtualRow({
     );
   }
   const { node } = row;
+  const braid = braidStrandFor({ ownerProjectId: node.span.ownerProjectId, owners: braidedOwners });
   const isRoot = node.depth === 0;
   const showSeparator = isRoot && rootCount > 1 && index > 0;
   return (
@@ -755,7 +768,16 @@ function WaterfallVirtualRow({
         hiddenDescendantCount={
           collapsedIds.has(spanNodeKey(node.span)) ? countDescendants(node) : 0
         }
-        braid={braidStrandFor({ ownerProjectId: node.span.ownerProjectId, owners: braidedOwners })}
+        braid={braid}
+        compactBraidBadge={
+          braid !== null &&
+          braidBadgeIsCompact({
+            treeWidthPx,
+            depth: node.depth,
+            spanName: draftNames.get(node.span.spanId) ?? node.span.name,
+            ownerName: braid.ownerName,
+          })
+        }
         isDimmed={selectedSpanId !== null && node.span.spanId !== selectedSpanId}
         signals={signalsBySpanId.get(node.span.spanId) ?? EMPTY_SIGNALS}
         traceId={rowTraceId}

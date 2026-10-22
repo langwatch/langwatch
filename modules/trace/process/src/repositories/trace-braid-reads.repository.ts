@@ -1,5 +1,6 @@
 import type { Authorization, CompiledWhere } from "@langwatch/authorization";
 
+import type { BraidedSpanGroup } from "../rules/braided-trace-totals.rules.ts";
 import type { TraceSpanSummaryRecord } from "./trace-projected-read.repository.ts";
 
 /** A draft or saved braid's condition as one statement renders it (ADR-183 §7). */
@@ -14,6 +15,12 @@ export type BraidActivityRead = BraidConditionRead &
 
 /** The owner's spans over a set of reader traces: traces whose every or only some spans match. */
 export type BraidOwnerTraceCounts = Readonly<{ every: number; some: number; unsigned: number }>;
+
+/**
+ * One project's spans in one trace, read through the reader's braided fence: one group per
+ * project and price. `costInput` is set on a group whose spans carry no `gen_ai.usage.cost`.
+ */
+export type TraceSpanTotalsGroup = Readonly<BraidedSpanGroup>;
 
 /**
  * The braid dialog's and the Braids page's reads (ADR-183 §7). Every statement reads one
@@ -58,6 +65,13 @@ export abstract class TraceBraidReadsRepository {
     sinceMs: number;
   }): Promise<Map<string, number>>;
 
+  /** On the reader's trace header: the latest version of each span its proof lets through. */
+  abstract sumSpansInTrace(input: {
+    authorization: Authorization;
+    traceId: string;
+    occurredAtMs?: number | undefined;
+  }): Promise<TraceSpanTotalsGroup[]>;
+
   /** The owner's latest span versions in one trace, each marked if the draft braid passes it. */
   abstract findOwnerSpansMarked(input: {
     authorization: Authorization;
@@ -91,6 +105,10 @@ export class EmptyTraceBraidReadsRepository extends TraceBraidReadsRepository {
 
   countReaderBraidActivity(): Promise<Map<string, number>> {
     return Promise.resolve(new Map());
+  }
+
+  sumSpansInTrace(): Promise<TraceSpanTotalsGroup[]> {
+    return Promise.resolve([]);
   }
 
   findOwnerSpansMarked(): Promise<(TraceSpanSummaryRecord & { braided: boolean })[]> {

@@ -209,6 +209,7 @@ import {
   type RouteSearchResult,
   TraceAiQueryUnavailableError,
   type TraceRef,
+  type TraceHeader,
 } from "@langwatch/trace-contract";
 import type { ConversationView } from "@langwatch/trace-contract/conversation";
 import type { z } from "zod";
@@ -331,6 +332,7 @@ import {
   type TraceBraidDirectory,
 } from "../features/read/services/trace-braid-detail.service.ts";
 import { TraceBraidPauseService } from "../features/read/services/trace-braid-pause.service.ts";
+import { TraceBraidedTotalsService } from "../features/read/services/trace-braided-totals.service.ts";
 import { TraceContentReadService } from "../features/read/services/trace-content-read.service.ts";
 import { TraceListService } from "../features/read/services/trace-list-read.service.ts";
 import { TraceLogRecordIOService } from "../features/read/services/trace-log-record-io.service.ts";
@@ -374,7 +376,8 @@ import {
 } from "../repositories/trace-summary.repository.ts";
 import type { TraceUsageCountRepository } from "../repositories/trace-usage-count.repository.ts";
 import type { TraceRepositories } from "../repositories/trace.repositories.ts";
-import { selectedSpanOwnerOf } from "../rules/braided-span-owner.rules.ts";
+import { readsBraidedSpans, selectedSpanOwnerOf } from "../rules/braided-span-owner.rules.ts";
+import { braidedTraceSummaryOf } from "../rules/braided-trace-totals.rules.ts";
 import { gateEvaluationContent } from "../rules/evaluation-content-gate.rules.ts";
 import { mapTraceEvaluationsToLegacyEvaluations } from "../rules/trace-evaluation-mapping.rules.ts";
 import {
@@ -773,6 +776,8 @@ export interface TraceAppDependencies {
   braidPlans?: Pick<EntitlementApi, "getActivePlan">;
   /** Owner names, the viewer's standing on an owner and the read audit; absent, braids say less. */
   braidDirectory?: TraceBraidDirectory;
+  /** Prices braided spans without a cost of their own for the header; absent, only stated costs. */
+  braidPrices?: Pick<ModelProviderApi, "estimateCost">;
   /**
    * The export download door's tier-effective rate window and in-flight
    * slots. Absent on a process that serves no export door; the door then
@@ -1254,6 +1259,7 @@ export class TraceModule implements TraceApi, CollectorApp {
         runs: options.repositories.instantEvalRuns,
       }),
       models: options.modelProviders,
+      braidPrices: options.modelProviders,
       storedObjects: options.storedObjects,
       ...(options.presence ? { presence: options.presence } : {}),
       share: options.share,
@@ -1439,6 +1445,7 @@ export class TraceModule implements TraceApi, CollectorApp {
   #braidPause: TraceBraidPauseService;
   #braidDetail: TraceBraidDetailService;
   #braidPreview: TraceBraidPreviewService;
+  #braidedTotals: TraceBraidedTotalsService;
   #transcriptRead: TraceTranscriptReadService;
   #exportProgress: TraceExportProgressService;
   #tenantUpdates: TraceTenantUpdateStreamService;
@@ -1458,6 +1465,10 @@ export class TraceModule implements TraceApi, CollectorApp {
     this.#braidPause = TraceBraidPauseService.create({ plans: dependencies.braidPlans ?? null });
     this.#braidDetail = TraceBraidDetailService.create({
       directory: dependencies.braidDirectory ?? null,
+    });
+    this.#braidedTotals = TraceBraidedTotalsService.create({
+      reads: dependencies.traces.braidReads ?? EmptyTraceBraidReadsRepository.create(),
+      prices: dependencies.braidPrices ?? null,
     });
     this.#braidPreview = TraceBraidPreviewService.create({
       reads: dependencies.traces.braidReads ?? EmptyTraceBraidReadsRepository.create(),
@@ -2922,6 +2933,40 @@ export class TraceModule implements TraceApi, CollectorApp {
       ...(input.tenantId !== undefined ? { tenantId: input.tenantId } : {}),
     });
     return this.#braidPause.honoured({ authorization });
+  }
+
+  /**
+   * The header's `braided`: whole-trace totals with the braided spans the reader sees, and their
+   * owners. A trace without them, or a proof without braids, adds nothing and sends no statement.
+   */
+  async readBraidedHeaderTotals(input: {
+    authorization: Authorization;
+    traceId: string;
+    tenantId: string;
+    occurredAtMs?: number | undefined;
+    viewerUserId: string;
+    header: TraceHeader;
+    canSeeCosts: boolean;
+  }): Promise<Pick<TraceHeader, "braided">> {
+    if (!readsBraidedSpans(input.authorization)) return {};
+    const totals = await this.#braidedTotals.ownerTotals({
+      authorization: await this.authorizationForTrace(input),
+      traceId: input.traceId,
+      occurredAtMs: input.occurredAtMs ?? input.header.timestamp,
+    });
+    if (totals.length === 0) return {};
+    const owners = await this.#braidDetail.describeOwners({
+      ownerProjectIds: totals.map((owner) => owner.ownerProjectId),
+      viewerUserId: input.viewerUserId,
+    });
+    return {
+      braided: braidedTraceSummaryOf({
+        header: input.header,
+        owners,
+        totals,
+        canSeeCosts: input.canSeeCosts,
+      }),
+    };
   }
 
   /** One trace's summary fold, read from the named member when the header names one. */

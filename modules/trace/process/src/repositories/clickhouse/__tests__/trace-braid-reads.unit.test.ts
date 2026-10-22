@@ -12,6 +12,7 @@ import {
 import { describe, expect, it, vi } from "vitest";
 
 import { braidedProof, ownProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
+import { TraceBraidedTotalsService } from "../../../features/read/services/trace-braided-totals.service.ts";
 import type { BraidActivityRead } from "../../trace-braid-reads.repository.ts";
 import { TRACE_ID_INDEXES } from "../clickhouse.trace-id-indexes.database.ts";
 import { ClickHouseTraceBraidReadsRepository } from "../trace-braid-reads.repository.ts";
@@ -207,6 +208,79 @@ describe("ClickHouseTraceBraidReadsRepository", () => {
       expect(fencedProjects(read())).toEqual([OWNER]);
       expect(read().params).toMatchObject({ traceId: "trace-1", braid_0v: "web" });
       expect(read().sql).not.toContain("'web'");
+    });
+  });
+
+  describe("when the trace header sums one trace's spans", () => {
+    const rows = [
+      { TenantId: READER, HasCost: 0, SpanCount: "4", StartMs: "1000", EndMs: "1500", Cost: 0 },
+      {
+        TenantId: OWNER,
+        HasCost: 1,
+        SpanCount: "2",
+        StartMs: "1100",
+        EndMs: "1900",
+        InputTokens: 30,
+        OutputTokens: 7,
+        Cost: 0.2,
+      },
+      {
+        TenantId: OWNER,
+        HasCost: 0,
+        SpanCount: "1",
+        StartMs: "1200",
+        EndMs: "1300",
+        InputTokens: 10,
+        OutputTokens: 5,
+        Cost: 0,
+        Model: "gpt-5-mini",
+        ResponseModel: "",
+        CacheReadTokens: 3,
+      },
+    ];
+
+    it("reads through the reader's braided fence, grouped by project, the condition bound", async () => {
+      const { repo, read } = braidReads(rows);
+
+      const groups = await repo.sumSpansInTrace({
+        authorization: braidedProof({
+          projectId: READER,
+          braids: [{ owner: OWNER, compiledWhere: WEB }],
+        }),
+        traceId: "trace-1",
+      });
+
+      expect(read().sql).toMatch(/GROUP BY TenantId, HasCost/);
+      expect(read().sql).toContain("{tenantScope_c0_ids:Array(String)}");
+      expect(read().sql).not.toMatch(/TenantId\s*(=|IN)\s*\{(?!tenantScope)/);
+      expect(read().sql).not.toMatch(/'(web|orchestrator)'/);
+      expect(read().params).toMatchObject({ traceId: "trace-1" });
+      expect(groups.filter((group) => group.tenantId === OWNER)).toEqual([
+        expect.objectContaining({ spanCount: 2, explicitCost: 0.2, costInput: null }),
+        expect.objectContaining({
+          spanCount: 1,
+          explicitCost: 0,
+          costInput: expect.objectContaining({
+            model: "gpt-5-mini",
+            promptTokens: 10,
+            completionTokens: 5,
+            attrs: expect.objectContaining({ "gen_ai.usage.cache_read.input_tokens": 3 }),
+          }),
+        }),
+      ]);
+    });
+
+    it("sends no statement for a proof without braids", async () => {
+      const { repo, read } = braidReads(rows);
+      const service = TraceBraidedTotalsService.create({ reads: repo, prices: null });
+
+      const totals = await service.ownerTotals({
+        authorization: ownProof({ projectId: READER }),
+        traceId: "trace-1",
+      });
+
+      expect(totals).toEqual([]);
+      expect(() => read()).toThrow("no braid statement was sent");
     });
   });
 });

@@ -548,6 +548,15 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
           traceReadMapperPorts.contentPrivacy,
         ),
         projectId: summary.tenantId,
+        ...(await app.readBraidedHeaderTotals({
+          authorization,
+          traceId: input.traceId,
+          tenantId: summary.tenantId,
+          occurredAtMs: input.occurredAtMs,
+          viewerUserId: actor.id,
+          header,
+          canSeeCosts: memberProtections.canSeeCosts === true,
+        })),
       };
     })
 

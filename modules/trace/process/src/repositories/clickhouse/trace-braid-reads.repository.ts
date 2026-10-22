@@ -21,6 +21,7 @@ import {
   type BraidActivityRead,
   type BraidConditionRead,
   type BraidOwnerTraceCounts,
+  type TraceSpanTotalsGroup,
 } from "../trace-braid-reads.repository.ts";
 import type { TraceSpanSummaryRecord } from "../trace-projected-read.repository.ts";
 import { ClickHouseTraceSpanRepository } from "./trace-span.repository.ts";
@@ -41,6 +42,45 @@ type VerifiedParts =
   | { kind: "signed"; rest: CompiledWhere | undefined; verified: CompiledWhere };
 
 /** The span versions an attribute key read samples, newest partitions first. */
+/** A span attribute read as a column; the key is fixed text, never a caller's value. */
+const attribute = (key: string) => `SpanAttributes['${key}']`;
+const attributeNumber = (key: string) => `toFloat64OrZero(${attribute(key)})`;
+/** The attributes a span is priced by that group spans together: one rate per group. */
+const PRICE_KEYS = [
+  ["gen_ai.request.model", "Model"],
+  ["gen_ai.response.model", "ResponseModel"],
+  ["langwatch.model.inputCostPerToken", "CustomInputRate"],
+  ["langwatch.model.outputCostPerToken", "CustomOutputRate"],
+  ["langwatch.model.cacheReadCostPerToken", "CustomCacheReadRate"],
+  ["langwatch.model.cacheCreationCostPerToken", "CustomCacheCreationRate"],
+  ["langwatch.model.cacheCreation1hCostPerToken", "CustomCacheCreation1hRate"],
+] as const;
+/** The counts a price multiplies, summed per group: the cost is linear in each under one rate. */
+const PRICE_COUNTS = [
+  ["gen_ai.usage.cache_read.input_tokens", "CacheReadTokens"],
+  ["gen_ai.usage.cache_creation.input_tokens", "CacheCreationTokens"],
+  ["gen_ai.usage.cache_creation_1h.input_tokens", "CacheCreation1hTokens"],
+  ["gen_ai.usage.input_chars", "InputChars"],
+  ["gen_ai.usage.audio_seconds", "AudioSeconds"],
+  ["gen_ai.usage.input_audio_tokens", "InputAudioTokens"],
+  ["gen_ai.usage.output_audio_tokens", "OutputAudioTokens"],
+  ["langwatch.span.cost", "SpanCost"],
+] as const;
+const total = z.coerce.number().catch(0);
+const spanTotalsRowsSchema = z.array(
+  z
+    .looseObject({
+      TenantId: z.string(),
+      HasCost: z.coerce.number(),
+      SpanCount: count,
+      StartMs: z.coerce.number(),
+      EndMs: z.coerce.number(),
+      InputTokens: total,
+      OutputTokens: total,
+      Cost: total,
+    })
+    .catchall(z.unknown()),
+);
 const ATTRIBUTE_KEY_SAMPLE_ROWS = 50_000;
 const MAX_TEST_TRACE_SPANS = 10_000;
 
@@ -262,6 +302,59 @@ export class ClickHouseTraceBraidReadsRepository extends TraceBraidReadsReposito
     );
   }
 
+  async sumSpansInTrace(input: {
+    authorization: Authorization;
+    traceId: string;
+    occurredAtMs?: number | undefined;
+  }): Promise<TraceSpanTotalsGroup[]> {
+    const client = this.clickhouse.as(input.authorization, { reads: "spans" });
+    const keys = PRICE_KEYS.map(([key, name]) => `${attribute(key)} AS ${name}`);
+    const counts = PRICE_COUNTS.map(([key, name]) => `sum(${attributeNumber(key)}) AS ${name}`);
+    const result = await client.query({
+      query: `
+        SELECT TenantId,
+          ${attributeNumber("gen_ai.usage.cost")} > 0 AS HasCost,
+          ${attributeNumber("langwatch.span.cost")} > 0 AS HasSpanCost,
+          ${keys.join(",\n          ")},
+          count() AS SpanCount,
+          min(toUnixTimestamp64Milli(StartTime)) AS StartMs,
+          max(toUnixTimestamp64Milli(EndTime)) AS EndMs,
+          sum(${attributeNumber("gen_ai.usage.input_tokens")}) AS InputTokens,
+          sum(${attributeNumber("gen_ai.usage.output_tokens")}) AS OutputTokens,
+          sum(${attributeNumber("gen_ai.usage.cost")}) AS Cost,
+          ${counts.join(",\n          ")}
+        FROM stored_spans
+        WHERE ${tenantScopeWithConditions("StartTime")} AND TraceId = {traceId:String}
+          {{idBound:stored_spans.TraceId:traceId}}
+          AND (TenantId, TraceId, SpanId, UpdatedAt) IN (
+            SELECT TenantId, TraceId, SpanId, max(UpdatedAt)
+            FROM stored_spans
+            WHERE ${tenantScope("StartTime")} AND TraceId = {traceId:String}
+              {{idBound:stored_spans.TraceId:traceId}}
+            GROUP BY TenantId, TraceId, SpanId
+          )
+        GROUP BY TenantId, HasCost, HasSpanCost, ${PRICE_KEYS.map(([, name]) => name).join(", ")}
+      `,
+      query_params: { traceId: input.traceId },
+      format: "JSONEachRow",
+      idBound: {
+        occurredAtHint: input.occurredAtMs ?? null,
+        fallback: "unbounded",
+        openEnded: true,
+      },
+    });
+    return spanTotalsRowsSchema.parse(await result.json()).map((row) => ({
+      tenantId: row.TenantId,
+      spanCount: row.SpanCount,
+      startMs: row.StartMs,
+      endMs: row.EndMs,
+      inputTokens: row.InputTokens,
+      outputTokens: row.OutputTokens,
+      explicitCost: row.HasCost === 1 ? row.Cost : 0,
+      costInput: row.HasCost === 1 ? null : costInputOf(row),
+    }));
+  }
+
   async findOwnerSpansMarked(input: {
     authorization: Authorization;
     traceId: string;
@@ -299,6 +392,21 @@ export class ClickHouseTraceBraidReadsRepository extends TraceBraidReadsReposito
       authorization: input.authorization,
     }).map((record, index) => ({ ...record, braided: flags[index]?.Braided === 1 }));
   }
+}
+
+/** A group's pricing inputs, in the shape the tree prices one span by. */
+function costInputOf(row: Record<string, unknown>): TraceSpanTotalsGroup["costInput"] {
+  const text = (name: string) =>
+    typeof row[name] === "string" && row[name] !== "" ? row[name] : undefined;
+  const attrs: Record<string, unknown> = {};
+  for (const [key, name] of PRICE_KEYS) attrs[key] = text(name);
+  for (const [key, name] of PRICE_COUNTS) attrs[key] = total.parse(row[name]) || undefined;
+  return {
+    attrs,
+    model: text("ResponseModel") ?? text("Model"),
+    promptTokens: total.parse(row.InputTokens),
+    completionTokens: total.parse(row.OutputTokens),
+  };
 }
 
 /** One `a<i>` column per braid: its window and condition, every literal bound under `a<i>`. */

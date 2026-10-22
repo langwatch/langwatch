@@ -114,7 +114,7 @@ import type {
   TraceMetadataUpdate,
 } from "./trace-rest.schemas.ts";
 import type { SharedTraceDto } from "./trace-share.schemas.ts";
-import type { SpanDetail, SpanLangwatchSignals } from "./trace-view.contract.ts";
+import type { SpanDetail, SpanLangwatchSignals, TraceHeader } from "./trace-view.contract.ts";
 import type { Protections } from "./trace-viewer-protections.contract.ts";
 import type {
   SpanTreeDeltaInput,
@@ -829,6 +829,16 @@ export interface TraceApi extends TraceOtlpIngestApi {
     traceId: string;
     tenantId?: string | undefined;
   }): Promise<Authorization>;
+  /** The header's `braided` totals and owners; `{}` for a trace or proof without braids. */
+  readBraidedHeaderTotals(input: {
+    authorization: Authorization;
+    traceId: string;
+    tenantId: string;
+    occurredAtMs?: number | undefined;
+    viewerUserId: string;
+    header: TraceHeader;
+    canSeeCosts: boolean;
+  }): Promise<Pick<TraceHeader, "braided">>;
   readTraceSummary(input: {
     authorization: Authorization;
     traceId: string;

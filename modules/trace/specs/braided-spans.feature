@@ -82,6 +82,13 @@ Feature: Braided spans in the reader's traces
       When sam opens that span
       Then its input is read from where "specialists" stored it
 
+    @unit
+    Scenario: Selecting a braided span reads it from its owner
+      Given "orchestrator" and "specialists" each hold spans in one trace
+      When sam selects a "specialists" span in the trace
+      Then the span is read from "specialists"
+      And selecting a span id that "orchestrator" also holds reads the "orchestrator" span
+
   Rule: Each span keeps its owner's privacy
 
     @integration
@@ -100,7 +107,7 @@ Feature: Braided spans in the reader's traces
 
   Rule: The trace view says where each span came from
 
-    @integration @unimplemented
+    @integration
     Scenario: A braided span carries a badge naming its owning project
       When sam opens a trace holding braided spans
       Then each braided span carries a badge reading "Specialists"
@@ -137,7 +144,7 @@ Feature: Braided spans in the reader's traces
       Then no link to open it in "specialists" is offered
       And a viewer who can read "specialists" is offered that link
 
-    @integration @unimplemented
+    @integration
     Scenario: The trace header's totals include braided spans and say so
       Given an "orchestrator" trace holding braided spans with their own cost and tokens
       When sam opens the trace

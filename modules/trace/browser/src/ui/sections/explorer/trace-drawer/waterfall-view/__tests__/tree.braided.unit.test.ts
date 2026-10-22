@@ -1,3 +1,4 @@
+import { featureProjectColour } from "@langwatch/design-system/feature-project-colour";
 import type { BraidedOwner, SpanTreeNode } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
@@ -107,11 +108,12 @@ describe("braidStrandFor", () => {
   });
 
   describe("given a braided span", () => {
-    it("takes the owner's name and the strand colour of its place in the header", () => {
-      expect(braidStrandFor({ ownerProjectId: "search", owners })).toEqual({
+    it("takes the owner's name and the colour the Braids page gives its project", () => {
+      const strand = braidStrandFor({ ownerProjectId: "search", owners: [owners[1]!] });
+      expect(strand).toEqual({
         ownerProjectId: "search",
         ownerName: "Search",
-        colour: "feature.braids.project.2",
+        colour: featureProjectColour({ feature: "braids", projectId: "search" }).fill,
       });
     });
   });
