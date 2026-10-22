@@ -189,7 +189,9 @@ describe("given a Reports board and a Dashboards board holding a widget", () => 
         placed: { status: 200, dashboardId: boardId },
       });
     });
+  });
 
+  describe("when an API key deletes a Dashboards board", () => {
     /** @scenario "AC199n Split: the public API creates and deletes Dashboards boards" */
     it("deletes it with its widgets, then answers it as not found", async () => {
       const { widget, send } = await projectWithBothBoards();
