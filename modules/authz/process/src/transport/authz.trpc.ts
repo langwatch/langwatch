@@ -8,7 +8,9 @@ import {
   authzBraidRemovedSchema,
   authzBraidSchema,
   authzChangeBraidInputSchema,
+  authzBraidTargetsSchema,
   authzCountProjectMembersHoldingInputSchema,
+  authzListBraidTargetsInputSchema,
   authzCreateBraidInputSchema,
   authzListBraidsInputSchema,
   authzProjectMembersHoldingSchema,
@@ -104,6 +106,10 @@ export const authzTrpc = defineTrpcContract("authz")
   .query("countProjectTraceViewers")
   .withInput(authzCountProjectMembersHoldingInputSchema.pick({ projectId: true }))
   .withOutput(authzProjectMembersHoldingSchema)
+
+  .query("listBraidTargets")
+  .withInput(authzListBraidTargetsInputSchema.omit({ caller: true }))
+  .withOutput(authzBraidTargetsSchema)
   .build();
 
 /** The session as the escalation ceiling: a person, or the key a CLI session arrived on. */
@@ -231,5 +237,12 @@ export const authzTrpcTransport: TrpcRouterDeclaration<AuthzApi, typeof authzTrp
     .withPermission("traces:view", { via: "projectId" })
     .handle(async ({ app, input }) =>
       app.countProjectMembersHolding({ ...input, permission: "traces:view" }),
+    )
+
+    /** ADR-183 §2: the braid dialog's picker, decided for the viewer in one batch. */
+    .procedure("listBraidTargets")
+    .withPermission("braids:manage", { via: "projectId" })
+    .handle(async ({ app, input, actor }) =>
+      app.listBraidTargets({ ...input, caller: callerOf(actor) }),
     )
     .build();

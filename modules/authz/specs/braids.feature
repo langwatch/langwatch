@@ -371,6 +371,26 @@ Feature: Braids
       When the number of people who will see spans braided into "orchestrator" is asked for
       Then the route declares traces:view at "orchestrator" before it answers
 
+  Rule: The braid dialog offers only projects whose traces the viewer can read
+
+    @unit
+    Scenario: The picker decides every listed project for the viewer at once
+      Given "specialists", "orchestrator" and an aggregate project "rollup" in ana's organisation
+      When ana, an organisation admin, asks where a braid from "specialists" may go
+      Then "orchestrator" may be picked
+      And "specialists" is refused as the braid's own project and "rollup" as an aggregate
+
+    @unit
+    Scenario: Projects whose traces the viewer cannot read are left out
+      Given tom is an admin of the team holding "specialists" only
+      When tom asks where a braid from "specialists" may go
+      Then "orchestrator" is left out, and so is a project of another organisation
+
+    @unit
+    Scenario: Only someone who may braid from a project may ask where it can braid into
+      When the projects a braid from "specialists" may go into are asked for
+      Then the route declares braids:manage at "specialists" before it answers
+
   Rule: Every braid change and every read through a braid is audited
 
     @integration @unimplemented

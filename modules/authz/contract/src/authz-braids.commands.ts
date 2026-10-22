@@ -97,6 +97,42 @@ export const authzProjectMembersHoldingSchema: AuthzProjectMembersHoldingSchema 
   authzProjectMembersHoldingSchemaDefinition;
 export type AuthzProjectMembersHolding = z.infer<typeof authzProjectMembersHoldingSchema>;
 
+/** Projects a braid dialog's picker asks about at most; the host lists the organisation's. */
+export const BRAID_TARGETS_LIMIT = 500;
+
+/** Which of `projectIds` the caller may braid `projectId` into, decided in one batch. */
+const authzListBraidTargetsInputSchemaDefinition = z
+  .object({
+    projectId: z.string().min(1),
+    projectIds: z.array(z.string().min(1)).max(BRAID_TARGETS_LIMIT),
+    caller: authzPrincipalRefSchema,
+  })
+  .strict();
+export interface AuthzListBraidTargetsInputSchema extends Named<
+  typeof authzListBraidTargetsInputSchemaDefinition
+> {}
+export const authzListBraidTargetsInputSchema: AuthzListBraidTargetsInputSchema =
+  authzListBraidTargetsInputSchemaDefinition;
+export type AuthzListBraidTargetsInput = z.infer<typeof authzListBraidTargetsInputSchema>;
+
+/** Why a listed project cannot be braided into: the braid's own project, or an aggregate. */
+export const braidTargetRefusalSchema = z.enum(["this_project", "aggregate"]);
+export type BraidTargetRefusal = z.infer<typeof braidTargetRefusalSchema>;
+
+/** The asked projects whose traces the caller can read, in the order asked; the rest left out. */
+const authzBraidTargetsSchemaDefinition = z.array(
+  z
+    .object({
+      projectId: z.string(),
+      selectable: z.boolean(),
+      reason: braidTargetRefusalSchema.optional(),
+    })
+    .strict(),
+);
+export interface AuthzBraidTargetsSchema extends Named<typeof authzBraidTargetsSchemaDefinition> {}
+export const authzBraidTargetsSchema: AuthzBraidTargetsSchema = authzBraidTargetsSchemaDefinition;
+export type AuthzBraidTargets = z.infer<typeof authzBraidTargetsSchema>;
+
 /** One live braid as both projects' settings show it. */
 const authzBraidSchemaDefinition = z
   .object({

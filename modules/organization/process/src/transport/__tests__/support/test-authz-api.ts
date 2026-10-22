@@ -301,4 +301,5 @@ export class TestAuthzApi implements AuthzApi {
   countProjectMembersHolding = unsupported<AuthzApi["countProjectMembersHolding"]>(
     "countProjectMembersHolding",
   );
+  listBraidTargets = unsupported<AuthzApi["listBraidTargets"]>("listBraidTargets");
 }

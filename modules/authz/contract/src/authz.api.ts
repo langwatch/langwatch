@@ -217,6 +217,8 @@ export interface AuthzApi {
   countProjectMembersHolding(
     args: Braids.AuthzCountProjectMembersHoldingInput,
   ): Promise<Braids.AuthzProjectMembersHolding>;
+  /** The braid dialog's picker: which projects the caller may braid into, one batched decision. */
+  listBraidTargets(args: Braids.AuthzListBraidTargetsInput): Promise<Braids.AuthzBraidTargets>;
   changeBindingRole(
     args: Commands.AuthzChangeBindingRoleInput,
   ): Promise<Commands.AuthzChangeBindingRoleOutput>;

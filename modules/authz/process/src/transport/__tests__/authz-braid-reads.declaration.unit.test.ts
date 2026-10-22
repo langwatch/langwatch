@@ -36,4 +36,15 @@ describe("the braid dialog's reads", () => {
       });
     });
   });
+
+  describe("when the dialog lists the projects a braid may go into", () => {
+    /** @scenario "Only someone who may braid from a project may ask where it can braid into" */
+    it("declares braids:manage at the project the braid starts from", () => {
+      expect(declaredAccess().get("listBraidTargets")).toMatchObject({
+        kind: "permission",
+        permission: "braids:manage",
+        via: "projectId",
+      });
+    });
+  });
 });
