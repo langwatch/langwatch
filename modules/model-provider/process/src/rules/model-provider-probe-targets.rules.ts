@@ -62,6 +62,10 @@ export const NOT_PROBEABLE: ReadonlySet<string> = new Set([
   "vertex_ai",
   "azure",
   "azure_safety",
+  // Decision model providers have no models list to probe (ADR-182).
+  "inception",
+  "perplexity",
+  "cloudflare",
 ] as const);
 
 /**

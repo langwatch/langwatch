@@ -29,8 +29,8 @@ describe("buildRollupTimeseriesQuery", () => {
     expect(sql).toContain("FROM trace_analytics_rollup");
   });
 
-  it("filters on TenantId first", () => {
-    expect(sql).toMatch(/WHERE\s+ra\.TenantId\s*=\s*\{tenantId:String\}/);
+  it("leads with the proof's fence on BucketStart", () => {
+    expect(sql).toMatch(/WHERE\s+\{\{tenantScope:BucketStart\}\}/);
   });
 
   it("filters on the partition column BucketStart for partition pruning", () => {
@@ -48,8 +48,9 @@ describe("buildRollupTimeseriesQuery", () => {
     expect(sql).not.toContain("group_key");
   });
 
-  it("passes tenantId via the params object", () => {
-    expect(params.tenantId).toBe("tenant-rollup");
+  it("names no tenant of its own, leaving the fence to pick them", () => {
+    expect(params).not.toHaveProperty("tenantId");
+    expect(sql).not.toMatch(/TenantId\s*=/);
   });
 
   describe("when the series is an ungrouped avg on completion_time", () => {
@@ -138,8 +139,9 @@ describe("buildSlimTimeseriesQuery", () => {
     expect(sql).not.toMatch(/SELECT\s+\*/);
   });
 
-  it("filters on TenantId first", () => {
-    expect(sql).toMatch(/ta\.TenantId\s*=\s*\{tenantId:String\}/);
+  it("fences both the dedup and the outer read on OccurredAt", () => {
+    expect(sql.match(/\{\{tenantScope:OccurredAt\}\}/g)).toHaveLength(2);
+    expect(sql).not.toMatch(/TenantId\s*=/);
   });
 
   /**

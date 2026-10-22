@@ -153808,6 +153808,11 @@ type GetApiModelDefaultsResponse struct {
 				Scope  *string `json:"scope"`
 				Source string  `json:"source"`
 			} `json:"FAST"`
+			INSTANTEVALS *struct {
+				Model  string  `json:"model"`
+				Scope  *string `json:"scope"`
+				Source string  `json:"source"`
+			} `json:"INSTANT_EVALS"`
 		} `json:"effective"`
 		Scope struct {
 			OrganizationId   *string `json:"organizationId"`
@@ -184101,6 +184106,11 @@ func ParseGetApiModelDefaultsResponse(rsp *http.Response) (*GetApiModelDefaultsR
 					Scope  *string `json:"scope"`
 					Source string  `json:"source"`
 				} `json:"FAST"`
+				INSTANTEVALS *struct {
+					Model  string  `json:"model"`
+					Scope  *string `json:"scope"`
+					Source string  `json:"source"`
+				} `json:"INSTANT_EVALS"`
 			} `json:"effective"`
 			Scope struct {
 				OrganizationId   *string `json:"organizationId"`

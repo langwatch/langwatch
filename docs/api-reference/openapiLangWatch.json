@@ -76495,12 +76495,43 @@
                               "type": "null"
                             }
                           ]
+                        },
+                        "INSTANT_EVALS": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "model": {
+                                  "type": "string"
+                                },
+                                "source": {
+                                  "type": "string"
+                                },
+                                "scope": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "model",
+                                "source",
+                                "scope"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
                         "DEFAULT",
                         "FAST",
-                        "EMBEDDINGS"
+                        "EMBEDDINGS",
+                        "INSTANT_EVALS"
                       ],
                       "additionalProperties": false
                     },
@@ -76785,7 +76816,7 @@
             }
           }
         },
-        "description": "Create a default-model config attached to one or more scopes. JSON keys may be roles (DEFAULT, FAST, LANGY, EMBEDDINGS) or registered feature keys; missing keys inherit from a higher scope.",
+        "description": "Create a default-model config attached to one or more scopes. JSON keys may be roles (DEFAULT, FAST, LANGY, EMBEDDINGS, INSTANT_EVALS) or registered feature keys; missing keys inherit from a higher scope.",
         "security": [
           {
             "project_api_key": []

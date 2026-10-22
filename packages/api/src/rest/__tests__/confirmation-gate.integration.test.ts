@@ -143,7 +143,10 @@ const router = defineRestRouter(RecordsApi)
     resource: "evaluator",
     action: "delete",
     idParam: "id",
-    name: ({ app, id }) => app.nameOf(id),
+    name: ({ app, id, ownerUserId }) => {
+      namedFor.push(ownerUserId);
+      return app.nameOf(id);
+    },
   })
   .withOutput(z.object({ removed: z.string() }))
   .handle(async ({ app, input }) => {
@@ -222,6 +225,8 @@ let refunded: number;
 let failWith: Error | undefined;
 let refundFailures: { refundError: unknown; routeError: unknown }[] = [];
 let asked: { request: RestConfirmationRequest; names: (string | null | undefined)[] }[];
+/** Whom each name was read for: the key's owner, so a record only they see still gets a card. */
+let namedFor: (string | null)[];
 
 const app: RecordsApi = {
   remove: async () => {
@@ -297,6 +302,7 @@ beforeEach(() => {
   failWith = undefined;
   refundFailures = [];
   asked = [];
+  namedFor = [];
 });
 
 describe("a route marked as removing something", () => {
@@ -323,6 +329,7 @@ describe("a route marked as removing something", () => {
           names: ["Record ev-1"],
         },
       ]);
+      expect(namedFor).toEqual(["user-1"]);
     });
   });
 

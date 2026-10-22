@@ -19,7 +19,9 @@ import {
   deleteMigratedTenantRows,
   startMigratedClickHouse,
 } from "../../../__tests__/migrated-clickhouse.harness.ts";
+import { analyticsProof } from "../../__tests__/analytics-proof.fixture.ts";
 import { ClickHouseAnalyticsRepository } from "../clickhouse.analytics.repository.ts";
+import { clickHouseQueryClientOver } from "./support/clickhouse-query-client.support.ts";
 
 const tenantId = `test-monitor-rate-${randomUUID()}`;
 const SEEDED_TABLES = ["trace_summaries", "evaluation_runs"] as const;
@@ -127,7 +129,7 @@ function read({
 }): Promise<AnalyticsTimeseriesResult> {
   return repository.runTimeseries({
     table: "trace_summaries",
-    tenantId,
+    authorization: analyticsProof({ projectId: tenantId }),
     input: {
       projectId: tenantId,
       startDate: START_DATE.getTime(),
@@ -151,7 +153,9 @@ function bucketFor(result: AnalyticsTimeseriesResult, day: string) {
 
 beforeAll(async () => {
   client = (await startMigratedClickHouse()).client;
-  repository = ClickHouseAnalyticsRepository.create({ resolveClient: async () => client });
+  repository = ClickHouseAnalyticsRepository.create({
+    clickhouse: clickHouseQueryClientOver(client),
+  });
 
   await deleteMigratedTenantRows({ client, tenantId, tables: SEEDED_TABLES });
 
