@@ -44,6 +44,8 @@ test_access_enabled_wires_sidecar() {
   grep -q 'secretName: metabase-passwords' <<<"$out" || fail "password Secret volume missing"
   helm template t . -f tests/values-access.yaml --show-only templates/access-configmap.yaml \
     | grep -q 'subject: system:serviceaccount:monitoring:grafana' || fail "access.yaml not rendered into the ConfigMap"
+  helm template t . -f tests/values-access.yaml --show-only templates/access-configmap.yaml \
+    | grep -q 'ca.crt: "-----BEGIN CERTIFICATE-----' || fail "extraFiles not rendered into the ConfigMap"
   echo "PASS: access enabled wires the sidecar"
 }
 
