@@ -66,6 +66,15 @@ packages = ["langevals"]
 
 [tool.uv]
 exclude-newer = "7 days"
+# Emergency exceptions to the 7-day age gate (dev/docs/best_practices/
+# dependency-age-gates.md), each scoped by timestamp to the one patched
+# release a CRITICAL advisory needs. Pillow 13.0.0 (uploaded 2026-10-16)
+# closes 28 advisories, four of them critical; certifi 2026.10.19 (uploaded
+# 2026-10-20) closes GHSA-6q48-6c7w-9gw2 (critical). Remove both entries once
+# those uploads are older than 7 days (Pillow from 2026-10-24, certifi from
+# 2026-10-28): a timestamp here then holds the package back, not forward.
+required-version = ">=0.9.25"
+exclude-newer-package = { pillow = "2026-10-17T00:00:00Z", certifi = "2026-10-21T00:00:00Z" }
 override-dependencies = [
   # The langchain family is on the 1.x line, where the advisories affecting it
   # are fixed. Each floor is the highest first-patched version across the
@@ -105,8 +114,9 @@ override-dependencies = [
   # key collision (both CRITICAL), plus four further advisories fixed across
   # 1.83.7 / 1.83.10 / 1.83.14. 1.84.0 is the first release above all of them.
   "litellm>=1.84.0",
-  # Pillow: heap overflow / DoS across several decoders.
-  "pillow>=12.3.0",
+  # Pillow: heap overflow / DoS across several decoders, then 28 advisories
+  # covering <13.0.0, four of them critical.
+  "pillow>=13.0.0",
   # nltk unsafe deserialization in the pickle loader path, plus the advisories
   # closed in 3.10.1 and 3.10.3.
   "nltk>=3.10.3",
@@ -130,7 +140,11 @@ override-dependencies = [
   #
   # NOT fixed here, deliberately:
   #   ragas, diskcache: no patched release exists upstream yet.
-  #   nltk: one advisory covers <=3.10.3, the current release, with no fix.
+  #   nltk: GHSA-8mgp-746c-j5xp covers <=3.10.3 and names no fix. 3.10.4
+  #   (uploaded 2026-10-21) sandboxes the model-artifact paths it describes,
+  #   but it is inside the age gate, and langevals reaches nltk only through
+  #   rouge-score's stemmer, not the affected loaders. Raise the floor to
+  #   3.10.4 once it clears the gate on 2026-10-28.
 ]
 
 # Security floors that only need to raise a version. Constraints add to the
@@ -149,6 +163,7 @@ constraint-dependencies = [
   # open until instructor lifts that cap. Without this floor in range the
   # resolver satisfies a higher one by walking arize-phoenix back to 14.x.
   "pydantic-ai-slim>=2.30.0",
+  "certifi>=2026.10.19", # certifi advisory covering <2026.10.19 (GHSA-6q48-6c7w-9gw2, critical)
   "mcp>=1.30.0,!=2.0.*,!=2.1.*", # MCP SDK unbounded StreamableHTTP sessions, fixed in 1.30.0 and 2.2.0 (#2828)
 ]
 
