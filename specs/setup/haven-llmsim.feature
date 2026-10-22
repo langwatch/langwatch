@@ -144,14 +144,6 @@ Feature: llmsim, a local LLM provider stand-in run by haven
     When a "/tool" line names a tool the request does not offer
     Then the answer is plain text naming the tool and the offered ones, with no tool call
 
-  Scenario: llmsim answers the Instant Evals decision calls
-    Given haven up +llm sets INSTANT_EVAL_DECISION_BASE_URL to llmsim
-    When the judge posts a decision call in the OpenAI Decisions, Jev or Cloudflare wire
-    Then each question gets a seeded answer in that wire's shape, Cloudflare's inside its result envelope
-    And a queued nextJson is the next decision call's exact answer, once
-    And the call is recorded with its wire and only the last four characters of its key
-    And a forced error answers with that status, a 429 with Retry-After
-
   Scenario: The console lists recent calls and applies its settings
     When a client makes a chat completion
     Then the console's calls list shows it with its model, mode and tokens, and its detail shows the request and reply

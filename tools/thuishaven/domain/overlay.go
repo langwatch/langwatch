@@ -645,11 +645,6 @@ func LLMProviderEnv(resolved map[string]string, port int) []string {
 	if resolved["HAVEN_SEED_LLMSIM_BASE_URL"] == "" {
 		env = append(env, "HAVEN_SEED_LLMSIM_BASE_URL="+base)
 	}
-	// Instant Evals decision models call fixed provider URLs; outside production the judge swaps
-	// their origin for this one, and llmsim answers the paths (ADR-182).
-	if resolved["INSTANT_EVAL_DECISION_BASE_URL"] == "" {
-		env = append(env, "INSTANT_EVAL_DECISION_BASE_URL="+base)
-	}
 	for _, p := range []struct{ key, url, value string }{
 		{"OPENAI_API_KEY", "OPENAI_BASE_URL", base + "/v1"},
 		{"ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL", base},

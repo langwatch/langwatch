@@ -19,9 +19,6 @@ gets the same answer, at no cost. Code: `services/sims/llmsim`, console `apps/si
   for SSE, else a JSON array), the Vertex path `/v1/projects/<p>/locations/<l>/publishers/google/models/<m>:generateContent`,
   and Bedrock `POST /model/<modelId>/converse` and `/converse-stream` (AWS event stream; the
   AWS SDK works with any keys via `BaseEndpoint`). These wires name the model in the path.
-  Instant Evals decision calls: `POST /v1/decisions` (OpenAI Decisions or Jev), `/v1/systemone`
-  and Cloudflare's `/client/v4/accounts/<a>/ai/run/@cf/<m>`; haven's `INSTANT_EVAL_DECISION_BASE_URL`
-  sends them here. A call's detail holds the `answer` and a masked `auth` (last four of the key).
   Calls tab: filter, per-call detail, Clear calls. Settings tab: forced error, seed and the
   per-call override headers.
 - The loopback port is stable per stack (a slug hash in 21000-21999, probed if taken), so seeded providers survive `haven up` restarts.

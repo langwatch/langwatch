@@ -57,11 +57,6 @@ func (s *Server) takeNextJSON(req request) (string, bool) {
 	if req.schema == nil && !req.jsonObject {
 		return "", false
 	}
-	return s.popNextJSON()
-}
-
-// popNextJSON hands out the queued JSON answer once, to whichever call takes it.
-func (s *Server) popNextJSON() (string, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	next := s.set.NextJSON
@@ -95,9 +90,6 @@ type record struct {
 	Error        string          `json:"error,omitempty"`
 	Request      json.RawMessage `json:"request,omitempty"`
 	Response     *reply          `json:"response,omitempty"`
-	// Answer is a decision call's answer body; Auth its masked bearer token.
-	Answer json.RawMessage `json:"answer,omitempty"`
-	Auth   string          `json:"auth,omitempty"`
 }
 
 func recordedBody(raw []byte, limit int) json.RawMessage {
@@ -173,7 +165,7 @@ func (s *Server) serveConsoleAPI(w http.ResponseWriter, r *http.Request, path st
 func (s *Server) callSummaries() []record {
 	calls := s.calls.newest()
 	for i := range calls {
-		calls[i].Request, calls[i].Response, calls[i].Answer = nil, nil, nil
+		calls[i].Request, calls[i].Response = nil, nil
 	}
 	return calls
 }
