@@ -5,6 +5,7 @@
  * @see specs/lwql/aggregate-reads.feature
  * @vitest-environment node
  */
+import { LangWatchQLShadowedViewError } from "@langwatch/analytics-contract";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { LangWatchQLViewProvisioningService } from "../../features/provisioning/services/langwatch-ql-view-provisioning.service.ts";
@@ -39,6 +40,28 @@ const COUNT_BY_TENANT =
 describe("given an aggregate over project A for its whole history and project B from noon", () => {
   let harness: LangWatchQLClickHouseHarness;
   let service: LangWatchQLService;
+
+  function runOnAggregate(sql: string) {
+    const { tenantA, tenantB } = harness;
+    return service.executeForProjects({
+      projects: [
+        { id: tenantA.tenantId, lwqlKey: tenantA.rawSecret },
+        { id: tenantB.tenantId, lwqlKey: tenantB.rawSecret },
+      ],
+      memberWindows: [
+        { projectId: tenantA.tenantId, from: 0 },
+        { projectId: tenantB.tenantId, from: SHARED_FROM },
+      ],
+      protections: {
+        catalogue: EVERY_CATALOGUE_PERMISSION,
+        canSeeCosts: true,
+        canSeeCapturedInput: true,
+        canSeeCapturedOutput: true,
+      },
+      sql,
+      timeWindow: WINDOW,
+    });
+  }
 
   beforeAll(async () => {
     harness = await startLangWatchQLClickHouse({ suite: "aggregatewindows", facts: "migrated" });
@@ -169,6 +192,33 @@ describe("given an aggregate over project A for its whole history and project B 
       expect(result.rows.map((row) => [row.TenantId, Number(row.n)])).toEqual([
         [tenantB.tenantId, 1],
       ]);
+    });
+  });
+
+  describe("when ana counts traces beside a nested WITH", () => {
+    /** @scenario "A WITH name spelt like a narrowed view is refused" */
+    it.each([
+      [
+        "a subquery",
+        "SELECT count() AS n FROM traces " +
+          "WHERE 1 IN (WITH traces AS (SELECT 1 AS n) SELECT n FROM traces)",
+      ],
+      [
+        "a UNION branch",
+        "SELECT count() AS n FROM traces LIMIT 1 UNION ALL " +
+          "SELECT n FROM (WITH traces AS (SELECT 1 AS n) SELECT n FROM traces) LIMIT 1",
+      ],
+    ])("refuses a WITH in %s named like the view it hides", async (_case, sql) => {
+      await expect(runOnAggregate(sql)).rejects.toBeInstanceOf(LangWatchQLShadowedViewError);
+    });
+
+    it("counts project B's row from noon only when the nested WITH names no view", async () => {
+      const result = await runOnAggregate(
+        `SELECT count() AS n FROM traces WHERE TenantId = '${harness.tenantB.tenantId}' ` +
+          `AND ${IN_PERIOD} AND 1 IN (WITH t AS (SELECT 1 AS n) SELECT n FROM t)`,
+      );
+
+      expect(result.rows.map((row) => Number(row.n))).toEqual([1]);
     });
   });
 });

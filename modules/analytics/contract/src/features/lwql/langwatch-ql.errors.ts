@@ -475,6 +475,23 @@ export class LangWatchQLTableModifierError extends HandledError {
 }
 
 /**
+ * A `WITH` name spelt like a view the read keeps to a window. The rewrite finds views by name, so
+ * a name declared in one subquery could hide the view another part of the statement reads.
+ */
+export class LangWatchQLShadowedViewError extends HandledError {
+  declare readonly code: "lwql_view_shadowed";
+
+  constructor(input: { names: readonly string[] }) {
+    super("lwql_view_shadowed", "A WITH name cannot repeat a view's name on this read.", {
+      httpStatus: 400,
+      fault: "customer",
+      meta: { names: [...input.names] },
+    });
+    this.name = "LangWatchQLShadowedViewError";
+  }
+}
+
+/**
  * The shared LangWatchQL identity is already running as many statements as it
  * may (ClickHouse TOO_MANY_SIMULTANEOUS_QUERIES). Nothing is wrong with the
  * query: the same request succeeds moments later, so it is retryable.

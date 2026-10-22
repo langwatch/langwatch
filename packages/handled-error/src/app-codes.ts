@@ -516,6 +516,7 @@ export const APP_ERROR_CODES = [
   "lwql_unavailable",
   "lwql_unknown_identifier",
   "lwql_unparseable",
+  "lwql_view_shadowed",
   "malformed_request",
   "mcp_authorization_required",
   "mcp_grant_revoked",

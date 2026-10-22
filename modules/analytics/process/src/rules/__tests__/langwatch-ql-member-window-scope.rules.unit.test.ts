@@ -5,6 +5,7 @@
  */
 import {
   type LangWatchQLMemberWindow,
+  LangWatchQLShadowedViewError,
   LangWatchQLTableModifierError,
 } from "@langwatch/analytics-contract";
 import { describe, expect, it } from "vitest";
@@ -153,6 +154,36 @@ describe("scopeLangWatchQL with member windows", () => {
 
       expect(refusal).toBeInstanceOf(LangWatchQLTableModifierError);
       expect((refusal as LangWatchQLTableModifierError).meta).toEqual({ modifiers: [modifier] });
+    });
+
+    /** @scenario "A WITH name spelt like a narrowed view is refused" */
+    it.each([
+      [
+        "declared in a subquery the outer view sits beside",
+        "SELECT count() FROM traces WHERE 1 IN (WITH traces AS (SELECT 1 AS n) SELECT n FROM traces)",
+      ],
+      [
+        "declared in one branch of a UNION",
+        "SELECT count() FROM traces UNION ALL (WITH traces AS (SELECT 1 AS n) SELECT n FROM traces)",
+      ],
+      ["spelt in another case", "WITH Traces AS (SELECT 1 AS n) SELECT count() FROM traces"],
+    ])("refuses a WITH name %s, which would hide the view from the window", (_case, sql) => {
+      const refusal = captureRefusal(() => scope({ sql, memberWindows: [WHOLE_A, DATED_B] }));
+
+      expect(refusal).toBeInstanceOf(LangWatchQLShadowedViewError);
+      expect((refusal as LangWatchQLShadowedViewError).meta).toEqual({ names: ["traces"] });
+    });
+
+    it("narrows the outer view beside a nested WITH whose name is no view's", () => {
+      const scoped = scope({
+        sql: "SELECT count() FROM traces WHERE 1 IN (WITH t AS (SELECT 1 AS n) SELECT n FROM t)",
+        memberWindows: [WHOLE_A, DATED_B],
+      });
+
+      expect(scoped).toBe(
+        `SELECT count() FROM (SELECT * FROM traces WHERE ${MEMBERS}) AS traces ` +
+          "WHERE 1 IN (WITH t AS (SELECT 1 AS n) SELECT n FROM t)",
+      );
     });
   });
 

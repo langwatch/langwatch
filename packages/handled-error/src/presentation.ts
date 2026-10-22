@@ -534,6 +534,11 @@ const presentations = {
     describe: () =>
       "This read keeps each project to its own dates, and that can't be combined with FINAL or SAMPLE. The datasets already keep one row per item, so remove them and run it again.",
   },
+  lwql_view_shadowed: {
+    title: "A WITH name repeats a view's name",
+    describe: () =>
+      "This read keeps each project to its own dates, and finds the views it reads by name. Rename the WITH so it does not reuse a view's name, then run it again.",
+  },
   lwql_too_many_members: {
     title: "This aggregate reads too many projects",
     describe: () =>

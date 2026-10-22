@@ -79,6 +79,13 @@ Feature: LangWatchQL on an aggregate project reads its members inside their gran
     Then the run is refused saying FINAL and SAMPLE cannot be used on this read
     And no statement reaches the store
 
+  @unit @integration
+  Scenario: A WITH name spelt like a narrowed view is refused
+    Given project B is shared from a point in time
+    When ana runs a statement whose WITH, in any subquery, is named like a view it reads
+    Then the run is refused saying a WITH name cannot repeat a view's name
+    And project B's rows from before its start are not read
+
   @unit
   Scenario: App functions read text only from members shared for their whole history
     Given project B is shared from a point in time

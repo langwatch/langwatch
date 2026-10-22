@@ -3,6 +3,7 @@ import {
   type LangWatchQLCaller,
   type LangWatchQLMemberWindow,
   type LangWatchQLProtections,
+  LangWatchQLShadowedViewError,
   LangWatchQLTableModifierError,
   type LangWatchQLTimeWindow,
 } from "@langwatch/analytics-contract";
@@ -88,19 +89,43 @@ function collectNodes(value: unknown, type: string, found: SqlAstNode[]): SqlAst
   return found;
 }
 
-/** The view references in a parsed statement, last first, each once; `WITH` names are not views. */
-function findViewReferences({
-  statements,
-  database,
-}: {
-  statements: readonly SqlAstNode[];
-  database: string;
-}): ViewReference[] {
-  const cteNames = new Set(
+/** Every `WITH` name a parsed statement declares, in any subquery, lower-cased. */
+function findWithNames(statements: readonly SqlAstNode[]): ReadonlySet<string> {
+  return new Set(
     collectNodes(statements, "WithElement", []).flatMap(({ name }) =>
       typeof name === "string" ? [name.trim().toLowerCase()] : [],
     ),
   );
+}
+
+/**
+ * Refuses a `WITH` name spelt like a catalogued view. The names are gathered across the whole
+ * statement, not per scope, so one declared in a subquery would hide the view a sibling reads.
+ * @throws {LangWatchQLShadowedViewError} naming the views shadowed.
+ */
+function assertNoShadowedView({
+  withNames,
+  views,
+}: {
+  withNames: ReadonlySet<string>;
+  views: readonly LangWatchQLViewDefinition[];
+}): void {
+  const shadowed = views
+    .map((view) => view.name.toLowerCase())
+    .filter((name) => withNames.has(name));
+  if (shadowed.length > 0) throw new LangWatchQLShadowedViewError({ names: shadowed });
+}
+
+/** The view references in a parsed statement, last first, each once; `WITH` names are not views. */
+function findViewReferences({
+  statements,
+  database,
+  withNames,
+}: {
+  statements: readonly SqlAstNode[];
+  database: string;
+  withNames: ReadonlySet<string>;
+}): ViewReference[] {
   // By position, because the tree reaches a `WITH` body from more than one field.
   const byStart = new Map<number, ViewReference>();
   for (const node of collectNodes(statements, "TableIdentifier", [])) {
@@ -112,7 +137,7 @@ function findViewReferences({
     if (typeof end?.offset !== "number") continue;
     const qualifier = typeof written === "string" ? written : undefined;
     const bareName = name.trim().toLowerCase();
-    if (!qualifier && cteNames.has(bareName)) continue;
+    if (!qualifier && withNames.has(bareName)) continue;
     byStart.set(start.offset, {
       qualified: qualifyTableName({ table: name, database: qualifier, defaultDatabase: database }),
       ...(typeof alias === "string" ? {} : { impliedAlias: name }),
@@ -363,16 +388,20 @@ export function scopeLangWatchQL({
     isWindowed && memberWindows
       ? buildWindowPredicates({ views, database, memberWindows, timeWindow })
       : undefined;
-  const rewrites = findViewReferences({ statements: parsed.statements, database }).flatMap(
-    (reference) => {
-      const window =
-        windows === undefined ? undefined : (windows.get(reference.qualified) ?? NO_ROWS);
-      const predicate = [origins.get(reference.qualified), window]
-        .filter((part) => part !== undefined)
-        .join(" AND ");
-      return predicate === "" ? [] : [{ reference, predicate }];
-    },
-  );
+  const withNames = findWithNames(parsed.statements);
+  assertNoShadowedView({ withNames, views });
+  const rewrites = findViewReferences({
+    statements: parsed.statements,
+    database,
+    withNames,
+  }).flatMap((reference) => {
+    const window =
+      windows === undefined ? undefined : (windows.get(reference.qualified) ?? NO_ROWS);
+    const predicate = [origins.get(reference.qualified), window]
+      .filter((part) => part !== undefined)
+      .join(" AND ");
+    return predicate === "" ? [] : [{ reference, predicate }];
+  });
   assertNoTableModifiers({
     statements: parsed.statements,
     references: rewrites.map(({ reference }) => reference),
