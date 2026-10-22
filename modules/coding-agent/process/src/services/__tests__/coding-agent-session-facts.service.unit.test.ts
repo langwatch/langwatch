@@ -49,7 +49,7 @@ function factsOver({
     recorder: {
       recordSessionStored: record ?? (async (fact) => void recorded.push(fact)),
     },
-    ...(nowMs ? { nowMs } : {}),
+    clock: { nowMs: nowMs ?? Date.now },
   });
   return { service, recorded };
 }

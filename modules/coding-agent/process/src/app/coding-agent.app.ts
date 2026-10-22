@@ -215,6 +215,7 @@ export class CodingAgentModule implements CodingAgentApi {
         projects: dependencies.projects,
         sessions: repositories.sessions,
         recorder: milestones,
+        clock: SystemCodingAgentClockService.create(),
       }),
       sessionContextMemo: repositories.sessionContextMemo,
       sessionFoldCache: repositories.sessionFoldCache,

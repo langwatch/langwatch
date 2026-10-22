@@ -3,6 +3,7 @@ import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 
 import type { CodingAgentSessionRepository } from "../repositories/coding-agent-session.repository.ts";
+import type { CodingAgentClock } from "./coding-agent-clock.service.ts";
 import { CODING_AGENT_SESSION_SEEN_WINDOW_MS } from "./coding-agent-session-seen.service.ts";
 import type { StoredSession } from "./coding-agent-session-store.service.ts";
 
@@ -25,7 +26,7 @@ type FactsDependencies = Readonly<{
   projects: Pick<ProjectApi, "findById">;
   sessions: Pick<CodingAgentSessionRepository, "hasOtherSession">;
   recorder: CodingAgentSessionStoredRecorder;
-  nowMs: () => number;
+  clock: CodingAgentClock;
 }>;
 
 /**
@@ -37,18 +38,13 @@ export class CodingAgentSessionFactsService {
 
   private constructor(private readonly dependencies: FactsDependencies) {}
 
-  static create(input: {
-    projects: Pick<ProjectApi, "findById">;
-    sessions: Pick<CodingAgentSessionRepository, "hasOtherSession">;
-    recorder: CodingAgentSessionStoredRecorder;
-    nowMs?: () => number;
-  }): CodingAgentSessionFactsService {
-    return new CodingAgentSessionFactsService({ ...input, nowMs: input.nowMs ?? Date.now });
+  static create(dependencies: FactsDependencies): CodingAgentSessionFactsService {
+    return new CodingAgentSessionFactsService(dependencies);
   }
 
   async record(sessions: StoredSession[]): Promise<void> {
     try {
-      const now = this.dependencies.nowMs();
+      const now = this.dependencies.clock.nowMs();
       if (this.heldUntil.size >= HOLD_SWEEP_THRESHOLD) this.sweepExpiredHolds(now);
       const projectIsStamped = new Map<string, Promise<boolean>>();
       const due = this.claimDue({ sessions, now });

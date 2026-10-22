@@ -12,11 +12,7 @@ import type { UserApi } from "@langwatch/user-contract";
 import type { PostHogChannel } from "../channels/posthog.channel.ts";
 import type { NurturingClaimRepository } from "../repositories/nurturing-claim.repository.ts";
 import { fire as fireActivity } from "../rules/nurturing-activity-tracking-service.rules.ts";
-import {
-  fireCodingOrApp,
-  fireUsesCodingAgent,
-  isCodingOrAppSignal,
-} from "../rules/nurturing-coding-delivery.rules.ts";
+import { fireCodingOrApp, isCodingOrAppSignal } from "../rules/nurturing-coding-delivery.rules.ts";
 import { pickCustomerIoDebounce } from "../rules/nurturing-delivery-debounce.rules.ts";
 import {
   fireExperimentRan,
@@ -42,6 +38,7 @@ import {
 } from "../rules/nurturing-posthog-activation.rules.ts";
 import {
   fireIntegrationMethod,
+  fireUsesCodingAgent,
   integrationMethodFor,
 } from "../rules/nurturing-product-interest-service.rules.ts";
 import { firePromptCreated } from "../rules/nurturing-prompt-creation-service.rules.ts";
