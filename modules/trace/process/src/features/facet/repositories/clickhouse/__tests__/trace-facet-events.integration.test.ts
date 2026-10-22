@@ -372,6 +372,7 @@ describe.skipIf(!clickHouseConfigured)("events facet integration", () => {
 
       /** @scenario Listing event names does not read their payload values */
       it("exceeds the same budget with the single-pass shape it replaced", async () => {
+        expect(await runFacet(BUDGET)).toHaveLength(5);
         const former = forTenant({
           sql: formerSinglePassSql(facetQueries.buildTimeWhere("StartTime")),
           params: facetQueries.baseParams(ctx),
