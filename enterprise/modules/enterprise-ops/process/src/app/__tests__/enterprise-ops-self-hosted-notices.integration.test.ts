@@ -60,6 +60,10 @@ function heldNotices(touched: string[]) {
       held.push(row);
       return row;
     },
+    updateSelfHostedNotice: async ({ id, ...fields }) => {
+      touched.push("update");
+      return Object.assign(find(id), fields);
+    },
     publishSelfHostedNotice: async ({ id, operatorId }) => {
       touched.push("publish");
       const row = find(id);
@@ -131,6 +135,52 @@ describe("Cloud admin's notices to self-hosted installs", () => {
           ["selfHostedNotices.publish", draft.id, "user_olive"],
           ["selfHostedNotices.getAll", undefined, "user_olive"],
         ]);
+      });
+    });
+
+    describe("when they edit a published notice and then withdraw it", () => {
+      it("lists it withdrawn with the new title, and audits the edit and the withdrawal", async () => {
+        const { app, entries } = await build();
+        const draft = await app.createSelfHostedNotice({ ...notice, operator });
+        await app.publishSelfHostedNotice({ id: draft.id, operator });
+        entries.length = 0;
+
+        await app.updateSelfHostedNotice({
+          ...notice,
+          id: draft.id,
+          title: "Upgrade to 3.4.3",
+          fixedIn: "3.4.3",
+          operator,
+        });
+        await app.withdrawSelfHostedNotice({ id: draft.id, operator });
+        const listed = await app.findSelfHostedNotices({ operator });
+
+        expect(listed).toEqual([
+          expect.objectContaining({
+            id: draft.id,
+            status: "withdrawn",
+            title: "Upgrade to 3.4.3",
+          }),
+        ]);
+        expect(entries.slice(0, 2)).toEqual([
+          expect.objectContaining({
+            action: "selfHostedNotices.update",
+            targetId: draft.id,
+            userId: "user_olive",
+            args: expect.objectContaining({
+              id: draft.id,
+              title: "Upgrade to 3.4.3",
+              fixedIn: "3.4.3",
+            }),
+          }),
+          expect.objectContaining({
+            action: "selfHostedNotices.withdraw",
+            targetId: draft.id,
+            userId: "user_olive",
+            args: { id: draft.id },
+          }),
+        ]);
+        expect(entries.slice(0, 2).every((entry) => entry.error === undefined)).toBe(true);
       });
     });
   });
