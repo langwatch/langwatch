@@ -18,8 +18,9 @@ exclude-newer = "7 days"
 # Security fixes released inside the 7-day window above. Each entry admits one
 # package up to a fixed date, so the rest of the tree keeps the cooldown. Drop
 # an entry once its date is more than 7 days old (#8958). streamlit is here
-# because 1.66.1 is its first release that accepts Pillow 13.
-exclude-newer-package = { certifi = "2026-10-22T00:00:00Z", pillow = "2026-10-22T00:00:00Z", pypdf = "2026-10-22T00:00:00Z", streamlit = "2026-10-22T00:00:00Z" }
+# because 1.66.1 is its first release that accepts Pillow 13. Each date sits
+# just after the patched release, so nothing newer slips in.
+exclude-newer-package = { certifi = "2026-10-21T00:00:00Z", pillow = "2026-10-17T00:00:00Z", pypdf = "2026-10-18T00:00:00Z", streamlit = "2026-10-22T00:00:00Z" }
 
 # Transitive-dependency security pins. Keep these even when the importing
 # package isn't a direct dependency, so a future re-resolution can't silently

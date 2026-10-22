@@ -21,7 +21,7 @@ exclude-newer = "7 days"
 # Security fix released inside the 7-day window above, admitted up to a fixed
 # date so the rest of the tree keeps the cooldown. Drop it once the date is
 # more than 7 days old (#8958).
-exclude-newer-package = { certifi = "2026-10-22T00:00:00Z" }
+exclude-newer-package = { certifi = "2026-10-21T00:00:00Z" }
 
 # Transitive-dependency security pins. Keep these even when the importing
 # package isn't a direct dependency, so a future re-resolution can't silently
