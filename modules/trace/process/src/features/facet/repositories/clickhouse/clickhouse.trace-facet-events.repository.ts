@@ -22,7 +22,9 @@ class ClickHouseTraceFacetEventsRepository {
 
   /** Event names with counts, joined to the metric buckets of events carrying `event.metrics.*`
    * keys. Names read `Events.Name` alone; the map is read only where its keys subcolumn holds
-   * a metric key, gated in PREWHERE, so a granule without one never opens the values. */
+   * a metric key, gated in PREWHERE, so a granule without one never opens the values. A search
+   * filter's trace-scope subquery runs once per half: it reads light trace_summaries columns,
+   * cheap beside the heavy map a single pass would drag through the join. */
   buildEventsFacetQuery(ctx: FacetQueryContext): FacetQuery {
     const where = this.facetQueries.buildTimeWhere("StartTime", ctx);
     const prefixFilter = ctx.prefix ? "AND lower(name) ILIKE concat({prefix:String}, '%')" : "";

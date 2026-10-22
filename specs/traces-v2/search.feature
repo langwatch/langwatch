@@ -2508,6 +2508,12 @@ Rule: Event rows drill down into their metric values
     When the sidebar loads the Event name section
     Then the section loads with every event name and the vote drilldown
 
+  @regression @integration
+  Scenario: Listing event names does not read their payload values
+    Given most of the project's events carry large attribute payloads and no metric values
+    When the sidebar loads the Event name section
+    Then the read fits a memory budget that reading the payloads as well exceeds
+
   @unit @integration
   Scenario: Event metric values follow the same trace filter as the event name counts
     Given a search filter narrows the traces in view

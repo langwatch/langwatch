@@ -61,9 +61,11 @@ const NON_VOTING_SPANS = SPAN_COUNT - VOTING_SPANS;
 const UP_VOTES = Math.ceil(SPAN_COUNT / UP_VOTE_EVERY);
 const DOWN_VOTES = VOTING_SPANS - UP_VOTES;
 
-// Tight enough that reading every payload value OOMs, loose enough that the
-// gated read completes. Tuned against CH 25.10 on the seed above.
-const MEMORY_CAP = "40000000"; // 40 MB
+// Between what the two reads need. Measured on CH 25.10 with the seed above and one
+// thread: the split read peaks near 5.8 MiB, the former single pass near 29 MiB.
+const MEMORY_CAP = "16000000"; // 16 MB
+/** One thread, so peak read memory doesn't scale with the runner's core count. */
+const BUDGET = { max_memory_usage: MEMORY_CAP, max_threads: "1" };
 
 type FacetRow = {
   facet_value: string;
@@ -350,25 +352,25 @@ describe.skipIf(!clickHouseConfigured)("events facet integration", () => {
 
         // Some votes fall outside the filter, so an unscoped bucket would count more.
         expect(expected.up + expected.down).toBeLessThan(VOTING_SPANS);
-        expect(buckets).toEqual(
-          [
-            [`${VOTE_KEY}${EVENT_METRIC_SEP}-1`, expected.down],
-            [`${VOTE_KEY}${EVENT_METRIC_SEP}1`, expected.up],
-          ].toSorted((a, b) => Number(b[1]) - Number(a[1])),
-        );
+        // Compared as a map: equal counts tie, and the facet doesn't promise a tie order.
+        expect(Object.fromEntries(buckets ?? [])).toEqual({
+          [`${VOTE_KEY}${EVENT_METRIC_SEP}-1`]: expected.down,
+          [`${VOTE_KEY}${EVENT_METRIC_SEP}1`]: expected.up,
+        });
+        expect(buckets).toHaveLength(2);
       });
     });
 
     describe("when the memory budget is too tight to read every payload value", () => {
       /** @scenario The Event name section loads when events carry large payloads */
       it("still completes with the full answer", async () => {
-        const rows = await runFacet({ max_memory_usage: MEMORY_CAP });
+        const rows = await runFacet(BUDGET);
 
         expect(rows).toHaveLength(5);
         expect(rows.find((r) => r.facet_value === VOTE_EVENT)?.metric_values).toHaveLength(2);
       });
 
-      /** @scenario The Event name section loads when events carry large payloads */
+      /** @scenario Listing event names does not read their payload values */
       it("exceeds the same budget with the single-pass shape it replaced", async () => {
         const former = forTenant({
           sql: formerSinglePassSql(facetQueries.buildTimeWhere("StartTime")),
@@ -381,10 +383,10 @@ describe.skipIf(!clickHouseConfigured)("events facet integration", () => {
               query: former.sql,
               query_params: former.params,
               format: "JSONEachRow",
-              clickhouse_settings: { max_memory_usage: MEMORY_CAP },
+              clickhouse_settings: BUDGET,
             })
             .then((r) => r.json()),
-        ).rejects.toThrow(/memory limit exceeded/i);
+        ).rejects.toMatchObject({ code: "241" }); // MEMORY_LIMIT_EXCEEDED
       });
     });
   });
