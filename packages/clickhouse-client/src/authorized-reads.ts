@@ -236,7 +236,11 @@ export function conditionsExpression({
       picks.push(`(${windowed.sql})`);
       return;
     }
-    const predicate = predicateOf({ compiledWhere: clause.compiledWhere, name });
+    const predicate = predicateOf({
+      compiledWhere: clause.compiledWhere,
+      param: (part) => fenceParam(name(part)),
+      readerSlot: slot("reader", "String"),
+    });
     Object.assign(params, predicate.params);
     if (predicate.verifies) params[fenceParam("reader")] = braids.reader;
     picks.push(`(${windowed.sql} AND (${predicate.sql}))`);
@@ -247,13 +251,43 @@ export function conditionsExpression({
   };
 }
 
+/**
+ * A compiled condition rendered for a statement of a module's own, the braid preview's
+ * (ADR-183 §7): the fence's conjunction, every key and literal bound under `prefix`, and
+ * `Verified()` against `reader`. The prefix may not be the fence's own.
+ */
+export function braidConditionExpression({
+  compiledWhere,
+  reader,
+  prefix,
+}: {
+  compiledWhere: CompiledWhere;
+  reader: string;
+  prefix: string;
+}): { sql: string; params: Record<string, unknown> } {
+  if (!/^[A-Za-z][A-Za-z0-9]*$/.test(prefix) || prefix.startsWith(TENANT_SCOPE_PARAM_PREFIX)) {
+    throw new StatementScopeError({ kind: "reserved-param", param: prefix });
+  }
+  const predicate = predicateOf({
+    compiledWhere,
+    param: (part) => `${prefix}_${part}`,
+    readerSlot: `{${prefix}_reader:String}`,
+  });
+  const params = predicate.verifies
+    ? { ...predicate.params, [`${prefix}_reader`]: reader }
+    : predicate.params;
+  return { sql: `(${predicate.sql})`, params };
+}
+
 /** A compiled condition as one conjunction over the span's columns, each key and value bound. */
 function predicateOf({
   compiledWhere,
-  name,
+  param,
+  readerSlot,
 }: {
   compiledWhere: CompiledWhere;
-  name: (part: string) => string;
+  param: (part: string) => string;
+  readerSlot: string;
 }): { sql: string; params: Record<string, unknown>; verifies: boolean } {
   if (compiledWhere.version !== BRAID_CONDITION_COMPILER_VERSION) {
     throw new StatementScopeError({
@@ -264,8 +298,8 @@ function predicateOf({
   const params: Record<string, unknown> = {};
   let verifies = false;
   const bind = (part: string, value: string): string => {
-    params[fenceParam(name(part))] = value;
-    return slot(name(part), "String");
+    params[param(part)] = value;
+    return `{${param(part)}:String}`;
   };
   const termSql = (term: BraidConditionTerm, index: number): string => {
     switch (term.kind) {
@@ -279,7 +313,7 @@ function predicateOf({
         return `mapContains(SpanAttributes, ${bind(`${index}k`, term.key)})`;
       case "verified":
         verifies = true;
-        return `SpanAttributes[${bind(`${index}k`, `${VERIFIED_ATTRIBUTE_PREFIX}${term.key}`)}] = ${slot("reader", "String")}`;
+        return `SpanAttributes[${bind(`${index}k`, `${VERIFIED_ATTRIBUTE_PREFIX}${term.key}`)}] = ${readerSlot}`;
     }
   };
   const sql = braidConditionTermsOf(compiledWhere.tree).map(termSql).join(" AND ");

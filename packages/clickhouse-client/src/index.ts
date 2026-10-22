@@ -293,6 +293,7 @@ export { tenantScope, tenantScopeWithConditions, tenantSet } from "@langwatch/cl
 export { refuseOverBudget, STATEMENT_BYTE_BUDGET } from "./statementBudget.ts";
 export {
   AuthorizedClickHouse,
+  braidConditionExpression,
   conditionsExpression,
   expandFragment,
   expandStatement,
