@@ -202,8 +202,9 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
   static async create(setup: InstantEvalSetup): Promise<InstantEvalModule> {
     const repositories = setup.repositories;
     // A project on its own decision model judges through the leaf with its key (ADR-182).
+    const hosted = InstantEvalModule.judgeOf(setup);
     const judge = InstantEvalDecisionModelJudgeService.create({
-      hosted: InstantEvalModule.judgeOf(setup),
+      hosted,
       own: setup.channels.judges,
       decisionModels: setup.dependencies.modelProviders,
     });
@@ -320,8 +321,9 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
       access,
       optIns,
       classifications,
+      // The search bar stays on LangWatch's classifier whatever the column says (ADR-182).
       searchClassifications: InstantEvalClassifySearchService.create({
-        classifications,
+        classifications: InstantEvalClassifyService.create({ judge: hosted }),
         peers: {
           isReleased: (input) => access.isReleased(input),
           traces,
