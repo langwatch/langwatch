@@ -35,9 +35,18 @@ index 7f8ab40e591a03cffbb914d5bcd8f06702ae4619..c12172bcac562e1ed856cea8641fa3ca
  					};
  					return result;
 diff --git a/dist/chunks/index.DzobfTyw.js b/dist/chunks/index.DzobfTyw.js
-index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..6ffead6e98cf8aedfcc802b46738430d638049fb 100644
+index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..208b264d9da4d38ec90f32a97fa16754d31361fb 100644
 --- a/dist/chunks/index.DzobfTyw.js
 +++ b/dist/chunks/index.DzobfTyw.js
+@@ -6335,7 +6335,7 @@ class ModuleFetcher {
+ 		const importedUrls = this.getSerializedImports(moduleGraphModule);
+ 		const map = moduleGraphModule.transformResult?.map;
+ 		const mappings = map && !("version" in map) && map.mappings === "";
+-		const cachedResult = await this.cacheResult(result, cachePath, moduleGraphModule.transformResult, importedUrls, !!mappings);
++		const cachedResult = await this.cacheResult(result, cachePath, moduleGraphModule.transformResult, importedUrls, !!mappings, true);
+ 		// remember where the code is stored on disk so that repeat fetches and the
+ 		// `fetchWarmModules` snapshot can point at it in this session already, not
+ 		// only after the cache is read back in the next one
 @@ -6405,6 +6405,13 @@ class ModuleFetcher {
  		}
  		const cachedModule = await this.fsCache.getCachedModule(cachePath);
@@ -75,7 +84,22 @@ index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..6ffead6e98cf8aedfcc802b46738430d
  	async fetchAndProcess(environment, url, importer, moduleGraphModule, options) {
  		const result = processResultSource(environment, await fetchModule(environment, url, importer, {
  			...options,
-@@ -7107,6 +7130,23 @@ const METADATA_FILE = "_metadata.json";
+@@ -6468,10 +6491,12 @@ class ModuleFetcher {
+ 		if (transformResult) transformResult.__vitestModuleType = moduleType;
+ 		return moduleType;
+ 	}
+-	async cacheResult(result, cachePath, transformResult, importedUrls = [], mappings = false) {
++	// `portable` only for the shared fs module cache: the forks pool's own copies
++	// stay as they are, since nothing puts a root back into them
++	async cacheResult(result, cachePath, transformResult, importedUrls = [], mappings = false, portable = false) {
+ 		const returnResult = "code" in result ? getCachedResult(result, cachePath) : result;
+ 		if (saveCachePromises.has(cachePath)) return saveCachePromises.get(cachePath);
+-		const savePromise = this.fsCache.saveCachedModule(cachePath, result, transformResult, importedUrls, mappings).then(() => returnResult).catch((error) => {
++		const savePromise = this.fsCache.saveCachedModule(cachePath, result, transformResult, importedUrls, mappings, portable).then(() => returnResult).catch((error) => {
+ 			debugFs$1?.(`failed to cache ${cachePath}, serving it inline: ${error}`);
+ 			return result;
+ 		}).finally(() => {
+@@ -7107,6 +7132,23 @@ const METADATA_FILE = "_metadata.json";
  // workspace root so it's shared by every project and is naturally invalidated
  // whenever dependencies are reinstalled.
  const DEFAULT_CACHE_DIRNAME = ".vitest-cache";
@@ -99,7 +123,7 @@ index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..6ffead6e98cf8aedfcc802b46738430d
  const parallelFsCacheRead = /* @__PURE__ */ new Map();
  class FileSystemModuleCache {
  	vitest;
-@@ -7119,8 +7159,12 @@ class FileSystemModuleCache {
+@@ -7119,8 +7161,12 @@ class FileSystemModuleCache {
  	* - lockfile changes are reflected for the whole workspace, not just for a single project
  	*/
  	rootCache;
@@ -114,7 +138,7 @@ index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..6ffead6e98cf8aedfcc802b46738430d
  	fsCacheRoots = /* @__PURE__ */ new WeakMap();
  	fsEnvironmentHashMap = /* @__PURE__ */ new WeakMap();
  	fsCacheKeyGenerators = /* @__PURE__ */ new Set();
-@@ -7130,8 +7174,49 @@ class FileSystemModuleCache {
+@@ -7130,8 +7176,49 @@ class FileSystemModuleCache {
  	fsCacheKeys = /* @__PURE__ */ new WeakMap();
  	constructor(vitest) {
  		this.vitest = vitest;
@@ -166,7 +190,7 @@ index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..6ffead6e98cf8aedfcc802b46738430d
  	}
  	defineCacheKeyGenerator(callback) {
  		this.fsCacheKeyGenerators.add(callback);
-@@ -7159,7 +7244,8 @@ class FileSystemModuleCache {
+@@ -7159,7 +7246,8 @@ class FileSystemModuleCache {
  		if (log) this.vitest.logger.log(`[cache] cleared fs module cache at ${uniquePaths.join(", ")}`);
  	}
  	readCachedFileConcurrently(cachedFilePath) {
@@ -176,7 +200,7 @@ index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..6ffead6e98cf8aedfcc802b46738430d
  			const matchIndex = code.lastIndexOf(cacheComment);
  			if (matchIndex === -1) {
  				debugFs?.(`${y.red("[empty]")} ${cachedFilePath} exists, but doesn't have a ${cacheComment} comment, transforming by vite instead`);
-@@ -7169,6 +7255,9 @@ class FileSystemModuleCache {
+@@ -7169,6 +7257,9 @@ class FileSystemModuleCache {
  				code,
  				meta: this.fromBase64(code.slice(matchIndex + cacheCommentLength))
  			};
@@ -186,17 +210,28 @@ index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..6ffead6e98cf8aedfcc802b46738430d
  		}).finally(() => {
  			parallelFsCacheRead.delete(cachedFilePath);
  		}));
-@@ -7210,15 +7299,15 @@ class FileSystemModuleCache {
+@@ -7196,7 +7287,7 @@ class FileSystemModuleCache {
+ 			staticMocks: meta.staticMocks
+ 		};
+ 	}
+-	async saveCachedModule(cachedFilePath, fetchResult, transformResult, importedUrls = [], mappings = false) {
++	async saveCachedModule(cachedFilePath, fetchResult, transformResult, importedUrls = [], mappings = false, portable = false) {
+ 		if ("code" in fetchResult) {
+ 			const result = {
+ 				file: fetchResult.file,
+@@ -7210,15 +7301,16 @@ class FileSystemModuleCache {
  				staticMocks: transformResult?.__vitestStaticMocks
  			};
  			debugFs?.(`${y.yellow("[write]")} ${fetchResult.id} is cached in ${cachedFilePath}`);
 -			await atomicWriteFile(cachedFilePath, `${fetchResult.code}${cacheComment}${this.toBase64(result)}`);
-+			await atomicWriteFile(cachedFilePath, `${this.toPortableCode(fetchResult.code, fetchResult.file)}${cacheComment}${this.toBase64(result)}`);
++			const code = portable ? this.toPortableCode(fetchResult.code, fetchResult.file) : fetchResult.code;
++			await atomicWriteFile(cachedFilePath, `${code}${cacheComment}${this.toBase64(result, portable)}`);
  		}
  	}
- 	toBase64(obj) {
+-	toBase64(obj) {
 -		const json = stringify(obj);
-+		const json = this.toPortable(stringify(obj));
++	toBase64(obj, portable = true) {
++		const json = portable ? this.toPortable(stringify(obj)) : stringify(obj);
  		return Buffer.from(json).toString("base64");
  	}
  	fromBase64(obj) {
@@ -205,7 +240,7 @@ index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..6ffead6e98cf8aedfcc802b46738430d
  		return parse(json);
  	}
  	invalidateCachePath(environment, id) {
-@@ -7243,6 +7332,12 @@ class FileSystemModuleCache {
+@@ -7243,6 +7335,12 @@ class FileSystemModuleCache {
  			debugMemory?.(`${y.yellow("[write]")} ${id} was bailed out because it has "import.meta.glob"`);
  			return null;
  		}
@@ -218,7 +253,7 @@ index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..6ffead6e98cf8aedfcc802b46738430d
  		let hashString = "";
  		for (const generator of this.fsCacheKeyGenerators) {
  			const result = generator({
-@@ -7279,20 +7374,29 @@ class FileSystemModuleCache {
+@@ -7279,20 +7377,29 @@ class FileSystemModuleCache {
  				configFileDependencies: config.configFileDependencies.map((file) => tryReadFileSync(file)),
  				environment: environment.name,
  				// this affects Vitest CSS plugin
@@ -252,7 +287,7 @@ index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..6ffead6e98cf8aedfcc802b46738430d
  			this.fsCacheRoots.set(vitestConfig, cacheRoot);
  			if (!existsSync(cacheRoot)) mkdirSync(cacheRoot, { recursive: true });
  		}
-@@ -7309,49 +7413,54 @@ class FileSystemModuleCache {
+@@ -7309,49 +7416,54 @@ class FileSystemModuleCache {
  		}
  		environmentKeys.set(id, cache);
  	}

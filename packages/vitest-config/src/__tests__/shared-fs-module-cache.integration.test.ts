@@ -16,10 +16,9 @@ import { promisify } from "node:util";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-// Exercises LangWatch's patch to Vitest's fsModuleCache (patches/vitest@5.0.1.patch,
-// ADR-185): two checkouts of the same files share one cache directory. Each
-// checkout is a workspace of its own, run by a child Vitest, so the cache, the
-// workspace root and the worker are all real.
+// LangWatch's fsModuleCache patch (ADR-185): two checkouts share one cache, each run
+// by a child Vitest from a package below its workspace root, importing a workspace
+// file and an installed package, so the code names both by `/@fs/<checkout>/...`.
 
 const run = promisify(execFile);
 const vitestBin = join(
@@ -33,7 +32,9 @@ export function explode(): never {
 }
 export const where = "file";
 `;
-const PROBE = `import { explode, where } from "./helper";
+const DEP = 'export const dep = "installed";\n';
+const PROBE = `import { explode, where } from "../../shared/helper";
+import { dep } from "probe-dep";
 
 test("throws from the helper", () => {
   explode();
@@ -46,6 +47,10 @@ test("reads its own checkout's path", () => {
 test("imports the helper this checkout has", () => {
   expect(where).toBe(process.env.EXPECTED_WHERE);
 });
+
+test("imports an installed package", () => {
+  expect(dep).toBe("installed");
+});
 `;
 
 interface CheckoutRun {
@@ -57,14 +62,17 @@ describe("the shared fs module cache", () => {
   let base: string;
   let cacheDir: string;
 
-  const checkout = (name: string, files: Record<string, string>) => {
+  const checkout = (name: string, files: Record<string, string>, fsModuleCache = true) => {
     const root = join(base, name);
     const all: Record<string, string> = {
-      "pnpm-workspace.yaml": "packages: []\n",
-      "package.json": '{ "name": "probe", "type": "module" }\n',
-      "vitest.config.mjs":
-        "export default { test: { fsModuleCache: true, globals: true, maxWorkers: 1 } };\n",
-      "src/probe.test.ts": PROBE,
+      "pnpm-workspace.yaml": "packages: [pkg]\n",
+      "package.json": '{ "name": "probe-workspace", "private": true }\n',
+      "node_modules/probe-dep/package.json":
+        '{ "name": "probe-dep", "type": "module", "exports": "./index.js" }\n',
+      "node_modules/probe-dep/index.js": DEP,
+      "pkg/package.json": '{ "name": "probe", "type": "module" }\n',
+      "pkg/vitest.config.mjs": `export default { test: { fsModuleCache: ${fsModuleCache}, globals: true, maxWorkers: 1 } };\n`,
+      "pkg/src/probe.test.ts": PROBE,
       ...files,
     };
     for (const [file, body] of Object.entries(all)) {
@@ -78,9 +86,9 @@ describe("the shared fs module cache", () => {
     const report = join(root, "report.json");
     const child = await run(
       process.execPath,
-      [vitestBin, "run", "--root", root, "--reporter=json", `--outputFile=${report}`],
+      [vitestBin, "run", "--root", join(root, "pkg"), "--reporter=json", `--outputFile=${report}`],
       {
-        cwd: root,
+        cwd: join(root, "pkg"),
         env: {
           ...process.env,
           VITEST_FS_MODULE_CACHE_DIR: cacheDir,
@@ -120,8 +128,8 @@ describe("the shared fs module cache", () => {
     // real, so it matches the module ids Vite resolves (macOS links /var to /private/var)
     base = realpathSync(mkdtempSync(join(tmpdir(), "shared-fs-module-cache-")));
     cacheDir = join(base, "cache");
-    firstRoot = checkout("first", { "src/helper.ts": HELPER });
-    secondRoot = checkout("second", { "src/helper.ts": HELPER });
+    firstRoot = checkout("first", { "shared/helper.ts": HELPER });
+    secondRoot = checkout("second", { "shared/helper.ts": HELPER });
     first = await runVitest(firstRoot, "file");
     writtenByFirst = cachedFiles().map((file) => ({ file, mtimeMs: statSync(file).mtimeMs }));
     second = await runVitest(secondRoot, "file");
@@ -142,7 +150,7 @@ describe("the shared fs module cache", () => {
 
     /** @scenario "A second checkout's first run reads what the first checkout transformed" */
     it("serves a second checkout from the cache without transforming again", () => {
-      expect(second.cacheLog).toContain(`[read] ${join(secondRoot, "src/probe.test.ts")}`);
+      expect(second.cacheLog).toContain(`[read] ${join(secondRoot, "pkg/src/probe.test.ts")}`);
       expect(second.cacheLog).not.toContain("[write]");
       expect(cachedFiles().map((file) => ({ file, mtimeMs: statSync(file).mtimeMs }))).toEqual(
         writtenByFirst,
@@ -150,13 +158,35 @@ describe("the shared fs module cache", () => {
     });
   });
 
+  describe("when a run imports modules it wrote to the cache itself", () => {
+    /** @scenario "A run reads back the modules it cached itself" */
+    it("imports the workspace file and the installed package in both checkouts", () => {
+      for (const checkoutRun of [first, second]) {
+        expect(checkoutRun.results["imports the helper this checkout has"]?.status).toBe("passed");
+        expect(checkoutRun.results["imports an installed package"]?.status).toBe("passed");
+      }
+    });
+  });
+
+  describe("given a suite with fsModuleCache off", () => {
+    /** @scenario "A suite with fsModuleCache off is untouched" */
+    it("imports the workspace file and the installed package", async () => {
+      const offRoot = checkout("off", { "shared/helper.ts": HELPER }, false);
+
+      const off = await runVitest(offRoot, "file");
+
+      expect(off.results["imports the helper this checkout has"]?.status).toBe("passed");
+      expect(off.results["imports an installed package"]?.status).toBe("passed");
+    }, 60_000);
+  });
+
   describe("when a test fails in the second checkout", () => {
     /** @scenario "Stack traces and module paths name the checkout that runs the test" */
     it("points the stack trace at the second checkout's files and lines", () => {
       const failure = second.results["throws from the helper"]?.failureMessages.join("\n");
 
-      expect(failure).toContain(`${join(secondRoot, "src/helper.ts")}:3:9`);
-      expect(failure).toContain(`${join(secondRoot, "src/probe.test.ts")}:4:3`);
+      expect(failure).toContain(`${join(secondRoot, "shared/helper.ts")}:3:9`);
+      expect(failure).toContain(`${join(secondRoot, "pkg/src/probe.test.ts")}:5:3`);
       expect(failure).not.toContain(firstRoot);
     });
 
@@ -171,7 +201,7 @@ describe("the shared fs module cache", () => {
     /** @scenario "A cached module whose import is missing here is transformed again" */
     it("transforms the importer again instead of importing a missing file", async () => {
       const movedRoot = checkout("moved", {
-        "src/helper/index.ts": HELPER.replace('"file"', '"directory"'),
+        "shared/helper/index.ts": HELPER.replace('"file"', '"directory"'),
       });
 
       const moved = await runVitest(movedRoot, "directory");

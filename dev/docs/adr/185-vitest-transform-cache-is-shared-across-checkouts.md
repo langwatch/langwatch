@@ -51,7 +51,10 @@ code and metadata becomes `@@vitest-fs-module-cache-root@@`, and the inline
 source map's `file` becomes the bare file name. On read, the main process and
 the worker (which reads the cached file itself) put the reading checkout's root
 back. A module whose source names the checkout's root keeps that root in its
-key, and a module whose source contains the token is not cached.
+key, and a module whose source contains the token is not cached. Only the shared
+cache's files carry the token: the copies of transformed modules the forks pool
+keeps when `fsModuleCache` is off are written as before, because nothing puts a
+root back into them.
 
 **A cached import that is missing here is transformed again.** Worktrees at
 different commits meet in one cache. An importer whose source did not change

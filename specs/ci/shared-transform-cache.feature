@@ -33,3 +33,17 @@ Feature: Vitest's transform cache is shared across checkouts
     When the second checkout runs the test
     Then the importer is transformed again
     And the test imports the second checkout's helper
+
+  @integration
+  Scenario: A run reads back the modules it cached itself
+    Given a package below the workspace root
+    And its test imports a workspace file and an installed package by /@fs/ path
+    When the checkout runs the test with an empty cache
+    Then both imports resolve to that checkout's files
+
+  @integration
+  Scenario: A suite with fsModuleCache off is untouched
+    Given a package whose config turns fsModuleCache off
+    When its tests import a workspace file and an installed package
+    Then the copies the forks pool keeps of transformed modules name the checkout's own path
+    And both imports resolve
