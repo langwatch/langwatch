@@ -5,6 +5,7 @@ import { useTraceQueryArgs } from "../../../behavior/explorer/use-trace-query-ar
 import { api } from "../../../behavior/trace-api.ts";
 import { useTraceDrawer } from "../../../behavior/trace-drawer.ts";
 import { applyOverlayToSpanDetail } from "../../../model/traces/edit-overlay/apply-trace-edit-overlay-to-views.ts";
+import { useSelectedSpanOwner } from "./use-selected-span-owner.ts";
 
 /**
  * The selected span exactly as captured, before any correction. Read it when
@@ -14,9 +15,10 @@ import { applyOverlayToSpanDetail } from "../../../model/traces/edit-overlay/app
 export function useSpanDetailCanonical() {
   const { isReady, queryArgs } = useTraceQueryArgs();
   const spanId = useTraceDrawer((s) => s.selectedSpanId);
+  const ownerProjectId = useSelectedSpanOwner(spanId);
 
   return api.traces.spanDetail.useQuery(
-    { ...queryArgs, spanId: spanId ?? "" },
+    { ...queryArgs, spanId: spanId ?? "", ...(ownerProjectId ? { ownerProjectId } : {}) },
     {
       enabled: isReady && !!spanId,
     },

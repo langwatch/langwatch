@@ -43,3 +43,24 @@ export function joinOwnerNames(names: readonly string[]): string {
   if (names.length <= 1) return names[0] ?? "";
   return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 }
+
+/**
+ * The project a selected span is read from: none when the reader holds that span id itself,
+ * else the first braid owner holding it in the loaded tree.
+ */
+export function selectedSpanOwnerIn({
+  nodes,
+  spanId,
+}: {
+  nodes: readonly Pick<SpanTreeNode, "spanId" | "ownerProjectId">[] | undefined;
+  spanId: string | null;
+}): string | undefined {
+  if (!spanId || !nodes) return undefined;
+  let owner: string | undefined;
+  for (const node of nodes) {
+    if (node.spanId !== spanId) continue;
+    if (!node.ownerProjectId) return undefined;
+    owner ??= node.ownerProjectId;
+  }
+  return owner;
+}
