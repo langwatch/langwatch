@@ -112,25 +112,29 @@ function parseOpenAiDecision(body: unknown): ClassifierResponse | undefined {
   };
 }
 
-function parseOpenAiAnswers(
-  sent: z.infer<typeof openAiDecisionResponseSchema>["answers"],
-): ClassifierResponse["answers"] {
+type OpenAiAnswer = z.infer<typeof openAiDecisionResponseSchema>["answers"][number];
+
+function parseOpenAiAnswers(sent: OpenAiAnswer[]): ClassifierResponse["answers"] {
   const answers: ClassifierResponse["answers"] = {};
   for (const answer of sent) {
     if (!answer.name || answer.type === "refusal") continue;
-    const probabilities = answer.probabilities
-      ? Object.fromEntries(answer.probabilities.map((p) => [String(p.value), p.probability]))
-      : undefined;
-    answers[answer.name] = {
-      type: answer.type,
-      ...(answer.probability === undefined ? {} : { noul: answer.probability }),
-      ...(answer.choice === undefined ? {} : { choice: String(answer.choice) }),
-      ...(answer.score === undefined ? {} : { score: answer.score }),
-      ...(probabilities ? { probabilities } : {}),
-      ...(answer.confidence === undefined ? {} : { confidence: answer.confidence }),
-    };
+    answers[answer.name] = toClassifierAnswer(answer);
   }
   return answers;
+}
+
+function toClassifierAnswer(answer: OpenAiAnswer): ClassifierResponse["answers"][string] {
+  const probabilities = answer.probabilities
+    ? Object.fromEntries(answer.probabilities.map((p) => [String(p.value), p.probability]))
+    : undefined;
+  return {
+    type: answer.type,
+    ...(answer.probability === undefined ? {} : { noul: answer.probability }),
+    ...(answer.choice === undefined ? {} : { choice: String(answer.choice) }),
+    ...(answer.score === undefined ? {} : { score: answer.score }),
+    ...(probabilities ? { probabilities } : {}),
+    ...(answer.confidence === undefined ? {} : { confidence: answer.confidence }),
+  };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
