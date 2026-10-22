@@ -37,9 +37,9 @@ describe("a self-hosted notice", () => {
       expect(refusedFields(createSelfHostedNoticeInputSchema, { ...valid, ...change })).toEqual([
         field,
       ]);
-      expect(
-        updateSelfHostedNoticeInputSchema.validate({ id: "n1", ...valid, ...change }),
-      ).toBe(false);
+      expect(updateSelfHostedNoticeInputSchema.validate({ id: "n1", ...valid, ...change })).toBe(
+        false,
+      );
     });
   });
 
@@ -52,8 +52,6 @@ describe("a self-hosted notice", () => {
         expiresAt: null,
       }),
     ).toBe(true);
-    expect(
-      createSelfHostedNoticeInputSchema.validate({ ...valid, fixedIn: "v3.4.2" }),
-    ).toBe(true);
+    expect(createSelfHostedNoticeInputSchema.validate({ ...valid, fixedIn: "v3.4.2" })).toBe(true);
   });
 });

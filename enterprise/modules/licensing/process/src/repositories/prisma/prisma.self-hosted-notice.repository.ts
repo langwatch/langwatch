@@ -1,8 +1,8 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import {
   SELF_HOSTED_NOTICE_STATUSES,
   type SelfHostedNoticeStatus,
 } from "@langwatch/enterprise-licensing-contract";
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { NotFoundError } from "@langwatch/handled-error";
 import {
   SELF_HOSTED_NOTICE_SEVERITIES,

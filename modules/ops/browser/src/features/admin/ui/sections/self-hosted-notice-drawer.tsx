@@ -132,6 +132,9 @@ export function SelfHostedNoticeDrawer({
               onChange={(event) => set("body", event.target.value)}
               placeholder="What changed, and what the operator should do about it"
             />
+            <Field.HelperText>
+              Every self-hosted install receives this, so treat it as public: no exploit details.
+            </Field.HelperText>
             <Field.ErrorText>{problems.body}</Field.ErrorText>
           </Field.Root>
           <Field.Root invalid={problems.url !== undefined}>

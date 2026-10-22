@@ -143,7 +143,6 @@ export class OpsCheckupService {
       now: nowInstant,
     });
     const { postgres, clickhouse, redis, upgradeLedger } = repositories;
-
     const factsFor = ({
       organizationId,
       requestedBy,

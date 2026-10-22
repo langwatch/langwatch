@@ -364,6 +364,16 @@ describe("OpsUpgradeService.getStatus notices", () => {
     });
   });
 
+  describe("given a running release that cannot be ordered", () => {
+    it("keeps a notice with fixed_in rather than hiding it", async () => {
+      const status = await service({
+        version: { kind: "release", release: "git-0abc123" },
+        notices: [notice("n1", "security", "3.4.2")],
+      }).getStatus();
+      expect(status.notices.map(({ id }) => id)).toEqual(["n1"]);
+    });
+  });
+
   describe("given notices of every severity", () => {
     it("names security first, then warning, then info", async () => {
       const status = await service({

@@ -160,7 +160,7 @@ function newerReleasesOf({
 /** Security first, then warning, then info; the newest first within each. */
 const NOTICE_SEVERITY_ORDER = ["security", "warning", "info"] as const;
 
-/** Cloud's notices this image does not fix: no `fixed_in`, or one newer than its release. */
+/** Cloud's notices this image does not fix: hidden only when `fixed_in` is known not newer. */
 function unfixedNoticesOf({
   version,
   held,
@@ -170,12 +170,11 @@ function unfixedNoticesOf({
 }): SelfHostedNotice[] {
   const running = version.kind === "release" ? version.release : version.containsRelease;
   return held
-    .filter(
-      ({ fixed_in }) =>
-        fixed_in === null ||
-        running === null ||
-        orderReleases({ left: fixed_in, right: running }) === "newer",
-    )
+    .filter(({ fixed_in }) => {
+      if (fixed_in === null || running === null) return true;
+      const order = orderReleases({ left: fixed_in, right: running });
+      return order !== "older" && order !== "same";
+    })
     .toSorted(
       (left, right) =>
         NOTICE_SEVERITY_ORDER.indexOf(left.severity) -

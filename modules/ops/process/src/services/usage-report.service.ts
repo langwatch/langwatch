@@ -89,7 +89,7 @@ export class UsageReportService {
     const connect = await install.getConnectDeployment();
     // LANGWATCH_CONNECT_DISABLED proves the install calls LangWatch for nothing, this report too.
     if (!connect.permitted) {
-      await this.forgetLatestRelease();
+      await this.forgetCloudReply();
       return "connect_disabled";
     }
     const { ids: organizationIds } = await this.deps.organizations.listAllIds();
@@ -147,7 +147,7 @@ export class UsageReportService {
     return this.deps.notices.find();
   }
 
-  private async forgetLatestRelease(): Promise<void> {
+  private async forgetCloudReply(): Promise<void> {
     await this.deps.latestReleases.save(null).catch(() => undefined);
     await this.deps.notices.save([]).catch(() => undefined);
   }

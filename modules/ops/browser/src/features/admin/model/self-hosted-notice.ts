@@ -9,6 +9,7 @@ import {
   SELF_HOSTED_NOTICE_TITLE_MAX,
   type SelfHostedNoticeSeverity,
 } from "@langwatch/ops-contract";
+import { toZonedDateTime } from "@langwatch/time";
 
 export type SelfHostedNoticeStatus = "draft" | "published" | "withdrawn";
 
@@ -76,7 +77,7 @@ export function draftOfNotice(notice: SelfHostedNoticeRow): NoticeDraft {
     body: notice.body,
     url: notice.url ?? "",
     fixedIn: notice.fixedIn ?? "",
-    expiresOn: notice.expiresAt?.slice(0, 10) ?? "",
+    expiresOn: notice.expiresAt ? toZonedDateTime(notice.expiresAt).toPlainDate().toString() : "",
   };
 }
 
