@@ -851,17 +851,6 @@ describe("Copilot session cache rebuilds", () => {
     });
   });
 
-  describe("given the first call's span arrives after the calls that followed it", () => {
-    describe("when the calls fold in arrival order", () => {
-      /** @scenario "A model call that arrives after a later one is not judged a rebuild" */
-      it("counts no cache rebuild", () => {
-        const row = foldSessions([second, third, first, fourth, fifth]).get(CLI_CONVERSATION);
-        expect(row?.modelCalls).toBe(5);
-        expect(row?.cacheRebuildCount).toBe(0);
-      });
-    });
-  });
-
   describe("given a later call read none of the cache and wrote it again", () => {
     it("still counts that call as a rebuild", () => {
       const row = foldSessions([first, second, call(4_000, 0, 14_700)]).get(CLI_CONVERSATION);

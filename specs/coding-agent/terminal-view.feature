@@ -148,7 +148,7 @@ Rule: The terminal reads back the whole session
 
   # A context note sizes a call's context as the whole prompt it sent: the part
   # read from the cache, the part written to it and the part sent fresh, the
-  # same figure the session's peak context and the usage chart use.
+  # same figure the trace's context size uses.
 
   @integration
   Scenario: A context note counts the fresh part of the prompt

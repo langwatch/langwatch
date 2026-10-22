@@ -225,8 +225,6 @@ interface ClickHouseWriteRecord {
   // UInt64 arrays / scalars ride as strings, like the other UInt64 columns.
   StepStartedAt: string[];
   PreviousCallContextTokens: string;
-  PreviousCallCachedTokens: string;
-  PreviousCallStartedAtMs: string;
   // Array(Tuple(SeriesId, MetricName, Type, Decision, Language, Value)).
   MetricSeries: [string, string, string, string, string, number][];
   LastEventOccurredAt: ClickHouseMoment;
@@ -414,8 +412,6 @@ function toRecord({
     SubAgentIds: row.subAgentIds,
     StepStartedAt: row.stepStartedAt.map(big),
     PreviousCallContextTokens: big(row.previousCallContextTokens),
-    PreviousCallCachedTokens: big(row.previousCallCachedTokens),
-    PreviousCallStartedAtMs: big(row.previousCallStartedAtMs),
     MetricSeries: row.metricSeries.map((unit) => [
       unit.seriesId,
       unit.metricName,
@@ -1383,8 +1379,6 @@ function fromRecord(record: Record<string, unknown>): CodingAgentSessionRow {
     subAgentIds: asStringArray(record.SubAgentIds),
     stepStartedAt: asNumberArray(record.StepStartedAt),
     previousCallContextTokens: asNumber(record.PreviousCallContextTokens),
-    previousCallCachedTokens: asNumber(record.PreviousCallCachedTokens),
-    previousCallStartedAtMs: asNumber(record.PreviousCallStartedAtMs),
     metricSeries: asMetricSeriesRows(record.MetricSeries),
     createdAt: parseClickHouseDateTimeMs(asString(record.CreatedAt)),
     updatedAt: parseClickHouseDateTimeMs(asString(record.UpdatedAt)),

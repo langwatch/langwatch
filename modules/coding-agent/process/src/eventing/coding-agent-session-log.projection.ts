@@ -116,7 +116,7 @@ export class CodingAgentSessionLogProjection {
         };
 
       case CLAUDE.EVENT.API_REQUEST:
-        return this.foldApiRequest({ base, attrs, isLogsOnly, occurredAtMs, context });
+        return this.foldApiRequest({ base, attrs, isLogsOnly, context });
 
       case CLAUDE.EVENT.API_RESPONSE:
         // The generated conversation title, already parsed out of the response
@@ -241,7 +241,6 @@ export class CodingAgentSessionLogProjection {
     base,
     attrs,
     isLogsOnly,
-    occurredAtMs,
     context = null,
   }: LogFoldStep): CodingAgentSessionData {
     // What the agent says it was billed, kept NEXT TO the computed cost
@@ -265,7 +264,6 @@ export class CodingAgentSessionLogProjection {
             state: { ...withReported, costUsd: withReported.costUsd + reported },
             attrs,
             fallbackDurationMs: 0,
-            startedAtMs: occurredAtMs ?? 0,
           }),
           context,
         })

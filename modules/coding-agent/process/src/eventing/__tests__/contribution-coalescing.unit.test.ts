@@ -129,7 +129,7 @@ describe("coding-agent contribution append coalescing", () => {
   // not one.
   describe("given the same model calls folded in two different orders", () => {
     describe("when the session is assembled from each", () => {
-      it("reports a different final request, though the context chain keeps the latest call", () => {
+      it("reports a different final request and context chain", () => {
         const calls = [
           modelCallPayload({ index: 0, contextTokens: 1_000 }),
           modelCallPayload({ index: 1, contextTokens: 5_000 }),
@@ -141,9 +141,8 @@ describe("coding-agent contribution append coalescing", () => {
 
         expect(inOrder.finalRequestId).toBe("req-2");
         expect(reordered.finalRequestId).toBe("req-0");
-        // A call that started before the last one folded is not its successor.
         expect(inOrder.previousCallContextTokens).toBe(9_000);
-        expect(reordered.previousCallContextTokens).toBe(9_000);
+        expect(reordered.previousCallContextTokens).toBe(1_000);
       });
     });
   });

@@ -119,8 +119,6 @@ export function codingAgentSessionStateFromRow(
     cacheRebuildCount: row.cacheRebuildCount,
     largestCacheRebuildTokens: row.largestCacheRebuildTokens,
     previousCallContextTokens: row.previousCallContextTokens,
-    previousCallCachedTokens: row.previousCallCachedTokens,
-    previousCallStartedAtMs: row.previousCallStartedAtMs,
 
     failedTools: row.failedTools,
     errorTypes: row.errorTypes,

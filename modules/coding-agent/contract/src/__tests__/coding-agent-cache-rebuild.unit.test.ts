@@ -8,7 +8,6 @@ describe("isCacheRebuild", () => {
     it("is not a rebuild", () => {
       expect(
         isCacheRebuild({
-          previousContextTokens: 14_817,
           previousCachedTokens: 14_814,
           cacheReadTokens: 14_814,
           cacheCreationTokens: 80_016,
@@ -22,7 +21,6 @@ describe("isCacheRebuild", () => {
     it("is a rebuild", () => {
       expect(
         isCacheRebuild({
-          previousContextTokens: 100_000,
           previousCachedTokens: 100_000,
           cacheReadTokens: 0,
           cacheCreationTokens: 90_000,
@@ -35,7 +33,6 @@ describe("isCacheRebuild", () => {
     it("is not a rebuild", () => {
       expect(
         isCacheRebuild({
-          previousContextTokens: 100_000,
           previousCachedTokens: 100_000,
           cacheReadTokens: 60_000,
           cacheCreationTokens: 90_000,
@@ -48,7 +45,6 @@ describe("isCacheRebuild", () => {
     it("is not a rebuild, since there was nothing to reuse", () => {
       expect(
         isCacheRebuild({
-          previousContextTokens: 80_000,
           previousCachedTokens: 0,
           cacheReadTokens: 0,
           cacheCreationTokens: 80_000,
@@ -61,7 +57,6 @@ describe("isCacheRebuild", () => {
     it("is not a rebuild, since the context shrank rather than being re-sent", () => {
       expect(
         isCacheRebuild({
-          previousContextTokens: 100_000,
           previousCachedTokens: 100_000,
           cacheReadTokens: 0,
           cacheCreationTokens: 20_000,
@@ -74,7 +69,6 @@ describe("isCacheRebuild", () => {
     it("is not a rebuild", () => {
       expect(
         isCacheRebuild({
-          previousContextTokens: 500,
           previousCachedTokens: 500,
           cacheReadTokens: 0,
           cacheCreationTokens: 400,

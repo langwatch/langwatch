@@ -103,8 +103,6 @@ export function codingAgentSessionFixture(
     subAgentIds: [],
     stepStartedAt: [],
     previousCallContextTokens: 0,
-    previousCallCachedTokens: 0,
-    previousCallStartedAtMs: 0,
     metricSeries: [],
     createdAt: CODING_AGENT_TEST_NOW_MS - 60_000,
     updatedAt: CODING_AGENT_TEST_NOW_MS - 1_000,

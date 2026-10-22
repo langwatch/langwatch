@@ -403,10 +403,6 @@ export interface CodingAgentSessionRow {
   stepStartedAt: number[];
   /** Previous model call's context size, to detect the next cache rebuild. */
   previousCallContextTokens: number;
-  /** What the previous model call left cached (read plus write), for the same rule. */
-  previousCallCachedTokens: number;
-  /** When the previous model call started, so a late-arriving earlier call is not judged. */
-  previousCallStartedAtMs: number;
   /** The converged metric units the metric-fed fields are recomputed from. */
   metricSeries: CodingAgentSessionMetricSeriesRow[];
   /** Fold bookkeeping timestamps (createdAt/updatedAt map to CreatedAt/UpdatedAt). */

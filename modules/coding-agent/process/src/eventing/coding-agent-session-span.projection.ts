@@ -133,25 +133,11 @@ export class CodingAgentSessionSpanProjection {
     }
 
     if (span.name === CLAUDE.SPAN.LLM_REQUEST) {
-      return this.applyClaudeLlmRequest({
-        state,
-        attrs,
-        durationMs,
-        startedAtMs: span.startTimeUnixMs,
-        isLogsOnly,
-        context,
-      });
+      return this.applyClaudeLlmRequest({ state, attrs, durationMs, isLogsOnly, context });
     }
 
     if (span.name === CODEX.SPAN.TURN) {
-      return this.applyCodexTurn({
-        state,
-        attrs,
-        agent,
-        startedAtMs: span.startTimeUnixMs,
-        isLogsOnly,
-        context,
-      });
+      return this.applyCodexTurn({ state, attrs, agent, isLogsOnly, context });
     }
 
     if (span.name === CODEX.SPAN.HELPER_REQUEST) {
@@ -194,14 +180,12 @@ export class CodingAgentSessionSpanProjection {
     state,
     attrs,
     durationMs,
-    startedAtMs,
     isLogsOnly,
     context,
   }: {
     state: CodingAgentSessionData;
     attrs: Record<string, unknown>;
     durationMs: number;
-    startedAtMs: number;
     isLogsOnly: boolean;
     context: NonNullable<CodingAgentSessionSpanProjectionInput["context"]> | null;
   }): CodingAgentSessionData {
@@ -212,7 +196,6 @@ export class CodingAgentSessionSpanProjection {
       state: before,
       attrs,
       fallbackDurationMs: durationMs,
-      startedAtMs,
     });
     // Priced from the span's tokens with the same formula and the same
     // cache-write lifetime the trace pipeline applies to the identical span,
@@ -259,14 +242,12 @@ export class CodingAgentSessionSpanProjection {
     state,
     attrs,
     agent,
-    startedAtMs,
     isLogsOnly,
     context,
   }: {
     state: CodingAgentSessionData;
     attrs: Record<string, unknown>;
     agent: CodingAgentSessionSpanProjectionInput["agent"];
-    startedAtMs: number;
     isLogsOnly: boolean;
     context: NonNullable<CodingAgentSessionSpanProjectionInput["context"]> | null;
   }): CodingAgentSessionData {
@@ -282,7 +263,6 @@ export class CodingAgentSessionSpanProjection {
       state: before,
       attrs: facts,
       fallbackDurationMs: 0,
-      startedAtMs,
     });
     return this.chargePricedCall({ before, folded, facts, context });
   }
@@ -329,7 +309,6 @@ export class CodingAgentSessionSpanProjection {
       state: before,
       attrs: facts,
       fallbackDurationMs: durationMs,
-      startedAtMs: span.startTimeUnixMs,
     });
     const charged = this.stateProjection.chargeContextUsage({
       before,

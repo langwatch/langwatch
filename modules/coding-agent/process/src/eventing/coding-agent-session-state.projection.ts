@@ -160,10 +160,6 @@ export interface CodingAgentSessionData {
   largestCacheRebuildTokens: number;
   /** Fold-only predecessor used to detect the next cache rebuild. */
   previousCallContextTokens: number;
-  /** What the predecessor left cached (read plus write), for the same rule. */
-  previousCallCachedTokens: number;
-  /** When the predecessor started; an earlier-starting call arrived late. */
-  previousCallStartedAtMs: number;
   failedTools: number;
   errorTypes: Record<string, number>;
   apiErrors: number;
@@ -297,8 +293,6 @@ export class CodingAgentSessionStateProjection {
       cacheRebuildCount: 0,
       largestCacheRebuildTokens: 0,
       previousCallContextTokens: 0,
-      previousCallCachedTokens: 0,
-      previousCallStartedAtMs: 0,
 
       failedTools: 0,
       errorTypes: {},
@@ -569,13 +563,10 @@ export class CodingAgentSessionStateProjection {
     state: next,
     attrs,
     fallbackDurationMs,
-    startedAtMs,
   }: {
     state: CodingAgentSessionData;
     attrs: Record<string, unknown>;
     fallbackDurationMs: number;
-    /** 0 when unknown; such a call is taken to arrive in order. */
-    startedAtMs: number;
   }): CodingAgentSessionData {
     const agentId = this.coerceString(attrs.agent_id);
     if (agentId !== null) Object.assign(next, this.recordSubAgent(next, agentId));
@@ -587,30 +578,15 @@ export class CodingAgentSessionStateProjection {
 
     const cacheReadTokens = this.number(attrs.cache_read_tokens);
     const cacheCreationTokens = this.number(attrs.cache_creation_tokens);
-    const inputTokens = this.number(attrs.input_tokens);
-    // Every carrier hands the fold fresh input disjoint from the cache, so the
-    // sum is the whole prompt the call sent.
-    const cachedTokens = cacheReadTokens + cacheCreationTokens;
-    const contextTokens = inputTokens + cachedTokens;
-    // A call that started before the one folded last arrived late: judging it
-    // against a later call would read its cold start as a rebuild, so it is
-    // neither judged nor taken as the next call's predecessor.
-    const arrivedLate = startedAtMs > 0 && startedAtMs < next.previousCallStartedAtMs;
-    const isRebuild =
-      !arrivedLate &&
-      isCacheRebuild({
-        previousContextTokens: next.previousCallContextTokens,
-        previousCachedTokens: next.previousCallCachedTokens,
-        cacheReadTokens,
-        cacheCreationTokens,
-      });
-    const predecessor = arrivedLate
-      ? {}
-      : {
-          previousCallContextTokens: contextTokens,
-          previousCallCachedTokens: cachedTokens,
-          previousCallStartedAtMs: startedAtMs,
-        };
+    const contextTokens = cacheReadTokens + cacheCreationTokens;
+    // The first call is never a "rebuild" — there is nothing to reuse yet,
+    // so a cold cache isn't the session's fault. `previousCallContextTokens`
+    // starts at 0, which doubles as that gate.
+    const isRebuild = isCacheRebuild({
+      previousCachedTokens: next.previousCallContextTokens,
+      cacheReadTokens,
+      cacheCreationTokens,
+    });
 
     return {
       ...next,
@@ -621,7 +597,7 @@ export class CodingAgentSessionStateProjection {
       // Attempts includes the first try, so attempts > modelCalls means the
       // session paid for retries somewhere.
       attempts: next.attempts + Math.max(1, this.number(attrs.attempt)),
-      inputTokens: next.inputTokens + inputTokens,
+      inputTokens: next.inputTokens + this.number(attrs.input_tokens),
       outputTokens: next.outputTokens + this.number(attrs.output_tokens),
       cacheReadTokens: next.cacheReadTokens + cacheReadTokens,
       cacheCreationTokens: next.cacheCreationTokens + cacheCreationTokens,
@@ -630,7 +606,7 @@ export class CodingAgentSessionStateProjection {
       largestCacheRebuildTokens: isRebuild
         ? Math.max(next.largestCacheRebuildTokens, cacheCreationTokens)
         : next.largestCacheRebuildTokens,
-      ...predecessor,
+      previousCallContextTokens: contextTokens,
       models: model !== null ? this.addToBoundedSet(next.models, model) : next.models,
       // The pointer back to the body that ended the session. Last call wins.
       finalRequestId: requestId ?? next.finalRequestId,

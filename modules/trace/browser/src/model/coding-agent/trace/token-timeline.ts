@@ -58,9 +58,7 @@ export interface CacheRebuildEvent {
   callIndex: number;
   atMs: number;
   cacheCreationTokens: number;
-  /** The whole prompt the PREVIOUS call sent, which the rebuild is measured against. */
-  previousContextTokens: number;
-  /** What the PREVIOUS call left in the cache (read plus written), shown as "reusing N cached". */
+  /** What the PREVIOUS call left in the cache (read plus written), the rebuild's yardstick. */
   previousCachedTokens: number;
   /** The nearest user message before this call — usually what caused the rebuild. */
   precedingPrompt: string | null;
@@ -69,20 +67,15 @@ export interface CacheRebuildEvent {
 /** The first call is never flagged: a cold cache isn't a rebuild. */
 export function findCacheRebuilds(entries: TranscriptEntry[]): CacheRebuildEvent[] {
   const events: CacheRebuildEvent[] = [];
-  let previousContextTokens = 0;
   let previousCachedTokens = 0;
   let callIndex = -1;
 
   for (const entry of entries) {
     if (entry.kind !== "model_call") continue;
     callIndex++;
-    const cachedTokens = modelCallCachedTokens(entry);
-    const contextTokens = modelCallContextTokens(entry);
-
     if (
       callIndex > 0 &&
       isCacheRebuild({
-        previousContextTokens,
         previousCachedTokens,
         cacheReadTokens: entry.cacheReadTokens,
         cacheCreationTokens: entry.cacheCreationTokens,
@@ -92,14 +85,12 @@ export function findCacheRebuilds(entries: TranscriptEntry[]): CacheRebuildEvent
         callIndex,
         atMs: entry.atMs,
         cacheCreationTokens: entry.cacheCreationTokens,
-        previousContextTokens,
         previousCachedTokens,
         precedingPrompt: nearestPrecedingPrompt(entries, entry.atMs),
       });
     }
 
-    previousContextTokens = contextTokens;
-    previousCachedTokens = cachedTokens;
+    previousCachedTokens = modelCallCachedTokens(entry);
   }
 
   return events;

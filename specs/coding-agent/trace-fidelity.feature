@@ -340,11 +340,12 @@ Feature: Coding Agent Trace Fidelity (Path B direct OTLP)
     Then the trace summary attributes carry no context size
 
   @unit
-  Scenario: A cache rebuild is measured against the whole prompt the call before it sent
-    Given a session's model call that sent most of its prompt fresh
-    And the next call wrote about as much to the cache
+  Scenario: A cache rebuild is measured against what the call before it left in the cache
+    Given a session's model call that sent most of its prompt fresh and read the rest from the cache
+    And the next call read none of the cache and wrote more than half of what was cached
     When the usage chart looks for cache rebuilds
-    Then it flags the next call as a rebuild of the context the first call sent
+    Then it flags the next call as a rebuild of what the first call cached
+    And a next call that read the cache back is not flagged, however much it wrote
 
   # The rebuild note reads "re-sent N instead of reusing M tokens cached". Only
   # what a call read from or wrote to the cache is there for the next call to
@@ -387,12 +388,6 @@ Feature: Coding Agent Trace Fidelity (Path B direct OTLP)
   Scenario: The session fold counts a rebuild only when the cache read fell
     Given a session whose last call read every cached token and wrote an 80K-token file on top
     When the session fold folds its model calls
-    Then the session row counts no cache rebuild
-
-  @unit
-  Scenario: A model call that arrives after a later one is not judged a rebuild
-    Given a session whose first model call arrives after the calls that followed it
-    When the session fold folds its model calls in arrival order
     Then the session row counts no cache rebuild
 
   @unit

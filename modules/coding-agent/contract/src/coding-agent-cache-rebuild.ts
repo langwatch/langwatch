@@ -9,8 +9,6 @@ export const CACHE_REBUILD_RATIO_THRESHOLD = 0.5;
 export const CACHE_REBUILD_MIN_TOKENS = 1_000;
 
 export interface CacheRebuildInput {
-  /** The whole prompt the previous call sent: fresh input plus cache read and write. */
-  previousContextTokens: number;
   /** What the previous call left in the cache: its read plus its write. */
   previousCachedTokens: number;
   cacheReadTokens: number;
@@ -19,20 +17,16 @@ export interface CacheRebuildInput {
 
 /**
  * A rebuild is a call whose cache READ fell below half of what the previous
- * call left cached, and that wrote about the previous prompt again. A large
- * write on top of a full read is the context growing, not a rebuild.
+ * call left cached, and that wrote about that much again. A large write on top
+ * of a full read is the context growing, not a rebuild.
  */
 export function isCacheRebuild({
-  previousContextTokens,
   previousCachedTokens,
   cacheReadTokens,
   cacheCreationTokens,
 }: CacheRebuildInput): boolean {
-  if (previousCachedTokens <= 0 || previousContextTokens <= 0) return false;
+  if (previousCachedTokens <= 0) return false;
   if (cacheCreationTokens < CACHE_REBUILD_MIN_TOKENS) return false;
-  const lostTokens = previousCachedTokens - cacheReadTokens;
-  return (
-    lostTokens >= previousCachedTokens * CACHE_REBUILD_RATIO_THRESHOLD &&
-    cacheCreationTokens >= previousContextTokens * CACHE_REBUILD_RATIO_THRESHOLD
-  );
+  const threshold = previousCachedTokens * CACHE_REBUILD_RATIO_THRESHOLD;
+  return previousCachedTokens - cacheReadTokens >= threshold && cacheCreationTokens >= threshold;
 }
