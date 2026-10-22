@@ -12,7 +12,7 @@ const AGG = "proj_aggregate";
 const A = "proj_member_a";
 const B = "proj_member_b";
 
-const proof = ({ shared }: { shared: string[] }): Authorization =>
+const proof = ({ shared, braided = [] }: { shared: string[]; braided?: string[] }): Authorization =>
   sealAuthorization({
     actor: { type: "user", id: "test-user" },
     principal: { type: "user", id: "test-user" },
@@ -25,6 +25,13 @@ const proof = ({ shared }: { shared: string[] }): Authorization =>
         via: [`grant_${index}`],
         kind: "shared" as const,
         condition: { type: "trace" as const, from: 0, until: null },
+      })),
+      ...braided.map((projectId, index) => ({
+        projectId,
+        permissions: ["traces:view" as const],
+        via: [`braid_${index}`],
+        kind: "shared" as const,
+        condition: { type: "span" as const, from: 0, until: null },
       })),
     ],
     expiresAt: Date.now() + 60_000,
@@ -63,6 +70,21 @@ describe("policyProjectIdsOf", () => {
       if (!narrowed) throw new Error("narrowing to a named member failed");
 
       expect(policyProjectIdsOf({ projectId: AGG, authorization: narrowed })).toEqual([AGG, A]);
+    });
+  });
+
+  describe("when the proof reads an owner's spans through a braid", () => {
+    /** @scenario "A braided span is redacted under its owning project's policy" */
+    it("leaves the braid's owner out of the reader's policy", () => {
+      expect(
+        policyProjectIdsOf({ projectId: AGG, authorization: proof({ shared: [], braided: [A] }) }),
+      ).toEqual([AGG]);
+    });
+
+    it("keeps every member read through a shared grant", () => {
+      expect(
+        policyProjectIdsOf({ projectId: AGG, authorization: proof({ shared: [A], braided: [B] }) }),
+      ).toEqual([AGG, A]);
     });
   });
 
