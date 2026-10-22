@@ -457,3 +457,83 @@ describe("UsageService over the trace count", () => {
     },
   );
 });
+
+describe("given limit checks that read the counting store", () => {
+  class GatedCounter implements UsageVolumeCounter {
+    readonly reads: {
+      resolve: (counts: ProjectUsageCounts) => void;
+      reject: (e: Error) => void;
+    }[] = [];
+
+    getCountByProjects(): Promise<ProjectUsageCounts> {
+      return new Promise((resolve, reject) => {
+        this.reads.push({ resolve, reject });
+      });
+    }
+  }
+
+  function serviceOver(counter: UsageVolumeCounter, clock: { ms: number }) {
+    return UsageService.create({
+      organizations: new TestOrganizations(),
+      traceCounter: counter,
+      eventCounter: counter,
+      planResolver: vi.fn().mockResolvedValue(plan(1000)),
+      deployment: { isSaas: true },
+      now: () => clock.ms,
+    });
+  }
+
+  /** Lets the service's awaits before the store read run. */
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  describe("when several checks for one organization arrive while its count is read", () => {
+    /** @scenario Concurrent limit checks for one organization share one count */
+    it("reads the store once and answers every check", async () => {
+      const counter = new GatedCounter();
+      const service = serviceOver(counter, { ms: 0 });
+
+      const checks = [1, 2, 3].map(() =>
+        service.checkLimitForOrganization({ organizationId: "org-1" }),
+      );
+      await settle();
+      expect(counter.reads).toHaveLength(1);
+      counter.reads[0]!.resolve([{ projectId: "project-1", count: 5_000 }]);
+
+      const results = await Promise.all(checks);
+      expect(results.map((r) => r.exceeded)).toEqual([true, true, true]);
+      expect(counter.reads).toHaveLength(1);
+    });
+  });
+
+  describe("when the store failed to read the organization's count", () => {
+    /** @scenario A count that failed is not read again until its retry window passes */
+    it("answers the failure without reading until the window passes, then reads again", async () => {
+      const outOfMemory = Object.assign(new Error("memory limit exceeded"), { code: "241" });
+      const clock = { ms: 1_000_000 };
+      let reads = 0;
+      const counter: UsageVolumeCounter = {
+        getCountByProjects: async () => {
+          reads++;
+          if (reads === 1) throw outOfMemory;
+          return [{ projectId: "project-1", count: 10 }];
+        },
+      };
+      const service = serviceOver(counter, clock);
+
+      await expect(service.checkLimitForOrganization({ organizationId: "org-1" })).rejects.toBe(
+        outOfMemory,
+      );
+      clock.ms += 29_000;
+      await expect(service.checkLimitForOrganization({ organizationId: "org-1" })).rejects.toBe(
+        outOfMemory,
+      );
+      expect(reads).toBe(1);
+
+      clock.ms += 1_000;
+      await expect(service.checkLimitForOrganization({ organizationId: "org-1" })).resolves.toEqual(
+        { exceeded: false },
+      );
+      expect(reads).toBe(2);
+    });
+  });
+});
