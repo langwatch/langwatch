@@ -47,8 +47,26 @@ Feature: Coding-agent records a session-stored fact
     Then the fact says firstForProject is true
 
   @unit
-  Scenario: A project already stamped is never first
-    Given a project whose last coding-agent session time is set
+  Scenario: A project stamped with main history is never first
+    Given a project whose last coding-agent session time is set and whose history holds a main session
+    When its session is reported
+    Then the fact says firstForProject is false
+
+  @unit
+  Scenario: A project stamped with no history left is never first
+    Given a project whose last coding-agent session time is set and whose history is empty
+    When its session is reported
+    Then the fact says firstForProject is false
+
+  @unit
+  Scenario: A project stamped only by helper threads still flags its main session first
+    Given a project whose last coding-agent session time is set and whose only other sessions are helper threads
+    When its main session is reported
+    Then the fact says firstForProject is true
+
+  @unit
+  Scenario: A deleted project is never first
+    Given a session whose project no longer exists
     When its session is reported
     Then the fact says firstForProject is false
 

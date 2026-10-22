@@ -19,6 +19,9 @@ type NamedSession = StoredSession & { agent: string };
 /** What one fold claims for a project: all its sessions, and the one that may be the first. */
 type ProjectClaim = { sessionIds: string[]; earliest: NamedSession };
 
+/** What the project row says: gone, or carrying a coding-agent stamp or not. */
+type ProjectState = "missing" | "stamped" | "unstamped";
+
 /** Where the session-stored fact is recorded; the owner's own pipeline, never a consumer. */
 export interface CodingAgentSessionStoredRecorder {
   recordSessionStored(fact: CodingAgentSessionStoredEventData): Promise<void>;
@@ -26,7 +29,7 @@ export interface CodingAgentSessionStoredRecorder {
 
 type FactsDependencies = Readonly<{
   projects: Pick<ProjectApi, "findById">;
-  sessions: Pick<CodingAgentSessionRepository, "hasOtherSession">;
+  sessions: Pick<CodingAgentSessionRepository, "findOtherSessionKind">;
   recorder: CodingAgentSessionStoredRecorder;
   clock: CodingAgentClock;
 }>;
@@ -48,11 +51,11 @@ export class CodingAgentSessionFactsService {
     try {
       const now = this.dependencies.clock.nowMs();
       this.holds.sweepIfLarge(now);
-      const projectIsStamped = new Map<string, Promise<boolean>>();
+      const projectStates = new Map<string, Promise<ProjectState>>();
       const due = this.claimDue({ sessions, now });
       const claims = claimsByProject(due);
       await Promise.all(
-        due.map((session) => this.recordOne({ session, now, projectIsStamped, claims })),
+        due.map((session) => this.recordOne({ session, now, projectStates, claims })),
       );
     } catch (error) {
       logger.warn({ error }, "recording the session-stored facts failed, non-fatal");
@@ -79,12 +82,12 @@ export class CodingAgentSessionFactsService {
   private async recordOne({
     session,
     now,
-    projectIsStamped,
+    projectStates,
     claims,
   }: {
     session: NamedSession;
     now: number;
-    projectIsStamped: Map<string, Promise<boolean>>;
+    projectStates: Map<string, Promise<ProjectState>>;
     claims: Map<string, ProjectClaim>;
   }): Promise<void> {
     const holdSetTo = now + CODING_AGENT_SESSION_SEEN_WINDOW_MS;
@@ -94,7 +97,7 @@ export class CodingAgentSessionFactsService {
         projectId: session.tenantId,
         sessionId: session.sessionId,
         agentType: session.agent,
-        firstForProject: await this.isFirstForProject({ session, projectIsStamped, claims }),
+        firstForProject: await this.isFirstForProject({ session, projectStates, claims }),
         occurredAt: session.occurredAt,
       });
     } catch (error) {
@@ -106,14 +109,18 @@ export class CodingAgentSessionFactsService {
     }
   }
 
-  /** Fails closed: any error reads as "not first", never as a false first-session event. */
+  /**
+   * Fails closed: any error reads as "not first". Accepted false firsts, both at the retention
+   * edge of an idle project: (a) history aged out, then a helper thread precedes the main
+   * session; (b) main sessions aged out while a later helper survived.
+   */
   private async isFirstForProject({
     session,
-    projectIsStamped,
+    projectStates,
     claims,
   }: {
     session: NamedSession;
-    projectIsStamped: Map<string, Promise<boolean>>;
+    projectStates: Map<string, Promise<ProjectState>>;
     claims: Map<string, ProjectClaim>;
   }): Promise<boolean> {
     try {
@@ -121,18 +128,22 @@ export class CodingAgentSessionFactsService {
       // Identity, not id: one session can be due on two days, and only one copy may be first.
       const claim = claims.get(session.tenantId);
       if (!claim || claim.earliest !== session) return false;
-      let stamped = projectIsStamped.get(session.tenantId);
-      if (stamped === undefined) {
-        stamped = this.dependencies.projects
-          .findById(session.tenantId)
-          .then((project) => project === null || project.lastCodingAgentSessionAt !== null);
-        projectIsStamped.set(session.tenantId, stamped);
+      let state = projectStates.get(session.tenantId);
+      if (state === undefined) {
+        state = this.dependencies.projects.findById(session.tenantId).then((project) => {
+          if (project === null) return "missing";
+          return project.lastCodingAgentSessionAt === null ? "unstamped" : "stamped";
+        });
+        projectStates.set(session.tenantId, state);
       }
-      if (await stamped) return false;
-      return !(await this.dependencies.sessions.hasOtherSession({
+      const projectState = await state;
+      if (projectState === "missing") return false;
+      const kind = await this.dependencies.sessions.findOtherSessionKind({
         tenantId: session.tenantId,
         excludeSessionIds: claim.sessionIds,
-      }));
+      });
+      // A stamp with only helper threads behind it came from them, so the main session is first.
+      return projectState === "stamped" ? kind === "helpers_only" : kind !== "main";
     } catch (error) {
       logger.warn(
         { error, tenantId: session.tenantId },

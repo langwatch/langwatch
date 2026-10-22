@@ -8,6 +8,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { projectRow } from "../../__tests__/fixtures/coding-agent.fixture.ts";
+import type { OtherSessionKind } from "../../repositories/coding-agent-session.repository.ts";
 import {
   CODING_AGENT_SESSION_SEEN_WINDOW_MS,
   HOLD_SWEEP_THRESHOLD,
@@ -28,12 +29,17 @@ const stored = (over: Partial<StoredSession> = {}): StoredSession => ({
 
 function factsOver({
   lastCodingAgentSessionAt = null,
-  hasOtherSession = async () => false,
+  findOtherSessionKind = async () => "none",
+  projectMissing = false,
   record,
   nowMs,
 }: {
   lastCodingAgentSessionAt?: Date | null;
-  hasOtherSession?: (input: { tenantId: string; excludeSessionIds: string[] }) => Promise<boolean>;
+  findOtherSessionKind?: (input: {
+    tenantId: string;
+    excludeSessionIds: string[];
+  }) => Promise<OtherSessionKind>;
+  projectMissing?: boolean;
   record?: (fact: CodingAgentSessionStoredEventData) => Promise<void>;
   nowMs?: () => number;
 } = {}) {
@@ -41,11 +47,12 @@ function factsOver({
   const service = CodingAgentSessionFactsService.create({
     projects: createApiFixture<ProjectApi>(
       {
-        findById: async (id: string) => projectRow(id, { lastCodingAgentSessionAt }),
+        findById: async (id: string) =>
+          projectMissing ? null : projectRow(id, { lastCodingAgentSessionAt }),
       },
       "ProjectApi",
     ),
-    sessions: { hasOtherSession },
+    sessions: { findOtherSessionKind },
     recorder: {
       recordSessionStored: record ?? (async (fact) => void recorded.push(fact)),
     },
@@ -128,9 +135,53 @@ describe("CodingAgentSessionFactsService", () => {
       expect(recorded[0]?.firstForProject).toBe(true);
     });
 
-    /** @scenario "A project already stamped is never first" */
-    it("does not flag it when the project is already stamped", async () => {
+    /** @scenario "A project stamped with main history is never first" */
+    it("does not flag it when the project is stamped and holds a main session", async () => {
+      const { service, recorded } = factsOver({
+        lastCodingAgentSessionAt: new Date(1),
+        findOtherSessionKind: async () => "main",
+      });
+
+      await service.record([stored()]);
+
+      expect(recorded[0]?.firstForProject).toBe(false);
+    });
+
+    /** @scenario "A project stamped with no history left is never first" */
+    it("does not flag it when the project is stamped and its history aged out", async () => {
       const { service, recorded } = factsOver({ lastCodingAgentSessionAt: new Date(1) });
+
+      await service.record([stored()]);
+
+      expect(recorded[0]?.firstForProject).toBe(false);
+    });
+
+    /** @scenario "A project stamped only by helper threads still flags its main session first" */
+    it("flags it when the project is stamped and only helper threads precede it", async () => {
+      const { service, recorded } = factsOver({
+        lastCodingAgentSessionAt: new Date(1),
+        findOtherSessionKind: async () => "helpers_only",
+      });
+
+      await service.record([stored()]);
+
+      expect(recorded[0]?.firstForProject).toBe(true);
+    });
+
+    /** @scenario "A helper-thread session in the history never blocks the first" */
+    it("flags it when the project is unstamped and only helper threads precede it", async () => {
+      const { service, recorded } = factsOver({
+        findOtherSessionKind: async () => "helpers_only",
+      });
+
+      await service.record([stored()]);
+
+      expect(recorded[0]?.firstForProject).toBe(true);
+    });
+
+    /** @scenario "A deleted project is never first" */
+    it("does not flag it when the project no longer exists", async () => {
+      const { service, recorded } = factsOver({ projectMissing: true });
 
       await service.record([stored()]);
 
@@ -139,7 +190,7 @@ describe("CodingAgentSessionFactsService", () => {
 
     /** @scenario "A project with an older session is never first" */
     it("does not flag it when another session of the project exists", async () => {
-      const { service, recorded } = factsOver({ hasOtherSession: async () => true });
+      const { service, recorded } = factsOver({ findOtherSessionKind: async () => "main" });
 
       await service.record([stored()]);
 
@@ -149,9 +200,9 @@ describe("CodingAgentSessionFactsService", () => {
     it("asks about other sessions without counting the stored one", async () => {
       const asked: { tenantId: string; excludeSessionIds: string[] }[] = [];
       const { service } = factsOver({
-        hasOtherSession: async (input) => {
+        findOtherSessionKind: async (input) => {
           asked.push(input);
-          return false;
+          return "none";
         },
       });
 
@@ -163,8 +214,10 @@ describe("CodingAgentSessionFactsService", () => {
     /** @scenario "Two new sessions of a fresh project in one batch flag exactly the earliest" */
     it("flags only the earliest of two sessions of a fresh project in one fold", async () => {
       const { service, recorded } = factsOver({
-        hasOtherSession: async ({ excludeSessionIds }) =>
-          !["session-1", "session-2"].every((id) => excludeSessionIds.includes(id)),
+        findOtherSessionKind: async ({ excludeSessionIds }) =>
+          ["session-1", "session-2"].every((id) => excludeSessionIds.includes(id))
+            ? "none"
+            : "main",
       });
 
       await service.record([
@@ -179,7 +232,7 @@ describe("CodingAgentSessionFactsService", () => {
 
     /** @scenario "A batch of a project with older history flags none" */
     it("flags none of two sessions when the project has prior history", async () => {
-      const { service, recorded } = factsOver({ hasOtherSession: async () => true });
+      const { service, recorded } = factsOver({ findOtherSessionKind: async () => "main" });
 
       await service.record([
         stored({ sessionId: "session-1", occurredAt: 1_000 }),
@@ -192,7 +245,7 @@ describe("CodingAgentSessionFactsService", () => {
     /** @scenario "A failing history check fails closed" */
     it("does not flag it when the ClickHouse check throws", async () => {
       const { service, recorded } = factsOver({
-        hasOtherSession: async () => {
+        findOtherSessionKind: async () => {
           throw new Error("clickhouse down");
         },
       });

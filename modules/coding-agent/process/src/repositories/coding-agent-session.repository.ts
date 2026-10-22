@@ -7,6 +7,9 @@ import type {
 
 export type CodingAgentSessionListReadOutcome = "hit" | "empty" | "error";
 
+/** The other sessions a tenant holds: a main-thread one, only helper threads, or none. */
+export type OtherSessionKind = "none" | "helpers_only" | "main";
+
 /** Observes the bounded session-list storage read without coupling the feature to app metrics. */
 export interface CodingAgentReadMetrics {
   observeSessionListRead(input: {
@@ -47,11 +50,14 @@ export abstract class CodingAgentSessionRepository {
     appliedEventIds: string[];
   } | null>;
 
-  /** Whether the tenant holds a stored session besides those named, over all time. */
-  abstract hasOtherSession(input: {
+  /**
+   * What kind of other session the tenant holds besides those named: a main-thread one, only
+   * helper threads, or none. "none" means nothing in retention, not "no history ever".
+   */
+  abstract findOtherSessionKind(input: {
     tenantId: string;
     excludeSessionIds: string[];
-  }): Promise<boolean>;
+  }): Promise<OtherSessionKind>;
 
   abstract findManyRecent(input: {
     tenantId: string;

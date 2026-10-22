@@ -63,9 +63,15 @@ describe.each(backends)("given the $name coding-agent repositories", ({ create }
     });
   });
 
-  describe("when asked whether a project holds another session", () => {
+  describe("when asked what other session a project holds", () => {
+    const kindOf = (repositories: ReturnType<typeof create>, excluded: string) =>
+      repositories.sessions.findOtherSessionKind({
+        tenantId: "project-1",
+        excludeSessionIds: [excluded],
+      });
+
     /** @scenario "A project with an older session is never first" */
-    it("answers yes when a different session of the tenant is stored", async () => {
+    it("answers main when a different main session of the tenant is stored", async () => {
       const repositories = create();
       await repositories.sessions.upsert(
         session({ tenantId: "project-1", sessionId: "session-1" }),
@@ -73,15 +79,10 @@ describe.each(backends)("given the $name coding-agent repositories", ({ create }
         [],
       );
 
-      await expect(
-        repositories.sessions.hasOtherSession({
-          tenantId: "project-1",
-          excludeSessionIds: ["session-2"],
-        }),
-      ).resolves.toBe(true);
+      await expect(kindOf(repositories, "session-2")).resolves.toBe("main");
     });
 
-    it("answers no when the only stored session is the excluded one", async () => {
+    it("answers none when the only stored session is the excluded one", async () => {
       const repositories = create();
       await repositories.sessions.upsert(
         session({ tenantId: "project-1", sessionId: "session-1" }),
@@ -89,16 +90,11 @@ describe.each(backends)("given the $name coding-agent repositories", ({ create }
         [],
       );
 
-      await expect(
-        repositories.sessions.hasOtherSession({
-          tenantId: "project-1",
-          excludeSessionIds: ["session-1"],
-        }),
-      ).resolves.toBe(false);
+      await expect(kindOf(repositories, "session-1")).resolves.toBe("none");
     });
 
     /** @scenario "A helper-thread session in the history never blocks the first" */
-    it("answers no when the only other session is a helper thread", async () => {
+    it("answers helpers_only when the only other session is a helper thread", async () => {
       const repositories = create();
       await repositories.sessions.upsert(
         session({ tenantId: "project-1", sessionId: "helper-1", auxiliary: true }),
@@ -106,15 +102,26 @@ describe.each(backends)("given the $name coding-agent repositories", ({ create }
         [],
       );
 
-      await expect(
-        repositories.sessions.hasOtherSession({
-          tenantId: "project-1",
-          excludeSessionIds: ["session-1"],
-        }),
-      ).resolves.toBe(false);
+      await expect(kindOf(repositories, "session-1")).resolves.toBe("helpers_only");
     });
 
-    it("answers no when only another tenant holds sessions", async () => {
+    it("answers main when a helper thread and a main session are both stored", async () => {
+      const repositories = create();
+      await repositories.sessions.upsert(
+        session({ tenantId: "project-1", sessionId: "helper-1", auxiliary: true }),
+        30,
+        [],
+      );
+      await repositories.sessions.upsert(
+        session({ tenantId: "project-1", sessionId: "session-3" }),
+        30,
+        [],
+      );
+
+      await expect(kindOf(repositories, "session-1")).resolves.toBe("main");
+    });
+
+    it("answers none when only another tenant holds sessions", async () => {
       const repositories = create();
       await repositories.sessions.upsert(
         session({ tenantId: "project-2", sessionId: "session-9" }),
@@ -122,12 +129,7 @@ describe.each(backends)("given the $name coding-agent repositories", ({ create }
         [],
       );
 
-      await expect(
-        repositories.sessions.hasOtherSession({
-          tenantId: "project-1",
-          excludeSessionIds: ["session-1"],
-        }),
-      ).resolves.toBe(false);
+      await expect(kindOf(repositories, "session-1")).resolves.toBe("none");
     });
   });
 

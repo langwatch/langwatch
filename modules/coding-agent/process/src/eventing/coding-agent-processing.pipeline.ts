@@ -136,13 +136,11 @@ export class EventingCodingAgentProcessingAdapter {
       EventingCodingAgentSessionStoreService.create({
         persistence: deps.projections,
         defaultRetentionDays: deps.defaultRetentionDays,
-        // The fact reads the project stamp, so it must record before the stamp moves; a helper
-        // thread never stamps, or it would make the main session's first look like a later one.
+        // The facts read the project stamp, so they record before the stamp moves. A stamp from
+        // helper threads alone does not block the first; the facts service tells the two apart.
         onSessionsStored: async (sessions) => {
           await deps.sessionFacts?.record(sessions);
-          await sessionSeen.record(
-            sessions.filter((session) => !session.auxiliary).map((session) => session.tenantId),
-          );
+          await sessionSeen.record(sessions.map((session) => session.tenantId));
         },
       }),
     );

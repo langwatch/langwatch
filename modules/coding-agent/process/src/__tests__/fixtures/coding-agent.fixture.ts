@@ -42,7 +42,10 @@ import type { CodingAgentBillingPolicy } from "../../services/coding-agent-cost-
 import type { CodingAgentClock } from "../../services/coding-agent-clock.service.ts";
 import { CODING_AGENT_ID_INDEXES } from "../../repositories/clickhouse/clickhouse.coding-agent-id-indexes.database.ts";
 import { CodingAgentSessionEventRepository } from "../../repositories/coding-agent-session-event.repository.ts";
-import { CodingAgentSessionRepository } from "../../repositories/coding-agent-session.repository.ts";
+import {
+  CodingAgentSessionRepository,
+  type OtherSessionKind,
+} from "../../repositories/coding-agent-session.repository.ts";
 import { CodingAgentTraceSessionRepository } from "../../repositories/coding-agent-trace-session.repository.ts";
 import {
   SessionMetricSeriesRepository,
@@ -405,10 +408,15 @@ export class TestSessions extends CodingAgentSessionRepository {
     return this.applied;
   }
 
-  async hasOtherSession(input: { tenantId: string; excludeSessionIds: string[] }): Promise<boolean> {
-    return this.rows.some(
+  async findOtherSessionKind(input: {
+    tenantId: string;
+    excludeSessionIds: string[];
+  }): Promise<OtherSessionKind> {
+    const others = this.rows.filter(
       (row) => row.tenantId === input.tenantId && !input.excludeSessionIds.includes(row.sessionId),
     );
+    if (others.some((row) => !row.auxiliary)) return "main";
+    return others.length > 0 ? "helpers_only" : "none";
   }
 
   async findManyRecent(input: {

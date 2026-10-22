@@ -263,13 +263,13 @@ describe("coding_agent_processing over the live repositories", () => {
       expect(projectActivity.touched.map((entry) => entry.projectId)).toEqual(["project_alpha"]);
     });
 
-    /** @scenario "A helper-thread session does not stamp its project" */
-    it("does not stamp the project for a helper-thread session", async () => {
+    /** @scenario "A helper-thread session stamps its project too" */
+    it("stamps the project for a helper-thread session", async () => {
       const { pipeline, projectActivity } = compose();
 
       await storeThrough(pipeline, { auxiliary: true });
 
-      expect(projectActivity.touched).toEqual([]);
+      expect(projectActivity.touched.map((entry) => entry.projectId)).toEqual(["project_alpha"]);
     });
   });
 
