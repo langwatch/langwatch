@@ -22,7 +22,7 @@ function adoptionAnswering(outcome: IdentityBackfillOutcome) {
 }
 
 describe("adopting the user an SSO arrival admitted", () => {
-  describe("when the identifier backfill is not enrolled automatically", () => {
+  describe("when the identifier backfill has not reached the arriving user yet", () => {
     /** @scenario "Adopting an arriving SSO user migrates that user alone" */
     it("migrates the arriving user, and nobody else", async () => {
       const { adoption, migrateUser } = adoptionAnswering({
