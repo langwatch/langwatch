@@ -735,6 +735,30 @@ describe("NurturingDeliveryService", () => {
         },
       ]);
     });
+
+    /** @scenario "Customer.io date attributes are sent as Unix seconds" */
+    it("does not throw from deliver and sends nothing when a report date is malformed", async () => {
+      const { cio, delivery } = deliveryOverBothSinks();
+
+      await expect(
+        delivery.deliver({
+          key: "self_hosted_crm:event-44",
+          signal: {
+            kind: "self_hosted_crm",
+            sourceEventId: "event-44",
+            ...at,
+            userId: "user-1",
+            organizationId: "org-1",
+            instanceId: "instance-1",
+            traits: { self_hosted: true, self_hosted_last_report_at: "not-a-date" },
+            events: [],
+          },
+        }),
+      ).resolves.toBeUndefined();
+      await settle();
+
+      expect(cio.sent.filter((call) => call.path === "/v1/group")).toEqual([]);
+    });
   });
 
   describe("when no sink is configured", () => {

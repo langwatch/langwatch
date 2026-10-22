@@ -466,8 +466,8 @@ export class NurturingDeliveryService {
     const nurturing = this.deps.customerIo;
     if (!nurturing) return;
     const { userId, organizationId, instanceId, events } = signal;
-    const traits = selfHostedTraits(signal.traits);
     void (async () => {
+      const traits = selfHostedTraits(signal.traits);
       await nurturing.groupUser({ userId, groupId: organizationId, traits });
       for (const event of events) {
         await nurturing.trackEvent({ userId, event, properties: { instance_id: instanceId } });

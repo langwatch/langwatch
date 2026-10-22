@@ -26,7 +26,7 @@ export function selfHostedTraits(
   } = traits;
   return {
     ...rest,
-    ...(firstSeenAt && { self_hosted_first_seen_at: unixSecondsOfIso(firstSeenAt) }),
-    ...(lastReportAt && { self_hosted_last_report_at: unixSecondsOfIso(lastReportAt) }),
+    ...(firstSeenAt ? { self_hosted_first_seen_at: unixSecondsOfIso(firstSeenAt) } : {}),
+    ...(lastReportAt ? { self_hosted_last_report_at: unixSecondsOfIso(lastReportAt) } : {}),
   };
 }
