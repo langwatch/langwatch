@@ -2,9 +2,8 @@
 # (ADR-183). Design: dev/docs/plans/braids/braids-prototype.html, steps 1 to 4, 7 and 9.
 # The braid's rules live in braids.feature; this file is what the screen offers and says.
 #
-# The page, the organisation screen and the plan states are built and bound; the dialog's
-# scenarios stay @unimplemented until the braid dialog lands. A rendered component is an
-# integration test.
+# Bound by rendered integration tests. Two dialog scenarios stay @unimplemented: the preview
+# wire carries no example trace and no "what a further braid adds" (only Test a trace shows one).
 
 @authz @braids @ui
 Feature: The Braids screen
@@ -28,14 +27,14 @@ Feature: The Braids screen
 
   Rule: The dialog builds a braid and shows what the reader will see
 
-    @integration @unimplemented
+    @integration
     Scenario: The braid starts from this project and picks where it goes
       When ana starts a new braid
       Then the project it braids from is "specialists" and cannot be changed
       And the project picker lists the plain projects ana can read
       And aggregate projects and "specialists" itself are listed but disabled, each with the reason
 
-    @integration @unimplemented
+    @integration
     Scenario: A team admin is offered only the projects they can read
       Given tom is an admin of the team holding "specialists" and cannot read "orchestrator" traces
       When tom starts a new braid from "specialists"
@@ -49,18 +48,18 @@ Feature: The Braids screen
       Then the preview counts what "orchestrator" will see with both braids
       And says how many more spans the new braid shows
 
-    @integration @unimplemented
+    @integration
     Scenario: The condition is checked as it is typed
       When ana types attributes["orchestrator"] == "web" or attributes["team"] == "a"
       Then the editor marks the or and explains how to write the condition instead
       And the create button stays disabled until the condition is supported
 
-    @integration @unimplemented
+    @integration
     Scenario: The attributes this project's spans carry can be inserted into the condition
       When ana picks an attribute from the ones "specialists" spans carry
       Then it is inserted into the condition at the cursor
 
-    @integration @unimplemented
+    @integration
     Scenario: The signed calls switch and the condition stay in step
       Given "orchestrator" has a signing key in use
       When ana turns on only signed calls
@@ -68,7 +67,7 @@ Feature: The Braids screen
       And deleting it from the condition turns the switch off
       And the switch says which key "orchestrator" signs with and when it was last used
 
-    @integration @unimplemented
+    @integration
     Scenario: Only signed calls offers to set up signing when the reader has no key
       Given "orchestrator" has no signing key
       When ana turns on only signed calls
@@ -81,17 +80,17 @@ Feature: The Braids screen
       And with only signed calls on it counts the calls that stay hidden for having no valid signature
       And it shows an example trace with the braided spans marked and the rest struck through, seen by ana only
 
-    @integration @unimplemented
+    @integration
     Scenario: Testing a trace shows it exactly as the reader will see it
       When ana tests the condition against an "orchestrator" trace id
       Then that trace is shown with exactly the spans "orchestrator" will see
 
-    @integration @unimplemented
+    @integration
     Scenario: The dialog names how many people will see the spans
       When ana picks "orchestrator" as the project to braid into
       Then the dialog says how many members of "orchestrator" will see the braided spans
 
-    @integration @unimplemented
+    @integration
     Scenario: Creating the braid names the project it goes into
       When ana completes a supported condition, a start date and an end choice
       Then the create button reads "Braid into orchestrator"

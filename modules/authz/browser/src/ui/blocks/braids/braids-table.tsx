@@ -22,8 +22,17 @@ export type BraidsTableProps = {
   paused: boolean;
   canEdit: boolean;
   canRemove: boolean;
+  /** Spans per braid over the last 24 hours; undefined while counting. */
+  activity: ReadonlyMap<string, number> | undefined;
+  onEdit: (row: BraidRow) => void;
   onRemove: (row: BraidRow) => void;
 };
+
+function activityText({ paused, spans }: { paused: boolean; spans: number | undefined }): string {
+  if (paused) return "Paused";
+  if (spans === undefined) return "Counting spans";
+  return spans === 1 ? "1 span in 24h" : `${spans.toLocaleString("en-GB")} spans in 24h`;
+}
 
 function day(ms: number): string {
   return format(ms, "d MMM yyyy");
@@ -41,6 +50,8 @@ export function BraidsTable({
   paused,
   canEdit,
   canRemove,
+  activity,
+  onEdit,
   onRemove,
 }: BraidsTableProps) {
   return (
@@ -97,9 +108,8 @@ export function BraidsTable({
               </Stack>
             </ListTable.Cell>
             <ListTable.Cell>
-              {/* Activity counts arrive with the trace module's braided-span count. */}
               <Text fontSize="sm" color="fg.muted" data-testid="braid-activity">
-                {paused ? "Paused" : "No activity yet"}
+                {activityText({ paused, spans: activity?.get(row.braidId) })}
               </Text>
             </ListTable.Cell>
             <ListTable.ActionCell>
@@ -116,7 +126,7 @@ export function BraidsTable({
                 </Menu.Trigger>
                 <Menu.Content>
                   {canEdit && row.side === "into" ? (
-                    <Menu.Item value="edit" disabled data-testid="braid-edit">
+                    <Menu.Item value="edit" onClick={() => onEdit(row)} data-testid="braid-edit">
                       Edit
                     </Menu.Item>
                   ) : null}

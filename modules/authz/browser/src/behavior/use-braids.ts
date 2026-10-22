@@ -1,5 +1,8 @@
 // The Braids screens' reads and writes; a write refreshes the lists and says how it went.
 
+import type { AuthzProjectBraids } from "@langwatch/authz-contract";
+import { traceClient } from "@langwatch/trace-client";
+
 import { useAuthzHost } from "../model/authz-host.ts";
 import { authzApi } from "./authz-api.ts";
 
@@ -63,4 +66,23 @@ export function useSetBraidsPolicy({ organizationId }: { organizationId: string 
     set: (braidsOrganizationAdminsOnly: boolean) =>
       setting.mutate({ organizationId, braidsOrganizationAdminsOnly }),
   };
+}
+
+/** Each braid's spans over the last 24 hours, by braid id; undefined until it answers. */
+export function useBraidActivity({
+  projectId,
+  braids,
+}: {
+  projectId: string | undefined;
+  braids: AuthzProjectBraids | undefined;
+}): ReadonlyMap<string, number> | undefined {
+  const braidIds = [...(braids?.intoOtherProjects ?? []), ...(braids?.fromOtherProjects ?? [])].map(
+    (braid) => braid.braidId,
+  );
+  const activity = traceClient.traces.braidActivity.useQuery(
+    { projectId: projectId ?? "", braidIds },
+    { enabled: !!projectId && braidIds.length > 0, retry: false },
+  );
+  if (!activity.data) return undefined;
+  return new Map(activity.data.activity.map(({ braidId, spanCount }) => [braidId, spanCount]));
 }

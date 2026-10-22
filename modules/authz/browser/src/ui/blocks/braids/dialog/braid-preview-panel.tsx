@@ -1,0 +1,231 @@
+// What the reader will see: its traces over 7 days getting every, some or none of the owner's
+// spans, the calls held back for want of a signature, and one tested trace, seen by you only.
+
+import { Banner } from "@langwatch/design-system/banner";
+import {
+  Badge,
+  Box,
+  Button,
+  HStack,
+  Input,
+  Skeleton,
+  Stack,
+  Text,
+} from "@langwatch/design-system/primitives";
+import { ShieldCheck, Users } from "lucide-react";
+import { useState } from "react";
+
+import type { TestTraceRow } from "../../../../model/braids/braid-draft.ts";
+
+export type BraidPreviewCounts = {
+  every: number;
+  some: number;
+  none: number;
+  total: number;
+  capped: boolean;
+};
+
+export type BraidPreviewPanelProps = {
+  ownerName: string;
+  readerName: string | undefined;
+  preview:
+    | { state: "no-reader" | "refused" | "loading" | "error" }
+    | { state: "ready"; traces: BraidPreviewCounts; unsignedHidden: number | null };
+  unsignedWarning: boolean;
+  viewers: string | undefined;
+  test:
+    | { state: "idle" | "loading" | "error" | "not-found" }
+    | { state: "ready"; rows: TestTraceRow[] };
+  onTest: (traceId: string) => void;
+};
+
+const count = (value: number) => value.toLocaleString("en-GB");
+
+function Legend({ colour, label, value }: { colour: string; label: string; value: number }) {
+  return (
+    <HStack gap={2} fontSize="sm">
+      <Box width="10px" height="10px" borderRadius="sm" bg={colour} flexShrink={0} />
+      <Text flex={1} color="fg.muted">
+        {label}
+      </Text>
+      <Text fontVariantNumeric="tabular-nums">{count(value)}</Text>
+    </HStack>
+  );
+}
+
+function Counts({ ownerName, traces }: { ownerName: string; traces: BraidPreviewCounts }) {
+  const share = (value: number) => (traces.total === 0 ? 0 : (value / traces.total) * 100);
+  return (
+    <Stack gap={3} data-testid="braid-preview-counts">
+      <Text fontSize="2xl" fontWeight="semibold">
+        {count(traces.every + traces.some)}{" "}
+        <Text as="span" fontSize="sm" fontWeight="normal" color="fg.muted">
+          {`of ${count(traces.total)} traces get spans`}
+        </Text>
+      </Text>
+      <HStack
+        gap={0}
+        height="8px"
+        borderRadius="full"
+        overflow="hidden"
+        bg="bg.emphasized"
+        aria-hidden
+      >
+        <Box height="full" width={`${share(traces.every)}%`} bg="fg" />
+        <Box height="full" width={`${share(traces.some)}%`} bg="feature.braids.project.1" />
+      </HStack>
+      <Stack gap={1}>
+        <Legend colour="fg" label={`Every ${ownerName} span`} value={traces.every} />
+        <Legend colour="feature.braids.project.1" label="Some of its spans" value={traces.some} />
+        <Legend colour="bg.emphasized" label={`Nothing from ${ownerName}`} value={traces.none} />
+      </Stack>
+      {traces.capped ? (
+        <Text fontSize="xs" color="fg.muted" data-testid="braid-preview-capped">
+          {`Counted over the most recent ${count(traces.total)} traces only; there are more.`}
+        </Text>
+      ) : null}
+    </Stack>
+  );
+}
+
+function TestTrace({ test, onTest }: Pick<BraidPreviewPanelProps, "test" | "onTest">) {
+  const [traceId, setTraceId] = useState("");
+  return (
+    <Stack gap={2}>
+      <Text fontWeight="medium" fontSize="sm">
+        Test a trace
+      </Text>
+      <HStack
+        as="form"
+        gap={2}
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (traceId.trim()) onTest(traceId.trim());
+        }}
+      >
+        <Input
+          size="sm"
+          aria-label="Trace id"
+          placeholder="Paste a trace id"
+          value={traceId}
+          onChange={(event) => setTraceId(event.target.value)}
+          fontFamily="mono"
+        />
+        <Button
+          size="sm"
+          type="submit"
+          variant="outline"
+          loading={test.state === "loading"}
+          data-testid="braid-test"
+        >
+          Test
+        </Button>
+      </HStack>
+      {test.state === "not-found" ? (
+        <Text fontSize="sm" color="fg.muted">
+          The other project holds no trace with that id.
+        </Text>
+      ) : null}
+      {test.state === "error" ? (
+        <Text fontSize="sm" color="red.fg">
+          Couldn't test that trace. Try again.
+        </Text>
+      ) : null}
+      {test.state === "ready" ? (
+        <Stack
+          gap={1}
+          padding={3}
+          borderWidth="1px"
+          borderRadius="md"
+          data-testid="braid-test-trace"
+        >
+          <Text fontSize="xs" color="fg.subtle">
+            Only you see this test; nothing is saved.
+          </Text>
+          {test.rows.map((row) => (
+            <HStack
+              key={row.spanId}
+              gap={2}
+              paddingLeft={`${row.depth * 12}px`}
+              data-kind={row.kind}
+              data-testid="braid-test-span"
+            >
+              <Text
+                fontFamily="mono"
+                fontSize="sm"
+                color={row.kind === "withheld" ? "fg.subtle" : "fg"}
+                textDecoration={row.kind === "withheld" ? "line-through" : undefined}
+              >
+                {row.name}
+              </Text>
+              {row.kind === "braided" ? (
+                <Badge size="sm" colorPalette="orange">
+                  Braided
+                </Badge>
+              ) : null}
+              {row.kind === "withheld" ? (
+                <Text fontSize="xs" color="fg.subtle">
+                  Never sent
+                </Text>
+              ) : null}
+            </HStack>
+          ))}
+        </Stack>
+      ) : null}
+    </Stack>
+  );
+}
+
+export function BraidPreviewPanel(props: BraidPreviewPanelProps) {
+  const reader = props.readerName ?? "the other project";
+  const { preview } = props;
+  return (
+    <Stack gap={4} padding={4} borderRadius="lg" bg="bg.subtle" data-testid="braid-preview">
+      <Stack gap={0}>
+        <Text fontWeight="semibold">{`What ${reader} will see`}</Text>
+        <Text fontSize="xs" color="fg.muted">
+          Last 7 days, updates as you type
+        </Text>
+      </Stack>
+      {preview.state === "no-reader" ? (
+        <Text fontSize="sm" color="fg.muted">
+          Pick a project to braid into to see a preview.
+        </Text>
+      ) : null}
+      {preview.state === "refused" ? (
+        <Text fontSize="sm" color="red.fg">
+          Fix the condition to see a preview.
+        </Text>
+      ) : null}
+      {preview.state === "error" ? (
+        <Text fontSize="sm" color="red.fg">
+          Couldn't load the preview. It updates when you change the braid.
+        </Text>
+      ) : null}
+      {preview.state === "loading" ? <Skeleton height="120px" /> : null}
+      {preview.state === "ready" ? (
+        <>
+          <Counts ownerName={props.ownerName} traces={preview.traces} />
+          {preview.unsignedHidden !== null && preview.unsignedHidden > 0 ? (
+            <HStack gap={2} fontSize="sm" color="fg.muted" data-testid="braid-preview-unsigned">
+              <ShieldCheck size={14} aria-hidden />
+              <Text>{`${count(preview.unsignedHidden)} calls had no valid signature and stay hidden.`}</Text>
+            </HStack>
+          ) : null}
+        </>
+      ) : null}
+      {props.unsignedWarning ? (
+        <Banner status="warning" title="Anyone can set a tag">
+          {`Without signing, any caller that sets this tag can get spans shown in ${reader}.`}
+        </Banner>
+      ) : null}
+      {props.readerName ? <TestTrace test={props.test} onTest={props.onTest} /> : null}
+      {props.viewers ? (
+        <HStack gap={2} fontSize="sm" color="fg.muted" data-testid="braid-viewers">
+          <Users size={14} aria-hidden />
+          <Text>{`${props.viewers} in ${reader} will see these spans`}</Text>
+        </HStack>
+      ) : null}
+    </Stack>
+  );
+}

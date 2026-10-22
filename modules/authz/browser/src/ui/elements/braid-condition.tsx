@@ -1,7 +1,7 @@
 // A braid's condition in code style, or "Every span" when it braids every span.
 
 import { InlineCode } from "@langwatch/design-system/inline-code";
-import { Text } from "@langwatch/design-system/primitives";
+import { Box, Text } from "@langwatch/design-system/primitives";
 
 export function BraidCondition({ where }: { where: string | null }) {
   if (!where) {
@@ -11,5 +11,10 @@ export function BraidCondition({ where }: { where: string | null }) {
       </Text>
     );
   }
-  return <InlineCode truncate="end">{where}</InlineCode>;
+  // Ligatures would draw `==` as one glyph, which is not what the condition says.
+  return (
+    <Box as="span" display="contents" fontVariantLigatures="none">
+      <InlineCode truncate="end">{where}</InlineCode>
+    </Box>
+  );
 }

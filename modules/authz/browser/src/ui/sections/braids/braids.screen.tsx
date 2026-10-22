@@ -10,12 +10,16 @@ import { ContentTabs } from "@langwatch/design-system/content-tabs";
 import { EnterprisePill } from "@langwatch/design-system/enterprise-pill";
 import { FeatureMark } from "@langwatch/design-system/feature-mark";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Box, HStack, Skeleton, Stack, Text } from "@langwatch/design-system/primitives";
-import { Tooltip } from "@langwatch/design-system/tooltip";
+import { HStack, Skeleton, Stack, Text } from "@langwatch/design-system/primitives";
 import { BookOpen, Plus } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
-import { useBraidsPolicy, useProjectBraids, useRemoveBraid } from "../../../behavior/use-braids.ts";
+import {
+  useBraidActivity,
+  useBraidsPolicy,
+  useProjectBraids,
+  useRemoveBraid,
+} from "../../../behavior/use-braids.ts";
 import { useAuthzHost } from "../../../model/authz-host.ts";
 import {
   type BraidAffordances,
@@ -30,23 +34,28 @@ import { BraidsHowItWorks } from "../../blocks/braids/braids-how-it-works.tsx";
 import { BraidsTable } from "../../blocks/braids/braids-table.tsx";
 import { RemoveBraidDialog } from "../../blocks/braids/remove-braid-dialog.tsx";
 import { SectionErrorNotice } from "../../elements/section-error-notice.tsx";
+import { BraidDrawer } from "./braid-drawer.tsx";
 import { BraidsSigningKeys } from "./braids-signing-keys.tsx";
 
 type BraidsTab = "into" | "from" | "keys";
 
 export const BRAIDS_MANAGE_PERMISSION = "braids:manage";
 
-/** Until the braid dialog lands, New braid is shown disabled and says so. */
-function NewBraidButton({ placement }: { placement: "header" | "inline" }) {
+/** The braid drawer is URL-routed: `?braid=new`, or `?braid=<id>` for Edit. */
+const BRAID_QUERY_KEY = "braid";
+
+function NewBraidButton({
+  placement,
+  onOpen,
+}: {
+  placement: "header" | "inline";
+  onOpen: () => void;
+}) {
   return (
-    <Tooltip content="Creating braids from this page is coming soon.">
-      <Box as="span" display="inline-flex" tabIndex={0} data-testid={`new-braid-${placement}`}>
-        <PageLayout.HeaderButton primary disabled>
-          <Plus size={14} aria-hidden />
-          New braid
-        </PageLayout.HeaderButton>
-      </Box>
-    </Tooltip>
+    <PageLayout.HeaderButton primary onClick={onOpen} data-testid={`new-braid-${placement}`}>
+      <Plus size={14} aria-hidden />
+      New braid
+    </PageLayout.HeaderButton>
   );
 }
 
@@ -61,11 +70,22 @@ function GuideLink() {
   );
 }
 
-export function BraidsHeader({ actions }: { actions?: ReactNode }) {
+export function BraidsHeader({
+  actions,
+  projectName,
+}: {
+  actions?: ReactNode;
+  /** The project the page is about; the organisation screen names none. */
+  projectName?: string;
+}) {
   return (
     <PageLayout.Header
       actions={actions}
-      description="Show spans from one project inside another project's traces. Nothing is copied."
+      description={
+        projectName
+          ? `Show ${projectName}'s spans inside another project's traces. Nothing is copied.`
+          : "Show spans from one project inside another project's traces. Nothing is copied."
+      }
     >
       <HStack gap={2}>
         <FeatureMark feature="braids" size={22} />
@@ -116,6 +136,10 @@ export default function BraidsScreen() {
   const [tab, setTab] = useState<BraidsTab>("into");
   const [removing, setRemoving] = useState<BraidRow | null>(null);
   const removal = useRemoveBraid({ onRemoved: () => setRemoving(null) });
+  const activity = useBraidActivity({ projectId, braids: braids.data });
+  const { query } = host.route();
+  const openBraid = (braid: string | undefined) =>
+    host.setQuery({ ...query, [BRAID_QUERY_KEY]: braid });
 
   if (!projectId || isPlanLoading || braids.isLoading) return <LoadingBraids />;
   if (braids.isError || !braids.data) {
@@ -137,7 +161,7 @@ export default function BraidsScreen() {
   if (planState === "upsell") {
     return (
       <>
-        <BraidsHeader actions={<GuideLink />} />
+        <BraidsHeader actions={<GuideLink />} projectName={projectName} />
         <BraidsEnterpriseUpsell />
       </>
     );
@@ -159,6 +183,8 @@ export default function BraidsScreen() {
         paused={paused}
         canEdit={can.canEditInto}
         canRemove={can.canRemove}
+        activity={activity}
+        onEdit={(row) => openBraid(row.braidId)}
         onRemove={setRemoving}
       />
       <WhoMayBraidHint keptToAdmins={keptToAdmins} />
@@ -168,7 +194,7 @@ export default function BraidsScreen() {
   const guideAndNew = can.canCreate ? (
     <>
       <GuideLink />
-      <NewBraidButton placement="inline" />
+      <NewBraidButton placement="inline" onOpen={() => openBraid("new")} />
     </>
   ) : (
     <GuideLink />
@@ -178,14 +204,20 @@ export default function BraidsScreen() {
   );
   if (rows.into.length > 0) intoContent = table("into");
   else if (planState === "enterprise") intoContent = <BraidsHowItWorks actions={guideAndNew} />;
+  const asked = query[BRAID_QUERY_KEY];
+  const editing = braids.data.intoOtherProjects.find((braid) => braid.braidId === asked);
+  const drawerOpen = (asked === "new" && can.canCreate) || (!!editing && can.canEditInto);
 
   return (
     <>
       <BraidsHeader
+        projectName={projectName}
         actions={
           <>
             <GuideLink />
-            {can.canCreate ? <NewBraidButton placement="header" /> : null}
+            {can.canCreate ? (
+              <NewBraidButton placement="header" onOpen={() => openBraid("new")} />
+            ) : null}
           </>
         }
       />
@@ -251,6 +283,14 @@ export default function BraidsScreen() {
           ]}
         />
       </Stack>
+      {drawerOpen ? (
+        <BraidDrawer
+          key={asked}
+          projectId={projectId}
+          editing={editing}
+          onClose={() => openBraid(undefined)}
+        />
+      ) : null}
       <RemoveBraidDialog
         row={removing}
         projectName={projectName}

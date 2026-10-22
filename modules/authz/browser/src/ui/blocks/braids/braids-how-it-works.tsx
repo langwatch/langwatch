@@ -18,7 +18,14 @@ export function BraidsHowItWorks({ actions }: BraidsHowItWorksProps) {
   return (
     <Stack gap={4} data-testid="braids-how-it-works">
       <Card padding="none">
-        <Box borderBottomWidth="1px" borderColor="border" bg="bg.subtle">
+        <Box
+          borderBottomWidth="1px"
+          borderColor="border"
+          bg="bg.subtle"
+          display="grid"
+          placeItems="center"
+          css={{ "& > *": { width: "100%", height: "auto", maxWidth: "none" } }}
+        >
           <FeatureIllustration feature="braids" name="empty-state" />
         </Box>
         <Stack

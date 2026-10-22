@@ -6,7 +6,12 @@
 import { createModuleApi, type OutputsFromMap } from "@langwatch/api/web";
 import type { AuthzPermission } from "@langwatch/authorization";
 import type {
+  AuthzBraid,
   AuthzBraidRemoved,
+  AuthzBraidTargets,
+  AuthzChangeBraidInput,
+  AuthzCreateBraidInput,
+  AuthzProjectMembersHolding,
   AuthzChangeGrantRoleInput,
   AuthzCreateGrantInput,
   AuthzListGrantsInput,
@@ -117,6 +122,36 @@ export type AuthzApiMap = {
     /** Every live braid in the organisation, for its admins. */
     listOrganizationBraids: {
       query: { input: OrganizationScope; output: AuthzOrganizationBraids };
+    };
+    /** The braid dialog's writes; Enterprise, and refused by code (`braid_*`). */
+    createBraid: {
+      mutation: { input: Omit<AuthzCreateBraidInput, "caller" | "actor">; output: AuthzBraid };
+    };
+    changeBraid: {
+      mutation: { input: Omit<AuthzChangeBraidInput, "caller" | "actor">; output: AuthzBraid };
+    };
+    /** The picker: of the projects named, those the viewer may braid into or why not. */
+    listBraidTargets: {
+      query: { input: { projectId: string; projectIds: string[] }; output: AuthzBraidTargets };
+    };
+    /** How many people can read the reader's traces; a floor when not `exact`. */
+    countProjectTraceViewers: {
+      query: { input: { projectId: string }; output: AuthzProjectMembersHolding };
+    };
+  };
+
+  /** The reader's signing keys, which the only-signed-calls switch names. */
+  signingKeys: {
+    list: {
+      query: {
+        input: { projectId: string };
+        output: {
+          id: string;
+          name: string;
+          status: "active" | "verifying" | "revoked";
+          lastUsedAt: string | null;
+        }[];
+      };
     };
   };
 

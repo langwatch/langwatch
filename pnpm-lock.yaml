@@ -6101,12 +6101,18 @@ importers:
       '@langwatch/enterprise-billing-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/billing/contract
+      '@langwatch/handled-error':
+        specifier: workspace:*
+        version: link:../../../packages/handled-error
       '@langwatch/role-contract':
         specifier: workspace:*
         version: link:../../role/contract
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
+      '@langwatch/trace-client':
+        specifier: workspace:*
+        version: link:../../trace/client
       lucide-react:
         specifier: 'catalog:'
         version: 1.22.0(react@19.2.8)

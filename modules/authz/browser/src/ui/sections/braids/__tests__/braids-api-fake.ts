@@ -24,6 +24,26 @@ export type BraidsApiState = {
   keptToAdmins: boolean;
   remove: Mock<(input: unknown) => void>;
   setPolicy: Mock<(input: unknown) => void>;
+  targets: { projectId: string; selectable: boolean; reason?: "this_project" | "aggregate" }[];
+  viewers: { count: number; exact: boolean };
+  signingKeys: { id: string; name: string; status: "active"; lastUsedAt: string | null }[];
+  create: Mock<(input: unknown) => void>;
+  change: Mock<(input: unknown) => void>;
+  /** When set, the next save fails with it instead of answering. */
+  saveError: unknown;
+};
+
+/** The trace module's braid reads, as the Braids screens use them. */
+export type BraidTraceState = {
+  preview: {
+    refusal: null;
+    traces: { every: number; some: number; none: number; total: number; capped: boolean };
+    unsignedHidden: number | null;
+  };
+  previewAsked: Mock<(input: unknown) => void>;
+  attributeKeys: { key: string; spanCount: number }[];
+  activity: { braidId: string; spanCount: number }[] | undefined;
+  testTrace: { found: boolean; nodes: unknown[] };
 };
 
 export function braidsApiFake() {
@@ -33,6 +53,12 @@ export function braidsApiFake() {
     keptToAdmins: false,
     remove: vi.fn(),
     setPolicy: vi.fn(),
+    targets: [],
+    viewers: { count: 0, exact: true },
+    signingKeys: [],
+    create: vi.fn(),
+    change: vi.fn(),
+    saveError: undefined,
   };
   const mutation = (
     record: () => Mock<(input: unknown) => void>,
@@ -42,7 +68,8 @@ export function braidsApiFake() {
       isPending: false,
       mutate: (input: never) => {
         record()(input);
-        options.onSuccess?.(answer(input));
+        if (state.saveError) options.onError?.(state.saveError);
+        else options.onSuccess?.(answer(input));
       },
     }),
   });
@@ -52,6 +79,14 @@ export function braidsApiFake() {
       return { data, isLoading: false, isError: false };
     },
   });
+  const asked = (read: () => unknown) => ({
+    useQuery: (_input: unknown, options?: { enabled?: boolean }) => {
+      const enabled = options?.enabled !== false;
+      return { data: enabled ? read() : undefined, isLoading: false, isError: false };
+    },
+  });
+  const saved = (input: { readerProjectId: string; braidId?: string }) =>
+    liveBraid({ braidId: input.braidId ?? "b-new", readerProjectId: input.readerProjectId });
   const api = {
     useUtils: () => ({
       authz: {
@@ -73,6 +108,10 @@ export function braidsApiFake() {
         () => state.remove,
         (input: { braidId: string }) => ({ braidId: input.braidId }),
       ),
+      listBraidTargets: asked(() => state.targets),
+      countProjectTraceViewers: asked(() => state.viewers),
+      createBraid: mutation(() => state.create, saved),
+      changeBraid: mutation(() => state.change, saved),
       setBraidsPolicy: mutation(
         () => state.setPolicy,
         (input: { braidsOrganizationAdminsOnly: boolean }) => ({
@@ -84,8 +123,40 @@ export function braidsApiFake() {
       ),
     },
   };
-  return { api, state };
+  return { api: { ...api, signingKeys: { list: asked(() => state.signingKeys) } }, state };
 }
+
+export function braidTraceFake() {
+  const state: BraidTraceState = {
+    preview: {
+      refusal: null,
+      traces: { every: 0, some: 0, none: 0, total: 0, capped: false },
+      unsignedHidden: null,
+    },
+    previewAsked: vi.fn(),
+    attributeKeys: [],
+    activity: [],
+    testTrace: { found: false, nodes: [] },
+  };
+  const asked = (read: () => unknown, record?: Mock<(input: unknown) => void>) => ({
+    useQuery: (input: unknown, options?: { enabled?: boolean }) => {
+      const enabled = options?.enabled !== false;
+      if (enabled) record?.(input);
+      return { data: enabled ? read() : undefined, isLoading: false, isError: false };
+    },
+  });
+  const traceClient = {
+    traces: {
+      braidPreview: asked(() => state.preview, state.previewAsked),
+      braidAttributeKeys: asked(() => ({ keys: state.attributeKeys })),
+      braidActivity: asked(() => (state.activity ? { activity: state.activity } : undefined)),
+      braidTestTrace: asked(() => state.testTrace),
+    },
+  };
+  return { traceClient, state };
+}
+
+export const braidTraces = braidTraceFake();
 
 export const STRUCTURE = {
   organizationName: "Acme",

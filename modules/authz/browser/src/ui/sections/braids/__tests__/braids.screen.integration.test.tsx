@@ -7,13 +7,16 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("@langwatch/trace-client", async () => ({
+  traceClient: (await import("./braids-api-fake.ts")).braidTraces.traceClient,
+}));
 vi.mock("../../../../behavior/authz-api.ts", async () => ({
   authzApi: (await import("./braids-api-fake.ts")).braidsFake.api,
 }));
 
 // Isolation is off: reload so the screen binds this file's mock, not a sibling suite's.
 vi.resetModules();
-const { braidsFake, liveBraid, STRUCTURE } = await import("./braids-api-fake.ts");
+const { braidsFake, braidTraces, liveBraid, STRUCTURE } = await import("./braids-api-fake.ts");
 const { FakeAuthzHost, renderWithAuthzHost } = await import("../../../../testing.tsx");
 const { default: BraidsScreen } = await import("../braids.screen.tsx");
 
@@ -68,13 +71,14 @@ describe("BraidsScreen", () => {
     /** @scenario Each braid row shows where it goes, its condition, its access and its activity */
     it("Each braid row shows where it goes, its condition, its access and its activity", async () => {
       braidsFake.state.project = { intoOtherProjects: [liveBraid()], fromOtherProjects: [] };
+      braidTraces.state.activity = [{ braidId: "b-1", spanCount: 1204 }];
       renderAs();
       const row = screen.getByTestId("braid-row");
       expect(within(row).getByText("orchestrator")).toBeInTheDocument();
       expect(within(row).getByText('attributes["orchestrator"] == "web"')).toBeInTheDocument();
       expect(within(row).getByText("From 1 Oct 2026")).toBeInTheDocument();
       expect(within(row).getByText("Until 31 Dec 2026")).toBeInTheDocument();
-      expect(within(row).getByTestId("braid-activity")).toHaveTextContent("No activity yet");
+      expect(within(row).getByTestId("braid-activity")).toHaveTextContent("1,204 spans in 24h");
       await openRowMenu();
       expect(await screen.findByRole("menuitem", { name: "Edit" })).toBeInTheDocument();
       expect(screen.getByRole("menuitem", { name: "View in audit log" })).toHaveAttribute(

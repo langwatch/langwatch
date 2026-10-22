@@ -7,6 +7,9 @@ import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("@langwatch/trace-client", async () => ({
+  traceClient: (await import("./braids-api-fake.ts")).braidTraces.traceClient,
+}));
 vi.mock("../../../../behavior/authz-api.ts", async () => ({
   authzApi: (await import("./braids-api-fake.ts")).braidsFake.api,
 }));

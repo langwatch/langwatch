@@ -20,15 +20,17 @@
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",
-    "@langwatch/authorization": "workspace:*",
     "@langwatch/api-key-client": "workspace:*",
+    "@langwatch/authorization": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/browser": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/enterprise-billing-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
     "@langwatch/role-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
+    "@langwatch/trace-client": "workspace:*",
     "lucide-react": "catalog:",
     "react-feather": "catalog:",
     "react-hook-form": "catalog:"
