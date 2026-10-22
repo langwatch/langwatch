@@ -27,7 +27,7 @@ import {
 } from "@langwatch/dashboard-contract";
 import { z } from "zod";
 
-import { viewerOfActor } from "../rules/dashboard-viewer.rules.ts";
+import { viewerOfActor, viewerOfOwner } from "../rules/dashboard-viewer.rules.ts";
 
 /**
  * The deep link back into the dashboards page for the project this credential
@@ -279,9 +279,9 @@ export const dashboardWidgetRest = defineRestRouter(DashboardApi)
     resource: "dashboard widget",
     action: "delete",
     idParam: "widgetId",
-    name: ({ app, projectId, id }) =>
+    name: ({ app, projectId, id, ownerUserId }) =>
       nameUnlessMissing({
-        read: app.getDashboardWidget({ projectId, id }),
+        read: app.getDashboardWidget({ projectId, id, ...viewerOfOwner({ ownerUserId }) }),
         missing: DashboardWidgetNotFoundError,
         nameOf: (widget) => widget.name,
       }),
