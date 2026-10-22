@@ -142,47 +142,30 @@ const buildSafeRegex = (pattern: string): RegExp | null => {
 };
 
 /**
- * Per cost list: each rate's compiled pattern and the winning rate (`null` for none) per model
- * name. Keyed by the list itself, so a newly read list starts empty and a dropped one is garbage
- * collected. Lists are treated as values; the length check only catches one resized in place.
+ * The winning rate (`null` for none) per model name, kept per cost list. Keyed by the list itself,
+ * so a newly read list starts empty and a dropped one is garbage collected. A cost list must be
+ * treated as immutable once passed in: build a new array to change a price, never edit one in
+ * place, or remembered answers go stale.
  */
-type CostListLookups = {
-  length: number;
-  patterns: (RegExp | null | undefined)[];
-  matches: Map<string, ModelCostRate | null>;
-};
-
-const costListLookups = new WeakMap<readonly ModelCostRate[], CostListLookups>();
+const costListMatches = new WeakMap<readonly ModelCostRate[], Map<string, ModelCostRate | null>>();
 const MATCHES_PER_COST_LIST_MAX_ENTRIES = 2_000;
 
-const lookupsFor = (costs: readonly ModelCostRate[]): CostListLookups => {
-  const existing = costListLookups.get(costs);
-  if (existing && existing.length === costs.length) return existing;
-  const created: CostListLookups = {
-    length: costs.length,
-    patterns: [],
-    matches: new Map(),
-  };
-  costListLookups.set(costs, created);
-  return created;
+const matchesFor = (costs: readonly ModelCostRate[]): Map<string, ModelCostRate | null> => {
+  let matches = costListMatches.get(costs);
+  if (!matches) {
+    matches = new Map();
+    costListMatches.set(costs, matches);
+  }
+  return matches;
 };
 
 const findModelCost = (
   model: string,
   costs: readonly ModelCostRate[],
-  lookups: CostListLookups,
 ): ModelCostRate | undefined => {
-  for (let index = 0; index < costs.length; index++) {
-    const cost = costs[index]!;
-    let pattern = lookups.patterns[index];
-    if (pattern === undefined) {
-      pattern = buildSafeRegex(cost.regex);
-      lookups.patterns[index] = pattern;
-    }
-    if (pattern?.test(model)) return cost;
-  }
-  if (model.includes("/"))
-    return findModelCost(model.slice(model.indexOf("/") + 1), costs, lookups);
+  const matched = costs.find((cost) => buildSafeRegex(cost.regex)?.test(model));
+  if (matched) return matched;
+  if (model.includes("/")) return findModelCost(model.slice(model.indexOf("/") + 1), costs);
   return undefined;
 };
 
@@ -207,38 +190,36 @@ export const findMatchingModelCost = (
   model: string,
   costs: readonly ModelCostRate[],
 ): ModelCostRate[] => {
-  const lookups = lookupsFor(costs);
+  const matches = matchesFor(costs);
   // `null` remembers a miss, so an unknown model is not rescanned on every span.
-  let match = lookups.matches.get(model);
+  let match = matches.get(model);
   if (match === undefined) {
     match =
-      findCandidateModelCost({ candidate: model, costs, lookups }) ??
-      findSubtypeStrippedModelCost({ model, costs, lookups }) ??
-      findBedrockModelCost({ model, costs, lookups }) ??
+      findCandidateModelCost({ candidate: model, costs }) ??
+      findSubtypeStrippedModelCost({ model, costs }) ??
+      findBedrockModelCost({ model, costs }) ??
       null;
-    if (lookups.matches.size >= MATCHES_PER_COST_LIST_MAX_ENTRIES) lookups.matches.clear();
-    lookups.matches.set(model, match);
+    if (matches.size >= MATCHES_PER_COST_LIST_MAX_ENTRIES) matches.clear();
+    matches.set(model, match);
   }
   return match ? [match] : [];
 };
 
-type CostListScan = { costs: readonly ModelCostRate[]; lookups: CostListLookups };
+type CostListScan = { costs: readonly ModelCostRate[] };
 
 function findCandidateModelCost({
   candidate,
   costs,
-  lookups,
 }: CostListScan & { candidate: string }): ModelCostRate | undefined {
-  const raw = findModelCost(candidate, costs, lookups);
+  const raw = findModelCost(candidate, costs);
   if (raw) return raw;
   const normalized = normalizeModelName(candidate);
-  return normalized === candidate ? undefined : findModelCost(normalized, costs, lookups);
+  return normalized === candidate ? undefined : findModelCost(normalized, costs);
 }
 
 function findSubtypeStrippedModelCost({
   model,
   costs,
-  lookups,
 }: CostListScan & { model: string }): ModelCostRate | undefined {
   const slash = model.indexOf("/");
   if (slash === -1) return undefined;
@@ -247,19 +228,17 @@ function findSubtypeStrippedModelCost({
   return findCandidateModelCost({
     candidate: provider.split(".")[0] + model.slice(slash),
     costs,
-    lookups,
   });
 }
 
 function findBedrockModelCost({
   model,
   costs,
-  lookups,
 }: CostListScan & { model: string }): ModelCostRate | undefined {
   const bedrock = normalizeBedrockModelId(model);
   return bedrock === model
     ? undefined
-    : findCandidateModelCost({ candidate: bedrock, costs, lookups });
+    : findCandidateModelCost({ candidate: bedrock, costs });
 }
 
 /**

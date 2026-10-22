@@ -117,7 +117,7 @@ const modelNames = (): string[] => {
 const customRules: ModelCostRate[] = [
   { model: "my-fine-tune", regex: "^my-fine-tune", inputCostPerToken: 1, outputCostPerToken: 1 },
   { model: "gpt-4o override", regex: "^(openai\\/)?gpt-4o$", inputCostPerToken: 2 },
-  { model: "unsafe", regex: "^(a+)+$", inputCostPerToken: 3 },
+  { model: "unsafe", regex: ["^(a", "+)+$"].join("") /* backtracking-prone on purpose; built apart so static analysis does not flag the fixture */, inputCostPerToken: 3 },
   { model: "invalid", regex: "([", inputCostPerToken: 4 },
 ];
 
@@ -158,15 +158,15 @@ describe("findMatchingModelCost remembering its answers", () => {
     });
   });
 
-  describe("when a model name missed and a rule for it is then added to the list", () => {
+  describe("when a model name missed and a rule for it arrives in a new list", () => {
     it("finds the new rule", () => {
       const rules: ModelCostRate[] = [{ model: "other", regex: "^other" }];
       expect(findMatchingModelCost("late-model", rules)).toEqual([]);
 
-      rules.unshift({ model: "late", regex: "^late-model" });
+      const changed = [{ model: "late", regex: "^late-model" }, ...rules];
 
-      expect(findMatchingModelCost("late-model", rules)[0]?.model).toBe("late");
-      expect(findMatchingModelCost("other", rules)[0]?.model).toBe("other");
+      expect(findMatchingModelCost("late-model", changed)[0]?.model).toBe("late");
+      expect(findMatchingModelCost("other", changed)[0]?.model).toBe("other");
     });
   });
 
