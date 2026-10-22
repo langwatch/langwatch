@@ -332,4 +332,25 @@ describe("given a deployment that reaches the internet only through an outbound 
     });
     expect(asked).toEqual([]);
   });
+
+  /** @scenario "NO_PROXY does not lift the public-address check on discovery" */
+  it("refuses an issuer NO_PROXY names when it resolves privately", async () => {
+    const asked: string[] = [];
+    const channel = HttpsSsoIssuerDiscoveryChannel.create({
+      policy: POLICY,
+      proxy: { httpsProxy: "http://proxy.corp.example:3128", noProxy: "login.acme.okta.com" },
+      validate: async () => {
+        throw new Error("resolves to a private address");
+      },
+      fetchValidated: async (validated) => {
+        asked.push(validated.originalUrl);
+        return respond(200, DISCOVERY_DOCUMENT);
+      },
+    });
+
+    await expect(channel.discover({ issuer: ISSUER })).resolves.toMatchObject({
+      reachable: false,
+    });
+    expect(asked).toEqual([]);
+  });
 });
