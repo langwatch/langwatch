@@ -43123,7 +43123,7 @@ LIMIT 50
 
 ## Judgments: Instant Eval verdicts per question
 
-`judgments` has one row per [Instant Eval](/features/instant-evals/overview) run, trace and question, and its time column is `CreatedAt`. Bind the run id as a parameter. With the CLI, add `--param run=<run-id>`. With REST, add `"parameters": {"run": "<run-id>"}` to the request body.
+`judgments` has one row per [Instant Eval](/features/instant-evals/overview) run, trace and question, and its time column is `CreatedAt`. Rows with `Status` `skipped` or `failed` have no verdict, so the statement keeps only `judged` rows. Bind the run id as a parameter. With the CLI, add `--param run=<run-id>`. With REST, add `"parameters": {"run": "<run-id>"}` to the request body.
 
 ```sql
 SELECT
@@ -43132,6 +43132,7 @@ SELECT
   count() AS judged
 FROM langwatch.judgments
 WHERE RunId = {run:String}
+  AND Status = 'judged'
   AND CreatedAt >= subtractDays(now(), 7)
 GROUP BY QuestionId
 ORDER BY QuestionId
