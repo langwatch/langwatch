@@ -14,11 +14,11 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
-    "@ai-sdk/openai": "^2.0.6",
+    "@ai-sdk/openai": "^2.0.116",
     "@opentelemetry/context-async-hooks": "^2.0.1",
     "@opentelemetry/sdk-node": "^0.217.0",
     "@vercel/otel": "^1.13.0",
-    "ai": "^5.0.52",
+    "ai": "^5.0.222",
     "cli-markdown": "^3.5.1",
     "dotenv-cli": "^10.0.0",
     "langwatch": "file:../../"
