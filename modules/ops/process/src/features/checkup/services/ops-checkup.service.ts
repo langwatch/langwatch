@@ -111,14 +111,15 @@ export class OpsCheckupService {
     };
   }
 
-  static create({
+  /** The usage report this install sends, built over the checkup's own dependencies. */
+  private static usageReportsOf({
     facts,
     config,
     peers,
     repositories,
     channels,
     opsHealth,
-  }: OpsCheckupDependencies): OpsCheckupService {
+  }: OpsCheckupDependencies): UsageReportService {
     const collection = UsageReportCollectionService.create({
       peers,
       opsHealth,
@@ -131,7 +132,7 @@ export class OpsCheckupService {
         gatewayConfigured: Boolean(peers.gateway.getDeploymentAddresses().baseUrl),
       }),
     });
-    const usageReports = UsageReportService.create({
+    return UsageReportService.create({
       collection,
       organizations: peers.organizationDirectory,
       channel: channels.usageReport,
@@ -142,6 +143,24 @@ export class OpsCheckupService {
       noticesDisabled: config.noticesDisabled,
       isSaas: facts.isSaas,
       now: nowInstant,
+    });
+  }
+
+  static create({
+    facts,
+    config,
+    peers,
+    repositories,
+    channels,
+    opsHealth,
+  }: OpsCheckupDependencies): OpsCheckupService {
+    const usageReports = OpsCheckupService.usageReportsOf({
+      facts,
+      config,
+      peers,
+      repositories,
+      channels,
+      opsHealth,
     });
     const { postgres, clickhouse, redis, upgradeLedger } = repositories;
     const factsFor = ({
