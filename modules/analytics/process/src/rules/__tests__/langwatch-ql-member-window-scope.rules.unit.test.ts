@@ -35,10 +35,12 @@ function scope({
   sql,
   memberWindows,
   excludeOrigins = [],
+  timeWindow,
 }: {
   sql: string;
   memberWindows?: readonly LangWatchQLMemberWindow[];
   excludeOrigins?: readonly string[];
+  timeWindow?: { start: string; end: string };
 }): string {
   return scopeLangWatchQL({
     sql,
@@ -46,6 +48,7 @@ function scope({
     database: "analytics",
     views: VIEWS,
     ...(memberWindows ? { memberWindows } : {}),
+    ...(timeWindow ? { timeWindow } : {}),
   });
 }
 
@@ -154,10 +157,10 @@ describe("scopeLangWatchQL with member windows", () => {
   });
 
   describe("given a dated member's evaluations", () => {
-    const traceInside =
+    const traceInside = (bound = "") =>
       "(ifNull(TraceId, '') = '' OR (TenantId, TraceId) IN (SELECT TenantId, TraceId " +
       "FROM analytics.traces WHERE TenantId = 'project_b' " +
-      `AND OccurredAt >= fromUnixTimestamp64Milli(toInt64(${SHARED_FROM}))))`;
+      `AND OccurredAt >= fromUnixTimestamp64Milli(toInt64(${SHARED_FROM}))${bound}))`;
 
     /** @scenario "The aggregate counts a member's evaluations by when their trace occurred" */
     it("reads an evaluation only when its trace is inside the window", () => {
@@ -166,8 +169,28 @@ describe("scopeLangWatchQL with member windows", () => {
       ).toBe(
         "SELECT count() FROM (SELECT * FROM evaluations WHERE (TenantId IN ('project_a') OR " +
           "(TenantId = 'project_b' AND " +
-          `ScheduledAt >= fromUnixTimestamp64Milli(toInt64(${SHARED_FROM})) AND ${traceInside}))) ` +
+          `ScheduledAt >= fromUnixTimestamp64Milli(toInt64(${SHARED_FROM})) AND ${traceInside()}))) ` +
           "AS evaluations",
+      );
+    });
+
+    it("bounds the trace lookup by the statement's period, as the origin lookup is bounded", () => {
+      const windowStart = "toDateTime('2026-03-10 00:00:00', 'UTC')";
+      const windowEnd = "toDateTime('2026-03-13 00:00:00', 'UTC')";
+      const lookupBound =
+        ` AND OccurredAt >= subtractDays(subtractSeconds(${windowStart}, ` +
+        `dateDiff('second', ${windowStart}, ${windowEnd})), 1)`;
+
+      expect(
+        scope({
+          sql: "SELECT count() FROM evaluations",
+          memberWindows: [DATED_B],
+          timeWindow: { start: "2026-03-10T00:00:00.000Z", end: "2026-03-13T00:00:00.000Z" },
+        }),
+      ).toBe(
+        "SELECT count() FROM (SELECT * FROM evaluations WHERE ((TenantId = 'project_b' AND " +
+          `ScheduledAt >= fromUnixTimestamp64Milli(toInt64(${SHARED_FROM})) AND ` +
+          `${traceInside(lookupBound)}))) AS evaluations`,
       );
     });
 

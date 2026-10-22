@@ -216,10 +216,12 @@ function buildWindowPredicates({
   views,
   database,
   memberWindows,
+  timeWindow,
 }: {
   views: readonly LangWatchQLViewDefinition[];
   database: string;
   memberWindows: readonly LangWatchQLMemberWindow[];
+  timeWindow: LangWatchQLTimeWindow | undefined;
 }): ReadonlyMap<string, string> {
   const whole = memberWindows.filter((window) => window.from <= 0);
   const wholeClause =
@@ -233,6 +235,7 @@ function buildWindowPredicates({
     dated: memberWindows.filter((window) => window.from > 0),
     canReachTraceView: views.some((view) => qualified(view.name) === traceView),
     evaluationViews: new Set(EVALUATION_VIEWS.map(qualified)),
+    timeWindow,
   };
 
   const predicates = new Map<string, string>();
@@ -254,6 +257,8 @@ type WindowReach = {
   dated: readonly LangWatchQLMemberWindow[];
   canReachTraceView: boolean;
   evaluationViews: ReadonlySet<string>;
+  /** The statement's period, bounding the trace lookup as the origin lookup is bounded. */
+  timeWindow: LangWatchQLTimeWindow | undefined;
 };
 
 const startOf = (window: LangWatchQLMemberWindow) =>
@@ -263,15 +268,19 @@ const startOf = (window: LangWatchQLMemberWindow) =>
 function traceInside({
   window,
   database,
+  timeWindow,
 }: {
   window: LangWatchQLMemberWindow;
   database: string;
+  timeWindow: LangWatchQLTimeWindow | undefined;
 }): string {
   return (
     `(ifNull(${TRACE_ID_COLUMN}, '') = '' OR (${TENANT_COLUMN}, ${TRACE_ID_COLUMN}) IN ` +
     `(SELECT ${TENANT_COLUMN}, ${TRACE_ID_COLUMN} FROM ${database}.${TRACE_VIEW} ` +
     `WHERE ${TENANT_COLUMN} = ${clickHouseLiteral(window.projectId)} ` +
-    `AND OccurredAt >= ${startOf(window)}))`
+    `AND OccurredAt >= ${startOf(window)}` +
+    (timeWindow ? ` AND OccurredAt >= ${traceLookupStart(timeWindow)}` : "") +
+    "))"
   );
 }
 
@@ -298,7 +307,13 @@ function datedPicks({
     (window) =>
       `(${TENANT_COLUMN} = ${clickHouseLiteral(window.projectId)} AND ` +
       `${timeColumn} >= ${startOf(window)}` +
-      (isEvaluationView ? ` AND ${traceInside({ window, database: reach.database })}` : "") +
+      (isEvaluationView
+        ? ` AND ${traceInside({
+            window,
+            database: reach.database,
+            timeWindow: reach.timeWindow,
+          })}`
+        : "") +
       ")",
   );
 }
@@ -346,7 +361,7 @@ export function scopeLangWatchQL({
         });
   const windows =
     isWindowed && memberWindows
-      ? buildWindowPredicates({ views, database, memberWindows })
+      ? buildWindowPredicates({ views, database, memberWindows, timeWindow })
       : undefined;
   const rewrites = findViewReferences({ statements: parsed.statements, database }).flatMap(
     (reference) => {
