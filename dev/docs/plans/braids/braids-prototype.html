@@ -1,421 +1,1922 @@
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Braids · design prototype</title>
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-<style>
-  :root {
-    --fg: #111113; --fg-2: #2d2d3d; --muted: #5c5c6e; --subtle: #7b8394; --faint: #9ca3af;
-    --line: #e2e8f0; --line-2: #e7ecf2; --bg: #f8fafc; --bg-2: #f1f5f9; --card: #fff;
-    --orange: #ed8926; --orange-600: #dd6b20; --orange-700: #c05621; --orange-50: #fffaf0; --orange-100: #fff3e4; --orange-200: #ffd19b;
-    --slate: #3d3d4d; --blue: #2563eb; --green: #16a34a; --green-50: #f0fdf4; --red: #dc2626; --red-50: #fef2f2; --yellow-50: #fefce8; --yellow-700: #a16207;
-    --r: 8px; --r-lg: 12px;
-    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-    --shadow: 0 1px 2px rgba(17,17,19,.04), 0 1px 3px rgba(17,17,19,.06);
-    --shadow-lg: 0 24px 48px -12px rgba(17,17,19,.25), 0 0 0 1px rgba(17,17,19,.04);
-  }
-  * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; }
-  body { font: 14px/1.5 Inter, system-ui, sans-serif; color: var(--fg); background: var(--bg); -webkit-font-smoothing: antialiased; }
-  button { font: inherit; color: inherit; cursor: pointer; }
-  code, .mono { font-family: var(--mono); font-size: 12.5px; }
-  code, .mono, pre, textarea, .cond, .mini, .chip, .secret, .act { font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0; }
-  svg.i { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
-  svg.i.sm { width: 14px; height: 14px; }
-  svg.i.lg { width: 20px; height: 20px; }
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Braids · design prototype</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --fg: #111113;
+        --fg-2: #2d2d3d;
+        --muted: #5c5c6e;
+        --subtle: #7b8394;
+        --faint: #9ca3af;
+        --line: #e2e8f0;
+        --line-2: #e7ecf2;
+        --bg: #f8fafc;
+        --bg-2: #f1f5f9;
+        --card: #fff;
+        --orange: #ed8926;
+        --orange-600: #dd6b20;
+        --orange-700: #c05621;
+        --orange-50: #fffaf0;
+        --orange-100: #fff3e4;
+        --orange-200: #ffd19b;
+        --slate: #3d3d4d;
+        --blue: #2563eb;
+        --green: #16a34a;
+        --green-50: #f0fdf4;
+        --red: #dc2626;
+        --red-50: #fef2f2;
+        --yellow-50: #fefce8;
+        --yellow-700: #a16207;
+        --r: 8px;
+        --r-lg: 12px;
+        --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+        --shadow: 0 1px 2px rgba(17, 17, 19, 0.04), 0 1px 3px rgba(17, 17, 19, 0.06);
+        --shadow-lg: 0 24px 48px -12px rgba(17, 17, 19, 0.25), 0 0 0 1px rgba(17, 17, 19, 0.04);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+      }
+      body {
+        font:
+          14px/1.5 Inter,
+          system-ui,
+          sans-serif;
+        color: var(--fg);
+        background: var(--bg);
+        -webkit-font-smoothing: antialiased;
+      }
+      button {
+        font: inherit;
+        color: inherit;
+        cursor: pointer;
+      }
+      code,
+      .mono {
+        font-family: var(--mono);
+        font-size: 12.5px;
+      }
+      code,
+      .mono,
+      pre,
+      textarea,
+      .cond,
+      .mini,
+      .chip,
+      .secret,
+      .act {
+        font-variant-ligatures: none;
+        font-feature-settings:
+          "liga" 0,
+          "calt" 0;
+      }
+      svg.i {
+        width: 16px;
+        height: 16px;
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        flex: none;
+      }
+      svg.i.sm {
+        width: 14px;
+        height: 14px;
+      }
+      svg.i.lg {
+        width: 20px;
+        height: 20px;
+      }
 
-  /* prototype chrome */
-  .proto { position: fixed; inset: 0 0 auto 0; height: 52px; background: #0d0d10; color: #e7ecf2; display: flex; align-items: center; gap: 16px; padding: 0 16px; z-index: 50; }
-  .proto .brand { display: flex; align-items: center; gap: 8px; font-weight: 600; white-space: nowrap; }
-  .proto .brand small { color: #7b8394; font-weight: 500; }
-  .steps { display: flex; gap: 4px; overflow-x: auto; flex: 1; scrollbar-width: none; }
-  .steps button { background: transparent; border: 1px solid transparent; color: #9ca3af; border-radius: 999px; padding: 5px 11px; font-size: 12.5px; white-space: nowrap; display: flex; gap: 6px; align-items: center; }
-  .steps button .n { width: 18px; height: 18px; border-radius: 50%; background: #2d2d3d; color: #cbd5e1; font-size: 11px; display: grid; place-items: center; font-weight: 600; }
-  .steps button:hover { color: #fff; }
-  .steps button.on { background: #1f1f28; border-color: #3d3d4d; color: #fff; }
-  .steps button.on .n { background: var(--orange); color: #111113; }
-  .proto .toggle { background: #1f1f28; border: 1px solid #3d3d4d; color: #e7ecf2; border-radius: 6px; padding: 5px 10px; font-size: 12.5px; display: flex; gap: 6px; align-items: center; white-space: nowrap; }
+      /* prototype chrome */
+      .proto {
+        position: fixed;
+        inset: 0 0 auto 0;
+        height: 52px;
+        background: #0d0d10;
+        color: #e7ecf2;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 0 16px;
+        z-index: 50;
+      }
+      .proto .brand {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      .proto .brand small {
+        color: #7b8394;
+        font-weight: 500;
+      }
+      .steps {
+        display: flex;
+        gap: 4px;
+        overflow-x: auto;
+        flex: 1;
+        scrollbar-width: none;
+      }
+      .steps button {
+        background: transparent;
+        border: 1px solid transparent;
+        color: #9ca3af;
+        border-radius: 999px;
+        padding: 5px 11px;
+        font-size: 12.5px;
+        white-space: nowrap;
+        display: flex;
+        gap: 6px;
+        align-items: center;
+      }
+      .steps button .n {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: #2d2d3d;
+        color: #cbd5e1;
+        font-size: 11px;
+        display: grid;
+        place-items: center;
+        font-weight: 600;
+      }
+      .steps button:hover {
+        color: #fff;
+      }
+      .steps button.on {
+        background: #1f1f28;
+        border-color: #3d3d4d;
+        color: #fff;
+      }
+      .steps button.on .n {
+        background: var(--orange);
+        color: #111113;
+      }
+      .proto .toggle {
+        background: #1f1f28;
+        border: 1px solid #3d3d4d;
+        color: #e7ecf2;
+        border-radius: 6px;
+        padding: 5px 10px;
+        font-size: 12.5px;
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        white-space: nowrap;
+      }
 
-  .app { position: fixed; inset: 52px 0 0 0; display: grid; grid-template-columns: 56px 1fr; }
-  .app.notes-open { right: 340px; }
-  .rail { background: #fff; border-right: 1px solid var(--line); display: flex; flex-direction: column; align-items: center; padding: 12px 0; gap: 4px; }
-  .rail .logo { width: 30px; height: 30px; border-radius: 8px; background: var(--orange); display: grid; place-items: center; margin-bottom: 12px; color: #111113; font-weight: 800; font-size: 13px; }
-  .rail a { width: 36px; height: 36px; border-radius: 8px; display: grid; place-items: center; color: var(--subtle); }
-  .rail a.on { background: var(--orange-100); color: var(--orange-700); }
-  .rail .grow { flex: 1; }
-  .main { overflow: auto; display: flex; flex-direction: column; }
-  .topbar { height: 52px; flex: none; background: #fff; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 10px; padding: 0 20px; position: sticky; top: 0; z-index: 5; }
-  .crumb { display: flex; align-items: center; gap: 8px; color: var(--muted); }
-  .crumb b { color: var(--fg); font-weight: 600; }
-  .switcher { display: flex; align-items: center; gap: 8px; padding: 4px 8px 4px 4px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
-  .topbar .sp { flex: 1; }
-  .me { width: 28px; height: 28px; border-radius: 50%; background: #213b41; color: #fff; display: grid; place-items: center; font-size: 11px; font-weight: 600; }
+      .app {
+        position: fixed;
+        inset: 52px 0 0 0;
+        display: grid;
+        grid-template-columns: 56px 1fr;
+      }
+      .app.notes-open {
+        right: 340px;
+      }
+      .rail {
+        background: #fff;
+        border-right: 1px solid var(--line);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 12px 0;
+        gap: 4px;
+      }
+      .rail .logo {
+        width: 30px;
+        height: 30px;
+        border-radius: 8px;
+        background: var(--orange);
+        display: grid;
+        place-items: center;
+        margin-bottom: 12px;
+        color: #111113;
+        font-weight: 800;
+        font-size: 13px;
+      }
+      .rail a {
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        color: var(--subtle);
+      }
+      .rail a.on {
+        background: var(--orange-100);
+        color: var(--orange-700);
+      }
+      .rail .grow {
+        flex: 1;
+      }
+      .main {
+        overflow: auto;
+        display: flex;
+        flex-direction: column;
+      }
+      .topbar {
+        height: 52px;
+        flex: none;
+        background: #fff;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 0 20px;
+        position: sticky;
+        top: 0;
+        z-index: 5;
+      }
+      .crumb {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--muted);
+      }
+      .crumb b {
+        color: var(--fg);
+        font-weight: 600;
+      }
+      .switcher {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 4px 8px 4px 4px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+      }
+      .topbar .sp {
+        flex: 1;
+      }
+      .me {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: #213b41;
+        color: #fff;
+        display: grid;
+        place-items: center;
+        font-size: 11px;
+        font-weight: 600;
+      }
 
-  .av { width: 22px; height: 22px; border-radius: 6px; display: inline-grid; place-items: center; color: #fff; font-size: 10px; font-weight: 700; flex: none; letter-spacing: .02em; }
-  .av.sm { width: 18px; height: 18px; border-radius: 5px; font-size: 9px; }
-  .av.lg { width: 32px; height: 32px; border-radius: 8px; font-size: 12px; }
+      .av {
+        width: 22px;
+        height: 22px;
+        border-radius: 6px;
+        display: inline-grid;
+        place-items: center;
+        color: #fff;
+        font-size: 10px;
+        font-weight: 700;
+        flex: none;
+        letter-spacing: 0.02em;
+      }
+      .av.sm {
+        width: 18px;
+        height: 18px;
+        border-radius: 5px;
+        font-size: 9px;
+      }
+      .av.lg {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        font-size: 12px;
+      }
 
-  .settings { display: grid; grid-template-columns: 232px 1fr; flex: 1; min-height: 0; }
-  .snav { border-right: 1px solid var(--line); background: #fff; padding: 20px 12px; overflow: auto; }
-  .snav h6 { margin: 16px 10px 6px; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--subtle); font-weight: 600; }
-  .snav h6:first-child { margin-top: 0; }
-  .snav a { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; color: var(--fg-2); text-decoration: none; font-size: 13.5px; }
-  .snav a.on { background: var(--bg-2); color: var(--fg); font-weight: 600; }
-  .snav a .tag { margin-left: auto; }
-  .content { padding: 32px 40px 80px; max-width: 1120px; width: 100%; }
+      .settings {
+        display: grid;
+        grid-template-columns: 232px 1fr;
+        flex: 1;
+        min-height: 0;
+      }
+      .snav {
+        border-right: 1px solid var(--line);
+        background: #fff;
+        padding: 20px 12px;
+        overflow: auto;
+      }
+      .snav h6 {
+        margin: 16px 10px 6px;
+        font-size: 11px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--subtle);
+        font-weight: 600;
+      }
+      .snav h6:first-child {
+        margin-top: 0;
+      }
+      .snav a {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 10px;
+        border-radius: 6px;
+        color: var(--fg-2);
+        text-decoration: none;
+        font-size: 13.5px;
+      }
+      .snav a.on {
+        background: var(--bg-2);
+        color: var(--fg);
+        font-weight: 600;
+      }
+      .snav a .tag {
+        margin-left: auto;
+      }
+      .content {
+        padding: 32px 40px 80px;
+        max-width: 1120px;
+        width: 100%;
+      }
 
-  .pill { display: inline-flex; align-items: center; gap: 4px; border-radius: 999px; padding: 1px 8px; font-size: 11.5px; font-weight: 600; border: 1px solid var(--line); background: #fff; color: var(--muted); white-space: nowrap; }
-  .pill.ent { border-color: #e9d5ff; background: #faf5ff; color: #7e22ce; }
-  .pill.ok { border-color: #bbf7d0; background: var(--green-50); color: #15803d; }
-  .pill.warn { border-color: #fde68a; background: var(--yellow-50); color: var(--yellow-700); }
-  .pill.bad { border-color: #fecaca; background: var(--red-50); color: var(--red); }
-  .pill.orange { border-color: var(--orange-200); background: var(--orange-50); color: var(--orange-700); }
-  .pill.quiet { background: var(--bg-2); border-color: transparent; }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        border-radius: 999px;
+        padding: 1px 8px;
+        font-size: 11.5px;
+        font-weight: 600;
+        border: 1px solid var(--line);
+        background: #fff;
+        color: var(--muted);
+        white-space: nowrap;
+      }
+      .pill.ent {
+        border-color: #e9d5ff;
+        background: #faf5ff;
+        color: #7e22ce;
+      }
+      .pill.ok {
+        border-color: #bbf7d0;
+        background: var(--green-50);
+        color: #15803d;
+      }
+      .pill.warn {
+        border-color: #fde68a;
+        background: var(--yellow-50);
+        color: var(--yellow-700);
+      }
+      .pill.bad {
+        border-color: #fecaca;
+        background: var(--red-50);
+        color: var(--red);
+      }
+      .pill.orange {
+        border-color: var(--orange-200);
+        background: var(--orange-50);
+        color: var(--orange-700);
+      }
+      .pill.quiet {
+        background: var(--bg-2);
+        border-color: transparent;
+      }
 
-  .ph { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 20px; }
-  .ph h1 { font-size: 22px; line-height: 1.25; margin: 0; letter-spacing: -.01em; display: flex; align-items: center; gap: 10px; }
-  .ph p { margin: 4px 0 0; color: var(--muted); }
-  .ph .sp { flex: 1; }
+      .ph {
+        display: flex;
+        align-items: flex-start;
+        gap: 16px;
+        margin-bottom: 20px;
+      }
+      .ph h1 {
+        font-size: 22px;
+        line-height: 1.25;
+        margin: 0;
+        letter-spacing: -0.01em;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .ph p {
+        margin: 4px 0 0;
+        color: var(--muted);
+      }
+      .ph .sp {
+        flex: 1;
+      }
 
-  .btn { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; border-radius: var(--r); border: 1px solid var(--line); background: #fff; font-weight: 500; white-space: nowrap; transition: background .12s, border-color .12s; }
-  .btn:hover { background: var(--bg); }
-  .btn.primary { background: var(--orange); border-color: var(--orange); color: #111113; font-weight: 600; }
-  .btn.primary:hover { background: #f19a45; }
-  .btn.primary[disabled] { opacity: .45; cursor: not-allowed; }
-  .btn.danger { background: var(--red); border-color: var(--red); color: #fff; font-weight: 600; }
-  .btn.ghost { border-color: transparent; background: transparent; }
-  .btn.ghost:hover { background: var(--bg-2); }
-  .btn.sm { height: 28px; padding: 0 9px; font-size: 13px; }
-  .btn[disabled] { cursor: not-allowed; color: var(--faint); }
-  .iconbtn { width: 30px; height: 30px; border-radius: 6px; border: 0; background: transparent; display: grid; place-items: center; color: var(--muted); }
-  .iconbtn:hover { background: var(--bg-2); color: var(--fg); }
-  a.link { color: var(--orange-700); text-decoration: none; font-weight: 500; display: inline-flex; gap: 4px; align-items: center; }
-  a.link:hover { text-decoration: underline; }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        height: 34px;
+        padding: 0 12px;
+        border-radius: var(--r);
+        border: 1px solid var(--line);
+        background: #fff;
+        font-weight: 500;
+        white-space: nowrap;
+        transition:
+          background 0.12s,
+          border-color 0.12s;
+      }
+      .btn:hover {
+        background: var(--bg);
+      }
+      .btn.primary {
+        background: var(--orange);
+        border-color: var(--orange);
+        color: #111113;
+        font-weight: 600;
+      }
+      .btn.primary:hover {
+        background: #f19a45;
+      }
+      .btn.primary[disabled] {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+      .btn.danger {
+        background: var(--red);
+        border-color: var(--red);
+        color: #fff;
+        font-weight: 600;
+      }
+      .btn.ghost {
+        border-color: transparent;
+        background: transparent;
+      }
+      .btn.ghost:hover {
+        background: var(--bg-2);
+      }
+      .btn.sm {
+        height: 28px;
+        padding: 0 9px;
+        font-size: 13px;
+      }
+      .btn[disabled] {
+        cursor: not-allowed;
+        color: var(--faint);
+      }
+      .iconbtn {
+        width: 30px;
+        height: 30px;
+        border-radius: 6px;
+        border: 0;
+        background: transparent;
+        display: grid;
+        place-items: center;
+        color: var(--muted);
+      }
+      .iconbtn:hover {
+        background: var(--bg-2);
+        color: var(--fg);
+      }
+      a.link {
+        color: var(--orange-700);
+        text-decoration: none;
+        font-weight: 500;
+        display: inline-flex;
+        gap: 4px;
+        align-items: center;
+      }
+      a.link:hover {
+        text-decoration: underline;
+      }
 
-  .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin-bottom: 24px; }
-  .tabs button { border: 0; background: none; padding: 10px 12px; color: var(--muted); font-weight: 500; border-bottom: 2px solid transparent; margin-bottom: -1px; display: flex; gap: 8px; align-items: center; }
-  .tabs button.on { color: var(--fg); border-bottom-color: var(--orange); }
-  .tabs .count { font-size: 11.5px; background: var(--bg-2); border-radius: 999px; padding: 0 7px; color: var(--muted); font-weight: 600; }
+      .tabs {
+        display: flex;
+        gap: 2px;
+        border-bottom: 1px solid var(--line);
+        margin-bottom: 24px;
+      }
+      .tabs button {
+        border: 0;
+        background: none;
+        padding: 10px 12px;
+        color: var(--muted);
+        font-weight: 500;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -1px;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .tabs button.on {
+        color: var(--fg);
+        border-bottom-color: var(--orange);
+      }
+      .tabs .count {
+        font-size: 11.5px;
+        background: var(--bg-2);
+        border-radius: 999px;
+        padding: 0 7px;
+        color: var(--muted);
+        font-weight: 600;
+      }
 
-  .card { background: #fff; border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow); }
-  .empty { padding: 0; overflow: hidden; }
-  .empty .art { display: grid; place-items: center; padding: 28px 40px 18px; background: linear-gradient(180deg, #fffaf3, #fff); border-bottom: 1px solid var(--line-2); }
-  .empty .body { display: flex; align-items: flex-end; gap: 32px; padding: 28px 40px 32px; }
-  .empty h2 { font-size: 20px; margin: 0 0 8px; letter-spacing: -.01em; }
-  .empty p { color: var(--muted); margin: 0; max-width: 560px; }
-  .weave { stroke-dasharray: 1; animation: weave-in 650ms cubic-bezier(.22, 1, .36, 1) both; }
-  .span-in { transform-box: fill-box; transform-origin: left; animation: span-in 360ms cubic-bezier(.22, 1, .36, 1) both; }
-  @keyframes weave-in { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
-  @keyframes span-in { from { transform: scaleX(0); opacity: 0; } to { transform: none; opacity: 1; } }
-  .weave.still, .span-in.still { animation: none; }
-  @media (prefers-reduced-motion: reduce) { .weave, .span-in { animation: none; } }
-  .how { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 16px; }
-  .how .card { padding: 18px; }
-  .how .k { width: 26px; height: 26px; border-radius: 50%; background: var(--orange-100); color: var(--orange-700); display: grid; place-items: center; font-weight: 700; font-size: 12px; margin-bottom: 10px; }
-  .how h4 { margin: 0 0 4px; font-size: 14px; }
-  .how p { margin: 0; color: var(--muted); font-size: 13px; }
+      .card {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: var(--r-lg);
+        box-shadow: var(--shadow);
+      }
+      .empty {
+        padding: 0;
+        overflow: hidden;
+      }
+      .empty .art {
+        display: grid;
+        place-items: center;
+        padding: 28px 40px 18px;
+        background: linear-gradient(180deg, #fffaf3, #fff);
+        border-bottom: 1px solid var(--line-2);
+      }
+      .empty .body {
+        display: flex;
+        align-items: flex-end;
+        gap: 32px;
+        padding: 28px 40px 32px;
+      }
+      .empty h2 {
+        font-size: 20px;
+        margin: 0 0 8px;
+        letter-spacing: -0.01em;
+      }
+      .empty p {
+        color: var(--muted);
+        margin: 0;
+        max-width: 560px;
+      }
+      .weave {
+        stroke-dasharray: 1;
+        animation: weave-in 650ms cubic-bezier(0.22, 1, 0.36, 1) both;
+      }
+      .span-in {
+        transform-box: fill-box;
+        transform-origin: left;
+        animation: span-in 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+      }
+      @keyframes weave-in {
+        from {
+          stroke-dashoffset: 1;
+        }
+        to {
+          stroke-dashoffset: 0;
+        }
+      }
+      @keyframes span-in {
+        from {
+          transform: scaleX(0);
+          opacity: 0;
+        }
+        to {
+          transform: none;
+          opacity: 1;
+        }
+      }
+      .weave.still,
+      .span-in.still {
+        animation: none;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .weave,
+        .span-in {
+          animation: none;
+        }
+      }
+      .how {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+        margin-top: 16px;
+      }
+      .how .card {
+        padding: 18px;
+      }
+      .how .k {
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        background: var(--orange-100);
+        color: var(--orange-700);
+        display: grid;
+        place-items: center;
+        font-weight: 700;
+        font-size: 12px;
+        margin-bottom: 10px;
+      }
+      .how h4 {
+        margin: 0 0 4px;
+        font-size: 14px;
+      }
+      .how p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
 
-  /* braid rows */
-  .route .names { min-width: 0; }
-  .route .names span, .route .names b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .braid { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(260px, 1.5fr) 140px 100px 36px; gap: 20px; align-items: center; padding: 16px 18px; border-bottom: 1px solid var(--line-2); }
-  .braid:last-child { border-bottom: 0; }
-  .braid.head { padding: 10px 18px; font-size: 12px; color: var(--subtle); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; background: var(--bg); border-radius: var(--r-lg) var(--r-lg) 0 0; }
-  .route { display: flex; align-items: center; gap: 10px; }
-  .route .names { display: flex; flex-direction: column; line-height: 1.3; }
-  .route .names b { font-weight: 600; }
-  .route .names span { font-size: 12.5px; color: var(--subtle); }
-  .cond { font-family: var(--mono); font-size: 12px; background: var(--bg); border: 1px solid var(--line-2); border-radius: 6px; padding: 6px 8px; color: var(--fg-2); white-space: pre-wrap; line-height: 1.5; }
-  .meta { font-size: 12.5px; color: var(--muted); line-height: 1.5; }
-  .meta b { color: var(--fg); font-weight: 600; font-size: 13px; }
-  .spark { display: block; margin-top: 4px; }
-  .braid.paused { opacity: .55; }
-  .braid-strand { width: 54px; height: 22px; flex: none; }
+      /* braid rows */
+      .route .names {
+        min-width: 0;
+      }
+      .route .names span,
+      .route .names b {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .braid {
+        display: grid;
+        grid-template-columns: minmax(220px, 1fr) minmax(260px, 1.5fr) 140px 100px 36px;
+        gap: 20px;
+        align-items: center;
+        padding: 16px 18px;
+        border-bottom: 1px solid var(--line-2);
+      }
+      .braid:last-child {
+        border-bottom: 0;
+      }
+      .braid.head {
+        padding: 10px 18px;
+        font-size: 12px;
+        color: var(--subtle);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        background: var(--bg);
+        border-radius: var(--r-lg) var(--r-lg) 0 0;
+      }
+      .route {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .route .names {
+        display: flex;
+        flex-direction: column;
+        line-height: 1.3;
+      }
+      .route .names b {
+        font-weight: 600;
+      }
+      .route .names span {
+        font-size: 12.5px;
+        color: var(--subtle);
+      }
+      .cond {
+        font-family: var(--mono);
+        font-size: 12px;
+        background: var(--bg);
+        border: 1px solid var(--line-2);
+        border-radius: 6px;
+        padding: 6px 8px;
+        color: var(--fg-2);
+        white-space: pre-wrap;
+        line-height: 1.5;
+      }
+      .meta {
+        font-size: 12.5px;
+        color: var(--muted);
+        line-height: 1.5;
+      }
+      .meta b {
+        color: var(--fg);
+        font-weight: 600;
+        font-size: 13px;
+      }
+      .spark {
+        display: block;
+        margin-top: 4px;
+      }
+      .braid.paused {
+        opacity: 0.55;
+      }
+      .braid-strand {
+        width: 54px;
+        height: 22px;
+        flex: none;
+      }
 
-  /* dialog */
-  .overlay { position: fixed; inset: 52px 0 0 0; background: rgba(17,17,19,.42); backdrop-filter: blur(2px); display: grid; place-items: center; z-index: 30; padding: 24px; animation: fade .15s ease; }
-  body.notes-open .overlay { right: 340px; }
-  @keyframes fade { from { opacity: 0 } }
-  @keyframes rise { from { opacity: 0; transform: translateY(8px) } }
-  .dialog { background: #fff; border-radius: 14px; box-shadow: var(--shadow-lg); width: min(1040px, 100%); max-height: calc(100vh - 100px); display: flex; flex-direction: column; animation: rise .18s ease; overflow: hidden; }
-  .dialog.narrow { width: min(520px, 100%); }
-  .dialog.mid { width: min(720px, 100%); }
-  .dh { display: flex; align-items: flex-start; gap: 12px; padding: 20px 24px 16px; }
-  .dh h3 { margin: 0; font-size: 17px; letter-spacing: -.01em; }
-  .dh p { margin: 2px 0 0; color: var(--muted); font-size: 13.5px; }
-  .dh .sp { flex: 1; }
-  .db { padding: 4px 24px 20px; overflow: auto; }
-  .df { display: flex; align-items: center; gap: 10px; padding: 14px 24px; border-top: 1px solid var(--line); background: #fff; }
-  .df .note { color: var(--subtle); font-size: 12.5px; flex: 1; display: flex; gap: 6px; align-items: center; }
+      /* dialog */
+      .overlay {
+        position: fixed;
+        inset: 52px 0 0 0;
+        background: rgba(17, 17, 19, 0.42);
+        backdrop-filter: blur(2px);
+        display: grid;
+        place-items: center;
+        z-index: 30;
+        padding: 24px;
+        animation: fade 0.15s ease;
+      }
+      body.notes-open .overlay {
+        right: 340px;
+      }
+      @keyframes fade {
+        from {
+          opacity: 0;
+        }
+      }
+      @keyframes rise {
+        from {
+          opacity: 0;
+          transform: translateY(8px);
+        }
+      }
+      .dialog {
+        background: #fff;
+        border-radius: 14px;
+        box-shadow: var(--shadow-lg);
+        width: min(1040px, 100%);
+        max-height: calc(100vh - 100px);
+        display: flex;
+        flex-direction: column;
+        animation: rise 0.18s ease;
+        overflow: hidden;
+      }
+      .dialog.narrow {
+        width: min(520px, 100%);
+      }
+      .dialog.mid {
+        width: min(720px, 100%);
+      }
+      .dh {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 20px 24px 16px;
+      }
+      .dh h3 {
+        margin: 0;
+        font-size: 17px;
+        letter-spacing: -0.01em;
+      }
+      .dh p {
+        margin: 2px 0 0;
+        color: var(--muted);
+        font-size: 13.5px;
+      }
+      .dh .sp {
+        flex: 1;
+      }
+      .db {
+        padding: 4px 24px 20px;
+        overflow: auto;
+      }
+      .df {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 14px 24px;
+        border-top: 1px solid var(--line);
+        background: #fff;
+      }
+      .df .note {
+        color: var(--subtle);
+        font-size: 12.5px;
+        flex: 1;
+        display: flex;
+        gap: 6px;
+        align-items: center;
+      }
 
-  .split { display: grid; grid-template-columns: 1fr 380px; gap: 24px; }
-  label.f { display: block; font-weight: 600; font-size: 13px; margin-bottom: 6px; }
-  label.f small { font-weight: 500; color: var(--subtle); margin-left: 4px; }
-  .hint { font-size: 12.5px; color: var(--subtle); margin-top: 6px; }
-  .field { margin-bottom: 18px; }
-  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-  .select { height: 38px; border: 1px solid var(--line); border-radius: var(--r); display: flex; align-items: center; gap: 8px; padding: 0 10px; background: #fff; width: 100%; text-align: left; position: relative; }
-  .select .v { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .select.fixed { background: var(--bg); }
-  .input { height: 38px; border: 1px solid var(--line); border-radius: var(--r); padding: 0 10px; width: 100%; font: inherit; background: #fff; }
-  .input:focus, .select:focus { outline: 2px solid var(--orange-200); border-color: var(--orange); }
-  .menu { position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow-lg); padding: 4px; z-index: 40; }
-  .menu .opt { display: flex; align-items: center; gap: 8px; padding: 8px; border-radius: 6px; }
-  .menu .opt:hover { background: var(--bg-2); }
-  .menu .opt.dis { opacity: .5; cursor: not-allowed; }
-  .menu .opt small { margin-left: auto; color: var(--subtle); font-size: 12px; }
+      .split {
+        display: grid;
+        grid-template-columns: 1fr 380px;
+        gap: 24px;
+      }
+      label.f {
+        display: block;
+        font-weight: 600;
+        font-size: 13px;
+        margin-bottom: 6px;
+      }
+      label.f small {
+        font-weight: 500;
+        color: var(--subtle);
+        margin-left: 4px;
+      }
+      .hint {
+        font-size: 12.5px;
+        color: var(--subtle);
+        margin-top: 6px;
+      }
+      .field {
+        margin-bottom: 18px;
+      }
+      .row2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+      }
+      .select {
+        height: 38px;
+        border: 1px solid var(--line);
+        border-radius: var(--r);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 10px;
+        background: #fff;
+        width: 100%;
+        text-align: left;
+        position: relative;
+      }
+      .select .v {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .select.fixed {
+        background: var(--bg);
+      }
+      .input {
+        height: 38px;
+        border: 1px solid var(--line);
+        border-radius: var(--r);
+        padding: 0 10px;
+        width: 100%;
+        font: inherit;
+        background: #fff;
+      }
+      .input:focus,
+      .select:focus {
+        outline: 2px solid var(--orange-200);
+        border-color: var(--orange);
+      }
+      .menu {
+        position: absolute;
+        top: calc(100% + 4px);
+        left: 0;
+        right: 0;
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        box-shadow: var(--shadow-lg);
+        padding: 4px;
+        z-index: 40;
+      }
+      .menu .opt {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px;
+        border-radius: 6px;
+      }
+      .menu .opt:hover {
+        background: var(--bg-2);
+      }
+      .menu .opt.dis {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .menu .opt small {
+        margin-left: auto;
+        color: var(--subtle);
+        font-size: 12px;
+      }
 
-  .fromto { display: grid; grid-template-columns: 1fr 64px 1fr; align-items: end; margin-bottom: 18px; }
-  .fromto .mid { height: 38px; display: grid; place-items: center; }
+      .fromto {
+        display: grid;
+        grid-template-columns: 1fr 64px 1fr;
+        align-items: end;
+        margin-bottom: 18px;
+      }
+      .fromto .mid {
+        height: 38px;
+        display: grid;
+        place-items: center;
+      }
 
-  /* code editor */
-  .editor { position: relative; border: 1px solid var(--line); border-radius: var(--r); background: #fff; transition: border-color .12s, box-shadow .12s; }
-  .editor:focus-within { border-color: var(--orange); box-shadow: 0 0 0 3px var(--orange-100); }
-  .editor.err { border-color: #fca5a5; }
-  .editor.err:focus-within { box-shadow: 0 0 0 3px #fee2e2; }
-  .editor pre, .editor textarea { margin: 0; padding: 10px 12px 10px 40px; font-family: var(--mono); font-size: 13px; line-height: 21px; white-space: pre-wrap; word-break: break-word; min-height: 74px; }
-  .editor pre { pointer-events: none; color: var(--fg-2); }
-  .editor textarea { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: transparent; color: transparent; caret-color: var(--fg); resize: none; outline: none; overflow: hidden; }
-  .editor .gutter { position: absolute; left: 0; top: 10px; width: 30px; text-align: right; font-family: var(--mono); font-size: 12px; line-height: 21px; color: var(--faint); user-select: none; }
-  .tk-str { color: #c05621; } .tk-kw { color: #7e22ce; font-weight: 500; } .tk-fn { color: #2563eb; } .tk-op { color: var(--subtle); } .tk-lit { color: #0d9488; } .tk-path { color: var(--fg); }
-  .vstate { display: flex; align-items: center; gap: 6px; font-size: 12.5px; margin-top: 6px; min-height: 20px; }
-  .vstate.ok { color: #15803d; } .vstate.err { color: var(--red); } .vstate.warn { color: var(--yellow-700); }
-  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; align-items: center; }
-  .chip { font-family: var(--mono); font-size: 11.5px; border: 1px dashed var(--line); border-radius: 6px; padding: 2px 7px; background: #fff; color: var(--fg-2); }
-  .chip:hover { border-color: var(--orange); color: var(--orange-700); border-style: solid; }
+      /* code editor */
+      .editor {
+        position: relative;
+        border: 1px solid var(--line);
+        border-radius: var(--r);
+        background: #fff;
+        transition:
+          border-color 0.12s,
+          box-shadow 0.12s;
+      }
+      .editor:focus-within {
+        border-color: var(--orange);
+        box-shadow: 0 0 0 3px var(--orange-100);
+      }
+      .editor.err {
+        border-color: #fca5a5;
+      }
+      .editor.err:focus-within {
+        box-shadow: 0 0 0 3px #fee2e2;
+      }
+      .editor pre,
+      .editor textarea {
+        margin: 0;
+        padding: 10px 12px 10px 40px;
+        font-family: var(--mono);
+        font-size: 13px;
+        line-height: 21px;
+        white-space: pre-wrap;
+        word-break: break-word;
+        min-height: 74px;
+      }
+      .editor pre {
+        pointer-events: none;
+        color: var(--fg-2);
+      }
+      .editor textarea {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        border: 0;
+        background: transparent;
+        color: transparent;
+        caret-color: var(--fg);
+        resize: none;
+        outline: none;
+        overflow: hidden;
+      }
+      .editor .gutter {
+        position: absolute;
+        left: 0;
+        top: 10px;
+        width: 30px;
+        text-align: right;
+        font-family: var(--mono);
+        font-size: 12px;
+        line-height: 21px;
+        color: var(--faint);
+        user-select: none;
+      }
+      .tk-str {
+        color: #c05621;
+      }
+      .tk-kw {
+        color: #7e22ce;
+        font-weight: 500;
+      }
+      .tk-fn {
+        color: #2563eb;
+      }
+      .tk-op {
+        color: var(--subtle);
+      }
+      .tk-lit {
+        color: #0d9488;
+      }
+      .tk-path {
+        color: var(--fg);
+      }
+      .vstate {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12.5px;
+        margin-top: 6px;
+        min-height: 20px;
+      }
+      .vstate.ok {
+        color: #15803d;
+      }
+      .vstate.err {
+        color: var(--red);
+      }
+      .vstate.warn {
+        color: var(--yellow-700);
+      }
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 8px;
+        align-items: center;
+      }
+      .chip {
+        font-family: var(--mono);
+        font-size: 11.5px;
+        border: 1px dashed var(--line);
+        border-radius: 6px;
+        padding: 2px 7px;
+        background: #fff;
+        color: var(--fg-2);
+      }
+      .chip:hover {
+        border-color: var(--orange);
+        color: var(--orange-700);
+        border-style: solid;
+      }
 
-  .signbox { border: 1px solid var(--line); border-radius: var(--r); padding: 12px; display: flex; gap: 12px; align-items: flex-start; }
-  .signbox .t { flex: 1; }
-  .signbox .t b { display: block; font-size: 13.5px; }
-  .signbox .t span { font-size: 12.5px; color: var(--muted); }
-  .switch { width: 36px; height: 20px; border-radius: 999px; background: #cbd5e1; position: relative; border: 0; flex: none; margin-top: 2px; transition: background .15s; }
-  .switch::after { content: ""; position: absolute; left: 2px; top: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .15s; box-shadow: 0 1px 2px rgba(0,0,0,.2); }
-  .switch.on { background: var(--orange); }
-  .switch.on::after { transform: translateX(16px); }
-  .keystate { display: flex; align-items: center; gap: 6px; font-size: 12.5px; margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line); }
+      .signbox {
+        border: 1px solid var(--line);
+        border-radius: var(--r);
+        padding: 12px;
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+      }
+      .signbox .t {
+        flex: 1;
+      }
+      .signbox .t b {
+        display: block;
+        font-size: 13.5px;
+      }
+      .signbox .t span {
+        font-size: 12.5px;
+        color: var(--muted);
+      }
+      .switch {
+        width: 36px;
+        height: 20px;
+        border-radius: 999px;
+        background: #cbd5e1;
+        position: relative;
+        border: 0;
+        flex: none;
+        margin-top: 2px;
+        transition: background 0.15s;
+      }
+      .switch::after {
+        content: "";
+        position: absolute;
+        left: 2px;
+        top: 2px;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: #fff;
+        transition: transform 0.15s;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+      }
+      .switch.on {
+        background: var(--orange);
+      }
+      .switch.on::after {
+        transform: translateX(16px);
+      }
+      .keystate {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12.5px;
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px dashed var(--line);
+      }
 
-  /* preview */
-  .preview { background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 18px; position: relative; }
-  .preview h4 { margin: 0; font-size: 14px; }
-  .preview .sub { color: var(--subtle); font-size: 12.5px; }
-  .big { font-size: 30px; font-weight: 600; letter-spacing: -.02em; margin: 12px 0 2px; font-variant-numeric: tabular-nums; }
-  .big small { font-size: 13px; color: var(--muted); font-weight: 500; letter-spacing: 0; }
-  .bar { height: 8px; border-radius: 999px; background: #e2e8f0; display: flex; overflow: hidden; margin: 10px 0 12px; }
-  .bar i { display: block; height: 100%; transition: width .3s ease; }
-  .legend { display: grid; gap: 5px; font-size: 13px; }
-  .legend div { display: flex; align-items: center; gap: 8px; }
-  .legend .sw { width: 10px; height: 10px; border-radius: 3px; }
-  .legend .num { margin-left: auto; font-variant-numeric: tabular-nums; font-weight: 600; }
-  .sect { font-size: 11px; letter-spacing: .07em; text-transform: uppercase; color: var(--subtle); font-weight: 600; margin: 16px 0 8px; display: flex; align-items: center; gap: 6px; }
-  .mini { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
-  .mini .r { display: grid; grid-template-columns: 1fr 120px; align-items: center; gap: 8px; height: 22px; font-family: var(--mono); font-size: 12px; }
-  .mini .r .bw { position: relative; height: 8px; }
-  .mini .r .bw i { position: absolute; top: 0; height: 8px; border-radius: 3px; }
-  .mini .r.hid { color: var(--faint); }
-  .mini .r.hid .nm { text-decoration: line-through; text-decoration-color: #cbd5e1; }
-  .hatch { background: repeating-linear-gradient(-45deg, #cbd5e1 0 2px, transparent 2px 5px); border: 1px solid #cbd5e1; }
-  .who { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
-  .stack { display: flex; }
-  .stack span { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--bg); margin-left: -6px; display: grid; place-items: center; font-size: 8px; color: #fff; font-weight: 700; }
-  .stack span:first-child { margin-left: 0; }
-  .test { display: flex; gap: 6px; }
-  .test .input { height: 32px; font-family: var(--mono); font-size: 12px; }
-  .testres { font-size: 12.5px; margin-top: 8px; color: var(--muted); }
-  .dim { opacity: .4; pointer-events: none; filter: grayscale(1); transition: opacity .2s; }
+      /* preview */
+      .preview {
+        background: var(--bg);
+        border: 1px solid var(--line);
+        border-radius: var(--r-lg);
+        padding: 18px;
+        position: relative;
+      }
+      .preview h4 {
+        margin: 0;
+        font-size: 14px;
+      }
+      .preview .sub {
+        color: var(--subtle);
+        font-size: 12.5px;
+      }
+      .big {
+        font-size: 30px;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+        margin: 12px 0 2px;
+        font-variant-numeric: tabular-nums;
+      }
+      .big small {
+        font-size: 13px;
+        color: var(--muted);
+        font-weight: 500;
+        letter-spacing: 0;
+      }
+      .bar {
+        height: 8px;
+        border-radius: 999px;
+        background: #e2e8f0;
+        display: flex;
+        overflow: hidden;
+        margin: 10px 0 12px;
+      }
+      .bar i {
+        display: block;
+        height: 100%;
+        transition: width 0.3s ease;
+      }
+      .legend {
+        display: grid;
+        gap: 5px;
+        font-size: 13px;
+      }
+      .legend div {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .legend .sw {
+        width: 10px;
+        height: 10px;
+        border-radius: 3px;
+      }
+      .legend .num {
+        margin-left: auto;
+        font-variant-numeric: tabular-nums;
+        font-weight: 600;
+      }
+      .sect {
+        font-size: 11px;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+        color: var(--subtle);
+        font-weight: 600;
+        margin: 16px 0 8px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .mini {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 10px 12px;
+      }
+      .mini .r {
+        display: grid;
+        grid-template-columns: 1fr 120px;
+        align-items: center;
+        gap: 8px;
+        height: 22px;
+        font-family: var(--mono);
+        font-size: 12px;
+      }
+      .mini .r .bw {
+        position: relative;
+        height: 8px;
+      }
+      .mini .r .bw i {
+        position: absolute;
+        top: 0;
+        height: 8px;
+        border-radius: 3px;
+      }
+      .mini .r.hid {
+        color: var(--faint);
+      }
+      .mini .r.hid .nm {
+        text-decoration: line-through;
+        text-decoration-color: #cbd5e1;
+      }
+      .hatch {
+        background: repeating-linear-gradient(-45deg, #cbd5e1 0 2px, transparent 2px 5px);
+        border: 1px solid #cbd5e1;
+      }
+      .who {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12.5px;
+        color: var(--muted);
+        margin-top: 14px;
+        padding-top: 12px;
+        border-top: 1px solid var(--line);
+      }
+      .stack {
+        display: flex;
+      }
+      .stack span {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        border: 2px solid var(--bg);
+        margin-left: -6px;
+        display: grid;
+        place-items: center;
+        font-size: 8px;
+        color: #fff;
+        font-weight: 700;
+      }
+      .stack span:first-child {
+        margin-left: 0;
+      }
+      .test {
+        display: flex;
+        gap: 6px;
+      }
+      .test .input {
+        height: 32px;
+        font-family: var(--mono);
+        font-size: 12px;
+      }
+      .testres {
+        font-size: 12.5px;
+        margin-top: 8px;
+        color: var(--muted);
+      }
+      .dim {
+        opacity: 0.4;
+        pointer-events: none;
+        filter: grayscale(1);
+        transition: opacity 0.2s;
+      }
 
-  /* tables */
-  table.t { width: 100%; border-collapse: collapse; }
-  table.t th { text-align: left; font-size: 12px; color: var(--subtle); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; padding: 10px 16px; background: var(--bg); border-bottom: 1px solid var(--line); }
-  table.t th:first-child { border-radius: var(--r-lg) 0 0 0; } table.t th:last-child { border-radius: 0 var(--r-lg) 0 0; }
-  table.t td { padding: 14px 16px; border-bottom: 1px solid var(--line-2); vertical-align: middle; }
-  table.t tr:last-child td { border-bottom: 0; }
+      /* tables */
+      table.t {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      table.t th {
+        text-align: left;
+        font-size: 12px;
+        color: var(--subtle);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        padding: 10px 16px;
+        background: var(--bg);
+        border-bottom: 1px solid var(--line);
+      }
+      table.t th:first-child {
+        border-radius: var(--r-lg) 0 0 0;
+      }
+      table.t th:last-child {
+        border-radius: 0 var(--r-lg) 0 0;
+      }
+      table.t td {
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--line-2);
+        vertical-align: middle;
+      }
+      table.t tr:last-child td {
+        border-bottom: 0;
+      }
 
-  /* secret + snippets */
-  .secret { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 13px; background: #111113; color: #e7ecf2; border-radius: var(--r); padding: 10px 12px; }
-  .secret span { flex: 1; overflow: hidden; text-overflow: ellipsis; }
-  .secret button { background: #2d2d3d; border: 0; color: #e7ecf2; border-radius: 6px; padding: 4px 8px; font-size: 12px; display: flex; gap: 4px; align-items: center; }
-  .callout { display: flex; gap: 10px; padding: 10px 12px; border-radius: var(--r); font-size: 13px; align-items: flex-start; }
-  .callout.warn { background: var(--yellow-50); color: #854d0e; border: 1px solid #fde68a; }
-  .callout.info { background: var(--bg); color: var(--fg-2); border: 1px solid var(--line); }
-  .callout.orange { background: var(--orange-50); color: #7b341e; border: 1px solid var(--orange-200); }
-  .callout.bad { background: var(--red-50); color: #991b1b; border: 1px solid #fecaca; }
-  .codetabs { display: flex; gap: 2px; margin-bottom: -1px; }
-  .codetabs button { border: 1px solid transparent; border-bottom: 0; background: none; padding: 6px 12px; border-radius: 8px 8px 0 0; color: var(--muted); font-size: 13px; }
-  .codetabs button.on { background: #111113; color: #fff; }
-  pre.code { margin: 0; background: #111113; color: #e7ecf2; border-radius: 0 var(--r) var(--r) var(--r); padding: 14px 16px; font-family: var(--mono); font-size: 12.5px; line-height: 1.6; overflow: auto; }
-  pre.code .c { color: #7b8394; } pre.code .s { color: #ffb26b; } pre.code .k { color: #c4a5ff; }
-  .steps2 { counter-reset: s; display: grid; gap: 14px; }
-  .steps2 > div { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 10px; }
-  .steps2 > div > div { min-width: 0; }
-  .steps2 > div::before { counter-increment: s; content: counter(s); width: 22px; height: 22px; border-radius: 50%; background: var(--orange-100); color: var(--orange-700); font-weight: 700; font-size: 12px; display: grid; place-items: center; }
+      /* secret + snippets */
+      .secret {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-family: var(--mono);
+        font-size: 13px;
+        background: #111113;
+        color: #e7ecf2;
+        border-radius: var(--r);
+        padding: 10px 12px;
+      }
+      .secret span {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .secret button {
+        background: #2d2d3d;
+        border: 0;
+        color: #e7ecf2;
+        border-radius: 6px;
+        padding: 4px 8px;
+        font-size: 12px;
+        display: flex;
+        gap: 4px;
+        align-items: center;
+      }
+      .callout {
+        display: flex;
+        gap: 10px;
+        padding: 10px 12px;
+        border-radius: var(--r);
+        font-size: 13px;
+        align-items: flex-start;
+      }
+      .callout.warn {
+        background: var(--yellow-50);
+        color: #854d0e;
+        border: 1px solid #fde68a;
+      }
+      .callout.info {
+        background: var(--bg);
+        color: var(--fg-2);
+        border: 1px solid var(--line);
+      }
+      .callout.orange {
+        background: var(--orange-50);
+        color: #7b341e;
+        border: 1px solid var(--orange-200);
+      }
+      .callout.bad {
+        background: var(--red-50);
+        color: #991b1b;
+        border: 1px solid #fecaca;
+      }
+      .codetabs {
+        display: flex;
+        gap: 2px;
+        margin-bottom: -1px;
+      }
+      .codetabs button {
+        border: 1px solid transparent;
+        border-bottom: 0;
+        background: none;
+        padding: 6px 12px;
+        border-radius: 8px 8px 0 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .codetabs button.on {
+        background: #111113;
+        color: #fff;
+      }
+      pre.code {
+        margin: 0;
+        background: #111113;
+        color: #e7ecf2;
+        border-radius: 0 var(--r) var(--r) var(--r);
+        padding: 14px 16px;
+        font-family: var(--mono);
+        font-size: 12.5px;
+        line-height: 1.6;
+        overflow: auto;
+      }
+      pre.code .c {
+        color: #7b8394;
+      }
+      pre.code .s {
+        color: #ffb26b;
+      }
+      pre.code .k {
+        color: #c4a5ff;
+      }
+      .steps2 {
+        counter-reset: s;
+        display: grid;
+        gap: 14px;
+      }
+      .steps2 > div {
+        display: grid;
+        grid-template-columns: 26px minmax(0, 1fr);
+        gap: 10px;
+      }
+      .steps2 > div > div {
+        min-width: 0;
+      }
+      .steps2 > div::before {
+        counter-increment: s;
+        content: counter(s);
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: var(--orange-100);
+        color: var(--orange-700);
+        font-weight: 700;
+        font-size: 12px;
+        display: grid;
+        place-items: center;
+      }
 
-  /* trace view */
-  .tv { display: grid; grid-template-columns: 1fr 400px; flex: 1; min-height: 0; }
-  .tv .left { padding: 20px 24px; overflow: auto; border-right: 1px solid var(--line); background: #fff; }
-  .tv .right { overflow: auto; background: #fff; }
-  .thead { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
-  .thead h2 { margin: 0; font-size: 19px; letter-spacing: -.01em; }
-  .tmeta { display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); font-size: 13px; margin: 6px 0 18px; align-items: center; }
-  .tmeta b { color: var(--fg); font-weight: 600; }
-  .wf { border: 1px solid var(--line); border-radius: var(--r-lg); overflow: hidden; }
-  .wf .scale { display: grid; grid-template-columns: 330px 1fr; font-size: 11.5px; color: var(--subtle); background: var(--bg); border-bottom: 1px solid var(--line); }
-  .wf .scale div:last-child { display: flex; justify-content: space-between; padding: 6px 14px; }
-  .wf .scale div:first-child { padding: 6px 14px; }
-  .span { display: grid; grid-template-columns: 330px 1fr; align-items: center; height: 40px; border-bottom: 1px solid var(--line-2); cursor: pointer; position: relative; }
-  .span:last-child { border-bottom: 0; }
-  .span:hover { background: var(--bg); }
-  .span.sel { background: var(--orange-50); }
-  .span.sel::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--orange); }
-  .span .nm { display: flex; align-items: center; gap: 7px; padding-right: 10px; font-size: 13px; white-space: nowrap; overflow: hidden; }
-  .span .nm .tree { color: #cbd5e1; font-family: var(--mono); }
-  .span .nm .type { font-size: 10.5px; font-weight: 600; border-radius: 4px; padding: 0 5px; background: var(--bg-2); color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
-  .span .track { position: relative; height: 100%; margin: 0 14px; }
-  .span .track i { position: absolute; top: 14px; height: 12px; border-radius: 4px; }
-  .span .track em { position: absolute; top: 12px; font-style: normal; font-size: 11px; color: var(--subtle); font-variant-numeric: tabular-nums; }
-  .bpill { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 600; color: var(--orange-700); background: var(--orange-50); border: 1px solid var(--orange-200); border-radius: 999px; padding: 0 7px 0 3px; height: 20px; }
-  .rp { padding: 20px; }
-  .rp h3 { margin: 0; font-size: 16px; font-family: var(--mono); font-weight: 500; }
-  .kv { display: grid; grid-template-columns: 110px 1fr; gap: 8px 12px; font-size: 13px; margin: 14px 0; }
-  .kv dt { color: var(--subtle); } .kv dd { margin: 0; }
-  .io { background: var(--bg); border: 1px solid var(--line); border-radius: var(--r); padding: 10px 12px; font-family: var(--mono); font-size: 12px; white-space: pre-wrap; color: var(--fg-2); }
-  .actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0 4px; }
-  .tip { position: relative; }
-  .tip[data-tip]:hover::after { content: attr(data-tip); position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); background: #111113; color: #fff; font-size: 12px; padding: 5px 8px; border-radius: 6px; white-space: nowrap; z-index: 60; font-weight: 500; }
-  .evals { display: grid; gap: 6px; }
-  .evals div { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--r); }
-  .evals div span:last-child { margin-left: auto; font-weight: 600; }
+      /* trace view */
+      .tv {
+        display: grid;
+        grid-template-columns: 1fr 400px;
+        flex: 1;
+        min-height: 0;
+      }
+      .tv .left {
+        padding: 20px 24px;
+        overflow: auto;
+        border-right: 1px solid var(--line);
+        background: #fff;
+      }
+      .tv .right {
+        overflow: auto;
+        background: #fff;
+      }
+      .thead {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 4px;
+      }
+      .thead h2 {
+        margin: 0;
+        font-size: 19px;
+        letter-spacing: -0.01em;
+      }
+      .tmeta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 16px;
+        color: var(--muted);
+        font-size: 13px;
+        margin: 6px 0 18px;
+        align-items: center;
+      }
+      .tmeta b {
+        color: var(--fg);
+        font-weight: 600;
+      }
+      .wf {
+        border: 1px solid var(--line);
+        border-radius: var(--r-lg);
+        overflow: hidden;
+      }
+      .wf .scale {
+        display: grid;
+        grid-template-columns: 330px 1fr;
+        font-size: 11.5px;
+        color: var(--subtle);
+        background: var(--bg);
+        border-bottom: 1px solid var(--line);
+      }
+      .wf .scale div:last-child {
+        display: flex;
+        justify-content: space-between;
+        padding: 6px 14px;
+      }
+      .wf .scale div:first-child {
+        padding: 6px 14px;
+      }
+      .span {
+        display: grid;
+        grid-template-columns: 330px 1fr;
+        align-items: center;
+        height: 40px;
+        border-bottom: 1px solid var(--line-2);
+        cursor: pointer;
+        position: relative;
+      }
+      .span:last-child {
+        border-bottom: 0;
+      }
+      .span:hover {
+        background: var(--bg);
+      }
+      .span.sel {
+        background: var(--orange-50);
+      }
+      .span.sel::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 3px;
+        background: var(--orange);
+      }
+      .span .nm {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding-right: 10px;
+        font-size: 13px;
+        white-space: nowrap;
+        overflow: hidden;
+      }
+      .span .nm .tree {
+        color: #cbd5e1;
+        font-family: var(--mono);
+      }
+      .span .nm .type {
+        font-size: 10.5px;
+        font-weight: 600;
+        border-radius: 4px;
+        padding: 0 5px;
+        background: var(--bg-2);
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .span .track {
+        position: relative;
+        height: 100%;
+        margin: 0 14px;
+      }
+      .span .track i {
+        position: absolute;
+        top: 14px;
+        height: 12px;
+        border-radius: 4px;
+      }
+      .span .track em {
+        position: absolute;
+        top: 12px;
+        font-style: normal;
+        font-size: 11px;
+        color: var(--subtle);
+        font-variant-numeric: tabular-nums;
+      }
+      .bpill {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 11.5px;
+        font-weight: 600;
+        color: var(--orange-700);
+        background: var(--orange-50);
+        border: 1px solid var(--orange-200);
+        border-radius: 999px;
+        padding: 0 7px 0 3px;
+        height: 20px;
+      }
+      .rp {
+        padding: 20px;
+      }
+      .rp h3 {
+        margin: 0;
+        font-size: 16px;
+        font-family: var(--mono);
+        font-weight: 500;
+      }
+      .kv {
+        display: grid;
+        grid-template-columns: 110px 1fr;
+        gap: 8px 12px;
+        font-size: 13px;
+        margin: 14px 0;
+      }
+      .kv dt {
+        color: var(--subtle);
+      }
+      .kv dd {
+        margin: 0;
+      }
+      .io {
+        background: var(--bg);
+        border: 1px solid var(--line);
+        border-radius: var(--r);
+        padding: 10px 12px;
+        font-family: var(--mono);
+        font-size: 12px;
+        white-space: pre-wrap;
+        color: var(--fg-2);
+      }
+      .actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin: 14px 0 4px;
+      }
+      .tip {
+        position: relative;
+      }
+      .tip[data-tip]:hover::after {
+        content: attr(data-tip);
+        position: absolute;
+        bottom: calc(100% + 6px);
+        left: 50%;
+        transform: translateX(-50%);
+        background: #111113;
+        color: #fff;
+        font-size: 12px;
+        padding: 5px 8px;
+        border-radius: 6px;
+        white-space: nowrap;
+        z-index: 60;
+        font-weight: 500;
+      }
+      .evals {
+        display: grid;
+        gap: 6px;
+      }
+      .evals div {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        padding: 8px 10px;
+        border: 1px solid var(--line);
+        border-radius: var(--r);
+      }
+      .evals div span:last-child {
+        margin-left: auto;
+        font-weight: 600;
+      }
 
-  /* toast */
-  .toasts { position: fixed; right: 20px; bottom: 20px; display: grid; gap: 8px; z-index: 70; }
-  body.notes-open .toasts { right: 360px; }
-  .toast { background: #111113; color: #fff; border-radius: 10px; padding: 12px 14px; display: flex; gap: 10px; align-items: flex-start; box-shadow: var(--shadow-lg); max-width: 380px; font-size: 13px; animation: rise .2s ease; }
-  .toast svg { color: #4ade80; margin-top: 2px; }
-  .toast span { color: #cbd5e1; display: block; }
+      /* toast */
+      .toasts {
+        position: fixed;
+        right: 20px;
+        bottom: 20px;
+        display: grid;
+        gap: 8px;
+        z-index: 70;
+      }
+      body.notes-open .toasts {
+        right: 360px;
+      }
+      .toast {
+        background: #111113;
+        color: #fff;
+        border-radius: 10px;
+        padding: 12px 14px;
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        box-shadow: var(--shadow-lg);
+        max-width: 380px;
+        font-size: 13px;
+        animation: rise 0.2s ease;
+      }
+      .toast svg {
+        color: #4ade80;
+        margin-top: 2px;
+      }
+      .toast span {
+        color: #cbd5e1;
+        display: block;
+      }
 
-  /* notes */
-  .notes { position: fixed; top: 52px; right: 0; bottom: 0; width: 340px; background: #fffdf5; border-left: 1px solid #f1e6c8; padding: 20px 22px; overflow: auto; z-index: 20; display: none; }
-  .notes.open { display: block; }
-  .notes .lbl { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; font-weight: 700; color: #a16207; display: flex; align-items: center; gap: 6px; }
-  .notes h3 { margin: 6px 0 12px; font-size: 16px; }
-  .notes ul { margin: 0; padding-left: 18px; display: grid; gap: 10px; color: #3c2415; font-size: 13px; }
-  .notes .open-q { margin-top: 18px; padding-top: 14px; border-top: 1px dashed #e9dcb5; }
-  .notes .open-q h4 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: #a16207; }
+      /* notes */
+      .notes {
+        position: fixed;
+        top: 52px;
+        right: 0;
+        bottom: 0;
+        width: 340px;
+        background: #fffdf5;
+        border-left: 1px solid #f1e6c8;
+        padding: 20px 22px;
+        overflow: auto;
+        z-index: 20;
+        display: none;
+      }
+      .notes.open {
+        display: block;
+      }
+      .notes .lbl {
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        font-weight: 700;
+        color: #a16207;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .notes h3 {
+        margin: 6px 0 12px;
+        font-size: 16px;
+      }
+      .notes ul {
+        margin: 0;
+        padding-left: 18px;
+        display: grid;
+        gap: 10px;
+        color: #3c2415;
+        font-size: 13px;
+      }
+      .notes .open-q {
+        margin-top: 18px;
+        padding-top: 14px;
+        border-top: 1px dashed #e9dcb5;
+      }
+      .notes .open-q h4 {
+        margin: 0 0 8px;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: #a16207;
+      }
 
-  .seg { display: inline-flex; background: var(--bg-2); border-radius: 8px; padding: 3px; gap: 2px; margin-bottom: 20px; }
-  .seg button { border: 0; background: none; padding: 5px 12px; border-radius: 6px; font-size: 13px; color: var(--muted); font-weight: 500; }
-  .seg button.on { background: #fff; color: var(--fg); box-shadow: var(--shadow); }
-  .banner { display: flex; gap: 12px; align-items: center; padding: 12px 16px; border-radius: var(--r-lg); margin-bottom: 20px; }
-  .upsell { padding: 48px; text-align: center; }
-  .upsell h2 { margin: 18px 0 8px; font-size: 22px; letter-spacing: -.01em; }
-  .upsell p { color: var(--muted); max-width: 520px; margin: 0 auto 20px; }
-  .ent-list { display: flex; gap: 18px; justify-content: center; color: var(--fg-2); font-size: 13px; margin-bottom: 24px; flex-wrap: wrap; }
-  .ent-list span { display: flex; gap: 6px; align-items: center; }
-  .ent-list svg { color: var(--green); }
+      .seg {
+        display: inline-flex;
+        background: var(--bg-2);
+        border-radius: 8px;
+        padding: 3px;
+        gap: 2px;
+        margin-bottom: 20px;
+      }
+      .seg button {
+        border: 0;
+        background: none;
+        padding: 5px 12px;
+        border-radius: 6px;
+        font-size: 13px;
+        color: var(--muted);
+        font-weight: 500;
+      }
+      .seg button.on {
+        background: #fff;
+        color: var(--fg);
+        box-shadow: var(--shadow);
+      }
+      .banner {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        padding: 12px 16px;
+        border-radius: var(--r-lg);
+        margin-bottom: 20px;
+      }
+      .upsell {
+        padding: 48px;
+        text-align: center;
+      }
+      .upsell h2 {
+        margin: 18px 0 8px;
+        font-size: 22px;
+        letter-spacing: -0.01em;
+      }
+      .upsell p {
+        color: var(--muted);
+        max-width: 520px;
+        margin: 0 auto 20px;
+      }
+      .ent-list {
+        display: flex;
+        gap: 18px;
+        justify-content: center;
+        color: var(--fg-2);
+        font-size: 13px;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+      }
+      .ent-list span {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+      }
+      .ent-list svg {
+        color: var(--green);
+      }
 
-  .filters { display: flex; gap: 8px; margin-bottom: 14px; align-items: center; }
-  .act { font-family: var(--mono); font-size: 12px; background: var(--bg-2); border-radius: 5px; padding: 2px 6px; }
-  .person { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
-  table.t td > div { white-space: nowrap; }
-  .person i { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-style: normal; font-size: 10px; font-weight: 700; }
-  .rule { height: 1px; background: var(--line); margin: 18px 0; }
-</style>
-</head>
-<body>
-<div class="proto">
-  <div class="brand"><span id="logo-braid"></span>Braids <small>design prototype</small></div>
-  <div class="steps" id="steps"></div>
-  <button class="toggle" data-action="notes"><span id="notes-ic"></span>Design notes</button>
-</div>
-<div class="app notes-open" id="app">
-  <nav class="rail" id="rail"></nav>
-  <div class="main" id="main"></div>
-</div>
-<div id="overlay-root"></div>
-<div class="toasts" id="toasts"></div>
-<aside class="notes open" id="notes"></aside>
+      .filters {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 14px;
+        align-items: center;
+      }
+      .act {
+        font-family: var(--mono);
+        font-size: 12px;
+        background: var(--bg-2);
+        border-radius: 5px;
+        padding: 2px 6px;
+      }
+      .person {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        white-space: nowrap;
+      }
+      table.t td > div {
+        white-space: nowrap;
+      }
+      .person i {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        color: #fff;
+        font-style: normal;
+        font-size: 10px;
+        font-weight: 700;
+      }
+      .rule {
+        height: 1px;
+        background: var(--line);
+        margin: 18px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="proto">
+      <div class="brand"><span id="logo-braid"></span>Braids <small>design prototype</small></div>
+      <div class="steps" id="steps"></div>
+      <button class="toggle" data-action="notes"><span id="notes-ic"></span>Design notes</button>
+    </div>
+    <div class="app notes-open" id="app">
+      <nav class="rail" id="rail"></nav>
+      <div class="main" id="main"></div>
+    </div>
+    <div id="overlay-root"></div>
+    <div class="toasts" id="toasts"></div>
+    <aside class="notes open" id="notes"></aside>
 
-<script>
-/* ---------- icons ---------- */
-const ICONS = {
-  home: '<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
-  activity: '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>',
-  flask: '<path d="M10 2v7.527a2 2 0 0 1-.211.896L4.72 20.55a1 1 0 0 0 .9 1.45h12.76a1 1 0 0 0 .9-1.45l-5.069-10.127A2 2 0 0 1 14 9.527V2"/><path d="M8.5 2h7"/><path d="M7 16h10"/>',
-  database: '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/>',
-  message: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
-  settings: '<path d="M20 7h-9"/><path d="M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/>',
-  key: '<path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/>',
-  check: '<path d="M20 6 9 17l-5-5"/>',
-  x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
-  copy: '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
-  more: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
-  plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
-  arrow: '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
-  lock: '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
-  info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
-  alert: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
-  shield: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>',
-  scroll: '<path d="M15 12h-5"/><path d="M15 8h-5"/><path d="M19 17V5a2 2 0 0 0-2-2H4"/><path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3"/>',
-  down: '<path d="m6 9 6 6 6-6"/>',
-  right: '<path d="m9 18 6-6-6-6"/>',
-  ext: '<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
-  search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
-  rotate: '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
-  trash: '<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>',
-  pause: '<rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/>',
-  users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
-  eyeoff: '<path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/>',
-  book: '<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>',
-  play: '<polygon points="6 3 20 12 6 21 6 3"/>',
-  pencil: '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/>',
-  sticky: '<path d="M15.5 3H5a2 2 0 0 0-2 2v14c0 1.1.9 2 2 2h14a2 2 0 0 0 2-2V8.5L15.5 3Z"/><path d="M15 3v6h6"/>',
-  tag: '<path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/>',
-  filter: '<polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>',
-  sparkle: '<path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/>',
-};
-const ic = (n, cls = "") => `<svg class="i ${cls}" viewBox="0 0 24 24">${ICONS[n]}</svg>`;
+    <script>
+      /* ---------- icons ---------- */
+      const ICONS = {
+        home: '<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
+        activity: '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>',
+        flask:
+          '<path d="M10 2v7.527a2 2 0 0 1-.211.896L4.72 20.55a1 1 0 0 0 .9 1.45h12.76a1 1 0 0 0 .9-1.45l-5.069-10.127A2 2 0 0 1 14 9.527V2"/><path d="M8.5 2h7"/><path d="M7 16h10"/>',
+        database:
+          '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/>',
+        message: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+        settings:
+          '<path d="M20 7h-9"/><path d="M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/>',
+        key: '<path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/>',
+        check: '<path d="M20 6 9 17l-5-5"/>',
+        x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+        copy: '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
+        more: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
+        plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
+        arrow: '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
+        lock: '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+        info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
+        alert:
+          '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+        shield:
+          '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>',
+        scroll:
+          '<path d="M15 12h-5"/><path d="M15 8h-5"/><path d="M19 17V5a2 2 0 0 0-2-2H4"/><path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3"/>',
+        down: '<path d="m6 9 6 6 6-6"/>',
+        right: '<path d="m9 18 6-6-6-6"/>',
+        ext: '<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
+        search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+        rotate:
+          '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
+        trash:
+          '<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>',
+        pause:
+          '<rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/>',
+        users:
+          '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+        eyeoff:
+          '<path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/>',
+        book: '<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>',
+        play: '<polygon points="6 3 20 12 6 21 6 3"/>',
+        pencil:
+          '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/>',
+        sticky:
+          '<path d="M15.5 3H5a2 2 0 0 0-2 2v14c0 1.1.9 2 2 2h14a2 2 0 0 0 2-2V8.5L15.5 3Z"/><path d="M15 3v6h6"/>',
+        tag: '<path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/>',
+        filter: '<polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>',
+        sparkle:
+          '<path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/>',
+      };
+      const ic = (n, cls = "") => `<svg class="i ${cls}" viewBox="0 0 24 24">${ICONS[n]}</svg>`;
 
-/* The Open weave mark (brand/braids-mark.svg): three strands cross, then end as staggered spans.
+      /* The Open weave mark (brand/braids-mark.svg): three strands cross, then end as staggered spans.
    Masks cut the gaps, so it sits on any background. Below 24px it uses the small master. */
-let markSeq = 0;
-function braidMark(size = 16, a = "#ED8926", b = "currentColor") {
-  const id = `bm${markSeq++}`, small = size <= 24, t = small ? 8 : 11, m = small ? 32 : 29;
-  const sa = `M4 ${t}H7C13 ${t} 13 20 19 20C25 20 25 ${m} 31 ${m}H32`;
-  const sb = `M4 20H7C13 20 13 ${t} 19 ${t}H36`;
-  const sc = `M4 ${m}H17C23 ${m} 23 20 29 20H34`;
-  const cut = (d) => `<mask id="${id}${d === sa ? "a" : "b"}" maskUnits="userSpaceOnUse" x="0" y="0" width="40" height="40"><rect width="40" height="40" fill="#fff"/><path d="${d}" stroke="#000" stroke-width="${small ? 7 : 6.4}" fill="none"/></mask>`;
-  return `<svg width="${size}" height="${size}" viewBox="0 0 40 40" style="flex:none" aria-hidden="true"><defs>${cut(sb)}${cut(sa)}</defs>
+      let markSeq = 0;
+      function braidMark(size = 16, a = "#ED8926", b = "currentColor") {
+        const id = `bm${markSeq++}`,
+          small = size <= 24,
+          t = small ? 8 : 11,
+          m = small ? 32 : 29;
+        const sa = `M4 ${t}H7C13 ${t} 13 20 19 20C25 20 25 ${m} 31 ${m}H32`;
+        const sb = `M4 20H7C13 20 13 ${t} 19 ${t}H36`;
+        const sc = `M4 ${m}H17C23 ${m} 23 20 29 20H34`;
+        const cut = (d) =>
+          `<mask id="${id}${d === sa ? "a" : "b"}" maskUnits="userSpaceOnUse" x="0" y="0" width="40" height="40"><rect width="40" height="40" fill="#fff"/><path d="${d}" stroke="#000" stroke-width="${small ? 7 : 6.4}" fill="none"/></mask>`;
+        return `<svg width="${size}" height="${size}" viewBox="0 0 40 40" style="flex:none" aria-hidden="true"><defs>${cut(sb)}${cut(sa)}</defs>
     <g fill="none" stroke-width="${small ? 3.8 : 3.2}" stroke-linecap="round" stroke-linejoin="round">
     <path d="${sc}" stroke="${b}" mask="url(#${id}a)"/><path d="${sa}" stroke="${a}" mask="url(#${id}b)"/><path d="${sb}" stroke="${b}"/></g></svg>`;
-}
+      }
 
-/* A horizontal strand joining two projects, used on braid rows. */
-function strandLink(from, to) {
-  return `<svg class="braid-strand" viewBox="0 0 54 22" fill="none" stroke-linecap="round">
+      /* A horizontal strand joining two projects, used on braid rows. */
+      function strandLink(from, to) {
+        return `<svg class="braid-strand" viewBox="0 0 54 22" fill="none" stroke-linecap="round">
     <path d="M2 6 C 18 6, 22 16, 38 16 S 50 11, 52 11" stroke="${from.color}" stroke-width="2.2"/>
     <path d="M2 16 C 18 16, 22 6, 38 6 S 50 11, 52 11" stroke="#fff" stroke-width="5"/>
     <path d="M2 16 C 18 16, 22 6, 38 6 S 50 11, 52 11" stroke="${to.color}" stroke-width="2.2"/>
     <circle cx="52" cy="11" r="2.4" fill="${to.color}"/>
   </svg>`;
-}
+      }
 
-/* Hero, from brand/braids-docs-hero.svg: each project's strand weaves in and lands on its spans. */
-let heroPlayed = false;
-function hero() {
-  const still = heroPlayed ? " still" : "";
-  heroPlayed = true;
-  const SE = { id: "SE", name: "Search agent", color: "#5B7A4A" };
-  const wo = "M207 102H230C280 102 280 176 330 176C380 176 380 249 430 249H492";
-  const sa = "M207 176H230C280 176 280 102 330 102C395 102 415 141 470 141H492";
-  const se = "M207 250H330C380 250 380 176 430 176C460 176 460 213 492 213";
-  const cut = (id, d) => `<mask id="${id}" maskUnits="userSpaceOnUse" x="200" y="60" width="300" height="220"><rect x="200" y="60" width="300" height="220" fill="#fff"/><path d="${d}" fill="none" stroke="#000" stroke-width="11" stroke-linecap="round"/></mask>`;
-  const strand = (d, p, mask, i) => `<path class="weave${still}" pathLength="1" style="animation-delay:${i * 90}ms" d="${d}" fill="none" stroke="${p.color}" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"${mask ? ` mask="url(#${mask})"` : ""}/>`;
-  const chip = (p, y) => `<rect x="28" y="${y}" width="179" height="46" rx="10" fill="#fff" stroke="#e2e8f0"/><rect x="38" y="${y + 10}" width="27" height="27" rx="7" fill="${p.color}"/><text x="51.5" y="${y + 28}" text-anchor="middle" font-size="10" font-weight="700" fill="${p === P.WO ? "#141417" : "#fff"}">${p.id}</text><text x="75" y="${y + 28.5}" font-size="14" font-weight="500" fill="#141417">${p.name}</text>`;
-  const bars = [[508, 105, 201, P.WO], [531, 141, 144, P.SA], [548, 177, 63, P.SA], [582, 213, 88, SE], [685, 249, 29, P.WO]];
-  const wf = bars.map(([x, y, w, p], i) => `<rect class="span-in${still}" style="animation-delay:${520 + i * 70}ms" x="${x}" y="${y}" width="${w}" height="13" rx="4" fill="${p.color}"/><text x="${x + 3}" y="${y + 28}" font-size="10" fill="#5c5c6e">${p.id}</text>`).join("");
-  return `<svg viewBox="16 14 728 286" width="100%" style="max-width:640px" font-family="Inter,sans-serif" role="img" aria-label="Each project's spans woven into one trace">
+      /* Hero, from brand/braids-docs-hero.svg: each project's strand weaves in and lands on its spans. */
+      let heroPlayed = false;
+      function hero() {
+        const still = heroPlayed ? " still" : "";
+        heroPlayed = true;
+        const SE = { id: "SE", name: "Search agent", color: "#5B7A4A" };
+        const wo = "M207 102H230C280 102 280 176 330 176C380 176 380 249 430 249H492";
+        const sa = "M207 176H230C280 176 280 102 330 102C395 102 415 141 470 141H492";
+        const se = "M207 250H330C380 250 380 176 430 176C460 176 460 213 492 213";
+        const cut = (id, d) =>
+          `<mask id="${id}" maskUnits="userSpaceOnUse" x="200" y="60" width="300" height="220"><rect x="200" y="60" width="300" height="220" fill="#fff"/><path d="${d}" fill="none" stroke="#000" stroke-width="11" stroke-linecap="round"/></mask>`;
+        const strand = (d, p, mask, i) =>
+          `<path class="weave${still}" pathLength="1" style="animation-delay:${i * 90}ms" d="${d}" fill="none" stroke="${p.color}" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"${mask ? ` mask="url(#${mask})"` : ""}/>`;
+        const chip = (p, y) =>
+          `<rect x="28" y="${y}" width="179" height="46" rx="10" fill="#fff" stroke="#e2e8f0"/><rect x="38" y="${y + 10}" width="27" height="27" rx="7" fill="${p.color}"/><text x="51.5" y="${y + 28}" text-anchor="middle" font-size="10" font-weight="700" fill="${p === P.WO ? "#141417" : "#fff"}">${p.id}</text><text x="75" y="${y + 28.5}" font-size="14" font-weight="500" fill="#141417">${p.name}</text>`;
+        const bars = [
+          [508, 105, 201, P.WO],
+          [531, 141, 144, P.SA],
+          [548, 177, 63, P.SA],
+          [582, 213, 88, SE],
+          [685, 249, 29, P.WO],
+        ];
+        const wf = bars
+          .map(
+            ([x, y, w, p], i) =>
+              `<rect class="span-in${still}" style="animation-delay:${520 + i * 70}ms" x="${x}" y="${y}" width="${w}" height="13" rx="4" fill="${p.color}"/><text x="${x + 3}" y="${y + 28}" font-size="10" fill="#5c5c6e">${p.id}</text>`,
+          )
+          .join("");
+        return `<svg viewBox="16 14 728 286" width="100%" style="max-width:640px" font-family="Inter,sans-serif" role="img" aria-label="Each project's spans woven into one trace">
     <defs>${cut("hero-a", sa)}${cut("hero-c", wo)}</defs>
     <text x="28" y="36" font-size="13" fill="#5c5c6e">Your projects</text><text x="492" y="36" font-size="13" fill="#5c5c6e">One trace in Web orchestrator</text>
     ${chip(P.WO, 79)}${chip(P.SA, 153)}${chip(SE, 227)}
@@ -423,229 +1924,481 @@ function hero() {
     <rect x="492" y="60" width="240" height="227" rx="12" fill="#f8fafc" stroke="#e2e8f0"/>
     <text x="508" y="86" font-size="15" font-weight="600" fill="#141417" font-family="JetBrains Mono,monospace">handle_message</text>
     <path d="M507 96H716" stroke="#e2e8f0"/>${wf}</svg>`;
-}
+      }
 
-/* ---------- data ---------- */
-const P = {
-  SA: { id: "SA", name: "Specialist agents", color: "#3d3d4d" },
-  WO: { id: "WO", name: "Web orchestrator", color: "#ED8926" },
-  AO: { id: "AO", name: "App orchestrator", color: "#2563eb" },
-  AA: { id: "AA", name: "All agents", color: "#7b8394", aggregate: true },
-};
-const av = (p, cls = "") => `<span class="av ${cls}" style="background:${p.color}">${p.id}</span>`;
-const fmt = (n) => n.toLocaleString("en-GB");
-const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      /* ---------- data ---------- */
+      const P = {
+        SA: { id: "SA", name: "Specialist agents", color: "#3d3d4d" },
+        WO: { id: "WO", name: "Web orchestrator", color: "#ED8926" },
+        AO: { id: "AO", name: "App orchestrator", color: "#2563eb" },
+        AA: { id: "AA", name: "All agents", color: "#7b8394", aggregate: true },
+      };
+      const av = (p, cls = "") =>
+        `<span class="av ${cls}" style="background:${p.color}">${p.id}</span>`;
+      const fmt = (n) => n.toLocaleString("en-GB");
+      const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-const DEFAULT_COND = 'attributes["orchestrator"] == "web"\nand Verified("orchestrator")';
-const state = {
-  step: 0,
-  tab: "into",
-  keys: [],
-  keyFlow: null, // null | {stage, name, lang}
-  braids: [],
-  dlg: null, // {mode, into, cond, from, expires, openMenu, test}
-  sel: "payments_agent",
-  plan: "none",
-  audit: "all",
-  notes: true,
-};
+      const DEFAULT_COND = 'attributes["orchestrator"] == "web"\nand Verified("orchestrator")';
+      const state = {
+        step: 0,
+        tab: "into",
+        keys: [],
+        keyFlow: null, // null | {stage, name, lang}
+        braids: [],
+        dlg: null, // {mode, into, cond, from, expires, openMenu, test}
+        sel: "payments_agent",
+        plan: "none",
+        audit: "all",
+        notes: true,
+      };
 
-function seedBraids() {
-  return [
-    { id: "b1", into: "WO", cond: DEFAULT_COND, from: "1 Oct 2026", expires: "Never", by: "Sam Rivera", on: "21 Oct", spans: "18.2k", spark: [8, 9, 12, 11, 14, 13, 16, 18] },
-    { id: "b2", into: "AO", cond: 'attributes["orchestrator"] == "app"\nand Verified("orchestrator")', from: "1 Oct 2026", expires: "31 Dec 2026", by: "Sam Rivera", on: "21 Oct", spans: "6.4k", spark: [5, 6, 5, 7, 6, 8, 7, 9] },
-  ];
-}
-function seedKeys() {
-  return [{ id: "k1", name: "Production", tail: "4f2a", created: "Today", by: "Sam Rivera", used: "2 min ago", ok: "18,204", bad: 3, status: "active" }];
-}
+      function seedBraids() {
+        return [
+          {
+            id: "b1",
+            into: "WO",
+            cond: DEFAULT_COND,
+            from: "1 Oct 2026",
+            expires: "Never",
+            by: "Sam Rivera",
+            on: "21 Oct",
+            spans: "18.2k",
+            spark: [8, 9, 12, 11, 14, 13, 16, 18],
+          },
+          {
+            id: "b2",
+            into: "AO",
+            cond: 'attributes["orchestrator"] == "app"\nand Verified("orchestrator")',
+            from: "1 Oct 2026",
+            expires: "31 Dec 2026",
+            by: "Sam Rivera",
+            on: "21 Oct",
+            spans: "6.4k",
+            spark: [5, 6, 5, 7, 6, 8, 7, 9],
+          },
+        ];
+      }
+      function seedKeys() {
+        return [
+          {
+            id: "k1",
+            name: "Production",
+            tail: "4f2a",
+            created: "Today",
+            by: "Sam Rivera",
+            used: "2 min ago",
+            ok: "18,204",
+            bad: 3,
+            status: "active",
+          },
+        ];
+      }
 
-/* ---------- condition language (v1 subset) ---------- */
-function highlight(src) {
-  const re = /("(?:[^"\\]|\\.)*"?)|(\b(?:and|or|not)\b)|(\b(?:Verified|IsMatch)\b)|(==|!=)|(\b(?:nil|true|false)\b)/g;
-  let out = "", last = 0, m;
-  while ((m = re.exec(src))) {
-    out += esc(src.slice(last, m.index));
-    const cls = m[1] ? "tk-str" : m[2] ? "tk-kw" : m[3] ? "tk-fn" : m[4] ? "tk-op" : "tk-lit";
-    out += `<span class="${cls}">${esc(m[0])}</span>`;
-    last = re.lastIndex;
-  }
-  return out + esc(src.slice(last)) + "\n";
-}
-function validate(src) {
-  const s = src.trim();
-  if (!s) return { ok: true, empty: true, verified: false, orch: null, env: null, name: null };
-  const quotes = (s.match(/(?<!\\)"/g) || []).length;
-  if (quotes % 2) return { ok: false, error: "Close the quote." };
-  if (/\bor\b/.test(s)) return { ok: false, error: "“or” isn’t supported yet. Create a second braid for the other case." };
-  if (/\bnot\b/.test(s)) return { ok: false, error: "“not” isn’t supported yet. Match what you want to show instead." };
-  if (/IsMatch/.test(s)) return { ok: false, error: "Pattern matching isn’t supported yet. Compare with == instead." };
-  const res = { ok: true, verified: false, orch: null, env: null, name: null };
-  for (const raw of s.split(/\band\b/)) {
-    const c = raw.trim();
-    let m;
-    if ((m = c.match(/^attributes\["([^"]+)"\]\s*==\s*"([^"]*)"$/))) { if (m[1] === "orchestrator") res.orch = m[2]; continue; }
-    if ((m = c.match(/^resource\.attributes\["([^"]+)"\]\s*==\s*"([^"]*)"$/))) { if (m[1] === "deployment.environment") res.env = m[2]; continue; }
-    if (/^(resource\.)?attributes\["[^"]+"\]\s*!=\s*nil$/.test(c)) continue;
-    if ((m = c.match(/^name\s*==\s*"([^"]*)"$/))) { res.name = m[1]; continue; }
-    if (/^instrumentation_scope\.name\s*==\s*"[^"]*"$/.test(c)) continue;
-    if ((m = c.match(/^Verified\("([^"]+)"\)$/))) { res.verified = true; continue; }
-    if (/==\s*(true|false)$/.test(c)) return { ok: false, error: 'Attribute values are text: write == "true".' };
-    if (/!=/.test(c)) return { ok: false, error: "!= only works with nil for now, for example attributes[\"channel\"] != nil." };
-    if (!c) return { ok: false, error: "Add a condition after “and”." };
-    return { ok: false, error: `Can’t read “${c.length > 40 ? c.slice(0, 40) + "…" : c}”.` };
-  }
-  return res;
-}
-function previewFor(into, v) {
-  const total = into === "WO" ? 4902 : 2113;
-  const mine = into === "WO" ? "web" : "app";
-  if (!v.ok) return null;
-  let whole, parts, unsigned = 0, match = true;
-  if (v.empty) { whole = into === "WO" ? 1302 : 553; parts = 0; }
-  else if (v.orch && v.orch !== mine) { whole = 0; parts = 0; match = false; }
-  else if (v.name) { whole = 0; parts = into === "WO" ? 640 : 210; }
-  else {
-    whole = into === "WO" ? 318 : 124; parts = into === "WO" ? 984 : 429;
-    if (v.verified) { unsigned = 18; whole -= 6; parts -= 12; }
-    if (!v.orch) { whole = into === "WO" ? 1302 : 553; parts = 0; }
-  }
-  if (v.env) { whole = Math.round(whole * 0.82); parts = Math.round(parts * 0.82); }
-  return { total, whole, parts, hidden: total - whole - parts, unsigned, match };
-}
+      /* ---------- condition language (v1 subset) ---------- */
+      function highlight(src) {
+        const re =
+          /("(?:[^"\\]|\\.)*"?)|(\b(?:and|or|not)\b)|(\b(?:Verified|IsMatch)\b)|(==|!=)|(\b(?:nil|true|false)\b)/g;
+        let out = "",
+          last = 0,
+          m;
+        while ((m = re.exec(src))) {
+          out += esc(src.slice(last, m.index));
+          const cls = m[1] ? "tk-str" : m[2] ? "tk-kw" : m[3] ? "tk-fn" : m[4] ? "tk-op" : "tk-lit";
+          out += `<span class="${cls}">${esc(m[0])}</span>`;
+          last = re.lastIndex;
+        }
+        return out + esc(src.slice(last)) + "\n";
+      }
+      function validate(src) {
+        const s = src.trim();
+        if (!s)
+          return { ok: true, empty: true, verified: false, orch: null, env: null, name: null };
+        const quotes = (s.match(/(?<!\\)"/g) || []).length;
+        if (quotes % 2) return { ok: false, error: "Close the quote." };
+        if (/\bor\b/.test(s))
+          return {
+            ok: false,
+            error: "“or” isn’t supported yet. Create a second braid for the other case.",
+          };
+        if (/\bnot\b/.test(s))
+          return {
+            ok: false,
+            error: "“not” isn’t supported yet. Match what you want to show instead.",
+          };
+        if (/IsMatch/.test(s))
+          return {
+            ok: false,
+            error: "Pattern matching isn’t supported yet. Compare with == instead.",
+          };
+        const res = { ok: true, verified: false, orch: null, env: null, name: null };
+        for (const raw of s.split(/\band\b/)) {
+          const c = raw.trim();
+          let m;
+          if ((m = c.match(/^attributes\["([^"]+)"\]\s*==\s*"([^"]*)"$/))) {
+            if (m[1] === "orchestrator") res.orch = m[2];
+            continue;
+          }
+          if ((m = c.match(/^resource\.attributes\["([^"]+)"\]\s*==\s*"([^"]*)"$/))) {
+            if (m[1] === "deployment.environment") res.env = m[2];
+            continue;
+          }
+          if (/^(resource\.)?attributes\["[^"]+"\]\s*!=\s*nil$/.test(c)) continue;
+          if ((m = c.match(/^name\s*==\s*"([^"]*)"$/))) {
+            res.name = m[1];
+            continue;
+          }
+          if (/^instrumentation_scope\.name\s*==\s*"[^"]*"$/.test(c)) continue;
+          if ((m = c.match(/^Verified\("([^"]+)"\)$/))) {
+            res.verified = true;
+            continue;
+          }
+          if (/==\s*(true|false)$/.test(c))
+            return { ok: false, error: 'Attribute values are text: write == "true".' };
+          if (/!=/.test(c))
+            return {
+              ok: false,
+              error: '!= only works with nil for now, for example attributes["channel"] != nil.',
+            };
+          if (!c) return { ok: false, error: "Add a condition after “and”." };
+          return { ok: false, error: `Can’t read “${c.length > 40 ? c.slice(0, 40) + "…" : c}”.` };
+        }
+        return res;
+      }
+      function previewFor(into, v) {
+        const total = into === "WO" ? 4902 : 2113;
+        const mine = into === "WO" ? "web" : "app";
+        if (!v.ok) return null;
+        let whole,
+          parts,
+          unsigned = 0,
+          match = true;
+        if (v.empty) {
+          whole = into === "WO" ? 1302 : 553;
+          parts = 0;
+        } else if (v.orch && v.orch !== mine) {
+          whole = 0;
+          parts = 0;
+          match = false;
+        } else if (v.name) {
+          whole = 0;
+          parts = into === "WO" ? 640 : 210;
+        } else {
+          whole = into === "WO" ? 318 : 124;
+          parts = into === "WO" ? 984 : 429;
+          if (v.verified) {
+            unsigned = 18;
+            whole -= 6;
+            parts -= 12;
+          }
+          if (!v.orch) {
+            whole = into === "WO" ? 1302 : 553;
+            parts = 0;
+          }
+        }
+        if (v.env) {
+          whole = Math.round(whole * 0.82);
+          parts = Math.round(parts * 0.82);
+        }
+        return { total, whole, parts, hidden: total - whole - parts, unsigned, match };
+      }
 
-/* ---------- steps ---------- */
-const STEPS = [
-  { t: "Braids page", project: "SA", go: () => { state.tab = "into"; state.braids = []; state.dlg = null; state.plan = "none"; } },
-  { t: "Signing key", project: "WO", go: () => { state.tab = "keys"; state.keys = []; state.keyFlow = null; state.dlg = null; state.plan = "none"; } },
-  { t: "New braid", project: "SA", go: () => { state.tab = "into"; state.braids = []; state.keys = seedKeys(); openNew(); state.plan = "none"; } },
-  { t: "Your braids", project: "SA", go: () => { state.tab = "into"; state.braids = seedBraids(); state.dlg = null; state.plan = "none"; } },
-  { t: "Braided into you", project: "WO", go: () => { state.tab = "from"; state.fromRemoved = false; state.braids = seedBraids(); state.keys = seedKeys(); state.dlg = null; state.plan = "none"; } },
-  { t: "Trace view", project: "WO", go: () => { state.sel = "payments_agent"; state.dlg = null; } },
-  { t: "Remove a braid", project: "SA", go: () => { state.tab = "into"; state.braids = seedBraids(); state.dlg = { mode: "remove", id: "b1" }; state.plan = "none"; } },
-  { t: "Audit log", project: "SA", go: () => { state.dlg = null; } },
-  { t: "Plan states", project: "SA", go: () => { state.tab = "into"; state.braids = seedBraids(); state.dlg = null; state.plan = "downgraded"; } },
-];
-function openNew(prefill) {
-  state.dlg = Object.assign({ mode: "new", into: "WO", cond: DEFAULT_COND, from: "1 Oct 2026", expires: "Never", openMenu: null, test: null }, prefill || {});
-}
+      /* ---------- steps ---------- */
+      const STEPS = [
+        {
+          t: "Braids page",
+          project: "SA",
+          go: () => {
+            state.tab = "into";
+            state.braids = [];
+            state.dlg = null;
+            state.plan = "none";
+          },
+        },
+        {
+          t: "Signing key",
+          project: "WO",
+          go: () => {
+            state.tab = "keys";
+            state.keys = [];
+            state.keyFlow = null;
+            state.dlg = null;
+            state.plan = "none";
+          },
+        },
+        {
+          t: "New braid",
+          project: "SA",
+          go: () => {
+            state.tab = "into";
+            state.braids = [];
+            state.keys = seedKeys();
+            openNew();
+            state.plan = "none";
+          },
+        },
+        {
+          t: "Your braids",
+          project: "SA",
+          go: () => {
+            state.tab = "into";
+            state.braids = seedBraids();
+            state.dlg = null;
+            state.plan = "none";
+          },
+        },
+        {
+          t: "Braided into you",
+          project: "WO",
+          go: () => {
+            state.tab = "from";
+            state.fromRemoved = false;
+            state.braids = seedBraids();
+            state.keys = seedKeys();
+            state.dlg = null;
+            state.plan = "none";
+          },
+        },
+        {
+          t: "Trace view",
+          project: "WO",
+          go: () => {
+            state.sel = "payments_agent";
+            state.dlg = null;
+          },
+        },
+        {
+          t: "Remove a braid",
+          project: "SA",
+          go: () => {
+            state.tab = "into";
+            state.braids = seedBraids();
+            state.dlg = { mode: "remove", id: "b1" };
+            state.plan = "none";
+          },
+        },
+        {
+          t: "Audit log",
+          project: "SA",
+          go: () => {
+            state.dlg = null;
+          },
+        },
+        {
+          t: "Plan states",
+          project: "SA",
+          go: () => {
+            state.tab = "into";
+            state.braids = seedBraids();
+            state.dlg = null;
+            state.plan = "downgraded";
+          },
+        },
+      ];
+      function openNew(prefill) {
+        state.dlg = Object.assign(
+          {
+            mode: "new",
+            into: "WO",
+            cond: DEFAULT_COND,
+            from: "1 Oct 2026",
+            expires: "Never",
+            openMenu: null,
+            test: null,
+          },
+          prefill || {},
+        );
+      }
 
-/* ---------- notes ---------- */
-const NOTES = [
-  { h: "Braids page, first visit", n: [
-    "Lives in project settings, next to API keys. The page belongs to the project whose spans are braided out, because that project's admins decide what leaves it.",
-    "Who can braid: this project's admins and organisation admins. A project's admins are its team's admins, so a team admin can braid out of every project in that team. Members see the lists and change nothing.",
-    "An organisation can keep braids to its admins with one setting in organisation settings. Then project admins see the lists, change nothing, and are told who to ask. Live braids stay.",
-    "Empty state teaches the three moves in the order a team does them: tag the call, copy the tag, braid. The illustration comes from the brand kit (brand/braids-docs-hero.svg): each project's strand weaves in and lands on its own spans in one trace. It plays once, and not at all under reduced motion.",
-    "Three tabs: braids out of this project, braids into it, and this project's signing keys. Counts on the tabs, so a project can see at a glance whether anything flows in or out.",
-    "Enterprise pill on the title and in the settings nav. Copy says what the customer gets and never mentions grants, proofs or tenants.",
-  ], q: [] },
-  { h: "Signing key, in the calling project", n: [
-    "The project that makes the call signs its tags, so the key lives in Web orchestrator. Projects that braid into it can then require the signature with Verified(\"orchestrator\").",
-    "Create flow: name the key, see it once, then set up the SDK in both places: the caller signs, the projects it calls copy the tag. Snippets for TypeScript, Python and Go (proposed SDK options, not built yet).",
-    "Each key shows last use and how many signed spans passed or failed in the last 24 hours, so a broken deploy is visible here before anyone notices missing spans.",
-    "Rotate keeps the old key working for 7 days so a deploy never drops signatures. Revoke is immediate.",
-  ], q: ["7-day overlap on rotation: right default?", "Should failed signatures also raise a notification to project admins?"] },
-  { h: "New braid", n: [
-    "From is fixed to this project. Into is a project picker offering only projects you can read; aggregate projects and this project are disabled with a reason.",
-    "Several braids may join the same two projects; the other project sees spans matching any of them. A further braid previews what it adds.",
-    "\"Data from\" may reach back before today, so the other project sees matching spans already recorded in its traces.",
-    "The condition editor checks as you type against the v1 subset (equality on text, and, != nil, Verified). Unsupported syntax gets a plain-language fix, not a parser error. Chips insert attributes this project's spans actually carry.",
-    "\"Only signed calls\" is the same thing as Verified(\"orchestrator\") in the condition, kept in sync both ways. It shows whether the other project has a working signing key.",
-    "The preview counts Web orchestrator's traces in the last 7 days: whole, parts, not shown. The example trace shows hidden spans struck through; only the admin creating the braid sees that, the reader never does.",
-    "\"Test a trace id\" renders one real trace exactly as the other project will see it. Try 4bf92f3577b34da6.",
-    "Footer names the people who gain visibility (members of Web orchestrator), so the admin understands this is access, not plumbing.",
-  ], q: ["Expiry choices: Never, 30 days, 90 days, a date."] },
-  { h: "Your braids (owner side)", n: [
-    "One row per braid: the strand from this project into the other, the condition, signing state, dates, and spans braided in the last 24 hours with a small trend.",
-    "Row menu: Edit, View in audit log, Remove braid. Edit reopens the same dialog; saving replaces the braid with no gap in what the other project sees, and the audit log shows a removal and a creation naming the braid it replaced.",
-    "Toast after creating says when spans start showing (within a minute), so nobody refreshes in a panic.",
-  ], q: [] },
-  { h: "Braided into you (reader side)", n: [
-    "For the receiving project: who braids into it, under which condition, and which of its signing keys the condition relies on. Its admins can remove a braid, not change it.",
-    "Created and changed by the admins of the project the spans come from, said plainly, with a link to ask one.",
-    "If a braid relies on a signature and this project has no active key, the row warns: nothing will show until a key is set up.",
-  ], q: [] },
-  { h: "Trace view", n: [
-    "Braided spans sit in the waterfall where they ran, with a badge naming their project. Bars use the project's colour so the strand is visible down the tree.",
-    "Spans that don't match are never sent: no gaps, no placeholders, no 'hidden spans' count. A braided span whose parent was not braided shows at the top of the trace, as a span with a missing parent does today; placing it lower would mean reading spans that were not braided.",
-    "Header totals include braided spans and say so, computed for this one trace. The trace list keeps this project's own totals in v1.",
-    "On a braided span: why it shows (matched condition, signed by), Open in Specialist agents if you can see that project, and playground, annotate and evaluations off with a reason. Evaluations from the other project aren't shown.",
-    "Click any span to compare own and braided details.",
-  ], q: ["Should the badge show on every braided span, or only on the top span of each braided branch?"] },
-  { h: "Remove a braid", n: [
-    "Plain consequence first: Web orchestrator stops seeing these spans within 30 seconds. Then the reassurance: nothing was copied, so nothing is left behind.",
-    "No type-to-confirm: removing is safe and reversible by creating the braid again.",
-  ], q: [] },
-  { h: "Audit log", n: [
-    "The owner's project logs braid created, changed and removed, with the condition. The reader's project logs reads of braided spans, grouped per person per 5 minutes.",
-    "Signing keys log create, rotate and revoke.",
-    "Filter chip for Braids so an access review is one click.",
-  ], q: [] },
-  { h: "Plan states", n: [
-    "Not on Enterprise: the page explains Braids and offers a conversation, nothing half-works.",
-    "Downgraded: braids pause at once, are kept, and come back on upgrade. Rows show Paused; the banner says exactly that.",
-  ], q: [] },
-];
+      /* ---------- notes ---------- */
+      const NOTES = [
+        {
+          h: "Braids page, first visit",
+          n: [
+            "Lives in project settings, next to API keys. The page belongs to the project whose spans are braided out, because that project's admins decide what leaves it.",
+            "Who can braid: this project's admins and organisation admins. A project's admins are its team's admins, so a team admin can braid out of every project in that team. Members see the lists and change nothing.",
+            "An organisation can keep braids to its admins with one setting in organisation settings. Then project admins see the lists, change nothing, and are told who to ask. Live braids stay.",
+            "Empty state teaches the three moves in the order a team does them: tag the call, copy the tag, braid. The illustration comes from the brand kit (brand/braids-docs-hero.svg): each project's strand weaves in and lands on its own spans in one trace. It plays once, and not at all under reduced motion.",
+            "Three tabs: braids out of this project, braids into it, and this project's signing keys. Counts on the tabs, so a project can see at a glance whether anything flows in or out.",
+            "Enterprise pill on the title and in the settings nav. Copy says what the customer gets and never mentions grants, proofs or tenants.",
+          ],
+          q: [],
+        },
+        {
+          h: "Signing key, in the calling project",
+          n: [
+            'The project that makes the call signs its tags, so the key lives in Web orchestrator. Projects that braid into it can then require the signature with Verified("orchestrator").',
+            "Create flow: name the key, see it once, then set up the SDK in both places: the caller signs, the projects it calls copy the tag. Snippets for TypeScript, Python and Go (proposed SDK options, not built yet).",
+            "Each key shows last use and how many signed spans passed or failed in the last 24 hours, so a broken deploy is visible here before anyone notices missing spans.",
+            "Rotate keeps the old key working for 7 days so a deploy never drops signatures. Revoke is immediate.",
+          ],
+          q: [
+            "7-day overlap on rotation: right default?",
+            "Should failed signatures also raise a notification to project admins?",
+          ],
+        },
+        {
+          h: "New braid",
+          n: [
+            "From is fixed to this project. Into is a project picker offering only projects you can read; aggregate projects and this project are disabled with a reason.",
+            "Several braids may join the same two projects; the other project sees spans matching any of them. A further braid previews what it adds.",
+            '"Data from" may reach back before today, so the other project sees matching spans already recorded in its traces.',
+            "The condition editor checks as you type against the v1 subset (equality on text, and, != nil, Verified). Unsupported syntax gets a plain-language fix, not a parser error. Chips insert attributes this project's spans actually carry.",
+            '"Only signed calls" is the same thing as Verified("orchestrator") in the condition, kept in sync both ways. It shows whether the other project has a working signing key.',
+            "The preview counts Web orchestrator's traces in the last 7 days: whole, parts, not shown. The example trace shows hidden spans struck through; only the admin creating the braid sees that, the reader never does.",
+            '"Test a trace id" renders one real trace exactly as the other project will see it. Try 4bf92f3577b34da6.',
+            "Footer names the people who gain visibility (members of Web orchestrator), so the admin understands this is access, not plumbing.",
+          ],
+          q: ["Expiry choices: Never, 30 days, 90 days, a date."],
+        },
+        {
+          h: "Your braids (owner side)",
+          n: [
+            "One row per braid: the strand from this project into the other, the condition, signing state, dates, and spans braided in the last 24 hours with a small trend.",
+            "Row menu: Edit, View in audit log, Remove braid. Edit reopens the same dialog; saving replaces the braid with no gap in what the other project sees, and the audit log shows a removal and a creation naming the braid it replaced.",
+            "Toast after creating says when spans start showing (within a minute), so nobody refreshes in a panic.",
+          ],
+          q: [],
+        },
+        {
+          h: "Braided into you (reader side)",
+          n: [
+            "For the receiving project: who braids into it, under which condition, and which of its signing keys the condition relies on. Its admins can remove a braid, not change it.",
+            "Created and changed by the admins of the project the spans come from, said plainly, with a link to ask one.",
+            "If a braid relies on a signature and this project has no active key, the row warns: nothing will show until a key is set up.",
+          ],
+          q: [],
+        },
+        {
+          h: "Trace view",
+          n: [
+            "Braided spans sit in the waterfall where they ran, with a badge naming their project. Bars use the project's colour so the strand is visible down the tree.",
+            "Spans that don't match are never sent: no gaps, no placeholders, no 'hidden spans' count. A braided span whose parent was not braided shows at the top of the trace, as a span with a missing parent does today; placing it lower would mean reading spans that were not braided.",
+            "Header totals include braided spans and say so, computed for this one trace. The trace list keeps this project's own totals in v1.",
+            "On a braided span: why it shows (matched condition, signed by), Open in Specialist agents if you can see that project, and playground, annotate and evaluations off with a reason. Evaluations from the other project aren't shown.",
+            "Click any span to compare own and braided details.",
+          ],
+          q: [
+            "Should the badge show on every braided span, or only on the top span of each braided branch?",
+          ],
+        },
+        {
+          h: "Remove a braid",
+          n: [
+            "Plain consequence first: Web orchestrator stops seeing these spans within 30 seconds. Then the reassurance: nothing was copied, so nothing is left behind.",
+            "No type-to-confirm: removing is safe and reversible by creating the braid again.",
+          ],
+          q: [],
+        },
+        {
+          h: "Audit log",
+          n: [
+            "The owner's project logs braid created, changed and removed, with the condition. The reader's project logs reads of braided spans, grouped per person per 5 minutes.",
+            "Signing keys log create, rotate and revoke.",
+            "Filter chip for Braids so an access review is one click.",
+          ],
+          q: [],
+        },
+        {
+          h: "Plan states",
+          n: [
+            "Not on Enterprise: the page explains Braids and offers a conversation, nothing half-works.",
+            "Downgraded: braids pause at once, are kept, and come back on upgrade. Rows show Paused; the banner says exactly that.",
+          ],
+          q: [],
+        },
+      ];
 
-/* ---------- render ---------- */
-function render() {
-  const step = STEPS[state.step];
-  document.getElementById("steps").innerHTML = STEPS.map((s, i) => `<button class="${i === state.step ? "on" : ""}" data-action="step" data-i="${i}"><span class="n">${i + 1}</span>${s.t}</button>`).join("");
-  document.getElementById("rail").innerHTML = `<div class="logo">${braidMark(18, "#ED8926", "#111113")}</div>
+      /* ---------- render ---------- */
+      function render() {
+        const step = STEPS[state.step];
+        document.getElementById("steps").innerHTML = STEPS.map(
+          (s, i) =>
+            `<button class="${i === state.step ? "on" : ""}" data-action="step" data-i="${i}"><span class="n">${i + 1}</span>${s.t}</button>`,
+        ).join("");
+        document.getElementById("rail").innerHTML =
+          `<div class="logo">${braidMark(18, "#ED8926", "#111113")}</div>
     <a>${ic("home")}</a><a class="${state.step === 5 ? "on" : ""}">${ic("activity")}</a><a>${ic("flask")}</a><a>${ic("database")}</a><a>${ic("message")}</a>
     <div class="grow"></div><a class="${state.step !== 5 ? "on" : ""}">${ic("settings")}</a>`;
-  const project = P[step.project];
-  const main = document.getElementById("main");
-  const topbar = `<div class="topbar">
+        const project = P[step.project];
+        const main = document.getElementById("main");
+        const topbar = `<div class="topbar">
       <div class="switcher">${av(project)}<b style="font-weight:600">${project.name}</b>${ic("down", "sm")}</div>
       <div class="crumb">${ic("right", "sm")}${state.step === 5 ? `Traces ${ic("right", "sm")} <b>checkout conversation</b>` : state.step === 7 ? `Organisation settings ${ic("right", "sm")} <b>Audit log</b>` : `Settings ${ic("right", "sm")} <b>Braids</b>`}</div>
       <div class="sp"></div><span class="pill quiet">Northwind</span><div class="me">SR</div></div>`;
-  let body;
-  if (state.step === 5) body = traceView();
-  else body = `<div class="settings">${settingsNav()}<div class="content">${state.step === 7 ? auditPage() : braidsPage(project)}</div></div>`;
-  main.innerHTML = topbar + body;
-  document.getElementById("overlay-root").innerHTML = overlay(project);
-  const n = NOTES[state.step];
-  document.getElementById("notes").innerHTML = `<div class="lbl">${ic("sticky", "sm")} Design notes · ${state.step + 1} of ${STEPS.length}</div><h3>${n.h}</h3><ul>${n.n.map((x) => `<li>${x}</li>`).join("")}</ul>${n.q.length ? `<div class="open-q"><h4>Open questions</h4><ul>${n.q.map((x) => `<li>${x}</li>`).join("")}</ul></div>` : ""}`;
-  document.getElementById("notes").classList.toggle("open", state.notes);
-  document.getElementById("app").classList.toggle("notes-open", state.notes);
-  document.body.classList.toggle("notes-open", state.notes);
-  wireEditor();
-}
+        let body;
+        if (state.step === 5) body = traceView();
+        else
+          body = `<div class="settings">${settingsNav()}<div class="content">${state.step === 7 ? auditPage() : braidsPage(project)}</div></div>`;
+        main.innerHTML = topbar + body;
+        document.getElementById("overlay-root").innerHTML = overlay(project);
+        const n = NOTES[state.step];
+        document.getElementById("notes").innerHTML =
+          `<div class="lbl">${ic("sticky", "sm")} Design notes · ${state.step + 1} of ${STEPS.length}</div><h3>${n.h}</h3><ul>${n.n.map((x) => `<li>${x}</li>`).join("")}</ul>${n.q.length ? `<div class="open-q"><h4>Open questions</h4><ul>${n.q.map((x) => `<li>${x}</li>`).join("")}</ul></div>` : ""}`;
+        document.getElementById("notes").classList.toggle("open", state.notes);
+        document.getElementById("app").classList.toggle("notes-open", state.notes);
+        document.body.classList.toggle("notes-open", state.notes);
+        wireEditor();
+      }
 
-function settingsNav() {
-  const audit = state.step === 7;
-  return `<nav class="snav"><h6>Project</h6>
+      function settingsNav() {
+        const audit = state.step === 7;
+        return `<nav class="snav"><h6>Project</h6>
     <a>General</a><a>Members</a><a>API keys</a><a>Model providers</a><a>Privacy</a>
     <a class="${audit ? "" : "on"}"><span style="color:var(--orange)">${braidMark(15)}</span>Braids<span class="tag pill ent">Enterprise</span></a>
     <h6>Organisation</h6><a>Members</a><a>Roles and access</a><a class="${audit ? "on" : ""}">Audit log</a><a>Usage</a><a>Plan and billing</a></nav>`;
-}
+      }
 
-function braidsPage(project) {
-  const isOwner = project.id === "SA";
-  const into = state.braids.length, from = state.step === 4 && !state.fromRemoved ? 1 : 0, keys = state.keys.length;
-  if (state.step === 8 && state.plan === "none-ent") return planSeg() + pageHeader(false) + upsell();
-  let html = pageHeader(isOwner && state.tab === "into" && state.step !== 8 && (state.step === 0 || state.braids.length));
-  if (state.step === 8) html = planSeg() + html + (state.plan === "downgraded" ? `<div class="banner callout warn">${ic("pause")}<div style="flex:1"><b>Braids are paused.</b> They need the Enterprise plan. Your 2 braids are kept and start working again when you upgrade.</div><button class="btn sm">See plans</button></div>` : "");
-  html += `<div class="tabs">
+      function braidsPage(project) {
+        const isOwner = project.id === "SA";
+        const into = state.braids.length,
+          from = state.step === 4 && !state.fromRemoved ? 1 : 0,
+          keys = state.keys.length;
+        if (state.step === 8 && state.plan === "none-ent")
+          return planSeg() + pageHeader(false) + upsell();
+        let html = pageHeader(
+          isOwner &&
+            state.tab === "into" &&
+            state.step !== 8 &&
+            (state.step === 0 || state.braids.length),
+        );
+        if (state.step === 8)
+          html =
+            planSeg() +
+            html +
+            (state.plan === "downgraded"
+              ? `<div class="banner callout warn">${ic("pause")}<div style="flex:1"><b>Braids are paused.</b> They need the Enterprise plan. Your 2 braids are kept and start working again when you upgrade.</div><button class="btn sm">See plans</button></div>`
+              : "");
+        html += `<div class="tabs">
     <button class="${state.tab === "into" ? "on" : ""}" data-action="tab" data-t="into">Into other projects <span class="count">${isOwner ? into : 0}</span></button>
     <button class="${state.tab === "from" ? "on" : ""}" data-action="tab" data-t="from">From other projects <span class="count">${isOwner ? 0 : from}</span></button>
     <button class="${state.tab === "keys" ? "on" : ""}" data-action="tab" data-t="keys">Signing keys <span class="count">${isOwner ? 0 : keys}</span></button></div>`;
-  if (state.tab === "into") html += isOwner ? (state.braids.length ? braidList() : emptyInto()) : emptySmall("Web orchestrator doesn’t braid its spans anywhere yet.");
-  else if (state.tab === "from") html += isOwner ? emptySmall("No project braids its spans into Specialist agents.") : fromList();
-  else html += isOwner ? emptySmall("Specialist agents has no signing keys. Create one if it calls other projects and wants to prove it.") : keysTab();
-  return html;
-}
-function pageHeader(showNew) {
-  return `<div class="ph"><div><h1>Braids <span class="pill ent">Enterprise</span></h1><p>Show spans from one project inside another project’s traces. Nothing is copied.</p></div><div class="sp"></div>
+        if (state.tab === "into")
+          html += isOwner
+            ? state.braids.length
+              ? braidList()
+              : emptyInto()
+            : emptySmall("Web orchestrator doesn’t braid its spans anywhere yet.");
+        else if (state.tab === "from")
+          html += isOwner
+            ? emptySmall("No project braids its spans into Specialist agents.")
+            : fromList();
+        else
+          html += isOwner
+            ? emptySmall(
+                "Specialist agents has no signing keys. Create one if it calls other projects and wants to prove it.",
+              )
+            : keysTab();
+        return html;
+      }
+      function pageHeader(showNew) {
+        return `<div class="ph"><div><h1>Braids <span class="pill ent">Enterprise</span></h1><p>Show spans from one project inside another project’s traces. Nothing is copied.</p></div><div class="sp"></div>
     <a class="link" style="margin-top:8px">${ic("book", "sm")}How braids work</a>${showNew ? `<button class="btn primary" data-action="new">${ic("plus")}New braid</button>` : ""}</div>`;
-}
-function planSeg() {
-  return `<div class="seg"><button class="${state.plan === "none-ent" ? "on" : ""}" data-action="plan" data-p="none-ent">Not on Enterprise</button><button class="${state.plan === "downgraded" ? "on" : ""}" data-action="plan" data-p="downgraded">Downgraded from Enterprise</button></div>`;
-}
-function emptyInto() {
-  return `<div class="card empty"><div class="art">${hero()}</div><div class="body"><div style="flex:1"><span class="pill orange" style="margin-bottom:14px">${braidMark(12, "#ED8926", "#7b341e")} New</span>
+      }
+      function planSeg() {
+        return `<div class="seg"><button class="${state.plan === "none-ent" ? "on" : ""}" data-action="plan" data-p="none-ent">Not on Enterprise</button><button class="${state.plan === "downgraded" ? "on" : ""}" data-action="plan" data-p="downgraded">Downgraded from Enterprise</button></div>`;
+      }
+      function emptyInto() {
+        return `<div class="card empty"><div class="art">${hero()}</div><div class="body"><div style="flex:1"><span class="pill orange" style="margin-bottom:14px">${braidMark(12, "#ED8926", "#7b341e")} New</span>
       <h2>One trace, across every project</h2>
       <p>When your agents call agents in other projects, the trace stops at the project line. A braid shows this project’s matching spans inside the other project’s traces, so it sees its calls all the way down.</p>
       </div><div style="display:flex;gap:8px;flex:none"><button class="btn">${ic("book")}Read the guide</button><button class="btn primary" data-action="new">${ic("plus")}New braid</button></div></div></div>
@@ -653,30 +2406,33 @@ function emptyInto() {
       <div class="card"><div class="k">1</div><h4>Tag the call</h4><p>The calling project adds a tag such as <code>orchestrator=web</code> to its calls and signs it.</p></div>
       <div class="card"><div class="k">2</div><h4>Copy the tag</h4><p>This project’s SDK copies the tag onto its spans. One line of setup.</p></div>
       <div class="card"><div class="k">3</div><h4>Braid</h4><p>Pick the project and a condition. Only spans that match ever leave this project.</p></div></div>`;
-}
-function emptySmall(t) {
-  return `<div class="card" style="padding:40px;text-align:center;color:var(--muted)"><div style="display:inline-grid;place-items:center;width:44px;height:44px;border-radius:12px;background:var(--bg-2);margin-bottom:10px;color:var(--subtle)">${braidMark(22, "#9ca3af", "#cbd5e1")}</div><div>${t}</div></div>`;
-}
-function braidList() {
-  const paused = state.step === 8;
-  const rows = state.braids.map((b) => {
-    const to = P[b.into];
-    const max = Math.max(...b.spark);
-    const sp = b.spark.map((v, i) => `${i * 10},${22 - (v / max) * 18}`).join(" ");
-    return `<div class="braid ${paused ? "paused" : ""}">
+      }
+      function emptySmall(t) {
+        return `<div class="card" style="padding:40px;text-align:center;color:var(--muted)"><div style="display:inline-grid;place-items:center;width:44px;height:44px;border-radius:12px;background:var(--bg-2);margin-bottom:10px;color:var(--subtle)">${braidMark(22, "#9ca3af", "#cbd5e1")}</div><div>${t}</div></div>`;
+      }
+      function braidList() {
+        const paused = state.step === 8;
+        const rows = state.braids
+          .map((b) => {
+            const to = P[b.into];
+            const max = Math.max(...b.spark);
+            const sp = b.spark.map((v, i) => `${i * 10},${22 - (v / max) * 18}`).join(" ");
+            return `<div class="braid ${paused ? "paused" : ""}">
       <div class="route">${strandLink(P.SA, to)}${av(to)}<div class="names"><b>${to.name}</b><span>Since ${b.on} · ${b.by}</span></div></div>
       <div><div class="cond">${highlight(b.cond).trim()}</div></div>
       <div class="meta">${paused ? `<span class="pill">${ic("pause", "sm")}Paused</span>` : `<span class="pill ok">${ic("shield", "sm")}Signed calls only</span>`}<div style="margin-top:6px">From ${b.from}<br>Expires ${b.expires}</div></div>
       ${b.spans === "–" && !paused ? `<div class="meta"><span class="pill orange">Starting</span><div style="margin-top:6px">First spans within a minute</div></div>` : `<div class="meta"><b>${paused ? "–" : b.spans}</b> spans<br><span>last 24 hours</span><svg class="spark" width="72" height="24"><polyline points="${sp}" fill="none" stroke="${paused ? "#cbd5e1" : "#ED8926"}" stroke-width="1.8"/></svg></div>`}
       <div style="position:relative"><button class="iconbtn" data-action="rowmenu" data-id="${b.id}">${ic("more")}</button>${state.rowMenu === b.id ? `<div class="menu" style="left:auto;right:0;width:200px"><div class="opt" data-action="edit" data-id="${b.id}">${ic("pencil", "sm")}Edit</div><div class="opt">${ic("scroll", "sm")}View in audit log</div><div class="opt" style="color:var(--red)" data-action="remove" data-id="${b.id}">${ic("trash", "sm")}Remove braid</div></div>` : ""}</div></div>`;
-  }).join("");
-  return `<div class="card"><div class="braid head"><div>Braided into</div><div>Condition</div><div>Access</div><div>Activity</div><div></div></div>${rows}</div>
+          })
+          .join("");
+        return `<div class="card"><div class="braid head"><div>Braided into</div><div>Condition</div><div>Access</div><div>Activity</div><div></div></div>${rows}</div>
     <p class="hint" style="margin-top:12px;display:flex;gap:6px;align-items:center">${ic("info", "sm")}Admins of this project and organisation admins can create, change or remove braids. Every change is in the audit log.</p>`;
-}
-function fromList() {
-  const b = seedBraids()[0];
-  if (state.fromRemoved) return emptySmall("No project braids its spans into Web orchestrator.");
-  return `<div class="card"><div class="braid head" style="grid-template-columns:minmax(220px,1fr) minmax(260px,1.5fr) 180px 100px 84px"><div>Braided from</div><div>Condition</div><div>Relies on</div><div>Activity</div><div></div></div>
+      }
+      function fromList() {
+        const b = seedBraids()[0];
+        if (state.fromRemoved)
+          return emptySmall("No project braids its spans into Web orchestrator.");
+        return `<div class="card"><div class="braid head" style="grid-template-columns:minmax(220px,1fr) minmax(260px,1.5fr) 180px 100px 84px"><div>Braided from</div><div>Condition</div><div>Relies on</div><div>Activity</div><div></div></div>
     <div class="braid" style="grid-template-columns:minmax(220px,1fr) minmax(260px,1.5fr) 180px 100px 84px">
       <div class="route">${av(P.SA)}${strandLink(P.SA, P.WO)}<div class="names"><b>Specialist agents</b><span>Data from 1 Oct · no expiry</span></div></div>
       <div class="cond">${highlight(b.cond).trim()}</div>
@@ -684,10 +2440,10 @@ function fromList() {
       <div class="meta"><b>18.2k</b> spans<br>last 24 hours</div>
       <div><button class="btn sm ghost" style="color:var(--red)" data-action="remove-from">${ic("trash", "sm")}Remove</button></div></div></div>
     <div class="callout info" style="margin-top:14px">${ic("users")}<div>Spans from these projects appear in your traces when they match. The admins of the project they come from manage each braid; your admins can remove one. <a class="link">Ask an admin</a></div></div>`;
-}
-function keysTab() {
-  if (!state.keys.length) {
-    return `<div class="card" style="padding:44px;display:grid;grid-template-columns:1fr 300px;gap:32px;align-items:center">
+      }
+      function keysTab() {
+        if (!state.keys.length) {
+          return `<div class="card" style="padding:44px;display:grid;grid-template-columns:1fr 300px;gap:32px;align-items:center">
       <div><div style="width:44px;height:44px;border-radius:12px;background:var(--orange-100);color:var(--orange-700);display:grid;place-items:center;margin-bottom:14px">${ic("key", "lg")}</div>
       <h2 style="margin:0 0 8px;font-size:20px">Sign your calls</h2>
       <p style="color:var(--muted);margin:0 0 18px;max-width:440px">Projects that braid into Web orchestrator can require your signature. Then only calls you really made show their spans here, and nobody can borrow your tag.</p>
@@ -697,80 +2453,165 @@ function keysTab() {
           <div style="display:flex;gap:8px;align-items:center">${av(P.WO, "sm")}<span>Web orchestrator adds <code>orchestrator=web</code> and a signature</span></div>
           <div style="display:flex;gap:8px;align-items:center">${av(P.SA, "sm")}<span>Specialist agents copies both onto its spans</span></div>
           <div style="display:flex;gap:8px;align-items:center"><span class="av sm" style="background:#16a34a">${ic("check", "sm")}</span><span>LangWatch checks the signature when spans arrive</span></div></div></div></div>`;
-  }
-  const rows = state.keys.map((k) => `<tr>
+        }
+        const rows = state.keys
+          .map(
+            (k) => `<tr>
       <td><div style="display:flex;gap:10px;align-items:center"><span style="width:30px;height:30px;border-radius:8px;background:var(--bg-2);display:grid;place-items:center;color:var(--muted)">${ic("key")}</span><div><b style="font-weight:600">${k.name}</b><div class="mono" style="color:var(--subtle)">lwsk_••••${k.tail}</div></div></div></td>
       <td>${k.status === "active" ? `<span class="pill ok">Active</span>` : k.status === "retiring" ? `<span class="pill warn">Retiring · works until 28 Oct</span>` : `<span class="pill bad">Revoked</span>`}</td>
       <td class="meta">${k.created}<br>by ${k.by}</td><td class="meta">${k.used}</td>
       <td class="meta"><b>${k.ok}</b> passed<br>${k.bad ? `<span class="tip" data-tip="${k.bad} calls had a bad signature, so their tags were removed" style="color:var(--red)">${k.bad} failed</span>` : "0 failed"}</td>
-      <td style="position:relative;width:40px"><button class="iconbtn" data-action="keymenu" data-id="${k.id}">${ic("more")}</button>${state.keyMenu === k.id ? `<div class="menu" style="left:auto;right:0;width:200px"><div class="opt" data-action="rotate" data-id="${k.id}">${ic("rotate", "sm")}Rotate</div><div class="opt">${ic("book", "sm")}Show setup</div><div class="opt" style="color:var(--red)" data-action="revoke" data-id="${k.id}">${ic("trash", "sm")}Revoke</div></div>` : ""}</td></tr>`).join("");
-  return `<div style="display:flex;align-items:center;margin-bottom:12px"><p style="margin:0;color:var(--muted);flex:1">Sign the tags on your calls so projects that braid into Web orchestrator can trust them.</p><button class="btn" data-action="newkey">${ic("plus")}Create signing key</button></div>
+      <td style="position:relative;width:40px"><button class="iconbtn" data-action="keymenu" data-id="${k.id}">${ic("more")}</button>${state.keyMenu === k.id ? `<div class="menu" style="left:auto;right:0;width:200px"><div class="opt" data-action="rotate" data-id="${k.id}">${ic("rotate", "sm")}Rotate</div><div class="opt">${ic("book", "sm")}Show setup</div><div class="opt" style="color:var(--red)" data-action="revoke" data-id="${k.id}">${ic("trash", "sm")}Revoke</div></div>` : ""}</td></tr>`,
+          )
+          .join("");
+        return `<div style="display:flex;align-items:center;margin-bottom:12px"><p style="margin:0;color:var(--muted);flex:1">Sign the tags on your calls so projects that braid into Web orchestrator can trust them.</p><button class="btn" data-action="newkey">${ic("plus")}Create signing key</button></div>
     <div class="card"><table class="t"><thead><tr><th>Key</th><th>Status</th><th>Created</th><th>Last used</th><th>Signed spans, 24 hours</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
-}
-function upsell() {
-  return `<div class="card upsell"><img src="brand/braids-enterprise.svg" alt="" style="display:block;width:100%;max-width:600px;margin:0 auto 6px;border-radius:14px">
+      }
+      function upsell() {
+        return `<div class="card upsell"><img src="brand/braids-enterprise.svg" alt="" style="display:block;width:100%;max-width:600px;margin:0 auto 6px;border-radius:14px">
     <h2>See every agent call, across projects</h2><p>Braids show spans from one project inside another project’s traces, under conditions your admins control. Braids are part of the Enterprise plan.</p>
     <div class="ent-list"><span>${ic("check")}Conditions on any attribute</span><span>${ic("check")}Signed calls</span><span>${ic("check")}Live preview</span><span>${ic("check")}Full audit log</span></div>
     <div style="display:flex;gap:8px;justify-content:center"><button class="btn primary">Talk to us</button><button class="btn">${ic("book")}How braids work</button></div></div>`;
-}
+      }
 
-/* ---------- audit ---------- */
-function auditPage() {
-  const rows = [
-    ["braid.created", "Sam Rivera", "#213b41", P.SA, `Into <b>Web orchestrator</b> · <code>orchestrator == "web"</code> and signed · from 1 Oct 2026`, "21 Oct, 14:08", "braids"],
-    ["braided_spans.viewed", "Priya Nair", "#7e22ce", P.WO, `Trace <code>4bf92f35…</code> · spans from <b>Specialist agents</b> · 4 views in 5 minutes`, "21 Oct, 14:21", "braids"],
-    ["braid.changed", "Sam Rivera", "#213b41", P.SA, `Into <b>App orchestrator</b> · expires: never → 31 Dec 2026`, "21 Oct, 14:30", "braids"],
-    ["signing_key.created", "Sam Rivera", "#213b41", P.WO, `Key <b>Production</b> · <code>lwsk_••••4f2a</code>`, "21 Oct, 13:55", "keys"],
-    ["signing_key.rotated", "Sam Rivera", "#213b41", P.WO, `Key <b>Production</b> · old key works until 28 Oct`, "21 Oct, 15:02", "keys"],
-    ["braid.removed", "Sam Rivera", "#213b41", P.SA, `Into <b>Web orchestrator</b> · stops showing within 30 seconds`, "21 Oct, 15:40", "braids"],
-  ].filter((r) => state.audit === "all" || r[6] === state.audit);
-  return `<div class="ph"><div><h1>Audit log</h1><p>Every change to who can see what, across the organisation.</p></div></div>
+      /* ---------- audit ---------- */
+      function auditPage() {
+        const rows = [
+          [
+            "braid.created",
+            "Sam Rivera",
+            "#213b41",
+            P.SA,
+            `Into <b>Web orchestrator</b> · <code>orchestrator == "web"</code> and signed · from 1 Oct 2026`,
+            "21 Oct, 14:08",
+            "braids",
+          ],
+          [
+            "braided_spans.viewed",
+            "Priya Nair",
+            "#7e22ce",
+            P.WO,
+            `Trace <code>4bf92f35…</code> · spans from <b>Specialist agents</b> · 4 views in 5 minutes`,
+            "21 Oct, 14:21",
+            "braids",
+          ],
+          [
+            "braid.changed",
+            "Sam Rivera",
+            "#213b41",
+            P.SA,
+            `Into <b>App orchestrator</b> · expires: never → 31 Dec 2026`,
+            "21 Oct, 14:30",
+            "braids",
+          ],
+          [
+            "signing_key.created",
+            "Sam Rivera",
+            "#213b41",
+            P.WO,
+            `Key <b>Production</b> · <code>lwsk_••••4f2a</code>`,
+            "21 Oct, 13:55",
+            "keys",
+          ],
+          [
+            "signing_key.rotated",
+            "Sam Rivera",
+            "#213b41",
+            P.WO,
+            `Key <b>Production</b> · old key works until 28 Oct`,
+            "21 Oct, 15:02",
+            "keys",
+          ],
+          [
+            "braid.removed",
+            "Sam Rivera",
+            "#213b41",
+            P.SA,
+            `Into <b>Web orchestrator</b> · stops showing within 30 seconds`,
+            "21 Oct, 15:40",
+            "braids",
+          ],
+        ].filter((r) => state.audit === "all" || r[6] === state.audit);
+        return `<div class="ph"><div><h1>Audit log</h1><p>Every change to who can see what, across the organisation.</p></div></div>
     <div class="filters">${["all", "braids", "keys"].map((f) => `<button class="btn sm ${state.audit === f ? "" : "ghost"}" data-action="audit" data-f="${f}" style="${state.audit === f ? "border-color:var(--orange);color:var(--orange-700);background:var(--orange-50)" : ""}">${f === "all" ? "All events" : f === "braids" ? `${braidMark(12)} Braids` : `${ic("key", "sm")} Signing keys`}</button>`).join("")}<div style="flex:1"></div><button class="btn sm">${ic("filter", "sm")}Filter</button></div>
     <div class="card"><table class="t"><thead><tr><th>Event</th><th>Who</th><th>Project</th><th>Detail</th><th>When</th></tr></thead><tbody>
-    ${rows.map((r) => `<tr><td><span class="act">${r[0]}</span></td><td><div class="person"><i style="background:${r[2]}">${r[1].split(" ").map((x) => x[0]).join("")}</i>${r[1]}</div></td><td><div style="display:flex;gap:6px;align-items:center">${av(r[3], "sm")}${r[3].name}</div></td><td class="meta" style="color:var(--fg-2)">${r[4]}</td><td class="meta" style="white-space:nowrap">${r[5]}</td></tr>`).join("")}
+    ${rows
+      .map(
+        (r) =>
+          `<tr><td><span class="act">${r[0]}</span></td><td><div class="person"><i style="background:${r[2]}">${r[1]
+            .split(" ")
+            .map((x) => x[0])
+            .join(
+              "",
+            )}</i>${r[1]}</div></td><td><div style="display:flex;gap:6px;align-items:center">${av(r[3], "sm")}${r[3].name}</div></td><td class="meta" style="color:var(--fg-2)">${r[4]}</td><td class="meta" style="white-space:nowrap">${r[5]}</td></tr>`,
+      )
+      .join("")}
     </tbody></table></div>`;
-}
+      }
 
-/* ---------- trace view ---------- */
-const SPANS = [
-  { id: "handle_message", p: "WO", d: 0, s: 0, e: 3420, type: "agent" },
-  { id: "plan", p: "WO", d: 1, s: 40, e: 620, type: "llm" },
-  { id: "payments_agent", p: "SA", d: 1, s: 700, e: 3100, type: "agent" },
-  { id: "llm.call", p: "SA", d: 2, s: 760, e: 1900, type: "llm" },
-  { id: "lookup_account", p: "SA", d: 2, s: 1950, e: 2500, type: "tool" },
-  { id: "respond", p: "WO", d: 1, s: 3150, e: 3400, type: "llm" },
-];
-function traceView() {
-  const T = 3420 * 1.14;
-  const rows = SPANS.map((sp, i) => {
-    const braided = sp.p === "SA";
-    const last = i === SPANS.length - 1 || SPANS[i + 1].d < sp.d || (SPANS[i + 1].d === sp.d && false);
-    const prefix = sp.d === 0 ? "" : "&nbsp;".repeat((sp.d - 1) * 3) + (SPANS.slice(i + 1).some((x) => x.d === sp.d && !SPANS.slice(i + 1, SPANS.indexOf(x)).some((y) => y.d < sp.d)) ? "├─" : "└─");
-    const left = (sp.s / T) * 100, w = ((sp.e - sp.s) / T) * 100;
-    return `<div class="span ${state.sel === sp.id ? "sel" : ""}" data-action="sel" data-id="${sp.id}">
+      /* ---------- trace view ---------- */
+      const SPANS = [
+        { id: "handle_message", p: "WO", d: 0, s: 0, e: 3420, type: "agent" },
+        { id: "plan", p: "WO", d: 1, s: 40, e: 620, type: "llm" },
+        { id: "payments_agent", p: "SA", d: 1, s: 700, e: 3100, type: "agent" },
+        { id: "llm.call", p: "SA", d: 2, s: 760, e: 1900, type: "llm" },
+        { id: "lookup_account", p: "SA", d: 2, s: 1950, e: 2500, type: "tool" },
+        { id: "respond", p: "WO", d: 1, s: 3150, e: 3400, type: "llm" },
+      ];
+      function traceView() {
+        const T = 3420 * 1.14;
+        const rows = SPANS.map((sp, i) => {
+          const braided = sp.p === "SA";
+          const last =
+            i === SPANS.length - 1 || SPANS[i + 1].d < sp.d || (SPANS[i + 1].d === sp.d && false);
+          const prefix =
+            sp.d === 0
+              ? ""
+              : "&nbsp;".repeat((sp.d - 1) * 3) +
+                (SPANS.slice(i + 1).some(
+                  (x) =>
+                    x.d === sp.d && !SPANS.slice(i + 1, SPANS.indexOf(x)).some((y) => y.d < sp.d),
+                )
+                  ? "├─"
+                  : "└─");
+          const left = (sp.s / T) * 100,
+            w = ((sp.e - sp.s) / T) * 100;
+          return `<div class="span ${state.sel === sp.id ? "sel" : ""}" data-action="sel" data-id="${sp.id}">
       <div class="nm" style="padding-left:14px"><span class="tree">${prefix}</span><span class="mono" style="font-size:12.5px">${sp.id}</span><span class="type">${sp.type}</span>${braided && sp.d === 1 ? `<span class="bpill">${av(P.SA, "sm")}Specialist agents</span>` : braided ? `<span class="tip" data-tip="Braided from Specialist agents">${av(P.SA, "sm")}</span>` : ""}</div>
       <div class="track"><i style="left:${left}%;width:${w}%;background:${braided ? P.SA.color : "#ED8926"};opacity:${braided ? 0.85 : 1}"></i><em style="left:calc(${left + w}% + 6px)">${((sp.e - sp.s) / 1000).toFixed(2)}s</em></div></div>`;
-  }).join("");
-  return `<div class="tv"><div class="left">
+        }).join("");
+        return `<div class="tv"><div class="left">
       <div class="thead"><h2>checkout conversation</h2><span class="pill orange">${braidMark(12, "#ED8926", "#7b341e")} Includes spans from Specialist agents</span></div>
       <div class="tmeta"><span class="mono">4bf92f3577b34da6</span><span>21 Oct, 14:02</span><span><b>3.42s</b></span>
         <span class="tip" data-tip="$0.0121 from this project, $0.0041 from braided spans"><b>$0.0162</b> cost ${ic("info", "sm")}</span><span><b>4,812</b> tokens</span><span class="pill ok">${ic("check", "sm")}2 evaluations passed</span></div>
       <div class="wf"><div class="scale"><div>Span</div><div><span>0s</span><span>1s</span><span>2s</span><span>3s</span></div></div>${rows}</div>
       <div class="hint" style="display:flex;gap:16px;margin-top:12px;align-items:center"><span style="display:flex;gap:6px;align-items:center"><i style="width:10px;height:10px;border-radius:3px;background:#ED8926;display:inline-block"></i>Web orchestrator</span><span style="display:flex;gap:6px;align-items:center"><i style="width:10px;height:10px;border-radius:3px;background:${P.SA.color};display:inline-block"></i>Braided from Specialist agents</span></div>
     </div><div class="right">${spanPanel()}</div></div>`;
-}
-function spanPanel() {
-  const sp = SPANS.find((s) => s.id === state.sel);
-  const braided = sp.p === "SA";
-  const io = {
-    handle_message: ['{ "message": "Why was my card charged twice?" }', '{ "reply": "I found a duplicate charge of €42.10 and reversed it." }'],
-    plan: ['[system] Decide which agent to call…', '{ "agent": "payments_agent" }'],
-    payments_agent: ['{ "task": "investigate duplicate charge", "customer": "cus_81f…" }', '{ "duplicate": true, "reversed": "€42.10" }'],
-    "llm.call": ['[user] Two charges of €42.10 on 20 Oct…', 'Both charges share one order id; reverse the second.'],
-    lookup_account: ['{ "customer": "cus_81f…" }', '{ "charges": 2, "order": "ord_5521" }'],
-    respond: ['[system] Write a short reply…', 'I found a duplicate charge of €42.10 and reversed it.'],
-  }[sp.id];
-  return `<div class="rp">
+      }
+      function spanPanel() {
+        const sp = SPANS.find((s) => s.id === state.sel);
+        const braided = sp.p === "SA";
+        const io = {
+          handle_message: [
+            '{ "message": "Why was my card charged twice?" }',
+            '{ "reply": "I found a duplicate charge of €42.10 and reversed it." }',
+          ],
+          plan: ["[system] Decide which agent to call…", '{ "agent": "payments_agent" }'],
+          payments_agent: [
+            '{ "task": "investigate duplicate charge", "customer": "cus_81f…" }',
+            '{ "duplicate": true, "reversed": "€42.10" }',
+          ],
+          "llm.call": [
+            "[user] Two charges of €42.10 on 20 Oct…",
+            "Both charges share one order id; reverse the second.",
+          ],
+          lookup_account: ['{ "customer": "cus_81f…" }', '{ "charges": 2, "order": "ord_5521" }'],
+          respond: [
+            "[system] Write a short reply…",
+            "I found a duplicate charge of €42.10 and reversed it.",
+          ],
+        }[sp.id];
+        return `<div class="rp">
     ${braided ? `<div class="callout orange" style="margin-bottom:16px">${braidMark(18, "#ED8926", "#3d3d4d")}<div><b>Braided from Specialist agents</b><div style="font-size:12.5px;margin-top:2px">Shown because it matches <code>orchestrator == "web"</code>. Signed by Web orchestrator with key “Production”.</div></div></div>` : ""}
     <div style="display:flex;align-items:center;gap:8px"><h3>${sp.id}</h3><span class="pill quiet">${sp.type}</span></div>
     <dl class="kv"><dt>Project</dt><dd style="display:flex;gap:6px;align-items:center">${av(P[sp.p], "sm")}${P[sp.p].name}</dd><dt>Duration</dt><dd>${((sp.e - sp.s) / 1000).toFixed(2)}s</dd>
@@ -778,47 +2619,61 @@ function spanPanel() {
     <div class="sect">Input</div><div class="io">${esc(io[0])}</div>
     <div class="sect">Output</div><div class="io">${esc(io[1])}</div>
     <div class="actions">
-      ${braided ? `<button class="btn sm">${ic("ext", "sm")}Open in Specialist agents</button>
+      ${
+        braided
+          ? `<button class="btn sm">${ic("ext", "sm")}Open in Specialist agents</button>
         <span class="tip" data-tip="Not available on braided spans"><button class="btn sm" disabled>${ic("play", "sm")}Open in playground</button></span>
         <span class="tip" data-tip="Not available on braided spans"><button class="btn sm" disabled>${ic("pencil", "sm")}Annotate</button></span>`
-      : `<button class="btn sm">${ic("play", "sm")}Open in playground</button><button class="btn sm">${ic("pencil", "sm")}Annotate</button><button class="btn sm">${ic("plus", "sm")}Add to dataset</button>`}
+          : `<button class="btn sm">${ic("play", "sm")}Open in playground</button><button class="btn sm">${ic("pencil", "sm")}Annotate</button><button class="btn sm">${ic("plus", "sm")}Add to dataset</button>`
+      }
     </div>
     <div class="sect">Evaluations</div>
-    ${braided ? `<div class="callout info" style="font-size:12.5px">${ic("info", "sm")}<div>Evaluations from Specialist agents stay in that project.</div></div>`
-      : `<div class="evals"><div>${ic("check", "sm")}Faithfulness<span>0.92</span></div><div>${ic("check", "sm")}Answer relevancy<span>0.88</span></div></div>`}
+    ${
+      braided
+        ? `<div class="callout info" style="font-size:12.5px">${ic("info", "sm")}<div>Evaluations from Specialist agents stay in that project.</div></div>`
+        : `<div class="evals"><div>${ic("check", "sm")}Faithfulness<span>0.92</span></div><div>${ic("check", "sm")}Answer relevancy<span>0.88</span></div></div>`
+    }
   </div>`;
-}
+      }
 
-/* ---------- overlays ---------- */
-function overlay(project) {
-  if (state.keyFlow) return keyDialog();
-  if (!state.dlg) return "";
-  if (state.dlg.mode === "remove") {
-    const b = state.braids.find((x) => x.id === state.dlg.id) || seedBraids()[0];
-    const to = P[b.into];
-    return `<div class="overlay"><div class="dialog narrow"><div class="dh"><div style="width:36px;height:36px;border-radius:10px;background:var(--red-50);color:var(--red);display:grid;place-items:center">${ic("trash")}</div><div><h3>Remove braid into ${to.name}?</h3><p>${to.name} stops seeing Specialist agents’ spans within 30 seconds. Nothing was copied, so nothing is left behind.</p></div></div>
+      /* ---------- overlays ---------- */
+      function overlay(project) {
+        if (state.keyFlow) return keyDialog();
+        if (!state.dlg) return "";
+        if (state.dlg.mode === "remove") {
+          const b = state.braids.find((x) => x.id === state.dlg.id) || seedBraids()[0];
+          const to = P[b.into];
+          return `<div class="overlay"><div class="dialog narrow"><div class="dh"><div style="width:36px;height:36px;border-radius:10px;background:var(--red-50);color:var(--red);display:grid;place-items:center">${ic("trash")}</div><div><h3>Remove braid into ${to.name}?</h3><p>${to.name} stops seeing Specialist agents’ spans within 30 seconds. Nothing was copied, so nothing is left behind.</p></div></div>
       <div class="db"><div class="cond">${highlight(b.cond).trim()}</div></div>
       <div class="df"><span class="note">You can create it again at any time.</span><button class="btn" data-action="close">Cancel</button><button class="btn danger" data-action="confirm-remove">Remove braid</button></div></div></div>`;
-  }
-  if (state.dlg.mode === "rotate") {
-    return `<div class="overlay"><div class="dialog narrow"><div class="dh"><div style="width:36px;height:36px;border-radius:10px;background:var(--orange-100);color:var(--orange-700);display:grid;place-items:center">${ic("rotate")}</div><div><h3>Rotate “Production”?</h3><p>You get a new key. The old one keeps working for 7 days, so you can deploy the new key without dropping signatures.</p></div></div>
+        }
+        if (state.dlg.mode === "rotate") {
+          return `<div class="overlay"><div class="dialog narrow"><div class="dh"><div style="width:36px;height:36px;border-radius:10px;background:var(--orange-100);color:var(--orange-700);display:grid;place-items:center">${ic("rotate")}</div><div><h3>Rotate “Production”?</h3><p>You get a new key. The old one keeps working for 7 days, so you can deploy the new key without dropping signatures.</p></div></div>
       <div class="df"><span class="note"></span><button class="btn" data-action="close">Cancel</button><button class="btn primary" data-action="confirm-rotate">Rotate key</button></div></div></div>`;
-  }
-  return braidDialog();
-}
+        }
+        return braidDialog();
+      }
 
-function braidDialog() {
-  const d = state.dlg, to = P[d.into], v = validate(d.cond), pv = previewFor(d.into, v);
-  const hasKey = state.keys.length > 0 && d.into === "WO";
-  const projOpts = ["WO", "AO", "SA", "AA"].map((id) => {
-    const p = P[id], dis = id === "SA" || p.aggregate;
-    return `<div class="opt ${dis ? "dis" : ""}" ${dis ? "" : `data-action="pick" data-id="${id}"`}>${av(p, "sm")}${p.name}${id === "SA" ? "<small>This project</small>" : p.aggregate ? "<small>Aggregate projects can’t be braided</small>" : id === d.into ? ic("check", "sm") : ""}</div>`;
-  }).join("");
-  const keyLine = d.into === "WO"
-    ? (hasKey ? `<div class="keystate" style="color:#15803d">${ic("check", "sm")}Web orchestrator signs its calls · key “Production”, last used 2 min ago</div>`
-              : `<div class="keystate" style="color:var(--yellow-700)">${ic("alert", "sm")}Web orchestrator has no signing key yet, so nothing will show. <a class="link">Create one</a></div>`)
-    : `<div class="keystate" style="color:var(--yellow-700)">${ic("alert", "sm")}App orchestrator has no signing key yet, so nothing will show. <a class="link">Create one</a></div>`;
-  return `<div class="overlay"><div class="dialog">
+      function braidDialog() {
+        const d = state.dlg,
+          to = P[d.into],
+          v = validate(d.cond),
+          pv = previewFor(d.into, v);
+        const hasKey = state.keys.length > 0 && d.into === "WO";
+        const projOpts = ["WO", "AO", "SA", "AA"]
+          .map((id) => {
+            const p = P[id],
+              dis = id === "SA" || p.aggregate;
+            return `<div class="opt ${dis ? "dis" : ""}" ${dis ? "" : `data-action="pick" data-id="${id}"`}>${av(p, "sm")}${p.name}${id === "SA" ? "<small>This project</small>" : p.aggregate ? "<small>Aggregate projects can’t be braided</small>" : id === d.into ? ic("check", "sm") : ""}</div>`;
+          })
+          .join("");
+        const keyLine =
+          d.into === "WO"
+            ? hasKey
+              ? `<div class="keystate" style="color:#15803d">${ic("check", "sm")}Web orchestrator signs its calls · key “Production”, last used 2 min ago</div>`
+              : `<div class="keystate" style="color:var(--yellow-700)">${ic("alert", "sm")}Web orchestrator has no signing key yet, so nothing will show. <a class="link">Create one</a></div>`
+            : `<div class="keystate" style="color:var(--yellow-700)">${ic("alert", "sm")}App orchestrator has no signing key yet, so nothing will show. <a class="link">Create one</a></div>`;
+        return `<div class="overlay"><div class="dialog">
     <div class="dh"><div><h3>${d.mode === "edit" ? "Edit braid" : "New braid"}</h3><p>Show this project’s matching spans inside another project’s traces.</p></div><div class="sp"></div><button class="iconbtn" data-action="close">${ic("x")}</button></div>
     <div class="db"><div class="split"><div>
       <div class="fromto">
@@ -840,29 +2695,32 @@ function braidDialog() {
     <div class="preview" id="preview">${previewPanel(d, v, pv)}</div></div></div>
     <div class="df"><span class="note">${ic("lock", "sm")}Admins of either project can remove a braid at any time.</span><button class="btn" data-action="close">Cancel</button><button class="btn primary" data-action="create" id="createbtn" ${v.ok ? "" : "disabled"}>${braidMark(15, "#fff", "#fff")}${d.mode === "edit" ? "Save braid" : `Braid into ${to.name}`}</button></div>
   </div></div>`;
-}
-function vstate(v) {
-  if (!v.ok) return `${ic("alert", "sm")}${esc(v.error)}`;
-  if (v.empty) return `${ic("alert", "sm")}No condition: every span from Specialist agents shows in the other project’s traces.`;
-  return `${ic("check", "sm")}Looks good${v.verified ? " · signed calls only" : ""}`;
-}
-function previewPanel(d, v, pv) {
-  const to = P[d.into];
-  if (!pv) return `<h4>What ${to.name} will see</h4><div class="sub">Last 7 days, updates as you type</div><div class="dim">${previewBody(to, { total: 4902, whole: 0, parts: 0, hidden: 4902, unsigned: 0, match: true }, v)}</div><div class="callout bad" style="margin-top:12px;font-size:12.5px">${ic("alert", "sm")}Fix the condition to see a preview.</div>`;
-  return `<h4>What ${to.name} will see</h4><div class="sub">Last 7 days, updates as you type</div>${previewBody(to, pv, v)}`;
-}
-function previewBody(to, pv, v) {
-  const shown = pv.whole + pv.parts, pct = (n) => (n / pv.total) * 100;
-  const match = pv.match && (pv.whole + pv.parts) > 0;
-  const rows = [
-    ["handle_message", "own", 0, 0, 100],
-    ["payments_agent", match ? "sh" : "hid", 1, 18, 62],
-    ["llm.call", match ? "sh" : "hid", 2, 22, 30],
-    ["lookup_account", match ? "sh" : "hid", 2, 55, 18],
-    ["fraud_check", v.empty ? "sh" : "hid", 1, 70, 20],
-  ];
-  const test = state.dlg.test;
-  return `<div class="big">${fmt(shown)} <small>of ${fmt(pv.total)} traces get spans</small></div>
+      }
+      function vstate(v) {
+        if (!v.ok) return `${ic("alert", "sm")}${esc(v.error)}`;
+        if (v.empty)
+          return `${ic("alert", "sm")}No condition: every span from Specialist agents shows in the other project’s traces.`;
+        return `${ic("check", "sm")}Looks good${v.verified ? " · signed calls only" : ""}`;
+      }
+      function previewPanel(d, v, pv) {
+        const to = P[d.into];
+        if (!pv)
+          return `<h4>What ${to.name} will see</h4><div class="sub">Last 7 days, updates as you type</div><div class="dim">${previewBody(to, { total: 4902, whole: 0, parts: 0, hidden: 4902, unsigned: 0, match: true }, v)}</div><div class="callout bad" style="margin-top:12px;font-size:12.5px">${ic("alert", "sm")}Fix the condition to see a preview.</div>`;
+        return `<h4>What ${to.name} will see</h4><div class="sub">Last 7 days, updates as you type</div>${previewBody(to, pv, v)}`;
+      }
+      function previewBody(to, pv, v) {
+        const shown = pv.whole + pv.parts,
+          pct = (n) => (n / pv.total) * 100;
+        const match = pv.match && pv.whole + pv.parts > 0;
+        const rows = [
+          ["handle_message", "own", 0, 0, 100],
+          ["payments_agent", match ? "sh" : "hid", 1, 18, 62],
+          ["llm.call", match ? "sh" : "hid", 2, 22, 30],
+          ["lookup_account", match ? "sh" : "hid", 2, 55, 18],
+          ["fraud_check", v.empty ? "sh" : "hid", 1, 70, 20],
+        ];
+        const test = state.dlg.test;
+        return `<div class="big">${fmt(shown)} <small>of ${fmt(pv.total)} traces get spans</small></div>
     <div class="bar"><i style="width:${pct(pv.whole)}%;background:#111113"></i><i style="width:${pct(pv.parts)}%;background:#ED8926"></i></div>
     <div class="legend"><div><span class="sw" style="background:#111113"></span>Every Specialist agents span<span class="num">${fmt(pv.whole)}</span></div>
       <div><span class="sw" style="background:#ED8926"></span>Some of its spans<span class="num">${fmt(pv.parts)}</span></div>
@@ -877,18 +2735,18 @@ function previewBody(to, pv, v) {
     <div class="test"><input class="input" id="testid" placeholder="Paste a trace id" value="${test ? esc(test.id) : ""}"/><button class="btn sm" data-action="test" style="height:32px">Test</button></div>
     <div class="testres" id="testres">${test ? test.msg : `Try <a class="link" data-action="try">4bf92f3577b34da6</a>`}</div>
     <div class="who"><div class="stack">${["#7e22ce", "#0d9488", "#2563eb", "#dd6b20"].map((c, i) => `<span style="background:${c}">${["PN", "JL", "AK", "MO"][i]}</span>`).join("")}</div>Seen by 14 members of ${to.name}</div>`;
-}
-const d_mine = () => (state.dlg.into === "WO" ? "web" : "app");
+      }
+      const d_mine = () => (state.dlg.into === "WO" ? "web" : "app");
 
-function keyDialog() {
-  const f = state.keyFlow;
-  if (f.stage === "name") {
-    return `<div class="overlay"><div class="dialog narrow"><div class="dh"><div><h3>Create signing key</h3><p>Web orchestrator uses it to sign the tags on its calls.</p></div><div class="sp"></div><button class="iconbtn" data-action="close">${ic("x")}</button></div>
+      function keyDialog() {
+        const f = state.keyFlow;
+        if (f.stage === "name") {
+          return `<div class="overlay"><div class="dialog narrow"><div class="dh"><div><h3>Create signing key</h3><p>Web orchestrator uses it to sign the tags on its calls.</p></div><div class="sp"></div><button class="iconbtn" data-action="close">${ic("x")}</button></div>
       <div class="db"><label class="f">Name</label><input class="input" id="keyname" value="${esc(f.name)}" placeholder="Production"/><div class="hint">Name it after where it runs, so you know which deploy to update when you rotate.</div></div>
       <div class="df"><span class="note"></span><button class="btn" data-action="close">Cancel</button><button class="btn primary" data-action="key-create">Create key</button></div></div></div>`;
-  }
-  const snip = {
-    ts: `<span class="c">// Web orchestrator: tag and sign every call it makes</span>
+        }
+        const snip = {
+          ts: `<span class="c">// Web orchestrator: tag and sign every call it makes</span>
 <span class="k">import</span> { setupObservability } <span class="k">from</span> <span class="s">"langwatch/observability/node"</span>;
 
 setupObservability({
@@ -899,7 +2757,7 @@ setupObservability({
 
 <span class="c">// Specialist agents: copy the tag onto its spans</span>
 setupObservability({ braids: { copy: [<span class="s">"orchestrator"</span>] } });`,
-    py: `<span class="c"># Web orchestrator: tag and sign every call it makes</span>
+          py: `<span class="c"># Web orchestrator: tag and sign every call it makes</span>
 <span class="k">import</span> os, langwatch
 
 langwatch.setup(braids=langwatch.Braids(
@@ -909,7 +2767,7 @@ langwatch.setup(braids=langwatch.Braids(
 
 <span class="c"># Specialist agents: copy the tag onto its spans</span>
 langwatch.setup(braids=langwatch.Braids(copy=[<span class="s">"orchestrator"</span>]))`,
-    go: `<span class="c">// Web orchestrator: tag and sign every call it makes</span>
+          go: `<span class="c">// Web orchestrator: tag and sign every call it makes</span>
 langwatch.Setup(langwatch.WithBraidSigning(
     os.Getenv(<span class="s">"LANGWATCH_SIGNING_KEY"</span>),
     <span class="k">map</span>[<span class="k">string</span>]<span class="k">string</span>{<span class="s">"orchestrator"</span>: <span class="s">"web"</span>},
@@ -917,127 +2775,338 @@ langwatch.Setup(langwatch.WithBraidSigning(
 
 <span class="c">// Specialist agents: copy the tag onto its spans</span>
 langwatch.Setup(langwatch.WithBraidCopy(<span class="s">"orchestrator"</span>))`,
-  };
-  return `<div class="overlay"><div class="dialog mid"><div class="dh"><div style="width:36px;height:36px;border-radius:10px;background:var(--green-50);color:var(--green);display:grid;place-items:center">${ic("check")}</div><div><h3>“${esc(f.name || "Production")}” is ready</h3><p>Copy the key now and set up your SDKs. You won’t see the key again.</p></div><div class="sp"></div></div>
+        };
+        return `<div class="overlay"><div class="dialog mid"><div class="dh"><div style="width:36px;height:36px;border-radius:10px;background:var(--green-50);color:var(--green);display:grid;place-items:center">${ic("check")}</div><div><h3>“${esc(f.name || "Production")}” is ready</h3><p>Copy the key now and set up your SDKs. You won’t see the key again.</p></div><div class="sp"></div></div>
     <div class="db"><div class="steps2">
       <div><div><b>Store the key as <code>LANGWATCH_SIGNING_KEY</code> in Web orchestrator</b><div class="secret" style="margin-top:8px"><span>lwsk_live_7Hq2mV9xR4tLpW8cN3kZ0bYd6sJf4f2a</span><button data-action="copied">${ic("copy", "sm")}Copy</button></div></div></div>
       <div><div><b>Tag and sign calls in Web orchestrator, copy the tag in the projects it calls</b>
-        <div class="codetabs" style="margin-top:8px">${[["ts", "TypeScript"], ["py", "Python"], ["go", "Go"]].map(([k, l]) => `<button class="${f.lang === k ? "on" : ""}" data-action="lang" data-l="${k}">${l}</button>`).join("")}</div><pre class="code">${snip[f.lang]}</pre></div></div>
+        <div class="codetabs" style="margin-top:8px">${[
+          ["ts", "TypeScript"],
+          ["py", "Python"],
+          ["go", "Go"],
+        ]
+          .map(
+            ([k, l]) =>
+              `<button class="${f.lang === k ? "on" : ""}" data-action="lang" data-l="${k}">${l}</button>`,
+          )
+          .join("")}</div><pre class="code">${snip[f.lang]}</pre></div></div>
       <div><div><b>Deploy, then check this page</b><div class="hint" style="margin-top:2px">Signed spans show up under the key within a minute. Failed signatures show there too.</div></div></div>
     </div></div>
     <div class="df"><span class="note">${ic("lock", "sm")}Keep the key secret. Anyone with it can sign as Web orchestrator.</span><button class="btn primary" data-action="key-done">I’ve stored the key</button></div></div></div>`;
-}
+      }
 
-/* ---------- editor wiring (keeps focus while typing) ---------- */
-function wireEditor() {
-  const ta = document.getElementById("cond");
-  if (!ta) return;
-  const sync = () => {
-    state.dlg.cond = ta.value;
-    document.getElementById("hl").innerHTML = highlight(ta.value);
-    document.getElementById("gutter").innerHTML = ta.value.split("\n").map((_, i) => i + 1).join("<br>");
-    const v = validate(ta.value), pv = previewFor(state.dlg.into, v);
-    document.getElementById("editor").classList.toggle("err", !v.ok);
-    const vs = document.getElementById("vstate");
-    vs.className = "vstate " + (v.ok ? (v.empty ? "warn" : "ok") : "err");
-    vs.innerHTML = vstate(v);
-    document.getElementById("preview").innerHTML = previewPanel(state.dlg, v, pv);
-    document.getElementById("signsw").classList.toggle("on", !!v.verified);
-    document.getElementById("createbtn").disabled = !v.ok;
-  };
-  ta.addEventListener("input", sync);
-  document.getElementById("gutter").innerHTML = ta.value.split("\n").map((_, i) => i + 1).join("<br>");
-}
+      /* ---------- editor wiring (keeps focus while typing) ---------- */
+      function wireEditor() {
+        const ta = document.getElementById("cond");
+        if (!ta) return;
+        const sync = () => {
+          state.dlg.cond = ta.value;
+          document.getElementById("hl").innerHTML = highlight(ta.value);
+          document.getElementById("gutter").innerHTML = ta.value
+            .split("\n")
+            .map((_, i) => i + 1)
+            .join("<br>");
+          const v = validate(ta.value),
+            pv = previewFor(state.dlg.into, v);
+          document.getElementById("editor").classList.toggle("err", !v.ok);
+          const vs = document.getElementById("vstate");
+          vs.className = "vstate " + (v.ok ? (v.empty ? "warn" : "ok") : "err");
+          vs.innerHTML = vstate(v);
+          document.getElementById("preview").innerHTML = previewPanel(state.dlg, v, pv);
+          document.getElementById("signsw").classList.toggle("on", !!v.verified);
+          document.getElementById("createbtn").disabled = !v.ok;
+        };
+        ta.addEventListener("input", sync);
+        document.getElementById("gutter").innerHTML = ta.value
+          .split("\n")
+          .map((_, i) => i + 1)
+          .join("<br>");
+      }
 
-/* ---------- actions ---------- */
-function toast(title, sub) {
-  const el = document.createElement("div");
-  el.className = "toast";
-  el.innerHTML = `${ic("check")}<div><b>${title}</b>${sub ? `<span>${sub}</span>` : ""}</div>`;
-  document.getElementById("toasts").appendChild(el);
-  setTimeout(() => el.remove(), 4200);
-}
-function runTest(id) {
-  id = (id || "").trim();
-  let msg, ok = false;
-  if (!id) msg = "Paste a trace id from Web orchestrator.";
-  else if (id.startsWith("4bf92f")) { ok = true; const v = validate(state.dlg.cond); const n = v.ok && previewFor(state.dlg.into, v)?.match ? 3 : 0; msg = `<span style="color:${n ? "#15803d" : "var(--yellow-700)"}">${n ? `${n} of 4 Specialist agents spans would show in this trace.` : "No Specialist agents spans would show in this trace."}</span>`; }
-  else if (id.startsWith("a1c9")) msg = "That trace isn’t in Web orchestrator, so nothing from it would show.";
-  else msg = "No trace with that id in Web orchestrator in the last 30 days.";
-  state.dlg.test = { id, ok, msg };
-  document.getElementById("preview").innerHTML = previewPanel(state.dlg, validate(state.dlg.cond), previewFor(state.dlg.into, validate(state.dlg.cond)));
-}
+      /* ---------- actions ---------- */
+      function toast(title, sub) {
+        const el = document.createElement("div");
+        el.className = "toast";
+        el.innerHTML = `${ic("check")}<div><b>${title}</b>${sub ? `<span>${sub}</span>` : ""}</div>`;
+        document.getElementById("toasts").appendChild(el);
+        setTimeout(() => el.remove(), 4200);
+      }
+      function runTest(id) {
+        id = (id || "").trim();
+        let msg,
+          ok = false;
+        if (!id) msg = "Paste a trace id from Web orchestrator.";
+        else if (id.startsWith("4bf92f")) {
+          ok = true;
+          const v = validate(state.dlg.cond);
+          const n = v.ok && previewFor(state.dlg.into, v)?.match ? 3 : 0;
+          msg = `<span style="color:${n ? "#15803d" : "var(--yellow-700)"}">${n ? `${n} of 4 Specialist agents spans would show in this trace.` : "No Specialist agents spans would show in this trace."}</span>`;
+        } else if (id.startsWith("a1c9"))
+          msg = "That trace isn’t in Web orchestrator, so nothing from it would show.";
+        else msg = "No trace with that id in Web orchestrator in the last 30 days.";
+        state.dlg.test = { id, ok, msg };
+        document.getElementById("preview").innerHTML = previewPanel(
+          state.dlg,
+          validate(state.dlg.cond),
+          previewFor(state.dlg.into, validate(state.dlg.cond)),
+        );
+      }
 
-document.addEventListener("click", (e) => {
-  const t = e.target.closest("[data-action]");
-  if (!t) {
-    if (state.rowMenu || state.keyMenu || (state.dlg && state.dlg.openMenu)) { state.rowMenu = state.keyMenu = null; if (state.dlg) state.dlg.openMenu = null; render(); }
-    return;
-  }
-  const a = t.dataset.action;
-  const keepMenus = ["menu", "rowmenu", "keymenu"].includes(a);
-  if (!keepMenus) { state.rowMenu = state.keyMenu = null; }
-  switch (a) {
-    case "step": state.step = +t.dataset.i; state.keyFlow = null; state.rowMenu = state.keyMenu = null; STEPS[state.step].go(); break;
-    case "notes": state.notes = !state.notes; break;
-    case "tab": state.tab = t.dataset.t; break;
-    case "new": openNew(); if (!state.keys.length) state.keys = seedKeys(); break;
-    case "close": state.dlg = null; state.keyFlow = null; break;
-    case "menu": e.stopPropagation(); state.dlg.openMenu = state.dlg.openMenu === t.dataset.m ? null : t.dataset.m; break;
-    case "pick": state.dlg.into = t.dataset.id; state.dlg.openMenu = null; state.dlg.cond = state.dlg.into === "AO" ? state.dlg.cond.replace('"web"', '"app"') : state.dlg.cond.replace('"app"', '"web"'); state.dlg.test = null; break;
-    case "setfrom": state.dlg.from = t.dataset.v; state.dlg.openMenu = null; break;
-    case "setexp": state.dlg.expires = t.dataset.v; state.dlg.openMenu = null; break;
-    case "chip": { const c = t.dataset.c; const cur = state.dlg.cond.trim(); state.dlg.cond = cur ? `${cur}\nand ${c}` : c; break; }
-    case "signed": {
-      const v = validate(state.dlg.cond);
-      if (v.verified) state.dlg.cond = state.dlg.cond.replace(/\s*\band\s+Verified\("[^"]+"\)/, "").replace(/^Verified\("[^"]+"\)\s*(\n?and\s*)?/, "");
-      else state.dlg.cond = (state.dlg.cond.trim() ? state.dlg.cond.trim() + "\nand " : "") + 'Verified("orchestrator")';
-      break;
-    }
-    case "test": runTest(document.getElementById("testid").value); return;
-    case "try": document.getElementById("testid").value = "4bf92f3577b34da6"; runTest("4bf92f3577b34da6"); return;
-    case "create": {
-      const d = state.dlg, editing = d.mode === "edit";
-      if (editing) { const b = state.braids.find((x) => x.id === d.id); Object.assign(b, { into: d.into, cond: d.cond, from: d.from, expires: d.expires }); }
-      else state.braids = [{ id: "b" + Date.now(), into: d.into, cond: d.cond, from: d.from, expires: d.expires, by: "Sam Rivera", on: "21 Oct", spans: "–", spark: [1, 1, 1, 1, 1, 1, 1, 1] }, ...state.braids];
-      const name = P[d.into].name;
-      state.dlg = null; state.tab = "into";
-      if (state.step === 2 || state.step === 0) state.step = 3;
-      toast(editing ? "Braid saved" : `Braided into ${name}`, editing ? `${name} keeps seeing spans while the change applies.` : `Matching spans start showing in ${name} within a minute.`);
-      break;
-    }
-    case "rowmenu": e.stopPropagation(); state.rowMenu = state.rowMenu === t.dataset.id ? null : t.dataset.id; break;
-    case "edit": { const b = state.braids.find((x) => x.id === t.dataset.id); openNew({ mode: "edit", id: b.id, into: b.into, cond: b.cond, from: b.from, expires: b.expires }); break; }
-    case "remove": state.dlg = { mode: "remove", id: t.dataset.id }; break;
-    case "remove-from": state.fromRemoved = true; toast("Braid removed", "Specialist agents' spans stop showing in Web orchestrator within 30 seconds."); break;
-    case "confirm-remove": { const b = state.braids.find((x) => x.id === state.dlg.id); state.braids = state.braids.filter((x) => x.id !== state.dlg.id); state.dlg = null; toast("Braid removed", `${P[(b || seedBraids()[0]).into].name} stops seeing these spans within 30 seconds.`); break; }
-    case "newkey": state.keyFlow = { stage: "name", name: "Production", lang: "ts" }; break;
-    case "key-create": state.keyFlow.name = (document.getElementById("keyname").value || "Production").trim(); state.keyFlow.stage = "secret"; break;
-    case "lang": state.keyFlow.lang = t.dataset.l; break;
-    case "copied": toast("Key copied"); return;
-    case "key-done": state.keys = [{ id: "k" + Date.now(), name: state.keyFlow.name, tail: "4f2a", created: "Just now", by: "Sam Rivera", used: "Not yet", ok: "0", bad: 0, status: "active" }]; state.keyFlow = null; toast("Signing key created", "Signed spans show here once you deploy."); setTimeout(() => { if (state.keys[0]) { Object.assign(state.keys[0], { used: "2 min ago", ok: "18,204", bad: 3 }); render(); } }, 2600); break;
-    case "keymenu": e.stopPropagation(); state.keyMenu = state.keyMenu === t.dataset.id ? null : t.dataset.id; break;
-    case "rotate": state.dlg = { mode: "rotate", id: t.dataset.id }; break;
-    case "confirm-rotate": { const k = state.keys.find((x) => x.id === state.dlg.id) || state.keys[0]; k.status = "retiring"; k.name = k.name; state.keys.unshift({ id: "k" + Date.now(), name: k.name + " (new)", tail: "9c1e", created: "Just now", by: "Sam Rivera", used: "Not yet", ok: "0", bad: 0, status: "active" }); state.dlg = null; toast("Key rotated", "Both keys work until 28 Oct."); break; }
-    case "revoke": { const k = state.keys.find((x) => x.id === t.dataset.id); k.status = "revoked"; toast("Key revoked", "Spans signed with it stop showing straight away."); break; }
-    case "sel": state.sel = t.dataset.id; break;
-    case "audit": state.audit = t.dataset.f; break;
-    case "plan": state.plan = t.dataset.p; break;
-  }
-  render();
-});
-document.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && e.target.id === "testid") runTest(e.target.value);
-  if (e.key === "Escape" && (state.dlg || state.keyFlow)) { state.dlg = null; state.keyFlow = null; render(); }
-  if (e.target.tagName === "TEXTAREA" || e.target.tagName === "INPUT") return;
-  if (e.key === "ArrowRight" && state.step < STEPS.length - 1) { state.step++; STEPS[state.step].go(); render(); }
-  if (e.key === "ArrowLeft" && state.step > 0) { state.step--; STEPS[state.step].go(); render(); }
-});
+      document.addEventListener("click", (e) => {
+        const t = e.target.closest("[data-action]");
+        if (!t) {
+          if (state.rowMenu || state.keyMenu || (state.dlg && state.dlg.openMenu)) {
+            state.rowMenu = state.keyMenu = null;
+            if (state.dlg) state.dlg.openMenu = null;
+            render();
+          }
+          return;
+        }
+        const a = t.dataset.action;
+        const keepMenus = ["menu", "rowmenu", "keymenu"].includes(a);
+        if (!keepMenus) {
+          state.rowMenu = state.keyMenu = null;
+        }
+        switch (a) {
+          case "step":
+            state.step = +t.dataset.i;
+            state.keyFlow = null;
+            state.rowMenu = state.keyMenu = null;
+            STEPS[state.step].go();
+            break;
+          case "notes":
+            state.notes = !state.notes;
+            break;
+          case "tab":
+            state.tab = t.dataset.t;
+            break;
+          case "new":
+            openNew();
+            if (!state.keys.length) state.keys = seedKeys();
+            break;
+          case "close":
+            state.dlg = null;
+            state.keyFlow = null;
+            break;
+          case "menu":
+            e.stopPropagation();
+            state.dlg.openMenu = state.dlg.openMenu === t.dataset.m ? null : t.dataset.m;
+            break;
+          case "pick":
+            state.dlg.into = t.dataset.id;
+            state.dlg.openMenu = null;
+            state.dlg.cond =
+              state.dlg.into === "AO"
+                ? state.dlg.cond.replace('"web"', '"app"')
+                : state.dlg.cond.replace('"app"', '"web"');
+            state.dlg.test = null;
+            break;
+          case "setfrom":
+            state.dlg.from = t.dataset.v;
+            state.dlg.openMenu = null;
+            break;
+          case "setexp":
+            state.dlg.expires = t.dataset.v;
+            state.dlg.openMenu = null;
+            break;
+          case "chip": {
+            const c = t.dataset.c;
+            const cur = state.dlg.cond.trim();
+            state.dlg.cond = cur ? `${cur}\nand ${c}` : c;
+            break;
+          }
+          case "signed": {
+            const v = validate(state.dlg.cond);
+            if (v.verified)
+              state.dlg.cond = state.dlg.cond
+                .replace(/\s*\band\s+Verified\("[^"]+"\)/, "")
+                .replace(/^Verified\("[^"]+"\)\s*(\n?and\s*)?/, "");
+            else
+              state.dlg.cond =
+                (state.dlg.cond.trim() ? state.dlg.cond.trim() + "\nand " : "") +
+                'Verified("orchestrator")';
+            break;
+          }
+          case "test":
+            runTest(document.getElementById("testid").value);
+            return;
+          case "try":
+            document.getElementById("testid").value = "4bf92f3577b34da6";
+            runTest("4bf92f3577b34da6");
+            return;
+          case "create": {
+            const d = state.dlg,
+              editing = d.mode === "edit";
+            if (editing) {
+              const b = state.braids.find((x) => x.id === d.id);
+              Object.assign(b, { into: d.into, cond: d.cond, from: d.from, expires: d.expires });
+            } else
+              state.braids = [
+                {
+                  id: "b" + Date.now(),
+                  into: d.into,
+                  cond: d.cond,
+                  from: d.from,
+                  expires: d.expires,
+                  by: "Sam Rivera",
+                  on: "21 Oct",
+                  spans: "–",
+                  spark: [1, 1, 1, 1, 1, 1, 1, 1],
+                },
+                ...state.braids,
+              ];
+            const name = P[d.into].name;
+            state.dlg = null;
+            state.tab = "into";
+            if (state.step === 2 || state.step === 0) state.step = 3;
+            toast(
+              editing ? "Braid saved" : `Braided into ${name}`,
+              editing
+                ? `${name} keeps seeing spans while the change applies.`
+                : `Matching spans start showing in ${name} within a minute.`,
+            );
+            break;
+          }
+          case "rowmenu":
+            e.stopPropagation();
+            state.rowMenu = state.rowMenu === t.dataset.id ? null : t.dataset.id;
+            break;
+          case "edit": {
+            const b = state.braids.find((x) => x.id === t.dataset.id);
+            openNew({
+              mode: "edit",
+              id: b.id,
+              into: b.into,
+              cond: b.cond,
+              from: b.from,
+              expires: b.expires,
+            });
+            break;
+          }
+          case "remove":
+            state.dlg = { mode: "remove", id: t.dataset.id };
+            break;
+          case "remove-from":
+            state.fromRemoved = true;
+            toast(
+              "Braid removed",
+              "Specialist agents' spans stop showing in Web orchestrator within 30 seconds.",
+            );
+            break;
+          case "confirm-remove": {
+            const b = state.braids.find((x) => x.id === state.dlg.id);
+            state.braids = state.braids.filter((x) => x.id !== state.dlg.id);
+            state.dlg = null;
+            toast(
+              "Braid removed",
+              `${P[(b || seedBraids()[0]).into].name} stops seeing these spans within 30 seconds.`,
+            );
+            break;
+          }
+          case "newkey":
+            state.keyFlow = { stage: "name", name: "Production", lang: "ts" };
+            break;
+          case "key-create":
+            state.keyFlow.name = (document.getElementById("keyname").value || "Production").trim();
+            state.keyFlow.stage = "secret";
+            break;
+          case "lang":
+            state.keyFlow.lang = t.dataset.l;
+            break;
+          case "copied":
+            toast("Key copied");
+            return;
+          case "key-done":
+            state.keys = [
+              {
+                id: "k" + Date.now(),
+                name: state.keyFlow.name,
+                tail: "4f2a",
+                created: "Just now",
+                by: "Sam Rivera",
+                used: "Not yet",
+                ok: "0",
+                bad: 0,
+                status: "active",
+              },
+            ];
+            state.keyFlow = null;
+            toast("Signing key created", "Signed spans show here once you deploy.");
+            setTimeout(() => {
+              if (state.keys[0]) {
+                Object.assign(state.keys[0], { used: "2 min ago", ok: "18,204", bad: 3 });
+                render();
+              }
+            }, 2600);
+            break;
+          case "keymenu":
+            e.stopPropagation();
+            state.keyMenu = state.keyMenu === t.dataset.id ? null : t.dataset.id;
+            break;
+          case "rotate":
+            state.dlg = { mode: "rotate", id: t.dataset.id };
+            break;
+          case "confirm-rotate": {
+            const k = state.keys.find((x) => x.id === state.dlg.id) || state.keys[0];
+            k.status = "retiring";
+            k.name = k.name;
+            state.keys.unshift({
+              id: "k" + Date.now(),
+              name: k.name + " (new)",
+              tail: "9c1e",
+              created: "Just now",
+              by: "Sam Rivera",
+              used: "Not yet",
+              ok: "0",
+              bad: 0,
+              status: "active",
+            });
+            state.dlg = null;
+            toast("Key rotated", "Both keys work until 28 Oct.");
+            break;
+          }
+          case "revoke": {
+            const k = state.keys.find((x) => x.id === t.dataset.id);
+            k.status = "revoked";
+            toast("Key revoked", "Spans signed with it stop showing straight away.");
+            break;
+          }
+          case "sel":
+            state.sel = t.dataset.id;
+            break;
+          case "audit":
+            state.audit = t.dataset.f;
+            break;
+          case "plan":
+            state.plan = t.dataset.p;
+            break;
+        }
+        render();
+      });
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && e.target.id === "testid") runTest(e.target.value);
+        if (e.key === "Escape" && (state.dlg || state.keyFlow)) {
+          state.dlg = null;
+          state.keyFlow = null;
+          render();
+        }
+        if (e.target.tagName === "TEXTAREA" || e.target.tagName === "INPUT") return;
+        if (e.key === "ArrowRight" && state.step < STEPS.length - 1) {
+          state.step++;
+          STEPS[state.step].go();
+          render();
+        }
+        if (e.key === "ArrowLeft" && state.step > 0) {
+          state.step--;
+          STEPS[state.step].go();
+          render();
+        }
+      });
 
-document.getElementById("logo-braid").innerHTML = braidMark(20, "#ED8926", "#e7ecf2");
-document.getElementById("notes-ic").innerHTML = ic("sticky", "sm");
-STEPS[0].go();
-render();
-</script>
-</body>
+      document.getElementById("logo-braid").innerHTML = braidMark(20, "#ED8926", "#e7ecf2");
+      document.getElementById("notes-ic").innerHTML = ic("sticky", "sm");
+      STEPS[0].go();
+      render();
+    </script>
+  </body>
 </html>
