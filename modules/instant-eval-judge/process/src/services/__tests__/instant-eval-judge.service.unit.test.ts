@@ -13,6 +13,7 @@ import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import { MemoryInstantEvalClassifierChannel } from "../../__tests__/support/instant-eval-classifier.test-fakes.ts";
+import { ScriptedInstantEvalDecisionModelChannel } from "../../__tests__/support/instant-eval-decision-model.test-fakes.ts";
 import { MemoryInstantEvalRateLimiter } from "../../__tests__/support/instant-eval-rate-limiter.test-fakes.ts";
 import type { InstantEvalClassifyRequest } from "../../channels/instant-eval-classifier.channel.ts";
 import { MemoryInstantEvalDecisionModelChannel } from "../../channels/memory/memory.instant-eval-decision-model.channel.ts";
@@ -76,7 +77,7 @@ function harness({
   const recorded: InstantEvalJudgeSpendPricedEventData[] = [];
   const { logger, lines } = createTestLogger();
   let minted = 0;
-  const decisionModels = MemoryInstantEvalDecisionModelChannel.create({
+  const decisionModels = ScriptedInstantEvalDecisionModelChannel.create({
     answer: () => ({
       verdicts: [{ questionId: QUESTION.id, probability: 0.7 }],
       inputTokens: 0,
