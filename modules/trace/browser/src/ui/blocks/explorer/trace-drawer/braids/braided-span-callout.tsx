@@ -52,7 +52,9 @@ function ShownBecause({ braid }: { braid: SpanBraid }) {
       {braid.matchedConditions.map((condition, index) => (
         <Fragment key={condition}>
           {index > 0 ? " or " : null}
-          <InlineCode>{condition}</InlineCode>
+          <InlineCode whiteSpace="normal" fontVariantLigatures="none">
+            {condition}
+          </InlineCode>
         </Fragment>
       ))}
       .
