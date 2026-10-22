@@ -76,7 +76,7 @@ Feature: Release manifests order every migration step release by release
   Scenario: The shipped manifests chain from the backfill start
     When the manifests shipped in the package are loaded
     Then the first manifest's previous release is the 3.18.1 baseline
-    And every release from 3.19.0 to 3.20.1 has a manifest whose previous release is the one before it
+    And every release from 3.19.0 to 3.21.0 has a manifest whose previous release is the one before it
 
   @unit
   Scenario: An upgrade across several releases steps release by release
@@ -128,6 +128,61 @@ Feature: Release manifests order every migration step release by release
     And an image shipping a step no manifest lists
     When the image's release is derived
     Then the image names itself unreleased
+
+  @unit
+  Scenario: A release is stamped with every step of its tree no manifest names, code steps included
+    Given release manifests stamped up to 3.20.1
+    And a tree adding a Prisma folder and a code step from its committed code step list
+    When 3.21.0 is stamped over the tree
+    Then the manifest names the Prisma folder and then the code step
+    And the tree names itself 3.21.0
+
+  @unit
+  Scenario: A release after one cut without its manifest also carries that release's steps
+    Given release manifests stamped up to 3.20.1 and a 3.21.0 tag with no manifest
+    And a tree holding a Prisma folder 3.21.0 shipped and a new one
+    When 3.22.0 is stamped over the tree
+    Then the manifest names both Prisma folders
+
+  # RELEASE-IDENTITY: a release image names itself that release. The release PR's check and the
+  # image publish refuse a tree that would not (packages/upgrade/scripts/check-release-manifest.ts).
+  @unit
+  Scenario: A release tree whose manifest is stamped names itself that release
+    Given release manifests stamped up to 3.20.1
+    And a tree cut as 3.20.1 whose every schema and code step a manifest lists
+    When the release check runs
+    Then it refuses nothing
+
+  @unit
+  Scenario: A release tree without its manifest fails the release check
+    Given release manifests stamped up to 3.20.1
+    And a tree cut as 3.21.0
+    When the release check runs
+    Then it refuses with the code "manifest_missing"
+    And the refusal names packages/upgrade/releases/3.21.0.json and the stamp command
+
+  @unit
+  Scenario: A release tree shipping a step its manifest misses fails the release check
+    Given release manifests stamped up to 3.20.1
+    And a tree cut as 3.20.1 that also ships a code step no manifest lists
+    When the release check runs
+    Then it refuses with the code "steps_unstamped", naming the step
+
+  @unit
+  Scenario: A release tree carrying a newer release's manifest fails the release check
+    Given release manifests stamped up to 3.21.0
+    And a tree cut as 3.20.1
+    When the release check runs
+    Then it refuses with the code "release_mismatch", naming 3.21.0
+
+  # An image cut before its manifest shipped names no release, so its runs record none.
+  @unit
+  Scenario: An install upgraded by a release image cut without its manifest reruns none of its steps
+    Given an installation upgraded to 3.20.1 and then by an image of 3.21.0 that named no release
+    And the ledger records the 3.21.0 schema step done
+    When a later image carrying the 3.21.0 manifest plans its upgrade
+    Then the plan starts from 3.20.1 and holds only the steps after 3.21.0
+    And a fresh install that only ever ran the 3.21.0 image is inferred at 3.21.0
 
   # Preview to a target (upgrade-ui plan 6.1.2, U6; Q-U3 ruled: the preview runs from the target
   # image's CLI, so this image never fetches another release's manifests).

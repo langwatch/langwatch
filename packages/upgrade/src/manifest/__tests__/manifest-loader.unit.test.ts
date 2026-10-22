@@ -77,9 +77,18 @@ describe("parseManifests()", () => {
 describe("loadReleases()", () => {
   describe("when the package's shipped releases are read", () => {
     /** @scenario "The shipped manifests chain from the backfill start" */
-    it("chains every release from 3.19.0 to 3.20.1", () => {
+    it("chains every release from 3.19.0 to 3.21.0", () => {
       const { manifests } = loadReleases();
-      const chain = ["3.19.0", "3.19.1", "3.19.2", "3.19.3", "3.19.4", "3.20.0", "3.20.1"];
+      const chain = [
+        "3.19.0",
+        "3.19.1",
+        "3.19.2",
+        "3.19.3",
+        "3.19.4",
+        "3.20.0",
+        "3.20.1",
+        "3.21.0",
+      ];
 
       expect(manifests.map((manifest) => manifest.release).slice(0, chain.length)).toEqual(chain);
       expect(manifests.slice(0, chain.length).map((manifest) => manifest.previous)).toEqual([

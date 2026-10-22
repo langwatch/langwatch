@@ -124,16 +124,24 @@ Feature: Migration order check
     When the PR adds a different Prisma migration with the same timestamp
     Then the goose-number rule does not apply, because Prisma records each migration by its full name
 
-  # A code step a release manifest names has run on real installs: its file is
-  # frozen exactly as a merged migration is (rethink 6.5 point 2).
+  # A blocking code step a release manifest names has run on real installs before
+  # they served: its file is frozen exactly as a merged migration is (rethink 6.5
+  # point 2). Background and operator steps stay editable (plan MIG-STEP-FILES).
   @unit
   Scenario: A PR changes the file of a code step a release manifest names
-    Given a release manifest on the base branch names the code step "topic:seed-clusters"
+    Given a release manifest on the base branch names the blocking code step "topic:seed-clusters"
     And a module file on the base branch declares that step id
     When the PR modifies, renames or deletes that file
     Then the check fails
     And the comment says the release shipped the step and a released step cannot change
     And the comment gives the git checkout that restores it
+
+  @unit
+  Scenario: A PR changes the file of a background code step a release manifest names
+    Given a release manifest on the base branch names the background code step "topic:seed-clusters"
+    And a module file on the base branch declares that step id
+    When the PR modifies that file
+    Then the check passes
 
   @unit
   Scenario: A code step no release manifest names yet may still change

@@ -82,7 +82,21 @@ func repoWithStep(t *testing.T, manifest string) string {
 const releasedManifest = `{"release":"3.21.0","previous":"3.20.1","cutAt":"2026-10-06","steps":[
   {"id":"prisma:20261001000000_x","kind":"schema","mode":"blocking","owner":null,"description":"x"},
   {"id":"clickhouse:00101","kind":"schema","mode":"blocking","owner":null,"description":"y"},
-  {"id":"topic:seed-clusters","kind":"data","mode":"background","owner":"topic","description":"z"}]}`
+  {"id":"topic:seed-clusters","kind":"data","mode":"blocking","owner":"topic","description":"z"}]}`
+
+// @scenario "A PR changes the file of a background code step a release manifest names"
+func TestStepsLeavesAReleasedBackgroundStepFileAlone(t *testing.T) {
+	background := strings.Replace(releasedManifest, `"mode":"blocking","owner":"topic"`, `"mode":"background","owner":"topic"`, 1)
+	root := repoWithStep(t, background)
+	writeAndCommit(t, root, stepFile, "export const step = defineMigrationStep({ id: \"topic:seed-clusters\", run });\n")
+	in, err := migrationorder.Repo{Root: root}.Steps(t.Context(), "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if findings := migrationorder.CheckSteps(in); len(findings) != 0 {
+		t.Errorf("a released background step's file changed, want no finding, got %+v", findings)
+	}
+}
 
 // @scenario "A PR changes the file of a code step a release manifest names"
 func TestStepsRefusesAChangeToAReleasedStepFile(t *testing.T) {
