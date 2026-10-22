@@ -16,8 +16,19 @@ const requestBoundsSchema = z
       .optional(),
   );
 
+/** One organization's own bounds, keyed by organization id (specs/security/read-rate-limits.feature). */
+const requestBoundsByOrganizationSchema = z
+  .string()
+  .optional()
+  .transform((raw) => (raw ? (JSON.parse(raw) as unknown) : undefined))
+  .pipe(z.record(z.string(), z.record(z.string(), z.number().int().positive())).optional());
+
 export const entitlementConfig = Config.define((c) => ({
   requestBounds: c.env("LANGWATCH_REQUEST_BOUNDS", requestBoundsSchema),
+  requestBoundsByOrganization: c.env(
+    "LANGWATCH_REQUEST_BOUNDS_BY_ORGANIZATION",
+    requestBoundsByOrganizationSchema,
+  ),
   /** The shared leaf: Cloud reads plans from billing's subscriptions; an install, its licence. */
   isSaas,
 }));

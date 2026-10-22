@@ -29,6 +29,10 @@ import type { OrganizationApi } from "@langwatch/organization-contract";
 
 import { ApiDoorAuditService } from "./api-door-audit.service.ts";
 import {
+  ApiDoorReadBudgetService,
+  type ApiDoorReadBudgetPeers,
+} from "./api-door-read-budget.service.ts";
+import {
   ApiRestCredentialsService,
   type ApiRestCredentialPeers,
   type ApiKeyDoorCredential,
@@ -63,6 +67,8 @@ export type ApiDoorPeers = Readonly<{
   >;
   entitlements: Pick<EntitlementApi, "getActivePlan">;
   auditLog: Pick<AuditLogApi, "record">;
+  /** What the per-credential read budget asks; absent, reads are not counted. */
+  readBudget?: ApiDoorReadBudgetPeers;
 }>;
 
 /** The API door auth binds for the process: who is calling, and what they may do (record §8). */
@@ -105,6 +111,7 @@ export class ApiDoorService {
       },
       entitlements: this.#planEntitlements(),
       audit: { rest: this.#audit.restAudit(), trpc: this.#audit.trpcAudit() },
+      ...(this.#peers.readBudget ? { readBudget: this.#readBudget(this.#peers.readBudget) } : {}),
     };
   }
 
@@ -348,6 +355,14 @@ export class ApiDoorService {
         ),
       identify: async ({ request }) =>
         keyCaller(request, await this.#credentials.identifyKey({ request })),
+    };
+  }
+
+  #readBudget(peers: ApiDoorReadBudgetPeers): NonNullable<ApiDoor["readBudget"]> {
+    const service = ApiDoorReadBudgetService.create(peers);
+    return {
+      limitsFor: (input) => service.limitsFor(input),
+      enforced: (input) => service.enforced(input),
     };
   }
 

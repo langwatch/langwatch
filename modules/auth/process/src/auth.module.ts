@@ -52,6 +52,11 @@ export const authProcessModule: PublishedProcessModule<"auth", AuthApi, AuthServ
           organizations: dependencies.organizations,
           entitlements: dependencies.entitlements,
           auditLog: dependencies.auditLog,
+          readBudget: {
+            projects: dependencies.projects,
+            featureFlags: dependencies.featureFlags,
+            entitlements: dependencies.entitlements,
+          },
         }).door(),
       ),
     ]);

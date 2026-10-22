@@ -30,6 +30,7 @@ import type {
   MountableTransport,
 } from "../hosting/transport-hosts.ts";
 import type { RateLimiter } from "../ports.ts";
+import type { ReadBudget } from "../read-budget/read-budget.ts";
 import { auditScopeIds, isAuditLogExempt, redactAuditArgs, trpcFailureTraceIds } from "./audit.ts";
 import {
   createTrpcRuntimePolicy,
@@ -134,6 +135,8 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
     sessionVersions?: TrpcSessionVersions | undefined;
     /** The plans a procedure declaring an entitlement asks; absent, it is refused at mount. */
     entitlements?: Entitlements | undefined;
+    /** Counts every query and export against the session that made it. */
+    readBudget?: ReadBudget | undefined;
     logger?: Pick<Logger, "warn" | "error"> | undefined;
   }): TrpcHost {
     return new TrpcHost(options);
@@ -383,6 +386,19 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
       denials: DENIALS,
       ...(options.entitlements ? { entitlements: options.entitlements } : {}),
       ...(options.throttle ? { throttle: throttleOf(options.throttle) } : {}),
+      ...(options.readBudget
+        ? {
+            readBudget: {
+              budget: options.readBudget,
+              actorOf: (ctx: TrpcRequestContext) => {
+                const actor = ctx.tryActor?.();
+                if (!actor) return null;
+                const impersonatorId = ctx.session?.user.impersonator?.id;
+                return { type: "user" as const, id: actor.id, ...(impersonatorId ? { impersonatorId } : {}) };
+              },
+            },
+          }
+        : {}),
       audit: {
         record: (entry) => this.#record(entry),
         redact: ({ procedure, args }) => redactAuditArgs({ input: args, action: procedure }),

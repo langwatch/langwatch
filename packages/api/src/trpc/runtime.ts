@@ -100,6 +100,7 @@ import {
 } from "./audit.ts";
 import { refuseOutdatedClient } from "./client-outdated.ts";
 import { doorInputSchema } from "./infinite-input.ts";
+import { trpcReadBudget, type TrpcReadBudget } from "../read-budget/trpc-read-budget.ts";
 import { trpcThrottle, type TrpcThrottle } from "./throttle.ts";
 
 const logger = createLogger("langwatch:trpc");
@@ -1153,6 +1154,8 @@ export type TrpcRuntimeMembers<TContext> = Readonly<{
    * throttles at all. Absent, every procedure passes through uncounted.
    */
   throttle?: TrpcThrottle<TContext>;
+  /** Counts every query and export against the credential that made it. */
+  readBudget?: TrpcReadBudget<TContext>;
   audit: Readonly<{
     record(entry: TrpcRuntimeAuditEntry): Promise<void>;
     /** The owner says WHAT is sensitive; the path only redacts. */
@@ -1223,6 +1226,7 @@ export function createTrpcRuntime<
   const trace = tracer(members);
   const handledError = handledErrors(members);
   const throttle = members.throttle ? trpcThrottle(members.throttle) : undefined;
+  const readBudget = members.readBudget ? trpcReadBudget(members.readBudget) : undefined;
 
   const build = (
     request: TrpcProcedureRequest<TContext>,
@@ -1257,7 +1261,8 @@ export function createTrpcRuntime<
     // The throttle runs AFTER the check, so the caller it counts is the one
     // the door resolved, and BEFORE the trail, so a refused call writes no
     // audit row.
-    const built = (throttle ? checked.use(throttle) : checked).use(
+    const throttled = throttle ? checked.use(throttle) : checked;
+    const built = (readBudget ? throttled.use(readBudget) : throttled).use(
       auditTrail(members, {
         anonymous,
         ...(request.audit ? { target: auditTargetPort({ members, request }) } : {}),

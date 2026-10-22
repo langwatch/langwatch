@@ -649,6 +649,7 @@ export const APP_ERROR_CODES = [
   "query_memory_exceeded",
   "query_scan_limit_exceeded",
   "query_timeout",
+  "read_rate_limited",
   "replay_already_running",
   "replay_start_failed",
   "report_channel_unsupported",

@@ -154,6 +154,7 @@ export class EntitlementModule implements EntitlementApiContract {
   #tenancy: EntitlementRepositories["tenancy"];
   #pricing: EntitlementCallerLookup["billing"];
   #requestBoundOverrides: RequestBoundsOverrides;
+  #organizationBoundOverrides: Readonly<Record<string, Readonly<Record<string, number>>>>;
   #buildUsagePipeline: UsagePipelineBuild | undefined;
   #usageSenders: UsageSenders | undefined;
 
@@ -167,7 +168,8 @@ export class EntitlementModule implements EntitlementApiContract {
     repositories: EntitlementReadRepositories;
     infrastructure: EntitlementInfrastructure;
     dependencies: EntitlementCallerLookup;
-    config: Pick<EntitlementConfig, "requestBounds">;
+    config: Pick<EntitlementConfig, "requestBounds"> &
+      Partial<Pick<EntitlementConfig, "requestBoundsByOrganization">>;
     usagePipeline?: UsagePipelineBuild;
   }) {
     this.#plans = EntitlementService.create(infrastructure);
@@ -186,6 +188,7 @@ export class EntitlementModule implements EntitlementApiContract {
     this.#tenancy = repositories.tenancy;
     this.#pricing = dependencies.billing;
     this.#requestBoundOverrides = config.requestBounds ?? {};
+    this.#organizationBoundOverrides = config.requestBoundsByOrganization ?? {};
     this.#buildUsagePipeline = usagePipeline;
   }
 
@@ -265,13 +268,17 @@ export class EntitlementModule implements EntitlementApiContract {
     repositories: EntitlementReadRepositories;
     infrastructure: EntitlementInfrastructure;
     dependencies: EntitlementCallerLookup;
-    config?: Pick<EntitlementConfig, "requestBounds">;
+    config?: Pick<EntitlementConfig, "requestBounds"> &
+      Partial<Pick<EntitlementConfig, "requestBoundsByOrganization">>;
   }): EntitlementModule {
     return new EntitlementModule({
       repositories: setup.repositories,
       infrastructure: setup.infrastructure,
       dependencies: setup.dependencies,
-      config: { requestBounds: setup.config?.requestBounds },
+      config: {
+        requestBounds: setup.config?.requestBounds,
+        requestBoundsByOrganization: setup.config?.requestBoundsByOrganization,
+      },
     });
   }
 
@@ -312,6 +319,9 @@ export class EntitlementModule implements EntitlementApiContract {
     key: RequestBoundKey;
     organizationId: string;
   }): Promise<number> {
+    const raised = this.#organizationBoundOverrides[input.organizationId]?.[input.key];
+    if (raised !== undefined) return raised;
+
     const override = this.#requestBoundOverrides[input.key];
     if (typeof override === "number") return override;
 

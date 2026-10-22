@@ -14,6 +14,7 @@ import type {
   MountableTransport,
 } from "../hosting/transport-hosts.ts";
 import type { RateLimiter } from "../ports.ts";
+import type { ReadBudget } from "../read-budget/read-budget.ts";
 import { allRegisteredRoutes } from "../route-registry.ts";
 import {
   claimsNoPrefix,
@@ -100,6 +101,8 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
      * answering uncounted.
      */
     rateLimiter?: RateLimiter | undefined;
+    /** Counts every read and export against the credential that made it. */
+    readBudget?: ReadBudget | undefined;
     /** Middleware context answered on every family at once: only the document build refuses it. */
     middlewareContext?: readonly MiddlewareContextBinding[] | undefined;
     /** The plans a route declaring an entitlement asks; absent, it is refused at mount. */
@@ -169,6 +172,7 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
       doors: identities,
       ...(this.options.idempotency ? { idempotency: this.options.idempotency } : {}),
       ...(this.options.rateLimiter ? { rateLimiter: this.options.rateLimiter } : {}),
+      ...(this.options.readBudget ? { readBudget: this.options.readBudget } : {}),
       ...(this.options.entitlements ? { entitlements: this.options.entitlements } : {}),
       ...(this.options.confirmations ? { confirmations: this.options.confirmations } : {}),
       authorization: { forRequest: () => authz },

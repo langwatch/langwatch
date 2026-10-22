@@ -10,6 +10,7 @@ import type { Authorize, Entitlements, PlatformDecision } from "../access/access
 import type { RestKeyKind } from "../rest/key-credential.ts";
 import type { SessionVerification } from "./session-reader.ts";
 import type { MiddlewareBinding, TransportPeers } from "./transport-hosts.ts";
+import type { ReadBudgetDeps } from "../read-budget/read-budget.ts";
 
 /**
  * The one door every API request passes: who is calling, and what they may do. auth binds it
@@ -31,6 +32,8 @@ export type ApiDoor = Readonly<{
   entitlements: Entitlements;
   /** Where every declared trail lands, on each transport. */
   audit: Readonly<{ rest: RestAuditSink; trpc: TrpcAuditSink }>;
+  /** The allowances and switch the per-credential read budget asks; absent, reads go uncounted. */
+  readBudget?: Pick<ReadBudgetDeps, "limitsFor" | "enforced">;
 }>;
 
 type ApiDoorBinding = Readonly<{ apiDoor: ApiDoor }>;

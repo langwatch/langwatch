@@ -103,6 +103,8 @@ import {
   recordedKeyOfDoor,
   type RestKeyCredential,
 } from "./key-credential.ts";
+import { type ReadBudget, readKindOf, rowsOf } from "../read-budget/read-budget.ts";
+import { restReadCredential } from "../read-budget/read-credential.ts";
 import { legacyErrorScopes, withLegacyError } from "./legacy-error.ts";
 import {
   CREDENTIAL_CLASS_BY_DOOR as CREDENTIAL_CLASS,
@@ -193,6 +195,8 @@ export type RestRuntimeMembers = Readonly<{
   authorization: Readonly<{ forRequest(request: Request): Authorize }>;
   /** The counter behind every route that declared how often one caller may ask. */
   rateLimiter?: RateLimiter;
+  /** Counts every read and export against the credential that made it. */
+  readBudget?: ReadBudget;
   /** The store behind every route that declared how long its answer stands. */
   cache?: ResponseCache;
   denials?: AccessDenial;
@@ -1490,6 +1494,16 @@ function handlerMiddleware<Api>({
     await refuseAggregateWrite({ route, ports, scope: resolved, request: context.req.raw });
 
     await countCall(capabilities);
+    const readCall = readCallOf({
+      route,
+      ports,
+      family,
+      door: credential,
+      actor: decision.actor,
+      scope: resolved,
+      request: context.req.raw,
+    });
+    if (readCall) await ports.readBudget?.admit(readCall);
 
     // After the door, never before it: a caller who may not read this cannot
     // be handed the bytes an entitled one left behind.
@@ -1551,6 +1565,7 @@ function handlerMiddleware<Api>({
       });
 
       caller.markUsed?.();
+      if (readCall) void ports.readBudget?.record({ ...readCall, rows: rowsOf(result) });
 
       return answerWith({ context, next, route, result });
     };
@@ -1561,6 +1576,33 @@ function handlerMiddleware<Api>({
 
     return keepAnswer({ ...capabilities, answer });
   };
+}
+
+/** The read a route's call counts as, or null for a write or a door the budget does not count. */
+function readCallOf({
+  route,
+  ports,
+  family,
+  door,
+  actor,
+  scope,
+  request,
+}: {
+  route: RestTransportRoute<unknown>;
+  ports: RestRuntimeMembers;
+  family: string;
+  door: RestDoorCredential;
+  actor: Actor | null;
+  scope: AuthzDeclaredScopeId | null;
+  request: Request;
+}) {
+  if (!ports.readBudget) return null;
+  const kind = readKindOf({ operation: route.operation, method: route.method });
+  if (!kind) return null;
+  const credential = restReadCredential({ door, actor, scope, request });
+  if (!credential) return null;
+
+  return { credential, kind, route: `${family}.${route.operation}`, scope } as const;
 }
 
 /**

@@ -260,6 +260,14 @@ export const FEATURE_FLAGS = [
   // decided solely by the internal flag store — never an env var
   // (envOverridable: false) — so /ops/feature-flags is the one lever.
   {
+    key: "release_read_rate_limits_enforced",
+    scope: "SYSTEM",
+    defaultValue: false,
+    family: "Security",
+    description:
+      "Refuses a read or export past its credential's allowance with 429 (spec: specs/security/read-rate-limits.feature). Off = the read budget still counts and logs read_rate_limit_exceeded, and answers the read as usual.",
+  },
+  {
     key: "release_langy_enabled",
     scope: "SYSTEM",
     defaultValue: false,

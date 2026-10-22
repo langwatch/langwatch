@@ -84,7 +84,8 @@ export function createEntitlementTestApp(
     infrastructure: Omit<EntitlementInfrastructure, "counter" | "warnings"> &
       Partial<Pick<EntitlementInfrastructure, "counter" | "warnings">>;
     dependencies?: Partial<{ billing: BillingApi }>;
-    config?: Pick<EntitlementConfig, "requestBounds">;
+    config?: Pick<EntitlementConfig, "requestBounds"> &
+      Partial<Pick<EntitlementConfig, "requestBoundsByOrganization">>;
   }>,
 ): EntitlementModule {
   return EntitlementModule.createForTesting({

@@ -4299,6 +4299,13 @@ const presentations = {
     title: "Too many test sends just now",
     describe: () => "That one wasn't sent. Wait a minute, then try again.",
   },
+  read_rate_limited: {
+    // Counted per key, token or session, so the copy says the wait is this
+    // caller's own and that asking for less at a time avoids it.
+    title: "Too many reads just now",
+    describe: () =>
+      "This key, token or session has read a lot of data in a short time. Wait a little, then try again, or narrow what you ask for.",
+  },
   trace_export_rate_limited: {
     // A full-project export is a full-store scan, so the copy says both the
     // wait and that nothing was produced.

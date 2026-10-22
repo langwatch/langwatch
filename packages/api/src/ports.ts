@@ -9,10 +9,12 @@ import type { Duplex } from "node:stream";
  * check; the constructed one is the default.
  */
 export interface RateLimiter {
+  /** `cost` is what one call spends (default 1); 0 reads the window without spending it. */
   check(
     key: string,
     limit?: { requests: number; seconds: number },
-  ): Promise<{ allowed: boolean; retryAfterSeconds?: number }>;
+    cost?: number,
+  ): Promise<{ allowed: boolean; retryAfterSeconds?: number; used?: number }>;
 }
 
 /** Response cache port; keys use the complete validated handler input. */
