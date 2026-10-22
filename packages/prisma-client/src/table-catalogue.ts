@@ -3,6 +3,7 @@ export const prismaTableCatalogue = {
   "Account": "Account",
   "AccountCredential": "AccountCredential",
   "Session": "Session",
+  "UserErasure": "UserErasure",
   "User": "User",
   "VerificationToken": "VerificationToken",
   "Identifier": "Identifier",
@@ -240,6 +241,11 @@ export const prismaModelFieldCatalogue = {
     "lastSeenAt",
     "createdAt",
     "updatedAt"
+  ],
+  "UserErasure": [
+    "id",
+    "accountCreatedAt",
+    "erasedAt"
   ],
   "User": [
     "id",
@@ -3017,6 +3023,7 @@ export const prismaRelationCatalogue = {
   "Session": {
     "user": "User"
   },
+  "UserErasure": {},
   "User": {
     "accounts": "Account",
     "accountCredentials": "AccountCredential",

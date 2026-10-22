@@ -1,5 +1,6 @@
 import type { LedgerActor } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { NotificationService as NotificationApi } from "@langwatch/notification-contract";
 import { createLogger } from "@langwatch/observability";
 import {
   OpsImpersonatedOperatorRefusedError,
@@ -11,6 +12,7 @@ import {
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { UserApi, UserProfile } from "@langwatch/user-contract";
 
+import { isEmailUnconfigured } from "../rules/platform-operator-seed.rules.ts";
 import { grantsAreStaffOnly, isStaffAccount } from "../rules/platform-operator-staff.rules.ts";
 
 const logger = createLogger("langwatch:ops:platform-operators");
@@ -56,11 +58,16 @@ type PlatformOperatorsServiceOptions = Readonly<{
     AuthzApi,
     "grantPlatformOperator" | "revokePlatformOperator" | "listPlatformOperators"
   >;
-  users: Pick<UserApi, "findByEmail" | "findById" | "countUsage">;
+  users: Pick<UserApi, "findByEmail" | "findById" | "countUsage" | "isFirstCreatedAccount">;
   organizations: Pick<OrganizationApi, "listProvisioningSummaries" | "findAdministrators">;
+  /** Whether the install has email at all: without it no account can verify its address. */
+  mail: Pick<NotificationApi, "getMailDelivery">;
   /** `cloud` is the seed's own: a deployment LangWatch runs. */
   deployment: Readonly<{ cloud: boolean; isLocalDevelopment: boolean }>;
 }>;
+
+/** Who ADMIN_EMAILS names that the seed may take, and whether an unverified one was passed over. */
+type NamedSeedables = Readonly<{ userIds: string[]; isLaterUnverifiedSkipped: boolean }>;
 
 /**
  * ops's side of the platform-operator grant (ARCHITECTURE.md, "Platform operators are a grant"
@@ -75,7 +82,7 @@ export class PlatformOperatorsService {
   }
 
   #recorder: PlatformOperatorSeedRecorder | undefined;
-  #namedUserWaitLogged = false;
+  #loggedWaitReason: string | undefined;
 
   /** Bound once ops's pipeline registers, as the system-migration kick is. */
   connectSeedRecorder(recorder: PlatformOperatorSeedRecorder): void {
@@ -126,9 +133,14 @@ export class PlatformOperatorsService {
     });
   }
 
-  /** The recovery task: lockout on self-hosted, staff at the cloud cutover. */
+  /**
+   * The recovery task: lockout on self-hosted, staff at the cloud cutover. With no email
+   * configured no address can verify, so shell access naming the account is the check.
+   */
   async grantAsSystem({ email }: { email: string }): Promise<OpsPlatformOperator> {
-    const user = await this.#eligibleUserOf(email);
+    const user = await this.#eligibleUserOf(email, {
+      canGrantUnverified: await this.#isEmailUnconfigured(),
+    });
     const held = await this.options.authz.grantPlatformOperator({
       principal: { type: "user", id: user.id },
       caller: { type: "system" },
@@ -201,8 +213,8 @@ export class PlatformOperatorsService {
 
   /**
    * The `ops:seed-platform-operators` upgrade step: while nobody holds the grant, grants the
-   * verified active users a still-set ADMIN_EMAILS names, and answers how many. Anything else (no
-   * named user yet, no ADMIN_EMAILS, the hosted service) stays with the seed process's wait.
+   * seedable active users a still-set ADMIN_EMAILS names (verified, or with no email configured
+   * the install's first-created account), and answers how many. The rest stays with the seed.
    */
   async seedFromAdminEmails({
     settings,
@@ -213,16 +225,15 @@ export class PlatformOperatorsService {
   }): Promise<number> {
     if (settings.cloud || settings.adminEmails.length === 0) return 0;
     if ((await this.options.authz.listPlatformOperators()).length > 0) return 0;
-    const named = await this.#verifiedUsersNamed(settings.adminEmails);
-    if (!dryRun && named.length > 0)
-      await this.grantSeeded({ via: "admin-emails", userIds: named });
-    return named.length;
+    const { userIds } = await this.#seedableUsersNamed(settings.adminEmails);
+    if (!dryRun && userIds.length > 0) await this.grantSeeded({ via: "admin-emails", userIds });
+    return userIds.length;
   }
 
   /**
-   * Cloud never seeds; no user waits; existing holders decide nobody. A set ADMIN_EMAILS takes its
-   * verified active users or waits, never an org admin. An empty one takes the only organization's
-   * oldest active admin, waits with no organization, and decides nobody with several.
+   * Cloud never seeds; no user waits; holders decide nobody. A set ADMIN_EMAILS takes its seedable
+   * active users (with no email configured, an unverified one only as the first-created account)
+   * or waits, never an org admin. An empty one takes the only organization's oldest active admin.
    */
   async #decide({
     adminEmails,
@@ -235,11 +246,11 @@ export class PlatformOperatorsService {
     }
 
     if (adminEmails.length > 0) {
-      const named = await this.#verifiedUsersNamed(adminEmails);
-      if (named.length > 0) {
-        return { via: "admin-emails", userIds: named, reason: "the users ADMIN_EMAILS names" };
+      const { userIds, isLaterUnverifiedSkipped } = await this.#seedableUsersNamed(adminEmails);
+      if (userIds.length > 0) {
+        return { via: "admin-emails", userIds, reason: "the users ADMIN_EMAILS names" };
       }
-      return this.#waitForNamedUser();
+      return this.#waitForNamedUser({ isLaterUnverifiedSkipped });
     }
 
     const organizations = await this.options.organizations.listProvisioningSummaries();
@@ -257,11 +268,19 @@ export class PlatformOperatorsService {
     };
   }
 
-  /** Waits for a named user; says so once per process, not on every wake. */
-  #waitForNamedUser(): PlatformOperatorSeedOutcome {
-    const reason = "no user named by ADMIN_EMAILS is verified and active yet";
-    if (!this.#namedUserWaitLogged) {
-      this.#namedUserWaitLogged = true;
+  /** Waits for a named user; says each reason once per process, not on every wake. */
+  #waitForNamedUser({
+    isLaterUnverifiedSkipped,
+  }: {
+    isLaterUnverifiedSkipped: boolean;
+  }): PlatformOperatorSeedOutcome {
+    const reason = isLaterUnverifiedSkipped
+      ? "the unverified account ADMIN_EMAILS names is not the install's first-created account, " +
+        "and with no email configured only that first account is seeded unverified, never a later " +
+        `one, even once the first is deactivated or erased; ${RECOVERY_HINT}`
+      : "no user named by ADMIN_EMAILS has an active account yet, verified where email is configured";
+    if (this.#loggedWaitReason !== reason) {
+      this.#loggedWaitReason = reason;
       logger.warn({ reason }, `the platform-operator seed is waiting: ${reason}`);
     }
     return waiting(reason);
@@ -276,13 +295,34 @@ export class PlatformOperatorsService {
     return Object.values(emailDomains).reduce((total, count) => total + count, 0);
   }
 
-  async #verifiedUsersNamed(adminEmails: readonly string[]): Promise<string[]> {
-    const ids = new Set<string>();
+  /**
+   * The active users the list names whose address is verified. With no email configured an
+   * unverified one counts only as the install's first-created account, as the first user does: a
+   * later sign-up on a named address proves nothing, even once the first is deactivated or erased.
+   */
+  async #seedableUsersNamed(adminEmails: readonly string[]): Promise<NamedSeedables> {
+    const active: UserProfile[] = [];
     for (const email of adminEmails) {
       const user = await this.options.users.findByEmail({ email });
-      if (user && user.emailVerified && user.deactivatedAt === null) ids.add(user.id);
+      if (user && user.deactivatedAt === null) active.push(user);
     }
-    return [...ids];
+    const verifiedIds = active.filter((user) => user.emailVerified).map((user) => user.id);
+    const unverified = active.filter((user) => !user.emailVerified);
+    if (unverified.length === 0 || !(await this.#isEmailUnconfigured())) {
+      return { userIds: [...new Set(verifiedIds)], isLaterUnverifiedSkipped: false };
+    }
+    const seedable = [...verifiedIds];
+    let isLaterUnverifiedSkipped = false;
+    for (const user of unverified) {
+      if (await this.options.users.isFirstCreatedAccount({ userId: user.id }))
+        seedable.push(user.id);
+      else isLaterUnverifiedSkipped = true;
+    }
+    return { userIds: [...new Set(seedable)], isLaterUnverifiedSkipped };
+  }
+
+  async #isEmailUnconfigured(): Promise<boolean> {
+    return isEmailUnconfigured({ mail: await this.options.mail.getMailDelivery() });
   }
 
   async #oldestActiveAdministrator({
@@ -302,11 +342,15 @@ export class PlatformOperatorsService {
   /**
    * Who the page and the task may grant: an active account with a verified address, since
    * whoever registered an unclaimed one first would operate; where grants are staff-only, staff.
+   * `canGrantUnverified` lifts only the verified rule, for the task on an install with no email.
    */
-  async #eligibleUserOf(email: string): Promise<UserProfile> {
+  async #eligibleUserOf(
+    email: string,
+    { canGrantUnverified = false }: { canGrantUnverified?: boolean } = {},
+  ): Promise<UserProfile> {
     const user = await this.options.users.findByEmail({ email });
     if (!user) throw new PlatformOperatorUserNotFoundError();
-    if (user.deactivatedAt !== null || !user.emailVerified) {
+    if (user.deactivatedAt !== null || (!user.emailVerified && !canGrantUnverified)) {
       throw new PlatformOperatorUserNotFoundError({ userId: user.id });
     }
     if (grantsAreStaffOnly(this.options.deployment) && !isStaffAccount(user)) {

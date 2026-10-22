@@ -129,6 +129,27 @@ export function deduplicateEvents<EventType extends Event>(events: EventType[]):
 }
 
 /**
+ * A page read's records as events, grouped per tenant stream and each stream deduplicated after
+ * `prepare` (a store's post-processing; none by default).
+ */
+export function streamEventsOfRecords<EventType extends Event>({
+  records,
+  prepare = (events) => events,
+}: {
+  records: readonly EventRecord[];
+  prepare?: (events: EventType[]) => EventType[];
+}): EventType[] {
+  const byStream = new Map<string, EventType[]>();
+  for (const record of records) {
+    const key = `${record.TenantId}\n${record.AggregateId}`;
+    const events = byStream.get(key) ?? [];
+    events.push(recordToEvent<EventType>(record, record.AggregateId));
+    byStream.set(key, events);
+  }
+  return [...byStream.values()].flatMap((events) => deduplicateEvents(prepare(events)));
+}
+
+/**
  * Validates that an event's tenantId matches the context tenantId.
  * Throws SecurityError with generic message (no tenant IDs in error text).
  */

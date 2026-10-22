@@ -54,6 +54,11 @@ export interface LwqlPrismaRows {
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
   };
+  readonly UserErasure: {
+    readonly id: "String";
+    readonly accountCreatedAt: "DateTime";
+    readonly erasedAt: "DateTime";
+  };
   readonly User: {
     readonly id: "String";
     readonly name: "String?";

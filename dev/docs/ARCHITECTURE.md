@@ -1703,6 +1703,8 @@ composes (Alex, 2026-10-06, round 4, Q205). One stored event's payload (trace's 
 read through a narrow single-event read seat beside the producer-only store, within main's 2-day
 window; the producer-only rule stands for everything else (Alex, 2026-10-06, round 3, Q209).
 2026-10-10: identity reads one aggregate's history through the read seat; WEB-9103.
+2026-10-19: the read seat also answers one page of aggregate streams at once, for upgrade steps
+that walk many aggregates (user's standing facts); the producer-only rule still holds for writes.
 
 **A lookup by id reads through its table's id index** (Alex, 2026-10-11): each time-partitioned
 table looked up by id alone has an unpartitioned `<table>_id_index` (TenantId, id to its time range),
@@ -1794,9 +1796,17 @@ markPaidOutOfBand take `ops:manage`. A view-only operator reads and is refused o
 task). Cloud never bootstraps: staff are seeded at cutover. On a self-hosted install the first user to sign up is recorded as the seed's decision (`first-user`) from user's `lw.user.created` fact, whatever `ADMIN_EMAILS` says, while nobody holds the grant and they are the only user; the seed's one-key record and latch grant at most one (Alex, 2026-10-10).
 A set `ADMIN_EMAILS` never falls back to an org admin: the seed waits, unlatched, until a named verified
 user exists. Users with no organization yet also wait; only a decision latches (Alex, 2026-10-01).
+Where no email is configured no address can be verified, so a named active user is seeded unverified;
+the account must already exist, the seed never creates one (Rogerio, 2026-10-18). An unverified one is
+seeded only as the install's first-created account, as the first user is, since anyone can register a
+named address first on an install that cannot verify it; a deactivated or erased first account never passes that
+place to a later sign-up, so the seed waits. Erasure deletes the row, so user keeps only the erased
+account's creation time (`UserErasure`); erasures before that table existed left no trace (Rogerio, 2026-10-19). There the recovery task
+also grants an unverified active account, since shell access naming it is the check, so a seed that
+waits stays recoverable; the page still grants verified accounts only (Rogerio, 2026-10-19).
 On a deployment LangWatch runs (the seed's `cloud`, a developer's local stack excepted) the page and the
-recovery task grant only an account whose verified address is on `langwatch.ai`; the task, like the page,
-grants verified accounts only, everywhere. `can()` asks nothing more than the live grant (Alex, 2026-10-14).
+recovery task grant only an account whose verified address is on `langwatch.ai`; the page grants
+verified accounts only, everywhere, and the task too wherever email is configured. `can()` asks nothing more than the live grant (Alex, 2026-10-14).
 Deactivating a user ends their sessions and CLI tokens before user's fact is sent, without an outbox;
 user's lifecycle facts carry the database clock. The back office refuses bulk user writes, a deliberate
 difference from main (Alex, 2026-10-01).
