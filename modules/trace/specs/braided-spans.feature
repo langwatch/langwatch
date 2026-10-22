@@ -146,10 +146,11 @@ Feature: Braided spans in the reader's traces
       Then the span says it was signed by "orchestrator"
       And a span with no mark, or with a mark naming another project, says nothing about signing
 
-    @integration @unimplemented
+    @integration
     Scenario: Actions that would act on the owner's data are off on a braided span, with a reason
       When sam selects a braided span
-      Then opening it in the playground, annotating it and evaluating it are off, each saying why
+      Then commenting, suggesting an edit and opening it in the playground are off, each saying why
+      And a prompt it ran is listed as the owner's, with opening the prompt and the playground off
       And the span says it is shown because it matches the braid's condition
 
     @integration
