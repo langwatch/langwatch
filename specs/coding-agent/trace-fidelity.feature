@@ -358,6 +358,56 @@ Feature: Coding Agent Trace Fidelity (Path B direct OTLP)
     Then the note says how many tokens were re-sent instead of reusing what the first call cached
     And the first call's fresh input is not counted as cached
 
+  # A rebuild is a cache READ that fell: the call failed to reuse what the call
+  # before it left cached (its read plus its write), by half or more, and wrote
+  # it again. A large write on top of a full read is the context growing (a big
+  # file or tool result), not a rebuild. Every surface asks the one rule.
+
+  @unit
+  Scenario: New content written on top of a full cache read is growth, not a rebuild
+    Given a session's model call that cached about 15K tokens
+    And the next call read all of them from the cache and wrote an 80K-token file on top
+    When the cache rebuild rule judges the next call
+    Then it is not a rebuild
+
+  @unit
+  Scenario: A call whose cache read fell and that wrote the context again is a rebuild
+    Given a session's model call that cached about 100K tokens
+    And the next call read none of them from the cache and wrote 90K tokens
+    When the cache rebuild rule judges the next call
+    Then it is a rebuild
+
+  @unit
+  Scenario: The usage chart does not flag a large write on top of a full cache read
+    Given a session whose last call read every cached token and wrote an 80K-token file on top
+    When the usage chart looks for cache rebuilds
+    Then it flags no call
+
+  @unit
+  Scenario: The session fold counts a rebuild only when the cache read fell
+    Given a session whose last call read every cached token and wrote an 80K-token file on top
+    When the session fold folds its model calls
+    Then the session row counts no cache rebuild
+
+  @unit
+  Scenario: A model call that arrives after a later one is not judged a rebuild
+    Given a session whose first model call arrives after the calls that followed it
+    When the session fold folds its model calls in arrival order
+    Then the session row counts no cache rebuild
+
+  @unit
+  Scenario: The cache rebuild finding follows the counted rebuilds, not the session's total writes
+    Given a session that wrote far more to the cache than it read but counted no rebuild
+    When the session's findings are derived
+    Then no finding says the cache was rebuilt
+
+  @integration
+  Scenario: The Usage tab calls the session's cache writes written, not rebuilt
+    Given a session that wrote 95K tokens to the cache and counted no rebuild
+    When the Usage tab shows its cache health
+    Then the 95K tokens read as written to the cache
+    And the cache misses read 0
+
   @unit
   Scenario: Context size is shown in the trace list next to tokens
     Given a trace list row whose trace reported a context size

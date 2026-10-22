@@ -112,6 +112,27 @@ describe("findCacheRebuilds", () => {
     });
   });
 
+  describe("given a call that read every cached token and wrote a large file on top", () => {
+    /** @scenario "The usage chart does not flag a large write on top of a full cache read" */
+    it("flags no call, since the context grew rather than being rebuilt", () => {
+      const events = findCacheRebuilds([
+        modelCall({
+          atMs: 1_000,
+          inputTokens: 3,
+          cacheReadTokens: 14_654,
+          cacheCreationTokens: 160,
+        }),
+        modelCall({
+          atMs: 2_000,
+          inputTokens: 3,
+          cacheReadTokens: 14_814,
+          cacheCreationTokens: 80_016,
+        }),
+      ]);
+      expect(events).toEqual([]);
+    });
+  });
+
   describe("given a rebuild below the minimum token floor", () => {
     it("does not flag noise on a session with a tiny context", () => {
       const events = findCacheRebuilds([

@@ -128,17 +128,31 @@ describe("deriveSessionSignals", () => {
     });
   });
 
-  describe("given the cache was rebuilt out of proportion to what it reused", () => {
-    it("reports the churn, because the raw token count never would", () => {
+  describe("given the session counted cache rebuilds", () => {
+    it("reports them with the largest one, because the raw token count never would", () => {
       const signals = deriveSessionSignals(
-        session({ cacheReadTokens: 400_000, cacheCreationTokens: 200_000 }),
+        session({
+          cacheReadTokens: 400_000,
+          cacheCreationTokens: 200_000,
+          cacheRebuildCount: 3,
+          largestCacheRebuildTokens: 90_000,
+        }),
       );
 
       const churn = signals.find((s) => s.id === "cache-churn");
-      expect(churn).toBeDefined();
-      // The comparison IS the finding — both sides have to be in the sentence.
-      expect(churn!.detail).toContain("200k");
-      expect(churn!.detail).toContain("400k");
+      expect(churn?.title).toBe("The cache was rebuilt 3×");
+      expect(churn?.detail).toContain("90k");
+    });
+  });
+
+  describe("given a session that wrote far more to the cache than it read but counted no rebuild", () => {
+    /** @scenario "The cache rebuild finding follows the counted rebuilds, not the session's total writes" */
+    it("stays quiet, since writing new context on top of a full read is growth", () => {
+      expect(
+        ids(
+          session({ cacheReadTokens: 58_449, cacheCreationTokens: 94_970, cacheRebuildCount: 0 }),
+        ),
+      ).not.toContain("cache-churn");
     });
   });
 
@@ -149,15 +163,6 @@ describe("deriveSessionSignals", () => {
       expect(
         ids(session({ cacheReadTokens: 8_000_000, cacheCreationTokens: 100_000 })),
       ).not.toContain("cache-churn");
-    });
-  });
-
-  describe("given a trivial amount of cache rebuilding", () => {
-    it("stays quiet even though the ratio is high", () => {
-      // 900 of 1000 is 90% — but 900 tokens is not a story.
-      expect(ids(session({ cacheReadTokens: 1_000, cacheCreationTokens: 900 }))).not.toContain(
-        "cache-churn",
-      );
     });
   });
 

@@ -184,6 +184,8 @@ const codingAgentSessionSchemaDefinition = z
     subAgentIds: z.array(z.string()),
     stepStartedAt: z.array(z.number()),
     previousCallContextTokens: z.number(),
+    previousCallCachedTokens: z.number().default(0),
+    previousCallStartedAtMs: z.number().default(0),
     metricSeries: z.array(codingAgentMetricSeriesRowSchema),
     createdAt: z.number(),
     updatedAt: z.number(),

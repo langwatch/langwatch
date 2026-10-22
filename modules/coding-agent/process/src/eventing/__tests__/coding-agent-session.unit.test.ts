@@ -1413,6 +1413,8 @@ describe("read-back losslessness (ADR-066)", () => {
       // The fields the pre-ADR-066 row could not represent are actually populated.
       expect(state.subAgentIds).toEqual(["sub-agent-1"]);
       expect(state.previousCallContextTokens).toBe(1_100);
+      expect(state.previousCallCachedTokens).toBe(1_000);
+      expect(state.previousCallStartedAtMs).toBe(1_000);
       expect(state.steps[0]?.startedAtMs).toBe(3_000);
       expect(Object.keys(state.metricSeries)).toContain("loc-added");
       expect(state.linesAdded).toBe(42);
@@ -1489,7 +1491,12 @@ describe("read-back losslessness (ADR-066)", () => {
       // prior context: the sub-agent count collapses to the one id it can see,
       // and the rebuild reads as the session's first call.
       const withoutBookkeeping = projection.apply(
-        { ...recover(state), subAgentIds: [], previousCallContextTokens: 0 },
+        {
+          ...recover(state),
+          subAgentIds: [],
+          previousCallContextTokens: 0,
+          previousCallCachedTokens: 0,
+        },
         third,
       );
 

@@ -121,6 +121,8 @@ export function toCodingAgentSessionRow({
     subAgentIds: state.subAgentIds,
     stepStartedAt: state.steps.map((s) => s.startedAtMs),
     previousCallContextTokens: state.previousCallContextTokens,
+    previousCallCachedTokens: state.previousCallCachedTokens,
+    previousCallStartedAtMs: state.previousCallStartedAtMs,
     metricSeries: Object.entries(state.metricSeries).map(([seriesId, fact]) => ({
       seriesId,
       metricName: fact.metricName,

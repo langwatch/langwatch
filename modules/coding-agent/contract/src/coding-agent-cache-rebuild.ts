@@ -1,0 +1,38 @@
+/**
+ * The one rule every surface asks whether a model call rebuilt the cache: the
+ * session fold's count, the usage chart, the terminal note and the findings.
+ */
+
+/** Share of the cache the read must lose, and the write must re-send, to count. */
+export const CACHE_REBUILD_RATIO_THRESHOLD = 0.5;
+/** Below this many written tokens a rebuild is noise, not a story. */
+export const CACHE_REBUILD_MIN_TOKENS = 1_000;
+
+export interface CacheRebuildInput {
+  /** The whole prompt the previous call sent: fresh input plus cache read and write. */
+  previousContextTokens: number;
+  /** What the previous call left in the cache: its read plus its write. */
+  previousCachedTokens: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
+}
+
+/**
+ * A rebuild is a call whose cache READ fell below half of what the previous
+ * call left cached, and that wrote about the previous prompt again. A large
+ * write on top of a full read is the context growing, not a rebuild.
+ */
+export function isCacheRebuild({
+  previousContextTokens,
+  previousCachedTokens,
+  cacheReadTokens,
+  cacheCreationTokens,
+}: CacheRebuildInput): boolean {
+  if (previousCachedTokens <= 0 || previousContextTokens <= 0) return false;
+  if (cacheCreationTokens < CACHE_REBUILD_MIN_TOKENS) return false;
+  const lostTokens = previousCachedTokens - cacheReadTokens;
+  return (
+    lostTokens >= previousCachedTokens * CACHE_REBUILD_RATIO_THRESHOLD &&
+    cacheCreationTokens >= previousContextTokens * CACHE_REBUILD_RATIO_THRESHOLD
+  );
+}

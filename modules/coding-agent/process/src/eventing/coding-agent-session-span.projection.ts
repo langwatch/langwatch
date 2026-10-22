@@ -133,11 +133,25 @@ export class CodingAgentSessionSpanProjection {
     }
 
     if (span.name === CLAUDE.SPAN.LLM_REQUEST) {
-      return this.applyClaudeLlmRequest({ state, attrs, durationMs, isLogsOnly, context });
+      return this.applyClaudeLlmRequest({
+        state,
+        attrs,
+        durationMs,
+        startedAtMs: span.startTimeUnixMs,
+        isLogsOnly,
+        context,
+      });
     }
 
     if (span.name === CODEX.SPAN.TURN) {
-      return this.applyCodexTurn({ state, attrs, agent, isLogsOnly, context });
+      return this.applyCodexTurn({
+        state,
+        attrs,
+        agent,
+        startedAtMs: span.startTimeUnixMs,
+        isLogsOnly,
+        context,
+      });
     }
 
     if (span.name === CODEX.SPAN.HELPER_REQUEST) {
@@ -180,19 +194,26 @@ export class CodingAgentSessionSpanProjection {
     state,
     attrs,
     durationMs,
+    startedAtMs,
     isLogsOnly,
     context,
   }: {
     state: CodingAgentSessionData;
     attrs: Record<string, unknown>;
     durationMs: number;
+    startedAtMs: number;
     isLogsOnly: boolean;
     context: NonNullable<CodingAgentSessionSpanProjectionInput["context"]> | null;
   }): CodingAgentSessionData {
     // Identity still rides the span; only the counted facts are the log's.
     if (isLogsOnly) return this.stateProjection.withIdentity(state, attrs);
     const before = this.stateProjection.withIdentity(state, attrs);
-    const folded = this.stateProjection.foldModelCall(before, attrs, durationMs);
+    const folded = this.stateProjection.foldModelCall({
+      state: before,
+      attrs,
+      fallbackDurationMs: durationMs,
+      startedAtMs,
+    });
     // Priced from the span's tokens with the same formula and the same
     // cache-write lifetime the trace pipeline applies to the identical span,
     // so the session and its traces state one figure. The cost the agent
@@ -238,12 +259,14 @@ export class CodingAgentSessionSpanProjection {
     state,
     attrs,
     agent,
+    startedAtMs,
     isLogsOnly,
     context,
   }: {
     state: CodingAgentSessionData;
     attrs: Record<string, unknown>;
     agent: CodingAgentSessionSpanProjectionInput["agent"];
+    startedAtMs: number;
     isLogsOnly: boolean;
     context: NonNullable<CodingAgentSessionSpanProjectionInput["context"]> | null;
   }): CodingAgentSessionData {
@@ -255,7 +278,12 @@ export class CodingAgentSessionSpanProjection {
     // Fallback duration 0, not the span's: the turn's wall time includes the
     // tools that ran inside it, and zero reads honestly as "not measured".
     const before = this.stateProjection.withIdentity(state, attrs);
-    const folded = this.stateProjection.foldModelCall(before, facts, 0);
+    const folded = this.stateProjection.foldModelCall({
+      state: before,
+      attrs: facts,
+      fallbackDurationMs: 0,
+      startedAtMs,
+    });
     return this.chargePricedCall({ before, folded, facts, context });
   }
 
@@ -297,7 +325,12 @@ export class CodingAgentSessionSpanProjection {
 
     const facts = this.genAiTokenFacts(span.attrs);
     // A chat span wraps one request and no tools, so its wall time is the call's latency.
-    const folded = this.stateProjection.foldModelCall(before, facts, durationMs);
+    const folded = this.stateProjection.foldModelCall({
+      state: before,
+      attrs: facts,
+      fallbackDurationMs: durationMs,
+      startedAtMs: span.startTimeUnixMs,
+    });
     const charged = this.stateProjection.chargeContextUsage({
       before,
       after: {

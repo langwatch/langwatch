@@ -1,4 +1,4 @@
-import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
+import { isCacheRebuild, type TranscriptEntry } from "@langwatch/coding-agent-contract";
 
 /**
  * Per-call token composition from spans; answers "where" (not just "how much")
@@ -62,14 +62,7 @@ export interface CacheRebuildEvent {
   precedingPrompt: string | null;
 }
 
-/**
- * A cache write costs MORE than a read, so a call whose `cacheCreationTokens`
- * nears the previous call's cached context size is paying twice for the same
- * tokens. The first call is never flagged — a cold cache isn't a rebuild.
- */
-const REBUILD_RATIO_THRESHOLD = 0.5;
-const REBUILD_MIN_TOKENS = 1_000;
-
+/** The first call is never flagged: a cold cache isn't a rebuild. */
 export function findCacheRebuilds(entries: TranscriptEntry[]): CacheRebuildEvent[] {
   const events: CacheRebuildEvent[] = [];
   let previousContextTokens = 0;
@@ -84,9 +77,12 @@ export function findCacheRebuilds(entries: TranscriptEntry[]): CacheRebuildEvent
 
     if (
       callIndex > 0 &&
-      entry.cacheCreationTokens >= REBUILD_MIN_TOKENS &&
-      previousContextTokens > 0 &&
-      entry.cacheCreationTokens / previousContextTokens >= REBUILD_RATIO_THRESHOLD
+      isCacheRebuild({
+        previousContextTokens,
+        previousCachedTokens,
+        cacheReadTokens: entry.cacheReadTokens,
+        cacheCreationTokens: entry.cacheCreationTokens,
+      })
     ) {
       events.push({
         callIndex,

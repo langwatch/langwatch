@@ -196,11 +196,11 @@ Permission `traces:view`. Declared at `src/transport/coding-agent.rest.ts:68`.
 Answers at `/api/coding-agent/sessions/:sessionId/events`, `/api/v1/coding-agent/sessions/:sessionId/events`; also, undocumented, `/api/coding-agent/2026-08-07/sessions/:sessionId/events`, `/api/v1/coding-agent/2026-08-07/sessions/:sessionId/events`, `/api/coding-agent/latest/sessions/:sessionId/events`, `/api/v1/coding-agent/latest/sessions/:sessionId/events`.
 
 ```typescript
-// Params: codingAgentSessionEventsRestParamsSchema, ../contract/src/coding-agent.ts:386
+// Params: codingAgentSessionEventsRestParamsSchema, ../contract/src/coding-agent.ts:388
 interface Params {
   sessionId: string;
 }
-// Query: codingAgentSessionEventsRestQuerySchema, ../contract/src/coding-agent.ts:431
+// Query: codingAgentSessionEventsRestQuerySchema, ../contract/src/coding-agent.ts:433
 interface Query {
   limit?: number;
   kinds?: string;
@@ -208,7 +208,7 @@ interface Query {
   to?: number;
   cursor?: string;
 }
-type Response = z.infer<typeof codingAgentSessionEventsRestResponseSchema>; // ../contract/src/coding-agent.ts:441
+type Response = z.infer<typeof codingAgentSessionEventsRestResponseSchema>; // ../contract/src/coding-agent.ts:443
 ```
 
 ### `codingAgentRollupRest`
@@ -258,7 +258,7 @@ interface Input {
   fromMs?: number;
   toMs?: number;
 }
-// Output: codingAgentUsageTotalsSchema, ../contract/src/coding-agent.ts:515
+// Output: codingAgentUsageTotalsSchema, ../contract/src/coding-agent.ts:517
 interface Output {
   sessionCount: number;
   costUsd: number;
@@ -289,7 +289,7 @@ interface Input {
 
 // codingAgents.pullRequestUsage
 type Input = z.infer<typeof codingAgentTrpcProjectScopeSchema>; // ../contract/src/coding-agent-trpc.schemas.ts:15
-type Output = z.infer<typeof codingAgentPersonalPullRequestUsageWithConnectionSchema>; // ../contract/src/coding-agent.ts:902
+type Output = z.infer<typeof codingAgentPersonalPullRequestUsageWithConnectionSchema>; // ../contract/src/coding-agent.ts:904
 
 // codingAgents.pullRequestDetail
 // Input: codingAgentTrpcPullRequestDetailInputSchema, ../contract/src/coding-agent-trpc.schemas.ts:63
@@ -299,7 +299,7 @@ interface Input {
   repositoryFullName: string;
   prNumber: number;
 }
-type Output = z.infer<typeof codingAgentPullRequestDetailSchema>; // ../contract/src/coding-agent.ts:811
+type Output = z.infer<typeof codingAgentPullRequestDetailSchema>; // ../contract/src/coding-agent.ts:813
 
 // codingAgents.session
 // Input: inline, ../contract/src/coding-agent.trpc.ts:58

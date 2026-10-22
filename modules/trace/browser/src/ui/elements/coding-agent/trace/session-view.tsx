@@ -30,7 +30,7 @@ import { TokenTimelineChart } from "./token-timeline-chart.tsx";
 interface SessionViewProps {
   session: CodingAgentSessionDisplay;
   /**
-   * Per-call token timeline. The fold above sums cache reused/rebuilt but not
+   * Per-call token timeline. The fold above sums cache reads and writes but not
    * where; optional so its absence doesn't fail the tab.
    */
   entries?: TranscriptEntry[];
@@ -47,8 +47,8 @@ export function SessionView({ session, entries }: SessionViewProps) {
         <Headline session={session} />
 
         {/*
-          Signals lead. The stat grid below can tell you the cache was rebuilt
-          318k tokens' worth, but only this can tell you that's four rebuilds and
+          Signals lead. The stat grid below can tell you 318k tokens went to the
+          cache, but only this can tell you four of those calls were rebuilds and
           it cost you money. Findings before figures.
         */}
         {signals.length > 0 && <Signals signals={signals} />}
@@ -333,7 +333,7 @@ function ToolTable({
 /**
  * Promoted out of the headline grid: peak context is banded against the
  * reliability curve in contextHealth.ts, and cache misses plus the worst
- * rebuild turn a raw "context rebuilt" number into a concrete story.
+ * rebuild turn a raw "written to cache" number into a concrete story.
  */
 function cacheRebuildTone(cacheRebuildCount: number): ContextHealthTone {
   if (cacheRebuildCount === 0) return "success";
@@ -362,7 +362,7 @@ function CacheHealth({ session }: { session: CodingAgentSessionDisplay }) {
           <Stat
             label="Cache misses"
             value={hasContextData ? String(session.cacheRebuildCount) : "—"}
-            hint="Model calls that re-created most of the context instead of reading it from cache. A cache WRITE costs more per token than a read, so this is the session paying twice for the same tokens."
+            hint="Model calls whose cache read fell below what the call before them left cached, and that wrote it again. A cache WRITE costs more per token than a read, so this is the session paying twice for the same tokens."
             tone={rebuildTone}
           />
           <Stat
@@ -371,9 +371,9 @@ function CacheHealth({ session }: { session: CodingAgentSessionDisplay }) {
             hint="Tokens served from the cache across the whole session. These bill at a fraction of fresh input: the more the better."
           />
           <Stat
-            label="Context rebuilt"
+            label="Written to cache"
             value={formatCompact(session.cacheCreationTokens)}
-            hint="Tokens spent writing the cache again, summed across the whole session."
+            hint="Tokens written to the cache across the whole session: new context as it grew, plus any rebuilds counted under cache misses."
           />
         </Grid>
         {session.largestCacheRebuildTokens > 0 && (

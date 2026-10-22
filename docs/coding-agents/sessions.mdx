@@ -40,12 +40,12 @@ Click a row to open the session. The **Usage** tab opens on the totals: cost, mo
 
 The **Cache health** section is where the money goes:
 
-| Stat                | What it tells you                                                                                                                                                              |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Peak context**    | The largest context the session carried, as a share of the model's window, banded against the current reliability guidance for long-context sessions.                          |
-| **Cache misses**    | Model calls that re-created most of the context instead of reading it from cache. A cache write costs more per token than a read, so each miss pays twice for the same tokens. |
-| **Context reused**  | Tokens served from the prompt cache across the session. These bill at a fraction of fresh input.                                                                               |
-| **Context rebuilt** | Tokens spent writing the cache again, summed across the session.                                                                                                               |
+| Stat                 | What it tells you                                                                                                                                                                                                                                                                  |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Peak context**     | The largest context the session carried, as a share of the model's window, banded against the current reliability guidance for long-context sessions.                                                                                                                              |
+| **Cache misses**     | Model calls whose cache read fell below what the call before them left cached, and that wrote it again. A cache write costs more per token than a read, so each miss pays twice for the same tokens. A large write on top of a full cache read is the context growing, not a miss. |
+| **Context reused**   | Tokens served from the prompt cache across the session. These bill at a fraction of fresh input.                                                                                                                                                                                   |
+| **Written to cache** | Tokens written to the cache across the session: new context as it grew, plus any rebuilds.                                                                                                                                                                                         |
 
 The detail also shows the biggest single rebuild: how many tokens one model call re-sent instead of reusing from cache.
 
