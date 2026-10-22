@@ -1,24 +1,51 @@
 import { sitePath } from "../../../lib/site-path.ts";
 
-async function copyText({ button }: { button: HTMLButtonElement }) {
-  const agent = button.closest(".docs-agent-launcher")?.querySelector<HTMLSelectElement>("select");
-  if (agent) return `npx langwatch ${agent.value}`;
-  const slug = button.dataset.docsPageCopy;
-  if (slug) {
-    const response = await fetch(sitePath({ path: `/${slug}.md` }), { credentials: "omit" });
-    if (!response.ok) throw new Error("Markdown unavailable");
-    return response.text();
-  }
-  if (button.hasAttribute("data-docs-prompt"))
-    return button.closest(".docs-agent-start")?.querySelector("pre")?.textContent ?? "";
-  const tabs = button.closest('[data-scope="tabs"][data-part="root"]');
-  const selected = tabs?.querySelector<HTMLElement>(
-    '[role="tabpanel"]:not([hidden]) .docs-code-region',
-  );
+async function fetchText({ path }: { path: string }) {
+  const response = await fetch(sitePath({ path }), { credentials: "omit" });
+  if (!response.ok) throw new Error("Copy source unavailable");
+  return response.text();
+}
+
+/** A code button reads the block it sits in: the selected tab of a group, else its only block. */
+function blockCode({ button }: { button: HTMLButtonElement }) {
   const response = button
     .closest("section")
     ?.querySelector<HTMLElement>("[data-response-status]:not([hidden]) .docs-code-region");
-  return response?.dataset.code ?? selected?.dataset.code ?? button.dataset.docsCopy ?? "";
+  const frame = button.closest(".docs-code-frame");
+  const tabs = button.closest('[data-scope="tabs"][data-part="root"]');
+  const visible = '[role="tabpanel"]:not([hidden]) .docs-code-region';
+  const region =
+    response ??
+    frame?.querySelector<HTMLElement>(visible) ??
+    frame?.querySelector<HTMLElement>(".docs-code-region") ??
+    tabs?.querySelector<HTMLElement>(visible);
+  return region?.dataset.code ?? "";
+}
+
+function copyText({ button }: { button: HTMLButtonElement }): string | Promise<string> {
+  const agent = button.closest(".docs-agent-launcher")?.querySelector<HTMLSelectElement>("select");
+  if (agent) return `npx langwatch ${agent.value}`;
+  const slug = button.dataset.docsPageCopy;
+  if (slug) return fetchText({ path: `/${slug}.md` });
+  const file = button.dataset.docsCopyFile;
+  if (file) return fetchText({ path: `/${file}` });
+  if (button.hasAttribute("data-docs-prompt"))
+    return button.closest(".docs-agent-start")?.querySelector("pre")?.textContent ?? "";
+  return button.dataset.docsCopyPrompt || button.dataset.docsCopy || blockCode({ button });
+}
+
+/** Fetched text goes through a promised clipboard item, so the click still counts as the gesture. */
+async function writeClipboard({ text }: { text: string | Promise<string> }) {
+  if (typeof text !== "string" && typeof ClipboardItem === "function") {
+    const blob = text.then((value) => new Blob([value], { type: "text/plain" }));
+    blob.catch(() => {});
+    try {
+      return await navigator.clipboard.write([new ClipboardItem({ "text/plain": blob })]);
+    } catch {
+      /* Fall back to plain text below. */
+    }
+  }
+  await navigator.clipboard.writeText(await text);
 }
 
 async function copy({ button }: { button: HTMLButtonElement }) {
@@ -28,7 +55,7 @@ async function copy({ button }: { button: HTMLButtonElement }) {
     button.closest(".docs-agent-start, .docs-agent-launcher")?.querySelector("output") ??
     button.parentElement?.querySelector("output");
   try {
-    await navigator.clipboard.writeText(await copyText({ button }));
+    await writeClipboard({ text: copyText({ button }) });
     if (label) button.setAttribute("aria-label", "Copied");
     else button.textContent = button.hasAttribute("data-docs-prompt") ? "Prompt copied" : "Copied";
     button.dataset.copied = "true";

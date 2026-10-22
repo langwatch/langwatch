@@ -32,7 +32,7 @@ function Command({ label, value }: { label: string; value: string }) {
         >
           {value}
         </Box>
-        <CopyAction code={value} label={`Copy ${label.toLowerCase()}`} />
+        <CopyAction code={value} label={`Copy ${label.toLowerCase()}`} source="button" />
       </Flex>
     </Box>
   );
@@ -88,7 +88,7 @@ export function SkillCard({
           <Flex alignItems="center" justifyContent="space-between" fontSize="13px">
             <span>Or paste the prompt into your agent</span>
             <Flex alignItems="center">
-              <CopyAction code={prompt} label="Copy full prompt" showLabel />
+              <CopyAction code={prompt} label="Copy full prompt" showLabel source="prompt" />
             </Flex>
           </Flex>
           <details className="docs-skill-prompt">

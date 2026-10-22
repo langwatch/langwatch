@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import type { CopyState } from "../../../lib/clipboard.ts";
 import { useCopy } from "../../../lib/clipboard.ts";
+import { PROMPT_ATTRIBUTE } from "./copy-source.ts";
 
 export type CodeSource = {
   lang: string;
@@ -42,23 +43,29 @@ function copyAnnouncement({ state }: { state: CopyState }) {
   return "";
 }
 
+/** Where a static page's copy handler finds the text: the code block, the button, or a prompt file. */
+type CopySource = "block" | "button" | "prompt";
+
 export function CopyAction({
   code,
   label = "Copy code",
   hidden = false,
   showLabel = false,
+  source = "block",
 }: {
   code: string;
   label?: string;
   hidden?: boolean;
   showLabel?: boolean;
+  source?: CopySource;
 }) {
   const { state, copy, ready } = useCopy();
   return (
     <>
       <Button
         hidden={hidden}
-        data-docs-copy={code}
+        data-docs-copy={source === "button" ? code : ""}
+        {...(source === "prompt" ? { [PROMPT_ATTRIBUTE]: code } : {})}
         type="button"
         size="xs"
         variant={showLabel ? "outline" : "ghost"}
