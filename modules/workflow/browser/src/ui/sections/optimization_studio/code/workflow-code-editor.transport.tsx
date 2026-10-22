@@ -29,6 +29,7 @@ type EditorModalProps = WorkflowCodeEditorContractProps & {
   setCode: (code: string) => void;
   open: boolean;
   onClose: () => void;
+  language?: string;
   viewStateKey?: string;
 };
 

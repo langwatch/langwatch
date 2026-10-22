@@ -44,3 +44,51 @@ export const rewriteCodeSignature = (
   }
   return next;
 };
+
+/** Splits a destructuring list on its top-level commas, so `x = [1, 2]` stays one entry. */
+function splitTopLevel({ list }: { list: string }): string[] {
+  const entries: string[] = [];
+  let depth = 0;
+  let quote: string | null = null;
+  let start = 0;
+  for (let i = 0; i < list.length; i++) {
+    const char = list[i]!;
+    if (quote) {
+      if (char === "\\") i++;
+      else if (char === quote) quote = null;
+    } else if (char === '"' || char === "'" || char === "`") quote = char;
+    else if ("([{".includes(char)) depth++;
+    else if (")]}".includes(char)) depth--;
+    else if (char === "," && depth === 0) {
+      entries.push(list.slice(start, i));
+      start = i + 1;
+    }
+  }
+  entries.push(list.slice(start));
+  return entries.map((entry) => entry.trim()).filter(Boolean);
+}
+
+const JS_ENTRYPOINT =
+  /(export\s+(?:default\s+)?(?:async\s+)?function\s*\*?\s*[\w$]*\s*\(\s*)\{((?:[^{}]|\{[^{}]*\})*)\}/;
+
+/**
+ * Rewrites the destructured parameter of a JavaScript entrypoint to the declared inputs.
+ * Surviving entries keep their text and defaults, and a `...rest` stays last; an
+ * entrypoint that does not destructure its argument already sees every input.
+ */
+export const rewriteJavaScriptSignature = ({
+  code,
+  inputs,
+}: {
+  code: string;
+  inputs: readonly { identifier: string }[];
+}): string => {
+  if (inputs.length === 0) return code;
+  return code.replace(JS_ENTRYPOINT, (_match, head: string, list: string) => {
+    const all = splitTopLevel({ list });
+    const rest = all.filter((entry) => entry.startsWith("..."));
+    const existing = new Map(all.map((entry) => [/^[\w$]+/.exec(entry)?.[0] ?? entry, entry]));
+    const entries = inputs.map((i) => existing.get(i.identifier) ?? i.identifier);
+    return `${head}{ ${[...entries, ...rest].join(", ")} }`;
+  });
+};

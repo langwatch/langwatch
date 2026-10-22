@@ -6,6 +6,7 @@ import { useCallback, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
+import { codeLanguageOf } from "../../../model/code-language.ts";
 import {
   applyMappingChange,
   buildAvailableSources,
@@ -54,6 +55,7 @@ export function CodePropertiesPanel({
   // Get code from parameters
   const codeParam = node.data.parameters?.find((p) => p.identifier === "code" && p.type === "code");
   const code = (codeParam?.value as string) ?? "";
+  const language = codeLanguageOf({ parameters: node.data.parameters });
 
   // Memoised so the editor contract and the field rows see stable arrays.
   const inputs: WorkflowVariable[] = useMemo(
@@ -165,7 +167,7 @@ export function CodePropertiesPanel({
       <CodeBlockEditor
         code={code}
         onChange={handleCodeChange}
-        language="python"
+        language={language}
         inputs={inputs}
         outputs={outputs}
         viewStateKey={`code-node:${node.id}`}

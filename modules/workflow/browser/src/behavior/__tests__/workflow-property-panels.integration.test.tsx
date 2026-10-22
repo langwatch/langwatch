@@ -38,9 +38,10 @@ const variables = ({ variables, title, onChange }: WorkflowVariablesProps) => (
   </div>
 );
 const outputs = ({ title }: WorkflowOutputsProps) => <span>{title}</span>;
-const codeEditor = ({ code, onChange }: WorkflowCodeEditorProps) => (
+const codeEditor = ({ code, onChange, language }: WorkflowCodeEditorProps) => (
   <textarea
     data-testid="code-editor"
+    data-language={language}
     value={code}
     onChange={(event) => onChange(event.target.value)}
   />
@@ -103,6 +104,39 @@ describe("Workflow property panels", () => {
       type: "code",
       value: "new",
     });
+  });
+
+  it("opens a JavaScript code node in the JavaScript editor", () => {
+    const node: Node<Component> = {
+      id: "code",
+      type: "code",
+      position: { x: 0, y: 0 },
+      data: {
+        name: "Code",
+        parameters: [
+          { identifier: "language", type: "str", value: "javascript" },
+          { identifier: "code", type: "code", value: "export default () => ({})" },
+        ],
+      },
+    };
+    _useWorkflowStore.setState({ nodes: [node] });
+    renderPanel(<CodePropertiesPanel {...common} node={node} />);
+    expect(screen.getByTestId("code-editor").dataset.language).toBe("javascript");
+  });
+
+  it("opens a code node without a language in the Python editor", () => {
+    const node: Node<Component> = {
+      id: "code",
+      type: "code",
+      position: { x: 0, y: 0 },
+      data: {
+        name: "Code",
+        parameters: [{ identifier: "code", type: "code", value: "class Code:\n    pass\n" }],
+      },
+    };
+    _useWorkflowStore.setState({ nodes: [node] });
+    renderPanel(<CodePropertiesPanel {...common} node={node} />);
+    expect(screen.getByTestId("code-editor").dataset.language).toBe("python");
   });
 
   it("shows entry dataset controls and links to the end node", () => {

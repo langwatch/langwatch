@@ -5,7 +5,9 @@ import { createStore, type StoreApi } from "zustand";
 import {
   removeInvalidEdges,
   store as storeCreator,
+  updateCodeClassName,
   updateInputFields,
+  updateOutputFields,
   type WorkflowStore,
 } from "../behavior/workflow-store.ts";
 
@@ -578,6 +580,48 @@ describe("workflowStoreCore", () => {
       expect(result[0]?.value).toContain(
         "def __call__(self, input: str = None, gate: bool = None):",
       );
+    });
+  });
+
+  describe("given a JavaScript code node", () => {
+    const jsParams = () => [
+      { identifier: "language", type: "str" as const, value: "javascript" },
+      {
+        identifier: "code",
+        type: "code" as const,
+        value: `export default async function ({ input }) {\n  return { output: "Hello" };\n}\n`,
+      },
+    ];
+    const codeOf = (params: { identifier: string; value?: unknown }[]) =>
+      params.find((p) => p.identifier === "code")?.value as string;
+
+    describe("when an input is added", () => {
+      it("adds it to the destructured parameter, not a Python signature", () => {
+        const result = updateInputFields(jsParams(), [
+          { identifier: "input", type: "str" },
+          { identifier: "context", type: "str" },
+        ]);
+        expect(codeOf(result)).toContain("export default async function ({ input, context })");
+        expect(codeOf(result)).not.toContain("from typing import Any");
+      });
+    });
+
+    describe("when an output is renamed", () => {
+      it("renames the returned key", () => {
+        const result = updateOutputFields(
+          jsParams(),
+          [{ identifier: "output", type: "str" }],
+          [{ identifier: "answer", type: "str" }],
+        );
+        expect(codeOf(result)).toContain('return { answer: "Hello" };');
+      });
+    });
+
+    describe("when the node is renamed", () => {
+      it("leaves the code untouched", () => {
+        const params = jsParams();
+        expect(updateCodeClassName(params, "code", "code_2")).toBe(params);
+      });
     });
   });
 

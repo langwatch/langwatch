@@ -116,7 +116,7 @@ export function CodeBlockEditor({
       <CodePreview
         code={code}
         language={language}
-        filename={`code.${language === "python" ? "py" : language}`}
+        filename={previewFileName({ language })}
         maxHeight="200px"
         lineNumbers
         compact
@@ -129,6 +129,7 @@ export function CodeBlockEditor({
           setCode={onChange}
           open={isModalOpen}
           onClose={handleClose}
+          language={language}
           inputs={inputs}
           outputs={outputs}
           viewStateKey={viewStateKey}
@@ -136,4 +137,10 @@ export function CodeBlockEditor({
       )}
     </Box>
   );
+}
+
+const PREVIEW_EXTENSIONS: Record<string, string> = { python: "py", javascript: "mjs" };
+
+function previewFileName({ language }: { language: string }) {
+  return `code.${PREVIEW_EXTENSIONS[language] ?? language}`;
 }

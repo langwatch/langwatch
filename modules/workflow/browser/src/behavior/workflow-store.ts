@@ -28,7 +28,8 @@ const snakeCaseToPascalCase = (value: string) =>
     .filter(Boolean)
     .map((part) => part[0]!.toUpperCase() + part.slice(1))
     .join("");
-import { rewriteCodeSignature } from "../model/code-signature.ts";
+import { codeLanguageOf } from "../model/code-language.ts";
+import { rewriteCodeSignature, rewriteJavaScriptSignature } from "../model/code-signature.ts";
 import {
   GATE_FIELD,
   GATE_HANDLE_ID,
@@ -319,6 +320,8 @@ export const updateCodeClassName = (
   _oldId: string,
   newId: string,
 ): Field[] => {
+  // A JavaScript entrypoint is an export, not a class named after the node.
+  if (codeLanguageOf({ parameters }) === "javascript") return parameters;
   return parameters.map((p) =>
     p.identifier === "code"
       ? {
@@ -342,12 +345,31 @@ export const updateInputFields = (parameters: Field[], inputs: Field[]) => {
     return parameters;
   }
 
+  const javascript = codeLanguageOf({ parameters }) === "javascript";
+  const rewrite = (code: string) =>
+    javascript ? rewriteJavaScriptSignature({ code, inputs }) : rewriteCodeSignature(code, inputs);
   return parameters.map((p) =>
-    p.identifier === "code" ? { ...p, value: rewriteCodeSignature(p.value as string, inputs) } : p,
+    p.identifier === "code" ? { ...p, value: rewrite(p.value as string) } : p,
   );
 };
 
 const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** Renames a key of the returned object literal, quoted or bare; shorthand keys are left alone. */
+function renameJavaScriptReturnKey({
+  code,
+  escapedId,
+  identifier,
+}: {
+  code: string;
+  escapedId: string;
+  identifier: string;
+}) {
+  return code.replace(
+    new RegExp(`(return\\s*\\{(?:[^}]*?,)?\\s*)(["']?)${escapedId}\\2(\\s*:)`),
+    `$1$2${identifier}$2$3`,
+  );
+}
 
 export const updateOutputFields = (
   parameters: Field[],
@@ -358,15 +380,18 @@ export const updateOutputFields = (
     return parameters;
   }
 
+  const javascript = codeLanguageOf({ parameters }) === "javascript";
   return parameters.map((p) => {
     if (p.identifier === "code") {
       let code = p.value as string;
       for (const [index, output] of outputs.entries()) {
         const escapedId = escapeRegex(previousOutputs[index]?.identifier ?? "");
-        code = code.replace(
-          new RegExp(`(return[\\s\\n\\t]+?\\{[^\\}]*?)"${escapedId}"`),
-          `$1"${output.identifier}"`,
-        );
+        code = javascript
+          ? renameJavaScriptReturnKey({ code, escapedId, identifier: output.identifier })
+          : code.replace(
+              new RegExp(`(return[\\s\\n\\t]+?\\{[^\\}]*?)"${escapedId}"`),
+              `$1"${output.identifier}"`,
+            );
       }
 
       return {

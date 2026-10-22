@@ -7,6 +7,8 @@ import type { editor } from "monaco-editor";
 import { registerCompletion } from "monacopilot";
 import { lazy, type ReactNode, Suspense, useEffect, useRef, useState } from "react";
 
+import { codeEditorLanguage } from "../../../model/code/code-editor-language.ts";
+import { registerJavaScriptLanguageService } from "../../../model/code/javascript-language-service.ts";
 import type {
   PythonField,
   PythonProviderHandle,
@@ -52,6 +54,7 @@ export function WorkflowCodeEditorModal({
   setCode,
   open,
   onClose,
+  language,
   inputs,
   outputs,
   viewStateKey,
@@ -64,6 +67,8 @@ export function WorkflowCodeEditorModal({
   setCode: (code: string) => void;
   open: boolean;
   onClose: () => void;
+  /** The code node's language; absent or anything but "javascript" edits as Python. */
+  language?: string;
   /** Stable id used to persist cursor/scroll state across modal opens. */
   viewStateKey?: string;
   projectId?: string;
@@ -72,6 +77,7 @@ export function WorkflowCodeEditorModal({
   renderModal: WorkflowCodeEditorModalHost;
 } & WorkflowCodeEditorContractProps) {
   const [localCode, setLocalCode] = useState(code);
+  const editorLanguage = codeEditorLanguage({ language });
   const editorRef = useRef<MonacoEditorInstance | null>(null);
   // Kept in component state (not just refs) so the status bar re-renders when
   // the editor mounts. The status bar subscribes to the editor + monaco events
@@ -180,7 +186,7 @@ export function WorkflowCodeEditorModal({
             }}
           >
             <LuFileCode size={14} />
-            <Text textStyle="mono">Code.py</Text>
+            <Text textStyle="mono">{editorLanguage.fileName}</Text>
           </HStack>
           <Box flex={1} />
           {renderSecretControls?.({ onInsertSecret: handleInsertSecret })}
@@ -208,8 +214,8 @@ export function WorkflowCodeEditorModal({
               onClose={onClose_}
               onSave={handleSave}
               onSaveAndClose={handleSaveAndClose}
-              language="python"
-              technologies={["python", "dspy"]}
+              language={editorLanguage.monacoLanguage}
+              technologies={editorLanguage.technologies}
               inputs={inputs}
               outputs={outputs}
               viewStateKey={viewStateKey}
@@ -230,7 +236,8 @@ export function WorkflowCodeEditorModal({
         <EditorStatusBar
           editor={editorInstance}
           monaco={monacoInstance}
-          language="python"
+          language={editorLanguage.label}
+          tabSize={editorLanguage.tabSize}
           onSave={handleSave}
           onSaveAndClose={handleSaveAndClose}
         />
@@ -480,16 +487,13 @@ export function WorkflowCodeEditor({
           editor.focus();
           onEditorMount?.(editor, monaco);
 
+          const contract = { secretNames, inputs: inputFields, outputs: outputFields };
+          providersRef.current?.dispose();
+          providersRef.current = null;
           if (language === "python") {
-            providersRef.current?.dispose();
-            providersRef.current = registerPythonProviders({
-              monaco,
-              contract: {
-                secretNames,
-                inputs: inputFields,
-                outputs: outputFields,
-              },
-            });
+            providersRef.current = registerPythonProviders({ monaco, contract });
+          } else if (language === "javascript") {
+            providersRef.current = registerJavaScriptLanguageService({ monaco, contract });
           }
 
           // React Flow's `panActivationKeyCode` defaults to `Space`, so it
@@ -541,7 +545,7 @@ export function WorkflowCodeEditor({
           // Show the parameter hint widget on call open and re-trigger between
           // arguments.
           parameterHints: { enabled: true, cycle: true },
-          tabSize: 4,
+          tabSize: codeEditorLanguage({ language }).tabSize,
           insertSpaces: true,
           padding: {
             top: 0,

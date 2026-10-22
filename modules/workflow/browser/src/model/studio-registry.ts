@@ -74,18 +74,28 @@ const signature: Signature = {
   })) as Field[],
 };
 
+/** New code nodes are JavaScript; a node without `language` predates it and stays Python. */
 const code: Code = {
   name: "Code",
-  description: "Python code block",
+  description: "JavaScript or Python code block",
   parameters: [
+    {
+      identifier: "language",
+      type: "str",
+      value: "javascript",
+    },
     {
       identifier: "code",
       type: "code",
-      value: `class Code:
-    def __call__(self, ${defaultInput?.identifier ?? "input"}: str = None):
-        # Your code goes here
+      value: `/**
+ * @param {Inputs} inputs
+ * @returns {Promise<Outputs>}
+ */
+export default async function ({ ${defaultInput?.identifier ?? "input"} }) {
+  // Your code goes here
 
-        return {"${defaultOutput?.identifier ?? "output"}": "Hello world!"}
+  return { ${defaultOutput?.identifier ?? "output"}: "Hello world!" };
+}
 `,
     },
   ],
