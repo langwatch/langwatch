@@ -59,6 +59,15 @@ const logger = createLogger("langwatch:api:traces");
  */
 const DEFAULT_TRACES_PAGE_SIZE = resolveRequestBound("tracesPageSizeMax", "FREE");
 
+/**
+ * The most traces one `includeSpans` search page answers. A page is built, serialised and
+ * buffered whole before the first byte is sent, and a trace with its spans is orders of
+ * magnitude larger than the trace row: at the enterprise bound of thousands of traces per page
+ * a single request could hold gigabytes (a prod api pod, 6 GiB limit, was OOM-killed with this
+ * request in flight, 2026-10-22). The caller pages on with `scrollId`, as for any page size.
+ */
+export const SEARCH_WITH_SPANS_PAGE_SIZE_MAX = 100;
+
 /** The credential a route reads: an API key's own id, and the member it acts as. */
 export const tracesRestCredential = defineMiddlewareContext(
   "tracesRestCredential",
@@ -242,7 +251,10 @@ async function searchTraces({
 
   logger.info({ projectId: scope.id }, "Searching traces for project");
 
-  const pageSize = rawPageSize ?? DEFAULT_TRACES_PAGE_SIZE;
+  const requestedPageSize = rawPageSize ?? DEFAULT_TRACES_PAGE_SIZE;
+  const pageSize = includeSpans
+    ? Math.min(requestedPageSize, SEARCH_WITH_SPANS_PAGE_SIZE_MAX)
+    : requestedPageSize;
   const protections = await app.resolveApiKeyProtections({
     projectId: scope.id,
     principal: caller.principal,
