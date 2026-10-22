@@ -8,6 +8,16 @@ import { defineTrpcContract, type Named } from "@langwatch/module";
 import { resolveRequestBound } from "@langwatch/plans";
 import { z } from "zod";
 
+import {
+  braidActivityInputSchema,
+  braidActivitySchema,
+  braidAttributeKeysInputSchema,
+  braidAttributeKeysSchema,
+  braidPreviewInputSchema,
+  braidPreviewSchema,
+  braidTestTraceInputSchema,
+  braidTestTraceSchema,
+} from "./features/braid/trace-braid.schemas.ts";
 import { explorerInstantEvalRunsSchema } from "./features/evaluation/trace-instant-eval.schemas.ts";
 import { FIRST_TRACE_RECORDED_EVENT_TYPE } from "./features/ingest/trace-project-milestones.events.ts";
 import { discoverResultSchema, facetValuesResultSchema } from "./features/list/trace-list-view.ts";
@@ -613,6 +623,26 @@ export const tracesTrpc = defineTrpcContract("traces")
     }),
   )
   .withOutput(tracesTraceEventsSchema)
+
+  /** ADR-183 §7: the braid dialog's counts, the owner's spans read under the owner's proof. */
+  .query("braidPreview")
+  .withInput(braidPreviewInputSchema)
+  .withOutput(braidPreviewSchema)
+
+  /** The owner's span attribute keys over the last 7 days, for the condition editor. */
+  .query("braidAttributeKeys")
+  .withInput(braidAttributeKeysInputSchema)
+  .withOutput(braidAttributeKeysSchema)
+
+  /** Each braid's spans in the last 24 hours, counted for the page's own project. */
+  .query("braidActivity")
+  .withInput(braidActivityInputSchema)
+  .withOutput(braidActivitySchema)
+
+  /** One reader trace with the owner's spans marked braided or not under a draft braid. */
+  .query("braidTestTrace")
+  .withInput(braidTestTraceInputSchema)
+  .withOutput(braidTestTraceSchema)
 
   .build();
 

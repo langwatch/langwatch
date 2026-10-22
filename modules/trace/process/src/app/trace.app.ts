@@ -78,6 +78,10 @@ import {
   type SharedTraceDto,
   type Span,
   type SpanDetail,
+  type BraidActivity,
+  type BraidAttributeKeys,
+  type BraidPreview,
+  type BraidTestTrace,
   type SpanLangwatchSignals,
   type SpanResourceInfo,
   type SpanSummaryRow,
@@ -352,6 +356,10 @@ import { ClickHouseTraceFullRecordRepository } from "../repositories/clickhouse/
 import type { StoredTraceSpan } from "../repositories/span-storage.repository.ts";
 import type { TraceAttributeSpendRepository } from "../repositories/trace-attribute-spend.repository.ts";
 import type { TraceAttributedRollupRepository } from "../repositories/trace-attributed-rollup.repository.ts";
+import {
+  EmptyTraceBraidReadsRepository,
+  type TraceBraidReadsRepository,
+} from "../repositories/trace-braid-reads.repository.ts";
 import type { TraceEvaluationRunsReadRepository } from "../repositories/trace-evaluation-runs.repository.ts";
 import type { TraceExistenceRepository } from "../repositories/trace-existence.repository.ts";
 import type { TraceModelSpendRepository } from "../repositories/trace-model-spend.repository.ts";
@@ -380,6 +388,7 @@ import { formatSpansDigest, formatSpansDigestBounded } from "../rules/trace-read
 import { buildTrackedEventSpan } from "../rules/tracked-event-span.rules.ts";
 import { PreconditionTraceDataService } from "../services/precondition-trace-data.service.ts";
 import { ScenarioRoleMetricsDerivationService } from "../services/scenario-role-metrics-derivation.service.ts";
+import { TraceBraidPreviewService } from "../services/trace-braid-preview.service.ts";
 import { TraceInstantEvalRunService } from "../services/trace-instant-eval-run.service.ts";
 import {
   TraceMetadataWriteService,
@@ -447,6 +456,7 @@ import {
   readDroppedFromParams,
   readPiiIncompleteFromParams,
   findTruncatedAttributesInParams,
+  mapLegacySpanSummaryToTreeNode,
   redactV2Content,
   toConversationContextTurn,
 } from "../rules/trace-read-mappers.rules.ts";
@@ -716,6 +726,8 @@ export interface TraceAppDependencies {
   annotationCommands?: TraceAnnotationCommands;
   traces: Readonly<{
     existence: TraceExistenceRepository;
+    /** The braid dialog's and Braids page's reads (ADR-183 §7); absent, they answer empty. */
+    braidReads?: TraceBraidReadsRepository | undefined;
     /** The legacy trace read the `traces.*` and `spans.*` surfaces call. */
     read: TraceLegacyRead;
     list: TracesListReader;
@@ -1190,6 +1202,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     return {
       traces: {
         existence: options.repositories.existence,
+        braidReads: options.repositories.braidReads,
         read,
         list,
         sessionGroups: SessionGroupsService.create({
@@ -1425,6 +1438,7 @@ export class TraceModule implements TraceApi, CollectorApp {
   #sharedRead: TraceSharedReadService | null;
   #braidPause: TraceBraidPauseService;
   #braidDetail: TraceBraidDetailService;
+  #braidPreview: TraceBraidPreviewService;
   #transcriptRead: TraceTranscriptReadService;
   #exportProgress: TraceExportProgressService;
   #tenantUpdates: TraceTenantUpdateStreamService;
@@ -1444,6 +1458,12 @@ export class TraceModule implements TraceApi, CollectorApp {
     this.#braidPause = TraceBraidPauseService.create({ plans: dependencies.braidPlans ?? null });
     this.#braidDetail = TraceBraidDetailService.create({
       directory: dependencies.braidDirectory ?? null,
+    });
+    this.#braidPreview = TraceBraidPreviewService.create({
+      reads: dependencies.traces.braidReads ?? EmptyTraceBraidReadsRepository.create(),
+      readerSpans: async (read) =>
+        (await this.readSpanSummaries(read)).map(mapLegacySpanSummaryToTreeNode),
+      braids: dependencies.braidDirectory?.authz ?? null,
     });
     this.#sharedRead =
       dependencies.protections && dependencies.shareReadLimiter && authorizeRead
@@ -1842,6 +1862,37 @@ export class TraceModule implements TraceApi, CollectorApp {
       turns,
       total: turns.length,
     };
+  }
+
+  previewBraid(input: {
+    ownerAuthorization: Authorization;
+    readerAuthorization: Authorization;
+    where?: string | undefined;
+    fromMs: number;
+  }): Promise<BraidPreview> {
+    return this.#braidPreview.preview(input);
+  }
+
+  readBraidAttributeKeys(input: { authorization: Authorization }): Promise<BraidAttributeKeys> {
+    return this.#braidPreview.attributeKeys(input);
+  }
+
+  readBraidActivity(input: {
+    projectId: string;
+    authorization: Authorization;
+    braidIds: readonly string[];
+  }): Promise<BraidActivity> {
+    return this.#braidPreview.activity(input);
+  }
+
+  readBraidTestTrace(input: {
+    ownerAuthorization: Authorization;
+    readerAuthorization: Authorization;
+    where?: string | undefined;
+    fromMs: number;
+    traceId: string;
+  }): Promise<BraidTestTrace> {
+    return this.#braidPreview.testTrace(input);
   }
 
   async readSpanDetailForViewer(input: {

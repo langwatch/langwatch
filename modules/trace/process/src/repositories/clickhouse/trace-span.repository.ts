@@ -470,6 +470,22 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
     };
   }
 
+  /** The tree's summary columns, for a statement of the module's own reading the same nodes. */
+  static readonly summarySelect: string = summarySelect;
+
+  /** Rows selected with `summarySelect`, mapped as the tree maps them. */
+  static summaryRecordsOf({
+    rows,
+    authorization,
+  }: {
+    rows: unknown;
+    authorization: Authorization;
+  }): TraceSpanSummaryRecord[] {
+    return spanSummaryRowsSchema
+      .parse(rows)
+      .map((row) => ClickHouseTraceSpanRepository.mapSummary(row, authorization));
+  }
+
   private static mapSummary(row: SpanSummaryRow, authorization: Authorization) {
     const explicitCost = ClickHouseTraceSpanRepository.numberOrNull(row.Cost);
     const cost = explicitCost !== null && explicitCost > 0 ? explicitCost : null;

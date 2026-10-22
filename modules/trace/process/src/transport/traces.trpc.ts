@@ -41,6 +41,9 @@ import {
 
 const evaluationsSchema = evaluationSchema.array();
 
+/** ADR-183 §9: the braid dialog's reads are Enterprise, named at the owner. */
+const braids = { feature: "BRAIDS" } as const;
+
 export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesTrpc> =
   defineTrpcRouter(TraceApi, tracesTrpc)
     .procedure("getAllForProject")
@@ -879,4 +882,45 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
         protections,
       );
     })
+
+    .procedure("braidPreview")
+    .withEntitlement("enterprise", braids)
+    .withPermission("traces:view", { via: "projectId" })
+    .withPermission("traces:view", { via: "projectId", field: "readerProjectId" })
+    .handle(({ app, input, authorizations }) =>
+      app.previewBraid({
+        ownerAuthorization: authorizations.projectId,
+        readerAuthorization: authorizations.readerProjectId,
+        where: input.where,
+        fromMs: input.fromMs,
+      }),
+    )
+
+    .procedure("braidAttributeKeys")
+    .withPermission("traces:view")
+    .handle(({ app, authorization }) => app.readBraidAttributeKeys({ authorization }))
+
+    .procedure("braidActivity")
+    .withPermission("traces:view")
+    .handle(({ app, input, authorization }) =>
+      app.readBraidActivity({
+        projectId: input.projectId,
+        authorization,
+        braidIds: input.braidIds,
+      }),
+    )
+
+    .procedure("braidTestTrace")
+    .withEntitlement("enterprise", braids)
+    .withPermission("traces:view", { via: "projectId" })
+    .withPermission("traces:view", { via: "projectId", field: "readerProjectId" })
+    .handle(({ app, input, authorizations }) =>
+      app.readBraidTestTrace({
+        ownerAuthorization: authorizations.projectId,
+        readerAuthorization: authorizations.readerProjectId,
+        where: input.where,
+        fromMs: input.fromMs,
+        traceId: input.traceId,
+      }),
+    )
     .build();

@@ -41,6 +41,7 @@ export * from "./features/list/trace-explorer-url-state.ts";
 export * from "./explorer/actions/index.ts";
 export * from "./features/evaluation/trace-instant-eval-chips.ts";
 export * from "./features/evaluation/trace-instant-eval.schemas.ts";
+export * from "./features/braid/trace-braid.schemas.ts";
 export * from "./features/query/trace-langwatch-ql-filter.ts";
 export * from "./features/query/trace-query-analysis.ts";
 export * from "./features/query/trace-query-ast.ts";

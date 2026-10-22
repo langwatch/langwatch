@@ -195,38 +195,65 @@ Feature: Braided spans in the reader's traces
 
   Rule: The braid dialog previews what the reader will see
 
-    @integration @unimplemented
+    @integration
     Scenario: The preview counts the reader's last 7 days of traces
       Given "orchestrator" recorded traces over the last 7 days, some holding matching "specialists" spans
       When an admin previews a condition for a braid from "specialists" into "orchestrator"
       Then the preview counts the traces that get every "specialists" span, some of them, or none
       And traces with nothing braided are still counted
 
-    @integration @unimplemented
+    @integration
     Scenario: The preview counts calls that would stay hidden for want of a valid signature
       When an admin previews a condition requiring signed calls
       Then the preview counts the otherwise matching calls whose signature is missing or invalid
 
-    @integration @unimplemented
+    @integration
     Scenario: Testing a trace renders it exactly as the reader will see it
       When an admin tests a condition against an "orchestrator" trace id
       Then that trace is returned with exactly the spans "orchestrator" would see under the condition
 
-    @integration @unimplemented
+    @unit
     Scenario: The preview asks for read access on both projects at the door
       Given an admin who can read "specialists" traces but not "orchestrator" traces
       When the admin previews a braid from "specialists" into "orchestrator"
       Then the preview is refused as a permission denial before it reads anything
       And the same holds the other way round
 
-    @integration @unimplemented
+    @unit
     Scenario: The preview needs the Enterprise plan
       Given an organisation below Enterprise
       When an admin previews a braid
       Then the preview is refused with enterprise_plan_required naming the Braids feature
 
-    @integration @unimplemented
+    @integration
     Scenario: The preview never reads a trace the reader does not have
       Given a "specialists" trace that "orchestrator" recorded nothing in
       When an admin previews or tests a condition that it matches
       Then that trace is neither counted nor returned
+
+    @unit
+    Scenario: The preview says when it counted only the newest traces
+      Given "orchestrator" recorded more than 10,000 traces over the last 7 days
+      When an admin previews a condition
+      Then the preview counts the newest 10,000 and says it was capped
+
+    @unit
+    Scenario: The preview shows why a condition is refused
+      When an admin previews a condition the compiler refuses
+      Then the preview names the construct, where it is and how to write it
+      And nothing is read
+
+    @integration
+    Scenario: The condition editor offers the owner's attribute keys
+      When an admin writes a condition for a braid from "specialists"
+      Then the editor offers the attribute keys of "specialists" spans over the last 7 days, most frequent first
+      And LangWatch's reserved keys are never offered
+
+    @integration
+    Scenario: Each Braids page counts a braid's last 24 hours with its own project's proof
+      Given a braid from "specialists" into "orchestrator"
+      When the "specialists" Braids page shows the braid
+      Then it counts the "specialists" spans that matched the braid in the last 24 hours
+      When the "orchestrator" Braids page shows the braid
+      Then it counts the braided spans "orchestrator" can see from "specialists" in the last 24 hours
+      And neither page reads the other project's data

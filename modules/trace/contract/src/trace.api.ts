@@ -39,6 +39,12 @@ import type {
   DeriveClaudeResponseContentResult,
 } from "./features/attribute/trace-canonicalisation.ts";
 import type {
+  BraidActivity,
+  BraidAttributeKeys,
+  BraidPreview,
+  BraidTestTrace,
+} from "./features/braid/trace-braid.schemas.ts";
+import type {
   TraceEditOverlayDto,
   TraceEditOverlayPatch,
 } from "./features/edit-overlay/trace-edit-overlay.contract.ts";
@@ -286,6 +292,29 @@ export interface TraceApi extends TraceOtlpIngestApi {
     authorization: Authorization;
     tenantId?: string | undefined;
   }): Promise<TracesConversationContext>;
+  /** ADR-183 §7: the reader's trace ids under its proof, then the owner's spans under its own. */
+  previewBraid(input: {
+    ownerAuthorization: Authorization;
+    readerAuthorization: Authorization;
+    where?: string | undefined;
+    fromMs: number;
+  }): Promise<BraidPreview>;
+  /** The owner's span attribute keys over the last 7 days, most frequent first. */
+  readBraidAttributeKeys(input: { authorization: Authorization }): Promise<BraidAttributeKeys>;
+  /** Each of the project's braids' spans in the last 24 hours, under the project's own proof. */
+  readBraidActivity(input: {
+    projectId: string;
+    authorization: Authorization;
+    braidIds: readonly string[];
+  }): Promise<BraidActivity>;
+  /** One reader trace, the owner's spans in it marked braided or not under the draft braid. */
+  readBraidTestTrace(input: {
+    ownerAuthorization: Authorization;
+    readerAuthorization: Authorization;
+    where?: string | undefined;
+    fromMs: number;
+    traceId: string;
+  }): Promise<BraidTestTrace>;
   /** One span's detail through the viewer's protections; refuses with `SpanNotFoundError`. */
   readSpanDetailForViewer(input: {
     projectId: string;
