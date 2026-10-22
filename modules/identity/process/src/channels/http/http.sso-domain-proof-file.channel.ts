@@ -67,9 +67,9 @@ class ProofFileDowngradedError extends Error {
 }
 
 /**
- * Reading a domain's proof out of a file it serves. `@langwatch/egress` is
- * what makes it safe: every hop is judged and the socket pinned to the
- * judged address, so a name cannot answer differently for the connection.
+ * Reading a domain's proof out of a file it serves. `@langwatch/egress` judges
+ * every hop and pins it to the judged address, unless the operator's proxy
+ * carries it: that proxy then resolves the name.
  */
 export class HttpsSsoDomainProofFileChannel implements SsoDomainProofFileChannel {
   private readonly validate: SsrfUrlValidator;

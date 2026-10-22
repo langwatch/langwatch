@@ -64822,9 +64822,10 @@ If your installation reaches the internet only through an HTTP proxy, set the
 standard `HTTPS_PROXY` (or `HTTP_PROXY`) and `NO_PROXY` variables on the app and
 the workers. LangWatch fetches the discovery document, and the domain
 verification file, through the proxy. It still checks that the address is
-public first, and checks every redirect again. Hosts listed in `NO_PROXY` are
-reached directly, so list an identity provider that runs inside your network
-there.
+public first, and checks every redirect again. `NO_PROXY` only chooses a
+direct connection: it does not lift that check. An identity provider inside
+your network needs its origin in `SSO_TRUSTED_IDP_ORIGINS`, and its host in
+`NO_PROXY` so it is reached directly rather than through the proxy.
 
 Register the client with the authorization code flow and the `openid`,
 `email` and `profile` scopes. GitHub sign-in is OAuth without OpenID Connect,
@@ -65416,7 +65417,7 @@ spec:
   source:
     repoURL: https://langwatch.github.io/langwatch
     chart: langwatch
-    targetRevision: 3.20.1 # x-release-please-version
+    targetRevision: 3.21.0 # x-release-please-version
     helm:
       releaseName: langwatch
       values: |
@@ -65471,7 +65472,7 @@ spec:
   sources:
     - repoURL: https://langwatch.github.io/langwatch
       chart: langwatch
-      targetRevision: 3.20.1 # x-release-please-version
+      targetRevision: 3.21.0 # x-release-please-version
       helm:
         releaseName: langwatch
         valueFiles:
@@ -65875,7 +65876,7 @@ For air-gapped or private environments, mirror the images to your own registry:
 ```bash
 # The release you are mirroring. Every tag below follows it, so set it once.
 # Pick the version from https://github.com/langwatch/langwatch/releases
-VERSION=3.20.1 # x-release-please-version
+VERSION=3.21.0 # x-release-please-version
 REGISTRY=registry.example.com
 
 for image in langwatch langwatch_nlp langevals; do
@@ -65891,13 +65892,13 @@ Then configure the Helm chart, giving every tag the version you mirrored:
 images:
   app:
     repository: registry.example.com/langwatch/langwatch
-    tag: "3.20.1" # x-release-please-version
+    tag: "3.21.0" # x-release-please-version
   langwatch_nlp:
     repository: registry.example.com/langwatch/langwatch_nlp
-    tag: "3.20.1" # x-release-please-version
+    tag: "3.21.0" # x-release-please-version
   langevals:
     repository: registry.example.com/langwatch/langevals
-    tag: "3.20.1" # x-release-please-version
+    tag: "3.21.0" # x-release-please-version
 ```
 
 Mirror and override the bundled services the same way: `gateway.image.repository`, `langyagent.image.repository`, `clickhouse.image.repository`, `postgresql.image.repository`, `redis.image.repository`, `prometheus.server.image.repository`, `cronjobs.image.repository` and `app.storedObjects.localFilesystem.serializeUpgradesImage` (the image the stored-objects upgrade hooks run).
@@ -70685,7 +70686,7 @@ helm search repo langwatch/langwatch --versions
 # x-release-please-start-version
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
-  --version 3.20.1 \
+  --version 3.21.0 \
   -f values-production.yaml
 # x-release-please-end
 ```

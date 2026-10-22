@@ -314,12 +314,18 @@ describe("given a deployment that reaches the internet only through an outbound 
 
   /** @scenario "Issuer discovery leaves through the deployment's outbound proxy" */
   it("never reaches the proxy for an issuer the fence refuses", async () => {
-    const { channel, asked } = channelAnswering(
-      async () => respond(200, DISCOVERY_DOCUMENT),
-      async () => {
+    const asked: string[] = [];
+    const channel = HttpsSsoIssuerDiscoveryChannel.create({
+      policy: POLICY,
+      proxy,
+      validate: async () => {
         throw new Error("resolves to a private address");
       },
-    );
+      fetchValidated: async (validated) => {
+        asked.push(validated.originalUrl);
+        return respond(200, DISCOVERY_DOCUMENT);
+      },
+    });
 
     await expect(channel.discover({ issuer: ISSUER })).resolves.toMatchObject({
       reachable: false,
