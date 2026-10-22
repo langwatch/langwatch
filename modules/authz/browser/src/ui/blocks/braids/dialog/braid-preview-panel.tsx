@@ -1,5 +1,6 @@
 // What the reader will see: its traces over 7 days getting every, some or none of the owner's
-// spans, the calls held back for want of a signature, and one tested trace, seen by you only.
+// spans with the pair's live braids and this one, the spans this one adds, the calls held back for
+// want of a signature, an example trace and one tested trace, seen by you only.
 
 import { Banner } from "@langwatch/design-system/banner";
 import {
@@ -12,7 +13,7 @@ import {
   Stack,
   Text,
 } from "@langwatch/design-system/primitives";
-import { ShieldCheck, Users } from "lucide-react";
+import { Plus, ShieldCheck, Users } from "lucide-react";
 import { useState } from "react";
 
 import type { TestTraceRow } from "../../../../model/braids/braid-draft.ts";
@@ -30,7 +31,15 @@ export type BraidPreviewPanelProps = {
   readerName: string | undefined;
   preview:
     | { state: "no-reader" | "refused" | "loading" | "error" }
-    | { state: "ready"; traces: BraidPreviewCounts; unsignedHidden: number | null };
+    | {
+        state: "ready";
+        traces: BraidPreviewCounts;
+        unsignedHidden: number | null;
+        /** Spans this braid shows beyond the pair's other live braids; null when it has none. */
+        added: { spans: number; braids: number } | null;
+        /** The newest counted trace that gets a braided span; null when none does. */
+        example: TestTraceRow[] | null;
+      };
   unsignedWarning: boolean;
   viewers: string | undefined;
   test:
@@ -103,6 +112,55 @@ function Counts({
   );
 }
 
+/** A trace as the reader will see it: braided spans marked, the owner's others struck through. */
+function TraceRows({
+  rows,
+  note,
+  testId,
+  rowTestId,
+}: {
+  rows: TestTraceRow[];
+  note: string;
+  testId: string;
+  rowTestId: string;
+}) {
+  return (
+    <Stack gap={1} padding={3} borderWidth="1px" borderRadius="md" data-testid={testId}>
+      <Text fontSize="xs" color="fg.subtle">
+        {note}
+      </Text>
+      {rows.map((row) => (
+        <HStack
+          key={row.spanId}
+          gap={2}
+          paddingLeft={`${row.depth * 12}px`}
+          data-kind={row.kind}
+          data-testid={rowTestId}
+        >
+          <Text
+            fontFamily="mono"
+            fontSize="sm"
+            color={row.kind === "withheld" ? "fg.subtle" : "fg"}
+            textDecoration={row.kind === "withheld" ? "line-through" : undefined}
+          >
+            {row.name}
+          </Text>
+          {row.kind === "braided" ? (
+            <Badge size="sm" colorPalette="orange">
+              Braided
+            </Badge>
+          ) : null}
+          {row.kind === "withheld" ? (
+            <Text fontSize="xs" color="fg.subtle">
+              Never sent
+            </Text>
+          ) : null}
+        </HStack>
+      ))}
+    </Stack>
+  );
+}
+
 function TestTrace({ test, onTest }: Pick<BraidPreviewPanelProps, "test" | "onTest">) {
   const [traceId, setTraceId] = useState("");
   return (
@@ -147,45 +205,12 @@ function TestTrace({ test, onTest }: Pick<BraidPreviewPanelProps, "test" | "onTe
         </Text>
       ) : null}
       {test.state === "ready" ? (
-        <Stack
-          gap={1}
-          padding={3}
-          borderWidth="1px"
-          borderRadius="md"
-          data-testid="braid-test-trace"
-        >
-          <Text fontSize="xs" color="fg.subtle">
-            Only you see this test; nothing is saved.
-          </Text>
-          {test.rows.map((row) => (
-            <HStack
-              key={row.spanId}
-              gap={2}
-              paddingLeft={`${row.depth * 12}px`}
-              data-kind={row.kind}
-              data-testid="braid-test-span"
-            >
-              <Text
-                fontFamily="mono"
-                fontSize="sm"
-                color={row.kind === "withheld" ? "fg.subtle" : "fg"}
-                textDecoration={row.kind === "withheld" ? "line-through" : undefined}
-              >
-                {row.name}
-              </Text>
-              {row.kind === "braided" ? (
-                <Badge size="sm" colorPalette="orange">
-                  Braided
-                </Badge>
-              ) : null}
-              {row.kind === "withheld" ? (
-                <Text fontSize="xs" color="fg.subtle">
-                  Never sent
-                </Text>
-              ) : null}
-            </HStack>
-          ))}
-        </Stack>
+        <TraceRows
+          rows={test.rows}
+          note="Only you see this test; nothing is saved."
+          testId="braid-test-trace"
+          rowTestId="braid-test-span"
+        />
       ) : null}
     </Stack>
   );
@@ -225,11 +250,30 @@ export function BraidPreviewPanel(props: BraidPreviewPanelProps) {
             readerName={props.readerName ?? "The project"}
             traces={preview.traces}
           />
+          {preview.added ? (
+            <HStack gap={2} fontSize="sm" color="fg.muted" data-testid="braid-preview-added">
+              <Plus size={14} aria-hidden />
+              <Text>{addedPhrase({ ...preview.added, ownerName: props.ownerName })}</Text>
+            </HStack>
+          ) : null}
           {preview.unsignedHidden !== null && preview.unsignedHidden > 0 ? (
             <HStack gap={2} fontSize="sm" color="fg.muted" data-testid="braid-preview-unsigned">
               <ShieldCheck size={14} aria-hidden />
               <Text>{unsignedHiddenPhrase(preview.unsignedHidden)}</Text>
             </HStack>
+          ) : null}
+          {preview.example ? (
+            <Stack gap={2}>
+              <Text fontWeight="medium" fontSize="sm">
+                An example trace
+              </Text>
+              <TraceRows
+                rows={preview.example}
+                note="The newest trace in the last 7 days that gets spans. Only you see it."
+                testId="braid-preview-example"
+                rowTestId="braid-example-span"
+              />
+            </Stack>
           ) : null}
         </>
       ) : null}
@@ -247,6 +291,22 @@ export function BraidPreviewPanel(props: BraidPreviewPanelProps) {
       ) : null}
     </Stack>
   );
+}
+
+/** What this braid adds to the pair's other live braids, in spans. */
+function addedPhrase({
+  spans,
+  braids,
+  ownerName,
+}: {
+  spans: number;
+  braids: number;
+  ownerName: string;
+}): string {
+  const others = braids === 1 ? "the other braid" : `the ${count(braids)} other braids`;
+  const more =
+    spans === 0 ? "no more spans" : `${count(spans)} more ${spans === 1 ? "span" : "spans"}`;
+  return `This braid shows ${more} than ${others} from ${ownerName} alone.`;
 }
 
 /** `unsignedHidden` counts spans, not calls. */

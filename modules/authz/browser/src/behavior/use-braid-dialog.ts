@@ -54,13 +54,25 @@ export function useOwnerAttributeKeys({ projectId }: { projectId: string }) {
   return traceClient.traces.braidAttributeKeys.useQuery({ projectId }, { retry: false });
 }
 
-/** The preview of the draft once typing settles; not asked while the condition is refused. */
-export function useBraidPreview({ projectId, draft }: { projectId: string; draft: BraidDraft }) {
+/**
+ * The preview of the draft once typing settles; not asked while the condition is refused. An
+ * edited braid is named, so the preview counts the draft in its place rather than beside it.
+ */
+export function useBraidPreview({
+  projectId,
+  draft,
+  braidId,
+}: {
+  projectId: string;
+  draft: BraidDraft;
+  braidId: string | undefined;
+}) {
   const asked = {
     projectId,
     readerProjectId: draft.readerProjectId ?? "",
     where: draft.where,
     fromMs: draft.fromMs,
+    ...(braidId ? { braidId } : {}),
   };
   const settled = useSettled({
     value: asked,
@@ -78,15 +90,20 @@ export function useBraidPreview({ projectId, draft }: { projectId: string; draft
   return { ...query, isSettling: JSON.stringify(asked) !== JSON.stringify(settled) };
 }
 
-/** One trace as the reader would see it under the draft; asked only when a trace id is tested. */
+/**
+ * One trace as the reader would see it with the pair's live braids and the draft; asked only when
+ * a trace id is tested. An edited braid is named, so the draft is read in its place.
+ */
 export function useBraidTestTrace({
   projectId,
   draft,
   traceId,
+  braidId,
 }: {
   projectId: string;
   draft: BraidDraft;
   traceId: string | undefined;
+  braidId: string | undefined;
 }) {
   const where = draft.where.trim();
   return traceClient.traces.braidTestTrace.useQuery(
@@ -96,6 +113,7 @@ export function useBraidTestTrace({
       fromMs: draft.fromMs,
       traceId: traceId ?? "",
       ...(where ? { where } : {}),
+      ...(braidId ? { braidId } : {}),
     },
     {
       enabled: !!traceId && !!draft.readerProjectId && checkCondition(draft.where).ok,
@@ -114,8 +132,10 @@ const SAVE_REFUSALS: Readonly<Record<string, string>> = {
   braid_across_organizations: "Both projects must be in the same organisation.",
   braid_condition_syntax: "The condition can't be read. Check it and try again.",
   braid_condition_unsupported: "The condition uses something braids don't support yet.",
-  braid_condition_too_large: "The condition is too long. Shorten it and try again.",
-  braid_condition_limit_reached: "The condition has too many comparisons. Simplify it.",
+  braid_condition_too_large:
+    "The condition is too long or has too many comparisons. Simplify it and try again.",
+  braid_condition_limit_reached:
+    "The project you're braiding into already receives the most different conditions it can. Reuse a condition one of its braids has, or remove a braid into it.",
   braid_not_on_project: "This braid is no longer on this project. Close and open it again.",
 };
 

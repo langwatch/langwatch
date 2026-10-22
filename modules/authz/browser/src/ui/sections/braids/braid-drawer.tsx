@@ -87,10 +87,13 @@ function previewStateOf({
   if (!conditionOk || preview.data?.refusal) return { state: "refused" };
   if (preview.isError) return { state: "error" };
   if (!preview.data || preview.isSettling) return { state: "loading" };
+  const { live, spans, example } = preview.data;
   return {
     state: "ready",
     traces: preview.data.traces,
     unsignedHidden: preview.data.unsignedHidden,
+    added: live.braids > 0 ? { spans: Math.max(0, spans - live.spans), braids: live.braids } : null,
+    example: example ? testTraceRows(example.nodes) : null,
   };
 }
 
@@ -141,8 +144,13 @@ export function BraidDrawer({ projectId, editing, braidsInto, onClose }: BraidDr
   const attributeKeys = useOwnerAttributeKeys({ projectId });
   const signingKeys = useReaderSigningKeys({ readerProjectId: draft.readerProjectId });
   const viewers = useTraceViewers({ readerProjectId: draft.readerProjectId });
-  const preview = useBraidPreview({ projectId, draft });
-  const tested = useBraidTestTrace({ projectId, draft, traceId: testedTraceId });
+  const preview = useBraidPreview({ projectId, draft, braidId: editing?.braidId });
+  const tested = useBraidTestTrace({
+    projectId,
+    draft,
+    traceId: testedTraceId,
+    braidId: editing?.braidId,
+  });
   const save = useSaveBraid({ projectId, braidId: editing?.braidId, onSaved: onClose });
 
   const owner = braidProject({ projectId, projects });

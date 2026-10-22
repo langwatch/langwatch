@@ -17,7 +17,7 @@ vi.mock("../../../../behavior/authz-api.ts", async () => ({
 
 // Isolation is off: reload so the screen binds this file's mocks, not a sibling suite's.
 vi.resetModules();
-const { braidsFake, braidTraces, liveBraid } = await import("./braids-api-fake.ts");
+const { braidsFake, braidTraces, liveBraid, previewOf } = await import("./braids-api-fake.ts");
 const { FakeAuthzHost, renderWithAuthzHost } = await import("../../../../testing.tsx");
 const { default: BraidsScreen } = await import("../braids.screen.tsx");
 
@@ -74,13 +74,28 @@ beforeEach(() => {
   state.create.mockClear();
   state.change.mockClear();
   braidTraces.state.attributeKeys = [{ key: "orchestrator", spanCount: 4210 }];
-  braidTraces.state.preview = {
-    refusal: null,
+  braidTraces.state.preview = previewOf({
     traces: { every: 1200, some: 300, none: 3402, total: 4902, capped: false },
-    unsignedHidden: null,
-  };
+  });
   braidTraces.state.previewAsked.mockClear();
+  braidTraces.state.testTraceAsked.mockClear();
 });
+
+/** A span of a trace as the trace module's braid reads return it. */
+function spanNode(spanId: string, name: string, extra: object = {}) {
+  return {
+    spanId,
+    parentSpanId: spanId === "s-1" ? null : "s-1",
+    name,
+    type: null,
+    startTimeMs: Number(spanId.slice(2)),
+    endTimeMs: 10,
+    durationMs: 1,
+    status: "ok",
+    model: null,
+    ...extra,
+  };
+}
 
 describe("the braid drawer", () => {
   describe("when ana starts a new braid", () => {
@@ -148,6 +163,58 @@ describe("the braid drawer", () => {
       await pickReader(user);
 
       expect(screen.queryByTestId("braid-pair-braids")).toBeNull();
+    });
+
+    describe("and ana previews another braid on the same pair", () => {
+      /** @scenario A further braid on the same pair says what it adds */
+      it("counts what the reader will see with both braids and says how many more spans it shows", async () => {
+        braidsFake.state.project = {
+          intoOtherProjects: [liveBraid({ expiresAtMs: null })],
+          fromOtherProjects: [],
+        };
+        braidTraces.state.preview = previewOf({
+          traces: { every: 1200, some: 300, none: 3402, total: 4902, capped: false },
+          spans: 9800,
+          live: {
+            braids: 1,
+            traces: { every: 900, some: 200, none: 3802, total: 4902, capped: false },
+            spans: 7400,
+          },
+        });
+        const { user } = openDrawer();
+        await pickReader(user);
+        await writeCondition(user, 'attributes["team"] == "billing"');
+
+        expect(await screen.findByTestId("braid-preview-counts")).toHaveTextContent(
+          "1,500 of 4,902 traces get spans",
+        );
+        expect(screen.getByTestId("braid-preview-added")).toHaveTextContent(
+          "This braid shows 2,400 more spans than the other braid from specialists alone.",
+        );
+        expect(braidTraces.state.previewAsked).toHaveBeenLastCalledWith(
+          expect.not.objectContaining({ braidId: expect.anything() }),
+        );
+      });
+
+      it("says when it shows no spans the other braid does not", async () => {
+        braidsFake.state.project = {
+          intoOtherProjects: [liveBraid({ expiresAtMs: null })],
+          fromOtherProjects: [],
+        };
+        const traces = { every: 1200, some: 300, none: 3402, total: 4902, capped: false };
+        braidTraces.state.preview = previewOf({
+          traces,
+          spans: 7400,
+          live: { braids: 1, traces, spans: 7400 },
+        });
+        const { user } = openDrawer();
+        await pickReader(user);
+        await writeCondition(user, CONDITION);
+
+        expect(await screen.findByTestId("braid-preview-added")).toHaveTextContent(
+          "This braid shows no more spans than the other braid from specialists alone.",
+        );
+      });
     });
   });
 
@@ -285,12 +352,12 @@ describe("the braid drawer", () => {
   });
 
   describe("when ana stops typing a supported condition", () => {
+    /** @scenario The preview counts what the reader will see as the condition changes */
     it("counts the reader's traces getting every, some or none, and the unsigned calls", async () => {
-      braidTraces.state.preview = {
-        refusal: null,
+      braidTraces.state.preview = previewOf({
         traces: { every: 1200, some: 300, none: 3402, total: 4902, capped: true },
         unsignedHidden: 37,
-      };
+      });
       const { user } = openDrawer();
       await pickReader(user);
       await writeCondition(user, `${CONDITION} and Verified("orchestrator")`);
@@ -305,14 +372,48 @@ describe("the braid drawer", () => {
       expect(braidTraces.state.previewAsked).toHaveBeenLastCalledWith(
         expect.objectContaining({ projectId: "p-spec", readerProjectId: "p-orch" }),
       );
+      expect(screen.queryByTestId("braid-preview-added")).toBeNull();
+    });
+
+    /** @scenario The preview counts what the reader will see as the condition changes */
+    it("shows an example trace, the braided spans marked and the rest struck through, for ana only", async () => {
+      braidTraces.state.preview = previewOf({
+        traces: { every: 1200, some: 300, none: 3402, total: 4902, capped: false },
+        example: {
+          traceId: "4bf92f3577b34da6",
+          nodes: [
+            spanNode("s-1", "handle_message"),
+            spanNode("s-2", "payments_agent", { ownerProjectId: "p-spec", braided: true }),
+            spanNode("s-3", "fraud_check", { ownerProjectId: "p-spec", braided: false }),
+          ],
+        },
+      });
+      const { user } = openDrawer();
+      await pickReader(user);
+      await writeCondition(user, CONDITION);
+
+      const example = await screen.findByTestId("braid-preview-example");
+      expect(example).toHaveTextContent("Only you see it.");
+      const spans = within(example).getAllByTestId("braid-example-span");
+      expect(spans.map((row) => row.dataset.kind)).toEqual(["own", "braided", "withheld"]);
+      expect(within(spans[2] as HTMLElement).getByText("fraud_check")).toHaveStyle({
+        textDecoration: "line-through",
+      });
+    });
+
+    it("shows no example when no trace gets spans", async () => {
+      const { user } = openDrawer();
+      await pickReader(user);
+      await writeCondition(user, CONDITION);
+
+      await screen.findByTestId("braid-preview-counts");
+      expect(screen.queryByTestId("braid-preview-example")).toBeNull();
     });
 
     it("says the reader has no traces to count instead of counting none of none", async () => {
-      braidTraces.state.preview = {
-        refusal: null,
+      braidTraces.state.preview = previewOf({
         traces: { every: 0, some: 0, none: 0, total: 0, capped: false },
-        unsignedHidden: null,
-      };
+      });
       const { user } = openDrawer();
       await pickReader(user);
       await writeCondition(user, CONDITION);
@@ -326,24 +427,12 @@ describe("the braid drawer", () => {
   describe("when ana tests a trace id", () => {
     /** @scenario Testing a trace shows it exactly as the reader will see it */
     it("shows the reader's spans, the braided ones marked and the rest struck through", async () => {
-      const span = (spanId: string, name: string, extra: object = {}) => ({
-        spanId,
-        parentSpanId: spanId === "s-1" ? null : "s-1",
-        name,
-        type: null,
-        startTimeMs: Number(spanId.slice(2)),
-        endTimeMs: 10,
-        durationMs: 1,
-        status: "ok",
-        model: null,
-        ...extra,
-      });
       braidTraces.state.testTrace = {
         found: true,
         nodes: [
-          span("s-1", "handle_message"),
-          span("s-2", "payments_agent", { ownerProjectId: "p-spec", braided: true }),
-          span("s-3", "fraud_check", { ownerProjectId: "p-spec", braided: false }),
+          spanNode("s-1", "handle_message"),
+          spanNode("s-2", "payments_agent", { ownerProjectId: "p-spec", braided: true }),
+          spanNode("s-3", "fraud_check", { ownerProjectId: "p-spec", braided: false }),
         ],
       };
       const { user } = openDrawer();
@@ -352,6 +441,9 @@ describe("the braid drawer", () => {
       await user.type(screen.getByRole("textbox", { name: "Trace id" }), "4bf92f3577b34da6");
       await user.click(screen.getByTestId("braid-test"));
 
+      expect(braidTraces.state.testTraceAsked).toHaveBeenLastCalledWith(
+        expect.not.objectContaining({ braidId: expect.anything() }),
+      );
       const trace = await screen.findByTestId("braid-test-trace");
       expect(trace).toHaveTextContent("Only you see this test; nothing is saved.");
       const spans = within(trace).getAllByTestId("braid-test-span");
@@ -408,6 +500,21 @@ describe("the braid drawer", () => {
         ).toBeInTheDocument();
         expect(host.queries).toEqual([]);
       });
+
+      it("says the reader holds the most different conditions it can, not that this one is too big", async () => {
+        braidsFake.state.saveError = { code: "braid_condition_limit_reached", httpStatus: 422 };
+        const { host, user } = openDrawer();
+        await pickReader(user);
+        await user.click(screen.getByTestId("braid-save"));
+
+        expect(
+          screen.getByText(
+            "The project you're braiding into already receives the most different conditions it can. Reuse a condition one of its braids has, or remove a braid into it.",
+          ),
+        ).toBeInTheDocument();
+        expect(screen.queryByText(/too many comparisons/)).toBeNull();
+        expect(host.queries).toEqual([]);
+      });
     });
   });
 
@@ -427,6 +534,32 @@ describe("the braid drawer", () => {
 
       expect(braidsFake.state.change).toHaveBeenCalledWith(
         expect.objectContaining({ braidId: "b-1", readerProjectId: "p-orch", where: changed }),
+      );
+    });
+
+    /** @scenario Testing a trace shows it exactly as the reader will see it */
+    it("tests a trace with the draft in place of the braid it edits", async () => {
+      braidsFake.state.project = { intoOtherProjects: [liveBraid()], fromOtherProjects: [] };
+      const { user } = openDrawer({ braid: "b-1" });
+
+      await user.type(screen.getByRole("textbox", { name: "Trace id" }), "4bf92f3577b34da6");
+      await user.click(screen.getByTestId("braid-test"));
+
+      expect(braidTraces.state.testTraceAsked).toHaveBeenLastCalledWith(
+        expect.objectContaining({ braidId: "b-1", traceId: "4bf92f3577b34da6" }),
+      );
+    });
+
+    /** @scenario A further braid on the same pair says what it adds */
+    it("asks the preview to count the draft in place of the braid it edits", async () => {
+      braidsFake.state.project = { intoOtherProjects: [liveBraid()], fromOtherProjects: [] };
+      const { user } = openDrawer({ braid: "b-1" });
+      await writeCondition(user, `${CONDITION} and attributes["team"] == "billing"`);
+
+      await waitFor(() =>
+        expect(braidTraces.state.previewAsked).toHaveBeenLastCalledWith(
+          expect.objectContaining({ braidId: "b-1", readerProjectId: "p-orch" }),
+        ),
       );
     });
   });

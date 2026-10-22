@@ -33,17 +33,23 @@ export type BraidsApiState = {
   saveError: unknown;
 };
 
+type PreviewTraces = { every: number; some: number; none: number; total: number; capped: boolean };
+
 /** The trace module's braid reads, as the Braids screens use them. */
 export type BraidTraceState = {
   preview: {
     refusal: null;
-    traces: { every: number; some: number; none: number; total: number; capped: boolean };
+    traces: PreviewTraces;
+    spans: number;
+    live: { braids: number; traces: PreviewTraces; spans: number };
     unsignedHidden: number | null;
+    example: { traceId: string; nodes: unknown[] } | null;
   };
   previewAsked: Mock<(input: unknown) => void>;
   attributeKeys: { key: string; spanCount: number }[];
   activity: { braidId: string; spanCount: number }[] | undefined;
   testTrace: { found: boolean; nodes: unknown[] };
+  testTraceAsked: Mock<(input: unknown) => void>;
 };
 
 export function braidsApiFake() {
@@ -128,15 +134,12 @@ export function braidsApiFake() {
 
 export function braidTraceFake() {
   const state: BraidTraceState = {
-    preview: {
-      refusal: null,
-      traces: { every: 0, some: 0, none: 0, total: 0, capped: false },
-      unsignedHidden: null,
-    },
+    preview: previewOf({ traces: { every: 0, some: 0, none: 0, total: 0, capped: false } }),
     previewAsked: vi.fn(),
     attributeKeys: [],
     activity: [],
     testTrace: { found: false, nodes: [] },
+    testTraceAsked: vi.fn(),
   };
   const asked = (read: () => unknown, record?: Mock<(input: unknown) => void>) => ({
     useQuery: (input: unknown, options?: { enabled?: boolean }) => {
@@ -150,10 +153,24 @@ export function braidTraceFake() {
       braidPreview: asked(() => state.preview, state.previewAsked),
       braidAttributeKeys: asked(() => ({ keys: state.attributeKeys })),
       braidActivity: asked(() => (state.activity ? { activity: state.activity } : undefined)),
-      braidTestTrace: asked(() => state.testTrace),
+      braidTestTrace: asked(() => state.testTrace, state.testTraceAsked),
     },
   };
   return { traceClient, state };
+}
+
+/** A preview answer with no live braids on the pair and no example unless given. */
+export function previewOf(
+  overrides: Partial<BraidTraceState["preview"]> & { traces: PreviewTraces },
+): BraidTraceState["preview"] {
+  return {
+    refusal: null,
+    spans: 0,
+    live: { braids: 0, traces: { ...overrides.traces, every: 0, some: 0 }, spans: 0 },
+    unsignedHidden: null,
+    example: null,
+    ...overrides,
+  };
 }
 
 export const braidTraces = braidTraceFake();

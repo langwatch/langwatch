@@ -2,8 +2,7 @@
 # (ADR-183). Design: dev/docs/plans/braids/braids-prototype.html, steps 1 to 4, 7 and 9.
 # The braid's rules live in braids.feature; this file is what the screen offers and says.
 #
-# Bound by rendered integration tests. Two dialog scenarios stay @unimplemented: the preview
-# wire carries no example trace and no "what a further braid adds" (only Test a trace shows one).
+# Bound by rendered integration tests.
 
 @authz @braids @ui
 Feature: The Braids screen
@@ -48,9 +47,7 @@ Feature: The Braids screen
       Then the dialog says "orchestrator" already sees spans from 1 braid from "specialists"
       And it shows that braid's condition and data window above the condition
 
-    # Unimplemented: "how many more spans" needs the trace preview to count with both braids; the
-    # dialog lists the pair's braids today (the scenario above).
-    @integration @unimplemented
+    @integration
     Scenario: A further braid on the same pair says what it adds
       Given a live braid from "specialists" into "orchestrator"
       When ana previews another braid from "specialists" into "orchestrator"
@@ -81,10 +78,7 @@ Feature: The Braids screen
       Given "orchestrator" has no signing key
       When ana turns on only signed calls
       Then the switch says "orchestrator" does not sign its calls yet and links to its signing keys
-
-    # Unimplemented: the preview read returns counts but no example trace, so the last step has no
-    # data yet; the counts and the hidden spans are bound under "when ana stops typing" in the drawer test.
-    @integration @unimplemented
+    @integration
     Scenario: The preview counts what the reader will see as the condition changes
       When ana stops typing a supported condition
       Then the preview counts "orchestrator" traces over the last 7 days that get every, some or none of their "specialists" spans
