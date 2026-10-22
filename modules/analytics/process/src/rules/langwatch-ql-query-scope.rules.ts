@@ -99,17 +99,21 @@ function findWithNames(statements: readonly SqlAstNode[]): ReadonlySet<string> {
 }
 
 /**
- * Refuses a `WITH` name spelt like a catalogued view. The names are gathered across the whole
- * statement, not per scope, so one declared in a subquery would hide the view a sibling reads.
+ * Refuses a `WITH` name spelt like a catalogued view on a read the member windows narrow: names
+ * are gathered statement-wide, so one in a subquery would hide the view a sibling reads. A plain
+ * project's row policy bounds it alone, so there such a name stays the `WITH`.
  * @throws {LangWatchQLShadowedViewError} naming the views shadowed.
  */
 function assertNoShadowedView({
   withNames,
   views,
+  windows,
 }: {
   withNames: ReadonlySet<string>;
   views: readonly LangWatchQLViewDefinition[];
+  windows: ReadonlyMap<string, string> | undefined;
 }): void {
+  if (windows === undefined) return;
   const shadowed = views
     .map((view) => view.name.toLowerCase())
     .filter((name) => withNames.has(name));
@@ -389,8 +393,7 @@ export function scopeLangWatchQL({
       ? buildWindowPredicates({ views, database, memberWindows, timeWindow })
       : undefined;
   const withNames = findWithNames(parsed.statements);
-  // Only the member windows are a boundary; a plain project's row policy bounds it alone.
-  if (windows !== undefined) assertNoShadowedView({ withNames, views });
+  assertNoShadowedView({ withNames, views, windows });
   const rewrites = findViewReferences({
     statements: parsed.statements,
     database,
