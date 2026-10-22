@@ -41,12 +41,16 @@ async function seatHolding({
     },
   ]);
   const reads: Parameters<EventRepository["getEventRecord"]>[0][] = [];
-  const recorded: Pick<EventRepository, "getEventRecord" | "getEventRecords"> = {
+  const recorded: Pick<
+    EventRepository,
+    "getEventRecord" | "getEventRecords" | "findEventRecordsOfAggregates"
+  > = {
     getEventRecord: (request) => {
       reads.push(request);
       return repository.getEventRecord(request);
     },
     getEventRecords: (request) => repository.getEventRecords(request),
+    findEventRecordsOfAggregates: (request) => repository.findEventRecordsOfAggregates(request),
   };
   return { seat: EventLogReadSeat.create({ repository: recorded }), eventId, reads };
 }
