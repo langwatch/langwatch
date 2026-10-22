@@ -141,6 +141,13 @@ Feature: Instant Evals decision model column in Default models
     Then the text is skipped as "classifier_key_invalid"
     And LangWatch's classifier is not called
 
+  @integration
+  Scenario: The search bar stays on LangWatch's classifier with an own decision model
+    Given the project resolves to an own decision model
+    When the search bar classifies a sentence
+    Then LangWatch's classifier is called
+    And the judge leaf is never called with the own model
+
   @unit
   Scenario: The free budget never binds a project on an own decision model
     Given the project resolves to an own decision model
