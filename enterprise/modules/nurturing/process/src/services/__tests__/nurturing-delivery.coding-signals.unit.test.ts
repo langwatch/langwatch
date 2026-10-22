@@ -17,7 +17,7 @@ import { NurturingDeliveryService } from "../nurturing-delivery.service.ts";
 import { NurturingService } from "../nurturing.service.ts";
 
 const T0 = Date.UTC(2026, 9, 20, 12);
-const iso = (ms: number) => new Date(ms).toISOString();
+const unixSeconds = (ms: number) => Math.floor(ms / 1000);
 
 /** Customer.io over a recording fetch: each call is kept as its path and body. */
 function customerIo() {
@@ -134,7 +134,7 @@ describe("NurturingDeliveryService coding-agent signals", () => {
       expect(cio.identifies()).toEqual([
         expect.objectContaining({
           userId: "admin-1",
-          traits: { coding_last_session_at: iso(T0) },
+          traits: { coding_last_session_at: unixSeconds(T0) },
         }),
       ]);
     });
@@ -168,8 +168,8 @@ describe("NurturingDeliveryService coding-agent signals", () => {
       await settle();
 
       expect(cio.identifies().map((call) => call.traits)).toEqual([
-        { coding_last_session_at: iso(T0) },
-        { coding_last_session_at: iso(T0 + 301_000) },
+        { coding_last_session_at: unixSeconds(T0) },
+        { coding_last_session_at: unixSeconds(T0 + 301_000) },
       ]);
     });
   });
@@ -232,7 +232,7 @@ describe("NurturingDeliveryService coding-agent signals", () => {
       expect(cio.identifies()).toEqual([
         expect.objectContaining({
           userId: "admin-1",
-          traits: { coding_first_session_at: iso(T0), coding_agent_types: ["claude_code"] },
+          traits: { coding_first_session_at: unixSeconds(T0), coding_agent_types: ["claude_code"] },
         }),
       ]);
     });
@@ -353,7 +353,10 @@ describe("NurturingDeliveryService app-open signals", () => {
       await settle();
 
       expect(cio.identifies()).toEqual([
-        expect.objectContaining({ userId: "user-1", traits: { app_last_opened_at: iso(T0) } }),
+        expect.objectContaining({
+          userId: "user-1",
+          traits: { app_last_opened_at: unixSeconds(T0) },
+        }),
       ]);
     });
 

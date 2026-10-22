@@ -13,6 +13,7 @@ import type { PostHogChannel } from "../channels/posthog.channel.ts";
 import type { NurturingClaimRepository } from "../repositories/nurturing-claim.repository.ts";
 import { fire as fireActivity } from "../rules/nurturing-activity-tracking-service.rules.ts";
 import { fireCodingOrApp, isCodingOrAppSignal } from "../rules/nurturing-coding-delivery.rules.ts";
+import { selfHostedTraits, unixSecondsOf } from "../rules/nurturing-customer-io-timestamp.rules.ts";
 import { pickCustomerIoDebounce } from "../rules/nurturing-delivery-debounce.rules.ts";
 import {
   fireExperimentRan,
@@ -89,10 +90,7 @@ export class NurturingDeliveryService {
     return new NurturingDeliveryService(deps);
   }
 
-  /**
-   * `key` names the signal: its kind and source event. A first session also identifies the
-   * members.
-   */
+  /** `key` names the signal: its kind and source event. A first session also tells its members. */
   async deliver({ key, signal }: { key: string; signal: NurturingSignal }): Promise<void> {
     if (!this.deps.customerIo && !this.deps.posthog) return;
     if (!(await this.deps.claims.claim(`nurturing:${key}`, DELIVERED_WINDOW_SECONDS))) return;
@@ -207,7 +205,7 @@ export class NurturingDeliveryService {
       case "trace_received":
         return this.identify({
           userId: signal.userId,
-          traits: { last_trace_at: isoOf(signal.occurredAt) },
+          traits: { last_trace_at: unixSecondsOf(signal.occurredAt) },
         });
       case "simulation_run_finished":
         return this.simulationRunFinished(signal);
@@ -366,7 +364,7 @@ export class NurturingDeliveryService {
             traits: {
               ...(user?.email ? { email: user.email } : {}),
               ...(user?.name ? { name: user.name } : {}),
-              createdAt: isoOf(signal.occurredAt),
+              createdAt: unixSecondsOf(signal.occurredAt),
             },
           },
         ]),
@@ -385,7 +383,7 @@ export class NurturingDeliveryService {
           has_traces: true,
           sdk_language: sdkLanguage,
           sdk_framework: sdkFramework,
-          first_trace_at: isoOf(signal.occurredAt),
+          first_trace_at: unixSecondsOf(signal.occurredAt),
         },
       },
       {
@@ -404,7 +402,7 @@ export class NurturingDeliveryService {
   /** Main's simulation sync: the organization's first run is a milestone, later ones a count. */
   private simulationRunFinished(signal: NurturingSignalOf<"simulation_run_finished">): void {
     const { userId, projectId, organizationRunCount } = signal;
-    const at = isoOf(signal.occurredAt);
+    const at = unixSecondsOf(signal.occurredAt);
     if (!signal.first) {
       return this.identify({
         userId,
@@ -433,7 +431,7 @@ export class NurturingDeliveryService {
   /** Main's evaluation sync once per batch; `first` picks the milestone, `count` the batch's. */
   private evaluationCompleted(signal: NurturingSignalOf<"evaluation_completed">): void {
     const { userId, projectId, organizationEvaluationCount: count } = signal;
-    const at = isoOf(signal.occurredAt);
+    const at = unixSecondsOf(signal.occurredAt);
     const calls: CioBatchCall[] = signal.first
       ? [
           {
@@ -467,8 +465,9 @@ export class NurturingDeliveryService {
   private selfHostedCrm(signal: NurturingSignalOf<"self_hosted_crm">): void {
     const nurturing = this.deps.customerIo;
     if (!nurturing) return;
-    const { userId, organizationId, instanceId, traits, events } = signal;
+    const { userId, organizationId, instanceId, events } = signal;
     void (async () => {
+      const traits = selfHostedTraits(signal.traits);
       await nurturing.groupUser({ userId, groupId: organizationId, traits });
       for (const event of events) {
         await nurturing.trackEvent({ userId, event, properties: { instance_id: instanceId } });

@@ -2577,6 +2577,7 @@ export class TraceModule implements TraceApi, CollectorApp {
   translateLegacyFilters(input: {
     filters: Readonly<Record<string, unknown>>;
     window?: { startDate?: number; endDate?: number };
+    fenced?: boolean;
   }): GenerateFilterConditionsResult {
     return translateLegacyFilters(input);
   }

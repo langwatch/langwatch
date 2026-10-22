@@ -119,7 +119,7 @@ Feature: Coding-agent session signals reach Customer.io
   @unit
   Scenario: A stored session identifies coding_last_session_at on the admin
     When a coding_session_stored signal is delivered
-    Then Customer.io identifies the admin with coding_last_session_at
+    Then Customer.io identifies the admin with coding_last_session_at in Unix seconds
 
   @unit
   Scenario: Session updates to Customer.io are debounced per project for 300 seconds
@@ -141,7 +141,7 @@ Feature: Coding-agent session signals reach Customer.io
   @unit
   Scenario: The first coding-agent session identifies the admin and tracks one event
     When a coding_agent_first_session signal is delivered
-    Then Customer.io identifies coding_first_session_at and coding_agent_types
+    Then Customer.io identifies coding_first_session_at in Unix seconds and coding_agent_types
     And tracks one coding_agent_first_session with the agent type
 
   @unit

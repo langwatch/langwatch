@@ -5,7 +5,7 @@ import type {
   NurturingSignalOf,
 } from "@langwatch/enterprise-nurturing-contract";
 
-import { isoOf } from "./nurturing-time.rules.ts";
+import { unixSecondsOf } from "./nurturing-customer-io-timestamp.rules.ts";
 
 const CODING_AND_APP_KINDS = [
   "coding_session_stored",
@@ -32,7 +32,11 @@ export function fireCodingOrApp(signal: CodingOrAppSignal): CioBatchCall[] {
   switch (signal.kind) {
     case "coding_session_stored":
       return [
-        { type: "identify", userId, traits: { coding_last_session_at: isoOf(signal.occurredAt) } },
+        {
+          type: "identify",
+          userId,
+          traits: { coding_last_session_at: unixSecondsOf(signal.occurredAt) },
+        },
       ];
     case "coding_active_days":
       return [
@@ -46,7 +50,7 @@ export function fireCodingOrApp(signal: CodingOrAppSignal): CioBatchCall[] {
           type: "identify",
           userId,
           traits: {
-            coding_first_session_at: isoOf(signal.occurredAt),
+            coding_first_session_at: unixSecondsOf(signal.occurredAt),
             coding_agent_types: signal.agentTypes,
           },
         },
@@ -59,7 +63,11 @@ export function fireCodingOrApp(signal: CodingOrAppSignal): CioBatchCall[] {
       ];
     case "app_opened":
       return [
-        { type: "identify", userId, traits: { app_last_opened_at: isoOf(signal.occurredAt) } },
+        {
+          type: "identify",
+          userId,
+          traits: { app_last_opened_at: unixSecondsOf(signal.occurredAt) },
+        },
       ];
     case "sessions_page_viewed":
       return [

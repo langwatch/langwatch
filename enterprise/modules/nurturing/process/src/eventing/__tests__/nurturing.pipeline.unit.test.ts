@@ -256,7 +256,7 @@ describe("nurturing's userCreated peer subscriber", () => {
         traits: {
           email: "jane@example.com",
           name: "Jane Doe",
-          createdAt: new Date(1_000).toISOString(),
+          createdAt: 1,
         },
       });
     });

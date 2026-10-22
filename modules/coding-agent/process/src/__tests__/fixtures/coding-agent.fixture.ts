@@ -32,6 +32,7 @@ import {
 import {
   type PaginatedProjects,
   type ProjectApi,
+  type ProjectIdentity,
   projectWithTeamSchema,
   type ProjectWithTeam,
 } from "@langwatch/project-contract";
@@ -820,8 +821,24 @@ export function projectRow(
   };
 }
 
+function projectIdentity({ id, name }: { id: string; name: string }): ProjectIdentity {
+  return {
+    id,
+    name,
+    slug: id,
+    teamId: "team-1",
+    organizationId: "organization-1",
+    isPersonal: false,
+    ownerUserId: null,
+    kind: "application",
+  };
+}
+
 export interface TestProjectState {
   projects: { id: string }[];
+  /** The names `listNamesByIds` answers with; an id left out has no live project. */
+  readonly projectNames: Map<string, string>;
+  readonly nameLookups: { projectIds: string[] }[];
   readonly sessionActivity: { projectId: string; at: Instant }[];
   teamProject: ProjectWithTeam | null;
 }
@@ -843,12 +860,23 @@ export function createTestProjects(overrides: Partial<ProjectApi> = {}): TestPro
           projects.sessionActivity.push(input);
           return Promise.resolve();
         },
+        listNamesByIds: (input) => {
+          projects.nameLookups.push(input);
+          return Promise.resolve(
+            input.projectIds.flatMap((id) => {
+              const name = projects.projectNames.get(id);
+              return name === undefined ? [] : [projectIdentity({ id, name })];
+            }),
+          );
+        },
         ...overrides,
       },
       "ProjectApi",
     ),
     {
       projects: [],
+      projectNames: new Map(),
+      nameLookups: [],
       sessionActivity: [],
       teamProject: projectWithTeamSchema.parse({
   id: "project-1",

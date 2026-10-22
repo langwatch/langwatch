@@ -7,7 +7,7 @@ Feature: App opens reach Customer.io on the opening user
   @unit
   Scenario: An app open identifies app_last_opened_at and tracks sessions_page_viewed on the opening user
     When auth records an app open for user-1
-    Then Customer.io identifies user-1 with app_last_opened_at
+    Then Customer.io identifies user-1 with app_last_opened_at in Unix seconds
     And tracks sessions_page_viewed on user-1
 
   @unit
