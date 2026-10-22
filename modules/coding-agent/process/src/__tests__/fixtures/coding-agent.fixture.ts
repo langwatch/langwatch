@@ -404,9 +404,9 @@ export class TestSessions extends CodingAgentSessionRepository {
     return this.applied;
   }
 
-  async hasOtherSession(input: { tenantId: string; excludeSessionId: string }): Promise<boolean> {
+  async hasOtherSession(input: { tenantId: string; excludeSessionIds: string[] }): Promise<boolean> {
     return this.rows.some(
-      (row) => row.tenantId === input.tenantId && row.sessionId !== input.excludeSessionId,
+      (row) => row.tenantId === input.tenantId && !input.excludeSessionIds.includes(row.sessionId),
     );
   }
 

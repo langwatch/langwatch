@@ -71,6 +71,18 @@ Feature: Coding-agent records a session-stored fact
     Then the fact says firstForProject is true
 
   @unit
+  Scenario: Two new sessions of a fresh project in one batch flag exactly the earliest
+    Given a project with no earlier session
+    When two new main sessions of it are stored in one batch
+    Then only the earlier session is flagged as the project's first
+
+  @unit
+  Scenario: A batch of a project with older history flags none
+    Given a project with an older session
+    When two new main sessions of it are stored in one batch
+    Then neither session is flagged as the project's first
+
+  @unit
   Scenario: A failing history check fails closed
     Given an unstamped project whose history check throws
     When its session is reported

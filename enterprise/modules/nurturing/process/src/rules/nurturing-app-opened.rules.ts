@@ -2,13 +2,17 @@
 import type { AppPageOpenedEventData } from "@langwatch/auth-contract";
 import type { NurturingSignal } from "@langwatch/enterprise-nurturing-contract";
 
-/** A page open, against the opening person's own profile, never the organization admin's. */
+/**
+ * A sessions page open (auth records no other page), against the opening person's own profile,
+ * never the organization admin's.
+ */
 export function appOpenedSignals({
   data,
 }: Readonly<{ data: AppPageOpenedEventData }>): NurturingSignal[] {
   const { userId, tenantId, occurredAt, page } = data;
   const base = { sourceEventId: `${userId}:${occurredAt}`, tenantId, occurredAt, userId, page };
-  const signals: NurturingSignal[] = [{ kind: "app_opened", ...base }];
-  if (page === "me_sessions") signals.push({ kind: "sessions_page_viewed", ...base });
-  return signals;
+  return [
+    { kind: "app_opened", ...base },
+    { kind: "sessions_page_viewed", ...base },
+  ];
 }

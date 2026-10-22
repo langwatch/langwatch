@@ -54,7 +54,10 @@ export interface NurturingCodingMilestonesRepository {
   findOrganization(
     input: Readonly<{ organizationId: string }>,
   ): Promise<NurturingOrganizationRow[]>;
-  /** Sets the first coding session once; `first` is true for the setter and a retry of its `occurredAt`. */
+  /**
+   * Sets the first coding session once; `first` is true for the setter and a retry of its
+   * `occurredAt`.
+   */
   recordCodingFirstSession(
     input: Readonly<{ organizationId: string; occurredAt: number }>,
   ): Promise<{ first: boolean }>;

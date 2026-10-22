@@ -76,7 +76,7 @@ describe.each(backends)("given the $name coding-agent repositories", ({ create }
       await expect(
         repositories.sessions.hasOtherSession({
           tenantId: "project-1",
-          excludeSessionId: "session-2",
+          excludeSessionIds: ["session-2"],
         }),
       ).resolves.toBe(true);
     });
@@ -92,7 +92,7 @@ describe.each(backends)("given the $name coding-agent repositories", ({ create }
       await expect(
         repositories.sessions.hasOtherSession({
           tenantId: "project-1",
-          excludeSessionId: "session-1",
+          excludeSessionIds: ["session-1"],
         }),
       ).resolves.toBe(false);
     });
@@ -109,7 +109,7 @@ describe.each(backends)("given the $name coding-agent repositories", ({ create }
       await expect(
         repositories.sessions.hasOtherSession({
           tenantId: "project-1",
-          excludeSessionId: "session-1",
+          excludeSessionIds: ["session-1"],
         }),
       ).resolves.toBe(false);
     });
@@ -125,7 +125,7 @@ describe.each(backends)("given the $name coding-agent repositories", ({ create }
       await expect(
         repositories.sessions.hasOtherSession({
           tenantId: "project-1",
-          excludeSessionId: "session-1",
+          excludeSessionIds: ["session-1"],
         }),
       ).resolves.toBe(false);
     });

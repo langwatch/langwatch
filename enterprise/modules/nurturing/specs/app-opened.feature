@@ -10,12 +10,6 @@ Feature: App opens reach Customer.io on the opening user
     Then Customer.io identifies user-1 with app_last_opened_at
     And tracks sessions_page_viewed on user-1
 
-  # Guard for when auth adds a page; auth accepts only me_sessions today.
-  @unit
-  Scenario: Only the sessions page raises sessions_page_viewed
-    When auth records an app open for a page other than the sessions page
-    Then app_opened is raised and sessions_page_viewed is not
-
   @unit
   Scenario: Repeated opens inside an hour send once per user
     When the same user opens the page twice inside an hour

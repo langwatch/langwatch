@@ -327,6 +327,27 @@ describe("NurturingCodingMilestonesService", () => {
       ).toEqual([1, 2]);
     });
 
+    /** @scenario "One batch over midnight counts both of its days" */
+    it("counts both days of a batch that spans midnight", async () => {
+      const { send, ofKind } = await serviceOver();
+
+      await send([fact({ firstForProject: false, occurredAt: Date.UTC(2026, 9, 19, 12) })]);
+      await send([
+        fact({
+          sessionId: "s-2",
+          firstForProject: false,
+          occurredAt: Date.UTC(2026, 9, 20, 23, 59),
+        }),
+        fact({ sessionId: "s-3", firstForProject: false, occurredAt: Date.UTC(2026, 9, 21, 0, 1) }),
+      ]);
+
+      expect(
+        ofKind("coding_active_days").map(
+          (s) => (s as { codingActiveDays: number }).codingActiveDays,
+        ),
+      ).toEqual([1, 3]);
+    });
+
     /** @scenario "A late session of an earlier day changes nothing" */
     it("raises no active-day signal for a late session of an earlier day", async () => {
       const { send, ofKind } = await serviceOver();

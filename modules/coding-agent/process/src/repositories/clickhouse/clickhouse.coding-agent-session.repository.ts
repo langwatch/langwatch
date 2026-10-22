@@ -619,13 +619,13 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
     };
   }
 
-  /** Whether the tenant holds a main-thread session besides the one named; helpers never count. */
+  /** Whether the tenant holds a main-thread session besides those named; helpers never count. */
   async hasOtherSession({
     tenantId,
-    excludeSessionId,
+    excludeSessionIds,
   }: {
     tenantId: string;
-    excludeSessionId: string;
+    excludeSessionIds: string[];
   }): Promise<boolean> {
     EventUtils.validateTenantId(
       { tenantId },
@@ -639,12 +639,12 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
         SELECT SessionId
         FROM ${TABLE_NAME}
         WHERE TenantId = {tenantId:String}
-          AND SessionId != {excludeSessionId:String}
+          AND SessionId NOT IN {excludeSessionIds:Array(String)}
         GROUP BY SessionId
         HAVING max(toUInt8(Auxiliary)) = 0
         LIMIT 1
       `,
-      params: { tenantId, excludeSessionId },
+      params: { tenantId, excludeSessionIds },
     });
     return rows.length > 0;
   }

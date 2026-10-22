@@ -62,11 +62,14 @@ export class MemoryCodingAgentSessionRepository extends CodingAgentSessionReposi
     return { row: stored.row, appliedEventIds: [...stored.appliedEventIds] };
   }
 
-  async hasOtherSession(input: { tenantId: string; excludeSessionId: string }): Promise<boolean> {
+  async hasOtherSession(input: {
+    tenantId: string;
+    excludeSessionIds: string[];
+  }): Promise<boolean> {
     return this.rows().some(
       (row) =>
         row.tenantId === input.tenantId &&
-        row.sessionId !== input.excludeSessionId &&
+        !input.excludeSessionIds.includes(row.sessionId) &&
         !row.auxiliary,
     );
   }

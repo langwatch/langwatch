@@ -47,8 +47,11 @@ export abstract class CodingAgentSessionRepository {
     appliedEventIds: string[];
   } | null>;
 
-  /** Whether the tenant holds a stored session besides the one named, over all time. */
-  abstract hasOtherSession(input: { tenantId: string; excludeSessionId: string }): Promise<boolean>;
+  /** Whether the tenant holds a stored session besides those named, over all time. */
+  abstract hasOtherSession(input: {
+    tenantId: string;
+    excludeSessionIds: string[];
+  }): Promise<boolean>;
 
   abstract findManyRecent(input: {
     tenantId: string;

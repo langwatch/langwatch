@@ -36,7 +36,7 @@ function factsOver({
   nowMs,
 }: {
   lastCodingAgentSessionAt?: Date | null;
-  hasOtherSession?: (input: { tenantId: string; excludeSessionId: string }) => Promise<boolean>;
+  hasOtherSession?: (input: { tenantId: string; excludeSessionIds: string[] }) => Promise<boolean>;
   record?: (fact: CodingAgentSessionStoredEventData) => Promise<void>;
   nowMs?: () => number;
 } = {}) {
@@ -163,7 +163,7 @@ describe("CodingAgentSessionFactsService", () => {
     });
 
     it("asks about other sessions without counting the stored one", async () => {
-      const asked: { tenantId: string; excludeSessionId: string }[] = [];
+      const asked: { tenantId: string; excludeSessionIds: string[] }[] = [];
       const { service } = factsOver({
         hasOtherSession: async (input) => {
           asked.push(input);
@@ -173,7 +173,36 @@ describe("CodingAgentSessionFactsService", () => {
 
       await service.record([stored()]);
 
-      expect(asked).toEqual([{ tenantId: "project-1", excludeSessionId: "session-1" }]);
+      expect(asked).toEqual([{ tenantId: "project-1", excludeSessionIds: ["session-1"] }]);
+    });
+
+    /** @scenario "Two new sessions of a fresh project in one batch flag exactly the earliest" */
+    it("flags only the earliest of two sessions of a fresh project in one fold", async () => {
+      const { service, recorded } = factsOver({
+        hasOtherSession: async ({ excludeSessionIds }) =>
+          !["session-1", "session-2"].every((id) => excludeSessionIds.includes(id)),
+      });
+
+      await service.record([
+        stored({ sessionId: "session-2", occurredAt: 2_000 }),
+        stored({ sessionId: "session-1", occurredAt: 1_000 }),
+      ]);
+
+      expect(recorded.filter((fact) => fact.firstForProject).map((fact) => fact.sessionId)).toEqual(
+        ["session-1"],
+      );
+    });
+
+    /** @scenario "A batch of a project with older history flags none" */
+    it("flags none of two sessions when the project has prior history", async () => {
+      const { service, recorded } = factsOver({ hasOtherSession: async () => true });
+
+      await service.record([
+        stored({ sessionId: "session-1", occurredAt: 1_000 }),
+        stored({ sessionId: "session-2", occurredAt: 2_000 }),
+      ]);
+
+      expect(recorded.map((fact) => fact.firstForProject)).toEqual([false, false]);
     });
 
     /** @scenario "A failing history check fails closed" */

@@ -89,7 +89,10 @@ export class NurturingDeliveryService {
     return new NurturingDeliveryService(deps);
   }
 
-  /** `key` names the signal: its kind and source event. A first session also identifies the members. */
+  /**
+   * `key` names the signal: its kind and source event. A first session also identifies the
+   * members.
+   */
   async deliver({ key, signal }: { key: string; signal: NurturingSignal }): Promise<void> {
     if (!this.deps.customerIo && !this.deps.posthog) return;
     if (!(await this.deps.claims.claim(`nurturing:${key}`, DELIVERED_WINDOW_SECONDS))) return;

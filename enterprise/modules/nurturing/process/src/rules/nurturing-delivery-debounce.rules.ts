@@ -3,7 +3,7 @@ import type { NurturingSignal } from "@langwatch/enterprise-nurturing-contract";
 
 export type Debounce = Readonly<{ seconds: number; claimKey: string }>;
 
-/** The tenant's trace, simulation, evaluation or coding update: main's CRM contract, five minutes. */
+/** The tenant's trace, simulation, evaluation or coding update: main's CRM contract, 5 minutes. */
 const TENANT_UPDATE_SECONDS = 5 * 60;
 const TENANT_UPDATE_KINDS: ReadonlySet<NurturingSignal["kind"]> = new Set([
   "trace_received",

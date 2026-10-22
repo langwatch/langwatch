@@ -94,6 +94,12 @@ Feature: Coding-agent session signals reach Customer.io
     Then the active-day count is two
 
   @unit
+  Scenario: One batch over midnight counts both of its days
+    Given the organization's last active day is D-1
+    When one batch holds sessions at 23:59 on D and 00:01 on D+1
+    Then the active-day count grows by two
+
+  @unit
   Scenario: A late session of an earlier day changes nothing
     Given the organization's last active day is D+3
     When a session of day D+2 arrives

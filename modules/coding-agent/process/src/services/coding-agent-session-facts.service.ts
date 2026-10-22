@@ -16,6 +16,9 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 /** A stored session whose product is known: the only kind a fact can name. */
 type NamedSession = StoredSession & { agent: string };
 
+/** What one fold claims for a project: all its sessions, and the one that may be the first. */
+type ProjectClaim = { sessionIds: string[]; earliest: NamedSession };
+
 /** Where the session-stored fact is recorded; the owner's own pipeline, never a consumer. */
 export interface CodingAgentSessionStoredRecorder {
   recordSessionStored(fact: CodingAgentSessionStoredEventData): Promise<void>;
@@ -51,10 +54,10 @@ export class CodingAgentSessionFactsService {
       const now = this.dependencies.nowMs();
       if (this.heldUntil.size >= HOLD_SWEEP_THRESHOLD) this.sweepExpiredHolds(now);
       const projectIsStamped = new Map<string, Promise<boolean>>();
+      const due = this.claimDue({ sessions, now });
+      const claims = claimsByProject(due);
       await Promise.all(
-        this.claimDue({ sessions, now }).map((session) =>
-          this.recordOne({ session, now, projectIsStamped }),
-        ),
+        due.map((session) => this.recordOne({ session, now, projectIsStamped, claims })),
       );
     } catch (error) {
       logger.warn({ error }, "recording the session-stored facts failed, non-fatal");
@@ -77,11 +80,11 @@ export class CodingAgentSessionFactsService {
       if (session.sessionId.length > MAX_SESSION_ID_LENGTH) continue;
       // A client span time is never trusted past a day ahead. Clamping here fixes the value in
       // the stored fact, so every redelivery sees the same time.
-      const named = { ...session, agent, occurredAt: Math.min(session.occurredAt, now + DAY_MS) };
-      const key = holdKey(named);
+      const clamped = { ...session, agent, occurredAt: Math.min(session.occurredAt, now + DAY_MS) };
+      const key = holdKey(clamped);
       if ((this.heldUntil.get(key) ?? 0) > now || due.has(key)) continue;
       this.heldUntil.set(key, now + CODING_AGENT_SESSION_SEEN_WINDOW_MS);
-      due.set(key, named);
+      due.set(key, clamped);
     }
     return [...due.values()];
   }
@@ -90,10 +93,12 @@ export class CodingAgentSessionFactsService {
     session,
     now,
     projectIsStamped,
+    claims,
   }: {
     session: NamedSession;
     now: number;
     projectIsStamped: Map<string, Promise<boolean>>;
+    claims: Map<string, ProjectClaim>;
   }): Promise<void> {
     const holdSetTo = now + CODING_AGENT_SESSION_SEEN_WINDOW_MS;
     try {
@@ -102,7 +107,7 @@ export class CodingAgentSessionFactsService {
         projectId: session.tenantId,
         sessionId: session.sessionId,
         agentType: session.agent,
-        firstForProject: await this.isFirstForProject({ session, projectIsStamped }),
+        firstForProject: await this.isFirstForProject({ session, projectIsStamped, claims }),
         occurredAt: session.occurredAt,
       });
     } catch (error) {
@@ -119,11 +124,16 @@ export class CodingAgentSessionFactsService {
   private async isFirstForProject({
     session,
     projectIsStamped,
+    claims,
   }: {
     session: NamedSession;
     projectIsStamped: Map<string, Promise<boolean>>;
+    claims: Map<string, ProjectClaim>;
   }): Promise<boolean> {
     try {
+      // Every row is stored before this runs, so only the fold's earliest session may be first.
+      const claim = claims.get(session.tenantId);
+      if (!claim || claim.earliest !== session) return false;
       let stamped = projectIsStamped.get(session.tenantId);
       if (stamped === undefined) {
         stamped = this.dependencies.projects
@@ -134,7 +144,7 @@ export class CodingAgentSessionFactsService {
       if (await stamped) return false;
       return !(await this.dependencies.sessions.hasOtherSession({
         tenantId: session.tenantId,
-        excludeSessionId: session.sessionId,
+        excludeSessionIds: claim.sessionIds,
       }));
     } catch (error) {
       logger.warn(
@@ -148,4 +158,24 @@ export class CodingAgentSessionFactsService {
 
 function holdKey(session: StoredSession): string {
   return `${session.tenantId}:${session.sessionId}:${Math.floor(session.occurredAt / DAY_MS)}`;
+}
+
+function claimsByProject(sessions: NamedSession[]): Map<string, ProjectClaim> {
+  const claims = new Map<string, ProjectClaim>();
+  for (const session of sessions) {
+    const claim = claims.get(session.tenantId);
+    if (!claim) {
+      claims.set(session.tenantId, { sessionIds: [session.sessionId], earliest: session });
+      continue;
+    }
+    if (!claim.sessionIds.includes(session.sessionId)) claim.sessionIds.push(session.sessionId);
+    const { earliest } = claim;
+    if (
+      session.occurredAt < earliest.occurredAt ||
+      (session.occurredAt === earliest.occurredAt && session.sessionId < earliest.sessionId)
+    ) {
+      claim.earliest = session;
+    }
+  }
+  return claims;
 }
