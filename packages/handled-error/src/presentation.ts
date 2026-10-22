@@ -824,6 +824,13 @@ const presentations = {
     title: "The workflow couldn't run",
     describe: () => "We've been notified. Try running it again in a moment.",
   },
+  workflow_result_too_large: {
+    // fault: customer. The run finished but returned more than one synchronous
+    // answer can carry (6 MB), so the workflow's own output is what to shrink.
+    title: "The workflow's result is too large",
+    describe: () =>
+      "Make the workflow return less data, for example fewer rows or shorter text, and run it again.",
+  },
 
   // ---- agent dev tunnel ----
   agent_dev_tunnel_unreachable: {

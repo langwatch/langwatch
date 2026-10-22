@@ -52835,7 +52835,7 @@ type PostApiTracesSearchJSONBody struct {
 	From    *PostApiTracesSearchJSONBodyFrom `json:"from,omitempty"`
 	GroupBy *string                          `json:"groupBy,omitempty"`
 
-	// IncludeSpans When true, fetches full span data for each trace. Useful for bulk export. Default false.
+	// IncludeSpans When true, fetches full span data for each trace. Useful for bulk export. Default false. A page with spans holds at most 100 traces, whatever `pageSize` asks for: page on with the `scrollId` the response returns.
 	IncludeSpans  *bool `json:"includeSpans,omitempty"`
 	LlmMode       *bool `json:"llmMode,omitempty"`
 	NegateFilters *bool `json:"negateFilters,omitempty"`
