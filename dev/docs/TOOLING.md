@@ -180,6 +180,7 @@ The generator needs TypeScript 6's compiler API, so pnpm `packageExtensions` giv
 ```bash
 pnpm --filter <pkg> typecheck  # one package
 pnpm test:affected           # same for tests
+pnpm test:changed            # only the test files the change reaches by imports (ADR-182)
 pnpm lint:types:affected     # same for type-aware lint
 pnpm lint                    # whole-tree oxlint, uncached (oxlint is fast)
 pnpm lint:changed            # the same for what you changed and its dependents
