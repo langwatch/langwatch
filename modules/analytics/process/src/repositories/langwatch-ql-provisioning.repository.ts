@@ -21,6 +21,17 @@ export interface RunClickHouseStatementsResult {
   readonly skipped: SkippedProvisioningStatement[];
 }
 
+/** How loudly a failed statement is logged: `warn` where a later check retries it. */
+export type ProvisioningFailureLevel = "error" | "warn";
+
+/** The named tables, views and SQL functions the server holds now. */
+export interface LwqlClickHouseInventory {
+  /** Each named table or view present. */
+  readonly relations: readonly string[];
+  /** The named SQL user-defined functions present. */
+  readonly functions: readonly string[];
+}
+
 /**
  * Untenanted statements on the shared server, restated from the stores' `clickhouseAdmin`
  * member so this module depends on no framework package (ADR-159).
@@ -40,7 +51,14 @@ export abstract class LangWatchQLProvisioningRepository {
   abstract runStatements(input: {
     statements: readonly string[];
     configStoreEntities?: readonly ConfigStoreLwqlEntity[];
+    failureLevel?: ProvisioningFailureLevel;
   }): Promise<RunClickHouseStatementsResult>;
+  /** Two catalog reads; throws when ClickHouse is unreachable. */
+  abstract readInventory(input: {
+    database: string;
+    relations: readonly string[];
+    functions: readonly string[];
+  }): Promise<LwqlClickHouseInventory>;
   abstract inventoryConfigStore(input: {
     names: LwqlAccessModelIdentity;
   }): Promise<ConfigStoreLwqlEntity[]>;

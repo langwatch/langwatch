@@ -7,7 +7,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { LangyInternalService } from "../langy-internal.service.ts";
-import type { LangyRestMetrics } from "../langy-rest-metrics-prometheus.service.ts";
+import type { LangyRestMetrics } from "../langy-rest-metrics-otel.service.ts";
 import type { LangyService } from "../langy.service.ts";
 
 const encoder = new TextEncoder();

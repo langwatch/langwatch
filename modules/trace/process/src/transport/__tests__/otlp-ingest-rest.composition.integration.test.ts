@@ -25,6 +25,7 @@ import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { TraceApi, type RecordSpanCommandData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { fakeTraceProcessingCommands } from "../../__tests__/support/trace-processing-commands.fake.ts";
 import { TraceModule } from "../../app/trace.app.ts";
 import { S3TraceLegacySpoolChannel } from "../../channels/s3/s3.trace-legacy-spool.channel.ts";
 import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
@@ -142,24 +143,22 @@ function apiKeyDirectory(
  */
 function deployment(
   access: OtlpAccess = {},
-  handoff: { fails?: boolean; failingSpanIds?: Set<string> } = {},
+  handoff: { fails?: boolean; failingSpanIds?: Set<string>; lostReplySpanIds?: Set<string> } = {},
 ) {
   const recordedSpans: RecordSpanCommandData[] = [];
   const markedUsed: string[] = [];
   const peers = unreachablePeers();
 
-  const commands: TraceProcessingCommands = {
+  const commands: TraceProcessingCommands = fakeTraceProcessingCommands({
     recordSpan: async (data) => {
       if (handoff.fails || handoff.failingSpanIds?.has(data.span.spanId)) {
         throw new Error("queue unavailable");
       }
       recordedSpans.push(data);
+      // Staged, but the answer never came back: the queue's outcome is unknown.
+      if (handoff.lostReplySpanIds?.has(data.span.spanId)) throw new Error("reply lost");
     },
-    changeTraceName: async () => undefined,
-    addAnnotation: async () => undefined,
-    removeAnnotation: async () => undefined,
-    assignTopic: async () => undefined,
-  };
+  });
 
   const canonicalisation = TraceCanonicalisationService.create();
   const app = TraceModule.fromDependencies(
@@ -389,6 +388,33 @@ describe("given the trace module as a process composes it", () => {
           "a1b2c3d4e5f60711",
           "a1b2c3d4e5f60712",
         ]);
+      });
+    });
+  });
+
+  describe("given a batch where the queue staged one span but its answer was lost", () => {
+    const lostSpanId = "a1b2c3d4e5f60711";
+
+    describe("when the exporter resends it", () => {
+      /** @scenario A span whose staging answer was lost is sent again under the same identity */
+      it("answers the first export as retryable and hands the resent span off again", async () => {
+        const lostReplySpanIds = new Set([lostSpanId]);
+        const { post, recordedSpans } = deployment({}, { lostReplySpanIds });
+
+        const first = await post("/api/otel/v1/traces", otlpTraceBody(3));
+        lostReplySpanIds.clear();
+        const resend = await post("/api/otel/v1/traces", otlpTraceBody(3));
+
+        expect([first.status, resend.status]).toEqual([503, 200]);
+        const handedOff = recordedSpans.map(({ tenantId, span }) => ({
+          tenantId,
+          traceId: span.traceId,
+          spanId: span.spanId,
+        }));
+        const lost = handedOff.filter(({ spanId }) => spanId === lostSpanId);
+        expect(lost).toHaveLength(2);
+        expect(lost[1]).toEqual(lost[0]);
+        expect(handedOff.filter(({ spanId }) => spanId !== lostSpanId)).toHaveLength(2);
       });
     });
   });

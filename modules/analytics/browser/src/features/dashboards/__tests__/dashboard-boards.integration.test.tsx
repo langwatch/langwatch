@@ -115,9 +115,9 @@ function inMemoryServer({
     state.calls.push(call);
     const input = (call.input ?? {}) as Input;
     switch (call.path) {
-      case "dashboards.getAll":
+      case "boards.getAll":
         return Promise.resolve(state.boards.map((each) => ({ ...each })));
-      case "dashboards.create": {
+      case "boards.create": {
         const created: Board = {
           ...HOME_BOARD,
           id: `board-new-${state.boards.length + 1}`,
@@ -130,17 +130,13 @@ function inMemoryServer({
         state.boards.push(created);
         return Promise.resolve({ ...created });
       }
-      case "dashboards.rename": {
-        const renamed = board(input.dashboardId);
-        renamed.name = String(input.name);
-        return Promise.resolve({ ...renamed });
+      case "boards.update": {
+        const updated = board(input.dashboardId);
+        if (input.name !== void 0) updated.name = input.name as string;
+        if (input.description !== void 0) updated.description = input.description as string | null;
+        return Promise.resolve({ ...updated });
       }
-      case "dashboards.updateDetails": {
-        const described = board(input.dashboardId);
-        described.description = input.description as string | null;
-        return Promise.resolve({ ...described });
-      }
-      case "dashboards.listStarred":
+      case "boards.listStarred":
         return Promise.resolve(
           state.boards
             .filter((each) => each.isStarred)
@@ -874,7 +870,7 @@ describe("a member's board", () => {
         await user.clear(field);
         await user.type(field, "Launch week{Enter}");
 
-        expect(callsTo(server, "dashboards.rename")[0]?.input).toEqual({
+        expect(callsTo(server, "boards.update")[0]?.input).toEqual({
           projectId: "proj-1",
           dashboardId: "board-1",
           name: "Launch week",
@@ -904,7 +900,7 @@ describe("a member's board", () => {
         expect(screen.getByText("What we check every Monday")).toBeInTheDocument();
         expect(screen.queryByText("Add a description")).toBeNull();
         await waitFor(() =>
-          expect(callsTo(server, "dashboards.updateDetails")[0]?.input).toEqual({
+          expect(callsTo(server, "boards.update")[0]?.input).toEqual({
             projectId: "proj-1",
             dashboardId: "board-1",
             description: "What we check every Monday",

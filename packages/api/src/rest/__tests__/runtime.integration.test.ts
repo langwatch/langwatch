@@ -94,6 +94,7 @@ const annotations = defineRestRouter(AnnotationApi)
 
   .delete("/:id", "deleteAnnotation")
   .withParams(z.object({ id: z.string() }))
+  .withoutConfirmation("test route")
   .withPermission("annotations:manage")
   .withDocs({ summary: "Delete an annotation in the caller’s project" })
   .withoutAudit("test route")
@@ -153,6 +154,7 @@ const secrets = defineRestRouter(SecretApi)
   .handle(async ({ app, input }) => app.getById({ id: input.id }))
 
   .post("/", "createSecret")
+  .keepsRecords()
   .withInput(z.object({ name: z.string() }))
   .withPermission("secrets:manage")
   .withOutput(z.object({ id: z.string() }))
@@ -723,6 +725,7 @@ const roles = defineRestRouter(RoleApi)
   }))
 
   .post("/", "createRole")
+  .keepsRecords()
   .withInput(z.object({ organizationId: z.string(), name: z.string() }))
   .withPermission("organization:manage")
   .withOutput(z.object({ id: z.string() }))
@@ -1370,7 +1373,7 @@ describe("a route that declares the several answers it may give", () => {
   it("records the request as handled rather than as a server fault", async () => {
     await platformHealthApp({ status: "unhealthy" }).app.request("/api/v1/platform-health");
 
-    const rows = logsFor("langwatch:api:platform-health");
+    const rows = logsFor("langwatch:api:hono");
 
     expect(rows).toContainEqual(
       expect.objectContaining({
@@ -1394,7 +1397,7 @@ describe("a route that declares the several answers it may give", () => {
       },
     });
 
-    expect(logsFor("langwatch:api:platform-health")).toContainEqual(
+    expect(logsFor("langwatch:api:hono")).toContainEqual(
       expect.objectContaining({
         fields: expect.objectContaining({
           endpointClass: "api",
@@ -1528,6 +1531,7 @@ const hooks = defineRestRouter(HookApi)
   .withVersion(VERSION)
   .withAddressing("v1-only")
   .post("/bytes", "recordHookBytes")
+  .keepsRecords()
   .withRawBody("bytes")
   .withPermission("annotations:manage")
   .withOutput(z.object({ digest: z.string(), length: z.number() }))
@@ -1536,6 +1540,7 @@ const hooks = defineRestRouter(HookApi)
   .handle(({ raw }) => ({ digest: new TextDecoder().decode(raw), length: raw.length }))
 
   .post("/text/:id", "recordHookText")
+  .keepsRecords()
   .withParams(z.object({ id: z.string() }))
   .withRawBody("text", { mediaType: "application/json" })
   .withPermission("annotations:manage")
@@ -1860,6 +1865,7 @@ const runRunner = defineRestRouter(RunApi)
   .withNamespace("runs")
   .withVersion(VERSION)
   .post("/execute", "executeRun")
+  .keepsRecords()
   .withInput(z.object({ name: z.string() }))
   .withPermission("experiments:manage")
   .withOutput(z.object({ started: z.string() }))
@@ -1867,6 +1873,7 @@ const runRunner = defineRestRouter(RunApi)
   .handle(async ({ app, input }) => app.execute({ name: input.name }))
 
   .post("/:slug/abort", "abortRun")
+  .keepsRecords()
   .withParams(z.object({ slug: z.string() }))
   .withPermission("experiments:manage")
   .withOutput(z.object({ aborted: z.string() }))
@@ -2006,6 +2013,7 @@ const uploads = defineRestRouter(UploadApi)
   .withVersion(VERSION)
   .withAddressing("v1-only")
   .post("/", "createUpload")
+  .keepsRecords()
   .withInput(z.object({ name: z.string() }))
   .withPermission("datasets:manage")
   .withOutput(createdUpload)
@@ -2106,6 +2114,7 @@ const evaluationsLegacy = defineRestRouter(EvaluationsApi)
   .handle(async ({ app }) => app.list())
 
   .post("/api/guardrails/:evaluator/evaluate", "runGuardrail")
+  .keepsRecords()
   .withParams(z.object({ evaluator: z.string() }))
   .withPermission("evaluations:manage")
   .withOutput(z.object({ status: z.string() }))
@@ -2376,6 +2385,7 @@ const datasetUploads = defineRestRouter(UploadsApi)
   .withVersion(VERSION)
   .withAddressing("v1-only")
   .post("/upload", "uploadDataset")
+  .keepsRecords()
   .withMultipart({ fields: z.object({ name: z.string() }), files: { file: { required: true } } })
   .withPermission("datasets:manage")
   .withOutput(z.object({ id: z.string(), name: z.string(), size: z.number() }))
@@ -2389,6 +2399,7 @@ const datasetUploads = defineRestRouter(UploadsApi)
   })
 
   .patch("/records/:recordId", "replaceDatasetRecord")
+  .keepsRecords()
   .withParams(z.object({ recordId: z.string() }))
   .withInput(z.object({ bytes: z.string() }))
   .withPermission("datasets:manage")
@@ -2472,7 +2483,8 @@ describe("a request that carries files beside its fields", () => {
       defineRestRouter(UploadsApi)
         .withNamespace("dataset")
         .withVersion(VERSION)
-        .post("/upload", "uploadDataset");
+        .post("/upload", "uploadDataset")
+        .keepsRecords();
 
     const multipart = {
       fields: z.object({ a: z.string() }),
@@ -2547,6 +2559,7 @@ const bugReports = defineRestRouter(BugReportApi)
   .withVersion(VERSION)
   .withAddressing("v1-only")
   .post("/", "submitBugReport")
+  .keepsRecords()
   .withInput(z.object({ title: z.string() }))
   .withAccess(optionalCredential({ reason: KEY_ONLY_ENRICHES }))
   .withOutput(z.object({ id: z.string(), filedUnder: z.string() }))
@@ -2643,6 +2656,7 @@ const anonymousBugReports = defineRestRouter(BugReportApi)
   .withVersion(VERSION)
   .withAddressing("v1-only")
   .post("/", "submitBugReport")
+  .keepsRecords()
   .withInput(z.object({ title: z.string() }))
   .withAccess(optionalCredential({ reason: KEY_ONLY_ENRICHES, refused: "anonymous" }))
   .withOutput(z.object({ id: z.string(), filedUnder: z.string() }))
@@ -2725,6 +2739,7 @@ const instanceSetup = defineRestRouter(InstanceApi)
   .withCredential("instance_admin")
   .withAddressing("v1-only")
   .post("/organizations", "createFirstOrganization")
+  .keepsRecords()
   .withInput(z.object({ name: z.string() }))
   .withAccess(anyAuthenticated({ reason: "the instance administrator key is the whole gate" }))
   .withOutput(z.object({ id: z.string(), scope: z.null() }))
@@ -3123,6 +3138,7 @@ const waitlist = defineRestRouter(WaitlistApi)
   .withNamespace("waitlist")
   .withVersion(VERSION)
   .post("/", "joinWaitlist")
+  .keepsRecords()
   .withAccess(publicRoute({ reason: "waitlist sign-up; reads no project data" }))
   .withInput(z.object({ email: z.string().email() }))
   .withoutAudit("test route")

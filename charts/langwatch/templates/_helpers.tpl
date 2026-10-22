@@ -1066,8 +1066,8 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 # Telemetry - Usage analytics collection
 - name: DISABLE_USAGE_STATS
   value: {{ (not (ternary .Values.app.telemetry.usage.enabled true (hasKey .Values.app.telemetry.usage "enabled"))) | quote }}
-# Telemetry - Prometheus metrics collection. The processes open their own
-# scrape listener only with a prometheus exporter and METRICS_API_KEY (ADR-175).
+{{- /* Telemetry - Prometheus metrics collection. The processes open their own
+       scrape listener only with a prometheus exporter and METRICS_API_KEY (ADR-175). */}}
 {{- if .Values.app.telemetry.metrics.enabled }}
 - name: OTEL_METRICS_EXPORTER
   value: "prometheus"
@@ -1682,7 +1682,7 @@ containers:
   # event loop is turning, which `kill -0 1` cannot tell us.
   #
   # The probe targets /healthz, NOT /metrics. The scrape door is on its
-  # own port and opens only with METRICS_API_KEY (the default,
+  # own port and opens only with the metrics API key (the default,
   # app.telemetry.metrics.enabled is false, sets none), so a /metrics
   # probe would fail and crash-loop the workers on a stock install. And an httpGet probe cannot read a
   # Secret, so a key delivered via secretKeyRef could never be put in a
@@ -2334,4 +2334,31 @@ envFrom:
 {{- with .extraEnvFrom }}
 {{ toYaml . | indent 2 }}
 {{- end }}
+{{- end }}
+
+{{/* Redis --maxmemory in bytes: redis.master.maxmemory when set, else half of
+     redis.master.resources.limits.memory, so a snapshot's copied pages still
+     fit under the container limit. Renders nothing with no limit and no
+     override; a numeric 0 still counts as set. Accepts bytes, k/M/G/T, Ki/Mi/Gi/Ti.
+     A values file hands numbers over as floats, printed as whole bytes. */}}
+{{- define "langwatch.redisMaxmemory" -}}
+{{- $override := "" -}}
+{{- if hasKey .Values.redis.master "maxmemory" -}}{{- $override = .Values.redis.master.maxmemory -}}{{- end -}}
+{{- if kindIs "invalid" $override -}}{{- $override = "" -}}{{- end -}}
+{{- if kindIs "float64" $override -}}{{- $override = printf "%.0f" $override -}}{{- end -}}
+{{- $override = toString $override -}}
+{{- $limit := dig "limits" "memory" "" (.Values.redis.master.resources | default dict) -}}
+{{- if kindIs "float64" $limit -}}{{- $limit = printf "%.0f" $limit -}}{{- end -}}
+{{- $limit = toString $limit -}}
+{{- $source := ternary $override $limit (ne $override "") -}}
+{{- if ne $source "" -}}
+{{- if not (regexMatch "^[0-9]+(\\.[0-9]+)?(Ki|Mi|Gi|Ti|k|M|G|T)?$" $source) -}}
+{{- fail (printf "redis.master memory %q is not a size: use bytes or a k, M, G, T, Ki, Mi, Gi or Ti suffix" $source) -}}
+{{- end -}}
+{{- $unit := regexFind "[A-Za-z]+$" $source -}}
+{{- $multipliers := dict "" 1.0 "k" 1000.0 "M" 1000000.0 "G" 1000000000.0 "T" 1000000000000.0 "Ki" 1024.0 "Mi" 1048576.0 "Gi" 1073741824.0 "Ti" 1099511627776.0 -}}
+{{- $bytes := mulf (float64 (trimSuffix $unit $source)) (get $multipliers $unit) -}}
+{{- if eq $override "" -}}{{- $bytes = divf $bytes 2.0 -}}{{- end -}}
+{{- printf "%d" (int64 (floor $bytes)) -}}
+{{- end -}}
 {{- end }}

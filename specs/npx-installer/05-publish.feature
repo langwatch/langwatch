@@ -4,10 +4,8 @@ Feature: CI smoke + publish for `@langwatch/server`
   So that `npx @langwatch/server` always points at the same version as helm/docker
 
   See _shared/contract.md §9 (CI matrix), §10 (publish), §11 (rip-out).
-  See ../../dev/docs/adr/111-physical-application-workspaces.md for the planned
-  source relocation. Physical paths below characterize the current artifact
-  until that migration stage moves the manifest and staging inputs atomically;
-  the public command and nested frozen-workspace behaviour remain authoritative.
+  See ../../dev/docs/adr/180-npx-server-downloads-a-prebuilt-app.md: the npm
+  package is the CLI and the app ships as a prebuilt archive per platform.
 
   # =========================================================================
   # Smoke matrix
@@ -26,25 +24,24 @@ Feature: CI smoke + publish for `@langwatch/server`
       | ubuntu-22.04         |
       | ubuntu-22.04-arm     |
 
-  Scenario: Smoke proves the artifact npm users receive, never the checkout
-    Given the smoke job packed the npm tarball
+  Scenario: Smoke proves the artifacts users receive, never the checkout
+    Given the smoke job packed the npm package and built the app archive
     When the smoke boots the server
-    Then everything that runs came from that tarball
-    And a file missing from the artifact fails the smoke even though the checkout has it
-    # A checkout boot masks packaging gaps: an over-broad exclusion breaks
-    # only the released artifact, which no CI step would otherwise execute.
+    Then everything that runs came from that package and that archive
+    And a file missing from the archive fails the smoke even though the checkout has it
+    # A checkout boot masks packaging gaps: an over-broad prune breaks only the
+    # released archive, which no CI step would otherwise execute.
 
-  Scenario: A fresh install from the published artifact boots with nothing missing
-    When a user installs from the published artifact
+  Scenario: A fresh install from the published artifacts boots with nothing missing
+    When a user installs from the published package and its app archive
     Then the server reaches healthy with every module the app imports present
-    And the publish job refuses to ship an artifact that would not
+    And the publish job refuses to ship an archive that would not
 
-  Scenario: An incomplete artifact fails at install time, not minutes later at boot
-    Given a published artifact missing packages the app needs
-    When the installer prepares the app
-    Then it fails during install, before any service starts
-    And the failure names the missing packages and says the artifact itself is at fault
-    And it points at the issue tracker instead of leaving the user to debug a bare module error
+  Scenario: An incomplete app archive fails the publish, not a user's first boot
+    Given an app archive missing packages the app needs
+    When the publish job checks it
+    Then no link inside it may point at a missing directory
+    And the publish fails before anything reaches npm
 
   Scenario: Smoke job uploads logs as artifact on failure
     Given a smoke job step fails
@@ -83,45 +80,17 @@ Feature: CI smoke + publish for `@langwatch/server`
     When the publish workflow is dispatched manually with no input
     Then the job aborts with "set inputs.force=true to publish without a release tag"
 
-  Scenario: Publish builds the langwatch app first
+  Scenario: Publish builds the app archives before npm pack
     Given a clean checkout
     When the publish job runs
-    Then the app's production build runs before npm pack
-    And the resulting tarball contains the prebuilt client at "app/langwatch/dist/client/"
-    And the tarball does NOT contain "node_modules" or build caches
-    # `pnpm --filter langwatch build` would be WRONG now: since ADR-076 that
-    # filter selects the published TypeScript SDK. The app is the retired platform application.
+    Then each platform's app archive is built from the production build on its own runner
+    And npm publish waits for every archive
+    # The archive contents, checks and size are in 09-prebuilt-app.feature.
 
-  Scenario: Tarball contains expected directories only
-    # Everything ships one level down, under app/ — npm deletes a lockfile at
-    # the package ROOT no matter what the manifest asks, and shipping the
-    # lockfile is what keeps the end-user install reproducible. See ADR-076.
-    When the publish job builds the tarball
-    Then the tarball contains:
-      | path                                  |
-      | app/apps/server/dist/                 |
-      | app/pnpm-workspace.yaml               |
-      | app/pnpm-lock.yaml                    |
-      | app/langwatch/dist/client/            |
-      | app/langwatch/public/                 |
-      | app/langwatch/prisma/                 |
-      | app/langevals/                        |
-      | app/python-sdk/                       |
-      | app/mcp-server/dist/                  |
-    And the tarball does NOT contain:
-      | path                       |
-      | app/langwatch/node_modules |
-      | app/langevals/**/.venv     |
-      | **/.env                    |
-      | **/.env.*                  |
-      | **/*.pem                   |
-      | **/.npmrc                  |
-      | **/__pycache__             |
-
-  Scenario: Tarball gzipped size is under 300 MB
-    When the publish job builds the tarball
-    Then "tar tzf <tarball> | wc -l" is under 50000
-    And the gzipped size is under 300 MB
+  Scenario: The npm package carries no application source
+    When the publish job packs the npm package
+    Then the package holds "dist/cli.cjs", "package.json", "README.md" and "LICENSE.md" only
+    And it holds no ".env", key, ".npmrc" or lockfile
 
   # =========================================================================
   # Rip-out: legacy uvx publish path is gone

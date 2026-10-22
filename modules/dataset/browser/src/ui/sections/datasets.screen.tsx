@@ -492,6 +492,7 @@ export default function DatasetsScreen() {
         onUploaded={() => {
           void datasets.refetch();
         }}
+        onOpenDataset={goToDataset}
         onCreateFromScratch={() => {
           bulkUploadModal.onClose();
           openCreateDrawer();

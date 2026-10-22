@@ -107,6 +107,17 @@ Feature: Simulation Run Cost and Latency Metrics
     Then it schedules a deferred retry with incremented retryCount
     And no MetricsComputed event is emitted
 
+  # A summary with no role-attributed span and no cost is the trace's settled
+  # shape, not a summary still filling in. Retrying repeats the same read; a
+  # trace whose spans are still arriving is computed again when it settles.
+  @unit
+  Scenario: Pull-mode command treats a trace with nothing to aggregate as final
+    Given a computeRunMetrics command for "trace-1" with no metrics in payload
+    And the trace summary for "trace-1" has no span with a scenario role and no cost
+    When the command handler processes the command
+    Then no MetricsComputed event is emitted
+    And no deferred retry is scheduled
+
   # ---------------------------------------------------------------------------
   # Fold projection: metrics_computed event
   # ---------------------------------------------------------------------------

@@ -2,7 +2,7 @@ import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { guidedPathSchema } from "./onboarding-guided-paths.ts";
-import { guidedOnboardingStateSchema } from "./onboarding-schemas.ts";
+import { guidedOnboardingStateSchema, onboardingVariantSchema } from "./onboarding-schemas.ts";
 
 /** Guided onboarding's lifecycle facts, which peers react to from their own side (§9). */
 export const GUIDED_ONBOARDING_LIFECYCLE_PIPELINE_NAME = "guided_onboarding_lifecycle" as const;
@@ -58,4 +58,25 @@ export const guidedOnboardingRecordedEventDataSchema: GuidedOnboardingRecordedEv
   guidedOnboardingRecordedEventDataSchemaDefinition;
 export type GuidedOnboardingRecordedEventData = z.infer<
   typeof guidedOnboardingRecordedEventDataSchema
+>;
+
+export const ONBOARDING_VARIANT_ASSIGNED_EVENT_TYPE =
+  "lw.guided_onboarding.variant_assigned" as const;
+export const ONBOARDING_VARIANT_ASSIGNED_EVENT_VERSION = "2026-10-18" as const;
+
+/** The experiment variant an organization was created with, for the person who created it. */
+const onboardingVariantAssignedEventDataSchemaDefinition = z.object({
+  tenantId: z.string().min(1),
+  occurredAt: z.number().int().nonnegative(),
+  organizationId: z.string().min(1),
+  userId: z.string().min(1),
+  variant: onboardingVariantSchema,
+});
+export interface OnboardingVariantAssignedEventDataSchema extends Named<
+  typeof onboardingVariantAssignedEventDataSchemaDefinition
+> {}
+export const onboardingVariantAssignedEventDataSchema: OnboardingVariantAssignedEventDataSchema =
+  onboardingVariantAssignedEventDataSchemaDefinition;
+export type OnboardingVariantAssignedEventData = z.infer<
+  typeof onboardingVariantAssignedEventDataSchema
 >;

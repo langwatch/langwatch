@@ -7,10 +7,10 @@ import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 import { resolveCredentials } from "../../utils/apiKey.ts";
 import { commandValidationError } from "../../utils/errorOutput.ts";
-import { failSpinnerFromResponse } from "../../utils/failFromResponse.ts";
 import type { CommandResult } from "../../utils/output.ts";
 import { createSpinner } from "../../utils/spinner.ts";
 import { failSpinner } from "../../utils/spinnerError.ts";
+import { failMonitorResponse } from "./findMonitor";
 /**
  * Returns the updated monitor rather than printing it: the output port renders
  * it in whatever format the caller asked for (utils/output.ts).
@@ -57,7 +57,7 @@ export const updateMonitorCommand = async (
     });
 
     if (!response.ok) {
-      await failSpinnerFromResponse({ spinner, response, action: "update monitor" });
+      await failMonitorResponse({ spinner, response, action: "update monitor", reference: id });
       process.exit(1);
     }
 
