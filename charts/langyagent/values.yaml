@@ -54,6 +54,8 @@ service:
   type: ClusterIP
   port: 80
   targetPort: 8080
+  ## @param service.annotations [object, default: {}] Annotations on the Service, e.g. service.kubernetes.io/topology-mode.
+  annotations: {}
 
 # Auth secret shared with the control plane: the app sends it as a Bearer
 # token, the agent verifies it, so BOTH pods must read the same value.
@@ -120,7 +122,7 @@ workspaceVolume:
   # emptyDir spec (e.g. medium: Memory).
   sizeLimit: 2Gi
 
-## @param scratchSizeLimit [string, default: 1Gi] Size cap for the writable /tmp emptyDir required under readOnlyRootFilesystem.
+## @param scratchSizeLimit [string, default: 1Gi] Size cap for the writable /tmp emptyDir required under readOnlyRootFilesystem. Empty renders an uncapped emptyDir.
 scratchSizeLimit: 1Gi
 
 ## SecurityContext.
@@ -362,6 +364,26 @@ egress:
 
 nameOverride: ""
 fullnameOverride: ""
+
+# ── Taking over objects created by another tool ─────────────────────────────
+# These values let an install hand an existing langyagent Deployment, Service
+# and ConfigMap over to this chart without deleting and recreating them. Leave
+# them at their defaults on a fresh install.
+
+## @param selectorLabels [object, default: {}] Replaces the default selector labels (app.kubernetes.io/name + instance) on the Deployment selector, the Service selector, the NetworkPolicy and the PDB. A Deployment's selector cannot be changed after creation, so set this only to keep an existing Deployment's selector when this chart takes it over.
+selectorLabels: {}
+
+## @param podLabels [object, default: {}] Extra labels on the pod template. The selector labels win on a shared key.
+podLabels: {}
+
+## @param extraEnv [array, default: []] Extra container environment entries, appended after the chart's own (same shape as a container's env list, so valueFrom works).
+extraEnv: []
+
+## @param extraConfig [object, default: {}] Extra keys for the agent ConfigMap. A key the chart already writes is refused at render time; set it through its own value.
+extraConfig: {}
+
+## @param progressDeadlineSeconds [int, default: unset] Deployment progressDeadlineSeconds. Unset keeps the Kubernetes default (600).
+progressDeadlineSeconds: null
 
 # Node placement for the agent pod. Rendered by deployment.yaml only when set;
 # empty (the default) keeps existing behaviour — the scheduler places the pod on
