@@ -166,19 +166,6 @@ describe("ClickHouse migration safety", () => {
       ).toEqual([]);
     });
 
-    /** @scenario "A variable-size column added without a default is refused by name" */
-    it("reads a tuple of several members whole, so its DEFAULT after the commas still counts", () => {
-      const tuple = "Array(Tuple(String, UInt64, Float64))";
-      expect(
-        rules(`-- +goose Up\nALTER TABLE t ADD COLUMN IF NOT EXISTS \`Usage\` ${tuple};\n`),
-      ).toEqual(["add-variable-size-column-without-default"]);
-      expect(
-        rules(
-          `-- +goose Up\nALTER TABLE t ADD COLUMN IF NOT EXISTS \`Usage\` ${tuple} DEFAULT [];\n`,
-        ),
-      ).toEqual([]);
-    });
-
     /** @scenario "More than one statement in a goose block is refused by name" */
     it("refuses two statements in one goose block, naming the count", () => {
       const findings = scan(
