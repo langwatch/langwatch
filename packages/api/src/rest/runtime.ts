@@ -111,7 +111,7 @@ import {
   documentRoute,
   requiresBody,
 } from "./openapi.ts";
-import { principalOf, recordRequestPrincipal } from "./request-principal.ts";
+import { recordRequestPrincipal, requestPrincipalOf } from "./request-principal.ts";
 import {
   bodyLimit,
   cachedRestAnswer,
@@ -918,7 +918,7 @@ function authenticateMiddleware({
       recordRequestPrincipal({
         context,
         read: () =>
-          principalOf({
+          requestPrincipalOf({
             actor: caller?.actor,
             key:
               caller && isKeyDoor(credential)

@@ -14,7 +14,7 @@ import { MANAGEMENT_API_VERSION } from "../addressing.ts";
 import { BearerIdentity } from "../bearer-identity.ts";
 import { defineRestRouter } from "../declaration.ts";
 import { RestHost } from "../host.ts";
-import { principalOf, requestPrincipalLogFields } from "../request-principal.ts";
+import { requestPrincipalOf, requestPrincipalLogFields } from "../request-principal.ts";
 import { bindRestCredential } from "../request.ts";
 
 const records = vi.hoisted(() => [] as Record<string, unknown>[]);
@@ -116,11 +116,11 @@ describe("the request access record", () => {
   });
 });
 
-describe("principalOf", () => {
+describe("requestPrincipalOf", () => {
   describe("when the door resolved an API key", () => {
     /** @scenario "The request log names the API key and its kind, never the key" */
     it("names the key id and its kind", () => {
-      const principal = principalOf({
+      const principal = requestPrincipalOf({
         actor: { type: "api_key", id: "key_1" },
         key: { kind: "api_key", apiKeyId: "key_1", ownerUserId: null },
       });
@@ -132,7 +132,7 @@ describe("principalOf", () => {
     });
 
     it("names the user a personal key acts as beside the key", () => {
-      const principal = principalOf({
+      const principal = requestPrincipalOf({
         actor: { type: "user", id: "user_9" },
         key: { kind: "ingestion_key", apiKeyId: "key_2", ownerUserId: "user_9" },
       });
@@ -145,7 +145,7 @@ describe("principalOf", () => {
     });
 
     it("names the kind of a key that carries no id", () => {
-      const principal = principalOf({
+      const principal = requestPrincipalOf({
         actor: null,
         key: { kind: "legacy_project_key", apiKeyId: null, ownerUserId: null },
       });
@@ -157,13 +157,13 @@ describe("principalOf", () => {
   describe("when nobody called", () => {
     /** @scenario "A request with no caller names no principal" */
     it("names no user, no key and no kind", () => {
-      const principal = principalOf({ actor: null, key: null });
+      const principal = requestPrincipalOf({ actor: null, key: null });
 
       expect(requestPrincipalLogFields({ principal, clientAddress: void 0 })).toEqual({});
     });
 
     it("names nobody for a system or internal actor", () => {
-      expect(principalOf({ actor: { type: "internal", codePath: "tests" }, key: null })).toEqual(
+      expect(requestPrincipalOf({ actor: { type: "internal", codePath: "tests" }, key: null })).toEqual(
         {},
       );
     });

@@ -17,7 +17,7 @@ export type RequestPrincipal = Readonly<{
 }>;
 
 /** The user or key an actor names, and the kind of key the door resolved, if any. */
-export function principalOf({
+export function requestPrincipalOf({
   actor,
   key,
 }: {
