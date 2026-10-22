@@ -5,9 +5,8 @@
 
 /** Long enough that the 24 hours the screen counts are always held. */
 export const SIGNING_KEY_USAGE_TTL_MS = 25 * 60 * 60 * 1000;
-export const SIGNING_KEY_USAGE_HOUR_MS = 60 * 60 * 1000;
 
-/** One key's counts in one hour, the hour as `floor(epoch ms / SIGNING_KEY_USAGE_HOUR_MS)`. */
+/** One key's counts in one hour, the hour as `signingKeyUsageHourOf` gives it. */
 export type SigningKeyHourlyUsage = Readonly<{
   keyId: string;
   hour: number;

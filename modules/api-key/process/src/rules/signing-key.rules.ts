@@ -1,8 +1,6 @@
 import type { SigningKeyStatus } from "@langwatch/api-key-contract";
 import type { Instant } from "@langwatch/time";
 
-import { SIGNING_KEY_USAGE_HOUR_MS } from "../repositories/signing-key-usage.repository.ts";
-
 type SigningKeyLifetime = Readonly<{ revokedAt: Instant | null; verifiesUntil: Instant | null }>;
 
 /** A key verifies until it is revoked or its rotation overlap ends, whichever comes first. */
@@ -28,6 +26,8 @@ export function signingKeyStatusOf({
   if (!signingKeyVerifiesAt({ key, at })) return "revoked";
   return key.verifiesUntil === null ? "active" : "verifying";
 }
+
+export const SIGNING_KEY_USAGE_HOUR_MS = 60 * 60 * 1000;
 
 /** The hour a count is held under. */
 export function signingKeyUsageHourOf({ at }: { at: number }): number {

@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { MemorySigningKeyUsageRepository } from "../../repositories/memory/memory.signing-key-usage.repository.ts";
 import { MemorySigningKeyRepository } from "../../repositories/memory/memory.signing-key.repository.ts";
-import { SIGNING_KEY_USAGE_HOUR_MS } from "../../repositories/signing-key-usage.repository.ts";
+import { SIGNING_KEY_USAGE_HOUR_MS } from "../../rules/signing-key.rules.ts";
 import { BraidSignatureVerificationService } from "../braid-signature-verification.service.ts";
 import { SigningKeyService } from "../signing-key.service.ts";
 
