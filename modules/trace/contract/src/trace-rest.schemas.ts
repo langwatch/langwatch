@@ -52,7 +52,9 @@ export const traceSearchBodyExtensions = {
     .boolean()
     .optional()
     .describe(
-      "When true, fetches full span data for each trace. Useful for bulk export. Default false.",
+      "When true, fetches full span data for each trace. Useful for bulk export. Default false. " +
+        "A page with spans holds at most 100 traces, whatever `pageSize` asks for: page on " +
+        "with the `scrollId` the response returns.",
     ),
   llmMode: z.boolean().optional(),
   dateField: z

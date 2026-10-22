@@ -77025,6 +77025,11 @@ To find failed evaluations across every evaluator, send
 `"filter": "evaluatorVerdict:fail"`.
 </Note>
 
+<Note>
+With `includeSpans: true`, a page holds at most 100 traces, whatever `pageSize`
+asks for. Page on with the `scrollId` each response returns.
+</Note>
+
 ---
 
 # FILE: ./api-reference/traces/update-trace-metadata.mdx
