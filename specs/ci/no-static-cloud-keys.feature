@@ -78,3 +78,10 @@ Feature: Workflows reach AWS through OIDC roles, not stored keys
     Given a pull request that only changes a file under .github/actions
     When go-ci decides which jobs to run
     Then the CI guards job runs
+
+  @unit
+  Scenario: A listed fallback variable with no fallback step left fails CI
+    Given a role variable is listed as a sanctioned fallback for a workflow
+    And that workflow no longer gates any stored-key step on it
+    When ciguard runs
+    Then it fails and asks for the entry to be deleted, so the list only shrinks

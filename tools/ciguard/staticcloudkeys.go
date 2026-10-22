@@ -57,8 +57,59 @@ func StaticCloudKeys(repoRoot string) ([]string, error) {
 		}
 		problems = append(problems, fileProblems...)
 	}
+	stale, err := staleFallbackVars(repoRoot)
+	if err != nil {
+		return nil, err
+	}
+
+	return append(problems, stale...), nil
+}
+
+// staleFallbackVars refuses a StaticKeyFallbackVars entry whose workflow no
+// longer gates any stored-key step on it, so the list can only shrink: once a
+// fallback step is deleted, its entry has to go in the same change.
+func staleFallbackVars(repoRoot string) ([]string, error) {
+	var problems []string
+	for _, gateVar := range sortedKeys(StaticKeyFallbackVars) {
+		rel := StaticKeyFallbackVars[gateVar]
+		if _, err := os.Stat(filepath.Join(repoRoot, rel)); os.IsNotExist(err) {
+			continue
+		}
+		workflow, err := ciscan.Load(repoRoot, rel)
+		if err != nil {
+			return nil, err
+		}
+		if !gatesAStoredKeyOn(workflow, gateVar) {
+			problems = append(problems, fmt.Sprintf(
+				"tools/ciguard/staticcloudkeys.go: StaticKeyFallbackVars lists %s for %s, which no longer gates a stored-key step on it; "+
+					"delete the entry so the fallback stays banned", gateVar, rel))
+		}
+	}
 
 	return problems, nil
+}
+
+func gatesAStoredKeyOn(workflow *ciscan.Workflow, gateVar string) bool {
+	for _, jobName := range workflow.JobNames() {
+		steps := workflow.Jobs[jobName].Steps
+		for i := range steps {
+			if found, ok := conditionTerm(steps[i].If, gateTerm); ok && found == gateVar && hasStoredKey(&steps[i]) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func sortedKeys(entries map[string]string) []string {
+	keys := make([]string, 0, len(entries))
+	for key := range entries {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	return keys
 }
 
 // staticKeysIn checks one file: every stored-key line must sit inside a
@@ -87,7 +138,7 @@ func staticKeysIn(repoRoot, rel string) ([]string, error) {
 			continue
 		}
 		problems = append(problems, fmt.Sprintf(
-			"%s:%d: stored AWS key; assume a role with GitHub OIDC (role-to-assume) instead", rel, line))
+			"%s:%d: stored AWS key: a long-lived key in GitHub can be read by any workflow edit; assume a role with GitHub OIDC (role-to-assume) instead", rel, line))
 	}
 
 	return problems, nil

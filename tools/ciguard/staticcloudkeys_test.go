@@ -70,7 +70,7 @@ func writeRepo(t *testing.T, files map[string]string) string {
 const embedsPath = ".github/workflows/embedded-binaries-publish.yml"
 
 func TestStaticCloudKeysAcceptsOIDCOnly(t *testing.T) {
-	problems, err := ciguard.StaticCloudKeys(writeRepo(t, map[string]string{embedsPath: oidcOnlyWorkflow}))
+	problems, err := ciguard.StaticCloudKeys(writeRepo(t, map[string]string{".github/workflows/other.yml": oidcOnlyWorkflow}))
 
 	require.NoError(t, err)
 	assert.Empty(t, problems)
@@ -83,8 +83,8 @@ func TestStaticCloudKeysRejectsAStoredKey(t *testing.T) {
 	problems, err := ciguard.StaticCloudKeys(writeRepo(t, map[string]string{embedsPath: ungated}))
 
 	require.NoError(t, err)
-	require.Len(t, problems, 2)
-	assert.Contains(t, problems[0], "stored AWS key")
+	assert.Contains(t, problems, embedsPath+":19: stored AWS key: a long-lived key in GitHub can be read by any workflow edit; assume a role with GitHub OIDC (role-to-assume) instead")
+	assert.Equal(t, 2, strings.Count(strings.Join(problems, "\n"), ": stored AWS key:"))
 }
 
 // @scenario "A workflow that reads a stored AWS key fails CI"
@@ -259,6 +259,15 @@ func TestStaticCloudKeysRunsOnCompositeActionChanges(t *testing.T) {
 	}
 
 	assert.Contains(t, filters["ciguards"], ".github/actions/**")
+}
+
+// @scenario "A listed fallback variable with no fallback step left fails CI"
+func TestStaticCloudKeysRefusesAStaleFallbackEntry(t *testing.T) {
+	problems, err := ciguard.StaticCloudKeys(writeRepo(t, map[string]string{embedsPath: oidcOnlyWorkflow}))
+
+	require.NoError(t, err)
+	require.Len(t, problems, 1)
+	assert.Contains(t, problems[0], "StaticKeyFallbackVars lists EMBEDS_AWS_ROLE_ARN")
 }
 
 func TestStaticCloudKeysPassesOnThisRepository(t *testing.T) {
