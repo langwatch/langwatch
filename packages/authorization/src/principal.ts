@@ -72,6 +72,8 @@ export type RestResolvedOrganizationCredential = {
   apiKeyId: string;
   userId: string | null;
   organizationId: string;
+  /** Set when the key belongs to an agent session rather than a person. */
+  isLangySessionKey?: boolean;
 };
 
 // The credential a REST request arrived with. Handlers that ask secondary permission
@@ -130,6 +132,8 @@ export type RestKeyCredentialPrincipal =
       userId: string | null;
       organizationId: string;
       resolvedProject?: Readonly<{ id: string; teamId: string }>;
+      /** Set when the key belongs to an agent session, so its removals still need the click. */
+      isLangySessionKey?: boolean;
     }>;
 
 /**

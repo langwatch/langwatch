@@ -52,6 +52,11 @@ export class ExecuteEvaluationCommand implements CommandHandler<
     return `exec:${payload.tenantId}:${payload.traceId}:${payload.evaluatorId}`;
   }
 
+  /** One job per retried attempt, so a retry never collapses onto the first send or another. */
+  static makeRetryJobId(payload: ExecuteEvaluationCommandData): string {
+    return `exec:${payload.tenantId}:${payload.evaluationId}:attempt:${payload.attempt ?? 1}`;
+  }
+
   handle(command: Command<ExecuteEvaluationCommandData>): Promise<EvaluationProcessingEvent[]> {
     return this.intent.execute(command.data);
   }

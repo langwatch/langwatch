@@ -22,6 +22,7 @@ import {
   type InstantEvalClassifierChannel,
   type InstantEvalRateLimiter,
 } from "../channels/instant-eval-classifier.channel.ts";
+import type { InstantEvalDecisionModelChannel } from "../channels/instant-eval-decision-model.channel.ts";
 import type { InstantEvalJudgeChannels } from "../channels/instant-eval-judge.channels.ts";
 import {
   buildInstantEvalJudgeFactsPipeline,
@@ -63,18 +64,21 @@ export class InstantEvalJudgeModule implements InstantEvalJudgeApi {
 
   readonly #facts: InstantEvalJudgeFactsService;
   readonly #classifier: InstantEvalClassifierChannel | undefined;
+  readonly #decisionModels: InstantEvalDecisionModelChannel;
   readonly #limiter: InstantEvalRateLimiter;
   readonly #judge: InstantEvalJudgeService;
   #spendCommands: EventingCommands<InstantEvalJudgeSpendPipeline> | undefined;
 
   private constructor(setup: InstantEvalJudgeSetup) {
-    const { classifier } = setup.channels;
+    const { classifier, decisionModels } = setup.channels;
+    this.#decisionModels = decisionModels;
     this.#facts = InstantEvalJudgeFactsService.create({ repositories: setup.repositories });
     this.#classifier = classifier;
     this.#limiter = InstantEvalJudgeModule.limiterOf(setup);
     this.#judge = InstantEvalJudgeService.create({
       repositories: setup.repositories,
       classifier,
+      decisionModels,
       limiter: this.#limiter,
       isCloud: isLangWatchJudgeHost(setup.config),
       recordSpendPriced: async (fact) => {
@@ -123,7 +127,14 @@ export class InstantEvalJudgeModule implements InstantEvalJudgeApi {
     text,
     questions,
     signal,
+    decisionModel,
   }: InstantEvalClassification): Promise<InstantEvalJudgement> {
+    if (decisionModel) {
+      return this.#decisionModels.classify(
+        { text, questions, decisionModel },
+        ...(signal ? [signal] : []),
+      );
+    }
     if (!this.#classifier) return instantEvalSkipped("classifier_not_configured");
     return this.#classifier.classify(
       { projectId, text, questions, limiter: this.#limiter },

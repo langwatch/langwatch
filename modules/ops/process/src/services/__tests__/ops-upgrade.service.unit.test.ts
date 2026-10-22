@@ -173,8 +173,9 @@ describe("OpsUpgradeService", () => {
         ],
         cursor: null,
       });
+      const { logTail: _logTail, ...listedStep } = STEP;
       expect(opsUpgradeStepPageSchema.parse(await upgrades.listSteps({}))).toEqual({
-        items: [STEP],
+        items: [listedStep],
         cursor: null,
       });
       expect(opsUpgradeStepDetailSchema.parse(await upgrades.getStep({ id: STEP.id }))).toEqual(
@@ -184,7 +185,10 @@ describe("OpsUpgradeService", () => {
         items: [RUN_SUMMARY],
         cursor: "next",
       });
-      expect(opsUpgradeRunSchema.parse(await upgrades.getRun({ id: RUN.id }))).toEqual(RUN);
+      expect(opsUpgradeRunSchema.parse(await upgrades.getRun({ id: RUN.id }))).toEqual({
+        ...RUN,
+        steps: RUN.steps.map(({ logTail: _logTail, ...step }) => step),
+      });
     });
 
     /** @scenario "A run's phases are listed in the order they ran" */
