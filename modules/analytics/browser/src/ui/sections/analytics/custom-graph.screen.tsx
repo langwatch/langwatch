@@ -98,7 +98,6 @@ import { FilterSidebar } from "../../../ui/sections/filter-sidebar.tsx";
 import { FilterToggle, FilterToggleButton } from "../../../ui/sections/filter-toggle.tsx";
 import { SavedViewsScope } from "../../../ui/sections/saved-views-scope.tsx";
 import { SeriesFiltersDialog } from "../../../ui/sections/series-filters-dialog.tsx";
-import { withAggregateAnalyticsGate } from "../aggregate-analytics-gate.tsx";
 import { AnalyticsOverflowMenu } from "../analytics-overflow-menu.tsx";
 
 /** Which of the builder's two addresses this render is. */
@@ -664,6 +663,8 @@ function CustomGraphForm({
   const addNewGraph = analyticsApi.graphs.create.useMutation();
   const updateGraphById = analyticsApi.graphs.updateById.useMutation();
   const host = useAnalyticsHost();
+  // A write the shell refuses (an aggregate, ADR-177, or no grant) offers no button.
+  const canSave = host.hasPermission(customId ? "analytics:update" : "analytics:create");
   const showErrorToast = useShowErrorToast();
   const project = host.project();
   const trpc = analyticsApi.useUtils();
@@ -924,7 +925,7 @@ function CustomGraphForm({
         >
           Cancel
         </Button>
-        {customId ? (
+        {canSave && customId && (
           <Button
             colorPalette="orange"
             onClick={updateGraph}
@@ -935,7 +936,8 @@ function CustomGraphForm({
           >
             Update
           </Button>
-        ) : (
+        )}
+        {canSave && !customId && (
           <Button
             colorPalette="orange"
             loading={addNewGraph.isPending}
@@ -1598,4 +1600,4 @@ function CustomGraphScreen({ mode }: { mode: CustomGraphScreenMode }) {
   );
 }
 
-export default withAggregateAnalyticsGate("Custom graph", CustomGraphScreen);
+export default CustomGraphScreen;
