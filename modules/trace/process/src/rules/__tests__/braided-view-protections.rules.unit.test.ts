@@ -12,7 +12,7 @@ import {
   verifiedMarksOf,
 } from "../braided-span-owner.rules.ts";
 import { mapLegacySpanSummaryToTreeNode } from "../trace-read-mappers.rules.ts";
-import { gateResources } from "../trace-view-gates.rules.ts";
+import { gateResources, resourceInfoOf } from "../trace-view-gates.rules.ts";
 
 const OWNER = "proj_specialists";
 const open: Protections = { canSeeCapturedInput: true, hiddenAttributes: [] };
@@ -169,6 +169,36 @@ describe("gateResources", () => {
       const gated = gateResources({ resources, protections: open });
 
       expect(gated.spans[1]?.resourceAttributes["service.name"]).not.toBe("owner-service");
+    });
+  });
+});
+
+describe("resourceInfoOf", () => {
+  const ingestKey = { "langwatch.api_key.id": "key_1", "service.name": "svc" };
+  const row = {
+    parentSpanId: "root",
+    startTimeMs: 0,
+    resourceAttributes: ingestKey,
+    scopeName: null,
+    scopeVersion: null,
+  };
+
+  describe("given a braided span sent with the owner's ingest key", () => {
+    /** @scenario "Every view of the trace shows the same braided spans" */
+    it("leaves the owner's key out and keeps the reader's", () => {
+      const info = resourceInfoOf({
+        rows: [
+          { ...row, spanId: "root", parentSpanId: null },
+          { ...row, spanId: "owner-span", ownerProjectId: OWNER },
+        ],
+        protections: open,
+        ownerProtections: new Map([[OWNER, open]]),
+      });
+
+      expect(info.spans.map((span) => span.resourceAttributes)).toEqual([
+        ingestKey,
+        { "service.name": "svc" },
+      ]);
     });
   });
 });

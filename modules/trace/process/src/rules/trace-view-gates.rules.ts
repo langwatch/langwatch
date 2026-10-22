@@ -77,7 +77,10 @@ export function resourceInfoOf({
       spans: rows.map((row) => ({
         spanId: row.spanId,
         parentSpanId: row.parentSpanId,
-        resourceAttributes: withoutHiddenResourceAttrs(row.resourceAttributes),
+        resourceAttributes:
+          row.ownerProjectId === undefined
+            ? withoutHiddenResourceAttrs(row.resourceAttributes)
+            : withoutIngestKey(row.resourceAttributes),
         scope: { name: row.scopeName ?? "", version: row.scopeVersion },
         ...(row.ownerProjectId === undefined ? {} : { ownerProjectId: row.ownerProjectId }),
       })),
@@ -158,6 +161,15 @@ export function gateEvaluations({
  * Fixed set, independent of viewer. Applied before gateResources.
  */
 const HIDDEN_RESOURCE_ATTRS: ReadonlySet<string> = new Set([NON_BILLABLE_ATTR]);
+
+/** Stamped by the ingestion receiver: the key a span was sent with, the sending project's own. */
+export const API_KEY_ID_ATTRIBUTE = "langwatch.api_key.id";
+
+/** Resources shown outside the project that sent them: a share page, or a braided span. */
+export function withoutIngestKey(attrs: Record<string, string>): Record<string, string> {
+  const { [API_KEY_ID_ATTRIBUTE]: _apiKeyId, ...rest } = withoutHiddenResourceAttrs(attrs);
+  return rest;
+}
 
 export function withoutHiddenResourceAttrs(attrs: Record<string, string>): Record<string, string> {
   let hasHidden = false;
