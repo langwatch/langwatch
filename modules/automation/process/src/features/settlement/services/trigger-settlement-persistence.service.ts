@@ -12,6 +12,7 @@ import { isCustomerConfigurationRefusal } from "../../../rules/settlement-refusa
 import type { AutomationProjectDirectory } from "../../../services/automation.service.ts";
 import type { AutomationPersistActionService } from "../../runaway/services/persist-action.service.ts";
 import type { AutomationSettlementMatchConfirmation } from "./automation-settlement-match-confirmation.service.ts";
+import { ConfigurationRefusalThrottle } from "./configuration-refusal-throttle.ts";
 import type { AutomationSettlementObservability } from "./automation-settlement-observability.service.ts";
 
 const logger = createLogger("langwatch:automation:settlement-persistence");
@@ -40,6 +41,8 @@ type PersistPage = {
 };
 
 export class TriggerSettlementPersistenceService {
+  private readonly refusalThrottle = ConfigurationRefusalThrottle.create();
+
   private constructor(private readonly composition: PersistenceComposition) {}
 
   static create(composition: PersistenceComposition): TriggerSettlementPersistenceService {
@@ -242,6 +245,7 @@ export class TriggerSettlementPersistenceService {
   private recordTraceFailure(page: PersistPage, traceId: string, error: unknown): void {
     const retryable = !refusesRetry(error);
     if (!retryable && isCustomerConfigurationRefusal(error)) {
+      if (!this.refusalThrottle.shouldLog({ triggerId: page.triggerId, code: error.code })) return;
       logger.warn(
         {
           projectId: page.projectId,

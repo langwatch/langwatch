@@ -21,6 +21,7 @@ import type { AutomationPersistActionService } from "../../runaway/services/pers
 import type { SlackDestinationService } from "../../slack/services/slack-destination.service.ts";
 import type { AutomationSettlementMatchConfirmation } from "./automation-settlement-match-confirmation.service.ts";
 import type { AutomationSettlementObservability } from "./automation-settlement-observability.service.ts";
+import { ConfigurationRefusalThrottle } from "./configuration-refusal-throttle.ts";
 import { TriggerSettlementNotificationService } from "./trigger-settlement-notification.service.ts";
 import { TriggerSettlementPersistenceService } from "./trigger-settlement-persistence.service.ts";
 
@@ -49,6 +50,7 @@ type SettlementComposition = {
 export class AutomationSettlementDispatchService extends AutomationSettlementExecutor {
   private readonly notifications: TriggerSettlementNotificationService;
   private readonly persistence: TriggerSettlementPersistenceService;
+  private readonly refusalThrottle = ConfigurationRefusalThrottle.create();
 
   private constructor(private readonly composition: SettlementComposition) {
     super();
@@ -112,12 +114,14 @@ export class AutomationSettlementDispatchService extends AutomationSettlementExe
 
   /**
    * One line per failure. A refusal the customer fixes in the automation is a
-   * warning and ends the dispatch; anything else is reported once through the
+   * warning, logged once per automation per window, and ends the dispatch; anything else is reported once through the
    * process's error capture, and rethrown when another attempt could succeed.
    */
   private rethrowIfRetryable(error: unknown, context: Record<string, unknown>): void {
     const retryable = !refusesRetry(error);
     if (!retryable && isCustomerConfigurationRefusal(error)) {
+      const triggerId = String(context.triggerId);
+      if (!this.refusalThrottle.shouldLog({ triggerId, code: error.code })) return;
       logger.warn(
         { ...context, code: error.code, fault: error.fault, error: error.message },
         "Settlement dispatch refused by the automation's saved configuration; not retrying",

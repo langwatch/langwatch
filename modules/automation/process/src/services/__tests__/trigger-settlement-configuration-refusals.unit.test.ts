@@ -74,6 +74,27 @@ describe("settlement refusals caused by the automation's saved configuration", (
     });
   });
 
+  describe("given an email automation that keeps firing with recipients that no longer validate", () => {
+    describe("when several matches settle", () => {
+      it("ends each dispatch without retrying and warns once for the automation", async () => {
+        const fixture = createSettlementFixture(
+          settlementTrigger("SEND_EMAIL", { actionParams: { members: [] } }),
+        );
+
+        for (const messageKey of ["digest:1", "digest:2", "digest:3"]) {
+          await expect(
+            fixture.service.notifyDigest(digest, settlementContext(messageKey)),
+          ).resolves.toBeUndefined();
+        }
+
+        expect(fixture.delivery.emails).toHaveLength(0);
+        expect(refusalWarnings()).toHaveLength(1);
+        expect(fixture.observability.captures).toEqual([]);
+        expect(loggerError).not.toHaveBeenCalled();
+      });
+    });
+  });
+
   describe("given a webhook automation whose stored settings no longer parse", () => {
     describe("when the match settles", () => {
       /** @scenario "A webhook automation whose saved settings no longer parse is refused as the customer's to fix" */
