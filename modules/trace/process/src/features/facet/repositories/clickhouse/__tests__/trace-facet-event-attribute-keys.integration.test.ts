@@ -55,9 +55,11 @@ const FIRST_KEY_OCCURRENCES = TOTAL_EVENTS - SPARSE_SPANS;
 /** Missing from the empty events and from the single-key ones. */
 const OTHER_KEY_OCCURRENCES = TOTAL_EVENTS - 2 * SPARSE_SPANS;
 
-// Between what the two reads need. Measured on CH 25.10 with the seed below:
-// the keys-only read peaks near 4 MiB, the whole-Map read near 28 MiB.
+// Between what the two reads need. Measured on CH 25.10 with the seed below and one
+// thread: the keys-only read peaks near 3.4 MiB, the whole-Map read near 26 MiB.
 const MEMORY_CAP = "12000000"; // 12 MB
+/** One thread, so peak read memory doesn't scale with the runner's core count. */
+const BUDGET = { max_memory_usage: MEMORY_CAP, max_threads: 1 };
 
 type FacetRow = { facet_value: string; cnt: string; total_distinct: string };
 
@@ -118,11 +120,14 @@ describe.skipIf(!clickHouseConfigured)("event-attribute-keys facet integration",
   beforeAll(async () => {
     if (!clickHouseConfigured) return;
     ch = await startMigratedTraceClickHouse();
+    // The budget assumes the parts the seed's batches create, so merges stay stopped.
+    await ch.command({ query: "SYSTEM STOP MERGES stored_spans" });
     await seedSpansWithEvents({ ch });
   }, 180_000);
 
   afterAll(async () => {
     if (!ch) return;
+    await ch.command({ query: "SYSTEM START MERGES stored_spans" });
     await ch.command({
       query: "DELETE FROM stored_spans WHERE TenantId = {tenantId:String}",
       query_params: { tenantId: TENANT_ID },
@@ -150,7 +155,7 @@ describe.skipIf(!clickHouseConfigured)("event-attribute-keys facet integration",
           query: query.sql,
           query_params: query.params,
           format: "JSONEachRow",
-          clickhouse_settings: { max_memory_usage: MEMORY_CAP },
+          clickhouse_settings: BUDGET,
         });
         rows = await result.json<FacetRow>();
       });
@@ -171,6 +176,9 @@ describe.skipIf(!clickHouseConfigured)("event-attribute-keys facet integration",
         // The subcolumn must not change multiplicity: one row per key per event
         // per span, which is what orders the sidebar by frequency.
 
+        const keys = rows.map((row) => row.facet_value);
+        expect(keys).toHaveLength(EXPECTED_DISTINCT_KEYS);
+        expect(new Set(keys).size).toBe(keys.length);
         const counts = Object.fromEntries(rows.map((row) => [row.facet_value, Number(row.cnt)]));
         expect(counts).toEqual({
           event_key_0: FIRST_KEY_OCCURRENCES,
@@ -185,7 +193,7 @@ describe.skipIf(!clickHouseConfigured)("event-attribute-keys facet integration",
     });
 
     describe("when reading the whole Map instead of the keys subcolumn", () => {
-      /** @scenario Event-attribute keys load when events carry large values */
+      /** @scenario Discovering event-attribute keys does not read their values */
       it("blows the same memory budget (the bug this fixes)", async () => {
         // Identical query except both the projection and the empty
         // short-circuit go through the Map, dragging the values column in.
@@ -207,7 +215,7 @@ describe.skipIf(!clickHouseConfigured)("event-attribute-keys facet integration",
               query: preFixSql,
               query_params: query.params,
               format: "JSONEachRow",
-              clickhouse_settings: { max_memory_usage: MEMORY_CAP },
+              clickhouse_settings: BUDGET,
             })
             .then((r) => r.json()),
         ).rejects.toMatchObject({ code: "241" }); // MEMORY_LIMIT_EXCEEDED

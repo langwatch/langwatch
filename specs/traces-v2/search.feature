@@ -2428,6 +2428,12 @@ Rule: Dynamic prefix sidebar parity
     When the sidebar discovers event-attribute keys
     Then the key list loads with every key
 
+  @regression @integration
+  Scenario: Discovering event-attribute keys does not read their values
+    Given most of the project's events carry large attribute values
+    When the sidebar discovers event-attribute keys
+    Then the read fits a memory budget that reading the values as well exceeds
+
 
 Rule: Attribute sections list values from their own attribute store
   Each attribute flavour is backed by a different ClickHouse column
