@@ -12,7 +12,6 @@ import {
   detectRequiredJoin,
   tableAliases,
 } from "../clickhouse.field-mappings.mapper.ts";
-import { OWN_TENANT_SQL } from "../clickhouse.tenant-predicate.mapper.ts";
 
 describe("field-mappings", () => {
   describe("when reading fieldMappings", () => {
@@ -168,13 +167,13 @@ describe("field-mappings", () => {
 
   describe("buildJoinClause()", () => {
     it("returns empty string for trace_summaries", () => {
-      expect(buildJoinClause({ table: "trace_summaries", tenant: OWN_TENANT_SQL })).toBe("");
+      expect(buildJoinClause({ table: "trace_summaries" })).toBe("");
     });
 
     it("builds correct JOIN for stored_spans with column pruning", () => {
-      const join = buildJoinClause({ table: "stored_spans", tenant: OWN_TENANT_SQL });
+      const join = buildJoinClause({ table: "stored_spans" });
       expect(join).toContain("FROM stored_spans");
-      expect(join).toContain("TenantId = {tenantId:String}");
+      expect(join).toContain("{{tenantSet}}");
       expect(join).toContain("ts.TenantId = ss.TenantId");
       expect(join).toContain("ts.TraceId = ss.TraceId");
       // Should not use SELECT *
@@ -182,7 +181,7 @@ describe("field-mappings", () => {
     });
 
     it("builds correct JOIN for evaluation_runs", () => {
-      const join = buildJoinClause({ table: "evaluation_runs", tenant: OWN_TENANT_SQL });
+      const join = buildJoinClause({ table: "evaluation_runs" });
       expect(join).toContain("FROM evaluation_runs");
       expect(join).toContain("GROUP BY TenantId, EvaluationId");
       expect(join).toContain("ts.TenantId = es.TenantId");
@@ -190,12 +189,12 @@ describe("field-mappings", () => {
     });
 
     it("leaves the stored_spans JOIN unbounded on StartTime when no filter is passed", () => {
-      const join = buildJoinClause({ table: "stored_spans", tenant: OWN_TENANT_SQL });
+      const join = buildJoinClause({ table: "stored_spans" });
       // StartTime is a selected column, but there must be no StartTime predicate:
       // the WHERE ends right after the tenant filter.
       expect(join).not.toContain("StartTime >=");
       expect(join).not.toContain("StartTime <");
-      expect(join).toContain("WHERE TenantId = {tenantId:String}) ss");
+      expect(join).toContain("WHERE {{tenantSet}}) ss");
     });
 
     it("injects the span time filter into the stored_spans JOIN when provided", () => {
@@ -204,10 +203,9 @@ describe("field-mappings", () => {
       const join = buildJoinClause({
         table: "stored_spans",
         spanTimeFilter: filter,
-        tenant: OWN_TENANT_SQL,
       });
       // The bound lands inside the subquery WHERE, before the closing paren/alias.
-      expect(join).toContain(`TenantId = {tenantId:String} ${filter})`);
+      expect(join).toContain(`{{tenantSet}} ${filter})`);
     });
 
     it("ignores the span time filter for evaluation_runs", () => {
@@ -215,7 +213,6 @@ describe("field-mappings", () => {
       const join = buildJoinClause({
         table: "evaluation_runs",
         spanTimeFilter: filter,
-        tenant: OWN_TENANT_SQL,
       });
       expect(join).not.toContain("StartTime");
     });
@@ -227,7 +224,6 @@ describe("field-mappings", () => {
       const join = buildJoinClause({
         table: "evaluation_runs",
         evalTimeFilter: filter,
-        tenant: OWN_TENANT_SQL,
       });
       // The dedup inner GROUP BY is the scan that walks partitions — a bound
       // only on the outer subquery would leave the full-history scan in place.
@@ -236,7 +232,7 @@ describe("field-mappings", () => {
     });
 
     it("leaves the evaluation_runs JOIN unbounded when no eval filter is passed", () => {
-      const join = buildJoinClause({ table: "evaluation_runs", tenant: OWN_TENANT_SQL });
+      const join = buildJoinClause({ table: "evaluation_runs" });
       expect(join).not.toContain("ScheduledAt >=");
       expect(join).not.toContain("UpdatedAt >= {");
     });
@@ -246,7 +242,6 @@ describe("field-mappings", () => {
       const join = buildJoinClause({
         table: "stored_spans",
         evalTimeFilter: filter,
-        tenant: OWN_TENANT_SQL,
       });
       expect(join).not.toContain("ScheduledAt");
     });
