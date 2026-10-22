@@ -43,10 +43,11 @@ func main() {
 		{name: "lean-checkout", run: ciguard.LeanCheckout},
 		{name: "go-version", run: ciguard.GoVersion},
 		{name: "pr-review-bot", run: ciguard.PRReviewBot},
+		{name: "static-cloud-keys", run: ciguard.StaticCloudKeys},
 	}
 
 	if failed := runAll(guards, repoRoot); failed {
-		fmt.Fprintln(os.Stderr, "\nSee specs/ci/lean-checkout.feature, specs/ci/go-version-consistency.feature and specs/ci/pr-review-bot.feature")
+		fmt.Fprintln(os.Stderr, "\nSee specs/ci/lean-checkout.feature, specs/ci/go-version-consistency.feature, specs/ci/pr-review-bot.feature and specs/ci/no-static-cloud-keys.feature")
 		os.Exit(1)
 	}
 }

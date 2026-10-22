@@ -22,6 +22,7 @@ import (
 // are modeled; everything else in a workflow is deliberately ignored.
 type Step struct {
 	Name string            `yaml:"name"`
+	If   string            `yaml:"if"`
 	Uses string            `yaml:"uses"`
 	With map[string]any    `yaml:"with"`
 	Env  map[string]string `yaml:"env"`
