@@ -65,6 +65,9 @@ import {
   type UpgradeDiagnosticsReceipt,
   type UpgradeDiagnosticsReport,
   type UpgradeDiagnosticsSubmission,
+  type CreateSelfHostedNoticeInput,
+  type SelfHostedNoticeView,
+  type UpdateSelfHostedNoticeInput,
   type GenerateLicenseKeyInput,
   LicenseSigningNotConfiguredError,
   type GenerateLicenseOutput,
@@ -75,7 +78,7 @@ import type { EntitlementGrant, ResolvePlanInput } from "@langwatch/entitlement-
 import type { EventingCommands } from "@langwatch/eventing";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import { optionalUsageReportKeys } from "@langwatch/ops-contract";
+import { optionalUsageReportKeys, type SelfHostedNotice } from "@langwatch/ops-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { nowInstant, Temporal } from "@langwatch/time";
 
@@ -131,6 +134,7 @@ import { LicensingInfrastructureService } from "../services/licensing-infrastruc
 import { SelfHostedCrmService } from "../services/self-hosted-crm.service.ts";
 import type { SelfHostedLeadsInfrastructure } from "../services/self-hosted-crm.service.ts";
 import { SelfHostedInstanceService } from "../services/self-hosted-instance.service.ts";
+import { SelfHostedNoticeService } from "../services/self-hosted-notice.service.ts";
 import { SsoGateStatusService } from "../services/sso-gate-status.service.ts";
 import { UpgradeDiagnosticsSenderService } from "../services/upgrade-diagnostics-sender.service.ts";
 import { UpgradeDiagnosticsService } from "../services/upgrade-diagnostics.service.ts";
@@ -196,6 +200,7 @@ export class LicensingModule implements LicensingApiContract {
   readonly #ssoGate: SsoGateStatusService;
   readonly #diagnostics: UpgradeDiagnosticsService;
   readonly #diagnosticsSender: UpgradeDiagnosticsSenderService;
+  readonly #notices: SelfHostedNoticeService;
   #configuredActivation: ConfiguredActivationService | undefined;
 
   /** The licensing_customer pipeline, whose facts organization applies (R42). */
@@ -227,8 +232,10 @@ export class LicensingModule implements LicensingApiContract {
     customerFacts,
     signInProviderMounts,
     diagnostics,
+    notices,
   }: {
     diagnostics: UpgradeDiagnosticsService;
+    notices: SelfHostedNoticeService;
     signInProviderMounts: SignInProviderMountRepository;
     customerFacts: LicensingCustomerFactsService;
     generation: LicenseGenerationService;
@@ -259,6 +266,7 @@ export class LicensingModule implements LicensingApiContract {
     this.#refresh = install.refresh;
     this.#diagnosticsSender = install.diagnosticsSender;
     this.#diagnostics = diagnostics;
+    this.#notices = notices;
     this.#ssoGate = SsoGateStatusService.create({
       mounts: signInProviderMounts,
       isPlatformSsoLicensed: () => this.isPlatformSsoLicensed(),
@@ -376,6 +384,10 @@ export class LicensingModule implements LicensingApiContract {
         repositories,
         baseUrl: config.publicBaseUrl ?? DEFAULT_PUBLIC_BASE_URL,
         ...(announcements ? { announcements } : {}),
+      }),
+      notices: SelfHostedNoticeService.create({
+        repository: repositories.selfHostedNotices,
+        now: nowInstant,
       }),
     });
     if (!config.isSaas && configured.form === "activation_code") {
@@ -827,6 +839,33 @@ export class LicensingModule implements LicensingApiContract {
 
   getUpgradeDiagnosticsDownload(input: { id: string }): Promise<UpgradeDiagnosticsDownload> {
     return this.#diagnostics.getDownload(input);
+  }
+
+  listSelfHostedNotices(): Promise<SelfHostedNoticeView[]> {
+    return this.#notices.list();
+  }
+
+  createSelfHostedNotice(input: CreateSelfHostedNoticeInput): Promise<SelfHostedNoticeView> {
+    return this.#notices.create(input);
+  }
+
+  updateSelfHostedNotice(input: UpdateSelfHostedNoticeInput): Promise<SelfHostedNoticeView> {
+    return this.#notices.update(input);
+  }
+
+  publishSelfHostedNotice(input: {
+    id: string;
+    operatorId: string;
+  }): Promise<SelfHostedNoticeView> {
+    return this.#notices.publish(input);
+  }
+
+  withdrawSelfHostedNotice(input: { id: string }): Promise<SelfHostedNoticeView> {
+    return this.#notices.withdraw(input);
+  }
+
+  findPublishedSelfHostedNotices(): Promise<SelfHostedNotice[]> {
+    return this.#notices.findSent();
   }
 }
 

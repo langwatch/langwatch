@@ -13,6 +13,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { MemoryUsageReportChannel } from "../../channels/memory/memory.usage-report.channel.ts";
 import { MemoryCloudLatestReleaseRepository } from "../../repositories/memory/memory.cloud-latest-release.repository.ts";
+import { MemoryCloudNoticeRepository } from "../../repositories/memory/memory.cloud-notice.repository.ts";
 import { MemoryOpsStore } from "../../repositories/memory/memory.ops.store.ts";
 import { UsageReportCollectionService } from "../usage-report-collection.service.ts";
 import {
@@ -80,6 +81,7 @@ let channel: MemoryUsageReportChannel;
 let install: InstallStandIn;
 let opsHealthReads: number;
 let latestReleases: MemoryCloudLatestReleaseRepository;
+let notices: MemoryCloudNoticeRepository;
 
 const OPS_HEALTH = {
   snapshot_at: "2026-09-21T09:59:00.000Z",
@@ -114,6 +116,7 @@ function service({ disabled = false, isSaas = false } = {}) {
     channel,
     install,
     latestReleases,
+    notices,
     disabled,
     isSaas,
     now: () => NOW,
@@ -126,6 +129,7 @@ beforeEach(() => {
   state.projectsByOrganization.set("org_2", ["project_2"]);
   channel = MemoryUsageReportChannel.create();
   latestReleases = MemoryCloudLatestReleaseRepository.create({ store: MemoryOpsStore.create() });
+  notices = MemoryCloudNoticeRepository.create({ store: MemoryOpsStore.create() });
   install = new InstallStandIn();
   opsHealthReads = 0;
 });
@@ -220,6 +224,48 @@ describe("given cloud's reply names a latest release", () => {
     it("names none", async () => {
       await latestReleases.save({ release: "3.22.0", commit: null });
       expect(await service({ disabled: true }).findLatestRelease()).toEqual([]);
+    });
+  });
+});
+
+describe("given cloud's reply names notices", () => {
+  const notice = (id: string) => ({
+    id,
+    severity: "info" as const,
+    title: `Notice ${id}`,
+    body: "",
+    url: null,
+    fixed_in: null,
+    published_at: "2026-10-20T09:00:00.000Z",
+  });
+
+  describe("when the daily report is sent", () => {
+    /** @scenario "The usage report keeps the notices cloud's reply names" */
+    it("keeps both for the status, and forgets them when a later reply names none", async () => {
+      channel.notices = [notice("n1"), notice("n2")];
+      expect(await service().send()).toBe("sent");
+      expect(await service().findNotices()).toEqual([notice("n1"), notice("n2")]);
+
+      channel.notices = [];
+      await service().send();
+      expect(await service().findNotices()).toEqual([]);
+    });
+  });
+
+  describe("when usage reporting is switched off", () => {
+    /** @scenario "No notices are named when usage reporting is off" */
+    it("names none", async () => {
+      await notices.save([notice("n1")]);
+      expect(await service({ disabled: true }).findNotices()).toEqual([]);
+    });
+  });
+
+  describe("when LangWatch Connect is disabled", () => {
+    it("forgets the notices it held", async () => {
+      await notices.save([notice("n1")]);
+      install.connect = { ...install.connect, permitted: false };
+      expect(await service().send()).toBe("connect_disabled");
+      expect(await notices.find()).toEqual([]);
     });
   });
 });

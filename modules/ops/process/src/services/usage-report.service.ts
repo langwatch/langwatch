@@ -8,6 +8,7 @@ import {
   INSTANCE_ID_NOT_MINTED,
   USAGE_REPORT_EVENT,
   USAGE_REPORT_SCHEMA_VERSION,
+  type SelfHostedNotice,
   type UsageReportPreview,
   type UsageReportSwitches,
 } from "@langwatch/ops-contract";
@@ -19,6 +20,7 @@ import type {
   CloudLatestRelease,
   CloudLatestReleaseRepository,
 } from "../repositories/cloud-latest-release.repository.ts";
+import type { CloudNoticeRepository } from "../repositories/cloud-notice.repository.ts";
 import { nextNoonUtc } from "../rules/usage-report-schedule.rules.ts";
 import type { UsageReportCollectionService } from "./usage-report-collection.service.ts";
 
@@ -57,6 +59,7 @@ interface UsageReportServiceDependencies {
   readonly channel: UsageReportChannel;
   readonly install: UsageReportInstall;
   readonly latestReleases: CloudLatestReleaseRepository;
+  readonly notices: CloudNoticeRepository;
   /** DISABLE_USAGE_STATS. */
   readonly disabled: boolean;
   readonly isSaas: boolean;
@@ -118,6 +121,9 @@ export class UsageReportService {
       await this.deps.latestReleases.save(answer.latestRelease).catch((error: unknown) => {
         logger.warn({ instanceId, error }, "could not keep the latest release cloud named");
       });
+      await this.deps.notices.save(answer.notices).catch((error: unknown) => {
+        logger.warn({ instanceId, error }, "could not keep the notices cloud named");
+      });
       logger.info({ instanceId }, "usage stats sent");
       return "sent";
     } catch (error) {
@@ -135,8 +141,15 @@ export class UsageReportService {
     return this.deps.latestReleases.find();
   }
 
+  /** The notices cloud last named; empty when this install does not report usage. */
+  async findNotices(): Promise<SelfHostedNotice[]> {
+    if (this.deps.isSaas || this.deps.disabled) return [];
+    return this.deps.notices.find();
+  }
+
   private async forgetLatestRelease(): Promise<void> {
     await this.deps.latestReleases.save(null).catch(() => undefined);
+    await this.deps.notices.save([]).catch(() => undefined);
   }
 
   /**

@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type {
+  CreateSelfHostedNoticeInput,
+  SelfHostedNoticeView,
+  UpdateSelfHostedNoticeInput,
   ActivationCodePage,
   ActivationCodeView,
   IssuedActivationCode,
@@ -139,6 +142,24 @@ export interface EnterpriseOpsApi {
     id: string;
     operator: OpsOperator | null;
   }): Promise<UpgradeDiagnosticsDownload>;
+
+  // -- notices to self-hosted installs (self-hosted-notices.feature); writes ask ops:manage --
+
+  listSelfHostedNotices(input: { operator: OpsOperator | null }): Promise<SelfHostedNoticeView[]>;
+  createSelfHostedNotice(
+    input: CreateSelfHostedNoticeInput & { operator: OpsOperator | null },
+  ): Promise<SelfHostedNoticeView>;
+  updateSelfHostedNotice(
+    input: UpdateSelfHostedNoticeInput & { operator: OpsOperator | null },
+  ): Promise<SelfHostedNoticeView>;
+  publishSelfHostedNotice(input: {
+    id: string;
+    operator: OpsOperator | null;
+  }): Promise<SelfHostedNoticeView>;
+  withdrawSelfHostedNotice(input: {
+    id: string;
+    operator: OpsOperator | null;
+  }): Promise<SelfHostedNoticeView>;
 }
 
 export const EnterpriseOpsApi = moduleApi<EnterpriseOpsApi>()("enterprise-ops");

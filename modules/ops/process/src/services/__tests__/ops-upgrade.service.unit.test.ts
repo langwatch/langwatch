@@ -11,6 +11,7 @@ import {
   opsUpgradeStepDetailSchema,
   opsUpgradeStepPageSchema,
   opsUpgradeTargetSummarySchema,
+  type SelfHostedNotice,
 } from "@langwatch/ops-contract";
 import type {
   UpgradePreview,
@@ -87,18 +88,27 @@ const STATUS = statusOf({
 function service({
   version,
   held,
+  notices,
   targets = [],
   routes,
 }: {
   version?: UpgradeImageVersion;
   held?: CloudLatestRelease[];
+  notices?: SelfHostedNotice[];
   targets?: UpgradeTargetSummary[];
   routes?: Parameters<typeof OpsUpgradeService.create>[0]["routes"];
 } = {}) {
   return OpsUpgradeService.create({
     isSaas: false,
     ...(routes ? { routes } : {}),
-    ...(held ? { cloudReleases: { findLatestRelease: async () => held } } : {}),
+    ...(held || notices
+      ? {
+          cloudReleases: {
+            findLatestRelease: async () => held ?? [],
+            findNotices: async () => notices ?? [],
+          },
+        }
+      : {}),
     ledger: MemoryUpgradeLedgerRepository.create({
       ...(version ? { version } : {}),
       reader: {
@@ -166,6 +176,7 @@ describe("OpsUpgradeService", () => {
         deprecations: [],
         version: { kind: "development", containsRelease: null, commit: null },
         latestRelease: null,
+        notices: [],
       });
       expect(opsUpgradeReleasePageSchema.parse(await upgrades.listReleases())).toEqual({
         items: [
@@ -314,6 +325,56 @@ describe("OpsUpgradeService.getStatus version and latest release", () => {
         held: [],
       }).getStatus();
       expect(status.latestRelease).toBeNull();
+    });
+  });
+});
+
+describe("OpsUpgradeService.getStatus notices", () => {
+  const notice = (
+    id: string,
+    severity: SelfHostedNotice["severity"],
+    fixed_in: string | null,
+  ): SelfHostedNotice => ({
+    id,
+    severity,
+    title: `Notice ${id}`,
+    body: "",
+    url: null,
+    fixed_in,
+    published_at: "2026-10-20T09:00:00.000Z",
+  });
+
+  describe("given a kept notice fixed in 3.4.2", () => {
+    const notices = [notice("n1", "security", "v3.4.2")];
+
+    /** @scenario "A notice fixed in the running release or earlier is not shown" */
+    it("names it on 3.4.0, and not on 3.4.2 or newer", async () => {
+      const older = await service({
+        version: { kind: "release", release: "3.4.0" },
+        notices,
+      }).getStatus();
+      expect(older.notices.map(({ id }) => id)).toEqual(["n1"]);
+      for (const release of ["3.4.2", "3.5.0"]) {
+        const current = await service({
+          version: { kind: "release", release },
+          notices,
+        }).getStatus();
+        expect(current.notices).toEqual([]);
+      }
+    });
+  });
+
+  describe("given notices of every severity", () => {
+    it("names security first, then warning, then info", async () => {
+      const status = await service({
+        version: { kind: "release", release: "3.4.0" },
+        notices: [
+          notice("i", "info", null),
+          notice("s", "security", null),
+          notice("w", "warning", null),
+        ],
+      }).getStatus();
+      expect(status.notices.map(({ id }) => id)).toEqual(["s", "w", "i"]);
     });
   });
 });

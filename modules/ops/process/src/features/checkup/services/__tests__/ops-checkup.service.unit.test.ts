@@ -15,6 +15,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { MemoryCheckupProbeChannel } from "../../../../channels/memory/memory.checkup-probe.channel.ts";
 import { MemoryUsageReportChannel } from "../../../../channels/memory/memory.usage-report.channel.ts";
 import { MemoryCloudLatestReleaseRepository } from "../../../../repositories/memory/memory.cloud-latest-release.repository.ts";
+import { MemoryCloudNoticeRepository } from "../../../../repositories/memory/memory.cloud-notice.repository.ts";
 import {
   MemoryClickHouseHealthRepository,
   MemoryPostgresHealthRepository,
@@ -167,6 +168,7 @@ function service() {
       cloudLatestRelease: MemoryCloudLatestReleaseRepository.create({
         store: MemoryOpsStore.create(),
       }),
+      cloudNotices: MemoryCloudNoticeRepository.create({ store: MemoryOpsStore.create() }),
     },
     channels: {
       usageReport: MemoryUsageReportChannel.create(),

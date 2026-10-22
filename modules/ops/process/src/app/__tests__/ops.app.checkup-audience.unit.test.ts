@@ -18,6 +18,7 @@ import { MemoryUsageReportChannel } from "../../channels/memory/memory.usage-rep
 import { OpsCheckupService } from "../../features/checkup/services/ops-checkup.service.ts";
 import { UpgradeDiagnosticsService } from "../../features/upgrades/services/upgrade-diagnostics.service.ts";
 import { MemoryCloudLatestReleaseRepository } from "../../repositories/memory/memory.cloud-latest-release.repository.ts";
+import { MemoryCloudNoticeRepository } from "../../repositories/memory/memory.cloud-notice.repository.ts";
 import {
   MemoryClickHouseHealthRepository,
   MemoryPostgresHealthRepository,
@@ -143,6 +144,7 @@ function checkupService(): OpsCheckupService {
       cloudLatestRelease: MemoryCloudLatestReleaseRepository.create({
         store: MemoryOpsStore.create(),
       }),
+      cloudNotices: MemoryCloudNoticeRepository.create({ store: MemoryOpsStore.create() }),
     },
     channels: {
       usageReport: MemoryUsageReportChannel.create(),

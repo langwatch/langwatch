@@ -9,6 +9,7 @@ import { nowInstant } from "@langwatch/time";
 import type { CheckupProbeChannel } from "../../../channels/checkup-probe.channel.ts";
 import type { UsageReportChannel } from "../../../channels/usage-report.channel.ts";
 import type { CloudLatestReleaseRepository } from "../../../repositories/cloud-latest-release.repository.ts";
+import type { CloudNoticeRepository } from "../../../repositories/cloud-notice.repository.ts";
 import type {
   ClickHouseHealthRepository,
   PostgresHealthRepository,
@@ -57,6 +58,8 @@ interface OpsCheckupDependencies {
     readonly upgradeLedger: Pick<UpgradeLedgerRepository, "findStatus" | "findSteps">;
     /** Where the usage report keeps the latest release cloud's reply named. */
     readonly cloudLatestRelease: CloudLatestReleaseRepository;
+    /** Where it keeps the notices the same reply named. */
+    readonly cloudNotices: CloudNoticeRepository;
   };
   readonly channels: { usageReport: UsageReportChannel; probes: CheckupProbeChannel };
   /** The ops health the usage report carries; left out where the process composes none. */
@@ -134,6 +137,7 @@ export class OpsCheckupService {
       channel: channels.usageReport,
       install: peers.licensing,
       latestReleases: repositories.cloudLatestRelease,
+      notices: repositories.cloudNotices,
       disabled: config.usageStats.disabled,
       isSaas: facts.isSaas,
       now: nowInstant,
