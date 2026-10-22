@@ -114,6 +114,8 @@ const NEXT_STEPS: Partial<Record<InstantEvalJudgeSkipReason, string>> = {
     "The decision model's key is missing, switched off or refused. Check it in Settings > Model Providers.",
   classifier_rate_limited: "The decision model is rate limited. Wait a moment and retry.",
   classifier_provider_unavailable: "The decision model's provider is unavailable. Retry later.",
+  classifier_failed:
+    "The classifier refused or could not read this text. Retry; if it keeps failing, pick another decision model in Settings > Model Providers.",
 };
 
 /** A refused judge call, returned as an error naming its code so it is never read as a skip. */

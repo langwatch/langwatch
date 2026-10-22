@@ -7,7 +7,7 @@
 import type { GuardrailCheckDirection } from "@langwatch/evaluation-contract";
 import type { EvaluatorApi, SingleEvaluationResult } from "@langwatch/evaluator-contract";
 import type { InstantEvalJudgeApi } from "@langwatch/instant-eval-judge-contract";
-import type { DecisionModelResolution, ModelProviderApi } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 
 import {
   ownDecisionModelOf,
@@ -27,8 +27,8 @@ import {
 
 type EvaluationJudgingDeps = Readonly<{
   judges: Pick<InstantEvalJudgeApi, "judge">;
-  /** The project's Instant Evals column; absent judges on LangWatch's classifier (ADR-182). */
-  decisionModels?: Pick<ModelProviderApi, "resolveDecisionModel"> | undefined;
+  /** The project's Instant Evals column: LangWatch's classifier or its own model (ADR-182). */
+  decisionModels: Pick<ModelProviderApi, "resolveDecisionModel">;
   /** The shared augmenter every judge's result runs through, so a leak is never hidden. */
   evaluators: Pick<EvaluatorApi, "augmentResult">;
 }>;
@@ -89,7 +89,7 @@ export class EvaluationJudgingService {
     const request = buildInstantEvalJudgeRequest({ judge, inputs });
     if (request.kind === "nothing_to_judge") return instantEvalSkipResultOf("nothing_to_judge");
 
-    const resolved = await this.decisionModelOf(projectId);
+    const resolved = await this.deps.decisionModels.resolveDecisionModel({ projectId });
     // A broken own key never falls back to LangWatch's classifier (ADR-182 decision 9).
     if (resolved.kind === "own_unavailable") {
       return instantEvalSkipResultOf(unavailableDecisionModelSkipOf(resolved));
@@ -110,11 +110,5 @@ export class EvaluationJudgingService {
       judgement: answer.judgement,
       priceUsd: answer.priceUsd,
     });
-  }
-
-  private decisionModelOf(projectId: string): Promise<DecisionModelResolution> {
-    return this.deps.decisionModels
-      ? this.deps.decisionModels.resolveDecisionModel({ projectId })
-      : Promise.resolve({ kind: "langwatch" });
   }
 }
