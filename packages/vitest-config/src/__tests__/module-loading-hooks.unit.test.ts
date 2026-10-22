@@ -135,7 +135,7 @@ describe("createModuleLoadingHooks", () => {
     /** @scenario "A changed installed file is read again, never served stale" */
     it("reads an edited file from disk even when its size is unchanged", () => {
       const { packageFile, packageUrl } = workspace();
-      const { load, sources, counts } = hooksOver();
+      const { load, sources } = hooksOver();
       const nextLoad = nextLoadFromDisk();
       load(packageUrl, loadContext, nextLoad);
 
@@ -146,7 +146,7 @@ describe("createModuleLoadingHooks", () => {
 
       expect(edited.source).toBe("module.exports = 2;\n");
       expect(again.source).toBe("module.exports = 2;\n");
-      expect(counts.loadStale).toBe(1);
+      expect(nextLoad).toHaveBeenCalledTimes(2);
       expect(sources.get(packageUrl)?.toString("utf8", 25)).toBe("module.exports = 2;\n");
     });
 

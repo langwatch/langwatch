@@ -119,3 +119,15 @@ Feature: Vitest workers load installed packages from a cache
     Given LANGWATCH_VITEST_FAST is 0
     When the shared vitest config is resolved
     Then the workers get no extra Node options
+
+  @unit
+  Scenario: A later worker reads what an earlier worker saved to disk
+    Given a worker that resolved a package and exited normally
+    When a later process starts with the cache and resolves the same package
+    Then it gets the saved answer, and a process without the cache gets Node's
+
+  @unit
+  Scenario: A forked worker ended with SIGTERM still saves its cache
+    Given a forked worker that loaded a package
+    When Vitest ends it with SIGTERM
+    Then the cache files are on disk afterwards

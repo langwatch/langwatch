@@ -9,14 +9,6 @@ export interface ModuleCacheStore {
   set(key: string, value: Buffer): void;
 }
 
-export interface ModuleLoadingCounts {
-  resolveHits: number;
-  resolveMisses: number;
-  loadHits: number;
-  loadMisses: number;
-  loadStale: number;
-}
-
 const FORMATS: (string | undefined)[] = [
   undefined,
   "commonjs",
@@ -92,22 +84,16 @@ function freshSource({
   entry,
   url,
   format,
-  counts,
 }: {
   entry: Buffer | undefined;
   url: string;
   format: string | null | undefined;
-  counts: ModuleLoadingCounts;
 }): LoadFnOutput | undefined {
   const stat = entry && statOf(url);
   if (!entry || !stat) return undefined;
-  if (!sameFile(entry, stat)) {
-    counts.loadStale++;
-    return undefined;
-  }
+  if (!sameFile(entry, stat)) return undefined;
   const cached = FORMATS[entry[0]!];
   if (format != null && format !== cached) return undefined;
-  counts.loadHits++;
   return { format: cached, source: entry.toString("utf8", SOURCE_HEADER), shortCircuit: true };
 }
 
@@ -136,9 +122,7 @@ export function createModuleLoadingHooks({
 }: {
   resolutions: ModuleCacheStore;
   sources: ModuleCacheStore;
-}): { resolve: ResolveHookSync; load: LoadHookSync; counts: ModuleLoadingCounts } {
-  const counts = { resolveHits: 0, resolveMisses: 0, loadHits: 0, loadMisses: 0, loadStale: 0 };
-
+}): { resolve: ResolveHookSync; load: LoadHookSync } {
   const resolve: ResolveHookSync = (specifier, context, nextResolve) => {
     if (specifier.startsWith("node:") || isBuiltin(specifier)) {
       return nextResolve(specifier, context);
@@ -146,12 +130,10 @@ export function createModuleLoadingHooks({
     const key = resolutionKey(specifier, context);
     const hit = resolutions.get(key);
     if (hit !== undefined) {
-      counts.resolveHits++;
       return { url: hit.toString("utf8", 1), format: FORMATS[hit[0]!], shortCircuit: true };
     }
     const result = nextResolve(specifier, context);
     if (keepsResolution(specifier, context.parentURL, result.url)) {
-      counts.resolveMisses++;
       const url = Buffer.from(result.url, "utf8");
       resolutions.set(key, Buffer.concat([Buffer.of(encodeFormat(result.format)), url]));
     }
@@ -161,17 +143,14 @@ export function createModuleLoadingHooks({
   const load: LoadHookSync = (url, context, nextLoad) => {
     if (!isInstalledPackageFile(url)) return nextLoad(url, context);
     const entry = sources.get(url);
-    const cached = freshSource({ entry, url, format: context.format, counts });
+    const cached = freshSource({ entry, url, format: context.format });
     if (cached) return cached;
     const before = statOf(url);
     const result = nextLoad(url, context);
     const kept = before && sourceEntry(url, before, result);
-    if (kept) {
-      sources.set(url, kept);
-      counts.loadMisses++;
-    }
+    if (kept) sources.set(url, kept);
     return result;
   };
 
-  return { resolve, load, counts };
+  return { resolve, load };
 }
