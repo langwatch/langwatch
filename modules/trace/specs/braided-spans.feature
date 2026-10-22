@@ -76,7 +76,7 @@ Feature: Braided spans in the reader's traces
       When the trace is read for "orchestrator"
       Then both spans are returned, each naming its owning project
 
-    @integration @unimplemented
+    @integration
     Scenario: A braided span's large body is read from its owning project
       Given a matching "specialists" span whose input was stored apart because of its size
       When sam opens that span
@@ -84,7 +84,7 @@ Feature: Braided spans in the reader's traces
 
   Rule: Each span keeps its owner's privacy
 
-    @integration @unimplemented
+    @integration
     Scenario: A braided span is redacted under its owning project's policy
       Given "specialists" hides span input and output from everyone
       And "orchestrator" shows span input and output to its members
@@ -92,7 +92,7 @@ Feature: Braided spans in the reader's traces
       Then the "specialists" spans show no input or output
       And the "orchestrator" spans show theirs
 
-    @unit @unimplemented
+    @unit
     Scenario: A viewer with no role on the owner project is outside its role-keyed audiences
       Given "specialists" shows span input only to its own admins
       When sam, an admin of "orchestrator" with no role on "specialists", opens a braided span
@@ -131,7 +131,7 @@ Feature: Braided spans in the reader's traces
       Then opening it in the playground, annotating it and evaluating it are off, each saying why
       And the span says it is shown because it matches the braid's condition
 
-    @integration @unimplemented
+    @integration
     Scenario: Opening the owner project is offered only to someone who can open it
       When sam selects a braided span
       Then no link to open it in "specialists" is offered

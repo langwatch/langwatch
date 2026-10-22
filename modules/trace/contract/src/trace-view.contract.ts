@@ -72,6 +72,8 @@ const braidedOwnerSchemaDefinition = z.object({
   projectId: z.string(),
   name: z.string(),
   canOpen: z.boolean(),
+  /** Set only when `canOpen`: the owner's slug, for the "Open in" link. */
+  slug: z.string().nullish(),
 });
 export interface BraidedOwnerSchema extends Named<typeof braidedOwnerSchemaDefinition> {}
 export const braidedOwnerSchema: BraidedOwnerSchema = braidedOwnerSchemaDefinition;
@@ -226,6 +228,8 @@ export type TruncatedAttribute = z.infer<typeof truncatedAttributeSchema>;
 const spanBraidSchemaDefinition = z.object({
   ownerProjectId: z.string(),
   ownerName: z.string(),
+  /** Set only when `canOpenOwner`: the owner's slug, for the "Open in" link. */
+  ownerProjectSlug: z.string().nullish(),
   canOpenOwner: z.boolean(),
   matchedConditions: z.array(z.string()),
   signedBy: z.object({ projectId: z.string(), name: z.string() }).nullable(),

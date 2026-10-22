@@ -1,4 +1,4 @@
-import { type Authorization, projectIdsReadBy } from "@langwatch/authorization";
+import { type Authorization, ownProjectIdReadBy, projectIdsReadBy } from "@langwatch/authorization";
 import { createLogger } from "@langwatch/observability";
 import type {
   DerivedTraceEvent,
@@ -21,6 +21,7 @@ import type {
   StoredTraceSpan,
   TraceEventRollupParams,
 } from "../../../repositories/span-storage.repository.ts";
+import { singleSpanOwnerRead } from "../../../rules/braided-span-owner.rules.ts";
 import { hasEventRefs, parseSpanEventRefs } from "../../../rules/trace-event-ref-parsing.rules.ts";
 import { redactSpanContent } from "../../../rules/trace-visibility-teaser.rules.ts";
 import { TraceOffloadResolutionService } from "../../../services/trace-offload-resolution.service.ts";
@@ -43,7 +44,8 @@ interface SpanReadBlobResolutionDeps {
 
 /** Every read carries the sealed proof; the repository fences its statement by it (ADR-177). */
 type ByTraceId = { authorization: Authorization; traceId: string } & OccurredAtHint;
-type BySpanId = ByTraceId & { spanId: string };
+/** `ownerProjectId` names a braided span's owner; absent, the reader's own (ADR-183 §5). */
+type BySpanId = ByTraceId & { spanId: string; ownerProjectId?: string | undefined };
 type Paginated = ByTraceId & { limit: number; offset: number };
 /** Full-span delta: keyed on span start (see `findSpansSince`). */
 type Since = ByTraceId & { sinceStartTimeMs: number };
@@ -160,6 +162,14 @@ export class SpanStorageService {
   async findSpanById(params: BySpanId & VisibilityGate): Promise<Span | null> {
     const gateOne = (span: Span | null): Span | null =>
       span ? (applyVisibilityGate([span], params.visibilityCutoffMs)[0] ?? null) : null;
+    const ownerRead = singleSpanOwnerRead(params);
+    if (ownerRead.kind === "unreadable") return null;
+    if (
+      ownerRead.kind === "braided" &&
+      ownerRead.ownerProjectId !== ownProjectIdReadBy(params.authorization)
+    ) {
+      return gateOne(await this.findBraidedSpan({ ...params, ...ownerRead }));
+    }
 
     if (!this.blobResolutionDeps) {
       return gateOne(await this.repository.findSpanByIds(params));
@@ -178,6 +188,25 @@ export class SpanStorageService {
     }
 
     return gateOne(mapNormalizedSpanToSpan(resolved));
+  }
+
+  /** A braided span read alone, its offloaded body resolved where its owner stored it. */
+  private async findBraidedSpan(
+    params: BySpanId & { ownerProjectId: string },
+  ): Promise<Span | null> {
+    const deps = this.blobResolutionDeps;
+    if (!deps) return this.repository.findSpanByIds(params);
+    const normalized = await this.repository.findNormalizedSpanByIds(params);
+    if (normalized === null) return null;
+    const { resolvedSpans } = await TraceOffloadResolutionService.create().resolveOffloadedTraces({
+      projectId: params.ownerProjectId,
+      normalizedSpans: [normalized],
+      blobStore: deps.blobStore,
+      ioExtractionService: deps.ioExtractionService,
+      logger: this.logger,
+    });
+    const [resolved] = resolvedSpans;
+    return resolved === undefined ? null : mapNormalizedSpanToSpan(resolved);
   }
 
   /**

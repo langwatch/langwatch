@@ -578,6 +578,8 @@ export const tracesTrpc = defineTrpcContract("traces")
       projectId: z.string(),
       traceId: z.string(),
       spanId: z.string(),
+      /** A braided span's owner (ADR-183 §5); absent, the reader's own span. */
+      ownerProjectId: z.string().optional(),
       ...spanReadHintShape,
     }),
   )

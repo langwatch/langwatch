@@ -804,6 +804,7 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
         }),
         traceId: input.traceId,
         spanId: input.spanId,
+        ownerProjectId: input.ownerProjectId,
         occurredAtMs: input.occurredAtMs,
         viewerUserId: actor.id,
       }),

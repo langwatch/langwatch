@@ -292,6 +292,8 @@ export interface TraceApi extends TraceOtlpIngestApi {
     authorization: Authorization;
     traceId: string;
     spanId: string;
+    /** A braided span's owner (ADR-183 §5); absent, the reader's own span. */
+    ownerProjectId?: string | undefined;
     occurredAtMs?: number;
     viewerUserId: string;
   }): Promise<SpanDetail>;
@@ -494,6 +496,7 @@ export interface TraceApi extends TraceOtlpIngestApi {
     authorization: Authorization;
     traceId: string;
     spanId: string;
+    ownerProjectId?: string | undefined;
     occurredAtMs?: number;
     visibilityCutoffMs?: number | null;
   }): Promise<Span | null>;
@@ -501,6 +504,7 @@ export interface TraceApi extends TraceOtlpIngestApi {
     authorization: Authorization;
     traceId: string;
     spanId: string;
+    ownerProjectId?: string | undefined;
     occurredAtMs?: number;
   }): Promise<ElasticSearchEvent[]>;
   readLangwatchSignals(input: {

@@ -173,7 +173,12 @@ export function SpanAccordions({
 
   return (
     <Box ref={containerRef}>
-      {detail?.braid ? <BraidedSpanCallout braid={detail.braid} ownerHref={null} /> : null}
+      {detail?.braid ? (
+        <BraidedSpanCallout
+          braid={detail.braid}
+          ownerHref={ownerTraceHref({ slug: detail.braid.ownerProjectSlug, traceId })}
+        />
+      ) : null}
       {isEditing && detail && !detail.braid && (
         <SpanNameTypeEditor
           spanId={span.spanId}
@@ -707,4 +712,20 @@ function spanSectionIds({
   if (hasScope) list.push("scope");
   list.push("events");
   return list;
+}
+
+/** The trace in the owner project, offered only when the read named the owner's slug. */
+function ownerTraceHref({
+  slug,
+  traceId,
+}: {
+  slug: string | null | undefined;
+  traceId: string;
+}): string | null {
+  if (!slug) return null;
+  const drawer = new URLSearchParams({
+    "drawer.open": "traceV2Details",
+    "drawer.traceId": traceId,
+  });
+  return `/${slug}/traces?${drawer.toString()}`;
 }

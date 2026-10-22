@@ -84,6 +84,14 @@ export interface OccurredAtHint {
   occurredAtMs?: number;
 }
 
+/** One span by id; under braids `ownerProjectId` names its owner, else the reader (ADR-183). */
+export type SingleSpanParams = {
+  authorization: Authorization;
+  traceId: string;
+  spanId: string;
+  ownerProjectId?: string | undefined;
+} & OccurredAtHint;
+
 // @see ADR-069 — partition hint is REQUIRED here for windowed claim-check reads
 export interface NormalizedSpanByIdParams {
   authorization: Authorization;
@@ -136,13 +144,9 @@ export abstract class SpanStorageRepository {
       limit?: number;
     } & OccurredAtHint,
   ): Promise<StoredTraceSpan[]>;
-  abstract findSpanByIds(
-    params: {
-      authorization: Authorization;
-      traceId: string;
-      spanId: string;
-    } & OccurredAtHint,
-  ): Promise<Span | null>;
+  abstract findSpanByIds(params: SingleSpanParams): Promise<Span | null>;
+  /** One whole span as stored, its offloaded body unresolved; braided under `ownerProjectId`. */
+  abstract findNormalizedSpanByIds(params: SingleSpanParams): Promise<NormalizedSpan | null>;
   /**
    * @see ADR-069
    * Claim-check resolution read: one canonical span by identity, windowed
@@ -169,13 +173,7 @@ export abstract class SpanStorageRepository {
   abstract findEventsByTraceId(
     params: { authorization: Authorization; traceId: string } & OccurredAtHint,
   ): Promise<ElasticSearchEvent[]>;
-  abstract findSpanEvents(
-    params: {
-      authorization: Authorization;
-      traceId: string;
-      spanId: string;
-    } & OccurredAtHint,
-  ): Promise<ElasticSearchEvent[]>;
+  abstract findSpanEvents(params: SingleSpanParams): Promise<ElasticSearchEvent[]>;
   abstract findSpanSummaryByTraceId(
     params: { authorization: Authorization; traceId: string } & OccurredAtHint,
   ): Promise<SpanSummaryRow[]>;
@@ -279,13 +277,11 @@ export class NullSpanStorageRepository implements SpanStorageRepository {
     return null;
   }
 
-  async findSpanByIds(
-    _params: {
-      authorization: Authorization;
-      traceId: string;
-      spanId: string;
-    } & OccurredAtHint,
-  ): Promise<Span | null> {
+  async findSpanByIds(_params: SingleSpanParams): Promise<Span | null> {
+    return null;
+  }
+
+  async findNormalizedSpanByIds(_params: SingleSpanParams): Promise<NormalizedSpan | null> {
     return null;
   }
 
@@ -307,13 +303,7 @@ export class NullSpanStorageRepository implements SpanStorageRepository {
     return [];
   }
 
-  async findSpanEvents(
-    _params: {
-      authorization: Authorization;
-      traceId: string;
-      spanId: string;
-    } & OccurredAtHint,
-  ): Promise<ElasticSearchEvent[]> {
+  async findSpanEvents(_params: SingleSpanParams): Promise<ElasticSearchEvent[]> {
     return [];
   }
 
