@@ -9,7 +9,9 @@ from collections.abc import Sequence
 
 import pytest
 from opentelemetry import baggage, trace
+from opentelemetry.baggage.propagation import W3CBaggagePropagator
 from opentelemetry.context import Context
+from opentelemetry.propagators.composite import CompositePropagator
 from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
 from opentelemetry.sdk.trace.export import (
     SimpleSpanProcessor,
@@ -17,6 +19,7 @@ from opentelemetry.sdk.trace.export import (
     SpanExportResult,
 )
 from opentelemetry.trace import NonRecordingSpan, SpanContext, TraceFlags
+from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
 
 from langwatch.braids import (
     BRAID_SIGNATURE_KEY,
@@ -30,6 +33,9 @@ SIGNING_KEY = "lwsk_testkid_testsecret"
 TRACE_ID = "0af7651916cd43dd8448eb211c80319c"
 ENTRIES = {"orchestrator": "web", "team": "a"}
 PINNED_SIGNATURE = "eyJ2IjoxLCJraWQiOiJ0ZXN0a2lkIiwia2V5cyI6WyJvcmNoZXN0cmF0b3IiLCJ0ZWFtIl0sInNpZyI6IjFNWGtzUVIzc25vdVBZV0Z4TzVDZnlyRzY2WUQ1MzlhbmNlbWVRaG9VazQifQ"
+# orchestrator "web" alone in TRACE_ID. The API key module verifies this exact value
+# (modules/api-key/process/src/services/__tests__/signing-key.signed-calls.service.unit.test.ts).
+CALL_SIGNATURE = "eyJ2IjoxLCJraWQiOiJ0ZXN0a2lkIiwia2V5cyI6WyJvcmNoZXN0cmF0b3IiXSwic2lnIjoiSjg2RU1MejJXUVZlZkpLN1BfN1R2UmEtdzRvR000TG96bjhlZTNMd0kyRSJ9"
 
 
 class _InMemoryExporter(SpanExporter):
@@ -137,6 +143,35 @@ def test_span_under_signed_baggage_carries_the_entries_and_the_signature():
     assert span.attributes["team"] == "a"
     assert span.attributes[BRAID_SIGNATURE_KEY] == PINNED_SIGNATURE
     assert format(span.context.trace_id, "032x") == TRACE_ID
+
+
+# @scenario "The <language> SDK signs the named entries and copies them onto spans"
+def test_called_service_spans_carry_the_signed_entry_and_its_signature():
+    wire = CompositePropagator(
+        [TraceContextTextMapPropagator(), W3CBaggagePropagator()]
+    )
+    headers: dict[str, str] = {}
+    calling = sign_baggage(SIGNING_KEY, {"orchestrator": "web"}, _context_in_trace())
+    wire.inject(headers, context=calling)
+
+    exporter = _InMemoryExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(BraidBaggageSpanProcessor(["orchestrator"]))
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    called = provider.get_tracer("called-service")
+    received = wire.extract(headers)
+    handler = called.start_span("handle call", context=received)
+    called.start_span(
+        "tool", context=trace.set_span_in_context(handler, received)
+    ).end()
+    handler.end()
+
+    assert len(exporter.spans) == 2
+    for span in exporter.spans:
+        assert format(span.context.trace_id, "032x") == TRACE_ID
+        assert span.attributes is not None
+        assert span.attributes["orchestrator"] == "web"
+        assert span.attributes[BRAID_SIGNATURE_KEY] == CALL_SIGNATURE
 
 
 def test_entries_not_named_stay_off_the_span():

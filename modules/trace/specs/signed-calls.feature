@@ -31,7 +31,7 @@ Feature: Signed calls
       When "specialists" sends a span carrying the entry and the signature
       Then the stored span marks orchestrator as verified by "orchestrator"
 
-    @integration @unimplemented
+    @unit
     Scenario: A span whose signature does not check out is stored unmarked and counted
       Given a span carrying the entry orchestrator "web" and a signature that does not match it
       When "specialists" sends the span
@@ -78,7 +78,7 @@ Feature: Signed calls
 
   Rule: Rotated and revoked keys
 
-    @integration @unimplemented
+    @unit
     Scenario: A rotated key keeps verifying for seven days
       Given "orchestrator" rotated its signing key
       When a span signed with the old key arrives within seven days of the rotation
@@ -102,7 +102,7 @@ Feature: Signed calls
 
   Rule: The SDK signs on the calling side and copies on the called side
 
-    @integration @unimplemented
+    @unit
     Scenario Outline: The <language> SDK signs the named entries and copies them onto spans
       Given the calling service uses the <language> SDK with a signing key and the entry orchestrator "web"
       And the called service uses the <language> SDK copying the entry orchestrator

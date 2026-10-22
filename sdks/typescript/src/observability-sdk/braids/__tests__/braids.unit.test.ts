@@ -1,4 +1,17 @@
-import { propagation, ROOT_CONTEXT, trace, TraceFlags, type Context } from "@opentelemetry/api";
+import {
+  defaultTextMapGetter,
+  defaultTextMapSetter,
+  propagation,
+  ROOT_CONTEXT,
+  trace,
+  TraceFlags,
+  type Context,
+} from "@opentelemetry/api";
+import {
+  CompositePropagator,
+  W3CBaggagePropagator,
+  W3CTraceContextPropagator,
+} from "@opentelemetry/core";
 import {
   BasicTracerProvider,
   InMemorySpanExporter,
@@ -15,6 +28,10 @@ const ENTRIES = { orchestrator: "web", team: "a" };
 // Pinned in sdks/python/tests/telemetry/test_braid_signing.py and sdks/go/braids_test.go too.
 const PINNED_SIGNATURE =
   "eyJ2IjoxLCJraWQiOiJ0ZXN0a2lkIiwia2V5cyI6WyJvcmNoZXN0cmF0b3IiLCJ0ZWFtIl0sInNpZyI6IjFNWGtzUVIzc25vdVBZV0Z4TzVDZnlyRzY2WUQ1MzlhbmNlbWVRaG9VazQifQ";
+// orchestrator "web" alone in TRACE_ID. The API key module verifies this exact value
+// (modules/api-key/process/src/services/__tests__/signing-key.signed-calls.service.unit.test.ts).
+const CALL_SIGNATURE =
+  "eyJ2IjoxLCJraWQiOiJ0ZXN0a2lkIiwia2V5cyI6WyJvcmNoZXN0cmF0b3IiXSwic2lnIjoiSjg2RU1MejJXUVZlZkpLN1BfN1R2UmEtdzRvR000TG96bjhlZTNMd0kyRSJ9";
 
 function contextInTrace(): Context {
   return trace.setSpanContext(ROOT_CONTEXT, {
@@ -166,6 +183,44 @@ describe("BraidBaggageSpanProcessor", () => {
         [BRAID_SIGNATURE_KEY]: PINNED_SIGNATURE,
       });
       expect(span.spanContext().traceId).toBe(TRACE_ID);
+    });
+  });
+
+  describe("given a calling service signing and a called service copying orchestrator", () => {
+    /** @scenario "The <language> SDK signs the named entries and copies them onto spans" */
+    it("carries the entry and its signature onto every span the called service records", () => {
+      const wire = new CompositePropagator({
+        propagators: [new W3CTraceContextPropagator(), new W3CBaggagePropagator()],
+      });
+      const headers: Record<string, string> = {};
+      const calling = signBaggage({
+        signingKey: SIGNING_KEY,
+        entries: { orchestrator: "web" },
+        context: contextInTrace(),
+      });
+      wire.inject(calling, headers, defaultTextMapSetter);
+
+      const exporter = new InMemorySpanExporter();
+      const called = new BasicTracerProvider({
+        spanProcessors: [
+          new BraidBaggageSpanProcessor({ copyEntries: ["orchestrator"] }),
+          new SimpleSpanProcessor(exporter),
+        ],
+      }).getTracer("called-service");
+      const received = wire.extract(ROOT_CONTEXT, headers, defaultTextMapGetter);
+      const handler = called.startSpan("handle call", {}, received);
+      called.startSpan("tool", {}, trace.setSpan(received, handler)).end();
+      handler.end();
+
+      const spans = exporter.getFinishedSpans();
+      expect(spans).toHaveLength(2);
+      for (const span of spans) {
+        expect(span.spanContext().traceId).toBe(TRACE_ID);
+        expect(span.attributes).toMatchObject({
+          orchestrator: "web",
+          [BRAID_SIGNATURE_KEY]: CALL_SIGNATURE,
+        });
+      }
     });
   });
 

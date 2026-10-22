@@ -5,8 +5,8 @@
 #
 # The server half is bound at unit level: the door's refusals and audit through the real
 # tRPC runtime with test decisions (signing-key.trpc.unit.test.ts); the screen through the lent
-# keys panel (signing-keys-panel.integration.test.tsx). Still @unimplemented: the organisation's
-# braid setting (authz).
+# keys panel (signing-keys-panel.integration.test.tsx); the organisation's braid setting through
+# the door and the authz module's own engine (signing-key.braids-admins-only.integration.test.ts).
 
 @api-key @braids
 Feature: Signing keys
@@ -73,7 +73,7 @@ Feature: Signing keys
       Then each succeeds
       And tom's request for a key of a project in another team is refused as a permission denial
 
-    @integration @unimplemented
+    @integration
     Scenario: With braids kept to organisation admins, a team admin may not manage signing keys
       Given the organisation keeps braids to its admins
       And tom is an admin of the team holding "orchestrator"

@@ -5,6 +5,7 @@
 import { createHmac } from "node:crypto";
 
 import {
+  type ApiKeyApi,
   braidSignatureMessage,
   parseBraidSignature,
   type BraidSignatureVerdict,
@@ -14,6 +15,7 @@ import { VERIFIED_ATTRIBUTE_PREFIX } from "@langwatch/authorization";
 import { createTenantId, type Command } from "@langwatch/eventing";
 import type { OtlpSpan } from "@langwatch/otlp/trace-request";
 import type { ProjectIdentity } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { RECORD_SPAN_COMMAND_TYPE, type RecordSpanCommandData } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
@@ -162,7 +164,7 @@ function admission({
   signatures,
   timeoutMs,
 }: {
-  signatures: ReturnType<typeof keyDirectory> | { verifyBraidSignature: () => Promise<never> };
+  signatures: Pick<ApiKeyApi, "verifyBraidSignature">;
   timeoutMs?: number;
 }) {
   return EventingRecordSpanAdapter.create({
@@ -301,6 +303,53 @@ describe("span admission for signed calls", () => {
       });
 
       expect(stored[MARK]).toBeUndefined();
+    });
+  });
+
+  describe("given the API key module's answer, however it was reached", () => {
+    const answering = (verdict: BraidSignatureVerdict) =>
+      admission({
+        signatures: createApiFixture<Pick<ApiKeyApi, "verifyBraidSignature">>(
+          { verifyBraidSignature: async () => verdict },
+          "signatures",
+        ),
+      });
+    const storedUnder = (verdict: BraidSignatureVerdict) =>
+      storedAttributes({
+        handler: answering(verdict),
+        command: commandFor({
+          sent: span({ attributes: { orchestrator: "web", "langwatch.signature": signedWeb() } }),
+        }),
+      });
+
+    /** @scenario "A span whose signature does not check out is stored unmarked and counted" */
+    it("stores the span with its entry and no mark when the answer is failed", async () => {
+      const stored = await storedUnder({
+        outcome: "failed",
+        reason: "bad_signature",
+        publicId: orchestratorKey.publicId,
+      });
+
+      expect(stored[MARK]).toBeUndefined();
+      expect(stored.orchestrator).toBe("web");
+    });
+
+    /** @scenario "A rotated key keeps verifying for seven days" */
+    /** @scenario "The <language> SDK signs the named entries and copies them onto spans" */
+    it("marks the entry on a verified answer and leaves it unmarked on an expired one", async () => {
+      const verified = await storedUnder({
+        outcome: "verified",
+        signingProjectId: "orchestrator",
+        keys: ["orchestrator"],
+      });
+      const expired = await storedUnder({
+        outcome: "failed",
+        reason: "expired",
+        publicId: orchestratorKey.publicId,
+      });
+
+      expect(verified[MARK]).toBe("orchestrator");
+      expect(expired[MARK]).toBeUndefined();
     });
   });
 

@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/baggage"
+	"go.opentelemetry.io/otel/propagation"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	"go.opentelemetry.io/otel/trace"
@@ -25,6 +26,10 @@ const (
 )
 
 var braidTestEntries = map[string]string{"orchestrator": "web", "team": "a"}
+
+// braidCallSignature signs orchestrator "web" alone in braidTestTraceID. The API key module
+// verifies this exact value (signing-key.signed-calls.service.unit.test.ts in modules/api-key).
+const braidCallSignature = "eyJ2IjoxLCJraWQiOiJ0ZXN0a2lkIiwia2V5cyI6WyJvcmNoZXN0cmF0b3IiXSwic2lnIjoiSjg2RU1MejJXUVZlZkpLN1BfN1R2UmEtdzRvR000TG96bjhlZTNMd0kyRSJ9"
 
 func braidContextInTrace(t *testing.T) context.Context {
 	t.Helper()
@@ -123,6 +128,40 @@ func TestBraidSpanUnderSignedBaggageCarriesTheEntriesAndTheSignature(t *testing.
 	assert.Equal(t, "web", attrs["orchestrator"])
 	assert.Equal(t, "a", attrs["team"])
 	assert.Equal(t, braidPinnedSig, attrs[BraidSignatureKey])
+}
+
+// @scenario "The <language> SDK signs the named entries and copies them onto spans"
+func TestBraidCalledServiceSpansCarryTheSignedEntryAndItsSignature(t *testing.T) {
+	wire := propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{})
+	calling, err := SignBaggage(braidContextInTrace(t), braidTestSigningKey, map[string]string{"orchestrator": "web"})
+	require.NoError(t, err)
+	headers := propagation.MapCarrier{}
+	wire.Inject(calling, headers)
+
+	processor, err := NewBraidBaggageSpanProcessor("orchestrator")
+	require.NoError(t, err)
+	exporter := tracetest.NewInMemoryExporter()
+	called := sdktrace.NewTracerProvider(
+		sdktrace.WithSpanProcessor(processor),
+		sdktrace.WithSyncer(exporter),
+	).Tracer("called-service")
+	received := wire.Extract(context.Background(), headers)
+	handlerCtx, handler := called.Start(received, "handle call")
+	_, tool := called.Start(handlerCtx, "tool")
+	tool.End()
+	handler.End()
+
+	spans := exporter.GetSpans()
+	require.Len(t, spans, 2)
+	for _, span := range spans {
+		assert.Equal(t, braidTestTraceID, span.SpanContext.TraceID().String())
+		attrs := map[string]string{}
+		for _, kv := range span.Attributes {
+			attrs[string(kv.Key)] = kv.Value.Emit()
+		}
+		assert.Equal(t, "web", attrs["orchestrator"])
+		assert.Equal(t, braidCallSignature, attrs[BraidSignatureKey])
+	}
 }
 
 func TestBraidEntriesNotNamedStayOffTheSpan(t *testing.T) {
