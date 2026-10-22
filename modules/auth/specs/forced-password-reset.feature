@@ -112,7 +112,7 @@ Feature: Force a password reset for a set of users
     When the operator runs require-password-reset with --email for that one, in any case
     Then only that user is marked
 
-  @integration
+  @unit
   Scenario: A dry run counts and writes nothing
     Given users with a credential password
     When the operator runs require-password-reset with --all-credential-users --dry-run

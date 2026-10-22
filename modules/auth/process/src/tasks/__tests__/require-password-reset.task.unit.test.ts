@@ -88,6 +88,18 @@ describe("the require-password-reset selector", () => {
     expect(revoked).toEqual([]);
   });
 
+  it("refuses an --email that carries no address, so it never falls back to every user", () => {
+    for (const args of [
+      ["--all-credential-users", "--email"],
+      ["--all-credential-users", "--email="],
+      ["--all-credential-users", "--email", " "],
+      ["--all-credential-users", "--email=,"],
+      ["--email", "--dry-run"],
+    ]) {
+      expect(() => parsePasswordResetSelector(args)).toThrow(/--email needs an address/);
+    }
+  });
+
   it("reads repeated, comma separated and inline addresses past the argument separator", () => {
     expect(
       parsePasswordResetSelector([

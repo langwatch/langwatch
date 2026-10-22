@@ -29,14 +29,20 @@ function refuseUnknownFlags(args: readonly string[]): void {
   });
 }
 
-/** Every address `--email <list>` and `--email=<list>` carry, in the order given. */
+/**
+ * Every address `--email <list>` and `--email=<list>` carry, in the order given. An `--email`
+ * with no address in it is refused, so it can never fall back to marking every user.
+ */
 function emailArguments(args: readonly string[]): string[] {
-  const lists = args.flatMap((arg, index) => {
-    if (arg.startsWith("--email=")) return [arg.slice("--email=".length)];
-    const next = args[index + 1];
-    return arg === "--email" && next !== undefined ? [next] : [];
+  return args.flatMap((arg, index) => {
+    if (arg !== "--email" && !arg.startsWith("--email=")) return [];
+    const operand = arg === "--email" ? args[index + 1] : arg.slice("--email=".length);
+    const emails = (operand?.startsWith("--") ? "" : (operand ?? ""))
+      .split(",")
+      .filter((email) => email.trim() !== "");
+    if (emails.length === 0) throw new Error(`--email needs an address. ${USAGE}`);
+    return emails;
   });
-  return lists.flatMap((list) => list.split(",")).filter((email) => email.trim() !== "");
 }
 
 /** Reads the selector from the task's arguments; refuses unknown flags, none, or both at once. */

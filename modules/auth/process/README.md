@@ -900,7 +900,7 @@ Run by the tasks process, before serve.
 | Task                            | Class                           | Declared at                                          |
 | ------------------------------- | ------------------------------- | ---------------------------------------------------- |
 | `clear-stale-pending-sso-setup` | `ClearStalePendingSsoSetupTask` | `src/tasks/clear-stale-pending-sso-setup.task.ts:11` |
-| `require-password-reset`        | `RequirePasswordResetTask`      | `src/tasks/require-password-reset.task.ts:61`        |
+| `require-password-reset`        | `RequirePasswordResetTask`      | `src/tasks/require-password-reset.task.ts:67`        |
 
 ## Configuration
 
