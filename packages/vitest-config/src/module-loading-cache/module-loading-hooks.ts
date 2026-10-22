@@ -36,7 +36,7 @@ const MAX_SOURCE = 8 * 1024 * 1024;
  * `.vitest-cache`, `.cache`) hold generated files and are left to Node; `.pnpm` is
  * not one, since its own nested node_modules is the last one in the path.
  */
-export function isInstalledPackageFile(url: string): boolean {
+function isInstalledPackageFile(url: string): boolean {
   const at = url.lastIndexOf("/node_modules/");
   return url.startsWith("file://") && at >= 0 && url[at + "/node_modules/".length] !== ".";
 }

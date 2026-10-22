@@ -38,10 +38,6 @@ export class CacheFile {
     return this.table.size;
   }
 
-  get pending(): number {
-    return this.added.size;
-  }
-
   get(key: string): Buffer | undefined {
     return this.added.get(key) ?? this.table.get(key);
   }

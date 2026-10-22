@@ -38,6 +38,7 @@ specifier can become `@langwatch/test-harness/vitest-config` in one pass.
 | `test.isolate`         | `false` for every kind, `jsdom` included | a fresh worker per test file re-evaluates the whole module graph per file; off, the graph is evaluated once per worker. `true` isolates only the files that mock modules, see below                              |
 | `test.maxWorkers`      | `1` in fast mode, when isolation is off  | collapses the run onto one child process instead of one per core, cutting fork/spawn overhead on top of the isolation win. Not set when a package asks for `isolate: true`, where separate workers are the point |
 | `test.fsModuleCache`   | `true` in fast mode                      | persists transformed modules to `node_modules/.vitest-cache` between runs, so a rerun skips the transform share                                                                                                  |
+| `test.execArgv`        | `--import` of the module loading cache in fast mode, off in CI | answers Node's resolution and reads of installed packages in each worker from a per-worktree cache, described below. Dropped with fast mode, and with `LANGWATCH_VITEST_MODULE_CACHE=0` |
 | `test.css`             | `false` in fast mode                     | skips CSS parse/transform on import; no package under the helper asserts on real computed CSS                                                                                                                    |
 | `test.fileParallelism` | `true`                                   | the default, declared because `fileParallelism: false` silently pins `maxWorkers` to 1                                                                                                                           |
 | `test.watch`           | `false`                                  | a run in CI or from an agent never watches                                                                                                                                                                       |
@@ -50,7 +51,7 @@ change isolation.
 ## Fast mode, and the one environment variable that outranks it
 
 `LANGWATCH_VITEST_FAST` is on unless it is set to `0`. Off, the helper drops
-`maxWorkers`, `fsModuleCache` and the CSS skip and returns the pre-fast-mode
+`maxWorkers`, `fsModuleCache`, `execArgv` and the CSS skip and returns the pre-fast-mode
 shape, so a package with a suite that breaks under one of them can opt a single
 run out without editing this helper or its own config.
 

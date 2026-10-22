@@ -19,6 +19,10 @@ function hashKey(key: string): number {
   return hash >>> 0 || 1;
 }
 
+/**
+ * A read-only view of one serialized table: `CacheTable.build` writes the bytes, and
+ * `get` looks a key up in them in place. Damaged bytes read as an empty table.
+ */
 export class CacheTable {
   readonly size: number;
   private readonly buf: Buffer;

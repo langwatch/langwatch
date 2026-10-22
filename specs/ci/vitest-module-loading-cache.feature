@@ -23,6 +23,19 @@ Feature: Vitest workers load installed packages from a cache
     Then Node answers it both times
 
   @unit
+  Scenario: A subpath import from project code is left to Node
+    Given a "#" import in project code that Node resolves into node_modules
+    When a worker resolves it twice
+    Then Node answers it both times
+    And nothing about it is cached
+
+  @unit
+  Scenario: A cached lookup is not shared across resolution conditions
+    Given a worker resolved a package name under the import conditions
+    When the same name is resolved under the require conditions
+    Then Node answers the second lookup
+
+  @unit
   Scenario: A worker reads an unchanged installed file from the cache
     Given an earlier worker loaded a file from node_modules
     When a later worker loads the same unchanged file
@@ -37,6 +50,19 @@ Feature: Vitest workers load installed packages from a cache
     And the cache keeps the edited source
 
   @unit
+  Scenario: A deleted installed file is not served from the cache
+    Given an earlier worker loaded a file from node_modules
+    And the file has since been deleted
+    When a later worker loads it
+    Then Node's own error reaches the worker
+
+  @unit
+  Scenario: A cached source is not served to a caller expecting another format
+    Given an earlier worker loaded a file from node_modules as CommonJS
+    When a later worker loads it expecting an ES module
+    Then Node answers the load
+
+  @unit
   Scenario: Generated files under node_modules are left to Node
     Given a file in a dot directory under node_modules, such as Vitest's own cache
     When a worker loads it
@@ -48,6 +74,19 @@ Feature: Vitest workers load installed packages from a cache
     When a worker starts after the install
     Then it starts from an empty cache
     And the next save removes the old file
+
+  @unit
+  Scenario: An install changes the name of the cache files
+    Given the cache files are named from the lockfile, pnpm's install state and the Node setup
+    When the lockfile changes, pnpm rewrites its install state, or symlinks are preserved
+    Then the name differs, so the next worker starts from an empty cache
+
+  @unit
+  Scenario: A temporary file a killed worker left behind is removed once it is old
+    Given a temporary file from a worker that was killed mid-save more than an hour ago
+    And one from a save still in flight
+    When any worker saves
+    Then the old file is removed and the recent one stays
 
   @unit
   Scenario: Workers that save at once keep each other's entries
@@ -67,6 +106,13 @@ Feature: Vitest workers load installed packages from a cache
     Then a local run loads the cache into every worker
     And a CI run does not
     And LANGWATCH_VITEST_MODULE_CACHE set to 0 or 1 outranks both
+
+  @unit
+  Scenario: The shared config loads the cache into every worker
+    When the shared vitest config is resolved for a local run
+    Then its execArgv holds --import and the path of the register file
+    When it is resolved in CI
+    Then its execArgv is empty
 
   @unit
   Scenario: Fast mode off leaves the workers as they were
