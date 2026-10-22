@@ -89,10 +89,9 @@ function preview({ html, children }: { html: string; children: { start: number; 
 }
 
 /**
- * Moves each skill prompt's rendered body into a content-hashed fragment under `assets/`, which
- * the prompt island fetches on first open. The page keeps a short preview and a link to the
- * prompt's Markdown file for readers without JavaScript. Run after `extractSkillPrompts`, so
- * each card names its prompt file. Rewrites `pages` in place and returns the fragments to write.
+ * Moves each skill prompt's body into a hashed `assets/` fragment the prompt island fetches on
+ * first open; the page keeps a preview and a link to the prompt's Markdown. Run after
+ * `extractSkillPrompts`. Rewrites `pages` in place and returns the fragments to write.
  */
 export function extractPromptBodies({
   pages,

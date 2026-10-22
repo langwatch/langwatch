@@ -38,6 +38,19 @@ export const budgetsSchema = z.strictObject({
     /** Issue code -> pages that had it when the gate landed; new pages or codes fail. */
     known: z.record(z.string(), z.array(z.string())).default({}),
   }),
+  agentReadiness: z.strictObject({
+    /** Approximate tokens (characters / 4) one page's Markdown export may hold. */
+    pageTokens: z.number().int().positive(),
+    /** Which docs.json pages are integration pages: whole navigation groups, plus listed slugs. */
+    integration: z.strictObject({
+      groups: z.array(z.strictObject({ anchor: z.string(), group: z.string() })),
+      pages: z.array(z.string()).default([]),
+      exclude: z.array(z.string()).default([]),
+    }),
+    /** AI crawlers robots.txt must name, so a later `User-agent: *` change cannot shut them out. */
+    crawlers: z.array(z.string().min(1)).min(1),
+    known: z.record(z.string(), z.array(z.string())).default({}),
+  }),
 });
 
 export type Budgets = z.infer<typeof budgetsSchema>;

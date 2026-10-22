@@ -5,10 +5,9 @@
 export type PublishedHeading = string | [id: string, text: string];
 
 /**
- * One page, in navigation order. `terms` holds the article words this page is the first to use,
- * sorted and space separated; `pages` lines up with it, giving each word's later pages as base-36
- * gaps (`3,1` is 3 and 4 positions later, empty when no later page uses it). Empty fields are
- * left out.
+ * One page, in navigation order. `terms`: the sorted article words this page uses first; `pages`
+ * lines up with it, each word's later pages as base-36 gaps (`3,1` is 3 and 4 positions later,
+ * empty when none). Empty fields are left out.
  */
 export type PublishedIndexEntry = {
   slug: string;
@@ -26,7 +25,7 @@ export const TRAIL_SEPARATOR = " › ";
 
 const EDGES = /^[^\p{L}\p{M}\p{N}_]+|[^\p{L}\p{M}\p{N}_]+$/gu;
 
-/** A term without the punctuation around it: `"level":` is `level`, `/api/traces/` is `api/traces`. */
+/** A term without its surrounding punctuation: `"level":` is `level`, `/a/b/` is `a/b`. */
 export function trimTerm({ term }: { term: string }) {
   return term.replace(EDGES, "");
 }

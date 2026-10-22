@@ -13,7 +13,7 @@ export function frontmatterDescription({ contents }: { contents: string }) {
   return line.replace(/^(["'])(.*)\1$/, "$2");
 }
 
-/** Every skill the pages manifest names, once, in first-seen order, read from the compiled files. */
+/** Every skill the pages manifest names, once, in first-seen order, from the compiled files. */
 export function readAgentSkills({ root = docsRoot }: { root?: string } = {}): AgentSkill[] {
   const repoRoot = path.resolve(root, "..");
   const manifest: Record<string, Record<string, ManifestEntry[]>> = JSON.parse(

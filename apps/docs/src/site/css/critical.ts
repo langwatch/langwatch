@@ -65,30 +65,40 @@ function markReadValues({ used, values }: { used: Set<string>; values: Map<strin
   }
 }
 
+/* Records the custom properties `nodes` read into `used` and each one's declared values. */
+function collectDeclarations({
+  nodes,
+  used,
+  values,
+}: {
+  nodes: CssNode[];
+  used: Set<string>;
+  values: Map<string, string[]>;
+}) {
+  const read = ({ text }: { text: string }) => {
+    for (const name of customPropertyNames({ text })) used.add(name);
+  };
+  for (const node of nodes) {
+    if (node.kind === "verbatim") read({ text: node.text });
+    else if (node.kind === "group") collectDeclarations({ nodes: node.children, used, values });
+    else
+      for (const declaration of splitDeclarations({ body: node.body })) {
+        const custom = CUSTOM_DECLARATION.exec(declaration);
+        if (!custom) read({ text: declaration });
+        else {
+          const name = unescapeIdentifier({ name: custom[1] ?? "" });
+          values.set(name, [...(values.get(name) ?? []), custom[2] ?? ""]);
+        }
+      }
+  }
+}
+
 /* Drops custom property declarations nothing reads: no var() in the kept rules, no mention in
    the page or a client bundle, and no kept custom property whose value reads them. */
 function pruneCustomProperties({ nodes, mentioned }: { nodes: CssNode[]; mentioned: Set<string> }) {
   const values = new Map<string, string[]>();
   const used = new Set(mentioned);
-  const read = ({ text }: { text: string }) => {
-    for (const name of customPropertyNames({ text })) used.add(name);
-  };
-  const collect = (list: CssNode[]) => {
-    for (const node of list) {
-      if (node.kind === "verbatim") read({ text: node.text });
-      else if (node.kind === "group") collect(node.children);
-      else
-        for (const declaration of splitDeclarations({ body: node.body })) {
-          const custom = CUSTOM_DECLARATION.exec(declaration);
-          if (!custom) read({ text: declaration });
-          else {
-            const name = unescapeIdentifier({ name: custom[1] ?? "" });
-            values.set(name, [...(values.get(name) ?? []), custom[2] ?? ""]);
-          }
-        }
-    }
-  };
-  collect(nodes);
+  collectDeclarations({ nodes, used, values });
   markReadValues({ used, values });
   return mapRuleBodies({
     nodes,

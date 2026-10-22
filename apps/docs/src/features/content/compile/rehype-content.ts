@@ -111,7 +111,7 @@ function skillCardsOf({ node }: { node: TreeNode }): { parent: TreeNode; node: T
  * Each card is moved to the end of the tree for the one slugging pass, then put back.
  */
 export function rehypeDocsSlugs() {
-  const slug = rehypeSlug();
+  const slug = rehypeSlug() as (tree: TreeNode) => void;
   return (tree: TreeNode) => {
     const cards = skillCardsOf({ node: tree }).map(({ parent, node }) => ({
       parent,
@@ -120,7 +120,7 @@ export function rehypeDocsSlugs() {
     }));
     for (const { parent, index } of cards.toReversed()) parent.children?.splice(index, 1);
     tree.children?.push(...cards.map(({ node }) => node));
-    slug(tree as unknown as Parameters<typeof slug>[0]);
+    slug(tree);
     tree.children?.splice(tree.children.length - cards.length, cards.length);
     for (const { parent, node, index } of cards) parent.children?.splice(index, 0, node);
   };

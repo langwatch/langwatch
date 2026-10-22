@@ -8,7 +8,10 @@ import { parseArgs } from "node:util";
 import { nowInstant } from "@langwatch/time";
 import { z } from "zod";
 
+import { docsRoot } from "../../paths.ts";
 import { startPreview } from "../preview-server.ts";
+import { agentReadinessMarkdown, agentReadinessReport } from "./agent-readiness-report.ts";
+import { checkAgentReadiness } from "./agent-readiness.ts";
 import {
   auditRunSchema,
   DEFAULT_BUDGETS_FILE,
@@ -44,6 +47,7 @@ const optionsSchema = z.object({
   "static-only": z.boolean().default(false),
   "skip-static": z.boolean().default(false),
   "write-seo-baseline": z.boolean().default(false),
+  "write-agent-baseline": z.boolean().default(false),
 });
 
 function readOptions() {
@@ -62,6 +66,7 @@ function readOptions() {
       "static-only": { type: "boolean" },
       "skip-static": { type: "boolean" },
       "write-seo-baseline": { type: "boolean" },
+      "write-agent-baseline": { type: "boolean" },
     },
   });
   return optionsSchema.parse(values);
@@ -187,6 +192,38 @@ async function checkExportTypes({ origin, exports }: { origin: string; exports: 
   return wrong.filter((issue) => issue !== null);
 }
 
+/** Agent readiness against its known gaps; `write` replaces them with today's. */
+function agentReadiness({
+  outDir,
+  budgets,
+  json,
+  write,
+}: {
+  outDir: string;
+  budgets: ReturnType<typeof readBudgets>;
+  json: boolean;
+  write: boolean;
+}) {
+  const result = checkAgentReadiness({ outDir, docsRoot, budget: budgets.agentReadiness });
+  let known = budgets.agentReadiness.known;
+  if (write) {
+    known = knownIssuesOf({ issues: result.issues });
+    const raw = JSON.parse(readFileSync(DEFAULT_BUDGETS_FILE, "utf8"));
+    raw.agentReadiness.known = known;
+    writeFileSync(DEFAULT_BUDGETS_FILE, `${JSON.stringify(raw, null, 2)}\n`);
+    log({
+      json,
+      message: `wrote ${result.issues.length} known agent readiness gaps to budgets.json`,
+    });
+  }
+  const gate = applyKnownIssues({ issues: result.issues, known });
+  log({
+    json,
+    message: `agent readiness: ${result.score}/100, ${gate.failures.length} new gaps, ${gate.known} known`,
+  });
+  return { result, gate };
+}
+
 async function main() {
   const started = nowInstant().epochMilliseconds;
   const options = readOptions();
@@ -208,6 +245,9 @@ async function main() {
     log({ json, message: `wrote ${seoResult.issues.length} known issues to budgets.json` });
   }
   const seo = applyKnownIssues({ issues: seoResult.issues, known });
+  const agent = options["skip-static"]
+    ? null
+    : agentReadiness({ outDir, budgets, json, write: options["write-agent-baseline"] });
   log({
     json,
     message: `static: ${seoResult.pages} pages, ${seo.failures.length} new issues, ${seo.known} known`,
@@ -272,11 +312,19 @@ async function main() {
   const report = { wallClockMs, runs, failures, notes, seo: { pages: seoResult.pages, ...seo } };
   mkdirSync(reportDir, { recursive: true });
   writeFileSync(path.join(reportDir, "audit-report.json"), JSON.stringify(report, null, 2));
-  const markdown = summaryMarkdown({ runs, failures, notes, seo: report.seo, wallClockMs });
+  const agentFailures = agent?.gate.failures.length ?? 0;
+  if (agent)
+    writeFileSync(
+      path.join(reportDir, "agent-readiness.json"),
+      JSON.stringify(agentReadinessReport(agent), null, 2),
+    );
+  const markdown =
+    summaryMarkdown({ runs, failures, notes, seo: report.seo, wallClockMs, agentFailures }) +
+    (agent ? agentReadinessMarkdown(agent) : "");
   if (options.summary) appendFileSync(options.summary, markdown);
   if (json) process.stdout.write(`${JSON.stringify(report)}\n`);
   else process.stdout.write(markdown);
-  if (failures.length > 0 || seo.failures.length > 0) process.exitCode = 1;
+  if (failures.length > 0 || seo.failures.length > 0 || agentFailures > 0) process.exitCode = 1;
 }
 
 await main();

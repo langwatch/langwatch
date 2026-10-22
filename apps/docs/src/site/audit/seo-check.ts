@@ -82,7 +82,8 @@ export function sitemapPages({ outDir }: { outDir: string }) {
   return [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => decodeEntities(match[1]));
 }
 
-function pageFile({ outDir, url }: { outDir: string; url: string }) {
+/** The prerendered HTML file for a sitemap address, or null for an address off the site. */
+export function pageFile({ outDir, url }: { outDir: string; url: string }) {
   if (url !== DOCS_URL && !url.startsWith(`${DOCS_URL}/`)) return null;
   const sitePathname = url.slice(DOCS_URL.length) || "/";
   return path.join(outDir, `.${sitePathname}`, "index.html");
@@ -242,11 +243,11 @@ function pageKey({ page }: { page: string }) {
 }
 
 /** Splits issues into new ones (failures) and known entries that no longer occur (fixed). */
-export function applyKnownIssues({
+export function applyKnownIssues<T extends SeoIssue>({
   issues,
   known,
 }: {
-  issues: SeoIssue[];
+  issues: T[];
   known: Budgets["seo"]["known"];
 }) {
   const seen = new Set(issues.map((issue) => `${issue.code} ${pageKey(issue)}`));

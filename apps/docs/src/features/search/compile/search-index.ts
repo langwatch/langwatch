@@ -124,22 +124,30 @@ export function publishSearchIndex({ entries }: { entries: unknown[] }) {
   for (const [word, pages] of wordPages({ entries: parsed }))
     terms[pages[0]].push([word, gapsOf({ pages })]);
   return JSON.stringify(
-    parsed.map((entry, position): PublishedIndexEntry => {
-      const sorted = terms[position].toSorted(([left], [right]) => (left < right ? -1 : 1));
-      const gaps = sorted.map(([, gap]) => gap);
-      return {
-        slug: entry.slug,
-        ...(entry.method ? { method: entry.method } : {}),
-        title: entry.title,
-        description: entry.description,
-        ...(entry.section === impliedSection({ trail: entry.trail })
-          ? {}
-          : { section: entry.section }),
-        ...(entry.trail ? { trail: entry.trail } : {}),
-        ...(entry.headings.length ? { headings: entry.headings.map(publishedHeading) } : {}),
-        ...(sorted.length ? { terms: sorted.map(([word]) => word).join(" ") } : {}),
-        ...(gaps.some(Boolean) ? { pages: gaps.join(" ") } : {}),
-      };
-    }),
+    parsed.map((entry, position) => publishedEntry({ entry, terms: terms[position] })),
   );
+}
+
+function publishedEntry({
+  entry,
+  terms,
+}: {
+  entry: z.infer<typeof searchEntrySchema>;
+  terms: [word: string, gaps: string][];
+}): PublishedIndexEntry {
+  const sorted = terms.toSorted(([left], [right]) => (left < right ? -1 : 1));
+  const gaps = sorted.map(([, gap]) => gap);
+  const section =
+    entry.section === impliedSection({ trail: entry.trail }) ? undefined : entry.section;
+  return {
+    slug: entry.slug,
+    ...(entry.method ? { method: entry.method } : {}),
+    title: entry.title,
+    description: entry.description,
+    ...(section === undefined ? {} : { section }),
+    ...(entry.trail ? { trail: entry.trail } : {}),
+    ...(entry.headings.length ? { headings: entry.headings.map(publishedHeading) } : {}),
+    ...(sorted.length ? { terms: sorted.map(([word]) => word).join(" ") } : {}),
+    ...(gaps.some(Boolean) ? { pages: gaps.join(" ") } : {}),
+  };
 }

@@ -16,9 +16,19 @@ async function shiftWithLateFonts({ browser, base, slug, width, lateScripts = fa
     const page = await context.newPage();
     await page.addInitScript(() => {
       window.docsShift = 0;
+      window.docsShifted = [];
+      const nameOf = (node) =>
+        node ? `${node.nodeName.toLowerCase()}.${String(node.className).slice(0, 60)}` : "?";
       new PerformanceObserver((list) => {
-        for (const entry of list.getEntries())
-          if (!entry.hadRecentInput) window.docsShift += entry.value;
+        for (const entry of list.getEntries()) {
+          if (entry.hadRecentInput) continue;
+          window.docsShift += entry.value;
+          const moved = entry.sources.map((source) => {
+            const [from, to] = [source.previousRect, source.currentRect];
+            return `${nameOf(source.node)} y${Math.round(from.y)}->${Math.round(to.y)} h${Math.round(from.height)}->${Math.round(to.height)}`;
+          });
+          window.docsShifted.push(`${entry.value.toFixed(4)}: ${moved.join(", ")}`);
+        }
       }).observe({ type: "layout-shift", buffered: true });
     });
     await page.route(lateScripts ? /\.(woff2|js)(\?|$)/ : "**/*.woff2", async (route) => {
@@ -30,6 +40,7 @@ async function shiftWithLateFonts({ browser, base, slug, width, lateScripts = fa
     await page.waitForTimeout(500);
     return await page.evaluate(() => ({
       shift: window.docsShift,
+      shifted: window.docsShifted,
       loaded: [...document.fonts]
         .filter((font) => font.status === "loaded")
         .map((font) => font.family),
@@ -46,11 +57,16 @@ await it("keeps a section index and a guide in place when the fonts swap in", as
     run: async ({ browser, base }) => {
       for (const slug of ["ai-governance/ingestion-sources", "integration/quick-start"]) {
         for (const width of [1440, 390]) {
-          const { shift, loaded } = await shiftWithLateFonts({ browser, base, slug, width });
+          const { shift, shifted, loaded } = await shiftWithLateFonts({
+            browser,
+            base,
+            slug,
+            width,
+          });
           assert.ok(loaded.includes("Inter"), `${slug} at ${width}px swaps in the web font`);
           assert.ok(
             shift <= 0.01,
-            `${slug} at ${width}px shifts ${shift.toFixed(4)} on the font swap`,
+            `${slug} at ${width}px shifts ${shift.toFixed(4)} on the font swap: ${shifted.join("; ")}`,
           );
         }
       }
@@ -66,8 +82,12 @@ await it("keeps the endpoint reference in place when the examples settle", async
       const slug = "api-reference/traces/get-trace";
       for (const width of [1440, 1280, 390]) {
         const late = { browser, base, slug, width, lateScripts: true };
-        const { shift } = await shiftWithLateFonts(late);
-        assert.ok(shift <= 0.01, `${slug} at ${width}px shifts ${shift.toFixed(4)} on load`);
+        const { shift, shifted } = await shiftWithLateFonts(late);
+        const detail = shifted.join("; ");
+        assert.ok(
+          shift <= 0.01,
+          `${slug} at ${width}px shifts ${shift.toFixed(4)} on load: ${detail}`,
+        );
       }
     },
   });

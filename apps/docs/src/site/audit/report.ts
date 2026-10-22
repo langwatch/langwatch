@@ -22,12 +22,15 @@ export function summaryMarkdown({
   notes,
   seo,
   wallClockMs,
+  agentFailures = 0,
 }: {
   runs: AuditRun[];
   failures: BudgetFinding[];
   notes: BudgetFinding[];
   seo: { pages: number; failures: SeoIssue[]; fixed: SeoIssue[]; known: number };
   wallClockMs: number;
+  /** New agent readiness gaps; their section follows this summary. */
+  agentFailures?: number;
 }) {
   const header = [
     "Page",
@@ -56,7 +59,7 @@ export function summaryMarkdown({
     run.requests === null ? "n/a" : String(run.requests),
   ]);
   const lines = [
-    `## Docs audit: ${failures.length + seo.failures.length === 0 ? "passed" : "failed"}`,
+    `## Docs audit: ${failures.length + seo.failures.length + agentFailures === 0 ? "passed" : "failed"}`,
     "",
     `Lighthouse on ${runs.length} page runs in ${Math.round(wallClockMs / 1000)} s; static checks on ${seo.pages} pages (${seo.known} known gaps tolerated).`,
   ];

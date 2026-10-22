@@ -23,6 +23,7 @@ const budgets = budgetsSchema.parse({
     },
   ],
   seo: { title: { min: 10, max: 70 }, description: { min: 50, max: 160 } },
+  agentReadiness: { pageTokens: 8000, integration: { groups: [] }, crawlers: ["GPTBot"] },
 });
 
 function run(overrides: Partial<AuditRun> = {}): AuditRun {
