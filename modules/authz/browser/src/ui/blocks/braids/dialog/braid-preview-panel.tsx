@@ -53,8 +53,23 @@ function Legend({ colour, label, value }: { colour: string; label: string; value
   );
 }
 
-function Counts({ ownerName, traces }: { ownerName: string; traces: BraidPreviewCounts }) {
-  const share = (value: number) => (traces.total === 0 ? 0 : (value / traces.total) * 100);
+function Counts({
+  ownerName,
+  readerName,
+  traces,
+}: {
+  ownerName: string;
+  readerName: string;
+  traces: BraidPreviewCounts;
+}) {
+  if (traces.total === 0) {
+    return (
+      <Text fontSize="sm" color="fg.muted" data-testid="braid-preview-counts">
+        {`${readerName} has no traces in the last 7 days, so there is nothing to count yet.`}
+      </Text>
+    );
+  }
+  const share = (value: number) => (value / traces.total) * 100;
   return (
     <Stack gap={3} data-testid="braid-preview-counts">
       <Text fontSize="2xl" fontWeight="semibold">
@@ -205,7 +220,11 @@ export function BraidPreviewPanel(props: BraidPreviewPanelProps) {
       {preview.state === "loading" ? <Skeleton height="120px" /> : null}
       {preview.state === "ready" ? (
         <>
-          <Counts ownerName={props.ownerName} traces={preview.traces} />
+          <Counts
+            ownerName={props.ownerName}
+            readerName={props.readerName ?? "The project"}
+            traces={preview.traces}
+          />
           {preview.unsignedHidden !== null && preview.unsignedHidden > 0 ? (
             <HStack gap={2} fontSize="sm" color="fg.muted" data-testid="braid-preview-unsigned">
               <ShieldCheck size={14} aria-hidden />

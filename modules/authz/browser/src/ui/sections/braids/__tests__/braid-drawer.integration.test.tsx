@@ -306,6 +306,21 @@ describe("the braid drawer", () => {
         expect.objectContaining({ projectId: "p-spec", readerProjectId: "p-orch" }),
       );
     });
+
+    it("says the reader has no traces to count instead of counting none of none", async () => {
+      braidTraces.state.preview = {
+        refusal: null,
+        traces: { every: 0, some: 0, none: 0, total: 0, capped: false },
+        unsignedHidden: null,
+      };
+      const { user } = openDrawer();
+      await pickReader(user);
+      await writeCondition(user, CONDITION);
+
+      expect(await screen.findByTestId("braid-preview-counts")).toHaveTextContent(
+        "orchestrator has no traces in the last 7 days, so there is nothing to count yet.",
+      );
+    });
   });
 
   describe("when ana tests a trace id", () => {
