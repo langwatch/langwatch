@@ -9,30 +9,23 @@ description: Plan, organise and maintain a full set of scenarios for one agent, 
 
 A scenario suite is the full set of scenarios that tells you whether your agent is safe to ship. It covers the flows that would hurt most if they broke, it runs on every change in a small form and on a schedule in a broad form, and every production failure you fix adds a scenario to it, so the same failure cannot come back unnoticed.
 
-This guide covers how to choose, organise, run and grow that set. The single pieces have their own pages: [Scenarios](/agent-testing/scenarios), [Test suites](/agent-testing/test-suites), [Run plans](/agent-testing/run-plans), [Run parameters](/agent-testing/run-parameters), [Setup and teardown hooks](/agent-testing/setup-and-teardown-hooks), [Run from CI](/agent-testing/run-from-ci) and [Results](/agent-testing/results).
+This page covers how to organise, run and maintain that set. For which cases to write and when the suite is complete, see [Test Suite Design](/agent-testing/designing-a-suite). For checking the data the agent changed, see [Check the World, Not the Words](/agent-testing/check-the-world). The single pieces have their own pages: [Scenarios](/agent-testing/scenarios), [Test suites](/agent-testing/test-suites), [Run plans](/agent-testing/run-plans), [Run parameters](/agent-testing/run-parameters), [Run from CI](/agent-testing/run-from-ci) and [Results](/agent-testing/results).
 
-## What to test first
+## What to test first and how big
 
-Start from product risk, not from features. List the things your agent does that write data, spend money, reach a customer or act on a guess, because a wrong answer there costs more than a clumsy reply in a read-only flow. For example, an assistant that edits dashboards should be tested first on "deletes the wrong widget" and "writes before it knows which board you mean", and only later on how it phrases a summary.
-
-Then read your traces for what users actually ask. The questions that come up most often belong in the suite even when they are low risk, because a regression there reaches the most people. The rare questions that went wrong belong in it too: each one is a failure you have already seen in production.
-
-Write one scenario per behaviour, with criteria the judge can check against the conversation and, where you [link your traces](/agent-testing/linking-your-traces), against what the agent did. A scenario that checks five behaviours at once fails without telling you which one broke.
-
-## How big should a suite be
-
-Start with ten to twenty scenarios that cover the risky flows, and grow from there. Ten good scenarios that run on every change catch more regressions than a hundred that nobody runs because they are slow and expensive. Add scenarios when a production failure or a new feature asks for one, not to reach a number.
-
-A suite of around ten scenarios is enough to be useful. For example, the suite LangWatch runs against Langy, its in-product assistant, has ten scenarios: seven about building, editing and reading dashboards, one for Topic Clustering setup, one for an empty time range and one for a cost question. Each file names its row, its labels and the run parameter its setup reads ([the suite on GitHub](https://github.com/langwatch/langwatch/tree/main/dev/dogfood/langy/scenarios)).
+Start from product risk, with ten to twenty scenarios, and grow from there. See [Which cases to write](/agent-testing/designing-a-suite#which-cases-to-write). For example, the suite LangWatch runs against Langy, its in-product assistant, has ten scenarios: seven about building, editing and reading dashboards, one for Topic Clustering setup, one for an empty time range and one for a cost question. Each file names its row, its labels and the run parameter its setup reads ([the suite on GitHub](https://github.com/langwatch/langwatch/tree/main/dev/dogfood/langy/scenarios)).
 
 ## How to organise scenarios
 
 Use test suites for the groups that ship together and labels for the cuts that cross them. A scenario belongs to exactly one test suite, and it can carry any number of labels, so a test suite works as the folder and a label as the tag.
 
+Start with one suite per agent, and split by area only when the fields or the owners differ. Never copy a suite per environment or per cadence, because copies drift: point a run plan at another target, or scope it by label, instead.
+
 | Use               | For                                                            | Example                                   |
 | ----------------- | -------------------------------------------------------------- | ----------------------------------------- |
 | **Test suite**    | One area of the agent, owned by one team                       | `Dashboards`, `Refunds`                   |
 | **Label**         | A cut across suites: speed, risk, or the kind of failure       | `smoke`, `safety`, `regression`           |
+| **Target**        | Which environment: `support-agent` in `production` and in `development` are separate targets | `connected:support-agent@staging`         |
 | **Run parameter** | One scenario under several setups, instead of copies of it     | `world=A1`, `plan=pro`                    |
 | **Run plan name** | One history on the Results tab for one way you run the suite   | `Dashboards smoke`, `Dashboards nightly`  |
 
@@ -54,17 +47,41 @@ langwatch run-plan run --all --target connected:support-agent \
   --name "Support nightly" --repeat 3 --wait
 ```
 
+A run plan is a name and a configuration: the scope (test suites, labels or specific scenarios), the targets, the repeat count from 1 to 5, and the simulator and judge models. Every run under the same name joins one pass rate history on [Results](/agent-testing/results). For the refund agent:
+
+| Run plan | Scope | Target | Repeats | When | Pass bar |
+|---|---|---|---|---|---|
+| **PR smoke** | Label `smoke` | Staging | 1 | Every PR that changes the prompt or tools. | All pass. |
+| **Refunds nightly** | Suite `Refunds` | Staging | 1 | On a cron schedule. | All pass, or a failure you can explain. |
+| **Critical** | Label `critical` | Staging | 5 | Before a release. | Every repetition passes, strong judge. |
+| **Refunds pre-release** | Suite `Refunds` | Staging | 3 | Before a release. | Happy paths and critical scenarios pass every repetition, the rest a majority. |
+| **Production canary** | Label `smoke` | Production | 1 | After each deploy. | All pass. |
+
+LangWatch does not apply a pass threshold for you. `--wait` exits non-zero when any run failed, so your team reads the pass bar on Results.
+
+```bash
+# Critical: 5 repetitions and a strong judge.
+langwatch run-plan run --label critical --target connected:support-agent@staging \
+  --name "Critical" --repeat 5 --judge-model openai/gpt-5 --wait
+
+# Production canary: the same smoke label against production.
+langwatch run-plan run --label smoke --target connected:support-agent@production \
+  --name "Production canary" --wait
+```
+
 LangWatch does not schedule runs itself: a run plan has no schedule or cron setting, and the API refuses one. Start the scheduled run from your CI's own scheduler, for example a GitHub Actions `schedule` trigger. See [Run from CI](/agent-testing/run-from-ci) for the batch id, the poll and the exit code.
 
 ## Isolate scenarios with setup and teardown hooks
 
-A scenario that reads or writes real data needs that data to exist before the first turn and to be gone after the last, or one run changes what the next one sees. Setup and teardown hooks on a connected agent create the test data for each run and remove it afterwards. See [Setup and teardown hooks](/agent-testing/setup-and-teardown-hooks) for how to declare them and what happens when one fails.
+A scenario that reads or writes real data needs that data to exist before the first turn and to be gone after the last, or one run changes what the next one sees. Setup and teardown hooks on a connected agent create the test data for each run and remove it afterwards. You declare them on the connected agent in the SDK. In Python, use the `@agent.scenario.setup` and `@agent.scenario.teardown` decorators. In TypeScript, call `agent.scenario.setup(...)` and `agent.scenario.teardown(...)`. See [Connect your agent](/agent-testing/connect-your-agent).
 
 Give each run its own names for the data it makes, such as a trace name or a board name with the run id in it. Runs of one plan share a project, so counting "every trace named `checkout`" includes what other runs left behind. For example, the Langy suite gives every run its own trace name so its totals stay exact, because traces have no delete route and teardown cannot remove them.
 
 ## How much will a suite cost to run
 
-A run plan starts one run per scenario, per target, per repeat: 20 scenarios against 2 targets with a repeat count of 3 is 120 runs. Each run is a conversation of up to the scenario's maximum turns, and you pay for your agent's model calls plus those of the user simulator and the judge.
+A run plan starts one run per scenario, per target, per repeat: 20 scenarios against 2 targets with a repeat count of 3 is 120 runs.
+
+Use cheaper models for the user simulator and the judge on routine scenarios, with the simulator and judge models of the run plan, and give critical scenarios a strong judge with **Override models** on the scenario. Each run is a conversation of up to the scenario's maximum turns, and you pay for your agent's model calls plus those of the user simulator and the judge.
 
 To estimate the cost, run the plan once with a repeat count of 1 and read the **Total cost** in the run header. Divide it by the number of runs for the cost of one run, then multiply by the runs a schedule adds up to. For example, a 20-scenario plan that costs $0.80 per run and runs nightly against one target costs about $16 a night.
 
@@ -121,4 +138,4 @@ Every failure you find in production can become a scenario that keeps it fixed. 
 5. **Review.** A person reads the scenario and its failing run and agrees that the criterion is the right one.
 6. **Fix.** Open the pull request that fixes the agent, with the scenario moved into the suite in the same pull request. The run that passes against the fix is the proof, and the scenario stays in the suite as the regression test.
 
-Also check: [Test suites](/agent-testing/test-suites), [Run plans](/agent-testing/run-plans), [Setup and teardown hooks](/agent-testing/setup-and-teardown-hooks), [Results](/agent-testing/results), [Compare agents](/agent-testing/compare-agents).
+Also check: [Test suites](/agent-testing/test-suites), [Run plans](/agent-testing/run-plans), [Connect your agent](/agent-testing/connect-your-agent), [Test Suite Design](/agent-testing/designing-a-suite), [Check the World, Not the Words](/agent-testing/check-the-world), [Results](/agent-testing/results), [Compare agents](/agent-testing/compare-agents).

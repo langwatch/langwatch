@@ -5,6 +5,8 @@ keywords: langwatch, agent testing, state of world, side effects, seed data, tes
 description: Test an agent that changes data by what changed, not by what it says it did. Parameters describe the case, the first turn builds it, and a state_of_world span shows the judge the result.
 ---
 
+This page covers checking state: parameters as the case, seeding the world and checking a value without the judge. For which cases to write, see [Test Suite Design](/agent-testing/designing-a-suite). For organising and running the suite, see [Build a Scenario Suite](/agent-testing/build-a-scenario-suite).
+
 ## Why the reply is not enough
 
 An agent that changes data, such as a refund, a booking or a dashboard edit, replies "Done, I refunded 49.95". That reply passes a criterion even when the refund went wrong, ran twice, or never happened.
@@ -173,7 +175,7 @@ Compare one fact, not the whole `state_of_world` object. One fact is safer.
 ## Caveats
 
 - **Keep the facts short and flat.** The judge reads a digest of the trace. A large trace becomes a structure-only tree that the judge has to expand, and a repeated long string is shown once. A few scalar facts read the same at any trace size.
-- **Clean up with a sweeper.** There is no teardown hook at the end of a run. Delete test data older than a few hours with a scheduled job, and find it by the test flag.
+- **Clean up after the run.** Declare a teardown hook on the connected agent to remove the data a run made, as [Build a scenario suite](/agent-testing/build-a-scenario-suite#isolate-scenarios-with-setup-and-teardown-hooks) shows. A teardown does not run if the agent process dies mid-run, so also delete test data older than a few hours with a scheduled job, and find it by the test flag.
 - **Seed in development or staging only.** Never seed test data in production.
 - **Self-hosted: run langevals.** Exact Match runs in langevals. If langevals is not running, the evaluator errors, and a required one fails the run.
 - **Background work is not covered.** The span reports the state when the function returns. Work that continues after the call, such as a queued job, is not in it.
@@ -189,6 +191,12 @@ Compare one fact, not the whole `state_of_world` object. One fact is safer.
   </Card>
   <Card title="Evaluators" icon="check" href="/agent-testing/evaluators">
     Attach a check that runs after every scenario run
+  </Card>
+  <Card title="Test Suite Design" icon="table" href="/agent-testing/designing-a-suite">
+    Which cases to write and when a suite is complete
+  </Card>
+  <Card title="Build a Scenario Suite" icon="layer-group" href="/agent-testing/build-a-scenario-suite">
+    Organise, run and maintain the suite
   </Card>
   <Card title="Connect your agent" icon="plug" href="/agent-testing/connect-your-agent">
     Sessions, environments and the options reference
