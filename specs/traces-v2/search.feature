@@ -2508,7 +2508,7 @@ Rule: Event rows drill down into their metric values
     When the sidebar loads the Event name section
     Then the section loads with every event name and the vote drilldown
 
-  @unit
+  @unit @integration
   Scenario: Event metric values follow the same trace filter as the event name counts
     Given a search filter narrows the traces in view
     When the sidebar loads the Event name section

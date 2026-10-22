@@ -74,6 +74,49 @@ type FacetRow = {
   total_distinct: string;
 };
 
+const TRACE_COUNT = 200;
+const traceIndexOf = (spanIndex: number) => spanIndex % TRACE_COUNT;
+/** The traces a search filter keeps: every third, so voting spans fall on both sides. */
+const inScope = (traceIndex: number) => traceIndex % 3 === 0;
+
+/** What the facet should answer over the spans `keeps` selects, from the seed's own rules. */
+function expectedOver(keeps: (spanIndex: number) => boolean) {
+  const names: Record<string, number> = {};
+  let up = 0;
+  let down = 0;
+  for (let i = 0; i < SPAN_COUNT; i++) {
+    if (!keeps(i)) continue;
+    const votes = i % VOTE_EVERY === 0;
+    for (const name of [...PAYLOAD_EVENTS, votes ? VOTE_EVENT : UNMEASURED_EVENT]) {
+      names[name] = (names[name] ?? 0) + 1;
+    }
+    if (votes && i % UP_VOTE_EVERY === 0) up++;
+    else if (votes) down++;
+  }
+  return { names, up, down };
+}
+
+/** One trace summary per seeded trace, named for whether the search filter keeps it. */
+async function seedTraceSummaries({ ch }: { ch: ClickHouseClient }): Promise<void> {
+  const at = new Date(SEEDED_AT);
+  await ch.insert({
+    table: "trace_summaries",
+    values: Array.from({ length: TRACE_COUNT }, (_, t) => ({
+      ProjectionId: `proj-events-facet-trace-${t}`,
+      TenantId: TENANT_ID,
+      TraceId: `${TENANT_ID}-trace-${t}`,
+      Version: "v1",
+      OccurredAt: at,
+      CreatedAt: at,
+      UpdatedAt: at,
+      LastEventOccurredAt: at,
+      TraceName: inScope(t) ? "in-scope" : "out-of-scope",
+    })),
+    format: "JSONEachRow",
+    clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
+  });
+}
+
 async function seedSpansWithEvents({ ch }: { ch: ClickHouseClient }): Promise<void> {
   const now = SEEDED_AT;
   const payload = Object.fromEntries(
@@ -96,7 +139,7 @@ async function seedSpansWithEvents({ ch }: { ch: ClickHouseClient }): Promise<vo
     rows.push({
       ProjectionId: `proj-events-facet-${i}`,
       TenantId: TENANT_ID,
-      TraceId: `${TENANT_ID}-trace-${i % 200}`,
+      TraceId: `${TENANT_ID}-trace-${traceIndexOf(i)}`,
       SpanId: `span-${i}`,
       ParentSpanId: null,
       ParentTraceId: null,
@@ -202,15 +245,18 @@ describe.skipIf(!clickHouseConfigured)("events facet integration", () => {
     // the payload spans, so merges on stored_spans stay stopped for the suite.
     await ch.command({ query: "SYSTEM STOP MERGES stored_spans" });
     await seedSpansWithEvents({ ch });
+    await seedTraceSummaries({ ch });
   }, 180_000);
 
   afterAll(async () => {
     if (!ch) return;
     await ch.command({ query: "SYSTEM START MERGES stored_spans" });
-    await ch.command({
-      query: "DELETE FROM stored_spans WHERE TenantId = {tenantId:String}",
-      query_params: { tenantId: TENANT_ID },
-    });
+    for (const table of ["stored_spans", "trace_summaries"]) {
+      await ch.command({
+        query: `DELETE FROM ${table} WHERE TenantId = {tenantId:String}`,
+        query_params: { tenantId: TENANT_ID },
+      });
+    }
   });
 
   const ctx = {
@@ -220,8 +266,11 @@ describe.skipIf(!clickHouseConfigured)("events facet integration", () => {
     offset: 0,
   };
 
-  async function runFacet(settings: Record<string, string> = {}): Promise<FacetRow[]> {
-    const built = EVENT_FACET.queryBuilder(ctx);
+  async function runFacet(
+    settings: Record<string, string> = {},
+    filterWhere?: { sql: string; params: Record<string, unknown> },
+  ): Promise<FacetRow[]> {
+    const built = EVENT_FACET.queryBuilder({ ...ctx, ...(filterWhere ? { filterWhere } : {}) });
     const query = { ...built, ...forTenant(built) };
     const result = await ch.query({
       query: query.sql,
@@ -273,6 +322,40 @@ describe.skipIf(!clickHouseConfigured)("events facet integration", () => {
         // must still come back with a count and an empty list of values.
         expect(Number(unmeasured?.cnt)).toBe(NON_VOTING_SPANS);
         expect(unmeasured?.metric_values).toEqual([]);
+      });
+    });
+
+    describe("when a search filter keeps only some of the traces", () => {
+      const filterWhere = {
+        sql: "TraceName = {scopeTraceName:String}",
+        params: { scopeTraceName: "in-scope" },
+      };
+      const expected = expectedOver((i) => inScope(traceIndexOf(i)));
+
+      /** @scenario Event metric values follow the same trace filter as the event name counts */
+      it("counts event names over the filtered traces only", async () => {
+        const rows = await runFacet({}, filterWhere);
+
+        expect(Object.fromEntries(rows.map((r) => [r.facet_value, Number(r.cnt)]))).toEqual(
+          expected.names,
+        );
+      });
+
+      /** @scenario Event metric values follow the same trace filter as the event name counts */
+      it("buckets vote values over the filtered traces only", async () => {
+        const rows = await runFacet({}, filterWhere);
+        const buckets = rows
+          .find((r) => r.facet_value === VOTE_EVENT)
+          ?.metric_values.map(([key, count]) => [key, Number(count)]);
+
+        // Some votes fall outside the filter, so an unscoped bucket would count more.
+        expect(expected.up + expected.down).toBeLessThan(VOTING_SPANS);
+        expect(buckets).toEqual(
+          [
+            [`${VOTE_KEY}${EVENT_METRIC_SEP}-1`, expected.down],
+            [`${VOTE_KEY}${EVENT_METRIC_SEP}1`, expected.up],
+          ].toSorted((a, b) => Number(b[1]) - Number(a[1])),
+        );
       });
     });
 
