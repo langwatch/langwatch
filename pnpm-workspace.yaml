@@ -127,6 +127,7 @@ catalog:
   knip: ^6.35.1
   libphonenumber-js: ^1.13.7
   lighthouse: 13.5.0
+  lightningcss: 1.33.0
   liqe: ^3.8.7
   liquidjs: ^10.27.1
   lodash-es: ^4.18.1

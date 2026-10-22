@@ -95,6 +95,28 @@ Feature: Static documentation with progressive interaction
     Then emitted style rules are extracted in order into a hashed stylesheet
     And executable rendering state is absent from its HTML
 
+  @unit
+  Scenario: Paint a page from its own styles without waiting for a stylesheet
+    Given the site's shared stylesheet holds every server and island rule
+    When a page is prerendered
+    Then the rules its markup can match are inlined in its head
+    And rules for classes or ids found only on other pages are left out
+    And rules a script can add at runtime, theme classes and unscoped rules are kept
+    And the shared stylesheet loads without blocking the first paint
+
+  @unit
+  Scenario: Minify the shared stylesheet for the supported browsers
+    When the server and island styles are combined into the shared stylesheet
+    Then duplicate rules and prefixes the supported browsers no longer need are removed
+    And prefixes those browsers still need are kept
+    And its file name changes whenever its contents change
+
+  @e2e
+  Scenario: Keep dark mode and island styles on a page with inlined styles
+    Given a page that inlines its own styles
+    When a reader switches to dark mode, opens search and navigates to another page
+    Then every surface is styled as before
+
   @e2e
   Scenario: Send a request from a lazy playground
     Given the API playground has not loaded React
@@ -148,3 +170,68 @@ Feature: Static documentation with progressive interaction
     When a browser loads a brand SVG from the documentation dev server
     Then the response declares its SVG image type
     And the browser decodes the brand mark successfully
+
+  @integration
+  Scenario: Open the mobile navigation from the page's one navigation tree
+    Given a page ships its sections and page tree once, in the left rail
+    When a reader opens the mobile navigation
+    Then the drawer shows the same sections and page tree with the current page marked
+    And no identifier on the page is repeated
+
+  @integration
+  Scenario: Draw navigation chevrons from shared styles
+    When a page lists collapsible navigation groups
+    Then each group toggle carries a styled chevron instead of its own inline icon
+    And the chevron turns when the group opens
+
+  @e2e
+  Scenario: Keep text in place while the web fonts load
+    Given the web fonts reach the reader after the page has painted
+    When a reader opens a section index or a guide
+    Then the text set in the metric-matched fallback fonts takes the same space as the web fonts
+    And the page shifts by no more than 0.01 when the fonts swap in
+
+  @e2e
+  Scenario: Fetch only the fonts an English page draws
+    When a reader opens an English page
+    Then the body and title fonts are requested before the stylesheet asks for them
+    And no extended-Latin font file is downloaded
+
+  @unit
+  Scenario: Preload the two fonts every page draws above the fold
+    When a page head is built
+    Then it preloads the Latin body font and the regular title font, under the site's base path, and no other font
+
+  @integration
+  Scenario: Serve the product tour poster at the size of the screen
+    When the docs home renders the product tour
+    Then its poster offers AVIF and WebP candidates by width, under the site's base path
+    And the video keeps the poster's shape before and after the tour starts
+
+  @e2e
+  Scenario: Keep the agent carousel's faded names out of the contrast and reading order
+    When a reader opens a page with the agent launcher
+    Then the agent names in the wheel are drawn by the stylesheet, with no text for assistive technology or contrast checks
+    And the chosen agent's name is still shown in the wheel
+
+  @integration
+  Scenario: Fetch a skill's full prompt from its own file instead of carrying it in the page
+    When the build publishes a page with skill cards
+    Then each card's copy button names a prompt file and carries no copy of the prompt
+    And the prompt file holds exactly the text the button copied before
+    And a page served without that step still copies the prompt from the button
+
+  @integration
+  Scenario: Copy a code block from the code it shows
+    When a page renders a code block or a tabbed code group
+    Then its copy button carries no second copy of the code
+    And copying reads the code of the block, or of the selected tab, the button belongs to
+    And a failed fetch or a denied clipboard reports that copying failed
+
+  @unit @e2e
+  Scenario: Follow the reader's dark preference without JavaScript
+    Given JavaScript is disabled and the reader prefers a dark colour scheme
+    When the reader opens a guide, the home page or an API reference
+    Then the page renders in the dark theme, theme-paired images included
+    And a reader preferring light still sees the light theme
+    And readers with JavaScript download no extra stylesheet for it

@@ -46,6 +46,7 @@
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "catalog:",
     "lighthouse": "catalog:",
+    "lightningcss": "catalog:",
     "mermaid": "catalog:",
     "oxc-transform-react": "catalog:",
     "playwright": "catalog:",

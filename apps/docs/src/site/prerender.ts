@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
-import { cp, mkdir, readFile } from "node:fs/promises";
+import { cp, mkdir, readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { isMainThread, parentPort, workerData } from "node:worker_threads";
@@ -9,6 +9,7 @@ import { z } from "zod";
 
 import { render } from "../app/entry-server.tsx";
 import { SPEC_FILES } from "../features/api-reference/compile/openapi.ts";
+import { extractSkillPrompts } from "../features/content/compile/skill-prompts.ts";
 import {
   discoveryFiles,
   llmsFull,
@@ -29,6 +30,7 @@ import { searchEntry } from "../features/search/compile/search-index.ts";
 import { publicSlug, withBasePath } from "../lib/site-path.ts";
 import { docsRoot, readBuildOptions } from "../paths.ts";
 import { compressedSearchIndex } from "./compressed-index.ts";
+import { inlinePageStyles } from "./css/page-styles.ts";
 import {
   composeDocument,
   islandHead,
@@ -57,8 +59,49 @@ const HERO_PRELOAD = ({ site }: { site: (path: string) => string }) =>
   `<link rel="preload" as="image" href="${site("/images/coding-agents/optimized/session-detail-1024.webp")}" imagesrcset="${site("/images/coding-agents/optimized/session-detail-640.webp")} 640w, ${site("/images/coding-agents/optimized/session-detail-1024.webp")} 1024w, ${site("/images/coding-agents/optimized/session-detail-1560.webp")} 1560w" imagesizes="(min-width: 1280px) calc(100vw - 620px), (min-width: 1024px) calc(100vw - 380px), calc(100vw - 40px)">`;
 const manifestSchema = z.record(
   z.string(),
-  z.looseObject({ file: z.string(), name: z.string().optional(), isEntry: z.boolean().optional() }),
+  z.looseObject({
+    file: z.string(),
+    name: z.string().optional(),
+    isEntry: z.boolean().optional(),
+    css: z.array(z.string()).optional(),
+  }),
 );
+
+const styleLink = ({ href }: { href: string }) =>
+  `<link data-docs-style rel="stylesheet" href="${href}">`;
+
+/** The client build's stylesheets (linked from the template) and its script text. */
+async function clientStyles({
+  dist,
+  basePath,
+  template,
+}: {
+  dist: string;
+  basePath: string;
+  template: string;
+}) {
+  const manifest = manifestSchema.parse(
+    JSON.parse(await readFile(path.join(dist, ".vite/manifest.json"), "utf8")),
+  );
+  const cssFiles = [...new Set(Object.values(manifest).flatMap((entry) => entry.css ?? []))];
+  const clientLinks = cssFiles.flatMap((file) => {
+    const href = withBasePath({ basePath, path: `/${file}` });
+    return [...template.matchAll(/<link\b[^>]*>/g)]
+      .map(([tag]) => tag)
+      .filter((tag) => tag.includes(`href="${href}"`));
+  });
+  const clientCss = await Promise.all(
+    cssFiles
+      .filter((file) => clientLinks.some((tag) => tag.includes(`/${file}"`)))
+      .map((file) => readFile(path.join(dist, file), "utf8")),
+  );
+  const scripts = await Promise.all(
+    (await readdir(path.join(dist, "assets")))
+      .filter((file) => file.endsWith(".js"))
+      .map((file) => readFile(path.join(dist, "assets", file), "utf8")),
+  );
+  return { clientCss, clientLinks, scripts };
+}
 
 /** The one immutable context every page task reads. */
 type RenderContext = { template: string; islands: string; nav: Nav; basePath: string };
@@ -72,14 +115,14 @@ async function renderPage({
 }): Promise<RenderedPage> {
   const { template, islands, nav, basePath } = context;
   const site = (sitePath: string) => withBasePath({ basePath, path: sitePath });
-  const styleLink = `<link data-docs-style rel="stylesheet" href="${STYLE_PLACEHOLDER}">`;
+  const placeholder = styleLink({ href: STYLE_PLACEHOLDER });
   const result = await render({ slug });
   const styled = extractStyles({ html: result.html });
   if (slug === "404") {
     const page = composeDocument({
       template,
       islands,
-      head: `${NOT_FOUND_HEAD}${styleLink}`,
+      head: `${NOT_FOUND_HEAD}${placeholder}`,
       app: styled.html,
       slug,
       operation: null,
@@ -91,7 +134,7 @@ async function renderPage({
   const page = composeDocument({
     template,
     islands,
-    head: `${preload}${pageHead({ slug, title, description, trail: breadcrumbTrail({ sections: nav.anchors, slug, title }) })}${styleLink}`,
+    head: `${preload}${pageHead({ slug, title, description, trail: breadcrumbTrail({ sections: nav.anchors, slug, title }) })}${placeholder}`,
     app: styled.html,
     slug,
     operation,
@@ -273,6 +316,7 @@ async function generate() {
   });
   const notFound = skipped.find((entry) => entry.slug === "404");
   if (notFound) throw new Error(`The 404 page failed to render: ${notFound.reason}`);
+  for (const [name, contents] of extractSkillPrompts({ pages })) files.set(name, contents);
 
   const redirects = siteRedirects({ docsRoot, slugs: Object.keys(context.nav.pages) });
   files.set("redirects.json", JSON.stringify(redirects));
@@ -291,11 +335,16 @@ async function generate() {
     cacheDir: plan.cacheDir ? path.join(path.dirname(plan.cacheDir), "compressed") : null,
   }))
     files.set(name, contents);
-  const css = styles.join("\n");
-  const cssFile = `assets/prerender-${createHash("sha256").update(css).digest("hex").slice(0, 16)}.css`;
-  files.set(cssFile, css);
-  const cssHref = withBasePath({ basePath, path: `/${cssFile}` });
-  for (const [target, page] of pages) pages.set(target, page.replace(STYLE_PLACEHOLDER, cssHref));
+  const client = await clientStyles({ dist, basePath, template: context.template });
+  const styled = inlinePageStyles({
+    rules: styles,
+    ...client,
+    pages,
+    placeholder: styleLink({ href: STYLE_PLACEHOLDER }),
+    href: (file) => withBasePath({ basePath, path: `/${file}` }),
+  });
+  for (const [name, contents] of styled.files) files.set(name, contents);
+  for (const [target, page] of styled.pages) pages.set(target, page);
   redirectPages({ dist, redirects, pages });
   files.set("skipped.json", JSON.stringify(skipped, null, 2));
   await writeOutputFiles({ root: dist, files });

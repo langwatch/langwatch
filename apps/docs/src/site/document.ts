@@ -75,12 +75,23 @@ export function composeDocument({
     .replace("</body>", `${pageData({ slug, operation })}</body>`);
 }
 
+/* An inline SVG's `<style>` is parsed as markup, so serialised diagrams escape `>` as `&gt;`;
+   in a stylesheet those entities would void the rule. */
+function decodeStyleEntities({ css }: { css: string }) {
+  return css
+    .replaceAll("&gt;", ">")
+    .replaceAll("&lt;", "<")
+    .replaceAll("&quot;", '"')
+    .replaceAll("&#39;", "'")
+    .replaceAll("&amp;", "&");
+}
+
 /** Moves server-emitted design-system `<style>` blocks out of the markup and drops scripts. */
 export function extractStyles({ html }: { html: string }) {
   const styles: string[] = [];
   const body = html
     .replace(/<style\b[^>]*>([\s\S]*?)<\/style>/g, (_, css: string) => {
-      styles.push(css);
+      styles.push(decodeStyleEntities({ css }));
       return "";
     })
     .replace(/<script\b[^>]*>[\s\S]*?<\/script>/g, "");

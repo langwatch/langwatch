@@ -58,12 +58,17 @@ async function installStyles({ next }: { next: Document }) {
 
   const pending = [...next.querySelectorAll<HTMLLinkElement>("link[data-docs-style]")].map(
     (source) => {
-      if (
-        [...document.querySelectorAll<HTMLLinkElement>("link[data-docs-style]")].some(
-          (link) => link.href === source.href,
-        )
-      )
-        return Promise.resolve();
+      const present = [...document.querySelectorAll<HTMLLinkElement>("link[data-docs-style]")].find(
+        (link) => link.href === source.href,
+      );
+      /* The shared sheet loads without blocking; wait if it is still on its way. */
+      if (present)
+        return present.sheet
+          ? Promise.resolve()
+          : new Promise<void>((resolve) => {
+              present.addEventListener("load", () => resolve(), { once: true });
+              present.addEventListener("error", () => resolve(), { once: true });
+            });
       return new Promise<void>((resolve, reject) => {
         const link = document.createElement("link");
         link.rel = "stylesheet";

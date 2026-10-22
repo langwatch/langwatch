@@ -44,4 +44,14 @@ describe("static style extraction", () => {
       result.href,
     );
   });
+
+  describe("when a diagram's inline SVG style escapes its selectors as markup", () => {
+    /** @scenario "Extract the exact server styles" */
+    it("extracts the rule a browser would apply inside the SVG", () => {
+      const result = extractStyles({
+        html: "<svg><style>#d text.actor&gt;tspan{fill:#201e1b}.q::before{content:'&amp;'}</style></svg>",
+      });
+      expect(result.css).toBe("#d text.actor>tspan{fill:#201e1b}.q::before{content:'&'}");
+    });
+  });
 });

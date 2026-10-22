@@ -479,6 +479,9 @@ catalogs:
     lighthouse:
       specifier: 13.5.0
       version: 13.5.0
+    lightningcss:
+      specifier: 1.33.0
+      version: 1.33.0
     liqe:
       specifier: ^3.8.7
       version: 3.8.7
@@ -1240,6 +1243,9 @@ importers:
       lighthouse:
         specifier: 'catalog:'
         version: 13.5.0(@opentelemetry/core@2.10.0(@opentelemetry/api@1.9.1))(@opentelemetry/exporter-trace-otlp-http@0.221.0(@opentelemetry/api@1.9.1))(bufferutil@4.1.0)(supports-color@10.2.2)(yauzl@2.10.0)
+      lightningcss:
+        specifier: 'catalog:'
+        version: 1.33.0
       mermaid:
         specifier: 'catalog:'
         version: 11.16.1

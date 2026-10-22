@@ -516,3 +516,127 @@ await it("expands and collapses server-rendered MDX accordions", async () => {
     },
   });
 });
+
+/** @scenario "Keep dark mode and island styles on a page with inlined styles" */
+await it("styles a page, dark mode, search and navigation from inlined styles", async () => {
+  await withPreviewBrowser({
+    outDir,
+    run: async ({ browser, base }) => {
+      const sample = (page) =>
+        page.locator(".docs-layout").evaluate((layout) =>
+          [layout, ...layout.querySelectorAll("*")].slice(0, 400).map((node) => {
+            const style = getComputedStyle(node);
+            return [style.display, style.color, style.backgroundColor, style.fontSize].join();
+          }),
+        );
+      const blocked = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      try {
+        const page = await blocked.newPage();
+        await page.route(/\/assets\/docs-[0-9a-f]+\.css$/, (route) => route.abort());
+        const response = await page.goto(base + "integration/quick-start");
+        const html = await response.text();
+        assert.match(html, /<style>@layer /);
+        assert.doesNotMatch(
+          html.replace(/<noscript>[\s\S]*?<\/noscript>/g, ""),
+          /<link(?![^>]*media="print")[^>]*rel="stylesheet"/,
+        );
+        assert.equal(
+          await page.locator(".docs-layout").evaluate((node) => getComputedStyle(node).display),
+          "grid",
+        );
+        const light = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+        await page.getByRole("button", { name: "Colour theme" }).first().click();
+        await page.getByRole("menuitemradio", { name: "Dark" }).click();
+        await page.waitForFunction(
+          (before) =>
+            document.documentElement.classList.contains("dark") &&
+            getComputedStyle(document.body).backgroundColor !== before,
+          light,
+        );
+        await page.keyboard.press("Escape");
+        await page.keyboard.press("Control+k");
+        const dialog = page.getByRole("dialog");
+        await dialog.waitFor();
+        assert.notEqual(
+          await dialog.evaluate((node) => getComputedStyle(node).backgroundColor),
+          "rgba(0, 0, 0, 0)",
+        );
+      } finally {
+        await blocked.close();
+      }
+      const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      try {
+        const page = await context.newPage();
+        await page.goto(base + "api-reference/traces/get-trace");
+        const fresh = await sample(page);
+        await page.goto(base + "integration/quick-start", { waitUntil: "networkidle" });
+        await page.locator("#content").evaluate((content) => {
+          const link = document.createElement("a");
+          link.href = "/api-reference/traces/get-trace";
+          link.id = "navigation-test";
+          link.textContent = "Get trace";
+          content.prepend(link);
+        });
+        await page.locator("#navigation-test").click();
+        await page.waitForURL("**/api-reference/traces/get-trace");
+        await page.locator("h1").waitFor();
+        assert.deepEqual(await sample(page), fresh);
+      } finally {
+        await context.close();
+      }
+    },
+  });
+});
+
+/** @scenario "Follow the reader's dark preference without JavaScript" */
+await it("follows a dark colour scheme without JavaScript and costs scripted readers nothing", async () => {
+  await withPreviewBrowser({
+    outDir,
+    run: async ({ browser, base }) => {
+      const slugs = ["introduction", "integration/quick-start", "api-reference/traces/get-trace"];
+      for (const [colorScheme, background] of [
+        ["dark", "rgb(20, 20, 23)"],
+        ["light", "rgb(255, 255, 255)"],
+      ]) {
+        const context = await browser.newContext({ javaScriptEnabled: false, colorScheme });
+        try {
+          const page = await context.newPage();
+          for (const slug of slugs) {
+            await page.goto(base + slug, { waitUntil: "load" });
+            assert.equal(
+              await page.evaluate(() => getComputedStyle(document.body).backgroundColor),
+              background,
+              `${slug} ${colorScheme}`,
+            );
+          }
+          await page.goto(base + "integration/quick-start", { waitUntil: "load" });
+          const visible = (selector) =>
+            page
+              .locator(selector)
+              .first()
+              .evaluate((node) => getComputedStyle(node).display);
+          if (await page.locator(".docs-dark-only").count())
+            assert.equal((await visible(".docs-dark-only")) === "none", colorScheme === "light");
+        } finally {
+          await context.close();
+        }
+      }
+      const context = await browser.newContext({ colorScheme: "dark" });
+      try {
+        const page = await context.newPage();
+        const styles = [];
+        page.on("request", (request) => {
+          if (request.url().endsWith(".css")) styles.push(request.url());
+        });
+        await page.goto(base + "integration/quick-start", { waitUntil: "networkidle" });
+        assert.equal(styles.filter((url) => url.includes("/docs-dark-")).length, 0);
+        assert.equal(
+          await page.evaluate(() => getComputedStyle(document.body).backgroundColor),
+          "rgb(20, 20, 23)",
+        );
+      } finally {
+        await context.close();
+      }
+    },
+  });
+});
