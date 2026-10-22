@@ -176,6 +176,7 @@ describe("AuthzBraidService", () => {
       expect(ledger.attachBraidGrant).not.toHaveBeenCalled();
     });
 
+    /** @scenario "A reader's distinct conditions fit in one statement" */
     it("refuses a new distinct condition past the reader's limit and accepts a held one", async () => {
       const { create } = setup();
       for (let index = 0; index < 50; index++) await create({ where: `name == "n${index}"` });

@@ -206,7 +206,7 @@ Feature: Braided spans in the reader's traces
       Then no "specialists" evaluation result is shown
       And the span says evaluations from "specialists" stay in that project
 
-    @integration @unimplemented
+    @unit
     Scenario: No reader monitor runs on a braided span
       Given an "orchestrator" monitor on every span
       When "specialists" records a span that is braided into an "orchestrator" trace

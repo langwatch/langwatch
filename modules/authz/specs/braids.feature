@@ -213,9 +213,7 @@ Feature: Braids
         | attributes["a"] == ""                                           | an empty string          |
         | attributes["orchestrator"] matches "w.*"                        | the operator matches     |
 
-    # Unimplemented: the proof is bound (an unconditioned span window); no fence or trace-read test
-    # yet shows every owner span of the reader's trace read through a braid with no condition.
-    @unit @unimplemented
+    @integration
     Scenario: A braid with no condition braids every owner span in the reader's traces
       When ana saves a braid from "specialists" into "orchestrator" with no condition
       Then the braid is accepted
@@ -233,9 +231,7 @@ Feature: Braids
       Then the braid is refused with braid_condition_too_large
       And the refusal says which limit it passed
 
-    # Unimplemented: the limit's refusal is unit-tested; no test yet runs the largest legal braided
-    # read against ClickHouse.
-    @integration @unimplemented
+    @integration
     Scenario: A reader's distinct conditions fit in one statement
       Given "orchestrator" receives braids with the most distinct conditions a reader may hold
       When a trace is opened in "orchestrator"
