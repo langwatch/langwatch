@@ -69,6 +69,24 @@ export class WorkflowExecutionFailedError extends HandledError {
   }
 }
 
+/**
+ * The workflow ran, but what it returned is larger than the engine can answer with in one
+ * synchronous call (Lambda caps a response at 6 MB). The run's own output is the cause, so it is
+ * the sender's to shrink, not an engine fault.
+ */
+export class WorkflowResultTooLargeError extends HandledError {
+  declare readonly code: "workflow_result_too_large";
+
+  constructor() {
+    super(
+      "workflow_result_too_large",
+      "The workflow's result is too large to return. Make it return less data, for example fewer rows or shorter text.",
+      { httpStatus: 422, fault: "customer" },
+    );
+    this.name = "WorkflowResultTooLargeError";
+  }
+}
+
 /** A dispatched Studio LLM node must name its model. */
 export class LlmModelNotSetError extends HandledError {
   declare readonly code: "llm_model_not_set";
