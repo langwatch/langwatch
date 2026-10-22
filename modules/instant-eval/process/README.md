@@ -184,7 +184,7 @@ type Response = z.infer<typeof instantEvalRunSchema>; // ../contract/src/instant
 
 Estimate a run
 
-Permission `analytics:manage`. Declared at `src/transport/instant-eval.rest.ts:84`.
+Permission `analytics:manage`. Declared at `src/transport/instant-eval.rest.ts:85`.
 
 Answers at `/api/v1/instant-evals/estimate`.
 
@@ -206,7 +206,7 @@ interface Response {
 
 List the project's runs, newest first. The project comes from the credential, so a run of another project is never listed. Page through them with before, which takes the created time of the oldest run the previous page carried.
 
-Permission `analytics:view`. Declared at `src/transport/instant-eval.rest.ts:103`.
+Permission `analytics:view`. Declared at `src/transport/instant-eval.rest.ts:105`.
 
 Answers at `/api/v1/instant-evals`.
 
@@ -224,7 +224,7 @@ type Response = z.infer<typeof instantEvalRunListSchema>; // ../contract/src/ins
 
 Read one run: its status, how many rows it found and judged, how many matched in total and per question, what it could not answer, and the tokens, cost and price the judging came to. An id this project does not hold answers 404 instant_eval_not_found.
 
-Permission `analytics:view`. Declared at `src/transport/instant-eval.rest.ts:120`.
+Permission `analytics:view`. Declared at `src/transport/instant-eval.rest.ts:122`.
 
 Answers at `/api/v1/instant-evals/:id`.
 
@@ -240,7 +240,7 @@ type Response = z.infer<typeof instantEvalRunSchema>; // ../contract/src/instant
 
 Cancel a run
 
-Permission `analytics:manage`. Declared at `src/transport/instant-eval.rest.ts:131`.
+Permission `analytics:manage`. Declared at `src/transport/instant-eval.rest.ts:133`.
 
 Answers at `/api/v1/instant-evals/:id/cancel`.
 
@@ -255,7 +255,7 @@ type Response = z.infer<typeof instantEvalRunSchema>; // ../contract/src/instant
 
 Read a run's results
 
-Permission `analytics:view`. Declared at `src/transport/instant-eval.rest.ts:154`.
+Permission `analytics:view`. Declared at `src/transport/instant-eval.rest.ts:157`.
 
 Answers at `/api/v1/instant-evals/:id/results`.
 
@@ -276,7 +276,7 @@ type Response = z.infer<typeof instantEvalResultsSchema>; // ../contract/src/ins
 
 Sample a run
 
-Permission `analytics:view`. Declared at `src/transport/instant-eval.rest.ts:177`.
+Permission `analytics:view`. Declared at `src/transport/instant-eval.rest.ts:180`.
 
 Answers at `/api/v1/instant-evals/:id/sample`.
 

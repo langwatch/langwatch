@@ -17,6 +17,7 @@ export const reads = {
     "docs/pricing.mdx",
     "docs/self-hosting/connect.mdx",
     "docs/features/instant-evals/limits-and-cost.mdx",
+    "docs/self-hosting/data-and-telemetry.mdx",
   ],
   "@langwatch/agent-process": [
     "modules/agent/**/*",
@@ -32,7 +33,7 @@ export const reads = {
     "modules/dashboard/process/src/**/*",
     "modules/topic/process/src/**/*",
   ],
-  "@langwatch/scenario-process": ["infra/docker/Dockerfile"],
+  "@langwatch/scenario-process": ["infra/docker/Dockerfile", "infra/docker/prune-runtime-tree.sh"],
   "@langwatch/stored-object-process": [
     "modules/stored-object/**/*",
     "modules/scenario/process/src/transport/scenario-event.rest.ts",
@@ -199,6 +200,9 @@ export const reads = {
     "pnpm-workspace.yaml",
     "tools/seedgen/runner/package.json",
     "infra/docker/compat/platform-app/package.json",
+    "infra/docker/Dockerfile",
+    "infra/docker/prune-runtime-tree.sh",
+    "infra/docker/check-links.mjs",
   ],
   "@langwatch/user-browser": ["docs/coding-agents/explore-your-usage-with-your-own-agent.mdx"],
   "@langwatch/gateway-contract": [".env.example"],

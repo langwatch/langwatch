@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Pathspec parity for detect-changes-by-sha.sh. On the real filters of every
-# pull_request_target caller of .github/actions/detect-changes, the git
-# `:(glob)` pathspecs must select exactly the changed paths dorny's picomatch
-# (`{ dot: true }`) selects. Two samples: every tracked path plus look-alikes,
+# pull_request and pull_request_target caller of .github/actions/detect-changes,
+# the git `:(glob)` pathspecs must select exactly the changed paths dorny's
+# picomatch (`{ dot: true }`) selects. Two samples: every tracked path plus look-alikes,
 # and paths that sit beneath a literal pattern as if it were a directory.
 #
 # PICOMATCH names the module to compare against (dorny v4.0.1 pins ^2.3.1);
@@ -83,6 +83,19 @@ compare() {
   fi
 }
 
+# Drops every path that is the parent directory of another path in the sample.
+# A tree cannot hold `services` as a file and `services/langevals` beneath it,
+# so the index would keep one of them and picomatch would see a path git lacks.
+without_parents() {
+  awk '{ paths[NR] = $0 } END {
+    for (i = 1; i <= NR; i++) {
+      parent = 0
+      for (j = 1; j <= NR; j++) if (index(paths[j], paths[i] "/") == 1) { parent = 1; break }
+      if (!parent) print paths[i]
+    }
+  }'
+}
+
 # Look-alikes of the callers' patterns: nested, suffixed, prefixed, dotted, cased.
 LOOK_ALIKES='apps/x/package.json
 package.json.bak
@@ -109,12 +122,12 @@ packages/api/src/restx/a.ts
 path with space/sdks/go/x'
 
 # @scenario "Git pathspecs select the same changed paths as dorny's picomatch"
-test_every_pull_request_target_caller() {
+test_every_pull_request_caller() {
   local workflow name filters tracked="$WORK/tracked" under="$WORK/under"
   git -C "$REPO_ROOT" ls-files -z | tr '\0' '\n' | grep -v '[\"\\]' >"$tracked"
   printf '%s\n' "$LOOK_ALIKES" >>"$tracked"
   local callers=0
-  for workflow in $(grep -l '^  pull_request_target:' "$REPO_ROOT"/.github/workflows/*.y*ml); do
+  for workflow in $(grep -lE '^  pull_request(_target)?:' "$REPO_ROOT"/.github/workflows/*.y*ml); do
     filters="$(by_sha filters_as_json <"$workflow" | jq -r '
       .jobs[].steps[]? | select(.uses == "./.github/actions/detect-changes") | .with.filters')"
     [ -n "$filters" ] || continue
@@ -122,19 +135,20 @@ test_every_pull_request_target_caller() {
     name="$(basename "$workflow" | sed 's/\.ya*ml$//')"
     compare "$name-tracked" "$filters" "$tracked" 1
     FILTERS="$filters" by_sha filter_patterns | cut -f2 |
-      sed -e '/\/\*\*$/{s|/\*\*$||;b' -e '}' -e '/[*?[]/d' -e 's|$|/inner|' | sort -u >"$under"
+      sed -e '/\/\*\*$/{s|/\*\*$||;b' -e '}' -e '/[*?[]/d' -e 's|$|/inner|' | sort -u |
+      without_parents >"$under"
     compare "$name-beneath" "$filters" "$under" 0
   done
-  if [ "$callers" -ge 5 ]; then
-    echo "PASS: $callers pull_request_target callers compared"
+  if [ "$callers" -ge 11 ]; then
+    echo "PASS: $callers pull request callers compared"
     PASS=$((PASS + 1))
   else
-    echo "FAIL: expected the five pull_request_target callers, found $callers"
+    echo "FAIL: expected the eleven pull request callers, found $callers"
     FAIL=$((FAIL + 1))
   fi
 }
 
-test_every_pull_request_target_caller
+test_every_pull_request_caller
 
 echo ""
 echo "Results: $PASS passed, $FAIL failed"

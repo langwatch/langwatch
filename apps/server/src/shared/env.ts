@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import type { PortAllocation } from "./ports.ts";
+import { allocatePorts, type PortAllocation } from "./ports.ts";
 
 export type EnvOverrides = Partial<Record<string, string>>;
 
@@ -40,6 +40,8 @@ type PortBoundEnvEntry = {
    * shape, so reconcile leaves it alone across port shifts.
    */
   scaffoldShape: RegExp;
+  /** A database URL: rewritten only while it names the previous run's bundled port. */
+  bundledPortKey?: keyof PortAllocation;
 };
 
 const LOCALHOST_URL_SHAPE = /^http:\/\/localhost:\d+$/;
@@ -59,14 +61,17 @@ export function portBoundEnv(ports: PortAllocation) {
       expected: `postgresql://langwatch@localhost:${ports.postgres}/langwatch_db?schema=langwatch_db&connection_limit=5`,
       scaffoldShape:
         /^postgresql:\/\/langwatch@localhost:\d+\/langwatch_db\?schema=langwatch_db&connection_limit=5$/,
+      bundledPortKey: "postgres",
     },
     REDIS_URL: {
       expected: `redis://localhost:${ports.redis}/0`,
       scaffoldShape: /^redis:\/\/localhost:\d+\/0$/,
+      bundledPortKey: "redis",
     },
     CLICKHOUSE_URL: {
       expected: `http://localhost:${ports.clickhouseHttp}/langwatch`,
       scaffoldShape: /^http:\/\/localhost:\d+\/langwatch$/,
+      bundledPortKey: "clickhouseHttp",
     },
     LANGWATCH_NLP_SERVICE: {
       expected: `http://localhost:${ports.nlp}`,
@@ -219,14 +224,17 @@ export function scaffoldEnvFile(
 }
 
 /**
- * Rewrites port-bound URLs to the given allocation. Only values still in
- * their scaffold shape are touched (see portBoundEnv), so a user override
- * survives. Returns the keys it rewrote.
+ * Rewrites port-bound URLs still in their scaffold shape (portBoundEnv) to the allocation; a
+ * database URL moves only from the previous run's bundled port, so one the person runs on this
+ * machine stays theirs. Returns the keys it rewrote.
  */
 export function reconcileEnvFile(input: { ports: PortAllocation; path: string }): string[] {
   if (!existsSync(input.path)) return [];
-  const entries = portBoundEnv(input.ports);
+  const entries: Record<string, PortBoundEnvEntry> = portBoundEnv(input.ports);
   const lines = readFileSync(input.path, "utf8").split("\n");
+  const valueOf = (key: string) =>
+    lines.find((l) => l.startsWith(`${key}=`))?.slice(key.length + 1);
+  const previous = previousAllocation(valueOf("PORT"));
   const reconciledKeys: string[] = [];
   for (const [key, entry] of Object.entries(entries)) {
     const idx = lines.findIndex((l) => l.startsWith(`${key}=`));
@@ -234,6 +242,9 @@ export function reconcileEnvFile(input: { ports: PortAllocation; path: string })
     const value = (lines[idx] as string).slice(key.length + 1);
     if (value === entry.expected) continue;
     if (!entry.scaffoldShape.test(value)) continue;
+    if (entry.bundledPortKey && !isOnPort({ value, port: previous?.[entry.bundledPortKey] })) {
+      continue;
+    }
     lines[idx] = `${key}=${entry.expected}`;
     reconciledKeys.push(key);
   }
@@ -246,6 +257,34 @@ export function reconcileEnvFile(input: { ports: PortAllocation; path: string })
     chmodSync(input.path, 0o600);
   }
   return reconciledKeys;
+}
+
+/** The ports the run that wrote this .env held, from its PORT line; null when it has none. */
+function previousAllocation(port: string | undefined): PortAllocation | null {
+  if (port === undefined || !/^\d+$/.test(port)) return null;
+  return allocatePorts(Number(port));
+}
+
+function isOnPort({ value, port }: { value: string; port: number | undefined }): boolean {
+  return port !== undefined && URL.canParse(value) && new URL(value).port === String(port);
+}
+
+/** Sets `values` in an existing .env, replacing each key's line or adding it; the rest stays. */
+export function setEnvValues({
+  path,
+  values,
+}: {
+  path: string;
+  values: Record<string, string>;
+}): void {
+  const lines = readFileSync(path, "utf8").split("\n");
+  for (const [key, value] of Object.entries(values)) {
+    const idx = lines.findIndex((l) => l.startsWith(`${key}=`));
+    if (idx >= 0) lines[idx] = `${key}=${value}`;
+    else lines.splice(lines.at(-1) === "" ? lines.length - 1 : lines.length, 0, `${key}=${value}`);
+  }
+  writeFileSync(path, lines.join("\n"), { mode: 0o600 });
+  chmodSync(path, 0o600);
 }
 
 function readPersistedSecrets(path: string): Record<string, string> {

@@ -1,5 +1,5 @@
 import { ResourceScope } from "@langwatch/process";
-import type { RateLimiter } from "@langwatch/process-stores";
+import type { ObjectStorage, RateLimiter } from "@langwatch/process-stores";
 import { ScopedSecrets } from "@langwatch/secrets";
 /**
  * @vitest-environment node
@@ -64,6 +64,7 @@ describe.skipIf(!TEST_DATABASE_URL)("the self-hosted instance registry in produc
           prisma,
           encryption: createApiFixture<IssuedLicenseCipher>(),
           rateLimiter: createApiFixture<RateLimiter>(),
+          objectStorage: createApiFixture<ObjectStorage>(),
         }),
         config: { ...TEST_LICENSING_CONFIG, isSaas: true },
         resources: new ResourceScope(),
