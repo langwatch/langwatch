@@ -50,6 +50,30 @@ async function shiftWithLateFonts({ browser, base, slug, width, lateScripts = fa
   }
 }
 
+/** The system fonts Chromium draws body, heading and code text with before the web fonts. */
+async function fallbackFonts({ browser, base, slug }) {
+  const context = await browser.newContext();
+  try {
+    const page = await context.newPage();
+    await page.route("**/*.woff2", (route) => route.abort());
+    await page.goto(base + slug, { waitUntil: "load" });
+    const cdp = await context.newCDPSession(page);
+    await cdp.send("DOM.enable");
+    await cdp.send("CSS.enable");
+    const { root } = await cdp.send("DOM.getDocument");
+    const used = [];
+    for (const selector of ["article p", "h1", "code"]) {
+      const { nodeId } = await cdp.send("DOM.querySelector", { nodeId: root.nodeId, selector });
+      if (!nodeId) continue;
+      const { fonts } = await cdp.send("CSS.getPlatformFontsForNode", { nodeId });
+      used.push(`${selector}: ${fonts.map((font) => font.familyName).join(", ")}`);
+    }
+    return used.join("; ");
+  } finally {
+    await context.close();
+  }
+}
+
 /** @scenario "Keep text in place while the web fonts load" */
 await it("keeps a section index and a guide in place when the fonts swap in", async () => {
   await withPreviewBrowser({
@@ -64,9 +88,10 @@ await it("keeps a section index and a guide in place when the fonts swap in", as
             width,
           });
           assert.ok(loaded.includes("Inter"), `${slug} at ${width}px swaps in the web font`);
+          const fonts = shift > 0.01 ? await fallbackFonts({ browser, base, slug }) : "";
           assert.ok(
             shift <= 0.01,
-            `${slug} at ${width}px shifts ${shift.toFixed(4)} on the font swap: ${shifted.join("; ")}`,
+            `${slug} at ${width}px shifts ${shift.toFixed(4)} on the font swap (fallbacks ${fonts}): ${shifted.join("; ")}`,
           );
         }
       }
