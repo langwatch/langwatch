@@ -148,10 +148,9 @@ The file runs `langwatch ingest hook copilot` on two Copilot events: `sessionSta
 
 LangWatch writes only `langwatch.json` and never opens your other hook files in that folder. A `langwatch.json` that LangWatch did not write is left as it is. `langwatch logout` deletes the file.
 
-The hook has two requirements:
+Each entry in the file holds the same command for `bash` and for `powershell`, so the hook runs on macOS, Linux and Windows.
 
-- **bash.** The file holds a `bash` command and no PowerShell one. On Windows without bash, Copilot sessions still appear, with no repository or branch, so they reach no pull request.
-- **`langwatch` on your PATH.** Copilot runs the command by name, so install the command-line tool with `npm install -g langwatch`, not through `npx` alone.
+The hook needs `langwatch` on your PATH. Copilot runs the command by name, so install the command-line tool with `npm install -g langwatch`, not through `npx` alone.
 
 ## Content and privacy
 
