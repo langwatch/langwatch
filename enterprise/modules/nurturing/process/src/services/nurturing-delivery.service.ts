@@ -13,7 +13,7 @@ import type { UserApi } from "@langwatch/user-contract";
 import type { PostHogChannel } from "../channels/posthog.channel.ts";
 import type { NurturingClaimRepository } from "../repositories/nurturing-claim.repository.ts";
 import { fire as fireActivity } from "../rules/nurturing-activity-tracking-service.rules.ts";
-import { unixSecondsOf, unixSecondsOfIso } from "../rules/nurturing-customer-io-timestamp.rules.ts";
+import { selfHostedTraits, unixSecondsOf } from "../rules/nurturing-customer-io-timestamp.rules.ts";
 import {
   fireExperimentRan,
   fireScenarioCreated,
@@ -466,14 +466,8 @@ export class NurturingDeliveryService {
     const nurturing = this.deps.customerIo;
     if (!nurturing) return;
     const { userId, organizationId, instanceId, events } = signal;
-    const { self_hosted_first_seen_at: firstSeenAt, self_hosted_last_report_at: lastReportAt } =
-      signal.traits;
+    const traits = selfHostedTraits(signal.traits);
     void (async () => {
-      const traits = {
-        ...signal.traits,
-        self_hosted_first_seen_at: firstSeenAt ? unixSecondsOfIso(firstSeenAt) : undefined,
-        self_hosted_last_report_at: lastReportAt ? unixSecondsOfIso(lastReportAt) : undefined,
-      };
       await nurturing.groupUser({ userId, groupId: organizationId, traits });
       for (const event of events) {
         await nurturing.trackEvent({ userId, event, properties: { instance_id: instanceId } });
