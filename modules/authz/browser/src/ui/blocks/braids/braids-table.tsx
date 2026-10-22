@@ -12,7 +12,12 @@ import { Badge, Button, Stack, Text } from "@langwatch/design-system/primitives"
 import { format } from "@langwatch/time";
 import { Pause } from "lucide-react";
 
-import { type BraidRow, type BraidSide, braidAuditHref } from "../../../model/braids/braids.ts";
+import {
+  type BraidRow,
+  type BraidSide,
+  braidAuditHref,
+  braidFromText,
+} from "../../../model/braids/braids.ts";
 import { BraidCondition } from "../../elements/braid-condition.tsx";
 import { BraidProjectLabel } from "../../elements/braid-project.tsx";
 
@@ -100,7 +105,7 @@ export function BraidsTable({
                   </Badge>
                 ) : null}
                 <Text fontSize="sm" color="fg.muted">
-                  From {day(row.fromMs)}
+                  {braidFromText({ fromMs: row.fromMs, showsTime: row.fromShowsTime })}
                 </Text>
                 <Text fontSize="sm" color="fg.muted">
                   {row.expiresAtMs === null ? "No end date" : `Until ${day(row.expiresAtMs)}`}

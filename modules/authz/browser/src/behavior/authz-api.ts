@@ -173,7 +173,11 @@ export type AuthzApiMap = {
         output: {
           id: string;
           name: string;
-          teams: { id: string; name: string; projects: { id: string; name: string }[] }[];
+          teams: {
+            id: string;
+            name: string;
+            projects: { id: string; slug: string; name: string }[];
+          }[];
         }[];
       };
     };

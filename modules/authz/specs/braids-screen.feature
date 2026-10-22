@@ -41,6 +41,15 @@ Feature: The Braids screen
       Then "orchestrator" is not offered
       And the picker says a braid can only go into a project whose traces you can read
 
+    @integration
+    Scenario: The dialog says what the reader already sees from this project
+      Given a live braid from "specialists" into "orchestrator"
+      When ana picks "orchestrator" for a new braid
+      Then the dialog says "orchestrator" already sees spans from 1 braid from "specialists"
+      And it shows that braid's condition and data window above the condition
+
+    # Unimplemented: "how many more spans" needs the trace preview to count with both braids; the
+    # dialog lists the pair's braids today (the scenario above).
     @integration @unimplemented
     Scenario: A further braid on the same pair says what it adds
       Given a live braid from "specialists" into "orchestrator"
@@ -73,11 +82,13 @@ Feature: The Braids screen
       When ana turns on only signed calls
       Then the switch says "orchestrator" does not sign its calls yet and links to its signing keys
 
+    # Unimplemented: the preview read returns counts but no example trace, so the last step has no
+    # data yet; the counts and the hidden spans are bound under "when ana stops typing" in the drawer test.
     @integration @unimplemented
     Scenario: The preview counts what the reader will see as the condition changes
       When ana stops typing a supported condition
       Then the preview counts "orchestrator" traces over the last 7 days that get every, some or none of their "specialists" spans
-      And with only signed calls on it counts the calls that stay hidden for having no valid signature
+      And with only signed calls on it counts the spans that stay hidden for having no valid signature
       And it shows an example trace with the braided spans marked and the rest struck through, seen by ana only
 
     @integration
@@ -104,6 +115,17 @@ Feature: The Braids screen
       When ana opens Braids
       Then the row shows the reader, the condition, the start date, the end date and the braided spans over the last 24 hours
       And its menu offers Edit, View in audit log and Remove braid
+
+    @unit
+    Scenario: Two braids on one pair from the same day show their start times
+      Given two braids from "specialists" into "orchestrator" that start on 1 Oct 2026
+      Then each row's From shows the time as well as the day
+      And a braid alone on its pair shows only the day
+
+    @unit
+    Scenario: A link opens the Braids page on its Signing keys tab
+      When a link names the Signing keys tab of another project's Braids page
+      Then the project switch opens that project and the page lands on Signing keys
 
     @integration
     Scenario: Removing a braid says what stops before it happens

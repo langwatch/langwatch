@@ -25,8 +25,11 @@ import {
   type BraidAffordances,
   type BraidRow,
   BRAIDS_GUIDE_HREF,
+  BRAIDS_TAB_QUERY_KEY,
+  type BraidsTab,
   braidAffordances,
   braidsPlanState,
+  braidsTabOf,
   projectBraidRows,
 } from "../../../model/braids/braids.ts";
 import { BraidsEnterpriseUpsell } from "../../blocks/braids/braids-enterprise-upsell.tsx";
@@ -36,8 +39,6 @@ import { RemoveBraidDialog } from "../../blocks/braids/remove-braid-dialog.tsx";
 import { SectionErrorNotice } from "../../elements/section-error-notice.tsx";
 import { BraidDrawer } from "./braid-drawer.tsx";
 import { BraidsSigningKeys } from "./braids-signing-keys.tsx";
-
-type BraidsTab = "into" | "from" | "keys";
 
 export const BRAIDS_MANAGE_PERMISSION = "braids:manage";
 
@@ -133,13 +134,24 @@ export default function BraidsScreen() {
   const { isEnterprise, isLoading: isPlanLoading } = host.plan();
   const braids = useProjectBraids({ projectId });
   const policy = useBraidsPolicy({ organizationId });
-  const [tab, setTab] = useState<BraidsTab>("into");
   const [removing, setRemoving] = useState<BraidRow | null>(null);
   const removal = useRemoveBraid({ onRemoved: () => setRemoving(null) });
   const activity = useBraidActivity({ projectId, braids: braids.data });
   const { query } = host.route();
   const openBraid = (braid: string | undefined) =>
     host.setQuery({ ...query, [BRAID_QUERY_KEY]: braid });
+  // The URL names the tab, so a link can open Signing keys; a pick shows at once and is written
+  // back, and a URL that changes after it wins.
+  const urlTab = braidsTabOf(query[BRAIDS_TAB_QUERY_KEY]);
+  const [picked, setPicked] = useState<{ from: BraidsTab; tab: BraidsTab }>();
+  const tab = picked?.from === urlTab ? picked.tab : urlTab;
+  const setTab = (next: BraidsTab) => {
+    setPicked({ from: urlTab, tab: next });
+    host.setQuery(
+      { ...query, [BRAIDS_TAB_QUERY_KEY]: next === "into" ? undefined : next },
+      { replace: true },
+    );
+  };
 
   if (!projectId || isPlanLoading || braids.isLoading) return <LoadingBraids />;
   if (braids.isError || !braids.data) {
@@ -288,6 +300,7 @@ export default function BraidsScreen() {
           key={asked}
           projectId={projectId}
           editing={editing}
+          braidsInto={braids.data.intoOtherProjects}
           onClose={() => openBraid(undefined)}
         />
       ) : null}

@@ -1,8 +1,9 @@
 // Braids as the screens show them: rows from either side, the plan state, what the viewer may do.
 // Spec: modules/authz/specs/braids-screen.feature. Decisions: ADR-183.
 
-import type { AuthzBraid } from "@langwatch/authz-contract";
+import { type AuthzBraid, BRAID_AUDIT_TARGET_KIND } from "@langwatch/authz-contract";
 import { featureProjectColour } from "@langwatch/design-system/feature-project-colour";
+import { format } from "@langwatch/time";
 
 /** Into other projects (this project owns the spans) or from other projects (it reads them). */
 export type BraidSide = "into" | "from";
@@ -25,6 +26,8 @@ export type BraidRow = {
   /** The condition as written; null braids every span. */
   where: string | null;
   fromMs: number;
+  /** Another braid on the same pair starts the same day, so the time tells them apart. */
+  fromShowsTime: boolean;
   expiresAtMs: number | null;
   createdAtMs: number;
 };
@@ -35,6 +38,7 @@ export type OrganizationBraidRow = {
   reader: BraidProject;
   where: string | null;
   fromMs: number;
+  fromShowsTime: boolean;
   expiresAtMs: number | null;
   createdAtMs: number;
 };
@@ -74,14 +78,27 @@ function conditionOf(braid: AuthzBraid): string | null {
   return where ? where : null;
 }
 
+/** The braids sharing their pair and their From day with another braid. */
+function sameDayOnPair(braids: readonly AuthzBraid[]): Set<string> {
+  const keyOf = (braid: AuthzBraid) =>
+    [braid.ownerProjectId, braid.readerProjectId, format(braid.fromMs, "yyyy-MM-dd")].join(" ");
+  const counts = new Map<string, number>();
+  for (const braid of braids) counts.set(keyOf(braid), (counts.get(keyOf(braid)) ?? 0) + 1);
+  return new Set(
+    braids.filter((braid) => (counts.get(keyOf(braid)) ?? 0) > 1).map((braid) => braid.braidId),
+  );
+}
+
 function rowOf({
   braid,
   side,
   projects,
+  sameDay,
 }: {
   braid: AuthzBraid;
   side: BraidSide;
   projects: readonly KnownProject[];
+  sameDay: ReadonlySet<string>;
 }): BraidRow {
   return {
     braidId: braid.braidId,
@@ -92,6 +109,7 @@ function rowOf({
     }),
     where: conditionOf(braid),
     fromMs: braid.fromMs,
+    fromShowsTime: sameDay.has(braid.braidId),
     expiresAtMs: braid.expiresAtMs,
     createdAtMs: braid.createdAtMs,
   };
@@ -104,9 +122,14 @@ export function projectBraidRows({
   braids: { intoOtherProjects: readonly AuthzBraid[]; fromOtherProjects: readonly AuthzBraid[] };
   projects: readonly KnownProject[];
 }): { into: BraidRow[]; from: BraidRow[] } {
+  const sameDay = sameDayOnPair([...braids.intoOtherProjects, ...braids.fromOtherProjects]);
   return {
-    into: braids.intoOtherProjects.map((braid) => rowOf({ braid, side: "into", projects })),
-    from: braids.fromOtherProjects.map((braid) => rowOf({ braid, side: "from", projects })),
+    into: braids.intoOtherProjects.map((braid) =>
+      rowOf({ braid, side: "into", projects, sameDay }),
+    ),
+    from: braids.fromOtherProjects.map((braid) =>
+      rowOf({ braid, side: "from", projects, sameDay }),
+    ),
   };
 }
 
@@ -117,12 +140,14 @@ export function organizationBraidRows({
   braids: readonly AuthzBraid[];
   projects: readonly KnownProject[];
 }): OrganizationBraidRow[] {
+  const sameDay = sameDayOnPair(braids);
   return braids.map((braid) => ({
     braidId: braid.braidId,
     owner: braidProject({ projectId: braid.ownerProjectId, projects }),
     reader: braidProject({ projectId: braid.readerProjectId, projects }),
     where: conditionOf(braid),
     fromMs: braid.fromMs,
+    fromShowsTime: sameDay.has(braid.braidId),
     expiresAtMs: braid.expiresAtMs,
     createdAtMs: braid.createdAtMs,
   }));
@@ -173,9 +198,30 @@ export function braidAffordances({
   };
 }
 
-/** Where the audit log opens on one braid's history. */
+/** A braid's From day, with the time when another braid on its pair starts the same day. */
+export function braidFromText({ fromMs, showsTime }: { fromMs: number; showsTime: boolean }) {
+  return `From ${format(fromMs, showsTime ? "d MMM yyyy, HH:mm" : "d MMM yyyy")}`;
+}
+
+/** Where the audit log opens on one braid's history: its entries name the braid as target. */
 export function braidAuditHref(braidId: string): string {
-  return `/settings/audit-log?targetId=${encodeURIComponent(braidId)}`;
+  const query = new URLSearchParams({ targetKind: BRAID_AUDIT_TARGET_KIND, targetId: braidId });
+  return `/settings/audit-log?${query.toString()}`;
 }
 
 export const BRAIDS_GUIDE_HREF = "https://langwatch.ai/docs/features/braids";
+
+/** The Braids page's tabs; `tab` in the query opens one, so a link can land on Signing keys. */
+export const BRAIDS_TABS = ["into", "from", "keys"] as const;
+export type BraidsTab = (typeof BRAIDS_TABS)[number];
+export const BRAIDS_TAB_QUERY_KEY = "tab";
+
+export function braidsTabOf(value: string | undefined): BraidsTab {
+  return BRAIDS_TABS.find((tab) => tab === value) ?? "into";
+}
+
+/** Another project's Signing keys tab: the shell switches to the project, then returns here. */
+export function braidsSigningKeysHref({ projectSlug }: { projectSlug: string }): string {
+  const keys = `/settings/braids?${BRAIDS_TAB_QUERY_KEY}=keys`;
+  return `/${encodeURIComponent(projectSlug)}?return_to=${encodeURIComponent(keys)}`;
+}

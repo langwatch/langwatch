@@ -114,10 +114,21 @@ describe("compileBraidCondition", () => {
       ['attributes["a"] != "x"', "!= with a value", 19],
       ['attributes["flag"] == true', "a comparison with true", 22],
       ['attributes["a"] == ""', "an empty string", 19],
+      ['attributes["orchestrator"] matches "w.*"', "the operator matches", 27],
     ])("refuses %s naming %s where it stands", (text, construct, at) => {
       const result = refusal({ text });
       expect(result).toMatchObject({ code: "braid_condition_unsupported", construct, at });
       expect(result.fix.length).toBeGreaterThan(0);
+    });
+
+    /** @scenario "An unsupported condition is refused with a fix the admin can act on" */
+    it("names an operator it does not support and the ones it does", () => {
+      const result = refusal({ text: 'attributes["orchestrator"] matches "w.*"' });
+
+      expect(result.construct).toBe("the operator matches");
+      expect(result.fix).toContain("==");
+      expect(result.fix).toContain("!= nil");
+      expect(result.fix).not.toContain("Start each comparison");
     });
 
     it.each([

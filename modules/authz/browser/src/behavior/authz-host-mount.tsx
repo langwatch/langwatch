@@ -107,7 +107,12 @@ export default function AuthzHostMount({ children }: { children?: ReactNode }) {
       organizationName: organization?.name,
       teams: teams.map((team) => ({ id: team.id, name: team.name })),
       projects: teams.flatMap((team) =>
-        team.projects.map((project) => ({ id: project.id, name: project.name, teamId: team.id })),
+        team.projects.map((project) => ({
+          id: project.id,
+          name: project.name,
+          slug: project.slug,
+          teamId: team.id,
+        })),
       ),
     };
   }, [organizations.data, organizationId]);

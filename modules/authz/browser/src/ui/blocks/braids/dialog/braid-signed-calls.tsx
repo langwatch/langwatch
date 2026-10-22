@@ -21,9 +21,19 @@ export type BraidSignedCallsProps = {
   entryKey: string;
   readerName: string | undefined;
   signing: ReaderSigning;
+  /** The reader's Signing keys tab; absent when the host does not know the reader's address. */
+  readerKeysHref?: string | undefined;
 };
 
-function SigningLine({ readerName, signing }: { readerName: string; signing: ReaderSigning }) {
+function SigningLine({
+  readerName,
+  signing,
+  keysHref,
+}: {
+  readerName: string;
+  signing: ReaderSigning;
+  keysHref: string | undefined;
+}) {
   if (signing.state === "signs") {
     const used = signing.lastUsedAt
       ? `last used ${formatDistanceToNow(signing.lastUsedAt)} ago`
@@ -39,12 +49,25 @@ function SigningLine({ readerName, signing }: { readerName: string; signing: Rea
     return (
       <HStack gap={1} color="orange.fg" fontSize="xs" data-testid="braid-signing-key">
         <AlertTriangle size={12} aria-hidden />
-        <Text>
-          {`${readerName} doesn't sign its calls yet, so nothing will show. Create a key under Signing keys in ${readerName}'s Braids settings. `}
-          <Link href={`${BRAIDS_GUIDE_HREF}#signing`} isExternal>
-            How signing works
-          </Link>
-        </Text>
+        {keysHref ? (
+          <Text>
+            {`${readerName} doesn't sign its calls yet, so nothing will show. `}
+            <Link href={keysHref} data-testid="braid-create-key">
+              Create a key
+            </Link>
+            {" · "}
+            <Link href={`${BRAIDS_GUIDE_HREF}#signing`} isExternal>
+              How signing works
+            </Link>
+          </Text>
+        ) : (
+          <Text>
+            {`${readerName} doesn't sign its calls yet, so nothing will show. Create a key under Signing keys in ${readerName}'s Braids settings. `}
+            <Link href={`${BRAIDS_GUIDE_HREF}#signing`} isExternal>
+              How signing works
+            </Link>
+          </Text>
+        )}
       </HStack>
     );
   }
@@ -69,7 +92,11 @@ export function BraidSignedCalls(props: BraidSignedCallsProps) {
           <InlineCode>{`Verified("${props.entryKey}")`}</InlineCode>.
         </Text>
         {props.readerName ? (
-          <SigningLine readerName={props.readerName} signing={props.signing} />
+          <SigningLine
+            readerName={props.readerName}
+            signing={props.signing}
+            keysHref={props.readerKeysHref}
+          />
         ) : null}
       </Stack>
       <Switch

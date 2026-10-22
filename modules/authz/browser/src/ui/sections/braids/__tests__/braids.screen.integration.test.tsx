@@ -27,12 +27,19 @@ function renderAs({
   grants = ADMIN,
   isEnterprise = true,
   projectId = "p-spec",
-}: { grants?: Set<string>; isEnterprise?: boolean; projectId?: string } = {}) {
+  query = {},
+}: {
+  grants?: Set<string>;
+  isEnterprise?: boolean;
+  projectId?: string;
+  query?: Record<string, string>;
+} = {}) {
   const host = new FakeAuthzHost({
     scope: { organizationId: "org-1", projectId },
     grants,
     plan: { isEnterprise, isLoading: false },
     structure: STRUCTURE,
+    query,
   });
   return renderWithAuthzHost(<BraidsScreen />, host);
 }
@@ -83,7 +90,7 @@ describe("BraidsScreen", () => {
       expect(await screen.findByRole("menuitem", { name: "Edit" })).toBeInTheDocument();
       expect(screen.getByRole("menuitem", { name: "View in audit log" })).toHaveAttribute(
         "href",
-        "/settings/audit-log?targetId=b-1",
+        "/settings/audit-log?targetKind=braid&targetId=b-1",
       );
       expect(screen.getByRole("menuitem", { name: "Remove braid" })).toBeInTheDocument();
     });
@@ -102,6 +109,22 @@ describe("BraidsScreen", () => {
       await user.click(within(dialog).getByRole("button", { name: "Remove braid" }));
       expect(braidsFake.state.remove).toHaveBeenCalledWith({ projectId: "p-spec", braidId: "b-1" });
       await waitFor(() => expect(host.successes[0]?.title).toBe("Braid removed"));
+    });
+
+    it("opens on Signing keys when the link names that tab, and writes a picked tab back", async () => {
+      const { host } = renderAs({ query: { tab: "keys" } });
+
+      expect(await screen.findByRole("tab", { name: /Signing keys/ })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+      const user = userEvent.setup();
+      await user.click(screen.getByRole("tab", { name: /From other projects/ }));
+      expect(screen.getByRole("tab", { name: /From other projects/ })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+      expect(host.queries.at(-1)).toEqual({ tab: "from" });
     });
 
     /** @scenario The reader's admins may remove a braid from their side but not change it */

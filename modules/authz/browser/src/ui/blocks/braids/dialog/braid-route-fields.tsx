@@ -5,7 +5,7 @@ import { Menu } from "@langwatch/design-system/menu";
 import { Button, Field, HStack, Stack, Text } from "@langwatch/design-system/primitives";
 import { ArrowRight, Check, ChevronDown, Lock } from "lucide-react";
 
-import type { BraidTargetOption } from "../../../../model/braids/braid-draft.ts";
+import { type BraidTargetOption, braidTargetLabel } from "../../../../model/braids/braid-draft.ts";
 import type { BraidProject } from "../../../../model/braids/braids.ts";
 import { BraidProjectBadge } from "../../../elements/braid-project.tsx";
 
@@ -67,6 +67,9 @@ export function BraidRouteFields(props: BraidRouteFieldsProps) {
                 width="full"
                 justifyContent="space-between"
                 disabled={props.readerFixed || props.isLoading}
+                aria-label={`Into, ${
+                  props.reader?.name ?? (props.isLoading ? "loading projects" : "pick a project")
+                }`}
                 data-testid="braid-into"
               >
                 <HStack gap={2} minWidth={0}>
@@ -90,6 +93,7 @@ export function BraidRouteFields(props: BraidRouteFieldsProps) {
                   value={option.projectId}
                   disabled={!option.selectable}
                   onClick={() => props.onPick(option.projectId)}
+                  aria-label={braidTargetLabel(option)}
                   data-testid="braid-target"
                 >
                   <HStack justify="space-between" width="full" gap={4}>

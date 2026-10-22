@@ -61,16 +61,25 @@ function RefusedText({ text, at }: { text: string; at: number }) {
 function CheckLine({
   check,
   empty,
+  held,
   ownerName,
   readerName,
   verified,
 }: {
   check: BraidConditionCompileResult;
   empty: boolean;
+  held: boolean;
   ownerName: string;
   readerName: string;
   verified: boolean;
 }) {
+  if (held) {
+    return (
+      <Text fontSize="sm" color="fg.muted" data-testid="braid-condition-check">
+        Type the value between the quotes.
+      </Text>
+    );
+  }
   if (!check.ok) {
     return (
       <HStack
@@ -105,6 +114,14 @@ function CheckLine({
 export function BraidConditionField(props: BraidConditionFieldProps) {
   const textarea = useRef<HTMLTextAreaElement>(null);
   const [caret, setCaret] = useState<number | null>(null);
+  // An inserted comparison's empty quotes are not refused until the text changes: the admin has
+  // not typed the value yet. Save stays disabled meanwhile, since the condition does not compile.
+  const [inserted, setInserted] = useState<{ where: string; quoteAt: number } | null>(null);
+  const held =
+    !props.check.ok &&
+    inserted !== null &&
+    inserted.where === props.value &&
+    inserted.quoteAt === props.check.at;
   useEffect(() => {
     if (caret === null || !textarea.current) return;
     textarea.current.focus();
@@ -116,10 +133,11 @@ export function BraidConditionField(props: BraidConditionFieldProps) {
     const next = insertAttribute({ where: props.value, cursor, key });
     props.onChange(next.where);
     setCaret(next.caret);
+    setInserted({ where: next.where, quoteAt: next.caret - 1 });
   };
 
   return (
-    <Field.Root invalid={!props.check.ok}>
+    <Field.Root invalid={!props.check.ok && !held}>
       <HStack justify="space-between" width="full">
         <Field.Label>
           Condition{" "}
@@ -176,10 +194,11 @@ export function BraidConditionField(props: BraidConditionFieldProps) {
         data-testid="braid-condition"
       />
       <Stack gap={2} width="full">
-        {props.check.ok ? null : <RefusedText text={props.value} at={props.check.at} />}
+        {props.check.ok || held ? null : <RefusedText text={props.value} at={props.check.at} />}
         <CheckLine
           check={props.check}
           empty={props.value.trim().length === 0}
+          held={held}
           ownerName={props.ownerName}
           readerName={props.readerName}
           verified={props.verified}

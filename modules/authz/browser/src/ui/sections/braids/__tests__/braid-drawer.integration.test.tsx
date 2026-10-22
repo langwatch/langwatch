@@ -25,9 +25,9 @@ const STRUCTURE = {
   organizationName: "Acme",
   teams: [{ id: "t-1", name: "Agents" }],
   projects: [
-    { id: "p-orch", name: "orchestrator", teamId: "t-1" },
-    { id: "p-spec", name: "specialists", teamId: "t-1" },
-    { id: "p-roll", name: "rollup", teamId: "t-1" },
+    { id: "p-orch", name: "orchestrator", teamId: "t-1", slug: "orchestrator-x1" },
+    { id: "p-spec", name: "specialists", teamId: "t-1", slug: "specialists-x2" },
+    { id: "p-roll", name: "rollup", teamId: "t-1", slug: "rollup-x3" },
   ],
 };
 const CONDITION = 'attributes["orchestrator"] == "web"';
@@ -94,7 +94,15 @@ describe("the braid drawer", () => {
         ),
       ).toBeInTheDocument();
       expect(screen.getByTestId("braid-from")).toHaveTextContent("specialists");
+      expect(screen.getByRole("button", { name: "Into, pick a project" })).toBeInTheDocument();
       await user.click(screen.getByTestId("braid-into"));
+      expect(screen.getByRole("menuitem", { name: "orchestrator" })).toBeInTheDocument();
+      expect(
+        screen.getByRole("menuitem", { name: "specialists, this project" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("menuitem", { name: "rollup, aggregate projects can't be braided" }),
+      ).toBeInTheDocument();
       const options = screen.getAllByTestId("braid-target");
       expect(options.map((option) => option.textContent)).toEqual([
         "orchestrator",
@@ -104,6 +112,42 @@ describe("the braid drawer", () => {
       expect(options[0]).not.toHaveAttribute("data-disabled");
       expect(options[1]).toHaveAttribute("data-disabled");
       expect(options[2]).toHaveAttribute("data-disabled");
+    });
+  });
+
+  describe("when ana picks a reader", () => {
+    /** @scenario The braid starts from this project and picks where it goes */
+    it("names the Into button by the picked project", async () => {
+      const { user } = openDrawer();
+      await pickReader(user);
+
+      expect(screen.getByRole("button", { name: "Into, orchestrator" })).toBeInTheDocument();
+    });
+  });
+
+  describe("when the picked reader already has a braid from this project", () => {
+    /** @scenario The dialog says what the reader already sees from this project */
+    it("lists each braid on the pair with its condition and window above the condition", async () => {
+      braidsFake.state.project = {
+        intoOtherProjects: [liveBraid({ expiresAtMs: null })],
+        fromOtherProjects: [],
+      };
+      const { user } = openDrawer();
+      await pickReader(user);
+
+      const pair = screen.getByTestId("braid-pair-braids");
+      expect(pair).toHaveTextContent(
+        "orchestrator already sees spans from 1 braid from specialists",
+      );
+      expect(within(pair).getByText(CONDITION)).toBeInTheDocument();
+      expect(pair).toHaveTextContent("From 1 Oct 2026 · No end date");
+    });
+
+    it("says nothing when the reader has none", async () => {
+      const { user } = openDrawer();
+      await pickReader(user);
+
+      expect(screen.queryByTestId("braid-pair-braids")).toBeNull();
     });
   });
 
@@ -153,6 +197,49 @@ describe("the braid drawer", () => {
       expect(editor).toHaveValue('attributes["orchestrator"] == ""');
       await waitFor(() => expect(editor.selectionStart).toBe(editor.value.length - 1));
     });
+
+    /** @scenario The attributes this project's spans carry can be inserted into the condition */
+    it("holds the empty value's refusal until ana types, keeping Save disabled", async () => {
+      const { user } = openDrawer();
+      await pickReader(user);
+
+      await user.click(screen.getByTestId("braid-insert-attribute"));
+      await user.click(screen.getByTestId("braid-attribute"));
+
+      const check = screen.getByTestId("braid-condition-check");
+      expect(check).toHaveTextContent("Type the value between the quotes.");
+      expect(screen.queryByRole("alert")).toBeNull();
+      expect(screen.getByTestId("braid-save")).toBeDisabled();
+
+      const editor = screen.getByTestId<HTMLTextAreaElement>("braid-condition");
+      const insideQuotes = editor.value.length - 1;
+      await user.type(editor, "web", {
+        initialSelectionStart: insideQuotes,
+        initialSelectionEnd: insideQuotes,
+      });
+
+      expect(screen.getByTestId("braid-condition")).toHaveValue(
+        'attributes["orchestrator"] == "web"',
+      );
+      expect(screen.getByTestId("braid-condition-check")).toHaveTextContent("Looks good");
+    });
+
+    it("refuses the empty value once ana changes the text without filling it in", async () => {
+      const { user } = openDrawer();
+
+      await user.click(screen.getByTestId("braid-insert-attribute"));
+      await user.click(screen.getByTestId("braid-attribute"));
+      const editor = screen.getByTestId<HTMLTextAreaElement>("braid-condition");
+      const end = editor.value.length;
+      await user.type(editor, ' and name == "n"', {
+        initialSelectionStart: end,
+        initialSelectionEnd: end,
+      });
+
+      expect(screen.getByTestId("braid-condition-check")).toHaveTextContent(
+        "An empty string isn't supported.",
+      );
+    });
   });
 
   describe("when the reader has a signing key in use", () => {
@@ -189,6 +276,10 @@ describe("the braid drawer", () => {
 
       const line = screen.getByTestId("braid-signing-key");
       expect(line).toHaveTextContent("orchestrator doesn't sign its calls yet");
+      expect(within(line).getByRole("link", { name: "Create a key" })).toHaveAttribute(
+        "href",
+        "/orchestrator-x1?return_to=%2Fsettings%2Fbraids%3Ftab%3Dkeys",
+      );
       expect(within(line).getByRole("link", { name: "How signing works" })).toBeInTheDocument();
     });
   });
@@ -208,7 +299,9 @@ describe("the braid drawer", () => {
       expect(counts).toHaveTextContent("1,500 of 4,902 traces get spans");
       expect(counts).toHaveTextContent("Every specialists span1,200");
       expect(screen.getByTestId("braid-preview-capped")).toBeInTheDocument();
-      expect(screen.getByTestId("braid-preview-unsigned")).toHaveTextContent("37 calls");
+      expect(screen.getByTestId("braid-preview-unsigned")).toHaveTextContent(
+        "37 spans had no valid signature and stay hidden.",
+      );
       expect(braidTraces.state.previewAsked).toHaveBeenLastCalledWith(
         expect.objectContaining({ projectId: "p-spec", readerProjectId: "p-orch" }),
       );

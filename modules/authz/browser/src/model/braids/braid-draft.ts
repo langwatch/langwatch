@@ -218,3 +218,42 @@ export function testTraceRows(nodes: readonly TestTraceNode[]): TestTraceRow[] {
   walk(null, 0);
   return rows;
 }
+
+/** A picker entry's accessible name: the project, and why it is refused when it is. */
+export function braidTargetLabel(option: Pick<BraidTargetOption, "name" | "reason">): string {
+  if (!option.reason) return option.name;
+  return `${option.name}, ${option.reason[0]?.toLowerCase() ?? ""}${option.reason.slice(1)}`;
+}
+
+/** The live braids the picked reader already has from this project; an edited one is left out. */
+export function braidsOnPair({
+  braids,
+  readerProjectId,
+  editingBraidId,
+  nowMs,
+}: {
+  braids: readonly AuthzBraid[];
+  readerProjectId: string | undefined;
+  editingBraidId: string | undefined;
+  nowMs: number;
+}): AuthzBraid[] {
+  if (!readerProjectId) return [];
+  return braids.filter(
+    (braid) =>
+      braid.readerProjectId === readerProjectId &&
+      braid.braidId !== editingBraidId &&
+      (braid.expiresAtMs === null || braid.expiresAtMs > nowMs),
+  );
+}
+
+export function pairBraidsPhrase({
+  readerName,
+  ownerName,
+  count,
+}: {
+  readerName: string;
+  ownerName: string;
+  count: number;
+}): string {
+  return `${readerName} already sees spans from ${count} ${count === 1 ? "braid" : "braids"} from ${ownerName}`;
+}

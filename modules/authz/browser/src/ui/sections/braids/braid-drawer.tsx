@@ -26,6 +26,7 @@ import { useAuthzHost } from "../../../model/authz-host.ts";
 import {
   type BraidDraft,
   braidDraftOf,
+  braidsOnPair,
   braidDraftReady,
   braidTargetOptions,
   checkCondition,
@@ -37,8 +38,9 @@ import {
   viewersPhrase,
   withSignedCalls,
 } from "../../../model/braids/braid-draft.ts";
-import { braidProject } from "../../../model/braids/braids.ts";
+import { braidProject, braidsSigningKeysHref } from "../../../model/braids/braids.ts";
 import { BraidConditionField } from "../../blocks/braids/dialog/braid-condition-field.tsx";
+import { BraidPairBraids } from "../../blocks/braids/dialog/braid-pair-braids.tsx";
 import {
   BraidPreviewPanel,
   type BraidPreviewPanelProps,
@@ -54,6 +56,8 @@ export type BraidDrawerProps = {
   projectId: string;
   /** The braid Edit opened; absent for New braid. */
   editing: AuthzBraid | undefined;
+  /** This project's braids into others, so the dialog says what a reader already sees. */
+  braidsInto: readonly AuthzBraid[];
   onClose: () => void;
 };
 
@@ -122,7 +126,7 @@ function saveBlockedReason({
   return "Finish the braid first";
 }
 
-export function BraidDrawer({ projectId, editing, onClose }: BraidDrawerProps) {
+export function BraidDrawer({ projectId, editing, braidsInto, onClose }: BraidDrawerProps) {
   const host = useAuthzHost();
   const { projects } = host.organizationStructure();
   const [nowMs] = useState(() => nowInstant().epochMilliseconds);
@@ -144,6 +148,13 @@ export function BraidDrawer({ projectId, editing, onClose }: BraidDrawerProps) {
   const reader = draft.readerProjectId
     ? braidProject({ projectId: draft.readerProjectId, projects })
     : undefined;
+  const readerSlug = projects.find((project) => project.id === draft.readerProjectId)?.slug;
+  const onPair = braidsOnPair({
+    braids: braidsInto,
+    readerProjectId: draft.readerProjectId,
+    editingBraidId: editing?.braidId,
+    nowMs,
+  });
   const { options, someLeftOut } = braidTargetOptions({ projects, targets: targets.data ?? [] });
   const check = checkCondition(draft.where);
   const verifiedKey = verifiedKeyIn(draft.where);
@@ -202,6 +213,9 @@ export function BraidDrawer({ projectId, editing, onClose }: BraidDrawerProps) {
             readerFixed={!!editing}
             onPick={(readerProjectId) => change({ readerProjectId })}
           />
+          {reader ? (
+            <BraidPairBraids readerName={reader.name} ownerName={owner.name} braids={onPair} />
+          ) : null}
           <BraidConditionField
             value={draft.where}
             onChange={(where) => change({ where })}
@@ -219,6 +233,9 @@ export function BraidDrawer({ projectId, editing, onClose }: BraidDrawerProps) {
             entryKey={entryKey}
             readerName={reader?.name}
             signing={signingOf(signingKeys)}
+            readerKeysHref={
+              readerSlug ? braidsSigningKeysHref({ projectSlug: readerSlug }) : undefined
+            }
           />
           <BraidWindowFields
             fromMs={draft.fromMs}

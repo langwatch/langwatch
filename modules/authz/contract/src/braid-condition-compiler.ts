@@ -45,6 +45,9 @@ export const braidConditionCompileResultSchema: BraidConditionCompileResultSchem
   braidConditionCompileResultSchemaDefinition;
 export type BraidConditionCompileResult = z.infer<typeof braidConditionCompileResultSchema>;
 
+/** Words that join or negate comparisons; any other word after a path is an operator. */
+const JOINING_WORDS = new Set(["and", "or", "not"]);
+
 const FIX = {
   comparison:
     'Start each comparison with attributes["k"], resource.attributes["k"] or name, for example attributes["k"] == "v".',
@@ -59,6 +62,8 @@ const FIX = {
   emptyString:
     'A missing key reads as "", so == "" matches spans that never set it; write attributes["k"] != nil to require the key.',
   join: "Join comparisons with the lower-case word and.",
+  operator:
+    'Compare with == or != nil only, for example attributes["k"] == "v" or attributes["k"] != nil.',
   verifiedKey:
     'Write Verified("k") with one signed entry key of 1 to 128 letters, digits, dots, dashes or underscores.',
   escape: 'Inside a string, escape only a double quote as \\" and a backslash as \\\\.',
@@ -314,6 +319,13 @@ class ConditionParser {
     }
     if (isSymbol(operator, "="))
       return unsupported({ construct: "=", at: operator.at, fix: FIX.stringEquality });
+    if (operator.kind === "word" && !JOINING_WORDS.has(operator.text)) {
+      return unsupported({
+        construct: `the operator ${operator.text}`,
+        at: operator.at,
+        fix: FIX.operator,
+      });
+    }
     return unsupported({
       construct: "a path without a comparison",
       at: operator.at,

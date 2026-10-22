@@ -6,7 +6,11 @@ import { ListTable } from "@langwatch/design-system/list-table";
 import { Text } from "@langwatch/design-system/primitives";
 import { format } from "@langwatch/time";
 
-import { type OrganizationBraidRow, braidAuditHref } from "../../../model/braids/braids.ts";
+import {
+  type OrganizationBraidRow,
+  braidAuditHref,
+  braidFromText,
+} from "../../../model/braids/braids.ts";
 import { BraidCondition } from "../../elements/braid-condition.tsx";
 import { BraidProjectLabel } from "../../elements/braid-project.tsx";
 
@@ -46,7 +50,8 @@ export function OrganizationBraidsTable({
             </ListTable.Cell>
             <ListTable.Cell>
               <Text fontSize="sm" color="fg.muted">
-                {paused ? "Paused · " : ""}From {day(row.fromMs)}
+                {paused ? "Paused · " : ""}
+                {braidFromText({ fromMs: row.fromMs, showsTime: row.fromShowsTime })}
               </Text>
               <Text fontSize="sm" color="fg.muted">
                 {row.expiresAtMs === null ? "No end date" : `Until ${day(row.expiresAtMs)}`}

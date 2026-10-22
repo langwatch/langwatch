@@ -209,7 +209,7 @@ export function BraidPreviewPanel(props: BraidPreviewPanelProps) {
           {preview.unsignedHidden !== null && preview.unsignedHidden > 0 ? (
             <HStack gap={2} fontSize="sm" color="fg.muted" data-testid="braid-preview-unsigned">
               <ShieldCheck size={14} aria-hidden />
-              <Text>{`${count(preview.unsignedHidden)} calls had no valid signature and stay hidden.`}</Text>
+              <Text>{unsignedHiddenPhrase(preview.unsignedHidden)}</Text>
             </HStack>
           ) : null}
         </>
@@ -228,4 +228,11 @@ export function BraidPreviewPanel(props: BraidPreviewPanelProps) {
       ) : null}
     </Stack>
   );
+}
+
+/** `unsignedHidden` counts spans, not calls. */
+function unsignedHiddenPhrase(spans: number): string {
+  return spans === 1
+    ? "1 span had no valid signature and stays hidden."
+    : `${count(spans)} spans had no valid signature and stay hidden.`;
 }

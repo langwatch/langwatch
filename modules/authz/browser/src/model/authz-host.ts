@@ -48,7 +48,8 @@ export type AuthzFailureNotice = {
 export type AuthzOrganizationStructure = {
   organizationName: string | undefined;
   teams: readonly { id: string; name: string }[];
-  projects: readonly { id: string; name: string; teamId: string }[];
+  /** `slug` addresses a project's pages; a host that has not read it leaves it out. */
+  projects: readonly { id: string; name: string; teamId: string; slug?: string }[];
 };
 
 /** The one thing the screens are handed. */
