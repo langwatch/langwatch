@@ -17,4 +17,12 @@ export abstract class IdentityMigrationRepository {
    * copied as it reads. Answers how many it copied (or would, on a dry run).
    */
   abstract carryOverSignInSwitch(args: { dryRun: boolean }): Promise<number>;
+
+  /**
+   * Nulls the provider access, refresh and ID tokens every `AccountCredential` row still holds,
+   * and answers how many rows it cleared (or would, on a dry run). `updatedAt` is left as it is,
+   * so the secret heal's comparison with the `Account` row is unchanged. A second run finds
+   * nothing.
+   */
+  abstract discardProviderTokens(args: { dryRun: boolean }): Promise<number>;
 }

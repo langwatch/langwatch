@@ -57,6 +57,7 @@
     "@langwatch/secrets": "workspace:*",
     "@langwatch/task": "workspace:*",
     "@langwatch/time": "workspace:*",
+    "@langwatch/upgrade": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
     "@simplewebauthn/server": "^13.3.2",
     "@slack/webhook": "catalog:",

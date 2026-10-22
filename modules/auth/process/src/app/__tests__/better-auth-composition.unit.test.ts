@@ -256,6 +256,63 @@ describe("when Better Auth deletes a user", () => {
   });
 });
 
+/** @see specs/auth/provider-tokens.feature */
+describe("when a provider callback writes a sign-in account", () => {
+  const TOKENS = {
+    accessToken: "provider-access-token",
+    refreshToken: "provider-refresh-token",
+    idToken: "header.payload.signature",
+  };
+  const NO_TOKENS = { accessToken: null, refreshToken: null, idToken: null };
+
+  async function accountHooks() {
+    const app = await appFor(true, {
+      identity: createApiFixture<IdentityApi>({
+        createStorageAdapter: ({ legacyEngine }) => legacyEngine,
+        ceremonies: () => ({
+          beforeUserDelete: async () => undefined,
+          createAccountIdentifier: async () => ({ pinned: true, data: { id: "account_1" } }),
+          beforeAccountDelete: async () => undefined,
+        }),
+      }),
+    });
+    const { options } = await app.betterAuth();
+    const hooks = options.databaseHooks?.account;
+    if (!hooks?.create?.before || !hooks.update?.before) throw new Error("account hooks unbound");
+    return { create: hooks.create.before, update: hooks.update.before };
+  }
+
+  /** @scenario "A new sign-in account is written without its provider tokens" */
+  it("writes the row without its access, refresh or ID token", async () => {
+    const { create } = await accountHooks();
+
+    const written = await create(
+      {
+        id: "account_1",
+        userId: "user_1",
+        providerId: "github",
+        issuer: "https://github.com",
+        accountId: "gh_1",
+        createdAt: new Date(0),
+        updatedAt: new Date(0),
+        ...TOKENS,
+      },
+      null,
+    );
+
+    expect(written).toEqual({ data: { id: "account_1", ...NO_TOKENS } });
+  });
+
+  /** @scenario "A returning sign-in clears the tokens its account still holds" */
+  it("writes nulls in place of the tokens a returning sign-in refreshes", async () => {
+    const { update } = await accountHooks();
+
+    const written = await update({ providerId: "github", ...TOKENS }, null);
+
+    expect(written).toEqual({ data: NO_TOKENS });
+  });
+});
+
 const genericOAuthOptionsSchema = z.object({
   config: z.array(z.object({ providerId: z.string() })),
 });

@@ -39,6 +39,7 @@ import { twoFactor } from "better-auth/plugins/two-factor";
 
 import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
 import { findRegisteredRefusals } from "../../rules/better-auth-error-code.rules.ts";
+import { withoutProviderTokens } from "../../rules/provider-token-retention.rules.ts";
 import {
   ID_TOKEN_MAX_AGE_SECONDS,
   SIGN_IN_CLOCK_TOLERANCE_SECONDS,
@@ -725,7 +726,8 @@ export const createAuthOptions = ({
           // derived id the same id.
           // The BRIDGE ceremonies, not the bare ones (ADR-116 §5): the
           const pin = await identity.createAccountIdentifier(account);
-          return pin.pinned ? { data: pin.data } : undefined;
+          // The evidence above read the ID token; no provider token is written (provider-tokens.feature).
+          return { data: withoutProviderTokens(pin.pinned ? pin.data : {}) };
         },
         after: async (account, context) => {
           recordCallbackAccount({ evidence: sessionClaims.evidence, account, context });
@@ -744,7 +746,9 @@ export const createAuthOptions = ({
       update: {
         before: async (account, context) => {
           recordCallbackEvidence({ evidence: sessionClaims.evidence, account, context });
-          return undefined;
+          // A returning sign-in refreshes the row's tokens; it writes nulls instead, which also
+          // clears what a row from before the rule still holds (provider-tokens.feature).
+          return { data: withoutProviderTokens({}) };
         },
         after: async (account, context) => {
           recordCallbackAccount({ evidence: sessionClaims.evidence, account, context });

@@ -6,6 +6,7 @@ import { memoryAdapter } from "better-auth/adapters/memory";
 import type { AuthDirectoryRepository } from "../auth-directory.repository.ts";
 import type { AuthRepositories } from "../auth.repositories.ts";
 import { BetterAuthStorageRepository } from "../better-auth-storage.repository.ts";
+import { MemoryAuthMigrationRepository } from "./memory.auth-migration.repository.ts";
 import { MemoryAuthRateLimitRepository } from "./memory.auth-rate-limit.repository.ts";
 import { MemoryAuthSessionRepository } from "./memory.auth-session.repository.ts";
 import { MemoryAuthDatabase, type MemoryUserRow } from "./memory.auth.database.ts";
@@ -72,6 +73,7 @@ export class MemoryAuthRepositories {
   readonly betterAuthHooks: MemoryBetterAuthHooksRepository;
   readonly directory: MemoryAuthDirectoryRepository;
   readonly pendingSsoSetup: MemoryPendingSsoSetupRepository;
+  readonly migration: MemoryAuthMigrationRepository;
   readonly sessionCache = null;
 
   private constructor(memory: MemoryAuthDatabase) {
@@ -85,5 +87,6 @@ export class MemoryAuthRepositories {
     this.betterAuthHooks = MemoryBetterAuthHooksRepository.create({ memory });
     this.directory = MemoryAuthDirectoryRepository.create({ memory });
     this.pendingSsoSetup = MemoryPendingSsoSetupRepository.create();
+    this.migration = MemoryAuthMigrationRepository.create({ memory });
   }
 }

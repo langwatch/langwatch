@@ -2,6 +2,7 @@ import { bindApiDoor } from "@langwatch/api/hosting";
 import { bindTrpcMiddlewareContext, type TrpcRuntimeContext } from "@langwatch/api/trpc";
 import type { AuthApi, AuthServerConfig } from "@langwatch/auth-contract";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
+import { defineMigrationStep } from "@langwatch/upgrade/step";
 
 import { AuthModule } from "./app/auth.app.ts";
 import { authChannels } from "./channels/auth-channels.registry.ts";
@@ -28,6 +29,22 @@ export const authProcessModule: PublishedProcessModule<"auth", AuthApi, AuthServ
     .withTransports(authTrpcTransport, signInSecurityTrpcTransport, authCliDeviceFlowRest, authRest)
     .withEventing(authEventing)
     .withEventing(authLifecycleEventing)
+    .withMigrations(({ repositories }) => [
+      // Background: `Account` is a sign-in table. Waits for old writers, which still store tokens
+      // on every sign-in (provider-tokens.feature).
+      defineMigrationStep({
+        id: "auth:discard-provider-tokens",
+        kind: "data",
+        mode: "background",
+        description:
+          "Clears the OAuth access, refresh and ID tokens kept on sign-in accounts; sign-in no longer stores them.",
+        needsOldWritersGone: true,
+        run: async ({ dryRun }) => {
+          const cleared = await repositories.migration.discardProviderTokens({ dryRun });
+          return dryRun ? { wouldClear: cleared } : { cleared };
+        },
+      }),
+    ])
     .withTasks(({ repositories, dependencies }) => [
       ClearStalePendingSsoSetupTask.create({
         candidates: repositories.pendingSsoSetup,

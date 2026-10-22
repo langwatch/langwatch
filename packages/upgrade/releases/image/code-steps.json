@@ -31,6 +31,14 @@
     "needsOldWritersGone": true
   },
   {
+    "id": "auth:discard-provider-tokens",
+    "kind": "data",
+    "mode": "background",
+    "owner": "auth",
+    "description": "Clears the OAuth access, refresh and ID tokens kept on sign-in accounts; sign-in no longer stores them.",
+    "needsOldWritersGone": true
+  },
+  {
     "id": "authz:engine",
     "kind": "tenant",
     "mode": "background",
@@ -234,6 +242,14 @@
     "mode": "background",
     "owner": "identity",
     "description": "Copies which users sign in on the identifier path from the migration state table into identity's own sign-in switch.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "identity:discard-provider-tokens",
+    "kind": "data",
+    "mode": "background",
+    "owner": "identity",
+    "description": "Clears the OAuth access, refresh and ID tokens kept on sign-in credentials; sign-in no longer stores them.",
     "needsOldWritersGone": true
   },
   {

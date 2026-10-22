@@ -4,6 +4,7 @@ import type { RedisConnection } from "@langwatch/redis-client";
 import type { AuthRepositories } from "../auth.repositories.ts";
 import { MemoryBetterAuthSecondaryStorageRepository } from "../memory/memory.better-auth-secondary-storage.repository.ts";
 import { PrismaAuthDirectoryRepository } from "../prisma/prisma.auth-directory.repository.ts";
+import { PrismaAuthMigrationRepository } from "../prisma/prisma.auth-migration.repository.ts";
 import { PostgresAuthRepositories } from "../prisma/prisma.auth.repositories.ts";
 import { PrismaBetterAuthHooksRepository } from "../prisma/prisma.better-auth-hooks.repository.ts";
 import {
@@ -48,6 +49,7 @@ export class LiveAuthRepositories {
       betterAuthHooks: PrismaBetterAuthHooksRepository.create(prisma),
       directory: PrismaAuthDirectoryRepository.create(prisma),
       pendingSsoSetup: PrismaPendingSsoSetupRepository.create(prisma),
+      migration: PrismaAuthMigrationRepository.create(prisma),
       sessionCache: RedisAuthSessionCacheRepository.create({ redis }),
     };
   }
