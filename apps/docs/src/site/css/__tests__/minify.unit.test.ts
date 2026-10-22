@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import { minifyCss } from "../minify.ts";
 import { inlinePageStyles } from "../page-styles.ts";
 
-/** @scenario "Minify the shared stylesheet for the supported browsers" */
 describe("minifyCss", () => {
   describe("when emitted rules repeat and carry vendor prefixes", () => {
     const css = minifyCss({
@@ -15,11 +14,13 @@ describe("minifyCss", () => {
       ].join("\n"),
     });
 
+    /** @scenario "Minify the shared stylesheet for the supported browsers" */
     it("removes duplicates and prefixes the supported browsers no longer need", () => {
       expect(css.match(/\.css-a/g)).toHaveLength(1);
       expect(css).toContain(".css-a{display:flex}");
     });
 
+    /** @scenario "Minify the shared stylesheet for the supported browsers" */
     it("keeps the prefixes those browsers still need", () => {
       expect(css).toContain("-webkit-backdrop-filter:blur(4px)");
       expect(css).toContain("-webkit-line-clamp:2");
@@ -28,6 +29,7 @@ describe("minifyCss", () => {
   });
 
   describe("when the shared stylesheet's contents change", () => {
+    /** @scenario "Minify the shared stylesheet for the supported browsers" */
     it("changes its file name", () => {
       const sheet = ({ rule }: { rule: string }) =>
         inlinePageStyles({

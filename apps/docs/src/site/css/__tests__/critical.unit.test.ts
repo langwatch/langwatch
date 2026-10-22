@@ -53,16 +53,17 @@ describe("parseStylesheet", () => {
 });
 
 describe("criticalCss", () => {
-  /** @scenario "Paint a page from its own styles without waiting for a stylesheet" */
   describe("when a page carries some of the site's classes and ids", () => {
     const css = pageStyles({ html: '<main class="css-here" id="guide-intro"></main>' });
 
+    /** @scenario "Paint a page from its own styles without waiting for a stylesheet" */
     it("keeps the rules its markup can match", () => {
       expect(css).toContain(".css-here{color:var(--ink)}");
       expect(css).toContain(".css-here:not(.css-there){margin:0}");
       expect(css).toContain("#guide-intro{scroll-margin:4px}");
     });
 
+    /** @scenario "Paint a page from its own styles without waiting for a stylesheet" */
     it("leaves out rules for classes and ids found only on other pages", () => {
       expect(css).not.toContain(".css-there{color:blue}");
       expect(css).not.toContain("#other-page");
@@ -70,6 +71,7 @@ describe("criticalCss", () => {
       expect(css).not.toContain(".docs-nav-indicator");
     });
 
+    /** @scenario "Paint a page from its own styles without waiting for a stylesheet" */
     it("keeps theme rules, unscoped rules, at-rules and rules for names no page carries", () => {
       expect(css).toContain(".dark .css-here,.css-there{background:var(--paper)}");
       expect(css).toContain(".dark{--paper:#000}");
@@ -81,6 +83,7 @@ describe("criticalCss", () => {
       expect(css).toContain("@keyframes spin");
     });
 
+    /** @scenario "Paint a page from its own styles without waiting for a stylesheet" */
     it("keeps only the custom properties a kept rule reads, directly or through another", () => {
       expect(css).toContain(
         ":root{--paper:#fff;--ink:var(--ink-base);--ink-base:#111;--menu:#eee}",
@@ -101,7 +104,6 @@ describe("criticalCss", () => {
 });
 
 describe("inlinePageStyles", () => {
-  /** @scenario "Paint a page from its own styles without waiting for a stylesheet" */
   describe("when pages are assembled with a client stylesheet", () => {
     const placeholder = '<link data-docs-style rel="stylesheet" href="/assets/prerender.css">';
     const clientLink = '<link rel="stylesheet" crossorigin href="/assets/index-a.css">';
@@ -120,6 +122,7 @@ describe("inlinePageStyles", () => {
     });
     const home = result.pages.get("index.html") ?? "";
 
+    /** @scenario "Paint a page from its own styles without waiting for a stylesheet" */
     it("inlines the page's rules and links the shared sheet without blocking", () => {
       expect(home).toContain(
         styleHead({ css: "@layer recipes{.css-here{color:red}}", href: `/docs/${result.file}` }),
@@ -129,6 +132,7 @@ describe("inlinePageStyles", () => {
       expect(home).not.toContain(clientLink);
     });
 
+    /** @scenario "Paint a page from its own styles without waiting for a stylesheet" */
     it("writes one hashed shared sheet holding every server and client rule", () => {
       expect(result.file).toMatch(/^assets\/docs-[0-9a-f]{16}\.css$/);
       const css = result.files.get(result.file) ?? "";

@@ -35,7 +35,7 @@ export async function render({ slug }: { slug: string }) {
   const meta = nav.pages[slug];
   return {
     html: renderToString(<App slug={slug} page={page} operation={operation} examples={examples} />),
-    title: `${meta?.title ?? slug} | LangWatch Docs`,
+    title: meta?.title ?? slug,
     description: pageDescription({
       title: meta?.title ?? slug,
       description: meta?.description,

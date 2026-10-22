@@ -113,6 +113,27 @@
   line-gap-override: 7.25%;
   unicode-range: U+0020-007E, U+00A0-00FF, U+2013-2014, U+2018-201A, U+201C-201E, U+2022, U+2026;
 }
+/* Linux has neither Charter nor Georgia; Liberation Serif needs its own scaling. */
+@font-face {
+  font-family: "Sentient Fallback Liberation";
+  src: local("Liberation Serif"), local("LiberationSerif");
+  font-weight: 100 450;
+  size-adjust: 117.09%;
+  ascent-override: 81.99%;
+  descent-override: 27.33%;
+  line-gap-override: 6.83%;
+  unicode-range: U+0020-007E, U+00A0-00FF, U+2013-2014, U+2018-201A, U+201C-201E, U+2022, U+2026;
+}
+@font-face {
+  font-family: "Sentient Fallback Liberation";
+  src: local("Liberation Serif"), local("LiberationSerif");
+  font-weight: 451 900;
+  size-adjust: 119.23%;
+  ascent-override: 80.52%;
+  descent-override: 26.84%;
+  line-gap-override: 6.71%;
+  unicode-range: U+0020-007E, U+00A0-00FF, U+2013-2014, U+2018-201A, U+201C-201E, U+2022, U+2026;
+}
 @font-face {
   font-family: "JetBrains Mono Fallback";
   src:
@@ -128,7 +149,7 @@
 :root {
   --chakra-fonts-body: Inter, "Inter Fallback", ui-sans-serif, system-ui, sans-serif;
   --chakra-fonts-heading:
-    Sentient, "Sentient Fallback", Charter, "Source Serif Pro", ui-serif, Georgia, serif;
+    Sentient, "Sentient Fallback", "Sentient Fallback Liberation", Charter, "Source Serif Pro", ui-serif, Georgia, serif;
   --chakra-fonts-mono:
     "JetBrains Mono", "JetBrains Mono Fallback", ui-monospace, SFMono-Regular, monospace;
 }

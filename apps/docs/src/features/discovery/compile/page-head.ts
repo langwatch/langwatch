@@ -35,7 +35,11 @@ export function headSettings({ root = docsRoot }: { root?: string } = {}): HeadS
 }
 
 function escapeAttribute(text: string) {
-  return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll('"', "&quot;");
+  return text
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
 }
 
 /** The authored description, else the operation's, else one naming the endpoint. */
@@ -54,6 +58,40 @@ export function pageDescription({
     operation.description ||
     `${title}: ${operation.method} ${operation.path} in the LangWatch REST API.`
   );
+}
+
+/** Longest meta description a search result shows without cutting it off itself. */
+export const MAX_DESCRIPTION_LENGTH = 160;
+const MIN_SENTENCE_LENGTH = 50;
+
+/** The suffix Mintlify gives every page title, kept so the migration does not change titles. */
+export const TITLE_SUFFIX = " - LangWatch";
+
+/** The `<title>` text for a page: "Quick Start - LangWatch". */
+export function documentTitle({ title }: { title: string }) {
+  return `${title}${TITLE_SUFFIX}`;
+}
+
+/**
+ * A description of at most 160 characters. A longer one is cut after its last full sentence
+ * that fits, else at the last word that fits; nothing is added and a word is never split.
+ */
+export function trimDescription({
+  text,
+  max = MAX_DESCRIPTION_LENGTH,
+}: {
+  text: string;
+  max?: number;
+}) {
+  const flat = text.replace(/\s+/g, " ").trim();
+  if (flat.length <= max) return flat;
+  const window = flat.slice(0, max + 1);
+  let sentenceEnd = -1;
+  for (const match of window.matchAll(/[.!?](?=\s|$)/g)) sentenceEnd = match.index + 1;
+  if (sentenceEnd >= MIN_SENTENCE_LENGTH && sentenceEnd <= max) return flat.slice(0, sentenceEnd);
+  const wordEnd = window.lastIndexOf(" ");
+  const cut = wordEnd > 0 ? flat.slice(0, wordEnd) : flat.slice(0, max);
+  return cut.replace(/[\s,;:\-\u2013\u2014(]+$/, "");
 }
 
 /** A crumb is a page a reader can open: its title and slug. */
@@ -125,11 +163,11 @@ export function pageHead({
   production?: boolean;
 }) {
   const url = canonicalUrl({ slug });
-  const description = authored || settings.description;
+  const description = trimDescription({ text: authored || settings.description });
   const modified = settings.dates.get(slug);
   const image = docsUrl({ path: "/images/coding-agents/optimized/session-detail-1560.webp" });
   const tags = [
-    `<title>${escapeAttribute(title)}</title>`,
+    `<title>${escapeAttribute(documentTitle({ title }))}</title>`,
     `<link rel="canonical" href="${escapeAttribute(url)}">`,
     `<link rel="alternate" type="text/markdown" href="${sitePath({ path: `/${slug}.md` })}">`,
     `<link rel="describedby" type="text/plain" href="${sitePath({ path: "/llms.txt" })}">`,
@@ -139,12 +177,12 @@ export function pageHead({
     ),
     '<meta property="og:type" content="website">',
     '<meta property="og:site_name" content="LangWatch documentation">',
-    `<meta property="og:title" content="${escapeAttribute(title)}">`,
+    `<meta property="og:title" content="${escapeAttribute(documentTitle({ title }))}">`,
     `<meta property="og:url" content="${escapeAttribute(url)}">`,
     `<meta property="og:image" content="${image}">`,
     '<meta property="og:image:alt" content="A coding-agent session in LangWatch">',
     '<meta name="twitter:card" content="summary_large_image">',
-    `<meta name="twitter:title" content="${escapeAttribute(title)}">`,
+    `<meta name="twitter:title" content="${escapeAttribute(documentTitle({ title }))}">`,
     `<meta name="twitter:image" content="${image}">`,
   ];
   if (description) {

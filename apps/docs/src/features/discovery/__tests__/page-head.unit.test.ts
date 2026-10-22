@@ -2,7 +2,13 @@ import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import { canonicalUrl, sitePath } from "../../../lib/site-path.ts";
-import { breadcrumbTrail, headSettings, pageDescription, pageHead } from "../compile/page-head.ts";
+import {
+  breadcrumbTrail,
+  headSettings,
+  pageDescription,
+  pageHead,
+  trimDescription,
+} from "../compile/page-head.ts";
 import type { HeadSettings } from "../compile/page-head.ts";
 
 function isInstant({ date }: { date: string }) {
@@ -47,7 +53,7 @@ describe("static documentation metadata", () => {
     });
     expect(canonicalUrl({ slug: "introduction" })).toBe("https://langwatch.ai/docs/introduction");
     expect(head).toContain('<link rel="canonical" href="https://langwatch.ai/docs/introduction">');
-    expect(head).toContain('content="Docs &lt;intro> &quot;test&quot;"');
+    expect(head).toContain('content="Docs &lt;intro&gt; &quot;test&quot; - LangWatch"');
     expect(head).toContain('type="text/markdown" href="/introduction.md"');
     expect(head).toContain('rel="describedby" type="text/plain" href="/llms.txt"');
     const data = head.match(/<script[^>]+>([\s\S]+)<\/script>/)?.[1];
@@ -217,5 +223,55 @@ describe("when a page head is built", () => {
       `<link rel="preload" href="${sitePath({ path: "/fonts/Inter-Variable-latin.woff2" })}" as="font" type="font/woff2" crossorigin>`,
       `<link rel="preload" href="${sitePath({ path: "/fonts/Sentient-Regular.woff2" })}" as="font" type="font/woff2" crossorigin>`,
     ]);
+  });
+});
+
+describe("search metadata", () => {
+  /** @scenario "Page titles keep the published format" */
+  it("suffixes the title and social titles but not the structured name", () => {
+    const head = pageHead({
+      slug: "integration/quick-start",
+      title: "Quick Start",
+      settings: EMPTY,
+    });
+    expect(head).toContain("<title>Quick Start - LangWatch</title>");
+    expect(head).toContain('property="og:title" content="Quick Start - LangWatch"');
+    expect(head).toContain('name="twitter:title" content="Quick Start - LangWatch"');
+    expect(structuredData({ head })[0]).toMatchObject({ name: "Quick Start" });
+  });
+
+  describe("when a description is longer than 160 characters", () => {
+    const sentence = "Search traces by any attribute and filter the results by date range.";
+    const long = `${sentence} ${sentence} ${sentence}`;
+
+    /** @scenario "Long descriptions are cut at a boundary" */
+    it("cuts after the last full sentence that fits", () => {
+      const cut = trimDescription({ text: long });
+      expect(cut).toBe(`${sentence} ${sentence}`);
+      expect(cut.length).toBeLessThanOrEqual(160);
+    });
+
+    /** @scenario "Long descriptions are cut at a boundary" */
+    it("cuts at a whole word when no sentence fits", () => {
+      const cut = trimDescription({ text: "word ".repeat(60), max: 160 });
+      expect(cut.length).toBeLessThanOrEqual(160);
+      expect(cut.endsWith("word")).toBe(true);
+      expect(cut).not.toContain("...");
+    });
+
+    /** @scenario "Long descriptions are cut at a boundary" */
+    it("repeats the same cut in every tag", () => {
+      const head = pageHead({ slug: "guide", title: "Guide", description: long, settings: EMPTY });
+      const cut = trimDescription({ text: long });
+      expect(head.split(`content="${cut}"`)).toHaveLength(4);
+      expect(structuredData({ head })[0]).toMatchObject({ description: cut });
+    });
+  });
+
+  describe("when a description is shorter than 50 characters", () => {
+    /** @scenario "Short descriptions stay as authored" */
+    it("keeps it unchanged", () => {
+      expect(trimDescription({ text: "Search traces." })).toBe("Search traces.");
+    });
   });
 });
