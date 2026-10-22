@@ -175,7 +175,7 @@ Feature: Braided spans in the reader's traces
 
   Rule: Outside the trace view, a project shows only its own spans in the first release
 
-    @integration @unimplemented
+    @integration
     Scenario Outline: <surface> shows only the project's own spans
       Given an "orchestrator" trace holding braided spans
       When sam reads it through <surface>
