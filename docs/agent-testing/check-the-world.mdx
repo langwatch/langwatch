@@ -175,7 +175,7 @@ Compare one fact, not the whole `state_of_world` object. One fact is safer.
 ## Caveats
 
 - **Keep the facts short and flat.** The judge reads a digest of the trace. A large trace becomes a structure-only tree that the judge has to expand, and a repeated long string is shown once. A few scalar facts read the same at any trace size.
-- **Clean up after the run.** Declare a teardown hook on the connected agent to remove the data a run made, as [Build a scenario suite](/agent-testing/build-a-scenario-suite#isolate-scenarios-with-setup-and-teardown-hooks) shows. A teardown does not run if the agent process dies mid-run, so also delete test data older than a few hours with a scheduled job, and find it by the test flag.
+- **Clean up after the run.** Declare a teardown hook to remove the data a run made, as [Build a scenario suite](/agent-testing/build-a-scenario-suite#isolate-scenarios-with-setup-and-teardown-hooks) shows. The hook gets the scenario state, not the session or thread id, so return the seeded ids as state with `AgentReply(..., state={...})`, or seed in a setup hook. A teardown does not run if the agent process dies, so also delete test data older than a few hours on a schedule, found by the test flag.
 - **Seed in development or staging only.** Never seed test data in production.
 - **Self-hosted: run langevals.** Exact Match runs in langevals. If langevals is not running, the evaluator errors, and a required one fails the run.
 - **Background work is not covered.** The span reports the state when the function returns. Work that continues after the call, such as a queued job, is not in it.

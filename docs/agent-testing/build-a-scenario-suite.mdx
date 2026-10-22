@@ -75,7 +75,7 @@ LangWatch does not schedule runs itself: a run plan has no schedule or cron sett
 
 A scenario that reads or writes real data needs that data to exist before the first turn and to be gone after the last, or one run changes what the next one sees. Setup and teardown hooks on a connected agent create the test data for each run and remove it afterwards.
 
-You declare them on the connected agent in the SDK. In Python, decorate the functions with `@support_agent.scenario.setup` and `@support_agent.scenario.teardown`, where `support_agent` is the agent function you decorated with `@langwatch.connect_agent`. In TypeScript, call `supportAgent.scenario.setup(...)` and `supportAgent.scenario.teardown(...)`, where `supportAgent` is what `connectAgent(...)` returns. See [Connect your agent](/agent-testing/connect-your-agent).
+You declare them on the connected agent in the SDK. In Python, decorate the functions with `@support_agent.scenario.setup` and `@support_agent.scenario.teardown`, where `support_agent` is the agent function you decorated with `@langwatch.connect_agent`. In TypeScript, call `supportAgent.scenario.setup(...)` and `supportAgent.scenario.teardown(...)`, where `supportAgent` is what `connectAgent(...)` returns. A setup hook receives the run and the run parameters, and returns the scenario state as a dictionary. A teardown hook receives the run, that state and the run parameters, and removes the data. See [Connect your agent](/agent-testing/connect-your-agent).
 
 Give each run its own names for the data it makes, such as a trace name or a board name with the run id in it. Runs of one plan share a project, so counting "every trace named `checkout`" includes what other runs left behind. For example, the Langy suite gives every run its own trace name so its totals stay exact, because traces have no delete route and teardown cannot remove them.
 
@@ -115,7 +115,7 @@ Promote a scenario when all of these hold:
 - Its criteria check behaviour, not exact wording, so a harmless rephrase does not fail it.
 - Its setup and teardown leave the project as they found it.
 
-Removing a scenario is a promotion in reverse. In the Langy sync, deleting a file drops the scenario from the run plan but keeps the scenario in the project, and renaming a file creates a new scenario, because the sync matches by name. Archive the old one in LangWatch after a rename or a removal.
+Removing a scenario is a promotion in reverse. In the Langy sync, deleting a file drops the scenario from the run plan but keeps the scenario in the project, and changing the `name` field inside a file creates a new scenario, because the sync matches scenarios by that field. Archive the old one in LangWatch after a rename or a removal.
 
 ## How local, platform and CI runs fit together
 
