@@ -1,3 +1,377 @@
+diff --git a/dist/chunks/index.D4dXTzh9.js b/dist/chunks/index.D4dXTzh9.js
+index 7f8ab40e591a03cffbb914d5bcd8f06702ae4619..c12172bcac562e1ed856cea8641fa3ca03b2c3ea 100644
+--- a/dist/chunks/index.D4dXTzh9.js
++++ b/dist/chunks/index.D4dXTzh9.js
+@@ -665,6 +665,13 @@ function getCachedVitestImport(id, state) {
+ }
+ 
+ const { readFileSync } = fs__default;
++// LangWatch: a module from the shared fs module cache names the workspace root
++// with a token; the main process puts this checkout's root in the environment.
++function readCachedModuleCode(file) {
++	const code = readFileSync(file, "utf-8");
++	const root = process.env.VITEST_FS_MODULE_CACHE_ROOT;
++	return root && code.includes("@@vitest-fs-module-cache-root@@") ? code.replaceAll("@@vitest-fs-module-cache-root@@", root) : code;
++}
+ const VITEST_VM_CONTEXT_SYMBOL = "__vitest_vm_context__";
+ const cwd = process.cwd();
+ const isWindows = process.platform === "win32";
+@@ -787,7 +794,7 @@ function startVitestModuleRunner(options) {
+ 						const warmResult = warm && (Object.hasOwn(warm, id) ? warm[id] : Object.hasOwn(warm, rawId) ? warm[rawId] : void 0);
+ 						if (warmResult) if ("tmp" in warmResult) try {
+ 							return {
+-								code: readFileSync(warmResult.tmp, "utf-8"),
++								code: readCachedModuleCode(warmResult.tmp),
+ 								...warmResult
+ 							};
+ 						} catch {}
+@@ -796,7 +803,7 @@ function startVitestModuleRunner(options) {
+ 					const otelCarrier = traces?.getContextCarrier();
+ 					const result = await trackFetchTime(rpc().fetch(id, importer, environment(), options, otelCarrier));
+ 					if ("cached" in result) return {
+-						code: readFileSync(result.tmp, "utf-8"),
++						code: readCachedModuleCode(result.tmp),
+ 						...result
+ 					};
+ 					return result;
+diff --git a/dist/chunks/index.DzobfTyw.js b/dist/chunks/index.DzobfTyw.js
+index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..6ffead6e98cf8aedfcc802b46738430d638049fb 100644
+--- a/dist/chunks/index.DzobfTyw.js
++++ b/dist/chunks/index.DzobfTyw.js
+@@ -6405,6 +6405,13 @@ class ModuleFetcher {
+ 		}
+ 		const cachedModule = await this.fsCache.getCachedModule(cachePath);
+ 		if (!cachedModule) return;
++		// LangWatch: the cache is shared with checkouts at other commits, where an
++		// import may have resolved to a file this checkout doesn't have
++		const missing = this.findMissingImport(environment, cachedModule.deps) ?? this.findMissingImport(environment, cachedModule.dynamicDeps);
++		if (missing) {
++			debugFs$1?.(`cached ${cachedModule.id} imports ${missing}, which doesn't exist here, re-transforming`);
++			return;
++		}
+ 		// keep the module graph in sync
+ 		let map = extractSourceMap(cachedModule.code);
+ 		if (map && cachedModule.file) map.file = cachedModule.file;
+@@ -6443,6 +6450,22 @@ class ModuleFetcher {
+ 			moduleType
+ 		};
+ 	}
++	// The first import, by its URL in the transformed code, whose file is missing.
++	// Only file URLs are checked: `/@fs/` paths, absolute paths and paths from the
++	// project root. Bare and virtual ids aren't files.
++	findMissingImport(environment, urls) {
++		if (!urls) return;
++		for (const url of urls) {
++			if (typeof url !== "string" || url[0] !== "/") continue;
++			const path = cleanUrl(url);
++			if (path.startsWith("/@fs/")) {
++				if (!existsSync(path.slice(4))) return url;
++				continue;
++			}
++			if (path.startsWith("/@")) continue;
++			if (!existsSync(join(environment.config.root, path)) && !existsSync(path)) return url;
++		}
++	}
+ 	async fetchAndProcess(environment, url, importer, moduleGraphModule, options) {
+ 		const result = processResultSource(environment, await fetchModule(environment, url, importer, {
+ 			...options,
+@@ -7107,6 +7130,23 @@ const METADATA_FILE = "_metadata.json";
+ // workspace root so it's shared by every project and is naturally invalidated
+ // whenever dependencies are reinstalled.
+ const DEFAULT_CACHE_DIRNAME = ".vitest-cache";
++// LangWatch: the module cache is shared by every checkout (git worktree) of a
++// repository, in one per-user directory (dev/docs/adr/185-*). The key is built
++// from the module's path relative to the workspace root, and the transformed
++// code and its metadata are stored with the workspace root written as
++// FS_CACHE_ROOT_TOKEN. The token is put back on read, here and in the worker
++// that reads the cached file itself, which finds the root in FS_CACHE_ROOT_ENV.
++// Each lockfile gets its own directory under the cache root, so a lockfile
++// change starts a new directory instead of clearing one that another checkout
++// still uses; a directory no run has used for FS_CACHE_UNUSED_MS is removed.
++const FS_CACHE_ROOT_TOKEN = "@@vitest-fs-module-cache-root@@";
++const FS_CACHE_ROOT_ENV = "VITEST_FS_MODULE_CACHE_ROOT";
++const FS_CACHE_UNUSED_MS = 7 * 24 * 60 * 60 * 1e3;
++const FS_CACHE_LOCKFILE_DIR_RE = /^(?:[0-9a-f_]{8}|\.removing-.+)$/;
++function defaultFsModuleCacheRoot() {
++	if (process.env.VITEST_FS_MODULE_CACHE_DIR) return resolve$1(process.env.VITEST_FS_MODULE_CACHE_DIR);
++	return join(process.env.XDG_CACHE_HOME || join(homedir(), ".cache"), "vitest", "fs-module-cache");
++}
+ const parallelFsCacheRead = /* @__PURE__ */ new Map();
+ class FileSystemModuleCache {
+ 	vitest;
+@@ -7119,8 +7159,12 @@ class FileSystemModuleCache {
+ 	* - lockfile changes are reflected for the whole workspace, not just for a single project
+ 	*/
+ 	rootCache;
+-	metadataFilePath;
+-	version = "1.0.0-beta.7";
++	workspaceRoot;
++	legacyCache;
++	// the absolute root, when the key must keep it: a path the token can't stand in for
++	pinnedRoot;
++	lockfileDirName;
++	version = "1.0.0-beta.7+langwatch-shared.1";
+ 	fsCacheRoots = /* @__PURE__ */ new WeakMap();
+ 	fsEnvironmentHashMap = /* @__PURE__ */ new WeakMap();
+ 	fsCacheKeyGenerators = /* @__PURE__ */ new Set();
+@@ -7130,8 +7174,49 @@ class FileSystemModuleCache {
+ 	fsCacheKeys = /* @__PURE__ */ new WeakMap();
+ 	constructor(vitest) {
+ 		this.vitest = vitest;
+-		this.rootCache = vitest.config.fsModuleCachePath || join(searchForWorkspaceRoot(vitest.viteConfig.root), "node_modules", DEFAULT_CACHE_DIRNAME);
+-		this.metadataFilePath = join(this.rootCache, METADATA_FILE);
++		this.workspaceRoot = searchForWorkspaceRoot(vitest.viteConfig.root);
++		this.legacyCache = join(this.workspaceRoot, "node_modules", DEFAULT_CACHE_DIRNAME);
++		this.rootCache = vitest.config.fsModuleCachePath || defaultFsModuleCacheRoot();
++		const root = this.workspaceRoot;
++		this.pinnedRoot = isWindows || encodeURI(root) !== root ? root : "";
++	}
++	getLockfileDirName() {
++		this.lockfileDirName ??= getLockfileHash(this.vitest.viteConfig.root);
++		return this.lockfileDirName;
++	}
++	// The root as a whole path segment: inside a path, or a quoted string on its own.
++	toPortable(text) {
++		const root = this.workspaceRoot;
++		if (!text.includes(root)) return text;
++		return text.replaceAll(`${root}/`, `${FS_CACHE_ROOT_TOKEN}/`).replaceAll(`"${root}"`, `"${FS_CACHE_ROOT_TOKEN}"`);
++	}
++	fromPortable(text) {
++		return text.includes(FS_CACHE_ROOT_TOKEN) ? text.replaceAll(FS_CACHE_ROOT_TOKEN, this.workspaceRoot) : text;
++	}
++	// The inline source map is base64, out of reach of `toPortable`: its `file`
++	// becomes a bare name (the reader sets it again) and a `sources` entry under
++	// the root becomes relative to the module, which is how both the worker and
++	// the main process resolve it.
++	toPortableCode(code, file) {
++		const marker = `//# ${SOURCEMAPPING_URL}=data:application/json;base64,`;
++		const at = code.lastIndexOf(marker);
++		let result = code;
++		if (at !== -1) {
++			const start = at + marker.length;
++			const newline = code.indexOf("\n", start);
++			const end = newline === -1 ? code.length : newline;
++			const json = Buffer.from(code.slice(start, end), "base64").toString("utf-8");
++			if (json.includes(this.workspaceRoot)) {
++				const map = JSON.parse(json);
++				if (typeof map.file === "string") map.file = basename(cleanUrl(map.file));
++				if (Array.isArray(map.sources) && file) {
++					const dir = dirname(file);
++					map.sources = map.sources.map((source) => typeof source === "string" && source.startsWith(`${this.workspaceRoot}/`) ? relative(dir, source) : source);
++				}
++				result = `${code.slice(0, start)}${Buffer.from(JSON.stringify(map)).toString("base64")}${code.slice(end)}`;
++			}
++		}
++		return this.toPortable(result);
+ 	}
+ 	defineCacheKeyGenerator(callback) {
+ 		this.fsCacheKeyGenerators.add(callback);
+@@ -7159,7 +7244,8 @@ class FileSystemModuleCache {
+ 		if (log) this.vitest.logger.log(`[cache] cleared fs module cache at ${uniquePaths.join(", ")}`);
+ 	}
+ 	readCachedFileConcurrently(cachedFilePath) {
+-		if (!parallelFsCacheRead.has(cachedFilePath)) parallelFsCacheRead.set(cachedFilePath, readFile(cachedFilePath, "utf-8").then((code) => {
++		if (!parallelFsCacheRead.has(cachedFilePath)) parallelFsCacheRead.set(cachedFilePath, readFile(cachedFilePath, "utf-8").then((portableCode) => {
++			const code = this.fromPortable(portableCode);
+ 			const matchIndex = code.lastIndexOf(cacheComment);
+ 			if (matchIndex === -1) {
+ 				debugFs?.(`${y.red("[empty]")} ${cachedFilePath} exists, but doesn't have a ${cacheComment} comment, transforming by vite instead`);
+@@ -7169,6 +7255,9 @@ class FileSystemModuleCache {
+ 				code,
+ 				meta: this.fromBase64(code.slice(matchIndex + cacheCommentLength))
+ 			};
++		}, (error) => {
++			// another checkout removed the directory between the check and the read
++			debugFs?.(`${y.red("[empty]")} ${cachedFilePath} could not be read, transforming by vite instead: ${error}`);
+ 		}).finally(() => {
+ 			parallelFsCacheRead.delete(cachedFilePath);
+ 		}));
+@@ -7210,15 +7299,15 @@ class FileSystemModuleCache {
+ 				staticMocks: transformResult?.__vitestStaticMocks
+ 			};
+ 			debugFs?.(`${y.yellow("[write]")} ${fetchResult.id} is cached in ${cachedFilePath}`);
+-			await atomicWriteFile(cachedFilePath, `${fetchResult.code}${cacheComment}${this.toBase64(result)}`);
++			await atomicWriteFile(cachedFilePath, `${this.toPortableCode(fetchResult.code, fetchResult.file)}${cacheComment}${this.toBase64(result)}`);
+ 		}
+ 	}
+ 	toBase64(obj) {
+-		const json = stringify(obj);
++		const json = this.toPortable(stringify(obj));
+ 		return Buffer.from(json).toString("base64");
+ 	}
+ 	fromBase64(obj) {
+-		const json = Buffer.from(obj, "base64").toString("utf-8");
++		const json = this.fromPortable(Buffer.from(obj, "base64").toString("utf-8"));
+ 		return parse(json);
+ 	}
+ 	invalidateCachePath(environment, id) {
+@@ -7243,6 +7332,12 @@ class FileSystemModuleCache {
+ 			debugMemory?.(`${y.yellow("[write]")} ${id} was bailed out because it has "import.meta.glob"`);
+ 			return null;
+ 		}
++		// the token would be read back as this checkout's root
++		if (fileContent.includes(FS_CACHE_ROOT_TOKEN)) {
++			this.saveMemoryCache(environment, id, null);
++			debugMemory?.(`${y.yellow("[write]")} ${id} was bailed out because it contains the cache's root token`);
++			return null;
++		}
+ 		let hashString = "";
+ 		for (const generator of this.fsCacheKeyGenerators) {
+ 			const result = generator({
+@@ -7279,20 +7374,29 @@ class FileSystemModuleCache {
+ 				configFileDependencies: config.configFileDependencies.map((file) => tryReadFileSync(file)),
+ 				environment: environment.name,
+ 				// this affects Vitest CSS plugin
+-				css: vitestConfig.css
++				css: vitestConfig.css,
++				// replaced into the code by Vite, and in the shared cache no longer
++				// tied to the one checkout that reads the same environment
++				define: config.define,
++				env: config.env,
++				vitest: version$1,
++				vite: version
+ 			}, (_, value) => {
+ 				if (typeof value === "function" || value instanceof RegExp) return value.toString();
+ 				return value;
+ 			});
+ 			// everything in the key that does not depend on the module, as one digest
+-			environmentHash = hash("sha1", (process.env.NODE_ENV ?? "") + this.version + cacheConfig, "hex");
++			environmentHash = hash("sha1", (process.env.NODE_ENV ?? "") + this.version + this.toPortable(cacheConfig), "hex");
+ 			this.fsEnvironmentHashMap.set(environment, environmentHash);
+ 		}
+-		hashString += id + fileContent + environmentHash + coverageAffectsCache;
++		// a module that names this checkout's root itself keeps it in the key: only
++		// this checkout can use its result
++		const pinnedRoot = fileContent.includes(this.workspaceRoot) ? this.workspaceRoot : this.pinnedRoot;
++		hashString += this.toPortable(id) + fileContent + environmentHash + coverageAffectsCache + pinnedRoot;
+ 		const cacheKey = hash("sha1", hashString, "hex");
+ 		let cacheRoot = this.fsCacheRoots.get(vitestConfig);
+ 		if (cacheRoot == null) {
+-			cacheRoot = vitestConfig.fsModuleCachePath || this.rootCache;
++			cacheRoot = join(vitestConfig.fsModuleCachePath || this.rootCache, this.getLockfileDirName());
+ 			this.fsCacheRoots.set(vitestConfig, cacheRoot);
+ 			if (!existsSync(cacheRoot)) mkdirSync(cacheRoot, { recursive: true });
+ 		}
+@@ -7309,49 +7413,54 @@ class FileSystemModuleCache {
+ 		}
+ 		environmentKeys.set(id, cache);
+ 	}
+-	async readMetadata() {
+-		// metadata is shared between every project in the workspace, so we always read it from the root cache
+-		if (!existsSync(this.metadataFilePath)) return;
+-		try {
+-			const content = await readFile(this.metadataFilePath, "utf-8");
+-			return JSON.parse(content);
+-		} catch {}
++	// before Vitest starts running tests, mark this lockfile's directory as used
++	// and remove the ones no run has used for FS_CACHE_UNUSED_MS. The lockfile
++	// names the directory, so a dependency or Vite/Vitest upgrade starts a new
++	// one; the config file content in the key won't catch a change made in an
++	// external plugin either.
++	async ensureCacheIntegrity() {
++		if (![this.vitest.getRootProject(), ...this.vitest.projects].some((p) => p.config.fsModuleCache)) return;
++		// the worker reads cached files itself and puts this checkout's root back
++		process.env[FS_CACHE_ROOT_ENV] = this.workspaceRoot;
++		const roots = new Set([this.rootCache, ...this.vitest.projects.map((p) => p.config.fsModuleCachePath || this.rootCache)]);
++		await Promise.all([...roots].map((root) => this.markAndPrune(root)));
++		// the cache used to live in each checkout's node_modules
++		if (!this.vitest.config.fsModuleCachePath && this.legacyCache !== this.rootCache && existsSync(this.legacyCache)) await rm(this.legacyCache, {
++			force: true,
++			recursive: true
++		}).catch(() => {});
+ 	}
+-	async writeMetadata(lockfileHash) {
++	async markAndPrune(root) {
++		const current = this.getLockfileDirName();
+ 		try {
+-			if (!existsSync(this.rootCache)) mkdirSync(this.rootCache, { recursive: true });
+-			await writeFile(this.metadataFilePath, JSON.stringify({ lockfileHash }, null, 2), "utf-8");
++			await mkdir(join(root, current), { recursive: true });
++			// its mtime is when a run last used the directory
++			await writeFile(join(root, current, METADATA_FILE), JSON.stringify({ lockfileHash: current }, null, 2), "utf-8");
++			const now = Date.now();
++			for (const entry of await readdir(root, { withFileTypes: true })) {
++				if (!entry.isDirectory() || entry.name === current || !FS_CACHE_LOCKFILE_DIR_RE.test(entry.name)) continue;
++				const directory = join(root, entry.name);
++				try {
++					const lastUsed = await stat(join(directory, METADATA_FILE)).catch(() => stat(directory));
++					if (now - lastUsed.mtimeMs < FS_CACHE_UNUSED_MS) continue;
++					// renamed first, so a run still reading it finds its files gone rather than half-deleted
++					const removing = entry.name.startsWith(".removing-") ? directory : join(root, `.removing-${entry.name}-${process.pid}`);
++					if (removing !== directory) await rename(directory, removing);
++					await rm(removing, {
++						force: true,
++						recursive: true
++					});
++					debugFs?.(`removed ${directory}, unused since ${new Date(lastUsed.mtimeMs).toISOString()}`);
++				} catch (error) {
++					// another run got there first
++					debugFs?.(`failed to remove ${directory}: ${error}`);
++				}
++			}
+ 		} catch (error) {
+-			// Recording the metadata is best-effort and losing the file shouldn't
+-			// abort the entire execution
+-			debugFs?.(`failed to write fs cache metadata: ${error}`);
++			// best-effort: losing the mark or a removal shouldn't abort the run
++			debugFs?.(`failed to maintain fs cache at ${root}: ${error}`);
+ 		}
+ 	}
+-	// before vitest starts running tests, we check that the lockfile wasn't updated
+-	// if it was, we nuke the previous cache in case a custom plugin was updated
+-	// or a new version of vite/vitest is installed
+-	// for the same reason we also cache config file content, but that won't catch changes made in external plugins
+-	async ensureCacheIntegrity() {
+-		if (![this.vitest.getRootProject(), ...this.vitest.projects].some((p) => p.config.fsModuleCache)) return;
+-		const metadata = await this.readMetadata();
+-		const currentLockfileHash = getLockfileHash(this.vitest.vite.config.root);
+-		// no metadata found, just store a new one, don't reset the cache
+-		if (!metadata) {
+-			debugFs?.(`fs metadata file was created with hash ${currentLockfileHash}`);
+-			await this.writeMetadata(currentLockfileHash);
+-			return;
+-		}
+-		// if lockfile didn't change, don't do anything
+-		if (metadata.lockfileHash === currentLockfileHash) return;
+-		// lockfile changed, let's clear all caches
+-		await this.clearCache(false);
+-		await this.writeMetadata(currentLockfileHash);
+-		this.vitest.vite.config.logger.info(`fs cache was cleared because lockfile has changed`, {
+-			timestamp: true,
+-			environment: y.yellow("[vitest]")
+-		});
+-		debugFs?.(`fs cache was cleared because lockfile has changed`);
+-	}
+ }
+ /**
+ * Performs an atomic write operation using the write-then-rename pattern.
+diff --git a/dist/chunks/init.3UJvPvQg.js b/dist/chunks/init.3UJvPvQg.js
+index bce0952f82a0a6e8ff5a1b18db56d67ba988d1a2..4d92b282791e5e5c6f032bce8f1ecb39708b5c26 100644
+--- a/dist/chunks/init.3UJvPvQg.js
++++ b/dist/chunks/init.3UJvPvQg.js
+@@ -8,6 +8,13 @@ import { b as serializeValue, c as createStackString, p as parseStacktrace } fro
+ import './index.M2dsQ_UQ.js';
+ import { m } from './tinyrainbow.Ht9iggcq.js';
+ import { Traces } from '../traces.js';
++// LangWatch: a module from the shared fs module cache names the workspace root
++// with a token; the main process puts this checkout's root in the environment.
++function readCachedModuleCode(file) {
++	const code = readFileSync(file, "utf-8");
++	const root = process.env.VITEST_FS_MODULE_CACHE_ROOT;
++	return root && code.includes("@@vitest-fs-module-cache-root@@") ? code.replaceAll("@@vitest-fs-module-cache-root@@", root) : code;
++}
+ import { o as onCancel, V as VitestEvaluatedModules, a as rpcDone, c as createRuntimeRpc } from './rpc.Bvs-iVxs.js';
+ import { s as setupInspect } from './inspector.CvyFGlXm.js';
+ import { E as EnvironmentTeardownError } from './utils.DYj33du9.js';
+@@ -29,7 +36,7 @@ function createEnvironmentLoader(root, rpc) {
+ 				async fetchModule(id, importer, options) {
+ 					const result = await rpc.fetch(id, importer, "__vitest__", options);
+ 					if ("cached" in result) return {
+-						code: readFileSync(result.tmp, "utf-8"),
++						code: readCachedModuleCode(result.tmp),
+ 						...result
+ 					};
+ 					if (isWindows && "externalize" in result)
 diff --git a/vitest.mjs b/vitest.mjs
 index 02dd4714b90340442ab2b2b72a704a99c9b5e4b8..7aa46c1f8d6b79550d27098684a53561b13db2ab 100755
 --- a/vitest.mjs

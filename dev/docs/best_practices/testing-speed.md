@@ -37,7 +37,7 @@ specifier can become `@langwatch/test-harness/vitest-config` in one pass.
 | `test.pool`            | `"forks"`                                | vitest 5's own default, declared so a package never drifts onto `vmThreads`, which cannot disable isolation                                                                                                      |
 | `test.isolate`         | `false` for every kind, `jsdom` included | a fresh worker per test file re-evaluates the whole module graph per file; off, the graph is evaluated once per worker. `true` isolates only the files that mock modules, see below                              |
 | `test.maxWorkers`      | `1` in fast mode, when isolation is off  | collapses the run onto one child process instead of one per core, cutting fork/spawn overhead on top of the isolation win. Not set when a package asks for `isolate: true`, where separate workers are the point |
-| `test.fsModuleCache`   | `true` in fast mode                      | persists transformed modules to `node_modules/.vitest-cache` between runs, so a rerun skips the transform share                                                                                                  |
+| `test.fsModuleCache`   | `true` in fast mode                      | persists transformed modules to `~/.cache/vitest/fs-module-cache`, shared by every worktree (ADR-185), so a rerun, or a new worktree's first run, skips the transform share                                      |
 | `test.css`             | `false` in fast mode                     | skips CSS parse/transform on import; no package under the helper asserts on real computed CSS                                                                                                                    |
 | `test.fileParallelism` | `true`                                   | the default, declared because `fileParallelism: false` silently pins `maxWorkers` to 1                                                                                                                           |
 | `test.watch`           | `false`                                  | a run in CI or from an agent never watches                                                                                                                                                                       |
@@ -93,7 +93,9 @@ The three levers, in the order they pay:
    It applies to a whole package, and it is safe only where nothing depends on
    a clean module registry.
 2. **`fsModuleCache: true`** - attacks the transform share (24% above). It does
-   nothing on a cold first run; it is a rerun and a second-process win.
+   nothing on a cold first run; it is a rerun and a second-process win. The
+   cache is one per user, so a new worktree's first run is a rerun too when
+   another worktree has run the same files under the same lockfile (ADR-185).
 3. **Import cost itself** - `deps.optimizer` and `server.deps.inline` change how
    a heavy dependency is pre-bundled. Not set by the helper: the optimizer is
    per-dependency tuning, and a wrong entry changes what a test resolves. Reach
