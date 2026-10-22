@@ -184,6 +184,7 @@ describe("WebSocketHost", () => {
           credential: "project",
           permission: "scenarios:manage",
           keyKinds: ["legacy_project_key"],
+          legacyKeyScopes: ["legacy_project_key_connected_agents"],
         },
         handle: async (
           app: EchoApp,
@@ -232,7 +233,7 @@ describe("WebSocketHost", () => {
       });
     }
 
-    it("asks the door its permission and key kinds, then hands the handler the credential", async () => {
+    it("asks the door its permission, key kinds and legacy key scopes, then hands the handler the credential", async () => {
       const { port, stop } = await serve(true);
       try {
         await expect(
@@ -245,6 +246,7 @@ describe("WebSocketHost", () => {
           permission: "scenarios:manage",
           permissions: ["scenarios:manage"],
           keyKinds: ["legacy_project_key"],
+          legacyKeyScopes: ["legacy_project_key_connected_agents"],
         });
         expect(asked.at(-1)?.request.headers.get("authorization")).toBe("Bearer key");
       } finally {

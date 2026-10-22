@@ -130,6 +130,8 @@ export class ApiRestCredentialsService {
     permissions: readonly AuthzPermission[];
     /** The key kinds the route admits (E7): refused once the key resolves, before permission. */
     keyKinds?: readonly RestKeyKind[];
+    /** The scope flags that open the route to a legacy project key (`withLegacyKeyScope`). */
+    legacyKeyScopes?: readonly string[];
   }): Promise<ApiProjectCredential> {
     const credential = await this.#resolveProjectCredential({
       request: input.request,
@@ -146,7 +148,8 @@ export class ApiRestCredentialsService {
     }
 
     for (const permission of asked(input.permissions)) {
-      if (!(await this.#projectHolds({ credential, permission }))) {
+      const routeScopes = input.legacyKeyScopes;
+      if (!(await this.#projectHolds({ credential, permission, routeScopes }))) {
         throw this.refusals.project({ credential, permission });
       }
     }
@@ -173,8 +176,9 @@ export class ApiRestCredentialsService {
   #projectHolds(input: {
     credential: ApiProjectCredential;
     permission: AuthzPermission;
+    routeScopes?: readonly string[];
   }): Promise<boolean> {
-    const { credential, permission } = input;
+    const { credential, permission, routeScopes } = input;
     if (credential.actsAsPerson) {
       return this.authz.hasProjectPermission({
         userId: credential.actsAsPerson.userId,
@@ -184,7 +188,11 @@ export class ApiRestCredentialsService {
     }
     const { resolved } = credential;
     if (resolved.type === "legacyProjectKey") {
-      return this.legacyKeys.holds({ project: resolved.project, permission });
+      return this.legacyKeys.holds({
+        project: resolved.project,
+        permission,
+        ...(routeScopes ? { routeScopes } : {}),
+      });
     }
     if (resolved.type !== "apiKey") return Promise.resolve(true);
 

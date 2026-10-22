@@ -275,14 +275,14 @@ Permission `evaluations:view`. Declared at `src/transport/evaluator.rest.ts:174`
 Answers at `/api/evaluators`, `/api/v1/evaluators`; also, undocumented, `/api/evaluators/2026-08-07`, `/api/v1/evaluators/2026-08-07`, `/api/evaluators/latest`, `/api/v1/evaluators/latest`.
 
 ```typescript
-// Response: z.array(evaluatorWireSchema) (inline, src/transport/evaluator.rest.ts:176)
+// Response: z.array(evaluatorWireSchema) (inline, src/transport/evaluator.rest.ts:177)
 ```
 
 #### `GET /:idOrSlug` · `getApiEvaluatorsByIdOrSlug`
 
 Get a specific evaluator by ID or slug
 
-Permission `evaluations:view`. Declared at `src/transport/evaluator.rest.ts:188`.
+Permission `evaluations:view`. Declared at `src/transport/evaluator.rest.ts:189`.
 
 Answers at `/api/evaluators/:idOrSlug`, `/api/v1/evaluators/:idOrSlug`; also, undocumented, `/api/evaluators/2026-08-07/:idOrSlug`, `/api/v1/evaluators/2026-08-07/:idOrSlug`, `/api/evaluators/latest/:idOrSlug`, `/api/v1/evaluators/latest/:idOrSlug`.
 
@@ -298,7 +298,7 @@ type Response = z.infer<typeof evaluatorWireSchema>; // ../contract/src/evaluato
 
 Create a new evaluator
 
-Permission `evaluations:create`. Declared at `src/transport/evaluator.rest.ts:209`.
+Permission `evaluations:create`. Declared at `src/transport/evaluator.rest.ts:211`.
 
 Answers at `/api/evaluators`, `/api/v1/evaluators`; also, undocumented, `/api/evaluators/2026-08-07`, `/api/v1/evaluators/2026-08-07`, `/api/evaluators/latest`, `/api/v1/evaluators/latest`.
 
@@ -315,7 +315,7 @@ type Response = z.infer<typeof evaluatorWireSchema>; // ../contract/src/evaluato
 
 Update an existing evaluator
 
-Permission `evaluations:update`. Declared at `src/transport/evaluator.rest.ts:221`.
+Permission `evaluations:update`. Declared at `src/transport/evaluator.rest.ts:223`.
 
 Answers at `/api/evaluators/:id`, `/api/v1/evaluators/:id`; also, undocumented, `/api/evaluators/2026-08-07/:id`, `/api/v1/evaluators/2026-08-07/:id`, `/api/evaluators/latest/:id`, `/api/v1/evaluators/latest/:id`.
 
@@ -336,7 +336,7 @@ type Response = z.infer<typeof evaluatorWireSchema>; // ../contract/src/evaluato
 
 Archive (soft-delete) an evaluator
 
-Permission `evaluations:manage`. Declared at `src/transport/evaluator.rest.ts:238`.
+Permission `evaluations:manage`. Declared at `src/transport/evaluator.rest.ts:240`.
 
 Answers at `/api/evaluators/:id`, `/api/v1/evaluators/:id`; also, undocumented, `/api/evaluators/2026-08-07/:id`, `/api/v1/evaluators/2026-08-07/:id`, `/api/evaluators/latest/:id`, `/api/v1/evaluators/latest/:id`.
 

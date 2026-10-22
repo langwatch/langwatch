@@ -1,13 +1,13 @@
 /**
  * @vitest-environment node
- * A legacy project key through the real door and the real REST runtime: it sends traces, holds
- * what its project's scope flags grant, and keeps full access only on
+ * A legacy project key through the real door and the real REST runtime: it sends traces, passes
+ * the routes that name a scope flag listing its project, and keeps full access only on
  * `legacy_project_key_full_access`.
  * @see modules/auth/specs/legacy-project-key-scope.feature
  */
 import { createErrorHandler } from "@langwatch/api";
 import {
-  LEGACY_PROJECT_KEY_SCOPES,
+  LEGACY_PROJECT_KEY_SCOPE_FLAGS,
   type ApiKeyTokenResolutionInput,
   type ResolvedApiKeyCredential,
 } from "@langwatch/api-key-contract";
@@ -59,7 +59,9 @@ const refuseEverything = () => Promise.reject(new Error("this request asks nothi
 type FlagRead = Parameters<FeatureFlagApi["isEnabled"]>;
 
 const FULL_ACCESS = "legacy_project_key_full_access";
-const EVERY_SCOPE = Object.keys(LEGACY_PROJECT_KEY_SCOPES);
+const PROMPTS_READ = "legacy_project_key_prompts_read";
+const TRACES_READ = "legacy_project_key_traces_read";
+const CONNECTED_AGENTS = "legacy_project_key_connected_agents";
 
 /** The real door over fixtures; `enabled` names the flags whose rule lists the project. */
 function world({ enabled }: { enabled: readonly string[] }) {
@@ -135,6 +137,8 @@ const OPERATIONS = [
   "promptsUpdate",
   "connect",
   "modelProviders",
+  "suiteArchive",
+  "agents",
   "identified",
   "keyIdentified",
   "keyPrompts",
@@ -163,45 +167,64 @@ const projectRoutes = defineRestRouter(ProbeApi)
   .post("/prompts", "prompts")
   .keepsRecords()
   .withPermission("prompts:view")
+  .withLegacyKeyScope(PROMPTS_READ)
   .withOutput(ANSWER)
   .withoutAudit("test route")
   .handle(({ app }) => app.prompts())
   .post("/traces", "traces")
   .keepsRecords()
   .withPermission("traces:view")
+  .withLegacyKeyScope(TRACES_READ)
   .withOutput(ANSWER)
   .withoutAudit("test route")
   .handle(({ app }) => app.traces())
   .post("/evaluations", "evaluations")
   .keepsRecords()
   .withPermission("evaluations:view")
+  .withLegacyKeyScope("legacy_project_key_evaluations")
   .withOutput(ANSWER)
   .withoutAudit("test route")
   .handle(({ app }) => app.evaluations())
   .post("/datasets", "datasets")
   .keepsRecords()
   .withPermission("datasets:view")
+  .withLegacyKeyScope("legacy_project_key_experiments")
   .withOutput(ANSWER)
   .withoutAudit("test route")
   .handle(({ app }) => app.datasets())
   .post("/prompts-update", "promptsUpdate")
   .keepsRecords()
   .withPermission("prompts:update")
+  .withLegacyKeyScope("legacy_project_key_prompts_write")
   .withOutput(ANSWER)
   .withoutAudit("test route")
   .handle(({ app }) => app.promptsUpdate())
   .post("/connect", "connect")
   .keepsRecords()
   .withPermission("scenarios:manage")
+  .withLegacyKeyScope(CONNECTED_AGENTS)
   .withOutput(ANSWER)
   .withoutAudit("test route")
   .handle(({ app }) => app.connect())
   .post("/model-providers", "modelProviders")
   .keepsRecords()
   .withPermission("project:view")
+  .withLegacyKeyScope(CONNECTED_AGENTS)
   .withOutput(ANSWER)
   .withoutAudit("test route")
   .handle(({ app }) => app.modelProviders())
+  .post("/suite-archive", "suiteArchive")
+  .keepsRecords()
+  .withPermission("scenarios:manage")
+  .withOutput(ANSWER)
+  .withoutAudit("test route")
+  .handle(({ app }) => app.suiteArchive())
+  .post("/agents", "agents")
+  .keepsRecords()
+  .withPermission("project:view")
+  .withOutput(ANSWER)
+  .withoutAudit("test route")
+  .handle(({ app }) => app.agents())
   .post("/identified", "identified")
   .keepsRecords()
   .withAccess(anyAuthenticated({ reason: "a test route that only identifies the caller" }))
@@ -345,9 +368,15 @@ describe("a legacy project key whose project is on the full-access flag", () => 
   });
 });
 
+async function refused(result: Awaited<ReturnType<typeof call>>) {
+  expect(result.response.status).toBe(403);
+  expect(result.body).toMatchObject({ code: "legacy_project_key_ingestion_only" });
+  expect(result.ran).toEqual([]);
+}
+
 describe("a legacy project key whose project is on scope flags", () => {
   describe("given the prompts-read flag only", () => {
-    const enabled = ["legacy_project_key_prompts_read"];
+    const enabled = [PROMPTS_READ];
 
     /** @scenario "A project on the prompts-read flag fetches prompts and nothing else" */
     it("fetches prompts and is refused trace reads and prompt writes", async () => {
@@ -355,25 +384,13 @@ describe("a legacy project key whose project is on scope flags", () => {
       expect(prompts.response.status).toBe(200);
       expect(prompts.ran).toEqual(["prompts"]);
 
-      for (const path of ["traces", "prompts-update"]) {
-        const { response, body, ran } = await call({ enabled, path });
-        expect(response.status).toBe(403);
-        expect(body).toMatchObject({ code: "legacy_project_key_ingestion_only" });
-        expect(ran).toEqual([]);
-      }
-    });
-
-    /** @scenario "A scope flag is honoured on the key door" */
-    it("fetches prompts on the key door", async () => {
-      const { response, ran } = await call({ enabled, door: "api_key", path: "prompts" });
-
-      expect(response.status).toBe(200);
-      expect(ran).toEqual(["prompts"]);
+      await refused(await call({ enabled, path: "traces" }));
+      await refused(await call({ enabled, path: "prompts-update" }));
     });
   });
 
   describe("given the prompts-read and traces-read flags", () => {
-    const enabled = ["legacy_project_key_prompts_read", "legacy_project_key_traces_read"];
+    const enabled = [PROMPTS_READ, TRACES_READ];
 
     /** @scenario "A project on two scope flags holds both" */
     it("holds both and is still refused evaluations", async () => {
@@ -381,25 +398,43 @@ describe("a legacy project key whose project is on scope flags", () => {
         const { response } = await call({ enabled, path });
         expect(response.status).toBe(200);
       }
-      const { response, body } = await call({ enabled, path: "evaluations" });
-      expect(response.status).toBe(403);
-      expect(body).toMatchObject({ code: "legacy_project_key_ingestion_only" });
+      await refused(await call({ enabled, path: "evaluations" }));
     });
   });
 
   describe("given the connected-agents flag only", () => {
-    const enabled = ["legacy_project_key_connected_agents"];
+    const enabled = [CONNECTED_AGENTS];
 
-    /** @scenario "The connected-agents flag opens connecting and model providers only" */
-    it("connects and reads model providers, and is refused prompts", async () => {
+    /** @scenario "The connected-agents flag opens the connect routes and the model providers read only" */
+    it("connects and reads model providers, and is refused suite archive and the agents list", async () => {
       for (const path of ["connect", "model-providers"]) {
         const { response, ran } = await call({ enabled, path });
         expect(response.status).toBe(200);
         expect(ran).toEqual([path]);
       }
-      const { response, body } = await call({ enabled, path: "prompts" });
-      expect(response.status).toBe(403);
-      expect(body).toMatchObject({ code: "legacy_project_key_ingestion_only" });
+      await refused(await call({ enabled, path: "suite-archive" }));
+      await refused(await call({ enabled, path: "agents" }));
+      await refused(await call({ enabled, path: "prompts" }));
+    });
+
+    /** @scenario "The connect socket's door admits a legacy key on the connected-agents flag" */
+    it("is admitted by the socket door only with the scope the socket names", async () => {
+      const { door } = world({ enabled });
+      const ask = (legacyKeyScopes?: readonly string[]) =>
+        door.identities.project.authenticate({
+          request: new Request("http://localhost/api/v1/agents/connect", {
+            headers: { "x-auth-token": "legacy-key" },
+          }),
+          permission: "scenarios:manage",
+          permissions: ["scenarios:manage"],
+          keyKinds: ["api_key", "legacy_project_key"],
+          ...(legacyKeyScopes ? { legacyKeyScopes } : {}),
+        });
+
+      await expect(ask([CONNECTED_AGENTS])).resolves.toMatchObject({
+        scope: { tier: "project", id: "project-1" },
+      });
+      await expect(ask()).rejects.toMatchObject({ code: "legacy_project_key_ingestion_only" });
     });
   });
 
@@ -408,12 +443,38 @@ describe("a legacy project key whose project is on scope flags", () => {
     it.each([
       ["project", "identified"],
       ["api_key", "identified"],
+      ["api_key", "prompts"],
     ] as const)("is refused on the %s door at /%s", async (door, path) => {
-      const { response, body, ran } = await call({ enabled: EVERY_SCOPE, door, path });
+      const result = await call({ enabled: LEGACY_PROJECT_KEY_SCOPE_FLAGS, door, path });
 
-      expect(response.status).toBe(403);
-      expect(body).toMatchObject({ code: "legacy_project_key_ingestion_only" });
-      expect(ran).toEqual([]);
+      expect(result.response.status).toBe(403);
+      await refused(result);
+    });
+  });
+
+  describe("given a route that names an unknown scope flag", () => {
+    /** @scenario "A route naming an unknown scope flag is refused" */
+    it("fails to mount behind the real project door", () => {
+      const { door } = world({ enabled: [] });
+      const typo = defineRestRouter(ProbeApi)
+        .withNamespace("legacy-scope-typo")
+        .withVersion(VERSION)
+        .post("/prompts", "prompts")
+        .keepsRecords()
+        .withPermission("prompts:view")
+        .withLegacyKeyScope("legacy_project_key_everything")
+        .withOutput(ANSWER)
+        .withoutAudit("test route")
+        .handle(({ app }) => app.prompts())
+        .build()
+        .router();
+
+      expect(() =>
+        createRestRuntime({
+          authorization: { forRequest: () => door.authz },
+          identity: door.identities.project,
+        }).mount(typo, { app: () => ({}) as ProbeApi, onError: createErrorHandler() }),
+      ).toThrow(/legacy_project_key_everything/);
     });
   });
 });

@@ -1,7 +1,7 @@
 import {
   INGESTION_PERMISSIONS,
   LegacyProjectKeyIngestionOnlyError,
-  legacyProjectKeyScopeFlagsGranting,
+  legacyProjectKeyScopeFlagSchema,
 } from "@langwatch/api-key-contract";
 import type { AuthzPermission } from "@langwatch/authorization";
 import {
@@ -13,8 +13,8 @@ import {
 type LegacyKeyProject = Readonly<{ id: string; organizationId: string }>;
 
 /**
- * A legacy project key (`Project.apiKey`) holds the ingestion permissions, plus what the scope
- * flags listing its project grant, or everything on `legacy_project_key_full_access`
+ * A legacy project key holds ingestion; a route naming scope flags (`withLegacyKeyScope`) when
+ * one lists its project; everything on `legacy_project_key_full_access`
  * (spec: modules/auth/specs/legacy-project-key-scope.feature).
  */
 export class LegacyProjectKeyScopeService {
@@ -26,12 +26,17 @@ export class LegacyProjectKeyScopeService {
 
   private constructor(private readonly featureFlags: Pick<FeatureFlagApi, "isEnabled">) {}
 
-  /** Reads only the scope flags that grant this permission, then full access. */
-  async holds(input: { project: LegacyKeyProject; permission: AuthzPermission }): Promise<boolean> {
-    const { project, permission } = input;
+  /** Reads only the scope flags the route names, then full access. */
+  async holds(input: {
+    project: LegacyKeyProject;
+    permission: AuthzPermission;
+    routeScopes?: readonly string[];
+  }): Promise<boolean> {
+    const { project, permission, routeScopes = [] } = input;
     if (INGESTION_PERMISSIONS.includes(permission)) return true;
 
-    for (const flag of legacyProjectKeyScopeFlagsGranting(permission)) {
+    for (const scope of routeScopes) {
+      const flag = legacyProjectKeyScopeFlagSchema.parse(scope);
       if (await this.featureFlags.isEnabled(flag, this.#target(project))) return true;
     }
 
@@ -42,7 +47,7 @@ export class LegacyProjectKeyScopeService {
     return legacyProjectKeyHasFullAccess({ featureFlags: this.featureFlags, project });
   }
 
-  /** A route that asks no permission matches no scope flag, so only full access opens it. */
+  /** A route that asks no permission names no scope flag, so only full access opens it. */
   async assertMayIdentify(project: LegacyKeyProject): Promise<void> {
     if (!(await this.holdsFullAccess(project))) throw new LegacyProjectKeyIngestionOnlyError();
   }

@@ -1,3 +1,4 @@
+import { LEGACY_PROJECT_KEY_SCOPE_FLAGS } from "@langwatch/api-key-contract";
 import type { Entitlements } from "@langwatch/api/access";
 import type { ApiDoor, RestCaller, RestIdentity } from "@langwatch/api/hosting";
 import {
@@ -247,15 +248,17 @@ export class ApiDoorService {
 
   #projectDoor(): RestIdentity {
     return {
-      authenticate: async ({ request, permissions, keyKinds }) =>
+      authenticate: async ({ request, permissions, keyKinds, legacyKeyScopes }) =>
         this.#projectCaller(
           request,
           await this.#credentials.authenticate({
             request,
             permissions,
             ...(keyKinds ? { keyKinds } : {}),
+            ...(legacyKeyScopes ? { legacyKeyScopes } : {}),
           }),
         ),
+      legacyKeyScopes: LEGACY_PROJECT_KEY_SCOPE_FLAGS,
       identify: async ({ request }) =>
         this.#projectCaller(request, await this.#credentials.identify({ request })),
       authorize: ({ caller, permission, target }) => {

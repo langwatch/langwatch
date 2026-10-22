@@ -4,7 +4,7 @@
 // (modules/auth/specs/legacy-project-key-scope.feature).
 import { createServer, type IncomingMessage, type Server } from "node:http";
 
-import { LEGACY_PROJECT_KEY_SCOPES } from "@langwatch/api-key-contract";
+import { LEGACY_PROJECT_KEY_SCOPE_FLAGS } from "@langwatch/api-key-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { ProjectApi, ProjectIdentity } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -122,7 +122,7 @@ describe("given a legacy project key as the MCP bearer", () => {
     /** @scenario "The hosted MCP refuses a legacy project key on scope flags only" */
     it("is refused 403 with the ingestion-only code", async () => {
       const { response, text } = await initialize(
-        await endpoint({ enabled: Object.keys(LEGACY_PROJECT_KEY_SCOPES) }),
+        await endpoint({ enabled: LEGACY_PROJECT_KEY_SCOPE_FLAGS }),
       );
 
       expect(response.status).toBe(403);

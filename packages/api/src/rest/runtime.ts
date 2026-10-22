@@ -543,6 +543,8 @@ function assertPortsBound<Api>({
 
     assertDoorQuestions({ address, route, door, credential });
 
+    assertLegacyKeyScopes({ address, route, door, credential });
+
     if (anonymousOnRefusal(route) && !door.identify) {
       throw new Error(
         `REST ${address} answers a refused credential as none, and this runtime ` +
@@ -598,6 +600,38 @@ function assertDoorQuestions({
 /** Whether the route asks its plan before its permission (Q31), at the credential's scope. */
 function planFirst(route: RestTransportRoute<unknown>): boolean {
   return route.entitlement?.before === "permission";
+}
+
+/**
+ * A legacy key scope is told to the project door when it asks the route's permission, so the
+ * route must ask one before the body; a door that lists its scopes refuses a name it lacks.
+ */
+function assertLegacyKeyScopes({
+  address,
+  route,
+  door,
+  credential,
+}: {
+  address: string;
+  route: RestTransportRoute<unknown>;
+  door: RestIdentity;
+  credential: RestDoorCredential;
+}): void {
+  const scopes = route.legacyKeyScopes;
+  if (!scopes) return;
+
+  if (credential !== "project" || !route.permission || identifiedFirst({ route, credential })) {
+    throw new Error(
+      `REST ${address} names a legacy key scope, which only a project door route that asks ` +
+        "its permission before the body can carry",
+    );
+  }
+  const unknown = door.legacyKeyScopes
+    ? scopes.filter((scope) => !door.legacyKeyScopes?.includes(scope))
+    : [];
+  if (unknown.length > 0) {
+    throw new Error(`REST ${address} names unknown legacy key scopes: ${unknown.join(", ")}`);
+  }
 }
 
 /** Whether the door only identifies the caller, leaving the permission to be asked later. */
@@ -2272,6 +2306,7 @@ async function callerOf({
     permissions: routePermissions(route),
     ...(route.permissionReach ? { reach: route.permissionReach } : {}),
     ...(route.keyKinds ? { keyKinds: route.keyKinds } : {}),
+    ...(route.legacyKeyScopes ? { legacyKeyScopes: route.legacyKeyScopes } : {}),
   });
 }
 

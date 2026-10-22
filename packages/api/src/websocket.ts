@@ -119,6 +119,8 @@ export type WebSocketDoor = Readonly<{
   permission: AuthzPermission;
   /** The key kinds the protocol admits; the door refuses any other with `KeyKindRefusedError`. */
   keyKinds?: RestKeyKinds;
+  /** The operator flags that open the upgrade to a legacy project key whose project they list. */
+  legacyKeyScopes?: readonly [string, ...string[]];
 }>;
 
 /** Who the door admitted, and the project credential it resolved for the upgrade. */
@@ -419,6 +421,7 @@ async function admitThroughDoor({
       permission: door.permission,
       permissions: [door.permission],
       ...(door.keyKinds ? { keyKinds: door.keyKinds } : {}),
+      ...(door.legacyKeyScopes ? { legacyKeyScopes: door.legacyKeyScopes } : {}),
     });
     const credential = projectCredentialOfRequest(asked);
     // The door is told the admitted kinds; the protocol still refuses one it let through.

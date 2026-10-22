@@ -339,7 +339,7 @@ export const FEATURE_FLAGS = [
     defaultValue: false,
     family: "Legacy project keys",
     description:
-      "Lets a project's legacy key, the one stored on the project itself rather than an API key, do everything in its project. Off by default: a legacy key can only send traces, logs, metrics and tracked events, plus what the legacy_project_key_* scope flags grant its project, and every other route, the hosted MCP and the project-keyed health probes refuse it with legacy_project_key_ingestion_only. Enable it for the projects whose owners are still moving to an API key with one rule naming them all, { projectId: [ids] }; remove an id from the list to end it for that project. A self-hosted install can set LEGACY_PROJECT_KEY_FULL_ACCESS=1 to keep full access for every legacy key (spec: modules/auth/specs/legacy-project-key-scope.feature).",
+      "Lets a project's legacy key, the one stored on the project itself rather than an API key, do everything in its project. Off by default: a legacy key can only send traces, logs, metrics and tracked events, plus the routes the legacy_project_key_* scope flags open for its project, and every other route, the hosted MCP and the project-keyed health probes refuse it with legacy_project_key_ingestion_only. Enable it for the projects whose owners are still moving to an API key with one rule naming them all, { projectId: [ids] }; remove an id from the list to end it for that project. A self-hosted install can set LEGACY_PROJECT_KEY_FULL_ACCESS=1 to keep full access for every legacy key (spec: modules/auth/specs/legacy-project-key-scope.feature).",
   },
   {
     key: "legacy_project_key_prompts_read",
@@ -348,7 +348,7 @@ export const FEATURE_FLAGS = [
     envOverridable: false,
     family: "Legacy project keys",
     description:
-      "Lets a project's legacy key read prompts (prompts:view), as the SDK prompts.get does. Off by default. List the projects in one rule, { projectId: [ids] }; remove an id to end it for that project. The permissions it grants are in LEGACY_PROJECT_KEY_SCOPES (modules/api-key/contract/src/api-key.legacy-scopes.ts). Internal flag store only; a self-hosted install uses LEGACY_PROJECT_KEY_FULL_ACCESS instead.",
+      "Lets a project's legacy key read prompts, as the SDK prompts.get does: the prompt list, a prompt, its versions and the tag list. Off by default. List the projects in one rule, { projectId: [ids] }; remove an id to end it for that project. The routes it opens name it with withLegacyKeyScope. Internal flag store only; a self-hosted install uses LEGACY_PROJECT_KEY_FULL_ACCESS instead.",
   },
   {
     key: "legacy_project_key_prompts_write",
@@ -357,7 +357,7 @@ export const FEATURE_FLAGS = [
     envOverridable: false,
     family: "Legacy project keys",
     description:
-      "Lets a project's legacy key create, update, sync and tag prompts (prompts:create, prompts:update, prompts:manage). It does not grant reads; pair it with legacy_project_key_prompts_read. Off by default. List the projects in one rule, { projectId: [ids] }; remove an id to end it for that project. The permissions it grants are in LEGACY_PROJECT_KEY_SCOPES (modules/api-key/contract/src/api-key.legacy-scopes.ts). Internal flag store only; a self-hosted install uses LEGACY_PROJECT_KEY_FULL_ACCESS instead.",
+      "Lets a project's legacy key create, update, restore, sync and tag prompts. Deleting a prompt or a tag still needs full access. It does not grant reads; pair it with legacy_project_key_prompts_read. Off by default. List the projects in one rule, { projectId: [ids] }; remove an id to end it for that project. The routes it opens name it with withLegacyKeyScope. Internal flag store only; a self-hosted install uses LEGACY_PROJECT_KEY_FULL_ACCESS instead.",
   },
   {
     key: "legacy_project_key_traces_read",
@@ -366,7 +366,7 @@ export const FEATURE_FLAGS = [
     envOverridable: false,
     family: "Legacy project keys",
     description:
-      "Lets a project's legacy key read and search traces over REST (traces:view). Off by default. List the projects in one rule, { projectId: [ids] }; remove an id to end it for that project. The permissions it grants are in LEGACY_PROJECT_KEY_SCOPES (modules/api-key/contract/src/api-key.legacy-scopes.ts). Internal flag store only; a self-hosted install uses LEGACY_PROJECT_KEY_FULL_ACCESS instead.",
+      "Lets a project's legacy key read and search traces and threads over REST. Sharing, metadata updates and coding-agent reads still need full access. Off by default. List the projects in one rule, { projectId: [ids] }; remove an id to end it for that project. The routes it opens name it with withLegacyKeyScope. Internal flag store only; a self-hosted install uses LEGACY_PROJECT_KEY_FULL_ACCESS instead.",
   },
   {
     key: "legacy_project_key_scenarios",
@@ -375,7 +375,7 @@ export const FEATURE_FLAGS = [
     envOverridable: false,
     family: "Legacy project keys",
     description:
-      "Lets a project's legacy key report scenario events and read simulation runs (scenarios:create, scenarios:view). Off by default. List the projects in one rule, { projectId: [ids] }; remove an id to end it for that project. The permissions it grants are in LEGACY_PROJECT_KEY_SCOPES (modules/api-key/contract/src/api-key.legacy-scopes.ts). Internal flag store only; a self-hosted install uses LEGACY_PROJECT_KEY_FULL_ACCESS instead.",
+      "Lets a project's legacy key report scenario events, offer a scenario browser tab and read simulation runs. Scenario, suite and run plan routes still need full access. Off by default. List the projects in one rule, { projectId: [ids] }; remove an id to end it for that project. The routes it opens name it with withLegacyKeyScope. Internal flag store only; a self-hosted install uses LEGACY_PROJECT_KEY_FULL_ACCESS instead.",
   },
   {
     key: "legacy_project_key_evaluations",
@@ -384,7 +384,7 @@ export const FEATURE_FLAGS = [
     envOverridable: false,
     family: "Legacy project keys",
     description:
-      "Lets a project's legacy key run evaluators and guardrails over REST and look evaluators up (evaluations:manage, evaluations:view). Off by default. List the projects in one rule, { projectId: [ids] }; remove an id to end it for that project. The permissions it grants are in LEGACY_PROJECT_KEY_SCOPES (modules/api-key/contract/src/api-key.legacy-scopes.ts). Internal flag store only; a self-hosted install uses LEGACY_PROJECT_KEY_FULL_ACCESS instead.",
+      "Lets a project's legacy key run evaluators and guardrails over REST and read evaluators. Evaluator and monitor writes still need full access. Off by default. List the projects in one rule, { projectId: [ids] }; remove an id to end it for that project. The routes it opens name it with withLegacyKeyScope. Internal flag store only; a self-hosted install uses LEGACY_PROJECT_KEY_FULL_ACCESS instead.",
   },
   {
     key: "legacy_project_key_experiments",
@@ -393,7 +393,7 @@ export const FEATURE_FLAGS = [
     envOverridable: false,
     family: "Legacy project keys",
     description:
-      "Lets a project's legacy key run CI/CD experiments, log SDK experiment and batch evaluation results, and read the datasets they use (experiments:*, evaluations:view, evaluations:create, evaluations:manage, datasets:view). Off by default. List the projects in one rule, { projectId: [ids] }; remove an id to end it for that project. The permissions it grants are in LEGACY_PROJECT_KEY_SCOPES (modules/api-key/contract/src/api-key.legacy-scopes.ts). Internal flag store only; a self-hosted install uses LEGACY_PROJECT_KEY_FULL_ACCESS instead.",
+      "Lets a project's legacy key run CI/CD experiments and read their runs, manage experiments and their workbench state, log SDK experiment, DSPy and batch evaluation results, evaluate a dataset or a workflow, run evaluators, and read datasets. Off by default. List the projects in one rule, { projectId: [ids] }; remove an id to end it for that project. The routes it opens name it with withLegacyKeyScope. Internal flag store only; a self-hosted install uses LEGACY_PROJECT_KEY_FULL_ACCESS instead.",
   },
   {
     key: "legacy_project_key_connected_agents",
@@ -402,7 +402,7 @@ export const FEATURE_FLAGS = [
     envOverridable: false,
     family: "Legacy project keys",
     description:
-      "Lets a project's legacy key connect agents: register, poll, post frames and open the connect socket (scenarios:manage), and read the project's model providers (project:view). Off by default. List the projects in one rule, { projectId: [ids] }; remove an id to end it for that project. The permissions it grants are in LEGACY_PROJECT_KEY_SCOPES (modules/api-key/contract/src/api-key.legacy-scopes.ts). Internal flag store only; a self-hosted install uses LEGACY_PROJECT_KEY_FULL_ACCESS instead.",
+      "Lets a project's legacy key connect agents (register, poll, post frames and open the connect socket) and read the project's model providers. Agent, scenario and suite routes still need full access. Off by default. List the projects in one rule, { projectId: [ids] }; remove an id to end it for that project. The routes it opens name it with withLegacyKeyScope. Internal flag store only; a self-hosted install uses LEGACY_PROJECT_KEY_FULL_ACCESS instead.",
   },
   // NOTE: `release_webhook_automations` (ADR-040) was retired — the webhook
   // delivery channel is offered to every project, so there is no picker card,
