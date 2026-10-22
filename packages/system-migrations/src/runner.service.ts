@@ -10,7 +10,9 @@ import {
 import type { SystemMigration } from "./system-migration.ts";
 import type { TenantSource } from "./tenant-source.ts";
 import {
+  type HeldReason,
   isTerminalTenantStatus,
+  isWaitingOnPerson,
   type MigrationPassSummary,
   type TenantMigrationOutcome,
   type TenantMigrationRecord,
@@ -131,8 +133,8 @@ export class SystemMigrationRunnerService {
 
   /**
    * Whether an eligible tenant (this runner's source, inside the cohort) holds no finished row
-   * for `migrationName` (a steady step's `migrated` counts as finished). Read from state, never a
-   * pass: a tenant claimed elsewhere, or by nobody while the lease is down, counts until finished.
+   * for `migrationName` (`isFinishedRecord`). Read from state, never a pass: a tenant claimed
+   * elsewhere, or by nobody while the lease is down, counts until finished.
    */
   async hasUnfinishedTenant({ migrationName }: { migrationName: string }): Promise<boolean> {
     let cursor: string | null = null;
@@ -151,12 +153,7 @@ export class SystemMigrationRunnerService {
         (migration) => migration.name === migrationName && migration.migratedIsSteady,
       );
       const finished = new Set(
-        records
-          .filter(
-            (record) =>
-              isTerminalTenantStatus(record.status) || (steady && record.status === "migrated"),
-          )
-          .map((r) => r.tenantId),
+        records.filter((record) => isFinishedRecord({ record, steady })).map((r) => r.tenantId),
       );
       if (eligible.some((tenantId) => !finished.has(tenantId))) return true;
     }
@@ -535,7 +532,7 @@ export class SystemMigrationRunnerService {
       const { heldReason } = record;
       const fields = { migration: migration.name, tenantId, status: outcome.status };
       if (heldReason) {
-        logger[heldNoticeLevel({ existing })](
+        logger[heldNoticeLevel({ existing, heldReason })](
           { ...fields, heldReason },
           "tenant migration held; it stays on its legacy path and nothing waits on it",
         );
@@ -554,16 +551,30 @@ export class SystemMigrationRunnerService {
   }
 }
 
+/** Finished for its step: terminal, a steady step's `migrated`, or a hold waiting on a person. */
+function isFinishedRecord({
+  record,
+  steady,
+}: {
+  record: TenantMigrationRecord;
+  steady: boolean;
+}): boolean {
+  if (isTerminalTenantStatus(record.status) || isWaitingOnPerson(record)) return true;
+  return steady && record.status === "migrated";
+}
+
 /**
  * A first hold is usually a projection still folding, and the next pass re-proves it, so it is
- * info; a tenant still held from an earlier pass is a warn.
+ * info; a tenant still held from an earlier pass is a warn, unless it waits on a person.
  */
 export function heldNoticeLevel({
   existing,
+  heldReason,
 }: {
   existing: TenantMigrationRecord | undefined;
+  heldReason?: HeldReason | undefined;
 }): "info" | "warn" {
-  return existing?.status === "migrated" ? "warn" : "info";
+  return existing?.status === "migrated" && heldReason !== "person" ? "warn" : "info";
 }
 
 /** Held carries why and since when (the first moment, while still held); else neither. */

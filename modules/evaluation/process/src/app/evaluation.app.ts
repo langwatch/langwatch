@@ -507,6 +507,8 @@ export class EvaluationModule implements EvaluationApiContract {
           execution,
           costs,
         }),
+        retryWindowMs: config.evaluatorRetryWindowMinutes * 60_000,
+        retries: commands,
       }),
       eventing: EvaluationProcessingStoresAdapter.create({
         runs: EvaluationRunProjectionService.create({

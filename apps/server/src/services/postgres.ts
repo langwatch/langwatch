@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { nowInstant } from "@langwatch/time";
 import { execa } from "execa";
 
+import { DEFAULT_LOG_LEVEL, postgresLogLevel } from "../shared/log-level.ts";
 import type { RuntimeContext } from "../shared/runtime-contract.ts";
 import type { EventBus } from "./event-bus.ts";
 import { execCheck, pollUntilHealthy } from "./health.ts";
@@ -80,6 +81,8 @@ export async function startPostgres(ctx: RuntimeContext, bus: EventBus): Promise
         "log_destination=stderr",
         "-c",
         "logging_collector=off",
+        "-c",
+        `log_min_messages=${postgresLogLevel(ctx.logLevel ?? DEFAULT_LOG_LEVEL)}`,
       ],
       env,
     },

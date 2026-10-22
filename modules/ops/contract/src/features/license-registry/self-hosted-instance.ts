@@ -137,6 +137,36 @@ export const selfHostedInstanceSummarySchema: SelfHostedInstanceSummarySchema =
   selfHostedInstanceSummarySchemaDefinition;
 export type SelfHostedInstanceSummary = z.infer<typeof selfHostedInstanceSummarySchema>;
 
+/** One upgrade diagnostics report an install sent; the bundle is downloaded on demand. */
+const upgradeDiagnosticsReportSchemaDefinition = z.object({
+  id: z.string(),
+  instanceId: z.string(),
+  stepId: z.string(),
+  stepDescription: z.string().nullable(),
+  release: z.string().nullable(),
+  attempt: z.number().int(),
+  trigger: z.enum(["operator", "automatic"]),
+  byteLength: z.number().int(),
+  receivedAt: z.string(),
+  expiresAt: z.string(),
+});
+export interface UpgradeDiagnosticsReportSchema extends Named<
+  typeof upgradeDiagnosticsReportSchemaDefinition
+> {}
+export const upgradeDiagnosticsReportSchema: UpgradeDiagnosticsReportSchema =
+  upgradeDiagnosticsReportSchemaDefinition;
+export type UpgradeDiagnosticsReportView = z.infer<typeof upgradeDiagnosticsReportSchema>;
+
+const upgradeDiagnosticsDownloadSchemaDefinition = z.object({
+  url: z.string(),
+  expiresAt: z.string(),
+});
+export interface UpgradeDiagnosticsDownloadSchema extends Named<
+  typeof upgradeDiagnosticsDownloadSchemaDefinition
+> {}
+export const upgradeDiagnosticsDownloadSchema: UpgradeDiagnosticsDownloadSchema =
+  upgradeDiagnosticsDownloadSchemaDefinition;
+
 /** Read only: an install reported every number here (ADR-156 §10). */
 export const selfHostedInstancesTrpc = defineTrpcContract("selfHostedInstances")
   .query("getAll")
@@ -150,4 +180,12 @@ export const selfHostedInstancesTrpc = defineTrpcContract("selfHostedInstances")
   .query("summary")
   .withInput(z.void())
   .withOutput(selfHostedInstanceSummarySchema)
+
+  .query("findDiagnostics")
+  .withInput(z.object({ instanceRowId: z.string().min(1) }))
+  .withOutput(z.array(upgradeDiagnosticsReportSchema))
+
+  .mutation("getDiagnosticsDownload")
+  .withInput(z.object({ id: z.string().min(1) }))
+  .withOutput(upgradeDiagnosticsDownloadSchema)
   .build();

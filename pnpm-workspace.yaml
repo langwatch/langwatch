@@ -172,6 +172,7 @@ catalog:
   slugify: ^1.6.9
   stripe: ^15.12.0
   ts-pattern: ^5.9.0
+  tsrs: 0.18.0-ts7.1.0-dev.20260929
   tsup: ^8.5.0
   typescript: ^7.0.2
   typescript-eslint: ^8.55.0
@@ -185,7 +186,7 @@ catalog:
   vitest-browser-react: ^2.3.0
   web-push: ^3.6.7
   ws: ^8.21.0
-  zod: ^4.6.5
+  zod: ^4.6.7
   zod-validation-error: ^5.0.0
   zundo: ^2.3.0
   zustand: ^4.5.7
@@ -213,6 +214,12 @@ verifyDepsBeforeRun: false
 minimumReleaseAge: 10080
 
 minimumReleaseAgeExclude:
+  - 'tsrs@0.18.0-ts7.1.0-dev.20260929'
+  - '@tsrs/darwin-arm64@0.18.0-ts7.1.0-dev.20260929'
+  - '@tsrs/linux-x64-gnu@0.18.0-ts7.1.0-dev.20260929'
+  - '@tsrs/linux-x64-musl@0.18.0-ts7.1.0-dev.20260929'
+  - '@tsrs/linux-arm64-gnu@0.18.0-ts7.1.0-dev.20260929'
+  - '@tsrs/linux-arm64-musl@0.18.0-ts7.1.0-dev.20260929'
   - '@langwatch/scenario'
   - langwatch@1.0.0
   - ws@8.21.1
@@ -338,7 +345,7 @@ overrides:
   react: ^19.2.7
   react-dom: ^19.2.7
   react-is: ^19.2.7
-  sanitize-html@<2.18.0: '>=2.18.0 <3'
+  sanitize-html@<2.18.1: '>=2.18.1 <3'
   shell-quote@<1.11.0: '>=1.11.0 <2'
   smol-toml@<1.9.0: '>=1.9.0 <2'
   source-map-js@>=1.0.0 <1.2.2: '>=1.2.2 <2'
@@ -364,6 +371,10 @@ packageExtensions:
   '@nx/js':
     dependencies:
       typescript: 6.0.3
+  # The patched `tsc` launcher runs tsrs, the Rust port (ADR-181), so it must resolve it.
+  typescript@7.0.2:
+    dependencies:
+      tsrs: 0.18.0-ts7.1.0-dev.20260929
 
 # Local fixes carried until upstream releases them (dev/docs/ARCHITECTURE.md, patched dependencies).
 patchedDependencies:

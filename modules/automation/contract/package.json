@@ -33,7 +33,7 @@
     "croner": "catalog:",
     "liquidjs": "catalog:",
     "marked": "^18.0.5",
-    "sanitize-html": "^2.18.0",
+    "sanitize-html": "^2.18.1",
     "zod": "catalog:"
   },
   "devDependencies": {
