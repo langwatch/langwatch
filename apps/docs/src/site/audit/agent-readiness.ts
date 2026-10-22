@@ -94,24 +94,31 @@ function readText({ file }: { file: string }) {
   return existsSync(file) ? readFileSync(file, "utf8") : null;
 }
 
-/** Robots groups by user agent; a crawler is named when a group lists it by name. */
-export function robotsIssues({ robots, crawlers }: { robots: string | null; crawlers: string[] }) {
+/* Each user agent's rules; consecutive User-agent lines share the rules that follow them. */
+function robotsGroups({ robots }: { robots: string }) {
   const groups = new Map<string, string[]>();
   let agents: string[] = [];
   let collecting = false;
-  for (const raw of (robots ?? "").split("\n")) {
+  for (const raw of robots.split("\n")) {
     const line = raw.replace(/#.*/, "").trim();
     const [field, ...rest] = line.split(":");
-    const value = rest.join(":").trim();
     if (/^user-agent$/i.test(field)) {
-      agents = collecting ? [...agents, value.toLowerCase()] : [value.toLowerCase()];
+      const agent = rest.join(":").trim().toLowerCase();
+      agents = collecting ? [...agents, agent] : [agent];
       collecting = true;
-      for (const agent of agents) groups.set(agent, groups.get(agent) ?? []);
-    } else if (line) {
-      collecting = false;
-      for (const agent of agents) groups.get(agent)?.push(line);
+      if (!groups.has(agent)) groups.set(agent, []);
+      continue;
     }
+    if (!line) continue;
+    collecting = false;
+    for (const agent of agents) groups.get(agent)?.push(line);
   }
+  return groups;
+}
+
+/** Robots groups by user agent; a crawler is named when a group lists it by name. */
+export function robotsIssues({ robots, crawlers }: { robots: string | null; crawlers: string[] }) {
+  const groups = robotsGroups({ robots: robots ?? "" });
   return crawlers.flatMap((crawler): AgentIssue[] => {
     const rules = groups.get(crawler.toLowerCase());
     const page = `robots.txt#${crawler}`;
@@ -161,6 +168,26 @@ function parsed<T>({ schema, text }: { schema: z.ZodType<T>; text: string | null
   }
 }
 
+function digestIssues({
+  outDir,
+  skill,
+}: {
+  outDir: string;
+  skill: { name: string; url: string; digest: string };
+}): AgentIssue[] {
+  const relative = skill.url.startsWith(`${DOCS_URL}/`)
+    ? skill.url.slice(DOCS_URL.length + 1)
+    : null;
+  const file = relative ? path.join(outDir, relative) : null;
+  const bytes = file && existsSync(file) ? readFileSync(file) : null;
+  const digest = bytes && `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
+  if (digest === skill.digest) return [];
+  const detail = bytes
+    ? "digest does not match the published file"
+    : `${skill.url} is not in the build`;
+  return [{ page: `agent-skills/${skill.name}`, code: "skills-digest-mismatch", detail }];
+}
+
 /** The agent card, the skills index and every SKILL.md digest it promises. */
 function discoveryFileIssues({ outDir }: { outDir: string }): AgentIssue[] {
   const issues: AgentIssue[] = [];
@@ -178,22 +205,7 @@ function discoveryFileIssues({ outDir }: { outDir: string }): AgentIssue[] {
       code: "skills-index-invalid",
       detail: index.error,
     });
-  for (const skill of index.data?.skills ?? []) {
-    const relative = skill.url.startsWith(`${DOCS_URL}/`)
-      ? skill.url.slice(DOCS_URL.length + 1)
-      : null;
-    const file = relative ? path.join(outDir, relative) : null;
-    const bytes = file && existsSync(file) ? readFileSync(file) : null;
-    const digest = bytes && `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
-    if (digest !== skill.digest)
-      issues.push({
-        page: `agent-skills/${skill.name}`,
-        code: "skills-digest-mismatch",
-        detail: bytes
-          ? "digest does not match the published file"
-          : `${skill.url} is not in the build`,
-      });
-  }
+  for (const skill of index.data?.skills ?? []) issues.push(...digestIssues({ outDir, skill }));
   if (!read("agents.txt")?.trim())
     issues.push({ page: "agents.txt", code: "agents-txt-missing", detail: "absent or empty" });
   return issues;

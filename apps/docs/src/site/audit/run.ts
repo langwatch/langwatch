@@ -224,6 +224,64 @@ function agentReadiness({
   return { result, gate };
 }
 
+/** Lighthouse over the selected pages and form factors, the median of each page's runs. */
+async function lighthouseRuns({
+  options,
+  budgets,
+  origin,
+  basePath,
+  reportDir,
+  json,
+}: {
+  options: ReturnType<typeof readOptions>;
+  budgets: ReturnType<typeof readBudgets>;
+  origin: string;
+  basePath: string;
+  reportDir: string;
+  json: boolean;
+}): Promise<AuditRun[]> {
+  const pages = selectPages({ pages: budgets.pages, selected: options.pages });
+  const tasks = pages.flatMap((page) =>
+    options["form-factors"].flatMap((formFactor) =>
+      Array.from({ length: options.runs }, (_, attempt) => ({ page, formFactor, attempt })),
+    ),
+  );
+  const limit =
+    options.concurrency ?? Math.max(1, Math.min(4, Math.floor(os.availableParallelism() / 2)));
+  const lhrDir = path.join(reportDir, "lighthouse");
+  if (options.lhr) mkdirSync(lhrDir, { recursive: true });
+  log({ json, message: `lighthouse: ${tasks.length} runs, ${limit} at a time` });
+  const all = await pool({
+    items: tasks,
+    limit,
+    work: async ({ page, formFactor, attempt }) => {
+      const run = await runLighthouse({
+        url: `${origin}${basePath}${page.path}`,
+        page,
+        formFactor,
+        lhr: options.lhr
+          ? path.join(
+              lhrDir,
+              `${page.id.replace(/[^a-z0-9-]+/gi, "_")}-${formFactor}-${attempt}.json`,
+            )
+          : undefined,
+      });
+      log({
+        json,
+        message: `${page.id} ${formFactor}: ${run.runtimeError ?? `${Math.round(run.durationMs / 1000)} s`}`,
+      });
+      return run;
+    },
+  });
+  return pages.flatMap((page) =>
+    options["form-factors"].map((formFactor) =>
+      medianRun({
+        runs: all.filter((run) => run.page === page.id && run.formFactor === formFactor),
+      }),
+    ),
+  );
+}
+
 async function main() {
   const started = nowInstant().epochMilliseconds;
   const options = readOptions();
@@ -258,48 +316,8 @@ async function main() {
   try {
     const origin = new URL(server.resolvedUrls?.local[0] ?? "http://127.0.0.1").origin;
     seo.failures.push(...(await checkExportTypes({ origin, exports: seoResult.exports })));
-    if (!options["static-only"]) {
-      const pages = selectPages({ pages: budgets.pages, selected: options.pages });
-      const tasks = pages.flatMap((page) =>
-        options["form-factors"].flatMap((formFactor) =>
-          Array.from({ length: options.runs }, (_, attempt) => ({ page, formFactor, attempt })),
-        ),
-      );
-      const limit =
-        options.concurrency ?? Math.max(1, Math.min(4, Math.floor(os.availableParallelism() / 2)));
-      const lhrDir = path.join(reportDir, "lighthouse");
-      if (options.lhr) mkdirSync(lhrDir, { recursive: true });
-      log({ json, message: `lighthouse: ${tasks.length} runs, ${limit} at a time` });
-      const all = await pool({
-        items: tasks,
-        limit,
-        work: async ({ page, formFactor, attempt }) => {
-          const run = await runLighthouse({
-            url: `${origin}${basePath}${page.path}`,
-            page,
-            formFactor,
-            lhr: options.lhr
-              ? path.join(
-                  lhrDir,
-                  `${page.id.replace(/[^a-z0-9-]+/gi, "_")}-${formFactor}-${attempt}.json`,
-                )
-              : undefined,
-          });
-          log({
-            json,
-            message: `${page.id} ${formFactor}: ${run.runtimeError ?? `${Math.round(run.durationMs / 1000)} s`}`,
-          });
-          return run;
-        },
-      });
-      runs = pages.flatMap((page) =>
-        options["form-factors"].map((formFactor) =>
-          medianRun({
-            runs: all.filter((run) => run.page === page.id && run.formFactor === formFactor),
-          }),
-        ),
-      );
-    }
+    if (!options["static-only"])
+      runs = await lighthouseRuns({ options, budgets, origin, basePath, reportDir, json });
   } finally {
     await new Promise((resolve) => server.httpServer.close(resolve));
   }

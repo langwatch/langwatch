@@ -33,37 +33,48 @@ const FENCE = /^\s*(`{3,}|~{3,})(.*)$/;
 
 /** The export as blocks: fenced code kept whole, prose split at blank lines and fences. */
 export function markdownBlocks({ markdown }: { markdown: string }): Block[] {
-  const blocks: Block[] = [];
-  let prose: string[] = [];
-  let fence: { marker: string; code: CodeBlock } | null = null;
-  const flush = () => {
-    if (prose.length > 0) blocks.push({ kind: proseKind({ line: prose[0] }), lines: prose });
-    prose = [];
-  };
-  for (const line of markdown.split("\n")) {
-    const match = FENCE.exec(line);
-    if (fence) {
-      const closes =
-        match && match[1][0] === fence.marker[0] && match[1].length >= fence.marker.length;
-      if (closes && match[2].trim() === "") {
-        blocks.push({ kind: "code", code: fence.code });
-        fence = null;
-      } else fence.code.lines.push(line);
-    } else if (match) {
-      flush();
-      fence = {
-        marker: match[1],
-        code: { lang: match[2].trim().split(/\s+/)[0].toLowerCase(), lines: [] },
-      };
-    } else if (line.trim() === "") flush();
-    else if (/^#{1,6}\s/.test(line)) {
-      flush();
-      blocks.push({ kind: "heading", lines: [line] });
-    } else prose.push(line);
+  const state: BlockState = { blocks: [], prose: [], fence: null };
+  for (const line of markdown.split("\n")) readLine({ state, line });
+  flushProse({ state });
+  if (state.fence) state.blocks.push({ kind: "code", code: state.fence.code });
+  return state.blocks;
+}
+
+type BlockState = {
+  blocks: Block[];
+  prose: string[];
+  fence: { marker: string; code: CodeBlock } | null;
+};
+
+function flushProse({ state }: { state: BlockState }) {
+  if (state.prose.length > 0)
+    state.blocks.push({ kind: proseKind({ line: state.prose[0] }), lines: state.prose });
+  state.prose = [];
+}
+
+function closesFence({ match, marker }: { match: RegExpExecArray | null; marker: string }) {
+  if (!match || match[1][0] !== marker[0]) return false;
+  return match[1].length >= marker.length && match[2].trim() === "";
+}
+
+function readLine({ state, line }: { state: BlockState; line: string }) {
+  const match = FENCE.exec(line);
+  if (state.fence) {
+    if (closesFence({ match, marker: state.fence.marker })) {
+      state.blocks.push({ kind: "code", code: state.fence.code });
+      state.fence = null;
+    } else state.fence.code.lines.push(line);
+    return;
   }
-  flush();
-  if (fence) blocks.push({ kind: "code", code: fence.code });
-  return blocks;
+  if (match) {
+    flushProse({ state });
+    const lang = match[2].trim().split(/\s+/)[0].toLowerCase();
+    state.fence = { marker: match[1], code: { lang, lines: [] } };
+  } else if (line.trim() === "") flushProse({ state });
+  else if (/^#{1,6}\s/.test(line)) {
+    flushProse({ state });
+    state.blocks.push({ kind: "heading", lines: [line] });
+  } else state.prose.push(line);
 }
 
 function proseKind({ line }: { line: string }): ProseKind {
@@ -81,7 +92,9 @@ const PREAMBLE =
 
 /** The description after the title, and the first paragraph before the first section heading. */
 export function openingOf({ blocks }: { blocks: Block[] }) {
-  const title = blocks.findIndex((block) => block.kind === "heading" && /^# /.test(block.lines[0]));
+  const title = blocks.findIndex(
+    (block) => block.kind === "heading" && block.lines[0].startsWith("# "),
+  );
   const rest = blocks.slice(title + 1);
   const description = rest[0]?.kind === "paragraph" ? rest[0].lines.join(" ") : null;
   let firstParagraph: string | null = null;

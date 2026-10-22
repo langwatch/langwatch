@@ -81,15 +81,27 @@ function collectDeclarations({
   for (const node of nodes) {
     if (node.kind === "verbatim") read({ text: node.text });
     else if (node.kind === "group") collectDeclarations({ nodes: node.children, used, values });
-    else
-      for (const declaration of splitDeclarations({ body: node.body })) {
-        const custom = CUSTOM_DECLARATION.exec(declaration);
-        if (!custom) read({ text: declaration });
-        else {
-          const name = unescapeIdentifier({ name: custom[1] ?? "" });
-          values.set(name, [...(values.get(name) ?? []), custom[2] ?? ""]);
-        }
-      }
+    else collectRuleBody({ body: node.body, read, values });
+  }
+}
+
+function collectRuleBody({
+  body,
+  read,
+  values,
+}: {
+  body: string;
+  read: (input: { text: string }) => void;
+  values: Map<string, string[]>;
+}) {
+  for (const declaration of splitDeclarations({ body })) {
+    const custom = CUSTOM_DECLARATION.exec(declaration);
+    if (!custom) {
+      read({ text: declaration });
+      continue;
+    }
+    const name = unescapeIdentifier({ name: custom[1] ?? "" });
+    values.set(name, [...(values.get(name) ?? []), custom[2] ?? ""]);
   }
 }
 
