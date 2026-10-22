@@ -69,7 +69,7 @@ exclude-newer = "7 days"
 # Emergency exceptions to the 7-day age gate (dev/docs/best_practices/
 # dependency-age-gates.md), each scoped by timestamp to the one patched
 # release a CRITICAL advisory needs. Pillow 13.0.0 (uploaded 2026-10-16)
-# closes 28 advisories, four of them critical; certifi 2026.10.19 (uploaded
+# closes 28 advisories, three of them critical; certifi 2026.10.19 (uploaded
 # 2026-10-20) closes GHSA-6q48-6c7w-9gw2 (critical). Remove both entries once
 # those uploads are older than 7 days (Pillow from 2026-10-24, certifi from
 # 2026-10-28): a timestamp here then holds the package back, not forward.
@@ -115,7 +115,7 @@ override-dependencies = [
   # 1.83.7 / 1.83.10 / 1.83.14. 1.84.0 is the first release above all of them.
   "litellm>=1.84.0",
   # Pillow: heap overflow / DoS across several decoders, then 28 advisories
-  # covering <13.0.0, four of them critical.
+  # covering <13.0.0, three of them critical.
   "pillow>=13.0.0",
   # nltk unsafe deserialization in the pickle loader path, plus the advisories
   # closed in 3.10.1 and 3.10.3.
