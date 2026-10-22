@@ -5,8 +5,9 @@
  */
 
 import {
-  DECISION_PROVIDER_KEY_FIELDS,
+  DECISION_PROVIDER_ACCOUNT_FIELDS,
   findDecisionModel,
+  findModelProviderDefinition,
   INSTANT_EVAL_DECISION_FEATURE_KEY,
   isOwnDecisionModelId,
   type DecisionModelResolution,
@@ -57,9 +58,10 @@ export function decisionModelResolutionOf({
   if (!row.enabled)
     return { kind: "own_unavailable", model: entry.id, reason: "provider_disabled" };
 
-  const fields = DECISION_PROVIDER_KEY_FIELDS[entry.provider];
-  const apiKey = fields ? textOf(row.customKeys?.[fields.apiKey]) : undefined;
-  const accountId = fields?.accountId ? textOf(row.customKeys?.[fields.accountId]) : undefined;
+  const keyField = findModelProviderDefinition(entry.provider)?.apiKey;
+  const accountField = DECISION_PROVIDER_ACCOUNT_FIELDS[entry.provider];
+  const apiKey = keyField ? textOf(row.customKeys?.[keyField]) : undefined;
+  const accountId = accountField ? textOf(row.customKeys?.[accountField]) : undefined;
   const needsAccount = entry.endpoint.includes("{accountId}");
   if (!apiKey || (needsAccount && !accountId)) {
     return { kind: "own_unavailable", model: entry.id, reason: "key_missing" };

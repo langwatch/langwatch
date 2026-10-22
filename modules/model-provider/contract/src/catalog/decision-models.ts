@@ -98,14 +98,9 @@ export const DECISION_MODELS: readonly DecisionModelEntry[] = [
   },
 ];
 
-/** Each provider row's key field, and its account field where the URL needs one. */
-export const DECISION_PROVIDER_KEY_FIELDS: Readonly<
-  Record<string, Readonly<{ apiKey: string; accountId?: string }>>
-> = {
-  openai: { apiKey: "OPENAI_API_KEY" },
-  inception: { apiKey: "INCEPTION_API_KEY" },
-  perplexity: { apiKey: "PERPLEXITY_API_KEY" },
-  cloudflare: { apiKey: "CLOUDFLARE_API_TOKEN", accountId: "CLOUDFLARE_ACCOUNT_ID" },
+/** The account field of a provider whose URL needs one; the key field is the registry's. */
+export const DECISION_PROVIDER_ACCOUNT_FIELDS: Readonly<Record<string, string>> = {
+  cloudflare: "CLOUDFLARE_ACCOUNT_ID",
 };
 
 export function findDecisionModel(id: string): DecisionModelEntry | undefined {
