@@ -1,0 +1,85 @@
+# syntax=docker/dockerfile:1.7
+#
+# langwatch_nlp as an AWS Lambda function image. Same engine as
+# Dockerfile.langwatch_nlp (nlpgo, a single static Go binary, plus a stdlib
+# python3 and the code-block sandbox libraries), fronted by the AWS Lambda Web
+# Adapter so the function can stream nlpgo's SSE flushes back through
+# InvokeWithResponseStream.
+#
+# Built from the repository root:
+#   docker build -f infra/docker/Dockerfile.langwatch_nlp.lambda .
+#
+# Keep the go-build and sandbox-build stages in step with
+# Dockerfile.langwatch_nlp: both images install byte-identically from the one
+# sandbox-requirements.txt.
+
+# The Lambda Web Adapter. Overridable so a registry mirror can stand in for
+# public.ecr.aws.
+ARG LAMBDA_ADAPTER_IMAGE=public.ecr.aws/awsguru/aws-lambda-adapter:0.9.1
+FROM ${LAMBDA_ADAPTER_IMAGE} AS lambda-adapter
+
+# ─── Go build ─────────────────────────────────────────────────────────────────
+FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine AS go-build
+WORKDIR /src
+RUN apk add --no-cache git ca-certificates
+ARG TARGETOS
+ARG TARGETARCH
+# go.work loads only when every module it uses has its go.mod, so all of them
+# land before `go mod download`. Mirrors Dockerfile.langwatch_nlp.
+COPY go.work go.work.sum ./
+COPY cmd/go.* cmd/
+COPY pkg/go.* pkg/
+COPY services/go.* services/
+COPY tools/go.* tools/
+COPY sdks/go/go.* sdks/go/
+COPY infra/clickhouse-serverless/go.* infra/clickhouse-serverless/
+# services/go.mod replaces the Go scenario SDK with this vendored copy.
+COPY services/third_party/scenario-go/ services/third_party/scenario-go/
+RUN --mount=type=cache,target=/go/pkg/mod,id=go-mod-${TARGETARCH} \
+    go mod download
+COPY cmd/ cmd/
+COPY pkg/ pkg/
+COPY services/ services/
+COPY sdks/go/ sdks/go/
+ARG VERSION=dev
+RUN --mount=type=cache,target=/go/pkg/mod,id=go-mod-${TARGETARCH} \
+    --mount=type=cache,target=/root/.cache/go-build,id=go-build-${TARGETARCH} \
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build \
+      -ldflags="-s -w -X main.Version=${VERSION}" -trimpath \
+      -o /out/service ./cmd/service
+
+# ─── Code-block sandbox libraries ──────────────────────────────────────────────
+# Python 3.11 to match the distroless/python3-debian12 runtime ABI. Keep every
+# *.dist-info: opentelemetry resolves its runtime context through
+# importlib.metadata entry points that live there. See Dockerfile.langwatch_nlp.
+FROM python:3.11-slim-bookworm AS sandbox-build
+COPY packages/ksuid-python/ /tmp/langwatch-ksuid/
+COPY sdks/python/ /tmp/langwatch-sdk/
+COPY services/nlpgo/app/engine/blocks/codeblock/sandbox-requirements.txt /tmp/sandbox-requirements.txt
+RUN pip install --no-cache-dir --target=/pylibs -r /tmp/sandbox-requirements.txt
+RUN set -eux; \
+    find /pylibs -name "__pycache__" -type d -prune -exec rm -rf {} +; \
+    find /pylibs -type d -name "tests" -prune -exec rm -rf {} +; \
+    find /pylibs/babel/locale-data -type f ! -name 'en*.dat' ! -name 'root.dat' -delete 2>/dev/null || true
+
+# ─── Runtime ───────────────────────────────────────────────────────────────────
+# The default (root) distroless variant, as the function runs today. Switching
+# to :nonroot is a separate change that needs a test on Lambda first.
+FROM gcr.io/distroless/python3-debian12
+COPY --from=lambda-adapter /lambda-adapter /opt/extensions/lambda-adapter
+COPY --from=sandbox-build /pylibs /opt/sandbox-libs
+COPY --from=go-build /out/service /usr/local/bin/service
+
+# nlpgo binds $SERVER_ADDR and serves /go/* and /healthz. Code blocks spawn
+# SANDBOX_PYTHON lazily with the sandbox libraries on PYTHONPATH.
+ENV SANDBOX_PYTHON=/usr/bin/python3.11
+ENV PYTHONPATH=/opt/sandbox-libs
+ENV SERVER_ADDR=:8080
+
+# The adapter probes nlpgo's liveness and streams each SSE flush as its own
+# response chunk.
+ENV AWS_LWA_READINESS_CHECK_PATH=/healthz
+ENV AWS_LWA_INVOKE_MODE=RESPONSE_STREAM
+
+EXPOSE 8080
+ENTRYPOINT ["/usr/local/bin/service", "nlpgo"]
