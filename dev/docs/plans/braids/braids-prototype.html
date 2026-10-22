@@ -1936,7 +1936,13 @@
       const av = (p, cls = "") =>
         `<span class="av ${cls}" style="background:${p.color}">${p.id}</span>`;
       const fmt = (n) => n.toLocaleString("en-GB");
-      const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      const esc = (s) =>
+        s
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
 
       const DEFAULT_COND = 'attributes["orchestrator"] == "web"\nand Verified("orchestrator")';
       const state = {
