@@ -20,6 +20,7 @@ import {
 } from "./metrics.ts";
 import { isPlausibleReadyScore, MIN_PLAUSIBLE_EPOCH_MS } from "./readyScore.ts";
 import { type GroupStagingScripts, pendingGroupsKey, ROUTING_META_HELPER_LUA } from "./scripts.ts";
+import { tenantIdFromGroupId } from "./storage.ts";
 
 /**
  * Sample size for backlog-age gauge; samples nearest deferred groups. Bounded
@@ -33,6 +34,9 @@ const OLDEST_BACKLOG_SAMPLE_GROUPS = 50;
  * page and every group is reached within one rotation, whatever the count.
  */
 const STAGING_DEPTH_GROUPS_PER_CYCLE = 1000;
+
+/** The gauge cannot name a group; a warning naming the deepest one is rate-limited to this. */
+export const STAGING_DEPTH_WARN_INTERVAL_MS = 5 * 60_000;
 
 /**
  * Blocked groups broken down by pipeline/job per cycle; any beyond read as
@@ -96,6 +100,10 @@ export class GroupQueueMetricsCollector {
   private stagingCursor = "0";
   /** Deepest group seen so far in the rotation in progress. */
   private stagingDepthMax = 0;
+  /** Which group that is, so a rotation's end can name it. */
+  private stagingDeepestGroupId: string | null = null;
+  /** When the deepest group was last named in a warning. */
+  private stagingDepthWarnedAtMs = 0;
   /**
    * Over-threshold groups in rotation, by id (not count, because SSCAN may
    * return members across rehashes; set stays empty in steady state).
@@ -458,6 +466,7 @@ export class GroupQueueMetricsCollector {
     })) {
       if (depth > this.stagingDepthMax) {
         this.stagingDepthMax = depth;
+        this.stagingDeepestGroupId = groupId;
       }
       if (depth >= STAGING_DEPTH_REPORT_FLOOR) {
         this.stagingOverThreshold.add(groupId);
@@ -471,9 +480,35 @@ export class GroupQueueMetricsCollector {
 
     this.stagingCursor = nextCursor;
     if (nextCursor === "0") {
+      await this.warnOfDeepestGroup({ keyPrefix });
       this.stagingDepthMax = 0;
+      this.stagingDeepestGroupId = null;
       this.stagingOverThreshold.clear();
     }
+  }
+
+  /** Names the rotation's deepest group once it is over the floor, and whether it is blocked. */
+  private async warnOfDeepestGroup({ keyPrefix }: { keyPrefix: string }): Promise<void> {
+    const groupId = this.stagingDeepestGroupId;
+    if (groupId === null || this.stagingDepthMax < STAGING_DEPTH_REPORT_FLOOR) return;
+    const nowMs = nowInstant().epochMilliseconds;
+    if (nowMs - this.stagingDepthWarnedAtMs < STAGING_DEPTH_WARN_INTERVAL_MS) return;
+    this.stagingDepthWarnedAtMs = nowMs;
+    const isBlocked = await this.params.redisConnection
+      .sismember(`${keyPrefix}blocked`, groupId)
+      .then((member) => member === 1)
+      .catch(() => null);
+    this.params.logger.warn(
+      {
+        queueName: this.params.queueName,
+        projectId: tenantIdFromGroupId(groupId),
+        groupId,
+        stagingDepth: this.stagingDepthMax,
+        groupsOverFloor: this.stagingOverThreshold.size,
+        isBlocked,
+      },
+      "A group's staged backlog is over the reporting floor; it is the deepest in this rotation",
+    );
   }
 
   /**

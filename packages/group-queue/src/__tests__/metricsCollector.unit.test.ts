@@ -140,6 +140,9 @@ function makeRedis(
       key.endsWith("blocked") ? (opts.blockedTotal ?? opts.blocked?.length ?? 0) : 0,
     ),
     smembers: vi.fn(async () => Object.keys(opts.parked ?? {})),
+    sismember: vi.fn(async (key: string, member: string) =>
+      key.endsWith("blocked") && opts.blocked?.includes(member) ? 1 : 0,
+    ),
     evalsha,
     zrangebyscore,
     sscan,
@@ -630,6 +633,66 @@ describe("GroupQueueMetricsCollector, per-group staging depth", () => {
         expect(readMax()).toBe(STAGING_DEPTH_REPORT_FLOOR * 25);
         expect(readOverThreshold()).toBe(1);
       });
+    });
+  });
+
+  describe("given a rotation whose deepest group is over the reporting floor", () => {
+    const warningsNamingDeepest = (logger: ReturnType<typeof makeLogger>) =>
+      logger.warn.mock.calls.filter((call) => String(call[1]).includes("staged backlog"));
+
+    describe("when the rotation ends", () => {
+      /** @scenario "The deepest staged group over the reporting floor is named in a warning" */
+      it("names the group, its depth and whether it is blocked", async () => {
+        const logger = makeLogger();
+        const deep = STAGING_DEPTH_REPORT_FLOOR * 30;
+        const { redis } = makeRedis({
+          readyZset: ready("project_a/fold/x/1", "project_b/fold/x/2"),
+          stagingDepths: { "project_a/fold/x/1": 3, "project_b/fold/x/2": deep },
+          blocked: ["project_b/fold/x/2"],
+        });
+
+        await makeCollector({ redis, logger }).collect();
+
+        const warnings = warningsNamingDeepest(logger);
+        expect(warnings).toHaveLength(1);
+        expect(warnings[0]?.[0]).toMatchObject({
+          groupId: "project_b/fold/x/2",
+          projectId: "project_b",
+          stagingDepth: deep,
+          isBlocked: true,
+        });
+      });
+
+      /** @scenario "The deepest staged group over the reporting floor is named in a warning" */
+      it("warns again only after the rate limit, not every rotation", async () => {
+        const logger = makeLogger();
+        const { redis } = makeRedis({
+          readyZset: ready("project_a/deep"),
+          stagingDepths: { "project_a/deep": STAGING_DEPTH_REPORT_FLOOR * 2 },
+        });
+        const collector = makeCollector({ redis, logger });
+
+        await collector.collect();
+        await collector.collect();
+
+        expect(warningsNamingDeepest(logger)).toHaveLength(1);
+      });
+    });
+  });
+
+  describe("given a rotation whose deepest group is under the reporting floor", () => {
+    it("names no group", async () => {
+      const logger = makeLogger();
+      const { redis } = makeRedis({
+        readyZset: ready("project_a/shallow"),
+        stagingDepths: { "project_a/shallow": STAGING_DEPTH_REPORT_FLOOR - 1 },
+      });
+
+      await makeCollector({ redis, logger }).collect();
+
+      expect(
+        logger.warn.mock.calls.filter((call) => String(call[1]).includes("staged backlog")),
+      ).toHaveLength(0);
     });
   });
 
