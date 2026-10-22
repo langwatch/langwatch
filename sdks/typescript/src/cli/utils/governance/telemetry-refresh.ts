@@ -13,7 +13,6 @@ import {
   codexGatewayBlockBaseUrl,
   codexHasGatewayBlock,
   codexHasOtelBlock,
-  codexOtelBlockAuthToken,
   codexOtelBlockEndpoint,
   codexTraceEndpoint,
   defaultCodexConfigPath,
@@ -56,7 +55,6 @@ import {
   rcHasLangwatchBlock,
   rcLangwatchBlockUrls,
   rcPath,
-  readLangwatchBlock,
   tildify,
   toolMarkers,
 } from "./shell-rc";
@@ -480,38 +478,6 @@ function toolWiringNeedsLoginRefresh(tool: string, expectedEndpoint: string): bo
   return scopedShellFunctionNeedsRefresh(tool, expectedEndpoint);
 }
 
-const PERSONAL_INGEST_KEY_RE = /ik-lw-[0-9A-Za-z]+_[0-9A-Za-z]+/g;
-
-/** The personal ingest keys a tool's persisted wiring carries. */
-function wiredIngestKeys(tool: string): string[] {
-  if (tool === "claude") {
-    const target = appSettingsTargetFor("claude");
-    const headers = target ? appEnvValues(target).OTEL_EXPORTER_OTLP_HEADERS : undefined;
-    return headers?.match(PERSONAL_INGEST_KEY_RE) ?? [];
-  }
-  if (tool === "codex") {
-    const token = codexOtelBlockAuthToken(defaultCodexConfigPath());
-    return token ? [token] : [];
-  }
-  const markers = toolMarkers(tool);
-  return REFRESH_SHELLS.flatMap(
-    (shell) => readLangwatchBlock({ shell, markers })?.match(PERSONAL_INGEST_KEY_RE) ?? [],
-  );
-}
-
-/**
- * Whether a tool's wiring carries a personal key the platform no longer lists
- * as live, whichever login retired it: an older CLI's login may have dropped
- * it from the cache already. Unknown live keys (`undefined`) judge nothing.
- */
-function toolWiringCarriesDeadKey(tool: string, liveKeyIds?: ReadonlySet<string>): boolean {
-  if (!liveKeyIds) return false;
-  return wiredIngestKeys(tool).some((key) => {
-    const lookupId = extractLookupIdFromToken(key);
-    return lookupId !== undefined && !liveKeyIds.has(lookupId);
-  });
-}
-
 export interface LoginTelemetryRefreshResult {
   /** One human-readable label per persisted target that was refreshed. */
   labels: string[];
@@ -585,7 +551,6 @@ async function refreshToolForLogin({
   sourceType,
   expectedEndpoint,
   loopbackLogin,
-  liveKeyIds,
   keptForLoopback,
   labels,
   warnings,
@@ -595,7 +560,6 @@ async function refreshToolForLogin({
   sourceType: string;
   expectedEndpoint: string;
   loopbackLogin: boolean;
-  liveKeyIds: ReadonlySet<string> | undefined;
   keptForLoopback: string[];
   labels: string[];
   warnings: string[];
@@ -625,13 +589,11 @@ async function refreshToolForLogin({
     // wiring; a new login never re-points it at the personal path.
     return false;
   }
-  const isStale =
-    toolWiringNeedsLoginRefresh(tool, expectedEndpoint) ||
-    toolWiringCarriesDeadKey(tool, liveKeyIds);
-  if (!isStale) return false;
-  // allowOfflineFallback: false - see resolveLiveIngestionKey's doc. The
-  // persisted endpoint or key is no longer this login's, so a network hiccup
-  // must mint fresh rather than reuse a secret the login did not confirm.
+  if (!toolWiringNeedsLoginRefresh(tool, expectedEndpoint)) return false;
+  // allowOfflineFallback: false - see resolveLiveIngestionKey's doc.
+  // This caller only gets here because the persisted endpoint
+  // already differs from the new login, so a network hiccup must
+  // mint fresh rather than reuse a secret bound to the old instance.
   const key = await resolveLiveIngestionKey({
     cfg,
     sourceType,
@@ -689,12 +651,11 @@ function resyncCodexGatewayBlock({
 
 /**
  * Login-time half of latest-login-wins: refresh any langwatch-authored block whose endpoint
- * differs from the new control plane, or whose key is not among `liveKeyIds` (the lookup ids
- * the platform lists as live). Best-effort: a failure skips a tool, never the login.
+ * differs from the new control plane; a block already pointing here is left for the next
+ * wrapper run to re-sync. Best-effort — per-tool failures skip that tool, never the login.
  */
 export async function refreshTelemetryWiringForLogin(
   cfg: GovernanceConfig,
-  { liveKeyIds }: { liveKeyIds?: ReadonlySet<string> } = {},
 ): Promise<LoginTelemetryRefreshResult> {
   const labels: string[] = [];
   let mintedAny = false;
@@ -727,7 +688,6 @@ export async function refreshTelemetryWiringForLogin(
         sourceType,
         expectedEndpoint,
         loopbackLogin,
-        liveKeyIds,
         keptForLoopback,
         labels,
         warnings,

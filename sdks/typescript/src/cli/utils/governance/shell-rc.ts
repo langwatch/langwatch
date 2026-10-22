@@ -144,7 +144,7 @@ export function rcHasLangwatchBlock({
 }
 
 /** The text between a well-formed pair of markers in the shell's rc file. */
-export function readLangwatchBlock({
+function readLangwatchBlock({
   shell,
   markers,
 }: {

@@ -60,7 +60,6 @@ vi.mock("../../identityNotice", () => ({
   rememberProjectName: vi.fn(),
 }));
 
-import { extractLookupIdFromToken, listIngestionKeys } from "../cli-api";
 import { loadConfig } from "../config";
 import type * as deviceFlowModule from "../device-flow";
 import { runUnifiedLoginFlow } from "../login-flow";
@@ -101,55 +100,6 @@ describe("runUnifiedLoginFlow (device session) personal-project persistence", ()
     await runUnifiedLoginFlow({ kind: "device_session" });
 
     expect(warn).toHaveBeenCalledWith(expect.stringContaining(notice));
-  });
-
-  /** @scenario "Signing in again re-keys wiring whose key the new login retired" */
-  it("drops cached keys the platform stopped listing and hands the refresh the live ones", async () => {
-    pollUntilDone.mockResolvedValue(exchangeResult());
-    vi.mocked(loadConfig).mockReturnValueOnce({
-      control_plane_url: "https://app.langwatch.ai",
-      gateway_url: "https://gateway.langwatch.ai",
-      default_personal_ingest_keys: { copilot_cli: { secret: "ik-lw-rotated_secret" } },
-    });
-    vi.mocked(extractLookupIdFromToken).mockReturnValueOnce("rotated");
-    vi.mocked(listIngestionKeys).mockResolvedValueOnce([
-      { sourceType: "claude_code", lookupId: "livekey" },
-    ]);
-
-    await runUnifiedLoginFlow({ kind: "device_session" });
-
-    const [cfg, options] = vi.mocked(refreshTelemetryWiringForLogin).mock.calls[0]!;
-    expect(cfg.default_personal_ingest_keys).toEqual({});
-    expect(options).toEqual({ liveKeyIds: new Set(["livekey"]) });
-  });
-
-  /** @scenario "Signing in again re-keys wiring whose key an earlier login retired" */
-  it("asks the platform for the live keys with a bounded wait even when the cache is empty", async () => {
-    pollUntilDone.mockResolvedValue(exchangeResult());
-    vi.mocked(listIngestionKeys).mockResolvedValueOnce([
-      { sourceType: "copilot_cli", lookupId: "livekey" },
-    ]);
-
-    await runUnifiedLoginFlow({ kind: "device_session" });
-
-    expect(listIngestionKeys).toHaveBeenCalledWith(expect.any(Object), {
-      timeoutMs: expect.any(Number),
-    });
-    expect(vi.mocked(refreshTelemetryWiringForLogin).mock.calls[0]?.[1]).toEqual({
-      liveKeyIds: new Set(["livekey"]),
-    });
-  });
-
-  /** @scenario "A login that cannot learn the live keys leaves the wiring's key alone" */
-  it("hands the refresh no live keys when the platform does not answer", async () => {
-    pollUntilDone.mockResolvedValue(exchangeResult());
-    vi.mocked(listIngestionKeys).mockRejectedValueOnce(new Error("The operation was aborted"));
-
-    await runUnifiedLoginFlow({ kind: "device_session" });
-
-    expect(vi.mocked(refreshTelemetryWiringForLogin).mock.calls[0]?.[1]).toEqual({
-      liveKeyIds: undefined,
-    });
   });
 
   /** @scenario device-login exchange delivers the personal project key and the CLI stores it */
