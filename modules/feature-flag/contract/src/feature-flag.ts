@@ -337,8 +337,65 @@ export const FEATURE_FLAGS = [
     key: "legacy_project_key_full_access",
     scope: "PRODUCT",
     defaultValue: false,
+    family: "Legacy project keys",
     description:
-      "Lets a project's legacy key, the one stored on the project itself rather than an API key, do everything in its project. Off by default: a legacy key can only send traces, logs, metrics and tracked events, and every other route, the hosted MCP and the project-keyed health probes refuse it with legacy_project_key_ingestion_only. Enable it for the projects whose owners are still moving to an API key with one rule naming them all, { projectId: [ids] }; remove an id from the list to end it for that project. A self-hosted install can set LEGACY_PROJECT_KEY_FULL_ACCESS=1 to keep full access for every legacy key (spec: modules/auth/specs/legacy-project-key-scope.feature).",
+      "Lets a project's legacy key, the one stored on the project itself rather than an API key, do everything in its project. Off by default: a legacy key can only send traces, logs, metrics and tracked events, plus what the legacy_project_key_* scope flags grant its project, and every other route, the hosted MCP and the project-keyed health probes refuse it with legacy_project_key_ingestion_only. Enable it for the projects whose owners are still moving to an API key with one rule naming them all, { projectId: [ids] }; remove an id from the list to end it for that project. A self-hosted install can set LEGACY_PROJECT_KEY_FULL_ACCESS=1 to keep full access for every legacy key (spec: modules/auth/specs/legacy-project-key-scope.feature).",
+  },
+  {
+    key: "legacy_project_key_prompts_read",
+    scope: "PRODUCT",
+    defaultValue: false,
+    family: "Legacy project keys",
+    description:
+      "Lets a project's legacy key read prompts (prompts:view), as the SDK prompts.get does. Off by default. List the projects in one rule, { projectId: [ids] }; remove an id to end it for that project. The permissions it grants are in LEGACY_PROJECT_KEY_SCOPES (modules/api-key/contract/src/api-key.legacy-scopes.ts).",
+  },
+  {
+    key: "legacy_project_key_prompts_write",
+    scope: "PRODUCT",
+    defaultValue: false,
+    family: "Legacy project keys",
+    description:
+      "Lets a project's legacy key create, update, sync and tag prompts (prompts:create, prompts:update, prompts:manage). It does not grant reads; pair it with legacy_project_key_prompts_read. Off by default. List the projects in one rule, { projectId: [ids] }; remove an id to end it for that project. The permissions it grants are in LEGACY_PROJECT_KEY_SCOPES (modules/api-key/contract/src/api-key.legacy-scopes.ts).",
+  },
+  {
+    key: "legacy_project_key_traces_read",
+    scope: "PRODUCT",
+    defaultValue: false,
+    family: "Legacy project keys",
+    description:
+      "Lets a project's legacy key read and search traces over REST (traces:view). Off by default. List the projects in one rule, { projectId: [ids] }; remove an id to end it for that project. The permissions it grants are in LEGACY_PROJECT_KEY_SCOPES (modules/api-key/contract/src/api-key.legacy-scopes.ts).",
+  },
+  {
+    key: "legacy_project_key_scenarios",
+    scope: "PRODUCT",
+    defaultValue: false,
+    family: "Legacy project keys",
+    description:
+      "Lets a project's legacy key report scenario events and read simulation runs (scenarios:create, scenarios:view). Off by default. List the projects in one rule, { projectId: [ids] }; remove an id to end it for that project. The permissions it grants are in LEGACY_PROJECT_KEY_SCOPES (modules/api-key/contract/src/api-key.legacy-scopes.ts).",
+  },
+  {
+    key: "legacy_project_key_evaluations",
+    scope: "PRODUCT",
+    defaultValue: false,
+    family: "Legacy project keys",
+    description:
+      "Lets a project's legacy key run evaluators and guardrails over REST and look evaluators up (evaluations:manage, evaluations:view). Off by default. List the projects in one rule, { projectId: [ids] }; remove an id to end it for that project. The permissions it grants are in LEGACY_PROJECT_KEY_SCOPES (modules/api-key/contract/src/api-key.legacy-scopes.ts).",
+  },
+  {
+    key: "legacy_project_key_experiments",
+    scope: "PRODUCT",
+    defaultValue: false,
+    family: "Legacy project keys",
+    description:
+      "Lets a project's legacy key run CI/CD experiments, log SDK experiment and batch evaluation results, and read the datasets they use (experiments:*, evaluations:view, evaluations:create, evaluations:manage, datasets:view). Off by default. List the projects in one rule, { projectId: [ids] }; remove an id to end it for that project. The permissions it grants are in LEGACY_PROJECT_KEY_SCOPES (modules/api-key/contract/src/api-key.legacy-scopes.ts).",
+  },
+  {
+    key: "legacy_project_key_connected_agents",
+    scope: "PRODUCT",
+    defaultValue: false,
+    family: "Legacy project keys",
+    description:
+      "Lets a project's legacy key connect agents: register, poll, post frames and open the connect socket (scenarios:manage), and read the project's model providers (project:view). Off by default. List the projects in one rule, { projectId: [ids] }; remove an id to end it for that project. The permissions it grants are in LEGACY_PROJECT_KEY_SCOPES (modules/api-key/contract/src/api-key.legacy-scopes.ts).",
   },
   // NOTE: `release_webhook_automations` (ADR-040) was retired — the webhook
   // delivery channel is offered to every project, so there is no picker card,

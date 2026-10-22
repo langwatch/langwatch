@@ -6287,9 +6287,9 @@ const presentations = {
     describe: () => "No license with that identity exists in the registry. Check the license id.",
   },
   legacy_project_key_ingestion_only: {
-    title: "Project keys can only send traces",
+    title: "Legacy project key is limited",
     describe: () =>
-      "This project key can only send traces, logs, metrics and events. Create an API key in Settings > API Keys and use it here instead.",
+      "This legacy project key is limited to ingestion and the scopes enabled for its project. Create an API key in Settings > API Keys and use it here instead.",
   },
   license_already_registered: {
     title: "License already registered",

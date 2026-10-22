@@ -315,7 +315,7 @@ const registry = {
   },
   legacy_project_key_ingestion_only: {
     tips: [
-      "A project key can only send traces, logs, metrics and events; create an API key with the permissions this call needs and send it instead",
+      "A legacy project key is limited to ingestion and the scopes enabled for its project; create an API key with the permissions this call needs and send it instead",
     ],
     docsPath: "/api-reference/api-keys/create-api-key",
   },

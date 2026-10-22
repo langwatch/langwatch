@@ -125,14 +125,14 @@ export class ApiKeyPermissionDeniedError extends HandledError {
   }
 }
 
-/** A legacy project key (`Project.apiKey`) asked for anything beyond sending traces. */
+/** A legacy project key (`Project.apiKey`) asked beyond ingestion and its project's scopes. */
 export class LegacyProjectKeyIngestionOnlyError extends HandledError {
   declare readonly code: "legacy_project_key_ingestion_only";
 
   constructor(options: { permission?: string; meta?: Record<string, unknown> } = {}) {
     super(
       "legacy_project_key_ingestion_only",
-      "Legacy project keys can only send traces, logs, metrics and events. Create an API key with the permissions this call needs and send it instead.",
+      "This legacy project key is limited to ingestion and the scopes enabled for its project. Create an API key with the permissions this call needs and send it instead.",
       {
         meta: {
           ...(options.permission ? { permission: options.permission } : {}),

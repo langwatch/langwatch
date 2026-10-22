@@ -1,13 +1,15 @@
 /**
  * @vitest-environment node
- * A legacy project key through the real door and the real REST runtime: it sends traces, is
- * refused everything else, and keeps full access only on `legacy_project_key_full_access`.
+ * A legacy project key through the real door and the real REST runtime: it sends traces, holds
+ * what its project's scope flags grant, and keeps full access only on
+ * `legacy_project_key_full_access`.
  * @see modules/auth/specs/legacy-project-key-scope.feature
  */
 import { createErrorHandler } from "@langwatch/api";
-import type {
-  ApiKeyTokenResolutionInput,
-  ResolvedApiKeyCredential,
+import {
+  LEGACY_PROJECT_KEY_SCOPES,
+  type ApiKeyTokenResolutionInput,
+  type ResolvedApiKeyCredential,
 } from "@langwatch/api-key-contract";
 import { anyAuthenticated } from "@langwatch/api/access";
 import {
@@ -56,13 +58,16 @@ const refuseEverything = () => Promise.reject(new Error("this request asks nothi
 
 type FlagRead = Parameters<FeatureFlagApi["isEnabled"]>;
 
-/** The real door over fixtures; `fullAccess` is what the flag answers for the project. */
-function world({ fullAccess }: { fullAccess: boolean }) {
+const FULL_ACCESS = "legacy_project_key_full_access";
+const EVERY_SCOPE = Object.keys(LEGACY_PROJECT_KEY_SCOPES);
+
+/** The real door over fixtures; `enabled` names the flags whose rule lists the project. */
+function world({ enabled }: { enabled: readonly string[] }) {
   const flagReads: FlagRead[] = [];
   const featureFlags = createApiFixture<FeatureFlagApi>({
     isEnabled: async (...read) => {
       flagReads.push(read);
-      return fullAccess;
+      return enabled.includes(read[0]);
     },
   });
   const getScope: AuthzApi["getScope"] = async (ids) => {
@@ -127,6 +132,9 @@ const OPERATIONS = [
   "traces",
   "evaluations",
   "datasets",
+  "promptsUpdate",
+  "connect",
+  "modelProviders",
   "identified",
   "keyIdentified",
   "keyPrompts",
@@ -176,6 +184,24 @@ const projectRoutes = defineRestRouter(ProbeApi)
   .withOutput(ANSWER)
   .withoutAudit("test route")
   .handle(({ app }) => app.datasets())
+  .post("/prompts-update", "promptsUpdate")
+  .keepsRecords()
+  .withPermission("prompts:update")
+  .withOutput(ANSWER)
+  .withoutAudit("test route")
+  .handle(({ app }) => app.promptsUpdate())
+  .post("/connect", "connect")
+  .keepsRecords()
+  .withPermission("scenarios:manage")
+  .withOutput(ANSWER)
+  .withoutAudit("test route")
+  .handle(({ app }) => app.connect())
+  .post("/model-providers", "modelProviders")
+  .keepsRecords()
+  .withPermission("project:view")
+  .withOutput(ANSWER)
+  .withoutAudit("test route")
+  .handle(({ app }) => app.modelProviders())
   .post("/identified", "identified")
   .keepsRecords()
   .withAccess(anyAuthenticated({ reason: "a test route that only identifies the caller" }))
@@ -210,20 +236,23 @@ const PATHS: Record<string, string> = {
   "traces:view": "traces",
   "evaluations:view": "evaluations",
   "datasets:view": "datasets",
+  "prompts:update": "prompts-update",
+  "scenarios:manage": "connect",
+  "project:view": "model-providers",
 };
 
 async function call({
-  fullAccess,
+  enabled,
   door: which = "project",
   path,
   token = "legacy-key",
 }: {
-  fullAccess: boolean;
+  enabled: readonly string[];
   door?: "project" | "api_key";
   path: string;
   token?: string;
 }) {
-  const { door, flagReads } = world({ fullAccess });
+  const { door, flagReads } = world({ enabled });
   const ran: string[] = [];
   const app = Object.fromEntries(
     OPERATIONS.map((operation) => [
@@ -257,7 +286,7 @@ describe("a legacy project key whose project is not on the full-access flag", ()
   describe("when it calls a route that asks traces:create", () => {
     /** @scenario "A legacy project key passes a route that asks traces:create" */
     it("is answered and never reads the flag", async () => {
-      const { response, ran, flagReads } = await call({ fullAccess: false, path: "ingest" });
+      const { response, ran, flagReads } = await call({ enabled: [], path: "ingest" });
 
       expect(response.status).toBe(200);
       expect(ran).toEqual(["ingest"]);
@@ -268,7 +297,7 @@ describe("a legacy project key whose project is not on the full-access flag", ()
   describe("when it calls routes beyond ingestion", () => {
     /** @scenario "A legacy project key is refused prompts, traces, evaluations and datasets" */
     it.each(ASKED)("refuses %s with the ingestion-only code before any handler", async (asked) => {
-      const { response, body, ran } = await call({ fullAccess: false, path: PATHS[asked]! });
+      const { response, body, ran } = await call({ enabled: [], path: PATHS[asked]! });
 
       expect(response.status).toBe(403);
       expect(body).toMatchObject({ code: "legacy_project_key_ingestion_only" });
@@ -280,7 +309,7 @@ describe("a legacy project key whose project is not on the full-access flag", ()
   describe("when it calls a project route that asks no permission", () => {
     /** @scenario "A legacy project key is refused a project route that asks no permission" */
     it("refuses with the ingestion-only code", async () => {
-      const { response, body, ran } = await call({ fullAccess: false, path: "identified" });
+      const { response, body, ran } = await call({ enabled: [], path: "identified" });
 
       expect(response.status).toBe(403);
       expect(body).toMatchObject({ code: "legacy_project_key_ingestion_only" });
@@ -291,7 +320,7 @@ describe("a legacy project key whose project is not on the full-access flag", ()
   describe("when it calls the key door", () => {
     /** @scenario "A legacy project key is refused on the key door" */
     it.each(["identified", "prompts"])("refuses /%s with the ingestion-only code", async (path) => {
-      const { response, body, ran } = await call({ fullAccess: false, door: "api_key", path });
+      const { response, body, ran } = await call({ enabled: [], door: "api_key", path });
 
       expect(response.status).toBe(403);
       expect(body).toMatchObject({ code: "legacy_project_key_ingestion_only" });
@@ -309,10 +338,83 @@ describe("a legacy project key whose project is on the full-access flag", () => 
     ["api_key", "identified"],
     ["api_key", "prompts"],
   ] as const)("is answered on the %s door at /%s", async (door, path) => {
-    const { response, ran } = await call({ fullAccess: true, door, path });
+    const { response, ran } = await call({ enabled: [FULL_ACCESS], door, path });
 
     expect(response.status).toBe(200);
     expect(ran).toEqual([path]);
+  });
+});
+
+describe("a legacy project key whose project is on scope flags", () => {
+  describe("given the prompts-read flag only", () => {
+    const enabled = ["legacy_project_key_prompts_read"];
+
+    /** @scenario "A project on the prompts-read flag fetches prompts and nothing else" */
+    it("fetches prompts and is refused trace reads and prompt writes", async () => {
+      const prompts = await call({ enabled, path: "prompts" });
+      expect(prompts.response.status).toBe(200);
+      expect(prompts.ran).toEqual(["prompts"]);
+
+      for (const path of ["traces", "prompts-update"]) {
+        const { response, body, ran } = await call({ enabled, path });
+        expect(response.status).toBe(403);
+        expect(body).toMatchObject({ code: "legacy_project_key_ingestion_only" });
+        expect(ran).toEqual([]);
+      }
+    });
+
+    /** @scenario "A scope flag is honoured on the key door" */
+    it("fetches prompts on the key door", async () => {
+      const { response, ran } = await call({ enabled, door: "api_key", path: "prompts" });
+
+      expect(response.status).toBe(200);
+      expect(ran).toEqual(["prompts"]);
+    });
+  });
+
+  describe("given the prompts-read and traces-read flags", () => {
+    const enabled = ["legacy_project_key_prompts_read", "legacy_project_key_traces_read"];
+
+    /** @scenario "A project on two scope flags holds both" */
+    it("holds both and is still refused evaluations", async () => {
+      for (const path of ["prompts", "traces"]) {
+        const { response } = await call({ enabled, path });
+        expect(response.status).toBe(200);
+      }
+      const { response, body } = await call({ enabled, path: "evaluations" });
+      expect(response.status).toBe(403);
+      expect(body).toMatchObject({ code: "legacy_project_key_ingestion_only" });
+    });
+  });
+
+  describe("given the connected-agents flag only", () => {
+    const enabled = ["legacy_project_key_connected_agents"];
+
+    /** @scenario "The connected-agents flag opens connecting and model providers only" */
+    it("connects and reads model providers, and is refused prompts", async () => {
+      for (const path of ["connect", "model-providers"]) {
+        const { response, ran } = await call({ enabled, path });
+        expect(response.status).toBe(200);
+        expect(ran).toEqual([path]);
+      }
+      const { response, body } = await call({ enabled, path: "prompts" });
+      expect(response.status).toBe(403);
+      expect(body).toMatchObject({ code: "legacy_project_key_ingestion_only" });
+    });
+  });
+
+  describe("given every scope flag but not full access", () => {
+    /** @scenario "A scope flag does not open a route that asks no permission" */
+    it.each([
+      ["project", "identified"],
+      ["api_key", "identified"],
+    ] as const)("is refused on the %s door at /%s", async (door, path) => {
+      const { response, body, ran } = await call({ enabled: EVERY_SCOPE, door, path });
+
+      expect(response.status).toBe(403);
+      expect(body).toMatchObject({ code: "legacy_project_key_ingestion_only" });
+      expect(ran).toEqual([]);
+    });
   });
 });
 
@@ -321,7 +423,7 @@ describe("other credentials", () => {
     /** @scenario "An unknown key is still refused as invalid credentials" */
     it("is refused as invalid credentials", async () => {
       const { response, body } = await call({
-        fullAccess: false,
+        enabled: [],
         path: "prompts",
         token: "nothing",
       });
@@ -335,7 +437,7 @@ describe("other credentials", () => {
     /** @scenario "An API key is still asked its own ceiling" */
     it("is answered without reading the flag", async () => {
       const { response, flagReads } = await call({
-        fullAccess: false,
+        enabled: [],
         path: "prompts",
         token: "sk-lw-ownerless",
       });
