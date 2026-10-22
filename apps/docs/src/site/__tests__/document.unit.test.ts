@@ -27,7 +27,7 @@ describe("when configured pages include a section index", () => {
     expect(llms).toContain("https://langwatch.ai/docs/llms-full.txt");
     expect(llms).toContain("npx langwatch report --user-approved");
     expect(llms).toMatch(
-      /## Documentation\n\n- \[Governance\]\(https:\/\/langwatch\.ai\/docs\/governance\/index\.md\): Control access\n$/,
+      /## Documentation\n\n- \[Governance\]\(https:\/\/langwatch\.ai\/docs\/governance\.md\): Control access\n$/,
     );
   });
 });

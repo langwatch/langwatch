@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { readBuildOptions, readPreviewOptions } from "../../paths.ts";
-import { BASE_PATH, stripBasePath, withBasePath } from "../site-path.ts";
+import { BASE_PATH, canonicalUrl, publicSlug, stripBasePath, withBasePath } from "../site-path.ts";
 
 describe("withBasePath", () => {
   /** @scenario "Build the documentation under a base path" */
@@ -73,5 +73,18 @@ describe("build options", () => {
       expect(() => readBuildOptions({ args: ["--base-path", value] })).toThrow(/base path/);
       expect(() => readPreviewOptions({ args: ["--base-path", value] })).toThrow(/base path/);
     }
+  });
+});
+
+describe("when a page is a section index", () => {
+  /** @scenario "Section index pages keep their published address" */
+  it("publishes it at the section address Mintlify serves", () => {
+    expect(publicSlug({ slug: "ai-governance/ingestion-sources/index" })).toBe(
+      "ai-governance/ingestion-sources",
+    );
+    expect(canonicalUrl({ slug: "ai-governance/ingestion-sources/index" })).toBe(
+      "https://langwatch.ai/docs/ai-governance/ingestion-sources",
+    );
+    expect(publicSlug({ slug: "integration/quick-start" })).toBe("integration/quick-start");
   });
 });

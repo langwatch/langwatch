@@ -61,7 +61,8 @@ function serveSource({
     return send({ response, type: "application/json; charset=utf-8", body });
   }
   if (PAGE_EXPORT_EXTENSIONS.some((extension) => pathname.endsWith(`.${extension}`))) {
-    const slug = exportSlug({ pathname });
+    const exported = exportSlug({ pathname });
+    const slug = Object.hasOwn(nav.pages, exported) ? exported : `${exported}/index`;
     if (!Object.hasOwn(nav.pages, slug)) return void response.writeHead(404).end("Not found");
     const body = pageMarkdown({ docsRoot, slug });
     return send({ response, type: "text/markdown; charset=utf-8", body });

@@ -1,4 +1,4 @@
-import { canonicalUrl, docsUrl } from "../../../lib/site-path.ts";
+import { canonicalUrl, docsUrl, publicSlug } from "../../../lib/site-path.ts";
 import { flatPages, type Section } from "../../navigation/model/nav.ts";
 
 /** The slice of the navigation the directory files list. */
@@ -19,7 +19,7 @@ export function exportSlug({ pathname }: { pathname: string }) {
 
 function directoryLine({ nav, slug }: { nav: DirectoryNav; slug: string }) {
   const page = nav.pages[slug];
-  return `- [${page.title}](${docsUrl({ path: `/${slug}.md` })})${page.description ? `: ${page.description}` : ""}`;
+  return `- [${page.title}](${docsUrl({ path: `/${publicSlug({ slug })}.md` })})${page.description ? `: ${page.description}` : ""}`;
 }
 
 /** Every page once, grouped under the site's own sections in reading order; the rest after. */

@@ -26,7 +26,7 @@ import {
 } from "../features/navigation/compile/redirects.ts";
 import type { Nav } from "../features/navigation/model/nav.ts";
 import { searchEntry } from "../features/search/compile/search-index.ts";
-import { withBasePath } from "../lib/site-path.ts";
+import { publicSlug, withBasePath } from "../lib/site-path.ts";
 import { docsRoot, readBuildOptions } from "../paths.ts";
 import { compressedSearchIndex } from "./compressed-index.ts";
 import {
@@ -208,7 +208,8 @@ function assemble({ slugs, outcomes }: { slugs: string[]; outcomes: Map<string, 
 function exportsOf({ slug }: { slug: string }): [string, string][] {
   if (slug === "404") return [];
   const markdown = pageMarkdown({ docsRoot, slug });
-  const names = slug === "introduction" ? [slug, "index"] : [slug];
+  const names =
+    slug === "introduction" ? [slug, "index"] : [...new Set([slug, publicSlug({ slug })])];
   return names.flatMap((name) =>
     PAGE_EXPORT_EXTENSIONS.map((extension): [string, string] => [`${name}.${extension}`, markdown]),
   );

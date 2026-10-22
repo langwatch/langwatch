@@ -85,6 +85,12 @@ Feature: Generate documentation data from authored sources
     And the LLM directory lists only configured pages with Markdown links
 
   @unit
+  Scenario: Section index pages keep their published address
+    Given a configured page is a section index such as "ai-governance/ingestion-sources/index"
+    When its canonical address, navigation link and Markdown export are generated
+    Then they name "/docs/ai-governance/ingestion-sources", the address the docs serve today
+
+  @unit
   Scenario: Resolve relative links independently of trailing slashes
     Given authored Markdown and MDX links use relative paths
     When the page is compiled

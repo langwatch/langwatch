@@ -21,9 +21,14 @@ export function sitePath({ path }: { path: string }) {
   return withBasePath({ basePath: BASE_PATH, path });
 }
 
+/** The public slug of a page: `section/index` is served at `section`, as Mintlify serves it. */
+export function publicSlug({ slug }: { slug: string }) {
+  return slug.endsWith("/index") ? slug.slice(0, -"/index".length) : slug;
+}
+
 /** A page's address: `introduction` -> `/introduction` (under the base path); "" is the home. */
 export function pagePath({ slug }: { slug: string }) {
-  return sitePath({ path: `/${slug}` });
+  return sitePath({ path: `/${publicSlug({ slug })}` });
 }
 
 /** The site path of a request path, or null when it lies outside this build's base path. */
@@ -54,5 +59,5 @@ export function docsUrl({ path }: { path: string }) {
 
 /** The home page is also published at the root; both name the introduction, as today. */
 export function canonicalUrl({ slug }: { slug: string }) {
-  return docsUrl({ path: `/${slug}` });
+  return docsUrl({ path: `/${publicSlug({ slug })}` });
 }
