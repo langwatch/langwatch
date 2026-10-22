@@ -2,7 +2,6 @@ import type { MetricOtlpDoorResult } from "@langwatch/metric-contract";
 import { canonicalOtlpPath, createLogger } from "@langwatch/observability";
 import {
   applyReceiverProvenance,
-  joinRejectionMessages,
   decodeOtlpBody,
   logCorrectedOtlpPath,
   otlpBodyForensics,
@@ -103,7 +102,7 @@ export class OtlpMetricReceiverService {
       return { outcome: "parse-failed" };
     }
 
-    const scopeDrop = applyReceiverProvenance({
+    applyReceiverProvenance({
       request: parsed.request,
       identity,
       signal: "metrics",
@@ -112,17 +111,11 @@ export class OtlpMetricReceiverService {
 
     if (identity.apiKeyId) traces.otlpMarkCredentialUsed({ apiKeyId: identity.apiKeyId });
 
-    const collected = await collection.handleOtlpMetricRequest({
+    return collection.handleOtlpMetricRequest({
       tenantId: project.id,
       organizationId: project.organizationId,
       metricRequest: parsed.request,
       piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
     });
-    if (collected.outcome !== "collected" || scopeDrop.rejected === 0) return collected;
-    return {
-      ...collected,
-      rejectedDataPoints: collected.rejectedDataPoints + scopeDrop.rejected,
-      errorMessage: joinRejectionMessages(scopeDrop.errorMessage, collected.errorMessage),
-    };
   }
 }

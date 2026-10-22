@@ -41,29 +41,9 @@ const CREDENTIAL: OtlpIngestCredential = {
   },
 };
 
-const COPILOT_ONLY = {
-  resourceAttributeKeysToRemove: [],
-  resourceAttributes: [],
-  allowedMetricScopeNames: ["github.copilot", "@github/copilot", "copilot-chat"],
-};
-
-/** A copilot_vscode key, whose policy keeps only Copilot's own metric scopes. */
-const VSCODE_CREDENTIAL: OtlpIngestCredential = {
-  ...CREDENTIAL,
-  identity: {
-    ...CREDENTIAL.identity,
-    ingestSourceType: "copilot_vscode",
-    sourcePolicy: {
-      status: "ready",
-      policies: { traces: COPILOT_ONLY, logs: COPILOT_ONLY, metrics: COPILOT_ONLY },
-    },
-  },
-};
-
 function receiver({
   collected = { outcome: "collected", acceptedDataPoints: 1, rejectedDataPoints: 0 },
-  credential = CREDENTIAL,
-}: { collected?: MetricRequestCollectionResult; credential?: OtlpIngestCredential } = {}) {
+}: { collected?: MetricRequestCollectionResult } = {}) {
   const calls: { markedUsed: string[]; collectedFor: string[] } = {
     markedUsed: [],
     collectedFor: [],
@@ -90,7 +70,7 @@ function receiver({
           headers: { "content-type": "application/json" },
           body: new TextEncoder().encode(body),
         },
-        credential,
+        credential: CREDENTIAL,
       }),
     );
   return { post, calls };
@@ -131,34 +111,6 @@ describe("OtlpMetricReceiverService", () => {
         body: {
           partialSuccess: { rejectedDataPoints: 2, errorMessage: "data point 2: not finite" },
         },
-      });
-    });
-  });
-
-  describe("given a copilot_vscode key whose batch comes from unrelated instrumentation", () => {
-    /** @scenario "Metric points dropped for their scope are reported back to the sender" */
-    it("counts the dropped points beside the collection's own rejections", async () => {
-      const { post } = receiver({
-        credential: VSCODE_CREDENTIAL,
-        collected: {
-          outcome: "collected",
-          acceptedDataPoints: 0,
-          rejectedDataPoints: 2,
-          errorMessage: "data point 2: not finite",
-        },
-      });
-
-      const answer = await post("/api/otel/v1/metrics");
-
-      expect(answer.status).toBe(200);
-      expect(answer.body).toEqual({
-        partialSuccess: {
-          rejectedDataPoints: 3,
-          errorMessage: expect.stringContaining("app.meter"),
-        },
-      });
-      expect(answer.body).toMatchObject({
-        partialSuccess: { errorMessage: expect.stringContaining("data point 2: not finite") },
       });
     });
   });

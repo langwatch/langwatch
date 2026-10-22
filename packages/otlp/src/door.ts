@@ -182,27 +182,7 @@ export function logCorrectedOtlpPath({
   );
 }
 
-/** What the receiver refused before collection, in the units OTLP's partial success counts. */
-export type OtlpReceiverRejection = Readonly<{ rejected: number; errorMessage: string }>;
-
-const NAMED_DROPPED_SCOPES = 5;
-
-/** The sender's account of a scope drop; a handful of names, since a sender may send many. */
-function describeScopeDrop(names: readonly string[]): string {
-  const shown = names.slice(0, NAMED_DROPPED_SCOPES).map((name) => name || "(unnamed)");
-  const more = names.length > shown.length ? ` and ${names.length - shown.length} more` : "";
-  return `dropped instrumentation scopes outside this ingestion key's source: ${shown.join(", ")}${more}`;
-}
-
-/** Joins the receiver's and the collection's rejection messages, skipping empty ones. */
-export function joinRejectionMessages(...messages: readonly (string | undefined)[]): string {
-  return messages.filter((message) => message !== undefined && message !== "").join("; ");
-}
-
-/**
- * Tags the request with the ingestion key's source policy, dropping scopes outside it, and
- * answers what was dropped so the door reports it as a partial rejection.
- */
+/** Tags the request with the ingestion key's source policy, dropping scopes outside it. */
 export function applyReceiverProvenance({
   request,
   identity,
@@ -217,7 +197,7 @@ export function applyReceiverProvenance({
   }>;
   signal: OtlpSignal;
   logger: Logger;
-}): OtlpReceiverRejection {
+}): void {
   const isIngestionKey = identity.apiKeyId !== null && Boolean(identity.ingestSourceType);
   const source = identity.sourcePolicy;
   if (isIngestionKey && !source) {
@@ -229,23 +209,19 @@ export function applyReceiverProvenance({
   }
 
   const policy = isIngestionKey && source?.status === "ready" ? source.policies[signal] : void 0;
-  const drop = applyOtlpReceiverPolicy({
+  const { droppedScopes } = applyOtlpReceiverPolicy({
     request,
     signal,
     apiKeyId: identity.apiKeyId,
     policy,
   });
 
-  if (drop.droppedScopes === 0) return { rejected: 0, errorMessage: "" };
-  logger.warn(
-    {
-      droppedForeign: drop.droppedScopes,
-      droppedItems: drop.droppedItems,
-      apiKeyId: identity.apiKeyId,
-    },
-    "dropped instrumentation scopes outside the authenticated ingestion policy",
-  );
-  return { rejected: drop.droppedItems, errorMessage: describeScopeDrop(drop.droppedScopeNames) };
+  if (droppedScopes > 0) {
+    logger.warn(
+      { droppedForeign: droppedScopes, apiKeyId: identity.apiKeyId },
+      "dropped instrumentation scopes outside the authenticated ingestion policy",
+    );
+  }
 }
 
 /** Media types an OTLP door refuses with 415: OTLP is served over HTTP only, never gRPC framing. */

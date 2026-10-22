@@ -13,7 +13,6 @@ import {
 import { createLogger } from "@langwatch/observability";
 import {
   applyReceiverProvenance,
-  joinRejectionMessages,
   decodeBase64OpenTelemetryId,
   ingestDoorRefusalBody,
   ingestDoorRefusalStatus,
@@ -228,7 +227,7 @@ async function handleTracesRequest({
   // Body successfully parsed - only now is the key marked used.
   if (identity.apiKeyId) ports.otlpMarkCredentialUsed({ apiKeyId: identity.apiKeyId });
 
-  const scopeDrop = applyReceiverProvenance({
+  applyReceiverProvenance({
     request: parsed.request,
     identity,
     signal: "traces",
@@ -251,8 +250,8 @@ async function handleTracesRequest({
     {
       message: "Trace received successfully.",
       partialSuccess: {
-        rejectedSpans: scopeDrop.rejected + (result?.rejectedSpans ?? 0),
-        errorMessage: joinRejectionMessages(scopeDrop.errorMessage, result?.errorMessage),
+        rejectedSpans: result?.rejectedSpans ?? 0,
+        errorMessage: result?.errorMessage ?? "",
       },
     },
     200,

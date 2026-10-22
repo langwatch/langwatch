@@ -57,13 +57,6 @@ interface ReceiverResourceGroup {
   scopeMetrics?: (ReceiverScopeGroup | null)[] | null;
 }
 
-/** What a scope allowlist refused: the scopes, and the spans or data points they carried. */
-export interface OtlpScopeDrop {
-  droppedScopes: number;
-  droppedItems: number;
-  droppedScopeNames: string[];
-}
-
 /** Mutation view of an already parsed export; unrelated wire fields stay untouched. */
 export interface OtlpReceiverRequest {
   resourceSpans?: (ReceiverResourceGroup | null)[] | null;
@@ -81,7 +74,7 @@ export function applyOtlpReceiverPolicy({
   signal: Signal;
   apiKeyId: string | null;
   policy?: OtlpReceiverPolicy;
-}): OtlpScopeDrop {
+}): { droppedScopes: number } {
   const keys = SIGNAL_KEYS[signal];
   const resources = request[keys.resources] ?? [];
   const scopeNames = {
@@ -90,7 +83,7 @@ export function applyOtlpReceiverPolicy({
     metrics: policy?.allowedMetricScopeNames,
   }[signal];
   const allowed = scopeNames ? new Set(scopeNames) : void 0;
-  const drop: OtlpScopeDrop = { droppedScopes: 0, droppedItems: 0, droppedScopeNames: [] };
+  let droppedScopes = 0;
 
   for (let index = resources.length - 1; index >= 0; index -= 1) {
     const group = resources[index];
@@ -100,14 +93,14 @@ export function applyOtlpReceiverPolicy({
 
     applyResourceAttributes(group, apiKeyId, policy);
     const scopes = group[keys.scopes] ?? [];
-    protectScopes({ scopes, signal, allowed, drop });
+    droppedScopes += protectScopes(scopes, signal, allowed);
 
     if (allowed && scopes.length === 0) {
       resources.splice(index, 1);
     }
   }
 
-  return drop;
+  return { droppedScopes };
 }
 
 function applyResourceAttributes(
@@ -137,25 +130,18 @@ function applyResourceAttributes(
   }
 }
 
-function protectScopes({
-  scopes,
-  signal,
-  allowed,
-  drop,
-}: {
-  scopes: (ReceiverScopeGroup | null)[];
-  signal: Signal;
-  allowed: Set<string> | undefined;
-  drop: OtlpScopeDrop;
-}): void {
+function protectScopes(
+  scopes: (ReceiverScopeGroup | null)[],
+  signal: Signal,
+  allowed: Set<string> | undefined,
+): number {
+  let droppedScopes = 0;
+
   for (let index = scopes.length - 1; index >= 0; index -= 1) {
     const scope = scopes[index];
-    const name = scope?.scope?.name ?? "";
-    if (allowed && !allowed.has(name)) {
+    if (allowed && !allowed.has(scope?.scope?.name ?? "")) {
       scopes.splice(index, 1);
-      drop.droppedScopes += 1;
-      drop.droppedItems += scope ? countScopeItems(scope, signal) : 0;
-      if (!drop.droppedScopeNames.includes(name)) drop.droppedScopeNames.push(name);
+      droppedScopes += 1;
       continue;
     }
 
@@ -164,29 +150,8 @@ function protectScopes({
       scrubScopeContents(scope, signal);
     }
   }
-}
 
-/** The items OTLP's partial success counts for a signal: spans, log records or data points. */
-function countScopeItems(scope: ReceiverScopeGroup, signal: Signal): number {
-  switch (signal) {
-    case "traces":
-      return scope.spans?.length ?? 0;
-    case "logs":
-      return scope.logRecords?.length ?? 0;
-    case "metrics":
-      return (scope.metrics ?? []).reduce(
-        (total, metric) =>
-          total +
-          [
-            metric?.gauge,
-            metric?.sum,
-            metric?.histogram,
-            metric?.exponentialHistogram,
-            metric?.summary,
-          ].reduce((points, series) => points + (series?.dataPoints?.length ?? 0), 0),
-        0,
-      );
-  }
+  return droppedScopes;
 }
 
 function scrubScopeContents(scope: ReceiverScopeGroup, signal: Signal): void {
