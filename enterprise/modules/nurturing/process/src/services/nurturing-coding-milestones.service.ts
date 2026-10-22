@@ -2,7 +2,6 @@
 import type { CodingAgentSessionStoredEventData } from "@langwatch/coding-agent-contract";
 import type { NurturingSignal } from "@langwatch/enterprise-nurturing-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import { nowInstant } from "@langwatch/time";
 
 import type {
   NurturingCodingMilestonesRepository,
@@ -17,15 +16,6 @@ import {
 } from "../rules/nurturing-coding-signals.rules.ts";
 import { seededAtRead } from "../rules/nurturing-owner-signals.rules.ts";
 import { utcDayOf } from "../rules/nurturing-time.rules.ts";
-
-const MAX_FUTURE_MS = 24 * 60 * 60 * 1000;
-
-/**
- * A client-supplied time is never trusted past tomorrow, so one far-future span cannot freeze
- * the day count. Applied once on entry: every signal and stored time sees the clamped time.
- */
-const clampedToTomorrow = (epochMilliseconds: number): number =>
-  Math.min(epochMilliseconds, nowInstant().epochMilliseconds + MAX_FUTURE_MS);
 
 type Deliver = (signal: NurturingSignal) => Promise<void>;
 type Fact = CodingAgentSessionStoredEventData;
@@ -64,13 +54,9 @@ export class NurturingCodingMilestonesService {
   }
 
   private async projectSessionsStored({
-    facts: received,
+    facts,
     deliver,
   }: Readonly<{ facts: readonly Fact[]; deliver: Deliver }>): Promise<void> {
-    const facts = received.map((fact) => ({
-      ...fact,
-      occurredAt: clampedToTomorrow(fact.occurredAt),
-    }));
     const latest = latestOf(facts);
     const organization = await this.organizationOf(latest.projectId);
     const adminUserId = organization?.row.adminUserId;
@@ -140,11 +126,10 @@ export class NurturingCodingMilestonesService {
   }: Readonly<{ organizationId: string; facts: readonly Fact[] }>): Promise<string[]> {
     let agentTypes: string[] = [];
     for (const agentType of new Set(facts.map((fact) => fact.agentType))) {
-      const result = await this.dependencies.milestones.addCodingAgentType({
+      agentTypes = await this.dependencies.milestones.addCodingAgentType({
         organizationId,
         agentType,
       });
-      agentTypes = result.codingAgentTypes;
     }
     return agentTypes;
   }

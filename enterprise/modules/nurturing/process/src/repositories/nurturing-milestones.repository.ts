@@ -58,10 +58,10 @@ export interface NurturingCodingMilestonesRepository {
   recordCodingFirstSession(
     input: Readonly<{ organizationId: string; occurredAt: number }>,
   ): Promise<{ first: boolean }>;
-  /** Adds the agent type once; the list is always the current one, `changed` only for a new type. */
+  /** Adds the agent type once; the list is always the current one. */
   addCodingAgentType(
     input: Readonly<{ organizationId: string; agentType: string }>,
-  ): Promise<{ changed: boolean; codingAgentTypes: string[] }>;
+  ): Promise<string[]>;
   /** Counts the UTC `day` when later than the last one; `changed` stays true for that same day. */
   recordCodingActiveDay(
     input: Readonly<{ organizationId: string; day: string }>,

@@ -64,21 +64,21 @@ describe("MemoryNurturingMilestonesRepository coding signals", () => {
   });
 
   describe("when an agent type is added", () => {
-    it("reports a change and the list the first time", async () => {
+    it("returns the list the first time", async () => {
       const repository = await learned();
 
       await expect(
         repository.addCodingAgentType({ organizationId: "org-1", agentType: "claude_code" }),
-      ).resolves.toEqual({ changed: true, codingAgentTypes: ["claude_code"] });
+      ).resolves.toEqual(["claude_code"]);
     });
 
-    it("reports no change and never duplicates the second time", async () => {
+    it("never duplicates the second time", async () => {
       const repository = await learned();
       await repository.addCodingAgentType({ organizationId: "org-1", agentType: "claude_code" });
 
       await expect(
         repository.addCodingAgentType({ organizationId: "org-1", agentType: "claude_code" }),
-      ).resolves.toEqual({ changed: false, codingAgentTypes: ["claude_code"] });
+      ).resolves.toEqual(["claude_code"]);
     });
 
     it("extends the list with a second agent", async () => {
@@ -87,7 +87,7 @@ describe("MemoryNurturingMilestonesRepository coding signals", () => {
 
       await expect(
         repository.addCodingAgentType({ organizationId: "org-1", agentType: "codex" }),
-      ).resolves.toEqual({ changed: true, codingAgentTypes: ["claude_code", "codex"] });
+      ).resolves.toEqual(["claude_code", "codex"]);
     });
   });
 

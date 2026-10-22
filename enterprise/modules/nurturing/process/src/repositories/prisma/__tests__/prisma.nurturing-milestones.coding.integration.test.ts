@@ -126,11 +126,7 @@ describe.skipIf(!databaseUrl)("given nurturing's organizations table and coding 
           repository.addCodingAgentType({ organizationId, agentType: "codex" }),
           repository.recordCodingActiveDay({ organizationId, day: "2026-10-20" }),
         ]),
-      ).resolves.toEqual([
-        { first: false },
-        { changed: false, codingAgentTypes: [] },
-        { changed: false, codingActiveDays: 0 },
-      ]);
+      ).resolves.toEqual([{ first: false }, [], { changed: false, codingActiveDays: 0 }]);
     });
   });
 });

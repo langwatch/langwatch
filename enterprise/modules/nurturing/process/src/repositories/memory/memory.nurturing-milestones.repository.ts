@@ -88,18 +88,15 @@ export class MemoryNurturingMilestonesRepository
   async addCodingAgentType({
     organizationId,
     agentType,
-  }: Parameters<NurturingCodingMilestonesRepository["addCodingAgentType"]>[0]): Promise<{
-    changed: boolean;
-    codingAgentTypes: string[];
-  }> {
+  }: Parameters<NurturingCodingMilestonesRepository["addCodingAgentType"]>[0]): Promise<string[]> {
     const organization = this.#organizations.get(organizationId);
-    if (!organization) return { changed: false, codingAgentTypes: [] };
+    if (!organization) return [];
     if (organization.codingAgentTypes.includes(agentType)) {
-      return { changed: false, codingAgentTypes: [...organization.codingAgentTypes] };
+      return [...organization.codingAgentTypes];
     }
     const codingAgentTypes = [...organization.codingAgentTypes, agentType];
     this.#organizations.set(organizationId, { ...organization, codingAgentTypes });
-    return { changed: true, codingAgentTypes: [...codingAgentTypes] };
+    return [...codingAgentTypes];
   }
 
   async recordCodingActiveDay({

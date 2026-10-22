@@ -104,11 +104,8 @@ export class PrismaNurturingMilestonesRepository
   async addCodingAgentType({
     organizationId,
     agentType,
-  }: Parameters<NurturingCodingMilestonesRepository["addCodingAgentType"]>[0]): Promise<{
-    changed: boolean;
-    codingAgentTypes: string[];
-  }> {
-    const { count } = await this.prisma.nurturingOrganization.updateMany({
+  }: Parameters<NurturingCodingMilestonesRepository["addCodingAgentType"]>[0]): Promise<string[]> {
+    await this.prisma.nurturingOrganization.updateMany({
       where: { organizationId, NOT: { codingAgentTypes: { has: agentType } } },
       data: { codingAgentTypes: { push: agentType } },
     });
@@ -116,7 +113,7 @@ export class PrismaNurturingMilestonesRepository
       where: { organizationId },
       select: { codingAgentTypes: true },
     });
-    return { changed: count === 1, codingAgentTypes: organization?.codingAgentTypes ?? [] };
+    return organization?.codingAgentTypes ?? [];
   }
 
   async recordCodingActiveDay({

@@ -109,7 +109,7 @@ export class NurturingDeliveryService {
       const claimKey = `nurturing:integration_method:coding_agent:${userId}`;
       if (!(await this.deps.claims.claim(claimKey, DELIVERED_WINDOW_SECONDS))) continue;
       // Sent at once, so a later member's claim failing never strands one already claimed.
-      this.sendCustomerIoCalls(fireCodingAgentIntegrationMethod({ memberUserIds: [userId] }));
+      this.sendCustomerIoCalls(fireCodingAgentIntegrationMethod({ userId }));
     }
   }
 

@@ -338,46 +338,6 @@ describe("NurturingCodingMilestonesService", () => {
     });
   });
 
-  describe("when a session is dated far in the future", () => {
-    /** @scenario "A far-future session time counts as at most tomorrow" */
-    it("counts it as at most tomorrow and still counts a later real day", async () => {
-      vi.useFakeTimers({ toFake: ["Date"] });
-      try {
-        vi.setSystemTime(DAY);
-        const { send, ofKind } = await serviceOver();
-
-        await send([fact({ firstForProject: false, occurredAt: DAY + 365 * 24 * HOUR })]);
-        vi.setSystemTime(DAY + 72 * HOUR);
-        await send([
-          fact({ sessionId: "s-2", firstForProject: false, occurredAt: DAY + 72 * HOUR }),
-        ]);
-
-        const days = ofKind("coding_active_days");
-        expect(days.map((s) => s.sourceEventId)).toEqual(["org-1:2026-10-21", "org-1:2026-10-23"]);
-      } finally {
-        vi.useRealTimers();
-      }
-    });
-
-    /** @scenario "A far-future session time counts as at most tomorrow" */
-    it("sends the stored and first-session signals with the clamped time", async () => {
-      vi.useFakeTimers({ toFake: ["Date"] });
-      try {
-        vi.setSystemTime(DAY);
-        const { send, ofKind } = await serviceOver();
-
-        await send([fact({ occurredAt: DAY + 365 * 24 * HOUR })]);
-
-        expect(ofKind("coding_session_stored")).toMatchObject([{ occurredAt: DAY + 24 * HOUR }]);
-        expect(ofKind("coding_agent_first_session")).toMatchObject([
-          { occurredAt: DAY + 24 * HOUR },
-        ]);
-      } finally {
-        vi.useRealTimers();
-      }
-    });
-  });
-
   describe("when the organization has no admin", () => {
     /** @scenario "An organization with no admin raises nothing" */
     it("raises no signal", async () => {

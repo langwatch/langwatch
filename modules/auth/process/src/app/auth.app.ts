@@ -137,9 +137,9 @@ import { resolveDialableIdentityProviderOrigins } from "../rules/trusted-origins
 import { AccountLifecycleService } from "../services/account-lifecycle.service.ts";
 import { AddressConfirmationService } from "../services/address-confirmation.service.ts";
 import type { CliAccessProject } from "../services/api-rest-credentials.service.ts";
+import { AppPageOpenedService } from "../services/app-page-opened.service.ts";
 import { AuthDoorService } from "../services/auth-door.service.ts";
 import {
-  AppPageOpenedService,
   AuthLifecycleNoticeService,
   type AuthLifecycleSenders,
 } from "../services/auth-lifecycle-notice.service.ts";

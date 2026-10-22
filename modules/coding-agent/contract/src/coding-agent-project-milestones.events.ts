@@ -16,7 +16,7 @@ const codingAgentSessionStoredEventDataSchemaDefinition = z
     agentType: z.string().min(1),
     /** True only for the project's first session; the owner decides it, never a peer. */
     firstForProject: z.boolean(),
-    /** The session's own last event time, epoch ms, so a late fold keeps its day. */
+    /** The session's own last event time, epoch ms, never more than a day after it was recorded. */
     occurredAt: z.number().int().nonnegative(),
   })
   .strict();

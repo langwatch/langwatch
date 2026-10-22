@@ -86,3 +86,39 @@ Feature: Coding-agent records a session-stored fact
   Scenario: A redelivered session-stored fact is one event
     Given the same session-stored fact recorded twice
     Then both carry one idempotency key
+
+  @unit
+  Scenario: A session time more than a day ahead is recorded as one day ahead
+    Given a stored session dated a year ahead
+    When the stored sessions are reported
+    Then the fact carries a time one day after the report
+
+  @unit
+  Scenario: A session reported again inside the hold records no second fact
+    Given a session already recorded
+    When it is reported again inside the hold
+    Then no second fact is recorded
+
+  @unit
+  Scenario: A session reported again after the hold records again
+    Given a session already recorded
+    When it is reported again after the hold
+    Then a second fact is recorded
+
+  @unit
+  Scenario: A session reported on two UTC days records on both
+    Given a session reported at 23:59 UTC
+    When it is reported again at 00:01 UTC
+    Then both reports record a fact
+
+  @unit
+  Scenario: A failed recording releases the hold
+    Given the recorder rejects once
+    When the same session is reported again
+    Then the second report records the fact
+
+  @unit
+  Scenario: Expired holds are swept when the hold map is full
+    Given the hold map has reached its sweep threshold
+    When the holds expire and a session is reported
+    Then a session whose hold expired records again

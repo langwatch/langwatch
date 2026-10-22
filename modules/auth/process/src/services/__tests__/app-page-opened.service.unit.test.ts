@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { AppPageOpenedService } from "../auth-lifecycle-notice.service.ts";
+import { AppPageOpenedService } from "../app-page-opened.service.ts";
 
 function serviceOver({
   memberships = async () => 1,

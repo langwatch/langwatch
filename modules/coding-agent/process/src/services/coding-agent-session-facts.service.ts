@@ -10,7 +10,7 @@ import { CODING_AGENT_SESSION_SEEN_WINDOW_MS } from "./coding-agent-session-seen
 import type { StoredSession } from "./coding-agent-session-store.service.ts";
 
 const logger = createLogger("langwatch:coding-agent:session-facts");
-const HOLD_SWEEP_THRESHOLD = 10_000;
+export const HOLD_SWEEP_THRESHOLD = 10_000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** A stored session whose product is known: the only kind a fact can name. */
@@ -75,10 +75,13 @@ export class CodingAgentSessionFactsService {
       if (session.auxiliary || agent === null) continue;
       // The fact's schema refuses a longer id, so recording it would only fail and retry.
       if (session.sessionId.length > MAX_SESSION_ID_LENGTH) continue;
-      const key = holdKey(session);
+      // A client span time is never trusted past a day ahead. Clamping here fixes the value in
+      // the stored fact, so every redelivery sees the same time.
+      const named = { ...session, agent, occurredAt: Math.min(session.occurredAt, now + DAY_MS) };
+      const key = holdKey(named);
       if ((this.heldUntil.get(key) ?? 0) > now || due.has(key)) continue;
       this.heldUntil.set(key, now + CODING_AGENT_SESSION_SEEN_WINDOW_MS);
-      due.set(key, { ...session, agent });
+      due.set(key, named);
     }
     return [...due.values()];
   }

@@ -11,8 +11,14 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { projectRow } from "../../__tests__/fixtures/coding-agent.fixture.ts";
-import { CodingAgentSessionFactsService } from "../coding-agent-session-facts.service.ts";
+import {
+  CodingAgentSessionFactsService,
+  HOLD_SWEEP_THRESHOLD,
+} from "../coding-agent-session-facts.service.ts";
+import { CODING_AGENT_SESSION_SEEN_WINDOW_MS } from "../coding-agent-session-seen.service.ts";
 import type { StoredSession } from "../coding-agent-session-store.service.ts";
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 const stored = (over: Partial<StoredSession> = {}): StoredSession => ({
   tenantId: "project-1",
@@ -27,10 +33,12 @@ function factsOver({
   lastCodingAgentSessionAt = null,
   hasOtherSession = async () => false,
   record,
+  nowMs,
 }: {
   lastCodingAgentSessionAt?: Date | null;
   hasOtherSession?: (input: { tenantId: string; excludeSessionId: string }) => Promise<boolean>;
   record?: (fact: CodingAgentSessionStoredEventData) => Promise<void>;
+  nowMs?: () => number;
 } = {}) {
   const recorded: CodingAgentSessionStoredEventData[] = [];
   const service = CodingAgentSessionFactsService.create({
@@ -44,6 +52,7 @@ function factsOver({
     recorder: {
       recordSessionStored: record ?? (async (fact) => void recorded.push(fact)),
     },
+    ...(nowMs ? { nowMs } : {}),
   });
   return { service, recorded };
 }
@@ -191,6 +200,97 @@ describe("CodingAgentSessionFactsService", () => {
       });
 
       await expect(service.record([stored()])).resolves.toBeUndefined();
+    });
+  });
+
+  describe("given a session time more than a day ahead", () => {
+    /** @scenario "A session time more than a day ahead is recorded as one day ahead" */
+    it("records it one day after now", async () => {
+      const now = Date.UTC(2026, 9, 20, 12);
+      const { service, recorded } = factsOver({ nowMs: () => now });
+
+      await service.record([stored({ occurredAt: now + 365 * DAY_MS })]);
+
+      expect(recorded[0]?.occurredAt).toBe(now + DAY_MS);
+    });
+  });
+
+  describe("given a session reported again", () => {
+    /** @scenario "A session reported again inside the hold records no second fact" */
+    it("records no second fact inside the hold", async () => {
+      let now = Date.UTC(2026, 9, 20, 12);
+      const { service, recorded } = factsOver({ nowMs: () => now });
+
+      await service.record([stored()]);
+      now += CODING_AGENT_SESSION_SEEN_WINDOW_MS - 1;
+      await service.record([stored()]);
+
+      expect(recorded).toHaveLength(1);
+    });
+
+    /** @scenario "A session reported again after the hold records again" */
+    it("records again after the hold", async () => {
+      let now = Date.UTC(2026, 9, 20, 12);
+      const { service, recorded } = factsOver({ nowMs: () => now });
+
+      await service.record([stored()]);
+      now += CODING_AGENT_SESSION_SEEN_WINDOW_MS;
+      await service.record([stored()]);
+
+      expect(recorded).toHaveLength(2);
+    });
+
+    /** @scenario "A session reported on two UTC days records on both" */
+    it("records at 23:59 UTC and again at 00:01 UTC", async () => {
+      let now = Date.UTC(2026, 9, 20, 23, 59);
+      const { service, recorded } = factsOver({ nowMs: () => now });
+
+      await service.record([stored({ occurredAt: now })]);
+      now += 2 * 60 * 1000;
+      await service.record([stored({ occurredAt: now })]);
+
+      expect(recorded).toHaveLength(2);
+    });
+  });
+
+  describe("when the recorder fails once", () => {
+    /** @scenario "A failed recording releases the hold" */
+    it("retries the same session on the next report", async () => {
+      const now = Date.UTC(2026, 9, 20, 12);
+      let failing = true;
+      const attempts: CodingAgentSessionStoredEventData[] = [];
+      const { service } = factsOver({
+        nowMs: () => now,
+        record: async (fact) => {
+          attempts.push(fact);
+          if (failing) throw new Error("event store unavailable");
+        },
+      });
+
+      await service.record([stored()]);
+      failing = false;
+      await service.record([stored()]);
+
+      expect(attempts).toHaveLength(2);
+    });
+  });
+
+  describe("when the hold map is full", () => {
+    /** @scenario "Expired holds are swept when the hold map is full" */
+    it("still records a session whose hold expired", async () => {
+      let now = Date.UTC(2026, 9, 20, 12);
+      const { service, recorded } = factsOver({ nowMs: () => now });
+      await service.record(
+        Array.from({ length: HOLD_SWEEP_THRESHOLD }, (_, index) =>
+          stored({ sessionId: `session-${index}` }),
+        ),
+      );
+      recorded.length = 0;
+
+      now += CODING_AGENT_SESSION_SEEN_WINDOW_MS;
+      await service.record([stored({ sessionId: "session-0" })]);
+
+      expect(recorded.map((fact) => fact.sessionId)).toEqual(["session-0"]);
     });
   });
 });

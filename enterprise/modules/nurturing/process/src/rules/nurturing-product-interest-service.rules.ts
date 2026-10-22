@@ -43,15 +43,9 @@ export function fireIntegrationMethod({
 }
 
 /**
- * A CLI sign-up skips the product page, so a coding-agent organization's members are told
- * integration_method coding_agent here: one identify per distinct member.
+ * A CLI sign-up skips the product page, so a coding-agent member is told integration_method
+ * coding_agent here.
  */
-export function fireCodingAgentIntegrationMethod({
-  memberUserIds,
-}: {
-  memberUserIds: readonly string[];
-}): CioBatchCall[] {
-  return [...new Set(memberUserIds)].flatMap((userId) =>
-    fireIntegrationMethod({ userId, integrationMethod: "coding_agent" }),
-  );
+export function fireCodingAgentIntegrationMethod({ userId }: { userId: string }): CioBatchCall[] {
+  return fireIntegrationMethod({ userId, integrationMethod: "coding_agent" });
 }
