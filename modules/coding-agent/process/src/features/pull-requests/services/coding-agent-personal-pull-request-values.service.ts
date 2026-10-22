@@ -79,7 +79,11 @@ export class CodingAgentPersonalPullRequestValuesService {
         cacheReadTokens: session.cacheReadTokens,
         cacheCreationTokens: session.cacheCreationTokens,
         costUsd: session.costUsd,
-        costKnown: !isCostUnknown(session.usageByModel),
+        costKnown: !isCostUnknown(
+          session.models.map((model) => ({
+            priced: this.dependencies.usage.isPricedAs({ agent: session.agent, model }),
+          })),
+        ),
         models: session.models,
       });
       groups.set(key, group);

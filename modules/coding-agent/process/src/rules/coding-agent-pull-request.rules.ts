@@ -53,25 +53,3 @@ export function pullRequestIdentity(pullRequest: GithubPullRequest): {
 export function isCostUnknown(usage: readonly { priced: boolean }[]): boolean {
   return usage.length > 0 && usage.every((each) => !each.priced);
 }
-
-type TokenCounts = {
-  inputTokens: number;
-  outputTokens: number;
-  cacheReadTokens: number;
-  cacheCreationTokens: number;
-};
-
-const tokenSum = (counts: TokenCounts): number =>
-  counts.inputTokens + counts.outputTokens + counts.cacheReadTokens + counts.cacheCreationTokens;
-
-/**
- * Whether a session's per-model record accounts for every token it counted. Only then may it
- * stand for the session's models: a row folded partly before the record existed misses calls.
- */
-export function isModelRecordComplete(
-  session: TokenCounts & { usageByModel: readonly TokenCounts[] },
-): boolean {
-  if (session.usageByModel.length === 0) return false;
-  const recorded = session.usageByModel.reduce((sum, usage) => sum + tokenSum(usage), 0);
-  return recorded === tokenSum(session);
-}

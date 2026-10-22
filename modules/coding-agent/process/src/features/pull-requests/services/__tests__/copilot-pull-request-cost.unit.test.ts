@@ -3,10 +3,7 @@
  * @see specs/coding-agent/copilot-sessions.feature
  * @see specs/coding-agent/pull-request-linkage.feature
  */
-import type {
-  CodingAgentSessionContextUsage,
-  CodingAgentSessionModelUsage,
-} from "@langwatch/coding-agent-contract";
+import type { CodingAgentSessionContextUsage } from "@langwatch/coding-agent-contract";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -24,6 +21,7 @@ import {
   session,
 } from "../../../../__tests__/fixtures/coding-agent.fixture.ts";
 import { CodingAgentFeatureService } from "../../../../services/coding-agent.service.ts";
+import { ModelCatalogCostEstimatorService } from "../../../../services/model-catalog-cost-estimator.service.ts";
 
 const DAY = 24 * 60 * 60 * 1000;
 const PRICED_MODEL = "gpt-6-luna";
@@ -43,9 +41,13 @@ const query = {
 
 const unstamped = { repositoryHost: "", repositoryOwner: "", repositoryName: "", branch: "" };
 
-function modelUsage(over: Partial<CodingAgentSessionModelUsage>): CodingAgentSessionModelUsage {
+type PerCallTotal = TestEvents["modelTotals"][number];
+
+/** One session's per-call fact rows on one model, summed as the repository sums them. */
+function perCallTotal(over: Partial<PerCallTotal> & { sessionId: string }): PerCallTotal {
   return {
     ...unstamped,
+    tenantId: "project-1",
     model: PRICED_MODEL,
     inputTokens: 0,
     outputTokens: 0,
@@ -53,9 +55,14 @@ function modelUsage(over: Partial<CodingAgentSessionModelUsage>): CodingAgentSes
     cacheCreationTokens: 0,
     costUsd: 0,
     aiUnits: 0,
-    priced: true,
     ...over,
   };
+}
+
+function eventsWith(totals: PerCallTotal[]): TestEvents {
+  const events = new TestEvents();
+  events.modelTotals = totals;
+  return events;
 }
 
 /** A Copilot session on the pull request's branch that called a priced and an unpriced model. */
@@ -71,25 +78,30 @@ function copilotSession() {
     cacheReadTokens: 17039,
     cacheCreationTokens: 17039,
     costUsd: 0.002,
-    usageByModel: [
-      modelUsage({
-        model: PRICED_MODEL,
-        inputTokens: 3,
-        outputTokens: 38,
-        cacheCreationTokens: 17039,
-        costUsd: 0.002,
-        aiUnits: 7,
-      }),
-      modelUsage({
-        model: UNPRICED_MODEL,
-        inputTokens: 13,
-        outputTokens: 50,
-        cacheReadTokens: 17039,
-        aiUnits: 5,
-        priced: false,
-      }),
-    ],
   });
+}
+
+/** The per-call rows the Copilot session's model-call spans wrote. */
+function copilotCalls(): PerCallTotal[] {
+  return [
+    perCallTotal({
+      sessionId: "copilot-1",
+      model: PRICED_MODEL,
+      inputTokens: 3,
+      outputTokens: 38,
+      cacheCreationTokens: 17039,
+      costUsd: 0.002,
+      aiUnits: 7,
+    }),
+    perCallTotal({
+      sessionId: "copilot-1",
+      model: UNPRICED_MODEL,
+      inputTokens: 13,
+      outputTokens: 50,
+      cacheReadTokens: 17039,
+      aiUnits: 5,
+    }),
+  ];
 }
 
 function serviceWith({ sessions, events }: { sessions: TestSessions; events?: TestEvents }) {
@@ -117,6 +129,7 @@ function serviceWith({ sessions, events }: { sessions: TestSessions; events?: Te
     projects: createTestProjects(),
     billing: new TestBillingPolicy(),
     clock: new TestClock(),
+    modelProviders: ModelCatalogCostEstimatorService.create(),
   });
 }
 
@@ -128,7 +141,10 @@ describe("Copilot pull-request cost", () => {
         const sessions = new TestSessions();
         sessions.branchRows = [copilotSession()];
 
-        const result = await serviceWith({ sessions }).getPullRequestUsage(query);
+        const result = await serviceWith({
+          sessions,
+          events: eventsWith(copilotCalls()),
+        }).getPullRequestUsage(query);
 
         expect(
           result.modelBreakdown.map(({ model, tokensKnown, inputTokens, outputTokens }) => ({
@@ -171,14 +187,24 @@ describe("Copilot pull-request cost", () => {
             startedAtMs: TEST_NOW_MS - 2 * DAY,
             inputTokens: 300,
             usageByContext: [context("feature", 100), context("other", 200)],
-            usageByModel: [
-              modelUsage({ ...stamp("feature"), model: PRICED_MODEL, inputTokens: 100 }),
-              modelUsage({ ...stamp("other"), model: UNPRICED_MODEL, inputTokens: 200 }),
-            ],
           }),
         ];
+        const events = eventsWith([
+          perCallTotal({
+            ...stamp("feature"),
+            sessionId: "copilot-2",
+            model: PRICED_MODEL,
+            inputTokens: 100,
+          }),
+          perCallTotal({
+            ...stamp("other"),
+            sessionId: "copilot-2",
+            model: UNPRICED_MODEL,
+            inputTokens: 200,
+          }),
+        ]);
 
-        const result = await serviceWith({ sessions }).getPullRequestUsage(query);
+        const result = await serviceWith({ sessions, events }).getPullRequestUsage(query);
 
         expect(result.totals.inputTokens).toBe(100);
         expect(
@@ -195,7 +221,10 @@ describe("Copilot pull-request cost", () => {
         const sessions = new TestSessions();
         sessions.branchRows = [copilotSession()];
 
-        const detail = await serviceWith({ sessions }).getPullRequestDetail(query);
+        const detail = await serviceWith({
+          sessions,
+          events: eventsWith(copilotCalls()),
+        }).getPullRequestDetail(query);
 
         expect(detail.modelBreakdown.map(({ model, aiUnits }) => ({ model, aiUnits }))).toEqual([
           { model: UNPRICED_MODEL, aiUnits: 5 },
@@ -218,7 +247,10 @@ describe("Copilot pull-request cost", () => {
         const sessions = new TestSessions();
         sessions.branchRows = [copilotSession()];
 
-        const result = await serviceWith({ sessions }).getPullRequestUsage(query);
+        const result = await serviceWith({
+          sessions,
+          events: eventsWith(copilotCalls()),
+        }).getPullRequestUsage(query);
 
         expect(result.modelBreakdown.find((each) => each.model === UNPRICED_MODEL)).toEqual({
           model: UNPRICED_MODEL,
@@ -245,10 +277,16 @@ describe("Copilot pull-request cost", () => {
       inputTokens: 13,
       outputTokens: 50,
       costUsd: 0,
-      usageByModel: [
-        modelUsage({ model: UNPRICED_MODEL, inputTokens: 13, outputTokens: 50, priced: false }),
-      ],
     };
+    const unpricedCalls = () =>
+      eventsWith([
+        perCallTotal({
+          sessionId: "copilot-unpriced",
+          model: UNPRICED_MODEL,
+          inputTokens: 13,
+          outputTokens: 50,
+        }),
+      ]);
 
     describe("when the pull request cost is shown", () => {
       /** @scenario "A pull request whose only model has no price shows an unknown cost, not zero" */
@@ -256,7 +294,10 @@ describe("Copilot pull-request cost", () => {
         const sessions = new TestSessions();
         sessions.branchRows = [branchSession(unpricedOnly)];
 
-        const detail = await serviceWith({ sessions }).getPullRequestDetail(query);
+        const detail = await serviceWith({
+          sessions,
+          events: unpricedCalls(),
+        }).getPullRequestDetail(query);
 
         expect(detail.totals).toMatchObject({
           inputTokens: 13,
@@ -286,7 +327,10 @@ describe("Copilot pull-request cost", () => {
           personalRow({ sessionId: "copilot-no-pull-request", gitBranch: "spike" }),
         ]);
 
-        const personal = await serviceWith({ sessions }).getForPersonalProject({
+        const personal = await serviceWith({
+          sessions,
+          events: unpricedCalls(),
+        }).getForPersonalProject({
           projectId: "project-1",
           permittedProjectIds: query.permittedProjectIds,
           costProjectIds: query.costProjectIds,
@@ -322,7 +366,10 @@ describe("Copilot pull-request cost", () => {
           }),
         ];
 
-        const detail = await serviceWith({ sessions }).getPullRequestDetail(query);
+        const detail = await serviceWith({
+          sessions,
+          events: unpricedCalls(),
+        }).getPullRequestDetail(query);
 
         expect(detail.totals.costUsd).toBeCloseTo(1.5, 9);
         expect(detail.contributors.find((row) => row.agent === "copilot")?.costUsd).toBeNull();
@@ -333,7 +380,7 @@ describe("Copilot pull-request cost", () => {
     });
   });
 
-  describe("given an older Copilot session with no per-model figures on a model a newer one priced", () => {
+  describe("given an older Copilot session with no per-call rows on a model a newer one priced", () => {
     const older = branchSession({
       sessionId: "copilot-old",
       agent: "copilot",
@@ -352,7 +399,10 @@ describe("Copilot pull-request cost", () => {
         const sessions = new TestSessions();
         sessions.branchRows = [copilotSession(), older];
 
-        const result = await serviceWith({ sessions }).getPullRequestUsage(query);
+        const result = await serviceWith({
+          sessions,
+          events: eventsWith(copilotCalls()),
+        }).getPullRequestUsage(query);
 
         expect(result.modelBreakdown.find((each) => each.model === PRICED_MODEL)).toMatchObject({
           tokensKnown: false,
@@ -397,37 +447,29 @@ describe("Copilot pull-request cost", () => {
       outputTokens: 2,
       costUsd: 0.25,
     });
-    const claudeEvents = () => {
-      const events = new TestEvents();
-      events.modelTotals = [
-        {
-          ...unstamped,
-          tenantId: "project-1",
-          sessionId: "claude-1",
-          model: "claude-opus-5",
-          inputTokens: 10,
-          outputTokens: 20,
-          cacheReadTokens: 0,
-          cacheCreationTokens: 0,
-          costUsd: 1.5,
-        },
-      ];
-      return events;
-    };
+    const claudeCall = perCallTotal({
+      sessionId: "claude-1",
+      model: "claude-opus-5",
+      inputTokens: 10,
+      outputTokens: 20,
+      costUsd: 1.5,
+    });
 
     describe("when the pull request usage is read", () => {
       /** @scenario "Claude Code and Codex rows are unchanged by the Copilot declarations" */
       it("keeps the Claude Code and Codex rows and their per-call model as before", async () => {
         const sessions = new TestSessions();
         sessions.branchRows = [claude, codex];
-        const before = await serviceWith({ sessions, events: claudeEvents() }).getPullRequestUsage(
-          query,
-        );
+        const before = await serviceWith({
+          sessions,
+          events: eventsWith([claudeCall]),
+        }).getPullRequestUsage(query);
         sessions.branchRows = [claude, codex, copilotSession()];
 
-        const after = await serviceWith({ sessions, events: claudeEvents() }).getPullRequestUsage(
-          query,
-        );
+        const after = await serviceWith({
+          sessions,
+          events: eventsWith([claudeCall, ...copilotCalls()]),
+        }).getPullRequestUsage(query);
 
         const byAgent = (rows: typeof after.rows, agent: string) =>
           rows.find((row) => row.agent === agent);
@@ -446,7 +488,10 @@ describe("Copilot pull-request cost", () => {
         const sessions = new TestSessions();
         sessions.branchRows = [codex, copilotSession()];
 
-        const result = await serviceWith({ sessions }).getPullRequestUsage(query);
+        const result = await serviceWith({
+          sessions,
+          events: eventsWith(copilotCalls()),
+        }).getPullRequestUsage(query);
 
         expect(result.modelBreakdown.map(({ model }) => model)).toEqual([
           UNPRICED_MODEL,

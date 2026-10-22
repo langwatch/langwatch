@@ -322,7 +322,7 @@ Copilot is added as one row of a single per-agent table (tool slug, server agent
 
 ### S7. Pull-request cost
 
-Per-model tokens come from the S2 model-call fold. AI units are shown as their own count and never enter a dollar total. A model with no price shows its tokens and an unknown cost, never zero.
+Per-model tokens, cost and AI units come from the per-call table (`coding_agent_session_events`), the same table the pull-request read already sums for Claude Code and Codex. Copilot sends its model calls on spans only, so each `chat` span writes its own `model_call` row there, stamped with the session's working context, with its cost computed from its tokens and its AI units in the `AiUnits` column. The agent definition's `modelCallsOnSpansOnly` flag decides this, so Claude Code and Codex, whose calls arrive as log events, never get a second row from their spans. The session row carries no per-model figures. AI units are shown as their own count and never enter a dollar total. A model with no price shows its tokens and an unknown cost, never zero; whether a span-fed model is priced is asked of the catalogue when the pull request is read.
 
 ### Rejected alternatives
 
@@ -338,6 +338,7 @@ Per-model tokens come from the S2 model-call fold. AI units are shown as their o
 | Claude Code and Codex rows, hooks and keys are unchanged | `specs/coding-agent/copilot-sessions.feature`, `specs/ai-governance/cli-wrappers/session-context-hook.feature` |
 | Only the declaring agent's spans are admitted            | `specs/coding-agent/copilot-sessions.feature`                                                                  |
 | Tokens and AI units are counted once, from model calls   | `specs/coding-agent/copilot-sessions.feature`                                                                  |
+| Each model call is written once to the per-call table    | `specs/coding-agent/copilot-sessions.feature`                                                                  |
 | No Copilot span mints a trace-id row                     | `specs/coding-agent/copilot-sessions.feature`                                                                  |
 | AI units never enter dollar totals                       | `specs/coding-agent/copilot-sessions.feature`                                                                  |
 | The user's own hook files are never edited               | `specs/ai-governance/cli-wrappers/session-context-hook.feature`                                                |
@@ -349,6 +350,8 @@ Per-model tokens come from the S2 model-call fold. AI units are shown as their o
 - A repository may carry its own `.github/hooks` file, so a session can run the same event twice. The hook's existing per-session fingerprint store already drops the repeat.
 
 ## Changelog
+
+- **v9 (2026-10-22, per-model figures on the per-call table):** S7 amended. Copilot's per-model tokens, cost and AI units come from `model_call` rows its `chat` spans write to `coding_agent_session_events`, gated by the agent definition's `modelCallsOnSpansOnly`, instead of per-model and AI-unit columns on the session row. One column added (`AiUnits` on the per-call table); the session table is unchanged.
 
 - **v8 (2026-10-20, sessions and pull requests from the #8803 captures):** §10 amended: hooks are in scope for repository and branch context only; tokens and content stay OTel-only. Added §Extension #3 (S1 to S7). Facts from the captures: CLI 1.0.100 dropped the `github.copilot.git.*` span attributes; `gen_ai.conversation.id` is on `chat`, `execute_tool` and `invoke_agent`; the hook session id equals it on both surfaces; AI units sit on every `chat` span; `~/.copilot/hooks` is the user-level hook folder of both the CLI and VS Code. The Copilot app is out of scope until it is captured.
 

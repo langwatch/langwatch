@@ -16,14 +16,3 @@ export function contextUsageKey(context: {
     context.branch,
   ].join("\0");
 }
-
-/** The key one (context, model) entry of the per-model record is kept under. */
-export function modelUsageKey(usage: {
-  repositoryHost: string;
-  repositoryOwner: string;
-  repositoryName: string;
-  branch: string;
-  model: string;
-}): string {
-  return `${contextUsageKey(usage)}\0${usage.model}`;
-}

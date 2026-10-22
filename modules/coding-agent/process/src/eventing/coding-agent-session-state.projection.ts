@@ -1,49 +1,13 @@
 import {
   AUXILIARY_SESSION_FACT,
   type CodingAgentSessionContextUsage,
-  type CodingAgentSessionModelUsage,
   isCacheRebuild,
   parseMcpToolName,
   type SessionWorkingContext,
 } from "@langwatch/coding-agent-contract";
 
 import type { SessionTitleSource } from "../rules/coding-agent-session-state-mapper.rules.ts";
-import { contextUsageKey, modelUsageKey } from "../rules/coding-agent-session-usage-key.rules.ts";
-
-/** Where an unstamped call's per-model usage is kept: the context no declaration named. */
-const UNSTAMPED_CONTEXT: SessionWorkingContext = {
-  repositoryHost: "",
-  repositoryOwner: "",
-  repositoryName: "",
-  branch: "",
-};
-
-/** The counters a model call moves that the per-model record follows. */
-type CountedField =
-  | "inputTokens"
-  | "outputTokens"
-  | "cacheReadTokens"
-  | "cacheCreationTokens"
-  | "costUsd"
-  | "aiUnits";
-
-function emptyModelUsage(
-  context: SessionWorkingContext,
-): Omit<CodingAgentSessionModelUsage, "model"> {
-  return {
-    repositoryHost: context.repositoryHost,
-    repositoryOwner: context.repositoryOwner,
-    repositoryName: context.repositoryName,
-    branch: context.branch,
-    inputTokens: 0,
-    outputTokens: 0,
-    cacheReadTokens: 0,
-    cacheCreationTokens: 0,
-    costUsd: 0,
-    aiUnits: 0,
-    priced: true,
-  };
-}
+import { contextUsageKey } from "../rules/coding-agent-session-usage-key.rules.ts";
 
 /** One thing the agent did, in the order it did it. */
 interface SessionStep {
@@ -128,19 +92,12 @@ export interface CodingAgentSessionData {
   /** Registry-computed cost; reported agent cost remains separate. */
   costUsd: number;
   agentReportedCostUsd: number;
-  /** AI units the agent reports per model call (Copilot), a count apart from any dollar figure. */
-  aiUnits: number;
   /**
    * Spend per declared working context, keyed by `contextUsageKey`: where the counters' amount
    * went, which splits a session's cost across its pull requests. Unstamped calls charge no
    * context.
    */
   usageByContext: Record<string, CodingAgentSessionContextUsage>;
-  /**
-   * The same spend split per model as well as per context, keyed by `modelUsageKey`, unstamped
-   * calls included. Kept only by agents whose calls never reach the per-call fact table.
-   */
-  usageByModel: Record<string, CodingAgentSessionModelUsage>;
   modelCallMs: number;
   toolMs: number;
   ttftMsTotal: number;
@@ -204,8 +161,6 @@ export const MAX_SET = 50;
  * per pull request reaches fifty in weeks. A record of exactly this size reads as saturated.
  */
 export const MAX_USAGE_CONTEXTS = 200;
-/** How many (context, model) entries the per-model record holds; past it nothing new opens. */
-export const MAX_USAGE_MODELS = 200;
 
 const TITLE_RANK: Record<SessionTitleSource, number> = {
   prompt: 1,
@@ -271,9 +226,7 @@ export class CodingAgentSessionStateProjection {
       cacheCreationTokens: 0,
       costUsd: 0,
       agentReportedCostUsd: 0,
-      aiUnits: 0,
       usageByContext: {},
-      usageByModel: {},
 
       modelCallMs: 0,
       toolMs: 0,
@@ -383,51 +336,6 @@ export class CodingAgentSessionStateProjection {
           cacheCreationTokens:
             charged.cacheCreationTokens + (after.cacheCreationTokens - before.cacheCreationTokens),
           costUsd: charged.costUsd + (after.costUsd - before.costUsd),
-        },
-      },
-    };
-  }
-
-  /**
-   * Charge one model call's counter and AI-unit delta to its (context, model) entry, unstamped
-   * calls under the empty context. `priced` false marks the model's cost unknown from then on.
-   */
-  chargeModelUsage({
-    before,
-    after,
-    context,
-    model,
-    priced,
-  }: {
-    before: CodingAgentSessionData;
-    after: CodingAgentSessionData;
-    context: SessionWorkingContext | null;
-    model: string | null;
-    priced: boolean;
-  }): CodingAgentSessionData {
-    if (model === null) return after;
-    const where = context ?? UNSTAMPED_CONTEXT;
-    const key = modelUsageKey({ ...where, model });
-    // A state cached before the per-model record has none: it starts empty.
-    const held = Object.hasOwn(after, "usageByModel") ? after.usageByModel : {};
-    const existing = held[key];
-    if (existing === undefined && Object.keys(held).length >= MAX_USAGE_MODELS) return after;
-    const charged = existing ?? { ...emptyModelUsage(where), model };
-    const delta = (field: CountedField): number =>
-      this.number(after[field]) - this.number(before[field]);
-    return {
-      ...after,
-      usageByModel: {
-        ...held,
-        [key]: {
-          ...charged,
-          inputTokens: charged.inputTokens + delta("inputTokens"),
-          outputTokens: charged.outputTokens + delta("outputTokens"),
-          cacheReadTokens: charged.cacheReadTokens + delta("cacheReadTokens"),
-          cacheCreationTokens: charged.cacheCreationTokens + delta("cacheCreationTokens"),
-          costUsd: charged.costUsd + delta("costUsd"),
-          aiUnits: charged.aiUnits + delta("aiUnits"),
-          priced: charged.priced && priced,
         },
       },
     };

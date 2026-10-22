@@ -2,7 +2,6 @@ import {
   type LogFactsContributedEvent,
   logFactsContributedEventSchema,
   type CodingAgentSessionContextUsage,
-  type CodingAgentSessionModelUsage,
   extractStampedContext,
   type MetricFactsContributedEvent,
   metricFactsContributedEventSchema,
@@ -333,16 +332,12 @@ export interface CodingAgentSessionRow {
   cacheCreationTokens: number;
   costUsd: number;
   agentReportedCostUsd: number;
-  /** AI units summed over model calls (migration 00122); 0 for agents that report none. */
-  aiUnits: number;
   /**
    * What the session spent under each declared working context (migration 00099), first seen first.
    * The counters above are the amount; this says where it went. Empty on a row folded before the
    * column, whose whole usage then reads as spent before any declaration.
    */
   usageByContext: CodingAgentSessionContextUsage[];
-  /** The per-model split (migration 00123); empty for log-fed agents and older rows. */
-  usageByModel: CodingAgentSessionModelUsage[];
 
   modelCallMs: number;
   toolMs: number;

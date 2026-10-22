@@ -39,6 +39,17 @@ export function genAiOperationRoleOf({
   return ROLES.find((role) => operations[role] === operation) ?? "undeclared";
 }
 
+/**
+ * Whether a span writes a row of the per-call fact table: a declared model call of an agent whose
+ * calls ride spans only. A log-fed agent's rows come from its logs, so no call counts twice.
+ */
+export function isSpanFedModelCall({ agent, name }: { agent: string; name: string }): boolean {
+  return (
+    definitionOf(agent)?.modelCallsOnSpansOnly === true &&
+    genAiOperationRoleOf({ agent, name }) === "modelCall"
+  );
+}
+
 /** The declared AI-unit count, surface and, on a session root, prompt name one span carries. */
 export function declaredSpanSessionFacts({
   agent,

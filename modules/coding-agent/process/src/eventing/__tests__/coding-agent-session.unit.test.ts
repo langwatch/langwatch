@@ -251,45 +251,6 @@ describe("CodingAgentSessionFoldProjection", () => {
       expect(state.agent).toBe("claude_code");
     });
 
-    /** @scenario "a span-fed session keeps its computed cost per model" */
-    it("records each model's tokens and computed cost, adding up to the session's", () => {
-      const projection = makeProjection();
-      let state = projection.handleCodingAgentSessionLogFactsContributed(
-        logFactsEvent({
-          facts: { "event.name": "claude_code.api_request", cost_usd: 0.0141 },
-        }),
-        projection.init(),
-      );
-      const call = (spanId: string, facts: Record<string, string | number>) =>
-        spanFactsEvent({ name: "claude_code.llm_request", spanId, facts });
-
-      state = projection.apply(
-        state,
-        call("llm-sonnet", {
-          model: "claude-sonnet-4-5",
-          input_tokens: 1_200,
-          output_tokens: 300,
-          cache_read_tokens: 5_000,
-          cache_creation_tokens: 800,
-          "llm_request.context": "interaction",
-        }),
-      );
-      state = projection.apply(
-        state,
-        call("llm-haiku", { model: "claude-haiku-4-5", input_tokens: 400, output_tokens: 50 }),
-      );
-
-      const byModel = Object.values(state.usageByModel);
-      expect(byModel.map(({ model, inputTokens }) => ({ model, inputTokens }))).toEqual([
-        { model: "claude-sonnet-4-5", inputTokens: 1_200 },
-        { model: "claude-haiku-4-5", inputTokens: 400 },
-      ]);
-      // 1200 x $3/M + 300 x $15/M + 5000 x $0.30/M + 800 hour-long writes x $6/M.
-      expect(byModel[0]?.costUsd).toBeCloseTo(0.0144, 9);
-      expect(byModel.reduce((sum, usage) => sum + usage.costUsd, 0)).toBeCloseTo(state.costUsd, 9);
-      expect(state.agentReportedCostUsd).toBe(0.0141);
-    });
-
     /** @scenario "The session's cost is computed from tokens, same formula as the trace" */
     it("computes the span's cost and keeps the reported figure beside it", () => {
       const projection = makeProjection();

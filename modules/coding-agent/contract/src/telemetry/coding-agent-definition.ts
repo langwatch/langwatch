@@ -174,6 +174,13 @@ export interface CodingAgentDefinition {
   /** A span without the provider session key is not session activity: no trace-id fallback. */
   spansRequireSessionKey?: boolean;
 
+  /**
+   * Model calls arrive on spans only, never as log events: the per-call fact table takes this
+   * agent's rows from its declared model-call spans. Agents that log their calls never set it, so
+   * no call is written twice.
+   */
+  modelCallsOnSpansOnly?: boolean;
+
   /** Per-model-call attributes carrying the agent's AI units in nano units; first present wins. */
   nanoAiUnitAttributes?: readonly string[];
 
@@ -225,6 +232,7 @@ export const copilotAgent: CodingAgentDefinition = {
   // ADR-039 §Extension: the root's usage is the rollup of its chat calls, so only chat counts.
   genAiOperations: { session: "invoke_agent", modelCall: "chat", toolRun: "execute_tool" },
   spansRequireSessionKey: true,
+  modelCallsOnSpansOnly: true,
   // The canonicaliser lifts both surfaces' raw counts onto this one key.
   nanoAiUnitAttributes: ["metadata.copilot_nano_aiu"],
   surfaceBySourceType: { copilot_cli: "cli", copilot_vscode: "vscode" },

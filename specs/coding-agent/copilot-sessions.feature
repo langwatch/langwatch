@@ -47,13 +47,32 @@ Rule: One row per conversation, every number from the model calls
     Given the captured spans of one Copilot CLI conversation
     When they are folded
     Then exactly one session row exists, keyed by the conversation id
-    And it shows the model, the input and output tokens and the AI units
+    And it shows the model and the input and output tokens
+    And each model call writes one per-call row carrying its tokens and AI units
 
   @unit
   Scenario: Tokens and AI units are counted from model calls, never again from the session root
     Given a session root whose usage is the rollup of its two model calls
     When the session is folded
-    Then the row's tokens and AI units equal the sum of the two model calls
+    Then the row's tokens and the per-call rows' AI units equal the sum of the two model calls
+
+  # Copilot sends its model calls on spans only, so its `chat` spans write the
+  # per-call rows that Claude Code and Codex write from their log events. The
+  # agent's definition says which signal carries its calls (ADR-039 S7).
+  @unit
+  Scenario: A Copilot model call writes one per-call row carrying its context, tokens and AI units
+    Given a Copilot chat span inside a session that declared its repository and branch
+    When the span is written to the per-call rows
+    Then one model call row carries the model, its tokens, its computed cost and its AI units
+    And the row is stamped with the session's repository and branch
+
+  @unit
+  Scenario: A model call that sends both a log event and a span is written once
+    Given a Claude Code model call that sends an API request log event and a span
+    And a Codex turn span
+    When both signals reach the per-call rows
+    Then the Claude Code call is written once, from its log event
+    And the Codex turn span writes no per-call row
 
   @unit
   Scenario: The session root sets the row's start
@@ -172,15 +191,15 @@ Rule: Pull-request cost keeps AI units apart from dollars
 
   @unit
   Scenario: A model an older session also ran reads as not fully known
-    Given a pull request fed by a Copilot session with per-model figures for a model
-    And an older Copilot session on the same model with no per-model figures
+    Given a pull request fed by a Copilot session with per-call rows for a model
+    And an older Copilot session on the same model with no per-call rows
     When its usage is read
     Then that model's tokens read as not known rather than the newer session's alone
     And the pull request totals still count both sessions
 
   @unit
   Scenario: A model whose figures are not known reads its AI units as not known, not zero
-    Given a pull request fed by a Copilot session that consumed AI units but kept no per-model figures
+    Given a pull request where a Copilot model ran in a session that wrote no per-call rows
     When its usage is read
     Then that model's AI units read as not known rather than zero
 
@@ -192,13 +211,8 @@ Rule: Pull-request cost keeps AI units apart from dollars
     And the pull requests table says the same of it
 
   @integration
-  Scenario: The per-model usage round-trips through the session row
-    Given a session that used two models, one of them unpriced, and consumed AI units
-    When the session row is written and read back
-    Then the row carries each model's tokens, cost, AI units and whether it was priced
-
-  @integration
-  Scenario: A session row from before the per-model usage column decodes with none
-    Given a session row written before the per-model usage column existed
-    When the row is read back
-    Then the session decodes with no per-model usage
+  Scenario: A model's AI units are summed from its per-call rows
+    Given per-call rows for two models, only one of which reported AI units
+    When the per-model totals are read
+    Then that model's AI units are the sum of its calls'
+    And the model whose calls reported none totals zero AI units

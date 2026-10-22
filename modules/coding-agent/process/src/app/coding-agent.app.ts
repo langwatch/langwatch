@@ -168,6 +168,8 @@ export class CodingAgentModule implements CodingAgentApi {
   };
 
   static create({ dependencies, repositories }: CodingAgentSetup): CodingAgentModule {
+    // One price list for the fold, its per-call rows and the reads that ask what it covers.
+    const modelProviders = ModelCatalogCostEstimatorService.create();
     const service = CodingAgentFeatureService.create({
       sessions: repositories.sessions,
       traceSessions: repositories.traceSessions,
@@ -177,6 +179,7 @@ export class CodingAgentModule implements CodingAgentApi {
       projects: dependencies.projects,
       billing: GovernanceCodingAgentBillingService.create({ governance: dependencies.governance }),
       clock: SystemCodingAgentClockService.create(),
+      modelProviders,
     });
     const scopeService = CodingAgentCallerScopeService.create({
       directory: CodingAgentScopeDirectoryService.create({
@@ -204,7 +207,7 @@ export class CodingAgentModule implements CodingAgentApi {
     const milestones = CodingAgentProjectMilestonesService.create();
     const processing = EventingCodingAgentProcessingAdapter.create({
       traceCanonicalisation: dependencies.traces,
-      modelProviders: ModelCatalogCostEstimatorService.create(),
+      modelProviders,
       costMetrics: OtelCodingAgentCostMetricsService.create(),
       projections: CodingAgentProjectionPersistenceService.create(repositories),
       projects: dependencies.projects,

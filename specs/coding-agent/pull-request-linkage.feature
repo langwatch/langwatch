@@ -662,24 +662,6 @@ Rule: Each pull request reports what every model consumed
     Then each model reports its own input, output and cache tokens
     And each model reports what it cost
 
-  # The per-call rows keep what the agent said it was billed, a drift signal
-  # (specs/coding-agent/session-aggregate.feature). A model's line prices the
-  # same tokens the session's cost does, so the lines add up to the total.
-  @unit
-  Scenario: Each model's cost is the one computed from its tokens, as the total is
-    Given a pull request fed by a session whose model calls reported their own cost
-    And the session kept its cost computed from tokens for each model
-    When the pull request usage is read
-    Then each model reports its computed cost, not the reported one
-    And the models' costs add up to the pull request's cost
-
-  @unit
-  Scenario: A session whose per-model record is incomplete falls back to its per-call rows
-    Given a session whose per-model record covers only some of its tokens
-    And per-call rows for every one of its model calls
-    When the pull request usage is read
-    Then each model's figures come from the per-call rows
-
   @unit
   Scenario: A model's cost is absent when no permitted project may be priced
     Given a pull request in a project the viewer may read but not price

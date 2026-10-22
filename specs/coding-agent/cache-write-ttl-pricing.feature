@@ -21,9 +21,8 @@ Feature: Prompt-cache writes are priced by how long they live
   keeps it. A Claude Code span says how many tokens were written but not how
   long they live, so its main-thread calls, which Claude Code writes to the
   hour-long cache, are recorded as hour-long writes and its other calls as
-  short-lived ones. The trace's per-span costs, the session's cost and each pull
-  request's model lines all price those same tokens with this one formula, so
-  they state one figure.
+  short-lived ones. The trace's per-span costs and the session's cost price
+  those same tokens with this one formula, so they state one figure.
 
   Scenario: The catalog's one cache-write price is the short-lived one
     Given an Anthropic model priced at 5 USD per million input tokens

@@ -55,34 +55,6 @@ export const codingAgentSessionContextUsageSchema: CodingAgentSessionContextUsag
   codingAgentSessionContextUsageSchemaDefinition;
 export type CodingAgentSessionContextUsage = z.infer<typeof codingAgentSessionContextUsageSchema>;
 
-/**
- * What a session's calls on one model spent under one working context ('' fields when unstamped),
- * kept for agents whose calls never reach the per-call fact table (migration 00123). `priced` turns
- * false once a call on the model had no price; `aiUnits` is a count, never a dollar figure.
- */
-const codingAgentSessionModelUsageSchemaDefinition = z
-  .object({
-    repositoryHost: z.string(),
-    repositoryOwner: z.string(),
-    repositoryName: z.string(),
-    branch: z.string(),
-    model: z.string(),
-    inputTokens: z.number(),
-    outputTokens: z.number(),
-    cacheReadTokens: z.number(),
-    cacheCreationTokens: z.number(),
-    costUsd: z.number(),
-    aiUnits: z.number(),
-    priced: z.boolean(),
-  })
-  .strict();
-export interface CodingAgentSessionModelUsageSchema extends Named<
-  typeof codingAgentSessionModelUsageSchemaDefinition
-> {}
-export const codingAgentSessionModelUsageSchema: CodingAgentSessionModelUsageSchema =
-  codingAgentSessionModelUsageSchemaDefinition;
-export type CodingAgentSessionModelUsage = z.infer<typeof codingAgentSessionModelUsageSchema>;
-
 /** The complete durable `coding_agent_sessions` read row. */
 const codingAgentSessionSchemaDefinition = z
   .object({
@@ -109,8 +81,6 @@ const codingAgentSessionSchemaDefinition = z
     gitBranches: z.array(z.string()),
     /** Where the session's usage went; empty on a row folded before 00099. */
     usageByContext: z.array(codingAgentSessionContextUsageSchema).default([]),
-    /** Per model and context; empty on a row folded before 00123 and for log-fed agents. */
-    usageByModel: z.array(codingAgentSessionModelUsageSchema).default([]),
     gitWorktree: z.string(),
     title: z.string(),
     titleSource: z.string(),
@@ -136,7 +106,6 @@ const codingAgentSessionSchemaDefinition = z
     cacheCreationTokens: z.number(),
     costUsd: z.number(),
     agentReportedCostUsd: z.number(),
-    aiUnits: z.number(),
     modelCallMs: z.number(),
     toolMs: z.number(),
     ttftMsTotal: z.number(),
@@ -255,9 +224,13 @@ export interface CodingAgentSessionEventSchema extends Named<
 export const codingAgentSessionEventSchema: CodingAgentSessionEventSchema =
   codingAgentSessionEventSchemaDefinition;
 
-/** One durable row in the ordered coding-agent session-event read model. */
+/**
+ * One durable row in the ordered coding-agent session-event read model. `aiUnits` is what the
+ * call consumed in its agent's AI units (migration 00123), a count beside the dollar figure;
+ * written for the pull-request read, not part of the events answer.
+ */
 const codingAgentSessionEventRecordSchemaDefinition = codingAgentSessionEventSchema
-  .safeExtend({ tenantId: z.string() })
+  .safeExtend({ tenantId: z.string(), aiUnits: z.number() })
   .strict();
 export interface CodingAgentSessionEventRecordSchema extends Named<
   typeof codingAgentSessionEventRecordSchemaDefinition
@@ -320,8 +293,6 @@ const codingAgentSessionBranchRecordSchemaDefinition = z
     gitBranches: z.array(z.string()),
     /** The split's ledger; empty on a row folded before 00099. */
     usageByContext: z.array(codingAgentSessionContextUsageSchema).default([]),
-    /** The per-model split of a span-fed session's usage; empty before 00123. */
-    usageByModel: z.array(codingAgentSessionModelUsageSchema).default([]),
     title: z.string(),
   })
   .strict();

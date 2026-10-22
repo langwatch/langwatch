@@ -23,6 +23,7 @@ import {
 } from "../../../../__tests__/fixtures/coding-agent.fixture.ts";
 import { MAX_USAGE_CONTEXTS } from "../../../../eventing/coding-agent-session-state.projection.ts";
 import { CodingAgentFeatureService } from "../../../../services/coding-agent.service.ts";
+import { ModelCatalogCostEstimatorService } from "../../../../services/model-catalog-cost-estimator.service.ts";
 import { USAGE_SESSION_WINDOW_MS } from "../coding-agent-personal-pull-request-read.service.ts";
 
 function serviceWith(input: {
@@ -40,6 +41,7 @@ function serviceWith(input: {
     projects: createTestProjects(),
     billing: input.billing ?? new TestBillingPolicy(),
     clock: new TestClock(),
+    modelProviders: ModelCatalogCostEstimatorService.create(),
   });
 }
 
@@ -474,15 +476,18 @@ describe("Coding Agent pull-request usage from the session's per-context record"
       cacheCreationTokens: 19_586,
       costUsd: 0.00319068,
       usageByContext: [elsewhere, here],
-      usageByModel: [elsewhere, here].map((usage) => ({
-        ...usage,
-        model: "gpt-6-luna",
-        aiUnits: usage.costUsd * 100,
-        priced: true,
-      })),
     });
+    // Its model calls' per-call rows, one total per context they were stamped with.
+    const events = new TestEvents();
+    events.modelTotals = [elsewhere, here].map((usage) => ({
+      ...usage,
+      tenantId: "project-1",
+      sessionId: "span-only",
+      model: "gpt-6-luna",
+      aiUnits: usage.costUsd * 100,
+    }));
 
-    const usage = await serviceFor(session).service.getPullRequestUsage(query);
+    const usage = await serviceFor(session, events).service.getPullRequestUsage(query);
 
     expect(usage.totals).toMatchObject({
       inputTokens: 6,

@@ -84,3 +84,10 @@ export const SPANS_REQUIRE_SESSION_KEY_AGENT_IDS: ReadonlySet<string> = new Set(
     (agent) => agent.id,
   ),
 );
+
+/** Agents whose per-call fact rows come from model-call spans, priced by the catalogue. */
+export const SPAN_FED_MODEL_CALL_AGENT_IDS: ReadonlySet<string> = new Set(
+  CODING_AGENT_REGISTRY.filter((agent) => agent.modelCallsOnSpansOnly === true).map(
+    (agent) => agent.id,
+  ),
+);

@@ -1,5 +1,4 @@
 import {
-  AI_UNITS_SESSION_FACT,
   EVENTS_FOLD_TOOL_RUNS_AGENT_IDS,
   genAiOperationRoleOf,
   type GenAiOperationRole,
@@ -7,9 +6,12 @@ import {
   SESSION_TITLE_FALLBACK_FACT_KEY,
   type SessionWorkingContext,
 } from "@langwatch/coding-agent-contract";
-import type { ModelCostEstimateInput } from "@langwatch/model-provider-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
 
+import {
+  genAiModelCallFacts,
+  modelCallCostInput,
+} from "../rules/coding-agent-model-call-facts.rules.ts";
 import type { CodingAgentCostEstimator } from "../services/model-catalog-cost-estimator.service.ts";
 import {
   type CodingAgentSessionStateProjection,
@@ -30,18 +32,8 @@ const CODEX = {
   // `HELPER_REQUEST` is a codex helper thread's request span: its one fact is the auxiliary mark.
   SPAN: { TURN: "session_task.turn", HELPER_REQUEST: "turn/start" },
 } as const;
-/** The GenAI semconv keys a codex turn and a declared model call both carry, canonicalised. */
-const GEN_AI = {
-  ATTR: {
-    INPUT_TOKENS: "gen_ai.usage.input_tokens",
-    OUTPUT_TOKENS: "gen_ai.usage.output_tokens",
-    CACHE_READ_TOKENS: "gen_ai.usage.cache_read.input_tokens",
-    CACHE_CREATION_TOKENS: "gen_ai.usage.cache_creation.input_tokens",
-    REQUEST_MODEL: "gen_ai.request.model",
-    RESPONSE_MODEL: "gen_ai.response.model",
-    TOOL_NAME: "gen_ai.tool.name",
-  },
-} as const;
+/** The GenAI semconv key a declared tool run names its tool by. */
+const GEN_AI_TOOL_NAME = "gen_ai.tool.name";
 /**
  * The spans whose tokens the fold counts as a model call, across every span-bearing agent. The
  * contribute service stamps exactly these with the session's declared working context, so the fold
@@ -209,7 +201,7 @@ export class CodingAgentSessionSpanProjection {
     });
   }
 
-  /** One priced model call charged to its context and, at the same computed cost, its model. */
+  /** One model call charged to its context at the cost computed from its tokens. */
   private chargePricedCall({
     before,
     folded,
@@ -221,20 +213,13 @@ export class CodingAgentSessionSpanProjection {
     facts: Record<string, unknown>;
     context: NonNullable<CodingAgentSessionSpanProjectionInput["context"]> | null;
   }): CodingAgentSessionData {
-    const charged = this.stateProjection.chargeContextUsage({
+    return this.stateProjection.chargeContextUsage({
       before,
       after: {
         ...folded,
-        costUsd: folded.costUsd + this.pricedFromTokens(facts, this.modelProviders),
+        costUsd: folded.costUsd + this.modelProviders.estimateCost(modelCallCostInput(facts)),
       },
       context,
-    });
-    return this.stateProjection.chargeModelUsage({
-      before,
-      after: charged,
-      context,
-      model: this.stateProjection.coerceString(facts.model),
-      priced: this.modelProviders.isPriced(this.costInput(facts)),
     });
   }
 
@@ -255,7 +240,7 @@ export class CodingAgentSessionSpanProjection {
     // declined foreign spans reusing this bare name, and one that still
     // arrives labeled as another agent contributes identity only.
     if (agent !== "codex" || isLogsOnly) return this.stateProjection.withIdentity(state, attrs);
-    const facts = this.genAiTokenFacts(attrs);
+    const facts = genAiModelCallFacts(attrs);
     // Fallback duration 0, not the span's: the turn's wall time includes the
     // tools that ran inside it, and zero reads honestly as "not measured".
     const before = this.stateProjection.withIdentity(state, attrs);
@@ -296,56 +281,22 @@ export class CodingAgentSessionSpanProjection {
 
     if (role === "toolRun") {
       return this.stateProjection.foldToolInvocation(before, {
-        attrs: { ...span.attrs, tool_name: span.attrs[GEN_AI.ATTR.TOOL_NAME] },
+        attrs: { ...span.attrs, tool_name: span.attrs[GEN_AI_TOOL_NAME] },
         failed: span.statusCode === SPAN_STATUS_ERROR,
         toolMs: durationMs,
         startedAtMs: span.startTimeUnixMs,
       });
     }
 
-    const facts = this.genAiTokenFacts(span.attrs);
-    // A chat span wraps one request and no tools, so its wall time is the call's latency.
+    const facts = genAiModelCallFacts(span.attrs);
+    // A chat span wraps one request and no tools, so its wall time is the call's latency. Its AI
+    // units and per-model figures land on the per-call fact table, never on the session row.
     const folded = this.stateProjection.foldModelCall({
       state: before,
       attrs: facts,
       fallbackDurationMs: durationMs,
     });
-    const charged = this.stateProjection.chargeContextUsage({
-      before,
-      after: {
-        ...folded,
-        costUsd: folded.costUsd + this.pricedFromTokens(facts, this.modelProviders),
-        // A state cached before the AI units column has none: read as 0, the sum stays a number.
-        aiUnits:
-          this.stateProjection.number(folded.aiUnits) +
-          this.stateProjection.number(span.attrs[AI_UNITS_SESSION_FACT]),
-      },
-      context,
-    });
-    // These calls never reach the per-call fact table, so the row keeps their per-model split.
-    return this.stateProjection.chargeModelUsage({
-      before,
-      after: charged,
-      context,
-      model: this.stateProjection.coerceString(facts.model),
-      priced: this.modelProviders.isPriced(this.costInput(facts)),
-    });
-  }
-
-  private pricedFromTokens(
-    facts: Record<string, unknown>,
-    modelProviders: CodingAgentCostEstimator,
-  ): number {
-    return modelProviders.estimateCost(this.costInput(facts));
-  }
-
-  private costInput(facts: Record<string, unknown>): ModelCostEstimateInput {
-    return {
-      attrs: facts,
-      model: this.stateProjection.coerceString(facts.model) ?? undefined,
-      promptTokens: this.stateProjection.number(facts.input_tokens),
-      completionTokens: this.stateProjection.number(facts.output_tokens),
-    };
+    return this.chargePricedCall({ before, folded, facts, context });
   }
 
   private claudeCallTokenFacts(
@@ -366,20 +317,6 @@ export class CodingAgentSessionSpanProjection {
       ...(writesLongLived
         ? { "gen_ai.usage.cache_creation_1h.input_tokens": cacheWriteTokens }
         : {}),
-    };
-  }
-
-  /** The fold's token facts off GenAI semconv keys, whose input the canonicaliser made disjoint. */
-  private genAiTokenFacts(attrs: Record<string, unknown>): Record<string, unknown> {
-    return {
-      ...attrs,
-      input_tokens: this.stateProjection.number(attrs[GEN_AI.ATTR.INPUT_TOKENS]),
-      output_tokens: this.stateProjection.number(attrs[GEN_AI.ATTR.OUTPUT_TOKENS]),
-      cache_read_tokens: this.stateProjection.number(attrs[GEN_AI.ATTR.CACHE_READ_TOKENS]),
-      cache_creation_tokens: this.stateProjection.number(attrs[GEN_AI.ATTR.CACHE_CREATION_TOKENS]),
-      model:
-        this.stateProjection.coerceString(attrs[GEN_AI.ATTR.REQUEST_MODEL]) ??
-        this.stateProjection.coerceString(attrs[GEN_AI.ATTR.RESPONSE_MODEL]),
     };
   }
 }

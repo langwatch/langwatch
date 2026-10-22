@@ -1,13 +1,12 @@
-import type {
-  CodingAgentContributorProject,
-  CodingAgentSessionBranchRecord,
+import {
+  type CodingAgentContributorProject,
+  type CodingAgentSessionBranchRecord,
+  SPAN_FED_MODEL_CALL_AGENT_IDS,
 } from "@langwatch/coding-agent-contract";
 
 import type { SessionModelTotalsRow } from "../../../repositories/coding-agent-session-event.repository.ts";
-import {
-  isCostUnknown,
-  isModelRecordComplete,
-} from "../../../rules/coding-agent-pull-request.rules.ts";
+import { isCostUnknown } from "../../../rules/coding-agent-pull-request.rules.ts";
+import type { CodingAgentCostEstimator } from "../../../services/model-catalog-cost-estimator.service.ts";
 
 export type CodingAgentUsageRow = {
   projectId: string;
@@ -47,14 +46,8 @@ export type CodingAgentModelUsage = {
   aiUnits: number | null;
 };
 
-/**
- * One (session, model, context) total the pull-request reads price: a per-call fact table row, or
- * a span-fed session's own per-model record. AI units are a count; `priced` false is unknown cost.
- */
-export type PullRequestModelTotalsRow = SessionModelTotalsRow & {
-  aiUnits: number;
-  priced: boolean;
-};
+/** One (session, model, context) per-call total the reads price; `priced` false is unknown cost. */
+export type PullRequestModelTotalsRow = SessionModelTotalsRow & { priced: boolean };
 
 type CodingAgentUsageTotals = {
   sessionsCount: number;
@@ -70,11 +63,13 @@ type CodingAgentUsageTotals = {
 
 /** Private value collaborator that keeps usage aggregation consistent across reads. */
 export class CodingAgentPullRequestUsageService {
-  static create(): CodingAgentPullRequestUsageService {
-    return new CodingAgentPullRequestUsageService();
+  static create(options: {
+    modelProviders: CodingAgentCostEstimator;
+  }): CodingAgentPullRequestUsageService {
+    return new CodingAgentPullRequestUsageService(options.modelProviders);
   }
 
-  private constructor() {}
+  private constructor(private readonly modelProviders: CodingAgentCostEstimator) {}
 
   ingestSourceType(agent: string): string {
     if (agent === "gemini_cli") {
@@ -266,9 +261,9 @@ export class CodingAgentPullRequestUsageService {
   }
 
   /**
-   * Every session's per-model totals: its own per-model record where it holds every token, since
-   * it prices them as the session's cost does; else its per-call rows, whose cost is the one the
-   * agent reported; else whatever record it has. A session is never counted from both.
+   * Each per-call total with whether its cost is known. A log-fed agent's cost is the one it
+   * reported, so it is; a span-fed agent's is computed from the catalogue, so a model no price
+   * covers reads as unknown, never as a confident zero.
    */
   modelTotalsOf({
     sessions,
@@ -277,25 +272,19 @@ export class CodingAgentPullRequestUsageService {
     sessions: readonly CodingAgentSessionBranchRecord[];
     eventTotals: readonly SessionModelTotalsRow[];
   }): PullRequestModelTotalsRow[] {
-    const keyOf = (row: { tenantId: string; sessionId: string }) =>
-      `${row.tenantId}\0${row.sessionId}`;
-    const logged = new Set(eventTotals.map(keyOf));
-    const fromRecord = sessions.filter(
-      (session) => isModelRecordComplete(session) || !logged.has(keyOf(session)),
-    );
-    const recordedKeys = new Set(fromRecord.map(keyOf));
-    const recorded = fromRecord.flatMap((session) =>
-      session.usageByModel.map((usage) => ({
-        ...usage,
-        tenantId: session.tenantId,
-        sessionId: session.sessionId,
-      })),
-    );
+    const agentOf = new Map(sessions.map((session) => [sessionKeyOf(session), session.agent]));
+    return eventTotals.map((total) => ({
+      ...total,
+      priced: this.isPricedAs({
+        agent: agentOf.get(sessionKeyOf(total)) ?? "",
+        model: total.model,
+      }),
+    }));
+  }
 
-    const fromEvents = eventTotals
-      .filter((total) => !recordedKeys.has(keyOf(total)))
-      .map((total) => ({ ...total, aiUnits: 0, priced: true }));
-    return [...fromEvents, ...recorded];
+  /** Whether an agent's cost on a model is known: see {@link modelTotalsOf}. */
+  isPricedAs({ agent, model }: { agent: string; model: string }): boolean {
+    return !SPAN_FED_MODEL_CALL_AGENT_IDS.has(agent) || this.modelProviders.isModelPriced(model);
   }
 
   modelUsage(

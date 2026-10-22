@@ -63,10 +63,7 @@ export function toCodingAgentSessionRow({
     cacheCreationTokens: state.cacheCreationTokens,
     costUsd: state.costUsd,
     agentReportedCostUsd: state.agentReportedCostUsd,
-    aiUnits: state.aiUnits,
     usageByContext: Object.values(state.usageByContext),
-    // A state cached before the per-model record has none.
-    usageByModel: Object.hasOwn(state, "usageByModel") ? Object.values(state.usageByModel) : [],
 
     modelCallMs: state.modelCallMs,
     toolMs: state.toolMs,
