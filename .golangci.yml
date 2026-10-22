@@ -152,6 +152,12 @@ linters:
       - dist
 
     rules:
+      # ragas 0.4.3 spells its SQL-equivalence JSON keys "explaination"; the Go port must match.
+      - path: services/nlpgo/modules/evaluators/
+        linters:
+          - misspell
+        text: "(?i)explaination"
+
       # Tests: relax rules that trade readability for strictness.
       #
       # funlen/gocognit are excluded because a table-driven test is one long
