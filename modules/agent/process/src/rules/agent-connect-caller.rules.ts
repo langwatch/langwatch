@@ -4,7 +4,10 @@ import type { RestResolvedProjectCredential } from "@langwatch/authorization";
 /** The keys that may connect a process: the door refuses an ingestion or Langy session key. */
 export const CONNECT_KEY_KINDS = ["api_key", "legacy_project_key"] as const;
 
-/** The scope a process needs to connect: a legacy project key holds it only on full access. */
+/**
+ * The scope a process needs to connect: a legacy key holds it on
+ * legacy_project_key_connected_agents or on full access.
+ */
 export const CONNECT_PERMISSION = "scenarios:manage";
 
 /**

@@ -1,5 +1,4 @@
 import type { AuthzPermission } from "@langwatch/authorization";
-import { z } from "zod";
 
 /**
  * Per-scope flags for a legacy project key (`Project.apiKey`), one entry per flag: each names
@@ -34,12 +33,7 @@ export const LEGACY_PROJECT_KEY_SCOPES = {
 
 export type LegacyProjectKeyScopeFlag = keyof typeof LEGACY_PROJECT_KEY_SCOPES;
 
-const SCOPE_FLAGS = Object.keys(LEGACY_PROJECT_KEY_SCOPES) as [
-  LegacyProjectKeyScopeFlag,
-  ...LegacyProjectKeyScopeFlag[],
-];
-
-export const legacyProjectKeyScopeFlagSchema = z.enum(SCOPE_FLAGS);
+const SCOPE_FLAGS = Object.keys(LEGACY_PROJECT_KEY_SCOPES) as LegacyProjectKeyScopeFlag[];
 
 /** The scope flags that grant this permission; empty when only full access does. */
 export function legacyProjectKeyScopeFlagsGranting(
