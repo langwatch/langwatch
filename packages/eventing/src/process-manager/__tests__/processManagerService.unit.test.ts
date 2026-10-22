@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { JsonSafetyError } from "../json.ts";
 import type { ProcessDefinition, ProcessRef } from "../processManager.types.ts";
-import { ProcessManagerService } from "../processManagerService.ts";
+import { DEFAULT_EVENT_REVISION_RETRIES, ProcessManagerService } from "../processManagerService.ts";
 import { InMemoryProcessStore } from "../stores/inMemoryProcessStore.ts";
 import {
   CONVERSATION_ID,
@@ -396,46 +396,130 @@ describe("ProcessManagerService", () => {
   });
 
   describe("given a concurrent commit bumps the revision mid-handling", () => {
-    it("reports a revision conflict without corrupting state", async () => {
-      await service.handleEvent({
-        envelope: pilotEvent({ eventId: "evt_start" }),
-        now: T0,
-      });
-
-      // Interleave a competing commit between the service's read and write.
+    /** Makes the next `count` reads race a competing commit that lands before the service writes. */
+    function interleaveCompetingCommits(count: number): { competingCommits: () => number } {
       const originalFindByRef = store.findByRef.bind(store);
-      let interleaved = false;
+      let committed = 0;
       store.findByRef = async <State = unknown>(params: { ref: ProcessRef }) => {
         const result = await originalFindByRef<State>(params);
-        if (!interleaved) {
-          interleaved = true;
+        if (committed < count && result) {
+          committed++;
           await store.commit({
             ref: pilotRef,
             tenantId: "tenant_1",
-            sourceEventId: "evt_competing",
-            expectedRevision: 1,
-            state: result!.state,
+            sourceEventId: `evt_competing_${committed}`,
+            expectedRevision: result.revision,
+            state: result.state,
             nextWakeAt: null,
             messages: [],
-            now: T0 + 1,
+            now: T0 + committed,
+          });
+        }
+        return result;
+      };
+      return { competingCommits: () => committed };
+    }
+
+    const toolCompleted = () =>
+      pilotEvent({
+        eventId: "evt_tool",
+        eventType: "langy.turn.tool-completed",
+        occurredAt: T0 + 10,
+        payload: { turnId: "turn_1" },
+      });
+
+    beforeEach(async () => {
+      await service.handleEvent({ envelope: pilotEvent({ eventId: "evt_start" }), now: T0 });
+    });
+
+    /** @scenario "An event that loses a revision race is re-applied to the winning revision" */
+    it("re-evolves against the winning revision and commits on top of it", async () => {
+      interleaveCompetingCommits(1);
+
+      const result = await service.handleEvent({ envelope: toolCompleted(), now: T0 + 10 });
+
+      expect(result).toMatchObject({ outcome: "committed", revision: 3 });
+      const instance = await store.findByRef<PilotState>({ ref: pilotRef });
+      expect(instance?.revision).toBe(3);
+      expect(instance?.state.lastActivityAt).toBe(T0 + 10);
+      expect(await store.hasConsumedSource({ ref: pilotRef, sourceEventId: "evt_tool" })).toBe(
+        true,
+      );
+    });
+
+    /** @scenario "An event that keeps losing its revision race is handed back to the queue" */
+    it("reports a revision conflict without corrupting state once its retries are spent", async () => {
+      const { competingCommits } = interleaveCompetingCommits(Number.POSITIVE_INFINITY);
+
+      const result = await service.handleEvent({ envelope: toolCompleted(), now: T0 + 10 });
+
+      expect(result.outcome).toBe("revisionConflict");
+      expect(competingCommits()).toBe(DEFAULT_EVENT_REVISION_RETRIES + 1);
+      const instance = await store.findByRef<PilotState>({ ref: pilotRef });
+      expect(instance?.revision).toBe(DEFAULT_EVENT_REVISION_RETRIES + 2);
+      expect(instance?.state.lastActivityAt).toBe(T0);
+      expect(await store.hasConsumedSource({ ref: pilotRef, sourceEventId: "evt_tool" })).toBe(
+        false,
+      );
+    });
+
+    it("reports the first conflict when retries are disabled", async () => {
+      service = new ProcessManagerService({
+        definition: pilotDefinition,
+        store,
+        eventRevisionRetries: 0,
+      });
+      const { competingCommits } = interleaveCompetingCommits(1);
+
+      const result = await service.handleEvent({ envelope: toolCompleted(), now: T0 + 10 });
+
+      expect(result.outcome).toBe("revisionConflict");
+      expect(competingCommits()).toBe(1);
+    });
+  });
+
+  describe("given the commit that won the race consumed the same event", () => {
+    /** @scenario "A race won by the same event stands down as a duplicate" */
+    it("stands down as a duplicate instead of applying the event twice", async () => {
+      await service.handleEvent({ envelope: pilotEvent({ eventId: "evt_start" }), now: T0 });
+      const envelope = pilotEvent({
+        eventId: "evt_tool",
+        eventType: "langy.turn.tool-completed",
+        occurredAt: T0 + 10,
+        payload: { turnId: "turn_1" },
+      });
+      const originalFindByRef = store.findByRef.bind(store);
+      let raced = false;
+      store.findByRef = async <State = unknown>(params: { ref: ProcessRef }) => {
+        const result = await originalFindByRef<State>(params);
+        if (!raced && result) {
+          raced = true;
+          // A redelivery of the same event commits first.
+          await new ProcessManagerService({ definition: pilotDefinition, store }).handleEvent({
+            envelope,
+            now: T0 + 10,
           });
         }
         return result;
       };
 
-      const result = await service.handleEvent({
-        envelope: pilotEvent({
-          eventId: "evt_tool",
-          eventType: "langy.turn.tool-completed",
-          occurredAt: T0 + 10,
-          payload: { turnId: "turn_1" },
-        }),
-        now: T0 + 10,
-      });
+      const result = await service.handleEvent({ envelope, now: T0 + 10 });
 
-      expect(result.outcome).toBe("revisionConflict");
-      const instance = await store.findByRef({ ref: pilotRef });
-      expect(instance?.revision).toBe(2);
+      expect(result.outcome).toBe("duplicateEvent");
+      expect((await store.findByRef({ ref: pilotRef }))?.revision).toBe(2);
+    });
+  });
+
+  describe("given a negative event revision retry count", () => {
+    it("refuses to construct", () => {
+      expect(
+        () =>
+          new ProcessManagerService({
+            definition: pilotDefinition,
+            store,
+            eventRevisionRetries: -1,
+          }),
+      ).toThrow("eventRevisionRetries must be a non-negative safe integer");
     });
   });
 
