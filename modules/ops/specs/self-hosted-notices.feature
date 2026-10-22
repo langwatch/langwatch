@@ -31,6 +31,13 @@ Feature: A self-hosted install shows the notices LangWatch sends
     When the status is read
     Then no notices are named
 
+  @unit
+  Scenario: An operator can opt out of notices and keep the usage report
+    Given DISABLE_LANGWATCH_NOTICES is set and cloud's reply names a notice
+    When the install sends its daily report
+    Then the report is sent
+    And no notice is kept or named
+
   @integration
   Scenario: The Upgrades overview shows notices above everything else
     Given a kept security notice "Vulnerability in prompt sharing" fixed in 3.4.2 and an info notice

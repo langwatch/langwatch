@@ -91,7 +91,7 @@ const OPS_HEALTH = {
   migrations: { tenant_split_v2: { parked: 1, rolled_back: 0 } },
 };
 
-function service({ disabled = false, isSaas = false } = {}) {
+function service({ disabled = false, isSaas = false, noticesDisabled = false } = {}) {
   return UsageReportService.create({
     collection: UsageReportCollectionService.create({
       peers: state.peers(),
@@ -118,6 +118,7 @@ function service({ disabled = false, isSaas = false } = {}) {
     latestReleases,
     notices,
     disabled,
+    noticesDisabled,
     isSaas,
     now: () => NOW,
   });
@@ -257,6 +258,17 @@ describe("given cloud's reply names notices", () => {
     it("names none", async () => {
       await notices.save([notice("n1")]);
       expect(await service({ disabled: true }).findNotices()).toEqual([]);
+    });
+  });
+
+  describe("when the operator opted out of notices", () => {
+    /** @scenario "An operator can opt out of notices and keep the usage report" */
+    it("still sends the report, but keeps and names no notices", async () => {
+      await notices.save([notice("n0")]);
+      channel.notices = [notice("n1")];
+      expect(await service({ noticesDisabled: true }).send()).toBe("sent");
+      expect(await notices.find()).toEqual([]);
+      expect(await service({ noticesDisabled: true }).findNotices()).toEqual([]);
     });
   });
 

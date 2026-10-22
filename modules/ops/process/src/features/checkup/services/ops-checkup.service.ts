@@ -139,6 +139,7 @@ export class OpsCheckupService {
       latestReleases: repositories.cloudLatestRelease,
       notices: repositories.cloudNotices,
       disabled: config.usageStats.disabled,
+      noticesDisabled: config.noticesDisabled,
       isSaas: facts.isSaas,
       now: nowInstant,
     });

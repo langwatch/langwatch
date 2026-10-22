@@ -62,6 +62,8 @@ interface UsageReportServiceDependencies {
   readonly notices: CloudNoticeRepository;
   /** DISABLE_USAGE_STATS. */
   readonly disabled: boolean;
+  /** DISABLE_LANGWATCH_NOTICES: the reply's notices are never kept. */
+  readonly noticesDisabled: boolean;
   readonly isSaas: boolean;
   readonly now: () => Instant;
 }
@@ -121,7 +123,8 @@ export class UsageReportService {
       await this.deps.latestReleases.save(answer.latestRelease).catch((error: unknown) => {
         logger.warn({ instanceId, error }, "could not keep the latest release cloud named");
       });
-      await this.deps.notices.save(answer.notices).catch((error: unknown) => {
+      const kept = this.deps.noticesDisabled ? [] : answer.notices;
+      await this.deps.notices.save(kept).catch((error: unknown) => {
         logger.warn({ instanceId, error }, "could not keep the notices cloud named");
       });
       logger.info({ instanceId }, "usage stats sent");
@@ -143,7 +146,7 @@ export class UsageReportService {
 
   /** The notices cloud last named; empty when this install does not report usage. */
   async findNotices(): Promise<SelfHostedNotice[]> {
-    if (this.deps.isSaas || this.deps.disabled) return [];
+    if (this.deps.isSaas || this.deps.disabled || this.deps.noticesDisabled) return [];
     return this.deps.notices.find();
   }
 

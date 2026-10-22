@@ -31,6 +31,7 @@ const CONFIG: OpsServerConfig = {
   clickhouseOpsUrl: undefined,
   usageStats: { disabled: false, installMethod: undefined, chartVersion: undefined },
   collectClickHouseBackupMetrics: true,
+  noticesDisabled: false,
   upgradeDiagnosticsAutoSendDisabled: false,
   productAnalytics: { key: undefined, host: undefined },
   grafana: { baseUrl: undefined, tempoDatasourceUid: undefined, lokiDatasourceUid: undefined },

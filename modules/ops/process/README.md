@@ -2640,19 +2640,20 @@ Run by the tasks process, before serve.
 | config | `usageStats.disabled`                | `DISABLE_USAGE_STATS`                   | `../contract/src/ops.config.ts:34` |
 | config | `usageStats.installMethod`           | `INSTALL_METHOD`                        | `../contract/src/ops.config.ts:35` |
 | config | `usageStats.chartVersion`            | `LANGWATCH_CHART_VERSION`               | `../contract/src/ops.config.ts:37` |
-| config | `upgradeDiagnosticsAutoSendDisabled` | `DISABLE_UPGRADE_DIAGNOSTICS_AUTO_SEND` | `../contract/src/ops.config.ts:40` |
-| config | `collectClickHouseBackupMetrics`     | `CLICKHOUSE_BACKUP_METRICS_ENABLED`     | `../contract/src/ops.config.ts:44` |
-| config | `productAnalytics.key`               | `POSTHOG_KEY`                           | `../contract/src/ops.config.ts:51` |
-| config | `productAnalytics.host`              | `POSTHOG_HOST`                          | `../contract/src/ops.config.ts:51` |
-| config | `grafana`                            | `GRAFANA_BASE_URL`                      | `../contract/src/ops.config.ts:53` |
-| config | `bugReportSlackChannel`              | `SLACK_BUG_REPORTS_CHANNEL`             | `../contract/src/ops.config.ts:55` |
-| config | `slackApiBase`                       | `SLACK_API_BASE`                        | `../contract/src/ops.config.ts:57` |
-| config | `cloudOps`                           | `LANGWATCH_CLOUD_OPS`                   | `../contract/src/ops.config.ts:59` |
-| config | `adminEmails`                        | `ADMIN_EMAILS`                          | `../contract/src/ops.config.ts:61` |
-| config | `nodeEnvironment`                    | `NODE_ENV`                              | `../contract/src/ops.config.ts:63` |
-| config | `isSaas`                             | `IS_SAAS`                               | `../contract/src/ops.config.ts:64` |
-| config | `publicBaseUrl`                      | `BASE_HOST`                             | `../contract/src/ops.config.ts:65` |
-| config | `serviceVersion`                     | `SERVICE_VERSION`                       | `../contract/src/ops.config.ts:67` |
-| config | `otelResourceAttributes`             | `OTEL_RESOURCE_ATTRIBUTES`              | `../contract/src/ops.config.ts:68` |
+| config | `noticesDisabled`                    | `DISABLE_LANGWATCH_NOTICES`             | `../contract/src/ops.config.ts:40` |
+| config | `upgradeDiagnosticsAutoSendDisabled` | `DISABLE_UPGRADE_DIAGNOSTICS_AUTO_SEND` | `../contract/src/ops.config.ts:42` |
+| config | `collectClickHouseBackupMetrics`     | `CLICKHOUSE_BACKUP_METRICS_ENABLED`     | `../contract/src/ops.config.ts:46` |
+| config | `productAnalytics.key`               | `POSTHOG_KEY`                           | `../contract/src/ops.config.ts:53` |
+| config | `productAnalytics.host`              | `POSTHOG_HOST`                          | `../contract/src/ops.config.ts:53` |
+| config | `grafana`                            | `GRAFANA_BASE_URL`                      | `../contract/src/ops.config.ts:55` |
+| config | `bugReportSlackChannel`              | `SLACK_BUG_REPORTS_CHANNEL`             | `../contract/src/ops.config.ts:57` |
+| config | `slackApiBase`                       | `SLACK_API_BASE`                        | `../contract/src/ops.config.ts:59` |
+| config | `cloudOps`                           | `LANGWATCH_CLOUD_OPS`                   | `../contract/src/ops.config.ts:61` |
+| config | `adminEmails`                        | `ADMIN_EMAILS`                          | `../contract/src/ops.config.ts:63` |
+| config | `nodeEnvironment`                    | `NODE_ENV`                              | `../contract/src/ops.config.ts:65` |
+| config | `isSaas`                             | `IS_SAAS`                               | `../contract/src/ops.config.ts:66` |
+| config | `publicBaseUrl`                      | `BASE_HOST`                             | `../contract/src/ops.config.ts:67` |
+| config | `serviceVersion`                     | `SERVICE_VERSION`                       | `../contract/src/ops.config.ts:69` |
+| config | `otelResourceAttributes`             | `OTEL_RESOURCE_ATTRIBUTES`              | `../contract/src/ops.config.ts:70` |
 
 <!-- readme:generated:end -->
