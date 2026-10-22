@@ -321,6 +321,7 @@ describe("the fence over a span read", () => {
     });
 
     describe("when the cache key is taken", () => {
+      /** @scenario "A compiled condition carries the compiler's version" */
       it("changes with a braid's tree and compiler version, and holds for the same proof", () => {
         const key = (grants: GrantInput[]) =>
           tenantScopeKey({ authorization: proof(grants), reads: "spans" });

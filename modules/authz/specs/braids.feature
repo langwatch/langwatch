@@ -221,9 +221,7 @@ Feature: Braids
       Then the braid is accepted
       And every "specialists" span sharing a trace id with an "orchestrator" trace is braided
 
-    # Unimplemented until the fence's cache-key test ("when the cache key is taken") names this
-    # scenario; the stored version and the read scope key are bound in modules/authz.
-    @unit @unimplemented
+    @unit
     Scenario: A compiled condition carries the compiler's version
       When ana saves a braid with a condition
       Then the stored condition carries the compiler version that compiled it
