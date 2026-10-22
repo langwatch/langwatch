@@ -2,11 +2,7 @@
 // never inline data: a deployment chains onto a default, it never assembles one.
 
 export { BrowserOriginGuard, type OriginBearingRequest } from "./browser-origin.ts";
-export {
-  ClientAddress,
-  type AddressedRequest,
-  type ClientAddressReporter,
-} from "./client-address.ts";
+export { ClientAddress, type AddressedRequest } from "./client-address.ts";
 export {
   ContentSecurityPolicy,
   storageConnectSources,

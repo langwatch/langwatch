@@ -1,9 +1,10 @@
 /**
- * Which address a request actually came from, behind this deployment's own
- * hops. Resolved ONCE at the door for every request: a per-IP limit on the
- * tRPC side and one on a REST route must not disagree about who is calling.
+ * Which address a request came from, resolved ONCE at the door. A header is read only from a
+ * socket peer inside TRUSTED_PROXY_ADDRESSES, never because the peer is private.
+ * Spec: specs/security/trusted-client-address.feature
  */
-import { isIP } from "node:net";
+import type { IncomingMessage } from "node:http";
+import { BlockList, isIP } from "node:net";
 
 /** The parts of a request this answer is read from, whatever framework carries it. */
 export type AddressedRequest = Readonly<{
@@ -13,51 +14,22 @@ export type AddressedRequest = Readonly<{
   socketAddress?: string | undefined;
 }>;
 
-/** In order of preference; the first that yields an untrusted hop wins. */
-const ADDRESS_HEADERS = [
-  "cf-connecting-ip", // Cloudflare
-  "x-forwarded-for", // AWS ELB and general proxy
-  "x-forwarded", // AWS ELB
-  "x-real-ip", // Nginx proxy
-  "x-client-ip", // Apache
-  "forwarded-for", // General forwarded header
-  "forwarded", // General forwarded header
-  "true-client-ip", // Akamai and Cloudflare
-  "x-cluster-client-ip", // Rackspace LB, Riverbed Stingray
-  "fastly-client-ip", // Fastly CDN
-] as const;
+/** The chain every proxy appends the address it received the request from to. */
+const FORWARDED_FOR_HEADER = "x-forwarded-for";
 
-/**
- * Ranges unreachable from the public internet, so an address in one belongs to
- * the operator's own network. Carrier-grade NAT (100.64.0.0/10) is deliberately
- * absent: mobile carriers put subscribers there, so it is a caller, not a hop.
- */
-const PRIVATE_IPV4_RANGES = [
-  "10.0.0.0/8",
-  "172.16.0.0/12",
-  "192.168.0.0/16",
-  "127.0.0.0/8",
-  "169.254.0.0/16",
-] as const;
-
-/** What this class reports to, so it depends on no logging implementation. */
-export type ClientAddressReporter = Readonly<{
-  warn: (context: object, message: string) => void;
-}>;
+/** Written by Cloudflare, and by anyone reaching the origin directly: read only when trusted. */
+const CLOUDFLARE_ADDRESS_HEADER = "cf-connecting-ip";
 
 export class ClientAddress {
   /**
-   * The hops this deployment trusts. Three-valued on purpose: an absent list
-   * classifies the peer by address, an EMPTY list means "trust nothing", and a
-   * populated one is the operator's exact answer.
+   * The hops this deployment trusts, as IPv4/IPv6 addresses or CIDR ranges; absent or empty, no
+   * header is read. `trustCloudflare` honours CF-Connecting-IP, still only from a trusted peer.
    */
-  static fromTrustedProxies(config: { addresses?: readonly string[] | undefined }): ClientAddress {
-    return new ClientAddress(config.addresses);
-  }
-
-  /** No list at all: a private peer counts as infrastructure, a public one does not. */
-  static classifyByAddress(): ClientAddress {
-    return new ClientAddress(void 0);
+  static fromTrustedProxies(config: {
+    addresses?: readonly string[] | undefined;
+    trustCloudflare?: boolean | undefined;
+  }): ClientAddress {
+    return new ClientAddress(trustedSet(config.addresses ?? []), config.trustCloudflare === true);
   }
 
   /**
@@ -65,17 +37,20 @@ export class ClientAddress {
    * second time, which is what keeps two counters over one caller from
    * disagreeing about who that caller is.
    */
-  static resolvedFor(request: Request): string | undefined {
+  static resolvedFor(request: Request | IncomingMessage): string | undefined {
     return (request as { [RESOLVED]?: string })[RESOLVED];
   }
 
-  /**
-   * Said once, not once per request: this is a deployment fact, and repeating
-   * it on a hot path would bury the thing it is trying to point at.
-   */
-  #announced = false;
+  /** A request rebuilt from another (a buffered body, a rewritten path) keeps its caller. */
+  static carried({ from, to }: { from: Request; to: Request }): Request {
+    stamp(to, ClientAddress.resolvedFor(from));
+    return to;
+  }
 
-  private constructor(private readonly trusted: readonly string[] | undefined) {}
+  private constructor(
+    private readonly trusted: BlockList | undefined,
+    private readonly trustCloudflare: boolean,
+  ) {}
 
   /**
    * As the mux's middleware: resolved ONCE, before routing, and left on the
@@ -83,143 +58,116 @@ export class ClientAddress {
    * decides who called, never what they are told.
    */
   handle(exchange: { request: Request; socketAddress: string | undefined }): void {
-    const address = this.of({
-      header: (name) => exchange.request.headers.get(name) ?? void 0,
-      ...(exchange.socketAddress ? { socketAddress: exchange.socketAddress } : {}),
-    });
+    stamp(
+      exchange.request,
+      this.of({
+        header: (name) => exchange.request.headers.get(name) ?? void 0,
+        ...(exchange.socketAddress ? { socketAddress: exchange.socketAddress } : {}),
+      }),
+    );
+  }
 
-    if (address === void 0) return;
-
-    Object.defineProperty(exchange.request, RESOLVED, { value: address, configurable: true });
+  /** The same answer for a raw Node request, which a raw door reads ahead of the mux. */
+  handleIncoming(request: IncomingMessage): void {
+    stamp(
+      request,
+      this.of({
+        header: (name) => {
+          const value = request.headers[name];
+          return Array.isArray(value) ? value.join(",") : value;
+        },
+        ...(request.socket?.remoteAddress ? { socketAddress: request.socket.remoteAddress } : {}),
+      }),
+    );
   }
 
   /**
-   * The caller's address: the socket, unless the request arrived from one of
-   * this deployment's own hops, in which case the rightmost hop no trusted
-   * proxy wrote.
+   * The socket, unless the peer is a declared hop; from one, the address Cloudflare names when
+   * trusted, else the rightmost forwarded-for hop no trusted proxy wrote.
    */
-  of(request: AddressedRequest, reporter?: ClientAddressReporter): string | undefined {
+  of(request: AddressedRequest): string | undefined {
     const socket = request.socketAddress ? (parseAddress(request.socketAddress) ?? void 0) : void 0;
-    if (reporter) this.announceUndeclaredPublicProxyOnce(request, socket, reporter);
+    if (socket === void 0 || !this.isTrustedHop(socket)) return socket;
 
-    if (socket === void 0 || !this.isInfrastructureHop(socket)) return socket;
+    const cloudflare = this.trustCloudflare ? cloudflareAddress(request) : void 0;
+    if (cloudflare !== void 0) return cloudflare;
 
     return this.forwardedAddress(request) ?? socket;
   }
 
-  /**
-   * Whether an address is this deployment's own hop rather than a caller. With a list present the
-   * operator has answered exactly; absent, a private peer counts as infrastructure, which is what
-   * keeps visitors behind one office router from sharing a single signed-out budget.
-   */
-  private isInfrastructureHop(address: string): boolean {
-    if (this.trusted === void 0) return isPrivateAddress(address);
+  private isTrustedHop(address: string): boolean {
+    if (!this.trusted) return false;
 
-    return this.trusted.some((entry) =>
-      entry.includes("/") ? withinIpv4Range(address, entry) : entry === address,
-    );
+    return this.trusted.check(address, isIP(address) === 6 ? "ipv6" : "ipv4");
   }
 
   private forwardedAddress(request: AddressedRequest): string | undefined {
-    for (const name of ADDRESS_HEADERS) {
-      const value = request.header(name);
-      if (!value) continue;
+    const hops = (request.header(FORWARDED_FOR_HEADER) ?? "").split(",");
 
-      const hops = value.split(",");
+    for (let index = hops.length - 1; index >= 0; index--) {
+      const address = parseAddress(hops[index] ?? "");
+      if (address === null) continue;
 
-      for (let index = hops.length - 1; index >= 0; index--) {
-        const address = parseAddress(hops[index] ?? "");
-        if (address === null) continue;
-
-        if (!this.isInfrastructureHop(address)) return address;
-      }
+      if (!this.isTrustedHop(address)) return address;
     }
 
     return void 0;
   }
-
-  /**
-   * A proxy on a public address nobody declared: a private hop is recognised,
-   * but a public one is indistinguishable from a caller, so every visitor
-   * behind it shares one signed-out budget. Only a declared list tells them apart.
-   */
-  private announceUndeclaredPublicProxyOnce(
-    request: AddressedRequest,
-    socket: string | undefined,
-    reporter: ClientAddressReporter,
-  ): void {
-    if (this.#announced) return;
-
-    if (this.trusted !== void 0 && this.trusted.length > 0) return;
-
-    if (!request.header("x-forwarded-for")) return;
-
-    if (socket === void 0 || isPrivateAddress(socket)) return;
-
-    this.#announced = true;
-
-    reporter.warn(
-      { setting: "TRUSTED_PROXY_ADDRESSES" },
-      "Ignored a forwarded-for header from a public peer, so signed-out authentication limits are counting that peer rather than the caller behind it. If it is this deployment's proxy, name it in TRUSTED_PROXY_ADDRESSES.",
-    );
-  }
 }
 
-/** Where the one resolved address is left for everything behind the mux. */
+/** Where the one resolved address is left for everything behind the door. */
 const RESOLVED = Symbol.for("langwatch.api.clientAddress");
 
-/** One address, or nothing when the text is not one. */
-function parseAddress(value: string): string | null {
-  const address = value.replace(/^\s*::ffff:/, "").trim();
+function stamp(request: object, address: string | undefined): void {
+  if (address === void 0) return;
 
-  return isIP(address) === 0 ? null : address;
+  Object.defineProperty(request, RESOLVED, { value: address, configurable: true });
 }
 
-function isPrivateAddress(address: string): boolean {
-  if (isIP(address) === 4) {
-    return PRIVATE_IPV4_RANGES.some((range) => withinIpv4Range(address, range));
+/**
+ * The declared hops as one membership test; an entry that is neither an
+ * address nor a range matches nothing. Empty means no hop is trusted.
+ */
+function trustedSet(entries: readonly string[]): BlockList | undefined {
+  const set = new BlockList();
+  let declared = 0;
+
+  for (const entry of entries) {
+    const [network = "", prefix] = entry.trim().split("/");
+    const address = parseAddress(network);
+    if (address === null) continue;
+
+    const family = isIP(address) === 6 ? "ipv6" : "ipv4";
+    if (prefix === void 0) {
+      set.addAddress(address, family);
+      declared++;
+      continue;
+    }
+
+    const bits = Number(prefix);
+    const widest = family === "ipv6" ? 128 : 32;
+    if (!Number.isInteger(bits) || bits < 0 || bits > widest) continue;
+
+    set.addSubnet(address, bits, family);
+    declared++;
   }
 
-  return isPrivateIpv6(address);
+  return declared === 0 ? void 0 : set;
 }
 
-/** Loopback (`::1`), unique-local (`fc00::/7`) and link-local (`fe80::/10`). */
-function isPrivateIpv6(address: string): boolean {
-  if (isIP(address) !== 6) return false;
+/** The one address Cloudflare names; anything else in the header (a list, a word) is ignored. */
+function cloudflareAddress(request: AddressedRequest): string | undefined {
+  const value = request.header(CLOUDFLARE_ADDRESS_HEADER);
+  if (!value || value.includes(",")) return void 0;
 
-  const normalized = address.toLowerCase();
-  if (normalized === "::1") return true;
-
-  const firstGroup = normalized.split(":")[0];
-  if (!firstGroup) return false;
-
-  const group = Number.parseInt(firstGroup, 16);
-  if (Number.isNaN(group)) return false;
-
-  return (group & 0xfe_00) === 0xfc_00 || (group & 0xff_c0) === 0xfe_80;
+  return parseAddress(value) ?? void 0;
 }
 
-/** IPv4 prefix membership; anything unparsable matches nothing. */
-function withinIpv4Range(address: string, range: string): boolean {
-  const [network, prefix] = range.split("/");
-  const bits = Number(prefix);
-  const hasValidPrefix = network !== void 0 && Number.isInteger(bits) && bits >= 0 && bits <= 32;
-  if (!hasValidPrefix) return false;
+/** One address, or nothing when the text is not one. An IPv4-mapped IPv6 address is its IPv4. */
+function parseAddress(value: string): string | null {
+  const trimmed = value.trim();
+  const unmapped = trimmed.replace(/^::ffff:/i, "");
+  const address = isIP(unmapped) === 4 ? unmapped : trimmed;
 
-  const target = ipv4AsNumber(address);
-  const base = ipv4AsNumber(network);
-  if (target === null || base === null) return false;
-
-  const mask = bits === 0 ? 0 : (0xff_ff_ff_ff << (32 - bits)) >>> 0;
-
-  return (target & mask) === (base & mask);
-}
-
-function ipv4AsNumber(address: string): number | null {
-  if (isIP(address) !== 4) return null;
-
-  const octets = address.split(".").map(Number);
-  if (octets.some((octet) => octet > 255)) return null;
-
-  return octets.reduce((total, octet) => ((total << 8) | octet) >>> 0, 0);
+  return isIP(address) === 0 ? null : address.toLowerCase();
 }

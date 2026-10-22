@@ -6,7 +6,7 @@ import type { ScopedSecrets } from "@langwatch/secrets";
 import type { ExposedSurface } from "../process-supply.ts";
 import { apiSurface, instanceAdminDoor } from "./api-surface.ts";
 import { resolveUiBundle } from "./bundle-config.ts";
-import { apiOwner, type ApiHostConfig } from "./config-owner.ts";
+import { apiOwner, cloudflareTrustOf, type ApiHostConfig } from "./config-owner.ts";
 
 export async function processSurface({
   config,
@@ -48,6 +48,7 @@ export async function processSurface({
     bundle,
     instanceAdmin,
     trustedProxies: config.trustedProxies,
+    trustCloudflare: cloudflareTrustOf(config),
     executionProxyBaseUrl,
     publicBaseUrl,
     production,

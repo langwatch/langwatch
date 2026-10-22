@@ -7,6 +7,7 @@ import type { Actor, AuthzDeclaredScopeId } from "@langwatch/authorization";
 import type { FeatureApiIdentity, ModuleApiToken, ModuleName } from "@langwatch/module";
 
 import type { RestCaller } from "../hosting/api-door.ts";
+import { ClientAddress } from "../policy/client-address.ts";
 import { bearerTokenOf } from "./bearer-identity.ts";
 import type { RestDoor } from "./request.ts";
 import type { RestProtocolRefusal } from "./response-kind.ts";
@@ -107,6 +108,7 @@ const PRESENTED: {
       path: new URL(request.url).pathname,
       method: request.method,
       header: (name) => request.headers.get(name) ?? undefined,
+      clientAddress: ClientAddress.resolvedFor(request),
     }),
   }),
 };

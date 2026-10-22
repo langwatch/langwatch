@@ -186,6 +186,12 @@ export const browserSessionContext = defineMiddlewareContext(
   z.object({ id: z.string().min(1) }).nullable(),
 );
 
+/**
+ * The caller's address as the door resolved it (ClientAddress), or null where none was. Each module
+ * whose routes name it provides it with `callerAddressOfRequest`; no route reads a proxy header.
+ */
+export const callerAddressContext = defineMiddlewareContext("callerAddress", z.string().nullable());
+
 /** What a superseded family or route answers with, and what replaces it. */
 export type RestDeprecation = Readonly<{
   /** The path of the family or route that replaces this one. */

@@ -36,6 +36,7 @@ import {
   type ResolvedError,
 } from "../errors.ts";
 import type { RestIdentity } from "../hosting/api-door.ts";
+import { ClientAddress } from "../policy/client-address.ts";
 import type { ResponseCache } from "../ports.ts";
 import { parseApiSchema, type ApiSchema, type ApiSchemaOutput } from "../schema.ts";
 import type { RestDoorCredential } from "./declaration.ts";
@@ -683,12 +684,14 @@ export async function isBodyAbsent(request: HonoRequest): Promise<boolean> {
 
 /** The request a route reads after the body has been drained to measure it. */
 function withBufferedBody(request: Request, body: Uint8Array<ArrayBuffer>): Request {
-  return new Request(request.url, {
+  const buffered = new Request(request.url, {
     method: request.method,
     headers: request.headers,
     body,
     signal: request.signal,
   });
+
+  return ClientAddress.carried({ from: request, to: buffered });
 }
 
 /** Caps the size of a request body, rejecting anything larger with 413. */

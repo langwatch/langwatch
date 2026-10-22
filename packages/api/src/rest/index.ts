@@ -31,6 +31,7 @@ export {
 // a route states its sources, its answers and its door with.
 export {
   browserSessionContext,
+  callerAddressContext,
   defineRestRouter,
   permissionOf,
   projectRequestContext,
@@ -154,6 +155,7 @@ export {
   type AppRestProjectVariables,
   browserCallerOfRequest,
   browserSessionOfRequest,
+  callerAddressOfRequest,
   credentialPrincipalOf,
   credentialPrincipalOfToken,
   keyCredentialOfRequest,

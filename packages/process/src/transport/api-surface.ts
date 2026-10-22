@@ -60,6 +60,8 @@ export type ApiSurfaceComposition = Readonly<{
   bundle: ApiUiBundle | undefined;
   instanceAdmin: RestIdentity;
   trustedProxies: readonly string[] | undefined;
+  /** TRUST_CLOUDFLARE_CLIENT_IP: honour CF-Connecting-IP from a peer inside `trustedProxies`. */
+  trustCloudflare?: boolean | undefined;
   executionProxyBaseUrl: string | undefined;
   /** The deployment's public address, which a proxy in front of the API may hide from it. */
   publicBaseUrl: string | undefined;
@@ -204,15 +206,24 @@ class ApiSurface {
     });
     this.#rest?.assertEveryRouteDeclared();
     const api = composeApiApplication({ rest: this.#rest, trpc: this.#trpc }, selected);
+    const clientAddress = ClientAddress.fromTrustedProxies({
+      addresses: composition.trustedProxies,
+      trustCloudflare: composition.trustCloudflare,
+    });
     const mux = HttpMux.create({ reporter: composition.logger })
-      .use(ClientAddress.fromTrustedProxies({ addresses: composition.trustedProxies }))
+      .use(clientAddress)
       .use(SecurityHeaders.strict({ production: composition.production }))
       .route("/api", api, { onFailure: answerApiFailure });
     for (const path of apiRootPaths(api))
       mux.route(path, api, { onFailure: answerApiFailure, exact: true });
     for (const document of selected.documents)
       mux.route(document.path, FramedDocument.create(document));
-    return composition.doors.ahead(mux.route("/", page).handler);
+    const listener = composition.doors.ahead(mux.route("/", page).handler);
+    // A raw door (hosted MCP) answers ahead of the mux, so it reads the same resolved address.
+    return (request, response) => {
+      clientAddress.handleIncoming(request);
+      return listener(request, response);
+    };
   }
 
   #browserDoor(): RestIdentity {
