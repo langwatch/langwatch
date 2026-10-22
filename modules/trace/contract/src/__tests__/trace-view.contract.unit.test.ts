@@ -140,6 +140,7 @@ describe("trace view contract", () => {
       "attributes",
       "privacy",
       "projectId",
+      "braided",
     ]);
     expect(Object.keys(spanDetailSchema.shape)).toEqual([
       "spanId",
@@ -167,8 +168,13 @@ describe("trace view contract", () => {
       "params",
       "events",
       "costSuggestion",
+      "braid",
     ]);
-    expect(Object.keys(spanLangwatchSignalsSchema.shape)).toEqual(["spanId", "signals"]);
+    expect(Object.keys(spanLangwatchSignalsSchema.shape)).toEqual([
+      "spanId",
+      "signals",
+      "ownerProjectId",
+    ]);
     expect(Object.keys(conversationContextSchema.shape)).toEqual([
       "conversationId",
       "total",
