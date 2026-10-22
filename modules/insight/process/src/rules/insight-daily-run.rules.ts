@@ -14,6 +14,8 @@ import {
 } from "@langwatch/insight-contract";
 import { Temporal } from "@langwatch/time";
 
+import { isBoardHealthKey } from "./insight-board-health.rules.ts";
+
 function digest(parts: readonly string[]): string {
   return createHash("sha256").update(parts.join("\u0000")).digest("hex").slice(0, 32);
 }
@@ -58,6 +60,22 @@ export function runInsightId({
   position: number;
 }): string {
   return `insight_run_${digest([scheduleId, runId, String(position)])}`;
+}
+
+/**
+ * The id of the card a run's board check files for the key: the same on a retry, and never
+ * an id of a Langy finding, whose ids start `insight_run_`.
+ */
+export function boardHealthInsightId({
+  scheduleId,
+  runId,
+  key,
+}: {
+  scheduleId: string;
+  runId: string;
+  key: string;
+}): string {
+  return `insight_health_${digest([scheduleId, runId, key])}`;
 }
 
 /** A half-open `[start, end)` in epoch milliseconds. */
@@ -140,8 +158,8 @@ type BoardInsights = Readonly<{
 }>;
 
 /**
- * The person's insights a finding of this run may repeat: on this board, filed before the
- * run, and open at the run's slot or marked done. Newest first. An expired one is no match,
+ * The person's insights a finding may repeat: on this board, not a board check's card, filed
+ * before the run, and open at its slot or marked done. Newest first. An expired one is no match,
  * so its finding is filed as news. A renewal keeps an open one open, so a retry reads the same.
  */
 export function matchableInsightsOfBoard({
@@ -153,6 +171,7 @@ export function matchableInsightsOfBoard({
     .filter(
       (entry) =>
         entry.board?.id === boardId &&
+        !isBoardHealthKey(entry.findingKey) &&
         entry.filedAt < slot &&
         insightFolder({ entry, now: slot }) !== "stale",
     )

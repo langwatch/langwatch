@@ -73,7 +73,7 @@ describe("given a member with analytics:view and a board with widgets", () => {
           projectId: PROJECT,
           source: "trace",
           since: dailyRunWindows({ slot, timezone: "UTC" }).window.start,
-          excludeOrigins: ["langy"],
+          excludeConversationIds: [],
         },
       ]);
       expect((await schedule.settingOf()).lastRun).toMatchObject({
@@ -108,13 +108,16 @@ describe("given a member with analytics:view and a board with widgets", () => {
     });
   });
 
-  describe("when the project's only new traces are Langy's own turns", () => {
+  describe("when the project's only new traces are its daily runs' own turns", () => {
     beforeEach(() => {
-      installed.world.newTraceOrigins = ["langy"];
+      installed.world.newTraceConversations = ["conversation-run-1"];
+      installed.world.runConversationIds = ["conversation-run-1"];
     });
 
-    /** @scenario "A project whose only new traces are Langy's own asks Langy nothing" */
+    /** @scenario "A project whose only new traces are its daily runs' own asks Langy nothing" */
     it("records nothing with no_new_traces and asks Langy nothing", async () => {
+      const slot = schedule.slotOf();
+
       await schedule.runDay({ day: 0 });
 
       expect(installed.langy.starts).toEqual([]);
@@ -122,6 +125,25 @@ describe("given a member with analytics:view and a board with widgets", () => {
         outcome: "nothing",
         reason: "no_new_traces",
       });
+      const since = dailyRunWindows({ slot, timezone: "UTC" }).window.start;
+      expect(installed.langy.runConversationAsks).toEqual([{ projectId: PROJECT, since }]);
+      expect(installed.lwql.traceAsks).toEqual([
+        expect.objectContaining({ excludeConversationIds: ["conversation-run-1"] }),
+      ]);
+    });
+  });
+
+  describe("when the project's only new trace is a Langy chat its person had", () => {
+    beforeEach(() => {
+      installed.world.newTraceConversations = ["conversation-chat-1"];
+      installed.world.runConversationIds = ["conversation-run-1"];
+    });
+
+    /** @scenario "A person's own Langy chat counts as a new trace" */
+    it("asks Langy", async () => {
+      await schedule.runDay({ day: 0 });
+
+      expect(installed.langy.starts).toHaveLength(1);
     });
   });
 

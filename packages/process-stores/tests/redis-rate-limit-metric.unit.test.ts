@@ -79,6 +79,18 @@ describe("given a rate limit with a window's max", () => {
 
       expect(exceededFor("plain-key")).toHaveLength(1);
     });
+
+    it("counts the denial under the scope the caller names, not the key's", async () => {
+      const limiter = redisRateLimiter(
+        redisCounting(() => 9),
+        { requests: 1, seconds: 60 },
+      );
+
+      await limiter.check("lwql:project-1", { requests: 1, seconds: 60, scope: "lwql_background" });
+
+      expect(exceededFor("lwql_background")).toHaveLength(1);
+      expect(exceededFor("lwql")).toEqual([]);
+    });
   });
 
   describe("when Redis answers a count already over the max", () => {

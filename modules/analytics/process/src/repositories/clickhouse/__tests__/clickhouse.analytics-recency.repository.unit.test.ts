@@ -74,6 +74,71 @@ describe("ClickHouseAnalyticsRecencyRepository", () => {
     });
   });
 
+  describe("given a trace-sourced recency read that leaves conversations out", () => {
+    /** @scenario "A recency read binds the left-out conversations as a parameter" */
+    it("keeps traces with no conversation and binds the conversations as a parameter", async () => {
+      const { queries, repository } = createRepository([{ lastMs: null }]);
+
+      await repository.findLastOccurredAt({
+        projectId: "project-1",
+        source: "trace",
+        since: SINCE,
+        excludeConversationIds: ["conversation-run-1"],
+      });
+
+      expect(queries[0]?.sql).toContain(
+        "ifNull(ConversationId, '') NOT IN ({excludeConversationIds:Array(String)})",
+      );
+      expect(queries[0]?.params).toEqual({
+        tenantId: "project-1",
+        startMs: SINCE.epochMilliseconds,
+        excludeConversationIds: ["conversation-run-1"],
+      });
+    });
+
+    it("leaves the conversations out of the newest versions, not the dedup subquery", async () => {
+      const { queries, repository } = createRepository([{ lastMs: null }]);
+
+      await repository.findLastOccurredAt({
+        projectId: "project-1",
+        source: "trace",
+        since: SINCE,
+        excludeConversationIds: ["conversation-run-1"],
+      });
+
+      const sql = queries[0]?.sql ?? "";
+      expect(sql.indexOf("ConversationId")).toBeGreaterThan(sql.indexOf("GROUP BY"));
+    });
+
+    it("adds no clause and no parameter for an empty list", async () => {
+      const { queries, repository } = createRepository([{ lastMs: null }]);
+
+      await repository.findLastOccurredAt({
+        projectId: "project-1",
+        source: "trace",
+        since: SINCE,
+        excludeConversationIds: [],
+      });
+
+      expect(queries[0]?.sql).not.toContain("ConversationId");
+      expect(queries[0]?.params).not.toHaveProperty("excludeConversationIds");
+    });
+
+    it("leaves no conversation out of an evaluation read", async () => {
+      const { queries, repository } = createRepository([{ lastMs: null }]);
+
+      await repository.findLastOccurredAt({
+        projectId: "project-1",
+        source: "evaluation",
+        since: SINCE,
+        excludeConversationIds: ["conversation-run-1"],
+      });
+
+      expect(queries[0]?.sql).not.toContain("ConversationId");
+      expect(queries[0]?.params).not.toHaveProperty("excludeConversationIds");
+    });
+  });
+
   describe("given an evaluation-sourced recency read", () => {
     it("reads evaluation_analytics keyed by EvaluationId", async () => {
       const { queries, repository } = createRepository([{ lastMs: null }]);

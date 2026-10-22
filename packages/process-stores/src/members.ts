@@ -114,12 +114,15 @@ export interface RateLimitDecision {
 }
 
 /**
- * Rate limiting. The framework owns the key, so the limiter only counts. A
- * caller past its allowance names its own window; the limiter's constructed
- * one is the default a caller that names none counts against.
+ * Rate limiting. The framework owns the key, so the limiter only counts. A caller past its
+ * allowance names its own window (else the constructed one), and a caller sharing another's
+ * key names its own `scope`, so its refusals are counted apart.
  */
 export interface RateLimiter {
-  check(key: string, limit?: { requests: number; seconds: number }): Promise<RateLimitDecision>;
+  check(
+    key: string,
+    limit?: { requests: number; seconds: number; scope?: string },
+  ): Promise<RateLimitDecision>;
 }
 
 /** Remembers a key for the window in which a repeat must not act twice. */

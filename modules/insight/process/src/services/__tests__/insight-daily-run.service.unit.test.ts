@@ -12,6 +12,10 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import type { InsightRepository } from "../../repositories/insight.repository.ts";
+import {
+  type InsightBoardHealthService,
+  NO_BOARD_HEALTH,
+} from "../insight-board-health.service.ts";
 import type { InsightCommandsService } from "../insight-commands.service.ts";
 import type { InsightDailyRunCommandsService } from "../insight-daily-run-commands.service.ts";
 import { InsightDailyRunMetricsService } from "../insight-daily-run-metrics.service.ts";
@@ -31,7 +35,10 @@ const RUN = {
   isFinalAttempt: false,
 };
 
-type Langy = Pick<LangyApi, "startUnattendedTurn" | "awaitTurnSettlement" | "stopTurn">;
+type Langy = Pick<
+  LangyApi,
+  "startUnattendedTurn" | "awaitTurnSettlement" | "stopTurn" | "findRunConversationIds"
+>;
 
 /** A turn that never settles: the wait ends only when the caller's signal does. */
 const neverSettles: Langy["awaitTurnSettlement"] = ({ signal }) =>
@@ -48,11 +55,16 @@ function harness({ stopTurn }: { stopTurn?: Langy["stopTurn"] } = {}) {
       check: async () => ({
         ok: true,
         board: { id: BOARD.id, name: BOARD.name },
-        widgets: [{ id: "widget-cost", name: "Cost per day", queries: [] }],
+        widgets: [{ id: "widget-cost", name: "Cost per day", queries: [], statements: [] }],
+        isPersonalProject: false,
       }),
+    }),
+    boardHealth: createApiFixture<Pick<InsightBoardHealthService, "check">>({
+      check: async () => NO_BOARD_HEALTH,
     }),
     langy: createApiFixture<Langy>({
       startUnattendedTurn: async () => ({ conversationId: "conversation-1", turnId: "turn-1" }),
+      findRunConversationIds: async () => [],
       awaitTurnSettlement: neverSettles,
       stopTurn:
         stopTurn ??

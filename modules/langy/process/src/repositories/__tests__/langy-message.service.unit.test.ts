@@ -1,4 +1,5 @@
 import { LangyConversationNotFoundError } from "@langwatch/langy-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { LangyMessageService } from "../../services/langy-message.service.ts";
@@ -36,7 +37,7 @@ function conversationRow(overrides: Partial<LangyConversationRow> = {}): LangyCo
 function makeConversationRepo(
   overrides?: Partial<LangyConversationRepository>,
 ): LangyConversationRepository {
-  return {
+  return createApiFixture<LangyConversationRepository>({
     countUsage: vi.fn().mockResolvedValue({ turns: 0, activeUsers: 0 }),
     getVisibleById: vi.fn().mockRejectedValue(new LangyConversationNotFoundError("c1")),
     findOwnership: vi.fn().mockResolvedValue("missing"),
@@ -46,7 +47,7 @@ function makeConversationRepo(
     hasAdmittedTurn: vi.fn().mockResolvedValue(false),
     turnExists: vi.fn().mockResolvedValue(false),
     ...overrides,
-  };
+  });
 }
 
 describe("LangyMessageService", () => {

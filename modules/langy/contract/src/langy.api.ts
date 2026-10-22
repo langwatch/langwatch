@@ -91,6 +91,12 @@ export interface LangyUsageCount {
   readonly firstTurnAt?: number;
 }
 
+/** The most conversation ids `LangyApi.findRunConversationIds` answers in one call. */
+export const LANGY_RUN_CONVERSATION_IDS_LIMIT = 1_000;
+
+/** A project's run conversations active since `since`, in epoch milliseconds. */
+export type LangyFindRunConversationIdsInput = Readonly<{ projectId: string; since: number }>;
+
 /** A public Langy REST surface, each behind its own per-project rollout. */
 export type LangyRestSurface = "turns" | "ui_actions";
 
@@ -369,6 +375,12 @@ export interface LangyApi {
   recordPlanUpdated(input: LangyRecordPlanUpdatedInput): Promise<void>;
   /** The usage report's figures (ADR-156, section 10). */
   countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<LangyUsageCount>;
+  /**
+   * The ids of the project's `run` conversations last active, or opened, at or after `since`,
+   * archived ones included (their traces remain). Newest activity first, one with no activity
+   * yet ahead of all, at most `LANGY_RUN_CONVERSATION_IDS_LIMIT`.
+   */
+  findRunConversationIds(input: LangyFindRunConversationIdsInput): Promise<string[]>;
   /** The setup skill's prompt the empty states copy; an unknown skill throws `not_found`. */
   getSetupSkillPrompt(input: { projectId: string; skill: string }): Promise<{ body: string }>;
   /** Rollout gate, then the key's owner; an unowned or unentitled key throws. */

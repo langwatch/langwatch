@@ -152,6 +152,16 @@ describe("given a board that is on", () => {
       expect(words({ outcome: "nothing", reason: null })).toBe("Ran 12:34 · nothing new");
     });
 
+    /** @scenario "The last run line says what the board check filed when Langy was not asked" */
+    it("says what the board check filed beside no new traces, and what a failed run filed", () => {
+      expect(words({ outcome: "filed", reason: "no_new_traces", filedCount: 1 })).toBe(
+        "Ran 12:34 · no new traces, so Langy was not asked · filed 1 new",
+      );
+      expect(words({ outcome: "failed", reason: "turn_failed", filedCount: 1 })).toBe(
+        "Failed 12:34 · filed 1 new before it stopped, and the next run tries again",
+      );
+    });
+
     /** @scenario "The dropdown says how many insights the last run saw again" */
     it("names what it saw again beside what it filed, and alone when it filed none", () => {
       expect(words({ outcome: "filed", filedCount: 2, renewedCount: 1 })).toBe(

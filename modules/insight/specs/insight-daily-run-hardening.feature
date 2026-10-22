@@ -16,15 +16,21 @@ Feature: The daily insights run before a wider rollout
       When the run is carried out
       Then it is recorded as nothing with the reason no_new_traces
       And Langy is never called and no insight is filed
-      And the project was asked once for its newest trace since the window's start, leaving out Langy's
+      And the project was asked once for its newest trace since the window's start, leaving out its daily runs' conversations
 
-    # A run's own turn is traced into the project as Langy's; it is no reason to read the board again.
+    # A run's own turn is traced into the project in its conversation; it is no reason to read the board again.
     @unit
-    Scenario: A project whose only new traces are Langy's own asks Langy nothing
-      Given a member with analytics:view, a board with widgets and a project whose only new traces are Langy's turns
+    Scenario: A project whose only new traces are its daily runs' own asks Langy nothing
+      Given a member with analytics:view, a board with widgets and a project whose only new traces are daily-run conversations
       When the run is carried out
       Then it is recorded as nothing with the reason no_new_traces
       And Langy is never called
+
+    @unit
+    Scenario: A person's own Langy chat counts as a new trace
+      Given a member with analytics:view, a board with widgets and a project whose only new trace is a Langy chat its person had
+      When the run is carried out
+      Then Langy is asked
 
     @unit
     Scenario: A member without access is skipped before the project's traces are asked
@@ -46,6 +52,13 @@ Feature: The daily insights run before a wider rollout
       When its last run ended as nothing with the reason no_new_traces
       Then the line says there were no new traces, so Langy was not asked
       And a run where Langy found nothing still reads "nothing new"
+
+    @unit
+    Scenario: The last run line says what the board check filed when Langy was not asked
+      Given a board that is on
+      When its last run ended as filed with the reason no_new_traces and 1 filed
+      Then the line says there were no new traces, so Langy was not asked, and that 1 new was filed
+      And a failed run that filed 1 says so instead of "nothing was filed"
 
   Rule: A schedule skipped on 7 scheduled days in a row turns itself off
 

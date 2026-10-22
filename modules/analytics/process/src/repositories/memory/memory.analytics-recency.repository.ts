@@ -27,6 +27,7 @@ export class MemoryAnalyticsRecencyRepository extends AnalyticsRecencyRepository
     source: AnalyticsMetricSource;
     since: Instant;
     excludeOrigins?: readonly string[];
+    excludeConversationIds?: readonly string[];
   }): Promise<Instant[]> {
     if (input.source !== "evaluation") return Promise.resolve([]);
 
