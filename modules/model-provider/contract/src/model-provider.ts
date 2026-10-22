@@ -2,6 +2,8 @@ import { serializedHandledErrorSchema } from "@langwatch/handled-error";
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
+import { MODEL_ROLES } from "./catalog/model-feature-registry.ts";
+
 export const MODEL_PROVIDER_FEATURE_ID = "model-provider" as const;
 export const DEFAULT_AZURE_API_VERSION = "2025-04-01-preview";
 export const ROUTING_HANDLE_MAX_LENGTH = 32;
@@ -490,7 +492,7 @@ export type ModelDefaultAvailableScopes = z.infer<typeof modelDefaultAvailableSc
 const modelDefaultFeatureSchemaDefinition = z
   .object({
     key: z.string(),
-    role: z.enum(["DEFAULT", "FAST", "LANGY", "EMBEDDINGS"]),
+    role: z.enum(MODEL_ROLES),
     displayName: z.string(),
     description: z.string(),
   })
@@ -538,7 +540,7 @@ export type ModelProviderResolutionSource = z.infer<typeof modelProviderResoluti
 const modelProviderResolutionFeatureSchemaDefinition = z
   .object({
     key: z.string().min(1),
-    role: z.enum(["DEFAULT", "FAST", "LANGY", "EMBEDDINGS"]),
+    role: z.enum(MODEL_ROLES),
     displayName: z.string().min(1),
     description: z.string(),
   })
