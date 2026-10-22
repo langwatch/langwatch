@@ -14,7 +14,11 @@ import (
 // carrying /v1/metrics. Callers assemble one or more readers into a single
 // MeterProvider (see installMetrics) so the same instruments fan out to every
 // configured sink.
-func newMetricReader(ctx context.Context, endpointURL string, headers map[string]string) (sdkmetric.Reader, error) {
+//
+// producers are extra metric sources the reader pulls on every export, for
+// services that keep instruments outside the OTel API (a Prometheus registry
+// bridged in, say). Without one, those instruments exist only on a pull door.
+func newMetricReader(ctx context.Context, endpointURL string, headers map[string]string, producers []sdkmetric.Producer) (sdkmetric.Reader, error) {
 	exporterOpts := []otlpmetrichttp.Option{
 		otlpmetrichttp.WithEndpointURL(endpointURL),
 	}
@@ -25,7 +29,11 @@ func newMetricReader(ctx context.Context, endpointURL string, headers map[string
 	if err != nil {
 		return nil, err
 	}
-	return sdkmetric.NewPeriodicReader(exp), nil
+	var readerOpts []sdkmetric.PeriodicReaderOption
+	for _, p := range producers {
+		readerOpts = append(readerOpts, sdkmetric.WithProducer(p))
+	}
+	return sdkmetric.NewPeriodicReader(exp, readerOpts...), nil
 }
 
 // metricsEndpointFromTraces derives the /v1/metrics URL from the primary traces
