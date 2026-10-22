@@ -2,7 +2,6 @@ import { createHash } from "node:crypto";
 
 import { describe, expect, it } from "vitest";
 
-import { sha256Hex } from "../braid-condition-digest.ts";
 import {
   BRAID_CONDITION_COMPILER_VERSION,
   BRAID_CONDITION_MAX_DEPTH,
@@ -101,19 +100,39 @@ describe("braid conditions", () => {
   });
 
   describe("given the digest a cache key carries", () => {
-    it("is SHA-256 of its input, as node computes it", () => {
-      const inputs = [
-        "",
-        "abc",
-        "x".repeat(55),
-        "y".repeat(64),
-        "z".repeat(1000),
-        "ünïcødé ✓",
-        "emoji 🧵",
-        "lone \ud800 surrogate",
+    it("is SHA-256 of the canonical tree, pinned so a library change cannot move a key", () => {
+      const unicode: BraidConditionNode = {
+        kind: "and",
+        terms: [orchestrator, { kind: "nameEquals", value: "agent ünïcødé 🧵" }],
+      };
+      const canonicals = [
+        {
+          compiledWhere: { version: 1, tree: orchestrator },
+          text: JSON.stringify([1, ["attributeEquals", "span", "orchestrator", "web"]]),
+        },
+        {
+          compiledWhere: { version: 1, tree: unicode },
+          text: JSON.stringify([
+            1,
+            [
+              "and",
+              ["attributeEquals", "span", "orchestrator", "web"],
+              ["nameEquals", "agent ünïcødé 🧵"],
+            ],
+          ]),
+        },
       ];
-      for (const input of inputs) {
-        expect(sha256Hex(input)).toBe(createHash("sha256").update(input, "utf8").digest("hex"));
+
+      expect(braidConditionDigest(canonicals[0]!.compiledWhere)).toBe(
+        "bf4068a3995d55197b0866558a2c0df768d56be040bb8ee4758c93abab9f54b0",
+      );
+      expect(braidConditionDigest(canonicals[1]!.compiledWhere)).toBe(
+        "fe6dac3cc5cb504bd93d93b314896eaa3d0a1dfe8ec248803f9b9056bbb0266c",
+      );
+      for (const { compiledWhere, text } of canonicals) {
+        expect(braidConditionDigest(compiledWhere)).toBe(
+          createHash("sha256").update(text, "utf8").digest("hex"),
+        );
       }
     });
 

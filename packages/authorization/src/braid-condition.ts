@@ -3,9 +3,9 @@
  * the compiler and the store client's fence both read. The tree holds conjunctions of string
  * comparisons only, so the fence renders it as one bracketed conjunction of bound parameters.
  */
+import { sha256 } from "@noble/hashes/sha2.js";
+import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
 import { z } from "zod";
-
-import { sha256Hex } from "./braid-condition-digest.ts";
 
 /** Stored with every compiled condition; part of every fence cache key. */
 export const BRAID_CONDITION_COMPILER_VERSION = 1;
@@ -123,5 +123,6 @@ function canonicalOf(node: BraidConditionNode): unknown[] {
  * version, so a key changes when either does. Braids sharing one digest share one predicate.
  */
 export function braidConditionDigest(compiledWhere: CompiledWhere): string {
-  return sha256Hex(JSON.stringify([compiledWhere.version, canonicalOf(compiledWhere.tree)]));
+  const canonical = JSON.stringify([compiledWhere.version, canonicalOf(compiledWhere.tree)]);
+  return bytesToHex(sha256(utf8ToBytes(canonical)));
 }
