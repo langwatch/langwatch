@@ -29,7 +29,11 @@ import {
 } from "#rules/trace-filter-hidden-origins.rules";
 
 import { traceQueryTranslation } from "../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
-import { tracesRestCredential, tracesRest } from "../traces.rest.ts";
+import {
+  SEARCH_WITH_SPANS_PAGE_SIZE_MAX,
+  tracesRestCredential,
+  tracesRest,
+} from "../traces.rest.ts";
 
 vi.mock("#features/projection/rules/trace-projection-compile.rules", async (importOriginal) => {
   const actual = await importOriginal<typeof projectionCompileRules>();
@@ -235,6 +239,34 @@ describe("POST /search", () => {
       await send({ startDate: 1000, endDate: 5000, format: "json", includeSpans: true });
       expect(listTraces).toHaveBeenCalledWith(
         expect.objectContaining({ options: expect.objectContaining({ includeSpans: true }) }),
+      );
+    });
+  });
+
+  describe("when includeSpans asks for a page larger than a spans page may be", () => {
+    it("clamps the page to the spans page bound, leaving scrollId to page on", async () => {
+      const { send, listTraces } = mount();
+      await send({ startDate: 1000, endDate: 5000, includeSpans: true, pageSize: 4000 });
+      expect(listTraces).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: expect.objectContaining({ pageSize: SEARCH_WITH_SPANS_PAGE_SIZE_MAX }),
+        }),
+      );
+    });
+
+    it("keeps a smaller requested page as it is", async () => {
+      const { send, listTraces } = mount();
+      await send({ startDate: 1000, endDate: 5000, includeSpans: true, pageSize: 20 });
+      expect(listTraces).toHaveBeenCalledWith(
+        expect.objectContaining({ query: expect.objectContaining({ pageSize: 20 }) }),
+      );
+    });
+
+    it("leaves a search without spans at the requested size", async () => {
+      const { send, listTraces } = mount();
+      await send({ startDate: 1000, endDate: 5000, pageSize: 4000 });
+      expect(listTraces).toHaveBeenCalledWith(
+        expect.objectContaining({ query: expect.objectContaining({ pageSize: 4000 }) }),
       );
     });
   });
