@@ -201,6 +201,78 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       Then the second execution does not see the file the first one wrote
       And no execution directory is left behind once the executor is done
 
+  Rule: A code block on the wasm runtime is contained, whatever it tries
+
+    # The author of a code block is an untrusted tenant on a shared engine.
+    # These scenarios pin what such code cannot reach or exhaust, in both
+    # languages, so a regression fails here rather than in production.
+
+    @unit
+    Scenario: on the wasm runtime, a code block cannot leave its run directory
+      Given a host file outside the run's directory
+      And a code node that tries "..", relative traversal, a symlink, a directory symlink and a hard link to reach it
+      When the executor runs the request
+      Then no attempt returns the file's content
+
+    @unit
+    Scenario: on the wasm runtime, a symlink a run leaves behind cannot reach the host
+      Given a code node that links a host path into its own directory and reads it
+      When the executor runs the request
+      Then the link is refused or resolves inside the guest, never to the host file
+
+    @unit
+    Scenario: the host bridge refuses malformed, unknown and excessive calls
+      Given a code node that writes a malformed host call, an unknown operation, and more requests than a run may make
+      When the executor runs the request
+      Then the malformed and unknown calls get a protocol error
+      And the requests past the per-run budget are refused while the earlier ones succeed
+
+    @unit
+    Scenario: the host bridge refuses an oversized call without exhausting the engine
+      Given a code node that sends a request larger than the host call size limit
+      When the executor runs the request
+      Then the call is refused with a limit error and the run continues
+
+    @unit
+    Scenario: on the wasm runtime, a redirect cannot reach a refused address
+      Given a permitted host that redirects to the cloud metadata address
+      When a Python and a JavaScript code node each request it
+      Then both get a "not permitted" error and the metadata address is never reached
+
+    @unit
+    Scenario: encoded, loopback, private and non-HTTP destinations are refused
+      Given a code node that requests the metadata address as IPv4-mapped IPv6, decimal and octal
+      And it requests the engine's own port, IPv6 loopback, a private address, a file URL and a gopher URL
+      When the executor runs the request under the default egress policy
+      Then every request is refused and no host file is read
+
+    @unit
+    Scenario: a JavaScript code block is held to its memory ceiling
+      Given an executor with a small memory ceiling
+      And a JavaScript code node that allocates without end
+      When the executor runs the request
+      Then the run fails on its own, not as a timeout
+      And the executor runs the next request normally
+
+    @unit
+    Scenario: a JavaScript code block that recurses without end fails on its own
+      Given a JavaScript code node that recurses without a base case
+      When the executor runs the request
+      Then the run fails with an error that is not a timeout
+
+    @unit
+    Scenario: a JavaScript code block cannot see another run's state
+      Given eight JavaScript runs in parallel, each with its own secret
+      And each run marks a global and a file in its directory
+      When they run
+      Then no run sees another run's global, file or secret
+
+    @unit
+    Scenario: an oversized result is refused instead of read into the engine
+      Given a code node that returns an output larger than the result size limit
+      When the executor runs the request
+      Then the run fails with a runner error naming the limit and no outputs
+
   Rule: JavaScript code blocks run on QuickJS inside the engine
 
     # A code node whose `language` parameter is "javascript" runs on QuickJS

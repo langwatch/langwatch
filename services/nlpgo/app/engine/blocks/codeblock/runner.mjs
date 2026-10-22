@@ -3,8 +3,9 @@
 // ({code, inputs, outputs, secrets, params}), the result JSON written to the
 // path in scriptArgs[1]. User code is an ES module whose default export (or
 // `execute` export) receives the inputs as one object and returns an object.
-import * as std from "qjs:std";
+
 import * as os from "qjs:os";
+import * as std from "qjs:std";
 
 const FRAME = "\x1eLWHOST ";
 const resultPath = scriptArgs[1];
@@ -165,9 +166,11 @@ function describe(value) {
 }
 
 const captured = { stdout: "", stderr: "" };
-const writer = (stream) => (...args) => {
-  captured[stream] += args.map(describe).join(" ") + "\n";
-};
+const writer =
+  (stream) =>
+  (...args) => {
+    captured[stream] += args.map(describe).join(" ") + "\n";
+  };
 const console = {
   log: writer("stdout"),
   info: writer("stdout"),
@@ -211,7 +214,9 @@ async function invoke(module, inputs) {
 function coerce(result) {
   if (result === undefined || result === null) return {};
   if (typeof result === "object" && !Array.isArray(result)) return { ...result };
-  throw new TypeError(`the code block must return an object, got ${Array.isArray(result) ? "array" : typeof result}`);
+  throw new TypeError(
+    `the code block must return an object, got ${Array.isArray(result) ? "array" : typeof result}`,
+  );
 }
 
 function writeResult(fields) {
@@ -227,7 +232,11 @@ function writeResult(fields) {
     text = JSON.stringify(result);
   } catch (e) {
     result.outputs = {};
-    result.error = { type: "TypeError", message: `outputs are not JSON: ${e.message}`, traceback: "" };
+    result.error = {
+      type: "TypeError",
+      message: `outputs are not JSON: ${e.message}`,
+      traceback: "",
+    };
     text = JSON.stringify(result);
   }
   const file = std.open(resultPath, "w");
@@ -240,10 +249,25 @@ async function main() {
   try {
     payload = JSON.parse(hostIn.getline() ?? "");
   } catch (e) {
-    writeResult({ error: { type: "ProtocolError", message: `invalid JSON on stdin: ${e.message}`, traceback: "" } });
+    writeResult({
+      error: {
+        type: "ProtocolError",
+        message: `invalid JSON on stdin: ${e.message}`,
+        traceback: "",
+      },
+    });
     return;
   }
-  Object.assign(globalThis, { console, fetch, Headers, Response, setTimeout, setInterval, clearTimeout, clearInterval: clearTimeout });
+  Object.assign(globalThis, {
+    console,
+    fetch,
+    Headers,
+    Response,
+    setTimeout,
+    setInterval,
+    clearTimeout,
+    clearInterval: clearTimeout,
+  });
   if (payload.secrets && Object.keys(payload.secrets).length) {
     globalThis.secrets = namespace("secret", payload.secrets);
   }
@@ -266,9 +290,14 @@ async function main() {
     }
     outputs = result;
   } catch (e) {
-    error = e instanceof Error
-      ? { type: e.name, message: e.message, traceback: `${e.name}: ${e.message}\n${e.stack ?? ""}` }
-      : { type: "Error", message: describe(e), traceback: "" };
+    error =
+      e instanceof Error
+        ? {
+            type: e.name,
+            message: e.message,
+            traceback: `${e.name}: ${e.message}\n${e.stack ?? ""}`,
+          }
+        : { type: "Error", message: describe(e), traceback: "" };
   }
   writeResult({ outputs, error, duration_ms: Date.now() - started });
 }

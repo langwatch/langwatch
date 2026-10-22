@@ -520,6 +520,9 @@ func (e *Executor) guestFor(language string) (*wasmGuest, error) {
 	}
 }
 
+// maxResultBytes caps the result file a run may hand back to the engine.
+const maxResultBytes = 32 << 20
+
 // runOutcome is how a run ended, on either runtime.
 type runOutcome struct {
 	timedOut bool
@@ -532,6 +535,15 @@ type runOutcome struct {
 // result file when it wrote one, otherwise a synthesized timeout or error.
 func collectResult(resultPath string, outcome runOutcome) *Result {
 	timedOut, elapsed, stderr, runErr := outcome.timedOut, outcome.elapsed, outcome.stderr, outcome.err
+	// The result file is written by the guest, so its size is the guest's choice.
+	if info, err := os.Stat(resultPath); err == nil && info.Size() > maxResultBytes {
+		return &Result{
+			DurationMS: elapsed.Milliseconds(),
+			TimedOut:   timedOut,
+			Stderr:     stderr,
+			Error:      &Error{Type: RunnerErrorType, Message: fmt.Sprintf("the code block's result exceeds the %d MiB limit", maxResultBytes>>20)},
+		}
+	}
 	if data, readErr := os.ReadFile(resultPath); readErr == nil && len(data) > 0 {
 		var parsed struct {
 			Outputs    map[string]any `json:"outputs"`
