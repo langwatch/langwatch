@@ -172,6 +172,8 @@ export type LangwatchSignalBucket = z.infer<typeof langwatchSignalBucketSchema>;
 const spanLangwatchSignalsSchemaDefinition = z.object({
   spanId: z.string(),
   signals: z.array(langwatchSignalBucketSchema),
+  /** Set only on a span braided in from another project (ADR-183 §5); absent: the reader's own. */
+  ownerProjectId: z.string().nullish(),
 });
 export interface SpanLangwatchSignalsSchema extends Named<
   typeof spanLangwatchSignalsSchemaDefinition
@@ -339,6 +341,8 @@ const spanResourceInfoSchema = z.object({
   parentSpanId: z.string().nullable(),
   resourceAttributes: z.record(z.string(), z.string()),
   scope: instrumentationScopeSchema,
+  /** Set only on a span braided in from another project (ADR-183 §5); absent: the reader's own. */
+  ownerProjectId: z.string().nullish(),
 });
 
 export type SpanResourceInfoDto = z.infer<typeof spanResourceInfoSchema>;

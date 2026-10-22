@@ -52,3 +52,87 @@ describe("TraceBraidDetailService.describeOwners", () => {
     });
   });
 });
+
+describe("TraceBraidDetailService.describeSpans", () => {
+  describe("given the reader's spans and a braided span", () => {
+    it("describes the braided span only, aligned with the spans given", async () => {
+      const described = await TraceBraidDetailService.create({ directory: null }).describeSpans({
+        readerProjectId: "proj_orchestrator",
+        viewerUserId: "sam",
+        spans: [
+          { startedAtMs: 1 },
+          { ownerProjectId: "proj_specialists", startedAtMs: 2 },
+          { startedAtMs: 3 },
+        ],
+      });
+
+      expect(described).toEqual([
+        null,
+        {
+          ownerProjectId: "proj_specialists",
+          ownerName: "proj_specialists",
+          ownerProjectSlug: null,
+          canOpenOwner: false,
+          matchedConditions: [],
+          signedBy: null,
+        },
+        null,
+      ]);
+    });
+  });
+});
+
+describe("TraceBraidDetailService signing", () => {
+  const signing = TraceBraidDetailService.create({
+    directory: {
+      authz: createApiFixture<AuthzApi>({
+        hasPermission: async () => false,
+        listBraids: async () => ({ intoOtherProjects: [], fromOtherProjects: [] }),
+      }),
+      projects: createApiFixture<ProjectApi>({
+        findSummaryById: async (projectId) =>
+          projectId === "proj_orchestrator" ? { name: "Orchestrator", slug: "orchestrator" } : null,
+      }),
+    },
+  });
+  const span = (signingProjectIds?: string[]) => ({
+    readerProjectId: "proj_orchestrator",
+    ownerProjectId: "proj_specialists",
+    viewerUserId: "sam",
+    spanStartedAtMs: 1,
+    ...(signingProjectIds === undefined ? {} : { signingProjectIds }),
+  });
+
+  describe("given a braided span whose verified mark names the reader", () => {
+    /** @scenario "A braided span from a signed call says who signed it" */
+    it("says the reader signed it, by name", async () => {
+      const braid = await signing.describe(span(["proj_orchestrator"]));
+
+      expect(braid.signedBy).toEqual({ projectId: "proj_orchestrator", name: "Orchestrator" });
+    });
+
+    it("says so on the same span in a list read", async () => {
+      const [braid] = await signing.describeSpans({
+        readerProjectId: "proj_orchestrator",
+        viewerUserId: "sam",
+        spans: [
+          {
+            ownerProjectId: "proj_specialists",
+            startedAtMs: 1,
+            signingProjectIds: ["proj_orchestrator"],
+          },
+        ],
+      });
+
+      expect(braid?.signedBy).toEqual({ projectId: "proj_orchestrator", name: "Orchestrator" });
+    });
+  });
+
+  describe("given a braided span with no mark, or a mark naming another project", () => {
+    /** @scenario "A braided span from a signed call says who signed it" */
+    it("says nothing about signing", async () => {
+      expect((await signing.describe(span())).signedBy).toBeNull();
+      expect((await signing.describe(span(["proj_elsewhere"]))).signedBy).toBeNull();
+    });
+  });
+});

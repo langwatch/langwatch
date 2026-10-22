@@ -31,13 +31,17 @@ export class TraceBraidDetailService {
     ownerProjectId,
     viewerUserId,
     spanStartedAtMs,
+    signingProjectIds = [],
   }: {
     readerProjectId: string;
     ownerProjectId: string;
     viewerUserId: string;
     spanStartedAtMs: number;
+    /** The projects the span's verified marks name (ADR-183 §4). */
+    signingProjectIds?: readonly string[];
   }): Promise<SpanBraid> {
     const directory = this.#directory;
+    const signedBy = await this.#signedByReader({ readerProjectId, signingProjectIds });
     if (directory === null) {
       return {
         ownerProjectId,
@@ -45,7 +49,7 @@ export class TraceBraidDetailService {
         ownerProjectSlug: null,
         canOpenOwner: false,
         matchedConditions: [],
-        signedBy: null,
+        signedBy,
       };
     }
     const [owner, canReadOwner, braids] = await Promise.all([
@@ -68,8 +72,21 @@ export class TraceBraidDetailService {
         ownerProjectId,
         spanStartedAtMs,
       }),
-      signedBy: null,
+      signedBy,
     };
+  }
+
+  /** The reader, named, when one of the span's verified marks names it; otherwise null. */
+  async #signedByReader({
+    readerProjectId,
+    signingProjectIds,
+  }: {
+    readerProjectId: string;
+    signingProjectIds: readonly string[];
+  }): Promise<SpanBraid["signedBy"]> {
+    if (!signingProjectIds.includes(readerProjectId)) return null;
+    const reader = await this.#directory?.projects.findSummaryById(readerProjectId);
+    return { projectId: readerProjectId, name: reader?.name ?? readerProjectId };
   }
 
   /** The header's owners, in the order given: the slug only for a viewer who may open one. */
@@ -101,6 +118,55 @@ export class TraceBraidDetailService {
         };
       }),
     );
+  }
+
+  /** Each span's `braid`, null on the reader's own; each owner and the braids are asked once. */
+  async describeSpans({
+    readerProjectId,
+    viewerUserId,
+    spans,
+  }: {
+    readerProjectId: string;
+    viewerUserId: string;
+    spans: readonly {
+      ownerProjectId?: string | undefined;
+      startedAtMs: number;
+      signingProjectIds?: readonly string[];
+    }[];
+  }): Promise<(SpanBraid | null)[]> {
+    const ownerProjectIds = [
+      ...new Set(spans.flatMap((span) => (span.ownerProjectId ? [span.ownerProjectId] : []))),
+    ];
+    if (ownerProjectIds.length === 0) return spans.map(() => null);
+    const signed = spans.some(
+      (span) => !!span.ownerProjectId && span.signingProjectIds?.includes(readerProjectId),
+    );
+    const [owners, braids, signedBy] = await Promise.all([
+      this.describeOwners({ ownerProjectIds, viewerUserId }),
+      this.#directory === null
+        ? Promise.resolve([])
+        : this.#directory.authz
+            .listBraids({ projectId: readerProjectId })
+            .then((listed) => listed.fromOtherProjects),
+      this.#signedByReader({ readerProjectId, signingProjectIds: signed ? [readerProjectId] : [] }),
+    ]);
+    const ownerById = new Map(owners.map((owner) => [owner.projectId, owner]));
+    return spans.map(({ ownerProjectId, startedAtMs, signingProjectIds = [] }) => {
+      if (!ownerProjectId) return null;
+      const owner = ownerById.get(ownerProjectId);
+      return {
+        ownerProjectId,
+        ownerName: owner?.name ?? ownerProjectId,
+        ownerProjectSlug: owner?.slug ?? null,
+        canOpenOwner: owner?.canOpen ?? false,
+        matchedConditions: braidConditionsShownFor({
+          braids,
+          ownerProjectId,
+          spanStartedAtMs: startedAtMs,
+        }),
+        signedBy: signingProjectIds.includes(readerProjectId) ? signedBy : null,
+      };
+    });
   }
 
   /** One audit call for a read that returned owner spans; an audit failure never fails the read. */

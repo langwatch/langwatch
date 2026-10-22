@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Public Trace operations shared by process peers after boot composition.
 
-Peers call these through the token, declared at `../contract/src/trace.api.ts:174`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/trace.api.ts:179`; nothing else in this package is public.
 It extends `TraceOtlpIngestApi`.
 
 #### `extractInlineMediaFromEvent`
@@ -417,8 +417,10 @@ isCodingAgentShapedSpan(span: Span): boolean;
 
 #### `enrichSpansFromCodingAgentLogs`
 
+The reader's own spans get their coding-agent log content; a braided span shows as stored.
+
 ```typescript
-enrichSpansFromCodingAgentLogs(input: { projectId: string; traceId: string; spans: Span[]; occurredAtMs?: number; }): Promise<Span[]>;
+enrichSpansFromCodingAgentLogs(input: { projectId: string; traceId: string; spans: (Span & { ownerProjectId?: string })[]; occurredAtMs?: number; }): Promise<(Span & { ownerProjectId?: string })[]>;
 ```
 
 #### `enrichSpanFromCodingAgentLogs`
@@ -442,25 +444,25 @@ getLogsByTraceId(input: { tenantId: string; traceId: string; occurredAtMs?: numb
 #### `readSpanSummaries`
 
 ```typescript
-readSpanSummaries(input: { authorization: Authorization; traceId: string; occurredAtMs?: number; }): Promise<SpanSummaryRow[]>;
+readSpanSummaries(input: { authorization: Authorization; traceId: string; occurredAtMs?: number; /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-183 §5). */ reads?: "spans" | "traces"; }): Promise<SpanSummaryRow[]>;
 ```
 
 #### `readSpans`
 
 ```typescript
-readSpans(input: { authorization: Authorization; traceId: string; occurredAtMs?: number; visibilityCutoffMs?: number | null; limit?: number; }): Promise<Span[]>;
+readSpans(input: { authorization: Authorization; traceId: string; occurredAtMs?: number; visibilityCutoffMs?: number | null; limit?: number; /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-183 §5). */ reads?: "spans" | "traces"; }): Promise<(Span & { ownerProjectId?: string })[]>;
 ```
 
 #### `readSpansPage`
 
 ```typescript
-readSpansPage(input: { authorization: Authorization; traceId: string; limit: number; offset: number; occurredAtMs?: number; visibilityCutoffMs?: number | null; }): Promise<{ spans: Span[]; total: number }>;
+readSpansPage(input: { authorization: Authorization; traceId: string; limit: number; offset: number; occurredAtMs?: number; visibilityCutoffMs?: number | null; /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-183 §5). */ reads?: "spans" | "traces"; }): Promise<{ spans: (Span & { ownerProjectId?: string })[]; total: number }>;
 ```
 
 #### `readSpansSince`
 
 ```typescript
-readSpansSince(input: { authorization: Authorization; traceId: string; sinceStartTimeMs: number; occurredAtMs?: number; visibilityCutoffMs?: number | null; }): Promise<Span[]>;
+readSpansSince(input: { authorization: Authorization; traceId: string; sinceStartTimeMs: number; occurredAtMs?: number; visibilityCutoffMs?: number | null; /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-183 §5). */ reads?: "spans" | "traces"; }): Promise<(Span & { ownerProjectId?: string })[]>;
 ```
 
 #### `findSpan`
@@ -478,19 +480,19 @@ readSpanEvents(input: { authorization: Authorization; traceId: string; spanId: s
 #### `readLangwatchSignals`
 
 ```typescript
-readLangwatchSignals(input: { authorization: Authorization; traceId: string; occurredAtMs?: number; }): Promise<{ spanId: string; signals: SpanLangwatchSignals["signals"] }[]>;
+readLangwatchSignals(input: { authorization: Authorization; traceId: string; occurredAtMs?: number; /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-183 §5). */ reads?: "spans" | "traces"; }): Promise< { spanId: string; signals: SpanLangwatchSignals["signals"]; ownerProjectId?: string }[] >;
 ```
 
 #### `readSpanResources`
 
 ```typescript
-readSpanResources(input: { authorization: Authorization; traceId: string; occurredAtMs?: number; }): Promise<SpanResourceInfo[]>;
+readSpanResources(input: { authorization: Authorization; traceId: string; occurredAtMs?: number; /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-183 §5). */ reads?: "spans" | "traces"; }): Promise<SpanResourceInfo[]>;
 ```
 
 #### `readTraceEvents`
 
 ```typescript
-readTraceEvents(input: { authorization: Authorization; traceId: string; occurredAtMs?: number; }): Promise<DerivedTraceEvent[]>;
+readTraceEvents(input: { authorization: Authorization; traceId: string; occurredAtMs?: number; /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-183 §5). */ reads?: "spans" | "traces"; }): Promise<DerivedTraceEvent[]>;
 ```
 
 #### `readTraceEventRollups`
@@ -799,6 +801,22 @@ The proof narrowed to the member holding the trace; an unreadable member is not 
 
 ```typescript
 authorizationForTrace(input: { authorization: Authorization; traceId: string; tenantId?: string | undefined; }): Promise<Authorization>;
+```
+
+#### `resolveBraidOwnerProtections`
+
+Each braid owner's protections for this viewer: its policy, the viewer's standing there.
+
+```typescript
+resolveBraidOwnerProtections(input: { viewerUserId: string; ownerProjectIds: readonly (string | null | undefined)[]; }): Promise<ReadonlyMap<string, Protections>>;
+```
+
+#### `describeBraidedSpans`
+
+Each span's `braid`, null on the reader's own (ADR-183 §5).
+
+```typescript
+describeBraidedSpans(input: { authorization: Authorization; viewerUserId: string; spans: readonly { ownerProjectId?: string | undefined; startedAtMs: number; params?: unknown; }[]; }): Promise<(SpanBraid | null)[]>;
 ```
 
 #### `readBraidedHeaderTotals`
@@ -1473,7 +1491,7 @@ type Input = z.infer<typeof traceScopeSchema>; // ../contract/src/features/edit-
 
 ### `traces`
 
-Contract `../contract/src/traces.trpc.ts:189`, router `src/transport/traces.trpc.ts:48`.
+Contract `../contract/src/traces.trpc.ts:189`, router `src/transport/traces.trpc.ts:44`.
 
 | Procedure                              | Kind         | Gate                                                                  | Input                           | Output                             |
 | -------------------------------------- | ------------ | --------------------------------------------------------------------- | ------------------------------- | ---------------------------------- |
@@ -1621,7 +1639,7 @@ type Output = z.infer<typeof distinctFieldNamesResultSchema>; // ../contract/src
 interface Input {
   projectId: string;
 }
-// Output: tracesFieldRedactionStatusSchema, ../contract/src/trace.responses.ts:276
+// Output: tracesFieldRedactionStatusSchema, ../contract/src/trace.responses.ts:278
 interface Output {
   isRedacted: {
     input: boolean;
@@ -1847,7 +1865,7 @@ interface Input {
   occurredAtMs?: number;
   tenantId?: string;
 }
-// Output: tracesTraceLogsSchema, ../contract/src/trace.responses.ts:263
+// Output: tracesTraceLogsSchema, ../contract/src/trace.responses.ts:265
 type Output = {
   spanId: string;
   timeUnixMs: number;
@@ -1933,6 +1951,7 @@ type Output = {
   signals: (
     "prompt" | "scenario" | "user" | "thread" | "evaluation" | "rag" | "metadata" | "genai"
   )[];
+  ownerProjectId?: string | null;
 }[];
 
 // traces.spansFull
@@ -1955,7 +1974,7 @@ interface Input {
   occurredAtMs?: number;
   tenantId?: string;
 }
-type Output = z.infer<typeof spanDetailSchema>; // ../contract/src/trace-view.contract.ts:295
+type Output = z.infer<typeof spanDetailSchema>; // ../contract/src/trace-view.contract.ts:297
 
 // traces.resourceInfo
 // Input: inline, ../contract/src/traces.trpc.ts:605
@@ -1965,7 +1984,7 @@ interface Input {
   occurredAtMs?: number;
   tenantId?: string;
 }
-type Output = z.infer<typeof traceResourceInfoSchema>; // ../contract/src/trace-view.contract.ts:354
+type Output = z.infer<typeof traceResourceInfoSchema>; // ../contract/src/trace-view.contract.ts:358
 
 // traces.traceEvents
 // Input: inline, ../contract/src/traces.trpc.ts:619
@@ -1975,12 +1994,13 @@ interface Input {
   occurredAtMs?: number;
   tenantId?: string;
 }
-// Output: tracesTraceEventsSchema, ../contract/src/trace.responses.ts:258
+// Output: tracesTraceEventsSchema, ../contract/src/trace.responses.ts:260
 type Output = {
   spanId: string;
   timestamp: number;
   name: string;
   attributes: Record<string, string>;
+  ownerProjectId?: string;
 }[];
 
 // traces.braidPreview

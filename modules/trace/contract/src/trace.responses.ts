@@ -246,6 +246,8 @@ const derivedTraceEventSchemaDefinition = z.object({
   timestamp: z.number(),
   name: z.string(),
   attributes: z.record(z.string(), z.string()),
+  /** Set only on a span braided in from another project (ADR-183 §5); absent: the reader's own. */
+  ownerProjectId: z.string().optional(),
 });
 export interface DerivedTraceEventSchema extends Named<typeof derivedTraceEventSchemaDefinition> {}
 export const derivedTraceEventSchema: DerivedTraceEventSchema = derivedTraceEventSchemaDefinition;

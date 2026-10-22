@@ -114,7 +114,12 @@ import type {
   TraceMetadataUpdate,
 } from "./trace-rest.schemas.ts";
 import type { SharedTraceDto } from "./trace-share.schemas.ts";
-import type { SpanDetail, SpanLangwatchSignals, TraceHeader } from "./trace-view.contract.ts";
+import type {
+  SpanBraid,
+  SpanDetail,
+  SpanLangwatchSignals,
+  TraceHeader,
+} from "./trace-view.contract.ts";
 import type { Protections } from "./trace-viewer-protections.contract.ts";
 import type {
   SpanTreeDeltaInput,
@@ -466,12 +471,13 @@ export interface TraceApi extends TraceOtlpIngestApi {
   recordAnnotation(input: TraceAnnotationMarker): Promise<void>;
   removeAnnotation(input: TraceAnnotationMarker): Promise<void>;
   isCodingAgentShapedSpan(span: Span): boolean;
+  /** The reader's own spans get their coding-agent log content; a braided span shows as stored. */
   enrichSpansFromCodingAgentLogs(input: {
     projectId: string;
     traceId: string;
-    spans: Span[];
+    spans: (Span & { ownerProjectId?: string })[];
     occurredAtMs?: number;
-  }): Promise<Span[]>;
+  }): Promise<(Span & { ownerProjectId?: string })[]>;
   enrichSpanFromCodingAgentLogs(input: {
     span: Span;
     modelCallRefs: unknown;
@@ -498,6 +504,8 @@ export interface TraceApi extends TraceOtlpIngestApi {
     authorization: Authorization;
     traceId: string;
     occurredAtMs?: number;
+    /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-183 §5). */
+    reads?: "spans" | "traces";
   }): Promise<SpanSummaryRow[]>;
   readSpans(input: {
     authorization: Authorization;
@@ -505,7 +513,9 @@ export interface TraceApi extends TraceOtlpIngestApi {
     occurredAtMs?: number;
     visibilityCutoffMs?: number | null;
     limit?: number;
-  }): Promise<Span[]>;
+    /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-183 §5). */
+    reads?: "spans" | "traces";
+  }): Promise<(Span & { ownerProjectId?: string })[]>;
   readSpansPage(input: {
     authorization: Authorization;
     traceId: string;
@@ -513,14 +523,18 @@ export interface TraceApi extends TraceOtlpIngestApi {
     offset: number;
     occurredAtMs?: number;
     visibilityCutoffMs?: number | null;
-  }): Promise<{ spans: Span[]; total: number }>;
+    /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-183 §5). */
+    reads?: "spans" | "traces";
+  }): Promise<{ spans: (Span & { ownerProjectId?: string })[]; total: number }>;
   readSpansSince(input: {
     authorization: Authorization;
     traceId: string;
     sinceStartTimeMs: number;
     occurredAtMs?: number;
     visibilityCutoffMs?: number | null;
-  }): Promise<Span[]>;
+    /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-183 §5). */
+    reads?: "spans" | "traces";
+  }): Promise<(Span & { ownerProjectId?: string })[]>;
   findSpan(input: {
     authorization: Authorization;
     traceId: string;
@@ -540,16 +554,24 @@ export interface TraceApi extends TraceOtlpIngestApi {
     authorization: Authorization;
     traceId: string;
     occurredAtMs?: number;
-  }): Promise<{ spanId: string; signals: SpanLangwatchSignals["signals"] }[]>;
+    /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-183 §5). */
+    reads?: "spans" | "traces";
+  }): Promise<
+    { spanId: string; signals: SpanLangwatchSignals["signals"]; ownerProjectId?: string }[]
+  >;
   readSpanResources(input: {
     authorization: Authorization;
     traceId: string;
     occurredAtMs?: number;
+    /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-183 §5). */
+    reads?: "spans" | "traces";
   }): Promise<SpanResourceInfo[]>;
   readTraceEvents(input: {
     authorization: Authorization;
     traceId: string;
     occurredAtMs?: number;
+    /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-183 §5). */
+    reads?: "spans" | "traces";
   }): Promise<DerivedTraceEvent[]>;
   readTraceEventRollups(input: {
     authorization: Authorization;
@@ -829,6 +851,21 @@ export interface TraceApi extends TraceOtlpIngestApi {
     traceId: string;
     tenantId?: string | undefined;
   }): Promise<Authorization>;
+  /** Each braid owner's protections for this viewer: its policy, the viewer's standing there. */
+  resolveBraidOwnerProtections(input: {
+    viewerUserId: string;
+    ownerProjectIds: readonly (string | null | undefined)[];
+  }): Promise<ReadonlyMap<string, Protections>>;
+  /** Each span's `braid`, null on the reader's own (ADR-183 §5). */
+  describeBraidedSpans(input: {
+    authorization: Authorization;
+    viewerUserId: string;
+    spans: readonly {
+      ownerProjectId?: string | undefined;
+      startedAtMs: number;
+      params?: unknown;
+    }[];
+  }): Promise<(SpanBraid | null)[]>;
   /** The header's `braided` totals and owners; `{}` for a trace or proof without braids. */
   readBraidedHeaderTotals(input: {
     authorization: Authorization;

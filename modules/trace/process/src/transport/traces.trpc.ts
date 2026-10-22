@@ -19,25 +19,21 @@ import {
   tracesTrpc,
 } from "@langwatch/trace-contract";
 
+import { protectByOwner } from "../rules/braided-span-owner.rules.ts";
 import {
   traceDerivedAttrPrefixes,
   traceReadMapperPorts,
 } from "../rules/trace-read-mapper-ports.rules.ts";
 import {
-  buildSpanContentRedactions,
+  protectSpans,
   deriveTraceDropPrivacy,
   gateTraceLogVisibility,
   mapLegacySpanSummaryToTreeNode,
-  mapSpansToDetailDtos,
+  mapSpanDetailsByOwner,
   mapTraceSummaryToHeader,
   redactV2Content,
 } from "../rules/trace-read-mappers.rules.ts";
-import {
-  gateHeaderCost,
-  gateResources,
-  gateTreeCost,
-  withoutHiddenResourceAttrs,
-} from "../rules/trace-view-gates.rules.ts";
+import { gateHeaderCost, gateTreeCost, resourceInfoOf } from "../rules/trace-view-gates.rules.ts";
 
 const evaluationsSchema = evaluationSchema.array();
 
@@ -632,18 +628,26 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
         limit: input.limit,
         offset: input.offset,
         occurredAtMs: input.occurredAtMs,
+        reads: "spans",
       });
-      const redactions = buildSpanContentRedactions(
-        page.spans,
-        protections,
-        traceReadMapperPorts.spanProtection,
-      );
+      const owners = await app.resolveBraidOwnerProtections({
+        viewerUserId: actor.id,
+        ownerProjectIds: page.spans.map((span) => span.ownerProjectId),
+      });
 
       return {
         ...page,
-        spans: page.spans.map((span) =>
-          traceReadMapperPorts.spanProtection.applySpanProtections(span, protections, redactions),
-        ),
+        spans: protectByOwner({
+          items: page.spans,
+          reader: protections,
+          owners,
+          protect: (group, groupProtections) =>
+            protectSpans({
+              spans: group,
+              protections: groupProtections,
+              spanProtection: traceReadMapperPorts.spanProtection,
+            }),
+        }),
       };
     })
 
@@ -666,16 +670,24 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
         sinceStartTimeMs: input.sinceStartTimeMs,
         visibilityCutoffMs: protections.visibilityCutoffMs,
         occurredAtMs: input.occurredAtMs,
+        reads: "spans",
       });
-      const redactions = buildSpanContentRedactions(
-        sinceSpans,
-        protections,
-        traceReadMapperPorts.spanProtection,
-      );
+      const owners = await app.resolveBraidOwnerProtections({
+        viewerUserId: actor.id,
+        ownerProjectIds: sinceSpans.map((span) => span.ownerProjectId),
+      });
 
-      return sinceSpans.map((span) =>
-        traceReadMapperPorts.spanProtection.applySpanProtections(span, protections, redactions),
-      );
+      return protectByOwner({
+        items: sinceSpans,
+        reader: protections,
+        owners,
+        protect: (group, groupProtections) =>
+          protectSpans({
+            spans: group,
+            protections: groupProtections,
+            spanProtection: traceReadMapperPorts.spanProtection,
+          }),
+      });
     })
 
     /**
@@ -746,6 +758,7 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
         authorization,
         traceId: input.traceId,
         occurredAtMs: input.occurredAtMs,
+        reads: "spans",
       });
 
       return gateTreeCost({ nodes: rows.map(mapLegacySpanSummaryToTreeNode), protections });
@@ -763,9 +776,14 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
         authorization,
         traceId: input.traceId,
         occurredAtMs: input.occurredAtMs,
+        reads: "spans",
       });
 
-      return rows.map((r) => ({ spanId: r.spanId, signals: r.signals }));
+      return rows.map((r) => ({
+        spanId: r.spanId,
+        signals: r.signals,
+        ...(r.ownerProjectId === undefined ? {} : { ownerProjectId: r.ownerProjectId }),
+      }));
     })
 
     /**
@@ -790,6 +808,7 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
         traceId: input.traceId,
         occurredAtMs: input.occurredAtMs,
         visibilityCutoffMs: protections.visibilityCutoffMs,
+        reads: "spans",
       });
       // Claude Code's real `llm_request` spans carry tokens + `request_id` but NO
       // message content, which lives in the trace's OTLP log records. Joined on
@@ -800,8 +819,29 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
         spans: storedSpans,
         ...(input.occurredAtMs !== undefined ? { occurredAtMs: input.occurredAtMs } : {}),
       });
+      const [owners, braids] = await Promise.all([
+        app.resolveBraidOwnerProtections({
+          viewerUserId: actor.id,
+          ownerProjectIds: spans.map((span) => span.ownerProjectId),
+        }),
+        app.describeBraidedSpans({
+          authorization,
+          viewerUserId: actor.id,
+          spans: spans.map((span) => ({
+            ownerProjectId: span.ownerProjectId,
+            startedAtMs: span.timestamps.started_at,
+            params: span.params,
+          })),
+        }),
+      ]);
 
-      return mapSpansToDetailDtos(spans, protections, traceReadMapperPorts);
+      return mapSpanDetailsByOwner({
+        spans,
+        protections,
+        owners,
+        braids,
+        ports: traceReadMapperPorts,
+      });
     })
 
     .procedure("spanDetail")
@@ -843,24 +883,14 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
         authorization,
         traceId: input.traceId,
         occurredAtMs: input.occurredAtMs,
+        reads: "spans",
       });
-      const resourceSpans = rows.map((r) => ({
-        spanId: r.spanId,
-        parentSpanId: r.parentSpanId,
-        resourceAttributes: withoutHiddenResourceAttrs(r.resourceAttributes),
-        scope: { name: r.scopeName ?? "", version: r.scopeVersion },
-      }));
-      const root = rows.find((r) => r.parentSpanId == null) ?? rows[0] ?? null;
+      const ownerProtections = await app.resolveBraidOwnerProtections({
+        viewerUserId: actor.id,
+        ownerProjectIds: rows.map((r) => r.ownerProjectId),
+      });
 
-      return gateResources({
-        resources: {
-          rootSpanId: root?.spanId ?? null,
-          resourceAttributes: withoutHiddenResourceAttrs(root?.resourceAttributes ?? {}),
-          scope: root ? { name: root.scopeName ?? "", version: root.scopeVersion } : null,
-          spans: resourceSpans,
-        },
-        protections,
-      });
+      return resourceInfoOf({ rows, protections, ownerProtections });
     })
 
     /**
@@ -884,12 +914,23 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
         authorization,
         traceId: input.traceId,
         occurredAtMs: input.occurredAtMs,
+        reads: "spans",
+      });
+      const owners = await app.resolveBraidOwnerProtections({
+        viewerUserId: actor.id,
+        ownerProjectIds: events.map((event) => event.ownerProjectId),
       });
 
-      return traceReadMapperPorts.spanProtection.applyDerivedTraceEventProtections(
-        events,
-        protections,
-      );
+      return protectByOwner({
+        items: events,
+        reader: protections,
+        owners,
+        protect: (group, groupProtections) =>
+          traceReadMapperPorts.spanProtection.applyDerivedTraceEventProtections(
+            group,
+            groupProtections,
+          ),
+      });
     })
 
     .procedure("braidPreview")

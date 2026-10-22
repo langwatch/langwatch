@@ -132,6 +132,20 @@ Feature: Braided spans in the reader's traces
       When the trace is read for "orchestrator"
       Then no count, gap or placeholder stands for the spans that did not match
 
+    @integration
+    Scenario: Every view of the trace shows the same braided spans
+      Given an "orchestrator" trace holding spans braided from "specialists"
+      When sam opens its span list, full spans, timeline, resources or instrumentation badges
+      Then each view shows the braided spans the span tree shows, each naming "specialists"
+      And each braided span is protected by the policy of "specialists", the others by that of "orchestrator"
+
+    @unit
+    Scenario: A braided span from a signed call says who signed it
+      Given a braided "specialists" span carrying a verified mark naming "orchestrator"
+      When sam selects it
+      Then the span says it was signed by "orchestrator"
+      And a span with no mark, or with a mark naming another project, says nothing about signing
+
     @integration @unimplemented
     Scenario: Actions that would act on the owner's data are off on a braided span, with a reason
       When sam selects a braided span
