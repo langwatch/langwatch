@@ -92,6 +92,12 @@ export function draftOfNotice(notice: SelfHostedNoticeRow): NoticeDraft {
   };
 }
 
+/** What the wire schema's `z.url({ protocol: /^https$/ })` takes: a parseable https address. */
+function isHttpsAddress(url: string): boolean {
+  if (!URL.canParse(url)) return false;
+  return new URL(url).protocol === "https:";
+}
+
 /** The bounds an install holds a received notice to, said before the server refuses them. */
 export function noticeProblemsOf(draft: NoticeDraft, expiresAt: string | null): NoticeProblems {
   const problems: NoticeProblems = {};
@@ -102,7 +108,7 @@ export function noticeProblemsOf(draft: NoticeDraft, expiresAt: string | null): 
   if (draft.body.length > SELF_HOSTED_NOTICE_BODY_MAX)
     problems.body = `Keep the message to ${SELF_HOSTED_NOTICE_BODY_MAX} characters.`;
   const url = draft.url.trim();
-  if (url && !url.startsWith("https://")) problems.url = "Link to an https:// address.";
+  if (url && !isHttpsAddress(url)) problems.url = "Link to an https:// address.";
   const fixedIn = draft.fixedIn.trim();
   if (fixedIn && !SELF_HOSTED_NOTICE_RELEASE_PATTERN.test(fixedIn))
     problems.fixedIn = "Name a release, such as 3.4.2.";

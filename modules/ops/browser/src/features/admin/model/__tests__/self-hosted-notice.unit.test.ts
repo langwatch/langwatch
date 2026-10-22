@@ -36,6 +36,8 @@ describe("noticeProblemsOf", () => {
       ["a title over the limit", { title: "t".repeat(SELF_HOSTED_NOTICE_TITLE_MAX + 1) }, "title"],
       ["a body over the limit", { body: "b".repeat(SELF_HOSTED_NOTICE_BODY_MAX + 1) }, "body"],
       ["an http link", { url: "http://langwatch.ai" }, "url"],
+      ["an https link with no address", { url: "https://" }, "url"],
+      ["an https link with a space in its host", { url: "https://lang watch.ai" }, "url"],
       ["a fixed-in that is not a release", { fixedIn: "next week" }, "fixedIn"],
     ] as const)("names %s", (_, fields, field) => {
       expect(Object.keys(noticeProblemsOf(draftOf(fields), null))).toEqual([field]);
