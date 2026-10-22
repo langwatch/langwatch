@@ -18,6 +18,7 @@
     "test:links:external": "node src/site/check-links.ts --external",
     "test:session": "node scripts/session.smoke.test.mjs",
     "test:performance": "node scripts/performance.smoke.test.mjs",
+    "test:assets": "node scripts/assets.smoke.test.mjs",
     "size": "node scripts/performance-report.mjs",
     "test:layout": "node scripts/layout.smoke.test.mjs",
     "test:polish": "node scripts/polish.smoke.test.mjs",

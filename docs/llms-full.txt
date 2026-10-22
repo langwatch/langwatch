@@ -20275,7 +20275,7 @@ mode: "wide"
 
 LangWatch helps you understand every user interaction (**Thread**), each individual AI task (**Trace**), and all the underlying steps (**Span**) involved.
 
-<Steps>
+<Steps titleSize="h2">
   <Step title="Create your LangWatch account">
     Head over to [app.langwatch.ai](https://app.langwatch.ai) and sign up. Create your first organization and project.
   </Step>

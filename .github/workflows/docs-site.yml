@@ -154,6 +154,11 @@ jobs:
             script: test:performance
             artifact: docs-site
             browser: true
+          - check: assets
+            name: Test font swaps, preloads and drawn wheel names
+            script: test:assets
+            artifact: docs-site
+            browser: true
           - check: links
             name: Check internal links
             # The production mount, so the URL ledger is checked at /docs.

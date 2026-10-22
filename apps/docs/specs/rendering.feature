@@ -71,3 +71,10 @@ Feature: Read and navigate the generated documentation
     Given the generated HTML is available before its JavaScript
     When a reader sees a page, code, skill or setup copy action
     Then the control is disabled until its browser handler is ready
+
+  @integration
+  Scenario: Step titles keep the page's heading order
+    Given an MDX page whose steps set Mintlify's titleSize
+    When the page is rendered
+    Then each step title is a heading of that level, or plain text for "p"
+    And steps without a size keep third-level titles

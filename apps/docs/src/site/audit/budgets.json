@@ -30,9 +30,7 @@
       },
       "maxCumulativeLayoutShift": 0.04,
       "maxTransferBytes": 560000,
-      "knownFailures": {
-        "color-contrast": "Desktop: the faded neighbours in the agent-name carousel (.docs-agent-name, 1.2 to 1.9:1)."
-      }
+      "knownFailures": {}
     },
     {
       "id": "guide",
@@ -41,10 +39,7 @@
       "categories": {},
       "maxCumulativeLayoutShift": 0.08,
       "maxTransferBytes": 760000,
-      "knownFailures": {
-        "color-contrast": "Desktop: the faded neighbours in the agent-name carousel (.docs-agent-name).",
-        "heading-order": "The page's authored headings jump from h1 to h3 (create-your-langwatch-account)."
-      }
+      "knownFailures": {}
     },
     {
       "id": "long-page",
@@ -52,9 +47,7 @@
       "why": "A long page with a diagram and images.",
       "categories": {},
       "maxTransferBytes": 440000,
-      "knownFailures": {
-        "color-contrast": "Desktop: the faded neighbours in the agent-name carousel (.docs-agent-name)."
-      }
+      "knownFailures": {}
     },
     {
       "id": "api-operation",
@@ -62,9 +55,7 @@
       "why": "An API reference operation with its playground.",
       "categories": {},
       "maxTransferBytes": 370000,
-      "knownFailures": {
-        "color-contrast": "Desktop: the faded neighbours in the agent-name carousel (.docs-agent-name)."
-      }
+      "knownFailures": {}
     },
     {
       "id": "section-index",
@@ -73,9 +64,7 @@
       "categories": {},
       "maxCumulativeLayoutShift": 0.16,
       "maxTransferBytes": 350000,
-      "knownFailures": {
-        "color-contrast": "Desktop: the faded neighbours in the agent-name carousel (.docs-agent-name)."
-      }
+      "knownFailures": {}
     },
     {
       "id": "not-found",
@@ -93,9 +82,7 @@
       "maxTransferBytes": 660000,
       "knownFailures": {
         "is-crawlable": "Deliberate: the not-found page is noindex.",
-        "meta-description": "The not-found page has no description; it is never indexed.",
-        "heading-order": "The not-found page's suggestions skip a heading level.",
-        "color-contrast": "Desktop: the faded neighbours in the agent-name carousel (.docs-agent-name)."
+        "meta-description": "The not-found page has no description; it is never indexed."
       }
     }
   ],

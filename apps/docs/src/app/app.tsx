@@ -135,6 +135,7 @@ function NotFound() {
         >
           <Search size={16} /> Search the docs
         </Button>
+        <h2 className="docs-sr-only">Starting points</h2>
         <CardGroup cols={3}>
           <Card
             title="Quick Start"

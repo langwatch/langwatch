@@ -1,6 +1,6 @@
 import { Box } from "@langwatch/design-system/primitives";
 import type { SystemStyleObject } from "@langwatch/design-system/primitives";
-import type { ReactNode } from "react";
+import { createContext, useContext, type ReactNode } from "react";
 
 import { Icon } from "./icon.tsx";
 
@@ -51,11 +51,17 @@ const STEPS_CSS = {
   },
 } satisfies SystemStyleObject;
 
-export function Steps({ children }: { children?: ReactNode }) {
+/** Mintlify's `titleSize`: the heading level of step titles; `p` is plain text. */
+type TitleSize = "p" | "h2" | "h3";
+const StepTitleSize = createContext<TitleSize>("h3");
+
+export function Steps({ children, titleSize }: { children?: ReactNode; titleSize?: TitleSize }) {
   return (
-    <Box as="ol" className="docs-steps" marginY="6" css={STEPS_CSS}>
-      {children}
-    </Box>
+    <StepTitleSize.Provider value={titleSize ?? "h3"}>
+      <Box as="ol" className="docs-steps" marginY="6" css={STEPS_CSS}>
+        {children}
+      </Box>
+    </StepTitleSize.Provider>
   );
 }
 
@@ -63,18 +69,21 @@ export function Step({
   title,
   icon,
   id,
+  titleSize,
   children,
 }: {
   title?: string;
   icon?: string;
   id?: string;
+  titleSize?: TitleSize;
   children?: ReactNode;
 }) {
+  const inherited = useContext(StepTitleSize);
   return (
     <li>
       {title ? (
         <Box
-          as="h3"
+          as={titleSize ?? inherited}
           color="fg"
           id={id}
           display="flex"
