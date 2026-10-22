@@ -61,6 +61,8 @@ func testInput() *config.Input {
 		TextLogLevel:         "warning",
 	}
 	i.ReadTierMaxExecutionTime = 300
+	i.AccessSidecar = "embedded"
+	i.AccessListen = "127.0.0.1:8124"
 	return i
 }
 

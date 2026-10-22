@@ -232,6 +232,31 @@ extraVolumeMounts: []
 lwqlAccess:
   secretName: ""
 
+# Users, tiers and logins from an access file (ADR-184). Off by default: the
+# server then has only its default user plus whatever extraVolumes mount.
+# On, a sidecar container keeps the users current and verifies OIDC token
+# logins on 127.0.0.1 inside the pod. See the README's "Access" section.
+access:
+  enabled: false
+  # The access file itself: issuers and users. Rolling users name a directory
+  # under /etc/clickhouse-access/secrets/<Secret name> (see passwordSecrets).
+  config: {}
+  # Or an existing ConfigMap with an `access.yaml` key; `config` is then ignored.
+  existingConfigMap: ""
+  # Secrets mounted as password directories, each at
+  # /etc/clickhouse-access/secrets/<name>. Every key is one valid password;
+  # `<key>.valid_until` (RFC 3339) ends `<key>`. Add a key, move the client,
+  # remove the old key: the sidecar applies each change within ~10 seconds.
+  passwordSecrets: []
+  sidecar:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        cpu: 200m
+        memory: 128Mi
+
 # Scheduling
 scheduling:
   nodeSelector: {}

@@ -5,6 +5,8 @@ import (
 	"math"
 	"strconv"
 	"strings"
+
+	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/access"
 )
 
 // Validate checks the Input for invalid or inconsistent values.
@@ -26,6 +28,12 @@ func (i *Input) Validate() error {
 			errs = append(errs, fmt.Sprintf("TIERED_MOVE_FACTOR: invalid float %q", i.TieredMoveFactor))
 		} else if math.IsNaN(f) || math.IsInf(f, 0) || f <= 0 || f > 1 {
 			errs = append(errs, fmt.Sprintf("TIERED_MOVE_FACTOR: must be in (0, 1] (got %v)", f))
+		}
+	}
+
+	if i.AccessFile != "" {
+		if err := access.ValidateListen(i.AccessListen); err != nil {
+			errs = append(errs, err.Error())
 		}
 	}
 

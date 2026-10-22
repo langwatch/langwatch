@@ -10,6 +10,7 @@ import (
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
 
+	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/access"
 	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/config"
 	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/storage"
 )
@@ -84,6 +85,10 @@ func RenderAll(log *zap.Logger, input *config.Input, computed *config.Computed, 
 			func() error { return renderPrometheus(configD) }},
 		{"storage", filepath.Join(configD, "storage.yaml"), input.ColdEnabled || input.BackupEnabled,
 			func() error { return renderStorage(input, computed, configD) }},
+		{"access-users", filepath.Join(usersD, access.UsersFileName), input.AccessFile != "",
+			func() error { return renderAccessUsers(log, input, usersD) }},
+		{"access-auth", filepath.Join(configD, access.AuthFileName), input.AccessFile != "",
+			func() error { return renderAccessAuth(input, configD) }},
 	} {
 		if !s.enabled {
 			if err := os.Remove(s.path); err != nil && !errors.Is(err, fs.ErrNotExist) {

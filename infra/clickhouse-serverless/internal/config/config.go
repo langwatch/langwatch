@@ -37,6 +37,12 @@ type Input struct {
 	InterserverPasswordFile string `env:"CLICKHOUSE_INTERSERVER_PASSWORD_FILE"`
 	InterserverPassword     string
 
+	// Optional access.yaml (ADR-184): users, their tiers and logins. The
+	// sidecar answers token logins on AccessListen and re-renders the users.
+	AccessFile    string `env:"CLICKHOUSE_ACCESS_FILE"`
+	AccessListen  string `env:"CLICKHOUSE_ACCESS_LISTEN" default:"127.0.0.1:8124"`
+	AccessSidecar string `env:"CLICKHOUSE_ACCESS_SIDECAR" default:"embedded" validate:"oneof=embedded external"`
+
 	// nil means true: default gets access_management and named_collection_control.
 	DefaultUserAccessManagement *bool `env:"DEFAULT_USER_ACCESS_MANAGEMENT"`
 
