@@ -1,7 +1,7 @@
 import type { FilterField } from "@langwatch/analytics-contract";
 import { type Authorization, projectIdsReadBy } from "@langwatch/authorization";
-import { HandledError } from "@langwatch/handled-error";
-import { createLogger } from "@langwatch/observability";
+import { HandledError, isTransientRefusal } from "@langwatch/handled-error";
+import { createLogger, type Logger } from "@langwatch/observability";
 import { getLangWatchTracer } from "langwatch";
 
 import type {
@@ -26,7 +26,6 @@ type GetFilterOptionsInput = {
  * Service for fetching filter options from ClickHouse.
  */
 export class FilterService {
-  private readonly logger = createLogger("langwatch:filters:service");
   private readonly tracer = getLangWatchTracer("langwatch.filters.service");
 
   /**
@@ -34,10 +33,19 @@ export class FilterService {
    * rather than a fault - it fails at the call, with the same message it
    * always did, instead of at boot.
    */
-  private constructor(private readonly repository: FilterOptionsRepository | null) {}
+  private constructor(
+    private readonly repository: FilterOptionsRepository | null,
+    private readonly logger: Pick<Logger, "error" | "warn">,
+  ) {}
 
-  static create(options: { repository: FilterOptionsRepository | null }): FilterService {
-    return new FilterService(options.repository);
+  static create(options: {
+    repository: FilterOptionsRepository | null;
+    logger?: Pick<Logger, "error" | "warn"> | undefined;
+  }): FilterService {
+    return new FilterService(
+      options.repository,
+      options.logger ?? createLogger("langwatch:filters:service"),
+    );
   }
 
   async getFilterOptions(input: GetFilterOptionsInput): Promise<FilterOption[]> {
@@ -84,11 +92,15 @@ export class FilterService {
 
           return filterOptions;
         } catch (error) {
-          this.logger.error(
+          // The whole error, not its message: the logger records its type, code, stack and
+          // cause chain, which the generic error thrown below deliberately does not carry.
+          // A busy ClickHouse is a retryable refusal, so it warns rather than errors.
+          const level = isTransientRefusalError(error) ? "warn" : "error";
+          this.logger[level](
             {
               projectId: input.projectId,
               field: input.field,
-              error: error instanceof Error ? error.message : error,
+              error,
             },
             "Failed to fetch filter options from ClickHouse",
           );
@@ -109,4 +121,9 @@ export class FilterService {
       },
     );
   }
+}
+
+/** A busy or unreachable ClickHouse, refused as a handled, retryable error. */
+function isTransientRefusalError(error: unknown): boolean {
+  return HandledError.isHandled(error) && isTransientRefusal(error);
 }
