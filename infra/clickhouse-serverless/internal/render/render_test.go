@@ -250,6 +250,7 @@ func TestRenderAll_UpgradePinsHold25_10Behaviour(t *testing.T) {
 			"serialization_info_version: basic",
 			"string_serialization_version: single_stream",
 			"patch_parts_version: v1",
+			"packed_skip_index_max_bytes: 0",
 			"asynchronous_metrics_key_values_mode: legacy_names",
 			"memory_worker_dynamic_hard_limit: 0",
 		},
