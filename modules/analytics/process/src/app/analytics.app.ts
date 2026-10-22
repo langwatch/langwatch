@@ -59,7 +59,12 @@ import { OverloadedRefusal, StatementBoundTelemetry } from "@langwatch/process-s
 import { ProjectApi } from "@langwatch/project-contract";
 import { Secret } from "@langwatch/secrets";
 import { toEpochMs, type Instant } from "@langwatch/time";
-import { TraceApi, type Trace, TRACE_FILTER_EXAMPLES } from "@langwatch/trace-contract";
+import {
+  TraceApi,
+  type ThreadTraceIds,
+  type Trace,
+  TRACE_FILTER_EXAMPLES,
+} from "@langwatch/trace-contract";
 
 import type { AnalyticsChannels } from "../channels/analytics.channels.ts";
 import { lwqlHydrationKeyCap } from "../features/app-functions/rules/langwatch-ql-app-function-catalog.rules.ts";
@@ -68,6 +73,7 @@ import { statementMightCallEvalFunction } from "../features/app-functions/rules/
 import { LangWatchQLHydrationComputeService } from "../features/hydration/services/langwatch-ql-hydration-compute.service.ts";
 import {
   LangWatchQLHydrationReadService,
+  type LangWatchQLThreadTraceIdsReadInput,
   type LangWatchQLThreadTraceReadInput,
   type LangWatchQLTraceReadInput,
   type LangWatchQLTraceSource,
@@ -373,6 +379,14 @@ class TraceApiHydrationSource implements LangWatchQLTraceSource {
       protections,
       maxTraces,
     });
+  }
+
+  readThreadTraceIds({
+    projectId,
+    threadKeys,
+    maxTraces,
+  }: LangWatchQLThreadTraceIdsReadInput): Promise<readonly ThreadTraceIds[]> {
+    return this.traces.readThreadsTraceIds({ projectId, threadIds: [...threadKeys], maxTraces });
   }
 }
 

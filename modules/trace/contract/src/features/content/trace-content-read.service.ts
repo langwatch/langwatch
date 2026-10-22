@@ -74,6 +74,18 @@ export type TraceReadThreadsTracesInput = {
   maxTraces?: number;
 };
 
+export type TraceReadThreadsTraceIdsInput = {
+  projectId: string;
+  threadIds: string[];
+  maxTraces?: number;
+};
+
+/** One thread's trace ids, oldest first. */
+export type ThreadTraceIds = {
+  threadId: string;
+  traceIds: string[];
+};
+
 export type TraceReadSampleTracesInput = {
   query: TraceLegacyListInput;
   protections: unknown;
@@ -95,6 +107,8 @@ export abstract class TraceContentReadService {
   abstract readThreadTraces(input: TraceReadThreadTracesInput): Promise<Trace[]>;
   /** `maxTraces` is the ceiling across every thread asked for, not per thread. */
   abstract readThreadsTraces(input: TraceReadThreadsTracesInput): Promise<Trace[]>;
+  /** `maxTraces` is the ceiling across every thread asked for, not per thread. */
+  abstract readThreadsTraceIds(input: TraceReadThreadsTraceIdsInput): Promise<ThreadTraceIds[]>;
   abstract readSampleTraces(input: TraceReadSampleTracesInput): Promise<Trace[]>;
 }
 

@@ -38,6 +38,7 @@ import type {
   DeriveClaudeResponseContentInput,
   DeriveClaudeResponseContentResult,
 } from "./features/attribute/trace-canonicalisation.ts";
+import type { ThreadTraceIds } from "./features/content/trace-content-read.service.ts";
 import type {
   TraceEditOverlayDto,
   TraceEditOverlayPatch,
@@ -377,6 +378,16 @@ export interface TraceApi extends TraceOtlpIngestApi {
     withEditOverlay?: boolean;
     maxTraces?: number;
   }): Promise<Trace[]>;
+  /**
+   * The trace ids of the named threads, one list per thread, oldest first. Reads
+   * the trace summaries' keys only: no content, so it needs no protections.
+   * `maxTraces` is the ceiling across all of the threads together.
+   */
+  readThreadsTraceIds(input: {
+    projectId: string;
+    threadIds: string[];
+    maxTraces?: number;
+  }): Promise<ThreadTraceIds[]>;
   readSampleTraces(input: {
     query: TraceLegacyListInput;
     protections: unknown;

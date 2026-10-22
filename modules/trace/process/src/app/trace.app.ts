@@ -182,6 +182,8 @@ import {
   type TraceReadOrderedSpansInput,
   type TraceReadThreadTracesInput,
   type TraceReadThreadsTracesInput,
+  type TraceReadThreadsTraceIdsInput,
+  type ThreadTraceIds,
   type TraceReadSampleTracesInput,
   TrackedEventInvalidError,
   trackEventRESTParamsValidatorSchema,
@@ -2170,6 +2172,17 @@ export class TraceModule implements TraceApi, CollectorApp {
       authorization: await this.#authorizeContentRead({
         projectId: input.projectId,
         route: "TraceApi.readThreadsTraces",
+      }),
+    });
+  }
+  async readThreadsTraceIds(input: TraceReadThreadsTraceIdsInput): Promise<ThreadTraceIds[]> {
+    await this.#readBounds.assertIdsWithinBound(input.projectId, input.threadIds);
+
+    return this.#contentReader.readThreadsTraceIds({
+      ...input,
+      authorization: await this.#authorizeContentRead({
+        projectId: input.projectId,
+        route: "TraceApi.readThreadsTraceIds",
       }),
     });
   }

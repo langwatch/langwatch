@@ -110,3 +110,16 @@ Feature: Trace span-tree read service
     When one of its traces is read with its spans
     Then the read is refused with private_dataplane_unavailable (503)
     And it is not wrapped into a bare internal_error
+
+  @unit
+  Scenario: A thread trace id read runs one keys-only statement
+    Given a caller asks for the trace ids of two threads
+    When the read runs
+    Then one trace_summaries statement runs, fenced to the caller's project
+    And it reads no captured content
+
+  @integration
+  Scenario: A thread trace id read answers each thread's ids, oldest first
+    Given two threads holding traces at different times, one trace stored in two versions
+    When a caller reads both threads' trace ids
+    Then each thread answers its own trace ids once each, oldest first

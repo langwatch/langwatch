@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Public Trace operations shared by process peers after boot composition.
 
-Peers call these through the token, declared at `../contract/src/trace.api.ts:168`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/trace.api.ts:169`; nothing else in this package is public.
 It extends `TraceOtlpIngestApi`.
 
 #### `extractInlineMediaFromEvent`
@@ -301,6 +301,14 @@ Every trace of the named threads. `maxTraces` is the ceiling across all of them 
 
 ```typescript
 readThreadsTraces(input: { projectId: string; threadIds: string[]; protections: unknown; withEditOverlay?: boolean; maxTraces?: number; }): Promise<Trace[]>;
+```
+
+#### `readThreadsTraceIds`
+
+The trace ids of the named threads, one list per thread, oldest first. Reads the trace summaries' keys only: no content, so it needs no protections. `maxTraces` is the ceiling across all of the threads together.
+
+```typescript
+readThreadsTraceIds(input: { projectId: string; threadIds: string[]; maxTraces?: number; }): Promise<ThreadTraceIds[]>;
 ```
 
 #### `readSampleTraces`

@@ -34,6 +34,7 @@ import type {
   TraceSummaryListOptions,
   TraceSummaryListQuery,
   TraceSummaryPage,
+  ThreadTraceIds,
 } from "@langwatch/trace-contract";
 import { isStorageAnchoredVersion } from "@langwatch/trace-contract";
 import { getLangWatchTracer } from "langwatch";
@@ -70,6 +71,7 @@ import {
 
 const attributeMapSchema = z.record(z.string(), z.unknown());
 const traceIdRowsSchema = z.array(z.looseObject({ TraceId: chString }));
+const threadTraceIdRowsSchema = z.array(z.looseObject({ ThreadId: chString, TraceId: chString }));
 const totalRowsSchema = z.array(z.looseObject({ total: chString }));
 const topicCountRowsSchema = z.array(
   z.looseObject({ TopicId: chString.nullable(), SubTopicId: chString.nullable(), count: chString }),
@@ -1022,6 +1024,55 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           );
           throw new Error("Failed to fetch traces by thread ID");
         }
+      },
+    );
+  }
+
+  /**
+   * A trace belongs to the thread its latest summary version among those naming
+   * one of the threads carries; OccurredAt is immutable, so ordering is stable.
+   * @param maxTraces traces the read may return across every thread asked for.
+   */
+  async findTraceIdsByThreadIds({
+    authorization,
+    projectId,
+    threadIds,
+    maxTraces,
+  }: {
+    authorization: Authorization;
+    projectId: string;
+    threadIds: string[];
+    maxTraces?: number | undefined;
+  }): Promise<ThreadTraceIds[]> {
+    return this.tracer.withActiveSpan(
+      "TraceLegacyReadClickHouseRepository.findTraceIdsByThreadIds",
+      { attributes: { "tenant.id": projectId, "thread.count": threadIds.length } },
+      async () => {
+        if (threadIds.length === 0) return [];
+        const reader = this.reader({ authorization, projectId });
+        const result = await reader.query({
+          query: `
+            SELECT
+              argMax(Attributes['gen_ai.conversation.id'], UpdatedAt) AS ThreadId,
+              TraceId,
+              min(OccurredAt) AS FirstOccurredAt
+            FROM trace_summaries
+            WHERE ${tenantScope("OccurredAt")}
+              AND Attributes['gen_ai.conversation.id'] IN ({threadIds:Array(String)})
+            GROUP BY TraceId
+            ORDER BY FirstOccurredAt ASC, TraceId ASC
+            LIMIT {maxTraces:UInt32}
+          `,
+          query_params: { threadIds, maxTraces: maxTraces ?? DEFAULT_THREAD_TRACES_LIMIT },
+          format: "JSONEachRow",
+        });
+        const byThread = new Map<string, string[]>();
+        for (const row of threadTraceIdRowsSchema.parse(await result.json())) {
+          const traceIds = byThread.get(row.ThreadId);
+          if (traceIds) traceIds.push(row.TraceId);
+          else byThread.set(row.ThreadId, [row.TraceId]);
+        }
+        return [...byThread].map(([threadId, traceIds]) => ({ threadId, traceIds }));
       },
     );
   }

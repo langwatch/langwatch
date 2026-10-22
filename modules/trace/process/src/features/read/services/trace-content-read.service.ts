@@ -7,6 +7,7 @@ import type {
   TraceSummaryListQuery,
   TraceSummaryPage,
   TracesForProjectResult,
+  ThreadTraceIds,
 } from "@langwatch/trace-contract";
 
 import type { TraceLegacyRead } from "../../../services/trace-viewer.service.ts";
@@ -160,6 +161,16 @@ export class TraceContentReadService {
         ...(input.maxTraces !== undefined ? { maxTraces: input.maxTraces } : {}),
       },
     });
+  }
+
+  readThreadsTraceIds(input: {
+    /** The own-only proof every store read goes through (ruling TRACE-PROOF-SHARE). */
+    authorization: Authorization;
+    projectId: string;
+    threadIds: string[];
+    maxTraces?: number;
+  }): Promise<ThreadTraceIds[]> {
+    return this.read.getTraceIdsByThreadIds(input);
   }
 
   async readSampleTraces(input: {

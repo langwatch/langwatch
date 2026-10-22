@@ -16,6 +16,7 @@ import type {
   TraceSummaryListOptions,
   TraceSummaryListQuery,
   TraceSummaryPage,
+  ThreadTraceIds,
 } from "@langwatch/trace-contract";
 import { getLangWatchTracer } from "langwatch";
 
@@ -23,7 +24,10 @@ import type { TraceIOExtractionService } from "#features/derivation/services/tra
 
 import type { TraceEvaluationRunsReadRepository } from "../../../repositories/trace-evaluation-runs.repository.ts";
 import { mapTraceEvaluationsToLegacyEvaluations } from "../../../rules/trace-evaluation-mapping.rules.ts";
-import { type TraceLogRecordReader } from "../../claude-code/rules/claude-code-log-enrichment.rules.ts";
+import {
+  type TraceLogRecordBatchReader,
+  type TraceLogRecordReader,
+} from "../../claude-code/rules/claude-code-log-enrichment.rules.ts";
 import type { TraceEditOverlayService } from "../../edit-overlay/services/trace-edit-overlay.service.ts";
 import type { TraceBlobStoreService } from "../../media/services/trace-blob-store.service.ts";
 import { TraceReadEnrichmentService } from "../../read/services/trace-read-enrichment.service.ts";
@@ -136,7 +140,7 @@ export class TraceLegacyReadService {
     mapping: LegacyTraceMappingService;
     /** Reviewer corrections, applied only where a caller opts in. */
     editOverlay: TraceEditOverlayService;
-    logRecordStorage?: TraceLogRecordReader;
+    logRecordStorage?: TraceLogRecordReader & TraceLogRecordBatchReader;
     /** Evaluation's shared runs (R40); every single-trace read resolves its evaluations. */
     evaluationRuns: Pick<TraceEvaluationRunsReadRepository, "findTraceEvaluations">;
   }): TraceLegacyReadService {
@@ -369,6 +373,26 @@ export class TraceLegacyReadService {
         return mapTraceEvaluationsToLegacyEvaluations(result);
       },
     );
+  }
+
+  /** Keys only: no mapping, blobs, overlay or enrichment, so no protections apply. */
+  async getTraceIdsByThreadIds({
+    authorization,
+    projectId,
+    threadIds,
+    maxTraces,
+  }: {
+    authorization: Authorization;
+    projectId: string;
+    threadIds: string[];
+    maxTraces?: number;
+  }): Promise<ThreadTraceIds[]> {
+    return this.clickHouseService.findTraceIdsByThreadIds({
+      authorization,
+      projectId,
+      threadIds,
+      maxTraces,
+    });
   }
 
   async getTracesWithSpansByThreadIds({

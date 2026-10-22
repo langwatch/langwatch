@@ -53,6 +53,14 @@ export type TraceLogRecordReader = Readonly<{
 }>;
 type TraceLogRecordReadRow = Awaited<ReturnType<TraceLogRecordReader["getLogsByTraceId"]>>[number];
 
+/** The same read for a batch of traces in one statement per store, keyed by trace id. */
+export type TraceLogRecordBatchReader = Readonly<{
+  getLogsByTraceIds(params: {
+    tenantId: string;
+    traces: readonly { traceId: string; occurredAtMs?: number }[];
+  }): Promise<ReadonlyMap<string, readonly TraceLogRecordReadRow[]>>;
+}>;
+
 /**
  * The trace-origin value Claude Code (and other coding assistants) carry. Only
  * traces of this origin pay for the log read + enrichment; every other trace

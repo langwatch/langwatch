@@ -2,6 +2,7 @@ import {
   LogRecordStorageRepository,
   type StoredLogRecordRow,
   TRACE_LOG_READ_CAP,
+  type TraceLogReadTarget,
 } from "../log-record-storage.repository.ts";
 
 /** A row as a test seeds it, with the tenant that owns it. */
@@ -68,5 +69,33 @@ export class MemoryLogRecordStorageRepository extends LogRecordStorageRepository
     limit?: number;
   }): Promise<StoredLogRecordRow[]> {
     return readTrace({ rows: this.logRecords, tenantId, traceId, limit });
+  }
+
+  async findLogsByTraceIds({
+    tenantId,
+    traces,
+    limitPerTrace = TRACE_LOG_READ_CAP,
+  }: {
+    tenantId: string;
+    traces: readonly TraceLogReadTarget[];
+    limitPerTrace?: number;
+  }): Promise<StoredLogRecordRow[]> {
+    return traces.flatMap(({ traceId }) =>
+      readTrace({ rows: this.storedLogRecords, tenantId, traceId, limit: limitPerTrace }),
+    );
+  }
+
+  async findLogRecordsByTraceIds({
+    tenantId,
+    traces,
+    limitPerTrace = TRACE_LOG_READ_CAP,
+  }: {
+    tenantId: string;
+    traces: readonly TraceLogReadTarget[];
+    limitPerTrace?: number;
+  }): Promise<StoredLogRecordRow[]> {
+    return traces.flatMap(({ traceId }) =>
+      readTrace({ rows: this.logRecords, tenantId, traceId, limit: limitPerTrace }),
+    );
   }
 }

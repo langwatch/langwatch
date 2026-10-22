@@ -5,24 +5,29 @@ import {
   enrichClaudeInteractionInputs,
   enrichSpansWithClaudeLogContent,
   hasCodingAgentJoinableSpans,
+  type TraceLogRecordBatchReader,
   type TraceLogRecordReader,
 } from "../rules/claude-code-log-enrichment.rules.ts";
 
-type ClaudeCodeLogEnrichmentDependencies = {
-  logRecords: TraceLogRecordReader;
+type ClaudeCodeLogEnrichmentDependencies<Reader extends TraceLogRecordReader> = {
+  logRecords: Reader;
   traceCanonicalisation: TraceCanonicalisationService;
   logger?: Logger;
 };
 
 /** Joins Claude Code log content onto a trace's spans, reading the trace's logs once. */
-export class ClaudeCodeLogEnrichmentService {
-  readonly #dependencies: ClaudeCodeLogEnrichmentDependencies;
+export class ClaudeCodeLogEnrichmentService<
+  Reader extends TraceLogRecordReader = TraceLogRecordReader,
+> {
+  readonly #dependencies: ClaudeCodeLogEnrichmentDependencies<Reader>;
 
-  static create(dependencies: ClaudeCodeLogEnrichmentDependencies): ClaudeCodeLogEnrichmentService {
+  static create<Reader extends TraceLogRecordReader>(
+    dependencies: ClaudeCodeLogEnrichmentDependencies<Reader>,
+  ): ClaudeCodeLogEnrichmentService<Reader> {
     return new ClaudeCodeLogEnrichmentService(dependencies);
   }
 
-  private constructor(dependencies: ClaudeCodeLogEnrichmentDependencies) {
+  private constructor(dependencies: ClaudeCodeLogEnrichmentDependencies<Reader>) {
     this.#dependencies = dependencies;
   }
 
@@ -68,5 +73,55 @@ export class ClaudeCodeLogEnrichmentService {
 
       return enrichClaudeInteractionInputs(spans);
     }
+  }
+
+  /**
+   * {@link enrichCodingAgentSpansFromLogs} for a batch of traces, reading all their logs in one
+   * statement per store rather than one per trace, answering each trace's spans in input order.
+   * Needs a batch reader. A failed read keeps attribute-only inputs.
+   */
+  async enrichManyCodingAgentSpansFromLogs(
+    this: ClaudeCodeLogEnrichmentService<TraceLogRecordReader & TraceLogRecordBatchReader>,
+    {
+      tenantId,
+      traces,
+    }: {
+      tenantId: string;
+      traces: readonly { traceId: string; spans: Span[]; occurredAtMs?: number }[];
+    },
+  ): Promise<Span[][]> {
+    const { logRecords, traceCanonicalisation, logger } = this.#dependencies;
+    const joinable = traces.filter(({ spans }) => hasCodingAgentJoinableSpans(spans));
+    if (joinable.length === 0) return traces.map(({ spans }) => spans);
+
+    let logsByTrace: Awaited<ReturnType<TraceLogRecordBatchReader["getLogsByTraceIds"]>>;
+    try {
+      logsByTrace = await logRecords.getLogsByTraceIds({
+        tenantId,
+        traces: joinable.map(({ traceId, occurredAtMs }) => ({ traceId, occurredAtMs })),
+      });
+    } catch (error) {
+      logger?.warn(
+        {
+          tenantId,
+          traceCount: joinable.length,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Claude Code log enrichment skipped: failed to read the batch's trace logs",
+      );
+      return traces.map(({ spans }) =>
+        hasCodingAgentJoinableSpans(spans) ? enrichClaudeInteractionInputs(spans) : spans,
+      );
+    }
+
+    return traces.map(({ traceId, spans }) =>
+      hasCodingAgentJoinableSpans(spans)
+        ? enrichSpansWithClaudeLogContent({
+            spans,
+            logRows: [...(logsByTrace.get(traceId) ?? [])],
+            traceCanonicalisation,
+          })
+        : spans,
+    );
   }
 }

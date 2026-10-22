@@ -79,6 +79,7 @@ function bootTraceApp(options: {
     getTracesWithSpans: unread,
     getTracesByThreadId: unread,
     getTracesWithSpansByThreadIds: unread,
+    getTraceIdsByThreadIds: unread,
     getEvaluationsMultiple: unread,
     getTopicCounts: unread,
     getCustomersAndLabels: unread,
