@@ -192,9 +192,11 @@ jobs:
           uv venv "$RUNNER_TEMP/codeblock-venv"
           uv pip install --python "$RUNNER_TEMP/codeblock-venv" requests ./sdks/python
           echo "LANGWATCH_CODEBLOCK_PYTHON=$RUNNER_TEMP/codeblock-venv/bin/python" >> "$GITHUB_ENV"
-      # The wasm code-block runtime's interpreter; its tests fail without it in CI.
-      - name: Fetch the code-block wasm runtime
-        run: services/nlpgo/scripts/fetch-python-wasm.sh
+      # The wasm code-block runtimes' interpreters; their tests fail without them in CI.
+      - name: Fetch the code-block wasm runtimes
+        run: |
+          services/nlpgo/scripts/fetch-python-wasm.sh
+          services/nlpgo/scripts/fetch-quickjs-wasm.sh
       # lingua/language_detection replays langevals over the generated models.
       - run: make lingua-models
       - run: go test -count=1 -race $GO_PKGS

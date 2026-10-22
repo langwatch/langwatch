@@ -41,10 +41,17 @@ default until the wasm runtime has run in production.
 - **Time is the engine's.** A run is stopped at its deadline wherever it is.
   `time.sleep` and the asyncio event loop wait through the engine, so a
   sleeping run also ends at its deadline.
+- **JavaScript runs on the same substrate, always.** A code node whose
+  `language` parameter is `javascript` runs on QuickJS (`quickjs-ng`, WASI
+  build), whatever runtime Python uses, from `NLPGO_ENGINE_QUICKJS_WASM`. User
+  code is an ES module whose default export takes the inputs as one object.
+  `fetch` and timers go through the same host bridge and deadline. A trivial
+  run takes a few milliseconds. New code nodes default to JavaScript.
 - **The runtime is an artifact, pinned by checksum.** CPython 3.14 for WASI
   (`brettcannon/cpython-wasi-build`), fetched and its stdlib precompiled by
   `services/nlpgo/scripts/fetch-python-wasm.sh`, shipped in the image at
-  `NLPGO_ENGINE_PYTHON_WASM_HOME`.
+  `NLPGO_ENGINE_PYTHON_WASM_HOME`; QuickJS 0.17.0 by
+  `services/nlpgo/scripts/fetch-quickjs-wasm.sh`.
 
 ## Rationale / Trade-offs
 
@@ -82,10 +89,14 @@ the Python installation in place).
 - The code-block suite runs on both runtimes in CI
   (`NLPGO_CODEBLOCK_TEST_RUNTIME=wasm`).
 - Once the wasm runtime is the default, the image can drop its Python base and
-  the curated library set, and JavaScript can be added on the same substrate.
+  the curated library set.
+- Existing nodes have no `language` and stay Python; only new nodes start in
+  JavaScript.
 
 ## References
 
-- `services/nlpgo/app/engine/blocks/codeblock/wasm.go`, `bridge.go`, `wasmsite/`
+- `services/nlpgo/app/engine/blocks/codeblock/wasm.go`, `bridge.go`, `wasmsite/`,
+  `runner.mjs`
 - `specs/nlp-go/code-block.feature`, rule "The wasm runtime runs each execution
-  in its own WebAssembly instance"
+  in its own WebAssembly instance" and "JavaScript code blocks run on QuickJS
+  inside the engine"

@@ -628,6 +628,7 @@ func (e *Engine) runCode(ctx context.Context, node *dsl.Node, run nodeRun) (map[
 	code := paramString(node.Data.Parameters, "code")
 	declared := outputNames(node.Data.Outputs)
 	res, err := e.code.Execute(ctx, codeblock.Request{
+		Language:        paramString(node.Data.Parameters, "language"),
 		Code:            code,
 		Inputs:          autoparseInputs(run.inputs, node.Data.Inputs),
 		DeclaredOutputs: declared,

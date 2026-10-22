@@ -189,12 +189,7 @@ func (b *bridge) handle(frame []byte) bridgeReply {
 
 // sleep blocks the guest until the time passes or the run's budget ends.
 func (b *bridge) sleep(seconds float64) bridgeReply {
-	timer := time.NewTimer(time.Duration(seconds * float64(time.Second)))
-	defer timer.Stop()
-	select {
-	case <-timer.C:
-	case <-b.ctx.Done():
-	}
+	sleepUntilDone(b.ctx, time.Duration(seconds*float64(time.Second)))
 	return bridgeReply{OK: true}
 }
 

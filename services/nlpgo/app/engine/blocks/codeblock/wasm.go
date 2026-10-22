@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing/fstest"
+	"time"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
@@ -25,6 +26,11 @@ import (
 //go:embed all:wasmsite
 var wasmSite embed.FS
 
+// runnerMjsSource is the JavaScript runner QuickJS starts with.
+//
+//go:embed runner.mjs
+var runnerMjsSource []byte
+
 // Guest paths. The stdlib and the runner are read-only; /work is the run's own.
 const (
 	guestPythonHome = "/usr/local"
@@ -33,23 +39,32 @@ const (
 	wasmPageBytes   = 64 << 10
 )
 
-// sharedCompilationCache compiles python.wasm once per process, however many
-// executors are built.
+// sharedCompilationCache compiles each guest binary once per process, however
+// many executors are built.
 var sharedCompilationCache = wazero.NewCompilationCache()
 
 // defaultWasmMemoryMiB caps one run's linear memory.
 const defaultWasmMemoryMiB = 512
 
-// wasmRuntime runs code blocks inside a WASI CPython. The module is compiled
+// wasmRuntime runs code blocks inside WebAssembly guests: a WASI CPython when
+// Python runs on wasm, and QuickJS for JavaScript. Each module is compiled
 // once; every run instantiates it afresh with its own memory and mounts, so
 // nothing one run does is visible to another and no process outlives a run.
 type wasmRuntime struct {
 	runtime wazero.Runtime
-	module  wazero.CompiledModule
-	stdlib  fs.FS
-	runner  fs.FS
+	python  *wasmGuest
+	js      *wasmGuest
 	client  *http.Client
 	opts    Options
+}
+
+// wasmGuest is one interpreter: its compiled module, its read-only mounts and
+// how it is started. A run adds only its own /work directory.
+type wasmGuest struct {
+	module wazero.CompiledModule
+	mounts map[string]fs.FS
+	args   []string
+	env    map[string]string
 }
 
 // runnerPair is the runner and the dspy stand-in it imports.
@@ -57,26 +72,15 @@ type runnerPair struct {
 	runner, fakeDspy []byte
 }
 
+// newWasmRuntime builds the guests opts asks for: Python when opts.Runtime is
+// RuntimeWasm, JavaScript when opts.QuickJSWasm names a qjs-wasi.wasm.
 func newWasmRuntime(ctx context.Context, opts Options, sources runnerPair) (*wasmRuntime, error) {
-	home := opts.PythonWasmHome
-	if home == "" {
-		return nil, errors.New("codeblock: the wasm runtime needs PythonWasmHome")
-	}
-	binary, err := os.ReadFile(filepath.Join(home, "python.wasm"))
-	if err != nil {
-		return nil, fmt.Errorf("codeblock: read python.wasm: %w", err)
-	}
-	stdlib, err := loadStdlib(filepath.Join(home, "lib"))
-	if err != nil {
-		return nil, err
-	}
-
 	memoryMiB := opts.WasmMemoryMiB
 	if memoryMiB <= 0 {
 		memoryMiB = defaultWasmMemoryMiB
 	}
-	// Debug info off: with it, wazero symbolizes every trap against
-	// python.wasm's DWARF, which held a timed-out run seconds past its deadline.
+	// Debug info off: with it, wazero symbolizes every trap against the
+	// guest's DWARF, which held a timed-out run seconds past its deadline.
 	config := wazero.NewRuntimeConfig().
 		WithDebugInfoEnabled(false).
 		WithCloseOnContextDone(true).
@@ -90,29 +94,81 @@ func newWasmRuntime(ctx context.Context, opts Options, sources runnerPair) (*was
 		cache = dirCache
 	}
 	config = config.WithCompilationCache(cache)
-	runtime := wazero.NewRuntimeWithConfig(ctx, config)
-	if _, err := wasi_snapshot_preview1.Instantiate(ctx, runtime); err != nil {
-		_ = runtime.Close(ctx)
-		return nil, fmt.Errorf("codeblock: wasi: %w", err)
-	}
-	module, err := runtime.CompileModule(ctx, binary)
-	if err != nil {
-		_ = runtime.Close(ctx)
-		return nil, fmt.Errorf("codeblock: compile python.wasm: %w", err)
-	}
-
-	runner, err := guestRunnerFS(sources)
-	if err != nil {
-		_ = runtime.Close(ctx)
-		return nil, err
-	}
-	return &wasmRuntime{
-		runtime: runtime,
-		module:  module,
-		stdlib:  stdlib,
-		runner:  runner,
+	w := &wasmRuntime{
+		runtime: wazero.NewRuntimeWithConfig(ctx, config),
 		client:  newFetchClient(opts.Egress),
 		opts:    opts,
+	}
+	if _, err := wasi_snapshot_preview1.Instantiate(ctx, w.runtime); err != nil {
+		_ = w.runtime.Close(ctx)
+		return nil, fmt.Errorf("codeblock: wasi: %w", err)
+	}
+	var err error
+	if opts.Runtime == RuntimeWasm {
+		w.python, err = w.pythonGuest(ctx, sources)
+	}
+	if err == nil && opts.QuickJSWasm != "" {
+		w.js, err = w.javascriptGuest(ctx)
+	}
+	if err != nil {
+		_ = w.runtime.Close(ctx)
+		return nil, err
+	}
+	return w, nil
+}
+
+func (w *wasmRuntime) compile(ctx context.Context, path string) (wazero.CompiledModule, error) {
+	binary, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("codeblock: read %s: %w", filepath.Base(path), err)
+	}
+	module, err := w.runtime.CompileModule(ctx, binary)
+	if err != nil {
+		return nil, fmt.Errorf("codeblock: compile %s: %w", filepath.Base(path), err)
+	}
+	return module, nil
+}
+
+func (w *wasmRuntime) pythonGuest(ctx context.Context, sources runnerPair) (*wasmGuest, error) {
+	home := w.opts.PythonWasmHome
+	if home == "" {
+		return nil, errors.New("codeblock: the wasm runtime needs PythonWasmHome")
+	}
+	module, err := w.compile(ctx, filepath.Join(home, "python.wasm"))
+	if err != nil {
+		return nil, err
+	}
+	stdlib, err := loadStdlib(filepath.Join(home, "lib"))
+	if err != nil {
+		return nil, err
+	}
+	runner, err := guestRunnerFS(sources)
+	if err != nil {
+		return nil, err
+	}
+	return &wasmGuest{
+		module: module,
+		mounts: map[string]fs.FS{guestPythonHome + "/lib": stdlib, guestRunnerDir: runner},
+		args:   []string{"python", "-S", "-B", "-u", guestRunnerDir + "/runner.py", guestWorkDir + "/result.json"},
+		env: map[string]string{
+			"PYTHONHOME":              guestPythonHome,
+			"PYTHONPATH":              guestRunnerDir,
+			"PYTHONDONTWRITEBYTECODE": "1",
+			"PYTHONIOENCODING":        "utf-8",
+		},
+	}, nil
+}
+
+func (w *wasmRuntime) javascriptGuest(ctx context.Context) (*wasmGuest, error) {
+	module, err := w.compile(ctx, w.opts.QuickJSWasm)
+	if err != nil {
+		return nil, err
+	}
+	runner := fstest.MapFS{"runner.mjs": {Data: runnerMjsSource, Mode: 0o444}}
+	return &wasmGuest{
+		module: module,
+		mounts: map[string]fs.FS{guestRunnerDir: runner},
+		args:   []string{"qjs", "--module", guestRunnerDir + "/runner.mjs", guestWorkDir + "/result.json"},
 	}, nil
 }
 
@@ -180,39 +236,39 @@ type wasmRunRequest struct {
 	env     []string
 }
 
-// run executes one code block. The guest sees no host path but runDir.
-func (w *wasmRuntime) run(ctx context.Context, req wasmRunRequest) wasmRun {
+// run executes one code block on guest. The guest sees no host path but runDir.
+func (w *wasmRuntime) run(ctx context.Context, guest *wasmGuest, req wasmRunRequest) wasmRun {
 	channel := w.newBridge(ctx, req.payload)
 	var stderr limitedBuffer
 	stderr.limit = maxStrayOutputBytes
 
-	fsConfig := wazero.NewFSConfig().
-		WithFSMount(w.stdlib, guestPythonHome+"/lib").
-		WithFSMount(w.runner, guestRunnerDir).
-		WithDirMount(req.runDir, guestWorkDir)
+	fsConfig := wazero.NewFSConfig()
+	for at, files := range guest.mounts {
+		fsConfig = fsConfig.WithFSMount(files, at)
+	}
+	fsConfig = fsConfig.WithDirMount(req.runDir, guestWorkDir)
 	config := wazero.NewModuleConfig().
 		WithName("").
-		WithArgs("python", "-S", "-B", "-u", guestRunnerDir+"/runner.py", guestWorkDir+"/result.json").
+		WithArgs(guest.args...).
 		WithStdin(channel).
 		WithStdout(channel).
 		WithStderr(&stderr).
 		WithFSConfig(fsConfig).
 		WithSysWalltime().
 		WithSysNanotime().
-		WithSysNanosleep().
+		WithNanosleep(func(ns int64) { sleepUntilDone(ctx, time.Duration(ns)) }).
 		WithRandSource(cryptoRand{}).
-		WithEnv("PYTHONHOME", guestPythonHome).
-		WithEnv("PYTHONPATH", guestRunnerDir).
-		WithEnv("PYTHONDONTWRITEBYTECODE", "1").
-		WithEnv("PYTHONIOENCODING", "utf-8").
 		WithEnv("HOME", guestWorkDir).
 		WithEnv("TMPDIR", guestWorkDir)
+	for name, value := range guest.env {
+		config = config.WithEnv(name, value)
+	}
 	for _, kv := range req.env {
 		name, value, _ := strings.Cut(kv, "=")
 		config = config.WithEnv(name, value)
 	}
 
-	instance, err := w.runtime.InstantiateModule(ctx, w.module, config)
+	instance, err := w.runtime.InstantiateModule(ctx, guest.module, config)
 	if instance != nil {
 		_ = instance.Close(context.WithoutCancel(ctx))
 	}
@@ -230,6 +286,16 @@ func (w *wasmRuntime) run(ctx context.Context, req wasmRunRequest) wasmRun {
 		out.err = err
 	}
 	return out
+}
+
+// sleepUntilDone is the guest's sleep: it ends early when the run's time is up.
+func sleepUntilDone(ctx context.Context, d time.Duration) {
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+	case <-ctx.Done():
+	}
 }
 
 // limitedBuffer keeps the first limit bytes written and drops the rest.

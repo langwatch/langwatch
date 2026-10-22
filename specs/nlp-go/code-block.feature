@@ -201,6 +201,68 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       Then the second execution does not see the file the first one wrote
       And no execution directory is left behind once the executor is done
 
+  Rule: JavaScript code blocks run on QuickJS inside the engine
+
+    # A code node whose `language` parameter is "javascript" runs on QuickJS
+    # compiled to WASI, in the same wasm runtime and host bridge as Python on
+    # wasm, whichever runtime Python uses (ADR-183). User code is an ES module
+    # whose default export, or `execute` export, takes the inputs as one object.
+
+    @unit
+    Scenario: a JavaScript code block returns its outputs
+      Given a code node in JavaScript exporting a function, an async function, an execute function or a class
+      When the executor runs the request with inputs
+      Then the returned object becomes the node's outputs
+
+    @unit
+    Scenario: a JavaScript code block that throws reports the error
+      Given a JavaScript code node that throws a RangeError
+      When the executor runs the request
+      Then the error carries "RangeError" as its type, the message, and a stack naming the code block's line
+
+    @unit
+    Scenario: a JavaScript code block missing a declared output fails
+      Given a JavaScript code node that does not return a declared output
+      When the executor runs the request
+      Then the error message names the missing output
+
+    @unit
+    Scenario: a JavaScript code block reads secrets and params
+      Given a JavaScript code node that reads secrets.TOKEN, params.LIMIT and an unknown secret, and logs
+      When the executor runs the request
+      Then the configured values arrive, the unknown secret throws a ReferenceError
+      And console.log reaches stdout and console.error reaches stderr
+
+    @unit
+    Scenario: a JavaScript code block calls fetch on a permitted host
+      Given a JavaScript code node that calls fetch with headers and a body
+      When the executor runs the request
+      Then the requests reach the host and the response's status, headers and JSON body are readable
+
+    @unit
+    Scenario: a JavaScript code block's requests follow the deployment's egress policy
+      Given a JavaScript code node that fetches metadata and loopback addresses
+      When the executor runs the request under the default egress policy
+      Then every request fails with a "not permitted" error and none reaches its destination
+
+    @unit
+    Scenario: a JavaScript code block has no host access
+      Given a JavaScript code node that reads the environment and host files, and writes to the runner mount
+      When the executor runs the request
+      Then it sees only HOME and TMPDIR, reads no host file, cannot change the runner and has no os.exec
+
+    @unit
+    Scenario: a JavaScript code block is stopped at its deadline
+      Given a JavaScript code node that loops forever, or waits on a long timer
+      When the executor runs the request with a short timeout
+      Then the run ends as a timeout close to its deadline
+
+    @unit
+    Scenario: a deployment without QuickJS refuses JavaScript code blocks
+      Given an executor built without NLPGO_ENGINE_QUICKJS_WASM
+      When it is asked to run a JavaScript code node
+      Then it returns an error saying JavaScript is not available
+
   Rule: The wasm runtime runs each execution in its own WebAssembly instance
 
     # NLPGO_ENGINE_CODE_BLOCK_RUNTIME=wasm runs user code in a WASI CPython

@@ -208,6 +208,7 @@ func newCodeExecutor(engineCfg nlpgo.EngineConfig, egress ssrf.Options, getenv f
 		PythonWasmHome:          engineCfg.PythonWasmHome,
 		WasmMemoryMiB:           engineCfg.CodeBlockMemoryMiB,
 		WasmCompilationCacheDir: engineCfg.WasmCompilationCacheDir,
+		QuickJSWasm:             engineCfg.QuickJSWasm,
 		// A wasm run reaches the network only through the engine, under the
 		// same policy as the HTTP block.
 		Egress: egress,

@@ -8,8 +8,11 @@ import (
 func init() {
 	testRuntime = os.Getenv("NLPGO_CODEBLOCK_TEST_RUNTIME")
 	testPythonWasmHome = PythonWasmHomeForTests()
-	if testRuntime == RuntimeWasm {
-		// Compile python.wasm once up front, so no test's timing includes it.
+	if _, err := os.Stat(QuickJSWasmForTests()); err == nil {
+		testQuickJSWasm = QuickJSWasmForTests()
+	}
+	if testRuntime == RuntimeWasm || testQuickJSWasm != "" {
+		// Compile the guests once up front, so no test's timing includes it.
 		_, _ = New(Options{})
 	}
 }
@@ -21,4 +24,13 @@ func PythonWasmHomeForTests() string {
 	}
 	home, _ := filepath.Abs("../../../../.cache/python-wasm")
 	return home
+}
+
+// QuickJSWasmForTests is where scripts/fetch-quickjs-wasm.sh puts qjs-wasi.wasm.
+func QuickJSWasmForTests() string {
+	if path := os.Getenv("NLPGO_TEST_QUICKJS_WASM"); path != "" {
+		return path
+	}
+	path, _ := filepath.Abs("../../../../.cache/quickjs-wasm/qjs-wasi.wasm")
+	return path
 }

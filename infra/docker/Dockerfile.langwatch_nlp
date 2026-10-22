@@ -74,6 +74,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl unzip ca-c
     && rm -rf /var/lib/apt/lists/*
 COPY services/nlpgo/scripts/fetch-python-wasm.sh /tmp/fetch-python-wasm.sh
 RUN /tmp/fetch-python-wasm.sh /opt/python-wasm
+# QuickJS for WASI, which JavaScript code blocks always run on.
+COPY services/nlpgo/scripts/fetch-quickjs-wasm.sh /tmp/fetch-quickjs-wasm.sh
+RUN /tmp/fetch-quickjs-wasm.sh /opt/quickjs-wasm
 
 # ─── Runtime ───────────────────────────────────────────────────────────────────
 # distroless/python3 (Python 3.11) provides a stdlib python3 for the code-block
@@ -84,6 +87,7 @@ COPY --from=go-build /out/service /usr/local/bin/service
 COPY --from=go-build /out/lingua-models.bin /usr/local/share/langwatch/lingua-models.bin
 COPY --from=sandbox-build /pylibs /opt/sandbox-libs
 COPY --from=python-wasm /opt/python-wasm /opt/python-wasm
+COPY --from=python-wasm /opt/quickjs-wasm/qjs-wasi.wasm /opt/quickjs-wasm/qjs-wasi.wasm
 
 # nlpgo binds this port; compose + the helm chart dial http://langwatch_nlp:5561.
 ENV SERVER_ADDR=:5561
@@ -96,6 +100,8 @@ ENV PYTHONPATH=/opt/sandbox-libs
 ENV PYTHONDONTWRITEBYTECODE=1
 # The wasm code-block runtime's interpreter; used only when it is selected.
 ENV NLPGO_ENGINE_PYTHON_WASM_HOME=/opt/python-wasm
+# JavaScript code blocks run on QuickJS inside nlpgo, whatever the runtime.
+ENV NLPGO_ENGINE_QUICKJS_WASM=/opt/quickjs-wasm/qjs-wasi.wasm
 ENV RUNNING_IN_DOCKER=true
 
 EXPOSE 5561

@@ -89,16 +89,25 @@ type Options struct {
 	WasmCompilationCacheDir string
 	// Egress is the policy a wasm run's outbound requests are held to.
 	Egress ssrf.Options
+	// QuickJSWasm is qjs-wasi.wasm; scripts/fetch-quickjs-wasm.sh. JavaScript
+	// always runs on wasm, so without it a JavaScript code block is refused.
+	QuickJSWasm string
 }
 
 // testRuntime lets the package's tests run the whole suite on another runtime;
 // export_test.go sets it from NLPGO_CODEBLOCK_TEST_RUNTIME. Never set in production.
-var testRuntime, testPythonWasmHome string
+var testRuntime, testPythonWasmHome, testQuickJSWasm string
 
 // Runtime values for Options.Runtime.
 const (
 	RuntimeSubprocess = "subprocess"
 	RuntimeWasm       = "wasm"
+)
+
+// Language values for Request.Language.
+const (
+	LanguagePython     = "python"
+	LanguageJavaScript = "javascript"
 )
 
 // defaultEnvAllowlist is the environment passed into the code-block
@@ -184,27 +193,29 @@ func New(opts Options) (*Executor, error) {
 		runnerSource:   runnerSource,
 		fakeDspySource: fakeDspySource,
 	}
-	if opts.Runtime == "" && testRuntime != "" {
-		opts.Runtime, opts.PythonWasmHome = testRuntime, testPythonWasmHome
+	if opts.Runtime == "" && opts.QuickJSWasm == "" && (testRuntime != "" || testQuickJSWasm != "") {
+		opts.Runtime, opts.PythonWasmHome, opts.QuickJSWasm = testRuntime, testPythonWasmHome, testQuickJSWasm
 		opts.Egress.AllowLocal = true
 	}
 	switch opts.Runtime {
-	case "", RuntimeSubprocess:
-	case RuntimeWasm:
+	case "", RuntimeSubprocess, RuntimeWasm:
+	default:
+		return nil, fmt.Errorf("codeblock: unknown runtime %q", opts.Runtime)
+	}
+	if opts.Runtime == RuntimeWasm || opts.QuickJSWasm != "" {
 		wasm, err := newWasmRuntime(context.Background(), opts, runnerPair{runner: runnerSource, fakeDspy: fakeDspySource})
 		if err != nil {
 			return nil, err
 		}
 		executor.wasm = wasm
-	default:
-		return nil, fmt.Errorf("codeblock: unknown runtime %q", opts.Runtime)
 	}
+	executor.opts = opts
 	return executor, nil
 }
 
 // Runtime reports which runtime this executor runs user code on.
 func (e *Executor) Runtime() string {
-	if e.wasm != nil {
+	if e.wasm != nil && e.wasm.python != nil {
 		return RuntimeWasm
 	}
 	return RuntimeSubprocess
@@ -219,12 +230,12 @@ const runnerFileMode = 0o400
 // newRunDir creates the directory for one execution and materializes the
 // runner pair into it. The caller removes the directory when the execution
 // ends, which also disposes of whatever the user's code wrote inside it.
-func (e *Executor) newRunDir() (string, error) {
+func (e *Executor) newRunDir(onWasm bool) (string, error) {
 	dir, err := os.MkdirTemp("", "nlpgo-codeblock-run-*")
 	if err != nil {
 		return "", fmt.Errorf("codeblock: run dir: %w", err)
 	}
-	if e.wasm != nil {
+	if onWasm {
 		// A wasm guest reads the runner from its own read-only mount.
 		return dir, nil
 	}
@@ -272,6 +283,8 @@ func removeRunDir(dir string) {
 
 // Request is what the engine hands to the executor per node invocation.
 type Request struct {
+	// Language is LanguagePython (also when empty) or LanguageJavaScript.
+	Language        string
 	Code            string
 	Inputs          map[string]any
 	DeclaredOutputs []string
@@ -403,7 +416,11 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 	// One directory per execution, holding the runner pair and the result
 	// file, removed on the way out. Nothing the user's code writes here
 	// survives to be read, imported or executed by a later run.
-	runDir, err := e.newRunDir()
+	guest, err := e.guestFor(req.Language)
+	if err != nil {
+		return nil, err
+	}
+	runDir, err := e.newRunDir(guest != nil)
 	if err != nil {
 		return nil, err
 	}
@@ -423,9 +440,9 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 		return nil, fmt.Errorf("codeblock: marshal request: %w", err)
 	}
 
-	if e.wasm != nil {
+	if guest != nil {
 		started := time.Now()
-		run := e.wasm.run(runCtx, wasmRunRequest{
+		run := e.wasm.run(runCtx, guest, wasmRunRequest{
 			runDir:  runDir,
 			payload: payload,
 			env:     withSandboxCredential(nil, req.SandboxAPIKey, e.opts.SandboxEndpoint),
@@ -437,7 +454,7 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 			err:      run.err,
 		}
 		if outcome.err == nil && run.exitCode != 0 {
-			outcome.err = fmt.Errorf("python exited with status %d", run.exitCode)
+			outcome.err = fmt.Errorf("the interpreter exited with status %d", run.exitCode)
 		}
 		return collectResult(resultPath, outcome), nil
 	}
@@ -483,6 +500,24 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 		stderr:   stderrBuf.String(),
 		err:      runErr,
 	}), nil
+}
+
+// guestFor picks the wasm guest a request runs on; nil means a subprocess.
+func (e *Executor) guestFor(language string) (*wasmGuest, error) {
+	switch language {
+	case "", LanguagePython:
+		if e.wasm != nil {
+			return e.wasm.python, nil
+		}
+		return nil, nil
+	case LanguageJavaScript:
+		if e.wasm == nil || e.wasm.js == nil {
+			return nil, errors.New("codeblock: JavaScript code blocks are not available on this deployment")
+		}
+		return e.wasm.js, nil
+	default:
+		return nil, fmt.Errorf("codeblock: unknown language %q", language)
+	}
 }
 
 // runOutcome is how a run ended, on either runtime.
