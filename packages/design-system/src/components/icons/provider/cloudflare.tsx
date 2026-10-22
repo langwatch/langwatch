@@ -1,3 +1,4 @@
+/** Cloudflare's brand mark, for its Workers AI decision models. */
 export function Cloudflare() {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">

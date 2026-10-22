@@ -1,3 +1,4 @@
+/** Inception's brand mark, for its decision models. A flat mark, inverted on dark surfaces. */
 export function Inception() {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" fillRule="evenodd" viewBox="0 0 24 24">
