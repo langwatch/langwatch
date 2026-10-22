@@ -488,13 +488,13 @@ Feature: Running system migrations across organizations
     Then the hold is logged at info
 
   # A first hold is usually a projection still folding under the upgrade's
-  # drain; the next pass re-proves it. Only a hold that persists is a warn.
+  # drain; the next pass re-proves it. A hold that persists is a debug line: every pass repeats it and the record already says why.
   @unit
-  Scenario: A first hold is logged at info and a hold that persists at warn
+  Scenario: A first hold is logged at info and a hold that persists at debug
     Given a migration whose own proof disagrees for "org_acme"
     When a pass holds it for the first time
     Then the hold is logged at info
-    And when a later pass still holds it, the hold is logged at warn
+    And when a later pass still holds it, the hold is logged at debug
 
   @unit
   Scenario: A tenant that leaves held drops its reason

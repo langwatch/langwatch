@@ -104,4 +104,59 @@ describe("StatementReporter", () => {
       expect(line!.fields).toHaveProperty("queryId");
     });
   });
+  describe("given the same cold-scan query shape repeated", () => {
+    const query = (tenant: string) =>
+      `SELECT * FROM evaluation_runs WHERE TenantId = '${tenant}' LIMIT 50`;
+    const coldScanning = (outcomeLogger: StatementLogSink, now: () => number) =>
+      new StatementReporter({
+        outcomeLogger,
+        now,
+        detectColdScan: () => "evaluation_runs",
+      });
+
+    it("warns once per shape, whatever its literals", () => {
+      const outcomeLogger = recordingSink();
+      const reporter = coldScanning(outcomeLogger, () => 0);
+
+      for (const tenant of ["a", "b", "c"]) {
+        reporter.success({ operation: "query", durationMs: 5, params: { query: query(tenant) } });
+      }
+
+      expect(outcomeLogger.lines.filter((line) => line.level === "warn")).toHaveLength(1);
+      expect(outcomeLogger.lines.filter((line) => line.level === "debug")).toHaveLength(2);
+    });
+
+    it("warns again after the quiet window and counts what it held back", () => {
+      const outcomeLogger = recordingSink();
+      let clock = 0;
+      const reporter = coldScanning(outcomeLogger, () => clock);
+      const run = () =>
+        reporter.success({ operation: "query", durationMs: 5, params: { query: query("a") } });
+
+      run();
+      run();
+      run();
+      clock = 61 * 60 * 1000;
+      run();
+
+      const warns = outcomeLogger.lines.filter((line) => line.level === "warn");
+      expect(warns).toHaveLength(2);
+      expect(warns[0]!.fields.suppressedSincePrevious).toBe(0);
+      expect(warns[1]!.fields.suppressedSincePrevious).toBe(2);
+    });
+
+    it("warns separately for a different shape", () => {
+      const outcomeLogger = recordingSink();
+      const reporter = coldScanning(outcomeLogger, () => 0);
+
+      reporter.success({ operation: "query", durationMs: 5, params: { query: query("a") } });
+      reporter.success({
+        operation: "query",
+        durationMs: 5,
+        params: { query: "SELECT count() FROM evaluation_runs" },
+      });
+
+      expect(outcomeLogger.lines.filter((line) => line.level === "warn")).toHaveLength(2);
+    });
+  });
 });

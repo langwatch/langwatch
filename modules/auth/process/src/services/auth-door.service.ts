@@ -24,6 +24,7 @@ import {
   isSignInCallbackPath,
   signInErrorRedirectOf,
   signInFailureLocation,
+  signInRefusalCause,
 } from "../rules/sign-in-callback-failure.rules.ts";
 import { findConnectionIdsInPath } from "../rules/sso-request-target.rules.ts";
 
@@ -259,7 +260,12 @@ function withholdInternalSignInError({
     );
   } else {
     logger.error(
-      { code: redirect.code, description: redirect.description, traceId: traceId ?? null },
+      {
+        error: signInRefusalCause({ code: redirect.code, description: redirect.description }),
+        code: redirect.code,
+        description: redirect.description,
+        traceId: traceId ?? null,
+      },
       "a sign-in failed for a reason we have not written down; the person was sent a generic refusal",
     );
   }
