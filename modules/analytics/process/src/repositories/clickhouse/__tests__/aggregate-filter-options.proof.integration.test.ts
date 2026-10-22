@@ -290,11 +290,7 @@ describe("filter pickers read under an aggregate's proof", () => {
         readsMembers: false,
       });
 
-      expect(labels).toEqual([
-        "a-early",
-        "a-late",
-        "a-shared",
-      ]);
+      expect(labels).toEqual(["a-early", "a-late", "a-shared"]);
     });
   });
 });
