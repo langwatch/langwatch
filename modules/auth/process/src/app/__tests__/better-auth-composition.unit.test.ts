@@ -256,7 +256,7 @@ describe("when Better Auth deletes a user", () => {
   });
 });
 
-/** @see specs/auth/provider-tokens.feature */
+/** @see modules/auth/specs/provider-tokens.feature */
 describe("when a provider callback writes a sign-in account", () => {
   const TOKENS = {
     accessToken: "provider-access-token",
@@ -300,7 +300,18 @@ describe("when a provider callback writes a sign-in account", () => {
       null,
     );
 
-    expect(written).toEqual({ data: { id: "account_1", ...NO_TOKENS } });
+    expect(written).toEqual({
+      data: {
+        id: "account_1",
+        userId: "user_1",
+        providerId: "github",
+        issuer: "https://github.com",
+        accountId: "gh_1",
+        createdAt: new Date(0),
+        updatedAt: new Date(0),
+        ...NO_TOKENS,
+      },
+    });
   });
 
   /** @scenario "A returning sign-in clears the tokens its account still holds" */
@@ -309,7 +320,16 @@ describe("when a provider callback writes a sign-in account", () => {
 
     const written = await update({ providerId: "github", ...TOKENS }, null);
 
-    expect(written).toEqual({ data: NO_TOKENS });
+    expect(written).toEqual({ data: { providerId: "github", ...NO_TOKENS } });
+  });
+
+  /** @scenario "An account update that carries no token keeps every field it writes" */
+  it("passes a password write through with its password intact", async () => {
+    const { update } = await accountHooks();
+
+    const written = await update({ password: "hashed-password" }, null);
+
+    expect(written).toEqual({ data: { password: "hashed-password", ...NO_TOKENS } });
   });
 });
 

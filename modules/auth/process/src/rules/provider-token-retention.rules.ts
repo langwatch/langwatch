@@ -1,8 +1,7 @@
 /**
- * The provider tokens an OAuth or OIDC callback hands Better Auth, none of which LangWatch keeps.
- * Sign-in asks providers for profile and email only, never calls them back on the person's behalf
- * and never signs out at the provider (`disableProviderLogout`), so every token is spent once the
- * callback is verified. A stored token is only something to leak.
+ * The provider tokens an OAuth or OIDC callback hands Better Auth, none of which LangWatch keeps:
+ * sign-in never calls a provider back or signs out there, so each token is spent once the callback
+ * is verified (modules/auth/specs/provider-tokens.feature).
  */
 export const DISCARDED_PROVIDER_TOKENS = {
   accessToken: null,

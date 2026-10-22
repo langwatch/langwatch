@@ -104,17 +104,45 @@ function tokensOf(memory: MemoryAuthDatabase) {
   }));
 }
 
+/** The declared step on a booted worker, refusing by name when it is not declared. */
+async function declaredStep() {
+  const runtime = await bootAuthWorker();
+  const step = runtime
+    .migrationSteps(isDeclaredMigrationStep)
+    .filter(isMigrationStep)
+    .find((candidate) => candidate.id === STEP);
+  if (!step) {
+    await runtime.stop();
+    throw new Error(`step ${STEP} is not declared`);
+  }
+  return { runtime, step };
+}
+
+function stepContext({ dryRun }: { dryRun: boolean }) {
+  return {
+    log: { info: () => undefined, warn: () => undefined },
+    checkpoint: { resumeFrom: null, save: async () => undefined },
+    signal: new AbortController().signal,
+    dryRun,
+  };
+}
+
 describe("auth's provider token discard step", () => {
   /** @scenario "The token discard step is a background step that waits for old writers to go" */
   it("is a background step that needs old writers gone", async () => {
-    const runtime = await bootAuthWorker();
+    const { runtime, step } = await declaredStep();
     try {
-      const step = runtime
-        .migrationSteps(isDeclaredMigrationStep)
-        .filter(isMigrationStep)
-        .find((candidate) => candidate.id === STEP);
-
       expect(step).toMatchObject({ kind: "data", mode: "background", needsOldWritersGone: true });
+    } finally {
+      await runtime.stop();
+    }
+  });
+
+  it("reports what it cleared on a run and what it would clear on a dry run", async () => {
+    const { runtime, step } = await declaredStep();
+    try {
+      expect(await step.run(stepContext({ dryRun: false }))).toEqual({ cleared: 0 });
+      expect(await step.run(stepContext({ dryRun: true }))).toEqual({ wouldClear: 0 });
     } finally {
       await runtime.stop();
     }

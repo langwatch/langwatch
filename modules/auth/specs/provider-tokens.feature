@@ -23,6 +23,13 @@ Feature: Sign-in keeps no provider token
     Then the update writes no token and nulls the ones the row still holds
 
   @unit
+  Scenario: An account update that carries no token keeps every field it writes
+    Given an account update that writes a new password and no token
+    When the account update hook runs
+    Then the update still writes the password
+    And it writes no token
+
+  @unit
   Scenario: The token discard step is a background step that waits for old writers to go
     Given auth's upgrade steps are declared
     Then "auth:discard-provider-tokens" is a background step

@@ -1,6 +1,6 @@
 /**
  * The token discard step's SQL against Postgres: it clears the provider tokens and leaves the rest
- * of the row, `updatedAt` included, as it was.
+ * of the row, `updatedAt` included, as it was. It runs in a rolled-back transaction.
  * @see modules/auth/specs/provider-tokens.feature
  */
 import { randomUUID } from "node:crypto";
@@ -10,8 +10,10 @@ import {
   PrismaConfigService,
   PrismaConnectionService,
   PrismaTenancyGuardService,
+  skipTenantCheck,
   type PrismaConnection,
 } from "@langwatch/prisma-client";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { PrismaAuthMigrationRepository } from "../prisma.auth-migration.repository.ts";
@@ -33,7 +35,6 @@ describe.skipIf(!databaseUrl)("Account provider token discard", () => {
 
   afterAll(async () => {
     if (!connection) return;
-    await connection.client.account.deleteMany({ where: { userId: namespace } });
     await connection.closeOnce();
   });
 
@@ -41,39 +42,59 @@ describe.skipIf(!databaseUrl)("Account provider token discard", () => {
     /** @scenario "The token discard SQL leaves each account's other columns and update time alone" */
     it("nulls the three tokens and keeps the scope and update time", async () => {
       const prisma = connection.client;
-      await prisma.account.create({
-        data: {
-          id: `${namespace}-account`,
-          userId: namespace,
-          provider: "github",
-          issuer: "https://github.com",
-          providerAccountId: `${namespace}-gh`,
-          access_token: "gho_access",
-          refresh_token: "ghr_refresh",
-          id_token: "header.payload.signature",
-          scope: "read:user,user:email",
-          updatedAt,
-        },
-      });
-      const repository = PrismaAuthMigrationRepository.create(prisma);
+      const rollback = new Error("rollback");
+      const id = `${namespace}-account`;
 
-      expect(await repository.discardProviderTokens({ dryRun: true })).toBeGreaterThanOrEqual(1);
-      expect(
-        await prisma.account.findUniqueOrThrow({ where: { id: `${namespace}-account` } }),
-      ).toMatchObject({ access_token: "gho_access" });
+      // The step is fleet-wide: lock writers out and roll back, so no other suite's row changes.
+      await expect(
+        prisma.$transaction(async (tx) => {
+          await tx.$executeRaw`
+            ${skipTenantCheck({
+              // A test lock over the whole table; `Account` has no tenant column.
+              SKIP_TENANT_CHECK: true,
+            })}
+            LOCK TABLE "Account" IN SHARE ROW EXCLUSIVE MODE
+          `;
+          await tx.account.create({
+            data: {
+              id,
+              userId: namespace,
+              provider: "github",
+              issuer: "https://github.com",
+              providerAccountId: `${namespace}-gh`,
+              access_token: "gho_access",
+              refresh_token: "ghr_refresh",
+              id_token: "header.payload.signature",
+              scope: "read:user,user:email",
+              updatedAt,
+            },
+          });
+          const repository = PrismaAuthMigrationRepository.create(tx as PrismaClient);
 
-      expect(await repository.discardProviderTokens({ dryRun: false })).toBeGreaterThanOrEqual(1);
+          expect(await repository.discardProviderTokens({ dryRun: true })).toBeGreaterThanOrEqual(
+            1,
+          );
+          expect(await tx.account.findUniqueOrThrow({ where: { id } })).toMatchObject({
+            access_token: "gho_access",
+          });
 
-      expect(
-        await prisma.account.findUniqueOrThrow({ where: { id: `${namespace}-account` } }),
-      ).toMatchObject({
-        access_token: null,
-        refresh_token: null,
-        id_token: null,
-        scope: "read:user,user:email",
-        updatedAt,
-      });
-      expect(await repository.discardProviderTokens({ dryRun: true })).toBe(0);
+          expect(await repository.discardProviderTokens({ dryRun: false })).toBeGreaterThanOrEqual(
+            1,
+          );
+          expect(await tx.account.findUniqueOrThrow({ where: { id } })).toMatchObject({
+            access_token: null,
+            refresh_token: null,
+            id_token: null,
+            scope: "read:user,user:email",
+            updatedAt,
+          });
+          expect(await repository.discardProviderTokens({ dryRun: true })).toBe(0);
+
+          throw rollback;
+        }),
+      ).rejects.toThrow("rollback");
+
+      expect(await prisma.account.count({ where: { userId: namespace } })).toBe(0);
     });
   });
 });

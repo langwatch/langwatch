@@ -4,10 +4,9 @@
  */
 export abstract class AuthMigrationRepository {
   /**
-   * Nulls the provider access, refresh and ID tokens every `Account` row still holds, and answers
-   * how many rows it cleared (or would, on a dry run). `updatedAt` is left as it is: identity's
-   * secret heal reads a newer `Account` row as drift and copies it over the credential. A second
-   * run finds nothing.
+   * Nulls the provider tokens every `Account` row still holds and answers how many rows it cleared
+   * (or would, on a dry run); a second run finds nothing. `updatedAt` is left alone: identity's
+   * secret heal reads a newer `Account` row as drift and copies it over the credential.
    */
   abstract discardProviderTokens(args: { dryRun: boolean }): Promise<number>;
 }
