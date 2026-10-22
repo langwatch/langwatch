@@ -35,11 +35,12 @@ describe("provider icons", () => {
   });
 
   describe("given the decision model providers", () => {
-    it.each(["inception", "perplexity", "cloudflare", "langwatch"] as const)(
-      "draws a %s mark of its own rather than the Custom glyph",
-      (provider) => {
-        expect(artworkOf(provider)).not.toBe(artworkOf("custom"));
-      },
-    );
+    /** @scenario Each decision model shows its provider's brand mark */
+    it("draws a mark of each one's own rather than the Custom glyph", () => {
+      const providers = ["inception", "perplexity", "cloudflare", "langwatch"] as const;
+      const drawings = [...providers, "custom" as const].map(artworkOf);
+
+      expect(new Set(drawings).size).toBe(providers.length + 1);
+    });
   });
 });

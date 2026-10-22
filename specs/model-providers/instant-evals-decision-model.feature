@@ -181,3 +181,9 @@ Feature: Instant Evals decision model column in Default models
     Given the flag is off for my organization
     When I edit the Instant Evals column
     Then I can pick only "LangWatch Instant Preview"
+
+  @integration
+  Scenario: Each decision model shows its provider's brand mark
+    When I open the decision model picker
+    Then LangWatch Instant Preview shows the LangWatch mark
+    And the Inception, Perplexity and Cloudflare models each show their own brand mark
