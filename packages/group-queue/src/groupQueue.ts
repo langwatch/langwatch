@@ -179,9 +179,18 @@ async function withActiveSpan<T>(
 
 export const JOB_RETRY_CONFIG = {
   maxAttempts: 25,
+  /** An overloaded server is not the job's fault: about six more hours at the backoff cap. */
+  maxOverloadedAttempts: 61,
   backoffBaseMs: 500,
   maxBackoffMs: 600_000,
 } as const;
+
+/** The attempts a failure may use: an overload, which names a retry delay, gets the longer budget. */
+export function attemptBudgetOf(decision: { retryAfterMs?: number }): number {
+  return decision.retryAfterMs === undefined
+    ? JOB_RETRY_CONFIG.maxAttempts
+    : JOB_RETRY_CONFIG.maxOverloadedAttempts;
+}
 
 export function getBackoffMs(attempt: number): number {
   return Math.min(
@@ -2144,7 +2153,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     span.recordException(error);
     span.setStatus({ code: SpanStatusCode.ERROR });
     const [quarantineError] = await this.quarantineErrors({ job, error, isRetryable });
-    if (isRetryable && attempt < JOB_RETRY_CONFIG.maxAttempts && !quarantineError) {
+    if (isRetryable && attempt < attemptBudgetOf(decision) && !quarantineError) {
       await this.retryClaimedJob({ job, error, decision, stopHeartbeat });
       return;
     }
@@ -2354,7 +2363,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
         groupId,
         stagedJobId,
         attempt,
-        maxAttempts: JOB_RETRY_CONFIG.maxAttempts,
+        maxAttempts: attemptBudgetOf(decision),
         backoffMs,
         // The whole Error, not `error.message`: the serializer emits
         // the stack, and for a handler crash the stack IS the
