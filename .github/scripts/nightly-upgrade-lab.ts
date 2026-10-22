@@ -2,7 +2,7 @@
 // and exit code (cell/command.go). Spec: specs/ci/nightly-suite.feature
 //   node --experimental-strip-types .github/scripts/nightly-upgrade-lab.ts --cell <name> \
 //     --run-dir "$RUNNER_TEMP/cell" --exit-code 1 --markdown upgrade-lab.md
-//   ... --exit-code 1 --verdict --known-failing B1,N4   exits 1 when the night is red
+//   ... --verdict --known-failing B1,N4,I5:inconclusive   exits 1 when the night is red
 
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -60,9 +60,9 @@ export const renderUpgradeCell = ({
 };
 
 /**
- * Why the job goes red, or undefined when it stays green. An invariant listed in `knownFailing`
- * cannot pass on a hosted runner yet (dev/docs/nightly-suite.md, "The upgrade lab on a hosted
- * runner"), so only a failure outside it, or a cell that could not judge, turns the night red.
+ * Why the job goes red, or undefined when it stays green. `knownFailing` names what cannot pass
+ * on a hosted runner yet (dev/docs/nightly-suite.md): `B1` excuses any result, `I5:inconclusive`
+ * only that one. Any other result that is not `pass`, or a cell that could not judge, is red.
  */
 export const upgradeLabFailure = ({
   exitCode,
@@ -75,8 +75,10 @@ export const upgradeLabFailure = ({
 }): string | undefined => {
   if (exitCode === 0) return undefined;
   if (report === null || exitCode !== 1) return VERDICT[2];
+  const excused = ({ id, result }: { id: string; result: string }) =>
+    knownFailing.includes(id) || knownFailing.includes(`${id}:${result}`);
   const failed = (report.verdicts ?? [])
-    .filter((verdict) => verdict.result === "fail" && !knownFailing.includes(verdict.id))
+    .filter((verdict) => verdict.result !== "pass" && !excused(verdict))
     .map((verdict) => verdict.id);
   return failed.length > 0 ? `${failed.join(", ")} did not pass` : undefined;
 };

@@ -181,10 +181,10 @@ Feature: One nightly suite runs the slow checks and reports them on one dashboar
 
     @unit
     Scenario: Only an invariant outside the hosted runner's known failures turns the upgrade lab red
-      Given B1 and N4 cannot pass on a hosted runner until the upgrade lab's own gaps are closed
-      When only B1 and N4 did not pass
+      Given B1 and N4 cannot pass on a hosted runner and I5 is inconclusive for seed 1
+      When only B1 and N4 failed and I5 was inconclusive
       Then the upgrade lab stays green and its section still lists them
-      But any other failing invariant, or a cell that could not judge, turns it red
+      But any other result that is not a pass, I5 failing outright, or a cell that could not judge turns it red
 
     # Not checkable by a unit test: it needs the hosted runner and two builds.
     @unimplemented

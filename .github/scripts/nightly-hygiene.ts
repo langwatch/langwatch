@@ -88,11 +88,13 @@ export const parseTypecheck = ({
 };
 
 /**
- * The enforcer's text summary: `architecture-enforcer: N findings …` then `   12  policy` lines.
- * Its crash and usage messages share the prefix but count nothing, so they are no report.
+ * The enforcer's text summary: `architecture-enforcer: N findings …` then `   12  policy` lines,
+ * or its clean-run line (cli.ts). Its crash and usage messages share the prefix and are no report.
  */
 export const parseArchitecture = ({ text }: { text: string }): ToolResult => {
   const all = lines(text);
+  if (all.includes("architecture-enforcer: package boundaries are sealed"))
+    return { reported: true, findings: [] };
   const header = all.findIndex((line) => /^architecture-enforcer: \d+ findings?\b/.test(line));
   if (header === -1) return { reported: false, findings: [] };
   const findings: Finding[] = [];

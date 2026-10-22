@@ -50,7 +50,8 @@ export const JOBS: NightlyJob[] = [
     id: "upgrade-lab",
     title: "Upgrade lab",
     section: "upgrade-lab.md",
-    redWhen: "an invariant of the upgrade from the last release to head does not pass",
+    redWhen:
+      "an invariant of the upgrade from the last release to head does not pass, other than B1, N4 or an inconclusive I5, which a hosted runner cannot pass yet",
   },
   {
     id: "migration-compat",

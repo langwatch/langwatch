@@ -103,26 +103,45 @@ void describe("given an upgrade lab cell", () => {
 
   void describe("when only invariants known to fail on a hosted runner did not pass", () => {
     /** @scenario "Only an invariant outside the hosted runner's known failures turns the upgrade lab red" */
-    void it("stays green for B1 and N4, and goes red for any other failure or no verdict", () => {
-      const report = (failing: string[]) => ({
+    void it("stays green for B1, N4 and an inconclusive I5, and goes red for anything else", () => {
+      const report = (others: { id: string; result: string }[]) => ({
         verdicts: [
           { id: "I1", name: "no request lost", result: "pass" },
-          { id: "I5", name: "read models", result: "inconclusive" },
-          ...failing.map((id) => ({ id, name: id, result: "fail" })),
+          ...others.map(({ id, result }) => ({ id, name: id, result })),
         ],
       });
-      const knownFailing = ["B1", "N4"];
+      const known = [
+        { id: "B1", result: "fail" },
+        { id: "N4", result: "fail" },
+        { id: "I5", result: "inconclusive" },
+      ];
+      const knownFailing = ["B1", "N4", "I5:inconclusive"];
       assert.equal(
-        upgradeLabFailure({ exitCode: 1, report: report(["B1", "N4"]), knownFailing }),
+        upgradeLabFailure({ exitCode: 1, report: report(known), knownFailing }),
         undefined,
       );
       assert.match(
-        renderUpgradeCell({ cell: "c", exitCode: 1, report: report(["B1", "N4"]) }),
+        renderUpgradeCell({ cell: "c", exitCode: 1, report: report(known) }),
         /\| B1 B1 \| fail \|[\s\S]*\| N4 N4 \| fail \|/,
       );
       assert.equal(
-        upgradeLabFailure({ exitCode: 1, report: report(["B1", "I7"]), knownFailing }),
+        upgradeLabFailure({
+          exitCode: 1,
+          report: report([...known, { id: "I7", result: "fail" }]),
+          knownFailing,
+        }),
         "I7 did not pass",
+      );
+      assert.equal(
+        upgradeLabFailure({
+          exitCode: 1,
+          report: report([
+            { id: "I5", result: "fail" },
+            { id: "D1", result: "inconclusive" },
+          ]),
+          knownFailing,
+        }),
+        "I5, D1 did not pass",
       );
       assert.match(
         upgradeLabFailure({ exitCode: 2, report: report([]), knownFailing }) ?? "",

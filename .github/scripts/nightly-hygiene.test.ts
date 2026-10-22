@@ -71,9 +71,7 @@ void describe("given the findings of tonight's tools", () => {
       assert.equal(report.categories["architecture/cycles"]?.count, 2);
       assert.equal(report.categories["architecture/manifests"]?.count, 1);
       assert.deepEqual(
-        parseArchitecture({
-          text: "architecture-enforcer: 0 findings, exit 0 (no policy refused anything)\n",
-        }),
+        parseArchitecture({ text: "architecture-enforcer: package boundaries are sealed\n" }),
         { reported: true, findings: [] },
       );
       assert.equal(parseArchitecture({ text: "pnpm: command not found\n" }).reported, false);

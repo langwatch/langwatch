@@ -588,13 +588,14 @@ jobs:
           if-no-files-found: warn
 
       # B1 and N4 cannot pass on a hosted runner until upgradelab's gaps 6 and 7 are
-      # closed (dev/docs/nightly-suite.md); any other failure, or no verdict, is red.
+      # closed, and this seed has no open suite runs for I5 to count (dev/docs/nightly-suite.md).
+      # Any other result that is not pass, or no verdict, is red.
       - name: Verdict
         working-directory: head
         run: >-
           node --experimental-strip-types .github/scripts/nightly-upgrade-lab.ts --verdict
           --run-dir "$RUNNER_TEMP/cell" --exit-code "${{ steps.cell.outputs.exit || '2' }}"
-          --known-failing B1,N4
+          --known-failing B1,N4,I5:inconclusive
 
   # ---------------------------------------------------------------------------
 
