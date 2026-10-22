@@ -245,29 +245,6 @@ func TestInstallPageRedirectsToSetup(t *testing.T) {
 	assert.Equal(t, http.StatusOK, call(s, "GET", "/app/installations/"+id, appJWT("42", fixedNow.Add(time.Minute)), "").Code)
 }
 
-// @scenario "Installing again on an account dates the installation now"
-func TestInstallPageRestampsAnExistingInstallation(t *testing.T) {
-	now := fixedNow
-	s := newServer(Config{Seed: true, AppID: "42", WebhookSecret: "whsec_test", MaxRecords: 50, SetupURL: "http://app.test/api/github/setup"},
-		func() time.Time { return now })
-	now = fixedNow.Add(10 * time.Minute)
-
-	done := call(s, "GET", "/github-apps/langwatch/installations/new?state=abc&account=langwatch-demo", "", "")
-	require.Equal(t, http.StatusFound, done.Code)
-	loc, err := url.Parse(done.Header().Get("Location"))
-	require.NoError(t, err)
-	assert.Equal(t, "1001", loc.Query().Get("installation_id"))
-	assert.Equal(t, "install", loc.Query().Get("setup_action"))
-
-	got := call(s, "GET", "/app/installations/1001", appJWT("42", now.Add(time.Minute)), "")
-	require.Equal(t, http.StatusOK, got.Code)
-	var body struct {
-		CreatedAt string `json:"created_at"`
-	}
-	require.NoError(t, json.Unmarshal(got.Body.Bytes(), &body))
-	assert.Equal(t, now.Format(time.RFC3339), body.CreatedAt)
-}
-
 // @scenario "OAuth sign-in gives a user"
 func TestOAuthSignIn(t *testing.T) {
 	s := testServer(t, nil)

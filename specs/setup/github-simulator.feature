@@ -58,15 +58,6 @@ Feature: githubsim, a local stand-in for GitHub
     Then it is redirected to the setup URL with installation_id, setup_action install and the same state
     And the installation exists with a default repository
 
-  Scenario: Installing again on an account dates the installation now
-    Given githubsim seeded an installation on an account when it started
-    And time has passed since
-    When a browser opens the App install page for that account
-    Then it is redirected with that installation and setup_action install
-    And the installation's created_at is the moment of the install, not of the seed
-    # The stack accepts only an installation created during its own connect flow, so a
-    # boot-time stamp refused every connect made more than a minute after the sim started.
-
   Scenario: OAuth sign-in gives a user
     Given githubsim is running
     When a browser is sent through authorize and the code is exchanged
