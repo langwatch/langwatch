@@ -36,7 +36,7 @@ export class SelfHostedNoticeService {
   ) {}
 
   /** Every notice, drafts and withdrawn ones included, the newest written first. */
-  async list(): Promise<SelfHostedNoticeView[]> {
+  async findAll(): Promise<SelfHostedNoticeView[]> {
     return (await this.repository.findAll()).map(selfHostedNoticeView);
   }
 

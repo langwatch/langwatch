@@ -9,7 +9,7 @@ import {
   SELF_HOSTED_NOTICE_TITLE_MAX,
   type SelfHostedNoticeSeverity,
 } from "@langwatch/ops-contract";
-import { toZonedDateTime } from "@langwatch/time";
+import { toEpochMs, toZonedDateTime } from "@langwatch/time";
 
 export type SelfHostedNoticeStatus = "draft" | "published" | "withdrawn";
 
@@ -53,6 +53,17 @@ export const STATUS_PALETTE: Record<SelfHostedNoticeStatus, string> = {
   published: "green",
   withdrawn: "orange",
 };
+
+/** The status staff see: a published notice past its expiry is no longer sent, so reads Expired. */
+export function noticeStatusOf(
+  notice: Pick<SelfHostedNoticeRow, "status" | "expiresAt">,
+  nowMs: number,
+): { label: string; palette: string } {
+  if (notice.status === "published" && notice.expiresAt && toEpochMs(notice.expiresAt) <= nowMs) {
+    return { label: "Expired", palette: "gray" };
+  }
+  return { label: STATUS_LABELS[notice.status], palette: STATUS_PALETTE[notice.status] };
+}
 
 /** The form as staff type it: every field a string, the expiry a calendar day. */
 export interface NoticeDraft {

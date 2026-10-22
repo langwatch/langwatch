@@ -841,8 +841,8 @@ export class LicensingModule implements LicensingApiContract {
     return this.#diagnostics.getDownload(input);
   }
 
-  listSelfHostedNotices(): Promise<SelfHostedNoticeView[]> {
-    return this.#notices.list();
+  findSelfHostedNotices(): Promise<SelfHostedNoticeView[]> {
+    return this.#notices.findAll();
   }
 
   createSelfHostedNotice(input: CreateSelfHostedNoticeInput): Promise<SelfHostedNoticeView> {

@@ -16,7 +16,7 @@ type Staff = Readonly<{ operatorId: string }>;
 
 type Notices = Pick<
   LicensingApi,
-  | "listSelfHostedNotices"
+  | "findSelfHostedNotices"
   | "createSelfHostedNotice"
   | "updateSelfHostedNotice"
   | "publishSelfHostedNotice"
@@ -36,9 +36,9 @@ export class SelfHostedNoticeAuditService {
     private readonly auditLog: Pick<AuditLogApi, "record">,
   ) {}
 
-  async list(input: Staff): Promise<SelfHostedNoticeView[]> {
+  async findAll(input: Staff): Promise<SelfHostedNoticeView[]> {
     await this.record(input.operatorId, "getAll", { args: {} });
-    return this.notices.listSelfHostedNotices();
+    return this.notices.findSelfHostedNotices();
   }
 
   async create(input: Staff & CreateSelfHostedNoticeInput): Promise<SelfHostedNoticeView> {

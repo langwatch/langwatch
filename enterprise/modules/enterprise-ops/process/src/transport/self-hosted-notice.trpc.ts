@@ -15,7 +15,7 @@ export const selfHostedNoticesTrpcTransport: TrpcRouterDeclaration<
   .procedure("getAll")
   .withMiddlewareContext(operatorContext)
   .withPermission("ops:view", STAFF)
-  .handle(({ app }, operator) => app.listSelfHostedNotices({ operator }))
+  .handle(({ app }, operator) => app.findSelfHostedNotices({ operator }))
 
   .procedure("create")
   .withMiddlewareContext(operatorContext)

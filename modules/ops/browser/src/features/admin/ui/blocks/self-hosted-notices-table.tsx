@@ -1,13 +1,13 @@
 import { ListTable } from "@langwatch/design-system/list-table";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Badge, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { nowInstant } from "@langwatch/time";
 import { Megaphone } from "lucide-react";
 
 import {
+  noticeStatusOf,
   SEVERITY_LABELS,
   SEVERITY_PALETTE,
-  STATUS_LABELS,
-  STATUS_PALETTE,
   type SelfHostedNoticeRow,
 } from "../../model/self-hosted-notice.ts";
 import { AdminDate, EmptyCell } from "../elements/admin-cells.tsx";
@@ -29,6 +29,7 @@ export function SelfHostedNoticesTable({
   onPublish: (notice: SelfHostedNoticeRow) => void;
   onWithdraw: (notice: SelfHostedNoticeRow) => void;
 }) {
+  const nowMs = nowInstant().epochMilliseconds;
   return (
     <ListTable
       variant="embedded"
@@ -63,8 +64,8 @@ export function SelfHostedNoticesTable({
               {notice.fixedIn ? <Text>{notice.fixedIn}</Text> : <EmptyCell />}
             </ListTable.Cell>
             <ListTable.Cell>
-              <Badge colorPalette={STATUS_PALETTE[notice.status]}>
-                {STATUS_LABELS[notice.status]}
+              <Badge colorPalette={noticeStatusOf(notice, nowMs).palette}>
+                {noticeStatusOf(notice, nowMs).label}
               </Badge>
             </ListTable.Cell>
             <ListTable.Cell>

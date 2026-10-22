@@ -113,6 +113,39 @@ describe("SelfHostedNoticeService", () => {
     });
   });
 
+  describe("when staff publish a withdrawn notice again", () => {
+    it("sends it again, published now and by them", async () => {
+      const { service, advance } = setup();
+      const draft = await service.create(securityFix);
+      await service.publish({ id: draft.id, operatorId: "user_olive" });
+      await service.withdraw({ id: draft.id });
+      advance(5);
+
+      const again = await service.publish({ id: draft.id, operatorId: "user_pat" });
+
+      expect(again).toMatchObject({
+        status: "published",
+        publishedBy: "user_pat",
+        publishedAt: "2026-10-21T10:05:00.000Z",
+      });
+      expect((await service.findSent()).map(({ id }) => id)).toEqual([draft.id]);
+    });
+  });
+
+  describe("given a published row the install's schema would refuse", () => {
+    it("leaves it out of the reply and still sends the others", async () => {
+      const { service, repository } = setup();
+      const bad = await service.create(securityFix);
+      await service.publish({ id: bad.id, operatorId: "user_olive" });
+      const [row] = await repository.findAllSentAt(START);
+      await repository.replace({ ...row!, url: "http://not-https.example" });
+      const good = await service.create({ ...securityFix, title: "Still fine" });
+      await service.publish({ id: good.id, operatorId: "user_olive" });
+
+      expect((await service.findSent()).map(({ id }) => id)).toEqual([good.id]);
+    });
+  });
+
   describe("when staff edit a published notice", () => {
     it("sends it as edited and keeps it published", async () => {
       const { service } = setup();

@@ -128,8 +128,8 @@ export class EnterpriseOpsModule implements EnterpriseOpsApiContract {
     async ({ operator, id }) =>
       this.#instances.getDiagnosticsDownload({ id, operatorId: await this.#manager(operator) });
 
-  listSelfHostedNotices: EnterpriseOpsApiContract["listSelfHostedNotices"] = async ({ operator }) =>
-    this.#notices.list({ operatorId: await this.#staff(operator) });
+  findSelfHostedNotices: EnterpriseOpsApiContract["findSelfHostedNotices"] = async ({ operator }) =>
+    this.#notices.findAll({ operatorId: await this.#staff(operator) });
 
   createSelfHostedNotice: EnterpriseOpsApiContract["createSelfHostedNotice"] = async ({
     operator,

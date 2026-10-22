@@ -128,10 +128,10 @@ A five-minute link to one bundle: the sensitive read, so it asks `ops:manage`.
 getUpgradeDiagnosticsDownload(input: { id: string; operator: OpsOperator | null; }): Promise<UpgradeDiagnosticsDownload>;
 ```
 
-#### `listSelfHostedNotices`
+#### `findSelfHostedNotices`
 
 ```typescript
-listSelfHostedNotices(input: { operator: OpsOperator | null }): Promise<SelfHostedNoticeView[]>;
+findSelfHostedNotices(input: { operator: OpsOperator | null }): Promise<SelfHostedNoticeView[]>;
 ```
 
 #### `createSelfHostedNotice`

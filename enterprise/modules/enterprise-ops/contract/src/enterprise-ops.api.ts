@@ -145,7 +145,7 @@ export interface EnterpriseOpsApi {
 
   // -- notices to self-hosted installs (self-hosted-notices.feature); writes ask ops:manage --
 
-  listSelfHostedNotices(input: { operator: OpsOperator | null }): Promise<SelfHostedNoticeView[]>;
+  findSelfHostedNotices(input: { operator: OpsOperator | null }): Promise<SelfHostedNoticeView[]>;
   createSelfHostedNotice(
     input: CreateSelfHostedNoticeInput & { operator: OpsOperator | null },
   ): Promise<SelfHostedNoticeView>;

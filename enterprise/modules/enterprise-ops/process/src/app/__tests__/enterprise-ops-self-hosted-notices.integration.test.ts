@@ -42,7 +42,7 @@ function heldNotices(touched: string[]) {
     return found;
   };
   return createApiFixture<LicensingApi>({
-    listSelfHostedNotices: async () => {
+    findSelfHostedNotices: async () => {
       touched.push("list");
       return held;
     },
@@ -116,7 +116,7 @@ describe("Cloud admin's notices to self-hosted installs", () => {
 
         const draft = await app.createSelfHostedNotice({ ...notice, operator });
         await app.publishSelfHostedNotice({ id: draft.id, operator });
-        const listed = await app.listSelfHostedNotices({ operator });
+        const listed = await app.findSelfHostedNotices({ operator });
 
         expect(listed).toEqual([
           expect.objectContaining({
@@ -142,7 +142,7 @@ describe("Cloud admin's notices to self-hosted installs", () => {
         const { app, entries, touched } = await build({ cloud: false });
 
         const refusals = await Promise.all([
-          app.listSelfHostedNotices({ operator }).catch((error: unknown) => error),
+          app.findSelfHostedNotices({ operator }).catch((error: unknown) => error),
           app.createSelfHostedNotice({ ...notice, operator }).catch((error: unknown) => error),
           app.publishSelfHostedNotice({ id: "n1", operator }).catch((error: unknown) => error),
           app.withdrawSelfHostedNotice({ id: "n1", operator }).catch((error: unknown) => error),

@@ -328,7 +328,7 @@ export interface LicensingApi {
    * published in Cloud admin, sent in the usage report reply while published and not expired.
    * An unknown id throws `not_found`.
    */
-  listSelfHostedNotices(): Promise<SelfHostedNoticeView[]>;
+  findSelfHostedNotices(): Promise<SelfHostedNoticeView[]>;
   createSelfHostedNotice(input: CreateSelfHostedNoticeInput): Promise<SelfHostedNoticeView>;
   updateSelfHostedNotice(input: UpdateSelfHostedNoticeInput): Promise<SelfHostedNoticeView>;
   publishSelfHostedNotice(input: { id: string; operatorId: string }): Promise<SelfHostedNoticeView>;

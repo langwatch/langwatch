@@ -490,12 +490,12 @@ A five-minute link to one report's bundle; an unknown id throws its code.
 getUpgradeDiagnosticsDownload(input: { id: string }): Promise<UpgradeDiagnosticsDownload>;
 ```
 
-#### `listSelfHostedNotices`
+#### `findSelfHostedNotices`
 
 Notices LangWatch staff send self-hosted installs (self-hosted-notices.feature): written and published in Cloud admin, sent in the usage report reply while published and not expired. An unknown id throws `not_found`.
 
 ```typescript
-listSelfHostedNotices(): Promise<SelfHostedNoticeView[]>;
+findSelfHostedNotices(): Promise<SelfHostedNoticeView[]>;
 ```
 
 #### `createSelfHostedNotice`

@@ -70,7 +70,7 @@ function door() {
     throw new Error("the door admitted the caller");
   };
   const app = createApiFixture<EnterpriseOpsApi>({
-    listSelfHostedNotices: reach("listSelfHostedNotices"),
+    findSelfHostedNotices: reach("findSelfHostedNotices"),
     createSelfHostedNotice: reach("createSelfHostedNotice"),
     updateSelfHostedNotice: reach("updateSelfHostedNotice"),
     publishSelfHostedNotice: reach("publishSelfHostedNotice"),
@@ -133,7 +133,7 @@ describe("Cloud admin's notices at the platform door", () => {
       await failureOf(as("user-viewer").getAll());
       const publish = await failureOf(as("user-viewer").publish({ id: "n1" }));
 
-      expect(reached).toEqual(["listSelfHostedNotices"]);
+      expect(reached).toEqual(["findSelfHostedNotices"]);
       expect(codeOf(publish)).toEqual({ trpc: "FORBIDDEN", code: "permission_denied" });
     });
   });

@@ -5,7 +5,12 @@
 import { SELF_HOSTED_NOTICE_BODY_MAX, SELF_HOSTED_NOTICE_TITLE_MAX } from "@langwatch/ops-contract";
 import { describe, expect, it } from "vitest";
 
-import { emptyNoticeDraft, noticeProblemsOf, type NoticeDraft } from "../self-hosted-notice.ts";
+import {
+  emptyNoticeDraft,
+  noticeProblemsOf,
+  noticeStatusOf,
+  type NoticeDraft,
+} from "../self-hosted-notice.ts";
 
 const draftOf = (fields: Partial<NoticeDraft>): NoticeDraft => ({
   ...emptyNoticeDraft(),
@@ -41,5 +46,22 @@ describe("noticeProblemsOf", () => {
         "expiresOn",
       ]);
     });
+  });
+});
+
+describe("noticeStatusOf", () => {
+  const now = Date.UTC(2026, 9, 22);
+
+  it("reads Expired for a published notice past its expiry, since it is no longer sent", () => {
+    expect(
+      noticeStatusOf({ status: "published", expiresAt: "2026-10-21T12:00:00.000Z" }, now).label,
+    ).toBe("Expired");
+  });
+
+  it("reads the stored status otherwise", () => {
+    expect(noticeStatusOf({ status: "published", expiresAt: null }, now).label).toBe("Published");
+    expect(
+      noticeStatusOf({ status: "withdrawn", expiresAt: "2026-10-21T12:00:00.000Z" }, now).label,
+    ).toBe("Withdrawn");
   });
 });
