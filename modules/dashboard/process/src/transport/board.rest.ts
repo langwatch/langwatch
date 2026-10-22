@@ -25,7 +25,7 @@ import {
 } from "@langwatch/dashboard-contract";
 import type { z } from "zod";
 
-import { authorOfActor, viewerOfActor } from "../rules/dashboard-viewer.rules.ts";
+import { authorOfActor, viewerOfActor, viewerOfOwner } from "../rules/dashboard-viewer.rules.ts";
 
 /** The tags every operation in this file carries in the published document. */
 const BOARD_TAGS = ["Analytics / LangWatchQL"];
@@ -174,11 +174,7 @@ export const boardRest = defineRestRouter(DashboardApi)
     idParam: "boardId",
     name: ({ app, projectId, id, ownerUserId }) =>
       nameUnlessMissing({
-        read: app.getBoard({
-          projectId,
-          dashboardId: id,
-          ...(ownerUserId ? { viewer: { userId: ownerUserId } } : {}),
-        }),
+        read: app.getBoard({ projectId, dashboardId: id, ...viewerOfOwner({ ownerUserId }) }),
         missing: DashboardNotFoundError,
         nameOf: (board) => board.name,
       }),
