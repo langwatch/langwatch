@@ -30,11 +30,15 @@ fail() {
 }
 pass() { echo "ok   [$1]"; }
 
+# Every filter here reads its whole input: under pipefail, a reader that exits
+# early (head, grep -q, awk exit) kills the writer with SIGPIPE and fails the
+# test for no reason.
+
 # Prints one kind's document from a render.
 doc_of() {
   awk -v kind="$1" '
-    /^---/ { if (grab) exit; next }
-    $0 == "kind: " kind { grab = 1 }
+    /^---/ { if (grab) done = 1; grab = 0; next }
+    !done && $0 == "kind: " kind { grab = 1 }
     grab { print }
   '
 }
@@ -43,8 +47,9 @@ doc_of() {
 # line at the same or a shallower indent.
 block_after() {
   awk -v key="$1" '
+    done { next }
     !found && index($0, key) { found = 1; match($0, /^ */); ind = RLENGTH; next }
-    found { match($0, /^ */); if (RLENGTH <= ind && $0 !~ /^ *$/) exit; print }
+    found { match($0, /^ */); if (RLENGTH <= ind && $0 !~ /^ *$/) { done = 1; next }; print }
   '
 }
 
@@ -52,7 +57,7 @@ render() { helm template takeover . "$@"; }
 
 # The tmp entry under the pod's volumes (8-space indent), not the container's
 # volumeMounts entry of the same name.
-scratch_volume() { awk '/^        - name: tmp$/ { grab = 1; next } grab && /^        - / { exit } grab { print }'; }
+scratch_volume() { awk 'done { next } /^        - name: tmp$/ { grab = 1; next } grab && /^        - / { done = 1; next } grab { print }'; }
 
 TAKEOVER=(
   --set-json 'selectorLabels={"app":"existing-agent"}'
@@ -69,14 +74,14 @@ test_default_selector() {
   local out
   out="$(render)"
   local sel
-  sel="$(doc_of Deployment <<<"$out" | block_after 'matchLabels:' | head -2 | sort | tr -d ' ')"
+  sel="$(doc_of Deployment <<<"$out" | block_after 'matchLabels:' | awk 'NR<=2' | sort | tr -d ' ')"
   if [[ "$sel" == $'app.kubernetes.io/instance:takeover\napp.kubernetes.io/name:langwatch-langyagent' ]]; then
     pass "default Deployment selector"
   else
     fail "default Deployment selector" "got: $sel"
   fi
-  if doc_of Service <<<"$out" | block_after 'selector:' | grep -q 'app.kubernetes.io/name: langwatch-langyagent' &&
-     doc_of NetworkPolicy <<<"$out" | block_after 'podSelector:' | grep -q 'app.kubernetes.io/name: langwatch-langyagent'; then
+  if doc_of Service <<<"$out" | block_after 'selector:' | grep 'app.kubernetes.io/name: langwatch-langyagent' >/dev/null &&
+     doc_of NetworkPolicy <<<"$out" | block_after 'podSelector:' | grep 'app.kubernetes.io/name: langwatch-langyagent' >/dev/null; then
     pass "default Service and NetworkPolicy selectors"
   else
     fail "default Service and NetworkPolicy selectors" "do not select the chart labels"
@@ -91,11 +96,11 @@ test_custom_selector_everywhere() {
   local sel
   sel="$(block_after 'selector:' <<<"$dep" | block_after 'matchLabels:' | tr -d ' ')"
   [[ "$sel" == "app:existing-agent" ]] && pass "Deployment selector" || fail "Deployment selector" "got: $sel"
-  block_after 'template:' <<<"$dep" | block_after 'labels:' | grep -q 'app: existing-agent' &&
+  block_after 'template:' <<<"$dep" | block_after 'labels:' | grep 'app: existing-agent' >/dev/null &&
     pass "pod template carries the selector" || fail "pod template carries the selector" "label missing"
   [[ "$(doc_of Service <<<"$out" | block_after 'selector:' | tr -d ' ')" == "app:existing-agent" ]] &&
     pass "Service selector" || fail "Service selector" "not the custom labels"
-  doc_of NetworkPolicy <<<"$out" | block_after 'podSelector:' | grep -q 'app: existing-agent' &&
+  doc_of NetworkPolicy <<<"$out" | block_after 'podSelector:' | grep 'app: existing-agent' >/dev/null &&
     pass "NetworkPolicy podSelector" || fail "NetworkPolicy podSelector" "not the custom labels"
 }
 
@@ -123,7 +128,7 @@ test_extra_env_appended() {
 
 # @scenario "Extra config adds keys to the agent ConfigMap"
 test_extra_config_added() {
-  render "${TAKEOVER[@]}" | doc_of ConfigMap | grep -q '^  LOG_FORMAT: "json"$' &&
+  render "${TAKEOVER[@]}" | doc_of ConfigMap | grep '^  LOG_FORMAT: "json"$' >/dev/null &&
     pass "extraConfig key" || fail "extraConfig key" "LOG_FORMAT missing from the ConfigMap"
 }
 
@@ -143,11 +148,11 @@ test_extra_config_refuses_owned_key() {
 test_annotations_and_deadline() {
   local out
   out="$(render "${TAKEOVER[@]}")"
-  doc_of Service <<<"$out" | grep -q 'service.kubernetes.io/topology-mode: Auto' &&
+  doc_of Service <<<"$out" | grep 'service.kubernetes.io/topology-mode: Auto' >/dev/null &&
     pass "Service annotations" || fail "Service annotations" "missing"
-  doc_of Deployment <<<"$out" | grep -q '^  progressDeadlineSeconds: 1800$' &&
+  doc_of Deployment <<<"$out" | grep '^  progressDeadlineSeconds: 1800$' >/dev/null &&
     pass "progressDeadlineSeconds" || fail "progressDeadlineSeconds" "missing"
-  render | doc_of Deployment | grep -q 'progressDeadlineSeconds' &&
+  render | doc_of Deployment | grep 'progressDeadlineSeconds' >/dev/null &&
     fail "no deadline by default" "rendered without being set" || pass "no deadline by default"
 }
 
@@ -156,7 +161,7 @@ test_scratch_uncapped() {
   local tmp
   tmp="$(render "${TAKEOVER[@]}" | doc_of Deployment | scratch_volume | tr -d ' \n')"
   [[ "$tmp" == "emptyDir:{}" ]] && pass "uncapped scratch" || fail "uncapped scratch" "got: $tmp"
-  render | doc_of Deployment | scratch_volume | grep -q 'sizeLimit: 1Gi' &&
+  render | doc_of Deployment | scratch_volume | grep 'sizeLimit: 1Gi' >/dev/null &&
     pass "default scratch cap kept" || fail "default scratch cap kept" "1Gi cap missing by default"
 }
 
