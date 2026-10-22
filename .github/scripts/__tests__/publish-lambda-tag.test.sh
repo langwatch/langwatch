@@ -81,6 +81,10 @@ case "$1 $2" in
     manifest="$(opt --image-manifest "$@")"
     media="$(opt --image-manifest-media-type "$@")"
     echo "put-image $to" >> "$STUB_REGISTRY/calls"
+    if [ -n "${STUB_PUT_ERROR:-}" ]; then
+      echo "An error occurred ($STUB_PUT_ERROR)" >&2
+      exit 254
+    fi
     if [ -f "$tags/$to" ] && [ "$(cat "$tags/$to")" = "$media $manifest" ]; then
       echo "An error occurred (ImageAlreadyExistsException)" >&2
       exit 254
@@ -208,9 +212,8 @@ test_a_tag_that_cannot_be_written_fails() {
   local reg
   reg="$(new_registry)"
   push "$reg" git-bbbbbbb "$PLAIN" '{"newest":true}'
-  # Make the registry refuse the write with an error other than "already exists".
-  sed -i.bak 's|echo "put-image \$to" >> "\$STUB_REGISTRY/calls"|echo "put-image $to" >> "$STUB_REGISTRY/calls"; echo "An error occurred (AccessDeniedException)" >\&2; exit 254|' "$reg/bin/aws"
-  run_subject "$reg" IMAGE_TAG=git-ccccccc IMAGE_WAS_BUILT=false
+  # The registry refuses the write with an error other than "already exists".
+  run_subject "$reg" IMAGE_TAG=git-ccccccc IMAGE_WAS_BUILT=false STUB_PUT_ERROR=AccessDeniedException
   if [ "$LAST_STATUS" -ne 0 ] && printf '%s' "$LAST_OUTPUT" | grep -q AccessDeniedException; then
     record yes "a refused write fails and shows the registry error"
   else
