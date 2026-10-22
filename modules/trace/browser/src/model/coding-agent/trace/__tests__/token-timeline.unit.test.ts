@@ -133,6 +133,22 @@ describe("findCacheRebuilds", () => {
     });
   });
 
+  describe("given a rebuild after a Copilot prompt that opens with its date block", () => {
+    /** @scenario "The usage chart's rebuild note quotes the user's own words of a Copilot prompt" */
+    it("names the prompt by the user's own words", () => {
+      const events = findCacheRebuilds([
+        modelCall({ atMs: 1_000, cacheReadTokens: 100_000 }),
+        prompt(
+          1_500,
+          "<current_datetime>2026-10-21T20:49:36.032+02:00</current_datetime>\n\nRead the whole file",
+        ),
+        modelCall({ atMs: 2_000, cacheCreationTokens: 90_000 }),
+      ]);
+
+      expect(events[0]?.precedingPrompt).toBe("Read the whole file");
+    });
+  });
+
   describe("given a rebuild below the minimum token floor", () => {
     it("does not flag noise on a session with a tiny context", () => {
       const events = findCacheRebuilds([

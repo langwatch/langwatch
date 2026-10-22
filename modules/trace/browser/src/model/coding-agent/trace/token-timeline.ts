@@ -1,4 +1,8 @@
-import { isCacheRebuild, type TranscriptEntry } from "@langwatch/coding-agent-contract";
+import {
+  isCacheRebuild,
+  splitLeadingContextBlocks,
+  type TranscriptEntry,
+} from "@langwatch/coding-agent-contract";
 
 /**
  * Per-call token composition from spans; answers "where" (not just "how much")
@@ -101,11 +105,14 @@ export function findCacheRebuilds(entries: TranscriptEntry[]): CacheRebuildEvent
   return events;
 }
 
+/** Quoted by the user's own words: leading context blocks (Copilot's date) peel off. */
 function nearestPrecedingPrompt(entries: TranscriptEntry[], atMs: number): string | null {
   let best: string | null = null;
   for (const entry of entries) {
     if (entry.atMs > atMs) break;
     if (entry.kind === "user_prompt" && entry.text?.trim()) best = entry.text;
   }
-  return best;
+  if (best === null) return null;
+  // A message that is only context blocks is left as written, as the Conversation tab does.
+  return splitLeadingContextBlocks(best).body || best;
 }

@@ -77,6 +77,12 @@ Rule: One row per conversation, every number from the model calls
     And the date block is folded away as hidden context, the way the Terminal tab folds it
 
   @unit
+  Scenario: The usage chart's rebuild note quotes the user's own words of a Copilot prompt
+    Given a Copilot session whose cache was rebuilt after a prompt that opens with Copilot's injected date block
+    When the usage chart names the prompt before the rebuild
+    Then it quotes the prompt's own words without the date block
+
+  @unit
   Scenario: Tool runs are counted with their names
     Given a Copilot session with three execute_tool spans
     When the session is folded
