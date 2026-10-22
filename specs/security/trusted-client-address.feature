@@ -59,6 +59,12 @@ Feature: The client address comes only from hops the operator declared
       When the API process reads its configuration
       Then it refuses to start with a configuration error naming both settings
 
+    @unit
+    Scenario: An unreadable trusted proxy entry refuses to boot
+      Given TRUSTED_PROXY_ADDRESSES names a hostname or a malformed range
+      When the API process reads its configuration
+      Then it refuses to start with a configuration error naming the entry
+
   Rule: with no trusted set, the socket is the client and no header is read
 
     @unit
@@ -81,6 +87,13 @@ Feature: The client address comes only from hops the operator declared
       When a request arrives from an IPv6 address inside that range carrying X-Forwarded-For
       Then the resolved client address is the rightmost forwarded hop outside the trusted set
       And a peer outside the range has its forwarded header ignored
+
+    @unit
+    Scenario: A resolved address has one spelling
+      Given a peer that is not a trusted hop
+      When its address is written in upper case, or as an IPv4 address carried in IPv6
+      Then the resolved address is lower case, and the IPv4 address unmapped
+      And an IPv6 address that only looks mapped stays IPv6
 
   Rule: every reader uses the address the door resolved
 

@@ -1,3 +1,4 @@
+import { isIP } from "node:net";
 import { fileURLToPath } from "node:url";
 
 import {
@@ -33,6 +34,14 @@ export const apiOwner = {
             .split(",")
             .map((address) => address.trim())
             .filter(Boolean);
+        })
+        .superRefine((entries, context) => {
+          const unreadable = (entries ?? []).filter((entry) => !isAddressOrRange(entry));
+          if (unreadable.length === 0) return;
+          context.addIssue({
+            code: "custom",
+            message: `not an IPv4/IPv6 address or CIDR range: ${unreadable.join(", ")}`,
+          });
         }),
     ),
     // CF-Connecting-IP is forgeable by anyone reaching the origin directly: read only from a
@@ -64,4 +73,15 @@ export function cloudflareTrustOf(
   throw new ConfigParseError([
     "http.trustCloudflare ← TRUST_CLOUDFLARE_CLIENT_IP: set TRUSTED_PROXY_ADDRESSES to the Cloudflare ranges it is read from",
   ]);
+}
+
+/** One address or CIDR range, as TRUSTED_PROXY_ADDRESSES names a hop; a hostname is neither. */
+function isAddressOrRange(entry: string): boolean {
+  const [network = "", prefix, extra] = entry.split("/");
+  const family = isIP(network);
+  if (family === 0 || extra !== void 0) return false;
+  if (prefix === void 0) return true;
+
+  const bits = Number(prefix);
+  return /^\d+$/.test(prefix) && bits <= (family === 6 ? 128 : 32);
 }

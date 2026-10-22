@@ -1,6 +1,7 @@
+import { parseProcessConfig } from "@langwatch/config";
 import { describe, expect, it } from "vitest";
 
-import { cloudflareTrustOf } from "../config-owner.ts";
+import { apiOwner, cloudflareTrustOf } from "../config-owner.ts";
 
 describe("cloudflareTrustOf", () => {
   describe("when TRUST_CLOUDFLARE_CLIENT_IP is on and no trusted proxy is declared", () => {
@@ -24,5 +25,32 @@ describe("cloudflareTrustOf", () => {
     it("does not trust Cloudflare's header, with or without a set", () => {
       expect(cloudflareTrustOf({ trustCloudflare: false, trustedProxies: undefined })).toBe(false);
     });
+  });
+});
+
+describe("TRUSTED_PROXY_ADDRESSES", () => {
+  const parsed = (value: string) =>
+    parseProcessConfig({ owners: [apiOwner], environment: { TRUSTED_PROXY_ADDRESSES: value } }).http
+      .trustedProxies;
+
+  describe("when every entry is an address or a range", () => {
+    it("reads IPv4 and IPv6 addresses and ranges", () => {
+      expect(parsed("10.0.0.0/8, 192.0.2.1,2400:cb00::/32,::1")).toEqual([
+        "10.0.0.0/8",
+        "192.0.2.1",
+        "2400:cb00::/32",
+        "::1",
+      ]);
+    });
+  });
+
+  describe("when an entry is a hostname or a malformed range", () => {
+    /** @scenario "An unreadable trusted proxy entry refuses to boot" */
+    it.each(["ingress.internal", "10.0.0.0/33", "10.0.0.0/8/1", "2400:cb00::/129", "10.0.0.0/x"])(
+      "refuses the configuration (%s)",
+      (entry) => {
+        expect(() => parsed(`10.0.0.0/8,${entry}`)).toThrow(entry);
+      },
+    );
   });
 });

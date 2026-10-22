@@ -197,3 +197,15 @@ describe("ClientAddress over a raw Node request", () => {
     expect(ClientAddress.resolvedFor(request)).toBe(NODE);
   });
 });
+
+describe("ClientAddress spelling", () => {
+  const resolved = (socketAddress: string) =>
+    ClientAddress.fromTrustedProxies({}).of({ header: () => void 0, socketAddress });
+
+  /** @scenario "A resolved address has one spelling" */
+  it("lower-cases IPv6, unmaps a mapped IPv4 and keeps a mapped-looking IPv6", () => {
+    expect(resolved("2001:DB8::1")).toBe("2001:db8::1");
+    expect(resolved("::FFFF:203.0.113.7")).toBe("203.0.113.7");
+    expect(resolved("::ffff:abcd")).toBe("::ffff:abcd");
+  });
+});
