@@ -42,6 +42,8 @@ function workspace() {
       execFileSync(process.execPath, [...(withCache ? ["--import", register] : []), entry], {
         cwd: root,
         encoding: "utf8",
+        // CI sets FORCE_COLOR, which makes console.log colour the printed number.
+        env: { ...process.env, FORCE_COLOR: "0", NO_COLOR: "1" },
       }).trim(),
   };
 }
