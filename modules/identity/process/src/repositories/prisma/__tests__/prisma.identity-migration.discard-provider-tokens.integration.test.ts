@@ -65,6 +65,13 @@ describe.skipIf(!DB_URL)("AccountCredential provider token discard", () => {
                 updatedAt,
               },
               {
+                id: `${namespace}-id-only`,
+                userId: namespace,
+                provider: "okta",
+                idToken: "header.payload.signature",
+                updatedAt,
+              },
+              {
                 id: `${namespace}-password`,
                 userId: namespace,
                 provider: "credential",
@@ -75,18 +82,17 @@ describe.skipIf(!DB_URL)("AccountCredential provider token discard", () => {
           });
           const repository = PrismaIdentityMigrationRepository.create(tx as PrismaClient);
 
-          expect(await repository.discardProviderTokens({ dryRun: true })).toBeGreaterThanOrEqual(
-            1,
-          );
-          expect(await repository.discardProviderTokens({ dryRun: false })).toBeGreaterThanOrEqual(
-            1,
-          );
+          const wouldClear = await repository.discardProviderTokens({ dryRun: true });
+          expect(wouldClear).toBeGreaterThanOrEqual(2);
+          // The lock holds the table still: the run clears exactly what the dry run counted.
+          expect(await repository.discardProviderTokens({ dryRun: false })).toBe(wouldClear);
 
           const rows = await tx.accountCredential.findMany({
             where: { userId: namespace },
             orderBy: { id: "asc" },
           });
           expect(rows).toMatchObject([
+            { id: `${namespace}-id-only`, idToken: null, updatedAt },
             {
               id: `${namespace}-oauth`,
               accessToken: null,

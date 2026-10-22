@@ -55,32 +55,50 @@ describe.skipIf(!databaseUrl)("Account provider token discard", () => {
             })}
             LOCK TABLE "Account" IN SHARE ROW EXCLUSIVE MODE
           `;
-          await tx.account.create({
-            data: {
-              id,
-              userId: namespace,
-              provider: "github",
-              issuer: "https://github.com",
-              providerAccountId: `${namespace}-gh`,
-              access_token: "gho_access",
-              refresh_token: "ghr_refresh",
-              id_token: "header.payload.signature",
-              scope: "read:user,user:email",
-              updatedAt,
-            },
+          await tx.account.createMany({
+            data: [
+              {
+                id,
+                userId: namespace,
+                provider: "github",
+                issuer: "https://github.com",
+                providerAccountId: `${namespace}-gh`,
+                access_token: "gho_access",
+                refresh_token: "ghr_refresh",
+                id_token: "header.payload.signature",
+                scope: "read:user,user:email",
+                updatedAt,
+              },
+              {
+                id: `${id}-refresh-only`,
+                userId: namespace,
+                provider: "github",
+                issuer: "https://github.com",
+                providerAccountId: `${namespace}-refresh-only`,
+                refresh_token: "ghr_only",
+                updatedAt,
+              },
+              {
+                id: `${id}-control`,
+                userId: namespace,
+                provider: "github",
+                issuer: "https://github.com",
+                providerAccountId: `${namespace}-control`,
+                scope: "control-scope",
+                updatedAt,
+              },
+            ],
           });
           const repository = PrismaAuthMigrationRepository.create(tx as PrismaClient);
 
-          expect(await repository.discardProviderTokens({ dryRun: true })).toBeGreaterThanOrEqual(
-            1,
-          );
+          const wouldClear = await repository.discardProviderTokens({ dryRun: true });
+          expect(wouldClear).toBeGreaterThanOrEqual(2);
           expect(await tx.account.findUniqueOrThrow({ where: { id } })).toMatchObject({
             access_token: "gho_access",
           });
 
-          expect(await repository.discardProviderTokens({ dryRun: false })).toBeGreaterThanOrEqual(
-            1,
-          );
+          // The lock holds the table still: the run clears exactly what the dry run counted.
+          expect(await repository.discardProviderTokens({ dryRun: false })).toBe(wouldClear);
           expect(await tx.account.findUniqueOrThrow({ where: { id } })).toMatchObject({
             access_token: null,
             refresh_token: null,
@@ -88,6 +106,12 @@ describe.skipIf(!databaseUrl)("Account provider token discard", () => {
             scope: "read:user,user:email",
             updatedAt,
           });
+          expect(
+            await tx.account.findUniqueOrThrow({ where: { id: `${id}-refresh-only` } }),
+          ).toMatchObject({ refresh_token: null, updatedAt });
+          expect(
+            await tx.account.findUniqueOrThrow({ where: { id: `${id}-control` } }),
+          ).toMatchObject({ scope: "control-scope", updatedAt });
           expect(await repository.discardProviderTokens({ dryRun: true })).toBe(0);
 
           throw rollback;
