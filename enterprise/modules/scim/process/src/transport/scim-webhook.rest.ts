@@ -48,6 +48,7 @@ export const scimWebhookRest = defineRestRouter(ScimApi)
   .withAddressing("literal", { v1Twin: false })
 
   .post("/api/webhooks/auth0-scim", "receiveAuth0ScimWebhook")
+  .keepsRecords()
   .withoutAudit("Auth0 webhook")
   // The HMAC is computed over these exact characters, so nothing parses them
   // first: a parse-then-reserialise verifies nothing.

@@ -50,6 +50,7 @@ describe("defineRestRouter", () => {
 
       .delete("/:id", "deleteAnnotation")
       .withParams(z.object({ id: z.string() }))
+      .withoutConfirmation("test route")
       .withPermission("annotations:view")
       .withoutAudit("test route")
       .handle(async () => {})
@@ -77,6 +78,7 @@ describe("defineRestRouter", () => {
     expect(() => {
       const route = router()
         .patch("/:id", "updateAnnotation")
+        .keepsRecords()
         .withParams(z.object({ id: z.string() }));
 
       Reflect.apply(Reflect.get(route, "withInput"), route, [z.object({ id: z.string() })]);
@@ -85,6 +87,7 @@ describe("defineRestRouter", () => {
     expect(() => {
       const route = router()
         .patch("/:id", "updateVariant")
+        .keepsRecords()
         .withParams(z.object({ id: z.string() }));
 
       const body = z.discriminatedUnion("kind", [
@@ -146,6 +149,7 @@ describe("defineRestRouter", () => {
           .withNamespace("ops")
           .withVersion("2026-08-07")
           .post("/report", "reportBug")
+          .keepsRecords()
           .withInput(z.object({ projectId: z.string() }))
           .withAccess(publicRoute({ reason: "issue intake; reporters may hold no credential" }))
           .withoutAudit("test route")
@@ -194,6 +198,7 @@ describe("defineRestRouter", () => {
           .withNamespace("projects")
           .withVersion("2026-08-07")
           .post("/", "createProject")
+          .keepsRecords()
           .withInput(z.object({ name: z.string() }))
           .withPermission("project:create")
           .withAccess(anyAuthenticated({ reason: "the key's own ceiling is the whole gate" }))
@@ -376,6 +381,7 @@ describe("defineRestRouter", () => {
         .withNamespace("hooks")
         .withVersion("2026-08-07")
         .post("/hook", "recordHook")
+        .keepsRecords()
         .withPermission("annotations:manage");
     }
 
@@ -861,6 +867,7 @@ describe("a route whose plan question names a capability and asks only for some 
       .withVersion("2026-08-07")
       .withCredential("organization")
       .post("/", "createGrant")
+      .keepsRecords()
       .withInput(z.object({ roleId: z.string() }))
       .withPermission("organization:manage")
       .withEntitlement("enterprise", {
@@ -992,6 +999,7 @@ describe("a create declared replayable under a caller's key", () => {
       .withVersion("2026-08-07")
       .withCredential("organization")
       .post("/endpoints", "createEndpoint")
+      .keepsRecords()
       .withPermission("webhookEndpoints:manage")
       .withIdempotency({ operation: "webhooks.v1.endpoints.create" })
       .withInput(z.object({ name: z.string() }))
@@ -1171,6 +1179,7 @@ describe("a route declared as minting a credential", () => {
       .withVersion("2026-08-07")
       .withCredential("organization")
       .post("/", "createKey")
+      .keepsRecords()
       .withPermission("organization:view")
       .mintsCredential("organization:view")
       .withOutput(z.object({ ran: z.boolean() }))
@@ -1218,6 +1227,7 @@ describe("a route declared as minting a credential", () => {
         .withNamespace("keys")
         .withVersion("2026-08-07")
         .post("/", "createKey")
+        .keepsRecords()
         .withAccess(publicRoute({ reason: "no caller" }))
         .mintsCredential("organization:view")
         .withoutAudit("test route")
