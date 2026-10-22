@@ -88,6 +88,9 @@ type Input struct {
 	EnableBlobLog         bool   `env:"ENABLE_BLOB_STORAGE_LOG"`
 	EnablePrometheus      bool   `env:"ENABLE_PROMETHEUS_METRICS"`
 
+	// Execution-time cap of the inspect and read tiers' profiles (ADR-184).
+	ReadTierMaxExecutionTime int `env:"READ_TIER_MAX_EXECUTION_TIME" default:"300" validate:"gte=1"`
+
 	// Query limits (0 = unlimited)
 	MaxExecutionTime    int    `env:"MAX_EXECUTION_TIME"`
 	MaxRowsToRead       int64  `env:"MAX_ROWS_TO_READ"`
