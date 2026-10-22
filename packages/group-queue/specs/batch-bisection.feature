@@ -111,6 +111,15 @@ Feature: GroupQueue batch bisection
     And the whole batch is re-staged once, after a backoff delay
     And one warning names the error and the delay
 
+  # One statement over its own memory limit is the batch's size, not the
+  # server's load: a smaller batch reads and writes less, so it may fit.
+  @unit @coalescing @bisection
+  Scenario: A statement over its own memory limit splits the batch
+    Given a coalesced batch whose ClickHouse statement exceeds the per-query memory limit
+    When the batch fails
+    Then the failure names no retry delay
+    And the queue splits the batch as it would any retryable failure
+
   # Overload is not the job's fault. Spending the ordinary budget on it blocked
   # healthy groups after a few hours of a busy server, for an operator to unblock.
   @unit @bisection

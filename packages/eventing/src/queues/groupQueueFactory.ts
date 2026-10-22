@@ -17,6 +17,7 @@ import {
   classifyClickHouseError,
   ErrorCategory,
   isProjectGone,
+  isQueryMemoryLimitExceeded,
   UndeclaredQueuedEventTypeError,
   UnroutableQueuedJobError,
 } from "../services/errorHandling.ts";
@@ -118,31 +119,52 @@ function overloadedClickHouseError(error: unknown): unknown {
   return undefined;
 }
 
+function codeOf(error: unknown): string {
+  return error !== null && typeof error === "object" && "code" in error
+    ? String(error.code)
+    : "unknown";
+}
+
 /**
- * An overloaded ClickHouse fails a smaller batch just the same, so the batch
- * names a retry delay: the queue backs it off whole on its own exponential
- * schedule instead of splitting it (packages/group-queue/specs/batch-bisection.feature).
+ * An overloaded ClickHouse fails a smaller batch just the same, so the batch names a retry
+ * delay and backs off whole. A statement over its own memory limit is the batch's size, not
+ * the server's load, so it splits (packages/group-queue/specs/batch-bisection.feature).
  */
 export async function backOffWhenOverloaded<T>({
   queueName,
   run,
+  unit = "batch",
 }: {
   queueName: string;
   run: () => Promise<T>;
+  /** A single job has nothing to split; it still takes the overload retry budget. */
+  unit?: "batch" | "job";
 }): Promise<T> {
   try {
     return await run();
   } catch (error) {
     const overloaded = overloadedClickHouseError(error);
     if (overloaded === undefined) throw error;
-    const code =
-      overloaded !== null && typeof overloaded === "object" && "code" in overloaded
-        ? String(overloaded.code)
-        : "unknown";
+    const code = codeOf(overloaded);
+    const detail = error instanceof Error ? error.message : String(error);
+    if (isQueryMemoryLimitExceeded(error)) {
+      throw new GroupQueueError({
+        queueName,
+        operation: unit === "batch" ? "processBatch" : "process",
+        message:
+          unit === "batch"
+            ? `ClickHouse statement over its memory limit (code ${code}); splitting the batch: ${detail}`
+            : `ClickHouse statement over its memory limit (code ${code}); retrying the job: ${detail}`,
+        cause: error,
+      });
+    }
     throw new GroupQueueError({
       queueName,
-      operation: "processBatch",
-      message: `ClickHouse overloaded (code ${code}); backing the batch off whole: ${error instanceof Error ? error.message : String(error)}`,
+      operation: unit === "batch" ? "processBatch" : "process",
+      message:
+        unit === "batch"
+          ? `ClickHouse overloaded (code ${code}); backing the batch off whole: ${detail}`
+          : `ClickHouse overloaded (code ${code}); backing the job off: ${detail}`,
       cause: error,
       retryAfterMs: 0,
     });
@@ -231,13 +253,18 @@ export function createEventingGroupQueueFactory({
     ): RunningGroupQueueConsumer<Record<string, unknown>> => {
       const configuredConsumer = new GroupQueueConsumer(queueDefinition, consumerDependencies);
       const one = (payload: Record<string, unknown>, context: JobDelivery | undefined) =>
-        refuse(() =>
-          completeWhenProjectGone({
-            queueName: eventingDefinition.name,
-            payloads: [payload],
-            run: () => eventingDefinition.process(payload, context),
-          }),
-        );
+        backOffWhenOverloaded({
+          queueName: eventingDefinition.name,
+          unit: "job",
+          run: () =>
+            refuse(() =>
+              completeWhenProjectGone({
+                queueName: eventingDefinition.name,
+                payloads: [payload],
+                run: () => eventingDefinition.process(payload, context),
+              }),
+            ),
+        });
       return eventingDefinition.processBatch
         ? configuredConsumer.handleBatch({
             each: one,
