@@ -51,13 +51,14 @@ describe("when built pages contain local links and redirects", () => {
       );
       writeFileSync(
         path.join(fixture.docsRoot, "index.html"),
-        '<link rel="canonical" href="https://docs.langwatch.ai/"><a href="/docs/old">Old</a><a href="/docs/guide#install">Guide</a><a href="guide">Relative</a><a href="/guide">Unprefixed</a><a href="/docs/missing">Missing</a>' +
+        '<link rel="canonical" href="https://langwatch.ai/docs/guide"><a href="https://langwatch.ai/docs/gone">Public</a><a href="/docs/old">Old</a><a href="/docs/guide#install">Guide</a><a href="guide">Relative</a><a href="/guide">Unprefixed</a><a href="/docs/missing">Missing</a>' +
           '<video src="/media/x.mp4" poster="/docs/media/x.jpg"></video><img src="https://cdn.example/a.png" srcset="/docs/a-1.webp 1x, /images/a-2.webp 2x">',
       );
       const report = checkLinks({ outDir: fixture.docsRoot, basePath: "/docs" });
       expect(report.issues).toEqual([
         { source: "/", href: "/media/x.mp4", code: "outside-base-path" },
         { source: "/", href: "/images/a-2.webp", code: "outside-base-path" },
+        { source: "/", href: "https://langwatch.ai/docs/gone", code: "missing-target" },
         { source: "/", href: "/guide", code: "outside-base-path" },
         { source: "/", href: "/docs/missing", code: "missing-target" },
       ]);

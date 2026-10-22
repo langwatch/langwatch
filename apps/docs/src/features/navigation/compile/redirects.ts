@@ -3,8 +3,8 @@ import path from "node:path";
 
 import { z } from "zod";
 
-import { sitePath, stripBasePath, withBasePath } from "../../../lib/site-path.ts";
-import { DOCS_ORIGIN } from "../../discovery/compile/page-head.ts";
+import { docsUrl, sitePath, stripBasePath, withBasePath } from "../../../lib/site-path.ts";
+import { matchRedirect } from "../model/redirect-match.ts";
 import { readDocsConfig } from "./nav.ts";
 
 const redirectsSchema = z.record(z.string(), z.string());
@@ -41,7 +41,7 @@ export function resolveRedirect({
 }) {
   const sitePathname = stripBasePath({ pathname, basePath });
   if (sitePathname === null) return null;
-  const destination = redirects[sitePathname.replace(/\/$/, "")];
+  const destination = matchRedirect({ path: sitePathname, redirects });
   if (!destination) return null;
   const target = new URL(destination, "http://docs.local");
   for (const [key, value] of new URLSearchParams(search)) {
@@ -68,6 +68,8 @@ export function isStaticRedirect({ source }: { source: string }) {
 /** A redirect any static host can serve: refresh to the destination, canonical, noindex, a link. */
 export function redirectPage({ destination }: { destination: string }) {
   const href = escapeAttribute(sitePath({ path: destination }));
-  const canonical = escapeAttribute(new URL(destination, DOCS_ORIGIN).href);
+  const canonical = escapeAttribute(
+    /^https?:\/\//.test(destination) ? destination : docsUrl({ path: destination }),
+  );
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Moved | LangWatch Docs</title><meta name="robots" content="noindex"><link rel="canonical" href="${canonical}"><meta http-equiv="refresh" content="0; url=${href}"></head><body><p>This page moved to <a href="${href}">${href}</a>.</p></body></html>`;
 }

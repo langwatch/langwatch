@@ -33,14 +33,16 @@ await it("keeps focus on Search until activation and synchronizes destination me
         await page.keyboard.press("Escape");
         await page.locator('#content a[href="/integration/quick-start"]').first().click();
         await page.waitForURL("**/integration/quick-start");
-        const url = "https://docs.langwatch.ai/integration/quick-start";
+        const url = "https://langwatch.ai/docs/integration/quick-start";
         assert.equal(await page.locator('link[rel="canonical"]').getAttribute("href"), url);
         assert.equal(await page.locator('meta[property="og:url"]').getAttribute("content"), url);
         assert.equal(
           await page.locator('link[rel="alternate"][type="text/markdown"]').getAttribute("href"),
           "/integration/quick-start.md",
         );
-        const metadata = JSON.parse(await page.locator("script[data-docs-metadata]").textContent());
+        const metadata = JSON.parse(
+          await page.locator("script[data-docs-metadata]").first().textContent(),
+        );
         assert.equal(metadata.url, url);
         await page.goto(base + "ai-governance/ingestion-sources");
         await page.keyboard.press("Control+k");

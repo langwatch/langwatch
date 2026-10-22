@@ -43,3 +43,16 @@ export function stripBasePath({
 export function isSitePath({ pathname }: { pathname: string }) {
   return stripBasePath({ pathname }) !== null;
 }
+
+/** Where the public documentation lives; docs.langwatch.ai answers with a 301 to it. */
+export const DOCS_URL = "https://langwatch.ai/docs";
+
+/** The public address of a root-absolute site path, whatever base path the build used. */
+export function docsUrl({ path }: { path: string }) {
+  return `${DOCS_URL}${path}`;
+}
+
+/** The home page is also published at the root; both name the introduction, as today. */
+export function canonicalUrl({ slug }: { slug: string }) {
+  return docsUrl({ path: `/${slug}` });
+}

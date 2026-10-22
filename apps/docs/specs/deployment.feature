@@ -11,6 +11,8 @@ Feature: Publish the documentation as a static site
     And the page names the destination as canonical and links to it without JavaScript
     But a configured page at the same path is published instead of the redirect
     And pattern sources such as ":path*" stay in redirects.json for hosts with redirect rules
+    And on a host without them the 404 page sends a matching pattern address to its destination
+    And in-page navigation lands on the destination's address, not the old one
 
   @unit
   Scenario: Build with materialized Git LFS assets

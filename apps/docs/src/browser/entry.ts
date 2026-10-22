@@ -45,6 +45,7 @@ export function loadIsland({ name, trigger }: { name: string; trigger?: HTMLElem
 
 prepareControls();
 startNavigation();
+if (document.querySelector('meta[name="docs-not-found"]')) loadIsland({ name: "redirect" });
 document.addEventListener("docs:navigated", prepareControls);
 document.addEventListener("click", (event) => {
   if (!(event.target instanceof Element)) return;

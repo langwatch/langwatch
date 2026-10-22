@@ -5,6 +5,7 @@ import { generateExample, initialBodyOf } from "../features/api-reference/model/
 import { EXAMPLE_LANGUAGES } from "../features/api-reference/model/operation.ts";
 import type { HighlightedExamples } from "../features/api-reference/model/operation.ts";
 import { highlightLines } from "../features/code/compile/highlight.ts";
+import { pageDescription } from "../features/discovery/compile/page-head.ts";
 import { App } from "./app.tsx";
 import { loadOperation, loadPage } from "./pages.ts";
 
@@ -35,7 +36,11 @@ export async function render({ slug }: { slug: string }) {
   return {
     html: renderToString(<App slug={slug} page={page} operation={operation} examples={examples} />),
     title: `${meta?.title ?? slug} | LangWatch Docs`,
-    description: meta?.description ?? operation?.description ?? "",
+    description: pageDescription({
+      title: meta?.title ?? slug,
+      description: meta?.description,
+      operation,
+    }),
     examples,
     operation,
     headings: page?.headings ?? [],

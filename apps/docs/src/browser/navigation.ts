@@ -1,6 +1,9 @@
 import { docsBasePath } from "../config.ts";
 
-const pages = new Map<string, { at: number; html: Promise<string> }>();
+/** A fetched page: its HTML and the address it ended at after any host redirect. */
+type Fetched = { html: string; url: string };
+
+const pages = new Map<string, { at: number; html: Promise<Fetched> }>();
 const positions = new Map<string, number>();
 let current = location.href;
 let navigating = 0;
@@ -26,10 +29,10 @@ async function fetchPage({ url }: { url: URL }) {
   const now = performance.now();
   if (cached && now - cached.at < 30_000) return cached.html;
   const html = fetch(key, { credentials: "omit", headers: { Accept: "text/html" } }).then(
-    async (response) => {
+    async (response): Promise<Fetched> => {
       if (!response.ok || !response.headers.get("content-type")?.includes("text/html"))
         throw new Error("Page unavailable");
-      return response.text();
+      return { html: await response.text(), url: response.url || key };
     },
   );
   pages.set(key, { at: now, html });
@@ -109,8 +112,10 @@ async function navigate({ url, restored = false }: { url: URL; restored?: boolea
   const sequence = ++navigating;
   positions.set(current, scrollY);
   try {
-    const html = await fetchPage({ url });
-    const next = new DOMParser().parseFromString(html, "text/html");
+    const fetched = await fetchPage({ url });
+    const next = new DOMParser().parseFromString(fetched.html, "text/html");
+    const address = new URL(fetched.url);
+    address.hash = url.hash;
     const build = (root: Document) =>
       root.querySelector<HTMLMetaElement>('meta[name="docs-build"]')?.content;
     const layout = next.querySelector(".docs-layout");
@@ -132,9 +137,10 @@ async function navigate({ url, restored = false }: { url: URL; restored?: boolea
       .getElementById("docs-mobile-nav")
       ?.replaceWith(next.getElementById("docs-mobile-nav") ?? document.createElement("span"));
     updateHead({ next });
-    if (!restored) history.pushState(null, "", url);
-    current = url.href;
-    finishNavigation({ url, restored });
+    if (!restored) history.pushState(null, "", address);
+    else if (address.href !== location.href) history.replaceState(null, "", address);
+    current = address.href;
+    finishNavigation({ url: address, restored });
   } catch {
     if (sequence === navigating) location.assign(url);
   }

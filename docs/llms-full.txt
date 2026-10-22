@@ -20265,6 +20265,7 @@ We use [GitHub Discussions](https://github.com/orgs/langwatch/discussions/new?ca
 
 ---
 title: Quick Start
+description: "Send your first traces to LangWatch in a few minutes, with a coding agent or by hand, in Python, TypeScript or any OpenTelemetry stack."
 mode: "wide"
 ---
 
@@ -20455,7 +20456,7 @@ func main() {
   <Step title="Start observing!">
     Open your LangWatch dashboard to see your data. You'll find **Traces** (individual AI tasks) and their detailed **Spans** (the steps within), all organized into **Threads** (complete user sessions). Add **User IDs** or custom **Labels** to filter and group them.
 
-    <img src="/images/llm-observability/quick-start/setup-monitor.webp" />
+    <img src="/images/llm-observability/quick-start/setup-monitor.webp" alt="Traces arriving in the LangWatch dashboard" />
 
   </Step>
 </Steps>
@@ -41379,7 +41380,7 @@ sidebarTitle: Quickstart
 description: Quickly visualize DSPy notebooks and optimization experiments in LangWatch to support debugging and agent evaluation.
 ---
 
-[<img align="center" src="https://colab.research.google.com/assets/colab-badge.svg" />](https://colab.research.google.com/github/langwatch/langwatch/blob/main/sdks/python/examples/dspy_visualization.ipynb)
+[<img align="center" src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open in Colab" />](https://colab.research.google.com/github/langwatch/langwatch/blob/main/sdks/python/examples/dspy_visualization.ipynb)
 
 LangWatch DSPy Visualization tracks your DSPy experiments in real time, so you can follow the progress, track costs and debug each step.
 
@@ -41422,7 +41423,7 @@ compiled_rag = optimizer.compile(RAG(), trainset=trainset)
 Open the link provided when the compilation starts or go to your [LangWatch dashboard](https://app.langwatch.ai) to follow the progress of your experiments:
 
 <Frame>
-  <img src="/images/dspy-visualizer.png" />
+  <img src="/images/dspy-visualizer.png" alt="A DSPy optimisation run in the LangWatch dashboard" />
 </Frame>
 
 ## Wrapping up
@@ -41447,7 +41448,7 @@ title: "RAG Visualization"
 description: Visualize DSPy RAG optimization steps in LangWatch to better understand performance and support AI agent testing.
 ---
 
-[<img align="center" src="https://colab.research.google.com/assets/colab-badge.svg" />](https://colab.research.google.com/github/langwatch/langevals/blob/main/notebooks/tutorials/dspy_rag.ipynb)
+[<img align="center" src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open in Colab" />](https://colab.research.google.com/github/langwatch/langevals/blob/main/notebooks/tutorials/dspy_rag.ipynb)
 
 LangWatch tracks the optimization of a RAG application built with [DSPy](https://dspy-docs.vercel.app), step by step.
 
@@ -44413,7 +44414,7 @@ You can also run evaluations through the Experiments Workbench without writing c
   <Frame>
     <img
       src="/images/offline-evaluation/Screenshot_2025-04-17_at_16.53.38.png"
-      alt=""
+      alt="The evaluators list in the LangWatch experiments page"
       style={{ maxWidth: "400px" }}
       noZoom
     />
@@ -72799,7 +72800,7 @@ Set up your first experiment using the [Experiments via UI](https://app.langwatc
   <Frame>
     <img
       src="/images/offline-evaluation/Screenshot_2025-04-17_at_16.53.38.png"
-      alt=""
+      alt="The evaluators list in the LangWatch experiments page"
       style={{ maxWidth: "400px" }}
       noZoom
     />

@@ -23,7 +23,7 @@ const { values } = parseArgs({
 const haven = values["haven-binary"] ?? process.env.DOCS_HAVEN_BINARY ?? "haven";
 const outDir = path.resolve(values["out-dir"] ?? "node_modules/.cache/haven-docs");
 const base = values["base-path"] ?? "/docs";
-const PRODUCTION = "https://docs.langwatch.ai";
+const PRODUCTION = "https://langwatch.ai/docs";
 
 if (!existsSync(path.join(outDir, "index.html")))
   throw new Error(`No build in ${outDir}; build with --base-path ${base} first.`);
@@ -188,7 +188,7 @@ void describe("the app front", () => {
     const html = await home.text();
     const escaped = rootAddresses({ html }).filter((address) => !address.startsWith(`${base}/`));
     assert.deepEqual(escaped, [], "every root-absolute address stays under the mount");
-    assert.match(html, new RegExp(`<link rel="canonical" href="${PRODUCTION}/">`));
+    assert.match(html, new RegExp(`<link rel="canonical" href="${PRODUCTION}/introduction">`));
     const markdown = await get(`${front.origin}${base}/introduction.md`);
     assert.equal(markdown.status, 200);
     assert.match(markdown.headers.get("content-type"), /text\/markdown/);
@@ -226,8 +226,12 @@ void describe("the app front", () => {
 
   void it("keeps discovery files canonical to production", async () => {
     const sitemap = await (await get(`${front.origin}${base}/sitemap.xml`)).text();
-    assert.ok(sitemap.includes(`<loc>${PRODUCTION}/</loc>`));
-    assert.ok(!sitemap.includes(`${base}/`), "the sitemap names production, never the mount");
+    assert.ok(sitemap.includes(`<loc>${PRODUCTION}/introduction</loc>`));
+    const locations = [...sitemap.matchAll(/<loc>([^<]*)<\/loc>/g)].map((match) => match[1]);
+    assert.ok(
+      locations.length > 0 && locations.every((loc) => loc.startsWith(`${PRODUCTION}/`)),
+      "the sitemap names production, never the mount",
+    );
     const llms = await (await get(`${front.origin}${base}/llms.txt`)).text();
     assert.ok(llms.includes(`${PRODUCTION}/`) && !llms.includes(`localhost${base}`));
   });

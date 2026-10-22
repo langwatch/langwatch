@@ -54,8 +54,18 @@ page into `apps/docs/dist`. It emits:
 - Hashed JavaScript and CSS under `assets/`, fonts, posters and docs media.
 - `search-index.json` with article text, navigation trails and headings, plus
   lossless `.br` and `.gz` variants for hosts supporting precompressed delivery.
-- `llms.txt`, a directory of configured pages linking to their Markdown.
+- `llms.txt`, a directory of configured pages linking to their Markdown, and
+  `llms-full.txt`, every page's Markdown in reading order.
+- `sitemap.xml` dated by each page's last commit (no dates from a shallow clone,
+  so the deploy checkout needs full history), plus `robots.txt` and `agents.txt`.
 - `redirects.json` and noindex redirect pages for exact source paths from `docs.json`.
+  On a host without redirect rules, the 404 page resolves pattern sources such as
+  `/guardrails/:path*` from `redirects.json` in the browser.
+
+Canonical, sitemap and export addresses name `https://langwatch.ai/docs`, where the
+docs are served today (`docs.langwatch.ai` redirects there). Production builds that
+mount at that address use `--base-path /docs`.
+
 - `404.html` with the documentation shell and recovery links.
 - `skipped.json`, empty after a successful build.
 
@@ -127,10 +137,9 @@ adapted during compilation. The current eight embedded product recordings have
 no audio streams; the video renderer explicitly mutes these silent demonstrations.
 Narrated media requires captions and a corresponding renderer before publication.
 
-The docs ground uses the marketing site's blue, apricot and rust palette. The
-centred paper, navigation rail and raised panels use separate semantic surfaces;
-gradients stay behind the page. The ground is static, including under reduced
-motion. The home recording starts only on request and has a local poster frame.
+The docs use the langwatch.ai brand: flat white paper (ink in dark mode), Sentient
+headings, Inter body text, JetBrains Mono code and the orange accent. The navigation
+rail and raised panels use separate semantic surfaces. The home recording starts only on request and has a local poster frame.
 Its agent setup panel copies the full tracing prompt from `skills/directory.mdx`;
 the picker changes the paste instructions, and an expandable preview shows exactly
 what is copied. The source remains in the MDX.

@@ -2,7 +2,7 @@ import { Box, Flex, Link, Text } from "@langwatch/design-system/primitives";
 import { ArrowLeft, ArrowRight, MessageSquareWarning, PencilLine } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { pagePath } from "../../../lib/site-path.ts";
+import { canonicalUrl, pagePath } from "../../../lib/site-path.ts";
 import { trailOf } from "../../navigation/model/nav.ts";
 import { sectionOf, site } from "../../navigation/ui/site-nav.ts";
 
@@ -145,7 +145,7 @@ export function PageFooter({
   const issue = `${site.github}/issues/new?${new URLSearchParams({
     title: `Docs: ${slug}`,
     labels: "documentation",
-    body: `Page: https://docs.langwatch.ai/${slug}\n\nWhat is outdated or broken?\n\nExpected behavior or suggested correction:\n`,
+    body: `Page: ${canonicalUrl({ slug })}\n\nWhat is outdated or broken?\n\nExpected behavior or suggested correction:\n`,
   })}`;
   return (
     <Box className="docs-page-footer" marginTop={{ base: "12", lg: "16" }}>

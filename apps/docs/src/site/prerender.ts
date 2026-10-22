@@ -11,8 +11,10 @@ import { render } from "../app/entry-server.tsx";
 import { SPEC_FILES } from "../features/api-reference/compile/openapi.ts";
 import {
   discoveryFiles,
+  llmsFull,
   PAGE_EXPORT_EXTENSIONS,
 } from "../features/discovery/compile/discovery-files.ts";
+import { pageLastModified } from "../features/discovery/compile/last-modified.ts";
 import { pageMarkdown } from "../features/discovery/compile/markdown-export.ts";
 import { breadcrumbTrail, pageHead } from "../features/discovery/compile/page-head.ts";
 import { buildNav } from "../features/navigation/compile/nav.ts";
@@ -183,6 +185,7 @@ function assemble({ slugs, outcomes }: { slugs: string[]; outcomes: Map<string, 
   const pages = new Map<string, string>();
   const files = new Map<string, string | Uint8Array>();
   const searchIndex: unknown[] = [];
+  const markdown: string[] = [];
   const skipped: { slug: string; reason: string }[] = [];
   for (const slug of slugs) {
     const outcome = outcomes.get(slug) ?? { error: "not rendered" };
@@ -192,11 +195,13 @@ function assemble({ slugs, outcomes }: { slugs: string[]; outcomes: Map<string, 
     }
     for (const rule of outcome.result.rules) styles.add(rule);
     if (outcome.result.search) searchIndex.push(outcome.result.search);
-    for (const [name, contents] of exportsOf({ slug })) files.set(name, contents);
+    const exported = exportsOf({ slug });
+    for (const [name, contents] of exported) files.set(name, contents);
+    if (exported.length > 0) markdown.push(exported[0][1]);
     for (const target of slug === "404" ? ["404.html"] : pageTargets({ slug }))
       pages.set(target, outcome.result.page);
   }
-  return { styles: [...styles], pages, files, searchIndex, skipped };
+  return { styles: [...styles], pages, files, searchIndex, markdown, skipped };
 }
 
 /** A page's Markdown exports; the home page is also exported at the root. */
@@ -261,7 +266,7 @@ async function generate() {
   const plan = readPlan();
   const run = await renderAll({ slugs, context, plan });
   const renderedAt = performance.now();
-  const { styles, pages, files, searchIndex, skipped } = assemble({
+  const { styles, pages, files, searchIndex, markdown, skipped } = assemble({
     slugs,
     outcomes: run.outcomes,
   });
@@ -270,8 +275,14 @@ async function generate() {
 
   const redirects = readRedirects({ docsRoot });
   files.set("redirects.json", JSON.stringify(redirects));
-  for (const [name, contents] of Object.entries(discoveryFiles({ nav: context.nav })))
+  for (const [name, contents] of Object.entries(
+    discoveryFiles({
+      nav: context.nav,
+      lastModified: pageLastModified({ docsRoot }),
+    }),
+  ))
     files.set(name, contents);
+  files.set("llms-full.txt", llmsFull({ nav: context.nav, exports: markdown }));
   const searchJson = JSON.stringify(searchIndex);
   files.set("search-index.json", searchJson);
   for (const [name, contents] of await compressedSearchIndex({

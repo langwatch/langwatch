@@ -4,7 +4,7 @@ import { Check, ChevronDown, Copy, FileText, Link2 } from "lucide-react";
 import { useState } from "react";
 import type { ReactNode } from "react";
 
-import { sitePath } from "../../../lib/site-path.ts";
+import { canonicalUrl, sitePath } from "../../../lib/site-path.ts";
 
 function MenuLabel({
   icon,
@@ -33,7 +33,7 @@ export function PageMenu({ slug, initialOpen = false }: { slug: string; initialO
   const [open, setOpen] = useState(initialOpen);
   const [copied, setCopied] = useState("");
   const [error, setError] = useState(false);
-  const url = `https://docs.langwatch.ai/${slug}`;
+  const url = canonicalUrl({ slug });
   const prompt = `Read ${url} and help me understand this page.`;
   const copy = async (kind: string) => {
     try {

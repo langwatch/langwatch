@@ -6,7 +6,7 @@ import {
   resolveRedirect,
   type Redirects,
 } from "../features/navigation/compile/redirects.ts";
-import { stripBasePath } from "../lib/site-path.ts";
+import { DOCS_URL, stripBasePath, withBasePath } from "../lib/site-path.ts";
 
 export type LinkIssue = { source: string; href: string; code: string };
 type Target = { url: URL } | { error: string } | { external: true };
@@ -24,9 +24,12 @@ function attributes({ html, attribute }: { html: string; attribute: string }) {
   return [...html.matchAll(pattern)].map((match) => match[1].replace(/&amp;/g, "&"));
 }
 
-/* Under a base path the production origin is external: canonical URLs name it, not the mount. */
-function siteOrigin({ basePath }: { basePath: string }) {
-  return basePath ? "http://docs.local" : "https://docs.langwatch.ai";
+const LOCAL_ORIGIN = "http://docs.local";
+
+/** A link to the public docs address checked as the same page in this build. */
+function localHref({ href, basePath }: { href: string; basePath: string }) {
+  if (href !== DOCS_URL && !href.startsWith(`${DOCS_URL}/`)) return href;
+  return withBasePath({ basePath, path: href.slice(DOCS_URL.length) || "/" });
 }
 
 function resolveTarget({
@@ -40,8 +43,8 @@ function resolveTarget({
   redirects: Redirects;
   basePath: string;
 }): Target {
-  const origin = siteOrigin({ basePath });
-  let url = new URL(href, `${origin}${basePath}${source}`);
+  const origin = LOCAL_ORIGIN;
+  let url = new URL(localHref({ href, basePath }), `${origin}${basePath}${source}`);
   const visited = new Set<string>();
   while (url.origin === origin) {
     if (visited.has(url.pathname)) return { error: "redirect-cycle" };

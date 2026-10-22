@@ -1,12 +1,12 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
+import { canonicalUrl, docsUrl } from "../../../lib/site-path.ts";
 import { resolveOperation } from "../../api-reference/compile/openapi.ts";
 import { generateExample, initialBodyOf } from "../../api-reference/model/codegen.ts";
 import type { Content, Operation } from "../../api-reference/model/operation.ts";
 import { readFrontmatter, withoutFrontmatter } from "../../content/compile/frontmatter.ts";
 import { withReleaseNotes } from "../../releases/compile/releases.ts";
-import { canonicalUrl, DOCS_ORIGIN } from "./page-head.ts";
 
 function jsonBlock({ value }: { value: unknown }) {
   return `\`\`\`json\n${JSON.stringify(value, null, 2)}\n\`\`\``;
@@ -169,8 +169,8 @@ function absoluteLinks({ source }: { source: string }) {
     source,
     line: (text) =>
       text
-        .replace(/\]\(\/(?!\/)/g, `](${DOCS_ORIGIN}/`)
-        .replace(/\bhref="\/(?!\/)/g, `href="${DOCS_ORIGIN}/`),
+        .replace(/\]\(\/(?!\/)/g, `](${docsUrl({ path: "/" })}`)
+        .replace(/\bhref="\/(?!\/)/g, `href="${docsUrl({ path: "/" })}`),
   });
 }
 
@@ -179,7 +179,7 @@ function provenance({ slug }: { slug: string }) {
   return [
     `> Page: ${canonicalUrl({ slug })}`,
     `> Source: ${SOURCE_REPOSITORY}/${slug}.mdx`,
-    `> Index of all pages: ${DOCS_ORIGIN}/llms.txt`,
+    `> Index of all pages: ${docsUrl({ path: "/llms.txt" })}`,
   ].join("\n");
 }
 

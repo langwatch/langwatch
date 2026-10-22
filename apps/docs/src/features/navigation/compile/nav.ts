@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { z } from "zod";
 
+import { docsUrl } from "../../../lib/site-path.ts";
 import { operationIndex, parseOpenapiRef } from "../../api-reference/compile/openapi.ts";
 import { readFrontmatter } from "../../content/compile/frontmatter.ts";
 import { readReleases } from "../../releases/compile/releases.ts";
@@ -303,8 +304,7 @@ export function buildNav({ docsRoot }: { docsRoot: string }): Nav {
     searchPrompt: config.search?.prompt ?? "Search the LangWatch docs",
     signIn: links.find((link) => /sign ?in/i.test(link.label))?.href ?? "https://app.langwatch.ai",
     github: config.navbar?.primary?.href ?? "https://github.com/langwatch/langwatch",
-    llms:
-      links.find((link) => /llms/i.test(link.label))?.href ?? "https://docs.langwatch.ai/llms.txt",
+    llms: links.find((link) => /llms/i.test(link.label))?.href ?? docsUrl({ path: "/llms.txt" }),
     stars: null,
     notFound: {
       title: config.errors?.["404"]?.title ?? "Page not found",

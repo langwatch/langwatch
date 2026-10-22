@@ -65,7 +65,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 ## Observability
 
 - [Observability & Tracing](https://langwatch.ai/docs/observability/overview.md): Monitor, debug, and optimize your LLM applications with comprehensive observability and tracing capabilities
-- [Quick Start](https://langwatch.ai/docs/integration/quick-start.md)
+- [Quick Start](https://langwatch.ai/docs/integration/quick-start.md): Send your first traces to LangWatch in a few minutes, with a coding agent or by hand, in Python, TypeScript or any OpenTelemetry stack.
 - [Concepts](https://langwatch.ai/docs/concepts.md): Explore core concepts of LLM tracing, observability, datasets, and evaluations in LangWatch to design reliable AI agent testing workflows.
 
 ### User Events

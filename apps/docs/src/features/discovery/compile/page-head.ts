@@ -1,14 +1,27 @@
-import { sitePath } from "../../../lib/site-path.ts";
+import { canonicalUrl, docsUrl, sitePath } from "../../../lib/site-path.ts";
+import type { Operation } from "../../api-reference/model/operation.ts";
 import { firstSlug, ownsSlug, type Section } from "../../navigation/model/nav.ts";
-
-export const DOCS_ORIGIN = "https://docs.langwatch.ai";
-
-export function canonicalUrl({ slug }: { slug: string }) {
-  return `${DOCS_ORIGIN}/${slug === "introduction" ? "" : slug}`;
-}
 
 function escapeAttribute(text: string) {
   return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll('"', "&quot;");
+}
+
+/** The authored description, else the operation's, else one naming the endpoint. */
+export function pageDescription({
+  title,
+  description,
+  operation,
+}: {
+  title: string;
+  description?: string;
+  operation: Pick<Operation, "method" | "path" | "description"> | null;
+}) {
+  if (description) return description;
+  if (!operation) return "";
+  return (
+    operation.description ||
+    `${title}: ${operation.method} ${operation.path} in the LangWatch REST API.`
+  );
 }
 
 /** A crumb is a page a reader can open: its title and slug. */
@@ -65,7 +78,7 @@ export function pageHead({
   trail?: Crumb[];
 }) {
   const url = canonicalUrl({ slug });
-  const image = `${DOCS_ORIGIN}/images/coding-agents/optimized/session-detail-1560.webp`;
+  const image = docsUrl({ path: "/images/coding-agents/optimized/session-detail-1560.webp" });
   const tags = [
     `<title>${escapeAttribute(title)}</title>`,
     `<link rel="canonical" href="${escapeAttribute(url)}">`,
@@ -97,7 +110,11 @@ export function pageHead({
     url,
     name: title,
     ...(description ? { description } : {}),
-    isPartOf: { "@type": "WebSite", name: "LangWatch documentation", url: `${DOCS_ORIGIN}/` },
+    isPartOf: {
+      "@type": "WebSite",
+      name: "LangWatch documentation",
+      url: docsUrl({ path: "/introduction" }),
+    },
   };
   tags.push(jsonLd({ data }));
   if (trail.length > 1) tags.push(jsonLd({ data: breadcrumbData({ trail }) }));

@@ -83,7 +83,7 @@ describe("when a guide declares its title and description", () => {
     });
     try {
       expect(pageMarkdown({ docsRoot: fixture.docsRoot, slug: "guide" })).toBe(
-        `# Agent setup\n\nConnect your coding agent.\n\n> Page: https://docs.langwatch.ai/guide\n> Source: https://github.com/langwatch/langwatch/blob/main/docs/guide.mdx\n> Index of all pages: https://docs.langwatch.ai/llms.txt\n\n${body}\n`,
+        `# Agent setup\n\nConnect your coding agent.\n\n> Page: https://langwatch.ai/docs/guide\n> Source: https://github.com/langwatch/langwatch/blob/main/docs/guide.mdx\n> Index of all pages: https://langwatch.ai/docs/llms.txt\n\n${body}\n`,
       );
     } finally {
       fixture.dispose();
@@ -134,7 +134,7 @@ describe("when a guide imports snippets", () => {
       expect(markdown).toContain('import Inline from "/snippets/inline.mdx";');
       expect(markdown).toContain('import Gone from "/snippets/gone.mdx";');
       expect(markdown).toContain(
-        "[quick start](https://docs.langwatch.ai/integration/quick-start)",
+        "[quick start](https://langwatch.ai/docs/integration/quick-start)",
       );
       expect(markdown).toContain("[anchor](#here) and [external](https://x.dev/a)");
       expect(markdown).toContain("<Unknown prop={1}>kept</Unknown>");
