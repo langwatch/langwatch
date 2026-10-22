@@ -1,6 +1,7 @@
 /**
  * The Instant Evals column: which decision model a project runs on, and whether an organization
- * may store one on its own key (ADR-182 decisions 4 and 5).
+ * may store one on its own key (ADR-182 decisions 4 and 5). The answer is kept a minute per
+ * project, so a page of rows or a busy monitor asks the scope chain once.
  * @see specs/model-providers/instant-evals-decision-model.feature
  */
 
@@ -13,6 +14,7 @@ import {
   type DecisionModelResolution,
   type ModelProvider,
 } from "@langwatch/model-provider-contract";
+import { nowInstant, type Instant } from "@langwatch/time";
 
 import { decisionModelResolutionOf, picksOwnDecisionModel } from "../rules/decision-model.rules.ts";
 import type { ModelProviderResolutionService } from "./model-provider-resolution.service.ts";
@@ -29,6 +31,15 @@ type DecisionModelOptions = Readonly<{
     provider: string;
   }) => Promise<ModelProvider | null>;
   isOwnModelAllowed: OwnDecisionModelGate;
+  now?: () => Instant;
+}>;
+
+const CACHE_TTL_MS = 60_000;
+const MAX_CACHED_PROJECTS = 10_000;
+
+type CachedResolution = Readonly<{
+  resolution: Promise<DecisionModelResolution>;
+  expiresAt: number;
 }>;
 
 /** The column holds nothing this catalogue still offers; it reads as LangWatch's default. */
@@ -38,13 +49,30 @@ const UNSET_CODES: ReadonlySet<string> = new Set([
 ]);
 
 export class ModelProviderDecisionModelService {
+  readonly #cache = new Map<string, CachedResolution>();
+
   private constructor(private readonly options: DecisionModelOptions) {}
 
   static create(options: DecisionModelOptions): ModelProviderDecisionModelService {
     return new ModelProviderDecisionModelService(options);
   }
 
-  async resolve({ projectId }: { projectId: string }): Promise<DecisionModelResolution> {
+  /** Concurrent callers share one lookup; a failed lookup is not kept. */
+  resolve({ projectId }: { projectId: string }): Promise<DecisionModelResolution> {
+    const nowMs = (this.options.now ?? nowInstant)().epochMilliseconds;
+    const cached = this.#cache.get(projectId);
+    if (cached && cached.expiresAt > nowMs) return cached.resolution;
+
+    const resolution = this.lookUp(projectId);
+    if (this.#cache.size >= MAX_CACHED_PROJECTS) this.#cache.clear();
+    this.#cache.set(projectId, { resolution, expiresAt: nowMs + CACHE_TTL_MS });
+    resolution.catch(() => {
+      if (this.#cache.get(projectId)?.resolution === resolution) this.#cache.delete(projectId);
+    });
+    return resolution;
+  }
+
+  private async lookUp(projectId: string): Promise<DecisionModelResolution> {
     const model = await this.storedModel(projectId);
     if (model === undefined || !isOwnDecisionModelId(model)) return { kind: "langwatch" };
 
@@ -54,7 +82,7 @@ export class ModelProviderDecisionModelService {
 
     const provider = findDecisionModel(model)?.provider ?? "";
     const row = await this.options.findProviderForProject({ projectId, provider });
-    return decisionModelResolutionOf({ model, isOwnModelAllowed, row: row ?? undefined });
+    return decisionModelResolutionOf({ model, row: row ?? undefined });
   }
 
   /** Refuses a config that picks an own decision model for an organization without the flag. */

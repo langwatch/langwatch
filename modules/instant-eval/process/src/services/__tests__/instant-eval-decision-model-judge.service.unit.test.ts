@@ -11,7 +11,6 @@ import type {
 } from "@langwatch/instant-eval-judge-contract";
 import type { DecisionModelResolution, ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import { DeterministicInstantEvalJudgeChannel } from "../../channels/memory/memory.instant-eval-judging.channel.ts";
@@ -35,7 +34,6 @@ const REQUEST = {
 function harness(resolution: DecisionModelResolution) {
   const hostedCalls: string[] = [];
   const ownCalls: InstantEvalClassification[] = [];
-  const resolutions: string[] = [];
   const deterministic = DeterministicInstantEvalJudgeChannel.create();
   const hosted = {
     limits: deterministic.limits,
@@ -58,16 +56,12 @@ function harness(resolution: DecisionModelResolution) {
     ),
     decisionModels: createApiFixture<ModelProviderApi>(
       {
-        resolveDecisionModel: async ({ projectId }) => {
-          resolutions.push(projectId);
-          return resolution;
-        },
+        resolveDecisionModel: async () => resolution,
       },
       "ModelProviderApi",
     ),
-    now: () => Temporal.Instant.fromEpochMilliseconds(0),
   });
-  return { judge, hostedCalls, ownCalls, resolutions };
+  return { judge, hostedCalls, ownCalls };
 }
 
 describe("InstantEvalDecisionModelJudgeService", () => {
@@ -97,15 +91,6 @@ describe("InstantEvalDecisionModelJudgeService", () => {
         apiKey: "customer-key",
       });
       expect(await judge.isOwnDecisionModel({ projectId: "proj_1" })).toBe(true);
-    });
-
-    it("asks model provider once for a page of texts", async () => {
-      const { judge, resolutions } = harness(OWN);
-
-      await judge.classify(REQUEST);
-      await judge.classify(REQUEST);
-
-      expect(resolutions).toEqual(["proj_1"]);
     });
   });
 

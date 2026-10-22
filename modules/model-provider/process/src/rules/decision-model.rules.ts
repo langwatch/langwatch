@@ -41,21 +41,18 @@ function textOf(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() !== "" ? value.trim() : undefined;
 }
 
+/** The flag is the caller's to ask; this answers for an organization that has it. */
 export function decisionModelResolutionOf({
   model,
-  isOwnModelAllowed,
   row,
 }: {
   /** The stored column value; undefined when nothing is stored. */
   model: string | undefined;
-  isOwnModelAllowed: boolean;
   /** The project's row for the model's provider; undefined when there is none. */
   row: DecisionProviderRow | undefined;
 }): DecisionModelResolution {
   const entry = model === undefined ? undefined : findDecisionModel(model);
   if (!entry?.wire || !entry.providerModel || !entry.endpoint) return { kind: "langwatch" };
-  if (!isOwnModelAllowed)
-    return { kind: "own_unavailable", model: entry.id, reason: "not_enabled" };
   if (!row) return { kind: "own_unavailable", model: entry.id, reason: "provider_missing" };
   if (!row.enabled)
     return { kind: "own_unavailable", model: entry.id, reason: "provider_disabled" };

@@ -7,16 +7,15 @@ const CLEF = "cloudflare/decisions:clef";
 describe("decisionModelResolutionOf", () => {
   /** @scenario "An unset column runs on LangWatch Instant Preview" */
   it("answers langwatch when nothing is stored", () => {
-    expect(
-      decisionModelResolutionOf({ model: undefined, isOwnModelAllowed: true, row: undefined }),
-    ).toEqual({ kind: "langwatch" });
+    expect(decisionModelResolutionOf({ model: undefined, row: undefined })).toEqual({
+      kind: "langwatch",
+    });
   });
 
   it("answers langwatch for the hosted entry", () => {
     expect(
       decisionModelResolutionOf({
         model: "langwatch/instant-evals",
-        isOwnModelAllowed: true,
         row: undefined,
       }),
     ).toEqual({ kind: "langwatch" });
@@ -26,7 +25,6 @@ describe("decisionModelResolutionOf", () => {
   it("fills the account id into the endpoint and carries the key", () => {
     const resolved = decisionModelResolutionOf({
       model: CLEF,
-      isOwnModelAllowed: true,
       row: {
         enabled: true,
         customKeys: { CLOUDFLARE_ACCOUNT_ID: "acct 1", CLOUDFLARE_API_TOKEN: "token" },
@@ -48,7 +46,6 @@ describe("decisionModelResolutionOf", () => {
     expect(
       decisionModelResolutionOf({
         model: "inception/decisions:mercury-decide",
-        isOwnModelAllowed: true,
         row: undefined,
       }),
     ).toEqual({
@@ -62,7 +59,6 @@ describe("decisionModelResolutionOf", () => {
   it("answers provider_disabled for a switched-off row", () => {
     const resolved = decisionModelResolutionOf({
       model: "perplexity/decisions:pplx-decider-v1.2",
-      isOwnModelAllowed: true,
       row: { enabled: false, customKeys: { PERPLEXITY_API_KEY: "key" } },
     });
 
@@ -73,23 +69,10 @@ describe("decisionModelResolutionOf", () => {
   it("answers key_missing when the account id is absent", () => {
     const resolved = decisionModelResolutionOf({
       model: CLEF,
-      isOwnModelAllowed: true,
       row: { enabled: true, customKeys: { CLOUDFLARE_API_TOKEN: "token" } },
     });
 
     expect(resolved).toMatchObject({ kind: "own_unavailable", reason: "key_missing" });
-  });
-
-  describe("when the flag is off", () => {
-    it("answers not_enabled rather than the billed classifier", () => {
-      const resolved = decisionModelResolutionOf({
-        model: "openai/decisions:gpt-6-luna",
-        isOwnModelAllowed: false,
-        row: { enabled: true, customKeys: { OPENAI_API_KEY: "key" } },
-      });
-
-      expect(resolved).toMatchObject({ kind: "own_unavailable", reason: "not_enabled" });
-    });
   });
 });
 

@@ -1,7 +1,7 @@
 /**
  * Sends a project on its own decision model to the judge leaf with its key, and every other
- * project to the deployment's judge as before (ADR-182 decisions 6, 7 and 9). The project's
- * column is read once a minute, so a page of rows asks model provider once.
+ * project to the deployment's judge as before (ADR-182 decisions 6, 7 and 9). Model provider
+ * keeps the answer a minute per project, so a page of rows reads the column once.
  * @see specs/model-providers/instant-evals-decision-model.feature
  */
 
@@ -10,28 +10,19 @@ import {
   type InstantEvalJudgeApi,
   type InstantEvalJudgement,
 } from "@langwatch/instant-eval-judge-contract";
-import type { DecisionModelResolution, ModelProviderApi } from "@langwatch/model-provider-contract";
-import { nowInstant, type Instant } from "@langwatch/time";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 
 import type {
   InstantEvalClassifyRequest,
   InstantEvalJudgeChannel,
 } from "../channels/instant-eval-judging.channel.ts";
 
-const CACHE_TTL_MS = 60_000;
-const MAX_CACHED_PROJECTS = 10_000;
-
-type CachedResolution = Readonly<{ resolution: DecisionModelResolution; expiresAt: number }>;
-
 export class InstantEvalDecisionModelJudgeService implements InstantEvalJudgeChannel {
-  readonly #cache = new Map<string, CachedResolution>();
-
   private constructor(
     private readonly options: Readonly<{
       hosted: InstantEvalJudgeChannel;
       own: Pick<InstantEvalJudgeApi, "classify">;
       decisionModels: Pick<ModelProviderApi, "resolveDecisionModel">;
-      now: () => Instant;
     }>,
   ) {}
 
@@ -39,14 +30,12 @@ export class InstantEvalDecisionModelJudgeService implements InstantEvalJudgeCha
     hosted,
     own,
     decisionModels,
-    now = nowInstant,
   }: {
     hosted: InstantEvalJudgeChannel;
     own: Pick<InstantEvalJudgeApi, "classify">;
     decisionModels: Pick<ModelProviderApi, "resolveDecisionModel">;
-    now?: () => Instant;
   }): InstantEvalDecisionModelJudgeService {
-    return new InstantEvalDecisionModelJudgeService({ hosted, own, decisionModels, now });
+    return new InstantEvalDecisionModelJudgeService({ hosted, own, decisionModels });
   }
 
   get limits(): InstantEvalJudgeChannel["limits"] {
@@ -61,7 +50,9 @@ export class InstantEvalDecisionModelJudgeService implements InstantEvalJudgeCha
     request: InstantEvalClassifyRequest,
     signal?: AbortSignal,
   ): Promise<InstantEvalJudgement> {
-    const resolved = await this.resolve({ projectId: request.projectId });
+    const resolved = await this.options.decisionModels.resolveDecisionModel({
+      projectId: request.projectId,
+    });
     if (resolved.kind === "langwatch") return this.options.hosted.classify(request, signal);
     if (resolved.kind === "own_unavailable") {
       // Never LangWatch's classifier in its place (ADR-182 decision 9).
@@ -80,7 +71,7 @@ export class InstantEvalDecisionModelJudgeService implements InstantEvalJudgeCha
     });
   }
 
-  /** An organization on its own model judges wherever its key works; the rest ask the judge. */
+  /** The hosted judge's availability governs every organization, own models included. */
   async isAvailableForOrganization(organizationId: string): Promise<boolean> {
     const { hosted } = this.options;
     return hosted.isAvailableForOrganization
@@ -94,17 +85,8 @@ export class InstantEvalDecisionModelJudgeService implements InstantEvalJudgeCha
 
   /** Whether the project runs on its own key, which the $1 budget never binds (decision 7). */
   async isOwnDecisionModel({ projectId }: { projectId: string }): Promise<boolean> {
-    return (await this.resolve({ projectId })).kind !== "langwatch";
-  }
-
-  private async resolve({ projectId }: { projectId: string }): Promise<DecisionModelResolution> {
-    const nowMs = this.options.now().epochMilliseconds;
-    const cached = this.#cache.get(projectId);
-    if (cached && cached.expiresAt > nowMs) return cached.resolution;
-
-    const resolution = await this.options.decisionModels.resolveDecisionModel({ projectId });
-    if (this.#cache.size >= MAX_CACHED_PROJECTS) this.#cache.clear();
-    this.#cache.set(projectId, { resolution, expiresAt: nowMs + CACHE_TTL_MS });
-    return resolution;
+    return (
+      (await this.options.decisionModels.resolveDecisionModel({ projectId })).kind !== "langwatch"
+    );
   }
 }
