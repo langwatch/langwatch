@@ -63,3 +63,25 @@ describe("when the docs are built under a base path", () => {
     expect(external).toContain('src="https://www.youtube.com/embed/x"');
   });
 });
+
+describe("when the docs home renders the product tour", () => {
+  /** @scenario "Serve the product tour poster at the size of the screen" */
+  it("offers AVIF and WebP poster candidates by width and keeps the video's shape", () => {
+    const html = render({
+      element: (
+        <DocsVideo>
+          <DocsSource src="/media/videos/introduction.webm" type="video/webm" />
+        </DocsVideo>
+      ),
+    });
+    for (const format of ["avif", "webp"]) {
+      expect(html).toContain(
+        `type="image/${format}" srcSet="/docs/media/posters/introduction-640.${format} 640w, /docs/media/posters/introduction-1024.${format} 1024w, /docs/media/posters/introduction-1664.${format} 1664w"`,
+      );
+    }
+    expect(html).toContain('src="/docs/media/posters/introduction.jpg" width="1664" height="1040"');
+    expect(html).toContain('fetchPriority="high"');
+    expect(html).not.toContain("poster=");
+    expect(html).toContain("aspect-ratio:1664 / 1040");
+  });
+});

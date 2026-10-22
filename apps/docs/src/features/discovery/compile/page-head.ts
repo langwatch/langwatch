@@ -10,6 +10,9 @@ import {
   type Section,
 } from "../../navigation/model/nav.ts";
 
+/* The body font and the title font paint above the fold on every page; the rest load on demand. */
+const ABOVE_THE_FOLD_FONTS = ["/fonts/Inter-Variable-latin.woff2", "/fonts/Sentient-Regular.woff2"];
+
 /** The docs.json settings a page head reads. */
 export type HeadSettings = {
   description: string;
@@ -130,6 +133,10 @@ export function pageHead({
     `<link rel="canonical" href="${escapeAttribute(url)}">`,
     `<link rel="alternate" type="text/markdown" href="${sitePath({ path: `/${slug}.md` })}">`,
     `<link rel="describedby" type="text/plain" href="${sitePath({ path: "/llms.txt" })}">`,
+    ...ABOVE_THE_FOLD_FONTS.map(
+      (path) =>
+        `<link rel="preload" href="${sitePath({ path })}" as="font" type="font/woff2" crossorigin>`,
+    ),
     '<meta property="og:type" content="website">',
     '<meta property="og:site_name" content="LangWatch documentation">',
     `<meta property="og:title" content="${escapeAttribute(title)}">`,

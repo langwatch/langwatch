@@ -63,6 +63,55 @@ export function DocsImage({ className, alt, src, srcSet, width, ...rest }: Compo
   );
 }
 
+const TOUR_POSTER = { width: 1664, height: 1040, widths: [640, 1024, 1664] };
+const TOUR_POSTER_SIZES =
+  "(min-width: 1280px) calc(100vw - 620px), (min-width: 1024px) calc(100vw - 380px), calc(100vw - 40px)";
+
+function tourPosterSet({ format }: { format: "avif" | "webp" }) {
+  return TOUR_POSTER.widths
+    .map(
+      (width) =>
+        `${sitePath({ path: `/media/posters/introduction-${width}.${format}` })} ${width}w`,
+    )
+    .join(", ");
+}
+
+/**
+ * The tour's poster as a responsive picture, so a phone fetches a phone-sized modern image. It is
+ * the docs home's largest paint at every width, so it is fetched first.
+ */
+function TourPoster() {
+  return (
+    <picture>
+      <source
+        type="image/avif"
+        srcSet={tourPosterSet({ format: "avif" })}
+        sizes={TOUR_POSTER_SIZES}
+      />
+      <source
+        type="image/webp"
+        srcSet={tourPosterSet({ format: "webp" })}
+        sizes={TOUR_POSTER_SIZES}
+      />
+      <img
+        src={sitePath({ path: "/media/posters/introduction.jpg" })}
+        width={TOUR_POSTER.width}
+        height={TOUR_POSTER.height}
+        alt=""
+        fetchPriority="high"
+        style={{
+          position: "absolute",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+          borderRadius: "var(--chakra-radii-xl)",
+        }}
+      />
+    </picture>
+  );
+}
+
 export function DocsVideo({ autoPlay, children, src, poster, ...rest }: ComponentProps<"video">) {
   const ref = useRef<HTMLVideoElement>(null);
   const [started, setStarted] = useState(false);
@@ -120,11 +169,12 @@ export function DocsVideo({ autoPlay, children, src, poster, ...rest }: Componen
           playsInline
           preload={introduction ? "none" : "metadata"}
           src={mediaPath({ path: src })}
-          poster={mediaPath({ path: introduction ? "/media/posters/introduction.jpg" : poster })}
+          poster={introduction ? undefined : mediaPath({ path: poster })}
           style={{
             display: "block",
             width: "100%",
             height: "auto",
+            aspectRatio: introduction ? `${TOUR_POSTER.width} / ${TOUR_POSTER.height}` : undefined,
             borderRadius: "var(--chakra-radii-xl)",
             boxShadow: "0 8px 24px var(--chakra-colors-docs-shadow-strong)",
           }}
@@ -143,8 +193,10 @@ export function DocsVideo({ autoPlay, children, src, poster, ...rest }: Componen
             alignItems="center"
             justifyContent="center"
           >
+            <TourPoster />
             <Button
               data-docs-video=""
+              position="relative"
               onClick={start}
               minHeight="48px"
               borderRadius="full"

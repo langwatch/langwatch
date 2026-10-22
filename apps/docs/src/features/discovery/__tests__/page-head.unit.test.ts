@@ -1,8 +1,17 @@
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import { canonicalUrl } from "../../../lib/site-path.ts";
+import { canonicalUrl, sitePath } from "../../../lib/site-path.ts";
 import { breadcrumbTrail, headSettings, pageDescription, pageHead } from "../compile/page-head.ts";
 import type { HeadSettings } from "../compile/page-head.ts";
+
+function isInstant({ date }: { date: string }) {
+  try {
+    return Temporal.Instant.from(date) !== null;
+  } catch {
+    return false;
+  }
+}
 
 const EMPTY: HeadSettings = {
   description: "",
@@ -173,8 +182,8 @@ describe("when docs.json describes the site and its organization", () => {
     const settings = headSettings();
     expect(settings.organization?.name).toBe("LangWatch");
     expect(settings.description).not.toBe("");
-    const date = settings.dates.get("introduction");
-    if (date !== undefined) expect(Number.isNaN(Date.parse(date))).toBe(false);
+    const unreadable = [...settings.dates.values()].filter((date) => !isInstant({ date }));
+    expect(unreadable).toEqual([]);
   });
 });
 
@@ -192,5 +201,21 @@ describe("when docs.json names a tag manager container", () => {
     expect(
       pageHead({ slug: "guide", title: "Guide", settings: SETTINGS, production: false }),
     ).not.toContain("docs-gtm");
+  });
+});
+
+describe("when a page head is built", () => {
+  /** @scenario "Preload the two fonts every page draws above the fold" */
+  it("preloads the Latin body font and the regular title font and no other font", () => {
+    const head = pageHead({
+      slug: "integration/quick-start",
+      title: "Quick Start",
+      settings: EMPTY,
+    });
+    const preloads = [...head.matchAll(/<link rel="preload"[^>]*>/g)].map((match) => match[0]);
+    expect(preloads).toEqual([
+      `<link rel="preload" href="${sitePath({ path: "/fonts/Inter-Variable-latin.woff2" })}" as="font" type="font/woff2" crossorigin>`,
+      `<link rel="preload" href="${sitePath({ path: "/fonts/Sentient-Regular.woff2" })}" as="font" type="font/woff2" crossorigin>`,
+    ]);
   });
 });
