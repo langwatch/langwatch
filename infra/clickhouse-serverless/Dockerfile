@@ -34,7 +34,8 @@ RUN install -d -o clickhouse -g clickhouse -m 755 \
         /scripts \
     && chown clickhouse:clickhouse /scripts/*.sh
 
-USER 101
+# Group 101 too: secret mounts may be readable by the clickhouse group only (0440).
+USER 101:101
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:8123/ping || exit 1
 ENTRYPOINT ["/usr/bin/tini", "--", "/scripts/entrypoint-wrapper.sh"]
