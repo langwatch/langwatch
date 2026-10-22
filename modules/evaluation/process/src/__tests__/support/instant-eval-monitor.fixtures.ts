@@ -42,10 +42,15 @@ function traceOf(projectId: string): Trace {
 export function buildInstantEvalMonitor({ judge }: { judge: Judge }) {
   const calls: InstantEvalJudgeCall[] = [];
   const execution = EvaluationExecutionService.create({
+    runs: { findTraceEvaluations: async () => [] },
+    authz: {
+      authorizeInternal: async () => {
+        throw new Error("these cases read no earlier evaluations");
+      },
+    },
     traces: {
       readTracesWithSpans: vi.fn(async () => [traceOf(INSTANT_EVAL_MONITOR_PROJECT_ID)]),
       readThreadsTraces: vi.fn(async () => []),
-      readEvaluations: vi.fn(async () => ({})),
     },
     spanDigest: { format: vi.fn(async () => ""), formatThread: vi.fn(async () => "") },
     modelEnvResolver: {

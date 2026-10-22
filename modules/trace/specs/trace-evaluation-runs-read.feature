@@ -30,3 +30,17 @@ Feature: Trace reads evaluation runs through its own repository
   Scenario: Trace asks nothing of evaluation_runs for an empty list of traces
     When trace reads evaluation summaries or evaluations for no traces
     Then it answers empty without querying ClickHouse
+
+  @unit
+  Scenario: Attempt columns a target has not added yet read as no attempts
+    Given the target's evaluation_runs does not have the attempt columns yet
+    When trace reads the evaluations of a trace
+    Then the statement names each missing attempt column as its default
+    And the run reads as having no attempts
+
+  @unit
+  Scenario: A run's attempts reach the trace's evaluation
+    Given an evaluation run with failed attempts, a last error and a next attempt time
+    When the run is mapped to the trace's evaluation
+    Then the attempts, last error, last attempt time and next attempt time are carried
+    And a run with no attempts carries none of them

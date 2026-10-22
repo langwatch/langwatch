@@ -34,6 +34,8 @@ import {
   PrismaProcessStore,
   type EventingClickHouseClient,
   type EventingClickHouseClientResolver,
+  type EventLogIdIndex,
+  type EventLogIndexReadiness,
   type EventLogRetentionPolicyLookup,
 } from "@langwatch/eventing/server";
 import {
@@ -82,8 +84,11 @@ export function buildEventing(options: {
   readonly participation?: EventingParticipation;
   /** The tenant directory's privately routed tenants, which a replay lists beside the log's. */
   readonly privateTenants?: () => AsyncIterable<string>;
+  /** Whether the event log's aggregate index may bound reads; none keeps them unbounded. */
+  readonly eventLogIndexReadiness?: EventLogIndexReadiness;
 }): BuiltMember<EventSourcing> {
   const { config } = options;
+  const eventLogIndex = eventLogIndexOf(options);
   const processStore = PrismaProcessStore.create({ database: options.prisma });
   // Read at append, after registration: each row takes its own pipeline's tenant retention.
   const retentionPolicyFor = (aggregateType: string) =>
@@ -93,9 +98,12 @@ export function buildEventing(options: {
     processName: options.processName,
     retentionPolicyFor,
     ...(options.eventLog === undefined ? {} : { eventLog: options.eventLog }),
+    eventLogIndex,
   });
   const eventReadSeat =
-    options.eventLog === undefined ? undefined : eventingReadSeat(options.eventLog);
+    options.eventLog === undefined
+      ? undefined
+      : eventingReadSeat({ eventLog: options.eventLog, eventLogIndex });
   const queueFactory =
     config.groupQueue === undefined || options.redis === undefined
       ? undefined
@@ -128,9 +136,8 @@ export function buildEventing(options: {
           replayEngine: replayEngineOver({
             redis: options.redis,
             clickhouse: options.eventLog.clickhouse,
-            ...(options.privateTenants === undefined
-              ? {}
-              : { privateTenants: options.privateTenants }),
+            privateTenants: options.privateTenants,
+            eventLogIndex,
           }),
         }),
   });
@@ -199,10 +206,12 @@ function replayEngineOver({
   redis,
   clickhouse,
   privateTenants,
+  eventLogIndex,
 }: {
   readonly redis: RedisConnection;
   readonly clickhouse: ClickHouseQueryClient;
-  readonly privateTenants?: () => AsyncIterable<string>;
+  readonly privateTenants: (() => AsyncIterable<string>) | undefined;
+  readonly eventLogIndex: EventLogIdIndex | undefined;
 }): NonNullable<EventSourcingOptions["replayEngine"]> {
   return ({ definitions, retentionPolicyResolver }) => {
     if (redis.isCluster) {
@@ -215,6 +224,7 @@ function replayEngineOver({
       source: new EventingClickHouseReplayEventSource({
         clickhouse,
         lean: replayLeanOf(definitions),
+        ...(eventLogIndex === undefined ? {} : { eventLogIndex }),
       }),
       upcasts: pipelineUpcastsOf(definitions),
     });
@@ -261,6 +271,7 @@ function eventingEventStore(options: {
   readonly processName: string;
   readonly retentionPolicyFor: EventLogRetentionPolicyLookup;
   readonly eventLog?: EventingEventLogMembers;
+  readonly eventLogIndex: EventLogIdIndex | undefined;
 }): EventStore {
   if (options.store.kind === "producer-only") {
     return EventStoreProducerOnly.create({ processName: options.processName });
@@ -280,6 +291,7 @@ function eventingEventStore(options: {
       resolveClient: eventingClickHouseResolver(eventLog.clickhouse),
       retention,
       ...(eventLog.organizationOf === undefined ? {} : { organizationOf: eventLog.organizationOf }),
+      ...(options.eventLogIndex === undefined ? {} : { eventLogIndex: options.eventLogIndex }),
     }),
     retention,
     retentionPolicyFor: options.retentionPolicyFor,
@@ -289,11 +301,30 @@ function eventingEventStore(options: {
   });
 }
 
+/** The aggregate index the event log's reads consult: only once the composition says when. */
+function eventLogIndexOf({
+  eventLog,
+  eventLogIndexReadiness,
+}: {
+  readonly eventLog?: EventingEventLogMembers;
+  readonly eventLogIndexReadiness?: EventLogIndexReadiness;
+}): EventLogIdIndex | undefined {
+  if (eventLog === undefined || eventLogIndexReadiness === undefined) return undefined;
+  return { reader: eventLog.clickhouse, readiness: eventLogIndexReadiness };
+}
+
 /** One event by id over the event log, whichever store this role appends through. */
-function eventingReadSeat(eventLog: EventingEventLogMembers): EventReadSeat {
+function eventingReadSeat({
+  eventLog,
+  eventLogIndex,
+}: {
+  readonly eventLog: EventingEventLogMembers;
+  readonly eventLogIndex: EventLogIdIndex | undefined;
+}): EventReadSeat {
   return EventLogReadSeat.create({
     repository: EventingClickHouseEventRepository.createForEventReads({
       resolveClient: eventingClickHouseResolver(eventLog.clickhouse),
+      ...(eventLogIndex === undefined ? {} : { eventLogIndex }),
     }),
   });
 }

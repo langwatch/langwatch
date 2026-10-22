@@ -3,7 +3,7 @@
 # stdlib only). Built here so the builder carries the binary and no Go
 # toolchain, and so this layer caches until those two directories change.
 # `go mod download` is skipped on purpose: the binary imports no module.
-FROM golang:1.27.2-alpine AS devscripts
+FROM golang:1.27.3-alpine AS devscripts
 WORKDIR /src
 COPY go.work go.work.sum ./
 COPY cmd/go.* cmd/
@@ -26,7 +26,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 # binary, never a cmd/service subcommand: that refuses to boot with
 # LANGWATCH_API_KEY set, and a run's key arrives in exactly that variable.
 # Cross-compiled on the build host, like Dockerfile.go_service.
-FROM --platform=$BUILDPLATFORM golang:1.27.2-alpine AS scenariorunner
+FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine AS scenariorunner
 ARG TARGETOS
 ARG TARGETARCH
 WORKDIR /src
@@ -50,7 +50,7 @@ RUN --mount=type=cache,target=/go/pkg/mod,id=go-mod-${TARGETARCH} \
 # Every member's package.json and nothing else. This stage re-runs on any
 # source edit, but its output changes only when a manifest does, so the
 # install layer below stays cached across source-only commits.
-FROM node:24-alpine AS manifests
+FROM node:24.22.1-alpine AS manifests
 WORKDIR /src
 COPY mcp/typescript ./mcp/typescript
 COPY packages ./packages
@@ -65,7 +65,7 @@ RUN find . ! -type d ! -name package.json -delete && find . -depth -type d -empt
 # script (allowBuilds in pnpm-workspace.yaml: bcrypt, node-pty and the rest) falls back to.
 # The pnpm store sits in a BuildKit cache mount at this path on every install,
 # so a lockfile change downloads only what is new.
-FROM node:24-alpine AS node-toolchain
+FROM node:24.22.1-alpine AS node-toolchain
 RUN apk --no-cache add curl python3 make gcc g++ openssl bash
 RUN npm install -g pnpm@12.6.0 && npm cache clean --force
 ENV pnpm_config_store_dir=/root/.local/share/pnpm/store
@@ -95,42 +95,12 @@ COPY apps/scenario-child/package.json ./apps/scenario-child/package.json
 COPY infra/docker/image.pnpmfile.cjs /tmp/image.pnpmfile.cjs
 COPY infra/docker/check-locked-versions.mjs /tmp/check-locked-versions.mjs
 COPY infra/docker/check-links.mjs /tmp/check-links.mjs
-# Three roles, the backend that hosts two of them and the scenario child the worker spawns;
-# @langwatch/ui is not installed, its bundle is built. --filter-prod, not --filter: with --prod alone
-# a filtered member's devDependencies are still followed. The image pnpmfile drops the peers that resolve to dev tools (see its header); a hook
-# runs only when pnpm resolves, so the lockfile is re-resolved first and the version check fails the
-# build on any version the committed lockfile does not name. Dependency build scripts run here.
+COPY infra/docker/prune-runtime-tree.sh /tmp/prune-runtime-tree.sh
+# The production install, its trims and the link checks, then every file but the node_modules
+# directories goes. One script holds the recipe so the npx app archive is pruned the same way
+# (ADR-180); its comments say why each step is there.
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    export pnpm_config_pnpmfile=/tmp/image.pnpmfile.cjs CI=true \
- && cp pnpm-lock.yaml /tmp/committed-pnpm-lock.yaml \
- && pnpm install --lockfile-only \
- && node /tmp/check-locked-versions.mjs /tmp/committed-pnpm-lock.yaml pnpm-lock.yaml \
- && pnpm install --frozen-lockfile --prod --filter-prod "@langwatch/platform-api..." --filter-prod "@langwatch/worker..." --filter-prod "@langwatch/scenario-child..." --filter-prod "@langwatch/tasks..." --filter-prod "@langwatch/backend..."
-
-# The installed packages' own weight: source maps, declarations, tests, docs and examples, and the
-# query compiler Prisma ships for every database it supports (this image talks to PostgreSQL only).
-RUN find node_modules/.pnpm -type d \( -name test -o -name tests -o -name __tests__ -o -name docs -o -name example -o -name examples \) -prune -exec rm -rf {} + \
- && find node_modules/.pnpm -type f \( -name '*.map' -o -name '*.d.ts' -o -name '*.d.mts' -o -name '*.d.cts' -o -name '*.md' \) -delete \
- && find node_modules/.pnpm -type f -name 'query_compiler_*' ! -name '*postgresql*' -delete \
- && node /tmp/check-links.mjs /app
-
-# The Prisma CLI is here for `prisma migrate deploy` (the upgrade runs it) and nothing else. Its entry
-# file needs Studio's data modules and the dev server's state module at load; Studio's browser UI,
-# the dev server's bundled database, the query-plan executor and Studio's graph layout go, with the
-# links that pointed at them.
-RUN rm -rf node_modules/.pnpm/@prisma+studio-core@*/node_modules/@prisma/studio-core/dist/ui \
-      node_modules/.pnpm/@prisma+studio-core@*/node_modules/@prisma/studio-core/dist/metafile-*.json \
-      node_modules/.pnpm/@prisma+dev@*/node_modules/@prisma/dev/dist/runtime-assets \
-      node_modules/.pnpm/@prisma+query-plan-executor@* node_modules/.pnpm/@electric-sql+pglite* node_modules/.pnpm/elkjs@* \
- && find node_modules/.pnpm -type l \( -path '*/@prisma/query-plan-executor' -o -path '*/@electric-sql/pglite*' -o -path '*/node_modules/elkjs' \) -delete \
- && node /tmp/check-links.mjs /app
-
-# Only node_modules directories leave this stage: the manifests, lockfile and workspace file go (the
-# runtime must carry no pnpm-workspace.yaml, see pnpm_config_verify_deps_before_run there), and so
-# do the member directories that got no node_modules. The runtime stage checks the links once the
-# built trees are in place.
-RUN find . -name node_modules -prune -o ! -type d -exec rm -f {} + \
- && find . -depth -type d -empty ! -path '*/node_modules/*' -delete
+    sh /tmp/prune-runtime-tree.sh deps /app
 
 # ── Stage 2: build ──────────────────────────────────────────────────
 FROM node-toolchain AS builder
@@ -236,17 +206,11 @@ RUN if echo "$LANGWATCH_BUILD_COMMIT" | grep -Eq '^[0-9a-f]{7,40}$'; then \
       && grep -q "^export const buildCommit: string | null = \"$SHORT_COMMIT\";\$" packages/upgrade/src/reader/build-commit.ts; \
     fi
 
-# `build:types` first: the module contracts' declarations now come from one
-# `tsc -b` over every contract's build config rather than a compiler process per
-# package, so the filtered application builds below find their dependencies'
-# .d.ts already on disk instead of emitting them 38 processes at a time.
-# The same preparation the CI build runs: generated files (modules, Prisma client,
-# langy skills) and the four dist-resolving packages (SDK, mcp-server, ksuid, mail)
-# before the declaration build, which reads their declarations. The root
-# `start:prepare:files`, `ensure:built` and `build:types` scripts go through nx,
-# and this stage copies neither nx.json nor the dev/nx plugins (here nx stopped at
-# "Failed to process project graph"), so each step runs its package script directly.
-# Keep this list in step with those three root scripts.
+# The generated files and the four dist-resolving packages build first, since
+# `build:types` reads their declarations. Each step calls its package script:
+# this stage has no nx.json, so the root nx scripts cannot run here. Keep it in
+# step with the root start:prepare:files, ensure:built and build:types. The last
+# build's `!` filters skip the projects the first build already built.
 RUN pnpm run ensure:ai-gateway-secrets && pnpm run generate:modules \
  && pnpm --filter @langwatch/prisma-client run prisma:generate \
  && pnpm --filter @langwatch/evaluator-contract run generate:evaluators \
@@ -255,27 +219,13 @@ RUN pnpm run ensure:ai-gateway-secrets && pnpm run generate:modules \
  && pnpm --filter @langwatch/langy-process run generate:setup-skill-bodies \
  && pnpm --filter "langwatch..." --filter "@langwatch/mcp-server..." --filter "@langwatch/ksuid..." --filter "@langwatch/mail..." run build \
  && NODE_OPTIONS=--max-old-space-size=4096 pnpm exec tsc -b --builders 16 modules/*/contract/tsconfig.build.json \
- && NODE_OPTIONS=--max-old-space-size=4096 pnpm --filter "@langwatch/ui..." --filter "@langwatch/platform-api..." --filter "@langwatch/worker..." --filter "@langwatch/scenario-child..." run build
+ && NODE_OPTIONS=--max-old-space-size=4096 pnpm --filter "@langwatch/ui..." --filter "@langwatch/platform-api..." --filter "@langwatch/worker..." --filter "@langwatch/scenario-child..." --filter "!langwatch..." --filter "!@langwatch/mcp-server..." --filter "!@langwatch/ksuid..." --filter "!@langwatch/mail..." run build
 
-# The built trees leave without node_modules: the runtime stage takes every node_modules directory
-# from prod-deps and lays these trees over them, and a link left here would replace a production one
-# with one into this stage's development install. The UI's source maps go too.
-RUN find . -name node_modules -type d -prune -exec rm -rf {} + \
- && find apps/ui/dist/client -name '*.map' -delete
-
-# What no process runs, removed before the runtime stage copies the trees: the module halves the
-# browser loads (the api serves the built bundle), tests, specs, ADRs, declarations, source maps
-# and the SDKs' sources and examples. Workspace packages nothing links to go too; the runtime
-# stage's link check fails the build if any link now points at nothing.
-RUN rm -rf modules/*/browser modules/*/client enterprise/modules/*/browser enterprise/modules/*/client \
-      packages/architecture-enforcer packages/oxlint-rules packages/design-system packages/design-system-internal \
-      packages/browser packages/browser-host packages/browser-types packages/sim-console packages/test-harness \
-      packages/vitest-config packages/webhook-verify packages/ksuid-python \
- && find sdks/typescript mcp/typescript -mindepth 1 -maxdepth 1 ! -name dist ! -name package.json -exec rm -rf {} + \
- && find apps packages modules enterprise \
-      \( -type d \( -name __tests__ -o -name tests -o -name e2e -o -name specs -o -name adrs -o -name docs -o -name examples \) -o \
-         -type f \( -name '*.test.*' -o -name '*.spec.*' -o -name '*.feature' -o -name '*.map' -o -name '*.d.ts' -o -name '*.d.mts' -o -name '*.tsbuildinfo' -o -name '*.md' \) \) \
-      -prune -exec rm -rf {} +
+# The built trees leave without node_modules (the runtime stage takes every one from prod-deps), and
+# without what no process runs: browser halves, tests, specs, declarations and source maps. The same
+# script prunes the npx app archive (ADR-180). Mounted, not copied, so the image carries nothing new.
+RUN --mount=type=bind,source=infra/docker/prune-runtime-tree.sh,target=/tmp/prune-runtime-tree.sh \
+    sh /tmp/prune-runtime-tree.sh built /app
 
 # ── Stage 2b: CDN assets ───────────────────────────────────────────
 # Not part of the runtime image: nothing reaches the default target through it.
@@ -286,7 +236,7 @@ FROM scratch AS ui-assets
 COPY --from=builder /app/apps/ui/dist/client/assets /assets
 
 # ── Stage 3: runtime ───────────────────────────────────────────────
-FROM node:24-alpine
+FROM node:24.22.1-alpine
 RUN apk --no-cache add curl openssl bash
 RUN npm install -g pnpm@12.6.0 && npm cache clean --force
 

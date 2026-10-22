@@ -2,6 +2,7 @@ import { moduleApi } from "@langwatch/module";
 
 import type { RetentionPolicySnapshot, RetentionStorageUsage } from "./data-retention.snapshot.ts";
 import type {
+  IdIndexRetentionRaiseInput,
   KillRetroactiveMutationInput,
   PinTraceInput,
   PinnedTrace,
@@ -52,6 +53,12 @@ export interface DataRetentionApi {
   getRetroactiveMutationProgress(
     input: RetroactiveMutationProjectInput,
   ): Promise<RetroactiveMutationProgress[]>;
+  /**
+   * Raises one ClickHouse target's id index rows to each tenant's current retention, never
+   * lowering one; run per target after its index is filled and before its marker is written, so a
+   * retention lengthened mid-fill leaves no short-lived row (Q4, id-index-2026-10-10.md).
+   */
+  raiseIdIndexRetention(input: IdIndexRetentionRaiseInput): Promise<{ tables: string[] }>;
   getTotalStorageBytes(input: StorageMeterTenantInput): Promise<number>;
   getTotalStorageBytesForTenants(input: StorageMeterTenantsInput): Promise<number>;
 

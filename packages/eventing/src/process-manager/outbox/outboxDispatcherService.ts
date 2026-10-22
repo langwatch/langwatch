@@ -23,7 +23,7 @@ import {
   ErrorCategory,
   isProjectGone,
 } from "../../services/errorHandling.ts";
-import { toSafeFailureDiagnostic } from "../failureDiagnostic.ts";
+import { diagnosticIsRedacted, toSafeFailureDiagnostic } from "../failureDiagnostic.ts";
 import type { JsonValue } from "../json.ts";
 import type {
   FailedOutboxAttempt,
@@ -159,6 +159,35 @@ function isTerminalError(error: unknown): boolean {
   // A transient ClickHouse cause still retries; otherwise the group queue's refusal rule decides.
   if (classifyClickHouseError(error) === ErrorCategory.RECOVERABLE) return false;
   return refusesRetry(error);
+}
+
+/**
+ * A handled error the customer caused (bad configuration, invalid parameters). Read by
+ * field, not instanceof, since the error may have crossed a serialisation boundary.
+ */
+function isCustomerFault(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  return (
+    Reflect.get(error, "fault") === "customer" && typeof Reflect.get(error, "code") === "string"
+  );
+}
+
+/** One V8 frame, `at fn (file:line:col)` or `at file:line:col`; anything else is dropped. */
+const STACK_FRAME = /^at (?:(?:async |new )?[^\s()]+(?: \[as [^\s\]]+\])? \()?[^\s()]+:\d+:\d+\)?$/;
+
+/**
+ * The frames of an error's stack, read only after its whole `name: message` header, so
+ * no line of a multi-line name or message can pass for a frame. No header, no frames.
+ */
+function stackFramesOf(error: unknown): string[] {
+  if (!(error instanceof Error) || typeof error.stack !== "string") return [];
+  const header = Error.prototype.toString.call(error);
+  if (header === "" || !error.stack.startsWith(header)) return [];
+  return error.stack
+    .slice(header.length)
+    .split("\n")
+    .map((frame) => frame.trim())
+    .filter((frame) => STACK_FRAME.test(frame));
 }
 
 /** Attempt log records DispatchError diagnostics; check by name not instanceof. */
@@ -831,8 +860,57 @@ export class OutboxDispatcherService {
       },
     });
     if (dead || attempt === 1) {
-      this.logDispatchFailure({ message, attempt, dead, errorType, errorMessage });
+      const hasCustomerFault = isCustomerFault(error);
+      this.logDispatchFailure({
+        message,
+        attempt,
+        dead,
+        errorType,
+        errorMessage,
+        hasCustomerFault,
+      });
+      if (diagnosticIsRedacted(error)) {
+        this.logRedactedCause({ message, attempt, error, dead, hasCustomerFault });
+      }
     }
+  }
+
+  /**
+   * Everything else carries only the redacted sentence, so this keeps where it failed:
+   * class and stack frames, never the foreign message or the payload. Its level follows
+   * the outcome, so a retry or a customer's own refusal never pages.
+   */
+  private logRedactedCause({
+    message,
+    attempt,
+    error,
+    dead,
+    hasCustomerFault,
+  }: {
+    message: LeasedOutboxMessageRecord;
+    attempt: number;
+    error: unknown;
+    dead: boolean;
+    hasCustomerFault: boolean;
+  }): void {
+    // Intentionally retain this opaque operational ID for delivery diagnostics.
+    const fields = {
+      processName: message.processName,
+      processKey: message.processKey,
+      projectId: message.projectId,
+      tenantId: message.tenantId,
+      messageKey: message.messageKey,
+      sourceEventId: message.sourceEventId,
+      intentType: message.intentType,
+      attempt,
+      outcome: dead ? "dead" : "retry_scheduled",
+      causeType: toSafeFailureDiagnostic(error).errorType,
+      causeStackFrames: stackFramesOf(error),
+    };
+    const line =
+      "Process-manager outbox delivery failed with a redacted cause; stack frames attached";
+    if (dead && !hasCustomerFault) this.logger.error(fields, line);
+    else this.logger.warn(fields, line);
   }
 
   private logDispatchFailure({
@@ -841,12 +919,14 @@ export class OutboxDispatcherService {
     dead,
     errorType,
     errorMessage,
+    hasCustomerFault,
   }: {
     message: LeasedOutboxMessageRecord;
     attempt: number;
     dead: boolean;
     errorType: string;
     errorMessage: string;
+    hasCustomerFault: boolean;
   }): void {
     // Intentionally retain this opaque operational ID for delivery diagnostics.
     const fields = {
@@ -863,7 +943,10 @@ export class OutboxDispatcherService {
       errorType,
       errorMessage,
     };
-    if (dead) {
+    if (dead && hasCustomerFault) {
+      // The customer's own setup refused the delivery; nothing for on-call to act on.
+      this.logger.warn(fields, "Process-manager outbox message exhausted delivery attempts");
+    } else if (dead) {
       this.logger.error(fields, "Process-manager outbox message exhausted delivery attempts");
     } else {
       this.logger.warn(fields, "Process-manager outbox delivery failed; retry scheduled");

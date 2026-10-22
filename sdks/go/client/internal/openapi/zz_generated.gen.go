@@ -10344,6 +10344,27 @@ func (e PostConnectedAgentFramesJSONBodyFrames2Type) Valid() bool {
 	}
 }
 
+// Defines values for PollConnectedAgentInstance200JSONResponseBodyFrames0Kind.
+const (
+	PollConnectedAgentInstance200JSONResponseBodyFrames0KindSetup    PollConnectedAgentInstance200JSONResponseBodyFrames0Kind = "setup"
+	PollConnectedAgentInstance200JSONResponseBodyFrames0KindTeardown PollConnectedAgentInstance200JSONResponseBodyFrames0Kind = "teardown"
+	PollConnectedAgentInstance200JSONResponseBodyFrames0KindTurn     PollConnectedAgentInstance200JSONResponseBodyFrames0Kind = "turn"
+)
+
+// Valid indicates whether the value is a known member of the PollConnectedAgentInstance200JSONResponseBodyFrames0Kind enum.
+func (e PollConnectedAgentInstance200JSONResponseBodyFrames0Kind) Valid() bool {
+	switch e {
+	case PollConnectedAgentInstance200JSONResponseBodyFrames0KindSetup:
+		return true
+	case PollConnectedAgentInstance200JSONResponseBodyFrames0KindTeardown:
+		return true
+	case PollConnectedAgentInstance200JSONResponseBodyFrames0KindTurn:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PollConnectedAgentInstance200JSONResponseBodyFrames0Protocol.
 const (
 	PollConnectedAgentInstance200JSONResponseBodyFrames0ProtocolN1 PollConnectedAgentInstance200JSONResponseBodyFrames0Protocol = 1
@@ -10911,6 +10932,27 @@ func (e ReplaceAgent200JSONResponseBodyType) Valid() bool {
 	case ReplaceAgent200JSONResponseBodyTypeVoice:
 		return true
 	case ReplaceAgent200JSONResponseBodyTypeWorkflow:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CallConnectedAgentJSONBodyKind.
+const (
+	CallConnectedAgentJSONBodyKindSetup    CallConnectedAgentJSONBodyKind = "setup"
+	CallConnectedAgentJSONBodyKindTeardown CallConnectedAgentJSONBodyKind = "teardown"
+	CallConnectedAgentJSONBodyKindTurn     CallConnectedAgentJSONBodyKind = "turn"
+)
+
+// Valid indicates whether the value is a known member of the CallConnectedAgentJSONBodyKind enum.
+func (e CallConnectedAgentJSONBodyKind) Valid() bool {
+	switch e {
+	case CallConnectedAgentJSONBodyKindSetup:
+		return true
+	case CallConnectedAgentJSONBodyKindTeardown:
+		return true
+	case CallConnectedAgentJSONBodyKindTurn:
 		return true
 	default:
 		return false
@@ -32928,8 +32970,9 @@ type DatasetPostEntries struct {
 
 // Evaluation defines model for Evaluation.
 type Evaluation struct {
-	Details *string `json:"details,omitempty"`
-	Error   *struct {
+	Attempts *int    `json:"attempts,omitempty"`
+	Details  *string `json:"details,omitempty"`
+	Error    *struct {
 		HasError   EvaluationErrorHasError `json:"has_error"`
 		Message    string                  `json:"message"`
 		Stacktrace []string                `json:"stacktrace"`
@@ -32940,6 +32983,7 @@ type Evaluation struct {
 	Inputs             *map[string]interface{} `json:"inputs,omitempty"`
 	IsGuardrail        *bool                   `json:"is_guardrail,omitempty"`
 	Label              *string                 `json:"label,omitempty"`
+	LastAttemptError   *string                 `json:"last_attempt_error,omitempty"`
 	Name               string                  `json:"name"`
 	Passed             *bool                   `json:"passed,omitempty"`
 	Retries            *float32                `json:"retries,omitempty"`
@@ -32978,6 +33022,8 @@ type EvaluationTimestamps struct {
 	FinishedAt              *float32 `json:"finished_at,omitempty"`
 	IgnoreTimestampsOnWrite *bool    `json:"ignore_timestamps_on_write,omitempty"`
 	InsertedAt              *float32 `json:"inserted_at,omitempty"`
+	LastAttemptAt           *int     `json:"last_attempt_at,omitempty"`
+	NextAttemptAt           *int     `json:"next_attempt_at,omitempty"`
 	StartedAt               *float32 `json:"started_at,omitempty"`
 	UpdatedAt               *float32 `json:"updated_at,omitempty"`
 }
@@ -38104,6 +38150,7 @@ type PostConnectedAgentFramesJSONBodyFrames1 struct {
 	Output   *PostConnectedAgentFramesJSONBody_Frames_1_Output `json:"output,omitempty"`
 	Protocol PostConnectedAgentFramesJSONBodyFrames1Protocol   `json:"protocol"`
 	Session  interface{}                                       `json:"session,omitempty"`
+	State    *map[string]interface{}                           `json:"state,omitempty"`
 	Type     PostConnectedAgentFramesJSONBodyFrames1Type       `json:"type"`
 }
 
@@ -38163,6 +38210,7 @@ type PollConnectedAgentInstance200JSONResponseBodyFrames0 struct {
 	AgentId     string                                                                                        `json:"agentId"`
 	CallId      string                                                                                        `json:"callId"`
 	DeadlineAt  int                                                                                           `json:"deadlineAt"`
+	Kind        PollConnectedAgentInstance200JSONResponseBodyFrames0Kind                                      `json:"kind"`
 	Messages    []PollConnectedAgentInstance200JSONResponseBody_Frames_0_Messages_Item                        `json:"messages"`
 	NewMessages []PollConnectedAgentInstance200JSONResponseBody_Frames_0_NewMessages_Item                     `json:"newMessages"`
 	Params      map[string]PollConnectedAgentInstance200JSONResponseBody_Frames_0_Params_AdditionalProperties `json:"params"`
@@ -38173,10 +38221,14 @@ type PollConnectedAgentInstance200JSONResponseBodyFrames0 struct {
 		ScenarioRunId *string `json:"scenarioRunId,omitempty"`
 	} `json:"run"`
 	Session     interface{}                                              `json:"session,omitempty"`
+	State       *map[string]interface{}                                  `json:"state,omitempty"`
 	ThreadId    string                                                   `json:"threadId"`
 	Traceparent *string                                                  `json:"traceparent"`
 	Type        PollConnectedAgentInstance200JSONResponseBodyFrames0Type `json:"type"`
 }
+
+// PollConnectedAgentInstance200JSONResponseBodyFrames0Kind defines parameters for PollConnectedAgentInstance.
+type PollConnectedAgentInstance200JSONResponseBodyFrames0Kind string
 
 // PollConnectedAgentInstance200JSONResponseBody_Frames_0_Messages_Item defines parameters for PollConnectedAgentInstance.
 type PollConnectedAgentInstance200JSONResponseBody_Frames_0_Messages_Item struct {
@@ -38231,12 +38283,16 @@ type PollConnectedAgentInstance200JSONResponseBody_Frames_Item struct {
 // RegisterConnectedAgentInstanceJSONBody defines parameters for RegisterConnectedAgentInstance.
 type RegisterConnectedAgentInstanceJSONBody struct {
 	Agents []struct {
-		Concurrency *int                    `json:"concurrency,omitempty"`
-		Environment string                  `json:"environment"`
-		Name        string                  `json:"name"`
-		Parameters  *map[string]interface{} `json:"parameters,omitempty"`
-		Sticky      *bool                   `json:"sticky,omitempty"`
-		TimeoutMs   *int                    `json:"timeoutMs,omitempty"`
+		Concurrency *int   `json:"concurrency,omitempty"`
+		Environment string `json:"environment"`
+		Hooks       *struct {
+			Setup    bool `json:"setup"`
+			Teardown bool `json:"teardown"`
+		} `json:"hooks,omitempty"`
+		Name       string                  `json:"name"`
+		Parameters *map[string]interface{} `json:"parameters,omitempty"`
+		Sticky     *bool                   `json:"sticky,omitempty"`
+		TimeoutMs  *int                    `json:"timeoutMs,omitempty"`
 	} `json:"agents"`
 	Instance struct {
 		Hostname        string    `json:"hostname"`
@@ -38557,6 +38613,9 @@ type ReplaceAgent200JSONResponseBodyType string
 
 // CallConnectedAgentJSONBody defines parameters for CallConnectedAgent.
 type CallConnectedAgentJSONBody struct {
+	// Kind A turn, or a scenario run's setup or teardown hook. Defaults to a turn.
+	Kind *CallConnectedAgentJSONBodyKind `json:"kind,omitempty"`
+
 	// Messages The whole conversation so far, OpenAI style.
 	Messages []CallConnectedAgentJSONBody_Messages_Item `json:"messages"`
 
@@ -38576,12 +38635,21 @@ type CallConnectedAgentJSONBody struct {
 	// Session The session the agent returned on its previous turn of this conversation, echoed back as is.
 	Session interface{} `json:"session,omitempty"`
 
+	// State The scenario run's test data: what setup returned, or a turn's latest update.
+	State *CallConnectedAgentJSONBody_State `json:"state,omitempty"`
+
 	// ThreadId The conversation id. Turns of one conversation share it; a new id starts a new one.
 	ThreadId *string `json:"threadId,omitempty"`
+
+	// TimeoutMs A setup or teardown hook's budget in milliseconds. A turn runs under the agent's own timeout.
+	TimeoutMs *int `json:"timeoutMs,omitempty"`
 
 	// Traceparent The W3C trace context the agent adopts, so its spans join this turn's trace.
 	Traceparent *string `json:"traceparent,omitempty"`
 }
+
+// CallConnectedAgentJSONBodyKind defines parameters for CallConnectedAgent.
+type CallConnectedAgentJSONBodyKind string
 
 // CallConnectedAgentJSONBody_Messages_Item defines parameters for CallConnectedAgent.
 type CallConnectedAgentJSONBody_Messages_Item struct {
@@ -38609,6 +38677,14 @@ type CallConnectedAgentJSONBody_Params_AdditionalProperties struct {
 	union json.RawMessage
 }
 
+// CallConnectedAgentJSONBodyState0 defines parameters for CallConnectedAgent.
+type CallConnectedAgentJSONBodyState0 map[string]interface{}
+
+// CallConnectedAgentJSONBody_State defines parameters for CallConnectedAgent.
+type CallConnectedAgentJSONBody_State struct {
+	union json.RawMessage
+}
+
 // CallConnectedAgent200JSONResponseBodyOutput0 defines parameters for CallConnectedAgent.
 type CallConnectedAgent200JSONResponseBodyOutput0 = string
 
@@ -38629,6 +38705,14 @@ type CallConnectedAgent200JSONResponseBody_Output_2_Item struct {
 
 // CallConnectedAgent200JSONResponseBody_Output defines parameters for CallConnectedAgent.
 type CallConnectedAgent200JSONResponseBody_Output struct {
+	union json.RawMessage
+}
+
+// CallConnectedAgent200JSONResponseBodyState0 defines parameters for CallConnectedAgent.
+type CallConnectedAgent200JSONResponseBodyState0 map[string]interface{}
+
+// CallConnectedAgent200JSONResponseBody_State defines parameters for CallConnectedAgent.
+type CallConnectedAgent200JSONResponseBody_State struct {
 	union json.RawMessage
 }
 
@@ -76154,6 +76238,42 @@ func (t *CallConnectedAgentJSONBody_Params_AdditionalProperties) UnmarshalJSON(b
 	return err
 }
 
+// AsCallConnectedAgentJSONBodyState0 returns the union data inside the CallConnectedAgentJSONBody_State as a CallConnectedAgentJSONBodyState0
+func (t CallConnectedAgentJSONBody_State) AsCallConnectedAgentJSONBodyState0() (CallConnectedAgentJSONBodyState0, error) {
+	var body CallConnectedAgentJSONBodyState0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromCallConnectedAgentJSONBodyState0 overwrites any union data inside the CallConnectedAgentJSONBody_State as the provided CallConnectedAgentJSONBodyState0
+func (t *CallConnectedAgentJSONBody_State) FromCallConnectedAgentJSONBodyState0(v CallConnectedAgentJSONBodyState0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeCallConnectedAgentJSONBodyState0 performs a merge with any union data inside the CallConnectedAgentJSONBody_State, using the provided CallConnectedAgentJSONBodyState0
+func (t *CallConnectedAgentJSONBody_State) MergeCallConnectedAgentJSONBodyState0(v CallConnectedAgentJSONBodyState0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t CallConnectedAgentJSONBody_State) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *CallConnectedAgentJSONBody_State) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // AsCallConnectedAgent200JSONResponseBodyOutput0 returns the union data inside the CallConnectedAgent200JSONResponseBody_Output as a CallConnectedAgent200JSONResponseBodyOutput0
 func (t CallConnectedAgent200JSONResponseBody_Output) AsCallConnectedAgent200JSONResponseBodyOutput0() (CallConnectedAgent200JSONResponseBodyOutput0, error) {
 	var body CallConnectedAgent200JSONResponseBodyOutput0
@@ -76238,6 +76358,42 @@ func (t CallConnectedAgent200JSONResponseBody_Output) MarshalJSON() ([]byte, err
 }
 
 func (t *CallConnectedAgent200JSONResponseBody_Output) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsCallConnectedAgent200JSONResponseBodyState0 returns the union data inside the CallConnectedAgent200JSONResponseBody_State as a CallConnectedAgent200JSONResponseBodyState0
+func (t CallConnectedAgent200JSONResponseBody_State) AsCallConnectedAgent200JSONResponseBodyState0() (CallConnectedAgent200JSONResponseBodyState0, error) {
+	var body CallConnectedAgent200JSONResponseBodyState0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromCallConnectedAgent200JSONResponseBodyState0 overwrites any union data inside the CallConnectedAgent200JSONResponseBody_State as the provided CallConnectedAgent200JSONResponseBodyState0
+func (t *CallConnectedAgent200JSONResponseBody_State) FromCallConnectedAgent200JSONResponseBodyState0(v CallConnectedAgent200JSONResponseBodyState0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeCallConnectedAgent200JSONResponseBodyState0 performs a merge with any union data inside the CallConnectedAgent200JSONResponseBody_State, using the provided CallConnectedAgent200JSONResponseBodyState0
+func (t *CallConnectedAgent200JSONResponseBody_State) MergeCallConnectedAgent200JSONResponseBodyState0(v CallConnectedAgent200JSONResponseBodyState0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t CallConnectedAgent200JSONResponseBody_State) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *CallConnectedAgent200JSONResponseBody_State) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
@@ -146202,6 +146358,9 @@ type CallConnectedAgentResponse struct {
 
 		// Session The agent's per-conversation memory, to send on the next turn.
 		Session interface{} `json:"session,omitempty"`
+
+		// State Setup's state, a turn's state update, or the object teardown returned.
+		State *CallConnectedAgent200JSONResponseBody_State `json:"state,omitempty"`
 	}
 }
 
@@ -176084,6 +176243,9 @@ func ParseCallConnectedAgentResponse(rsp *http.Response) (*CallConnectedAgentRes
 
 			// Session The agent's per-conversation memory, to send on the next turn.
 			Session interface{} `json:"session,omitempty"`
+
+			// State Setup's state, a turn's state update, or the object teardown returned.
+			State *CallConnectedAgent200JSONResponseBody_State `json:"state,omitempty"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err

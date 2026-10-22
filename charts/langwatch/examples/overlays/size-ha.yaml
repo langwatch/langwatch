@@ -70,6 +70,10 @@ redis:
   master:
     persistence:
       size: 10Gi
+    # Ceiling is half the limit (1.5Gi), so a snapshot fits under it.
+    resources:
+      requests: { cpu: 500m, memory: 1Gi }
+      limits: { cpu: 1, memory: 3Gi }
 
 prometheus:
   chartManaged: true

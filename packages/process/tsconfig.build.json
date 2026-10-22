@@ -18,6 +18,9 @@
       "path": "../process-stores/tsconfig.build.json"
     },
     {
+      "path": "../clickhouse-client/tsconfig.build.json"
+    },
+    {
       "path": "../prisma-client/tsconfig.build.json"
     },
     {

@@ -3,6 +3,8 @@ import type {
   ConnectCredential,
   LicenseSeatCounts,
   LicenseSyncAnswer,
+  UpgradeDiagnosticsReceipt,
+  UpgradeDiagnosticsSubmission,
 } from "@langwatch/enterprise-licensing-contract";
 
 /**
@@ -29,4 +31,11 @@ export abstract class ConnectLicenseChannel {
     seats: LicenseSeatCounts;
     signal?: AbortSignal;
   }): Promise<LicenseSyncAnswer>;
+
+  /** One failed upgrade step's redacted bundle, sent with the licence credential a sync uses. */
+  abstract sendUpgradeDiagnostics(params: {
+    credential: ConnectCredential;
+    submission: UpgradeDiagnosticsSubmission;
+    signal?: AbortSignal;
+  }): Promise<UpgradeDiagnosticsReceipt>;
 }

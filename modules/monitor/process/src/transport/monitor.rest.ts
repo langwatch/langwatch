@@ -9,6 +9,7 @@ import {
   documentedResponses,
   MANAGEMENT_API_VERSION,
   projectRequestContext,
+  type RestConfirmation,
   type RestDoorCredential,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
@@ -27,6 +28,20 @@ import {
 import { z } from "zod";
 
 const notFound = documentedResponses({ 404: badRequestSchema });
+
+/**
+ * The click a monitor route asks a Langy key for, named from the monitor itself. A disable asks
+ * only when the call turns the monitor off; turning it on removes nothing.
+ */
+function monitorConfirmation(action: "delete" | "disable"): RestConfirmation<MonitorApi> {
+  return {
+    resource: "monitor",
+    action,
+    idParam: "id",
+    ...(action === "disable" ? { when: (input) => input.enabled === false } : {}),
+    name: async ({ app, projectId, id }) => (await app.findById({ id, projectId }))?.name,
+  };
+}
 
 /** Where an online evaluation opens in the platform. */
 function monitorWire(params: {
@@ -111,6 +126,7 @@ export function createMonitorsRest(): Readonly<{
       // hierarchy, so no existing caller loses access. Deletion stays on
       // `:manage` below, where the destructive line sits.
       .post("/", "postApiMonitors")
+      .keepsRecords()
       .withAudit("monitors.create")
       .withInput(monitorRestCreateInputSchema)
       .withPermission("evaluations:create")
@@ -148,6 +164,8 @@ export function createMonitorsRest(): Readonly<{
       .withParams(monitorRestIdParamsSchema)
       .withInput(monitorRestUpdateInputSchema)
       .withPermission("evaluations:update")
+      // An update that switches the monitor off is a disable, and the toggle's click covers it.
+      .withConfirmation(monitorConfirmation("disable"))
       .withOutput(monitorRestResponseSchema)
       .withDocs({
         tags: ["Monitors"],
@@ -171,6 +189,7 @@ export function createMonitorsRest(): Readonly<{
       .withParams(monitorRestIdParamsSchema)
       .withInput(monitorRestToggleInputSchema)
       .withPermission("evaluations:update")
+      .withConfirmation(monitorConfirmation("disable"))
       .withOutput(monitorRestToggledSchema)
       .withDocs({
         tags: ["Monitors"],
@@ -188,6 +207,7 @@ export function createMonitorsRest(): Readonly<{
       .withAudit("monitors.delete")
       .withParams(monitorRestIdParamsSchema)
       .withPermission("evaluations:manage")
+      .withConfirmation(monitorConfirmation("delete"))
       .withOutput(monitorRestDeletedSchema)
       .withDocs({
         tags: ["Monitors"],
