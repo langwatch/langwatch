@@ -55,6 +55,29 @@ jobs:
             echo "is_release=false" >> $GITHUB_OUTPUT
           fi
 
+      # A release image must name itself its release (specs/upgrade/release-manifests.feature);
+      # without its manifest it reports a development build and records no release.
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        if: steps.extract_version.outputs.is_release == 'true'
+        with:
+          version: 12.6.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        if: steps.extract_version.outputs.is_release == 'true'
+        with:
+          node-version: "24.22.1"
+      - name: Check the release manifest
+        if: steps.extract_version.outputs.is_release == 'true'
+        env:
+          VERSION: ${{ steps.extract_version.outputs.version }}
+        run: |
+          set -euo pipefail
+          if ! [[ "${VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "${VERSION} is a prerelease: no manifest names it"; exit 0
+          fi
+          CI=true pnpm install --frozen-lockfile --filter "@langwatch/upgrade..."
+          node --disable-warning=ExperimentalWarning --experimental-transform-types \
+            packages/upgrade/scripts/check-release-manifest.ts --release "${VERSION}"
+
   build-and-push:
     needs: extract-version
     strategy:

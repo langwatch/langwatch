@@ -8,8 +8,22 @@ import { loadReleaseBaseline } from "../../manifest/baseline.ts";
 import { loadReleases } from "../../manifest/manifest-loader.ts";
 import { gooseStepId, prismaStepId, stampRelease } from "../../manifest/stamp.ts";
 import { readImageCodeSteps } from "../image-code-steps.ts";
-import { imageRelease, readImageTree, unstampedSteps } from "../image-tree.ts";
+import {
+  imageRelease,
+  readImageTree,
+  releaseIdentityRefusal,
+  STAMP_RELEASE_COMMAND,
+  stampTreeRelease,
+  unstampedSteps,
+} from "../image-tree.ts";
 
+const codeStep = {
+  id: "dataset:move-content-to-object-storage",
+  kind: "data",
+  mode: "background",
+  owner: "dataset",
+  description: "Moves dataset content to object storage",
+} as const;
 const stamped = {
   prismaFolders: ["20260101000000_first"],
   gooseFiles: ["00001_first.sql"],
@@ -40,6 +54,123 @@ describe("imageRelease()", () => {
     it("names itself unreleased", () => {
       const tree = { ...stamped, prismaFolders: [...stamped.prismaFolders, "20261010000000_next"] };
       expect(imageRelease({ manifests, tree, baseline })).toBeNull();
+    });
+  });
+});
+
+describe("releaseIdentityRefusal()", () => {
+  describe("when the tree's every step is in a manifest up to its release", () => {
+    /** @scenario "A release tree whose manifest is stamped names itself that release" */
+    it("refuses nothing", () => {
+      expect(
+        releaseIdentityRefusal({ release: "3.20.1", manifests, tree: stamped, baseline }),
+      ).toBeNull();
+    });
+  });
+
+  describe("when the release has no manifest", () => {
+    /** @scenario "A release tree without its manifest fails the release check" */
+    it("refuses with manifest_missing, naming the file and the stamp command", () => {
+      const refusal = releaseIdentityRefusal({
+        release: "3.21.0",
+        manifests,
+        tree: stamped,
+        baseline,
+      });
+
+      expect(refusal?.code).toBe("manifest_missing");
+      expect(refusal?.message).toContain("packages/upgrade/releases/3.21.0.json");
+      expect(refusal?.message).toContain(STAMP_RELEASE_COMMAND);
+    });
+  });
+
+  describe("when the manifest misses a code step the tree ships", () => {
+    /** @scenario "A release tree shipping a step its manifest misses fails the release check" */
+    it("refuses with steps_unstamped, naming the step", () => {
+      const tree = { ...stamped, codeSteps: [codeStep] };
+      const refusal = releaseIdentityRefusal({ release: "3.20.1", manifests, tree, baseline });
+
+      expect(refusal?.code).toBe("steps_unstamped");
+      expect(refusal?.message).toContain(codeStep.id);
+    });
+  });
+
+  describe("when the tree carries a manifest newer than its release", () => {
+    /** @scenario "A release tree carrying a newer release's manifest fails the release check" */
+    it("refuses with release_mismatch, naming the newer release", () => {
+      const newer = stampRelease({
+        release: "3.21.0",
+        previous: "3.20.1",
+        cutAt: "2026-02-01T00:00:00Z",
+        current: { ...stamped, codeSteps: [codeStep] },
+        shipped: new Set(manifests.flatMap((manifest) => manifest.steps.map(({ id }) => id))),
+        ownerOf: () => null,
+      });
+      const refusal = releaseIdentityRefusal({
+        release: "3.20.1",
+        manifests: [...manifests, newer],
+        tree: { ...stamped, codeSteps: [codeStep] },
+        baseline,
+      });
+
+      expect(refusal?.code).toBe("release_mismatch");
+      expect(refusal?.message).toContain("3.21.0");
+    });
+  });
+});
+
+describe("stampTreeRelease()", () => {
+  const next = {
+    previous: "3.20.1",
+    cutAt: "2026-02-01T00:00:00Z",
+    baseline,
+    ownerOf: () => null,
+  };
+
+  describe("when the tree adds a Prisma folder and a code step", () => {
+    /** @scenario "A release is stamped with every step of its tree no manifest names, code steps included" */
+    it("stamps both, and the tree names itself the release", () => {
+      const tree = {
+        ...stamped,
+        prismaFolders: [...stamped.prismaFolders, "20260201000000_next"],
+        codeSteps: [codeStep],
+      };
+      const { manifest, refusal } = stampTreeRelease({
+        ...next,
+        release: "3.21.0",
+        tree,
+        earlier: manifests,
+      });
+      const withIt = manifest ? [...manifests, manifest] : manifests;
+
+      expect(refusal).toBeNull();
+      expect(manifest?.steps.map(({ id }) => id)).toEqual([
+        "prisma:20260201000000_next",
+        codeStep.id,
+      ]);
+      expect(imageRelease({ manifests: withIt, tree, baseline })).toBe("3.21.0");
+    });
+  });
+
+  describe("when the release before went out without its manifest", () => {
+    /** @scenario "A release after one cut without its manifest also carries that release's steps" */
+    it("stamps the earlier release's steps into this one", () => {
+      const tree = {
+        ...stamped,
+        prismaFolders: [...stamped.prismaFolders, "20260201000000_lost", "20260301000000_next"],
+      };
+      const { manifest } = stampTreeRelease({
+        ...next,
+        previous: "3.21.0",
+        release: "3.22.0",
+        tree,
+        earlier: manifests,
+      });
+
+      expect(manifest?.steps.map(({ id }) => id)).toEqual([
+        "prisma:20260201000000_lost",
+        "prisma:20260301000000_next",
+      ]);
     });
   });
 });
