@@ -19,7 +19,7 @@ type CodingAgentPersonalSession = {
   cacheReadTokens: number;
   cacheCreationTokens: number;
   costUsd: number;
-  costKnown: boolean;
+  isCostKnown: boolean;
   models: string[];
 };
 
@@ -79,7 +79,7 @@ export class CodingAgentPersonalPullRequestValuesService {
         cacheReadTokens: session.cacheReadTokens,
         cacheCreationTokens: session.cacheCreationTokens,
         costUsd: session.costUsd,
-        costKnown: !isCostUnknown(
+        isCostKnown: !isCostUnknown(
           session.models.map((model) => ({
             priced: this.dependencies.usage.isPricedAs({ agent: session.agent, model }),
           })),
@@ -145,7 +145,7 @@ export class CodingAgentPersonalPullRequestValuesService {
     sessions: readonly CodingAgentPersonalSession[];
     nonBillableAgents: ReadonlySet<string>;
   }): { costUsd: number | null; billedCostUsd: number | null; nonBilledCostUsd: number | null } {
-    const priced = sessions.filter((session) => session.costKnown);
+    const priced = sessions.filter((session) => session.isCostKnown);
     if (priced.length === 0) {
       return { costUsd: null, billedCostUsd: null, nonBilledCostUsd: null };
     }

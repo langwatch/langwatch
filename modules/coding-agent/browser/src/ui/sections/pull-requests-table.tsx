@@ -738,7 +738,7 @@ const StatusCell: React.FC<{
   return <PullRequestStatusBadge status={row.snapshotStatus} source="payload" />;
 };
 
-/** A known model's tokens, its AI units as their own count, then its cost when it has one. */
+/** A null cost is unknown (unpriced, or withheld from this viewer): $0 would claim it was free. */
 function modelUsageSummary(model: ModelUsage): string {
   return [
     `${formatTokens(model.totalTokens)} tokens`,

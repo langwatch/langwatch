@@ -664,8 +664,8 @@ export class TraceSummaryFoldProjection
     // The merged attribute map only carries identity/metadata keys, so the
     // raw gen_ai.usage.cache_* numbers never reach the drawer — fold the sums
     // in under reserved keys the popover reads directly.
-    const tokenAccumulationSkipped = runtime.spanCost.isTokenAccumulationSkipped(span);
-    const cacheTokens = tokenAccumulationSkipped
+    const isTokenAccumulationSkipped = runtime.spanCost.isTokenAccumulationSkipped(span);
+    const cacheTokens = isTokenAccumulationSkipped
       ? { cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0 }
       : runtime.spanCost.extractCacheTokens(span);
     TraceSummaryFoldProjection.addReservedTokenSum(
@@ -686,7 +686,7 @@ export class TraceSummaryFoldProjection
     TraceSummaryFoldProjection.recordContextSize({
       attributes,
       span,
-      inputTokens: tokenAccumulationSkipped ? 0 : runtime.spanCost.extractInputTokens(span),
+      inputTokens: isTokenAccumulationSkipped ? 0 : runtime.spanCost.extractInputTokens(span),
       cacheTokens,
     });
 

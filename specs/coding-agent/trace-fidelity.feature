@@ -359,10 +359,10 @@ Feature: Coding Agent Trace Fidelity (Path B direct OTLP)
     Then the note says how many tokens were re-sent instead of reusing what the first call cached
     And the first call's fresh input is not counted as cached
 
-  # A rebuild is a cache READ that fell: the call failed to reuse what the call
-  # before it left cached (its read plus its write), by half or more, and wrote
-  # it again. A large write on top of a full read is the context growing (a big
-  # file or tool result), not a rebuild. Every surface asks the one rule.
+  # A rebuild is a cache READ that fell: the call failed to reuse half or more of
+  # what the call before it left cached (its read plus its write), and wrote at
+  # least half of that again. Both halves share that one base. A large write on
+  # top of a full read is the context growing, not a rebuild.
 
   @unit
   Scenario: New content written on top of a full cache read is growth, not a rebuild

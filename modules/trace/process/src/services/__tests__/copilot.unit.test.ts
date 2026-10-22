@@ -316,14 +316,15 @@ describe("CopilotCanonicaliserService", () => {
         "gen_ai.request.model": "oswe-vscode-prime",
         "gen_ai.usage.input_tokens": 618820,
         "gen_ai.usage.output_tokens": 11348,
-        copilot_usage_nano_aiu: 230235000,
+        "copilot_chat.copilot_usage_nano_aiu": 230235000,
       });
 
       expect(result.appliedRules.some((r) => r.startsWith("genai:"))).toBe(true);
       expect(result.attributes["gen_ai.request.model"]).toBe("oswe-vscode-prime");
       expect(result.attributes["gen_ai.usage.input_tokens"]).toBe(618820);
       expect(result.attributes["gen_ai.usage.output_tokens"]).toBe(11348);
-      // Copilot's extras never become a dollar cost.
+      // Copilot's AI units are lifted as their own count and never become a dollar cost.
+      expect(result.attributes["metadata.copilot_nano_aiu"]).toBe("230235000");
       expect(result.attributes["langwatch.span.cost"]).toBeUndefined();
     });
 

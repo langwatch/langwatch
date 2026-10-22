@@ -210,7 +210,7 @@ function typeChangeFindings({ up, liveUp }: { up: string; liveUp: string }): Fin
     });
 }
 
-/** The column definition from `start` to the next comma or semicolon outside parentheses. */
+/** Tracks depth: a comma inside a nested type (`Map(String, UInt64)`) must not end the column. */
 function columnDefinitionFrom({ text, start }: { text: string; start: number }): string {
   let depth = 0;
   for (let index = start; index < text.length; index++) {
