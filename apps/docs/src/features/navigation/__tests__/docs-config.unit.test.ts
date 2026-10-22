@@ -40,10 +40,11 @@ describe("the docs.json and frontmatter inventory", () => {
 
     /** @scenario "Account for every configuration and frontmatter key" */
     it("holds every pinned key at the value the site implements", () => {
-      for (const [key, handling] of Object.entries(DOCS_JSON_KEYS)) {
-        if (handling.status === "pinned")
-          expect([key, valueAt({ config, path: key })]).toEqual([key, handling.value]);
-      }
+      const pinned = Object.entries(DOCS_JSON_KEYS).flatMap(([key, handling]) =>
+        handling.status === "pinned" ? [[key, handling.value]] : [],
+      );
+      const actual = pinned.map(([key]) => [key, valueAt({ config, path: String(key) })]);
+      expect(actual).toEqual(pinned);
     });
 
     /** @scenario "Account for every configuration and frontmatter key" */

@@ -71,7 +71,10 @@ export function htmlFacts({ html }: { html: string }): HtmlFacts {
   };
 }
 
-/** The site path an HTML file is served at: `a/b/index.html` -> `/a/b/`, `404.html` -> `/404.html`. */
+/**
+ * The site path an HTML file is served at: `a/b/index.html` -> `/a/b/`, `404.html` ->
+ * `/404.html`.
+ */
 export function servedPath({ outDir, file }: { outDir: string; file: string }) {
   return `/${path
     .relative(outDir, file)

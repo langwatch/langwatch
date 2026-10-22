@@ -1,4 +1,5 @@
 import { Text } from "@langwatch/design-system/primitives";
+import { Temporal } from "@langwatch/time";
 
 const DATE = new Intl.DateTimeFormat("en-GB", {
   day: "numeric",
@@ -7,10 +8,18 @@ const DATE = new Intl.DateTimeFormat("en-GB", {
   timeZone: "UTC",
 });
 
+function parseInstant({ date }: { date: string }) {
+  try {
+    return Temporal.Instant.from(date);
+  } catch {
+    return null;
+  }
+}
+
 /** The page's last commit date; nothing when the build could not date it. */
 export function LastUpdated({ date }: { date: string }) {
-  const time = Date.parse(date);
-  if (!date || Number.isNaN(time)) return null;
+  const instant = parseInstant({ date });
+  if (!instant) return null;
   return (
     <Text
       className="docs-last-updated"
@@ -19,7 +28,10 @@ export function LastUpdated({ date }: { date: string }) {
       lineHeight="20px"
       color="fg.muted"
     >
-      Last updated <time dateTime={new Date(time).toISOString()}>{DATE.format(time)}</time>
+      Last updated{" "}
+      <time dateTime={instant.toString({ fractionalSecondDigits: 3 })}>
+        {DATE.format(instant.epochMilliseconds)}
+      </time>
     </Text>
   );
 }

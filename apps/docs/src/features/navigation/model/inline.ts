@@ -29,50 +29,59 @@ function closingBracket({ source, from }: { source: string; from: number }) {
   return -1;
 }
 
+type Scan = { nodes: Inline[]; text: string; index: number };
+
+function flushText({ scan }: { scan: Scan }) {
+  if (scan.text) scan.nodes.push({ type: "text", value: scan.text });
+  scan.text = "";
+}
+
+function scanStrong({ scan, rest }: { scan: Scan; rest: string }) {
+  const end = rest.startsWith("**") ? rest.indexOf("**", 2) : -1;
+  if (end <= 2) return false;
+  flushText({ scan });
+  scan.nodes.push({ type: "strong", children: parseInline({ source: rest.slice(2, end) }) });
+  scan.index += end + 2;
+  return true;
+}
+
+function scanCode({ scan, rest }: { scan: Scan; rest: string }) {
+  const end = rest.startsWith("`") ? rest.indexOf("`", 1) : -1;
+  if (end <= 1) return false;
+  flushText({ scan });
+  scan.nodes.push({ type: "code", value: rest.slice(1, end) });
+  scan.index += end + 1;
+  return true;
+}
+
+function scanLink({ scan, source }: { scan: Scan; source: string }) {
+  if (source[scan.index] !== "[") return false;
+  const close = closingBracket({ source, from: scan.index + 1 });
+  const target = close > 0 ? /^\(([^)\s]+)\)/.exec(source.slice(close + 1)) : null;
+  if (!target) return false;
+  flushText({ scan });
+  scan.nodes.push({
+    type: "link",
+    href: localHref({ href: target[1] }),
+    children: parseInline({ source: source.slice(scan.index + 1, close) }),
+  });
+  scan.index = close + 1 + target[0].length;
+  return true;
+}
+
 /** Parses `**strong**`, `` `code` `` and `[label](href)`; anything else stays text. */
 export function parseInline({ source }: { source: string }): Inline[] {
-  const nodes: Inline[] = [];
-  let text = "";
-  const flush = () => {
-    if (text) nodes.push({ type: "text", value: text });
-    text = "";
-  };
-  let index = 0;
-  while (index < source.length) {
-    const rest = source.slice(index);
-    const strongEnd = rest.startsWith("**") ? rest.indexOf("**", 2) : -1;
-    if (strongEnd > 2) {
-      flush();
-      nodes.push({ type: "strong", children: parseInline({ source: rest.slice(2, strongEnd) }) });
-      index += strongEnd + 2;
+  const scan: Scan = { nodes: [], text: "", index: 0 };
+  while (scan.index < source.length) {
+    const rest = source.slice(scan.index);
+    if (scanStrong({ scan, rest }) || scanCode({ scan, rest }) || scanLink({ scan, source })) {
       continue;
     }
-    const codeEnd = rest.startsWith("`") ? rest.indexOf("`", 1) : -1;
-    if (codeEnd > 1) {
-      flush();
-      nodes.push({ type: "code", value: rest.slice(1, codeEnd) });
-      index += codeEnd + 1;
-      continue;
-    }
-    if (rest.startsWith("[")) {
-      const close = closingBracket({ source, from: index + 1 });
-      const target = close > 0 ? /^\(([^)\s]+)\)/.exec(source.slice(close + 1)) : null;
-      if (target) {
-        flush();
-        nodes.push({
-          type: "link",
-          href: localHref({ href: target[1] }),
-          children: parseInline({ source: source.slice(index + 1, close) }),
-        });
-        index = close + 1 + target[0].length;
-        continue;
-      }
-    }
-    text += source[index];
-    index += 1;
+    scan.text += source[scan.index];
+    scan.index += 1;
   }
-  flush();
-  return nodes;
+  flushText({ scan });
+  return scan.nodes;
 }
 
 /** The text a reader sees, for labels and metadata. */

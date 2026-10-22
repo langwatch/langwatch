@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 
+import { nowInstant } from "@langwatch/time";
 import { z } from "zod";
 
 import { startPreview } from "../preview-server.ts";
@@ -33,6 +34,7 @@ const optionsSchema = z.object({
   "out-dir": z.string().default("dist"),
   "base-path": z.string().default("/docs"),
   "report-dir": z.string().optional(),
+  summary: z.string().optional(),
   pages: list.optional(),
   "form-factors": list.pipe(z.array(z.enum(FORM_FACTORS))).default([...FORM_FACTORS]),
   concurrency: z.coerce.number().int().min(1).optional(),
@@ -50,6 +52,7 @@ function readOptions() {
       "out-dir": { type: "string" },
       "base-path": { type: "string" },
       "report-dir": { type: "string" },
+      summary: { type: "string" },
       pages: { type: "string" },
       "form-factors": { type: "string" },
       concurrency: { type: "string" },
@@ -144,7 +147,7 @@ async function pool<T, R>({
   limit: number;
   work: (item: T) => Promise<R>;
 }) {
-  const results: R[] = new Array(items.length);
+  const results = Array.from<R>({ length: items.length });
   let next = 0;
   await Promise.all(
     Array.from({ length: Math.min(limit, items.length) }, async () => {
@@ -159,7 +162,7 @@ async function pool<T, R>({
 
 /** The run with the median performance score, so one noisy run neither passes nor fails a page. */
 function medianRun({ runs }: { runs: AuditRun[] }) {
-  const sorted = [...runs].sort(
+  const sorted = runs.toSorted(
     (a, b) => (a.scores.performance ?? -1) - (b.scores.performance ?? -1),
   );
   return sorted[Math.floor(sorted.length / 2)];
@@ -185,7 +188,7 @@ async function checkExportTypes({ origin, exports }: { origin: string; exports: 
 }
 
 async function main() {
-  const started = Date.now();
+  const started = nowInstant().epochMilliseconds;
   const options = readOptions();
   const json = options.json;
   const outDir = path.resolve(options["out-dir"]);
@@ -265,12 +268,12 @@ async function main() {
     runs,
     budgets: { ...budgets, pages: selectPages({ pages: budgets.pages, selected: options.pages }) },
   });
-  const wallClockMs = Date.now() - started;
+  const wallClockMs = nowInstant().epochMilliseconds - started;
   const report = { wallClockMs, runs, failures, notes, seo: { pages: seoResult.pages, ...seo } };
   mkdirSync(reportDir, { recursive: true });
   writeFileSync(path.join(reportDir, "audit-report.json"), JSON.stringify(report, null, 2));
   const markdown = summaryMarkdown({ runs, failures, notes, seo: report.seo, wallClockMs });
-  if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, markdown);
+  if (options.summary) appendFileSync(options.summary, markdown);
   if (json) process.stdout.write(`${JSON.stringify(report)}\n`);
   else process.stdout.write(markdown);
   if (failures.length > 0 || seo.failures.length > 0) process.exitCode = 1;

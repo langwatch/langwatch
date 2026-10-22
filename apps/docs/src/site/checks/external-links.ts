@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
+import { nowInstant } from "@langwatch/time";
 import { z } from "zod";
 
 import type { BuildIndex } from "./build-index.ts";
@@ -51,14 +52,17 @@ async function requestStatus({ href, fetcher }: { href: string; fetcher: typeof 
   return 0;
 }
 
-/** Requests each external link once, `concurrency` at a time; answers younger than `maxAge` are reused. */
+/**
+ * Requests each external link once, `concurrency` at a time; answers younger than `maxAge` are
+ * reused.
+ */
 export async function checkExternalLinks({
   links,
   cacheFile,
   concurrency = 8,
   maxAge = DAY,
   fetcher = fetch,
-  now = Date.now(),
+  now = nowInstant().epochMilliseconds,
 }: {
   links: Map<string, Set<string>>;
   cacheFile: string;

@@ -88,6 +88,78 @@ function pageFile({ outDir, url }: { outDir: string; url: string }) {
   return path.join(outDir, `.${sitePathname}`, "index.html");
 }
 
+type PageIssue = Omit<SeoIssue, "page">;
+type PageHead = ReturnType<typeof readHead>;
+
+function metaIssues({ head, seo }: { head: PageHead; seo: SeoBudgets }): PageIssue[] {
+  const issues: PageIssue[] = [];
+  if (head.headings !== 1)
+    issues.push({ code: "h1-count", detail: `${head.headings} <h1> elements, expected 1` });
+  const title = lengthIssue({ name: "title", value: head.title, range: seo.title });
+  const description = lengthIssue({
+    name: "description",
+    value: head.description,
+    range: seo.description,
+  });
+  for (const issue of [title, description]) if (issue) issues.push(issue);
+  return issues;
+}
+
+function canonicalIssue({ head, url }: { head: PageHead; url: string }): PageIssue | null {
+  const { canonical } = head;
+  if (!canonical) return { code: "missing-canonical", detail: "no canonical link" };
+  if (!isAbsoluteHttps(canonical)) return { code: "relative-canonical", detail: canonical };
+  if (canonical !== url)
+    return { code: "canonical-mismatch", detail: `${canonical} is not ${url}` };
+  return null;
+}
+
+function socialIssues({ head }: { head: PageHead }): PageIssue[] {
+  const issues: PageIssue[] = [];
+  const named = [
+    ["og:title", head.ogTitle],
+    ["og:description", head.ogDescription],
+  ] as const;
+  for (const [name, value] of named)
+    if (!value) issues.push({ code: "missing-open-graph", detail: `no ${name}` });
+  if (!isAbsoluteHttps(head.ogImage))
+    issues.push({ code: "open-graph-image", detail: `og:image ${head.ogImage ?? "missing"}` });
+  return issues;
+}
+
+function jsonLdIssues({ head }: { head: PageHead }): PageIssue[] {
+  if (head.jsonLd.length === 0) return [{ code: "missing-json-ld", detail: "no JSON-LD" }];
+  const issues: PageIssue[] = [];
+  for (const data of head.jsonLd) {
+    try {
+      JSON.parse(data);
+    } catch (error) {
+      issues.push({ code: "invalid-json-ld", detail: (error as Error).message });
+    }
+  }
+  return issues;
+}
+
+function markdownIssues({
+  head,
+  outDir,
+  basePath,
+  exports,
+}: {
+  head: PageHead;
+  outDir: string;
+  basePath: string;
+  exports: string[];
+}): PageIssue[] {
+  const markdown = head.markdown ? stripBasePath({ pathname: head.markdown, basePath }) : null;
+  if (!head.markdown || !markdown)
+    return [{ code: "missing-markdown-link", detail: "no text/markdown link" }];
+  exports.push(head.markdown);
+  const markdownFile = path.join(outDir, `.${markdown}`);
+  const empty = !existsSync(markdownFile) || readFileSync(markdownFile, "utf8").trim() === "";
+  return empty ? [{ code: "empty-markdown-export", detail: markdown }] : [];
+}
+
 function checkPage({
   outDir,
   basePath,
@@ -102,50 +174,22 @@ function checkPage({
   llms: Set<string>;
   seo: SeoBudgets;
   exports: string[];
-}): Omit<SeoIssue, "page">[] {
+}): PageIssue[] {
   const file = pageFile({ outDir, url });
   if (!file) return [{ code: "foreign-sitemap-url", detail: `not under ${DOCS_URL}` }];
   if (!existsSync(file)) return [{ code: "missing-page", detail: path.relative(outDir, file) }];
   const head = readHead({ html: readFileSync(file, "utf8") });
-  const issues: Omit<SeoIssue, "page">[] = [];
-  if (head.headings !== 1)
-    issues.push({ code: "h1-count", detail: `${head.headings} <h1> elements, expected 1` });
-  for (const issue of [
-    lengthIssue({ name: "title", value: head.title, range: seo.title }),
-    lengthIssue({ name: "description", value: head.description, range: seo.description }),
-  ])
-    if (issue) issues.push(issue);
-  if (!head.canonical) issues.push({ code: "missing-canonical", detail: "no canonical link" });
-  else if (!isAbsoluteHttps(head.canonical))
-    issues.push({ code: "relative-canonical", detail: head.canonical });
-  else if (head.canonical !== url)
-    issues.push({ code: "canonical-mismatch", detail: `${head.canonical} is not ${url}` });
-  for (const [name, value] of [
-    ["og:title", head.ogTitle],
-    ["og:description", head.ogDescription],
-  ] as const)
-    if (!value) issues.push({ code: "missing-open-graph", detail: `no ${name}` });
-  if (!isAbsoluteHttps(head.ogImage))
-    issues.push({ code: "open-graph-image", detail: `og:image ${head.ogImage ?? "missing"}` });
-  if (head.jsonLd.length === 0) issues.push({ code: "missing-json-ld", detail: "no JSON-LD" });
-  for (const data of head.jsonLd) {
-    try {
-      JSON.parse(data);
-    } catch (error) {
-      issues.push({ code: "invalid-json-ld", detail: (error as Error).message });
-    }
-  }
+  const canonical = canonicalIssue({ head, url });
+  const issues: PageIssue[] = [
+    ...metaIssues({ head, seo }),
+    ...(canonical ? [canonical] : []),
+    ...socialIssues({ head }),
+    ...jsonLdIssues({ head }),
+  ];
   if (head.robots?.toLowerCase().includes("noindex"))
     issues.push({ code: "noindex", detail: `robots "${head.robots}" on a sitemap page` });
+  issues.push(...markdownIssues({ head, outDir, basePath, exports }));
   const markdown = head.markdown ? stripBasePath({ pathname: head.markdown, basePath }) : null;
-  if (!head.markdown || !markdown)
-    issues.push({ code: "missing-markdown-link", detail: "no text/markdown link" });
-  else {
-    exports.push(head.markdown);
-    const markdownFile = path.join(outDir, `.${markdown}`);
-    if (!existsSync(markdownFile) || readFileSync(markdownFile, "utf8").trim() === "")
-      issues.push({ code: "empty-markdown-export", detail: markdown });
-  }
   const listed = [url, `${url}.md`, markdown && docsUrl({ path: markdown })];
   if (!listed.some((candidate) => candidate && llms.has(candidate)))
     issues.push({ code: "missing-from-llms-txt", detail: `${url} (or its .md) is not linked` });
@@ -216,8 +260,8 @@ export function knownIssuesOf({ issues }: { issues: SeoIssue[] }) {
   for (const issue of issues) (known[issue.code] ??= []).push(pageKey(issue));
   return Object.fromEntries(
     Object.entries(known)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([code, pages]) => [code, [...new Set(pages)].sort()]),
+      .toSorted(([a], [b]) => a.localeCompare(b))
+      .map(([code, pages]) => [code, [...new Set(pages)].toSorted()]),
   );
 }
 

@@ -4,6 +4,7 @@ import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { parseArgs } from "node:util";
 
+import { nowInstant } from "@langwatch/time";
 import lighthouse, { desktopConfig } from "lighthouse";
 import { chromium } from "playwright";
 import { z } from "zod";
@@ -50,7 +51,7 @@ async function main() {
     channel: "chromium",
     args: ["--remote-debugging-port=0"],
   });
-  const started = Date.now();
+  const started = nowInstant().epochMilliseconds;
   try {
     const port = await devtoolsPort({ userDataDir });
     const result = await lighthouse(
@@ -65,7 +66,7 @@ async function main() {
       page: args.page,
       pagePath: args.path,
       formFactor: args["form-factor"],
-      durationMs: Date.now() - started,
+      durationMs: nowInstant().epochMilliseconds - started,
     });
     process.stdout.write(`${JSON.stringify(run)}\n`);
   } finally {

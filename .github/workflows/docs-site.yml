@@ -242,7 +242,8 @@ jobs:
           pnpm --filter @langwatch/docs-site test:audit
           --out-dir dist --base-path /docs
           --form-factors ${{ matrix.form-factor }} --runs 3 --concurrency 2
-          --report-dir "$RUNNER_TEMP/docs-audit" --lhr ${{ matrix.extra-args }}
+          --report-dir "$RUNNER_TEMP/docs-audit" --summary "$GITHUB_STEP_SUMMARY"
+          --lhr ${{ matrix.extra-args }}
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:

@@ -71,10 +71,17 @@ export function resolveTarget({
   return { external: true };
 }
 
-/** The HTML page a Markdown export stands for: `/a/b.md` -> `a/b/index.html`, `/index.md` -> home. */
+/**
+ * The HTML page a Markdown export stands for: `/a/b.md` -> `a/b/index.html`, `/index.md` ->
+ * home.
+ */
 function exportPage({ outDir, file }: { outDir: string; file: string }) {
   const stem = path.relative(outDir, file).replace(EXPORT_EXTENSION, "");
   return path.join(outDir, stem === "index" ? "" : stem, "index.html");
+}
+
+function isFile({ file }: { file: string }) {
+  return existsSync(file) && statSync(file).isFile();
 }
 
 /** Null when a resolved site URL reaches a built file and, for a fragment, an element id. */
@@ -88,10 +95,10 @@ export function checkTarget({
   const { outDir } = index;
   const pathname = decodeURIComponent(url.pathname);
   const target = path.resolve(outDir, `.${pathname}`);
-  const withinBuild = target.startsWith(outDir + path.sep) || target === outDir;
-  if (!withinBuild) return "outside-build";
+  const insideBuild = target.startsWith(outDir + path.sep);
+  if (!insideBuild && target !== outDir) return "outside-build";
   const file = path.extname(target) ? target : path.join(target, "index.html");
-  if (!existsSync(file) || !statSync(file).isFile()) return "missing-target";
+  if (!isFile({ file })) return "missing-target";
   if (!url.hash) return null;
   const page = EXPORT_EXTENSION.test(file) ? exportPage({ outDir, file }) : file;
   const facts = index.html.get(page);

@@ -7,6 +7,11 @@ import { afterAll, describe, expect, it } from "vitest";
 import { checkExternalLinks, externalLinks } from "../checks/external-links.ts";
 import { buildFixture, page } from "./build-fixture.ts";
 
+function requestUrl({ input }: { input: Parameters<typeof fetch>[0] }) {
+  if (typeof input === "string") return input;
+  return input instanceof URL ? input.href : input.url;
+}
+
 describe("when external links are checked on request", () => {
   const fixture = buildFixture({
     files: {
@@ -39,7 +44,7 @@ describe("when external links are checked on request", () => {
     let active = 0;
     let peak = 0;
     const fetcher: typeof fetch = async (input, init) => {
-      const href = String(input);
+      const href = requestUrl({ input });
       requests.push(`${init?.method} ${href}`);
       active += 1;
       peak = Math.max(peak, active);

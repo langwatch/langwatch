@@ -22,7 +22,7 @@ const reportDir =
     : await mkdtemp(path.join(os.tmpdir(), "docs-audit-"));
 
 /** @scenario "Audit representative pages in a real browser" */
-it("audits every representative page within budget", async () => {
+void it("audits every representative page within budget", async () => {
   const forwarded =
     typeof values["report-dir"] === "string" ? args : [...args, "--report-dir", reportDir];
   const result = spawnSync(process.execPath, [runner, ...forwarded], { stdio: "inherit" });

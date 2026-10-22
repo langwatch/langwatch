@@ -19,7 +19,9 @@ export function startTagManager({ win = window }: { win?: TagWindow } = {}) {
     started = true;
     for (const name of INTERACTIONS) win.removeEventListener(name, start);
     win.dataLayer = win.dataLayer ?? [];
-    win.dataLayer.push({ "gtm.start": Date.now(), event: "gtm.js" });
+    // The performance clock gives epoch milliseconds without pulling Temporal into this island.
+    const epochMilliseconds = Math.round(performance.timeOrigin + performance.now());
+    win.dataLayer.push({ "gtm.start": epochMilliseconds, event: "gtm.js" });
     const script = win.document.createElement("script");
     script.async = true;
     script.src = `https://www.googletagmanager.com/gtm.js?id=${encodeURIComponent(id)}`;

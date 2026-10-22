@@ -48,7 +48,7 @@ export function summariseResult({
     .filter((audit) => audit && audit.score !== null && audit.score < 1)
     .map((audit) => ({ id: audit.id, title: audit.title, ...savings({ audit }) }))
     .filter((entry) => entry.savingsMs > 0 || entry.savingsBytes > 0)
-    .sort((a, b) => b.savingsMs - a.savingsMs || b.savingsBytes - a.savingsBytes)
+    .toSorted((a, b) => b.savingsMs - a.savingsMs || b.savingsBytes - a.savingsBytes)
     .slice(0, 5);
   const requests = audits["network-requests"]?.details as { items?: unknown[] } | undefined;
   return {
