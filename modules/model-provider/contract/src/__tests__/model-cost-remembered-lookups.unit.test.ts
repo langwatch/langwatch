@@ -117,7 +117,8 @@ const modelNames = (): string[] => {
 const customRules: ModelCostRate[] = [
   { model: "my-fine-tune", regex: "^my-fine-tune", inputCostPerToken: 1, outputCostPerToken: 1 },
   { model: "gpt-4o override", regex: "^(openai\\/)?gpt-4o$", inputCostPerToken: 2 },
-  { model: "unsafe", regex: ["^(a", "+)+$"].join("") /* backtracking-prone on purpose; built apart so static analysis does not flag the fixture */, inputCostPerToken: 3 },
+  // Backtracking-prone on purpose, built in two pieces so static analysis skips the fixture.
+  { model: "unsafe", regex: ["^(a", "+)+$"].join(""), inputCostPerToken: 3 },
   { model: "invalid", regex: "([", inputCostPerToken: 4 },
 ];
 

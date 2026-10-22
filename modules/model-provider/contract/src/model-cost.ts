@@ -142,15 +142,14 @@ const buildSafeRegex = (pattern: string): RegExp | null => {
 };
 
 /**
- * The winning rate (`null` for none) per model name, kept per cost list. Keyed by the list itself,
- * so a newly read list starts empty and a dropped one is garbage collected. A cost list must be
- * treated as immutable once passed in: build a new array to change a price, never edit one in
- * place, or remembered answers go stale.
+ * The winning rate (`null` for none) per model name, kept per cost list and keyed by the list
+ * itself. A cost list is immutable once passed in: build a new array to change a price.
  */
-const costListMatches = new WeakMap<readonly ModelCostRate[], Map<string, ModelCostRate | null>>();
+type RememberedMatches = Map<string, ModelCostRate | null>;
+const costListMatches = new WeakMap<readonly ModelCostRate[], RememberedMatches>();
 const MATCHES_PER_COST_LIST_MAX_ENTRIES = 2_000;
 
-const matchesFor = (costs: readonly ModelCostRate[]): Map<string, ModelCostRate | null> => {
+const matchesFor = (costs: readonly ModelCostRate[]): RememberedMatches => {
   let matches = costListMatches.get(costs);
   if (!matches) {
     matches = new Map();
@@ -236,9 +235,7 @@ function findBedrockModelCost({
   costs,
 }: CostListScan & { model: string }): ModelCostRate | undefined {
   const bedrock = normalizeBedrockModelId(model);
-  return bedrock === model
-    ? undefined
-    : findCandidateModelCost({ candidate: bedrock, costs });
+  return bedrock === model ? undefined : findCandidateModelCost({ candidate: bedrock, costs });
 }
 
 /**
