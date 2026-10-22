@@ -10,12 +10,23 @@ export function unixSecondsOf(epochMilliseconds: number): number {
   return Math.floor(epochMilliseconds / 1000);
 }
 
-/** An ISO-8601 instant, as an owner recorded it, in Customer.io's Unix seconds. */
-export function unixSecondsOfIso(iso: string): number {
+/** An ISO-8601 instant in Customer.io's Unix seconds; throws a RangeError when it is not a valid instant. */
+function getUnixSecondsOfIso(iso: string): number {
   return unixSecondsOf(Temporal.Instant.from(iso).epochMilliseconds);
 }
 
-/** A self-hosted report's traits for Customer.io: its two ISO dates as Unix seconds, each only when reported. */
+/** The date as a one-key trait, or nothing when it is absent or malformed, so one bad date never drops the rest. */
+function dateTrait<Key extends string>(key: Key, iso: string | undefined): { [K in Key]?: number } {
+  if (!iso) return {};
+  try {
+    return { [key]: getUnixSecondsOfIso(iso) } as { [K in Key]?: number };
+  } catch (error) {
+    if (error instanceof RangeError) return {};
+    throw error;
+  }
+}
+
+/** A self-hosted report's traits for Customer.io: its two ISO dates as Unix seconds, each only when reported and valid. */
 export function selfHostedTraits(
   traits: NurturingSignalOf<"self_hosted_crm">["traits"],
 ): Partial<CioOrgTraits> {
@@ -26,7 +37,7 @@ export function selfHostedTraits(
   } = traits;
   return {
     ...rest,
-    ...(firstSeenAt ? { self_hosted_first_seen_at: unixSecondsOfIso(firstSeenAt) } : {}),
-    ...(lastReportAt ? { self_hosted_last_report_at: unixSecondsOfIso(lastReportAt) } : {}),
+    ...dateTrait("self_hosted_first_seen_at", firstSeenAt),
+    ...dateTrait("self_hosted_last_report_at", lastReportAt),
   };
 }

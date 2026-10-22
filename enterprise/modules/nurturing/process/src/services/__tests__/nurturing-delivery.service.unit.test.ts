@@ -736,8 +736,8 @@ describe("NurturingDeliveryService", () => {
       ]);
     });
 
-    /** @scenario "Customer.io date attributes are sent as Unix seconds" */
-    it("does not throw from deliver and sends nothing when a report date is malformed", async () => {
+    /** @scenario "A malformed self-hosted report date is left out and the rest is still sent" */
+    it("groups the organization without the malformed date and still tracks the events", async () => {
       const { cio, delivery } = deliveryOverBothSinks();
 
       await expect(
@@ -750,14 +750,34 @@ describe("NurturingDeliveryService", () => {
             userId: "user-1",
             organizationId: "org-1",
             instanceId: "instance-1",
-            traits: { self_hosted: true, self_hosted_last_report_at: "not-a-date" },
-            events: [],
+            traits: {
+              self_hosted: true,
+              self_hosted_first_seen_at: "2026-10-22T10:13:20Z",
+              self_hosted_last_report_at: "not-a-date",
+            },
+            events: ["self_hosted_license_expiring"],
           },
         }),
       ).resolves.toBeUndefined();
       await settle();
 
-      expect(cio.sent.filter((call) => call.path === "/v1/group")).toEqual([]);
+      expect(cio.sent.filter((call) => call.path === "/v1/group")).toEqual([
+        {
+          path: "/v1/group",
+          body: expect.objectContaining({
+            traits: { self_hosted: true, self_hosted_first_seen_at: 1_792_664_000 },
+          }),
+        },
+      ]);
+      expect(cio.sent.filter((call) => call.path === "/v1/track")).toEqual([
+        {
+          path: "/v1/track",
+          body: expect.objectContaining({
+            userId: "user-1",
+            event: "self_hosted_license_expiring",
+          }),
+        },
+      ]);
     });
   });
 
