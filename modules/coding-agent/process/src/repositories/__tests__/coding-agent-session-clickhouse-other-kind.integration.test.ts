@@ -1,6 +1,6 @@
 /**
  * Runs findOtherSessionKind's two-probe SQL against real ClickHouse.
- * @see specs/coding-agent-session-stored.feature
+ * @see modules/coding-agent/specs/coding-agent-session-stored.feature
  */
 import { randomUUID } from "node:crypto";
 
