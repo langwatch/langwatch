@@ -35,20 +35,40 @@ const DAY = "2026-06-15";
 const at = (time: string) => Temporal.Instant.from(`${DAY}T${time}Z`);
 const LATE_MEMBER_FROM = at("10:00:00");
 
-/** One trace per row; its user, model and evaluator name say which row a picker offered. */
-const TRACES: { tenantId: string; time: string; name: string }[] = [
+/** A trace id two members both carry, as ids from different projects can collide. */
+const SHARED_TRACE_ID = `trace-${RUN}-shared`;
+
+/**
+ * One trace per row; its user, model and evaluator name say which row a picker offered. An
+ * evaluation runs when its trace occurred unless `evaluatedAt` says later.
+ */
+const TRACES: {
+  tenantId: string;
+  time: string;
+  name: string;
+  traceId?: string;
+  evaluatedAt?: string;
+}[] = [
   { tenantId: WHOLE_HISTORY_MEMBER, time: "08:00:00", name: "a-early" },
   { tenantId: WHOLE_HISTORY_MEMBER, time: "11:00:00", name: "a-late" },
   { tenantId: LATE_MEMBER, time: "09:30:00", name: "b-before-grant" },
   { tenantId: LATE_MEMBER, time: "10:30:00", name: "b-in-grant" },
   { tenantId: FOREIGN, time: "10:30:00", name: "foreign" },
+  {
+    tenantId: LATE_MEMBER,
+    time: "09:00:00",
+    name: "b-before-grant-evaluated-after",
+    evaluatedAt: "10:45:00",
+  },
+  { tenantId: WHOLE_HISTORY_MEMBER, time: "11:30:00", name: "a-shared", traceId: SHARED_TRACE_ID },
+  { tenantId: LATE_MEMBER, time: "11:30:00", name: "b-shared", traceId: SHARED_TRACE_ID },
 ];
-const IN_WINDOWS = ["a-early", "a-late", "b-in-grant"];
+const IN_WINDOWS = ["a-early", "a-late", "a-shared", "b-in-grant", "b-shared"];
 
 let client: ClickHouseClient;
 let repository: FilterOptionsClickHouseRepository;
 
-const traceIdOf = (index: number) => `trace-${RUN}-${index}`;
+const traceIdOf = (index: number) => TRACES[index]?.traceId ?? `trace-${RUN}-${index}`;
 const dateOf = (time: string) => new Date(at(time).epochMilliseconds);
 
 function traceSummaryRow({ tenantId, time, name }: (typeof TRACES)[number], index: number) {
@@ -119,8 +139,11 @@ function storedSpanRow({ tenantId, time, name }: (typeof TRACES)[number], index:
   };
 }
 
-function evaluationRunRow({ tenantId, time, name }: (typeof TRACES)[number], index: number) {
-  const scheduledAt = dateOf(time).toISOString();
+function evaluationRunRow(
+  { tenantId, time, name, evaluatedAt }: (typeof TRACES)[number],
+  index: number,
+) {
+  const scheduledAt = dateOf(evaluatedAt ?? time).toISOString();
   return {
     ProjectionId: `proj-${randomUUID()}`,
     TenantId: tenantId,
@@ -150,18 +173,22 @@ const aggregateProof = () =>
     ],
   });
 
+/** What a picker offers; `readsMembers` is what FilterService sets for an aggregate's proof. */
 async function offered({
   field,
   authorization = aggregateProof(),
+  readsMembers = true,
   scope,
 }: {
   field: FilterField;
   authorization?: Authorization;
+  readsMembers?: boolean;
   scope?: FindFilterOptionsInput["scope"];
 }): Promise<string[]> {
   const options = await repository.findOptions({
     field,
     authorization,
+    readsMembers,
     startDate: at("06:00:00").epochMilliseconds,
     endDate: at("14:00:00").epochMilliseconds,
     ...(scope ? { scope } : {}),
@@ -227,15 +254,46 @@ describe("filter pickers read under an aggregate's proof", () => {
 
       expect(await offered({ field: "metadata.user_id", scope })).toEqual(["a-late"]);
     });
+
+    /** @scenario "The aggregate's filter pickers offer member values inside their windows" */
+    it("offers no evaluator whose trace predates the member's grant, though it ran after", async () => {
+      const labels = await offered({ field: "evaluations.evaluator_id" });
+
+      expect(labels).not.toContain("[langevals/exact_match] b-before-grant-evaluated-after");
+    });
+  });
+
+  describe("given two members carrying the same trace id, and a scope picking one member's", () => {
+    const scope = {
+      conditions: ["ts.Attributes['langwatch.user_id'] = {user:String}"],
+      params: { user: "a-shared" },
+    };
+
+    it("offers that member's evaluators alone", async () => {
+      expect(await offered({ field: "evaluations.evaluator_id", scope })).toEqual([
+        "[langevals/exact_match] a-shared",
+      ]);
+    });
+
+    it("offers that member's span values alone", async () => {
+      expect(await offered({ field: "spans.type", scope })).toEqual(["a-shared"]);
+    });
   });
 
   describe("given a plain project's proof", () => {
     it("offers its own values alone, as before", async () => {
       const proof = analyticsProof({ projectId: WHOLE_HISTORY_MEMBER });
 
-      expect(await offered({ field: "metadata.user_id", authorization: proof })).toEqual([
+      const labels = await offered({
+        field: "metadata.user_id",
+        authorization: proof,
+        readsMembers: false,
+      });
+
+      expect(labels).toEqual([
         "a-early",
         "a-late",
+        "a-shared",
       ]);
     });
   });

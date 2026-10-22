@@ -40,16 +40,33 @@ export function buildStoredSpansConditions(_params: ClickHouseFilterQueryParams)
   return conditions.join(" AND ");
 }
 
+/** A side table's rows narrowed to the traces `conditions` pick, matched on tenant and trace. */
+function inTraces(conditions: string): string {
+  return `(TenantId, TraceId) IN (SELECT TenantId, TraceId FROM trace_summaries ts WHERE ${conditions})`;
+}
+
 /**
- * Build common WHERE conditions for evaluation_runs queries.
+ * Build common WHERE conditions for evaluation_runs queries. An evaluation is timed when it ran,
+ * so on an aggregate it is also held to its trace being inside the member's window: a trace
+ * from before the share, evaluated after it, stays out (ADR-177 v4.15).
  */
-export function buildEvaluationRunsConditions(_params: ClickHouseFilterQueryParams): string {
+export function buildEvaluationRunsConditions(params: ClickHouseFilterQueryParams): string {
   const conditions: string[] = [
     tenantScope("ScheduledAt"),
     "ScheduledAt >= fromUnixTimestamp64Milli({startDate:UInt64})",
     "ScheduledAt <= fromUnixTimestamp64Milli({endDate:UInt64})",
   ];
+  if (params.readsMembers) conditions.push(inTraces(buildTraceSummariesConditions(params)));
   return conditions.join(" AND ");
+}
+
+/**
+ * Narrows a stored_spans or evaluation_runs picker to the traces the other filters pick. Matched
+ * on tenant as well as trace: an aggregate's members can carry the same trace id.
+ */
+export function buildTraceScopeJoin(params: ClickHouseFilterQueryParams): string {
+  const { sql: scopeSql } = buildScopeConditions(params);
+  return scopeSql ? `AND ${inTraces(`${buildTraceSummariesConditions(params)} ${scopeSql}`)}` : "";
 }
 
 /**
