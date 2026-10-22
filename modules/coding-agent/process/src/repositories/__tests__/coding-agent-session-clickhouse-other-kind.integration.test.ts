@@ -24,7 +24,7 @@ const clickHouseUrl = testClickHouseUrl();
 const baseMs = Date.now();
 const tag = randomUUID();
 const tenantFor = (name: string) => `${tag}-${name}`;
-const tenants = ["main", "helpers", "none", "both", "refold", "other"].map(tenantFor);
+const tenants = ["main", "helpers", "none", "both", "refold", "other", "empty"].map(tenantFor);
 
 class FixedClock implements CodingAgentClock {
   nowMs(): number {
@@ -97,7 +97,7 @@ describe.skipIf(clickHouseUrl === null)("coding_agent_sessions other-session kin
   it("reads another tenant's sessions as none", async () => {
     await store(tenantFor("other"), "m1", false);
 
-    expect(await kindOf(tenantFor("none"), ["x"])).toBe("none");
+    expect(await kindOf(tenantFor("empty"), ["x"])).toBe("none");
   });
 
   // Row-level probe, no dedup: the older non-auxiliary version still matches. That can only

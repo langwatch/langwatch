@@ -110,9 +110,9 @@ export class CodingAgentSessionFactsService {
   }
 
   /**
-   * Fails closed: any error reads as "not first". Accepted false firsts at an idle project's
-   * retention edge: history aged out before a helper thread; main sessions aged out before a
-   * later helper. Safe-side loss: a helper-stamped project's main session named late is not first.
+   * Fails closed: errors read as "not first". Accepted false firsts: history aged out before a
+   * helper thread; main sessions aged out before a later helper; a fold rebuild resetting
+   * createdAt. Accepted loss: a session named after its first window once the project is stamped.
    */
   private async isFirstForProject({
     session,

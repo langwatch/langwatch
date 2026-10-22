@@ -36,7 +36,7 @@ export interface StoredSession {
   agent: string | null;
   /** The session's own last event time, epoch ms. */
   occurredAt: number;
-  /** When the fold first existed (framework-set at init, preserved on read-back), epoch ms. */
+  /** When the session was first folded (set at fold init, kept on read-back), epoch ms. */
   firstStoredAt: number;
   auxiliary: boolean;
 }
