@@ -21,6 +21,7 @@
   "dependencies": {
     "@langwatch/api": "workspace:*",
     "@langwatch/authorization": "workspace:*",
+    "@langwatch/api-key-client": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/browser": "workspace:*",
     "@langwatch/browser-host": "workspace:*",

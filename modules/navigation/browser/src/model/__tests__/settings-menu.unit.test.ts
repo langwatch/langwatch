@@ -175,15 +175,18 @@ describe("given a plan that lacks Enterprise", () => {
       expect(lockedHrefsIn({ hasPermission: () => true })).toEqual([
         "/settings/audit-log",
         "/settings/roles",
+        "/settings/organization-braids",
+        "/settings/braids",
       ]);
     });
 
     /** @scenario "A plan without Enterprise sees its entries locked" */
     it("still hides an entry the reader lacks the permission for", () => {
-      expect(lockedHrefsIn({})).toEqual(["/settings/roles"]);
+      expect(lockedHrefsIn({})).toEqual(["/settings/roles", "/settings/braids"]);
       expect(lockedHrefsIn({ hasPermission: (p) => p === "auditLog:view" })).toEqual([
         "/settings/audit-log",
         "/settings/roles",
+        "/settings/braids",
       ]);
     });
 

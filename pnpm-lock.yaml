@@ -6080,6 +6080,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/api-key-client':
+        specifier: workspace:*
+        version: link:../../api-key/client
       '@langwatch/authorization':
         specifier: workspace:*
         version: link:../../../packages/authorization

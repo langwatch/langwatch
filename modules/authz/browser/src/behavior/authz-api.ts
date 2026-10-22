@@ -6,11 +6,16 @@
 import { createModuleApi, type OutputsFromMap } from "@langwatch/api/web";
 import type { AuthzPermission } from "@langwatch/authorization";
 import type {
+  AuthzBraidRemoved,
   AuthzChangeGrantRoleInput,
   AuthzCreateGrantInput,
   AuthzListGrantsInput,
   AuthzManagedOrganizationBinding,
+  AuthzOrganizationBraids,
+  AuthzOrganizationPolicy,
   AuthzOwnStanding,
+  AuthzProjectBraids,
+  AuthzRemoveBraidInput,
   AuthzRevokeGrantByIdInput,
   Grant,
   GrantPage,
@@ -88,6 +93,30 @@ export type AuthzApiMap = {
      */
     listManagedGrants: {
       query: { input: OrganizationScope; output: AuthzManagedOrganizationBinding[] };
+    };
+
+    /** A project's braids, both directions; any member of either project reads them. */
+    listBraids: {
+      query: { input: { projectId: string }; output: AuthzProjectBraids };
+    };
+    /** Either side's admins, on any plan: stopping a braid only narrows access. */
+    removeBraid: {
+      mutation: {
+        input: Omit<AuthzRemoveBraidInput, "caller" | "actor">;
+        output: AuthzBraidRemoved;
+      };
+    };
+    /** Whether only organisation admins may braid; any member reads it. */
+    getBraidsPolicy: { query: { input: OrganizationScope; output: AuthzOrganizationPolicy } };
+    setBraidsPolicy: {
+      mutation: {
+        input: OrganizationScope & { braidsOrganizationAdminsOnly: boolean };
+        output: AuthzOrganizationPolicy;
+      };
+    };
+    /** Every live braid in the organisation, for its admins. */
+    listOrganizationBraids: {
+      query: { input: OrganizationScope; output: AuthzOrganizationBraids };
     };
   };
 

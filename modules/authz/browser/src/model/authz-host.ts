@@ -5,9 +5,10 @@ import { createContext, useContext } from "react";
 // Route and writes guard on organization:manage; prevents leaked organization data.
 export const AUTHZ_MANAGE_PERMISSION = "organization:manage";
 
-/** The organization these two pages are about. */
+/** The organization these pages are about, and the project a project settings page is about. */
 export type AuthzHostScope = {
   organizationId: string | undefined;
+  projectId?: string | undefined;
 };
 
 /**

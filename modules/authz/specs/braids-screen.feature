@@ -2,8 +2,9 @@
 # (ADR-183). Design: dev/docs/plans/braids/braids-prototype.html, steps 1 to 4, 7 and 9.
 # The braid's rules live in braids.feature; this file is what the screen offers and says.
 #
-# EVERY SCENARIO IS @unimplemented: none of this is built. Each carries the level its
-# binding is expected at; a rendered component is an integration test.
+# The page, the organisation screen and the plan states are built and bound; the dialog's
+# scenarios stay @unimplemented until the braid dialog lands. A rendered component is an
+# integration test.
 
 @authz @braids @ui
 Feature: The Braids screen
@@ -17,7 +18,7 @@ Feature: The Braids screen
 
   Rule: The page explains braids before there are any
 
-    @integration @unimplemented
+    @integration
     Scenario: A project with no braids shows how braids work
       Given "specialists" has no braids
       When ana opens Braids in the project settings
@@ -98,21 +99,21 @@ Feature: The Braids screen
 
   Rule: The list shows each braid and what it is doing
 
-    @integration @unimplemented
+    @integration
     Scenario: Each braid row shows where it goes, its condition, its access and its activity
       Given a live braid from "specialists" into "orchestrator"
       When ana opens Braids
       Then the row shows the reader, the condition, the start date, the end date and the braided spans over the last 24 hours
       And its menu offers Edit, View in audit log and Remove braid
 
-    @integration @unimplemented
+    @integration
     Scenario: Removing a braid says what stops before it happens
       Given a live braid from "specialists" into "orchestrator"
       When ana chooses Remove braid
       Then a confirmation says "orchestrator" stops seeing "specialists" spans and the removal is audited
       And confirming removes the braid and says so
 
-    @integration @unimplemented
+    @integration
     Scenario: The reader's admins may remove a braid from their side but not change it
       Given a live braid from "specialists" into "orchestrator"
       And olu is an admin of the team holding "orchestrator" with no role on "specialists"
@@ -120,7 +121,7 @@ Feature: The Braids screen
       Then the braid from "specialists" is listed with its condition and access
       And it offers Remove braid and no Edit
 
-    @integration @unimplemented
+    @integration
     Scenario: A project admin is told when the organisation keeps braids to its admins
       Given the organisation keeps braids to its admins
       And tom is an admin of the team holding "specialists"
@@ -128,13 +129,13 @@ Feature: The Braids screen
       Then the braids are listed and no New braid, Edit or Remove is offered
       And the page says the organisation's admins manage braids, with a link to ask one
 
-    @integration @unimplemented
+    @integration
     Scenario: An organisation admin chooses who may braid
       When ana opens Braids in the organisation settings
       Then every braid in the organisation is listed
       And a setting offers to keep braids to organisation admins, saying project admins can braid until it is on
 
-    @integration @unimplemented
+    @integration
     Scenario: A member who is not an admin sees the braids but cannot change them
       Given a member named sam who is not an admin
       When sam opens Braids
@@ -143,14 +144,14 @@ Feature: The Braids screen
 
   Rule: Below Enterprise the page says what Braids does
 
-    @integration @unimplemented
+    @integration
     Scenario: An organisation below Enterprise sees what Braids offers
       Given an organisation below Enterprise
       When ana opens Braids
       Then the page explains braids and offers a conversation about Enterprise
       And nothing half-works
 
-    @integration @unimplemented
+    @integration
     Scenario: After leaving Enterprise the page says braids are paused and kept
       Given a live braid from "specialists" into "orchestrator"
       And the organisation has left Enterprise

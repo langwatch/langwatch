@@ -39,6 +39,9 @@
       "path": "../contract/tsconfig.build.json"
     },
     {
+      "path": "../../api-key/client/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/authorization/tsconfig.build.json"
     },
     {
