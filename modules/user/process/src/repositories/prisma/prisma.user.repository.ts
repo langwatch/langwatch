@@ -67,10 +67,10 @@ function storedPreferenceMap(value: Prisma.JsonValue): Prisma.JsonObject {
   return value;
 }
 
-/** The three models, the transaction runner, and the raw read of the database's clock. */
+/** The four models, the transaction runner, and the raw read of the database's clock. */
 export type UserDatabase = Pick<
   PrismaClient,
-  "user" | "account" | "passkey" | "$transaction" | "$queryRaw"
+  "user" | "account" | "passkey" | "userErasure" | "$transaction" | "$queryRaw"
 >;
 
 const userProfileSelect = {
@@ -100,7 +100,7 @@ const userFullProfileSelect = {
 const createdUserSelect = { id: true } satisfies Prisma.UserSelect;
 
 export class PrismaUserRepository
-  extends PrismaRepository.transactionalFor("User", "Account", "Passkey")
+  extends PrismaRepository.transactionalFor("User", "Account", "Passkey", "UserErasure")
   implements UserRepository
 {
   static create({ prisma }: { prisma: UserDatabase }): PrismaUserRepository {
@@ -191,6 +191,22 @@ export class PrismaUserRepository
   async hasAnyAccount(): Promise<boolean> {
     const row = await this.prisma.user.findFirst({ select: { id: true } });
     return row !== null;
+  }
+
+  async findFirstCreatedId(): Promise<string | null> {
+    const [row, erased] = await Promise.all([
+      this.prisma.user.findFirst({
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        select: { id: true, createdAt: true },
+      }),
+      this.prisma.userErasure.findFirst({
+        orderBy: { accountCreatedAt: "asc" },
+        select: { accountCreatedAt: true },
+      }),
+    ]);
+    if (!row) return null;
+    if (erased && erased.accountCreatedAt.getTime() <= row.createdAt.getTime()) return null;
+    return row.id;
   }
 
   async findBackfillPage({

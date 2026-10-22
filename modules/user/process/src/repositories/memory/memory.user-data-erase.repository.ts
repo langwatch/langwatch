@@ -66,7 +66,9 @@ export class MemoryGdprUserDataEraseRepository implements GdprUserDataEraseRepos
 
   /** As the Prisma twin's transaction: the rows go and the erased fact is appended together. */
   async eraseUserAndOwnedResources({ userId }: { userId: string }): Promise<void> {
+    const [row] = this.database.usersById([userId]);
     this.database.deleteUser(userId);
+    if (row) this.database.recordErasure({ accountCreatedAt: row.createdAt });
     const occurredAt = nowInstant().epochMilliseconds;
     await this.database.appendFacts({
       userId,

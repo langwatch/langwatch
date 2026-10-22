@@ -584,10 +584,11 @@ Feature: The identifier model - identity as an event-sourced pipeline
     And an operator rollback closes it again
 
   @unit
-  Scenario: The identifier backfill waits for enrollment and migrates one user per tenant
-    Given the installation is cloud
+  Scenario: The identifier backfill reaches every user on its own and migrates one user per tenant
+    Given the front door reads each user's identity history
     When the migration runner reads the identifier backfill
-    Then it is not enrolled automatically and does not run on its own on self-hosted
+    Then it is enrolled automatically on cloud and runs on its own on self-hosted
+    And it asks for no operator confirmation
     And each tenant the runner hands it is one user, migrated alone
 
 
@@ -608,7 +609,7 @@ Feature: The identifier model - identity as an event-sourced pipeline
 
   @unit @regression
   Scenario: Adopting an arriving SSO user migrates that user alone
-    Given the identifier backfill is not enrolled automatically
+    Given the identifier backfill has not reached the arriving user yet
     When an SSO arrival adopts the user it admitted
     Then that user's migration runs without enrollment
     And no other user is migrated
