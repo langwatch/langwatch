@@ -3,6 +3,11 @@ autogen:
 access:
   enabled: true
   passwordSecrets: [metabase-passwords]
+  extraFiles:
+    ca.crt: |
+      -----BEGIN CERTIFICATE-----
+      test
+      -----END CERTIFICATE-----
   config:
     issuers:
       - name: cluster

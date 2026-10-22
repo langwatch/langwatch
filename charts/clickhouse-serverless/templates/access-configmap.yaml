@@ -9,4 +9,7 @@ metadata:
 data:
   access.yaml: |
     {{- toYaml .Values.access.config | nindent 4 }}
+  {{- range $name, $content := .Values.access.extraFiles }}
+  {{ $name }}: {{ $content | quote }}
+  {{- end }}
 {{- end }}

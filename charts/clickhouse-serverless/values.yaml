@@ -241,7 +241,11 @@ access:
   # The access file itself: issuers and users. Rolling users name a directory
   # under /etc/clickhouse-access/secrets/<Secret name> (see passwordSecrets).
   config: {}
-  # Or an existing ConfigMap with an `access.yaml` key; `config` is then ignored.
+  # More files next to access.yaml, at /etc/clickhouse-access/config/<name>:
+  # an issuer's private CA for ca_file, say.
+  extraFiles: {}
+  # Or an existing ConfigMap with an `access.yaml` key (every key is mounted);
+  # `config` and `extraFiles` are then ignored.
   existingConfigMap: ""
   # Secrets mounted as password directories, each at
   # /etc/clickhouse-access/secrets/<name>. Every key is one valid password;

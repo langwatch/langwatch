@@ -366,9 +366,6 @@ spec:
         - name: access-config
           configMap:
             name: {{ .Values.access.existingConfigMap | default (printf "%s-access" (include "clickhouse-serverless.fullname" .)) }}
-            items:
-              - key: access.yaml
-                path: access.yaml
         {{- range $i, $name := .Values.access.passwordSecrets }}
         - name: access-secret-{{ $i }}
           secret:
