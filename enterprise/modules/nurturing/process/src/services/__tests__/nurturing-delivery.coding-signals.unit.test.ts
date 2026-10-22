@@ -128,13 +128,13 @@ describe("NurturingDeliveryService coding-agent signals", () => {
     it("identifies the admin with the session's time", async () => {
       const { delivery, cio } = deliveryOver(new ClockedClaims());
 
-      await deliver(delivery, sessionStored("s-1", T0));
+      await deliver(delivery, sessionStored("s-1", T0 + 999));
       await settle();
 
       expect(cio.identifies()).toEqual([
         expect.objectContaining({
           userId: "admin-1",
-          traits: { coding_last_session_at: unixSeconds(T0) },
+          traits: { coding_last_session_at: 1_792_497_600 },
         }),
       ]);
     });
@@ -355,7 +355,7 @@ describe("NurturingDeliveryService app-open signals", () => {
       expect(cio.identifies()).toEqual([
         expect.objectContaining({
           userId: "user-1",
-          traits: { app_last_opened_at: unixSeconds(T0) },
+          traits: { app_last_opened_at: 1_792_497_600 },
         }),
       ]);
     });
