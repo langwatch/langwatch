@@ -1679,6 +1679,12 @@ export interface LwqlPrismaRows {
     readonly lastAppliedEventId: "String?";
     readonly updatedAt: "DateTime";
   };
+  readonly AuthzOrganizationPolicy: {
+    readonly organizationId: "String";
+    readonly braidsOrganizationAdminsOnly: "Boolean";
+    readonly updatedByUserId: "String";
+    readonly updatedAt: "DateTime";
+  };
   readonly RoleBinding: {
     readonly id: "String";
     readonly organizationId: "String";
@@ -1710,6 +1716,7 @@ export interface LwqlPrismaRows {
     readonly expiresAt: "DateTime?";
     readonly maxViews: "Int?";
     readonly condition: "Json?";
+    readonly replacesGrantId: "String?";
     readonly occurredAt: "DateTime";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
@@ -1758,6 +1765,20 @@ export interface LwqlPrismaRows {
     readonly isSystemManaged: "Boolean";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
+  };
+  readonly SigningKey: {
+    readonly id: "String";
+    readonly organizationId: "String";
+    readonly projectId: "String";
+    readonly name: "String";
+    readonly publicId: "String";
+    readonly secretCiphertext: "String";
+    readonly createdByUserId: "String";
+    readonly createdAt: "DateTime";
+    readonly rotatedAt: "DateTime?";
+    readonly verifiesUntil: "DateTime?";
+    readonly revokedAt: "DateTime?";
+    readonly lastUsedAt: "DateTime?";
   };
   readonly ProjectActiveDay: {
     readonly id: "String";
