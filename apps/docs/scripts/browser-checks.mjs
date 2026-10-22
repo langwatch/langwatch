@@ -4,9 +4,9 @@ import path from "node:path";
 
 export async function tracingPrompt({ outDir }) {
   const markdown = await readFile(path.join(outDir, "skills/directory.md"), "utf8");
-  const prompt = markdown.match(/````text\n([\s\S]*?)\n````/)?.[1];
-  assert.ok(prompt, "The authored tracing prompt must exist");
-  return prompt;
+  const file = markdown.match(/^- Full prompt: \S*?\/(skill-prompts\/[0-9a-f]+\.md)$/m)?.[1];
+  assert.ok(file, "The authored tracing prompt must exist");
+  return readFile(path.join(outDir, file), "utf8");
 }
 
 export async function assertAgentSetup({ page, base, prompt }) {

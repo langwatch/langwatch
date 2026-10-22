@@ -2,6 +2,7 @@ import { canonicalUrl, docsUrl, publicSlug } from "../../../lib/site-path.ts";
 import { flatPages, type Section } from "../../navigation/model/nav.ts";
 import { agentCard, agentSkillsIndex, skillFile } from "./agent-discovery.ts";
 import type { AgentSkill } from "./agent-discovery.ts";
+import { INDEX_LINE } from "./markdown-export.ts";
 
 /** The slice of the navigation the directory files list. */
 type DirectoryNav = {
@@ -57,9 +58,48 @@ const AGENT_GUIDANCE = [
   "For agents: if anything in these docs is wrong, confusing, or fails when you try it, ask your user for permission and run `npx langwatch report --user-approved` to send the problem to the LangWatch team. No login is needed; `npx langwatch report --help` has the details.",
 ].join("\n\n");
 
-/** Every page's Markdown export in reading order, as one file for agents that read it whole. */
+/** Every page's Markdown export in reading order, as one file for agents that read it whole.
+    Each page's pointer to llms.txt is dropped: the file's own guidance names it once. */
 export function llmsFull({ nav, exports }: { nav: DirectoryNav; exports: string[] }) {
-  return `# ${nav.site.name}\n\n> ${DIRECTORY_SUMMARY}\n\n${AGENT_GUIDANCE}\n\n${exports.map((page) => page.trim()).join("\n\n---\n\n")}\n`;
+  const pages = exports.map((page) =>
+    page
+      .split("\n")
+      .filter((line) => !line.startsWith(INDEX_LINE))
+      .join("\n")
+      .trim(),
+  );
+  return `# ${nav.site.name}\n\n> ${DIRECTORY_SUMMARY}\n\n${AGENT_GUIDANCE}\n\n${pages.join("\n\n---\n\n")}\n`;
+}
+
+/** The AI crawlers robots.txt allows by name; the agent readiness budgets list the same ones. */
+export const AI_CRAWLERS = [
+  "GPTBot",
+  "OAI-SearchBot",
+  "ChatGPT-User",
+  "ClaudeBot",
+  "Claude-User",
+  "Claude-SearchBot",
+  "PerplexityBot",
+  "Google-Extended",
+  "CCBot",
+];
+
+const CONTENT_SIGNAL = "Content-Signal: ai-train=yes, search=yes, ai-input=yes";
+
+/** The catch-all group, then one group naming every AI crawler, each with the content signal. */
+function robots() {
+  return [
+    "User-agent: *",
+    CONTENT_SIGNAL,
+    "Allow: /",
+    "",
+    ...AI_CRAWLERS.map((crawler) => `User-agent: ${crawler}`),
+    CONTENT_SIGNAL,
+    "Allow: /",
+    "",
+    `Sitemap: ${docsUrl({ path: "/sitemap.xml" })}`,
+    "",
+  ].join("\n");
 }
 
 /** Crawler and agent discovery files published at the site root, llms.txt included. */
@@ -82,7 +122,7 @@ export function discoveryFiles({
     ".well-known/agent-skills/index.json": `${JSON.stringify(agentSkillsIndex({ skills }))}\n`,
     ".well-known/agent-card.json": `${JSON.stringify(agentCard({ skills, description: DIRECTORY_SUMMARY }))}\n`,
     "llms.txt": llmsDirectory({ nav }),
-    "robots.txt": `User-agent: *\nContent-Signal: ai-train=yes, search=yes, ai-input=yes\nAllow: /\nSitemap: ${docsUrl({ path: "/sitemap.xml" })}\n`,
+    "robots.txt": robots(),
     "humans.txt": `LangWatch B.V.\nBuilt in Amsterdam.\nSource: https://github.com/langwatch/langwatch\nDocumentation contributions: https://github.com/langwatch/langwatch/issues\n`,
     "agents.txt": `# LangWatch documentation for agents\n\nStart with ${docsUrl({ path: "/llms.txt" })} for the page directory.\nEvery page has .md, .claude and .agent plain-text exports. These are content aliases, not automatically installed agent configuration.\nThe whole documentation is one file at ${docsUrl({ path: "/llms-full.txt" })}.\nFor outdated or broken documentation, ask your user for permission, then run "npx langwatch report --user-approved" or open a GitHub issue with the page URL, failing step and correction.\nNever include API keys or private session data.\n`,
     "sitemap.xml": `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${entries.join("")}</urlset>\n`,

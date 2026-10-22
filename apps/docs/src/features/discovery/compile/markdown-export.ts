@@ -8,9 +8,29 @@ import type { Content, Operation } from "../../api-reference/model/operation.ts"
 import { readFrontmatter, withoutFrontmatter } from "../../content/compile/frontmatter.ts";
 import { readDocsConfig } from "../../navigation/compile/nav.ts";
 import { withReleaseNotes } from "../../releases/compile/releases.ts";
+import { FENCE, mapProse, markedLines, mdxToMarkdown } from "./mdx-markdown.ts";
+
+const JSON_LINE = 80;
+
+/** JSON indented by level, but any value that fits on one line stays on it. */
+function compactJson({ value, indent = "" }: { value: unknown; indent?: string }): string {
+  const flat = JSON.stringify(value) ?? "null";
+  if (flat.length + indent.length <= JSON_LINE || value === null || typeof value !== "object")
+    return flat;
+  const inner = `${indent}  `;
+  if (Array.isArray(value)) {
+    const items = value.map((item) => `${inner}${compactJson({ value: item, indent: inner })}`);
+    return `[\n${items.join(",\n")}\n${indent}]`;
+  }
+  const entries = Object.entries(value).map(
+    ([key, item]) =>
+      `${inner}${JSON.stringify(key)}: ${compactJson({ value: item, indent: inner })}`,
+  );
+  return `{\n${entries.join(",\n")}\n${indent}}`;
+}
 
 function jsonBlock({ value }: { value: unknown }) {
-  return `\`\`\`json\n${JSON.stringify(value, null, 2)}\n\`\`\``;
+  return `\`\`\`json\n${compactJson({ value })}\n\`\`\``;
 }
 
 function contentMarkdown({ contents }: { contents: Content[] }) {
@@ -35,7 +55,11 @@ function operationMarkdown({ operation }: { operation: Operation }) {
     operation.schemes.length
       ? operation.schemes
           .map((scheme) =>
-            [`### ${scheme.id}`, scheme.description, jsonBlock({ value: scheme })]
+            [
+              `### ${scheme.id}`,
+              scheme.description,
+              jsonBlock({ value: { ...scheme, description: void 0 } }),
+            ]
               .filter(Boolean)
               .join("\n\n"),
           )
@@ -89,26 +113,20 @@ function operationMarkdown({ operation }: { operation: Operation }) {
 
 const SOURCE_REPOSITORY = "https://github.com/langwatch/langwatch/blob/main/docs";
 const SNIPPET_IMPORT = /^import\s+([A-Z]\w*)\s+from\s+["'](\/snippets\/[^"']+\.mdx)["'];?\s*$/;
-const FENCE = /^\s*(`{3,}|~{3,})/;
-const CLOSING_FENCE = /^\s*(`{3,}|~{3,})\s*$/;
-
-/** Rewrites (or with null drops) each line outside fenced code; code is never touched. */
-function mapProse({ source, line }: { source: string; line: (text: string) => string | null }) {
-  let fence: string | null = null;
-  return source
-    .split("\n")
-    .flatMap((text) => {
-      if (fence) {
-        const marker = CLOSING_FENCE.exec(text)?.[1];
-        if (marker && marker[0] === fence[0] && marker.length >= fence.length) fence = null;
-        return [text];
-      }
-      fence = FENCE.exec(text)?.[1] ?? null;
-      if (fence) return [text];
-      const mapped = line(text);
-      return mapped === null ? [] : [mapped];
-    })
-    .join("\n");
+/** A snippet compiles on its own, so a fence it leaves open ends with it; an empty one goes. */
+function closeFence({ source }: { source: string }) {
+  const lines = markedLines({ source });
+  const opener = lines.findLastIndex((line) => line.opens);
+  const closed = lines.slice(opener).some((line) => line.closes);
+  if (opener === -1 || closed) return source;
+  const empty = lines.slice(opener + 1).every((line) => !line.text.trim());
+  if (empty)
+    return lines
+      .slice(0, opener)
+      .map((line) => line.text)
+      .join("\n")
+      .trimEnd();
+  return `${source}\n${FENCE.exec(lines[opener].text)?.[1] ?? "```"}`;
 }
 
 /* An imported snippet's content in place of its own-line `<Name />`; an import used any
@@ -129,7 +147,9 @@ function inlineSnippets({
       const match = SNIPPET_IMPORT.exec(text);
       const file = match ? path.join(docsRoot, match[2]) : "";
       if (match && depth < 3 && existsSync(file)) {
-        const body = withoutFrontmatter({ source: readFileSync(file, "utf8") }).trim();
+        const body = closeFence({
+          source: withoutFrontmatter({ source: readFileSync(file, "utf8") }).trim(),
+        });
         snippets.set(match[1], inlineSnippets({ docsRoot, source: body, depth: depth + 1 }));
       }
       return text;
@@ -175,12 +195,15 @@ function absoluteLinks({ source }: { source: string }) {
   });
 }
 
+/** The provenance line that points a lone export at the page directory. */
+export const INDEX_LINE = "> Index of all pages: ";
+
 /** Where the page lives, where its source is, and where the full directory starts. */
 function provenance({ slug }: { slug: string }) {
   return [
     `> Page: ${canonicalUrl({ slug })}`,
     `> Source: ${SOURCE_REPOSITORY}/${slug}.mdx`,
-    `> Index of all pages: ${docsUrl({ path: "/llms.txt" })}`,
+    `${INDEX_LINE}${docsUrl({ path: "/llms.txt" })}`,
   ].join("\n");
 }
 
@@ -215,7 +238,8 @@ export function pageMarkdown({
   const title = (metadata.title ?? operation?.summary ?? fallbackTitle) || fallbackTitle;
   const description = metadata.description ?? operation?.description ?? "";
   const authored = withoutFrontmatter({ source: withReleaseNotes({ source, slug, docsRoot }) });
-  const body = absoluteLinks({ source: inlineSnippets({ docsRoot, source: authored }) }).trim();
+  const markdown = mdxToMarkdown({ source: inlineSnippets({ docsRoot, source: authored }) });
+  const body = absoluteLinks({ source: markdown }).trim();
   return (
     [
       instructions,

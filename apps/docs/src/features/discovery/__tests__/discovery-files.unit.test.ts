@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { discoveryFiles, llmsFull } from "../compile/discovery-files.ts";
+import { robotsIssues } from "../../../site/audit/agent-readiness.ts";
+import budgets from "../../../site/audit/budgets.json" with { type: "json" };
+import { AI_CRAWLERS, discoveryFiles, llmsFull } from "../compile/discovery-files.ts";
 
 describe("documentation discovery", () => {
   /** @scenario "Discover page exports and crawlable documentation" */
@@ -94,5 +96,27 @@ describe("when agents read the whole documentation", () => {
     const full = llmsFull({ nav, exports: ["# Introduction\n", "# Spans\n"] });
     expect(full.indexOf("npx langwatch report")).toBeLessThan(full.indexOf("# Introduction"));
     expect(full).toContain("# Introduction\n\n---\n\n# Spans\n");
+  });
+
+  /** @scenario "Discover page exports and crawlable documentation" */
+  it("drops each page's pointer to llms.txt, which the file names once", () => {
+    const page = "# Spans\n\n> Page: https://langwatch.ai/docs/spans\n> Index of all pages: x\n";
+    const full = llmsFull({ nav, exports: [page] });
+    expect(full).toContain("> Page: https://langwatch.ai/docs/spans\n");
+    expect(full).not.toContain("> Index of all pages");
+  });
+
+  /** @scenario "Robots.txt names each AI crawler" */
+  it("allows each AI crawler the budgets list by name, keeping the catch-all and sitemap", () => {
+    const robots = discoveryFiles({ nav })["robots.txt"];
+    expect(AI_CRAWLERS).toEqual(budgets.agentReadiness.crawlers);
+    expect(robotsIssues({ robots, crawlers: AI_CRAWLERS })).toEqual([]);
+    expect(robots.split("\n\n")[0]).toBe(
+      "User-agent: *\nContent-Signal: ai-train=yes, search=yes, ai-input=yes\nAllow: /",
+    );
+    expect(robots).toContain(
+      "User-agent: CCBot\nContent-Signal: ai-train=yes, search=yes, ai-input=yes\nAllow: /",
+    );
+    expect(robots).toContain("Sitemap: https://langwatch.ai/docs/sitemap.xml");
   });
 });
