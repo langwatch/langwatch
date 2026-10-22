@@ -801,6 +801,14 @@ The proof narrowed to the member holding the trace; an unreadable member is not 
 authorizationForTrace(input: { authorization: Authorization; traceId: string; tenantId?: string | undefined; }): Promise<Authorization>;
 ```
 
+#### `readBraidedHeaderTotals`
+
+The header's `braided` totals and owners; `{}` for a trace or proof without braids.
+
+```typescript
+readBraidedHeaderTotals(input: { authorization: Authorization; traceId: string; tenantId: string; occurredAtMs?: number | undefined; viewerUserId: string; header: TraceHeader; canSeeCosts: boolean; }): Promise<Pick<TraceHeader, "braided">>;
+```
+
 #### `readTraceSummary`
 
 ```typescript
