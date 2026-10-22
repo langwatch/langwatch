@@ -82,7 +82,7 @@ the offending field and the fields that exist.
 
 ```bash
 langwatch query "SELECT toStartOfDay(OccurredAt) AS day, count() AS traces
-FROM analytics.traces
+FROM langwatch.traces
 WHERE OccurredAt >= subtractDays(now(), 7)
 GROUP BY day ORDER BY day"
 ```
@@ -116,7 +116,7 @@ without changing a character of your statement.
 
 ```sql
 SELECT TraceId, OccurredAt, CapturedInput, CapturedOutput
-FROM analytics.traces
+FROM langwatch.traces
 WHERE OccurredAt >= subtractDays(now(), 7)
   AND (OccurredAt, TraceId) > ({after_ts:DateTime64(3)}, {after_id:String})
 ORDER BY OccurredAt, TraceId
