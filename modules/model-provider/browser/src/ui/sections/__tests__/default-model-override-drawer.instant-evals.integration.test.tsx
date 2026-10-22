@@ -102,7 +102,7 @@ describe("<DefaultModelOverrideDrawer/> Instant Evals column", () => {
   afterEach(() => cleanup());
 
   describe("given the own-decision-model flag is off for the organization", () => {
-    /** @scenario The drawer offers only decision models for the Instant Evals column */
+    /** @scenario "The drawer offers only decision models for the Instant Evals column" */
     it("offers only LangWatch Instant Preview, never a chat model or an own model", () => {
       renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
 

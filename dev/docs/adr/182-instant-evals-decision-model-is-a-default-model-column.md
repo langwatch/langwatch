@@ -27,7 +27,8 @@
    - no provider row, row off, no key, or the key or account refused (401, 402, 403): `classifier_key_invalid`, "check the key in Settings > Model Providers", not retried;
    - rate limited (429): `classifier_rate_limited`, "wait and retry";
    - provider down, timed out or unreadable answer (5xx, network): `classifier_provider_unavailable`, "retry later";
-   - the text too large (413): `classifier_input_too_large`; any other refusal (400, 422): `classifier_failed`.
+   - the text too large (413): `classifier_input_too_large`, a skip and not an error, since the trace's size is nothing to fix;
+   - any other refusal (400, 422): `classifier_failed`, "retry; if it keeps failing, pick another decision model".
    For an LLM judge these are error results (ADR-174 decision 7). For a run or a judged query they are skips, counted by reason.
 10. **The hosted path is untouched.** A project on LangWatch Instant Preview runs exactly as before: same classifier, same Connect choice off cloud, same meter, same cap.
 
@@ -53,7 +54,7 @@
 - The Default models table grows a fifth column, and every hard-coded role list gains `INSTANT_EVALS`.
 - An own-key project's Instant Evals usage shows no cost in LangWatch; the provider bills the customer.
 - A decision model with smaller limits than the hosted one may skip long texts as `classifier_input_too_large`; Clef Flash truncates a long text itself.
-- The answer is cached per project for a minute in Instant Evals, so a page of rows asks model provider once. A change to the column or the flag takes up to a minute to reach a running page, and a run that spans the change may mix verdicts from two models. Every page still checks the $1 total for a hosted project.
+- The answer is cached per project for a minute in model provider, so a page of rows or a busy monitor reads the column once, and concurrent callers share one lookup. A change to the column or the flag takes up to a minute to reach a running page, and a run that spans the change may mix verdicts from two models. Every page still checks the $1 total for a hosted project.
 - The search bar keeps classifying on LangWatch's key, unmetered (ADR-144), whatever the column says.
 - A run's estimate for an own-model project still shows the hosted price, with no $1 standing. Showing no price is a follow-up.
 
