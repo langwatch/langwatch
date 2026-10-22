@@ -389,7 +389,8 @@ export function scopeLangWatchQL({
       ? buildWindowPredicates({ views, database, memberWindows, timeWindow })
       : undefined;
   const withNames = findWithNames(parsed.statements);
-  assertNoShadowedView({ withNames, views });
+  // Only the member windows are a boundary; a plain project's row policy bounds it alone.
+  if (windows !== undefined) assertNoShadowedView({ withNames, views });
   const rewrites = findViewReferences({
     statements: parsed.statements,
     database,

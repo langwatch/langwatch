@@ -139,6 +139,13 @@ describe("scopeLangWatchQL", () => {
       );
     });
 
+    /** @scenario "A WITH name spelt like a narrowed view is refused" */
+    it("reads a WITH named like a view as the WITH, since only member windows refuse it", () => {
+      const sql = "WITH traces AS (SELECT 1 AS n) SELECT n FROM traces";
+
+      expect(scope({ sql })).toBe(sql);
+    });
+
     it("scopes both halves of a UNION ALL", () => {
       const scoped = scope({
         sql:

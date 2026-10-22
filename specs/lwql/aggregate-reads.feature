@@ -85,6 +85,7 @@ Feature: LangWatchQL on an aggregate project reads its members inside their gran
     When ana runs a statement whose WITH, in any subquery, is named like a view it reads
     Then the run is refused saying a WITH name cannot repeat a view's name
     And project B's rows from before its start are not read
+    And a plain project's statement with the same WITH runs as written
 
   @unit
   Scenario: App functions read text only from members shared for their whole history
