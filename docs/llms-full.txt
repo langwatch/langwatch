@@ -65582,7 +65582,7 @@ spec:
   source:
     repoURL: https://langwatch.github.io/langwatch
     chart: langwatch
-    targetRevision: 3.20.1 # x-release-please-version
+    targetRevision: 3.21.0 # x-release-please-version
     helm:
       releaseName: langwatch
       values: |
@@ -65637,7 +65637,7 @@ spec:
   sources:
     - repoURL: https://langwatch.github.io/langwatch
       chart: langwatch
-      targetRevision: 3.20.1 # x-release-please-version
+      targetRevision: 3.21.0 # x-release-please-version
       helm:
         releaseName: langwatch
         valueFiles:
@@ -66041,7 +66041,7 @@ For air-gapped or private environments, mirror the images to your own registry:
 ```bash
 # The release you are mirroring. Every tag below follows it, so set it once.
 # Pick the version from https://github.com/langwatch/langwatch/releases
-VERSION=3.20.1 # x-release-please-version
+VERSION=3.21.0 # x-release-please-version
 REGISTRY=registry.example.com
 
 for image in langwatch langwatch_nlp langevals; do
@@ -66057,13 +66057,13 @@ Then configure the Helm chart, giving every tag the version you mirrored:
 images:
   app:
     repository: registry.example.com/langwatch/langwatch
-    tag: "3.20.1" # x-release-please-version
+    tag: "3.21.0" # x-release-please-version
   langwatch_nlp:
     repository: registry.example.com/langwatch/langwatch_nlp
-    tag: "3.20.1" # x-release-please-version
+    tag: "3.21.0" # x-release-please-version
   langevals:
     repository: registry.example.com/langwatch/langevals
-    tag: "3.20.1" # x-release-please-version
+    tag: "3.21.0" # x-release-please-version
 ```
 
 Mirror and override the bundled services the same way: `gateway.image.repository`, `langyagent.image.repository`, `clickhouse.image.repository`, `postgresql.image.repository`, `redis.image.repository`, `prometheus.server.image.repository`, `cronjobs.image.repository` and `app.storedObjects.localFilesystem.serializeUpgradesImage` (the image the stored-objects upgrade hooks run).
@@ -69981,6 +69981,19 @@ kubectl -n langwatch logs sts/langwatch-clickhouse --tail=50 | grep -i s3
 
 Ensure the service account has S3 access (IRSA) or static credentials are configured correctly.
 
+### ClickHouse restarts with `NAMED_COLLECTION_ALREADY_EXISTS`
+
+With chart-managed ClickHouse, the chart delivers the LangWatchQL named collections `lwql_postgres` and `lwql_postgres_<database>` as server config. A collection of the same name created by hand with `CREATE NAMED COLLECTION` clashes with it, and the server stops at startup. Before you upgrade, list the collections and drop any whose `source` is `SQL`:
+
+```bash
+kubectl -n langwatch exec sts/langwatch-clickhouse -- clickhouse-client -q \
+  "SELECT name, source FROM system.named_collections WHERE name LIKE 'lwql_postgres%'"
+kubectl -n langwatch exec sts/langwatch-clickhouse -- clickhouse-client -q \
+  "DROP NAMED COLLECTION lwql_postgres_langwatch"
+```
+
+Upgrades need no collection created by hand: the upgrade binds the LangWatchQL tables to a collection the server already holds.
+
 ## PostgreSQL Issues
 
 ### The app refuses to start: the installation is behind
@@ -70851,7 +70864,7 @@ helm search repo langwatch/langwatch --versions
 # x-release-please-start-version
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
-  --version 3.20.1 \
+  --version 3.21.0 \
   -f values-production.yaml
 # x-release-please-end
 ```
