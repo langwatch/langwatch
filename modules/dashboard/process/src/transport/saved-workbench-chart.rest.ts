@@ -15,6 +15,7 @@ import {
   MANAGEMENT_API_VERSION,
   resolver,
   type RouteResponse,
+  nameUnlessMissing,
 } from "@langwatch/api/rest";
 import {
   createSavedWorkbenchChartSchema,
@@ -24,12 +25,13 @@ import {
   savedWorkbenchChartParamsSchema,
   savedWorkbenchChartProjectParamsSchema,
   savedWorkbenchChartResourceSchema,
+  SavedWorkbenchChartNotFoundError,
   updateSavedWorkbenchChartSchema,
   type SavedWorkbenchChart,
 } from "@langwatch/dashboard-contract";
 import { z } from "zod";
 
-import { viewerOfActor } from "../rules/dashboard-viewer.rules.ts";
+import { viewerOfActor, viewerOfOwner } from "../rules/dashboard-viewer.rules.ts";
 
 /**
  * The deep link back into the workbench for the project this credential
@@ -135,6 +137,7 @@ export const savedWorkbenchChartRest = defineRestRouter(DashboardApi)
     "/api/v1/projects/:projectId/analytics/charts",
     "postApiV1ProjectsByProjectIdAnalyticsCharts",
   )
+  .keepsRecords()
   .withAudit("analytics.savedWorkbenchCharts.create")
   .withSharedPath(PROJECT_ANALYTICS)
   .withParams(savedWorkbenchChartProjectParamsSchema)
@@ -206,6 +209,7 @@ export const savedWorkbenchChartRest = defineRestRouter(DashboardApi)
     "/api/v1/projects/:projectId/analytics/charts/:chartId",
     "patchApiV1ProjectsByProjectIdAnalyticsChartsByChartId",
   )
+  .keepsRecords()
   .withAudit("analytics.savedWorkbenchCharts.update")
   .withSharedPath(PROJECT_ANALYTICS)
   .withParams(savedWorkbenchChartParamsSchema)
@@ -249,6 +253,21 @@ export const savedWorkbenchChartRest = defineRestRouter(DashboardApi)
   .withSharedPath(PROJECT_ANALYTICS)
   .withParams(savedWorkbenchChartParamsSchema)
   .withPermission("analytics:delete")
+  .withConfirmation({
+    resource: "chart",
+    action: "delete",
+    idParam: "chartId",
+    name: ({ app, projectId, id, ownerUserId }) =>
+      nameUnlessMissing({
+        read: app.getSavedWorkbenchChart({
+          projectId,
+          chartId: id,
+          ...viewerOfOwner({ ownerUserId }),
+        }),
+        missing: SavedWorkbenchChartNotFoundError,
+        nameOf: (chart) => chart.name,
+      }),
+  })
   .withOutput(z.void())
   .withDocs({
     summary: "Delete a saved workbench chart",
@@ -275,6 +294,7 @@ export const savedWorkbenchChartRest = defineRestRouter(DashboardApi)
     "/api/v1/projects/:projectId/analytics/charts/:chartId/placement",
     "putApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement",
   )
+  .keepsRecords()
   .withAudit("analytics.savedWorkbenchCharts.place")
   .withSharedPath(PROJECT_ANALYTICS)
   .withParams(savedWorkbenchChartParamsSchema)
@@ -317,6 +337,21 @@ export const savedWorkbenchChartRest = defineRestRouter(DashboardApi)
   .withSharedPath(PROJECT_ANALYTICS)
   .withParams(savedWorkbenchChartParamsSchema)
   .withPermission("analytics:update")
+  .withConfirmation({
+    resource: "dashboard chart",
+    action: "remove",
+    idParam: "chartId",
+    name: ({ app, projectId, id, ownerUserId }) =>
+      nameUnlessMissing({
+        read: app.getSavedWorkbenchChart({
+          projectId,
+          chartId: id,
+          ...viewerOfOwner({ ownerUserId }),
+        }),
+        missing: SavedWorkbenchChartNotFoundError,
+        nameOf: (chart) => chart.name,
+      }),
+  })
   .withOutput(z.void())
   .withDocs({
     summary: "Remove a saved workbench chart from its dashboard",

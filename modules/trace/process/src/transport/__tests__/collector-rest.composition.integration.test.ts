@@ -19,6 +19,7 @@ import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import type { RecordSpanCommandData } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
+import { fakeTraceProcessingCommands } from "../../__tests__/support/trace-processing-commands.fake.ts";
 import { TraceModule } from "../../app/trace.app.ts";
 import { S3TraceLegacySpoolChannel } from "../../channels/s3/s3.trace-legacy-spool.channel.ts";
 import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
@@ -120,15 +121,11 @@ function deployment(access: CollectorAccess = {}) {
   const markedUsed: string[] = [];
   const peers = unreachablePeers();
 
-  const commands: TraceProcessingCommands = {
+  const commands: TraceProcessingCommands = fakeTraceProcessingCommands({
     recordSpan: async (data) => {
       recordedSpans.push(data);
     },
-    changeTraceName: async () => undefined,
-    addAnnotation: async () => undefined,
-    removeAnnotation: async () => undefined,
-    assignTopic: async () => undefined,
-  };
+  });
 
   const canonicalisation = TraceCanonicalisationService.create();
   const app = TraceModule.fromDependencies(

@@ -2427,6 +2427,17 @@
               "null"
             ]
           },
+          "attempts": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "last_attempt_error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "timestamps": {
             "$ref": "#/components/schemas/EvaluationTimestamps"
           }
@@ -2470,6 +2481,30 @@
             "type": [
               "number",
               "null"
+            ]
+          },
+          "last_attempt_at": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "next_attempt_at": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
             ]
           }
         }
@@ -8577,6 +8612,21 @@
                     "session": {
                       "description": "The agent's per-conversation memory, to send on the next turn."
                     },
+                    "state": {
+                      "description": "Setup's state, a turn's state update, or the object teardown returned.",
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {}
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "instance": {
                       "type": "object",
                       "properties": {
@@ -8721,6 +8771,36 @@
                         "type": "string"
                       }
                     }
+                  },
+                  "kind": {
+                    "description": "A turn, or a scenario run's setup or teardown hook. Defaults to a turn.",
+                    "type": "string",
+                    "enum": [
+                      "turn",
+                      "setup",
+                      "teardown"
+                    ]
+                  },
+                  "state": {
+                    "description": "The scenario run's test data: what setup returned, or a turn's latest update.",
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {}
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "timeoutMs": {
+                    "description": "A setup or teardown hook's budget in milliseconds. A turn runs under the agent's own timeout.",
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 300000
                   }
                 },
                 "required": [
@@ -9059,6 +9139,21 @@
                         },
                         "sticky": {
                           "type": "boolean"
+                        },
+                        "hooks": {
+                          "type": "object",
+                          "properties": {
+                            "setup": {
+                              "type": "boolean"
+                            },
+                            "teardown": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "setup",
+                            "teardown"
+                          ]
                         }
                       },
                       "required": [
@@ -9106,6 +9201,15 @@
                               "type": {
                                 "type": "string",
                                 "const": "call"
+                              },
+                              "kind": {
+                                "default": "turn",
+                                "type": "string",
+                                "enum": [
+                                  "turn",
+                                  "setup",
+                                  "teardown"
+                                ]
                               },
                               "callId": {
                                 "type": "string"
@@ -9163,6 +9267,20 @@
                                 }
                               },
                               "session": {},
+                              "state": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "propertyNames": {
+                                      "type": "string"
+                                    },
+                                    "additionalProperties": {}
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
                               "traceparent": {
                                 "type": [
                                   "string",
@@ -9193,6 +9311,7 @@
                             "required": [
                               "protocol",
                               "type",
+                              "kind",
                               "callId",
                               "agentId",
                               "threadId",
@@ -9396,6 +9515,20 @@
                               ]
                             },
                             "session": {},
+                            "state": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "propertyNames": {
+                                    "type": "string"
+                                  },
+                                  "additionalProperties": {}
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
                             "error": {
                               "type": "object",
                               "properties": {
@@ -76362,12 +76495,43 @@
                               "type": "null"
                             }
                           ]
+                        },
+                        "INSTANT_EVALS": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "model": {
+                                  "type": "string"
+                                },
+                                "source": {
+                                  "type": "string"
+                                },
+                                "scope": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "model",
+                                "source",
+                                "scope"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
                         "DEFAULT",
                         "FAST",
-                        "EMBEDDINGS"
+                        "EMBEDDINGS",
+                        "INSTANT_EVALS"
                       ],
                       "additionalProperties": false
                     },
@@ -76652,7 +76816,7 @@
             }
           }
         },
-        "description": "Create a default-model config attached to one or more scopes. JSON keys may be roles (DEFAULT, FAST, LANGY, EMBEDDINGS) or registered feature keys; missing keys inherit from a higher scope.",
+        "description": "Create a default-model config attached to one or more scopes. JSON keys may be roles (DEFAULT, FAST, LANGY, EMBEDDINGS, INSTANT_EVALS) or registered feature keys; missing keys inherit from a higher scope.",
         "security": [
           {
             "project_api_key": []

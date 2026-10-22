@@ -8,7 +8,7 @@ import {
   type GuidedOnboardingState,
   type GuidedPath,
 } from "@langwatch/onboarding-contract";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   fireGuidedOnboardingPaths,
@@ -183,8 +183,13 @@ describe("fireGuidedOnboardingProgress()", () => {
   });
 
   describe("when the gateway path is completed with llmops already done", () => {
+    afterEach(() => vi.useRealTimers());
+
     /** @scenario 'completing a path identifies the completed paths and fires the completion event' */
+    /** @scenario "Customer.io date attributes are sent as Unix seconds" */
     it("decides to identify the completed paths with the time, group them and track the completion", () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(1_792_664_000_123);
       const calls = fireGuidedOnboardingProgress({
         userId: "user-1",
         organizationId: "org-1",
@@ -197,7 +202,7 @@ describe("fireGuidedOnboardingProgress()", () => {
         type: "identify",
         traits: {
           guided_onboarding_completed_paths: "gateway,llmops",
-          guided_onboarding_completed_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/) as unknown,
+          guided_onboarding_completed_at: 1_792_664_000,
         },
       });
       expect(calls[1]).toMatchObject({

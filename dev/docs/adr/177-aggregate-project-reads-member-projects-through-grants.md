@@ -1,8 +1,8 @@
 # ADR-177: An aggregate project reads its member projects through shared grants
 
-**Date:** 2026-09-26, revised 2026-10-09
+**Date:** 2026-09-26, revised 2026-10-21
 
-**Status:** Accepted (v4.10, 2026-10-09)
+**Status:** Accepted (v4.15, 2026-10-21)
 
 **Builds on:** ADR-166 (grant-scoped data access: a sealed `Authorization`
 proof minted once at the door, carried by hand, applied by the store client),
@@ -155,7 +155,8 @@ departmentId }`, or `{ kind: "explicit", projectIds: [...] }`. The default
    projects in the same organisation, and a `condition` present. Every other
    foreign placement, every team or organisation placement and every other
    role key stay refused. `project-reader` is a built-in role whose whole
-   permission list is `traces:view` and `analytics:view`. It never carries
+   permission list is `traces:view`, `analytics:view` and, since v4.15,
+   `cost:view`. It never carries
    `*:manage`, and it never applies to a user or API-key principal. The
    `where` field of the condition is accepted only when empty in v1; a
    non-empty `where` is refused until the OTTL compiler lands. (Block A.)
@@ -205,9 +206,10 @@ AND StartTime within the grant's window))` onto the query. A trace from a
    coding-agent session list reads through the route's proof, so the page
    spans the members under their grants' windows on `StartedAt`, and the
    aggregate offers the destination on its kind alone, since it records no
-   session of its own to grow it from. Analytics leaves the navigation until
-   analytics across members ships (v4.8). Annotations on member traces are
-   out of scope. (Block D.)
+   session of its own to grow it from. Since v4.15 Analytics is back in the
+   navigation and its pages read the members as a plain project reads its
+   own, less the Topics views and the per-monitor cards (v4.15). Annotations
+   on member traces are out of scope. (Block D.)
 
 9. **Strictest member privacy policy, audited like admin workspace views
    today.** The effective privacy policy of an aggregate read is the most
@@ -238,7 +240,7 @@ AND StartTime within the grant's window))` onto the query. A trace from a
 | ----------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | `PROJECT_KIND_AGGREGATE`            | `"aggregate"`                                              | `Project.kind` value                                                                                                                 |
 | `PROJECT_READER_ROLE_KEY`           | `"project-reader"`                                         | `Grant.roleKey` for a project-to-project read grant                                                                                  |
-| `PROJECT_READER_PERMISSIONS`        | `["traces:view", "analytics:view"]`                        | the role's whole permission list                                                                                                     |
+| `PROJECT_READER_PERMISSIONS`        | `["traces:view", "analytics:view", "cost:view"]`           | the role's whole permission list                                                                                                     |
 | `GRANT_SOURCE_AGGREGATE_RECONCILER` | `"aggregate-reconciler"`                                   | added to `GRANT_EVENT_SOURCES`                                                                                                       |
 | `AUTHORIZATION_CONDITION_TYPES`     | `"trace" \| "span" \| "log"`                               | `Grant.condition.type` and the proof's condition type, in `@langwatch/actor` beside `grantConditionSchema`; v1 writes only `"trace"` |
 | `AUTHORIZATION_GRANT_KINDS`         | `"own" \| "shared"`                                        | ADR-166 grant kind inside the proof                                                                                                  |
@@ -256,7 +258,7 @@ AND StartTime within the grant's window))` onto the query. A trace from a
 | Invariant                                | Meaning                                                                                                                                    | Test anchor                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Foreign placement stays refused          | Only `project-reader` with a condition on a same-organisation project lifts the refusal                                                    | `authz-grants/schemas/events.test.ts`: every other foreign placement, team placement, organisation placement, role key and non-empty `where` is refused                                                                                                                                                                                                                                                                       |
-| Read grants never escalate               | `project-reader` satisfies only `traces:view` and `analytics:view`                                                                         | `packages/authz` matcher test: `traces:manage`, `project:manage`, `prompts:view` all denied through a `project-reader` grant                                                                                                                                                                                                                                                                                                  |
+| Read grants never escalate               | `project-reader` satisfies only `traces:view`, `analytics:view` and `cost:view`                                                            | `packages/authz` matcher test: `traces:manage`, `project:manage`, `prompts:view` all denied through a `project-reader` grant                                                                                                                                                                                                                                                                                                  |
 | Proof is sealed                          | A proof built outside `authz.authorize` is refused by the client                                                                           | `ForgedAuthorizationError` unit test                                                                                                                                                                                                                                                                                                                                                                                          |
 | Proof expires                            | A proof past `expiresAt` is refused; a revoked grant is absent from the next mint                                                          | `AuthorizationExpiredError` test; revoke-then-mint test                                                                                                                                                                                                                                                                                                                                                                       |
 | No leak outside the proof                | A tenant not named in the proof returns zero rows from every ClickHouse trace read                                                         | integration test per repository: list, summary, spans, analytics with a foreign tenant holding rows                                                                                                                                                                                                                                                                                                                           |
@@ -444,10 +446,10 @@ side keeps its existing guards until ADR-166's `prisma.as` lands.
 - Whether the settings-shaped writes that ride `project:update` (pinned
   traces, model providers, retention jobs, topic clustering) should also be
   refused on an aggregate (v4.6). Owner: platform.
-- Whether to admit `TimeUnixMs` (log records) and `BucketStart` (the
-  analytics rollup) as time columns the client may window on. Until then
-  an aggregate's logs and analytics read the aggregate's own tenant and
-  show nothing. Owner: product and platform, for the next block.
+- Whether to admit `TimeUnixMs` (log records) as a time column the client
+  may window on. Until then an aggregate's logs read the aggregate's own
+  tenant and show nothing. `BucketStart` was admitted in v4.13. Owner:
+  product and platform, for the next block.
 - Whether the organisation reconcile should leave the request path (v4.7).
   Personal workspace creation, SCIM deprovisioning and department moves
   run it inline: per aggregate a lock, two reads of every member, the
@@ -841,3 +843,109 @@ side keeps its existing guards until ADR-166's `prisma.as` lands.
   transcript reads) keep their own tenant and find nothing on an aggregate;
   the session rows carry no member name, so the page does not yet say which
   member a session belongs to.
+- v4.13 (2026-10-15, implementation note, no decision changed; lifts the
+  v4.9 mint limit). Routes checked under `analytics:view` mint the proof
+  again, because an analytics read now applies it: `analytics.getTimeseries`
+  and both REST timeseries routes hand it to the series, and a caller with
+  none (a scheduled report, a graph alert) reads under a proof the platform
+  mints for its own project alone. The four rollup and slim builders
+  (`trace_analytics_rollup`, `trace_analytics`, `evaluation_analytics_rollup`,
+  `evaluation_analytics`) write the fence marker instead of a tenant, so an
+  aggregate's series spans its members under their windows. `BucketStart`
+  is admitted as a fence time column with a one-minute bucket width: a
+  window admits only buckets wholly inside it, so a grant's edge drops the
+  bucket it cuts through rather than counting up to a minute outside the
+  grant. The series cache keys on the projects and windows the proof reads,
+  not on the proof, and a series asked under another project's proof is
+  refused before any read. The read tripwire is skipped when the proof
+  reads more than one project, since the legacy tables do not read members
+  yet. Not moved: `trace_summaries` and `evaluation_runs` (the legacy
+  builders), filter options, feedbacks and top documents keep their own
+  tenant, so the Analytics pages stay hidden on an aggregate (decision 8)
+  until those are fenced too. Superseded by v4.15: the legacy builders,
+  filter options, feedbacks and top documents now write the fence marker,
+  and the pages open on an aggregate.
+- v4.14 (2026-10-19, decision 8 changed: LangWatchQL on the aggregate).
+  LangWatchQL becomes the way an aggregate reads analytics; the legacy
+  Analytics pages are not fenced further and retire with that service. The
+  in-app door (`AnalyticsApp.executeLangWatchQL`) reads the members from the
+  route's `analytics:view` proof (`fenceFor`), never from the request, and
+  runs the statement under each member's LangWatchQL key, so the row policy
+  bounds the tenants as it does for a multi-project API key (ADR-142). A
+  member whose key cannot be read refuses the run by name. The row policy
+  knows no dates, so the door also narrows every catalogued view the
+  statement reads to each shared grant's window on that view's time column,
+  through the same reference rewrite that leaves out origins; a view with no
+  time column reads only members shared for their whole history. An app
+  function's text read takes a key from the result and no date, so it reads
+  only whole-history members, and Instant Evals are off on an aggregate. The tenant
+  bound is the store's, the date bound is the rewrite's, so the gate is an
+  integration test counting rows across a window edge and a non-member. The
+  strictest member protections apply (decision 9), the bounds are charged to
+  the aggregate once, a member count above the key-set cap is refused before
+  any read, and the audit row is the one the permission gate already writes
+  when it mints the proof. A plain project's statement reaches the store as
+  before. Not moved: the Analytics and Dashboards navigation stay hidden on
+  an aggregate until the Dashboards pages ship there. Superseded by v4.15:
+  Analytics opens on an aggregate; Dashboards stays hidden.
+  Spec: `specs/lwql/aggregate-reads.feature`.
+- v4.15 (2026-10-21, decision 8 changed again: Analytics pages on the
+  aggregate). The aggregate's Analytics pages read the members the way a
+  plain project's read its own, so v4.14's "the legacy Analytics pages are
+  not fenced further and retire" is withdrawn, and v4.13's "not moved" list
+  is out of date: the legacy `trace_summaries` and `evaluation_runs`
+  builders already write the fence marker. What changes:
+  - The filter pickers (`analytics.dataForFilter`) read through the route's
+    `analytics:view` proof. Each picker writes the fence marker on its own
+    time column (`OccurredAt`, `StartTime`, `ScheduledAt`), so a picker
+    offers only values from member rows inside their windows.
+  - `cost:view` joins the `project-reader` permission list and the
+    proof-bearing set, read as resource `cost` under the `trace` window.
+    The cost-gated reads (top documents, feedbacks and their pages) take
+    that proof and write the fence marker. Who may see cost is still the
+    viewer's own `cost:view` on the aggregate; the grant only lets the read
+    reach the members.
+  - The strictest member privacy policy applies across the whole read, as
+    decision 9 says. Hiding content per member, so a loose member's text
+    shows beside a strict member's hidden one, is tasks#960.
+  - The Topics views stay hidden: a topic belongs to one project's
+    clustering, and two members' topic ids do not name the same topic.
+    Opening the Topics address leads back to the Overview, with no
+    history entry, rather than a page explaining why it is empty.
+  - The per-monitor cards on the evaluations page stay hidden: they list
+    the aggregate's own monitors, which never run on member traces
+    (decision 8), so they would say "No data" for ever. The overall health
+    and pass-or-fail cards read evaluation runs and do span the members.
+  - A scheduled report and a graph alert on an aggregate are refused by
+    name before any read, instead of reading the aggregate's own empty
+    tenant and reporting zero. Allowing them is tasks#961, which must settle
+    whose permission a read with no viewer runs under.
+  - A chart on an aggregate takes one slot of the per-tenant concurrency
+    bound for the aggregate and one for each member it reads, taken in one
+    sorted order so two charts never wait on each other. Thirty members
+    behind fourteen charts then cost the members the work they actually do,
+    and a member's own dashboards still get their share. A chart reading
+    more members than `LWQL_AGGREGATE_MAX_MEMBERS` is refused before any
+    read, the same cap and refusal LangWatchQL applies.
+  - The Analytics navigation and pages open on the aggregate; the
+    "not available yet" gate is removed. Dashboards stay hidden (v4.14).
+  - API keys stay refused on the aggregate (decision 7). A key outlives its
+    maker and reads every member if it leaks; that is tasks#955.
+  - A window's minute bucket edge keeps v4.13's rule: the bucket a grant's
+    edge cuts through is dropped, not counted.
+  - A LangWatchQL run on an aggregate with a member shared up to a date is
+    refused naming that member, as a missing key is, instead of leaving the
+    member out of the total. No view can keep a read to before the end, and
+    the reconciler writes no end today. The rate limit is checked before
+    any member is looked up.
+  - A member's evaluation is counted only when its trace is inside the
+    grant's window. An evaluation is timed when it ran, so a window on that
+    time let a trace from before the share in once it was evaluated after
+    it. On an aggregate a chart of evaluations reads the legacy builder,
+    which windows the trace and joins its evaluations, never the
+    evaluation slim or rollup tables. In LangWatchQL a dated member's
+    `evaluations` and `evaluation_metrics` rows must name a trace in
+    `traces` inside the window; `evaluation_metrics_by_minute` names no
+    trace, so it reads only members shared for their whole history. An
+    evaluation that names no trace keeps its own time.
+    Spec: `specs/governance/aggregate-project.feature`, section D.

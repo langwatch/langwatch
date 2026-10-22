@@ -507,6 +507,9 @@ export const codingAgentSessionListPullRequestSchema: CodingAgentSessionListPull
 /** The exact row returned by the sessions screen. */
 const codingAgentSessionListRowSchemaDefinition = z
   .object({
+    /** The member project that recorded the session; a group project lists several. */
+    tenantId: z.string(),
+    projectName: z.string(),
     sessionId: z.string(),
     title: z.string().nullable(),
     agent: z.string(),

@@ -725,5 +725,112 @@ describe("Coding Agent sessions list", () => {
 
       expect(rows.map((row) => row.sessionId)).toEqual(["a-new", "b-after", "a-old"]);
     });
+
+    /**
+     * @see specs/governance/aggregate-project.feature
+     * @scenario "Two member projects' sessions that share an id stay two rows on the aggregate's Sessions page"
+     */
+    it("keeps the same session id from two members as two rows, each with its own project and pull requests", async () => {
+      const sessions = new TestSessions();
+      sessions.recentRowsByTenant.set("member-a", [
+        session({
+          tenantId: "member-a",
+          sessionId: "shared",
+          startedAtMs: TEST_NOW_MS - 1 * HOUR_MS,
+          repositoryOwner: "acme",
+          repositoryName: "widgets",
+          gitBranch: "feat/a",
+          gitBranches: ["feat/a"],
+          costUsd: 1.5,
+        }),
+      ]);
+      sessions.recentRowsByTenant.set("member-b", [
+        session({
+          tenantId: "member-b",
+          sessionId: "shared",
+          startedAtMs: TEST_NOW_MS - 2 * HOUR_MS,
+          repositoryOwner: "acme",
+          repositoryName: "gadgets",
+          gitBranch: "feat/b",
+          gitBranches: ["feat/b"],
+          costUsd: 7.25,
+        }),
+      ]);
+      const github = new TestGithubService();
+      github.pullRequests = [
+        pullRequest({ repositoryFullName: "acme/widgets", headBranch: "feat/a", prNumber: 11 }),
+        pullRequest({ repositoryFullName: "acme/gadgets", headBranch: "feat/b", prNumber: 22 }),
+      ];
+      const projects = createTestProjects();
+      projects.projectNames.set("member-a", "Alice's workspace");
+      projects.projectNames.set("member-b", "Bob's workspace");
+      const service = serviceWith({ sessions, github, projects });
+
+      const rows = await service.listForProject({
+        projectId: "aggregate",
+        authorization: aggregateProof({
+          projectId: "aggregate",
+          members: [
+            { projectId: "member-a", from: 0 },
+            { projectId: "member-b", from: 0 },
+          ],
+        }),
+      });
+
+      expect(
+        rows.map((row) => ({
+          tenantId: row.tenantId,
+          projectName: row.projectName,
+          sessionId: row.sessionId,
+          repositoryName: row.repositoryName,
+          costUsd: row.costUsd,
+          pullRequests: row.pullRequests.map((pull) => pull.number),
+        })),
+      ).toEqual([
+        {
+          tenantId: "member-a",
+          projectName: "Alice's workspace",
+          sessionId: "shared",
+          repositoryName: "widgets",
+          costUsd: 1.5,
+          pullRequests: [11],
+        },
+        {
+          tenantId: "member-b",
+          projectName: "Bob's workspace",
+          sessionId: "shared",
+          repositoryName: "gadgets",
+          costUsd: 7.25,
+          pullRequests: [22],
+        },
+      ]);
+      // One name lookup for the page, over each member once.
+      expect(projects.nameLookups).toEqual([{ projectIds: ["member-a", "member-b"] }]);
+    });
+
+    /**
+     * @see specs/governance/aggregate-project.feature
+     * @scenario "A member project the name lookup cannot find is named by its id"
+     */
+    it("names a member by its id when the lookup has no name for it", async () => {
+      const sessions = new TestSessions();
+      sessions.recentRowsByTenant.set("member-a", [
+        session({ tenantId: "member-a", sessionId: "a-1" }),
+      ]);
+      const projects = createTestProjects();
+      const service = serviceWith({ sessions, projects });
+
+      const rows = await service.listForProject({
+        projectId: "aggregate",
+        authorization: aggregateProof({
+          projectId: "aggregate",
+          members: [{ projectId: "member-a", from: 0 }],
+        }),
+      });
+
+      expect(rows.map((row) => [row.tenantId, row.projectName])).toEqual([
+        ["member-a", "member-a"],
+      ]);
+    });
   });
 });

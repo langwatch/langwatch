@@ -29,22 +29,26 @@ const DECODABLE_PROJECTION_VERSIONS: ReadonlySet<string> = new Set([
  * read through an own-only proof on the context's tenant from `authorize` (ADR-177 block C).
  */
 export class TraceAnalyticsStore implements FoldProjectionStore<TraceAnalyticsData> {
-  private constructor(
-    private readonly storage: TraceAnalyticsProjectionRepository,
-    private readonly defaultRetentionDays: () => number,
-    private readonly authorize: FoldReadAuthorizer,
-  ) {}
+  private readonly storage: TraceAnalyticsProjectionRepository;
+  private readonly defaultRetentionDays: () => number;
+  private readonly authorize: FoldReadAuthorizer;
+
+  private constructor(options: {
+    storage: TraceAnalyticsProjectionRepository;
+    defaultRetentionDays: () => number;
+    authorize: FoldReadAuthorizer;
+  }) {
+    this.storage = options.storage;
+    this.defaultRetentionDays = options.defaultRetentionDays;
+    this.authorize = options.authorize;
+  }
 
   static create(options: {
     storage: TraceAnalyticsProjectionRepository;
     defaultRetentionDays: () => number;
     authorize: FoldReadAuthorizer;
   }): TraceAnalyticsStore {
-    return new TraceAnalyticsStore(
-      options.storage,
-      options.defaultRetentionDays,
-      options.authorize,
-    );
+    return new TraceAnalyticsStore(options);
   }
 
   async store(state: TraceAnalyticsData, context: ProjectionStoreContext): Promise<void> {

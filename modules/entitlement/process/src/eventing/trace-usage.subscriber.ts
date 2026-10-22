@@ -1,4 +1,4 @@
-import type { Event, PeerSubscriberDefinition } from "@langwatch/eventing";
+import type { Event, PeerEventSubscriberDefinition } from "@langwatch/eventing";
 import {
   MONTH_TRACE_IDS_LISTED_EVENT_TYPE,
   monthTraceIdsListedEventDataSchema,
@@ -38,7 +38,7 @@ const spanSeenDataSchema = spanReceivedEventDataSchema.pick({});
 /** Trace's span event: the trace (its aggregate) in the month the span was appended. */
 export function traceUsageSpanSubscriber(
   usage: Recorder,
-): PeerSubscriberDefinition<typeof spanSeenDataSchema> {
+): PeerEventSubscriberDefinition<typeof spanSeenDataSchema> {
   return {
     eventType: SPAN_RECEIVED_EVENT_TYPE,
     data: spanSeenDataSchema,
@@ -55,7 +55,7 @@ export function traceUsageSpanSubscriber(
 /** Trace's upgrade step: a page of a project's trace ids first seen in the named month. */
 export function traceUsageMonthIdsSubscriber(
   usage: Recorder,
-): PeerSubscriberDefinition<typeof monthTraceIdsListedEventDataSchema> {
+): PeerEventSubscriberDefinition<typeof monthTraceIdsListedEventDataSchema> {
   return {
     eventType: MONTH_TRACE_IDS_LISTED_EVENT_TYPE,
     data: monthTraceIdsListedEventDataSchema,

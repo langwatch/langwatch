@@ -95,7 +95,10 @@ function nurturingOverMemoryPostHog(users: UserApi = createApiFixture<UserApi>({
   );
   const seen = new Set<string>();
   const delivery = NurturingDeliveryService.create({
-    claims: { claim: async (key: string) => !seen.has(key) && Boolean(seen.add(key)) },
+    claims: {
+      claim: async (key: string) => !seen.has(key) && Boolean(seen.add(key)),
+      release: async (key: string) => void seen.delete(key),
+    },
     customerIo: NurturingService.create({
       channel: HttpCustomerIoChannel.create({
         config: { customerIoApiKey: "key", customerIoRegion: "us" },
@@ -110,8 +113,8 @@ function nurturingOverMemoryPostHog(users: UserApi = createApiFixture<UserApi>({
     projectCreated: async () => undefined,
     guidedTurnFailed: (data) => delivery.deliverGuidedTurnFailed(data),
     usageReportReceived: (input) => delivery.deliverUsageReport(input),
-    evaluationCompleted: async () => [],
-    simulationRunFinished: async () => [],
+    evaluationsCompleted: async () => undefined,
+    simulationRunsFinished: async () => undefined,
   });
   const subscribers: EventSubscriberDefinition<Event>[] = [];
   const registry = createApiFixture<
@@ -252,7 +255,7 @@ describe("nurturing's userCreated peer subscriber", () => {
         traits: {
           email: "jane@example.com",
           name: "Jane Doe",
-          createdAt: new Date(1_000).toISOString(),
+          createdAt: 1,
         },
       });
     });
@@ -615,7 +618,7 @@ describe("nurturing's usageReportReceived peer subscriber", () => {
     it("sends nothing and claims nothing", async () => {
       const claim = vi.fn(async () => true);
       const delivery = NurturingDeliveryService.create({
-        claims: { claim },
+        claims: { claim, release: async () => undefined },
         customerIo: undefined,
         posthog: undefined,
         users: createApiFixture<UserApi>({}),
