@@ -1,5 +1,6 @@
 import { nowInstant } from "@langwatch/time";
 
+import { DEFAULT_LOG_LEVEL } from "../shared/log-level.ts";
 import type { RuntimeContext } from "../shared/runtime-contract.ts";
 import type { EventBus } from "./event-bus.ts";
 import { httpGetCheck, pollUntilHealthy } from "./health.ts";
@@ -30,8 +31,9 @@ export async function startAigateway(
         // services/aigateway/README.md and pkg/config/validate_test.go).
         // PORT alone is ignored — that's a Node convention, not Go.
         SERVER_ADDR: `:${ctx.ports.aigateway}`,
-        LW_GATEWAY_BASE_URL: `http://127.0.0.1:${ctx.ports.langwatch}`,
+        LW_GATEWAY_BASE_URL: `http://127.0.0.1:${ctx.ports.backend}`,
         LOG_FORMAT: "pretty",
+        LOG_LEVEL: ctx.logLevel ?? DEFAULT_LOG_LEVEL,
       },
     },
     paths: sp,

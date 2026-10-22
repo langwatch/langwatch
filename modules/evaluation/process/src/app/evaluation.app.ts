@@ -434,6 +434,7 @@ export class EvaluationModule implements EvaluationApiContract {
       evaluators: dependencies.evaluators,
       workflowExecutor: WorkflowEvaluationService.create(dependencies.workflows),
       judges: dependencies.judges,
+      decisionModels: dependencies.modelProviders,
       installEnvironment: environment.read(),
       telemetry,
     });
@@ -507,6 +508,8 @@ export class EvaluationModule implements EvaluationApiContract {
           execution,
           costs,
         }),
+        retryWindowMs: config.evaluatorRetryWindowMinutes * 60_000,
+        retries: commands,
       }),
       eventing: EvaluationProcessingStoresAdapter.create({
         runs: EvaluationRunProjectionService.create({

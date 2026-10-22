@@ -1,4 +1,5 @@
 /** Spec: modules/trace/specs/trace-month-trace-ids.feature */
+import type { ProjectIdPageInput } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { MemoryTraceUsageCountRepository } from "../../repositories/memory/memory.trace-usage-count.repository.ts";
@@ -42,7 +43,7 @@ function compose({
   const logger = { warn: vi.fn() };
   const service = TraceMonthIdsMigrationService.create({
     projects: {
-      listAllWithOrganization: async ({ after, limit = ids.length } = {}) => {
+      listAllWithOrganization: async ({ after, limit = ids.length }: ProjectIdPageInput = {}) => {
         pagesAsked.push(after);
         const rest = ids.filter((id) => after === undefined || id > after);
         const page = rest.slice(0, limit);
