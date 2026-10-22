@@ -99,9 +99,10 @@ Feature: GroupQueue batch bisection
     Then the batch is not split
     And the failure is surfaced without further handler calls
 
-  # An overloaded server (ClickHouse MEMORY_LIMIT_EXCEEDED, too many queries, a
-  # timeout) fails a half just as it failed the whole, and every split re-runs
-  # the heavy work on it at once. The failure names a retry delay instead.
+  # An overloaded server (ClickHouse's server-wide memory limit, too many
+  # queries, a statement the client shed, a timeout) fails a half just as it
+  # failed the whole, and every split re-runs the heavy work on it at once. The
+  # failure names a retry delay instead.
   @unit @coalescing @bisection
   Scenario: An overloaded server backs the whole batch off instead of splitting it
     Given a coalesced batch whose failure names a retry delay
@@ -109,6 +110,15 @@ Feature: GroupQueue batch bisection
     Then the batch is not split
     And the whole batch is re-staged once, after a backoff delay
     And one warning names the error and the delay
+
+  # Overload is not the job's fault. Spending the ordinary budget on it blocked
+  # healthy groups after a few hours of a busy server, for an operator to unblock.
+  @unit @bisection
+  Scenario: An overloaded server does not spend a group's ordinary retry budget
+    Given a job that has used the ordinary attempt budget
+    When it fails again with a failure that names a retry delay
+    Then it is re-staged with backoff instead of blocking its group
+    And its group blocks only once the longer overload budget is spent
 
   @integration @coalescing @bisection
   Scenario: Splitting is bounded within one locked attempt

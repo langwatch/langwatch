@@ -7,7 +7,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { GroupQueueRuntimeDefinition } from "../contracts.ts";
 import { EnvelopeBlobLifecycle } from "../envelopeBlobLifecycle.ts";
 import { HandBackGroupQueueError, NonRetryableGroupQueueError } from "../errors.ts";
-import { GroupQueueProcessor, HAND_BACK_CONFIG, handBackOutcome } from "../groupQueue.ts";
+import {
+  GroupQueueProcessor,
+  HAND_BACK_CONFIG,
+  handBackOutcome,
+  JOB_RETRY_CONFIG,
+} from "../groupQueue.ts";
 import { PayloadTooLargeError } from "../jobEnvelope.ts";
 import { type DrainedJob, GroupStagingScripts } from "../scripts.ts";
 import { TransientBlobStoreError } from "../tieredBlobStore.ts";
@@ -528,6 +533,45 @@ describe("given a dispatch that read the group's retry-chain counter inside the 
 
     expect(named(calls, "handler.process")).toHaveLength(1);
     expect(named(calls, "redis.get")).toHaveLength(0);
+  });
+
+  describe("when the job has used the ordinary attempt budget", () => {
+    const spent = { ...dispatched, groupAttempt: JOB_RETRY_CONFIG.maxAttempts };
+    const failing = async () => {
+      throw new Error("Too many queries in flight");
+    };
+
+    /** @scenario "An overloaded server does not spend a group's ordinary retry budget" */
+    it("re-stages an overloaded failure instead of blocking the group", async () => {
+      const { processor, calls } = recordingProcessor({ retryAfterMs: 0, process: failing });
+
+      await processor["processWithRetries"](spent);
+
+      expect(named(calls, "scripts.retryRestage")).toHaveLength(1);
+      expect(named(calls, "scripts.restageAndBlock")).toHaveLength(0);
+    });
+
+    it("blocks the group on an ordinary failure", async () => {
+      const { processor, calls } = recordingProcessor({ process: failing });
+
+      await processor["processWithRetries"](spent);
+
+      expect(named(calls, "scripts.retryRestage")).toHaveLength(0);
+      expect(named(calls, "scripts.restageAndBlock")).toHaveLength(1);
+    });
+
+    /** @scenario "An overloaded server does not spend a group's ordinary retry budget" */
+    it("blocks the group once the overload budget is spent too", async () => {
+      const { processor, calls } = recordingProcessor({ retryAfterMs: 0, process: failing });
+
+      await processor["processWithRetries"]({
+        ...dispatched,
+        groupAttempt: JOB_RETRY_CONFIG.maxOverloadedAttempts,
+      });
+
+      expect(named(calls, "scripts.retryRestage")).toHaveLength(0);
+      expect(named(calls, "scripts.restageAndBlock")).toHaveLength(1);
+    });
   });
 
   it("still reads the counter itself when the claim carried none", async () => {
