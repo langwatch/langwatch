@@ -13,7 +13,7 @@ import {
 import { pageMarkdown } from "../features/discovery/compile/markdown-export.ts";
 import { breadcrumbTrail, pageHead } from "../features/discovery/compile/page-head.ts";
 import { buildNav } from "../features/navigation/compile/nav.ts";
-import { readRedirects, resolveRedirect } from "../features/navigation/compile/redirects.ts";
+import { siteRedirects, resolveRedirect } from "../features/navigation/compile/redirects.ts";
 import { sourceSearchIndex } from "../features/search/compile/search-index.ts";
 import { appRoot } from "../paths.ts";
 import {
@@ -143,7 +143,8 @@ export function docsDevPlugin({ docsRoot }: { docsRoot: string }): Plugin {
           response.writeHead(400).end("Invalid URL");
           return;
         }
-        const redirects = readRedirects({ docsRoot });
+        const slugs = Object.keys(buildNav({ docsRoot }).pages);
+        const redirects = siteRedirects({ docsRoot, slugs });
         const redirect = resolveRedirect({ pathname, search: url.search, redirects });
         if (redirect) {
           response.writeHead(301, { Location: redirect }).end();

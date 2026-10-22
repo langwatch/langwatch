@@ -561,6 +561,20 @@ body {
   font-size: 12px;
   line-height: 20px;
 }
+/* The docs.json banner shares the release strip's one-line geometry, so neither shifts. */
+.docs-announcement {
+  color: var(--chakra-colors-fg);
+}
+.docs-announcement-text {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.docs-announcement-text a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
 .docs-release-link {
   display: flex;
   align-items: center;

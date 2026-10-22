@@ -1,5 +1,5 @@
 Feature: Useful release updates in the documentation
-  Published release notes replace the repeated Skills announcement.
+  Published release notes sit beside the configured docs.json announcement.
 
   @unit
   Scenario: Read published release notes

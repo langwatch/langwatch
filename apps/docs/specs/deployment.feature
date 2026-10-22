@@ -4,6 +4,14 @@ Feature: Publish the documentation as a static site
   application server, edge function or host-specific configuration.
 
   @unit
+  Scenario: Directory addresses and moved exports redirect as they do today
+    Given "/integration" is a directory of pages but not a page itself
+    When the documentation is built
+    Then "/integration" redirects to the first page under it in reading order
+    And a configured redirect or a page at the same path wins over the directory rule
+    And the Markdown, ".claude" and ".agent" exports of a moved page redirect to the new page's exports
+
+  @unit
   Scenario: Serve every configured redirect from a static page
     Given a docs.json redirect with an exact source path
     When the documentation is built

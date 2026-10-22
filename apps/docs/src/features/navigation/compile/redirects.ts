@@ -3,7 +3,13 @@ import path from "node:path";
 
 import { z } from "zod";
 
-import { docsUrl, sitePath, stripBasePath, withBasePath } from "../../../lib/site-path.ts";
+import {
+  docsUrl,
+  publicSlug,
+  sitePath,
+  stripBasePath,
+  withBasePath,
+} from "../../../lib/site-path.ts";
 import { matchRedirect } from "../model/redirect-match.ts";
 import { readDocsConfig } from "./nav.ts";
 
@@ -18,6 +24,32 @@ export function readRedirects({ docsRoot }: { docsRoot: string }): Redirects {
       destination,
     ]),
   );
+}
+
+const EXPORT_EXTENSIONS = ["md", "claude", "agent"];
+
+/**
+ * Every redirect the site answers: docs.json first, then each directory to its first page in
+ * reading order (as Mintlify does), then the Markdown exports of moved pages to their new export.
+ */
+export function siteRedirects({ docsRoot, slugs }: { docsRoot: string; slugs: string[] }) {
+  const redirects = readRedirects({ docsRoot });
+  const published = new Set(slugs.map((slug) => `/${publicSlug({ slug })}`));
+  for (const slug of slugs) {
+    const parts = publicSlug({ slug }).split("/");
+    for (let depth = 1; depth < parts.length; depth++) {
+      const directory = `/${parts.slice(0, depth).join("/")}`;
+      if (published.has(directory) || Object.hasOwn(redirects, directory)) continue;
+      redirects[directory] = `/${publicSlug({ slug })}`;
+    }
+  }
+  for (const [source, destination] of Object.entries(redirects)) {
+    if (!isStaticRedirect({ source }) || !destination.startsWith("/")) continue;
+    const target = new URL(destination, "http://docs.local").pathname;
+    for (const extension of EXPORT_EXTENSIONS)
+      redirects[`${source}.${extension}`] ??= `${target}.${extension}`;
+  }
+  return redirects;
 }
 
 /** The redirects a build published as `redirects.json`, read back by preview and the link check. */
@@ -62,7 +94,7 @@ export function redirectTarget({ source }: { source: string }) {
 
 /** `:param` and `*` sources match many paths; only a real host rule can serve them. */
 export function isStaticRedirect({ source }: { source: string }) {
-  return !/[:*]/.test(source);
+  return !/[:*]|\.(md|claude|agent)$/.test(source);
 }
 
 /** A redirect any static host can serve: refresh to the destination, canonical, noindex, a link. */

@@ -1,3 +1,5 @@
+import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
@@ -6,8 +8,11 @@ import { z } from "zod";
 import { docsUrl } from "../../../lib/site-path.ts";
 import { operationIndex, parseOpenapiRef } from "../../api-reference/compile/openapi.ts";
 import { readFrontmatter } from "../../content/compile/frontmatter.ts";
+import { pageLastModified } from "../../discovery/compile/last-modified.ts";
 import { readReleases } from "../../releases/compile/releases.ts";
-import type { Nav, NavItem, PageMeta } from "../model/nav.ts";
+import { localHref, parseInline } from "../model/inline.ts";
+import { contextualOptions } from "../model/nav.ts";
+import type { Announcement, Nav, NavItem, PageMeta } from "../model/nav.ts";
 
 const ACRONYMS = new Set([
   "api",
@@ -97,8 +102,27 @@ const docsConfigSchema = z.looseObject({
     })
     .optional(),
   redirects: z.array(z.looseObject({ source: z.string(), destination: z.string() })).optional(),
+  description: z.string().optional(),
+  seo: z
+    .looseObject({
+      indexing: z.string().optional(),
+      organization: z
+        .looseObject({
+          name: z.string(),
+          url: z.string(),
+          logo: z.string().optional(),
+          sameAs: z.array(z.string()).optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+  metadata: z.looseObject({ timestamp: z.boolean().optional() }).optional(),
+  markdown: z.looseObject({ instructions: z.string().optional() }).optional(),
+  banner: z.looseObject({ content: z.string(), dismissible: z.boolean().optional() }).optional(),
+  contextual: z.looseObject({ options: z.array(z.string()).optional() }).optional(),
+  integrations: z.looseObject({ gtm: z.looseObject({ tagId: z.string() }).optional() }).optional(),
 });
-/** docs.json, the authored site map: navigation, navbar, errors and redirects. */
+/** docs.json, the authored site map and settings; docs-config.ts accounts for every key. */
 export function readDocsConfig({ docsRoot }: { docsRoot: string }) {
   return docsConfigSchema.parse(JSON.parse(readFileSync(path.join(docsRoot, "docs.json"), "utf8")));
 }
@@ -178,6 +202,8 @@ function buildPage({
     mode: meta.mode ?? "",
     icon: meta.icon ?? "",
     logo: "",
+    updated: "",
+    tag: meta.tag ?? (meta.deprecated ? "Deprecated" : ""),
   };
   return { type: "page", slug: item, title: pages[item].sidebarTitle };
 }
@@ -287,7 +313,11 @@ export function buildNav({ docsRoot }: { docsRoot: string }): Nav {
       .filter((child) => child !== null);
     return { title: anchor.anchor, icon: anchor.icon ?? "", children };
   });
-  for (const [slug, meta] of Object.entries(pages)) meta.logo = logos.get(slug) ?? "";
+  const dates = config.metadata?.timestamp ? pageDates({ docsRoot }) : new Map<string, string>();
+  for (const [slug, meta] of Object.entries(pages)) {
+    meta.logo = logos.get(slug) ?? "";
+    meta.updated = dates.get(slug) ?? "";
+  }
   const anchors = built.map((anchor) => ({
     ...anchor,
     children: finishGroups({ items: anchor.children, pages, docsRoot }),
@@ -298,20 +328,66 @@ export function buildNav({ docsRoot }: { docsRoot: string }): Nav {
     href: anchor.href ?? "",
   }));
   const links = config.navbar?.links ?? [];
+  const organization = config.seo?.organization;
   const site = {
     name: config.name ?? "LangWatch",
     releases: readReleases({ docsRoot }),
     searchPrompt: config.search?.prompt ?? "Search the LangWatch docs",
     signIn: links.find((link) => /sign ?in/i.test(link.label))?.href ?? "https://app.langwatch.ai",
     github: config.navbar?.primary?.href ?? "https://github.com/langwatch/langwatch",
-    llms: links.find((link) => /llms/i.test(link.label))?.href ?? docsUrl({ path: "/llms.txt" }),
+    llms: localHref({
+      href: links.find((link) => /llms/i.test(link.label))?.href ?? docsUrl({ path: "/llms.txt" }),
+    }),
     stars: null,
     notFound: {
       title: config.errors?.["404"]?.title ?? "Page not found",
       description: config.errors?.["404"]?.description ?? "",
+      content: parseInline({ source: config.errors?.["404"]?.description ?? "" }),
     },
+    description: config.description ?? "",
+    organization: organization ? { logo: "", sameAs: [], ...organization } : null,
+    announcement: announcementOf({ banner: config.banner }),
+    contextual: contextualOptions({ options: config.contextual?.options ?? [] }),
+    tagManager: config.integrations?.gtm?.tagId ?? "",
   };
   return { anchors, support, pages, site };
+}
+
+function announcementOf({
+  banner,
+}: {
+  banner: { content: string; dismissible?: boolean } | undefined;
+}): Announcement | null {
+  const content = banner?.content.trim();
+  if (!content) return null;
+  const id = createHash("sha256").update(content).digest("hex").slice(0, 12);
+  return {
+    id: `announcement:${id}`,
+    content: parseInline({ source: content }),
+    dismissible: banner?.dismissible === true,
+  };
+}
+
+const datesByCommit = new Map<string, Map<string, string>>();
+/** Last commit dates per page, read once per docs checkout and commit; none outside git. */
+export function pageDates({ docsRoot }: { docsRoot: string }): ReadonlyMap<string, string> {
+  let head = "";
+  try {
+    head = execFileSync("git", ["rev-parse", "HEAD"], {
+      cwd: docsRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+  } catch {
+    return new Map();
+  }
+  const key = `${docsRoot}\0${head}`;
+  let dates = datesByCommit.get(key);
+  if (!dates) {
+    dates = pageLastModified({ docsRoot });
+    datesByCommit.set(key, dates);
+  }
+  return dates;
 }
 
 /** Slug to `openapi:` reference for every configured API page. */

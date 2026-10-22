@@ -6,6 +6,7 @@ import { resolveOperation } from "../../api-reference/compile/openapi.ts";
 import { generateExample, initialBodyOf } from "../../api-reference/model/codegen.ts";
 import type { Content, Operation } from "../../api-reference/model/operation.ts";
 import { readFrontmatter, withoutFrontmatter } from "../../content/compile/frontmatter.ts";
+import { readDocsConfig } from "../../navigation/compile/nav.ts";
 import { withReleaseNotes } from "../../releases/compile/releases.ts";
 
 function jsonBlock({ value }: { value: unknown }) {
@@ -183,8 +184,26 @@ function provenance({ slug }: { slug: string }) {
   ].join("\n");
 }
 
-/** A page as Markdown: title, description, the resolved operation, then the authored MDX. */
-export function pageMarkdown({ docsRoot, slug }: { docsRoot: string; slug: string }) {
+/** docs.json `markdown.instructions` as the quoted block Mintlify opens every export with. */
+export function agentInstructions({ docsRoot }: { docsRoot: string }) {
+  const text = readDocsConfig({ docsRoot }).markdown?.instructions?.trim() ?? "";
+  if (!text) return "";
+  return ["## Agent Instructions", ...text.split("\n")]
+    .map((line) => `> ${line}`.trimEnd())
+    .join("\n");
+}
+
+/** A page as Markdown: agent instructions, title, description, operation, then the MDX. */
+export function pageMarkdown({
+  docsRoot,
+  slug,
+  instructions = agentInstructions({ docsRoot }),
+}: {
+  docsRoot: string;
+  slug: string;
+  /** Pass "" where pages are concatenated, so the block appears once rather than per page. */
+  instructions?: string;
+}) {
   const source = readFileSync(path.join(docsRoot, `${slug}.mdx`), "utf8");
   const metadata = readFrontmatter({ source });
   const operation = metadata.openapi
@@ -199,6 +218,7 @@ export function pageMarkdown({ docsRoot, slug }: { docsRoot: string; slug: strin
   const body = absoluteLinks({ source: inlineSnippets({ docsRoot, source: authored }) }).trim();
   return (
     [
+      instructions,
       `# ${title}`,
       description,
       provenance({ slug }),

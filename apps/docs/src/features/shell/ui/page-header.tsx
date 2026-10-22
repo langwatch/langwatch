@@ -1,8 +1,9 @@
-import { Box, Button, Flex, Heading, Text } from "@langwatch/design-system/primitives";
+import { Badge, Box, Button, Flex, Heading, Text } from "@langwatch/design-system/primitives";
 import { Check, Copy } from "lucide-react";
 
 import { useCopy } from "../../../lib/clipboard.ts";
 import { sitePath } from "../../../lib/site-path.ts";
+import type { ContextualOption } from "../../navigation/model/nav.ts";
 import type { PageKind } from "./header.tsx";
 import { PageMenu } from "./page-menu.tsx";
 
@@ -12,42 +13,55 @@ async function readMarkdown({ slug }: { slug: string }): Promise<string> {
   return response.text();
 }
 
-function CopyPageMenu({ slug, title }: { slug: string; title: string }) {
+function CopyPageMenu({
+  slug,
+  title,
+  actions,
+}: {
+  slug: string;
+  title: string;
+  actions: ContextualOption[];
+}) {
   const { state, copy, ready } = useCopy();
+  const menu = actions.filter((action) => action !== "copy");
   return (
     <Flex alignItems="center" gap="2">
       <Flex>
-        <Button
-          type="button"
-          variant="outline"
-          colorPalette="gray"
-          size="sm"
-          height={{ base: "44px", xl: "34px" }}
-          minHeight={{ base: "44px", xl: "34px" }}
-          data-docs-page-copy={slug}
-          aria-keyshortcuts="Alt+Shift+C"
-          title="Copy page as Markdown (Alt+Shift+C)"
-          disabled={!ready}
-          borderEndRadius="0"
-          onClick={() =>
-            copy({
-              text: () =>
-                readMarkdown({ slug }).catch(
-                  () => document.querySelector("article")?.innerText ?? "",
-                ),
-            })
-          }
-        >
-          {state === "copied" ? (
-            <Check size={16} aria-hidden="true" />
-          ) : (
-            <Copy size={16} aria-hidden="true" />
-          )}
-          {state === "copied" ? "Copied" : "Copy page"}
-        </Button>
-        <Box data-docs-menu-root="page" data-slug={slug}>
-          <PageMenu slug={slug} />
-        </Box>
+        {actions.includes("copy") ? (
+          <Button
+            type="button"
+            variant="outline"
+            colorPalette="gray"
+            size="sm"
+            height={{ base: "44px", xl: "34px" }}
+            minHeight={{ base: "44px", xl: "34px" }}
+            data-docs-page-copy={slug}
+            aria-keyshortcuts="Alt+Shift+C"
+            title="Copy page as Markdown (Alt+Shift+C)"
+            disabled={!ready}
+            borderEndRadius={menu.length ? "0" : undefined}
+            onClick={() =>
+              copy({
+                text: () =>
+                  readMarkdown({ slug }).catch(
+                    () => document.querySelector("article")?.innerText ?? "",
+                  ),
+              })
+            }
+          >
+            {state === "copied" ? (
+              <Check size={16} aria-hidden="true" />
+            ) : (
+              <Copy size={16} aria-hidden="true" />
+            )}
+            {state === "copied" ? "Copied" : "Copy page"}
+          </Button>
+        ) : null}
+        {menu.length ? (
+          <Box data-docs-menu-root="page" data-slug={slug} data-actions={actions.join(" ")}>
+            <PageMenu slug={slug} actions={actions} />
+          </Box>
+        ) : null}
       </Flex>
       {state === "failed" ? (
         <Text as="output" fontSize="13px" color="red.fg">
@@ -85,12 +99,16 @@ export function PageHeader({
   title,
   description,
   breadcrumb,
+  tag = "",
+  actions = [],
 }: {
   slug: string;
   title: string;
   description: string;
   breadcrumb: string[];
   kind: PageKind;
+  tag?: string;
+  actions?: ContextualOption[];
 }) {
   return (
     <Box paddingTop={{ base: "7", xl: "10" }} paddingBottom="0">
@@ -103,10 +121,17 @@ export function PageHeader({
           marginBottom="2"
           position="relative"
         >
-          <Breadcrumb trail={breadcrumb} />
-          {slug !== "404" ? (
+          <Flex alignItems="center" gap="3">
+            <Breadcrumb trail={breadcrumb} />
+            {tag ? (
+              <Badge data-docs-page-tag="" colorPalette="orange" variant="subtle" size="sm">
+                {tag}
+              </Badge>
+            ) : null}
+          </Flex>
+          {slug !== "404" && actions.length ? (
             <Box className="docs-page-actions">
-              <CopyPageMenu slug={slug} title={title} />
+              <CopyPageMenu slug={slug} title={title} actions={actions} />
             </Box>
           ) : null}
         </Flex>

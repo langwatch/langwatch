@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { canonicalUrl, pagePath } from "../../../lib/site-path.ts";
 import { trailOf } from "../../navigation/model/nav.ts";
 import { sectionOf, site } from "../../navigation/ui/site-nav.ts";
+import { LastUpdated } from "./last-updated.tsx";
 
 type Neighbour = { slug: string; title: string } | undefined;
 
@@ -137,10 +138,12 @@ export function PageFooter({
   slug,
   previous,
   next,
+  updated = "",
 }: {
   slug: string;
   previous: Neighbour;
   next: Neighbour;
+  updated?: string;
 }) {
   const issue = `${site.github}/issues/new?${new URLSearchParams({
     title: `Docs: ${slug}`,
@@ -149,6 +152,11 @@ export function PageFooter({
   })}`;
   return (
     <Box className="docs-page-footer" marginTop={{ base: "12", lg: "16" }}>
+      {updated ? (
+        <Box marginBottom="6">
+          <LastUpdated date={updated} />
+        </Box>
+      ) : null}
       {previous || next ? (
         <Box
           as="nav"

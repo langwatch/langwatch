@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { docsRoot } from "../../../paths.ts";
 import { docsFixture } from "../../../testing/docs-fixture.ts";
-import { pageMarkdown } from "../compile/markdown-export.ts";
+import { agentInstructions, pageMarkdown } from "../compile/markdown-export.ts";
 
 describe("when an API page contains only OpenAPI frontmatter", () => {
   /** @scenario "Export complete API operations for agents" */
@@ -85,6 +85,34 @@ describe("when a guide declares its title and description", () => {
       expect(pageMarkdown({ docsRoot: fixture.docsRoot, slug: "guide" })).toBe(
         `# Agent setup\n\nConnect your coding agent.\n\n> Page: https://langwatch.ai/docs/guide\n> Source: https://github.com/langwatch/langwatch/blob/main/docs/guide.mdx\n> Index of all pages: https://langwatch.ai/docs/llms.txt\n\n${body}\n`,
       );
+    } finally {
+      fixture.dispose();
+    }
+  });
+});
+
+describe("when docs.json gives agents Markdown instructions", () => {
+  /** @scenario "Give agents the site's instructions in every Markdown export" */
+  it("opens the export with them, before the title, as Mintlify does", () => {
+    const fixture = docsFixture({
+      config: {
+        markdown: { instructions: "Report problems with `npx langwatch report`.\nThanks." },
+      },
+      pages: { "guide.mdx": "---\ntitle: Agent setup\n---\nBody" },
+    });
+    try {
+      const markdown = pageMarkdown({ docsRoot: fixture.docsRoot, slug: "guide" });
+      expect(
+        markdown.startsWith(
+          "> ## Agent Instructions\n> Report problems with `npx langwatch report`.\n> Thanks.\n\n# Agent setup\n",
+        ),
+      ).toBe(true);
+      expect(agentInstructions({ docsRoot: fixture.docsRoot })).toContain("## Agent Instructions");
+      expect(
+        pageMarkdown({ docsRoot: fixture.docsRoot, slug: "guide", instructions: "" }).startsWith(
+          "# Agent setup",
+        ),
+      ).toBe(true);
     } finally {
       fixture.dispose();
     }

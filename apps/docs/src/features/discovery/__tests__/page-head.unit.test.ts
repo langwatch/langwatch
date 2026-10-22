@@ -1,7 +1,32 @@
 import { describe, expect, it } from "vitest";
 
 import { canonicalUrl } from "../../../lib/site-path.ts";
-import { breadcrumbTrail, pageDescription, pageHead } from "../compile/page-head.ts";
+import { breadcrumbTrail, headSettings, pageDescription, pageHead } from "../compile/page-head.ts";
+import type { HeadSettings } from "../compile/page-head.ts";
+
+const EMPTY: HeadSettings = {
+  description: "",
+  organization: null,
+  tagManager: "",
+  dates: new Map(),
+};
+const SETTINGS: HeadSettings = {
+  description: "The open-source LLMOps platform.",
+  organization: {
+    name: "LangWatch",
+    url: "https://langwatch.ai",
+    logo: "https://langwatch.ai/docs/logo/light.svg",
+    sameAs: ["https://github.com/langwatch/langwatch"],
+  },
+  tagManager: "GTM-ABC123",
+  dates: new Map([["integration/quick-start", "2026-10-12T08:12:32+00:00"]]),
+};
+
+function structuredData({ head }: { head: string }) {
+  return [...head.matchAll(/<script[^>]+>([\s\S]+?)<\/script>/g)].map((match): unknown =>
+    JSON.parse(match[1]),
+  );
+}
 
 describe("static documentation metadata", () => {
   /** @scenario "Discover page exports and crawlable documentation" */
@@ -27,7 +52,11 @@ describe("static documentation metadata", () => {
 
   /** @scenario "Discover page exports and crawlable documentation" */
   it("gives a deep API page matching canonical, social and structured URLs", () => {
-    const head = pageHead({ slug: "api-reference/traces/get-trace", title: "Get trace" });
+    const head = pageHead({
+      slug: "api-reference/traces/get-trace",
+      title: "Get trace",
+      settings: EMPTY,
+    });
     expect(head).toContain('href="https://langwatch.ai/docs/api-reference/traces/get-trace"');
     expect(head).toContain(
       'property="og:url" content="https://langwatch.ai/docs/api-reference/traces/get-trace"',
@@ -96,5 +125,72 @@ describe("when a page has no authored description", () => {
       "Authored",
     );
     expect(pageDescription({ title: "Guide", operation: null })).toBe("");
+  });
+});
+
+describe("when docs.json describes the site and its organization", () => {
+  /** @scenario "Describe every page to search engines and social previews" */
+  it("describes an undescribed page with the site description", () => {
+    const head = pageHead({ slug: "guide", title: "Guide", settings: SETTINGS });
+    for (const attribute of ['name="description"', 'property="og:description"']) {
+      expect(head).toContain(`<meta ${attribute} content="The open-source LLMOps platform.">`);
+    }
+    expect(
+      pageHead({ slug: "guide", title: "Guide", description: "Own", settings: SETTINGS }),
+    ).toContain('<meta name="description" content="Own">');
+  });
+
+  /** @scenario "Describe every page to search engines and social previews" */
+  it("names the organization as the publisher and dates a known page", () => {
+    const dated = pageHead({
+      slug: "integration/quick-start",
+      title: "Quick Start",
+      settings: SETTINGS,
+    });
+    expect(structuredData({ head: dated })[0]).toMatchObject({
+      "@type": "WebPage",
+      dateModified: "2026-10-12T08:12:32+00:00",
+      isPartOf: {
+        "@type": "WebSite",
+        publisher: {
+          "@type": "Organization",
+          name: "LangWatch",
+          url: "https://langwatch.ai",
+          logo: { "@type": "ImageObject", url: "https://langwatch.ai/docs/logo/light.svg" },
+          sameAs: ["https://github.com/langwatch/langwatch"],
+        },
+      },
+    });
+    const undated = structuredData({
+      head: pageHead({ slug: "guide", title: "Guide", settings: EMPTY }),
+    });
+    expect(undated[0]).not.toHaveProperty("dateModified");
+    expect(undated[0]).not.toHaveProperty("isPartOf.publisher");
+  });
+
+  /** @scenario "Show when a page was last updated" */
+  it("reads the real docs.json organization and commit dates", () => {
+    const settings = headSettings();
+    expect(settings.organization?.name).toBe("LangWatch");
+    expect(settings.description).not.toBe("");
+    const date = settings.dates.get("introduction");
+    if (date !== undefined) expect(Number.isNaN(Date.parse(date))).toBe(false);
+  });
+});
+
+describe("when docs.json names a tag manager container", () => {
+  /** @scenario "Load the tag manager without slowing the page" */
+  it("names it on production pages only and never adds a tag script", () => {
+    const production = pageHead({
+      slug: "guide",
+      title: "Guide",
+      settings: SETTINGS,
+      production: true,
+    });
+    expect(production).toContain('<meta name="docs-gtm" content="GTM-ABC123">');
+    expect(production).not.toContain("googletagmanager");
+    expect(
+      pageHead({ slug: "guide", title: "Guide", settings: SETTINGS, production: false }),
+    ).not.toContain("docs-gtm");
   });
 });

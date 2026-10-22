@@ -51558,7 +51558,7 @@ import json
 # Authenticate with LangWatch
 langwatch.login()
 
-# Create a sample evaluation dataset (or load one from [LangWatch Datasets](https://docs.langwatch.ai/evaluations/experiments/sdk#use-langwatch-datasets)). In a real workflow, you would load this
+# Create a sample evaluation dataset (or load one from [LangWatch Datasets](https://langwatch.ai/docs/datasets/programmatic-access)). In a real workflow, you would load this
 # from a CSV or directly from LangWatch Datasets.
 data = [
     {

@@ -1,6 +1,35 @@
+import { isProduction } from "../../../config.ts";
 import { canonicalUrl, docsUrl, sitePath } from "../../../lib/site-path.ts";
+import { docsRoot } from "../../../paths.ts";
 import type { Operation } from "../../api-reference/model/operation.ts";
-import { firstSlug, ownsSlug, type Section } from "../../navigation/model/nav.ts";
+import { pageDates, readDocsConfig } from "../../navigation/compile/nav.ts";
+import {
+  firstSlug,
+  ownsSlug,
+  type Organization,
+  type Section,
+} from "../../navigation/model/nav.ts";
+
+/** The docs.json settings a page head reads. */
+export type HeadSettings = {
+  description: string;
+  organization: Organization | null;
+  tagManager: string;
+  /** Last commit dates by slug; empty unless docs.json shows timestamps. */
+  dates: ReadonlyMap<string, string>;
+};
+
+/** Head settings from the authored docs.json, read per call so development sees edits. */
+export function headSettings({ root = docsRoot }: { root?: string } = {}): HeadSettings {
+  const config = readDocsConfig({ docsRoot: root });
+  const organization = config.seo?.organization;
+  return {
+    description: config.description ?? "",
+    organization: organization ? { logo: "", sameAs: [], ...organization } : null,
+    tagManager: config.integrations?.gtm?.tagId ?? "",
+    dates: config.metadata?.timestamp ? pageDates({ docsRoot: root }) : new Map(),
+  };
+}
 
 function escapeAttribute(text: string) {
   return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll('"', "&quot;");
@@ -66,18 +95,35 @@ function jsonLd({ data }: { data: unknown }) {
   return `<script data-docs-metadata type="application/ld+json">${JSON.stringify(data).replaceAll("<", "\\u003c")}</script>`;
 }
 
+function organizationData({ organization }: { organization: Organization }) {
+  return {
+    "@type": "Organization",
+    name: organization.name,
+    url: organization.url,
+    ...(organization.logo ? { logo: { "@type": "ImageObject", url: organization.logo } } : {}),
+    ...(organization.sameAs.length ? { sameAs: organization.sameAs } : {}),
+  };
+}
+
 export function pageHead({
   slug,
   title,
-  description = "",
+  description: authored = "",
   trail = [],
+  settings = headSettings(),
+  production = isProduction,
 }: {
   slug: string;
   title: string;
   description?: string;
   trail?: Crumb[];
+  settings?: HeadSettings;
+  /** Production pages name the tag manager container; development pages never do. */
+  production?: boolean;
 }) {
   const url = canonicalUrl({ slug });
+  const description = authored || settings.description;
+  const modified = settings.dates.get(slug);
   const image = docsUrl({ path: "/images/coding-agents/optimized/session-detail-1560.webp" });
   const tags = [
     `<title>${escapeAttribute(title)}</title>`,
@@ -110,13 +156,19 @@ export function pageHead({
     url,
     name: title,
     ...(description ? { description } : {}),
+    ...(modified ? { dateModified: modified } : {}),
     isPartOf: {
       "@type": "WebSite",
       name: "LangWatch documentation",
       url: docsUrl({ path: "/introduction" }),
+      ...(settings.organization
+        ? { publisher: organizationData({ organization: settings.organization }) }
+        : {}),
     },
   };
   tags.push(jsonLd({ data }));
+  if (production && settings.tagManager)
+    tags.push(`<meta name="docs-gtm" content="${escapeAttribute(settings.tagManager)}">`);
   if (trail.length > 1) tags.push(jsonLd({ data: breadcrumbData({ trail }) }));
   return tags.join("");
 }

@@ -1,4 +1,5 @@
 import { prepareReadingLayout } from "./reading-layout.ts";
+import { startTagManager } from "./tag-manager.ts";
 
 let scheduled = false;
 function updateToc() {
@@ -83,3 +84,6 @@ export function installToc() {
 installToc();
 
 prepareReadingLayout();
+
+/* The idle island every page loads, so the tag never joins the initial bundle. */
+startTagManager();

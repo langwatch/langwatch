@@ -5,6 +5,7 @@ import {
   isStaticRedirect,
   readRedirects,
   redirectPage,
+  siteRedirects,
   redirectTarget,
   resolveRedirect,
 } from "../compile/redirects.ts";
@@ -79,5 +80,41 @@ describe("when a redirect source is a pattern", () => {
     expect(resolveRedirect({ pathname: "/guardrails/x", search: "?a=1", redirects })).toBe(
       "/evaluations/guardrails/overview?a=1",
     );
+  });
+});
+
+describe("when a directory holds pages but is not one", () => {
+  /** @scenario "Directory addresses and moved exports redirect as they do today" */
+  it("sends it to its first page in reading order and keeps configured redirects first", () => {
+    const fixture = docsFixture({
+      config: {
+        redirects: [
+          { source: "/guides", destination: "/guides/start" },
+          { source: "/old-page", destination: "/integration/cli#install" },
+        ],
+      },
+    });
+    try {
+      const redirects = siteRedirects({
+        docsRoot: fixture.docsRoot,
+        slugs: [
+          "integration/cli",
+          "integration/python/guide",
+          "integration/python/reference",
+          "governance/index",
+          "governance/roles",
+          "guides/intro",
+        ],
+      });
+      expect(redirects["/integration"]).toBe("/integration/cli");
+      expect(redirects["/integration/python"]).toBe("/integration/python/guide");
+      expect(redirects["/governance"]).toBeUndefined();
+      expect(redirects["/guides"]).toBe("/guides/start");
+      expect(redirects["/old-page.md"]).toBe("/integration/cli.md");
+      expect(redirects["/old-page.agent"]).toBe("/integration/cli.agent");
+      expect(isStaticRedirect({ source: "/old-page.md" })).toBe(false);
+    } finally {
+      fixture.dispose();
+    }
   });
 });

@@ -7,7 +7,7 @@ import { z } from "zod";
 import { readDocsConfig, type DocsItem } from "../features/navigation/compile/nav.ts";
 import {
   isStaticRedirect,
-  readRedirects,
+  readBuiltRedirects,
   redirectTarget,
 } from "../features/navigation/compile/redirects.ts";
 import { docsRoot } from "../paths.ts";
@@ -35,7 +35,7 @@ export async function assertBuild({ outDir }: { outDir: string }) {
     await access(path.join(outDir, `${slug}.md`));
     expectedHtml.push(...pageTargets({ slug }));
   }
-  const redirectPages = Object.keys(readRedirects({ docsRoot }))
+  const redirectPages = Object.keys(readBuiltRedirects({ outDir }))
     .filter((source) => isStaticRedirect({ source }))
     .map((source) => redirectTarget({ source }))
     .filter((target) => !expectedHtml.includes(target));

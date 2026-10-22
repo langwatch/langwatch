@@ -1,4 +1,5 @@
 import type { Release } from "../../releases/model/release.ts";
+import type { Inline } from "./inline.ts";
 
 export type NavItem =
   | { type: "page"; slug: string; title: string }
@@ -23,7 +24,32 @@ export type PageMeta = {
   icon: string;
   /** A brand logo path from an overview card linking here, e.g. /images/logos/mastra.svg. */
   logo: string;
+  /** The page's last commit date (ISO 8601) when docs.json shows timestamps; "" when unknown. */
+  updated: string;
+  /** The authored `tag`, or "Deprecated" for a `deprecated: true` page; "" otherwise. */
+  tag: string;
 };
+
+/** docs.json `contextual.options`, the page actions Mintlify knows, in its own spelling. */
+export const CONTEXTUAL_OPTIONS = [
+  "copy",
+  "view",
+  "claude",
+  "chatgpt",
+  "cursor",
+  "vscode",
+  "mcp",
+] as const;
+export type ContextualOption = (typeof CONTEXTUAL_OPTIONS)[number];
+/** The known page actions among `options`, in their authored order; unknown names are dropped. */
+export function contextualOptions({ options }: { options: readonly string[] }) {
+  return options.flatMap((option) => CONTEXTUAL_OPTIONS.filter((known) => known === option));
+}
+
+export type Organization = { name: string; url: string; logo: string; sameAs: string[] };
+
+/** docs.json `banner`: keyed by its content, so a changed announcement shows again. */
+export type Announcement = { id: string; content: Inline[]; dismissible: boolean };
 
 export type SiteMeta = {
   name: string;
@@ -33,7 +59,14 @@ export type SiteMeta = {
   github: string;
   llms: string;
   stars: number | null;
-  notFound: { title: string; description: string };
+  notFound: { title: string; description: string; content: Inline[] };
+  /** docs.json `description`: the meta description of a page without its own. */
+  description: string;
+  organization: Organization | null;
+  announcement: Announcement | null;
+  contextual: ContextualOption[];
+  /** A Google Tag Manager container id, or "" for none. */
+  tagManager: string;
 };
 
 export type Section = { title: string; icon: string; children: NavItem[] };

@@ -119,7 +119,17 @@ describe("when integration groups carry roots, expansion and overview card logos
 });
 
 function meta({ openapi = "" }: { openapi?: string }): PageMeta {
-  return { title: "", description: "", sidebarTitle: "", openapi, mode: "", icon: "", logo: "" };
+  return {
+    title: "",
+    description: "",
+    sidebarTitle: "",
+    openapi,
+    mode: "",
+    icon: "",
+    logo: "",
+    updated: "",
+    tag: "",
+  };
 }
 
 function endpointGroup({ size }: { size: number }): {

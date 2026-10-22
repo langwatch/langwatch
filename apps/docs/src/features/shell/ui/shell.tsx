@@ -7,7 +7,8 @@ import type { TypeMode } from "../../../lib/type-mode.tsx";
 import { neighbours, trailOf } from "../../navigation/model/nav.ts";
 import { MobileNav } from "../../navigation/ui/mobile-nav.tsx";
 import { SideNav } from "../../navigation/ui/side-nav.tsx";
-import { sectionOf } from "../../navigation/ui/site-nav.ts";
+import { sectionOf, site } from "../../navigation/ui/site-nav.ts";
+import { SiteAnnouncement } from "../../releases/ui/announcement.tsx";
 import { SiteBanner } from "../../releases/ui/banner.tsx";
 import { Header, HEADER_HEIGHT, type PageKind } from "./header.tsx";
 import { PageFooter } from "./page-footer.tsx";
@@ -27,6 +28,10 @@ type ShellProps = {
   children?: ReactNode;
   typeMode?: TypeMode;
   wide?: boolean;
+  /** The page's last commit date when docs.json shows timestamps; "" for none. */
+  updated?: string;
+  /** A frontmatter tag such as "Deprecated", shown beside the breadcrumb. */
+  tag?: string;
   endpoint?: { summary: ReactNode; playground: ReactNode; reference: ReactNode };
 };
 
@@ -64,6 +69,8 @@ export function DocsShell({
   endpoint,
   typeMode = "expressive",
   wide = false,
+  updated = "",
+  tag = "",
 }: ShellProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const section = sectionOf({ slug });
@@ -78,10 +85,15 @@ export function DocsShell({
       description={description}
       breadcrumb={breadcrumb}
       kind={kind}
+      tag={tag}
+      actions={site.contextual}
     />
   );
   const contents = kind !== "endpoint" && toc.length >= 2 ? <TocDisclosure entries={toc} /> : null;
-  const footer = slug === "404" ? null : <PageFooter slug={slug} previous={previous} next={next} />;
+  const footer =
+    slug === "404" ? null : (
+      <PageFooter slug={slug} previous={previous} next={next} updated={updated} />
+    );
 
   return (
     <Box
@@ -105,6 +117,7 @@ export function DocsShell({
           Skip to page list
         </a>
       ) : null}
+      <SiteAnnouncement announcement={site.announcement} />
       <SiteBanner />
       <Header kind={kind} onMenu={() => setMenuOpen(true)} />
       <Box

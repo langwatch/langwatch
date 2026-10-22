@@ -1,4 +1,4 @@
-import { Box, Button } from "@langwatch/design-system/primitives";
+import { Box, Button, Text } from "@langwatch/design-system/primitives";
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { createDesignSystem } from "@langwatch/design-system/system";
 import { MDXProvider } from "@mdx-js/react";
@@ -11,6 +11,7 @@ import { Playground } from "../features/api-reference/ui/playground.tsx";
 import { EndpointReference, EndpointSummary } from "../features/api-reference/ui/reference.tsx";
 import { Card, CardGroup } from "../features/content/ui/cards.tsx";
 import { mdxComponents } from "../features/content/ui/mdx-components.ts";
+import { InlineContent } from "../features/shell/ui/inline-content.tsx";
 import { DocsShell } from "../features/shell/ui/shell.tsx";
 import { TypeRegion } from "../lib/type-mode.tsx";
 import type { PageModule } from "./pages.ts";
@@ -70,6 +71,8 @@ function PageContent({ slug, page, operation, examples }: AppProps) {
           title={meta.title}
           description={meta.description || operation.description}
           toc={toc}
+          updated={meta.updated}
+          tag={meta.tag}
           endpoint={{
             summary: <EndpointSummary operation={operation} />,
             playground: (
@@ -94,6 +97,8 @@ function PageContent({ slug, page, operation, examples }: AppProps) {
       description={meta.description}
       toc={toc}
       wide={meta.mode === "wide"}
+      updated={meta.updated}
+      tag={meta.tag}
     >
       <Content />
     </DocsShell>
@@ -106,10 +111,19 @@ function NotFound() {
       slug="404"
       kind="guide"
       title={nav.site.notFound.title}
-      description="This page may have moved. Search the docs or choose a starting point below."
+      description={
+        nav.site.notFound.content.length
+          ? ""
+          : "This page may have moved. Search the docs or choose a starting point below."
+      }
       toc={[]}
     >
       <Box paddingBottom="12">
+        {nav.site.notFound.content.length ? (
+          <Text data-docs-not-found-copy="" marginTop="0" marginBottom="6" color="docs.lede">
+            <InlineContent nodes={nav.site.notFound.content} />
+          </Text>
+        ) : null}
         <Button
           data-docs-search=""
           variant="outline"

@@ -20,7 +20,7 @@ import { breadcrumbTrail, pageHead } from "../features/discovery/compile/page-he
 import { buildNav } from "../features/navigation/compile/nav.ts";
 import {
   isStaticRedirect,
-  readRedirects,
+  siteRedirects,
   redirectPage,
   redirectTarget,
 } from "../features/navigation/compile/redirects.ts";
@@ -197,7 +197,7 @@ function assemble({ slugs, outcomes }: { slugs: string[]; outcomes: Map<string, 
     if (outcome.result.search) searchIndex.push(outcome.result.search);
     const exported = exportsOf({ slug });
     for (const [name, contents] of exported) files.set(name, contents);
-    if (exported.length > 0) markdown.push(exported[0][1]);
+    if (exported.length > 0) markdown.push(pageMarkdown({ docsRoot, slug, instructions: "" }));
     for (const target of slug === "404" ? ["404.html"] : pageTargets({ slug }))
       pages.set(target, outcome.result.page);
   }
@@ -274,7 +274,7 @@ async function generate() {
   const notFound = skipped.find((entry) => entry.slug === "404");
   if (notFound) throw new Error(`The 404 page failed to render: ${notFound.reason}`);
 
-  const redirects = readRedirects({ docsRoot });
+  const redirects = siteRedirects({ docsRoot, slugs: Object.keys(context.nav.pages) });
   files.set("redirects.json", JSON.stringify(redirects));
   for (const [name, contents] of Object.entries(
     discoveryFiles({

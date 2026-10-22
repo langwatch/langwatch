@@ -35,12 +35,23 @@ function fill({ destination, values }: { destination: string; values: Map<string
   return destination.replace(/:(\w+)\*?/g, (whole, name: string) => values.get(name) ?? whole);
 }
 
+const patterns = new WeakMap<RedirectRules, [string, string][]>();
+
+/** The pattern sources of a rule set, listed once per set rather than once per lookup. */
+function patternsOf({ redirects }: { redirects: RedirectRules }) {
+  let listed = patterns.get(redirects);
+  if (!listed) {
+    listed = Object.entries(redirects).filter(([source]) => source.includes(":"));
+    patterns.set(redirects, listed);
+  }
+  return listed;
+}
+
 /** An exact source wins; otherwise the first `:param` or `:param*` source that matches. */
 export function matchRedirect({ path, redirects }: { path: string; redirects: RedirectRules }) {
   const exact = redirects[path.replace(/\/$/, "")];
   if (exact) return exact;
-  for (const [source, destination] of Object.entries(redirects)) {
-    if (!source.includes(":")) continue;
+  for (const [source, destination] of patternsOf({ redirects })) {
     const match = matchPattern({ source, destination, path });
     if (match !== null) return match.replace(/\/+$/, "") || "/";
   }

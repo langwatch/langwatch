@@ -6,10 +6,11 @@ import "../app/docs.css";
 
 /** Enables server-disabled controls and applies stored dismissals; reruns after navigation. */
 function prepareControls() {
-  const banner = document.querySelector<HTMLElement>("[data-docs-banner]");
   try {
-    if (banner && localStorage.getItem(`lw-docs:${banner.dataset.docsBanner}`) === "dismissed")
-      banner.remove();
+    document.querySelectorAll<HTMLElement>("[data-docs-banner]").forEach((notice) => {
+      if (localStorage.getItem(`lw-docs:${notice.dataset.docsBanner}`) === "dismissed")
+        notice.remove();
+    });
   } catch {
     /* Storage is optional. */
   }
@@ -59,7 +60,7 @@ document.addEventListener("click", (event) => {
     ["[data-docs-video]", "media"],
     ["[data-scope=accordion] button, [data-docs-tooltip]", "disclosures"],
     [
-      '[data-docs-agent], [aria-label="Dismiss announcement"], nav[aria-label="Page navigation"] button[aria-expanded]',
+      '[data-docs-agent], [aria-label="Dismiss announcement"], [data-docs-dismiss], nav[aria-label="Page navigation"] button[aria-expanded]',
       "controls",
     ],
   ];

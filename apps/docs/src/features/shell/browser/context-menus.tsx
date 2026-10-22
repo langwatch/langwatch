@@ -2,6 +2,7 @@ import { SystemProvider } from "@langwatch/design-system/system-provider";
 import { createRoot } from "react-dom/client";
 
 import { docsIslandSystem } from "../../../app/island-theme.ts";
+import { contextualOptions } from "../../navigation/model/nav.ts";
 import { PageMenu } from "../ui/page-menu.tsx";
 import { ThemeMenu } from "../ui/theme-menu.tsx";
 
@@ -21,7 +22,11 @@ document.addEventListener("click", (event) => {
       {container.dataset.docsMenuRoot === "theme" ? (
         <ThemeMenu initialOpen />
       ) : (
-        <PageMenu slug={container.dataset.slug ?? "introduction"} initialOpen />
+        <PageMenu
+          slug={container.dataset.slug ?? "introduction"}
+          actions={contextualOptions({ options: (container.dataset.actions ?? "").split(" ") })}
+          initialOpen
+        />
       )}
     </SystemProvider>,
   );

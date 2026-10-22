@@ -9,7 +9,7 @@ document.addEventListener("click", (event) => {
     const name = region?.querySelector("[data-docs-agent-name]");
     if (name) name.textContent = button.dataset.docsAgent ?? "";
   }
-  if (button.matches('[aria-label="Dismiss announcement"]')) {
+  if (button.matches('[aria-label="Dismiss announcement"], [data-docs-dismiss]')) {
     const banner = button.closest<HTMLElement>("[data-docs-banner]");
     if (banner) {
       try {

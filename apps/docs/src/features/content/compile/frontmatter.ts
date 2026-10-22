@@ -8,6 +8,11 @@ const text = z
   .transform(String)
   .optional()
   .catch(undefined);
+/* `deprecated: true` (or the text "true") marks a page; anything else reads as not deprecated. */
+const flag = z
+  .union([z.boolean(), z.literal("true").transform(() => true)])
+  .optional()
+  .catch(undefined);
 const pageFrontmatterSchema = z
   .looseObject({
     title: text,
@@ -16,6 +21,8 @@ const pageFrontmatterSchema = z
     openapi: text,
     mode: text,
     icon: text,
+    tag: text,
+    deprecated: flag,
   })
   .catch({});
 export type PageFrontmatter = z.infer<typeof pageFrontmatterSchema>;
