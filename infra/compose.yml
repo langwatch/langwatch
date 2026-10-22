@@ -5,7 +5,7 @@ services:
     image: langwatch/langwatch:latest
     environment:
       DATABASE_URL: postgresql://prisma:prisma@postgres:5432/mydb?schema=mydb
-      CLICKHOUSE_URL: http://default:langwatch@clickhouse:8123/langwatch
+      CLICKHOUSE_URL: http://default:${CLICKHOUSE_PASSWORD:-langwatch}@clickhouse:8123/langwatch
       # This compose stack runs a plain ClickHouse with no backups, so
       # system.backup_log does not exist here. Backup-status collection is on by
       # default (an unset flag must not disarm the alerts that read those gauges
@@ -41,7 +41,7 @@ services:
     working_dir: /app/apps/worker
     environment:
       DATABASE_URL: postgresql://prisma:prisma@postgres:5432/mydb?schema=mydb
-      CLICKHOUSE_URL: http://default:langwatch@clickhouse:8123/langwatch
+      CLICKHOUSE_URL: http://default:${CLICKHOUSE_PASSWORD:-langwatch}@clickhouse:8123/langwatch
       # This compose stack runs a plain ClickHouse with no backups, so
       # system.backup_log does not exist here. Backup-status collection is on by
       # default (an unset flag must not disarm the alerts that read those gauges
@@ -126,7 +126,10 @@ services:
   clickhouse:
     image: langwatch/clickhouse-serverless:0.2.0
     environment:
-      CLICKHOUSE_PASSWORD: langwatch
+      # Set CLICKHOUSE_PASSWORD in .env (openssl rand -hex 24; URL-safe, it is
+      # part of CLICKHOUSE_URL above). The `langwatch` fallback keeps existing
+      # installs starting; the server warns at boot and the next major drops it.
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-langwatch}
     ports:
       - "8123:8123"
     volumes:

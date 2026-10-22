@@ -13,6 +13,12 @@ func (i *Input) Validate() error {
 	// Tag-based validation (required, oneof, gte)
 	errs := validateStruct(i)
 
+	// As before, only an empty password is refused; a published or blank-looking
+	// one starts with a warning (WeakPasswordWarning).
+	if i.Password == "" {
+		errs = append(errs, "CLICKHOUSE_PASSWORD or CLICKHOUSE_PASSWORD_FILE must set a password for the default user")
+	}
+
 	// TieredMoveFactor must be a float in (0, 1]
 	if i.TieredMoveFactor != "" {
 		f, err := strconv.ParseFloat(i.TieredMoveFactor, 64)

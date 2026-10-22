@@ -40,12 +40,32 @@ func TestValidate_RAMTooLow(t *testing.T) {
 	}
 }
 
+// @scenario "The server refuses to start without a password for the default user"
 func TestValidate_PasswordRequired(t *testing.T) {
 	i := validInput()
 	i.Password = ""
 	err := i.Validate()
-	if err == nil || !strings.Contains(err.Error(), "CLICKHOUSE_PASSWORD") {
-		t.Errorf("expected password error, got: %v", err)
+	if err == nil || !strings.Contains(err.Error(), "CLICKHOUSE_PASSWORD or CLICKHOUSE_PASSWORD_FILE") {
+		t.Errorf("expected an error naming both variables, got: %v", err)
+	}
+}
+
+// @scenario "A published or blank-looking default password starts with a warning"
+func TestWeakPasswordWarning(t *testing.T) {
+	for _, pw := range []string{"langwatch", "ClickHouse", "password", "default", "   ", "\t\n"} {
+		i := validInput()
+		i.Password = pw
+		if err := i.Validate(); err != nil {
+			t.Errorf("password %q: should still start, got: %v", pw, err)
+		}
+		if w := i.WeakPasswordWarning(); !strings.Contains(w, "openssl rand -hex 24") {
+			t.Errorf("password %q: warning = %q, want one saying how to set a password", pw, w)
+		}
+	}
+	i := validInput()
+	i.Password = strings.Repeat("generated", 4)
+	if w := i.WeakPasswordWarning(); w != "" {
+		t.Errorf("a generated password should not warn, got %q", w)
 	}
 }
 
@@ -89,7 +109,6 @@ func TestValidate_PartialS3CredentialsWithCold(t *testing.T) {
 		t.Errorf("expected S3 credential error, got: %v", err)
 	}
 }
-
 
 func TestValidate_MultipleErrors(t *testing.T) {
 	i := &Input{
@@ -140,4 +159,3 @@ func TestValidate_TieredMoveFactor(t *testing.T) {
 		})
 	}
 }
-

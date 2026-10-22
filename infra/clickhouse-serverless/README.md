@@ -4,9 +4,11 @@ Auto-tuning ClickHouse Docker image. Pass CPU + RAM, get a fully configured serv
 
 ```bash
 docker run -d \
-  -e CLICKHOUSE_PASSWORD=mysecret \
+  -e CLICKHOUSE_PASSWORD="$(openssl rand -hex 24)" \
   langwatch/clickhouse-serverless
 ```
+
+There is no default password: without `CLICKHOUSE_PASSWORD` or `CLICKHOUSE_PASSWORD_FILE` the container exits at startup. A published one (`langwatch`, `clickhouse`, `password`, `default`) or a blank-looking one starts with a warning at every boot.
 
 CPU and RAM are auto-detected from cgroups. Override with `CH_CPU` and `CH_RAM` if needed.
 

@@ -4,7 +4,7 @@
 # configured before the server starts — SYSTEM RELOAD CONFIG cannot add policies.
 set -euo pipefail
 
-CLICKHOUSE_PASSWORD="${CLICKHOUSE_PASSWORD:-ci_password}"
+CLICKHOUSE_PASSWORD="${CLICKHOUSE_PASSWORD:?CLICKHOUSE_PASSWORD is required; there is no default}"
 
 # ---------------------------------------------------------------------------
 # Step 1: Write storage policy config

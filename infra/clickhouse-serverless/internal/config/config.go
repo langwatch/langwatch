@@ -22,7 +22,7 @@ type Input struct {
 	DataNodePort int    `env:"CH_DATA_NODE_PORT" default:"9000"`
 
 	// Auth
-	Password          string `env:"CLICKHOUSE_PASSWORD" validate:"required"`
+	Password          string `env:"CLICKHOUSE_PASSWORD"`            // Validate refuses an empty one
 	ClusterSecretFile string `env:"CLICKHOUSE_CLUSTER_SECRET_FILE"` // path to mounted cluster secret
 
 	// Opt-in: render the real cluster secret (read from ClusterSecretFile by
