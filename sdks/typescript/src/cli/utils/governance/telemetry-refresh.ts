@@ -625,10 +625,10 @@ async function refreshToolForLogin({
     // wiring; a new login never re-points it at the personal path.
     return false;
   }
-  const stale =
+  const isStale =
     toolWiringNeedsLoginRefresh(tool, expectedEndpoint) ||
     toolWiringCarriesDeadKey(tool, liveKeyIds);
-  if (!stale) return false;
+  if (!isStale) return false;
   // allowOfflineFallback: false - see resolveLiveIngestionKey's doc. The
   // persisted endpoint or key is no longer this login's, so a network hiccup
   // must mint fresh rather than reuse a secret the login did not confirm.

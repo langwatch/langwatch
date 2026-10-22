@@ -359,6 +359,68 @@ describe("the Copilot hook file LangWatch owns", () => {
     });
   });
 
+  describe("given a file of ours an older CLI wrote with a bash command only", () => {
+    const bashOnly = { type: "command", bash: "langwatch ingest hook copilot", timeoutSec: 10 };
+
+    /** @scenario "A Copilot hook file holding only LangWatch's entries is brought up to date" */
+    it("rewrites it so every entry carries the PowerShell command too", () => {
+      fs.mkdirSync(path.dirname(copilotFile()), { recursive: true });
+      fs.writeFileSync(
+        copilotFile(),
+        JSON.stringify({ version: 1, hooks: { sessionStart: [bashOnly], agentStop: [bashOnly] } }),
+      );
+
+      expect(install({ tool: "copilot" }).action).toBe("updated");
+      const powershellOf = (entries: unknown) =>
+        Array.isArray(entries) ? entries.map((entry) => entry.powershell) : [];
+      const hooks = readSettings(copilotFile()).hooks;
+      expect(powershellOf(hooks.sessionStart)).toEqual(["langwatch ingest hook copilot"]);
+      expect(powershellOf(hooks.agentStop)).toEqual(["langwatch ingest hook copilot"]);
+    });
+  });
+
+  describe("given a file at our path whose PowerShell command is the user's", () => {
+    it("treats it as the user's file that runs our hook, never rewritten", () => {
+      const theirs = JSON.stringify({
+        version: 1,
+        hooks: {
+          sessionStart: [
+            {
+              type: "command",
+              bash: "langwatch ingest hook copilot",
+              powershell: "./scripts/theirs.ps1",
+            },
+          ],
+        },
+      });
+      fs.mkdirSync(path.dirname(copilotFile()), { recursive: true });
+      fs.writeFileSync(copilotFile(), theirs);
+
+      expect(install({ tool: "copilot" }).action).toBe("user_file_runs_hook");
+      expect(fs.readFileSync(copilotFile(), "utf8")).toBe(theirs);
+    });
+  });
+
+  describe("given a file at our path the CLI cannot read", () => {
+    const theirs = '{"hooks":{"sessionStart":[{"bash":"./scripts/theirs.sh"}]}}';
+    const isRoot = process.getuid?.() === 0;
+
+    afterEach(() => {
+      if (fs.existsSync(copilotFile())) fs.chmodSync(copilotFile(), 0o600);
+    });
+
+    /** @scenario "A langwatch.json the CLI cannot read is never written over" */
+    it.skipIf(isRoot)("fails naming the file and leaves it exactly as it was", () => {
+      fs.mkdirSync(path.dirname(copilotFile()), { recursive: true });
+      fs.writeFileSync(copilotFile(), theirs);
+      fs.chmodSync(copilotFile(), 0o200);
+
+      expect(() => install({ tool: "copilot" })).toThrow(copilotFile());
+      fs.chmodSync(copilotFile(), 0o600);
+      expect(fs.readFileSync(copilotFile(), "utf8")).toBe(theirs);
+    });
+  });
+
   describe("given a file at our path that runs none of our commands", () => {
     const theirs = JSON.stringify({
       version: 1,

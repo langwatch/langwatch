@@ -323,15 +323,10 @@ function installOwnedHookFile({
   tool: HookedTool;
   target: HooksTarget;
 }): SessionContextHooksInstallResult {
-  let existing: string | null;
-  try {
-    existing = fs.readFileSync(target.path, "utf8");
-  } catch {
-    existing = null;
-  }
+  const existing = readHookFileText(target.path);
   if (existing !== null && readOwnedHookFile({ tool, filePath: target.path }) === null) {
-    const runsOurHook = fileRunsHookCommand({ tool, filePath: target.path });
-    return { action: runsOurHook ? "user_file_runs_hook" : "not_ours", ...target };
+    const isRunningOurHook = fileRunsHookCommand({ tool, filePath: target.path });
+    return { action: isRunningOurHook ? "user_file_runs_hook" : "not_ours", ...target };
   }
 
   const document = copilotHookFileDocument(tool);
@@ -343,13 +338,37 @@ function installOwnedHookFile({
 }
 
 /**
- * The file in Copilot's hook format: one command per event, run through
- * bash, which is how both the CLI and VS Code read a user-level hook file.
+ * A hook file's text, or null when there is none. Any other read failure
+ * throws, as a shared file's does: writing over a file we could not read
+ * would lose whatever it holds.
+ */
+function readHookFileText(filePath: string): string | null {
+  try {
+    return fs.readFileSync(filePath, "utf8");
+  } catch (error) {
+    if (isMissingFileError(error)) return null;
+    throw new Error(
+      `Can't read ${filePath}: ${error instanceof Error ? error.message : String(error)}. ` +
+        `Fix the file and run this again; writing over it would lose everything it holds.`,
+    );
+  }
+}
+
+function isMissingFileError(error: unknown): boolean {
+  return isPlainObject(error) && error.code === "ENOENT";
+}
+
+/**
+ * The file in Copilot's hook format: one command per event, under `bash` for
+ * macOS and Linux and `powershell` for Windows, as Copilot reads them. The
+ * command is the same in both shells, as a Claude Code or Codex hook's is.
  */
 function copilotHookFileDocument(tool: HookedTool): Record<string, unknown> {
+  const command = sessionContextHookCommand(tool);
   const entry = {
     type: "command",
-    bash: sessionContextHookCommand(tool),
+    bash: command,
+    powershell: command,
     timeoutSec: HOOK_TIMEOUT_SECONDS,
   };
   return {
@@ -359,7 +378,7 @@ function copilotHookFileDocument(tool: HookedTool): Record<string, unknown> {
 }
 
 /** The keys an entry of ours carries, in what `copilotHookFileDocument` writes or wrote. */
-const OWNED_ENTRY_KEYS: ReadonlySet<string> = new Set(["type", "bash", "timeoutSec"]);
+const OWNED_ENTRY_KEYS: ReadonlySet<string> = new Set(["type", "bash", "powershell", "timeoutSec"]);
 
 /** The top-level keys a hook file of ours carries. */
 const OWNED_FILE_KEYS: ReadonlySet<string> = new Set(["version", "hooks"]);
@@ -383,12 +402,14 @@ function readOwnedHookFile({
     return null;
   }
   if (!isPlainObject(parsed) || !isPlainObject(parsed.hooks)) return null;
-  const onlyOurKeys = Object.keys(parsed).every((key) => OWNED_FILE_KEYS.has(key));
-  if (!onlyOurKeys) return null;
+  const hasOnlyOurKeys = Object.keys(parsed).every((key) => OWNED_FILE_KEYS.has(key));
+  if (!hasOnlyOurKeys) return null;
   const events = Object.values(parsed.hooks);
   const command = sessionContextHookCommand(tool);
   const isOurEntry = (entry: unknown): boolean => {
     if (!isPlainObject(entry) || entry.bash !== command) return false;
+    // A file an older CLI wrote carries no `powershell`; one that differs is the user's.
+    if ("powershell" in entry && entry.powershell !== command) return false;
     return Object.keys(entry).every((key) => OWNED_ENTRY_KEYS.has(key));
   };
   const isOnlyOurs = (entries: unknown): boolean => {
@@ -413,8 +434,11 @@ function fileRunsHookCommand({ tool, filePath }: { tool: HookedTool; filePath: s
   const hookArgs = ["ingest", "hook", SESSION_CONTEXT_AGENTS[tool].hookArgument];
   const runsCommand = (entry: unknown): boolean =>
     isPlainObject(entry) &&
-    typeof entry.bash === "string" &&
-    entry.bash.split(/&&|\|\||;/).some((part) => runsLangwatchWith({ part, args: hookArgs }));
+    [entry.bash, entry.powershell].some(
+      (shellCommand) =>
+        typeof shellCommand === "string" &&
+        shellCommand.split(/&&|\|\||;/).some((part) => runsLangwatchWith({ part, args: hookArgs })),
+    );
   return Object.values(parsed.hooks).some(
     (entries) => Array.isArray(entries) && entries.some(runsCommand),
   );

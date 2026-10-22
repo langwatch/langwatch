@@ -306,6 +306,7 @@ describe("the copilot ingestion install", () => {
   const copilotHookEntry = {
     type: "command",
     bash: "langwatch ingest hook copilot",
+    powershell: "langwatch ingest hook copilot",
     timeoutSec: 10,
   };
 

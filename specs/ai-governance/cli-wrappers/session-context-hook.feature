@@ -295,6 +295,12 @@ Rule: The hook never disturbs the session
     Then the process ends with exit code zero and nothing on stdout
     And the budget leaves room for the process to start inside the agent's ten seconds
 
+  @unit
+  Scenario: The hook process ends with exit code zero when its work fails
+    Given a hook whose work fails before it posts anything
+    When the failure reaches the process
+    Then the process ends itself with exit code zero
+
 Rule: A tool pinned to a project reports with the pinned key
 
   # `langwatch instrument <tool> --key` and `--project` pin the tool to one
@@ -609,6 +615,7 @@ Rule: Copilot reports through one hook file LangWatch owns
     When the copilot ingestion install runs twice
     Then exactly one LangWatch hook file is present
     And it runs the hook command for copilot on sessionStart and agentStop
+    And each entry carries the command for both bash and PowerShell, so it runs on Windows too
 
   @unit
   Scenario: The Copilot hook file follows COPILOT_HOME
@@ -631,6 +638,13 @@ Rule: Copilot reports through one hook file LangWatch owns
     When the copilot ingestion install runs and logout then removes the telemetry targets
     Then the file is unchanged throughout
     And logout does not offer to remove it
+
+  @unit
+  Scenario: A langwatch.json the CLI cannot read is never written over
+    Given a Copilot langwatch.json that exists but cannot be read
+    When the copilot ingestion install runs
+    Then it fails naming the file
+    And the file is left exactly as it was
 
   @unit
   Scenario: A Copilot hook file holding only LangWatch's entries is brought up to date

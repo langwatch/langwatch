@@ -391,11 +391,11 @@ function renderToolInstallationNotes(report: InstallReport): void {
       );
     }
   } else if (report.tool === "copilot_cli") {
-    const wroteHookFile =
+    const isHookFileInstalled =
       report.session_hooks_action === "created" ||
       report.session_hooks_action === "updated" ||
       report.session_hooks_action === "unchanged";
-    if (wroteHookFile) {
+    if (isHookFileInstalled) {
       process.stdout.write(
         `\nA LangWatch hook file was added to your Copilot hooks folder, so every Copilot CLI\n` +
           `and VS Code session reports the repository, branch and worktree it ran in. Your\n` +

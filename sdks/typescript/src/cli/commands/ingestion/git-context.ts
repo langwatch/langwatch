@@ -10,7 +10,8 @@ import { parseGitRemoteUrl, type SessionContext } from "@/cli/utils/governance/s
 
 /**
  * How long a single git invocation may take. Each blocks the process, and the
- * hook makes four, so together they must fit its budget with room to spare.
+ * hook makes up to five (the top level only in a linked worktree): 5s at worst
+ * of its 7s budget (HOOK_BUDGET_MS), leaving 2s for the post.
  */
 const GIT_TIMEOUT_MS = 1_000;
 

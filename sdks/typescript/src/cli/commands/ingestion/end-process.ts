@@ -9,8 +9,8 @@ const FLUSH_TIMEOUT_MS = 500;
 
 /**
  * Run `work`, then end the process with exit code zero: once the work is done,
- * or once `budgetMs` is spent, whichever comes first. The work never throws
- * here; the commands it runs swallow their own failures.
+ * once it fails, or once `budgetMs` is spent, whichever comes first. A failure
+ * is swallowed here, so no agent ever sees its hook fail.
  */
 export async function endProcessWhenDone({
   work,
@@ -26,8 +26,13 @@ export async function endProcessWhenDone({
   const budgetSpent = new Promise<void>((resolve) => {
     if (budgetMs !== undefined) timer = setTimeout(resolve, budgetMs);
   });
-  await Promise.race([work(), budgetSpent]);
-  clearTimeout(timer);
+  try {
+    await Promise.race([work(), budgetSpent]);
+  } catch {
+    // Failing the agent's hook is the one outcome this wrapper exists to prevent.
+  } finally {
+    clearTimeout(timer);
+  }
   await flushStdout();
   exit(0);
 }
