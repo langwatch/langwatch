@@ -793,7 +793,7 @@ jobs:
                 else
                   LAMBDA_BUILT=false
                 fi
-                BUILT="${LAMBDA_BUILT}" bash .github/scripts/publish-lambda-tag.sh "${IMAGE}" ;;
+                IMAGE_WAS_BUILT="${LAMBDA_BUILT}" bash .github/scripts/publish-lambda-tag.sh "${IMAGE}" ;;
               *)
                 ( set -euo pipefail; publish "${IMAGE}" ) ;;
             esac

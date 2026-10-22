@@ -120,7 +120,7 @@ test_an_unchanged_image_gets_the_commit_tag() {
   push "$reg" git-aaaaaaa "$PLAIN" '{"older":true}'
   push "$reg" latest "$PLAIN" '{"latest":true}'
   push "$reg" git-bbbbbbb "$PLAIN" '{"newest":true}'
-  run_subject "$reg" IMAGE_TAG=git-ccccccc BUILT=false
+  run_subject "$reg" IMAGE_TAG=git-ccccccc IMAGE_WAS_BUILT=false
   if [ "$LAST_STATUS" -eq 0 ] && [ "$(manifest_at "$reg" git-ccccccc)" = '{"newest":true}' ]; then
     record yes "the commit tag names the newest git-* manifest, not latest"
   else
@@ -133,7 +133,7 @@ test_an_unchanged_image_gets_the_commit_tag() {
   fi
 
   # A re-run finds the tag already there and succeeds.
-  run_subject "$reg" IMAGE_TAG=git-ccccccc BUILT=false
+  run_subject "$reg" IMAGE_TAG=git-ccccccc IMAGE_WAS_BUILT=false
   if [ "$LAST_STATUS" -eq 0 ]; then
     record yes "re-running over an existing tag succeeds"
   else
@@ -146,7 +146,7 @@ test_a_lambda_image_is_never_retagged_from_an_index() {
   local reg
   reg="$(new_registry)"
   push "$reg" git-bbbbbbb "$INDEX" '{"index":true}'
-  run_subject "$reg" IMAGE_TAG=git-ccccccc BUILT=false
+  run_subject "$reg" IMAGE_TAG=git-ccccccc IMAGE_WAS_BUILT=false
   if [ "$LAST_STATUS" -ne 0 ] && [ ! -f "$reg/tags/git-ccccccc" ]; then
     record yes "an index is refused and no tag is written"
   else
@@ -154,16 +154,12 @@ test_a_lambda_image_is_never_retagged_from_an_index() {
   fi
 }
 
-# @scenario "A failed Lambda build does not hold back the service images"
-#
-# The service images are published by the same loop; what this script owes it
-# is a failure for the one Lambda image whose build did not push its tag, so
-# the job ends red without stopping the loop.
+# @scenario "A Lambda image whose build did not push its tag fails the run"
 test_a_lambda_image_that_was_not_built_fails() {
   local reg
   reg="$(new_registry)"
   push "$reg" git-bbbbbbb "$PLAIN" '{"newest":true}'
-  run_subject "$reg" IMAGE_TAG=git-ccccccc BUILT=true
+  run_subject "$reg" IMAGE_TAG=git-ccccccc IMAGE_WAS_BUILT=true
   if [ "$LAST_STATUS" -ne 0 ] && printf '%s' "$LAST_OUTPUT" | grep -q "was due to be built"; then
     record yes "a rebuilt image whose tag is missing fails, naming the image"
   else
@@ -181,7 +177,7 @@ test_a_release_also_tags_the_version() {
   local reg
   reg="$(new_registry)"
   push "$reg" git-ccccccc "$PLAIN" '{"built":true}'
-  run_subject "$reg" IMAGE_TAG=git-ccccccc BUILT=true IS_RELEASE=true VERSION=3.9.0
+  run_subject "$reg" IMAGE_TAG=git-ccccccc IMAGE_WAS_BUILT=true IS_RELEASE=true VERSION=3.9.0
   if [ "$LAST_STATUS" -eq 0 ] && [ "$(manifest_at "$reg" 3.9.0)" = '{"built":true}' ]; then
     record yes "the version tag names the commit's manifest"
   else
@@ -189,7 +185,47 @@ test_a_release_also_tags_the_version() {
   fi
 }
 
+# @scenario "A Lambda image with no earlier image is left unpublished with a warning"
+test_an_image_with_no_earlier_image_warns_and_writes_nothing() {
+  local reg
+  reg="$(new_registry)"
+  push "$reg" latest "$PLAIN" '{"latest":true}'
+  run_subject "$reg" IMAGE_TAG=git-ccccccc IMAGE_WAS_BUILT=false
+  if [ "$LAST_STATUS" -eq 0 ] && printf '%s' "$LAST_OUTPUT" | grep -q "has no previous git-\* image"; then
+    record yes "an image with no git-* tag warns and succeeds"
+  else
+    record no "an image with no git-* tag warns and succeeds"
+  fi
+  if [ ! -f "$reg/tags/git-ccccccc" ] && [ ! -f "$reg/calls" ]; then
+    record yes "no tag is written"
+  else
+    record no "no tag is written"
+  fi
+}
+
+# @scenario "A tag that cannot be written fails the run"
+test_a_tag_that_cannot_be_written_fails() {
+  local reg
+  reg="$(new_registry)"
+  push "$reg" git-bbbbbbb "$PLAIN" '{"newest":true}'
+  # Make the registry refuse the write with an error other than "already exists".
+  sed -i.bak 's|echo "put-image \$to" >> "\$STUB_REGISTRY/calls"|echo "put-image $to" >> "$STUB_REGISTRY/calls"; echo "An error occurred (AccessDeniedException)" >\&2; exit 254|' "$reg/bin/aws"
+  run_subject "$reg" IMAGE_TAG=git-ccccccc IMAGE_WAS_BUILT=false
+  if [ "$LAST_STATUS" -ne 0 ] && printf '%s' "$LAST_OUTPUT" | grep -q AccessDeniedException; then
+    record yes "a refused write fails and shows the registry error"
+  else
+    record no "a refused write fails and shows the registry error"
+  fi
+  if [ ! -f "$reg/tags/git-ccccccc" ]; then
+    record yes "no tag is left behind"
+  else
+    record no "no tag is left behind"
+  fi
+}
+
 test_an_unchanged_image_gets_the_commit_tag
+test_an_image_with_no_earlier_image_warns_and_writes_nothing
+test_a_tag_that_cannot_be_written_fails
 test_a_lambda_image_is_never_retagged_from_an_index
 test_a_lambda_image_that_was_not_built_fails
 test_a_release_also_tags_the_version

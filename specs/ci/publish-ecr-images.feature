@@ -30,12 +30,31 @@ Feature: Publish every deployable image to the artifacts registry
     Then each langwatch-eval-<package> image gets the git-<short sha> tag of that commit
     And the tag names the manifest the image already had, with no rebuild
 
-  @unit
+  @unimplemented
   Scenario: A failed Lambda build does not hold back the service images
     Given the build of one evaluator image fails
     When publish-docker-ecr finishes for that commit
     Then the service images still have their git-<short sha> tags
-    And the run fails, naming the evaluator image that was not published
+
+  @unit
+  Scenario: A Lambda image whose build did not push its tag fails the run
+    Given an evaluator image was due to be built and has no git-<short sha> tag
+    When publish-docker-ecr publishes that image
+    Then it fails, naming the evaluator image that was not published
+    And it does not fall back to an older image
+
+  @unit
+  Scenario: A Lambda image with no earlier image is left unpublished with a warning
+    Given an evaluator image has no git-<sha> tag at all
+    When publish-docker-ecr re-tags that image for a commit that did not change it
+    Then it warns that the image needs a dispatch run to be seeded
+    And it writes no tag and does not fail
+
+  @unit
+  Scenario: A tag that cannot be written fails the run
+    Given the registry refuses to write the commit tag for an evaluator image
+    When publish-docker-ecr re-tags that image
+    Then it fails and shows the registry's error
 
   @unit
   Scenario: A Lambda image is never re-tagged from an index

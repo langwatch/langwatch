@@ -10,17 +10,17 @@
 #   publish-lambda-tag.sh <repository>
 #
 # Env:
-#   IMAGE_TAG   the tag to publish, e.g. git-<short sha>
-#   BUILT       "true" when build-and-push-lambda rebuilt this image this run
-#               (it pushed IMAGE_TAG itself); otherwise the newest bare
-#               `git-<sha>` image is re-tagged as IMAGE_TAG
-#   IS_RELEASE  "true" to also write VERSION
-#   VERSION     the release version tag
+#   IMAGE_TAG        the tag to publish, e.g. git-<short sha>
+#   IMAGE_WAS_BUILT  "true" when build-and-push-lambda rebuilt this image this run
+#                    (it pushed IMAGE_TAG itself); otherwise the newest bare
+#                    `git-<sha>` image is re-tagged as IMAGE_TAG
+#   IS_RELEASE       "true" to also write VERSION
+#   VERSION          the release version tag
 set -euo pipefail
 
 image="${1:?repository name required}"
 : "${IMAGE_TAG:?}"
-BUILT="${BUILT:-false}"
+IMAGE_WAS_BUILT="${IMAGE_WAS_BUILT:-false}"
 IS_RELEASE="${IS_RELEASE:-false}"
 VERSION="${VERSION:-}"
 
@@ -55,7 +55,7 @@ put_manifest() {
   return 1
 }
 
-if [ "${BUILT}" = "true" ]; then
+if [ "${IMAGE_WAS_BUILT}" = "true" ]; then
   # build-and-push-lambda pushed the bare tag itself. Missing means that leg
   # failed.
   if ! aws ecr describe-images --repository-name "${image}" \
