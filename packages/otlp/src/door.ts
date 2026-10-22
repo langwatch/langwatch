@@ -3,9 +3,12 @@
  * hand: the refusal they render, the receiver policy they tag with, and the two
  * diagnostics they log. See specs/otlp/endpoint-path-canonicalisation.feature.
  */
+import { createHash } from "node:crypto";
+
 import { HandledError } from "@langwatch/handled-error";
 import type { Named } from "@langwatch/module";
-import type { Logger } from "@langwatch/observability";
+import { createWarnThrottle, type Logger } from "@langwatch/observability";
+import { counter } from "@langwatch/observability/metrics";
 import { nowInstant } from "@langwatch/time";
 import { z } from "zod";
 
@@ -87,6 +90,106 @@ const DOOR_REFUSAL_CODES: ReadonlySet<string> = new Set([
 /** A refusal the credential chain raised that an ingestion door renders itself. */
 export function isIngestDoorRefusal(error: unknown): error is HandledError {
   return HandledError.isHandled(error) && DOOR_REFUSAL_CODES.has(error.code);
+}
+
+/** One door-refusal line per caller bucket per window; the counter below holds the full volume. */
+const REFUSAL_LOG_WINDOW_MS = 60_000;
+/** Callers share a bounded number of buckets, so the throttle's state cannot grow without limit. */
+const REFUSAL_LOG_BUCKETS = 64;
+
+const refusalLog = createWarnThrottle(REFUSAL_LOG_WINDOW_MS);
+
+/** Every refused ingest request, by signal, reason code and status: no tenant, key or token. */
+const ingestDoorRefusalsTotal = counter({
+  name: "langwatch_ingest_door_refusals_total",
+  description: "Ingest requests refused at the credential door, by signal, reason code and status.",
+});
+
+/** The slice of a span the client-fault guard writes. */
+type FaultSpan = {
+  recordException(exception: Error): void;
+  setAttributes(attributes: Record<string, string>): void;
+};
+
+type Held<T> = { ok: true; value: T } | { ok: false; error: unknown };
+
+/**
+ * Runs `body` inside a span that `open` starts, without letting the caller's own fault mark that
+ * span ERROR. A tracer's active-span helper sets ERROR on anything thrown. A refusal the sender
+ * must fix (over its plan, unreadable body) is not a server error, so it is held inside the span,
+ * written as an exception event with its code, and rethrown once the span has closed UNSET.
+ * Anything else is thrown through the span as before.
+ */
+export async function withClientFaultSpan<S extends FaultSpan, T>(
+  open: (run: (span: S) => Promise<Held<T>>) => Promise<Held<T>>,
+  body: (span: S) => Promise<T>,
+): Promise<T> {
+  const held = await open(async (span) => {
+    try {
+      return { ok: true, value: await body(span) };
+    } catch (error) {
+      if (!HandledError.isHandled(error) || error.fault !== "customer") throw error;
+      span.recordException(error);
+      span.setAttributes({
+        "langwatch.error.code": error.code,
+        "langwatch.error.fault": "customer",
+      });
+      return { ok: false, error };
+    }
+  });
+  if (!held.ok) throw held.error;
+  return held.value;
+}
+
+/** Clears the sampled-log state; tests only. */
+export function resetIngestDoorRefusalLog(): void {
+  refusalLog.reset();
+}
+
+/**
+ * Records a credential refusal at an ingestion door. The counter takes every refusal. The warn
+ * line, with its request fingerprint, is sampled per caller bucket: a misconfigured exporter
+ * retries its refused batch many times a second, and each retry is the same fact. A suppressed
+ * refusal is still written, at debug.
+ */
+export function recordIngestDoorRefusal({
+  logger,
+  signal,
+  error,
+  diagnostics,
+  now = Date.now(),
+}: {
+  logger: Pick<Logger, "warn" | "debug">;
+  signal: OtlpSignal;
+  error: HandledError;
+  diagnostics: Readonly<{ hasEmptyAuthToken: boolean } & Record<string, unknown>>;
+  now?: number;
+}): void {
+  const refusalStatus = ingestDoorRefusalStatus(error);
+  ingestDoorRefusalsTotal.inc({ signal, code: error.code, status: refusalStatus });
+
+  const caller = `${String(diagnostics.userAgent ?? "")}|${String(diagnostics.forwardedFor ?? "")}`;
+  const bucket = createHash("sha256").update(caller).digest().readUInt16BE(0) % REFUSAL_LOG_BUCKETS;
+  const suppressed = refusalLog.claim({
+    key: `${signal}|${error.code}|${diagnostics.hasEmptyAuthToken}|${bucket}`,
+    now,
+  });
+  const message = diagnostics.hasEmptyAuthToken
+    ? "Authentication failed: X-Auth-Token sent but empty"
+    : "Authentication failed";
+
+  if (suppressed === undefined) {
+    logger.debug({ ...diagnostics, refusalStatus }, message);
+    return;
+  }
+  logger.warn(
+    {
+      ...diagnostics,
+      refusalStatus,
+      ...(suppressed > 0 ? { suppressedRefusals: suppressed } : {}),
+    },
+    message,
+  );
 }
 
 /** Whether the refusal is "we do not know this credential", not a ceiling on a key we know. */

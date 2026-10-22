@@ -3,6 +3,8 @@
  * receiver) resolve for themselves. One resolution, refused by throwing;
  * each door renders the refusal in its own vocabulary.
  */
+import { createHash } from "node:crypto";
+
 import { ProjectInvalidCredentialsError, ProjectMissingCredentialsError } from "@langwatch/api";
 import type { ApiKeyApi, ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
 import { ApiKeyPermissionDeniedError } from "@langwatch/api-key-contract";
@@ -30,6 +32,16 @@ const INGEST_PERMISSION = "traces:create" as const;
  * its refused batch many times a second, and every retry is the same fact.
  */
 const CEILING_REFUSAL_LOG_WINDOW_MS = 5 * 60_000;
+
+/**
+ * How long a token the directory did not know stays refused without asking it again. A
+ * misconfigured exporter resends the same bad key many times a second; each repeat otherwise
+ * costs a directory lookup. Short, so a key created a moment ago is not locked out for long.
+ */
+const UNKNOWN_TOKEN_TTL_MS = 10_000;
+
+/** The most unknown tokens remembered at once; the oldest is forgotten first, bounding memory. */
+const UNKNOWN_TOKEN_MAX_ENTRIES = 2_000;
 
 /** A resolved ingestion credential and the clock stamp it earns once its body is accepted. */
 type TraceIngestResolution = Readonly<{
@@ -62,6 +74,8 @@ export class TraceIngestCredentialService {
   #logger: Pick<Logger, "warn">;
   #now: () => number;
   #refusalLog = createWarnThrottle(CEILING_REFUSAL_LOG_WINDOW_MS);
+  /** Digest of an unknown token and its project, to when the refusal stops being remembered. */
+  #unknownTokens = new Map<string, number>();
 
   private constructor(
     options: TraceIngestCredentialOptions & Readonly<{ logger: Pick<Logger, "warn"> }>,
@@ -131,8 +145,14 @@ export class TraceIngestCredentialService {
   ): Promise<TraceIngestResolution> {
     if (!credentials) throw new ProjectMissingCredentialsError();
 
+    const unknownKey = unknownTokenKey(credentials);
+    if (this.#isRememberedUnknown(unknownKey)) throw new ProjectInvalidCredentialsError();
+
     const resolved = await this.#apiKeys.findResolvedToken(credentials);
-    if (!resolved) throw new ProjectInvalidCredentialsError();
+    if (!resolved) {
+      this.#rememberUnknown(unknownKey);
+      throw new ProjectInvalidCredentialsError();
+    }
 
     // A legacy project key has no per-permission ceiling: project keys predate
     // RBAC and carry full project access by design.
@@ -155,6 +175,23 @@ export class TraceIngestCredentialService {
     };
   }
 
+  #isRememberedUnknown(key: string): boolean {
+    const expiresAt = this.#unknownTokens.get(key);
+    if (expiresAt === undefined) return false;
+    if (expiresAt > this.#now()) return true;
+    this.#unknownTokens.delete(key);
+    return false;
+  }
+
+  #rememberUnknown(key: string): void {
+    this.#unknownTokens.delete(key);
+    this.#unknownTokens.set(key, this.#now() + UNKNOWN_TOKEN_TTL_MS);
+    if (this.#unknownTokens.size > UNKNOWN_TOKEN_MAX_ENTRIES) {
+      const oldest = this.#unknownTokens.keys().next();
+      if (!oldest.done) this.#unknownTokens.delete(oldest.value);
+    }
+  }
+
   /** The sender's own key configuration: a customer fault, logged as a warning, sampled per key. */
   #ceilingRefusal(resolved: Extract<ResolvedApiKeyCredential, { type: "apiKey" }>): HandledError {
     const suppressedRefusals = this.#refusalLog.claim({
@@ -175,6 +212,15 @@ export class TraceIngestCredentialService {
     }
     return new ApiKeyPermissionDeniedError(INGEST_PERMISSION);
   }
+}
+
+/** The memory key of a refused token: a digest, so the token itself is never held. */
+function unknownTokenKey(credentials: TraceLegacyRequestCredentials): string {
+  return createHash("sha256")
+    .update(credentials.projectId ?? "")
+    .update("\0")
+    .update(credentials.token)
+    .digest("base64");
 }
 
 /** The three ids both doors record a batch against. */

@@ -15,6 +15,7 @@ import { createLogger } from "@langwatch/observability";
 import {
   ingestDoorRefusalBody,
   ingestDoorRefusalStatus,
+  recordIngestDoorRefusal,
   isIngestDoorRefusal,
   OTLP_CORRECTED_PATH_HEADER,
   OTLP_REFUSED_MEDIA_TYPES,
@@ -57,12 +58,7 @@ export const otlpLogsDoor = defineRestDoor("otlp_ingest", {
     } catch (error) {
       if (!isIngestDoorRefusal(error)) throw error;
 
-      logger.warn(
-        { ...diagnostics, refusalStatus: ingestDoorRefusalStatus(error) },
-        diagnostics.hasEmptyAuthToken
-          ? "Authentication failed: X-Auth-Token sent but empty"
-          : "Authentication failed",
-      );
+      recordIngestDoorRefusal({ logger: logger, signal: "logs", error, diagnostics });
       throw error;
     }
   },
