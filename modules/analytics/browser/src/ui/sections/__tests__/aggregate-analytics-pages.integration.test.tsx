@@ -9,6 +9,7 @@ import { screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
+import type * as UseDashboards from "../../../behavior/use-dashboards.ts";
 import { renderWithAnalyticsHost } from "../../../testing.tsx";
 
 const savedViewsRead = vi.fn();
@@ -29,7 +30,8 @@ vi.mock("../../../behavior/use-saved-views.tsx", () => ({
     reorderViews: vi.fn(),
   }),
 }));
-vi.mock("../../../behavior/use-dashboards.ts", () => ({
+vi.mock("../../../behavior/use-dashboards.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof UseDashboards>()),
   useProjectMonitors: ({ projectId }: { projectId: string }) => {
     monitorsRead(projectId);
     return {
@@ -39,20 +41,22 @@ vi.mock("../../../behavior/use-dashboards.ts", () => ({
     };
   },
 }));
-vi.mock("../analytics-header.tsx", () => ({
-  AnalyticsHeader: ({ tabs }: { tabs: ReactNode }) => tabs,
-}));
-vi.mock("../custom-dashboards-section.tsx", () => ({
-  DashboardsTabMenu: () => <p>dashboards menu</p>,
-}));
-vi.mock("../../../behavior/use-filter-toggle.ts", () => ({
-  useFilterToggle: () => ({ showFilters: true }),
-}));
-vi.mock("../topics-selector.tsx", () => ({ TopicsSelector: () => <p>topic picker</p> }));
-vi.mock("../fields-filters.tsx", () => ({ QueryStringFieldsFilters: () => null }));
-vi.mock("../custom-graph.tsx", () => ({
-  CustomGraph: ({ input }: { input: { graphId: string } }) => <p>{input.graphId}</p>,
-}));
+// Every other procedure the screens read answers as an empty, settled query: the screens are
+// drawn whole, and only the tRPC client under them is replaced.
+vi.mock("../../../behavior/analytics-api.ts", () => {
+  const settled = { data: undefined, isLoading: false, isError: false, isFetched: true };
+  const procedure = (): unknown =>
+    new Proxy(() => undefined, {
+      get: (_target, prop) => {
+        if (prop === "useQuery" || prop === "useInfiniteQuery") return () => settled;
+        if (prop === "useMutation") return () => ({ mutate: vi.fn(), mutateAsync: vi.fn() });
+        if (prop === "then") return undefined;
+        return procedure();
+      },
+      apply: () => procedure(),
+    });
+  return { analyticsApi: procedure() };
+});
 
 import AnalyticsLayout from "../analytics-layout.tsx";
 import AnalyticsEvaluationsScreen from "../analytics/analytics-evaluations.screen.tsx";
@@ -92,13 +96,13 @@ describe("the analytics pages on an aggregate project", () => {
     it("offers no Topics tab and no topic picker", () => {
       renderWithAnalyticsHost(
         <AnalyticsLayout tab="overview">
-          <FilterSidebar />
+          <FilterSidebar defaultShowFilters />
         </AnalyticsLayout>,
         { project: projectOfKind("aggregate") },
       );
 
       expect(tabLabels()).toEqual(["Overview", "Users", "LLM metrics", "Evaluations"]);
-      expect(screen.queryByText("topic picker")).not.toBeInTheDocument();
+      expect(screen.queryByText("No topics found")).not.toBeInTheDocument();
     });
 
     /** @scenario "The aggregate hides the views that only make sense inside one project" */
@@ -110,7 +114,7 @@ describe("the analytics pages on an aggregate project", () => {
         { project: projectOfKind("aggregate") },
       );
 
-      expect(screen.queryByText("dashboards menu")).not.toBeInTheDocument();
+      expect(screen.queryByText("Dashboards")).not.toBeInTheDocument();
     });
 
     /** @scenario "The aggregate hides the views that only make sense inside one project" */
@@ -145,13 +149,13 @@ describe("the analytics pages on an aggregate project", () => {
     it("still offers its topics and its monitors' cards", () => {
       renderWithAnalyticsHost(
         <AnalyticsLayout tab="overview">
-          <FilterSidebar />
+          <FilterSidebar defaultShowFilters />
         </AnalyticsLayout>,
         { project: projectOfKind("application") },
       );
       expect(tabLabels()).toContain("Topics");
-      expect(screen.getByText("topic picker")).toBeInTheDocument();
-      expect(screen.getByText("dashboards menu")).toBeInTheDocument();
+      expect(screen.getByText("No topics found")).toBeInTheDocument();
+      expect(screen.getByText("Dashboards")).toBeInTheDocument();
     });
 
     it("still draws a card per monitor on the evaluations page", () => {
