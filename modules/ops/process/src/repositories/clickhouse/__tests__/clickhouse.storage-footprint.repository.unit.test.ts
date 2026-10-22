@@ -57,6 +57,25 @@ describe("given an endpoint's system tables", () => {
       expect(statements[1]?.sql).toContain("FROM system.backup_log");
     });
 
+    it("reads every replica's log when a cluster is named, so another replica's backup counts", async () => {
+      const { repo, statements } = repoAnswering([]);
+
+      await repo.findBackupStatuses({ cluster: "default" });
+
+      expect(statements[1]?.sql).toContain("clusterAllReplicas('default', system.backup_log)");
+    });
+
+    it("reads the local log with no cluster, or one that is not a plain name", async () => {
+      for (const cluster of [undefined, "", "x'); DROP TABLE t; --"]) {
+        const { repo, statements } = repoAnswering([]);
+
+        await repo.findBackupStatuses({ cluster });
+
+        expect(statements[1]?.sql).toContain("FROM system.backup_log");
+        expect(statements[1]?.sql).not.toContain("clusterAllReplicas");
+      }
+    });
+
     it("skips the query, so nothing errors, on a server without the table", async () => {
       const { repo, statements } = repoAnswering([], "0");
 

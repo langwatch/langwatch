@@ -71,6 +71,7 @@ function process(
       ops: {
         apiKey: undefined,
         clickhouseOpsUrl: undefined,
+        clickhouseCluster: undefined,
         usageStats: {
           disabled: false,
           installMethod: undefined,

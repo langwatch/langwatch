@@ -80,8 +80,13 @@ export class ClickHouseStorageFootprintRepository extends StorageFootprintReposi
     }));
   }
 
-  /** Read from `system.backup_log` rather than `system.backups`. */
-  async findBackupStatuses(): Promise<BackupStatusRow[]> {
+  /**
+   * Read from `system.backup_log` rather than `system.backups`. With a cluster, every replica's
+   * log is read and merged: the backup runs on one replica, the app may be connected to another.
+   */
+  async findBackupStatuses({ cluster }: { cluster?: string | undefined } = {}): Promise<
+    BackupStatusRow[]
+  > {
     if (!(await this.hasBackupLog())) return [];
     const result = await this.clickhouse.query<{
       status: string;
@@ -96,7 +101,7 @@ export class ClickHouseStorageFootprintRepository extends StorageFootprintReposi
           count() as cnt,
           maxIf(end_time, status = 'BACKUP_CREATED') as last_success_time,
           argMaxIf(total_size, end_time, status = 'BACKUP_CREATED') as last_success_size
-        FROM system.backup_log
+        FROM ${backupLogSource(cluster)}
         GROUP BY status
       `,
       // System.backup_log carries no tenant column: this is the instance's backup history.
@@ -120,4 +125,14 @@ export class ClickHouseStorageFootprintRepository extends StorageFootprintReposi
     });
     return Number.parseInt(result.rows[0]?.present ?? "0", 10) > 0;
   }
+}
+
+/** A cluster name is spliced as an identifier, so only a plain one is trusted; else read locally. */
+const CLUSTER_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+function backupLogSource(cluster: string | undefined): string {
+  const name = cluster?.trim();
+  return name && CLUSTER_NAME.test(name)
+    ? `clusterAllReplicas('${name}', system.backup_log)`
+    : "system.backup_log";
 }
