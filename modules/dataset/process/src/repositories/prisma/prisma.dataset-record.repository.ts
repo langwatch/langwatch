@@ -29,6 +29,19 @@ export class PrismaDatasetRecordRepository
     return this.database.datasetRecord.count({ where: input });
   }
 
+  async countByDataset(input: {
+    projectId: string;
+    datasetIds: readonly string[];
+  }): Promise<{ datasetId: string; recordCount: number }[]> {
+    if (input.datasetIds.length === 0) return [];
+    const grouped = await this.database.datasetRecord.groupBy({
+      by: ["datasetId"],
+      where: { projectId: input.projectId, datasetId: { in: [...input.datasetIds] } },
+      _count: { _all: true },
+    });
+    return grouped.map((row) => ({ datasetId: row.datasetId, recordCount: row._count._all }));
+  }
+
   async findPage(input: {
     datasetId: string;
     projectId: string;

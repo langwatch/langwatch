@@ -66,9 +66,10 @@ export type UserAddressReplacement = "replaced" | "changed" | "taken";
  * Persistence owned by User. It never crosses the feature boundary. Every mint commits user's
  * created fact (and a self-registration its registered fact) to the fact outbox with the row.
  */
-/** A name change, an address change, or both, as the two `UserApi` writes ask for them. */
+/** A name change, an address change, or both; a new address carries its cleared verification. */
 export type StoredProfileChange = UpdateUserProfileInput &
-  Partial<Pick<UpdateUserEmailInput, "email">>;
+  Partial<Pick<UpdateUserEmailInput, "email">> &
+  Partial<Pick<UserProfile, "emailVerified">>;
 
 export interface UserRepository {
   findProfiles(userIds: string[]): Promise<UserFullProfile[]>;

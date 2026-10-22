@@ -17,7 +17,7 @@ import (
 // rest appear once their application has written a line.
 var LogApps = []string{
 	"all", "ui", "api", "worker", "gateway", "nlp", "langy",
-	"idp", "mail", "storage", "voice", "llm", "analytics", "outbound", "payment", "lambda", "github", "design-system", "mail-room", "tasks", "obs",
+	"idp", "mail", "storage", "voice", "llm", "analytics", "outbound", "payment", "lambda", "github", "mcp", "design-system", "mail-room", "tasks", "obs",
 }
 
 // AllApps is the sub-tab holding every application's lines interleaved.
@@ -141,6 +141,8 @@ func appFromServiceName(service string) (string, bool) {
 		return "lambda", true
 	case strings.Contains(service, "githubsim"):
 		return "github", true
+	case strings.Contains(service, "mcpsim"):
+		return "mcp", true
 	case strings.Contains(service, "paymentsim"):
 		return "payment", true
 	case strings.Contains(service, "telemetrysim"):

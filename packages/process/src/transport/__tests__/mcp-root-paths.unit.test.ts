@@ -20,9 +20,7 @@ type EndpointApp = Readonly<{ name: string }>;
 const MAIN_MCP_ROUTES = [
   { method: "POST", path: "/mcp" },
   { method: "GET", path: "/mcp/health" },
-  { method: "GET", path: "/sse" },
-  { method: "POST", path: "/messages" },
-  { method: "POST", path: "/sse/messages" },
+  { method: "POST", path: "/sse" },
   { method: "GET", path: "/.well-known/oauth-protected-resource" },
   { method: "GET", path: "/.well-known/oauth-protected-resource/mcp" },
   { method: "GET", path: "/.well-known/oauth-protected-resource/sse" },

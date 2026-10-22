@@ -252,10 +252,10 @@ function nonEmptyString(value: unknown): string | undefined {
  */
 export const GROUP_QUEUE_CONFIG = {
   /**
-   * Max parallel groups per consumer. Jobs mostly wait on flushed ClickHouse inserts (~200 ms),
-   * so slots set throughput; a listed run's bench reached 1,474 jobs/s at 1,000 (Alex, 2026-10-12).
+   * Max parallel groups per consumer: the previous release's 100 (Alex, 2026-10-13).
+   * GLOBAL_QUEUE_CONCURRENCY raises it; a bench reached 1,474 jobs/s at 1,000.
    */
-  defaultGlobalConcurrency: 1_000,
+  defaultGlobalConcurrency: 100,
   /** TTL for the active key (safety net for crashes), in seconds */
   activeTtlSec: 300,
   /** BRPOP timeout in seconds (fallback polling interval) */

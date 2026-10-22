@@ -36,7 +36,10 @@ function compose() {
     prisma: recording.database,
     operatorReads,
   });
-  const pipeline: ScimSyncPipeline = composeScimSyncPipeline({ scimSyncs });
+  const pipeline: ScimSyncPipeline = composeScimSyncPipeline({
+    repositories: { scimSyncs },
+    app: { postSyncSummary: async () => undefined },
+  });
   return { ...recording, pipeline };
 }
 
@@ -92,8 +95,8 @@ describe("composeScimSyncPipeline", () => {
         "revokeScimSync",
       ]);
       expect([...(pipeline.stateProjections?.keys() ?? [])]).toEqual(["scimSyncState"]);
-      // No process manager, deliberately: the retry belongs to the directory.
-      expect(pipeline.processManagers ?? []).toHaveLength(0);
+      // The retry belongs to the directory; the one process manager only summarises pushes.
+      expect([...(pipeline.processManagers?.keys() ?? [])]).toEqual(["scimSyncSummary"]);
     });
 
     /** @scenario "The worker builds the directory-sync ledger from its own client" */

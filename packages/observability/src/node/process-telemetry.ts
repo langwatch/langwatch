@@ -38,7 +38,7 @@ export function processTelemetry(serviceName: string) {
       // Pyroscope's own push, gated on its own endpoint: independent of OTLP.
       const profiler = startProfiling({
         serverAddress: settings.profilingServerAddress,
-        appName: serviceName,
+        appName: name,
         environment: settings.environment,
         resourceAttributes: settings.resourceAttributes,
       });

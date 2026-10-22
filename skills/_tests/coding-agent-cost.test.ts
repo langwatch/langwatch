@@ -88,5 +88,19 @@ describe("the coding-agent-cost skill", () => {
         expect(query).toContain("TimeUnixMs >= now() - INTERVAL 30 DAY");
       }
     });
+
+    /** @scenario "One project is narrowed with a TenantId filter in the query" */
+    it("narrows to one project with a TenantId filter, not --project", () => {
+      const oneProject = costSkill()
+        .split("\n\n")
+        .find((p) => p.includes("For one project,"));
+      expect(oneProject, "the skill says how to read one project").toBeTruthy();
+      expect(oneProject).toContain("add `AND TenantId = '<id>'` to every query below");
+      expect(oneProject).toContain("`personal_project.id` in `langwatch whoami`");
+      expect(oneProject).toContain(
+        "if that field is missing, ask the user which project id to use",
+      );
+      expect(oneProject).not.toContain("--project");
+    });
   });
 });

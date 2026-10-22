@@ -5433,6 +5433,12 @@ from .post_api_optimization_by_workflow_id_by_version_id_body import PostApiOpti
 from .post_api_optimization_by_workflow_id_by_version_id_response_200 import (
     PostApiOptimizationByWorkflowIdByVersionIdResponse200,
 )
+from .post_api_optimization_by_workflow_id_by_version_id_response_200_error import (
+    PostApiOptimizationByWorkflowIdByVersionIdResponse200Error,
+)
+from .post_api_optimization_by_workflow_id_by_version_id_response_200_nodes import (
+    PostApiOptimizationByWorkflowIdByVersionIdResponse200Nodes,
+)
 from .post_api_optimization_by_workflow_id_by_version_id_response_200_result_type_0 import (
     PostApiOptimizationByWorkflowIdByVersionIdResponse200ResultType0,
 )
@@ -7207,6 +7213,12 @@ from .post_api_workflows_by_workflow_id_by_version_id_run_body import PostApiWor
 from .post_api_workflows_by_workflow_id_by_version_id_run_response_200 import (
     PostApiWorkflowsByWorkflowIdByVersionIdRunResponse200,
 )
+from .post_api_workflows_by_workflow_id_by_version_id_run_response_200_error import (
+    PostApiWorkflowsByWorkflowIdByVersionIdRunResponse200Error,
+)
+from .post_api_workflows_by_workflow_id_by_version_id_run_response_200_nodes import (
+    PostApiWorkflowsByWorkflowIdByVersionIdRunResponse200Nodes,
+)
 from .post_api_workflows_by_workflow_id_by_version_id_run_response_200_result_type_0 import (
     PostApiWorkflowsByWorkflowIdByVersionIdRunResponse200ResultType0,
 )
@@ -7215,6 +7227,8 @@ from .post_api_workflows_by_workflow_id_by_version_id_run_response_200_status im
 )
 from .post_api_workflows_by_workflow_id_run_body import PostApiWorkflowsByWorkflowIdRunBody
 from .post_api_workflows_by_workflow_id_run_response_200 import PostApiWorkflowsByWorkflowIdRunResponse200
+from .post_api_workflows_by_workflow_id_run_response_200_error import PostApiWorkflowsByWorkflowIdRunResponse200Error
+from .post_api_workflows_by_workflow_id_run_response_200_nodes import PostApiWorkflowsByWorkflowIdRunResponse200Nodes
 from .post_api_workflows_by_workflow_id_run_response_200_result_type_0 import (
     PostApiWorkflowsByWorkflowIdRunResponse200ResultType0,
 )
@@ -11320,6 +11334,8 @@ __all__ = (
     "PostApiMonitorsResponse201ExecutionMode",
     "PostApiOptimizationByWorkflowIdByVersionIdBody",
     "PostApiOptimizationByWorkflowIdByVersionIdResponse200",
+    "PostApiOptimizationByWorkflowIdByVersionIdResponse200Error",
+    "PostApiOptimizationByWorkflowIdByVersionIdResponse200Nodes",
     "PostApiOptimizationByWorkflowIdByVersionIdResponse200ResultType0",
     "PostApiOptimizationByWorkflowIdByVersionIdResponse200Status",
     "PostApiPromptsBody",
@@ -12140,10 +12156,14 @@ __all__ = (
     "PostApiWorkflowsByIdEvaluateResponse200",
     "PostApiWorkflowsByWorkflowIdByVersionIdRunBody",
     "PostApiWorkflowsByWorkflowIdByVersionIdRunResponse200",
+    "PostApiWorkflowsByWorkflowIdByVersionIdRunResponse200Error",
+    "PostApiWorkflowsByWorkflowIdByVersionIdRunResponse200Nodes",
     "PostApiWorkflowsByWorkflowIdByVersionIdRunResponse200ResultType0",
     "PostApiWorkflowsByWorkflowIdByVersionIdRunResponse200Status",
     "PostApiWorkflowsByWorkflowIdRunBody",
     "PostApiWorkflowsByWorkflowIdRunResponse200",
+    "PostApiWorkflowsByWorkflowIdRunResponse200Error",
+    "PostApiWorkflowsByWorkflowIdRunResponse200Nodes",
     "PostApiWorkflowsByWorkflowIdRunResponse200ResultType0",
     "PostApiWorkflowsByWorkflowIdRunResponse200Status",
     "PostConnectedAgentFramesBody",

@@ -6,7 +6,11 @@ import type {
 } from "@langwatch/automation-contract";
 
 import { AutomationLogger } from "../../../services/automation.service.ts";
-import type { ReportScheduleTarget } from "../../trigger.repository.ts";
+import type {
+  ReportScheduleTarget,
+  TriggerJsonText,
+  TriggerJsonTextOutcome,
+} from "../../trigger.repository.ts";
 import { TriggerRepository } from "../../trigger.repository.ts";
 
 const unavailable = (): Promise<never> => Promise.reject(new Error("unused test dependency"));
@@ -48,6 +52,14 @@ export class HeartbeatTriggerRepository extends TriggerRepository {
   }
 
   replaceActionParamsIfUnchanged(): Promise<boolean> {
+    return unavailable();
+  }
+
+  findJsonTextPage(): Promise<TriggerJsonText[]> {
+    return unavailable();
+  }
+
+  unwrapJsonText(): Promise<TriggerJsonTextOutcome> {
     return unavailable();
   }
 

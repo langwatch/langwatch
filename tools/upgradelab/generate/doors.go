@@ -262,9 +262,10 @@ func (doors *ComposeDoors) seedProducts(ctx context.Context) error {
 }
 
 // SeedAccount is the seed's credential account; seed-derived so a restored copy can sign in again.
+// On the staff domain, as cloud deployments grant the platform-operator role to staff only.
 func SeedAccount(seedValue int64) (email, password string) {
 	n := strconv.FormatInt(seedValue, 10)
-	return "seed+" + n + "@snapshot.test", "snapshot-test-seed-password-" + n
+	return "seed+" + n + "@langwatch.ai", "snapshot-test-seed-password-" + n
 }
 
 // AccountSQL hashes in a scratch pgcrypto schema it drops in the same transaction, so the old schema keeps no extension.

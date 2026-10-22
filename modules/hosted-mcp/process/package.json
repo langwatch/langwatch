@@ -2,7 +2,7 @@
   "name": "@langwatch/hosted-mcp-process",
   "version": "0.1.0",
   "private": true,
-  "description": "The Model Context Protocol endpoint LangWatch hosts: Streamable HTTP and SSE transports, OAuth token issue and exchange, and session recovery.",
+  "description": "The Model Context Protocol endpoint LangWatch hosts: the Streamable HTTP transport, OAuth token issue and exchange, and session recovery.",
   "files": [
     "src"
   ],

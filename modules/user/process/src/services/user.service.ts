@@ -270,12 +270,21 @@ export class UserService {
     return this.repository.updateProfile(update);
   }
 
-  /** Stored trimmed and lower-cased, as the parse left it; auth's door ends the old sessions. */
+  /**
+   * Stored trimmed and lower-cased, as the parse left it; auth's door ends the old sessions.
+   * A different address is not yet verified; a change of case alone keeps the verification.
+   */
   async updateEmail(input: UpdateUserEmailInput): Promise<UserProfile> {
     const parsed = updateUserEmailInputSchema.parse(input);
-    if (!(await this.repository.findById(parsed.id))) throw new UserNotFoundError(parsed.id);
+    const current = await this.repository.findById(parsed.id);
+    if (!current) throw new UserNotFoundError(parsed.id);
+    const sameAddress = (current.email ?? "").toLowerCase() === parsed.email;
 
-    return this.repository.updateProfile({ id: parsed.id, email: parsed.email });
+    return this.repository.updateProfile({
+      id: parsed.id,
+      email: parsed.email,
+      ...(sameAddress ? {} : { emailVerified: false }),
+    });
   }
 
   async getAccountInfo(input: UserIdInput): Promise<UserAccountInfo> {

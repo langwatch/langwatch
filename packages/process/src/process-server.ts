@@ -9,6 +9,7 @@ import { z } from "zod";
 
 import { bootInstalledProcess } from "./boot-installed-process.ts";
 import { processShutdownDeadlineMs } from "./lifecycle/shutdown-deadline.ts";
+import { warnIgnoredMigrationSkips } from "./migration/ignored-migration-skips.ts";
 import {
   type UpgradeGate,
   upgradeGateComponent,
@@ -247,6 +248,7 @@ export class ProcessServer implements ProcessBoot {
     logger: ServerLogger;
   }): void {
     this.upgradeGate = gate;
+    if (role === "worker") warnIgnoredMigrationSkips({ skips: this.settings, logger });
     this.server.with(
       upgradeGateComponent({
         server: this.server.name,
@@ -296,4 +298,6 @@ const processSettings = z.object({
   nlpCodeBlockTimeoutSeconds: z.string().optional(),
   outboundProxy: z.record(z.string(), z.string().optional()).optional(),
   rawSocketPort: z.number().int().min(0).max(65535).default(3300),
+  skipPrismaMigrate: z.string().optional(),
+  skipClickHouseMigrate: z.string().optional(),
 });

@@ -1,5 +1,5 @@
 import type { WireOf } from "@langwatch/api/web";
-import type { DatasetWire } from "@langwatch/dataset-contract";
+import type { DatasetSummaryWire } from "@langwatch/dataset-contract";
 /**
  * @vitest-environment jsdom
  * Dataset's picker list, as it lends it to the workflow dataset node.
@@ -12,9 +12,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { DatasetPickerList } from "../dataset-picker-list.tsx";
 
-const turn10: WireOf<DatasetWire> = {
+const turn10: WireOf<DatasetSummaryWire> = {
   id: "ds-1",
-  projectId: "proj-1",
   name: "turn 10",
   slug: "turn-10",
   columnTypes: [
@@ -23,23 +22,16 @@ const turn10: WireOf<DatasetWire> = {
   ],
   createdAt: "2026-06-01T10:00:00.000Z",
   updatedAt: "2026-06-01T10:00:00.000Z",
-  archivedAt: null,
-  mapping: null,
-  useS3: false,
-  s3RecordCount: null,
-  contentLayout: "s3_jsonl",
   status: "ready",
-  statusError: null,
-  stagingKey: null,
-  uploadFilename: null,
-  rowCount: 10,
-  sizeBytes: null,
-  chunkCount: null,
-  chunkOffsets: null,
 };
 
-const renderPicker = (onSelect = vi.fn()) => {
-  renderWithDesignSystem(<DatasetPickerList datasets={[turn10]} onSelect={onSelect} />);
+const renderPicker = (
+  onSelect = vi.fn(),
+  recordCounts: ReadonlyMap<string, number> = new Map([["ds-1", 10]]),
+) => {
+  renderWithDesignSystem(
+    <DatasetPickerList datasets={[turn10]} recordCounts={recordCounts} onSelect={onSelect} />,
+  );
   return onSelect;
 };
 
@@ -55,6 +47,14 @@ describe("dataset picker list", () => {
     expect(screen.getByText("10 entries")).toBeInTheDocument();
     expect(screen.getByText("2 columns")).toBeInTheDocument();
     expect(screen.getByText(/Updated/)).toBeInTheDocument();
+  });
+
+  /** @scenario "The list shows before entry counts arrive" */
+  it("shows each dataset while its entry count is still on its way", () => {
+    renderPicker(vi.fn(), new Map());
+
+    expect(screen.getByTestId("dataset-card-turn 10")).toBeInTheDocument();
+    expect(screen.getByLabelText("Counting entries")).toBeInTheDocument();
   });
 
   /** @scenario Picking a dataset binds it to the node */

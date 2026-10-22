@@ -137,8 +137,13 @@ function contractCases(backend: Backend): void {
         page: 1,
         limit: 50,
       });
+      const counted = await backend.records().countByDataset({
+        projectId: backend.mine(),
+        datasetIds: [mine.id, theirs.id],
+      });
 
-      expect(listed.map((dataset) => [dataset.slug, dataset.recordCount])).toEqual([["mine", 1]]);
+      expect(listed.map((dataset) => dataset.slug)).toEqual(["mine"]);
+      expect(counted).toEqual([{ datasetId: mine.id, recordCount: 1 }]);
     });
   });
 

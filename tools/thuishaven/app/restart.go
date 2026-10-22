@@ -217,7 +217,7 @@ func restartTargets(st domain.Stack, name string) []restartTarget {
 	inGo := map[string]bool{"gateway": !mono, "nlp": !mono}
 	inSims := map[string]bool{}
 	if !mono && goLaneHostsSimulators(st.WorktreeDir) {
-		for _, sim := range []string{domain.IdPService, domain.MailService, domain.StorageService, domain.VoiceService, domain.LLMService, domain.AnalyticsService, domain.OutboundService, domain.PaymentService, domain.TelemetryService, domain.LambdaService, domain.GithubService} {
+		for _, sim := range []string{domain.IdPService, domain.MailService, domain.StorageService, domain.VoiceService, domain.LLMService, domain.AnalyticsService, domain.OutboundService, domain.PaymentService, domain.TelemetryService, domain.LambdaService, domain.GithubService, domain.McpService} {
 			inSims[sim] = true
 		}
 	}

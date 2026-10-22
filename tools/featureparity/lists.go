@@ -49,6 +49,7 @@ var (
 		"services/sims/telemetrysim",
 		"services/sims/lambdasim",
 		"services/sims/githubsim",
+		"services/sims/mcpsim",
 		"services/scenariorunner",
 		"tools/workerrun",
 		"tools/seedgen",

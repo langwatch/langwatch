@@ -6,6 +6,7 @@ import {
   type UpsertDatasetInput,
 } from "@langwatch/dataset-contract";
 
+import { isSingleFileDataset } from "../rules/dataset-single-file.rules.ts";
 import type { DatasetServiceOptions } from "./dataset.service.ts";
 
 /** How many postgres-backed rows a copy moves at a time. */
@@ -56,6 +57,21 @@ export class DatasetCopyService {
         projectId: parsed.targetProjectId,
         slugOrId: target.id,
       });
+    }
+
+    if (isSingleFileDataset(source) && options.singleFile) {
+      const entries = await options.singleFile.findAllEntries({ dataset: source });
+      for (let start = 0; start < entries.length; start += COPY_BATCH_ROWS) {
+        await options.records.createMany({
+          datasetId: target.id,
+          projectId: parsed.targetProjectId,
+          entries: entries
+            .slice(start, start + COPY_BATCH_ROWS)
+            .map((entry) => ({ id: this.deps.generateId(), ...entry })),
+        });
+      }
+
+      return target;
     }
 
     // Every row, one batch in memory at a time.

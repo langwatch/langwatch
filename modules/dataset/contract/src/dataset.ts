@@ -220,23 +220,56 @@ export interface DatasetRecordSchema extends Named<typeof datasetRecordSchemaDef
 export const datasetRecordSchema: DatasetRecordSchema = datasetRecordSchemaDefinition;
 export type DatasetRecord = z.infer<typeof datasetRecordSchema>;
 
-const datasetSummarySchemaDefinition = datasetSchema.safeExtend({
-  recordCount: z.number().int().nonnegative(),
-});
+/** What the list surfaces render of a dataset; its entry count is a second read. */
+const datasetSummaryFields = {
+  id: true,
+  name: true,
+  slug: true,
+  columnTypes: true,
+  status: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
+
+const datasetSummarySchemaDefinition = datasetSchema.pick(datasetSummaryFields);
 export interface DatasetSummarySchema extends Named<typeof datasetSummarySchemaDefinition> {}
 export const datasetSummarySchema: DatasetSummarySchema = datasetSummarySchemaDefinition;
 export type DatasetSummary = z.infer<typeof datasetSummarySchema>;
 
 /** One row of the dataset list as the browser reads it. */
-const datasetSummaryWireSchemaDefinition = datasetWireSchema.safeExtend({
-  recordCount: z.number().int().nonnegative(),
-});
+const datasetSummaryWireSchemaDefinition = datasetWireSchema.pick(datasetSummaryFields);
 export interface DatasetSummaryWireSchema extends Named<
   typeof datasetSummaryWireSchemaDefinition
 > {}
 export const datasetSummaryWireSchema: DatasetSummaryWireSchema =
   datasetSummaryWireSchemaDefinition;
 export type DatasetSummaryWire = z.infer<typeof datasetSummaryWireSchema>;
+
+/** The most datasets one entry-count read answers: the list's own page. */
+export const DATASET_RECORD_COUNTS_MAX = 200;
+
+const countDatasetRecordsInputSchemaDefinition = z.object({
+  projectId: z.string().min(1),
+  datasetIds: z.array(z.string().min(1)).max(DATASET_RECORD_COUNTS_MAX),
+});
+export interface CountDatasetRecordsInputSchema extends Named<
+  typeof countDatasetRecordsInputSchemaDefinition
+> {}
+export const countDatasetRecordsInputSchema: CountDatasetRecordsInputSchema =
+  countDatasetRecordsInputSchemaDefinition;
+export type CountDatasetRecordsInput = z.infer<typeof countDatasetRecordsInputSchema>;
+
+/** How many entries one dataset holds, whichever storage it uses. */
+const datasetRecordCountSchemaDefinition = z.object({
+  datasetId: z.string().min(1),
+  recordCount: z.number().int().nonnegative(),
+});
+export interface DatasetRecordCountSchema extends Named<
+  typeof datasetRecordCountSchemaDefinition
+> {}
+export const datasetRecordCountSchema: DatasetRecordCountSchema =
+  datasetRecordCountSchemaDefinition;
+export type DatasetRecordCount = z.infer<typeof datasetRecordCountSchema>;
 
 const datasetPaginationSchemaDefinition = z.object({
   page: z.number().int().positive(),
@@ -248,8 +281,16 @@ export interface DatasetPaginationSchema extends Named<typeof datasetPaginationS
 export const datasetPaginationSchema: DatasetPaginationSchema = datasetPaginationSchemaDefinition;
 export type DatasetPagination = z.infer<typeof datasetPaginationSchema>;
 
+/** One row of a `listDatasets` page: the summary with its entry count, as the REST API answers. */
+const datasetListEntrySchemaDefinition = datasetSummarySchema.safeExtend({
+  recordCount: z.number().int().nonnegative(),
+});
+export interface DatasetListEntrySchema extends Named<typeof datasetListEntrySchemaDefinition> {}
+export const datasetListEntrySchema: DatasetListEntrySchema = datasetListEntrySchemaDefinition;
+export type DatasetListEntry = z.infer<typeof datasetListEntrySchema>;
+
 const datasetListResultSchemaDefinition = z.object({
-  data: z.array(datasetSummarySchema),
+  data: z.array(datasetListEntrySchema),
   pagination: datasetPaginationSchema,
 });
 export interface DatasetListResultSchema extends Named<typeof datasetListResultSchemaDefinition> {}

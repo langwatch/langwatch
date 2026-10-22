@@ -19,6 +19,12 @@ export const TRACE_INPUT_MEDIA_REFERENCE_ATTRIBUTE = "langwatch.reserved.media_r
 export const TRACE_OUTPUT_MEDIA_REFERENCE_ATTRIBUTE = "langwatch.reserved.media_refs.output";
 
 /**
+ * Start time of the span whose input is the trace input; 0 when a root set it.
+ * Lets the top-most span present win when no span has a null parent.
+ */
+export const RESERVED_INPUT_SPAN_START_MS = "langwatch.reserved.input_span_start_ms";
+
+/**
  * Trace-level model metadata stamped by the fold from the models its spans (or
  * log turns) actually used. Semantic:
  */
@@ -37,6 +43,7 @@ export function accumulateTraceAttributes({
   outputSource,
   inputIsFallback,
   outputIsFallback,
+  inputSpanStartTimeMs,
   inputMediaRefs,
   outputMediaRefs,
 }: {
@@ -45,6 +52,7 @@ export function accumulateTraceAttributes({
   outputSource: string;
   inputIsFallback: boolean;
   outputIsFallback: boolean;
+  inputSpanStartTimeMs: number | null;
   /** Compact JSON media refs following the winning IO, or null to clear. */
   inputMediaRefs: string | null;
   outputMediaRefs: string | null;
@@ -64,7 +72,13 @@ export function accumulateTraceAttributes({
   hoistTraceOrigin({ state, span, mergedAttributes: merged });
   hoistTraceOriginSource({ state, span, mergedAttributes: merged });
 
-  applyReservedFlags({ merged, outputSource, inputIsFallback, outputIsFallback });
+  applyReservedFlags({
+    merged,
+    outputSource,
+    inputIsFallback,
+    outputIsFallback,
+    inputSpanStartTimeMs,
+  });
   recordMediaAndRedaction({ merged, span, inputMediaRefs, outputMediaRefs });
 
   return merged;
@@ -231,11 +245,13 @@ function applyReservedFlags({
   outputSource,
   inputIsFallback,
   outputIsFallback,
+  inputSpanStartTimeMs,
 }: {
   merged: Record<string, string>;
   outputSource: string;
   inputIsFallback: boolean;
   outputIsFallback: boolean;
+  inputSpanStartTimeMs: number | null;
 }): void {
   merged["langwatch.reserved.output_source"] = outputSource;
   if (inputIsFallback) {
@@ -248,6 +264,12 @@ function applyReservedFlags({
     merged["langwatch.reserved.output_is_fallback"] = "true";
   } else {
     delete merged["langwatch.reserved.output_is_fallback"];
+  }
+
+  if (inputSpanStartTimeMs === null) {
+    delete merged[RESERVED_INPUT_SPAN_START_MS];
+  } else {
+    merged[RESERVED_INPUT_SPAN_START_MS] = String(inputSpanStartTimeMs);
   }
 }
 

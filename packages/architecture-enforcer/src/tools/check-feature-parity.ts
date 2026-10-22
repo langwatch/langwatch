@@ -241,6 +241,7 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   "services/sims/telemetrysim",
   "services/sims/lambdasim",
   "services/sims/githubsim",
+  "services/sims/mcpsim",
   // The Go scenario runner: its child-contract and fence scenarios bind only from Go tests.
   "services/scenariorunner",
   "tools/workerrun",

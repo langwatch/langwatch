@@ -438,6 +438,11 @@ An [ingestion template](/ai-governance/ingestion-templates) mints an ingestion k
 
   <Step title="Copy the key">
     Click **Create secret key**. The key is shown once, as `sk-lw-<id>_<secret>`, with ready-made `.env`, HTTP header, terminal and MCP snippets whose copy buttons carry the real key. Copy it now; the table never shows it again.
+
+    <Frame>
+      <img src="/images/mcp/api-key-created-light.png" alt="The Token created dialog with the new key, .env values and code assistant snippets" className="block dark:hidden" />
+      <img src="/images/mcp/api-key-created-dark.png" alt="The Token created dialog with the new key, .env values and code assistant snippets" className="hidden dark:block" />
+    </Frame>
   </Step>
 </Steps>
 
@@ -547,7 +552,15 @@ A **Restricted** key holds read or write access per category. Read grants the `v
 
 ## Connect an AI assistant over MCP
 
-A personal key gives the [LangWatch MCP Server](/integration/mcp) access to traces, analytics, prompts and the other features your key allows. The MCP server needs both `LANGWATCH_API_KEY` and `LANGWATCH_PROJECT_ID`.
+The [LangWatch MCP Server](/integration/mcp) is hosted at `https://app.langwatch.ai/mcp`. Most AI clients connect to it with OAuth: you sign in and approve a project, and no key is involved. See the [MCP setup guide](/integration/mcp).
+
+A client that cannot sign in can send a personal key as a header instead. The key gives the MCP server access to traces, analytics, prompts and the other features your key allows:
+
+```bash
+claude mcp add --transport http langwatch https://app.langwatch.ai/mcp --header "Authorization: Bearer sk-lw-..."
+```
+
+To run the MCP server on your machine instead, give it both `LANGWATCH_API_KEY` and `LANGWATCH_PROJECT_ID`:
 
 
 ### Claude Code
@@ -15273,10 +15286,10 @@ The pattern is `governance_<resource_with_underscores>_<verb_with_underscores>`,
 
 ## Authentication
 
-Governance MCP tools register inside LangWatch's existing MCP server (served on the same host that serves the dashboard), there is **no separate `langwatch mcp serve` binary**. Clients connect over HTTP using either streamable-HTTP at `/mcp` or SSE at `/sse`, and authenticate with one of:
+Governance MCP tools register inside LangWatch's existing MCP server (served on the same host that serves the dashboard), there is **no separate `langwatch mcp serve` binary**. Clients connect over the Streamable HTTP transport at `/mcp`, and authenticate with one of:
 
 - **Project API key as Bearer** (`Authorization: Bearer <projectApiKey>`), the plain read tools work immediately. Sufficient to call `governance_*_list` and `governance_*_get`. Admin reads (`governance_*_admin_list`, which expose `ottlRules`) and every write tool require a user-bound session and reject a project-key-only caller.
-- **OAuth (PKCE) flow** at `/api/v1/mcp/authorize` → `/oauth/token`, required for write tools and admin reads. The OAuth flow captures the user's id at authorize time, threads it through the session token cache, and surfaces it to governance tools as `ctx.callerUserId`. Without it, a write tool returns an `AUTH_REQUIRED:` error pointing the client at the OAuth flow.
+- **OAuth (PKCE) flow** at `/mcp/authorize` → `/oauth/token`, required for write tools and admin reads. The OAuth flow captures the user's id at authorize time, threads it through the session token cache, and surfaces it to governance tools as `ctx.callerUserId`. Without it, a write tool returns an `AUTH_REQUIRED:` error pointing the client at the OAuth flow.
 
 ```jsonc
 // MCP client config, points at the LangWatch instance's MCP endpoint
@@ -15285,10 +15298,8 @@ Governance MCP tools register inside LangWatch's existing MCP server (served on 
   "mcpServers": {
     "langwatch-governance": {
       "url": "https://app.langwatch.ai/mcp",
-      // Clients that speak the older SSE transport use
-      // https://app.langwatch.ai/sse instead.
       // Read-only access: add Authorization: Bearer <projectApiKey>.
-      // Read+write access: complete the OAuth PKCE flow at /api/v1/mcp/authorize.
+      // Read+write access: complete the OAuth PKCE flow at /mcp/authorize.
     },
   },
 }
@@ -15298,13 +15309,13 @@ The 9 governance tools register via `registerGovernanceMcpTools(server, ctx)` fr
 
 <Note>
   **Dev-environment port routing**: in production, LangWatch listens on a single port and the `/mcp`
-  + `/sse` + `/oauth/*` + `/.well-known/oauth-*` routes are all reachable on the same host. In dev
+  + `/oauth/*` + `/.well-known/oauth-*` routes are all reachable on the same host. In dev
   (Vite), external MCP clients (e.g. Claude Code) hit `FRONTEND_PORT` (default `5560`) which proxies
-  the seven MCP route prefixes through to the API port.
+  the MCP routes through to the API port.
 
   Local Claude Code runbook: `claude mcp add
   langwatch http://localhost:5560/mcp` (or the OAuth flow at
-  `http://localhost:5560/api/v1/mcp/authorize` for write tools). All 9 tools register over that proxy,
+  `http://localhost:5560/mcp/authorize` for write tools). All 9 tools register over that proxy,
   read tools return the catalog with a project apiKey Bearer, and write tools return
   `AUTH_REQUIRED:` until the OAuth flow completes.
 </Note>
@@ -15321,7 +15332,7 @@ Governance tools enforce two distinct gates at the tool layer (`enterprise/modul
   "content": [
     {
       "type": "text",
-      "text": "AUTH_REQUIRED: this tool requires an OAuth-authenticated MCP session. Complete the OAuth flow at /api/v1/mcp/authorize and reconnect.",
+      "text": "AUTH_REQUIRED: this tool requires an OAuth-authenticated MCP session. Complete the OAuth flow at /mcp/authorize and reconnect.",
     },
   ],
 }
@@ -15348,7 +15359,7 @@ The Path B mechanics (per `fc6d54100` + `7639b6c2b`):
 - **RBAC check happens at the MCP tool layer**, BEFORE the service call, the tool asks the same permission probe the tRPC and REST surfaces ask, `AuthzService.hasPermission` (`modules/authz/contract/src/authz.service.ts`, resolved against the built-in role sets in `modules/authz/contract/src/roles.ts`), and returns `FORBIDDEN:` early if the required permission is missing. Services trust the surface, they do not gate on the MCP-resolved scope a second time.
 
   This split is intentional: the MCP tool owns the RBAC contract for its surface; the service owns the multitenancy + business-logic contract.
-- **`callerUserId` flows from the OAuth session**, the OAuth PKCE flow at `/api/v1/mcp/authorize` captures the user's id, threads it through the session token cache and `SessionState`, and surfaces it as `ctx.callerUserId`. For `IngestionKeyService.{install, rotate}` it's required (write tools reject with `AUTH_REQUIRED:` if absent). For `IngestionTemplateService` authoring methods (which take `callerUserId` for the audit trail), same plumbing.
+- **`callerUserId` flows from the OAuth session**, the OAuth PKCE flow at `/mcp/authorize` captures the user's id, threads it through the session token cache and `SessionState`, and surfaces it as `ctx.callerUserId`. For `IngestionKeyService.{install, rotate}` it's required (write tools reject with `AUTH_REQUIRED:` if absent). For `IngestionTemplateService` authoring methods (which take `callerUserId` for the audit trail), same plumbing.
 - **Snake_case ↔ camelCase boundary**: MCP tool inputs use snake_case (`source_template_id`, `template_id`) per public-surface convention; the tool maps to camelCase (`sourceTemplateId`, `templateId`) before calling the service, since service signatures are camelCase. The mapping is the tool's job, not the service's.
 
 ## Audit emission
@@ -19314,7 +19325,7 @@ WHERE EventKind = 'model_call' AND TimeUnixMs >= now() - INTERVAL 30 DAY
 GROUP BY TenantId ORDER BY cost_usd DESC
 ```
 
-If more than one project comes back, ask whether the report covers the user's own sessions or the whole team. For one project, pass `--project <id or slug>` to every query below; on a LangWatch server older than this flag's support, also add `AND TenantId = '<id>'`.
+If more than one project comes back, ask whether the report covers the user's own sessions or the whole team. For one project, add `AND TenantId = '<id>'` to every query below; the user's own id is `personal_project.id` in `langwatch whoami`; if that field is missing, ask the user which project id to use.
 
 `langwatch.coding_sessions` holds one row per session, with `Title`, `PeakContextTokens`, `Compactions`, `Models`, `SubAgentTypes`, `CostUsd`, `StartedAt` and `UserId`. Use it to name example sessions.
 
@@ -32851,25 +32862,25 @@ The [LangWatch MCP Server](https://www.npmjs.com/package/@langwatch/mcp-server) 
 
 Instead of manually reading docs and writing boilerplate code, just ask your AI assistant to instrument your codebase with LangWatch, and it will do it for you.
 
+<Note>
+**The server URL is `https://app.langwatch.ai/mcp`.** If you added LangWatch to your AI client before October 2026, update the connector's URL to this one. Self-hosted deployments use their own host followed by `/mcp`.
+</Note>
+
 ## Setup
 
-<Steps>
+Connect to the hosted server at `https://app.langwatch.ai/mcp`. Sign in with **OAuth** (recommended): your client opens a browser window, you sign in to LangWatch and approve a project, and the client refreshes its access on its own, with no key to manage. Clients that cannot sign in can send a [personal API key](/platform/api-keys#create-a-personal-key) as an `Authorization: Bearer <key>` header instead.
 
-<Step title="Get your API key">
-Go to [**Settings → API Keys**](https://app.langwatch.ai/settings/api-keys) and create a **personal API key**. This key connects your coding assistant to your LangWatch account for observability, prompts, and analytics tools. Documentation tools work without a key.
-
-See the [API Keys guide](/platform/api-keys#create-a-personal-key) for step-by-step instructions.
-</Step>
-
-<Step title="Configure your MCP">
+<Frame caption="The approval page your client opens after you sign in: pick the project it may use, then Allow.">
+  <img src="/images/mcp/mcp-authorize-light.png" alt="The Authorize MCP Connection page, asking to allow a client to use a LangWatch project" className="block dark:hidden" />
+  <img src="/images/mcp/mcp-authorize-dark.png" alt="The Authorize MCP Connection page, asking to allow a client to use a LangWatch project" className="hidden dark:block" />
+</Frame>
 
 
 ### Claude Desktop
 
-1. Go to **Settings → Connectors**
-2. Click **Add custom connector**
-3. Enter the server URL: `https://app.langwatch.ai/sse`
-4. Click **Connect**: you'll be redirected to sign in and authorize access to your project
+1. Go to **Customize → Connectors**, click **+ Add**, then **Add custom connector**. On Team and Enterprise plans, an owner adds it under **Organization settings → Connectors → Add → Custom → Web**.
+2. Enter the server URL: `https://app.langwatch.ai/mcp`
+3. Click **Connect**: you'll be redirected to sign in and approve access to a project
 
 The same steps work in Claude Cowork and in Claude chat on the web.
 
@@ -32878,99 +32889,97 @@ The same steps work in Claude Cowork and in Claude chat on the web.
 
 ### Claude Code
 
-Run this command to add the MCP server:
+Add the server, then sign in:
 
 ```bash
-claude mcp add langwatch --env LANGWATCH_API_KEY=your-api-key-here -- npx -y @langwatch/mcp-server
+claude mcp add --transport http langwatch https://app.langwatch.ai/mcp
 ```
 
-Or add it manually to your `~/.claude.json`. Under the `mcpServers` object, add an entry named `langwatch` with these fields:
+In Claude Code, run `/mcp`, pick `langwatch` and choose **Authenticate**. Sign in to LangWatch in the browser window that opens and approve a project.
 
-- `command`: `npx`
-- `args`: `-y`, then the package name `@langwatch/mcp-server` on a separate token
-- `env.LANGWATCH_API_KEY`: your LangWatch API key
+To use an API key instead of signing in, add the header when you add the server:
 
-See the [Claude Code MCP documentation](https://code.claude.com/docs/en/mcp#plugin-provided-mcp-servers) for more details.
+```bash
+claude mcp add --transport http langwatch https://app.langwatch.ai/mcp --header "Authorization: Bearer your-api-key"
+```
 
-<Info>
-This page intentionally describes the config in prose rather than as a JSON snippet. Some CLI agents (notably Gemini CLI 0.36.0 and earlier) parse `@`-prefixed runs as file paths and can crash with `ENAMETOOLONG` when a multi-line JSON snippet wraps the scoped package name in double quotes. See [#3104](https://github.com/langwatch/langwatch/issues/3104) for details. The bash `claude mcp add` form above is safe: the package name is followed by a whitespace terminator.
-</Info>
+See the [Claude Code MCP documentation](https://code.claude.com/docs/en/mcp) for more details.
 
 
 ### Copilot
 
-Add to `.vscode/mcp.json` in your project (or use **MCP: Add Server** from the Command Palette).
+Add to `.vscode/mcp.json` in your project (or use **MCP: Add Server** from the Command Palette). Under the `servers` object, add an entry named `langwatch` with these fields:
 
-Under the `servers` object, add an entry named `langwatch` with these fields:
+- `type`: `http`
+- `url`: `https://app.langwatch.ai/mcp`
 
-- `type`: `stdio`
-- `command`: `npx`
-- `args`: `-y`, then the package name `@langwatch/mcp-server` on a separate token
-- `env.LANGWATCH_API_KEY`: your LangWatch API key
+VS Code opens a browser window to sign in the first time it connects. To use an API key instead, add `headers.Authorization` set to `Bearer ` followed by your key.
 
 
 ### Cursor
 
 1. Open Cursor Settings
 2. Navigate to the **Tools and MCP** section in the sidebar
-3. Add the LangWatch MCP server. Under the `mcpServers` object, add an entry named `langwatch` with these fields:
-   - `command`: `npx`
-   - `args`: `-y`, then the package name `@langwatch/mcp-server` on a separate token
-   - `env.LANGWATCH_API_KEY`: your LangWatch API key
+3. Add the LangWatch MCP server. Under the `mcpServers` object, add an entry named `langwatch` with the field `url` set to `https://app.langwatch.ai/mcp`
+
+Cursor signs you in through your browser when it first connects. To use an API key instead, add `headers.Authorization` set to `Bearer ` followed by your key.
 
 
 ### ChatGPT
 
-1. Go to **Settings → Connectors**
-2. Click **Add connector**
-3. Enter the server URL: `https://app.langwatch.ai/sse`
-4. Click **Connect**: you'll be redirected to sign in and authorize access to your project
+1. Turn on developer mode, then add a custom MCP server in ChatGPT's apps settings
+2. Enter the server URL: `https://app.langwatch.ai/mcp`
+3. Choose **OAuth** as the authentication
+4. Click **Connect**: you'll be redirected to sign in and approve access to a project
 
-*Requires a Plus or Team plan.*
-
-
-### BoltAI, Other MCP Clients
-
-For any MCP client that supports remote servers with OAuth:
-
-1. Add a new remote MCP server
-2. Enter the endpoint URL: `https://app.langwatch.ai/sse`
-3. Select **OAuth (browser)** authentication
-4. Click **Connect**: you'll be redirected to sign in and authorize access to your project
-
-The server supports OAuth Authorization Code + PKCE with Dynamic Client Registration, so any standards-compliant MCP client should work automatically. Clients that speak the Streamable HTTP transport can point at `https://app.langwatch.ai/mcp` instead.
+ChatGPT supports OAuth only, not API keys.
 
 
 ### Other
 
-For other MCP-compatible editors, add an entry named `langwatch` under the `mcpServers` object of your editor's MCP settings file with these fields:
+For any MCP client that supports remote servers:
+
+1. Add a new remote MCP server with the URL `https://app.langwatch.ai/mcp`
+2. Select **OAuth** authentication, or send a personal API key as an `Authorization: Bearer <key>` header
+3. Connect, then sign in and approve a project in the browser window that opens
+
+The server speaks the Streamable HTTP transport and supports OAuth Authorization Code + PKCE with Dynamic Client Registration, so any standards-compliant MCP client should work automatically.
+
+### Run it locally instead
+
+Coding assistants can also run the MCP server on your machine with your API key and the project to work in. For Claude Code:
+
+```bash
+claude mcp add langwatch --env LANGWATCH_API_KEY=your-api-key-here --env LANGWATCH_PROJECT_ID=your-project-id -- npx -y @langwatch/mcp-server
+```
+
+For other editors, add an entry named `langwatch` under your editor's MCP servers with these fields:
 
 - `command`: `npx`
 - `args`: `-y`, then the package name `@langwatch/mcp-server` on a separate token
 - `env.LANGWATCH_API_KEY`: your LangWatch API key
+- `env.LANGWATCH_PROJECT_ID`: your LangWatch project ID
 
-Refer to your editor's MCP documentation for the specific configuration file location.
+<Info>
+This page intentionally describes the config in prose rather than as a JSON snippet. Some CLI agents (notably Gemini CLI 0.36.0 and earlier) parse `@`-prefixed runs as file paths and can crash with `ENAMETOOLONG` when a multi-line JSON snippet wraps the scoped package name in double quotes. See [#3104](https://github.com/langwatch/langwatch/issues/3104) for details. The bash `claude mcp add` form above is safe: the package name is followed by a whitespace terminator.
+</Info>
 
-</Step>
+Once connected, open your AI assistant's chat and ask it to help with LangWatch tasks.
 
-<Step title="Start using it">
-Open your AI assistant chat (e.g., `Cmd/Ctrl + I` in Cursor, or `Cmd/Ctrl + Shift + P` > "Claude Code: Open Chat" in Claude Code) and ask it to help with LangWatch tasks.
-</Step>
-</Steps>
-
-### Configuration
+### Local server configuration
 
 | Environment Variable | CLI Argument | Description |
 |---------------------|-------------|-------------|
 | `LANGWATCH_API_KEY` | `--apiKey` | API key for authentication |
+| `LANGWATCH_PROJECT_ID` | `--projectId` | The project to work in; needed for a personal API key, which can reach several projects |
 | `LANGWATCH_ENDPOINT` | `--endpoint` | API endpoint (default: `https://app.langwatch.ai`) |
 
 ### Two Modes
 
 The MCP server runs in two modes:
 
-- **Local (stdio)**: Default. Runs as a subprocess of your coding assistant (Claude Code, Copilot, Cursor). API key set via `--apiKey` flag or `LANGWATCH_API_KEY` env var.
-- **Remote (HTTP/SSE)**: For chat assistants (Claude Desktop, ChatGPT, BoltAI, etc.). Hosted at `https://app.langwatch.ai`. Uses OAuth Authorization Code + PKCE, click Connect and sign in via your browser to authorize access to your project. Supports both SSE (`/sse`) and Streamable HTTP (`/mcp`) transports.
+- **Remote (Streamable HTTP)**: Recommended, for every client. Hosted at `https://app.langwatch.ai/mcp`. Sign in with OAuth (Authorization Code + PKCE) in your browser and approve a project, or send a personal API key as a Bearer token.
+- **Local (stdio)**: Runs as a subprocess of your coding assistant. API key set via `--apiKey` flag or `LANGWATCH_API_KEY` env var.
 
 ## Usage Examples
 
@@ -34844,6 +34853,207 @@ Also check: [Test suites](/agent-testing/test-suites), [Run plans](/agent-testin
 
 ---
 
+# FILE: ./agent-testing/check-the-world.mdx
+
+---
+title: Check the World, Not the Words
+sidebarTitle: Check the world
+keywords: langwatch, agent testing, state of world, side effects, seed data, test data, fixtures, run parameters, connected agent, tool span, evaluator, exact match, refund, booking
+description: Test an agent that changes data by what changed, not by what it says it did. Parameters describe the case, the first turn builds it, and a state_of_world span shows the judge the result.
+---
+
+## Why the reply is not enough
+
+An agent that changes data, such as a refund, a booking or a dashboard edit, replies "Done, I refunded 49.95". That reply passes a criterion even when the refund went wrong, ran twice, or never happened.
+
+A tool call span shows what the agent tried. It does not show what happened. To test the result, the test has to see the data after the agent acted.
+
+This page shows two levels. Both work with a [connected agent](/agent-testing/connect-your-agent) today, with no extra setup on the platform.
+
+| Level | Who writes it | What it adds |
+|---|---|---|
+| **1. Parameters are the case** | The person who writes the scenario | The case is stated once, as readable facts, and the simulated user, the agent and the judge all read the same values. |
+| **2. Seed the world, report its state** | The developer who connects the agent | The agent builds the case on the first turn and reports the resulting data in a span, so the judge checks the data, not the reply. |
+
+## Level 1: parameters are the case
+
+Declare the facts of the case as [run parameters](/agent-testing/run-parameters) on the scenario, and read them in the situation and the criteria as `{{ params.NAME }}`.
+
+```text title="Situation"
+A {{ params.customer_tier }} member was charged {{ params.charges }} times for one order, {{ params.amount }} each. They want the extra charge back.
+```
+
+```text title="Criteria"
+Refunds exactly {{ params.amount }}, once
+The original charge is untouched
+Tells the customer when the money arrives
+```
+
+With the defaults `customer_tier = plus`, `charges = 2` and `amount = 49.95`, the run renders the situation as "A plus member was charged 2 times for one order, 49.95 each" and the first criterion as "Refunds exactly 49.95, once". The simulated user acts on these values, and the judge scores against the same values. The criteria assume one duplicate charge (`charges = 2`). A case with more charges needs its own criteria.
+
+The connected agent declares the same names as keyword arguments, so it receives the values too:
+
+```python
+@langwatch.connect_agent(name="support-agent")
+async def support_agent(
+    messages: list[dict],
+    *,
+    customer_tier: str = "plus",
+    charges: int = 2,
+    amount: float = 49.95,
+):
+    ...
+```
+
+Write parameters as readable facts about the case: a tier, a count, an amount. Do not use a fixture id or a database dump. The person who reads the run should understand the case from the parameter values alone.
+
+## Level 2: seed the world, report its state
+
+The agent builds the data for the case on the first turn, and reports the state of that data in a span after every turn.
+
+1. On the first turn, `session` is `None`.
+2. Build the data from the parameters. Scope it to the `thread_id`, and flag it as test data.
+3. Write a function decorated with `@langwatch.span(name="state_of_world", type="tool")`. It returns a few flat facts about the data.
+4. Call it once after the setup, and once after each turn.
+5. Return the session, so the next turn finds the same data.
+
+The name `state_of_world` is only an example: any span name works, and the platform gives it no special meaning, so the evaluator mapping uses the name you choose.
+
+```python
+import langwatch
+
+from my_app import payments, SupportAgent
+
+
+@langwatch.span(name="state_of_world", type="tool")
+def state_of_world(thread_id: str, charge_id: str) -> dict:
+    refunds = payments.refunds(namespace=thread_id)
+    return {
+        "refund_count": len(refunds),
+        "refund_total": round(sum(r.amount for r in refunds), 2),
+        "original_charge_status": payments.charge_status(charge_id),
+    }
+
+
+@langwatch.connect_agent(name="support-agent")
+async def support_agent(
+    messages: list[dict],
+    thread_id: str,
+    session: dict | None = None,
+    *,
+    customer_tier: str = "plus",
+    charges: int = 2,
+    amount: float = 49.95,
+):
+    if session is None:  # first turn: build the data for this conversation
+        customer = payments.find_customer(namespace=thread_id) or payments.create_customer(
+            tier=customer_tier, namespace=thread_id, test=True
+        )
+        existing = [c.id for c in payments.charges(customer.id)]
+        charge_ids = existing + [payments.charge(customer.id, amount) for _ in range(charges - len(existing))]
+        session = {"customer_id": customer.id, "charge_id": charge_ids[0]}
+        state_of_world(thread_id, session["charge_id"])  # before
+
+    reply = await SupportAgent(customer_id=session["customer_id"]).run(messages)
+
+    state_of_world(thread_id, session["charge_id"])  # after this turn
+    return langwatch.AgentReply(reply, session=session)
+```
+
+Seeding is keyed by `thread_id`, so a retried first turn reuses the data and completes a partial seed.
+
+`payments` stands for your own test back end. The session value is limited to 64 kilobytes, so keep ids in it, not the data.
+
+### What the judge reads
+
+The span is a tool span inside the agent's trace, so the judge reads it with the other spans before its verdict. See [Linking your traces](/agent-testing/linking-your-traces). In a run of the scenario above, the trace held these spans in this order:
+
+| Span | Output |
+|---|---|
+| `state_of_world` (before) | `{"refund_count": 0, "refund_total": 0, "original_charge_status": "captured"}` |
+| `list_charges` | Two captured charges of 49.95 |
+| `refund_charge` | The second charge, 49.95, approved |
+| `state_of_world` (after) | `{"refund_count": 1, "refund_total": 49.95, "original_charge_status": "captured"}` |
+
+The trace tree can list the second `state_of_world` above `invoke_agent`. The timing bar shows the true order.
+
+The judge cited the span in its reasoning (shortened):
+
+```text
+The final state_of_world shows refund_count: 1 and refund_total: 49.95, demonstrating a
+single refund of exactly 49.95. The original charge remains captured in the traces and
+state_of_world, indicating it was left untouched.
+```
+
+### Check a value without the judge
+
+For an exact check, compare one fact. Add a second tool span that returns only that number:
+
+```python
+@langwatch.span(name="refund_total", type="tool")
+def refund_total(thread_id: str) -> float:
+    return round(sum(r.amount for r in payments.refunds(namespace=thread_id)), 2)
+```
+
+Call it after the turn, next to `state_of_world`. Then attach an Exact Match evaluator to the [test suite](/agent-testing/evaluators):
+
+1. Run the scenario once first. The tool calls picker lists every span name the project has seen, not only tool spans. A span name shows only after a run has produced it, so `refund_total` is not there before that.
+2. Map `output` to source **Trace**, tool call `refund_total`, `output`.
+3. Set `expected_output` to the literal `49.95`. Type `49.95`, then click **Use "49.95" as value**.
+
+The run plan editor lists no tool names. On a run plan, set this mapping through the [run plans API](/api-reference/run-plans/create-run).
+
+When you attach the evaluator, `output` defaults to the agent's last message. Change it to the tool call, or the check compares the wrong text.
+
+Exact Match compares two numbers as numbers, so `49.95` and `49.950` both pass. In the API, the attachment is:
+
+```json
+{
+  "evaluators": [
+    {
+      "id": "attachment_abc123",
+      "evaluatorId": "evaluator_abc123",
+      "required": true,
+      "mappings": {
+        "output": { "type": "source", "sourceId": "trace", "path": ["tool_calls", "refund_total", "output"] },
+        "expected_output": { "type": "value", "value": "49.95" }
+      }
+    }
+  ]
+}
+```
+
+Set this mapping by hand. The platform never infers a tool call mapping. The last `refund_total` call wins, by start time. That is the value after the last turn.
+
+Compare one fact, not the whole `state_of_world` object. One fact is safer.
+
+## Caveats
+
+- **Keep the facts short and flat.** The judge reads a digest of the trace. A large trace becomes a structure-only tree that the judge has to expand, and a repeated long string is shown once. A few scalar facts read the same at any trace size.
+- **Clean up with a sweeper.** There is no teardown hook at the end of a run. Delete test data older than a few hours with a scheduled job, and find it by the test flag.
+- **Seed in development or staging only.** Never seed test data in production.
+- **Self-hosted: run langevals.** Exact Match runs in langevals. If langevals is not running, the evaluator errors, and a required one fails the run.
+- **Background work is not covered.** The span reports the state when the function returns. Work that continues after the call, such as a queued job, is not in it.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Run parameters" icon="sliders" href="/agent-testing/run-parameters">
+    Declare the values a run supplies
+  </Card>
+  <Card title="Linking your traces" icon="diagram-project" href="/agent-testing/linking-your-traces">
+    What the judge reads from your agent's spans
+  </Card>
+  <Card title="Evaluators" icon="check" href="/agent-testing/evaluators">
+    Attach a check that runs after every scenario run
+  </Card>
+  <Card title="Connect your agent" icon="plug" href="/agent-testing/connect-your-agent">
+    Sessions, environments and the options reference
+  </Card>
+</CardGroup>
+
+---
+
 # FILE: ./agent-testing/compare-agents.mdx
 
 ---
@@ -36604,6 +36814,8 @@ Write the criterion about the action, in your system's own vocabulary, and the j
 
 A criterion that names an action your traces do not record cannot be verified. Instrument the action, or reword the criterion to something the conversation itself proves.
 
+A tool call span shows what the agent tried, not what changed. For an agent that writes data, report the data after each turn in a span of its own. See [Check the world, not the words](/agent-testing/check-the-world).
+
 ## Linked traces in code-first scenarios
 
 The Scenario SDKs fetch the agent's traces from LangWatch with a flag on the run or on the global configuration:
@@ -37717,6 +37929,7 @@ Each run records the values it used, so every result shows which plan it tested.
 
 - **Plans and tiers.** One cancellation scenario, run for `free` and run for `enterprise`.
 - **Test accounts and fixtures.** Point the run at seeded data with `--param fixture=order-1042`. The agent under test answers from that account, and the criteria can name its facts.
+- **The facts of the case.** A tier, a count and an amount, read by the simulated user, the agent and the judge alike. The agent can build the data from them on the first turn. See [Check the world, not the words](/agent-testing/check-the-world).
 - **Regions, tenants and languages.** The same conversation against `eu-central` and `us-east`, or against two tenants of your product.
 - **Values your agent's API needs.** An HTTP target puts `{{ params.NAME }}` in its URL or request body, so your endpoint receives the value on every request.
 
@@ -56244,7 +56457,7 @@ WHERE EventKind = 'model_call' AND TimeUnixMs >= now() - INTERVAL 30 DAY
 GROUP BY TenantId ORDER BY cost_usd DESC
 ```
 
-If more than one project comes back, ask whether the report covers the user's own sessions or the whole team. For one project, pass `--project <id or slug>` to every query below; on a LangWatch server older than this flag's support, also add `AND TenantId = '<id>'`.
+If more than one project comes back, ask whether the report covers the user's own sessions or the whole team. For one project, add `AND TenantId = '<id>'` to every query below; the user's own id is `personal_project.id` in `langwatch whoami`; if that field is missing, ask the user which project id to use.
 
 `langwatch.coding_sessions` holds one row per session, with `Title`, `PeakContextTokens`, `Compactions`, `Models`, `SubAgentTypes`, `CostUsd`, `StartedAt` and `UserId`. Use it to name example sessions.
 

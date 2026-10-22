@@ -9,16 +9,26 @@ import { datasetClient } from "@langwatch/dataset-client";
 import {
   type DatasetColumns,
   datasetColumnsSchema,
-  datasetDisplayRecordCount,
   type DatasetSummaryWire,
 } from "@langwatch/dataset-contract";
 import { FormattedDate } from "@langwatch/design-system/formatted-date";
 import { MoreVerticalIcon } from "@langwatch/design-system/icons";
-import { ListPage, type ListPageState } from "@langwatch/design-system/list-page";
+import {
+  ListPage,
+  type ListPageErrorConfig,
+  type ListPageState,
+} from "@langwatch/design-system/list-page";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Badge, Button, HStack, Text, useDisclosure } from "@langwatch/design-system/primitives";
+import {
+  Badge,
+  Button,
+  HStack,
+  Skeleton,
+  Text,
+  useDisclosure,
+} from "@langwatch/design-system/primitives";
 import { AggregateReadOnlyGate } from "@langwatch/error-views";
 import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { readableDate } from "@langwatch/time";
@@ -27,6 +37,7 @@ import { type ReactNode, useMemo, useState } from "react";
 
 import { datasetApi } from "../../behavior/dataset-api.ts";
 import { SetupWithAgentButton } from "../../behavior/lent-setup-with-agent-button.tsx";
+import { useDatasetRecordCounts } from "../../behavior/use-dataset-record-counts.ts";
 import { useDatasetHost } from "../../model/dataset-host.ts";
 import { DeleteDatasetDialog } from "../../ui/blocks/delete-dataset-dialog.tsx";
 import { AddOrEditDatasetDrawer } from "./add-or-edit-dataset-drawer.tsx";
@@ -98,6 +109,8 @@ function DatasetTable({
   onCopy,
   onDelete,
   onEdit,
+  recordCounts,
+  countsFailed,
   slug,
 }: {
   columnsOf: (dataset: DatasetRow) => DatasetColumns;
@@ -107,6 +120,10 @@ function DatasetTable({
   onCopy: (target: { datasetId: string; datasetName: string }) => void;
   onDelete: (target: { id: string; name: string }) => void;
   onEdit: (dataset: DatasetRow) => void;
+  /** Each dataset's entry count; a missing one is still being counted. */
+  recordCounts: ReadonlyMap<string, number>;
+  /** The count read gave up: missing counts show as unavailable, not loading. */
+  countsFailed: boolean;
   slug: string | undefined;
 }) {
   return (
@@ -149,7 +166,9 @@ function DatasetTable({
                 ))}
               </HStack>
             </ListTable.Cell>
-            <ListTable.Cell numeric>{datasetDisplayRecordCount(dataset)}</ListTable.Cell>
+            <ListTable.Cell numeric>
+              <RecordCount count={recordCounts.get(dataset.id)} failed={countsFailed} />
+            </ListTable.Cell>
             <ListTable.Cell tone="muted">
               <FormattedDate
                 value={readableDate(dataset.updatedAt ?? dataset.createdAt).getTime()}
@@ -169,6 +188,27 @@ function DatasetTable({
         ))}
       </ListTable.Body>
     </ListTable>
+  );
+}
+
+function RecordCount({ count, failed }: { count: number | undefined; failed: boolean }) {
+  if (count !== undefined) return <>{count}</>;
+  if (failed) {
+    return (
+      <Text as="span" color="fg.muted" aria-label="Entry count unavailable">
+        —
+      </Text>
+    );
+  }
+
+  return (
+    <Skeleton
+      display="inline-block"
+      height="1em"
+      width="2.5em"
+      verticalAlign="middle"
+      aria-label="Counting entries"
+    />
   );
 }
 
@@ -259,6 +299,10 @@ export default function DatasetsScreen() {
     { projectId: project?.id ?? "" },
     { enabled: !!project },
   );
+  const { recordCounts, countsFailed } = useDatasetRecordCounts({
+    projectId: project?.id,
+    datasets: datasets.data,
+  });
 
   /**
    * `columnTypes` is persisted JSON and older or CLI-created rows can carry an
@@ -348,6 +392,17 @@ export default function DatasetsScreen() {
     total: datasets.data?.length,
     shown: filteredDatasets?.length,
   });
+  const loadError: ListPageErrorConfig = {
+    title: "Couldn't load the datasets",
+    description: "Try again, or read how datasets work.",
+    onRetry: () => void datasets.refetch(),
+    next: [{ kind: "docs", label: "Read about datasets", href: DATASETS_DOCS }],
+  };
+  // ListPage draws any error it is given over loaded rows, so only a failed read passes one.
+  const stateProps =
+    listState === "error"
+      ? { state: listState, error: loadError }
+      : { state: listState, ...(datasets.isError ? { error: loadError } : {}) };
 
   return (
     <>
@@ -365,7 +420,7 @@ export default function DatasetsScreen() {
             </UploadOrCreateDatasetMenu>
           )
         }
-        state={listState}
+        {...stateProps}
         toolbar={
           projectIsAggregate
             ? undefined
@@ -379,12 +434,6 @@ export default function DatasetsScreen() {
                 },
               }
         }
-        error={{
-          title: "Couldn't load the datasets",
-          description: "Try again, or read how datasets work.",
-          onRetry: () => void datasets.refetch(),
-          next: [{ kind: "docs", label: "Read about datasets", href: DATASETS_DOCS }],
-        }}
         empty={{
           title: "No datasets yet",
           description:
@@ -408,6 +457,8 @@ export default function DatasetsScreen() {
             isLiteMember={isLiteMember}
             onCopy={setCopyDataset}
             onDelete={setDatasetToDelete}
+            recordCounts={recordCounts}
+            countsFailed={countsFailed}
             onEdit={(dataset) => {
               setEditDataset({
                 datasetId: dataset.id,

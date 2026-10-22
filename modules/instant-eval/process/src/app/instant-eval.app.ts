@@ -215,6 +215,9 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
       },
       isJudgeConfigured: () => setup.config.classifier !== "null",
       judge,
+      hostedPlans: setup.config.isSaas
+        ? { isEnterprisePlan: InstantEvalModule.isEnterprisePlanOf(setup) }
+        : null,
     });
     const optIns = InstantEvalModule.optInsOf({ setup, access });
     const reads = InstantEvalReadsService.create({
@@ -376,6 +379,15 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
     });
   }
 
+  /** The plan's tier, which on the hosted service decides both the offer and what releases. */
+  private static isEnterprisePlanOf(
+    setup: InstantEvalSetup,
+  ): (organizationId: string) => Promise<boolean> {
+    const { plans } = setup.dependencies;
+    return async (organizationId) =>
+      isEnterpriseTier((await plans.getActivePlan({ organizationId })).type);
+  }
+
   /** The offer and the switch, each peer narrowed to the one question it answers. */
   private static optInsOf({
     setup,
@@ -384,7 +396,7 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
     setup: InstantEvalSetup;
     access: InstantEvalAccessService;
   }): InstantEvalOptInService {
-    const { plans, organizations, authz } = setup.dependencies;
+    const { organizations, authz } = setup.dependencies;
     const { projects, licensing } = setup.channels;
 
     return InstantEvalOptInService.create({
@@ -401,8 +413,7 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
         },
         licenseStateOf: (organizationId) =>
           licensing.getConnectServiceState({ organizationId, service: "instant_evals" }),
-        isEnterprisePlan: async (organizationId) =>
-          isEnterpriseTier((await plans.getActivePlan({ organizationId })).type),
+        isEnterprisePlan: InstantEvalModule.isEnterprisePlanOf(setup),
         mayManageOrganization: ({ userId, organizationId }) =>
           authz.can({
             principal: { type: "user", id: userId },

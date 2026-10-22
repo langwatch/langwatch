@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { InstanceAdminRepository } from "../../repositories/instance-admin.repository.ts";
 import { AdminAuditSink } from "../impersonation.service.ts";
 import { InstanceAdminService } from "../instance-admin.service.ts";
+import { noOperators } from "./support/admin-doubles.ts";
 import { TestUserApi } from "./support/test-user-api.ts";
 
 class RecordingRepository extends InstanceAdminRepository {
@@ -28,6 +29,7 @@ function projectAdmin() {
   const repository = new RecordingRepository();
   const switches: SetTraceSharingInput[] = [];
   const service = InstanceAdminService.create({
+    operators: noOperators,
     repository,
     users: new TestUserApi(),
     accounts: {

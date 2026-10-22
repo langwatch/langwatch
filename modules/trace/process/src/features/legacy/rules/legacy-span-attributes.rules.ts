@@ -302,12 +302,24 @@ function toRagChunk(ctx: unknown): RAGChunk {
   }
 
   const obj = ctx as Record<string, unknown>;
+  // A scalar content (a number, a boolean) reads as its text: the chunk shape takes a string,
+  // a record or a list, and a RAG span with a chunk it refuses would lose all its contexts.
+  const content = obj.content ?? obj;
 
   return {
     document_id: typeof obj.document_id === "string" ? obj.document_id : null,
     chunk_id: typeof obj.chunk_id === "string" ? obj.chunk_id : null,
-    content: obj.content ?? obj,
+    content: typeof content === "object" ? (content as RAGChunk["content"]) : scalarText(content),
   };
+}
+
+/** A scalar's text. A non-JSON value (a function, a symbol) has none, so it reads as empty. */
+function scalarText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") {
+    return String(value);
+  }
+  return "";
 }
 
 /**

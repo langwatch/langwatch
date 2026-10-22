@@ -69,6 +69,14 @@
     "needsOldWritersGone": true
   },
   {
+    "id": "automation:unwrap-trigger-json-text",
+    "kind": "data",
+    "mode": "background",
+    "owner": "automation",
+    "description": "Rewrites automation filters and action settings an earlier release saved as quoted JSON text into JSON objects; text that is not a JSON object is left as it is.",
+    "needsOldWritersGone": true
+  },
+  {
     "id": "billing:record-usage-billing-catch-up",
     "kind": "data",
     "mode": "background",

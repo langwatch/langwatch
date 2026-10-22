@@ -18,6 +18,7 @@ import {
 interface OpsApi {
   listQueues(input: unknown): Promise<{ queues: string[] }>;
   findUser(input: unknown): Promise<{ queues: string[] }>;
+  pauseQueues(input: unknown): Promise<{ queues: string[] }>;
 }
 
 const OpsApi = moduleApi<OpsApi>()("ops");
@@ -28,6 +29,9 @@ const opsContract = defineTrpcContract("ops")
   .withOutput(z.object({ queues: z.array(z.string()) }))
   .query("findUser")
   .withInput(z.object({ email: z.string() }))
+  .withOutput(z.object({ queues: z.array(z.string()) }))
+  .mutation("pauseQueues")
+  .withInput(z.object({}))
   .withOutput(z.object({ queues: z.array(z.string()) }))
   .build();
 
@@ -99,6 +103,9 @@ function caller({
     .procedure("findUser")
     .withPermission("ops:view", { at: "platform", refusal: "hidden" })
     .handle(handle("findUser"))
+    .procedure("pauseQueues")
+    .withPermission("ops:manage", { at: "platform" })
+    .handle(handle("pauseQueues"))
     .build();
 
   const runtime = createTrpcRuntime({
@@ -113,6 +120,7 @@ function caller({
       .mount(router, () => ({
         listQueues: async () => ({ queues: [] }),
         findUser: async () => ({ queues: [] }),
+        pauseQueues: async () => ({ queues: [] }),
       }))
       .createCaller({ actor }),
   };
@@ -153,6 +161,29 @@ describe("a procedure that asks a platform-tier permission", () => {
 
       expect(asked).toEqual([{ userId: "operator-1", permission: "ops:view" }]);
       expect(ran).toEqual(["listQueues"]);
+    });
+  });
+
+  describe("when an impersonating operator asks ops:manage", () => {
+    /** @scenario "An impersonated caller is never answered ops:manage at the platform" */
+    it("refuses FORBIDDEN permission_denied without asking, while ops:view still answers", async () => {
+      const ran: string[] = [];
+      const { asked, call } = caller({ actor: IMPERSONATED, ran });
+
+      const failure = await call.pauseQueues({}).catch((error: unknown) => error);
+      await call.listQueues({});
+
+      expect(refusalOf(failure)).toEqual({ trpc: "FORBIDDEN", code: "permission_denied" });
+      expect(asked).toEqual([{ userId: "operator-1", permission: "ops:view" }]);
+      expect(ran).toEqual(["listQueues"]);
+    });
+
+    /** @scenario "An impersonated caller is never answered ops:manage at the platform" */
+    it("answers the same operator signed in as themselves", async () => {
+      const ran: string[] = [];
+      const { call } = caller({ actor: OPERATOR, ran });
+
+      await expect(call.pauseQueues({})).resolves.toEqual({ queues: ["events"] });
     });
   });
 

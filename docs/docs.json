@@ -114,6 +114,7 @@
                   "agent-testing/targets",
                   "agent-testing/environments",
                   "agent-testing/linking-your-traces",
+                  "agent-testing/check-the-world",
                   "agent-testing/authenticated-agents",
                   "agent-testing/other-ways-to-connect"
                 ]
@@ -1739,7 +1740,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1791957543",
+      "source": "/ci/cache/busted/1792015783",
       "destination": "/introduction"
     },
     {

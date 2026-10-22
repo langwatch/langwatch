@@ -14,7 +14,7 @@ import {
   initializeBody,
   type ReplicaPair,
   startReplicaPair,
-} from "./support/sse-harness.ts";
+} from "./support/replica-harness.ts";
 
 const VALID_API_KEY = "lw_reconnect_key_a";
 const OTHER_API_KEY = "lw_reconnect_key_b";
@@ -67,23 +67,6 @@ describe("Feature: MCP streamable transport across replicas", () => {
       return sessionId;
     }
 
-    /**
-     * Whether a replica built the session for itself. DELETE only consults
-     * the replica's own session map, so it answers 200 exactly when that
-     * replica holds the session and 404 when it never built one.
-     */
-    async function replicaHoldsSession(baseUrl: string, sessionId: string): Promise<boolean> {
-      const res = await fetch(`${baseUrl}/mcp`, {
-        method: "DELETE",
-        headers: {
-          authorization: `Bearer ${VALID_API_KEY}`,
-          "mcp-session-id": sessionId,
-        },
-      });
-      await res.text();
-      return res.status === 200;
-    }
-
     describe("when the client reconnects the stream through the other replica", () => {
       /** @scenario Reconnecting the streaming transport to another replica resumes the session */
       it("serves the stream instead of reporting the session expired", async () => {
@@ -126,22 +109,23 @@ describe("Feature: MCP streamable transport across replicas", () => {
             },
             signal: abort.signal,
           });
-          await resumed.text();
+          const body: unknown = await resumed.json();
 
           expect(resumed.status).toBe(401);
+          expect(body).toEqual({ error: "Authorization required" });
         } finally {
           abort.abort();
         }
 
         // Rebuilding decrypts the stored key and connects a server bound to
         // it, so a refused caller must not have caused any of it.
-        expect(await replicaHoldsSession(urlB, sessionId)).toBe(false);
+        expect(replicas.bHolds(sessionId)).toBe(false);
       });
     });
 
     describe("when the reconnect carries credentials for a different project", () => {
       /** @scenario Reconnecting with another project's credentials is refused and rebuilds nothing */
-      it("answers 401 and leaves the other replica holding no session", async () => {
+      it("answers 404 and leaves the other replica holding no session", async () => {
         const sessionId = await createStreamableSession(91);
 
         const abort = new AbortController();
@@ -155,14 +139,16 @@ describe("Feature: MCP streamable transport across replicas", () => {
             },
             signal: abort.signal,
           });
-          await resumed.text();
+          const body: unknown = await resumed.json();
 
-          expect(resumed.status).toBe(401);
+          // A valid key for another project learns nothing about the session.
+          expect(resumed.status).toBe(404);
+          expect(body).toEqual({ error: "Session not found" });
         } finally {
           abort.abort();
         }
 
-        expect(await replicaHoldsSession(urlB, sessionId)).toBe(false);
+        expect(replicas.bHolds(sessionId)).toBe(false);
       });
     });
   });
