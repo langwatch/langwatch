@@ -209,6 +209,13 @@ describe.skipIf(!clickHouseConfigured)("event-attribute-keys facet integration",
         expect(preFixSql).not.toBe(query.sql); // guard: the replaces actually hit
         expect(preFixSql).not.toContain(".keys");
 
+        const fits = await ch.query({
+          query: query.sql,
+          query_params: query.params,
+          format: "JSONEachRow",
+          clickhouse_settings: BUDGET,
+        });
+        expect(await fits.json()).toHaveLength(EXPECTED_DISTINCT_KEYS);
         await expect(
           ch
             .query({
