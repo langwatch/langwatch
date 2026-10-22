@@ -2,6 +2,7 @@ package codeblock_test
 
 import (
 	"context"
+	"os"
 	"os/exec"
 	"testing"
 	"time"
@@ -109,7 +110,9 @@ func TestCodeBlock_WithholdsPodEnvironment(t *testing.T) {
 	require.Nil(t, res.Error, "expected no error, got %+v", res.Error)
 	assert.Equal(t, "<absent>", res.Outputs["aws"], "AWS secret leaked into user code env")
 	assert.Equal(t, "<absent>", res.Outputs["token"], "internal token leaked into user code env")
-	assert.Equal(t, true, res.Outputs["has_path"], "allowlisted PATH should still be present")
+	if os.Getenv("NLPGO_CODEBLOCK_TEST_RUNTIME") != codeblock.RuntimeWasm {
+		assert.Equal(t, true, res.Outputs["has_path"], "allowlisted PATH should still be present")
+	}
 }
 
 // TestCodeBlock_EmptyAllowlistPassesNothing verifies the explicit

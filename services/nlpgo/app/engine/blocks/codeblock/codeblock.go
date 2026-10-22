@@ -20,6 +20,8 @@ import (
 	"time"
 
 	_ "embed"
+
+	"github.com/langwatch/langwatch/pkg/ssrf"
 )
 
 //go:embed runner.py
@@ -76,7 +78,28 @@ type Options struct {
 	// an endpoint with no key, gives agent code half a credential and one
 	// failure it cannot read.
 	SandboxEndpoint string
+	// Runtime picks where user code runs: RuntimeSubprocess (the default) or
+	// RuntimeWasm, a WASI CPython inside the engine; see ADR-181.
+	Runtime string
+	// PythonWasmHome holds python.wasm and lib/; scripts/fetch-python-wasm.sh.
+	PythonWasmHome string
+	// WasmMemoryMiB caps one wasm run's memory. Zero means 512.
+	WasmMemoryMiB int
+	// WasmCompilationCacheDir, when set, keeps compiled python.wasm across restarts.
+	WasmCompilationCacheDir string
+	// Egress is the policy a wasm run's outbound requests are held to.
+	Egress ssrf.Options
 }
+
+// testRuntime lets the package's tests run the whole suite on another runtime;
+// export_test.go sets it from NLPGO_CODEBLOCK_TEST_RUNTIME. Never set in production.
+var testRuntime, testPythonWasmHome string
+
+// Runtime values for Options.Runtime.
+const (
+	RuntimeSubprocess = "subprocess"
+	RuntimeWasm       = "wasm"
+)
 
 // defaultEnvAllowlist is the environment passed into the code-block
 // subprocess when Options.EnvAllowlist is nil. It carries only what the
@@ -116,6 +139,7 @@ type Executor struct {
 	opts           Options
 	runnerSource   []byte
 	fakeDspySource []byte
+	wasm           *wasmRuntime
 }
 
 // New builds an Executor, resolving the runner sources it will write for
@@ -155,11 +179,35 @@ func New(opts Options) (*Executor, error) {
 			return nil, fmt.Errorf("codeblock: read fake_dspy %q: %w", sibling, err)
 		}
 	}
-	return &Executor{
+	executor := &Executor{
 		opts:           opts,
 		runnerSource:   runnerSource,
 		fakeDspySource: fakeDspySource,
-	}, nil
+	}
+	if opts.Runtime == "" && testRuntime != "" {
+		opts.Runtime, opts.PythonWasmHome = testRuntime, testPythonWasmHome
+		opts.Egress.AllowLocal = true
+	}
+	switch opts.Runtime {
+	case "", RuntimeSubprocess:
+	case RuntimeWasm:
+		wasm, err := newWasmRuntime(context.Background(), opts, runnerPair{runner: runnerSource, fakeDspy: fakeDspySource})
+		if err != nil {
+			return nil, err
+		}
+		executor.wasm = wasm
+	default:
+		return nil, fmt.Errorf("codeblock: unknown runtime %q", opts.Runtime)
+	}
+	return executor, nil
+}
+
+// Runtime reports which runtime this executor runs user code on.
+func (e *Executor) Runtime() string {
+	if e.wasm != nil {
+		return RuntimeWasm
+	}
+	return RuntimeSubprocess
 }
 
 // runnerFileMode is read-only even for the owner. User code runs as the same
@@ -175,6 +223,10 @@ func (e *Executor) newRunDir() (string, error) {
 	dir, err := os.MkdirTemp("", "nlpgo-codeblock-run-*")
 	if err != nil {
 		return "", fmt.Errorf("codeblock: run dir: %w", err)
+	}
+	if e.wasm != nil {
+		// A wasm guest reads the runner from its own read-only mount.
+		return dir, nil
 	}
 	for name, source := range map[string][]byte{
 		"runner.py":    e.runnerSource,
@@ -371,6 +423,25 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 		return nil, fmt.Errorf("codeblock: marshal request: %w", err)
 	}
 
+	if e.wasm != nil {
+		started := time.Now()
+		run := e.wasm.run(runCtx, wasmRunRequest{
+			runDir:  runDir,
+			payload: payload,
+			env:     withSandboxCredential(nil, req.SandboxAPIKey, e.opts.SandboxEndpoint),
+		})
+		outcome := runOutcome{
+			timedOut: errors.Is(runCtx.Err(), context.DeadlineExceeded),
+			elapsed:  time.Since(started),
+			stderr:   run.stderr,
+			err:      run.err,
+		}
+		if outcome.err == nil && run.exitCode != 0 {
+			outcome.err = fmt.Errorf("python exited with status %d", run.exitCode)
+		}
+		return collectResult(resultPath, outcome), nil
+	}
+
 	cmd := exec.CommandContext(runCtx, e.opts.Python, runnerPath, resultPath) //nolint:gosec // runnerPath is this execution's own copy of the engine's embedded runner
 	// Withhold the pod environment from user code. cmd.Env is always set to
 	// a non-nil slice so exec never falls back to inheriting os.Environ();
@@ -406,6 +477,26 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 		_ = killGroup(cmd.Process.Pid)
 	}
 
+	return collectResult(resultPath, runOutcome{
+		timedOut: timedOut,
+		elapsed:  elapsed,
+		stderr:   stderrBuf.String(),
+		err:      runErr,
+	}), nil
+}
+
+// runOutcome is how a run ended, on either runtime.
+type runOutcome struct {
+	timedOut bool
+	elapsed  time.Duration
+	stderr   string
+	err      error
+}
+
+// collectResult turns what a run left behind into a Result: the runner's own
+// result file when it wrote one, otherwise a synthesized timeout or error.
+func collectResult(resultPath string, outcome runOutcome) *Result {
+	timedOut, elapsed, stderr, runErr := outcome.timedOut, outcome.elapsed, outcome.stderr, outcome.err
 	if data, readErr := os.ReadFile(resultPath); readErr == nil && len(data) > 0 {
 		var parsed struct {
 			Outputs    map[string]any `json:"outputs"`
@@ -426,7 +517,7 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 			if timedOut && res.Error == nil {
 				res.Error = &Error{Type: TimeoutType, Message: "code_block_timeout"}
 			}
-			return res, nil
+			return res
 		}
 	}
 
@@ -436,25 +527,25 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 		return &Result{
 			DurationMS: elapsed.Milliseconds(),
 			TimedOut:   true,
-			Stderr:     stderrBuf.String(),
+			Stderr:     stderr,
 			Error:      &Error{Type: TimeoutType, Message: "code_block_timeout"},
-		}, nil
+		}
 	}
 	if runErr != nil {
 		return &Result{
 			DurationMS: elapsed.Milliseconds(),
-			Stderr:     stderrBuf.String(),
+			Stderr:     stderr,
 			Error: &Error{
 				Type:    RunnerErrorType,
 				Message: runErr.Error(),
 			},
-		}, nil
+		}
 	}
 	return &Result{
 		DurationMS: elapsed.Milliseconds(),
-		Stderr:     stderrBuf.String(),
+		Stderr:     stderr,
 		Error:      &Error{Type: RunnerErrorType, Message: "empty_result"},
-	}, nil
+	}
 }
 
 func killGroup(pid int) error {

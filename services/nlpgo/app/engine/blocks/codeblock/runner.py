@@ -86,13 +86,11 @@ Wire shape (result file):
 
 from __future__ import annotations
 
-import inspect
 import io
 import json
 import os
 import sys
 import time
-import traceback
 from contextlib import redirect_stdout, redirect_stderr
 from types import SimpleNamespace
 
@@ -105,6 +103,10 @@ if _RUNNER_DIR not in sys.path:
     sys.path.insert(0, _RUNNER_DIR)
 import fake_dspy  # noqa: E402 — must come after sys.path manipulation
 sys.modules.setdefault("dspy", fake_dspy)
+try:
+    import _lw_wasm_boot  # noqa: E402, F401 — only the wasm runtime ships it
+except ImportError:
+    pass
 
 
 def main() -> int:
@@ -112,7 +114,8 @@ def main() -> int:
         sys.stderr.write("usage: runner.py <result_path>\n")
         return 2
     result_path = sys.argv[1]
-    raw = sys.stdin.read()
+    # One line: the wasm runtime keeps stdin open for host-bridge replies.
+    raw = sys.stdin.readline()
     try:
         payload = json.loads(raw)
     except json.JSONDecodeError as e:
@@ -173,7 +176,7 @@ def main() -> int:
         error = {
             "type": type(exc).__name__,
             "message": str(exc),
-            "traceback": traceback.format_exc(),
+            "traceback": _format_exc(),
         }
 
     elapsed_ms = int((time.perf_counter() - started) * 1000)
@@ -214,7 +217,7 @@ def _invoke_user_entrypoint(module_globals: dict, inputs: dict):
     callable_cls = None
     forward_cls = None
     for value in module_globals.values():
-        if not inspect.isclass(value):
+        if not isinstance(value, type):
             continue
         if issubclass(value, fake_dspy.Module) and value is not fake_dspy.Module:
             if dspy_module_cls is None:
@@ -273,6 +276,14 @@ def _coerce_result(result):
     raise TypeError(
         f"user-code entrypoint must return dict, dspy.Prediction, or None — got {type(result).__name__}"
     )
+
+
+def _format_exc():
+    # Imported only on failure: traceback pulls in most of inspect, which is
+    # the single largest import cost of a run under the wasm runtime.
+    import traceback
+
+    return traceback.format_exc()
 
 
 def write_result(path, **fields):

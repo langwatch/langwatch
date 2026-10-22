@@ -163,6 +163,7 @@ require (
 	github.com/prometheus/client_golang v1.23.2
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
 	github.com/stretchr/testify v1.12.1
+	github.com/tetratelabs/wazero v1.12.0
 	github.com/tidwall/gjson v1.19.0
 	github.com/tidwall/sjson v1.2.5
 	github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2

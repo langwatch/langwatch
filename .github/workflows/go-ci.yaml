@@ -192,9 +192,14 @@ jobs:
           uv venv "$RUNNER_TEMP/codeblock-venv"
           uv pip install --python "$RUNNER_TEMP/codeblock-venv" requests ./sdks/python
           echo "LANGWATCH_CODEBLOCK_PYTHON=$RUNNER_TEMP/codeblock-venv/bin/python" >> "$GITHUB_ENV"
+      # The wasm code-block runtime's interpreter; its tests fail without it in CI.
+      - name: Fetch the code-block wasm runtime
+        run: services/nlpgo/scripts/fetch-python-wasm.sh
       # lingua/language_detection replays langevals over the generated models.
       - run: make lingua-models
       - run: go test -count=1 -race $GO_PKGS
+      # The whole code-block suite again, on the wasm runtime.
+      - run: NLPGO_CODEBLOCK_TEST_RUNTIME=wasm go test -count=1 ./services/nlpgo/app/engine/blocks/codeblock/
       - run: go test -count=1 -tags dev ./cmd/service/...
       # Memory ceilings skip under -race (it multiplies memory and time), so
       # they run here in a plain build.

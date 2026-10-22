@@ -112,6 +112,15 @@ type EngineConfig struct {
 	// set the unprefixed SANDBOX_PYTHON instead, which resolveSandboxPython
 	// accepts as a fallback.
 	SandboxPython string `env:"SANDBOX_PYTHON"`
+	// CodeBlockRuntime — where user code runs: "subprocess" (default) or
+	// "wasm", a WASI CPython inside the engine (ADR-181).
+	CodeBlockRuntime string `env:"CODE_BLOCK_RUNTIME"`
+	// PythonWasmHome — python.wasm and its stdlib, for the wasm runtime.
+	PythonWasmHome string `env:"PYTHON_WASM_HOME"`
+	// CodeBlockMemoryMiB — one wasm run's memory ceiling. Zero means 512.
+	CodeBlockMemoryMiB int `env:"CODE_BLOCK_MEMORY_MIB"`
+	// WasmCompilationCacheDir — keeps compiled python.wasm across restarts.
+	WasmCompilationCacheDir string `env:"WASM_COMPILATION_CACHE_DIR"`
 	// LangWatchBaseURL — base URL for evaluator + agent-workflow callbacks.
 	// In production this is the public LangWatch app URL (eg.
 	// https://app.langwatch.ai); in dev it's typically http://host.docker.internal:5560

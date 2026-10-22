@@ -80,7 +80,7 @@ func Run(ctx context.Context, opts Options) error {
 	)
 
 	httpExec := newHTTPExecutor(cfg.Engine, ssrfOpts)
-	codeExec, err := newCodeExecutor(cfg.Engine, os.Getenv)
+	codeExec, err := newCodeExecutor(cfg.Engine, ssrfOpts, os.Getenv)
 	if err != nil {
 		return err
 	}
@@ -202,8 +202,15 @@ func newEngine(cfg *nlpgo.Config, parts engineParts) *engine.Engine {
 // standing up the whole service.
 //
 // `getenv` is injected so tests don't need to mutate process env.
-func newCodeExecutor(engineCfg nlpgo.EngineConfig, getenv func(string) string) (*codeblock.Executor, error) {
+func newCodeExecutor(engineCfg nlpgo.EngineConfig, egress ssrf.Options, getenv func(string) string) (*codeblock.Executor, error) {
 	return codeblock.New(codeblock.Options{
+		Runtime:                 engineCfg.CodeBlockRuntime,
+		PythonWasmHome:          engineCfg.PythonWasmHome,
+		WasmMemoryMiB:           engineCfg.CodeBlockMemoryMiB,
+		WasmCompilationCacheDir: engineCfg.WasmCompilationCacheDir,
+		// A wasm run reaches the network only through the engine, under the
+		// same policy as the HTTP block.
+		Egress: egress,
 		Python: resolveSandboxPython(engineCfg.SandboxPython, getenv),
 		// The instance a code node's LangWatch SDK calls. It is the same URL
 		// the evaluator blocks call back on, and it is injected only next to

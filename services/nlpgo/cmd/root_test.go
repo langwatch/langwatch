@@ -144,7 +144,7 @@ func TestNewCodeExecutor_AppliesConfiguredCodeBlockTimeout(t *testing.T) {
 	exec, err := newCodeExecutor(nlpgo.EngineConfig{
 		SandboxPython:           nlpgo.DefaultSandboxPython,
 		CodeBlockTimeoutSeconds: 300,
-	}, getenv)
+	}, ssrf.Options{}, getenv)
 	if err != nil {
 		t.Fatalf("newCodeExecutor: %v", err)
 	}
@@ -161,7 +161,7 @@ func TestNewCodeExecutor_UnsetTimeoutKeepsTheTenMinuteDefault(t *testing.T) {
 
 	exec, err := newCodeExecutor(nlpgo.EngineConfig{
 		SandboxPython: nlpgo.DefaultSandboxPython,
-	}, getenv)
+	}, ssrf.Options{}, getenv)
 	if err != nil {
 		t.Fatalf("newCodeExecutor: %v", err)
 	}
@@ -205,7 +205,7 @@ func TestNewCodeExecutor_NegativeTimeoutDoesNotExpireImmediately(t *testing.T) {
 	exec, err := newCodeExecutor(nlpgo.EngineConfig{
 		SandboxPython:           nlpgo.DefaultSandboxPython,
 		CodeBlockTimeoutSeconds: -30,
-	}, getenv)
+	}, ssrf.Options{}, getenv)
 	if err != nil {
 		t.Fatalf("newCodeExecutor: %v", err)
 	}
@@ -303,7 +303,7 @@ func TestCodeBlockTimeout_ReachesTheExecutorFromTheEnvironment(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadConfig: %v", err)
 	}
-	exec, err := newCodeExecutor(cfg.Engine, os.Getenv)
+	exec, err := newCodeExecutor(cfg.Engine, ssrf.Options{}, os.Getenv)
 	if err != nil {
 		t.Fatalf("newCodeExecutor: %v", err)
 	}
