@@ -287,3 +287,70 @@ describe("given an issuer origin an operator vouched for", () => {
     expect(asked).toEqual([]);
   });
 });
+
+describe("given a deployment that reaches the internet only through an outbound proxy", () => {
+  const proxy = { httpsProxy: "http://proxy.corp.example:3128", noProxy: "corp.example" };
+
+  /** @scenario "Issuer discovery leaves through the deployment's outbound proxy" */
+  it("judges the issuer first, then hands the proxy to the fetch", async () => {
+    const steps: string[] = [];
+    const channel = HttpsSsoIssuerDiscoveryChannel.create({
+      policy: POLICY,
+      proxy,
+      validate: async (url) => {
+        steps.push("judged");
+        return admitted(url);
+      },
+      fetchValidated: async (_validated, init) => {
+        steps.push("fetched");
+        expect(init.proxy).toEqual(proxy);
+        return respond(200, DISCOVERY_DOCUMENT);
+      },
+    });
+
+    await expect(channel.discover({ issuer: ISSUER })).resolves.toMatchObject({ reachable: true });
+    expect(steps).toEqual(["judged", "fetched"]);
+  });
+
+  /** @scenario "Issuer discovery leaves through the deployment's outbound proxy" */
+  it("never reaches the proxy for an issuer the fence refuses", async () => {
+    const asked: string[] = [];
+    const channel = HttpsSsoIssuerDiscoveryChannel.create({
+      policy: POLICY,
+      proxy,
+      validate: async () => {
+        throw new Error("resolves to a private address");
+      },
+      fetchValidated: async (validated) => {
+        asked.push(validated.originalUrl);
+        return respond(200, DISCOVERY_DOCUMENT);
+      },
+    });
+
+    await expect(channel.discover({ issuer: ISSUER })).resolves.toMatchObject({
+      reachable: false,
+    });
+    expect(asked).toEqual([]);
+  });
+
+  /** @scenario "NO_PROXY does not lift the public-address check on discovery" */
+  it("refuses an issuer NO_PROXY names when it resolves privately", async () => {
+    const asked: string[] = [];
+    const channel = HttpsSsoIssuerDiscoveryChannel.create({
+      policy: POLICY,
+      proxy: { httpsProxy: "http://proxy.corp.example:3128", noProxy: "login.acme.okta.com" },
+      validate: async () => {
+        throw new Error("resolves to a private address");
+      },
+      fetchValidated: async (validated) => {
+        asked.push(validated.originalUrl);
+        return respond(200, DISCOVERY_DOCUMENT);
+      },
+    });
+
+    await expect(channel.discover({ issuer: ISSUER })).resolves.toMatchObject({
+      reachable: false,
+    });
+    expect(asked).toEqual([]);
+  });
+});

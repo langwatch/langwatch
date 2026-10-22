@@ -42,3 +42,39 @@ Feature: Egress address policy and the pinned fetch
     Then the next hop is sent without them
     When the receiver redirects within the same origin
     Then the next hop keeps them
+
+  # Behind a corporate proxy the only way out is the proxy: a socket pinned to
+  # the judged address never leaves the network. The policy still judges every
+  # hop first; the proxy only decides how an admitted request travels.
+
+  @unit
+  Scenario: An admitted destination leaves through the configured outbound proxy
+    Given an outbound proxy is configured
+    When a destination the policy admitted is fetched
+    Then the request is sent through the proxy, not to the judged address
+
+  @unit
+  Scenario: A destination the proxy exclusions name is reached directly
+    Given an outbound proxy is configured and NO_PROXY names a destination's host
+    When that destination is fetched
+    Then the request is sent to the judged address, without the proxy
+
+  @unit
+  Scenario: A redirect is judged again before it travels through the proxy
+    Given an outbound proxy is configured
+    When the receiver redirects to a destination the policy refuses
+    Then the next hop is refused without being sent to the proxy
+
+  # Every caller opts in by passing its proxy setting (ADR-182). These have not yet.
+  @integration @unimplemented
+  Scenario Outline: A caller that fetches a user-supplied address passes the outbound proxy
+    Given an outbound proxy is configured
+    When <caller> fetches a destination the policy admitted
+    Then the request leaves through the proxy
+
+    Examples:
+      | caller                            |
+      | a webhook destination             |
+      | a model provider credential check |
+      | a web push subscription           |
+      | an external image                 |

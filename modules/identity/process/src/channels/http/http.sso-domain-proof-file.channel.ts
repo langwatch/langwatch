@@ -2,6 +2,7 @@ import {
   createSsrfUrlValidator,
   type EgressTlsPolicy,
   type FencedFetchOptions,
+  type OutboundProxyConfig,
   RedirectRefusedError,
   type SsrfUrlValidator,
   type SsrfValidationResult,
@@ -66,31 +67,51 @@ class ProofFileDowngradedError extends Error {
 }
 
 /**
- * Reading a domain's proof out of a file it serves. `@langwatch/egress` is
- * what makes it safe: every hop is judged and the socket pinned to the
- * judged address, so a name cannot answer differently for the connection.
+ * Reading a domain's proof out of a file it serves. `@langwatch/egress` judges
+ * every hop and pins it to the judged address, unless the operator's proxy
+ * carries it: that proxy then resolves the name.
  */
 export class HttpsSsoDomainProofFileChannel implements SsoDomainProofFileChannel {
-  private constructor(
-    private readonly validate: SsrfUrlValidator,
-    private readonly fetchValidated: FencedProofFetch,
-    private readonly tls: EgressTlsPolicy,
-  ) {}
+  private readonly validate: SsrfUrlValidator;
+  private readonly fetchValidated: FencedProofFetch;
+  private readonly tls: EgressTlsPolicy;
+  private readonly proxy: OutboundProxyConfig | undefined;
+
+  private constructor({
+    validate,
+    fetchValidated,
+    tls,
+    proxy,
+  }: {
+    validate: SsrfUrlValidator;
+    fetchValidated: FencedProofFetch;
+    tls: EgressTlsPolicy;
+    proxy: OutboundProxyConfig | undefined;
+  }) {
+    this.validate = validate;
+    this.fetchValidated = fetchValidated;
+    this.tls = tls;
+    this.proxy = proxy;
+  }
 
   static create(options: {
     policy: SsoDomainProofEgressPolicy;
+    /** The deployment's outbound proxy, which carries the fetch once the fence admits it. */
+    proxy?: OutboundProxyConfig;
     validate?: SsrfUrlValidator;
     fetchValidated?: FencedProofFetch;
   }): HttpsSsoDomainProofFileChannel {
-    return new HttpsSsoDomainProofFileChannel(
-      options.validate ??
+    return new HttpsSsoDomainProofFileChannel({
+      validate:
+        options.validate ??
         createSsrfUrlValidator({
           blockLocal: options.policy.blockLocal,
           allowedHosts: [...options.policy.allowedHosts],
         }),
-      options.fetchValidated ?? fetchValidatedDestination,
-      { rejectUnauthorized: options.policy.verifyTls },
-    );
+      fetchValidated: options.fetchValidated ?? fetchValidatedDestination,
+      tls: { rejectUnauthorized: options.policy.verifyTls },
+      proxy: options.proxy,
+    });
   }
 
   /** Every hop, the first included: https, then the deployment's fence. */
@@ -119,6 +140,7 @@ export class HttpsSsoDomainProofFileChannel implements SsoDomainProofFileChannel
           signal: controller.signal,
           followRedirects: true,
           revalidate: this.judge,
+          proxy: this.proxy,
         },
         this.tls,
       );
