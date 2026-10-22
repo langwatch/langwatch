@@ -134,4 +134,28 @@ describe("buildEventing", () => {
       }
     });
   });
+
+  describe("given a paged aggregate history read", () => {
+    /** @scenario A page of an aggregate's history reads payloads only for its own rows */
+    it("carries the page's lazy-read setting through to the routed ClickHouse member", async () => {
+      const reads: QueryRequest[] = [];
+      const built = consumingEventingOver({ inserts: [], reads });
+      const tenantId = createTenantId("project_abc");
+
+      try {
+        await built.value.eventStore?.getEventsPaged?.({
+          aggregateId: "user_1",
+          aggregateType: "user",
+          context: { tenantId },
+          after: undefined,
+          limit: 250,
+        });
+
+        expect(reads).toHaveLength(1);
+        expect(reads[0]?.settings).toEqual({ query_plan_max_limit_for_lazy_materialization: 250 });
+      } finally {
+        await built.close?.();
+      }
+    });
+  });
 });

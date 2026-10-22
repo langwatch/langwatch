@@ -35,13 +35,13 @@ const readWindowRecoveryWarned = new Set<string>();
  * What a re-fold history read still misses before it may replace the loaded
  * state. See `FoldProjectionExecutor.historyReadGap`.
  */
-/** A paged history read's strict cursor: the last row of the previous page. */
-type PageCursor = { timestamp: number; eventId: string };
-
 type HistoryReadGap = {
   missingAppliedIds: string[];
   isFrontierMissing: boolean;
 };
+
+/** A paged history read's strict cursor: the last row of the previous page. */
+type PageCursor = { timestamp: number; eventId: string };
 
 /**
  * Arrival time, then the id: the order of two events the event log accepted,
@@ -186,13 +186,13 @@ class HistoryAccount {
     loadedAppliedIds: readonly string[];
     stateFrontierOccurredAtMs: number;
   }): HistoryReadGap | null {
-    const accounted = new Set(this.accounted);
+    // The delivered events' tokens on their own, so the history's set is never copied.
+    const deliveredTokens = new Set(delivered.flatMap(appliedTokensOf));
     let maxOccurredAt = this.maxOccurredAt;
-    for (const e of delivered) {
-      for (const token of appliedTokensOf(e)) accounted.add(token);
-      maxOccurredAt = Math.max(maxOccurredAt, e.occurredAt ?? 0);
-    }
-    const missingAppliedIds = loadedAppliedIds.filter((id) => !accounted.has(id));
+    for (const e of delivered) maxOccurredAt = Math.max(maxOccurredAt, e.occurredAt ?? 0);
+    const missingAppliedIds = loadedAppliedIds.filter(
+      (id) => !this.accounted.has(id) && !deliveredTokens.has(id),
+    );
     const isFrontierMissing =
       stateFrontierOccurredAtMs > 0 && maxOccurredAt < stateFrontierOccurredAtMs;
     if (missingAppliedIds.length === 0 && !isFrontierMissing) return null;

@@ -201,6 +201,22 @@ describe("rebuilding a fold's aggregate for a missed hand-off", () => {
       });
     });
 
+    describe("when the log does not hold the missed event but accounts for everything stored", () => {
+      /** @scenario An order-insensitive fold that missed an event is rebuilt from its log a page at a time */
+      it("folds the missed event once on top of the paged history", async () => {
+        const [first, missed, later] = [at(1_000), at(2_000), at(3_000)];
+        const { fold, current } = pagedCountingFold({ log: () => [first, later] });
+        const paging = new FoldProjectionExecutor({ refoldPageSize: 2 });
+        await paging.execute(fold, first, context);
+
+        await paging.rebuild(fold, missed, context);
+
+        expect(current()?.state.count).toBe(3);
+        expect(current()?.state.seen.filter((id) => id === missed.id)).toHaveLength(1);
+        expect(current()?.applied).toEqual(expect.arrayContaining([first.id, later.id, missed.id]));
+      });
+    });
+
     describe("when its stored state applied an event the paged read does not return yet", () => {
       /** @scenario A paged rebuild that reads an incomplete history retries and then refuses */
       it("retries the paged read, then refuses the incomplete history", async () => {

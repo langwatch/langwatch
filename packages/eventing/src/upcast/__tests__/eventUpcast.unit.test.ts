@@ -359,6 +359,62 @@ describe("an upcast declared on the owning pipeline", () => {
       expect(seen).toEqual(new Set(["a1", "a2", "a3", "a4"]));
     });
 
+    /** @scenario An order-insensitive fold that missed an event is rebuilt from its log a page at a time */
+    it("pages a renamed aggregate with the rewritten row winning over its original", async () => {
+      const store = EventStoreMemory.createForTesting();
+      const context = { tenantId: TENANT };
+      // e1 is mid-rewrite: its original under the former type, its rewrite under the current one.
+      await store.storeEvents(
+        [
+          stored({
+            id: "e1",
+            createdAt: 1,
+            data: { organizationId: "organization-1", billableEvents: 1 },
+          }),
+        ],
+        context,
+        "usage_organization",
+      );
+      const current = (id: string, createdAt: number, billableEvents: number) =>
+        stored({
+          id,
+          type: CURRENT,
+          aggregateType: "entitlement_organization",
+          createdAt,
+          data: { organizationId: "organization-1", billableEvents },
+        });
+      await store.storeEvents(
+        [current("e1", 1, 99), current("e2", 2, 2), current("e3", 3, 3)],
+        context,
+        "entitlement_organization",
+      );
+      const definition = entitlementPipeline();
+      const upcasting = upcastEventStore({
+        store,
+        upcaster: EventUpcaster.of(definition.upcasts),
+        parseEvent: definition.parseEvent,
+      });
+
+      const pages: Event[][] = [];
+      let after: { timestamp: number; eventId: string } | undefined;
+      for (;;) {
+        const page = await upcasting.getEventsPaged!({
+          aggregateId: "organization-1",
+          context,
+          aggregateType: "entitlement_organization",
+          after,
+          limit: 2,
+        });
+        pages.push([...page]);
+        if (page.length < 2) break;
+        const last = page[page.length - 1]!;
+        after = { timestamp: last.createdAt, eventId: last.id };
+      }
+
+      expect(pages.map((page) => page.map((event) => event.id))).toEqual([["e1", "e2"], ["e3"]]);
+      expect(pages[0]![0]!.data).toMatchObject({ billableEvents: 99 });
+    });
+
     /** @scenario "A payload transform reshapes the stored data before the current schema parses it" */
     it("parses the transformed payload with the current schema", async () => {
       const definition = entitlementPipeline({

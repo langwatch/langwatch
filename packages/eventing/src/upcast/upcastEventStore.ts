@@ -79,14 +79,52 @@ class UpcastingEventStore<EventType extends Event> implements EventStore<EventTy
     const paged = this.store.getEventsUpToPaged?.bind(this.store);
     if (!paged) return undefined;
     return (request) =>
-      this.#page(request, (aggregateType) => paged({ ...request, aggregateType }));
+      this.#page(request, ({ aggregateType, after }) =>
+        paged({ ...request, aggregateType, after }),
+      );
   }
 
   get getEventsPaged(): EventStore<EventType>["getEventsPaged"] {
     const paged = this.store.getEventsPaged?.bind(this.store);
     if (!paged) return undefined;
     return (request) =>
-      this.#page(request, (aggregateType) => paged({ ...request, aggregateType }));
+      this.#page(request, ({ aggregateType, after }) =>
+        paged({ ...request, aggregateType, after }),
+      );
+  }
+
+  /**
+   * A page short only when the history is exhausted. One type: its raw page, never deduped (the
+   * caller dedupes across pages). Several: one id under two types collapses, the rewritten row
+   * winning, and reading continues until the page is full or every type is exhausted.
+   */
+  async #page(
+    request: { aggregateType: string; after: PageCursor | undefined; limit: number },
+    read: (page: {
+      aggregateType: string;
+      after: PageCursor | undefined;
+    }) => Promise<readonly EventType[]>,
+  ): Promise<readonly EventType[]> {
+    const types = this.#aggregateTypes(request.aggregateType);
+    if (types.length === 1) {
+      const page = await read({ aggregateType: types[0]!, after: request.after });
+      return page.map((stored) => this.#current(stored));
+    }
+    const byId = new Map<string, EventType>();
+    let after = request.after;
+    for (;;) {
+      const reads = await Promise.all(types.map((aggregateType) => read({ aggregateType, after })));
+      const fetched = reads.flat().toSorted(logOrder);
+      for (const stored of fetched) this.#keepPreferred(byId, stored);
+      const exhausted = reads.every((page) => page.length < request.limit);
+      const last = fetched.at(-1);
+      if (exhausted || last === undefined || byId.size >= request.limit) break;
+      after = { timestamp: last.createdAt, eventId: last.id };
+    }
+    return [...byId.values()]
+      .map((stored) => this.#current(stored))
+      .toSorted(logOrder)
+      .slice(0, request.limit);
   }
 
   async countEventsBefore(
@@ -106,18 +144,10 @@ class UpcastingEventStore<EventType extends Event> implements EventStore<EventTy
     return aggregateType === own ? [own, ...this.upcaster.formerAggregateTypes] : [aggregateType];
   }
 
-  /**
-   * One raw page, never deduped: a paged caller reads a short page as the end of the history and
-   * dedupes across pages itself. Several types' pages interleave in log order, cut to the limit.
-   */
-  async #page(
-    request: { aggregateType: string; limit: number },
-    read: (aggregateType: string) => Promise<readonly EventType[]>,
-  ): Promise<readonly EventType[]> {
-    const types = this.#aggregateTypes(request.aggregateType);
-    const reads = await Promise.all(types.map(read));
-    const events = reads.flat().map((stored) => this.#current(stored));
-    return types.length > 1 ? events.toSorted(logOrder).slice(0, request.limit) : events;
+  /** A row rewritten to the current type wins over its stored original. */
+  #keepPreferred(byId: Map<string, EventType>, stored: EventType): void {
+    const known = byId.get(stored.id);
+    if (!known || this.upcaster.declaresFrom(known.type)) byId.set(stored.id, stored);
   }
 
   async #merged(
@@ -127,11 +157,7 @@ class UpcastingEventStore<EventType extends Event> implements EventStore<EventTy
     const types = this.#aggregateTypes(aggregateType);
     const reads = await Promise.all(types.map(read));
     const byId = new Map<string, EventType>();
-    for (const stored of reads.flat()) {
-      const known = byId.get(stored.id);
-      // A row rewritten to the current type wins over its stored original.
-      if (!known || this.upcaster.declaresFrom(known.type)) byId.set(stored.id, stored);
-    }
+    for (const stored of reads.flat()) this.#keepPreferred(byId, stored);
     const events = [...byId.values()].map((stored) => this.#current(stored));
     return types.length > 1 ? events.toSorted(logOrder) : events;
   }
@@ -144,6 +170,9 @@ class UpcastingEventStore<EventType extends Event> implements EventStore<EventTy
 }
 
 /** The log's order, `EventTimestamp, EventId`, as ClickHouse and the memory repository read it. */
+/** A paged read's strict cursor: the last row of the previous page. */
+type PageCursor = { timestamp: number; eventId: string };
+
 function logOrder(left: Event, right: Event): number {
   if (left.createdAt !== right.createdAt) return left.createdAt - right.createdAt;
   return compareOrdinal(left.id, right.id);
