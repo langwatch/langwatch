@@ -36,6 +36,8 @@ export interface StoredSession {
   agent: string | null;
   /** The session's own last event time, epoch ms. */
   occurredAt: number;
+  /** When the fold first existed (framework-set at init, preserved on read-back), epoch ms. */
+  firstStoredAt: number;
   auxiliary: boolean;
 }
 
@@ -168,6 +170,7 @@ function toStoredSession(
     sessionId: String(context.aggregateId),
     agent: state.agent,
     occurredAt: state.LastEventOccurredAt,
+    firstStoredAt: state.createdAt,
     auxiliary: state.auxiliary,
   };
 }

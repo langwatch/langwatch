@@ -236,6 +236,7 @@ describe("EventingCodingAgentSessionStoreService durable dedup", () => {
       sessionId: "session-1",
       agent: "claude_code",
       occurredAt: 1_000,
+      firstStoredAt: 1_000,
       auxiliary: false,
       ...over,
     });

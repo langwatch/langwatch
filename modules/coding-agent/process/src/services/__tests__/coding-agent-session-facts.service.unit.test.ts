@@ -23,6 +23,7 @@ const stored = (over: Partial<StoredSession> = {}): StoredSession => ({
   sessionId: "session-1",
   agent: "claude_code",
   occurredAt: Date.UTC(2026, 9, 20, 12),
+  firstStoredAt: Date.UTC(2026, 9, 20, 12),
   auxiliary: false,
   ...over,
 });
@@ -157,15 +158,43 @@ describe("CodingAgentSessionFactsService", () => {
     });
 
     /** @scenario "A project stamped only by helper threads still flags its main session first" */
-    it("flags it when the project is stamped and only helper threads precede it", async () => {
+    it("flags it when only helper threads precede it and the stamp predates its first store", async () => {
       const { service, recorded } = factsOver({
         lastCodingAgentSessionAt: new Date(1),
         findOtherSessionKind: async () => "helpers_only",
+        nowMs: () => stored().firstStoredAt + 1_000,
       });
 
       await service.record([stored()]);
 
       expect(recorded[0]?.firstForProject).toBe(true);
+    });
+
+    /** @scenario "A main session re-folded while the stamp still predates it is not first again" */
+    it("does not flag it when the fold comes after its first fact window", async () => {
+      const { service, recorded } = factsOver({
+        lastCodingAgentSessionAt: new Date(1),
+        findOtherSessionKind: async () => "helpers_only",
+        nowMs: () => stored().firstStoredAt + CODING_AGENT_SESSION_SEEN_WINDOW_MS + 1,
+      });
+
+      await service.record([stored()]);
+
+      expect(recorded[0]?.firstForProject).toBe(false);
+    });
+
+    /** @scenario "A first main session folded again is not first a second time" */
+    it("does not flag it again when the stamp came after its first store", async () => {
+      const firstStoredAt = Date.UTC(2026, 9, 20, 12);
+      const { service, recorded } = factsOver({
+        lastCodingAgentSessionAt: new Date(firstStoredAt + 1),
+        findOtherSessionKind: async () => "helpers_only",
+        nowMs: () => firstStoredAt + 1_000,
+      });
+
+      await service.record([stored({ firstStoredAt })]);
+
+      expect(recorded[0]?.firstForProject).toBe(false);
     });
 
     /** @scenario "A helper-thread session in the history never blocks the first" */

@@ -20,7 +20,7 @@ type NamedSession = StoredSession & { agent: string };
 type ProjectClaim = { sessionIds: string[]; earliest: NamedSession };
 
 /** What the project row says: gone, or carrying a coding-agent stamp or not. */
-type ProjectState = "missing" | "stamped" | "unstamped";
+type ProjectState = { kind: "missing" } | { kind: "unstamped" } | { kind: "stamped"; at: number };
 
 /** Where the session-stored fact is recorded; the owner's own pipeline, never a consumer. */
 export interface CodingAgentSessionStoredRecorder {
@@ -97,7 +97,7 @@ export class CodingAgentSessionFactsService {
         projectId: session.tenantId,
         sessionId: session.sessionId,
         agentType: session.agent,
-        firstForProject: await this.isFirstForProject({ session, projectStates, claims }),
+        firstForProject: await this.isFirstForProject({ session, now, projectStates, claims }),
         occurredAt: session.occurredAt,
       });
     } catch (error) {
@@ -110,16 +110,18 @@ export class CodingAgentSessionFactsService {
   }
 
   /**
-   * Fails closed: any error reads as "not first". Accepted false firsts, both at the retention
-   * edge of an idle project: (a) history aged out, then a helper thread precedes the main
-   * session; (b) main sessions aged out while a later helper survived.
+   * Fails closed: any error reads as "not first". Accepted false firsts at an idle project's
+   * retention edge: history aged out before a helper thread; main sessions aged out before a
+   * later helper. Safe-side loss: a helper-stamped project's main session named late is not first.
    */
   private async isFirstForProject({
     session,
+    now,
     projectStates,
     claims,
   }: {
     session: NamedSession;
+    now: number;
     projectStates: Map<string, Promise<ProjectState>>;
     claims: Map<string, ProjectClaim>;
   }): Promise<boolean> {
@@ -131,19 +133,26 @@ export class CodingAgentSessionFactsService {
       let state = projectStates.get(session.tenantId);
       if (state === undefined) {
         state = this.dependencies.projects.findById(session.tenantId).then((project) => {
-          if (project === null) return "missing";
-          return project.lastCodingAgentSessionAt === null ? "unstamped" : "stamped";
+          if (project === null) return { kind: "missing" };
+          const stamp = project.lastCodingAgentSessionAt;
+          return stamp === null ? { kind: "unstamped" } : { kind: "stamped", at: stamp.getTime() };
         });
         projectStates.set(session.tenantId, state);
       }
       const projectState = await state;
-      if (projectState === "missing") return false;
+      if (projectState.kind === "missing") return false;
       const kind = await this.dependencies.sessions.findOtherSessionKind({
         tenantId: session.tenantId,
         excludeSessionIds: claim.sessionIds,
       });
-      // A stamp with only helper threads behind it came from them, so the main session is first.
-      return projectState === "stamped" ? kind === "helpers_only" : kind !== "main";
+      if (projectState.kind === "unstamped") return kind !== "main";
+      // A stamp older than this session's first store, with only helpers behind it, is theirs.
+      // Only the first fact window qualifies: a later re-fold, its own stamp held, is not first.
+      return (
+        kind === "helpers_only" &&
+        projectState.at < session.firstStoredAt &&
+        now - session.firstStoredAt < CODING_AGENT_SESSION_SEEN_WINDOW_MS
+      );
     } catch (error) {
       logger.warn(
         { error, tenantId: session.tenantId },
