@@ -156,6 +156,8 @@ func dialectOf(path string) string {
 		return dialectGemini
 	case isBedrockPath(path):
 		return dialectBedrock
+	case isDecisionPath(path):
+		return dialectDecisions
 	}
 	return dialectOpenAI
 }
@@ -165,6 +167,9 @@ func (s *Server) serveProvider(w http.ResponseWriter, r *http.Request, path stri
 	started := time.Now()
 	pc := &providerCall{w: w, dialect: dialectOf(path), pathModel: modelInPath(r)}
 	pc.rec = record{At: started, Path: path, Dialect: pc.dialect, Status: http.StatusOK}
+	if pc.dialect == dialectDecisions {
+		pc.rec.Auth = maskedBearer(r.Header.Get("Authorization"))
+	}
 	defer func() {
 		pc.rec.LatencyMs = float64(time.Since(started).Microseconds()) / 1000
 		s.calls.add(pc.rec)
@@ -276,6 +281,9 @@ func (s *Server) routeProvider(pc *providerCall, r *http.Request, body map[strin
 		req.altSSE = r.URL.Query().Get("alt") == "sse"
 	case isBedrockPath(path):
 		req = parseBedrock(body, pc.rec.Model, strings.HasSuffix(path, "/converse-stream"))
+	case isDecisionPath(path):
+		s.serveDecision(pc, r, body)
+		return
 	default:
 		pc.fail(http.StatusNotFound, "llmsim does not serve "+r.URL.Path)
 		return

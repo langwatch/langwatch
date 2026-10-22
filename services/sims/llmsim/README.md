@@ -29,6 +29,14 @@ Azure's `/openai/deployments/{d}/chat/completions` all answer.
 | `:generateContent`       | Gemini (`/v1beta/models/<m>`) or Vertex (`/projects/.../models/<m>`), JSON      |
 | `:streamGenerateContent` | the same, as SSE with `?alt=sse` or else a JSON array of chunks                 |
 | `/model/<id>/converse`   | Bedrock Converse; `/converse-stream` answers an AWS event stream                |
+| `/v1/decisions`          | Instant Evals decision models: OpenAI Decisions (`input`) or Jev (`state`)      |
+| `/v1/systemone`          | the hosted Jev classifier                                                       |
+| `/ai/run/@cf/<m>`        | Cloudflare Workers AI decision models: Jev, answered inside `result`            |
+
+Decision answers are seeded per model, text and question; a queued `nextJson` is the next
+decision call's exact answer. Each decision call records its wire as the mode and only the last
+four characters of its bearer key (`auth`). haven sets `INSTANT_EVAL_DECISION_BASE_URL` to llmsim,
+so a development judge sends its decision calls here.
 
 The OpenAI Responses API is not served: the gateway turns a Responses call to
 an OpenAI provider with a base URL into chat completions before it leaves.
