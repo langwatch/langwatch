@@ -136,8 +136,8 @@ describe("ModelProviderDecisionModelService.resolve", () => {
     it("does not keep the failure, so the next call asks again", async () => {
       const { service, lookups } = harness({ stored: new Error("database down") });
 
-      await expect(service.resolve({ projectId: "proj_1" })).rejects.toThrow();
-      await expect(service.resolve({ projectId: "proj_1" })).rejects.toThrow();
+      await expect(service.resolve({ projectId: "proj_1" })).rejects.toThrow("database down");
+      await expect(service.resolve({ projectId: "proj_1" })).rejects.toThrow("database down");
 
       expect(lookups).toEqual(["proj_1", "proj_1"]);
     });

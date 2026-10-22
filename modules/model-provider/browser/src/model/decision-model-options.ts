@@ -11,12 +11,12 @@ import {
   type ModelPickerOption,
 } from "@langwatch/model-provider-contract";
 
-/** Every decision model's label keyed by its id, so a chip or picker reads the label, not the id. */
+/** Every decision model's label keyed by its id, so a chip or picker shows the label. */
 export const DECISION_MODEL_DISPLAY_NAMES: Readonly<Record<string, string>> = Object.fromEntries(
   DECISION_MODELS.map((entry) => [entry.id, entry.label]),
 );
 
-/** Whether a stored id is one the column can show; an id the catalogue no longer offers reads as unset. */
+/** Whether the column can show a stored id; an id the catalogue dropped reads as unset. */
 export function isShownDecisionModel(id: string | null | undefined): id is string {
   return !!id && !!findDecisionModel(id);
 }

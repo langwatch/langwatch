@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import {
   decisionFailureOf,
   decisionRequestBodyOf,
-  decisionResponseOf,
+  parseDecisionResponse,
 } from "../instant-eval-decision-wire.rules.ts";
 
 const QUESTIONS: InstantEvalQuestion[] = [
@@ -86,10 +86,10 @@ describe("decisionRequestBodyOf", () => {
   });
 });
 
-describe("decisionResponseOf", () => {
+describe("parseDecisionResponse", () => {
   /** @scenario "OpenAI Decisions questions are sent as named questions and read back by name" */
   it("reads OpenAI's named answers back into verdicts", () => {
-    const response = decisionResponseOf({
+    const response = parseDecisionResponse({
       wire: "openai_decisions",
       body: {
         model: "gpt-6-luna",
@@ -130,7 +130,7 @@ describe("decisionResponseOf", () => {
   });
 
   it("drops a refused question and keeps the rest", () => {
-    const response = decisionResponseOf({
+    const response = parseDecisionResponse({
       wire: "openai_decisions",
       body: {
         answers: [
@@ -145,7 +145,7 @@ describe("decisionResponseOf", () => {
 
   /** @scenario "Cloudflare's answer is read from inside its result envelope" */
   it("unwraps Cloudflare's result envelope", () => {
-    const response = decisionResponseOf({
+    const response = parseDecisionResponse({
       wire: "cloudflare_jev",
       body: {
         success: true,
@@ -158,7 +158,7 @@ describe("decisionResponseOf", () => {
   });
 
   it("answers undefined for a body that is not the provider's shape", () => {
-    expect(decisionResponseOf({ wire: "jev", body: { nope: true } })).toBeUndefined();
+    expect(parseDecisionResponse({ wire: "jev", body: { nope: true } })).toBeUndefined();
   });
 });
 

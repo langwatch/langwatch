@@ -1,8 +1,7 @@
 /**
- * The decision models the Instant Evals column of Default models may hold (ADR-182 decision 2).
- * LangWatch Instant Preview is the hosted, metered default; every other entry runs on the
- * organization's own key, behind the own-decision-model flag. Ids read `<provider>/decisions:<model>`
- * so none collides with a chat model of the same name.
+ * The decision models the Instant Evals column may hold (ADR-182 decision 2): the hosted, metered
+ * LangWatch Instant Preview, then own-key models behind the own-decision-model flag. Ids read
+ * `<provider>/decisions:<model>` so none collides with a chat model of the same name.
  */
 
 /** Same id as `INSTANT_EVAL_JUDGE_MODEL_ID`; a contract never imports another module's contract. */

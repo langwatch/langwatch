@@ -38,7 +38,7 @@ type DecisionProviderRow = Readonly<{
   customKeys: Readonly<Record<string, unknown>> | null;
 }>;
 
-function textOf(value: unknown): string | undefined {
+function normalizeText(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() !== "" ? value.trim() : undefined;
 }
 
@@ -60,8 +60,8 @@ export function decisionModelResolutionOf({
 
   const keyField = findModelProviderDefinition(entry.provider)?.apiKey;
   const accountField = DECISION_PROVIDER_ACCOUNT_FIELDS[entry.provider];
-  const apiKey = keyField ? textOf(row.customKeys?.[keyField]) : undefined;
-  const accountId = accountField ? textOf(row.customKeys?.[accountField]) : undefined;
+  const apiKey = keyField ? normalizeText(row.customKeys?.[keyField]) : undefined;
+  const accountId = accountField ? normalizeText(row.customKeys?.[accountField]) : undefined;
   const needsAccount = entry.endpoint.includes("{accountId}");
   if (!apiKey || (needsAccount && !accountId)) {
     return { kind: "own_unavailable", model: entry.id, reason: "key_missing" };

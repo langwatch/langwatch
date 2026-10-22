@@ -95,7 +95,7 @@ export class ModelProviderDecisionModelService {
     config: Readonly<Record<string, string>>;
     stored?: Readonly<Record<string, string>>;
   }): Promise<void> {
-    if (!picksOwnDecisionModel({ config, ...(stored ? { stored } : {}) })) return;
+    if (!picksOwnDecisionModel({ config, stored: stored ?? {} })) return;
     if (await this.options.isOwnModelAllowed({ organizationId })) return;
 
     throw new ModelDefaultValidationError(

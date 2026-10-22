@@ -300,9 +300,8 @@ export interface ModelProviderApi {
   resolveModelForFeature(input: ModelDefaultResolveInput): Promise<ModelProviderResolution>;
   /**
    * What the project's Instant Evals run on: LangWatch's classifier, or the organization's own
-   * decision model with its decrypted key. An own model that cannot run (flag off, provider
-   * missing or off, key missing) answers `own_unavailable`, never `langwatch` (ADR-182
-   * decisions 4 and 5). The answer is kept a minute per project.
+   * decision model with its decrypted key. An own model that cannot run answers `own_unavailable`,
+   * never `langwatch` (ADR-182 decisions 4 and 5). The answer is kept a minute per project.
    */
   resolveDecisionModel(input: { projectId: string }): Promise<DecisionModelResolution>;
   findAlternateModel(input: {

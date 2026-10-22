@@ -1,8 +1,7 @@
 /**
- * One metered judge call (ADR-174 decisions 8, 10, 14, 15), in a fixed order: cloud only,
- * unknown project, budget, classify, price, priced fact. A refusal is returned, never thrown, and
- * calls no classifier. An own decision model skips all of it but the call (ADR-182 decision 7).
- * Spec: modules/instant-eval/specs/instant-eval-judge-model.feature
+ * One metered judge call (ADR-174 decisions 8, 10, 14, 15): cloud only, unknown project, budget,
+ * classify, price, priced fact; a refusal is returned. An own model skips all but the call (ADR-182
+ * decision 7). Spec: modules/instant-eval/specs/instant-eval-judge-model.feature
  */
 
 import {

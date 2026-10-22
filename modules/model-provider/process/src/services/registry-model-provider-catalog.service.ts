@@ -31,6 +31,23 @@ import type { ModelProviderCredentialProbe } from "../features/credential-probe/
 import { isDecisionDefaultKey } from "../rules/decision-model.rules.ts";
 import type { ModelProviderManagedGateway } from "./managed-model-provider-gateway.service.ts";
 
+/** Says why a newly picked model may not be the default stored under `key`. */
+function refuseDefault({ key, value }: { key: string; value: string }): never {
+  if (isDecisionDefaultKey(key)) {
+    throw new ModelDefaultValidationError(
+      `"${value}" is not a decision model. Pick one from the Instant Evals list.`,
+    );
+  }
+  if (isDecisionModelId(value)) {
+    throw new ModelDefaultValidationError(
+      `"${value}" is a decision model and can only be the Instant Evals default.`,
+    );
+  }
+  throw new ModelDefaultValidationError(
+    `"${value}" ${CODING_ASSISTANT_SURFACES_ONLY_NEEDLE} and cannot be set for "${key}".`,
+  );
+}
+
 /** Registry/SDK boundary. Provider SDKs and environment configuration stay behind this port. */
 export abstract class ModelProviderCatalog {
   exists(provider: string): boolean {
@@ -138,21 +155,7 @@ export abstract class ModelProviderCatalog {
         droppedRestricted = true;
         continue;
       }
-      if (!allowed && isDecisionDefaultKey(key)) {
-        throw new ModelDefaultValidationError(
-          `"${value}" is not a decision model. Pick one from the Instant Evals list.`,
-        );
-      }
-      if (!allowed && isDecisionModelId(value)) {
-        throw new ModelDefaultValidationError(
-          `"${value}" is a decision model and can only be the Instant Evals default.`,
-        );
-      }
-      if (!allowed) {
-        throw new ModelDefaultValidationError(
-          `"${value}" ${CODING_ASSISTANT_SURFACES_ONLY_NEEDLE} and cannot be set for "${key}".`,
-        );
-      }
+      if (!allowed) refuseDefault({ key, value });
 
       clean[key] = value;
     }

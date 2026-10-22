@@ -384,17 +384,12 @@ function ConfigCell({
       <ChipWithEdit onEdit={onEdit}>
         {role === "INSTANT_EVALS" ? (
           <DecisionModelChip model={resolvedRoleModel} isInvalid={isInvalid} />
-        ) : resolvedRoleModel ? (
-          <ModelChip
+        ) : (
+          <RoleModelChip
             model={resolvedRoleModel}
-            size="sm"
-            invalid={isInvalid(resolvedRoleModel)}
+            isInvalid={isInvalid}
             displayNames={displayNames}
           />
-        ) : (
-          <Badge colorPalette="orange" variant="subtle">
-            Not configured
-          </Badge>
         )}
       </ChipWithEdit>
       {featureOverrides.map((feature) => (
@@ -435,6 +430,28 @@ function DecisionModelChip({
       invalid={!!shown && isOwnDecisionModelId(shown) && isInvalid(shown)}
       displayNames={DECISION_MODEL_DISPLAY_NAMES}
     />
+  );
+}
+
+/** Any other role's cell: its resolved model, or "Not configured" when the cascade has none. */
+function RoleModelChip({
+  model,
+  isInvalid,
+  displayNames,
+}: {
+  model: string | null;
+  isInvalid: (model: string) => boolean;
+  displayNames: Record<string, string>;
+}) {
+  if (!model) {
+    return (
+      <Badge colorPalette="orange" variant="subtle">
+        Not configured
+      </Badge>
+    );
+  }
+  return (
+    <ModelChip model={model} size="sm" invalid={isInvalid(model)} displayNames={displayNames} />
   );
 }
 

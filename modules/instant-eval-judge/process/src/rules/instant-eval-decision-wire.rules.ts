@@ -85,26 +85,38 @@ const openAiDecisionResponseSchema = z.object({
 });
 
 /** The answer as the Jev reader takes it, or undefined when it is not the provider's shape. */
-export function decisionResponseOf({
+export function parseDecisionResponse({
   wire,
   body,
 }: {
   wire: InstantEvalDecisionWire;
   body: unknown;
 }): ClassifierResponse | undefined {
-  if (wire === "openai_decisions") return fromOpenAiDecision(body);
+  if (wire === "openai_decisions") return parseOpenAiDecision(body);
   const unwrapped =
     wire === "cloudflare_jev" && isRecord(body) && isRecord(body.result) ? body.result : body;
   const parsed = classifierResponseSchema.safeParse(unwrapped);
   return parsed.success ? parsed.data : undefined;
 }
 
-function fromOpenAiDecision(body: unknown): ClassifierResponse | undefined {
+function parseOpenAiDecision(body: unknown): ClassifierResponse | undefined {
   const parsed = openAiDecisionResponseSchema.safeParse(body);
   if (!parsed.success) return undefined;
 
+  const answers = parseOpenAiAnswers(parsed.data.answers);
+  const inputTokens = parsed.data.usage?.input_tokens;
+  return {
+    ...(parsed.data.model ? { model: parsed.data.model } : {}),
+    answers,
+    ...(inputTokens === undefined ? {} : { usage: { input_tokens: inputTokens } }),
+  };
+}
+
+function parseOpenAiAnswers(
+  sent: z.infer<typeof openAiDecisionResponseSchema>["answers"],
+): ClassifierResponse["answers"] {
   const answers: ClassifierResponse["answers"] = {};
-  for (const answer of parsed.data.answers) {
+  for (const answer of sent) {
     if (!answer.name || answer.type === "refusal") continue;
     const probabilities = answer.probabilities
       ? Object.fromEntries(answer.probabilities.map((p) => [String(p.value), p.probability]))
@@ -118,12 +130,7 @@ function fromOpenAiDecision(body: unknown): ClassifierResponse | undefined {
       ...(answer.confidence === undefined ? {} : { confidence: answer.confidence }),
     };
   }
-  const inputTokens = parsed.data.usage?.input_tokens;
-  return {
-    ...(parsed.data.model ? { model: parsed.data.model } : {}),
-    answers,
-    ...(inputTokens === undefined ? {} : { usage: { input_tokens: inputTokens } }),
-  };
+  return answers;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -8,7 +8,7 @@ import type * as actualModule from "@langwatch/design-system/scope-chip-picker";
 import { cleanup, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { FakeModelProviderHost, renderWithModelProviderHost } from "../../../testing.tsx";
+import { renderWithModelProviderHost } from "../../../testing.tsx";
 import { DefaultModelOverrideDrawer } from "../default-model-override-drawer.tsx";
 import "@testing-library/jest-dom/vitest";
 

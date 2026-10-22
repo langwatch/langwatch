@@ -19,7 +19,7 @@ import { prepareInstantEvalText } from "../../rules/instant-eval-classifier-text
 import {
   decisionFailureOf,
   decisionRequestBodyOf,
-  decisionResponseOf,
+  parseDecisionResponse,
 } from "../../rules/instant-eval-decision-wire.rules.ts";
 import type {
   InstantEvalDecisionModelChannel,
@@ -74,7 +74,7 @@ export class HttpInstantEvalDecisionModelChannel implements InstantEvalDecisionM
         signal,
       });
       if (sent.kind === "answered") {
-        const response = decisionResponseOf({ wire: decisionModel.wire, body: sent.body });
+        const response = parseDecisionResponse({ wire: decisionModel.wire, body: sent.body });
         if (!response)
           return this.skip({
             reason: "classifier_provider_unavailable",
