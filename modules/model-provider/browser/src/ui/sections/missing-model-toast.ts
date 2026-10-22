@@ -1,4 +1,4 @@
-import { reportUiFailure } from "@langwatch/browser-host/toaster";
+import { showErrorToast } from "@langwatch/browser-host/errors";
 import { toaster } from "@langwatch/design-system/toaster";
 
 /**
@@ -98,7 +98,7 @@ export function showAiCallFailedToast(info: AiCallFailedInfo): void {
   const roleLabel = ROLE_LABEL[info.role];
   const href = settingsHref(info);
 
-  reportUiFailure({
+  showErrorToast({
     id,
     error: {
       code: "ai_call_failed",
@@ -162,7 +162,7 @@ export function showProviderDisabledToast(info: ProviderDisabledInfo): void {
   const swapAvailable = info.alternate?.providerEnabled === true && info.onSwapToAlternate;
   const altSummary = info.alternate ? info.alternate.model : null;
 
-  reportUiFailure({
+  showErrorToast({
     id,
     error: {
       code: "model_default_provider_disabled",

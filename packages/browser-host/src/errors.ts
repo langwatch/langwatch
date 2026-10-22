@@ -5,7 +5,7 @@
 import { explainAnyError } from "@langwatch/handled-error/presentation";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 
-import type { UiFailureAction } from "./capabilities.ts";
+import { type UiFailureAction, UiHostServiceUnavailableError } from "./capabilities.ts";
 import { currentUiFeedbackHost } from "./toaster.ts";
 
 /** The generic line, for a failure the registry has nothing specific to say about. */
@@ -43,6 +43,8 @@ export type ShowErrorToastOptions = {
   action?: UiFailureAction;
   /** Toast id, for deduping repeated failures of the same action. */
   id?: string;
+  /** Stays on screen until the reader acts: for a failure only the offered action clears. */
+  sticky?: boolean;
 };
 
 /**
@@ -60,13 +62,20 @@ export function showErrorToast({ error, ...options }: ShowErrorToastOptions): vo
     console.warn("A failure was reported with no feedback host mounted:", options.fallbackTitle);
     return;
   }
-  host.failed({
-    error,
-    fallbackTitle: options.fallbackTitle ?? UNNAMED_FAILURE_TITLE,
-    description: options.description,
-    action: options.action,
-    id: options.id,
-  });
+  try {
+    host.failed({
+      error,
+      fallbackTitle: options.fallbackTitle ?? UNNAMED_FAILURE_TITLE,
+      description: options.description,
+      action: options.action,
+      id: options.id,
+      sticky: options.sticky,
+    });
+  } catch (failure) {
+    // A composition with no feedback service mounts the unavailable stand-in: log, never throw.
+    if (!(failure instanceof UiHostServiceUnavailableError)) throw failure;
+    console.warn("A failure was reported with no feedback host mounted:", options.fallbackTitle);
+  }
 }
 
 /**

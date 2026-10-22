@@ -87,16 +87,28 @@ describe("no-failure-on-toaster", () => {
     });
   });
 
-  describe("when the file is a test or lives in apps/ui", () => {
-    /** @scenario "Code outside feature-web modules is not governed" */
+  describe("when the file lives in apps/ui or a shared package", () => {
+    /** @scenario "The app shell and shared packages are governed too" */
+    it("reports each", () => {
+      const code = `${IMPORT}toaster.error({ title: "x" });`;
+
+      expect(failures(code, "apps/ui/src/panel.tsx")).toHaveLength(1);
+      expect(failures(code, "packages/browser/src/shell.tsx")).toHaveLength(1);
+    });
+  });
+
+  describe("when the file is a test or belongs to the toaster's own packages", () => {
+    /** @scenario "Tests and the toaster's own packages are not governed" */
     it("reports nothing", () => {
       const code = `${IMPORT}toaster.error({ title: "x" });`;
 
       expect(failures(code, "modules/agent/browser/src/ui/__tests__/panel.unit.test.tsx")).toEqual(
         [],
       );
-      expect(failures(code, "apps/ui/src/panel.tsx")).toEqual([]);
-      expect(moduleToasters("createToaster({});", "apps/ui/src/toaster.ts")).toEqual([]);
+      expect(failures(code, "packages/browser-host/src/ui-feedback.ts")).toEqual([]);
+      expect(
+        moduleToasters("createToaster({});", "packages/design-system/src/toaster.tsx"),
+      ).toEqual([]);
     });
   });
 

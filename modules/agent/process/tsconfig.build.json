@@ -24,6 +24,9 @@
   ],
   "references": [
     {
+      "path": "../../api-key/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../workflow/contract/tsconfig.build.json"
     },
     {
@@ -91,7 +94,6 @@
   "nx": {
     "sync": {
       "ignoredDependencies": [
-        "@langwatch/api-key-contract",
         "@langwatch/module",
         "@langwatch/secrets",
         "@langwatch/task",

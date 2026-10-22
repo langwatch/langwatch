@@ -504,6 +504,17 @@ function nameOfHolder(holder) {
   return undefined;
 }
 
+// The mail templates' local preview shows a developer the render error; no customer sees it.
+const DEVELOPER_TOOLS = /^packages\/mail\/preview\//;
+
+/** Browser code, plus every package: a shared component renders to the customer too. */
+function isGovernedUiCode(file) {
+  if (isBrowserCode(file)) return true;
+  if (file.isTest) return false;
+
+  return file.workspacePath.startsWith("packages/") && !DEVELOPER_TOOLS.test(file.workspacePath);
+}
+
 /** How a finding names the place the raw message reaches. */
 function sinkLabel({ isToast, isFormSetError, name }) {
   if (isToast) return "a toast";
@@ -514,7 +525,7 @@ function sinkLabel({ isToast, isFormSetError, name }) {
 export const noRawErrorMessageInUiRule = defineRule({
   name: "no-raw-error-message-in-ui",
   kind: "problem",
-  applies: (file) => isBrowserCode(file),
+  applies: (file) => isGovernedUiCode(file),
   messages: {
     rawErrorMessage: {
       what: "`{{expression}}` reaches the customer through {{sink}}.",

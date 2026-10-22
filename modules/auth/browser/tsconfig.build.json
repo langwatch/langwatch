@@ -21,6 +21,9 @@
   ],
   "references": [
     {
+      "path": "../../user/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/time/tsconfig.build.json"
     },
     {
@@ -60,7 +63,6 @@
       "ignoredDependencies": [
         "@langwatch/config",
         "@langwatch/feature-flag-client",
-        "@langwatch/user-contract",
         "@langwatch/vitest-config"
       ]
     }

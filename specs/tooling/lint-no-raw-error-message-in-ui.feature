@@ -82,6 +82,18 @@ Feature: The no-raw-error-message-in-ui lint rule
     Then it reports nothing
 
   @unit
+  Scenario: A shared package's component is governed like browser code
+    Given a package file that renders an error's message
+    When the no-raw-error-message-in-ui rule runs over it
+    Then it reports rawErrorMessage
+
+  @unit
+  Scenario: The mail templates' local preview is not governed
+    Given the mail preview renders a render error's message to the developer
+    When the no-raw-error-message-in-ui rule runs over it
+    Then it reports nothing
+
+  @unit
   Scenario: A finding says what to do instead
     Given a browser file that renders an error's message
     When the no-raw-error-message-in-ui rule runs over it

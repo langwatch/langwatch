@@ -79,14 +79,6 @@ function deliver({
   }
 }
 
-/** Reports a failure straight to the mounted host, for a feature that holds no toast of its own. */
-export function reportUiFailure(failure: UiFailureNotice): void {
-  deliver({
-    title: failure.title ?? failure.fallbackTitle,
-    send: (host) => host.failed(failure),
-  });
-}
-
 /** The host a report goes to, for the error module next door. */
 export function currentUiFeedbackHost(): UiFeedbackSink | undefined {
   return mounted;

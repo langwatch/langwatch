@@ -121,11 +121,6 @@ export function callTimeoutMsFor({ declared }: { declared: number | null | undef
   return Math.min(declared ?? DEFAULT_CALL_TIMEOUT_MS, MAX_CALL_TIMEOUT_MS);
 }
 
-/** The most any one agent call may take, in milliseconds, whatever the agent declared. */
-export function maxCallTimeoutMs(): number {
-  return MAX_CALL_TIMEOUT_MS;
-}
-
 /**
  * How long a caller waits before it retries a busy agent: the delay the agent asked for, or
  * the owner's default when it asked for none or for something unusable.

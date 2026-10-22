@@ -37,8 +37,14 @@ Feature: The no-failure-on-toaster and no-module-toaster lint rules
     Then it reports nothing
 
   @unit
-  Scenario: Code outside feature-web modules is not governed
-    Given a test file and an apps/ui file that raise a failure on the toaster
+  Scenario: The app shell and shared packages are governed too
+    Given an apps/ui file and a package file that raise a failure on the toaster
+    When the no-failure-on-toaster rule runs over them
+    Then it reports each
+
+  @unit
+  Scenario: Tests and the toaster's own packages are not governed
+    Given a test file, a browser-host file and a design-system file that raise a failure on the toaster
     When the toaster rules run over them
     Then they report nothing
 

@@ -15,7 +15,7 @@ type TraceIngestAllowanceOptions = Readonly<{
 
 /** Whether an ingest door's allowance refused the batch with the plan limit. */
 function isPlanLimitRefusal(error: unknown): error is HandledError {
-  return HandledError.isHandled(error) && PlanLimitExceededError.is(error);
+  return PlanLimitExceededError.is(error);
 }
 
 export class TraceIngestAllowanceService {

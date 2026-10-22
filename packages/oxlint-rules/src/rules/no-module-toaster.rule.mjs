@@ -1,5 +1,5 @@
 import { defineRule } from "../define-rule.mjs";
-import { isErrorToastType, isFeatureWebCode } from "../toaster-shapes.mjs";
+import { isErrorToastType, isToasterGovernedCode } from "../toaster-shapes.mjs";
 
 // A feature-web module carries no toaster of its own. A renderer built with `createToaster` is a
 // second toast surface the composing application never mounts, so whatever it shows nobody sees.
@@ -22,7 +22,7 @@ function exportsToaster(node) {
 export const noModuleToasterRule = defineRule({
   name: "no-module-toaster",
   kind: "problem",
-  applies: (file) => isFeatureWebCode(file),
+  applies: (file) => isToasterGovernedCode(file),
   messages: {
     ownRenderer: {
       what: "This module builds a toast renderer of its own with `createToaster`.",

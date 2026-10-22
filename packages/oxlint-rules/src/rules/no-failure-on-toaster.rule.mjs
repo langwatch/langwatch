@@ -1,5 +1,5 @@
 import { defineRule } from "../define-rule.mjs";
-import { isErrorToastType, isFeatureWebCode } from "../toaster-shapes.mjs";
+import { isErrorToastType, isToasterGovernedCode } from "../toaster-shapes.mjs";
 
 // A feature-web module must not raise a failure straight onto the Design System toaster: use the
 // host port (`showErrorToast`, `host.failed`). Once a file imports the toaster, every
@@ -80,7 +80,7 @@ function isRaisedOnToaster({ candidate, state }) {
 export const noFailureOnToasterRule = defineRule({
   name: "no-failure-on-toaster",
   kind: "problem",
-  applies: (file) => isFeatureWebCode(file),
+  applies: (file) => isToasterGovernedCode(file),
   messages: {
     failureOnToaster: {
       what: "This module raises a failure on the Design System toaster directly.",

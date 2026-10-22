@@ -113,7 +113,6 @@ function serviceFor(options: {
       nlpServiceUrl: "http://langwatch_nlp:5561",
       legacyDefaultModel: "openai/gpt-5-mini",
     },
-    maxCallTimeoutMs: 300_000,
   });
   return { service, queueRun, callConnected };
 }
@@ -233,8 +232,8 @@ describe("AgentTestService.sendTurn", () => {
 
   describe("given an HTTP agent that never answers", () => {
     /** @scenario "A turn that outlives the call deadline is failed" */
-    it("fails with agent_call_timeout at the platform cap", async () => {
-      runTurn.mockResolvedValue({ success: false, error: "no answer", timeoutMs: 300_000 });
+    it("fails with agent_call_timeout at the agent's call budget", async () => {
+      runTurn.mockResolvedValue({ success: false, error: "no answer", timeoutMs: 120_000 });
       const { service } = serviceFor({});
 
       const pending = service.sendTurn({
@@ -247,8 +246,28 @@ describe("AgentTestService.sendTurn", () => {
       await expect(pending).rejects.toMatchObject({ code: "agent_call_timeout" });
       expect(runTurn).toHaveBeenCalledWith(
         expect.objectContaining({
-          job: expect.objectContaining({ kind: "agent-test-turn", timeoutMs: 300_000 }),
+          job: expect.objectContaining({ kind: "agent-test-turn", timeoutMs: 120_000 }),
         }),
+      );
+    });
+  });
+
+  describe("given an HTTP agent that declares its own timeout", () => {
+    /** @scenario "A turn's deadline is the timeout the agent declared" */
+    it("gives the turn that timeout", async () => {
+      runTurn.mockResolvedValue({ success: true, output: "pong", durationMs: 12 });
+      const { service } = serviceFor({});
+      const agent = httpAgent();
+
+      await service.sendTurn({
+        projectId: "proj_1",
+        agent: { ...agent, config: { ...agent.config, timeoutMs: 30_000 } } as AgentWithFields,
+        message: "ping",
+        actor,
+      });
+
+      expect(runTurn).toHaveBeenCalledWith(
+        expect.objectContaining({ job: expect.objectContaining({ timeoutMs: 30_000 }) }),
       );
     });
   });
@@ -282,7 +301,7 @@ describe("AgentTestService.sendTurn", () => {
           executeSyncRoute: { mode: "relay", relayBaseUrl: "http://app:5560" },
           parameters: {},
           message: "ping",
-          timeoutMs: 300_000,
+          timeoutMs: 120_000,
           nlpTimeouts: { maxTimeoutMs: 90_000 },
         },
         environment: {

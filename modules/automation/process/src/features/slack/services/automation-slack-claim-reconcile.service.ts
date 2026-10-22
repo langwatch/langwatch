@@ -1,5 +1,4 @@
 import type { Trigger } from "@langwatch/automation-contract";
-import { HandledError } from "@langwatch/handled-error";
 import {
   type SlackApi,
   type SlackConnectionClaim,
@@ -64,7 +63,7 @@ function holdsClaim({
 }
 
 function isUnusableConnection(error: unknown): boolean {
-  return HandledError.isHandled(error) && SlackIntegrationMissingError.is(error);
+  return SlackIntegrationMissingError.is(error);
 }
 
 /**

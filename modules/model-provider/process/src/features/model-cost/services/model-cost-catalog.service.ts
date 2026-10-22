@@ -1,4 +1,3 @@
-import { HandledError } from "@langwatch/handled-error";
 import { modelCostListInputSchema, type ModelCost } from "@langwatch/model-provider-contract";
 import { ProjectNotFoundError } from "@langwatch/project-contract";
 
@@ -29,7 +28,7 @@ export class ModelCostCatalogService {
       .getProjectScopes(projectId)
       .then((projectScopes) => this.costs.findForProject(projectScopes))
       .catch((error: unknown) => {
-        if (HandledError.isHandled(error) && ProjectNotFoundError.is(error)) return [];
+        if (ProjectNotFoundError.is(error)) return [];
         throw error;
       });
   }

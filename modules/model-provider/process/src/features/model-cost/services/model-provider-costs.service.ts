@@ -1,4 +1,3 @@
-import { HandledError } from "@langwatch/handled-error";
 import {
   estimateModelCost,
   ModelCostNotFoundError,
@@ -105,8 +104,7 @@ export class ModelProviderCostsService {
     const organizationId = await this.options.scopes
       .getAnchorOrganizationId({ projectId: parsed.projectId })
       .catch((error: unknown) => {
-        if (HandledError.isHandled(error) && ProjectNotFoundError.is(error))
-          throw new ModelCostNotFoundError();
+        if (ProjectNotFoundError.is(error)) throw new ModelCostNotFoundError();
         throw error;
       });
     if (organizationId !== existing.organizationId) {

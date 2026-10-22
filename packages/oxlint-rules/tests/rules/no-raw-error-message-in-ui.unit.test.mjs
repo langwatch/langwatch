@@ -199,6 +199,28 @@ describe("given a file that is not browser code", () => {
       expect(report(code, "modules/agent/browser/src/ui/__tests__/panel.test.tsx")).toEqual([]);
     });
   });
+
+  describe("when a shared package renders the message", () => {
+    /** @scenario "A shared package's component is governed like browser code" */
+    it("reports rawErrorMessage", () => {
+      const code =
+        "function P() { try { run(); } catch (error) { return <p>{error.message}</p>; } }";
+
+      expect(
+        report(code, "packages/design-system/src/panel.tsx").map((finding) => finding.messageId),
+      ).toEqual(["rawErrorMessage"]);
+    });
+  });
+
+  describe("when the mail templates' local preview renders it", () => {
+    /** @scenario "The mail templates' local preview is not governed" */
+    it("reports nothing", () => {
+      const code =
+        "function P() { try { run(); } catch (error) { return <p>{error.message}</p>; } }";
+
+      expect(report(code, "packages/mail/preview/main.tsx")).toEqual([]);
+    });
+  });
 });
 
 describe("given a finding", () => {

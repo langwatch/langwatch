@@ -273,15 +273,20 @@ Feature: Test agent with one scripted run
       Then the turn is refused as scenario_parameter_option_invalid
       And no instance is reached
 
-  Rule: A turn answers inside the platform call deadline
+  Rule: A turn answers inside the agent's call budget
 
-    # Every kind of agent answers inside the same ceiling the connected path
-    # clamps its call budget to. An HTTP agent carries no timeout of its own,
-    # and a code agent can carry one far above the cap, so the deadline is
-    # held here rather than left to the agent.
+    # Every kind of agent answers inside the budget the agent module gives a
+    # call: the timeout the agent declared, else the default, never above the
+    # platform cap. A simulation's call to a connected agent takes the same one.
 
     @unit
     Scenario: A turn that outlives the call deadline is failed
       Given an HTTP agent that never answers
       When a test turn is sent to it
-      Then the turn fails with agent_call_timeout at the platform cap
+      Then the turn fails with agent_call_timeout at the agent's call budget
+
+    @unit
+    Scenario: A turn's deadline is the timeout the agent declared
+      Given an HTTP agent that declares a 30 second timeout
+      When a test turn is sent to it
+      Then the turn is given 30 seconds

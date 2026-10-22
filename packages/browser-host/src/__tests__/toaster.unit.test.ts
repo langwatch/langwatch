@@ -5,7 +5,7 @@ import {
   type UiSuccessNotice,
   UNAVAILABLE_UI_FEEDBACK,
 } from "../capabilities.ts";
-import { reportUiFailure, setUiFeedbackHost, toaster } from "../toaster.ts";
+import { setUiFeedbackHost, toaster } from "../toaster.ts";
 
 function recordingHost() {
   const succeeded: UiSuccessNotice[] = [];
@@ -108,49 +108,6 @@ describe("toaster", () => {
 
       expect(() => toaster.create(toast)).not.toThrow();
       expect(warn).toHaveBeenCalledWith(expect.any(String), toast.title);
-    });
-  });
-});
-
-describe("reportUiFailure", () => {
-  describe("when a feedback host is mounted", () => {
-    it("hands it the failure untouched", () => {
-      const { failed, host } = recordingHost();
-      setUiFeedbackHost(host);
-
-      reportUiFailure({ error: new Error("x"), fallbackTitle: "Model unavailable", sticky: true });
-
-      expect(failed).toHaveLength(1);
-      expect(failed[0]?.sticky).toBe(true);
-    });
-  });
-
-  describe("when no feedback host is mounted", () => {
-    /** @scenario A report with no working feedback host is logged, never thrown */
-    it("warns with the failure's title and does not throw", () => {
-      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-
-      expect(() =>
-        reportUiFailure({ error: new Error("x"), fallbackTitle: "Model unavailable" }),
-      ).not.toThrow();
-      expect(warn).toHaveBeenCalledWith(expect.any(String), "Model unavailable");
-    });
-  });
-
-  describe("when the mounted host is the unavailable stand-in", () => {
-    /** @scenario A report with no working feedback host is logged, never thrown */
-    it("warns with the failure's title and does not throw", () => {
-      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-      setUiFeedbackHost(UNAVAILABLE_UI_FEEDBACK);
-
-      expect(() =>
-        reportUiFailure({
-          error: new Error("x"),
-          fallbackTitle: "Model unavailable",
-          title: "Gone",
-        }),
-      ).not.toThrow();
-      expect(warn).toHaveBeenCalledWith(expect.any(String), "Gone");
     });
   });
 });
