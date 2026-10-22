@@ -147,6 +147,7 @@ describe("the tasks process installation", () => {
       const names = runtime.tasks(isTask).map((task) => task.name);
       expect(names).toEqual([
         "clear-stale-pending-sso-setup",
+        "require-password-reset",
         "slack-alert",
         "tiered-free-to-seat-event",
         "stripe-prices-sync",
@@ -163,7 +164,6 @@ describe("the tasks process installation", () => {
         "request-system-migrations-pass",
         "topic-clustering-run",
         "user-data-erase",
-        "require-password-reset",
         "webhook-signature-vectors",
       ]);
     } finally {

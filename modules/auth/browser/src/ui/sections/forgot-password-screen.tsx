@@ -30,11 +30,9 @@ export default function ForgotPassword() {
 
 function ForgotPasswordScreen() {
   const publicEnv = usePublicEnv();
-  // The sign-in step hands over the address just typed, in the fragment; read
-  // at first paint to prefill the field, then taken out of the address bar.
+  // The sign-in step hands over the address just typed, in the fragment, read at first paint.
   const [carriedEmail] = useState(readCarriedEmail);
   const [resetRequired] = useState(readCarriedResetRequirement);
-  useEffect(forgetCarriedEmail, []);
 
   if (!publicEnv.data) {
     return null;
@@ -80,6 +78,8 @@ function ForgotPasswordForm({
   carriedEmail: string | undefined;
   resetRequired: boolean;
 }) {
+  // Only the form takes the address back out of the address bar, having prefilled it.
+  useEffect(forgetCarriedEmail, []);
   const form = useForm<z.infer<typeof forgotPasswordSchema>>({
     resolver: zodResolver(forgotPasswordSchema),
     defaultValues: { email: carriedEmail ?? "" },

@@ -385,7 +385,7 @@ export class PrismaUserRepository
     const rows = await this.prisma.user.findMany({
       where: {
         accounts: { some: { provider: CREDENTIAL_PROVIDER, password: { not: null } } },
-        ...(emails === null ? {} : { email: { in: emails.map((email) => email.toLowerCase()) } }),
+        ...(emails === null ? {} : { email: { in: [...emails], mode: "insensitive" as const } }),
       },
       select: { id: true, email: true, passwordResetRequiredAt: true },
       orderBy: { id: "asc" },

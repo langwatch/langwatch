@@ -6,9 +6,9 @@ import { signIn } from "./auth-client.tsx";
 const PASSWORD_RESET_REQUIRED = "identity_password_reset_required";
 
 /**
- * Password attempt with four outcomes. A refused credential for an address
- * the router says nobody holds becomes a sign-up; nothing is mailed here.
- * A correct password that owes a second factor is a challenge, not a session.
+ * Password attempt with five outcomes. A refused credential for an unheld address becomes a
+ * sign-up; nothing is mailed here. A correct password owing a second factor is a challenge, and
+ * one marked for a reset sends the person to choose a new password.
  */
 export type CredentialAttempt =
   | { outcome: "signed_in" }

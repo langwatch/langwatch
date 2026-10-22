@@ -193,7 +193,6 @@ describe("ForgotPassword page", () => {
       expect(screen.getByText(/choose a new password/i)).toBeTruthy();
       expect(screen.getByText(/need to set a new password before you can sign in/i)).toBeTruthy();
       expect(screen.getByText(/contact your administrator/i)).toBeTruthy();
-      expect(window.location.hash).toBe("");
       window.history.replaceState(null, "", "/");
     });
   });

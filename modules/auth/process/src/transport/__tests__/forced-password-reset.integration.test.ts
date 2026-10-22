@@ -22,8 +22,29 @@ const EMAIL = "holder@company.test";
 const OLD_PASSWORD = "the-old-password-1";
 const NEW_PASSWORD = "the-new-password-2";
 
-async function markedHolder() {
+/** Every lockout call the after-hook makes, by address. */
+function recordingLockout() {
+  const calls: { kind: "failure" | "success"; identifier: string }[] = [];
+  return {
+    calls,
+    counter: {
+      refuseIfLockedOut: async () => undefined,
+      recordFailure: async ({ identifier }: { identifier: string }) => {
+        calls.push({ kind: "failure", identifier });
+      },
+      recordSuccess: async ({ identifier }: { identifier: string }) => {
+        calls.push({ kind: "success", identifier });
+      },
+    },
+  };
+}
+
+async function markedHolder({
+  marked = true,
+  twoStep = false,
+}: { marked?: boolean; twoStep?: boolean } = {}) {
   const memory = MemoryAuthDatabase.create();
+  const lockout = recordingLockout();
   const userId = `user-${randomUUID()}`;
   memory.db.User.push({
     id: userId,
@@ -31,7 +52,8 @@ async function markedHolder() {
     email: EMAIL,
     emailVerified: true,
     lastLoginAt: new Date(),
-    passwordResetRequiredAt: new Date(),
+    passwordResetRequiredAt: marked ? new Date() : null,
+    ...(twoStep ? { twoFactorEnabled: true } : {}),
     createdAt: new Date(),
     updatedAt: new Date(),
   });
@@ -48,8 +70,9 @@ async function markedHolder() {
 
   const sent: { email: string; token: string }[] = [];
   const transport = betterAuthTransportFor(
-    {},
+    { mfaEnrollmentOpen: twoStep },
     {
+      signInLockout: lockout.counter,
       storage: memoryAdapter(memory.db),
       database: MemoryBetterAuthHooksRepository.create({ memory }),
       sendResetPassword: async (mail) => {
@@ -80,7 +103,7 @@ async function markedHolder() {
   };
   const mark = () => memory.db.User.find((user) => user.id === userId)?.passwordResetRequiredAt;
 
-  return { memory, post, sent, mark };
+  return { memory, post, sent, mark, lockout };
 }
 
 describe("a password marked as requiring a reset", () => {
@@ -106,5 +129,42 @@ describe("a password marked as requiring a reset", () => {
 
     const newPassword = await post("/sign-in/email", { email: EMAIL, password: NEW_PASSWORD });
     expect(newPassword).toMatchObject({ status: 200 });
+  });
+});
+
+describe("a marked password with two-step verification turned on", () => {
+  /** @scenario "A marked user who holds a second factor is refused before the challenge" */
+  it("is refused with the reset code and no two-step challenge is started", async () => {
+    const control = await markedHolder({ marked: false, twoStep: true });
+    const challenged = await control.post("/sign-in/email", {
+      email: EMAIL,
+      password: OLD_PASSWORD,
+    });
+    expect(challenged).toBeInstanceOf(Response);
+    expect(await (challenged as Response).json()).toMatchObject({ twoFactorRedirect: true });
+    expect(control.memory.db.VerificationToken.length).toBeGreaterThan(0);
+
+    const { memory, post } = await markedHolder({ twoStep: true });
+    const refused = await post("/sign-in/email", { email: EMAIL, password: OLD_PASSWORD });
+
+    expect(refused).toMatchObject({ code: "identity_password_reset_required", httpStatus: 403 });
+    expect(memory.db.Session).toEqual([]);
+    expect(memory.db.VerificationToken).toEqual([]);
+  });
+});
+
+describe("the sign-in lockout for a marked password", () => {
+  /** @scenario "A correct but marked password does not count toward the sign-in lockout" */
+  it("does not count a correct but marked password as a failed attempt", async () => {
+    const { post, lockout } = await markedHolder();
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const refused = await post("/sign-in/email", { email: EMAIL, password: OLD_PASSWORD });
+      expect(refused).toMatchObject({ code: "identity_password_reset_required" });
+    }
+    expect(lockout.calls).toEqual([]);
+
+    await post("/sign-in/email", { email: EMAIL, password: "a-wrong-password" });
+    expect(lockout.calls).toEqual([{ kind: "failure", identifier: EMAIL }]);
   });
 });

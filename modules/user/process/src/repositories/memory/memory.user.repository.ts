@@ -213,7 +213,9 @@ export class MemoryUserRepository implements UserRepository {
     const wanted = emails === null ? null : new Set(emails.map((email) => email.toLowerCase()));
     return this.#database
       .rows()
-      .filter((row) => (wanted === null ? true : row.email !== null && wanted.has(row.email)))
+      .filter((row) =>
+        wanted === null ? true : row.email !== null && wanted.has(row.email.toLowerCase()),
+      )
       .filter((row) => Boolean(this.#credentialAccount(row.id)?.password))
       .map((row) => ({
         id: row.id,

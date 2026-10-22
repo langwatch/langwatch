@@ -1,4 +1,4 @@
-import { HandledError } from "@langwatch/handled-error";
+import { HandledError, remediation } from "@langwatch/handled-error";
 import {
   IdentityCommandRefusedError,
   PasskeyCommandRefusedError,
@@ -227,6 +227,7 @@ export class IdentityPasswordResetRequiredError extends IdentityCommandRefusedEr
       httpStatus: 403,
       fault: "customer",
       reasons: [new Error(detail)],
+      ...remediation("identity_password_reset_required"),
     });
     this.name = "IdentityPasswordResetRequiredError";
   }

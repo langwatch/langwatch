@@ -6,8 +6,10 @@ Feature: Force a password reset for a set of users
   because the reset replaced it. Sign-in methods that do not use the password
   (single sign-on, social providers, passkeys) are not affected.
 
-  The mark is User.passwordResetRequiredAt, set by the require-password-reset
-  task and cleared by any password write that replaces the stored hash.
+  The mark is User.passwordResetRequiredAt. The auth module's
+  require-password-reset task sets it through the user module and ends the
+  marked users' browser sessions; any password write that replaces the stored
+  hash clears it.
 
   # --- Sign-in ---
 
@@ -18,7 +20,7 @@ Feature: Force a password reset for a set of users
     Then no session is created
     And the refusal carries the code PASSWORD_RESET_REQUIRED
 
-  @unit
+  @integration
   Scenario: A marked user who holds a second factor is refused before the challenge
     Given a marked user who has two-step verification turned on
     When they sign in with their email and correct password
@@ -49,6 +51,13 @@ Feature: Force a password reset for a set of users
     When they sign in with a wrong password
     Then the refusal is the handled error "identity_sign_in_refused" with status 401
     And nothing says that a reset is required
+
+  @integration
+  Scenario: A correct but marked password does not count toward the sign-in lockout
+    Given a user whose password is marked as requiring a reset
+    When they sign in with their email and correct password several times
+    Then no failed attempt is recorded for their address
+    And a wrong password is still recorded as a failed attempt
 
   # --- Clearing the mark ---
 
@@ -99,8 +108,8 @@ Feature: Force a password reset for a set of users
 
   @integration
   Scenario: The task marks only the users named by email
-    Given several users with a credential password
-    When the operator runs require-password-reset with --email for one of them
+    Given several users with a credential password, one stored with capitals in its address
+    When the operator runs require-password-reset with --email for that one, in any case
     Then only that user is marked
 
   @integration
@@ -108,6 +117,20 @@ Feature: Force a password reset for a set of users
     Given users with a credential password
     When the operator runs require-password-reset with --all-credential-users --dry-run
     Then the task reports how many users would be marked
+    And no user is marked
+    And no session is ended
+
+  @unit
+  Scenario: Marking a user ends their sessions
+    Given users with a credential password, one of them marked by an earlier run
+    When the operator runs require-password-reset for them
+    Then every matched user's browser sessions are ended
+    And the task reports how many users had their sessions ended
+
+  @unit
+  Scenario: A misspelled flag is refused before anyone is marked
+    When the operator runs require-password-reset with --all-credential-users --dryrun
+    Then the task fails naming the unknown argument
     And no user is marked
 
   @integration

@@ -167,10 +167,7 @@ describe("the before-session-create hook", () => {
       })(sessionFor("user-1"), createApiFixture<MintContext>({ path }));
 
     /** @scenario "A correct password for a marked user opens no session" */
-    /** @scenario "A marked user who holds a second factor is refused before the challenge" */
     it("refuses the password session with the code the sign-in screen reads", async () => {
-      // The two-step plugin replaces this session with its challenge only after it exists,
-      // so refusing it here also refuses the challenge.
       await expect(mintOn("/sign-in/email")).rejects.toMatchObject({
         body: { code: "PASSWORD_RESET_REQUIRED" },
       });

@@ -52,7 +52,7 @@ export function betterAuthTransportFor(
 ) {
   return createBetterAuthTransport({
     auth: {} as never,
-    /** A completed reset lifts the forced-reset mark; nothing else is read unless a test says so. */
+    /** A completed reset lifts the forced-reset mark; nothing else is read unless a test asks. */
     database: createApiFixture<BetterAuthHooksRepository>({
       clearPasswordResetRequirement: async () => undefined,
     }),

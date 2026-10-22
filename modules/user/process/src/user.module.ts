@@ -10,7 +10,6 @@ import {
   UserAddressLowerCaseService,
   userAddressLowerCaseReportSchema,
 } from "./services/user-address-lower-case.service.ts";
-import { RequirePasswordResetTask } from "./tasks/require-password-reset.task.ts";
 import { createGdprUserDataEraseRunner } from "./tasks/user-data-erase.task.ts";
 import { meRest } from "./transport/me.rest.ts";
 import { userAvatarRest } from "./transport/user-avatar.rest.ts";
@@ -25,7 +24,6 @@ export const userProcessModule: PublishedProcessModule<"user", UserApi, UserServ
     .withEventing(userLifecycleEventing)
     .withTasks(({ repositories }) => [
       createGdprUserDataEraseRunner({ repository: repositories.dataErase }),
-      RequirePasswordResetTask.create({ users: repositories.users }),
     ])
     .withMigrations(({ app, repositories }) => [
       defineMigrationStep({
