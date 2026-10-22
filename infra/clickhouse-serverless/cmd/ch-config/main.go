@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -76,16 +78,43 @@ func sidecar(log *zap.Logger, outputDir string) {
 	if accessFile == "" {
 		log.Fatal("CLICKHOUSE_ACCESS_FILE is required in sidecar mode")
 	}
+	listen := os.Getenv("CLICKHOUSE_ACCESS_LISTEN")
+	if listen == "" {
+		listen = "127.0.0.1:8124"
+	}
+	if err := access.ValidateListen(listen); err != nil {
+		log.Fatal("invalid listen address", zap.Error(err))
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 
+	verifier := &access.Verifier{Now: time.Now, Log: log}
 	syncer := &access.Syncer{
 		AccessFile: accessFile,
 		UsersD:     filepath.Join(outputDir, "users.d"),
 		Log:        log,
 		Now:        time.Now,
+		OnLoad:     func(f *access.File) { verifier.SetFile(ctx, f) },
 	}
-	log.Info("access sidecar started", zap.String("access_file", accessFile))
+
+	server := &http.Server{
+		Addr:              listen,
+		Handler:           verifier.Handler(),
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      10 * time.Second,
+		MaxHeaderBytes:    64 << 10,
+	}
+	go func() {
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatal("token verifier stopped", zap.Error(err))
+		}
+	}()
+	log.Info("access sidecar started", zap.String("access_file", accessFile), zap.String("listen", listen))
 	syncer.Run(ctx)
+
+	shutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_ = server.Shutdown(shutdown)
 }
