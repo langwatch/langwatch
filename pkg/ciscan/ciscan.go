@@ -72,18 +72,10 @@ func lastLine(node *yaml.Node) int {
 	return last
 }
 
-// Grants reports whether the block grants scope at level, which honors the
-// write-all shorthand (and read-all for a read grant).
-func (p Permissions) Grants(scope, level string) bool {
-	switch p.Shorthand {
-	case "write-all":
-		return true
-	case "read-all":
-		return level == "read"
-	}
-	granted := p.Scopes[scope]
-
-	return granted == level || (level == "read" && granted == "write")
+// GrantsWrite reports whether the block grants write on scope, counting the
+// write-all shorthand.
+func (p Permissions) GrantsWrite(scope string) bool {
+	return p.Shorthand == "write-all" || p.Scopes[scope] == "write"
 }
 
 // Declared reports whether a permissions block was written at all.

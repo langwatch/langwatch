@@ -15,8 +15,9 @@ import (
 // storedAWSKey matches a long-lived AWS key read from secrets, env or vars,
 // or passed as configure-aws-credentials' aws-access-key-id input. A shell
 // `$AWS_ACCESS_KEY_ID` is a session the job already holds, so it is ignored.
+// Case-insensitive, because GitHub resolves context names case-insensitively.
 var storedAWSKey = regexp.MustCompile(
-	`\b(?:secrets|env|vars)\.[A-Z0-9_]*AWS_(?:ACCESS_KEY_ID|SECRET_ACCESS_KEY)\b|^\s*-?\s*aws-access-key-id\s*:`,
+	`(?i)\b(?:secrets|env|vars)\.[A-Z0-9_]*AWS_(?:ACCESS_KEY_ID|SECRET_ACCESS_KEY)\b|^\s*-?\s*aws-access-key-id\s*:`,
 )
 
 // gateTerm matches one `&&` term of a fallback step's `if:` that holds only
@@ -245,7 +246,7 @@ func fallbackProblem(workflow *ciscan.Workflow, jobName, gateVar string) string 
 		return fmt.Sprintf("stored-key fallback has no separate step in the same job assuming vars.%s by OIDC "+
 			"(configure-aws-credentials with role-to-assume, `if: vars.%s != ''`, and no stored key)", gateVar, gateVar)
 	}
-	if !workflow.EffectivePermissions(jobName).Grants("id-token", "write") {
+	if !workflow.EffectivePermissions(jobName).GrantsWrite("id-token") {
 		return "the OIDC twin needs `id-token: write` in the job's effective permissions " +
 			"(a job-level permissions block replaces the workflow-level one)"
 	}

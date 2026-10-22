@@ -98,6 +98,17 @@ func TestStaticCloudKeysRejectsAKeyInJobEnv(t *testing.T) {
 	assert.NotEmpty(t, problems)
 }
 
+// @scenario "A workflow that reads a stored AWS key fails CI"
+func TestStaticCloudKeysIgnoresCase(t *testing.T) {
+	lower := strings.Replace(oidcOnlyWorkflow, "      - run: aws s3 ls", "      - env:\n          K: ${{ secrets.matrix_aws_access_key_id }}\n        run: aws s3 ls", 1)
+
+	problems, err := ciguard.StaticCloudKeys(writeRepo(t, map[string]string{".github/workflows/other.yml": lower}))
+
+	require.NoError(t, err)
+	require.Len(t, problems, 1)
+	assert.Contains(t, problems[0], ".github/workflows/other.yml:18:")
+}
+
 // @scenario "A composite action that reads a stored AWS key fails CI"
 func TestStaticCloudKeysScansCompositeActions(t *testing.T) {
 	action := "runs:\n  using: composite\n  steps:\n    - uses: aws-actions/configure-aws-credentials@0000000000000000000000000000000000000000\n      with:\n        aws-access-key-id: ${{ inputs.key }}\n"
