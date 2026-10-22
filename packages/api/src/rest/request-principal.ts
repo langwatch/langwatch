@@ -1,6 +1,7 @@
 /**
  * Who a request acted as and where it came from, as its access record names them: ids and a
- * key kind only, never a key or a secret. Spec: specs/observability/request-log-client-and-principal.feature
+ * key kind only, never a key or a secret.
+ * Spec: specs/observability/request-log-client-and-principal.feature
  */
 import type { Actor } from "@langwatch/authorization";
 import type { Context } from "hono";
@@ -36,7 +37,7 @@ export function requestPrincipalOf({
   };
 }
 
-/** Leaves the principal for the logger; a principal that cannot be read is left out, never thrown. */
+/** Leaves the principal for the logger; a principal that cannot be read is left out, not thrown. */
 export function recordRequestPrincipal({
   context,
   read,
