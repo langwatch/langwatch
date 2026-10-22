@@ -1,8 +1,4 @@
-import {
-  isCacheRebuild,
-  splitLeadingContextBlocks,
-  type TranscriptEntry,
-} from "@langwatch/coding-agent-contract";
+import { splitLeadingContextBlocks, type TranscriptEntry } from "@langwatch/coding-agent-contract";
 
 /**
  * Per-call token composition from spans; answers "where" (not just "how much")
@@ -58,39 +54,52 @@ export interface CacheRebuildEvent {
   callIndex: number;
   atMs: number;
   cacheCreationTokens: number;
-  /** What the PREVIOUS call left in the cache (read plus written), the rebuild's yardstick. */
+  /** The whole prompt the PREVIOUS call sent, which the rebuild is measured against. */
+  previousContextTokens: number;
+  /** What the PREVIOUS call left in the cache (read plus written), shown as "reusing N cached". */
   previousCachedTokens: number;
   /** The nearest user message before this call — usually what caused the rebuild. */
   precedingPrompt: string | null;
 }
 
-/** The first call is never flagged: a cold cache isn't a rebuild. */
+/**
+ * A cache write costs MORE than a read, so a call whose `cacheCreationTokens`
+ * nears the previous call's cached context size is paying twice for the same
+ * tokens. The first call is never flagged — a cold cache isn't a rebuild.
+ */
+const REBUILD_RATIO_THRESHOLD = 0.5;
+const REBUILD_MIN_TOKENS = 1_000;
+
 export function findCacheRebuilds(entries: TranscriptEntry[]): CacheRebuildEvent[] {
   const events: CacheRebuildEvent[] = [];
+  let previousContextTokens = 0;
   let previousCachedTokens = 0;
   let callIndex = -1;
 
   for (const entry of entries) {
     if (entry.kind !== "model_call") continue;
     callIndex++;
+    const cachedTokens = modelCallCachedTokens(entry);
+    const contextTokens = modelCallContextTokens(entry);
+
     if (
       callIndex > 0 &&
-      isCacheRebuild({
-        previousCachedTokens,
-        cacheReadTokens: entry.cacheReadTokens,
-        cacheCreationTokens: entry.cacheCreationTokens,
-      })
+      entry.cacheCreationTokens >= REBUILD_MIN_TOKENS &&
+      previousContextTokens > 0 &&
+      entry.cacheCreationTokens / previousContextTokens >= REBUILD_RATIO_THRESHOLD
     ) {
       events.push({
         callIndex,
         atMs: entry.atMs,
         cacheCreationTokens: entry.cacheCreationTokens,
+        previousContextTokens,
         previousCachedTokens,
         precedingPrompt: nearestPrecedingPrompt(entries, entry.atMs),
       });
     }
 
-    previousCachedTokens = modelCallCachedTokens(entry);
+    previousContextTokens = contextTokens;
+    previousCachedTokens = cachedTokens;
   }
 
   return events;

@@ -16,6 +16,16 @@ export interface SessionSignal {
   detail: string;
 }
 
+/**
+ * A cache read costs a fraction of fresh input; re-CREATING it costs more,
+ * so creation tokens are what quietly cost money. Their ratio against reads
+ * says whether the session re-warmed repeatedly, or paid once at the start.
+ */
+const CACHE_CHURN_RATIO = 0.25;
+
+/** Below this there is nothing to say — a handful of tokens is not a story. */
+const MIN_CACHE_CREATION_TOKENS = 20_000;
+
 /** Waiting on a human for this long is friction worth surfacing. */
 const NOTABLE_BLOCKED_MS = 60_000;
 
@@ -69,20 +79,19 @@ const SIGNAL_RULES: readonly SignalRule[] = [
     detail: (row) =>
       `${formatShortDuration(row.retryMs)} went on retried requests — paid for, but produced nothing.`,
   },
-  // The expensive mistake, and the one no raw token count shows. Counted by the
-  // session fold's one rebuild rule, so writing new context on top of a full
-  // cache read never reads as a rebuild here.
+  // The expensive mistake, and the one no raw token count shows.
   {
     id: "cache-churn",
     tone: "warning",
-    applies: (row) => row.cacheRebuildCount > 0,
-    title: (row) =>
-      row.cacheRebuildCount === 1
-        ? "The cache was rebuilt"
-        : `The cache was rebuilt ${row.cacheRebuildCount}×`,
+    applies: (row) =>
+      row.cacheCreationTokens >= MIN_CACHE_CREATION_TOKENS &&
+      row.cacheReadTokens > 0 &&
+      row.cacheCreationTokens / row.cacheReadTokens >= CACHE_CHURN_RATIO,
+    title: () => "The cache kept being rebuilt",
     detail: (row) =>
-      `A model call re-sent what the cache already held instead of reading it (the largest ` +
-      `${formatCompact(row.largestCacheRebuildTokens)} tokens). Rebuilding costs more per token than reusing.`,
+      `Rebuilding the cache cost ${formatCompact(row.cacheCreationTokens)} tokens against ` +
+      `${formatCompact(row.cacheReadTokens)} reused — and rebuilding costs more per token than reusing. ` +
+      "A long session that keeps re-warming its cache pays for the same context repeatedly.",
   },
   {
     id: "compacted",

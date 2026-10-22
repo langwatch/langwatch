@@ -1,7 +1,6 @@
 import {
   AUXILIARY_SESSION_FACT,
   type CodingAgentSessionContextUsage,
-  isCacheRebuild,
   parseMcpToolName,
   type SessionWorkingContext,
 } from "@langwatch/coding-agent-contract";
@@ -168,6 +167,8 @@ const TITLE_RANK: Record<SessionTitleSource, number> = {
   name: 3,
 };
 const TRUNCATING_STOP_REASONS = new Set(["max_tokens", "refusal"]);
+const CACHE_REBUILD_RATIO_THRESHOLD = 0.5;
+const CACHE_REBUILD_MIN_TOKENS = 1_000;
 
 /**
  * Owns the bounded state transitions shared by span and log projections.
@@ -490,11 +491,10 @@ export class CodingAgentSessionStateProjection {
     // The first call is never a "rebuild" — there is nothing to reuse yet,
     // so a cold cache isn't the session's fault. `previousCallContextTokens`
     // starts at 0, which doubles as that gate.
-    const isRebuild = isCacheRebuild({
-      previousCachedTokens: next.previousCallContextTokens,
-      cacheReadTokens,
-      cacheCreationTokens,
-    });
+    const isRebuild =
+      next.previousCallContextTokens > 0 &&
+      cacheCreationTokens >= CACHE_REBUILD_MIN_TOKENS &&
+      cacheCreationTokens / next.previousCallContextTokens >= CACHE_REBUILD_RATIO_THRESHOLD;
 
     return {
       ...next,

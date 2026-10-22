@@ -835,37 +835,3 @@ describe("Copilot session context", () => {
     });
   });
 });
-
-describe("Copilot session cache rebuilds", () => {
-  // The call shapes of a real Copilot CLI session: three short calls, then a
-  // call that read the whole cache and wrote an 80K-token file on top.
-  const call = (startMs: number, cacheRead: number, cacheCreation: number) =>
-    cliChat({ startMs, input: 3, output: 20, cacheRead, cacheCreation, nanoAiUnits: "0" });
-  const [first, second, third, fourth, fifth] = [
-    call(1_000, 0, 14_327),
-    call(3_000, 14_327, 327),
-    call(6_000, 14_654, 140),
-    call(9_000, 14_654, 160),
-    call(12_000, 14_814, 80_016),
-  ];
-
-  describe("given the last call read every cached token and wrote a large file on top", () => {
-    describe("when the calls fold in the order they ran", () => {
-      /** @scenario "The session fold counts a rebuild only when the cache read fell" */
-      it("counts no cache rebuild", () => {
-        const row = foldSessions([first, second, third, fourth, fifth]).get(CLI_CONVERSATION);
-        expect(row?.cacheCreationTokens).toBe(94_970);
-        expect(row?.cacheRebuildCount).toBe(0);
-        expect(row?.largestCacheRebuildTokens).toBe(0);
-      });
-    });
-  });
-
-  describe("given a later call read none of the cache and wrote it again", () => {
-    it("still counts that call as a rebuild", () => {
-      const row = foldSessions([first, second, call(4_000, 0, 14_700)]).get(CLI_CONVERSATION);
-      expect(row?.cacheRebuildCount).toBe(1);
-      expect(row?.largestCacheRebuildTokens).toBe(14_700);
-    });
-  });
-});

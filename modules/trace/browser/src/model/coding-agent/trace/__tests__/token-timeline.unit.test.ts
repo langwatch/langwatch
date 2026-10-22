@@ -75,32 +75,26 @@ describe("findCacheRebuilds", () => {
         callIndex: 1,
         atMs: 2_000,
         cacheCreationTokens: 90_000,
-        previousCachedTokens: 100_000,
+        previousContextTokens: 100_000,
         precedingPrompt: "wait, actually undo that and start over",
       });
     });
   });
 
   describe("given a call that sent most of its prompt fresh", () => {
-    /** @scenario "A cache rebuild is measured against what the call before it left in the cache" */
-    it("measures the next call's rebuild against what the call before it cached", () => {
+    /** @scenario "A cache rebuild is measured against the whole prompt the call before it sent" */
+    it("measures the next call's rebuild against the whole prompt it sent", () => {
       const events = findCacheRebuilds([
         modelCall({ atMs: 1_000, inputTokens: 60_000, cacheReadTokens: 20_000 }),
         modelCall({ atMs: 2_000, cacheCreationTokens: 50_000 }),
       ]);
 
       expect(events).toHaveLength(1);
-      expect(events[0]).toMatchObject({ callIndex: 1, previousCachedTokens: 20_000 });
-    });
-
-    /** @scenario "A cache rebuild is measured against what the call before it left in the cache" */
-    it("flags no call when the next one read what was cached, however much it wrote", () => {
-      const events = findCacheRebuilds([
-        modelCall({ atMs: 1_000, inputTokens: 60_000, cacheReadTokens: 20_000 }),
-        modelCall({ atMs: 2_000, cacheReadTokens: 20_000, cacheCreationTokens: 50_000 }),
-      ]);
-
-      expect(events).toEqual([]);
+      expect(events[0]).toMatchObject({
+        callIndex: 1,
+        previousContextTokens: 80_000,
+        previousCachedTokens: 20_000,
+      });
     });
   });
 
@@ -112,27 +106,6 @@ describe("findCacheRebuilds", () => {
           atMs: 2_000,
           cacheReadTokens: 100_000,
           cacheCreationTokens: 2_000,
-        }),
-      ]);
-      expect(events).toEqual([]);
-    });
-  });
-
-  describe("given a call that read every cached token and wrote a large file on top", () => {
-    /** @scenario "The usage chart does not flag a large write on top of a full cache read" */
-    it("flags no call, since the context grew rather than being rebuilt", () => {
-      const events = findCacheRebuilds([
-        modelCall({
-          atMs: 1_000,
-          inputTokens: 3,
-          cacheReadTokens: 14_654,
-          cacheCreationTokens: 160,
-        }),
-        modelCall({
-          atMs: 2_000,
-          inputTokens: 3,
-          cacheReadTokens: 14_814,
-          cacheCreationTokens: 80_016,
         }),
       ]);
       expect(events).toEqual([]);

@@ -352,23 +352,6 @@ describe("SessionView", () => {
     });
   });
 
-  describe("given a session that wrote to the cache but counted no rebuild", () => {
-    /** @scenario "The Usage tab calls the session's cache writes written, not rebuilt" */
-    it("names the writes as written to the cache, with no cache miss", () => {
-      renderSession({
-        peakContextTokens: 94_833,
-        cacheReadTokens: 58_449,
-        cacheCreationTokens: 95_000,
-        cacheRebuildCount: 0,
-        largestCacheRebuildTokens: 0,
-      });
-
-      expect(screen.queryByText("Context rebuilt")).toBeNull();
-      expect(screen.getByText("Written to cache").parentElement).toHaveTextContent("95k");
-      expect(screen.getByText("Cache misses").parentElement).toHaveTextContent("0");
-    });
-  });
-
   describe("given a session that reported no context data", () => {
     it("shows a dash for peak context and cache misses, not zero", () => {
       renderSession({ peakContextTokens: 0, cacheRebuildCount: 0 });
