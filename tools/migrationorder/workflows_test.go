@@ -280,6 +280,12 @@ func TestCompatWorkflowBootsThePreviousReleaseImageNightly(t *testing.T) {
 		t.Error("no manual dispatch")
 	}
 	steps := workflow.Jobs["previous-release"].Steps
+	migrate := stepNamed(t, steps, "Migrate with head's tasks")
+	for _, key := range []string{"BASE_HOST", "NEXTAUTH_URL"} {
+		if got := migrate.Env[key]; got != "http://localhost:5560" {
+			t.Errorf("head's upgrade %s = %q, want http://localhost:5560", key, got)
+		}
+	}
 	if read := stepNamed(t, steps, "Read the previous release"); !strings.Contains(read.Run, "sort -V | tail -n 1") {
 		t.Errorf("the previous release is not the newest manifest:\n%s", read.Run)
 	}
