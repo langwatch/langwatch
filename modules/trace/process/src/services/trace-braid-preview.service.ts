@@ -1,5 +1,6 @@
 import {
   braidConditionTermsOf,
+  isSpanBraidGrant,
   narrowAuthorization,
   ownProjectIdReadBy,
   withoutSpanBraids,
@@ -23,9 +24,11 @@ import type {
   SpanTreeNode,
 } from "@langwatch/trace-contract";
 
-import type {
-  BraidActivityRead,
-  TraceBraidReadsRepository,
+import {
+  NO_BRAID_TRACE_COUNTS,
+  type BraidActivityRead,
+  type BraidWindowRead,
+  type TraceBraidReadsRepository,
 } from "../repositories/trace-braid-reads.repository.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -44,8 +47,10 @@ export type BraidReaderSpans = (input: {
   traceId: string;
 }) => Promise<SpanTreeNode[]>;
 
+type Own = { projectId: string; authorization: Authorization };
+
 /** One proof's own project, and the proof narrowed to it, never widened. */
-function ownOf(authorization: Authorization): { projectId: string; authorization: Authorization } {
+function ownOf(authorization: Authorization): Own {
   const projectId = ownProjectIdReadBy(authorization);
   return {
     projectId,
@@ -56,6 +61,30 @@ function ownOf(authorization: Authorization): { projectId: string; authorization
 function refusalViewOf(refusal: BraidConditionRefusal): NonNullable<BraidPreview["refusal"]> {
   const { message } = new BraidConditionRefusedError({ refusal });
   return { message, at: refusal.at, construct: refusal.construct, fix: refusal.fix };
+}
+
+/**
+ * The reader's live braids from the owner, as the reader's own proof carries them, each with its
+ * own window; the braid being edited is left out, since the draft replaces it.
+ */
+function liveBraidsOf({
+  reader,
+  ownerProjectId,
+  replacedBraidId,
+}: {
+  reader: Own;
+  ownerProjectId: string;
+  replacedBraidId: string | undefined;
+}): BraidWindowRead[] {
+  return reader.authorization.grants
+    .filter((grant) => isSpanBraidGrant(grant) && grant.projectId === ownerProjectId)
+    .filter((grant) => replacedBraidId === undefined || !grant.via.includes(replacedBraidId))
+    .map((grant) => ({
+      compiledWhere: grant.condition?.compiledWhere,
+      readerProjectId: reader.projectId,
+      fromMs: grant.condition?.from ?? 0,
+      untilMs: grant.condition?.until ?? null,
+    }));
 }
 
 const holdsVerified = (compiledWhere: CompiledWhere | undefined): boolean =>
@@ -110,20 +139,37 @@ export class TraceBraidPreviewService {
     this.#now = deps.now ?? (() => nowInstant().epochMilliseconds);
   }
 
-  /** Two statements: the reader's newest trace ids, then the owner's spans in exactly those. */
+  /**
+   * The reader's newest trace ids under its proof, then one statement under the owner's counting
+   * those traces with the pair's live braids and the draft together and with the live ones alone,
+   * and naming the example trace, which is then read as Test a trace reads one.
+   */
   async preview(input: {
     ownerAuthorization: Authorization;
     readerAuthorization: Authorization;
     where?: string | undefined;
     fromMs: number;
+    braidId?: string | undefined;
   }): Promise<BraidPreview> {
+    const reader = ownOf(input.readerAuthorization);
+    const owner = ownOf(input.ownerAuthorization);
+    const live = liveBraidsOf({
+      reader,
+      ownerProjectId: owner.projectId,
+      replacedBraidId: input.braidId,
+    });
     const compiled = compileBraidCondition({ text: input.where ?? "" });
     if (!compiled.ok) {
       const traces = { every: 0, some: 0, none: 0, total: 0, capped: false };
-      return { refusal: refusalViewOf(compiled), traces, unsignedHidden: null };
+      return {
+        refusal: refusalViewOf(compiled),
+        traces,
+        spans: 0,
+        live: { braids: live.length, traces, spans: 0 },
+        unsignedHidden: null,
+        example: null,
+      };
     }
-    const reader = ownOf(input.readerAuthorization);
-    const owner = ownOf(input.ownerAuthorization);
     const sinceMs = this.#now() - BRAID_PREVIEW_WINDOW_MS;
     const found = await this.#reads.findReaderTraceIds({
       authorization: reader.authorization,
@@ -132,28 +178,50 @@ export class TraceBraidPreviewService {
     });
     const capped = found.length > BRAID_PREVIEW_TRACE_CAP;
     const traceIds = found.slice(0, BRAID_PREVIEW_TRACE_CAP);
-    const verifies = holdsVerified(compiled.compiledWhere);
+    const draft: BraidWindowRead = {
+      compiledWhere: compiled.compiledWhere,
+      readerProjectId: reader.projectId,
+      fromMs: input.fromMs,
+      untilMs: null,
+    };
     const counts =
       traceIds.length === 0
-        ? { every: 0, some: 0, unsigned: 0 }
+        ? NO_BRAID_TRACE_COUNTS
         : await this.#reads.countOwnerSpansInTraces({
             authorization: owner.authorization,
             traceIds,
             sinceMs,
-            fromMs: input.fromMs,
-            condition: { compiledWhere: compiled.compiledWhere, readerProjectId: reader.projectId },
+            live,
+            draft,
           });
     const total = traceIds.length;
+    const tracesOf = ({ every, some }: { every: number; some: number }) => ({
+      every,
+      some,
+      none: Math.max(0, total - every - some),
+      total,
+      capped,
+    });
+    const { exampleTraceId } = counts;
+    const exampleNodes =
+      exampleTraceId === null
+        ? null
+        : await this.#asReaderSees({
+            reader,
+            owner,
+            traceId: exampleTraceId,
+            braids: [...live, draft],
+          });
     return {
       refusal: null,
-      traces: {
-        every: counts.every,
-        some: counts.some,
-        none: Math.max(0, total - counts.every - counts.some),
-        total,
-        capped,
-      },
-      unsignedHidden: verifies ? counts.unsigned : null,
+      traces: tracesOf(counts.shown),
+      spans: counts.shown.spans,
+      live: { braids: live.length, traces: tracesOf(counts.live), spans: counts.live.spans },
+      unsignedHidden: holdsVerified(compiled.compiledWhere) ? counts.unsigned : null,
+      example:
+        exampleTraceId === null || exampleNodes === null
+          ? null
+          : { traceId: exampleTraceId, nodes: exampleNodes },
     };
   }
 
@@ -214,37 +282,67 @@ export class TraceBraidPreviewService {
     };
   }
 
-  /** The reader's own spans, then the owner's in that trace, each marked braided or not. */
+  /**
+   * One reader trace as the reader will see it: the owner's spans marked by the same braids the
+   * count reads, the pair's live braids and the draft, the draft replacing the braid being edited.
+   */
   async testTrace(input: {
     ownerAuthorization: Authorization;
     readerAuthorization: Authorization;
     where?: string | undefined;
     fromMs: number;
     traceId: string;
+    braidId?: string | undefined;
   }): Promise<BraidTestTrace> {
     const compiled = compileBraidCondition({ text: input.where ?? "" });
     if (!compiled.ok) throw new BraidConditionRefusedError({ refusal: compiled });
     const reader = ownOf(input.readerAuthorization);
     const owner = ownOf(input.ownerAuthorization);
+    const live = liveBraidsOf({
+      reader,
+      ownerProjectId: owner.projectId,
+      replacedBraidId: input.braidId,
+    });
+    const draft: BraidWindowRead = {
+      compiledWhere: compiled.compiledWhere,
+      readerProjectId: reader.projectId,
+      fromMs: input.fromMs,
+      untilMs: null,
+    };
+    const nodes = await this.#asReaderSees({
+      reader,
+      owner,
+      traceId: input.traceId,
+      braids: [...live, draft],
+    });
+    return nodes === null ? { found: false, nodes: [] } : { found: true, nodes };
+  }
+
+  /** The reader's own spans, then the owner's in that trace marked; null if the reader has none. */
+  async #asReaderSees(input: {
+    reader: Own;
+    owner: Own;
+    traceId: string;
+    braids: readonly BraidWindowRead[];
+  }): Promise<BraidTestTraceNode[] | null> {
     const readerNodes = await this.#readerSpans({
-      authorization: withoutSpanBraids(reader.authorization),
+      authorization: withoutSpanBraids(input.reader.authorization),
       traceId: input.traceId,
     });
-    if (readerNodes.length === 0) return { found: false, nodes: [] };
+    if (readerNodes.length === 0) return null;
     const ownerSpans = await this.#reads.findOwnerSpansMarked({
-      authorization: owner.authorization,
+      authorization: input.owner.authorization,
       traceId: input.traceId,
-      fromMs: input.fromMs,
-      condition: { compiledWhere: compiled.compiledWhere, readerProjectId: reader.projectId },
+      braids: input.braids,
     });
     const nodes: BraidTestTraceNode[] = [
       ...readerNodes.map(nodeOf),
       ...ownerSpans.map((span) => ({
         ...nodeOf(span),
-        ownerProjectId: owner.projectId,
+        ownerProjectId: input.owner.projectId,
         braided: span.braided,
       })),
     ];
-    return { found: true, nodes: nodes.toSorted((a, b) => a.startTimeMs - b.startTimeMs) };
+    return nodes.toSorted((a, b) => a.startTimeMs - b.startTimeMs);
   }
 }

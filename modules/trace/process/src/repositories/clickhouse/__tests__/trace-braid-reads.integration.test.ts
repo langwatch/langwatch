@@ -1,6 +1,7 @@
 /**
  * The braid dialog's and Braids page's reads against production schema (ADR-183 §7): each
- * statement reads one project under its own proof. Spec: modules/trace/specs/braided-spans.feature
+ * statement reads one project under its own proof. Spec: modules/trace/specs/braided-spans.feature,
+ * modules/authz/specs/braids-screen.feature
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { CompiledWhere } from "@langwatch/authorization";
@@ -41,6 +42,17 @@ const trace = {
 const web = { orchestrator: "web" };
 const app = { orchestrator: "app" };
 const signed = { ...web, "langwatch.reserved.verified.sig": reader };
+const billing = { team: "billing" };
+const MINUTE_MS = 60 * 1000;
+/** A second pair: the reader already sees `web` spans through a braid that ended 20 minutes ago. */
+const pair = {
+  reader: `test-braid-pair-reader-${nanoid()}`,
+  owner: `test-braid-pair-owner-${nanoid()}`,
+  older: `trace-pair-older-${nanoid()}`,
+  newer: `trace-pair-newer-${nanoid()}`,
+  nothing: `trace-pair-nothing-${nanoid()}`,
+  liveUntil: base - 20 * MINUTE_MS,
+};
 
 let ch: ClickHouseClient;
 let service: TraceBraidPreviewService;
@@ -88,10 +100,18 @@ function spanRow(input: {
   };
 }
 
-function summaryRow({ traceId, at = base }: { traceId: string; at?: number }) {
+function summaryRow({
+  traceId,
+  at = base,
+  tenantId = reader,
+}: {
+  traceId: string;
+  at?: number;
+  tenantId?: string;
+}) {
   return {
     ProjectionId: `proj-${nanoid()}`,
-    TenantId: reader,
+    TenantId: tenantId,
     TraceId: traceId,
     Version: "v1",
     Attributes: {},
@@ -122,6 +142,30 @@ function summaryRow({ traceId, at = base }: { traceId: string; at?: number }) {
     SubTopicId: null,
     HasAnnotation: null,
   };
+}
+
+/** The pair's spans: `web` inside and after the live braid's window, `billing` in the draft's. */
+function pairSpanRows() {
+  const at = (minutes: number) => base - minutes * MINUTE_MS;
+  const owned = (traceId: string, spanId: string, minutes: number, attributes: object) =>
+    spanRow({
+      tenantId: pair.owner,
+      traceId,
+      spanId,
+      at: at(minutes),
+      attributes: { ...attributes },
+    });
+  return [
+    ...[pair.older, pair.newer, pair.nothing].map((traceId) =>
+      spanRow({ tenantId: pair.reader, traceId, spanId: `root-${traceId}`, at: at(5) }),
+    ),
+    owned(pair.older, "p-old-web", 30, web),
+    owned(pair.older, "p-old-billing", 30, billing),
+    owned(pair.older, "p-old-web-late", 10, web),
+    owned(pair.newer, "p-new-billing", 5, billing),
+    owned(pair.newer, "p-new-app", 5, app),
+    owned(pair.nothing, "p-nothing-app", 5, app),
+  ];
 }
 
 const braid: AuthzBraid = {
@@ -164,10 +208,14 @@ beforeAll(async () => {
     spanRow({ tenantId: owner, traceId: trace.none, spanId: "o-app-2", attributes: app }),
     spanRow({ tenantId: owner, traceId: trace.old, spanId: "o-old", at: old, attributes: web }),
     spanRow({ tenantId: owner, traceId: trace.ownerOnly, spanId: "o-alone", attributes: web }),
+    ...pairSpanRows(),
   ];
   const summaryRows = [
     ...[trace.every, trace.some, trace.none, trace.empty].map((traceId) => summaryRow({ traceId })),
     summaryRow({ traceId: trace.old, at: old }),
+    ...[pair.older, pair.newer, pair.nothing].map((traceId) =>
+      summaryRow({ traceId, tenantId: pair.reader, at: base - 5 * MINUTE_MS }),
+    ),
   ];
   const settings = { async_insert: 0, wait_for_async_insert: 0 } as const;
   await ch.insert({
@@ -188,8 +236,8 @@ afterAll(async () => {
   if (!ch) return;
   for (const table of ["stored_spans", "trace_summaries"]) {
     await ch.exec({
-      query: `ALTER TABLE ${table} DELETE WHERE TenantId IN ({reader:String}, {owner:String})`,
-      query_params: { reader, owner },
+      query: `ALTER TABLE ${table} DELETE WHERE TenantId IN ({tenants:Array(String)})`,
+      query_params: { tenants: [reader, owner, pair.reader, pair.owner] },
     });
   }
 });
@@ -205,11 +253,14 @@ describe.skipIf(!clickHouseConfigured)("braid reads against ClickHouse", () => {
     it("counts the reader's recent traces by every, some or no owner span matching", async () => {
       const preview = await service.preview({ ...proofs(), where: WEB_TEXT, fromMs: 0 });
 
-      expect(preview).toEqual({
+      expect(preview).toMatchObject({
         refusal: null,
         traces: { every: 1, some: 1, none: 2, total: 4, capped: false },
+        spans: 3,
+        live: { braids: 0, spans: 0 },
         unsignedHidden: null,
       });
+      expect([trace.every, trace.some]).toContain(preview.example?.traceId);
     });
 
     /** @scenario "The preview counts calls that would stay hidden for want of a valid signature" */
@@ -222,6 +273,95 @@ describe.skipIf(!clickHouseConfigured)("braid reads against ClickHouse", () => {
 
       expect(preview.traces).toMatchObject({ every: 0, some: 1, none: 3, total: 4 });
       expect(preview.unsignedHidden).toBe(2);
+    });
+  });
+
+  describe("when the reader already sees spans from the owner through a live braid", () => {
+    const pairProofs = () => ({
+      ownerAuthorization: ownProof({ projectId: pair.owner }),
+      readerAuthorization: braidedProof({
+        projectId: pair.reader,
+        braids: [{ owner: pair.owner, compiledWhere: WEB, from: 0, until: pair.liveUntil }],
+      }),
+    });
+    const draft = { where: 'attributes["team"] == "billing"', fromMs: base - 60 * MINUTE_MS };
+
+    /** @scenario A further braid on the same pair says what it adds */
+    it("counts the live braid and the draft together, each in its own window, and the spans it adds", async () => {
+      const preview = await service.preview({ ...pairProofs(), ...draft });
+
+      expect(preview).toMatchObject({
+        traces: { every: 0, some: 2, none: 1, total: 3, capped: false },
+        spans: 3,
+        live: {
+          braids: 1,
+          traces: { every: 0, some: 1, none: 2, total: 3, capped: false },
+          spans: 1,
+        },
+      });
+    });
+
+    /** @scenario The preview counts what the reader will see as the condition changes */
+    it("shows the newest trace getting a braided span, each owner span marked", async () => {
+      const preview = await service.preview({ ...pairProofs(), ...draft });
+
+      expect(preview.example?.traceId).toBe(pair.newer);
+      expect(
+        preview.example?.nodes.map((node) => [
+          node.spanId,
+          node.ownerProjectId ?? null,
+          node.braided,
+        ]),
+      ).toEqual(
+        expect.arrayContaining([
+          [`root-${pair.newer}`, null, undefined],
+          ["p-new-billing", pair.owner, true],
+          ["p-new-app", pair.owner, false],
+        ]),
+      );
+    });
+
+    /** @scenario Testing a trace shows it exactly as the reader will see it */
+    it("marks a span only the live braid shows as braided when a trace is tested", async () => {
+      const tested = await service.testTrace({ ...pairProofs(), ...draft, traceId: pair.older });
+
+      expect(
+        tested.nodes.map((node) => [node.spanId, node.ownerProjectId ?? null, node.braided]),
+      ).toEqual(
+        expect.arrayContaining([
+          [`root-${pair.older}`, null, undefined],
+          ["p-old-web", pair.owner, true],
+          ["p-old-billing", pair.owner, true],
+          ["p-old-web-late", pair.owner, false],
+        ]),
+      );
+    });
+
+    it("tests a trace with the draft in place of the braid being edited", async () => {
+      const tested = await service.testTrace({
+        ...pairProofs(),
+        ...draft,
+        traceId: pair.older,
+        braidId: "braid_0",
+      });
+
+      expect(tested.nodes.find((node) => node.spanId === "p-old-web")?.braided).toBe(false);
+    });
+
+    it("lets the draft replace the braid being edited rather than count beside it", async () => {
+      const preview = await service.preview({
+        ...pairProofs(),
+        where: WEB_TEXT,
+        fromMs: 0,
+        braidId: "braid_0",
+      });
+
+      expect(preview).toMatchObject({
+        traces: { every: 0, some: 1, none: 2, total: 3 },
+        spans: 2,
+        live: { braids: 0, spans: 0 },
+      });
+      expect(preview.example?.traceId).toBe(pair.older);
     });
   });
 

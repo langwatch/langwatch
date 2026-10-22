@@ -19,6 +19,8 @@ const braidDraftShape = {
   readerProjectId: z.string(),
   where: z.string().max(BRAID_PREVIEW_WHERE_MAX_LENGTH).optional(),
   fromMs: z.number(),
+  /** The braid being edited, which the draft replaces; absent for a new braid. */
+  braidId: z.string().optional(),
 } as const;
 
 const braidPreviewInputSchemaDefinition = z.object(braidDraftShape);
@@ -53,16 +55,6 @@ export interface BraidPreviewTracesSchema extends Named<
 > {}
 export const braidPreviewTracesSchema: BraidPreviewTracesSchema =
   braidPreviewTracesSchemaDefinition;
-
-/** `unsignedHidden`: spans held back only by `Verified(...)`; null when the condition has none. */
-const braidPreviewSchemaDefinition = z.object({
-  refusal: braidConditionRefusalViewSchema.nullable(),
-  traces: braidPreviewTracesSchema,
-  unsignedHidden: z.number().int().min(0).nullable(),
-});
-export interface BraidPreviewSchema extends Named<typeof braidPreviewSchemaDefinition> {}
-export const braidPreviewSchema: BraidPreviewSchema = braidPreviewSchemaDefinition;
-export type BraidPreview = z.infer<typeof braidPreviewSchema>;
 
 const braidAttributeKeysInputSchemaDefinition = z.object({ projectId: z.string() });
 export interface BraidAttributeKeysInputSchema extends Named<
@@ -109,7 +101,7 @@ export const braidTestTraceInputSchema: BraidTestTraceInputSchema =
   braidTestTraceInputSchemaDefinition;
 export type BraidTestTraceInput = z.infer<typeof braidTestTraceInputSchema>;
 
-/** An owner span carries `ownerProjectId` and whether the draft braid lets it through. */
+/** An owner span carries `ownerProjectId` and whether a live braid or the draft lets it through. */
 const braidTestTraceNodeSchemaDefinition = z.object({
   ...spanTreeNodeSchema.shape,
   braided: z.boolean().optional(),
@@ -129,3 +121,40 @@ const braidTestTraceSchemaDefinition = z.object({
 export interface BraidTestTraceSchema extends Named<typeof braidTestTraceSchemaDefinition> {}
 export const braidTestTraceSchema: BraidTestTraceSchema = braidTestTraceSchemaDefinition;
 export type BraidTestTrace = z.infer<typeof braidTestTraceSchema>;
+
+/** The pair's live braids alone, the draft left out: how many, and what they show. */
+const braidPreviewLiveSchemaDefinition = z.object({
+  braids: z.number().int().min(0),
+  traces: braidPreviewTracesSchema,
+  spans: z.number().int().min(0),
+});
+export interface BraidPreviewLiveSchema extends Named<typeof braidPreviewLiveSchemaDefinition> {}
+export const braidPreviewLiveSchema: BraidPreviewLiveSchema = braidPreviewLiveSchemaDefinition;
+
+/** The newest counted trace that gets a braided span, rendered as Test a trace renders one. */
+const braidPreviewExampleSchemaDefinition = z.object({
+  traceId: z.string(),
+  nodes: z.array(braidTestTraceNodeSchema),
+});
+export interface BraidPreviewExampleSchema extends Named<
+  typeof braidPreviewExampleSchemaDefinition
+> {}
+export const braidPreviewExampleSchema: BraidPreviewExampleSchema =
+  braidPreviewExampleSchemaDefinition;
+
+/**
+ * `traces` and `spans`: what the reader sees with the pair's live braids and the draft together;
+ * `live`: the same without the draft. `unsignedHidden`: spans held back only by `Verified(...)`,
+ * null when the condition has none. `example`: null when no counted trace gets a braided span.
+ */
+const braidPreviewSchemaDefinition = z.object({
+  refusal: braidConditionRefusalViewSchema.nullable(),
+  traces: braidPreviewTracesSchema,
+  spans: z.number().int().min(0),
+  live: braidPreviewLiveSchema,
+  unsignedHidden: z.number().int().min(0).nullable(),
+  example: braidPreviewExampleSchema.nullable(),
+});
+export interface BraidPreviewSchema extends Named<typeof braidPreviewSchemaDefinition> {}
+export const braidPreviewSchema: BraidPreviewSchema = braidPreviewSchemaDefinition;
+export type BraidPreview = z.infer<typeof braidPreviewSchema>;

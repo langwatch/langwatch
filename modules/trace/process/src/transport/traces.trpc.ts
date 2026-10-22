@@ -943,6 +943,7 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
         readerAuthorization: authorizations.readerProjectId,
         where: input.where,
         fromMs: input.fromMs,
+        braidId: input.braidId,
       }),
     )
 
@@ -971,6 +972,7 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
         where: input.where,
         fromMs: input.fromMs,
         traceId: input.traceId,
+        braidId: input.braidId,
       }),
     )
     .build();

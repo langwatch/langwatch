@@ -303,6 +303,8 @@ export interface TraceApi extends TraceOtlpIngestApi {
     readerAuthorization: Authorization;
     where?: string | undefined;
     fromMs: number;
+    /** The braid being edited, which the draft replaces in the count; absent for a new braid. */
+    braidId?: string | undefined;
   }): Promise<BraidPreview>;
   /** The owner's span attribute keys over the last 7 days, most frequent first. */
   readBraidAttributeKeys(input: { authorization: Authorization }): Promise<BraidAttributeKeys>;
@@ -312,13 +314,15 @@ export interface TraceApi extends TraceOtlpIngestApi {
     authorization: Authorization;
     braidIds: readonly string[];
   }): Promise<BraidActivity>;
-  /** One reader trace, the owner's spans in it marked braided or not under the draft braid. */
+  /** One reader trace, the owner's spans marked by the pair's live braids and the draft. */
   readBraidTestTrace(input: {
     ownerAuthorization: Authorization;
     readerAuthorization: Authorization;
     where?: string | undefined;
     fromMs: number;
     traceId: string;
+    /** The braid being edited, which the draft replaces; absent for a new braid. */
+    braidId?: string | undefined;
   }): Promise<BraidTestTrace>;
   /** One span's detail through the viewer's protections; refuses with `SpanNotFoundError`. */
   readSpanDetailForViewer(input: {

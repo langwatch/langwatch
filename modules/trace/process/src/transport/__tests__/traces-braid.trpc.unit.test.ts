@@ -19,10 +19,14 @@ type Context = { actor: { id: string } | null };
 const OWNER = "project_specialists";
 const READER = "project_orchestrator";
 
+const counted = { every: 1, some: 0, none: 0, total: 1, capped: false };
 const previewed: BraidPreview = {
   refusal: null,
-  traces: { every: 1, some: 0, none: 0, total: 1, capped: false },
+  traces: counted,
+  spans: 2,
+  live: { braids: 0, traces: { ...counted, every: 0, none: 1 }, spans: 0 },
   unsignedHidden: null,
+  example: null,
 };
 
 type Holds = (input: { permission: AuthzPermission; scope: AuthzDeclaredScopeId }) => boolean;
@@ -78,6 +82,16 @@ describe("the braid dialog's trace reads", () => {
       expect(call?.ownerAuthorization).toBeDefined();
       expect(call?.readerAuthorization).toBeDefined();
       expect(call?.ownerAuthorization).not.toBe(call?.readerAuthorization);
+    });
+
+    it("hands the app the braid being edited, which the draft replaces in both reads", async () => {
+      const { caller, app } = mount({});
+
+      await caller.braidPreview({ ...draft, braidId: "braid_web" });
+      await caller.braidTestTrace({ ...draft, traceId: "trace-1", braidId: "braid_web" });
+
+      expect(app.previewBraid.mock.calls[0]?.[0]).toMatchObject({ braidId: "braid_web" });
+      expect(app.readBraidTestTrace.mock.calls[0]?.[0]).toMatchObject({ braidId: "braid_web" });
     });
   });
 

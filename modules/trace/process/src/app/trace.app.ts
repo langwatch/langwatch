@@ -1896,6 +1896,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     readerAuthorization: Authorization;
     where?: string | undefined;
     fromMs: number;
+    braidId?: string | undefined;
   }): Promise<BraidPreview> {
     return this.#braidPreview.preview(input);
   }
@@ -1918,6 +1919,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     where?: string | undefined;
     fromMs: number;
     traceId: string;
+    braidId?: string | undefined;
   }): Promise<BraidTestTrace> {
     return this.#braidPreview.testTrace(input);
   }

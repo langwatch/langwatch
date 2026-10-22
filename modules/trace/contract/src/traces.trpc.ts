@@ -624,7 +624,10 @@ export const tracesTrpc = defineTrpcContract("traces")
   )
   .withOutput(tracesTraceEventsSchema)
 
-  /** ADR-183 §7: the braid dialog's counts, the owner's spans read under the owner's proof. */
+  /**
+   * ADR-183 §7: the braid dialog's counts with the pair's live braids and the draft, and with the
+   * live ones alone, the owner's spans read under the owner's proof, and one example trace.
+   */
   .query("braidPreview")
   .withInput(braidPreviewInputSchema)
   .withOutput(braidPreviewSchema)
@@ -639,7 +642,7 @@ export const tracesTrpc = defineTrpcContract("traces")
   .withInput(braidActivityInputSchema)
   .withOutput(braidActivitySchema)
 
-  /** One reader trace with the owner's spans marked braided or not under a draft braid. */
+  /** One reader trace, the owner's spans marked by the pair's live braids and the draft. */
   .query("braidTestTrace")
   .withInput(braidTestTraceInputSchema)
   .withOutput(braidTestTraceSchema)

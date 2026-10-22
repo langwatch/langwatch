@@ -13,8 +13,30 @@ export type BraidConditionRead = Readonly<{
 export type BraidActivityRead = BraidConditionRead &
   Readonly<{ braidId: string; ownerProjectId: string; fromMs: number; untilMs: number }>;
 
-/** The owner's spans over a set of reader traces: traces whose every or only some spans match. */
-export type BraidOwnerTraceCounts = Readonly<{ every: number; some: number; unsigned: number }>;
+/** One braid as a statement over the owner's spans reads it: its condition and its own window. */
+export type BraidWindowRead = BraidConditionRead &
+  Readonly<{ fromMs: number; untilMs: number | null }>;
+
+/** Reader traces whose every or only some owner spans a set of braids shows, and those spans. */
+export type BraidTraceCounts = Readonly<{ every: number; some: number; spans: number }>;
+
+/**
+ * The owner's spans over a set of reader traces: with the live braids and the draft together, with
+ * the live braids alone, the spans only `Verified()` holds back, and the newest trace shown any.
+ */
+export type BraidOwnerTraceCounts = Readonly<{
+  shown: BraidTraceCounts;
+  live: BraidTraceCounts;
+  unsigned: number;
+  exampleTraceId: string | null;
+}>;
+
+export const NO_BRAID_TRACE_COUNTS: BraidOwnerTraceCounts = {
+  shown: { every: 0, some: 0, spans: 0 },
+  live: { every: 0, some: 0, spans: 0 },
+  unsigned: 0,
+  exampleTraceId: null,
+};
 
 /**
  * One project's spans in one trace, read through the reader's braided fence: one group per
@@ -34,13 +56,13 @@ export abstract class TraceBraidReadsRepository {
     limit: number;
   }): Promise<string[]>;
 
-  /** The owner's latest span versions in those traces, counted per trace against the condition. */
+  /** The owner's latest span versions in those traces, counted per trace in one statement. */
   abstract countOwnerSpansInTraces(input: {
     authorization: Authorization;
     traceIds: readonly string[];
     sinceMs: number;
-    fromMs: number;
-    condition: BraidConditionRead;
+    live: readonly BraidWindowRead[];
+    draft: BraidWindowRead;
   }): Promise<BraidOwnerTraceCounts>;
 
   /** The owner's span attribute keys since `sinceMs`, most frequent first. */
@@ -72,12 +94,11 @@ export abstract class TraceBraidReadsRepository {
     occurredAtMs?: number | undefined;
   }): Promise<TraceSpanTotalsGroup[]>;
 
-  /** The owner's latest span versions in one trace, each marked if the draft braid passes it. */
+  /** The owner's latest span versions in one trace, each marked if any of the braids passes it. */
   abstract findOwnerSpansMarked(input: {
     authorization: Authorization;
     traceId: string;
-    fromMs: number;
-    condition: BraidConditionRead;
+    braids: readonly BraidWindowRead[];
   }): Promise<(TraceSpanSummaryRecord & { braided: boolean })[]>;
 }
 
@@ -92,7 +113,7 @@ export class EmptyTraceBraidReadsRepository extends TraceBraidReadsRepository {
   }
 
   countOwnerSpansInTraces(): Promise<BraidOwnerTraceCounts> {
-    return Promise.resolve({ every: 0, some: 0, unsigned: 0 });
+    return Promise.resolve(NO_BRAID_TRACE_COUNTS);
   }
 
   findAttributeKeys(): Promise<{ key: string; spanCount: number }[]> {

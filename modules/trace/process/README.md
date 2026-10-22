@@ -220,7 +220,7 @@ readConversationContextForViewer(input: { projectId: string; conversationId: str
 ADR-183 §7: the reader's trace ids under its proof, then the owner's spans under its own.
 
 ```typescript
-previewBraid(input: { ownerAuthorization: Authorization; readerAuthorization: Authorization; where?: string | undefined; fromMs: number; }): Promise<BraidPreview>;
+previewBraid(input: { ownerAuthorization: Authorization; readerAuthorization: Authorization; where?: string | undefined; fromMs: number; /** The braid being edited, which the draft replaces in the count; absent for a new braid. */ braidId?: string | undefined; }): Promise<BraidPreview>;
 ```
 
 #### `readBraidAttributeKeys`
@@ -241,10 +241,10 @@ readBraidActivity(input: { projectId: string; authorization: Authorization; brai
 
 #### `readBraidTestTrace`
 
-One reader trace, the owner's spans in it marked braided or not under the draft braid.
+One reader trace, the owner's spans marked by the pair's live braids and the draft.
 
 ```typescript
-readBraidTestTrace(input: { ownerAuthorization: Authorization; readerAuthorization: Authorization; where?: string | undefined; fromMs: number; traceId: string; }): Promise<BraidTestTrace>;
+readBraidTestTrace(input: { ownerAuthorization: Authorization; readerAuthorization: Authorization; where?: string | undefined; fromMs: number; traceId: string; /** The braid being edited, which the draft replaces; absent for a new braid. */ braidId?: string | undefined; }): Promise<BraidTestTrace>;
 ```
 
 #### `readSpanDetailForViewer`
@@ -1417,7 +1417,7 @@ type Output = z.infer<typeof exportProgressEventSchema>; // ../contract/src/feat
 
 ### `sharedTrace`
 
-Contract `../contract/src/traces.trpc.ts:652`, router `src/transport/shared-trace.trpc.ts:30`.
+Contract `../contract/src/traces.trpc.ts:655`, router `src/transport/shared-trace.trpc.ts:30`.
 
 | Procedure         | Kind  | Gate                                                                                                                                                | Input                       | Output                 |
 | ----------------- | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- | ---------------------- |
@@ -1425,7 +1425,7 @@ Contract `../contract/src/traces.trpc.ts:652`, router `src/transport/shared-trac
 
 ```typescript
 // sharedTrace.get
-// Input: sharedTraceGetInputSchema, ../contract/src/traces.trpc.ts:650
+// Input: sharedTraceGetInputSchema, ../contract/src/traces.trpc.ts:653
 interface Input {
   token: string;
 }
@@ -1434,7 +1434,7 @@ type Output = z.infer<typeof sharedTraceDtoSchema>; // ../contract/src/trace-sha
 
 ### `spans`
 
-Contract `../contract/src/traces.trpc.ts:661`, router `src/transport/spans.trpc.ts:10`.
+Contract `../contract/src/traces.trpc.ts:664`, router `src/transport/spans.trpc.ts:10`.
 
 | Procedure                  | Kind  | Gate                     | Input              | Output                   |
 | -------------------------- | ----- | ------------------------ | ------------------ | ------------------------ |
@@ -1451,7 +1451,7 @@ interface Input {
 type Output = z.infer<typeof spansForTraceSchema>; // ../contract/src/trace.responses.ts:63
 
 // spans.getForPromptStudio
-// Input: inline, ../contract/src/traces.trpc.ts:668
+// Input: inline, ../contract/src/traces.trpc.ts:671
 interface Input {
   projectId: string;
   spanId: string;
@@ -2004,21 +2004,22 @@ type Output = {
 }[];
 
 // traces.braidPreview
-// Input: braidPreviewInputSchema, ../contract/src/features/braid/trace-braid.schemas.ts:26
+// Input: braidPreviewInputSchema, ../contract/src/features/braid/trace-braid.schemas.ts:28
 interface Input {
   projectId: string;
   readerProjectId: string;
   where?: string;
   fromMs: number;
+  braidId?: string;
 }
-type Output = z.infer<typeof braidPreviewSchema>; // ../contract/src/features/braid/trace-braid.schemas.ts:64
+type Output = z.infer<typeof braidPreviewSchema>; // ../contract/src/features/braid/trace-braid.schemas.ts:159
 
 // traces.braidAttributeKeys
-// Input: braidAttributeKeysInputSchema, ../contract/src/features/braid/trace-braid.schemas.ts:72
+// Input: braidAttributeKeysInputSchema, ../contract/src/features/braid/trace-braid.schemas.ts:64
 interface Input {
   projectId: string;
 }
-// Output: braidAttributeKeysSchema, ../contract/src/features/braid/trace-braid.schemas.ts:82
+// Output: braidAttributeKeysSchema, ../contract/src/features/braid/trace-braid.schemas.ts:74
 interface Output {
   keys: {
     key: string;
@@ -2027,12 +2028,12 @@ interface Output {
 }
 
 // traces.braidActivity
-// Input: braidActivityInputSchema, ../contract/src/features/braid/trace-braid.schemas.ts:93
+// Input: braidActivityInputSchema, ../contract/src/features/braid/trace-braid.schemas.ts:85
 interface Input {
   projectId: string;
   braidIds: string[];
 }
-// Output: braidActivitySchema, ../contract/src/features/braid/trace-braid.schemas.ts:101
+// Output: braidActivitySchema, ../contract/src/features/braid/trace-braid.schemas.ts:93
 interface Output {
   activity: {
     braidId: string;
@@ -2041,15 +2042,16 @@ interface Output {
 }
 
 // traces.braidTestTrace
-// Input: braidTestTraceInputSchema, ../contract/src/features/braid/trace-braid.schemas.ts:109
+// Input: braidTestTraceInputSchema, ../contract/src/features/braid/trace-braid.schemas.ts:101
 interface Input {
   projectId: string;
   readerProjectId: string;
   where?: string;
   fromMs: number;
+  braidId?: string;
   traceId: string;
 }
-type Output = z.infer<typeof braidTestTraceSchema>; // ../contract/src/features/braid/trace-braid.schemas.ts:130
+type Output = z.infer<typeof braidTestTraceSchema>; // ../contract/src/features/braid/trace-braid.schemas.ts:122
 ```
 
 ## Sockets
