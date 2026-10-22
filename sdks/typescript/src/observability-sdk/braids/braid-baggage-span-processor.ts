@@ -36,7 +36,9 @@ export class BraidBaggageSpanProcessor implements SpanProcessor {
     }
   }
 
-  onEnd(_span: ReadableSpan): void {}
+  onEnd(_span: ReadableSpan): void {
+    // The entries are copied when the span starts; nothing is left to do at its end.
+  }
 
   forceFlush(): Promise<void> {
     return Promise.resolve();
