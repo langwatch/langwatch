@@ -76,6 +76,7 @@ func TestMiddlewareKeepsInternalRootAndLinksInboundTrace(t *testing.T) {
 	}
 }
 
+// @scenario "The gateway leaves a 4xx request span unset"
 func TestMiddlewareSpanStatusByResponseStatus(t *testing.T) {
 	cases := []struct {
 		name   string

@@ -30,6 +30,7 @@ function door() {
 
 describe("TraceIngestCredentialService unknown tokens", () => {
   describe("when the same unknown token is sent repeatedly", () => {
+    /** @scenario An unknown ingest token is not looked up again for ten seconds */
     it("asks the directory once and refuses every repeat as invalid", async () => {
       const { send, findResolvedToken } = door();
 
@@ -39,6 +40,7 @@ describe("TraceIngestCredentialService unknown tokens", () => {
       expect(findResolvedToken).toHaveBeenCalledTimes(1);
     });
 
+    /** @scenario An unknown ingest token is looked up again once its memory expires */
     it("asks again once the memory expires", async () => {
       const { send, findResolvedToken, advance } = door();
 
@@ -51,6 +53,7 @@ describe("TraceIngestCredentialService unknown tokens", () => {
   });
 
   describe("when a different token or project is sent", () => {
+    /** @scenario A different unknown token or project is looked up on its own */
     it("is looked up on its own", async () => {
       const { send, findResolvedToken } = door();
 

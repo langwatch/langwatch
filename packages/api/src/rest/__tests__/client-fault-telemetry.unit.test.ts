@@ -23,6 +23,7 @@ function fakeSpan() {
 
 describe("recordRequestSpanFailure", () => {
   describe("when the caller's credential is refused", () => {
+    /** @scenario A refused credential leaves the request span unset */
     it("keeps the exception and leaves the span status unset", () => {
       const { span, asSpan } = fakeSpan();
       const error = new ProjectInvalidCredentialsError();
@@ -39,6 +40,7 @@ describe("recordRequestSpanFailure", () => {
   });
 
   describe("when a request is answered 413 by the framework", () => {
+    /** @scenario A 4xx the framework answers is the caller's fault */
     it("treats it as the caller's fault", () => {
       const { span, asSpan } = fakeSpan();
 
@@ -52,6 +54,7 @@ describe("recordRequestSpanFailure", () => {
   });
 
   describe("when the server fails", () => {
+    /** @scenario A server fault marks the span ERROR with its cause */
     it("marks the span ERROR and carries the cause in the status message", () => {
       const { span, asSpan } = fakeSpan();
 
@@ -84,6 +87,7 @@ describe("sampleClientFaultLog", () => {
   afterEach(() => metrics.uninstall());
 
   describe("when the same refusal repeats inside one window", () => {
+    /** @scenario A repeated caller fault warns once a minute and counts every request */
     it("warns once, demotes the repeats to debug, and counts every one", () => {
       const error = new ProjectInvalidCredentialsError();
       const sample = (now: number) =>
@@ -105,6 +109,7 @@ describe("sampleClientFaultLog", () => {
   });
 
   describe("when the failure is a server error", () => {
+    /** @scenario A server fault is not counted as a caller fault */
     it("is left to the default logging and is not counted", () => {
       expect(
         sampleClientFaultLog({ error: new Error("boom"), family: "otel", statusCode: 500 }),

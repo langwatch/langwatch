@@ -39,6 +39,7 @@ describe("recordIngestDoorRefusal", () => {
   afterEach(() => metrics.uninstall());
 
   describe("when one caller is refused repeatedly", () => {
+    /** @scenario A refused ingest export warns once a minute per caller */
     it("warns once per window with the held-back count and counts every refusal", () => {
       const logger = { warn: vi.fn(), debug: vi.fn() };
       const record = (now: number) =>
@@ -84,6 +85,7 @@ describe("withClientFaultSpan", () => {
     return { span, open };
   }
 
+  /** @scenario An OTLP receiver span stays unset for a caller fault */
   it("rethrows a customer fault with the span left unset and the exception recorded", async () => {
     const { span, open } = opener();
     const error = refusal();
@@ -94,6 +96,7 @@ describe("withClientFaultSpan", () => {
     expect(span.recordException).toHaveBeenCalledWith(error);
   });
 
+  /** @scenario An OTLP receiver span still records any other failure as ERROR */
   it("lets any other failure through the span", async () => {
     const { span, open } = opener();
 
