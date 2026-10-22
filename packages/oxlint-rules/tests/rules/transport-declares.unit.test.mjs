@@ -315,6 +315,35 @@ describe("given a route that declares its permission target", () => {
   });
 });
 
+describe("given a procedure that asks a permission at two projects", () => {
+  const head = [
+    'import { defineTrpcRouter } from "@langwatch/api/trpc";',
+    "export const router = defineTrpcRouter(contract)",
+  ];
+  const twoProjects = [
+    '  .procedure("preview")',
+    '  .withPermission("traces:view", { via: "projectId" })',
+    '  .withPermission("traces:view", { via: "projectId", field: "readerProjectId" })',
+    "  .handle(({ app, authorizations }) => app.preview({ authorizations }))",
+  ];
+
+  it("accepts authorizations, each project's proof by field", () => {
+    expect(report([...head, ...twoProjects, ";"].join("\n"))).toEqual([]);
+  });
+
+  it("reports authorizations on a later procedure that asks at one project", () => {
+    const code = [
+      ...head,
+      ...twoProjects,
+      '  .procedure("keys")',
+      '  .withPermission("traces:view")',
+      "  .handle(({ app, authorizations }) => app.keys({ authorizations }));",
+    ].join("\n");
+
+    expect(found(code)).toEqual([["rawContextField", 9]]);
+  });
+});
+
 describe("given a door credential that declares a session", () => {
   it("accepts session from a router-level or a route-level withCredential", () => {
     expect(
