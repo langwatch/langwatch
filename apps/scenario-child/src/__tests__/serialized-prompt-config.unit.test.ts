@@ -70,7 +70,7 @@ describe("SerializedPromptConfigAdapter", () => {
     expect(adapter.name).toBe("SerializedPromptConfigAdapter");
   });
 
-  it("builds messages with system prompt first", async () => {
+  it("sends the system prompt as instructions", async () => {
     const adapter = new HttpSerializedPromptConfigChannel({
       config: defaultConfig,
       litellmParams: defaultLitellmParams,
@@ -81,9 +81,7 @@ describe("SerializedPromptConfigAdapter", () => {
 
     expect(mockGenerateText).toHaveBeenCalledWith(
       expect.objectContaining({
-        messages: expect.arrayContaining([
-          { role: "system", content: "You are a helpful assistant." },
-        ]),
+        instructions: "You are a helpful assistant.",
       }),
     );
   });
@@ -103,12 +101,9 @@ describe("SerializedPromptConfigAdapter", () => {
       content: string;
     }[];
 
-    expect(messages[0]).toEqual({
-      role: "system",
-      content: "You are a helpful assistant.",
-    });
-    expect(messages[1]).toEqual({ role: "user", content: "Hello" });
-    expect(messages[2]).toEqual({ role: "user", content: "How are you?" });
+    expect(callArgs.instructions).toBe("You are a helpful assistant.");
+    expect(messages[0]).toEqual({ role: "user", content: "Hello" });
+    expect(messages[1]).toEqual({ role: "user", content: "How are you?" });
   });
 
   it("passes temperature to generateText", async () => {
@@ -180,12 +175,9 @@ describe("SerializedPromptConfigAdapter", () => {
         content: string;
       }[];
 
-      expect(messages[0]).toEqual({
-        role: "system",
-        content: "You are helping with: How are you?",
-      });
+      expect(callArgs.instructions).toBe("You are helping with: How are you?");
       // Input messages still appended for conversation context
-      expect(messages[1]).toEqual({ role: "user", content: "How are you?" });
+      expect(messages[0]).toEqual({ role: "user", content: "How are you?" });
     });
 
     it("replaces {{input}} in template messages", async () => {
@@ -208,7 +200,7 @@ describe("SerializedPromptConfigAdapter", () => {
         content: string;
       }[];
 
-      expect(messages[1]).toEqual({
+      expect(messages[0]).toEqual({
         role: "user",
         content: "User asked: How are you?",
       });
@@ -236,11 +228,11 @@ describe("SerializedPromptConfigAdapter", () => {
           content: string;
         }[];
 
-        // System + the conversation. Before the fix the bare word "messages"
+        // The conversation is still sent. Before the fix the bare word "messages"
         // matched the history-suppression check and the model was told to
         // summarise a conversation it was never shown.
-        expect(messages).toHaveLength(2);
-        expect(messages[1]).toMatchObject({
+        expect(messages).toHaveLength(1);
+        expect(messages[0]).toMatchObject({
           role: "user",
           content: "How are you?",
         });
@@ -268,12 +260,8 @@ describe("SerializedPromptConfigAdapter", () => {
         await adapter.call({ ...defaultInput, threadId: "thread_abc" });
 
         const callArgs = mockGenerateText.mock.calls[0]![0];
-        const messages = callArgs.messages as {
-          role: string;
-          content: string;
-        }[];
 
-        expect(messages[0]!.content).toBe("question: How are you?\nthread: thread_abc");
+        expect(callArgs.instructions).toBe("question: How are you?\nthread: thread_abc");
       });
 
       /** @scenario "An input nothing can be bound to renders as a visible placeholder" */
@@ -301,12 +289,8 @@ describe("SerializedPromptConfigAdapter", () => {
         await adapter.call(defaultInput);
 
         const callArgs = mockGenerateText.mock.calls[0]![0];
-        const messages = callArgs.messages as {
-          role: string;
-          content: string;
-        }[];
 
-        expect(messages[0]!.content).toBe("tier: [unbound input: customer_tier]");
+        expect(callArgs.instructions).toBe("tier: [unbound input: customer_tier]");
       });
     });
 
@@ -330,10 +314,11 @@ describe("SerializedPromptConfigAdapter", () => {
         content: string;
       }[];
 
-      // Only system message - input.messages not appended because template handles it
+      // input.messages is not appended because the template handles it, but AI SDK 7
+      // rejects an empty `messages`, so just this turn's new message is sent.
       expect(messages).toHaveLength(1);
-      expect(messages[0]!.content).toContain("How are you?");
-      expect(messages[0]!.role).toBe("system");
+      expect(messages[0]).toEqual({ role: "user", content: "How are you?" });
+      expect(callArgs.instructions).toContain("How are you?");
     });
 
     it("does not append input.messages when {{messages}} is in template message", async () => {
@@ -356,10 +341,9 @@ describe("SerializedPromptConfigAdapter", () => {
         content: string;
       }[];
 
-      // System + template message only - input.messages not appended
-      expect(messages).toHaveLength(2);
-      expect(messages[0]!.role).toBe("system");
-      expect(messages[1]!.content).toContain("How are you?");
+      expect(messages).toHaveLength(1);
+      expect(callArgs.instructions).toBe("You are helpful.");
+      expect(messages[0]!.content).toContain("How are you?");
     });
 
     describe("given a template that reads the conversation in structured form", () => {
@@ -384,12 +368,12 @@ describe("SerializedPromptConfigAdapter", () => {
           content: string;
         }[];
 
-        // Only the system message. The template already carries the turn, so an
-        // appended input.messages would show the model the same turn twice —
-        // and every prior turn twice on turn three.
+        // The template already carries the turn, so appending input.messages would
+        // show the model the same turn twice. AI SDK 7 rejects an empty `messages`,
+        // so just this turn's new message is sent.
         expect(messages).toHaveLength(1);
-        expect(messages[0]!.role).toBe("system");
-        expect(messages[0]!.content).toContain("How are you?");
+        expect(messages[0]).toEqual({ role: "user", content: "How are you?" });
+        expect(callArgs.instructions).toContain("How are you?");
       });
     });
 
@@ -408,9 +392,8 @@ describe("SerializedPromptConfigAdapter", () => {
         content: string;
       }[];
 
-      // System + template message + input message
-      expect(messages).toHaveLength(3);
-      expect(messages[2]).toEqual({ role: "user", content: "How are you?" });
+      expect(messages).toHaveLength(2);
+      expect(messages[1]).toEqual({ role: "user", content: "How are you?" });
     });
 
     describe("when system prompt contains Liquid conditions", () => {
@@ -436,15 +419,8 @@ describe("SerializedPromptConfigAdapter", () => {
         await adapter.call(input);
 
         const callArgs = mockGenerateText.mock.calls[0]![0];
-        const messages = callArgs.messages as {
-          role: string;
-          content: string;
-        }[];
 
-        expect(messages[0]).toEqual({
-          role: "system",
-          content: "You handle refunds.",
-        });
+        expect(callArgs.instructions).toBe("You handle refunds.");
       });
     });
 
@@ -478,7 +454,7 @@ describe("SerializedPromptConfigAdapter", () => {
           content: string;
         }[];
 
-        const userMessage = promptMessages[1];
+        const userMessage = promptMessages[0];
         expect(userMessage?.role).toBe("user");
         expect(userMessage?.content).toBe("Summary: [Hello][How are you?]");
         // Verify Liquid tags are fully rendered (no raw template syntax remains)
@@ -504,13 +480,14 @@ describe("SerializedPromptConfigAdapter", () => {
 
       await adapter.call(defaultInput);
 
-      const promptMessages = mockGenerateText.mock.calls[0]![0].messages as {
+      const callArgs = mockGenerateText.mock.calls[0]![0];
+      const promptMessages = callArgs.messages as {
         role: string;
         content: string;
       }[];
 
-      expect(promptMessages[0]?.content).toBe("You serve a platinum customer in eu-central.");
-      expect(promptMessages[1]?.content).toBe("Tier: platinum");
+      expect(callArgs.instructions).toBe("You serve a platinum customer in eu-central.");
+      expect(promptMessages[0]?.content).toBe("Tier: platinum");
     });
   });
 });

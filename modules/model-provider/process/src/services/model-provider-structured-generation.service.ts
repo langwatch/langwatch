@@ -25,7 +25,7 @@ export class ModelProviderStructuredGenerationService {
     const result = await generateObject({
       model,
       schema: input.schema,
-      system: input.system,
+      instructions: input.system,
       prompt: input.prompt,
       maxRetries: input.maxRetries,
       abortSignal: AbortSignal.timeout(input.timeoutMs),

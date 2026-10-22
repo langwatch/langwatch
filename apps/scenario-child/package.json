@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "@ai-sdk/openai-compatible": "catalog:",
-    "@ai-sdk/provider": "^3.0.13",
+    "@ai-sdk/provider": "^4.0.24",
     "@elevenlabs/elevenlabs-js": "catalog:",
     "@langwatch/agent-contract": "workspace:*",
     "@langwatch/automation-contract": "workspace:*",

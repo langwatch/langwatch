@@ -5,7 +5,7 @@
  */
 
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import type { LanguageModelV3 } from "@ai-sdk/provider";
+import type { LanguageModelV4 } from "@ai-sdk/provider";
 import { nlpInternalSecretHeaders } from "@langwatch/process/nlp-internal-secret";
 import { defaultSettingsMiddleware, wrapLanguageModel } from "ai";
 import { z } from "zod";
@@ -133,7 +133,7 @@ export class HttpLitellmModelChannel implements LitellmModelChannel {
 
   private constructor() {}
 
-  model(input: LitellmModelInput): LanguageModelV3 {
+  model(input: LitellmModelInput): LanguageModelV4 {
     const { litellmParams, nlpServiceUrl, nlpInternalSecret } = input;
     const providerKey = litellmParams.model.split("/")[0] || undefined;
     const headers = {
@@ -161,7 +161,7 @@ export class HttpLitellmModelChannel implements LitellmModelChannel {
    * Creates JudgeAgent's model. Preemptively supply `reasoning_effort: 'none'`
    * for gpt-5.6 models (they enable reasoning when omitted, reject with tools).
    */
-  judgeModel(input: LitellmModelInput): LanguageModelV3 {
+  judgeModel(input: LitellmModelInput): LanguageModelV4 {
     const model = this.model(input);
     if (!JUDGE_MODELS_REQUIRING_DISABLED_REASONING.has(input.litellmParams.model)) {
       return model;

@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createGoogle } from "@ai-sdk/google";
 import scenario, { assertSkillWasRead } from "@langwatch/scenario";
 import dotenv from "dotenv";
 import { describe, expect, it } from "vitest";
@@ -20,7 +20,7 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const isCI = !!process.env.CI;
-const google = createGoogleGenerativeAI({ apiKey: process.env.GEMINI_API_KEY });
+const google = createGoogle({ apiKey: process.env.GEMINI_API_KEY });
 const judgeModel = google("gemini-2.5-flash-lite");
 
 /**

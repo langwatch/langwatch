@@ -59,7 +59,7 @@ describe("ModelProviderTextGenerationService", () => {
     });
     expect(ai.generateText).toHaveBeenCalledWith({
       model,
-      system: "You write commit messages.",
+      instructions: "You write commit messages.",
       messages: [{ role: "user", content: "the diff" }],
       maxOutputTokens: 64,
       temperature: 0,

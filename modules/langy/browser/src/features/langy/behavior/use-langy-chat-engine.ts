@@ -38,7 +38,7 @@ export function useLangyChatEngine({
     resumeStream,
   } = useChat({
     transport,
-    experimental_throttle: LANGY_STREAM_RENDER_THROTTLE_MS,
+    throttle: LANGY_STREAM_RENDER_THROTTLE_MS,
     onError: (error) => {
       // Global-handled errors (license / lite-member) are owned by their own
       // handler — leave them to it.

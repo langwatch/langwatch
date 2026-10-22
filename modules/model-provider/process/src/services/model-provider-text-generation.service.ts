@@ -40,7 +40,7 @@ export class ModelProviderTextGenerationService {
       });
       const completion = await generateText({
         model,
-        system: input.system,
+        instructions: input.system,
         messages: input.messages.map((message) => ({ ...message })),
         ...(input.maxOutputTokens === undefined ? {} : { maxOutputTokens: input.maxOutputTokens }),
         ...(input.maxRetries === undefined ? {} : { maxRetries: input.maxRetries }),

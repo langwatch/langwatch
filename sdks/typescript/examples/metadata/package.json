@@ -18,10 +18,11 @@
     "start:rest-api": "tsc && dotenv -- node dist/rest-api.js"
   },
   "dependencies": {
-    "@ai-sdk/openai": "^2.0.6",
+    "@ai-sdk/openai": "^4.0.86",
+    "@ai-sdk/otel": "^1.0.130",
     "@opentelemetry/context-async-hooks": "^2.0.1",
     "@opentelemetry/sdk-node": "^0.217.0",
-    "ai": "^5.0.8",
+    "ai": "^7.0.130",
     "dotenv-cli": "^10.0.0",
     "langwatch": "file:../../"
   },

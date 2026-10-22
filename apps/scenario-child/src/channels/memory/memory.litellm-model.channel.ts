@@ -1,5 +1,5 @@
-import type { LanguageModelV3 } from "@ai-sdk/provider";
-import { MockLanguageModelV3 } from "ai/test";
+import type { LanguageModelV4 } from "@ai-sdk/provider";
+import { MockLanguageModelV4 } from "ai/test";
 
 import type { LitellmModelChannel, LitellmModelInput } from "../litellm-model.channel.ts";
 
@@ -15,13 +15,13 @@ export class MemoryLitellmModelChannel implements LitellmModelChannel {
 
   private constructor() {}
 
-  model(input: LitellmModelInput): LanguageModelV3 {
+  model(input: LitellmModelInput): LanguageModelV4 {
     this.requested.push({ ...input, role: "model" });
-    return new MockLanguageModelV3({ modelId: input.litellmParams.model });
+    return new MockLanguageModelV4({ modelId: input.litellmParams.model });
   }
 
-  judgeModel(input: LitellmModelInput): LanguageModelV3 {
+  judgeModel(input: LitellmModelInput): LanguageModelV4 {
     this.requested.push({ ...input, role: "judge" });
-    return new MockLanguageModelV3({ modelId: input.litellmParams.model });
+    return new MockLanguageModelV4({ modelId: input.litellmParams.model });
   }
 }

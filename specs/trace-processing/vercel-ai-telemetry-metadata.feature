@@ -106,3 +106,35 @@ Feature: Vercel AI SDK telemetry metadata reaches the trace summary
     Given a span with ai.telemetry.functionId = "checkout-flow"
     When the trace summary is built
     Then the trace has no custom metadata key "functionId"
+
+  # ─── AI SDK 7 runtime context ──────────────────────────────────────
+  # AI SDK 7 replaced experimental_telemetry.metadata with runtimeContext.
+  # Each key opted in through includeRuntimeContext lands on the spans as
+  # ai.settings.context.<key>, and resolves exactly like the old channel.
+
+  @unit
+  Scenario: Labels passed as AI SDK 7 runtime context reach the trace
+    Given a span with ai.settings.context.labels = ["checkout", "beta"]
+    When the trace summary is built
+    Then the trace has the labels "checkout" and "beta"
+
+  @unit
+  Scenario: Identity keys passed as AI SDK 7 runtime context identify the trace
+    Given a span with ai.settings.context.thread_id = "thread-9"
+    And the same span with ai.settings.context.user_id = "user-42"
+    When the trace summary is built
+    Then the trace conversation id is "thread-9"
+    And the trace user id is "user-42"
+
+  @unit
+  Scenario: A key that is not reserved in AI SDK 7 runtime context becomes custom metadata
+    Given a span with ai.settings.context.tenant = "eu-west"
+    When the trace summary is built
+    Then the trace metadata key "tenant" is "eu-west"
+
+  @unit
+  Scenario: An explicit LangWatch attribute wins over AI SDK 7 runtime context
+    Given a span with langwatch.user.id = "explicit-user"
+    And the same span with ai.settings.context.user_id = "context-user"
+    When the trace summary is built
+    Then the trace user id is "explicit-user"
