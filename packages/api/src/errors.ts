@@ -224,7 +224,8 @@ export class RateLimitedError extends HandledError {
   }
 }
 
-/** A credential spent one of its read or export windows (specs/security/read-rate-limits.feature). */
+/** A credential spent one of its read or export windows
+ * (specs/security/read-rate-limits.feature). */
 export class ReadRateLimitedError extends HandledError {
   declare readonly code: "read_rate_limited";
 

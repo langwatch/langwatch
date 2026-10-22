@@ -14,7 +14,7 @@ import type {
   MountableTransport,
 } from "../hosting/transport-hosts.ts";
 import type { RateLimiter } from "../ports.ts";
-import type { ReadBudget } from "../read-budget/read-budget.ts";
+import type { ReadBudget } from "../read-budget.ts";
 import { allRegisteredRoutes } from "../route-registry.ts";
 import {
   claimsNoPrefix,

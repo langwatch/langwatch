@@ -110,4 +110,4 @@ export {
   READ_RATE_LIMIT_EXCEEDED_EVENT,
   ReadBudget,
   type ReadBudgetLimits,
-} from "./read-budget/read-budget.ts";
+} from "./read-budget.ts";

@@ -56,6 +56,8 @@ import {
 import type { RestAuditSink, RestCaller, RestIdentity } from "../hosting/api-door.ts";
 import { ClientAddress } from "../policy/client-address.ts";
 import type { RateLimiter, ResponseCache } from "../ports.ts";
+import { type ReadBudget, readKindOf, rowsOf } from "../read-budget.ts";
+import { restReadCredential } from "../read-credential.ts";
 import { type RegisteredSharedPath, registerRoutePolicy } from "../route-registry.ts";
 import {
   addressesOf,
@@ -103,8 +105,6 @@ import {
   recordedKeyOfDoor,
   type RestKeyCredential,
 } from "./key-credential.ts";
-import { type ReadBudget, readKindOf, rowsOf } from "../read-budget/read-budget.ts";
-import { restReadCredential } from "../read-budget/read-credential.ts";
 import { legacyErrorScopes, withLegacyError } from "./legacy-error.ts";
 import {
   CREDENTIAL_CLASS_BY_DOOR as CREDENTIAL_CLASS,
@@ -1503,7 +1503,7 @@ function handlerMiddleware<Api>({
       scope: resolved,
       request: context.req.raw,
     });
-    if (readCall) await ports.readBudget?.admit(readCall);
+    await admitRead({ ports, readCall });
 
     // After the door, never before it: a caller who may not read this cannot
     // be handed the bytes an entitled one left behind.
@@ -1565,7 +1565,7 @@ function handlerMiddleware<Api>({
       });
 
       caller.markUsed?.();
-      if (readCall) void ports.readBudget?.record({ ...readCall, rows: rowsOf(result) });
+      recordRead({ ports, readCall, result });
 
       return answerWith({ context, next, route, result });
     };
@@ -1603,6 +1603,26 @@ function readCallOf({
   if (!credential) return null;
 
   return { credential, kind, route: `${family}.${route.operation}`, scope } as const;
+}
+
+type ReadCall = ReturnType<typeof readCallOf>;
+
+/** Spends the call's read window before the handler runs; a call the budget skips passes. */
+async function admitRead({ ports, readCall }: { ports: RestRuntimeMembers; readCall: ReadCall }) {
+  if (readCall) await ports.readBudget?.admit(readCall);
+}
+
+/** Counts the rows a read answered, off the response path: a failed count never fails the read. */
+function recordRead({
+  ports,
+  readCall,
+  result,
+}: {
+  ports: RestRuntimeMembers;
+  readCall: ReadCall;
+  result: unknown;
+}) {
+  if (readCall) void ports.readBudget?.record({ ...readCall, rows: rowsOf(result) });
 }
 
 /**

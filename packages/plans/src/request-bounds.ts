@@ -127,7 +127,8 @@ export const requestBounds = [
   },
   {
     key: "readRequestsPerMinute",
-    description: "Reads per credential per minute, REST and tRPC (specs/security/read-rate-limits.feature).",
+    description:
+      "Reads per credential per minute, REST and tRPC (specs/security/read-rate-limits.feature).",
     unit: "requests-per-minute",
     free: 300,
     paid: 600,

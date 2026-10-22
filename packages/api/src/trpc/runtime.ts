@@ -100,7 +100,7 @@ import {
 } from "./audit.ts";
 import { refuseOutdatedClient } from "./client-outdated.ts";
 import { doorInputSchema } from "./infinite-input.ts";
-import { trpcReadBudget, type TrpcReadBudget } from "../read-budget/trpc-read-budget.ts";
+import { trpcReadBudget, type TrpcReadBudget } from "./read-budget.ts";
 import { trpcThrottle, type TrpcThrottle } from "./throttle.ts";
 
 const logger = createLogger("langwatch:trpc");
@@ -1226,7 +1226,7 @@ export function createTrpcRuntime<
   const trace = tracer(members);
   const handledError = handledErrors(members);
   const throttle = members.throttle ? trpcThrottle(members.throttle) : undefined;
-  const readBudget = members.readBudget ? trpcReadBudget(members.readBudget) : undefined;
+  const readBudget = trpcReadBudget(members.readBudget);
 
   const build = (
     request: TrpcProcedureRequest<TContext>,
@@ -1261,8 +1261,7 @@ export function createTrpcRuntime<
     // The throttle runs AFTER the check, so the caller it counts is the one
     // the door resolved, and BEFORE the trail, so a refused call writes no
     // audit row.
-    const throttled = throttle ? checked.use(throttle) : checked;
-    const built = (readBudget ? throttled.use(readBudget) : throttled).use(
+    const built = (throttle ? checked.use(throttle) : checked).use(readBudget).use(
       auditTrail(members, {
         anonymous,
         ...(request.audit ? { target: auditTargetPort({ members, request }) } : {}),

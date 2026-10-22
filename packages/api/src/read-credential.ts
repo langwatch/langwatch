@@ -1,8 +1,9 @@
-/** Who a read counts against, from what the door resolved (specs/security/read-rate-limits.feature). */
+/** Who a read counts against, from what the door resolved
+ * (specs/security/read-rate-limits.feature). */
 import type { Actor, AuthzDeclaredScopeId } from "@langwatch/authorization";
 
-import { isKeyDoor, recordedKeyOfDoor } from "../rest/key-credential.ts";
 import type { ReadCredential } from "./read-budget.ts";
+import { isKeyDoor, recordedKeyOfDoor } from "./rest/key-credential.ts";
 
 /** An operator acting as somebody counts as the operator; a person in a browser by person. */
 export function actorReadCredential(actor: Actor | null): ReadCredential | null {

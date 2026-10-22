@@ -108,7 +108,13 @@ describe("entitlement app installation", () => {
       const { logger } = createTestLogger();
       const runtime = await createApp({ role })
         .withModules([entitlementProcessModule])
-        .withConfig({ entitlement: { requestBounds: undefined, isSaas: true } })
+        .withConfig({
+          entitlement: {
+            requestBounds: undefined,
+            requestBoundsByOrganization: undefined,
+            isSaas: true,
+          },
+        })
         .withStores(memoryStores())
         .withEventing(eventingFor(role))
         .withObservability((observability) => observability.withLogging(logger))
@@ -167,7 +173,13 @@ describe("entitlement app installation", () => {
       const { logger } = createTestLogger();
       const runtime = await createApp({ role: "api" })
         .withModules([entitlementProcessModule])
-        .withConfig({ entitlement: { requestBounds: undefined, isSaas: true } })
+        .withConfig({
+          entitlement: {
+            requestBounds: undefined,
+            requestBoundsByOrganization: undefined,
+            isSaas: true,
+          },
+        })
         .withStores(memoryStores())
         .withObservability((observability) => observability.withLogging(logger))
         .provide({

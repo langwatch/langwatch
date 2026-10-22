@@ -6,13 +6,13 @@ import { moduleApi } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { authorizationPort } from "../../__tests__/api-double.ts";
-import { createErrorHandler } from "../../errors.ts";
-import type { RateLimiter } from "../../ports.ts";
-import { recordProjectCredential } from "../../rest/credential.ts";
-import { defineRestRouter } from "../../rest/declaration.ts";
-import { createRestRuntime } from "../../rest/runtime.ts";
+import { createErrorHandler } from "../errors.ts";
+import type { RateLimiter } from "../ports.ts";
 import { ReadBudget, type ReadBudgetLimits } from "../read-budget.ts";
+import { recordProjectCredential } from "../rest/credential.ts";
+import { defineRestRouter } from "../rest/declaration.ts";
+import { createRestRuntime } from "../rest/runtime.ts";
+import { authorizationPort } from "./api-double.ts";
 
 interface ListingApi {
   list(): Promise<{ rows: { id: number }[] }>;
@@ -63,7 +63,10 @@ function listingApp({ enforced }: { enforced: boolean }) {
           ingestionTemplateId: null,
           project: { id: "project-1", slug: "project-1" },
         } as never);
-        return { actor: { type: "user", id: "user-1" }, scope: { tier: "project", id: "project-1" } };
+        return {
+          actor: { type: "user", id: "user-1" },
+          scope: { tier: "project", id: "project-1" },
+        };
       },
     },
     readBudget: ReadBudget.create({

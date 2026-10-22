@@ -5,8 +5,8 @@
  */
 import type { AuthzDeclaredScopeId } from "@langwatch/authorization";
 
-import { ReadRateLimitedError } from "../errors.ts";
-import type { RateLimiter } from "../ports.ts";
+import { ReadRateLimitedError } from "./errors.ts";
+import type { RateLimiter } from "./ports.ts";
 
 /** The log event the security alerting reads; its field names are a contract with it. */
 export const READ_RATE_LIMIT_EXCEEDED_EVENT = "read_rate_limit_exceeded";
@@ -99,12 +99,23 @@ export class ReadBudget {
       const { limits, organizationId } = await this.#deps.limitsFor({ scope: call.scope });
       for (const window of admissionWindows(call, limits)) {
         const cost = window.dimension.startsWith("rows_") ? 0 : 1;
-        const decision = await this.#deps.counter.check(keyOf(call.credential, window), window, cost);
+        const decision = await this.#deps.counter.check(
+          keyOf(call.credential, window),
+          window,
+          cost,
+        );
         if (decision.allowed) continue;
 
         const retryAfterSeconds = decision.retryAfterSeconds ?? window.seconds;
         const enforced = await this.#deps.enforced({ scope: call.scope });
-        this.#logExceeded({ call, window, organizationId, enforced, retryAfterSeconds, observed: decision.used });
+        this.#logExceeded({
+          call,
+          window,
+          organizationId,
+          enforced,
+          retryAfterSeconds,
+          observed: decision.used,
+        });
 
         return enforced
           ? new ReadRateLimitedError({ dimension: window.dimension, retryAfterSeconds })
@@ -123,12 +134,23 @@ export class ReadBudget {
     await this.#guarded(call, async () => {
       const { limits, organizationId } = await this.#deps.limitsFor({ scope: call.scope });
       for (const window of rowWindows(call.credential, limits)) {
-        const decision = await this.#deps.counter.check(keyOf(call.credential, window), window, call.rows);
+        const decision = await this.#deps.counter.check(
+          keyOf(call.credential, window),
+          window,
+          call.rows,
+        );
         if (decision.allowed) continue;
 
         const enforced = await this.#deps.enforced({ scope: call.scope });
         const retryAfterSeconds = decision.retryAfterSeconds ?? window.seconds;
-        this.#logExceeded({ call, window, organizationId, enforced, retryAfterSeconds, observed: decision.used });
+        this.#logExceeded({
+          call,
+          window,
+          organizationId,
+          enforced,
+          retryAfterSeconds,
+          observed: decision.used,
+        });
       }
       return undefined;
     });
@@ -142,7 +164,12 @@ export class ReadBudget {
       return await run();
     } catch (error) {
       this.#deps.logger.error(
-        { event: "read_budget_unavailable", route: call.route, credentialType: call.credential.type, err: error },
+        {
+          event: "read_budget_unavailable",
+          route: call.route,
+          credentialType: call.credential.type,
+          err: error,
+        },
         "read budget could not be counted; the read was admitted",
       );
       return undefined;
@@ -213,7 +240,12 @@ function admissionWindows(call: ReadCall, limits: ReadBudgetLimits): readonly Wi
               : limits.exportsPerMinute,
             seconds: MINUTE,
           },
-          { dimension: "exports_per_day", suffix: "exports-day", requests: limits.exportsPerDay, seconds: DAY },
+          {
+            dimension: "exports_per_day",
+            suffix: "exports-day",
+            requests: limits.exportsPerDay,
+            seconds: DAY,
+          },
         ]
       : [
           {

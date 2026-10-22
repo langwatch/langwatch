@@ -16,7 +16,8 @@ const requestBoundsSchema = z
       .optional(),
   );
 
-/** One organization's own bounds, keyed by organization id (specs/security/read-rate-limits.feature). */
+/** One organization's own bounds, keyed by organization id
+ * (specs/security/read-rate-limits.feature). */
 const requestBoundsByOrganizationSchema = z
   .string()
   .optional()

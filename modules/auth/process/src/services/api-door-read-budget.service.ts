@@ -4,8 +4,12 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { type RequestBoundKey, resolveRequestBound } from "@langwatch/plans";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { nowInstant } from "@langwatch/time";
 
-/** Off: a read past its allowance is logged and answered. On: it is refused (read-rate-limits.feature). */
+/**
+ * Off: a read past its allowance is logged and answered. On: it is refused
+ * (read-rate-limits.feature).
+ */
 export const READ_RATE_LIMITS_ENFORCED_FLAG = "release_read_rate_limits_enforced";
 
 const CACHE_MS = 60_000;
@@ -34,11 +38,11 @@ export class ApiDoorReadBudgetService {
   limitsFor({ scope }: { scope: AuthzDeclaredScopeId | null }): Promise<Resolved> {
     const key = scope ? `${scope.tier}:${scope.id}` : "none";
     const cached = this.#limits.get(key);
-    if (cached && Date.now() - cached.at < CACHE_MS) return cached.value;
+    if (cached && nowInstant().epochMilliseconds - cached.at < CACHE_MS) return cached.value;
 
     const value = this.#resolve(scope);
     value.catch(() => this.#limits.delete(key));
-    this.#limits.set(key, { at: Date.now(), value });
+    this.#limits.set(key, { at: nowInstant().epochMilliseconds, value });
     return value;
   }
 

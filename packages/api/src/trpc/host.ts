@@ -30,7 +30,7 @@ import type {
   MountableTransport,
 } from "../hosting/transport-hosts.ts";
 import type { RateLimiter } from "../ports.ts";
-import type { ReadBudget } from "../read-budget/read-budget.ts";
+import type { ReadBudget } from "../read-budget.ts";
 import { auditScopeIds, isAuditLogExempt, redactAuditArgs, trpcFailureTraceIds } from "./audit.ts";
 import {
   createTrpcRuntimePolicy,
@@ -386,19 +386,7 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
       denials: DENIALS,
       ...(options.entitlements ? { entitlements: options.entitlements } : {}),
       ...(options.throttle ? { throttle: throttleOf(options.throttle) } : {}),
-      ...(options.readBudget
-        ? {
-            readBudget: {
-              budget: options.readBudget,
-              actorOf: (ctx: TrpcRequestContext) => {
-                const actor = ctx.tryActor?.();
-                if (!actor) return null;
-                const impersonatorId = ctx.session?.user.impersonator?.id;
-                return { type: "user" as const, id: actor.id, ...(impersonatorId ? { impersonatorId } : {}) };
-              },
-            },
-          }
-        : {}),
+      ...(options.readBudget ? { readBudget: trpcReadBudgetOf(options.readBudget) } : {}),
       audit: {
         record: (entry) => this.#record(entry),
         redact: ({ procedure, args }) => redactAuditArgs({ input: args, action: procedure }),
@@ -588,4 +576,17 @@ function isTrpcRouterDeclaration(
     "members" in value.contract &&
     typeof value.contract.members === "object"
   );
+}
+
+/** The read budget's view of a tRPC call: the session's person, or the operator acting as them. */
+function trpcReadBudgetOf(budget: ReadBudget) {
+  return {
+    budget,
+    actorOf: (ctx: TrpcRequestContext) => {
+      const actor = ctx.tryActor?.();
+      if (!actor) return null;
+      const impersonatorId = ctx.session?.user.impersonator?.id;
+      return { type: "user" as const, id: actor.id, ...(impersonatorId ? { impersonatorId } : {}) };
+    },
+  };
 }

@@ -169,9 +169,10 @@ The chain builds early when `!billableEventsMeter` (`src/eventing/usage.pipeline
 
 ## Configuration
 
-| Kind   | Leaf            | Environment variable       | Declared at                                |
-| ------ | --------------- | -------------------------- | ------------------------------------------ |
-| config | `requestBounds` | `LANGWATCH_REQUEST_BOUNDS` | `../contract/src/entitlement.config.ts:20` |
-| config | `isSaas`        | `IS_SAAS`                  | `../contract/src/entitlement.config.ts:22` |
+| Kind   | Leaf                          | Environment variable                       | Declared at                                |
+| ------ | ----------------------------- | ------------------------------------------ | ------------------------------------------ |
+| config | `requestBounds`               | `LANGWATCH_REQUEST_BOUNDS`                 | `../contract/src/entitlement.config.ts:28` |
+| config | `requestBoundsByOrganization` | `LANGWATCH_REQUEST_BOUNDS_BY_ORGANIZATION` | `../contract/src/entitlement.config.ts:29` |
+| config | `isSaas`                      | `IS_SAAS`                                  | `../contract/src/entitlement.config.ts:34` |
 
 <!-- readme:generated:end -->

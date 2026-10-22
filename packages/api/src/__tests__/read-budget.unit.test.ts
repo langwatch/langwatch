@@ -1,13 +1,13 @@
+import { explainHandledError } from "@langwatch/handled-error/presentation";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 /**
  * The per-credential read budget: admission before a read, rows counted after it.
  * @see specs/security/read-rate-limits.feature
  */
 import { describe, expect, it } from "vitest";
 
-import { explainHandledError } from "@langwatch/handled-error/presentation";
-
-import { ReadRateLimitedError } from "../../errors.ts";
-import type { RateLimiter } from "../../ports.ts";
+import { ReadRateLimitedError } from "../errors.ts";
+import type { RateLimiter } from "../ports.ts";
 import {
   READ_RATE_LIMIT_EXCEEDED_EVENT,
   ReadBudget,
@@ -261,14 +261,19 @@ describe("ReadRateLimitedError", () => {
   describe("when a read_rate_limited refusal is raised", () => {
     /** @scenario "The refusal carries a customer-safe message, the wait and the remediation" */
     it("is a 429 customer fault carrying the wait, the dimension, tips and copy", () => {
-      const refusal = new ReadRateLimitedError({ dimension: "rows_per_hour", retryAfterSeconds: 30 });
+      const refusal = new ReadRateLimitedError({
+        dimension: "rows_per_hour",
+        retryAfterSeconds: 30,
+      });
 
       expect(refusal.code).toBe("read_rate_limited");
       expect(refusal.httpStatus).toBe(429);
       expect(refusal.fault).toBe("customer");
       expect(refusal.meta).toEqual({ dimension: "rows_per_hour", retryAfterMs: 30_000 });
       expect(refusal.tips?.length).toBeGreaterThan(0);
-      expect(explainHandledError(refusal).title).toBe("Too many reads just now");
+      const shape = readHandledError(refusal);
+      expect(shape).not.toBeNull();
+      expect(shape && explainHandledError(shape).title).toBe("Too many reads just now");
     });
   });
 });

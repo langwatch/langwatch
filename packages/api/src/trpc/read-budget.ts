@@ -2,8 +2,8 @@
 import type { Actor, AuthzDeclaredScopeId } from "@langwatch/authorization";
 import type { MiddlewareResult } from "@trpc/server/unstable-core-do-not-import";
 
-import { type ReadBudget, readKindOf, rowsOf } from "./read-budget.ts";
-import { actorReadCredential } from "./read-credential.ts";
+import { type ReadBudget, readKindOf, rowsOf } from "../read-budget.ts";
+import { actorReadCredential } from "../read-credential.ts";
 
 export type TrpcReadBudget<TContext> = Readonly<{
   budget: ReadBudget;
@@ -16,7 +16,8 @@ function scopeOfInput(input: unknown): AuthzDeclaredScopeId | null {
   return typeof projectId === "string" ? { tier: "project", id: projectId } : null;
 }
 
-export function trpcReadBudget<TContext>(readBudget: TrpcReadBudget<TContext>) {
+/** Absent a budget, every call passes through uncounted. */
+export function trpcReadBudget<TContext>(readBudget: TrpcReadBudget<TContext> | undefined) {
   return async ({
     ctx,
     path,
@@ -30,7 +31,11 @@ export function trpcReadBudget<TContext>(readBudget: TrpcReadBudget<TContext>) {
     input?: unknown;
     next: () => Promise<MiddlewareResult<object>>;
   }): Promise<MiddlewareResult<object>> => {
-    const kind = readKindOf({ operation: path.split(".").at(-1) ?? path, method: type === "query" ? "GET" : "POST" });
+    if (!readBudget) return next();
+    const kind = readKindOf({
+      operation: path.split(".").at(-1) ?? path,
+      method: type === "query" ? "GET" : "POST",
+    });
     const credential = kind ? actorReadCredential(readBudget.actorOf(ctx)) : null;
     if (!kind || !credential) return next();
 
