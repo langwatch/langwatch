@@ -7,6 +7,7 @@
 import { Link } from "@langwatch/browser-host/link";
 import { Banner, BannerAction } from "@langwatch/design-system/banner";
 import { ContentTabs } from "@langwatch/design-system/content-tabs";
+import { EnterprisePill } from "@langwatch/design-system/enterprise-pill";
 import { FeatureMark } from "@langwatch/design-system/feature-mark";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Box, HStack, Skeleton, Stack, Text } from "@langwatch/design-system/primitives";
@@ -28,7 +29,6 @@ import { BraidsEnterpriseUpsell } from "../../blocks/braids/braids-enterprise-up
 import { BraidsHowItWorks } from "../../blocks/braids/braids-how-it-works.tsx";
 import { BraidsTable } from "../../blocks/braids/braids-table.tsx";
 import { RemoveBraidDialog } from "../../blocks/braids/remove-braid-dialog.tsx";
-import { BraidsEnterprisePill } from "../../elements/braids-enterprise-pill.tsx";
 import { SectionErrorNotice } from "../../elements/section-error-notice.tsx";
 import { BraidsSigningKeys } from "./braids-signing-keys.tsx";
 
@@ -70,7 +70,7 @@ export function BraidsHeader({ actions }: { actions?: ReactNode }) {
       <HStack gap={2}>
         <FeatureMark feature="braids" size={22} />
         <PageLayout.Heading>Braids</PageLayout.Heading>
-        <BraidsEnterprisePill />
+        <EnterprisePill feature="braids" />
       </HStack>
     </PageLayout.Header>
   );

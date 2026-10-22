@@ -186,6 +186,10 @@
       "types": "./dist/components/brand/feature-illustration.d.ts",
       "default": "./src/components/brand/feature-illustration.tsx"
     },
+    "./enterprise-pill": {
+      "types": "./dist/components/brand/enterprise-pill.d.ts",
+      "default": "./src/components/brand/enterprise-pill.tsx"
+    },
     "./access-state": {
       "types": "./dist/components/states/access-state.d.ts",
       "default": "./src/components/states/access-state.tsx"

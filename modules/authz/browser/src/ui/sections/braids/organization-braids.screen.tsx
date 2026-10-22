@@ -7,6 +7,7 @@
 import { Link } from "@langwatch/browser-host/link";
 import { Banner } from "@langwatch/design-system/banner";
 import { Card } from "@langwatch/design-system/card";
+import { EnterprisePill } from "@langwatch/design-system/enterprise-pill";
 import { FeatureMark } from "@langwatch/design-system/feature-mark";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Button, HStack, Skeleton, Stack, Text } from "@langwatch/design-system/primitives";
@@ -21,7 +22,6 @@ import {
 import { useAuthzHost } from "../../../model/authz-host.ts";
 import { BRAIDS_GUIDE_HREF, organizationBraidRows } from "../../../model/braids/braids.ts";
 import { OrganizationBraidsTable } from "../../blocks/braids/organization-braids-table.tsx";
-import { BraidsEnterprisePill } from "../../elements/braids-enterprise-pill.tsx";
 import { SectionErrorNotice } from "../../elements/section-error-notice.tsx";
 
 function OrganizationBraidsHeader() {
@@ -39,7 +39,7 @@ function OrganizationBraidsHeader() {
       <HStack gap={2}>
         <FeatureMark feature="braids" size={22} />
         <PageLayout.Heading>Braids</PageLayout.Heading>
-        <BraidsEnterprisePill />
+        <EnterprisePill feature="braids" />
       </HStack>
     </PageLayout.Header>
   );

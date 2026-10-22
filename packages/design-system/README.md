@@ -105,7 +105,7 @@ Section headers share the same behaviour. `withBorder={false}` opts out.
 ## Branded features
 
 A feature with its own name, mark and art (Braids is the first) is branded through
-`FeatureMark`, `FeatureLockup` and `FeatureIllustration` and its `feature.<name>.*` colour
+`FeatureMark`, `FeatureLockup`, `FeatureIllustration` and `EnterprisePill`, and its `feature.<name>.*` colour
 roles. [How features are branded](docs/feature-branding.md) has the rules and the steps.
 
 ## Checklist

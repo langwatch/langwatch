@@ -10,9 +10,11 @@ Braids (spans from one project shown in another project's traces) as the worked 
 | `@langwatch/design-system/feature-mark`         | `FeatureMark`         | The mark: colour, one colour, or the small master         |
 | `@langwatch/design-system/feature-lockup`       | `FeatureLockup`       | Mark plus the name in the display face, optional tagline  |
 | `@langwatch/design-system/feature-illustration` | `FeatureIllustration` | The feature's art: `empty-state`, `enterprise` and `hero` |
+| `@langwatch/design-system/enterprise-pill`      | `EnterprisePill`      | "Enterprise" with the feature's mark, where it is gated   |
 
 In Storybook: Brand/Feature branding (the whole kit on one page), Brand/Feature mark,
-Brand/Feature lockup, Brand/Feature illustration and the feature rows in Foundations/Colour.
+Brand/Feature lockup, Brand/Feature illustration, Brand/Enterprise pill and the feature rows in
+Foundations/Colour.
 
 ## When a feature earns a brand
 
@@ -35,7 +37,7 @@ Everything else uses the product look unchanged. A settings page does not get a 
 | Colour roles     | Named tokens under `feature.<name>.*`, light and dark values                  | `lead`, `weave`, `project.1-3`, `projectInk.1-3`             |
 | Illustration set | An empty state, an Enterprise upsell and a hero, 760 by 350                   | Project strands weaving into one trace                       |
 | Motion           | At most one arrival animation, in the hero                                    | Strands weave in over 650ms, spans land after                |
-| Enterprise pill  | Where the feature is gated, the mark in one colour beside the word Enterprise | `FeatureMark variant="mono" size={16}`                       |
+| Enterprise pill  | Where the feature is gated, the mark in one colour beside the word Enterprise | `EnterprisePill feature="braids"`                            |
 
 Inside the product, page titles stay in Inter. Sentient appears only in the lockup and on
 landing or docs pages, as Langy and the front door already use it.
