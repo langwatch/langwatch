@@ -127,7 +127,7 @@ export class ClickHouseStorageFootprintRepository extends StorageFootprintReposi
   }
 }
 
-/** A cluster name is spliced as an identifier, so only a plain one is trusted; else read locally. */
+/** A cluster name is spliced as an identifier, so only a plain one is trusted. */
 const CLUSTER_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 function backupLogSource(cluster: string | undefined): string {

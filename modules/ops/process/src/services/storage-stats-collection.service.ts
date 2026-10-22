@@ -41,7 +41,7 @@ interface StorageStatsCollectionOptions {
   readings: StorageStatsReadingsRepository;
   /** Whether the backup log is read at all. */
   collectBackups: boolean;
-  /** `CLICKHOUSE_CLUSTER`: the replicas whose backup logs are read together; unset reads one node. */
+  /** `CLICKHOUSE_CLUSTER`: replicas whose backup logs are read together; unset reads one node. */
   clusterName?: string | undefined;
   logger: Pick<Logger, "debug" | "info" | "warn" | "error">;
 }

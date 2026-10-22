@@ -1,10 +1,6 @@
 /**
- * Inbound HTTP request metrics: one histogram whose labels are all bounded, so
- * a per-service error ratio and p95/p99 can be read without a raw path ever
- * becoming a series.
- *
- * `service` is not a label here: every series carries the process's
- * `service.name` resource attribute (Prometheus `service_name`).
+ * Inbound HTTP request duration; every label is bounded, so no raw path becomes a series.
+ * `service` is not a label: the `service.name` resource attribute carries it.
  */
 import { histogram } from "./instruments.ts";
 

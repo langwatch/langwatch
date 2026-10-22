@@ -354,8 +354,11 @@ import {
   type InstanceAdminShares,
   type OrganizationSsoRouting,
 } from "../services/instance-admin.service.ts";
-import { OVERDUE_PENDING_MS, OVERDUE_WAKE_MS } from "../services/manager-explorer.service.ts";
-import { ManagerExplorerService } from "../services/manager-explorer.service.ts";
+import {
+  ManagerExplorerService,
+  OVERDUE_PENDING_MS,
+  OVERDUE_WAKE_MS,
+} from "../services/manager-explorer.service.ts";
 import { OpsHealthService } from "../services/ops-health.service.ts";
 import { OpsUpgradeService } from "../services/ops-upgrade.service.ts";
 import { OpsService } from "../services/ops.service.ts";
