@@ -13,9 +13,9 @@ On LangWatch Cloud the views are in the `langwatch` database, for example `langw
 
 A self-hosted deployment uses the database named in its `CLICKHOUSE_URL`. That is `langwatch` in the shipped Helm chart and in `.env.example`. LangWatchQL is unavailable when `CLICKHOUSE_URL` names no database. The full list, with every column and the permission it needs, is in the [Query API reference](/api-reference/query/overview#queryable-views), and `GET /api/v1/query/schema` returns the list your key can query today.
 
-## When to use LangWatchQL instead of dashboards
+## What LangWatchQL is for
 
-Use a [dashboard](/features/dashboards) for a chart you want to look at again. Use LangWatchQL when you need an answer the charts do not give you: a join across views, a percentile on one group of traces, rows exported to a file, or a question an agent asks from code.
+Use LangWatchQL for a join across views, a percentile on one group of traces, rows exported to a file, or a question an agent asks from code. [Dashboards](/features/dashboards#how-the-data-is-read) read their data with LangWatchQL too: each widget runs named LangWatchQL statements.
 
 For finding individual traces with their spans and evaluations, use the trace filter instead. [Querying your data](/features/querying-your-data) compares the two languages.
 
