@@ -105,7 +105,18 @@ export abstract class ModelProviderCatalog {
   staticCostRates(): readonly ModelCostRate[] {
     return getStaticModelCostRates();
   }
-  sanitizeDefaultConfig(input: Record<string, unknown>): Record<string, string> {
+  /**
+   * Drops unknown and empty keys, refuses a newly picked restricted model. A
+   * restricted model already stored is dropped (and `droppedRestricted` set):
+   * it predates the restriction, and refusing it would block every other key.
+   */
+  sanitizeDefaultConfig({
+    config,
+    stored = {},
+  }: {
+    config: Record<string, unknown>;
+    stored?: Record<string, string>;
+  }): { config: Record<string, string>; droppedRestricted: boolean } {
     const valid = new Set<string>([
       "DEFAULT",
       "FAST",
@@ -114,7 +125,8 @@ export abstract class ModelProviderCatalog {
       ...allFeatures().map((feature) => feature.key),
     ]);
     const clean: Record<string, string> = {};
-    for (const [key, value] of Object.entries(input)) {
+    let droppedRestricted = false;
+    for (const [key, value] of Object.entries(config)) {
       if (!valid.has(key) || typeof value !== "string" || value.length === 0) {
         continue;
       }
@@ -125,6 +137,10 @@ export abstract class ModelProviderCatalog {
             findFeatureByKey(key)[0] &&
             isModelAllowedForFeature({ modelId: value, featureKey: key }),
           );
+      if (!allowed && stored[key] === value) {
+        droppedRestricted = true;
+        continue;
+      }
       if (!allowed) {
         throw new ModelDefaultValidationError(
           `"${value}" ${CODING_ASSISTANT_SURFACES_ONLY_NEEDLE} and cannot be set for "${key}".`,
@@ -134,7 +150,7 @@ export abstract class ModelProviderCatalog {
       clean[key] = value;
     }
 
-    return clean;
+    return { config: clean, droppedRestricted };
   }
   normalizeRoutingHandle(input: string | null): string | null {
     return normalizeRoutingHandle(input);

@@ -513,7 +513,8 @@ export function Dialog({
   contentRef,
   "data-testid": testId,
 }: DialogProps) {
-  const ownRef = React.useRef<HTMLDivElement>(null);
+  // By id, not a ref: a resuming focus trap calls this mid-commit, while React has refs detached.
+  const contentId = React.useId();
   const endInset = useDrawerEndInset();
   const slot = (name: string) => (testId ? `${testId}-${name}` : undefined);
   const closable = dismissible && !busy;
@@ -531,14 +532,15 @@ export function Dialog({
     throw new Error('Dialog surface="glass" stands on the card ground; drop ground="panel".');
   }
   const pickInitialFocus = () => {
-    const usable = (selector: string) => firstFocusable(ownRef.current, selector);
+    const content = document.getElementById(contentId);
+    const usable = (selector: string) => firstFocusable(content, selector);
     const requested = initialFocus ? usable(`[data-frame-action="${initialFocus}"]`) : null;
     return (
       requested ??
       usable("input, textarea, select") ??
       usable('[data-frame-action="cancel"]') ??
       usable(FOCUSABLE_CONTROLS) ??
-      ownRef.current
+      content
     );
   };
   const resolveInitialFocus = () => initialFocusEl?.() ?? pickInitialFocus();
@@ -589,6 +591,7 @@ export function Dialog({
       trapFocus={trapFocus}
       preventScroll={preventScroll}
       closeOnInteractOutside={closable && closeOnInteractOutside}
+      ids={{ content: contentId }}
       initialFocusEl={resolveInitialFocus}
       finalFocusEl={finalFocusEl}
       onExitComplete={onExitComplete}
@@ -597,7 +600,7 @@ export function Dialog({
       }}
     >
       <DialogContent
-        ref={mergeRefs(ownRef, contentRef)}
+        ref={contentRef}
         maxWidth={dialogMaxWidth({ size, endInset })}
         width="full"
         maxHeight={

@@ -8,6 +8,8 @@ export type GuidedTourState = {
   useRunning(): boolean;
   /** The replay: runs `path`'s tour again and records it on the organization, when named. */
   useReplay(): (input: { path: string; organizationId?: string | null }) => void;
+  /** "Later" on Langy's model prompt: recorded on the organization so no landing prompts again. */
+  usePutOffModelPrompt(): (input: { organizationId: string }) => void;
 };
 
 /** Onboarding's guided path; `useIsActive` is a hook, call it during render. */

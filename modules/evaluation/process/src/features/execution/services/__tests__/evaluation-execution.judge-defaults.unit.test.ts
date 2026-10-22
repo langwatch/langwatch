@@ -44,10 +44,15 @@ function buildService() {
     },
   };
   const deps: EvaluationExecutionDeps = {
+    runs: { findTraceEvaluations: async () => [] },
+    authz: {
+      authorizeInternal: async () => {
+        throw new Error("these cases read no earlier evaluations");
+      },
+    },
     traces: {
       readTracesWithSpans: async () => [trace],
       readThreadsTraces: async () => [trace],
-      readEvaluations: async () => ({}),
     },
     spanDigest,
     modelEnvResolver: { resolveForEvaluator: async () => ({}) },

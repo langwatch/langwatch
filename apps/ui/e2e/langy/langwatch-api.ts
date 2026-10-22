@@ -178,7 +178,7 @@ export async function listPrompts(): Promise<{ id: string; name?: string; handle
   return toArray(await lwGet("/api/prompts"));
 }
 
-export async function listMonitors(): Promise<{ id: string; name?: string }[]> {
+export async function listMonitors(): Promise<{ id: string; name?: string; enabled?: boolean }[]> {
   return toArray(await lwGet("/api/monitors"));
 }
 
@@ -191,6 +191,48 @@ export async function createEvaluator(name: string): Promise<{ id: string; name:
     path: "/api/evaluators",
     body: { name, config: { evaluatorType: "langevals/exact_match" } },
   });
+}
+
+/**
+ * Seeds an enabled ON_MESSAGE monitor. It runs a saved evaluator, so a backing
+ * exact-match one is created too and returned as `evaluatorId` for cleanup:
+ * deleting the monitor does not delete it.
+ */
+export async function createMonitor({
+  name,
+}: {
+  name: string;
+}): Promise<{ id: string; name: string; evaluatorId: string }> {
+  const evaluator = await createEvaluator(`${name}-evaluator`);
+  try {
+    const monitor = await lwPost({
+      path: "/api/monitors",
+      body: {
+        name,
+        checkType: "langevals/exact_match",
+        executionMode: "ON_MESSAGE",
+        sample: 1.0,
+        evaluatorId: evaluator.id,
+        level: "trace",
+        parameters: {},
+        preconditions: [],
+      },
+    });
+    return { id: monitor.id, name: monitor.name, evaluatorId: evaluator.id };
+  } catch (error) {
+    // The monitor never existed, so nothing else would ever remove its evaluator.
+    await deleteEvaluator(evaluator.id);
+    throw error;
+  }
+}
+
+/** The monitor as the API reports it, or null once it is gone. */
+export async function getMonitor(
+  id: string,
+): Promise<{ id: string; name: string; enabled: boolean } | null> {
+  const monitor = (await listMonitors()).find((m) => m.id === id);
+  if (!monitor) return null;
+  return { id: monitor.id, name: monitor.name ?? "", enabled: monitor.enabled === true };
 }
 
 /**
@@ -316,11 +358,20 @@ export async function seedApplicationTraces(count = 8): Promise<void> {
   });
   await Promise.all(posts);
 
-  // Poll every seeded id, not a first/last bracket. The posts above go out
-  // concurrently, so the order they were generated in says nothing about the
-  // order they are indexed in: both ends can be queryable while a trace in the
-  // middle is still missing, and the data scenarios would then read a short
-  // batch as the ground truth.
+  await awaitTracesQueryable({ traceIds, what: "Seeded traces" });
+}
+
+/**
+ * Polls every id, not a first/last bracket: posts go out concurrently, so a
+ * middle trace can still be missing while both ends are queryable.
+ */
+async function awaitTracesQueryable({
+  traceIds,
+  what,
+}: {
+  traceIds: string[];
+  what: string;
+}): Promise<void> {
   const deadline = Date.now() + INGESTION_VISIBILITY_TIMEOUT_MS;
   while (Date.now() < deadline) {
     const visible = await Promise.all(traceIds.map(traceExists));
@@ -329,9 +380,51 @@ export async function seedApplicationTraces(count = 8): Promise<void> {
   }
 
   throw new Error(
-    `Seeded traces were still not queryable after ${
+    `${what} were still not queryable after ${
       INGESTION_VISIBILITY_TIMEOUT_MS / 1_000
-    }s. This is ingestion lag in the environment, NOT a Langy defect — the ` +
-      "data scenarios would have graded an empty index as a wrong answer.",
+    }s. This is ingestion lag in the environment, NOT a Langy defect: the ` +
+      "scenarios would have graded an empty index as a wrong answer.",
   );
+}
+
+/**
+ * Seeds traces carrying `label` whose `started_at` is `ageMs` in the past, so a
+ * time-bounded question over a recent window finds nothing while the data
+ * exists. Resolves once every trace is queryable.
+ */
+export async function seedStaleTraces({
+  label,
+  ageMs,
+  count = 3,
+}: {
+  label: string;
+  ageMs: number;
+  count?: number;
+}): Promise<void> {
+  const now = Date.now();
+  const traceIds = Array.from({ length: count }, (_, i) => `trace_e2e_stale_${label}_${i}`);
+  await Promise.all(
+    traceIds.map((traceId, i) => {
+      const startedAt = now - ageMs - i * 60_000;
+      return lwPost({
+        path: "/api/collector",
+        body: {
+          spans: [
+            {
+              trace_id: traceId,
+              span_id: `span_e2e_stale_${label}_${i}`,
+              type: "llm",
+              model: "gpt-5-mini",
+              input: { type: "text", value: `stale question #${i}` },
+              output: { type: "text", value: `stale answer #${i}` },
+              timestamps: { started_at: startedAt, finished_at: startedAt + 800 },
+            },
+          ],
+          metadata: { labels: [label] },
+        },
+      });
+    }),
+  );
+
+  await awaitTracesQueryable({ traceIds, what: `Stale traces labelled ${label}` });
 }

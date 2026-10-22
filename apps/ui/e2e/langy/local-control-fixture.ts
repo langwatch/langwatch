@@ -574,10 +574,11 @@ export async function createDemoRepo({
 }
 
 /** Folders a scenario can share that are NOT a demo app (README.md "local-control-fixture.ts"). */
-export type FixtureFolderName = "acme-notes";
+export type FixtureFolderName = "acme-notes" | "acme-pocket";
 
 const FIXTURE_FOLDER: Record<FixtureFolderName, string> = {
   "acme-notes": path.join(REPO_ROOT, "dev", "dogfood", "acme-notes", "python"),
+  "acme-pocket": path.join(REPO_ROOT, "dev", "dogfood", "acme-pocket"),
 };
 
 /** A shared folder that is not a demo repository, and what a test reads of it. */
@@ -1030,8 +1031,14 @@ export interface QuestionAsk {
     question: string;
     options?: { label: string; quiet?: boolean }[];
   }[];
-  answered: { question: string; selected: string[] }[];
+  answered: { question: string; selected: string[]; other?: string }[];
   turnId: string;
+  /**
+   * Tool frames read when the answer was sent. A call at an earlier index did
+   * not wait for the card; cards are not tool frames, so this is the only
+   * record of the card's place in the order.
+   */
+  toolEventsBeforeAnswer: number;
 }
 
 /** How the fixture answers permission cards, in the order it reads the rules. */
@@ -1044,11 +1051,14 @@ export interface PermissionPolicy {
   fallback?: "allow_once" | "deny";
 }
 
-/** Picks the answer to one question card, default first (README.md "local-control-fixture.ts"). */
+/**
+ * Picks the answer to one question card, default first; `{ other }` answers in
+ * typed words with no pick (README.md "local-control-fixture.ts").
+ */
 export type QuestionAnswerPicker = (question: {
   question: string;
   options?: { label: string; quiet?: boolean }[];
-}) => string[] | Promise<string[]>;
+}) => string[] | { other: string } | Promise<string[] | { other: string }>;
 
 /** One message in the shape the scenario judge reads. */
 export type JudgeMessage =
@@ -1091,13 +1101,15 @@ export interface ConversationWatcher {
   toolEvents: LangyToolEvent[];
   /** Every turn the watcher observed, in the order it observed them. */
   turnIds: string[];
+  /** Turns whose stream could not be opened or broke, so their frames are missing. */
+  unreadTurns: string[];
   /** The turns the panel started on its own, without a message from the test. */
   turnsStartedWithoutUs: (knownTurnIds: string[]) => string[];
   /** Wait for a turn other than the ones already known. */
   waitForNewTurn: (input: { knownTurnIds: string[]; timeoutMs?: number }) => Promise<string>;
   /** Whether the card answered inside the turn's call (README.md "local-control-fixture.ts"). */
   cardAnsweredInsideTurn: (input: { turnId: string }) => Promise<boolean>;
-  /** Waits until no turn is in flight (README.md "local-control-fixture.ts"). */
+  /** Waits for no turn in flight and no pending card (README.md "local-control-fixture.ts"). */
   waitForIdle: (timeoutMs?: number) => Promise<void>;
   /** The whole conversation, as the panel would render it. */
   transcript: () => Promise<string>;
@@ -1309,7 +1321,10 @@ export function turnFailureMessage({
 /** The line that says what the developer answered on a question card. */
 export function questionAnswerNote(ask: QuestionAsk): string {
   const answers = ask.answered
-    .map((answer) => `"${answer.question}" -> ${answer.selected.join(", ")}`)
+    .map(
+      (answer) =>
+        `"${answer.question}" -> ${[...answer.selected, ...(answer.other ? [answer.other] : [])].join(", ")}`,
+    )
     .join("; ");
   return `[developer answered in the panel: ${answers}]`;
 }
@@ -1365,7 +1380,112 @@ export function pendingWaitDispatches({
   return dispatches;
 }
 
-/** One turn's live stream, reported (README.md "local-control-fixture.ts"). */
+/**
+ * Tokens of a command: simple single/double quotes stay one token, and unquoted
+ * `&&`, `||`, `;`, `|`, `&` and newline are their own tokens even when glued to
+ * a word. A newline becomes `;` so it never reads as a quoted token.
+ */
+function commandTokens(command: string): string[] {
+  return (command.match(/"[^"]*"|'[^']*'|&&|\|\||[;|&\n]|[^\s;|&"']+/g) ?? []).map((token) => {
+    if (token === "\n") return ";";
+    return /^(["']).*\1$/.test(token) ? token.slice(1, -1) : token;
+  });
+}
+
+const OPEN_GROUP = /^(\$\(|\(|`)+/;
+const CLOSE_GROUP = /[)`]+$/;
+
+/** Splits tokens into command segments at chain operators and `(`/`)`/`$(`/backtick groups. */
+function commandSegments(tokens: string[]): string[][] {
+  const segments: string[][] = [[]];
+  for (const token of tokens) {
+    if (["&&", "||", ";", "|", "&"].includes(token)) segments.push([]);
+    else {
+      if (OPEN_GROUP.test(token)) segments.push([]);
+      const bare = token.replace(OPEN_GROUP, "").replace(CLOSE_GROUP, "");
+      if (bare) segments[segments.length - 1]?.push(bare);
+      if (CLOSE_GROUP.test(token)) segments.push([]);
+    }
+  }
+  return segments;
+}
+
+/**
+ * True for `langwatch <resource> delete|remove|archive ...`, matched by token, so
+ * an item named `delete-me` is not one. Handles chains, groups, path-invoked
+ * binaries and quoted commands. Global flags before the resource are not: the CLI rejects them.
+ */
+export function isDeleteCommand(command: string | null | undefined): boolean {
+  const tokens = commandTokens(command ?? "");
+  const quoted = tokens.filter((token) => /\s/.test(token));
+  if (quoted.some(isDeleteCommand)) return true;
+  const plain = tokens.filter((token) => !quoted.includes(token));
+  return commandSegments(plain).some(segmentDeletes);
+}
+
+function segmentDeletes(segment: string[]): boolean {
+  const start = segment.findIndex((token) => token.split("/").pop() === "langwatch");
+  if (start === -1) return false;
+  const positional = segment.slice(start + 1).filter((token) => !token.startsWith("-"));
+  return ["delete", "remove", "archive"].includes(positional[1] ?? "");
+}
+
+/** The platform's refusal of a delete or disable that has no Yes click behind it yet. */
+const CONFIRMATION_REFUSAL = "langy_confirmation_required";
+
+/** How `--output json` opens a failed command's answer. */
+const CLI_ERROR = '{"ok":false';
+
+/**
+ * Why a delete did not wait for the user's yes, or null when it did. A delete the
+ * CLI failed (the 409 confirmation, a not-found) changed nothing, so it is not one.
+ * Fails closed: an unread turn, or a target gone with no delete frame, is a failure.
+ */
+export function deleteOrderFailure({
+  toolEvents,
+  questions,
+  turnIds,
+  unreadTurns,
+  deleted,
+}: {
+  toolEvents: LangyToolEvent[];
+  questions: Pick<QuestionAsk, "toolEventsBeforeAnswer">[];
+  turnIds: string[];
+  unreadTurns: string[];
+  deleted: boolean;
+}): string | null {
+  if (unreadTurns.length > 0) {
+    return `The watcher could not read turn(s) ${unreadTurns.join(", ")}, so the delete's order is unknown.`;
+  }
+  const failed = (start: LangyToolEvent) =>
+    toolEvents.some(
+      (event) =>
+        event.phase === "end" &&
+        event.id === start.id &&
+        event.turnId === start.turnId &&
+        (event.output?.includes(CONFIRMATION_REFUSAL) === true ||
+          event.output?.includes(CLI_ERROR) === true),
+    );
+  const firstDelete = toolEvents.findIndex(
+    (event) => event.phase === "start" && isDeleteCommand(event.command) && !failed(event),
+  );
+  if (firstDelete === -1) {
+    return deleted
+      ? `The target is gone but none of the ${toolEvents.length} recorded tool frames is a delete, so the order cannot be shown.`
+      : null;
+  }
+  const waited =
+    questions.length > 0
+      ? questions.some((ask) => ask.toolEventsBeforeAnswer <= firstDelete)
+      : toolEvents[firstDelete]?.turnId !== turnIds[0];
+  if (waited) return null;
+  return `Langy issued the delete (tool frame ${firstDelete}) before the user's yes: ${
+    questions.length > 0
+      ? "a confirmation card was sent but answered after the delete"
+      : "no confirmation card; delete ran in the request turn"
+  }. It must ask first and delete on the user's yes.`;
+}
+
 /** One raw SSE frame's lines, dispatched to `onEntry` (README.md "local-control-fixture.ts"). */
 function dispatchTurnFrame(frame: string, onEntry: (entry: StreamEntry) => void): void {
   for (const line of frame.split("\n")) {
@@ -1375,8 +1495,7 @@ function dispatchTurnFrame(frame: string, onEntry: (entry: StreamEntry) => void)
     if (!payload) continue;
     try {
       const parsed: unknown = JSON.parse(payload);
-      if (typeof parsed !== "object" || parsed === null || !("json" in parsed)) continue;
-      if (isStreamEntry(parsed.json)) onEntry(parsed.json);
+      if (isStreamEntry(parsed)) onEntry(parsed);
     } catch (error) {
       // A frame the suite does not understand is not this suite's business.
       console.debug(`[fixture] unparsed stream frame: ${String(error)}`);
@@ -1384,6 +1503,7 @@ function dispatchTurnFrame(frame: string, onEntry: (entry: StreamEntry) => void)
   }
 }
 
+/** One turn's live stream, reported (README.md "local-control-fixture.ts"). */
 async function readTurnEntries({
   cookie,
   conversationId,
@@ -1398,13 +1518,16 @@ async function readTurnEntries({
   signal: AbortSignal;
 }): Promise<void> {
   const input = encodeURIComponent(
-    JSON.stringify({ json: { projectId: CONFIG.PROJECT_ID, conversationId, turnId } }),
+    JSON.stringify({ projectId: CONFIG.PROJECT_ID, conversationId, turnId }),
   );
+  // The live channel opens only from the app's own origin (BrowserOriginGuard).
   const response = await fetch(`${APP_BASE}/api/sse/langy.onTurnStream?input=${input}`, {
-    headers: { Cookie: cookie, Accept: "text/event-stream" },
+    headers: { Cookie: cookie, Accept: "text/event-stream", Origin: APP_BASE },
     signal,
   });
-  if (!response.ok || !response.body) return;
+  if (!response.ok || !response.body) {
+    throw new Error(`turn ${turnId} stream answered ${response.status}`);
+  }
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -1432,6 +1555,7 @@ interface ConversationWatchState {
   questions: QuestionAsk[];
   workspaceEvents: { state: string; name: string; root: string }[];
   turnIds: string[];
+  unreadTurns: string[];
   navigateHrefs: string[];
   toolEvents: LangyToolEvent[];
   answeredWaits: Set<string>;
@@ -1500,6 +1624,21 @@ async function answerLangyPermission(
   });
 }
 
+async function answerOneQuestion({
+  question,
+  picker,
+}: {
+  question: QuestionAsk["questions"][number];
+  picker?: QuestionAnswerPicker;
+}): Promise<QuestionAsk["answered"][number]> {
+  const picked = await picker?.(question);
+  if (picked && !Array.isArray(picked)) {
+    return { question: question.question, selected: [], other: picked.other };
+  }
+  const first = question.options?.[0]?.label;
+  return { question: question.question, selected: picked ?? (first ? [first] : []) };
+}
+
 async function answerLangyQuestion(
   state: ConversationWatchState,
   entry: StreamEntry,
@@ -1510,16 +1649,17 @@ async function answerLangyQuestion(
   if (entry.status !== "pending") return;
   state.answeredWaits.add(waitId);
   const asked = (Array.isArray(entry.questions) ? entry.questions : []) as QuestionAsk["questions"];
-  const answers: { question: string; selected: string[] }[] = [];
+  const answers: QuestionAsk["answered"] = [];
   for (const question of asked) {
-    answers.push({
-      question: question.question,
-      selected:
-        (await state.answerQuestion?.(question)) ??
-        (question.options?.[0]?.label ? [question.options[0].label] : []),
-    });
+    answers.push(await answerOneQuestion({ question, picker: state.answerQuestion }));
   }
-  const ask: QuestionAsk = { waitId, questions: asked, answered: answers, turnId };
+  const ask: QuestionAsk = {
+    waitId,
+    questions: asked,
+    answered: answers,
+    turnId,
+    toolEventsBeforeAnswer: state.toolEvents.length,
+  };
   state.questions.push(ask);
   state.answerNotes.push(questionAnswerNote(ask));
   const cookie = await getSessionCookie();
@@ -1537,36 +1677,45 @@ async function answerLangyQuestion(
   });
 }
 
+/** One followed turn's stream entry, routed to what the watcher keeps of it. */
+function recordTurnEntry(state: ConversationWatchState, entry: StreamEntry, turnId: string): void {
+  if (entry.type === "local_permission") {
+    void answerLangyPermission(state, entry, turnId);
+  } else if (entry.type === "question") {
+    void answerLangyQuestion(state, entry, turnId);
+  } else if (entry.type === "navigate" && typeof entry.href === "string") {
+    state.navigateHrefs.push(entry.href);
+  } else if (entry.type === "tool") {
+    const event = toolEventOf({ entry, turnId });
+    if (event) state.toolEvents.push(event);
+  } else if (entry.type === "local_workspace") {
+    state.workspaceEvents.push({
+      state: stringField(entry.state),
+      name: stringField(entry.name),
+      root: stringField(entry.root),
+    });
+  }
+}
+
 function watchLangyTurn(state: ConversationWatchState, turnId: string): void {
   if (state.watchedTurns.has(turnId)) return;
   state.watchedTurns.add(turnId);
   state.turnIds.push(turnId);
   void (async () => {
-    const cookie = await getSessionCookie();
-    await readTurnEntries({
-      cookie,
-      conversationId: state.adapter.state.conversationId ?? "",
-      turnId,
-      signal: state.controller.signal,
-      onEntry: (entry) => {
-        if (entry.type === "local_permission") {
-          void answerLangyPermission(state, entry, turnId);
-        } else if (entry.type === "question") {
-          void answerLangyQuestion(state, entry, turnId);
-        } else if (entry.type === "navigate" && typeof entry.href === "string") {
-          state.navigateHrefs.push(entry.href);
-        } else if (entry.type === "tool") {
-          const event = toolEventOf({ entry, turnId });
-          if (event) state.toolEvents.push(event);
-        } else if (entry.type === "local_workspace") {
-          state.workspaceEvents.push({
-            state: stringField(entry.state),
-            name: stringField(entry.name),
-            root: stringField(entry.root),
-          });
-        }
-      },
-    }).catch(() => undefined);
+    try {
+      await readTurnEntries({
+        cookie: await getSessionCookie(),
+        conversationId: state.adapter.state.conversationId ?? "",
+        turnId,
+        signal: state.controller.signal,
+        onEntry: (entry) => recordTurnEntry(state, entry, turnId),
+      });
+    } catch (error) {
+      // A turn read short leaves its frames out; recorded, so order checks fail closed.
+      if (state.controller.signal.aborted) return;
+      state.unreadTurns.push(turnId);
+      console.log(`[fixture] turn ${turnId} not read: ${String(error)}`);
+    }
   })();
 }
 
@@ -1600,8 +1749,8 @@ async function readLangyRecordWaits(state: ConversationWatchState): Promise<Reco
 }
 
 // Cards come off the record, not off the stream. The record folds the whole
-// event log per call, so it is read while a turn is in flight and not
-// between turns, which is also the only time a card can be up.
+// event log per call, so this is one read per poll. It also runs between
+// turns: the platform's own delete/disable card can outlive the turn.
 async function answerLangyRecordWaits(state: ConversationWatchState): Promise<void> {
   const dispatches = pendingWaitDispatches({
     waits: await readLangyRecordWaits(state),
@@ -1625,9 +1774,7 @@ async function pollLangyConversation(state: ConversationWatchState): Promise<voi
       if (state.adapter.state.currentTurnId) {
         watchLangyTurn(state, state.adapter.state.currentTurnId);
       }
-      if (snapshot?.currentTurnId ?? state.adapter.state.currentTurnId) {
-        await answerLangyRecordWaits(state);
-      }
+      await answerLangyRecordWaits(state);
     } catch (error) {
       // The conversation may not exist yet, or the app may be busy.
       console.debug(`[fixture] conversation read retry: ${String(error)}`);
@@ -1688,6 +1835,7 @@ export function watchLangyConversation({
     questions: [],
     workspaceEvents: [],
     turnIds: [],
+    unreadTurns: [],
     navigateHrefs: [],
     toolEvents: [],
     answeredWaits: new Set<string>(),
@@ -1715,6 +1863,7 @@ export function watchLangyConversation({
     navigateHrefs: state.navigateHrefs,
     toolEvents: state.toolEvents,
     turnIds: state.turnIds,
+    unreadTurns: state.unreadTurns,
     turnsStartedWithoutUs: (knownTurnIds) =>
       state.turnIds.filter((id) => !knownTurnIds.includes(id)),
     waitForNewTurn: async ({ knownTurnIds, timeoutMs = 240_000 }) =>
@@ -1732,7 +1881,10 @@ export function watchLangyConversation({
         intervalMs: 2_000,
         read: async () => {
           const snapshot = await readLangyConversation(state);
-          return snapshot !== null && snapshot.currentTurnId === null;
+          if (snapshot === null || snapshot.currentTurnId !== null) return false;
+          // A card left pending is about to start the follow-up turn once answered.
+          const waits = await readLangyRecordWaits(state);
+          return waits.every((wait) => wait.status !== "pending");
         },
       });
     },

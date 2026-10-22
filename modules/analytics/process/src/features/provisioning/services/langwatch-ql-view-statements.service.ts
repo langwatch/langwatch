@@ -16,6 +16,7 @@ import { LangWatchQLSqlTextService } from "../../../services/langwatch-ql-sql-te
  * @see specs/lwql/api.feature
  */
 import { LWQL_SOURCE_ALIAS } from "../../lwql-catalogue/rules/lwql-source-alias.rules.ts";
+import { postgresEngineColumnType } from "../rules/lwql-postgres-engine-type.rules.ts";
 
 const catalogShapes = LangWatchQLCatalogShapesService.create();
 const sqlText = LangWatchQLSqlTextService.create();
@@ -189,8 +190,8 @@ function groupedColumnExpression(
 
 /**
  * One projection expression: an identity over a PostgreSQL engine table (the
- * approved view already renamed), the grouped form under `GROUP BY`, else the
- * column's own expression.
+ * approved view already renamed, a date cast back to its catalogue type), the
+ * grouped form under `GROUP BY`, else the column's own expression.
  */
 function projectedExpression({
   view,
@@ -206,7 +207,11 @@ function projectedExpression({
   joinedColumn: ((name: string) => string) | undefined;
 }): string {
   if (postgres) {
-    return sourceColumn(column.name);
+    const source = sourceColumn(column.name);
+    // The engine table widens a date to read it right; the view keeps the catalogue's type.
+    return postgresEngineColumnType(column.type) === column.type
+      ? source
+      : `CAST(${source} AS ${column.type})`;
   }
 
   if (grouped) {

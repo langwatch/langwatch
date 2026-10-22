@@ -413,6 +413,8 @@ export class EvaluationModule implements EvaluationApiContract {
     });
     const execution = EvaluationExecutionService.create({
       traces: dependencies.traces,
+      runs: repositories.runs,
+      authz: dependencies.authz,
       spanDigest: EvaluationSpanDigestService.create(dependencies.traces),
       modelEnvResolver: EvaluatorModelEnvService.create({
         modelProviders: dependencies.modelProviders,
@@ -505,6 +507,8 @@ export class EvaluationModule implements EvaluationApiContract {
           execution,
           costs,
         }),
+        retryWindowMs: config.evaluatorRetryWindowMinutes * 60_000,
+        retries: commands,
       }),
       eventing: EvaluationProcessingStoresAdapter.create({
         runs: EvaluationRunProjectionService.create({

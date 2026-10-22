@@ -8,6 +8,7 @@ import { defineRestRouter, MANAGEMENT_API_VERSION, resolver } from "@langwatch/a
 import { mapZodIssuesToLogContext } from "@langwatch/config";
 import {
   EvaluationApi,
+  EvaluationReportUnavailableError,
   EvaluatorMissingFieldError,
   evaluateErrorSchema,
   evaluateResponseSchema,
@@ -181,6 +182,7 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
   })
 
   .post("/api/evaluations/:evaluator/evaluate", "postApiEvaluationsByEvaluatorEvaluate")
+  .keepsRecords()
   .withoutAudit("run, not a change")
   .withSharedPath(EXPERIMENT_NAMESPACE)
   .withParams(evaluatorParamsSchema)
@@ -215,6 +217,7 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
     "/api/evaluations/:evaluator/:subpath/evaluate",
     "postApiEvaluationsByEvaluatorBySubpathEvaluate",
   )
+  .keepsRecords()
   .withoutAudit("run, not a change")
   .withSharedPath(EXPERIMENT_NAMESPACE)
   .withParams(namespacedEvaluatorParamsSchema)
@@ -246,6 +249,7 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
   )
 
   .post("/api/guardrails/:evaluator/evaluate", "postApiGuardrailsByEvaluatorEvaluate")
+  .keepsRecords()
   .withoutAudit("run, not a change")
   .withParams(evaluatorParamsSchema)
   .withInput(z.looseObject({}), { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
@@ -706,6 +710,8 @@ async function reportVerdict({
       { err: eventError, projectId, evaluationId },
       "Failed to emit evaluation reported event",
     );
+    // A 200 here would lose the verdict for good; a retryable 503 lets the caller send it again.
+    throw new EvaluationReportUnavailableError();
   }
 }
 

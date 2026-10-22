@@ -1,12 +1,15 @@
 /**
  * @see packages/eventing/specs/event-read-seat.feature
+ * @see specs/clickhouse/id-index-reads.feature
  */
 import { generate, Ksuid } from "@langwatch/ksuid";
-import { describe, expect, it } from "vitest";
+import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createTenantId } from "../../domain/tenantId.ts";
 import { EventNotFoundError, ValidationError } from "../../services/errorHandling.ts";
 import { EVENT_READ_WINDOW_MS, EventLogReadSeat } from "../eventReadSeat.ts";
+import type { EventRepository } from "../repositories/eventRepository.types.ts";
 import { EventRepositoryMemory } from "../repositories/eventRepositoryMemory.ts";
 
 const TENANT = createTenantId("project-1");
@@ -37,7 +40,22 @@ async function seatHolding({
       IdempotencyKey: eventId,
     },
   ]);
-  return { seat: EventLogReadSeat.create({ repository }), eventId };
+  const reads: Parameters<EventRepository["getEventRecord"]>[0][] = [];
+  const recorded: Pick<EventRepository, "getEventRecord" | "getEventRecords"> = {
+    getEventRecord: (request) => {
+      reads.push(request);
+      return repository.getEventRecord(request);
+    },
+    getEventRecords: (request) => repository.getEventRecords(request),
+  };
+  return { seat: EventLogReadSeat.create({ repository: recorded }), eventId, reads };
+}
+
+let meter = createRecordingMeterProvider();
+
+/** How many event reads were counted with `outcome` so far. */
+function countedEventReads(outcome: string): number {
+  return meter.valueOf("es_event_log_index_read_total", { read: "event", outcome });
 }
 
 /** The time a KSUID id carries, or a fixed time for an id that carries none. */
@@ -54,7 +72,13 @@ function read(seat: EventLogReadSeat, eventId: string, tenantId = TENANT) {
 }
 
 describe("EventLogReadSeat", () => {
-  describe("given an event recorded within two days of its id's time", () => {
+  beforeEach(() => {
+    meter = createRecordingMeterProvider();
+    meter.install();
+  });
+  afterEach(() => meter.uninstall());
+
+  describe("given an event recorded within seven days of its id's time", () => {
     /** @scenario "An event inside the window is answered" */
     it("answers the event with its data", async () => {
       const { seat, eventId } = await seatHolding({ occurredAt: (t) => t - DAY_MS });
@@ -66,14 +90,34 @@ describe("EventLogReadSeat", () => {
     });
   });
 
-  describe("given an event recorded more than two days from its id's time", () => {
-    /** @scenario "An event recorded outside the window is not found" */
-    it("fails as not found", async () => {
-      const { seat, eventId } = await seatHolding({
-        occurredAt: (t) => t + EVENT_READ_WINDOW_MS + DAY_MS,
+  describe("given an event stored eight weeks ago, occurred close to its id's time", () => {
+    /** @scenario "an event is found first in the window its id's time names" */
+    it("answers it from one read bounded to seven days either side of the id's time", async () => {
+      vi.useFakeTimers({ toFake: ["Date"], now: Date.now() - 56 * DAY_MS });
+      const eventId = generate("event").toString();
+      vi.useRealTimers();
+      const { seat, reads } = await seatHolding({ eventId, occurredAt: (t) => t + 60_000 });
+
+      await expect(read(seat, eventId)).resolves.toMatchObject({ id: eventId });
+
+      const idTimeMs = idTime(eventId);
+      expect(reads.map((each) => each.occurredAt)).toEqual([
+        { fromMs: idTimeMs - EVENT_READ_WINDOW_MS, toMs: idTimeMs + EVENT_READ_WINDOW_MS },
+      ]);
+    });
+  });
+
+  describe("given an event exported today whose occurred time is three months ago", () => {
+    /** @scenario "an event whose occurred time drifted far from its id falls back" */
+    it("finds nothing in the window, then answers it from the whole stream and counts it", async () => {
+      const { seat, eventId, reads } = await seatHolding({
+        occurredAt: (t) => t - 90 * DAY_MS,
       });
 
-      await expect(read(seat, eventId)).rejects.toBeInstanceOf(EventNotFoundError);
+      await expect(read(seat, eventId)).resolves.toMatchObject({ id: eventId });
+
+      expect(reads.map((each) => each.occurredAt !== undefined)).toEqual([true, false]);
+      expect(countedEventReads("window_fallback")).toBe(1);
     });
   });
 
@@ -95,6 +139,19 @@ describe("EventLogReadSeat", () => {
       });
 
       await expect(read(seat, eventId)).resolves.toMatchObject({ id: "not-a-ksuid" });
+    });
+
+    /** @scenario "an event id that is not a KSUID takes the existing lookup path" */
+    it("reads once, with no time taken from the id", async () => {
+      const { seat, eventId, reads } = await seatHolding({
+        eventId: "legacy-event-1",
+        occurredAt: () => 1_600_000_000_000,
+      });
+
+      await read(seat, eventId);
+
+      expect(reads).toHaveLength(1);
+      expect(reads[0]?.occurredAt).toBeUndefined();
     });
   });
 

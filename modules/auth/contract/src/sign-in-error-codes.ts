@@ -70,6 +70,9 @@ export const STABLE_AUTH_ERRORS = [
   // The connection's arrival policy refused or held a newcomer: an administrator has to act.
   "identity_jit_disabled",
   "identity_link_proposed",
+  // better-auth's state check: the attempt expired or began in another tab or browser. Starting
+  // again is the remedy, and a bounce would start it from the same stale state.
+  "state_mismatch",
 ] as const;
 
 export const isStableAuthError = (error: string | null | undefined): boolean =>

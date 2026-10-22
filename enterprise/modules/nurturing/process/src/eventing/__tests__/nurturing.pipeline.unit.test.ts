@@ -17,9 +17,13 @@ import {
   GUIDED_ONBOARDING_RECORDED_EVENT_TYPE,
   GUIDED_ONBOARDING_RECORDED_EVENT_VERSION,
   type GuidedOnboardingRecordedEventData,
+  ONBOARDING_VARIANT_ASSIGNED_EVENT_TYPE,
+  ONBOARDING_VARIANT_ASSIGNED_EVENT_VERSION,
+  type OnboardingVariantAssignedEventData,
 } from "@langwatch/onboarding-contract";
 import { SIMULATION_RUN_EVENT_TYPES } from "@langwatch/scenario-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { Temporal } from "@langwatch/time";
 import {
   FIRST_TRACE_RECORDED_EVENT_TYPE,
   TRACE_RECEIVED_EVENT_TYPE,
@@ -42,6 +46,7 @@ import { describe, expect, it, vi } from "vitest";
  */
 import { HttpCustomerIoChannel } from "../../channels/http/http.customer-io.channel.ts";
 import { MemoryPostHogChannel } from "../../channels/memory/memory.posthog.channel.ts";
+import { postHogUuidFor } from "../../rules/nurturing-guided-onboarding-service.rules.ts";
 import { NurturingDeliveryService } from "../../services/nurturing-delivery.service.ts";
 import { NurturingService } from "../../services/nurturing.service.ts";
 import { RecordNurturingSignalCommand } from "../nurturing-signal.commands.ts";
@@ -90,7 +95,10 @@ function nurturingOverMemoryPostHog(users: UserApi = createApiFixture<UserApi>({
   );
   const seen = new Set<string>();
   const delivery = NurturingDeliveryService.create({
-    claims: { claim: async (key: string) => !seen.has(key) && Boolean(seen.add(key)) },
+    claims: {
+      claim: async (key: string) => !seen.has(key) && Boolean(seen.add(key)),
+      release: async (key: string) => void seen.delete(key),
+    },
     customerIo: NurturingService.create({
       channel: HttpCustomerIoChannel.create({
         config: { customerIoApiKey: "key", customerIoRegion: "us" },
@@ -105,8 +113,8 @@ function nurturingOverMemoryPostHog(users: UserApi = createApiFixture<UserApi>({
     projectCreated: async () => undefined,
     guidedTurnFailed: (data) => delivery.deliverGuidedTurnFailed(data),
     usageReportReceived: (input) => delivery.deliverUsageReport(input),
-    evaluationCompleted: async () => [],
-    simulationRunFinished: async () => [],
+    evaluationsCompleted: async () => undefined,
+    simulationRunsFinished: async () => undefined,
   });
   const subscribers: EventSubscriberDefinition<Event>[] = [];
   const registry = createApiFixture<
@@ -386,6 +394,79 @@ describe("nurturing's guidedOnboardingRecorded peer subscriber", () => {
   });
 });
 
+/** Onboarding's fact for the variant an organization was created with, as it records it. */
+function variantAssignedFact(variant: OnboardingVariantAssignedEventData["variant"]): Event {
+  return {
+    id: `evt-variant-${variant}`,
+    aggregateId: "org-1",
+    aggregateType: GUIDED_ONBOARDING_AGGREGATE_TYPE,
+    tenantId: createTenantId("org-1"),
+    createdAt: 1_000,
+    occurredAt: 1_000,
+    type: ONBOARDING_VARIANT_ASSIGNED_EVENT_TYPE,
+    version: ONBOARDING_VARIANT_ASSIGNED_EVENT_VERSION,
+    data: {
+      tenantId: "org-1",
+      occurredAt: 1_000,
+      organizationId: "org-1",
+      userId: "user-1",
+      variant,
+    },
+    idempotencyKey: "org-1:org-1:variant_assigned",
+  } as Event;
+}
+
+describe("nurturing's onboardingVariantAssigned peer subscriber", () => {
+  describe("when onboarding records the guided variant, delivered twice", () => {
+    /** @scenario "the variant assignment reaches PostHog once with the person property" */
+    it("tracks exactly one onboarding_variant_assigned and tells Customer.io nothing", async () => {
+      const { posthog, customerIoFetch, deliverFact } = nurturingOverMemoryPostHog();
+      const fact = variantAssignedFact("guided");
+
+      await deliverFact(fact);
+      await deliverFact(fact);
+      await settle();
+
+      expect(posthog.tracked).toEqual([
+        {
+          userId: "user-1",
+          event: "onboarding_variant_assigned",
+          uuid: postHogUuidFor("onboarding-variant-assigned:org-1"),
+          timestamp: Temporal.Instant.fromEpochMilliseconds(1_000),
+          properties: {
+            variant: "guided",
+            "$feature/experiment_onboarding_langy_guided": "guided",
+            organization_id: "org-1",
+            $set: { onboarding_variant: "guided" },
+          },
+        },
+      ]);
+      expect(customerIoFetch).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when onboarding records the classic variant", () => {
+    /** @scenario "the variant assignment is the exposure of the experiment" */
+    it("carries the experiment property as control", async () => {
+      const { posthog, deliverFact } = nurturingOverMemoryPostHog();
+
+      await deliverFact(variantAssignedFact("classic"));
+      await settle();
+
+      expect(posthog.tracked).toEqual([
+        expect.objectContaining({
+          event: "onboarding_variant_assigned",
+          properties: expect.objectContaining({
+            variant: "classic",
+            "$feature/experiment_onboarding_langy_guided": "control",
+            $set: { onboarding_variant: "classic" },
+          }),
+        }),
+      ]);
+    });
+  });
+});
+
 /** Langy's fact for one failed guided turn, as its langy_guided_onboarding pipeline records it. */
 function turnFailedFact(overrides: Partial<GuidedOnboardingTurnFailedEventData> = {}): Event {
   const data: GuidedOnboardingTurnFailedEventData = {
@@ -537,7 +618,7 @@ describe("nurturing's usageReportReceived peer subscriber", () => {
     it("sends nothing and claims nothing", async () => {
       const claim = vi.fn(async () => true);
       const delivery = NurturingDeliveryService.create({
-        claims: { claim },
+        claims: { claim, release: async () => undefined },
         customerIo: undefined,
         posthog: undefined,
         users: createApiFixture<UserApi>({}),
