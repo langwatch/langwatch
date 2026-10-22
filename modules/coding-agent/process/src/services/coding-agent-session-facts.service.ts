@@ -4,11 +4,13 @@ import type { ProjectApi } from "@langwatch/project-contract";
 
 import type { CodingAgentSessionRepository } from "../repositories/coding-agent-session.repository.ts";
 import type { CodingAgentClock } from "./coding-agent-clock.service.ts";
-import { CODING_AGENT_SESSION_SEEN_WINDOW_MS } from "./coding-agent-session-seen.service.ts";
+import {
+  CODING_AGENT_SESSION_SEEN_WINDOW_MS,
+  CodingAgentHoldWindowService,
+} from "./coding-agent-hold-window.service.ts";
 import type { StoredSession } from "./coding-agent-session-store.service.ts";
 
 const logger = createLogger("langwatch:coding-agent:session-facts");
-export const HOLD_SWEEP_THRESHOLD = 10_000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** A stored session whose product is known: the only kind a fact can name. */
@@ -34,7 +36,7 @@ type FactsDependencies = Readonly<{
  * first. Every failure is logged and swallowed: the stored row never depends on it.
  */
 export class CodingAgentSessionFactsService {
-  private readonly heldUntil = new Map<string, number>();
+  private readonly holds = CodingAgentHoldWindowService.create();
 
   private constructor(private readonly dependencies: FactsDependencies) {}
 
@@ -45,7 +47,7 @@ export class CodingAgentSessionFactsService {
   async record(sessions: StoredSession[]): Promise<void> {
     try {
       const now = this.dependencies.clock.nowMs();
-      if (this.heldUntil.size >= HOLD_SWEEP_THRESHOLD) this.sweepExpiredHolds(now);
+      this.holds.sweepIfLarge(now);
       const projectIsStamped = new Map<string, Promise<boolean>>();
       const due = this.claimDue({ sessions, now });
       const claims = claimsByProject(due);
@@ -54,12 +56,6 @@ export class CodingAgentSessionFactsService {
       );
     } catch (error) {
       logger.warn({ error }, "recording the session-stored facts failed, non-fatal");
-    }
-  }
-
-  private sweepExpiredHolds(now: number): void {
-    for (const [key, until] of this.heldUntil) {
-      if (until <= now) this.heldUntil.delete(key);
     }
   }
 
@@ -73,8 +69,8 @@ export class CodingAgentSessionFactsService {
       // the stored fact, so every redelivery sees the same time.
       const clamped = { ...session, agent, occurredAt: Math.min(session.occurredAt, now + DAY_MS) };
       const key = holdKey(clamped);
-      if ((this.heldUntil.get(key) ?? 0) > now || due.has(key)) continue;
-      this.heldUntil.set(key, now + CODING_AGENT_SESSION_SEEN_WINDOW_MS);
+      if (this.holds.isHeld(key, now) || due.has(key)) continue;
+      this.holds.hold(key, now);
       due.set(key, clamped);
     }
     return [...due.values()];
@@ -102,8 +98,7 @@ export class CodingAgentSessionFactsService {
         occurredAt: session.occurredAt,
       });
     } catch (error) {
-      const key = holdKey(session);
-      if (this.heldUntil.get(key) === holdSetTo) this.heldUntil.delete(key);
+      this.holds.release(holdKey(session), holdSetTo);
       logger.warn(
         { error, tenantId: session.tenantId, sessionId: session.sessionId },
         "recording the session-stored fact failed, non-fatal, the next fold retries it",

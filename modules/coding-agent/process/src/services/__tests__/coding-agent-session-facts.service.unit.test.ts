@@ -9,10 +9,10 @@ import { describe, expect, it } from "vitest";
 
 import { projectRow } from "../../__tests__/fixtures/coding-agent.fixture.ts";
 import {
-  CodingAgentSessionFactsService,
+  CODING_AGENT_SESSION_SEEN_WINDOW_MS,
   HOLD_SWEEP_THRESHOLD,
-} from "../coding-agent-session-facts.service.ts";
-import { CODING_AGENT_SESSION_SEEN_WINDOW_MS } from "../coding-agent-session-seen.service.ts";
+} from "../coding-agent-hold-window.service.ts";
+import { CodingAgentSessionFactsService } from "../coding-agent-session-facts.service.ts";
 import type { StoredSession } from "../coding-agent-session-store.service.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
