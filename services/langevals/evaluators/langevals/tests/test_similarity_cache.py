@@ -5,6 +5,7 @@ request the evaluator makes.
 """
 
 import hashlib
+import threading
 
 import litellm
 import numpy as np
@@ -166,3 +167,38 @@ def test_cache_is_bounded_and_drops_the_least_recently_used():
     assert cache.get(b) is None
     assert cache.get(a) is not None
     assert cache.get(c) is not None
+
+
+def test_concurrent_misses_on_one_target_make_one_embedding_request(
+    embedding_requests, monkeypatch
+):
+    release = threading.Event()
+    started = threading.Event()
+    original = litellm.embedding
+
+    def slow_embedding(*, model, input, **kwargs):
+        if input == "You suck":
+            started.set()
+            release.wait(timeout=5)
+        return original(model=model, input=input, **kwargs)
+
+    monkeypatch.setattr(litellm, "embedding", slow_embedding)
+    entry = CustomSimilarityEntry(output="an answer")
+    results = []
+
+    threads = [
+        threading.Thread(
+            target=lambda: results.append(make_evaluator().evaluate(entry))
+        )
+        for _ in range(4)
+    ]
+    threads[0].start()
+    assert started.wait(timeout=5)
+    for thread in threads[1:]:
+        thread.start()
+    release.set()
+    for thread in threads:
+        thread.join(timeout=10)
+
+    assert len(results) == 4
+    assert [r["input"] for r in embedding_requests].count("You suck") == 1

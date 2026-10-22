@@ -38,6 +38,7 @@ class TargetEmbeddingCache:
         self.max_entries = max_entries
         self._entries: OrderedDict[tuple[str, str, str], np.ndarray] = OrderedDict()
         self._lock = threading.Lock()
+        self._in_flight: dict[tuple[str, str, str], threading.Event] = {}
 
     @staticmethod
     def key(model: str, env: dict[str, str], text: str) -> tuple[str, str, str]:
@@ -60,6 +61,42 @@ class TargetEmbeddingCache:
             self._entries.move_to_end(key)
             while len(self._entries) > self.max_entries:
                 self._entries.popitem(last=False)
+
+    def get_or_compute(self, key: tuple[str, str, str], compute):
+        """Return the cached embedding, or run `compute` once per key.
+
+        Concurrent callers that miss the same key wait for the first one
+        instead of each asking the provider. Other keys stay concurrent. A
+        result that is not an array (a skip) or an exception is not cached;
+        the waiters then try for themselves.
+        """
+        while True:
+            with self._lock:
+                embedding = self._entries.get(key)
+                if embedding is not None:
+                    self._entries.move_to_end(key)
+                    return embedding
+                pending = self._in_flight.get(key)
+                if pending is None:
+                    pending = threading.Event()
+                    self._in_flight[key] = pending
+                    owner = True
+                else:
+                    owner = False
+
+            if not owner:
+                pending.wait()
+                continue
+
+            try:
+                result = compute()
+                if isinstance(result, np.ndarray):
+                    self.put(key, result)
+                return result
+            finally:
+                with self._lock:
+                    del self._in_flight[key]
+                pending.set()
 
     def clear(self) -> None:
         with self._lock:
@@ -155,10 +192,11 @@ class CustomSimilarityEvaluator(
         key = TargetEmbeddingCache.key(
             self.settings.embeddings_model, current_request_env(), text
         )
-        cached = target_embedding_cache.get(key)
-        if cached is not None:
-            return cached
+        return target_embedding_cache.get_or_compute(
+            key, lambda: self._embed_target(text)
+        )
 
+    def _embed_target(self, text: str):
         embedding = self.get_embeddings(text)
         if isinstance(embedding, EvaluationResultSkipped):
             return embedding
@@ -167,7 +205,6 @@ class CustomSimilarityEvaluator(
         # score is identical whether the target came from the cache or not.
         array = np.asarray(embedding, dtype=np.float64)
         array.setflags(write=False)
-        target_embedding_cache.put(key, array)
         return array
 
     def get_embeddings(self, text: str):
