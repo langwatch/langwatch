@@ -33,7 +33,7 @@ const TYPE_ONLY = /^(?:import|export)\s+type\s+(?!from\b)/;
 const RELATIVE_LITERAL = /['"](\.{1,2}\/[^'"\n]+)['"]/g;
 
 export const isTestFile = (file) => TEST.test(file);
-export const isVitestConfig = (file) => VITEST_CONFIG.test(basename(file));
+const isVitestConfig = (file) => VITEST_CONFIG.test(basename(file));
 
 /**
  * The module specifiers a file names, type-only imports left out. A Vitest

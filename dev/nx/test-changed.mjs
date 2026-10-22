@@ -4,11 +4,11 @@
 // script. No files means the diff from the merge base with origin/main,
 // untracked files included. ADR-182, specs/tooling/test-changed.feature.
 import { spawn, spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname, join, matchesGlob, posix } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { buildImportGraph, isTestFile, isVitestConfig, reachedFrom } from "./import-graph.mjs";
+import { buildImportGraph, isTestFile, reachedFrom } from "./import-graph.mjs";
 import { reads } from "./test-reads-plugin.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -16,24 +16,49 @@ const CACHE_FILE = join(root, "node_modules/.cache/test-changed/import-graph.jso
 const DEFAULT_CONFIG = /^vitest\.config\.[cm]?[jt]s$/;
 const VITEST_SCRIPT = /^vitest run(?:\s[^&|;<>`$]*)?$/;
 
-function git(args) {
-  const result = spawnSync("git", args, { cwd: root, encoding: "utf8" });
+function git({ args, cwd = root, allowFailure = false }) {
+  const result = spawnSync("git", args, { cwd, encoding: "utf8" });
+  if (result.status !== 0) {
+    if (allowFailure) return [];
+    throw new Error(`git ${args.join(" ")} failed: ${result.stderr.trim()}`);
+  }
 
-  return result.status === 0 ? result.stdout.split("\n").filter(Boolean) : [];
+  return result.stdout.split("\n").filter(Boolean);
 }
 
 /** Committed, staged, unstaged and untracked changes since `base`. */
-function changedSince(base) {
-  const tracked = git(["diff", "--name-only", "--diff-filter=ACMRD", base]);
-  const untracked = git(["ls-files", "--others", "--exclude-standard"]);
+export function changedSince({ base, cwd = root }) {
+  const tracked = git({ args: ["diff", "--name-only", "--diff-filter=ACMRD", base], cwd });
+  const untracked = git({ args: ["ls-files", "--others", "--exclude-standard"], cwd });
 
   return [...new Set([...tracked, ...untracked])].toSorted((a, b) => a.localeCompare(b));
 }
 
-function defaultBase() {
-  const [base] = git(["merge-base", "HEAD", "origin/main"]);
+/** The merge base with origin/main; HEAD when origin/main is not there. */
+export function defaultBase({ cwd = root } = {}) {
+  const [base] = git({ args: ["merge-base", "HEAD", "origin/main"], cwd, allowFailure: true });
 
   return base ?? "HEAD";
+}
+
+/**
+ * Names what is wrong with the named arguments. An option-like argument is
+ * unknown; a file in the graph, on disk or tracked in HEAD (a deleted file)
+ * is real, anything else is a typo or a package-relative path.
+ */
+export function checkNamed({ named, known, cwd = root }) {
+  const problems = [];
+  for (const arg of named) {
+    if (arg.startsWith("-")) {
+      problems.push(`unknown option ${arg}`);
+      continue;
+    }
+    const inHead = git({ args: ["ls-tree", "HEAD", "--", arg], cwd, allowFailure: true }).length > 0;
+    if (!known(arg) && !existsSync(join(cwd, arg)) && !inHead)
+      problems.push(`${arg} is not a file in this repository (paths are from the repository root)`);
+  }
+
+  return problems;
 }
 
 /** Every workspace package with its directory, name and `test` script. */
@@ -102,7 +127,7 @@ export function planRuns({ graph, packages, changed, reached, withReads = false 
   const wholeDirs = new Set(whole.map(({ pkg }) => pkg.dir));
   const filesByDir = new Map();
   const notVitest = [];
-  const tests = reached.filter((file) => isTestFile(file) && !isVitestConfig(file));
+  const tests = reached.filter((file) => isTestFile(file));
   for (const file of tests) {
     const pkg = owner({ packagesByDir, file });
     if (!isVitest(pkg)) notVitest.push(file);
@@ -187,16 +212,19 @@ async function main() {
   const base = baseFlag === -1 ? void 0 : args[baseFlag + 1];
   const flags = new Set(["--list", "--json", "--reads", "--base", base]);
   const named = args.filter((arg) => !flags.has(arg));
-  const changed =
-    named.length > 0
-      ? named.map((file) => posix.normalize(file).replace(/^\.\//, ""))
-      : changedSince(base ?? defaultBase());
+  const normalized = named.map((file) => posix.normalize(file).replace(/^\.\//, ""));
+  const graph = buildImportGraph({ root, cacheFile: CACHE_FILE });
+  const problems = checkNamed({ named: normalized, known: (file) => graph.index.has(file) });
+  if (problems.length > 0) {
+    process.stderr.write(`test:changed: ${problems.join("\ntest:changed: ")}\n`);
+    process.exit(2);
+  }
+  const changed = normalized.length > 0 ? normalized : changedSince({ base: base ?? defaultBase() });
   if (changed.length === 0) {
     process.stderr.write("test:changed: nothing changed.\n");
     process.exit(0);
   }
 
-  const graph = buildImportGraph({ root, cacheFile: CACHE_FILE });
   const packages = readPackages({
     files: graph.files,
     readText: (file) => readFileSync(join(root, file), "utf8"),

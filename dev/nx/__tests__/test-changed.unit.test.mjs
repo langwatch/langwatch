@@ -9,7 +9,7 @@ import { dirname, join } from "node:path";
 import { describe, it } from "node:test";
 
 import { buildImportGraph, reachedFrom, scanSpecifiers } from "../import-graph.mjs";
-import { planRuns, readPackages } from "../test-changed.mjs";
+import { changedSince, checkNamed, defaultBase, planRuns, readPackages } from "../test-changed.mjs";
 
 const FILES = {
   "package.json": { name: "@langwatch/workspace", private: true },
@@ -159,6 +159,55 @@ void describe("test:changed", () => {
     const result = plan({ root, changed: ["packages/time/src/clock.ts"] });
 
     assert.deepEqual(result.notVitest, ["dev/scripts/__tests__/clock.unit.test.mjs"]);
+  });
+
+  /** @scenario "With no files named, the change is what differs from the merge base" */
+  void it("collects committed, staged, unstaged and untracked files since the base", () => {
+    const root = fixtureRepo();
+    const commit = (message) =>
+      execFileSync(
+        "git",
+        ["-c", "commit.gpgsign=false", "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", message],
+        { cwd: root },
+      );
+    commit("base");
+    const base = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+    write({ root, file: "packages/time/src/clock.ts", content: "export const clock = () => 2;\n" });
+    execFileSync("git", ["add", "-A"], { cwd: root });
+    commit("committed edit");
+    write({ root, file: "packages/time/src/index.ts", content: "export {};\n" });
+    execFileSync("git", ["add", "packages/time/src/index.ts"], { cwd: root });
+    write({ root, file: "packages/time/src/shape.ts", content: "export type Shape = {};\n" });
+    write({ root, file: "packages/time/src/new.ts", content: "export const n = 1;\n" });
+
+    assert.deepEqual(changedSince({ base, cwd: root }), [
+      "packages/time/src/clock.ts",
+      "packages/time/src/index.ts",
+      "packages/time/src/new.ts",
+      "packages/time/src/shape.ts",
+    ]);
+  });
+
+  /** @scenario "With no files named, the change is what differs from the merge base" */
+  void it("falls back to HEAD as the base when origin/main does not exist", () => {
+    const root = fixtureRepo();
+    execFileSync("git", ["-c", "commit.gpgsign=false", "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "base"], { cwd: root });
+
+    assert.equal(defaultBase({ cwd: root }), "HEAD");
+  });
+
+  /** @scenario "An argument that is not a file or a known option is refused" */
+  void it("refuses unknown options and files that exist nowhere, and allows deleted files", () => {
+    const root = fixtureRepo();
+    execFileSync("git", ["-c", "commit.gpgsign=false", "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "base"], { cwd: root });
+    const known = (file) => file === "packages/time/src/clock.ts";
+
+    assert.deepEqual(checkNamed({ named: ["packages/time/src/clock.ts"], known, cwd: root }), []);
+    assert.deepEqual(checkNamed({ named: ["modules/auth/notes.md"], known, cwd: root }), []);
+    assert.equal(checkNamed({ named: ["--base=origin/main", "-l"], known, cwd: root }).length, 2);
+    assert.equal(checkNamed({ named: ["src/clock.ts"], known, cwd: root }).length, 1);
+    execFileSync("git", ["rm", "-q", "packages/time/src/shape.ts"], { cwd: root });
+    assert.deepEqual(checkNamed({ named: ["packages/time/src/shape.ts"], known, cwd: root }), []);
   });
 
   /** @scenario "The graph rescans only the files that changed since the last run" */

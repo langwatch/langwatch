@@ -45,3 +45,15 @@ Feature: test:changed runs the tests a change reaches by imports
     When one source file's contents change
     Then only that file is read again
     And with no change at all, nothing is read or resolved again
+
+  Scenario: With no files named, the change is what differs from the merge base
+    Given a repository with a base commit, a later commit, a staged edit, an unstaged edit and an untracked file
+    When test:changed picks its change set with no files named
+    Then every one of those files is in the change set
+    And the base is HEAD when origin/main does not exist
+
+  Scenario: An argument that is not a file or a known option is refused
+    Given an unknown option, or a path that is in no part of the repository
+    When test:changed checks its arguments
+    Then it names each one and exits with a failure instead of running no tests
+    And a file deleted since the last commit is still accepted
