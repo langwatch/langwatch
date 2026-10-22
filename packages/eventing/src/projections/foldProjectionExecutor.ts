@@ -10,8 +10,9 @@ import {
   observeEsFoldBlindReapplyEvents,
 } from "../metrics.ts";
 import { FoldRebuildIncompleteHistoryError } from "../services/errorHandling.ts";
+import type { PageCursor } from "../stores/eventStore.types.ts";
 import { compareOrdinal } from "../utils/compareOrdinal.ts";
-import { mergeAppliedEventIds } from "./foldCache/foldCacheEntry.ts";
+import { MAX_APPLIED_EVENT_IDS, mergeAppliedEventIds } from "./foldCache/foldCacheEntry.ts";
 import type { FoldProjectionDefinition } from "./foldProjection.types.ts";
 import { type ProjectionStoreContext, readWindowAround } from "./projectionStoreContext.ts";
 import { projectionConsumes } from "./sealedProjection.ts";
@@ -39,9 +40,6 @@ type HistoryReadGap = {
   missingAppliedIds: string[];
   isFrontierMissing: boolean;
 };
-
-/** A paged history read's strict cursor: the last row of the previous page. */
-type PageCursor = { timestamp: number; eventId: string };
 
 /**
  * Arrival time, then the id: the order of two events the event log accepted,
@@ -1082,6 +1080,7 @@ export class FoldProjectionExecutor {
       state = projection.apply(state, missed);
       applied.push(missedToken);
     }
+    const rebuiltEventCount = folded.appliedCount + applied.length - folded.applied.length;
     await projection.store.store(
       state,
       withAppliedEventIds(context, mergeAppliedEventIds({ previous: [], applied })),
@@ -1092,7 +1091,7 @@ export class FoldProjectionExecutor {
         aggregateId: context.aggregateId,
         tenantId: context.tenantId,
         missedEventId: missed.id,
-        rebuiltEventCount: applied.length,
+        rebuiltEventCount,
         streamed: true,
       },
       "Rebuilt the aggregate for a missed hand-off",
@@ -1111,10 +1110,18 @@ export class FoldProjectionExecutor {
     missed: E;
     context: ProjectionStoreContext;
     consumes: (event: Event) => boolean;
-  }): Promise<{ state: State; applied: string[]; seen: Set<string>; read: HistoryAccount }> {
+  }): Promise<{
+    state: State;
+    applied: string[];
+    appliedCount: number;
+    seen: Set<string>;
+    read: HistoryAccount;
+  }> {
     const read = HistoryAccount.empty();
     const seen = new Set<string>();
-    const applied: string[] = [];
+    // `mergeAppliedEventIds` stores only the trailing ids, so only those are kept.
+    let applied: string[] = [];
+    let appliedCount = 0;
     let state = projection.init();
     await this.walkPages({
       aggregateId: context.aggregateId,
@@ -1136,10 +1143,13 @@ export class FoldProjectionExecutor {
           if (!consumes(event)) continue;
           state = projection.apply(state, event as E);
           applied.push(token);
+          appliedCount++;
+          if (applied.length > 2 * MAX_APPLIED_EVENT_IDS)
+            applied = applied.slice(-MAX_APPLIED_EVENT_IDS);
         }
       },
     });
-    return { state, applied, seen, read };
+    return { state, applied, appliedCount, seen, read };
   }
 
   /**

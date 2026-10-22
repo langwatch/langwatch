@@ -189,6 +189,45 @@ function replayed(
   };
 }
 
+/**
+ * A repository whose pages repeat their first row, as ClickHouse's event_log can for a retried
+ * insert (the memory twin drops duplicates on insert).
+ */
+function duplicatingFirstRow(): EventRepositoryMemory {
+  const repository = EventRepositoryMemory.createForTesting();
+  return new Proxy(repository, {
+    get(target, prop, receiver) {
+      if (prop !== "getEventRecordsPaged") return Reflect.get(target, prop, receiver);
+      return async (request: Parameters<typeof target.getEventRecordsPaged>[0]) => {
+        const page = await target.getEventRecordsPaged({ ...request, limit: request.limit - 1 });
+        return page.length === 0 ? page : [page[0]!, ...page];
+      };
+    },
+  });
+}
+
+/** Walks an aggregate's paged history two rows at a time until a short page. */
+async function readAllPages(
+  upcasting: ReturnType<typeof upcastEventStore>,
+  aggregateType: string,
+): Promise<Event[][]> {
+  const pages: Event[][] = [];
+  let after: { timestamp: number; eventId: string } | undefined;
+  for (;;) {
+    const page = await upcasting.getEventsPaged!({
+      aggregateId: "organization-1",
+      context: { tenantId: TENANT },
+      aggregateType,
+      after,
+      limit: 2,
+    });
+    pages.push([...page]);
+    if (page.length < 2) return pages;
+    const last = page[page.length - 1]!;
+    after = { timestamp: last.createdAt, eventId: last.id };
+  }
+}
+
 describe("an upcast declared on the owning pipeline", () => {
   describe("when the worker dispatches a queued job carrying the stored type", () => {
     /** @scenario "A queued job carrying the stored type is dispatched as the current type" */
@@ -310,20 +349,7 @@ describe("an upcast declared on the owning pipeline", () => {
     it("keeps a page's raw length, so a duplicate row cannot end a paged read early", async () => {
       // ClickHouse's event_log can return one EventId twice in a page (a retried insert); the
       // memory twin drops duplicates on insert, so the repository here repeats a page's first row.
-      const repository = EventRepositoryMemory.createForTesting();
-      const duplicating = new Proxy(repository, {
-        get(target, prop, receiver) {
-          if (prop !== "getEventRecordsPaged") return Reflect.get(target, prop, receiver);
-          return async (request: Parameters<typeof target.getEventRecordsPaged>[0]) => {
-            const page = await target.getEventRecordsPaged({
-              ...request,
-              limit: request.limit - 1,
-            });
-            return page.length === 0 ? page : [page[0]!, ...page];
-          };
-        },
-      });
-      const store = EventStoreMemory.createForTesting(duplicating);
+      const store = EventStoreMemory.createForTesting(duplicatingFirstRow());
       const context = { tenantId: TENANT };
       const other = (id: string, createdAt: number) =>
         stored({ id, type: CURRENT, aggregateType: "other_aggregate", createdAt });
@@ -339,24 +365,11 @@ describe("an upcast declared on the owning pipeline", () => {
         parseEvent: definition.parseEvent,
       });
 
-      const seen = new Set<string>();
-      let after: { timestamp: number; eventId: string } | undefined;
-      for (;;) {
-        const page = await upcasting.getEventsPaged!({
-          aggregateId: "organization-1",
-          context,
-          aggregateType: "other_aggregate",
-          after,
-          limit: 2,
-        });
-        if (page.length === 0) break;
-        for (const event of page) seen.add(event.id);
-        const last = page[page.length - 1]!;
-        after = { timestamp: last.createdAt, eventId: last.id };
-        if (page.length < 2) break;
-      }
+      const pages = await readAllPages(upcasting, "other_aggregate");
 
-      expect(seen).toEqual(new Set(["a1", "a2", "a3", "a4"]));
+      expect(new Set(pages.flat().map((event) => event.id))).toEqual(
+        new Set(["a1", "a2", "a3", "a4"]),
+      );
     });
 
     /** @scenario An order-insensitive fold that missed an event is rebuilt from its log a page at a time */
@@ -395,24 +408,44 @@ describe("an upcast declared on the owning pipeline", () => {
         parseEvent: definition.parseEvent,
       });
 
-      const pages: Event[][] = [];
-      let after: { timestamp: number; eventId: string } | undefined;
-      for (;;) {
-        const page = await upcasting.getEventsPaged!({
-          aggregateId: "organization-1",
-          context,
-          aggregateType: "entitlement_organization",
-          after,
-          limit: 2,
-        });
-        pages.push([...page]);
-        if (page.length < 2) break;
-        const last = page[page.length - 1]!;
-        after = { timestamp: last.createdAt, eventId: last.id };
-      }
+      const pages = await readAllPages(upcasting, "entitlement_organization");
 
       expect(pages.map((page) => page.map((event) => event.id))).toEqual([["e1", "e2"], ["e3"]]);
       expect(pages[0]![0]!.data).toMatchObject({ billableEvents: 99 });
+    });
+
+    /** @scenario An order-insensitive fold that missed an event is rebuilt from its log a page at a time */
+    it("pages a renamed aggregate without skipping rows when a type's page ends earlier", async () => {
+      // Each read repeats its first row, so a page collapses short and the pager reads again; the
+      // former type's full page ends (b) before the current type's next row (x).
+      const store = EventStoreMemory.createForTesting(duplicatingFirstRow());
+      const context = { tenantId: TENANT };
+      const former = (id: string, createdAt: number) =>
+        stored({ id, createdAt, data: { organizationId: "organization-1", billableEvents: 1 } });
+      await store.storeEvents([former("a", 1), former("b", 2)], context, "usage_organization");
+      const current = (id: string, createdAt: number) =>
+        stored({
+          id,
+          type: CURRENT,
+          aggregateType: "entitlement_organization",
+          createdAt,
+          data: { organizationId: "organization-1", billableEvents: 1 },
+        });
+      await store.storeEvents(
+        [current("x", 10), current("y", 11)],
+        context,
+        "entitlement_organization",
+      );
+      const definition = entitlementPipeline();
+      const upcasting = upcastEventStore({
+        store,
+        upcaster: EventUpcaster.of(definition.upcasts),
+        parseEvent: definition.parseEvent,
+      });
+
+      const pages = await readAllPages(upcasting, "entitlement_organization");
+
+      expect(pages.flat().map((event) => event.id)).toEqual(["a", "b", "x", "y"]);
     });
 
     /** @scenario "A payload transform reshapes the stored data before the current schema parses it" */

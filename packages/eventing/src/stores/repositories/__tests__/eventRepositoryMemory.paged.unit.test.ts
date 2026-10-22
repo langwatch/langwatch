@@ -145,3 +145,22 @@ describe("EventRepositoryMemory.getEventRecordsPaged", () => {
     });
   });
 });
+
+describe("EventRepositoryMemory.getEventRecordsPaged", () => {
+  describe("given a limit that is not a positive integer", () => {
+    it.each([0, -1, 1.5])("refuses limit %s instead of reading an empty page", async (limit) => {
+      const repo = EventRepositoryMemory.createForTesting();
+      await repo.insertEventRecords([record({ eventId: "e1", ts: 1000 })]);
+
+      await expect(
+        repo.getEventRecordsPaged({
+          tenantId: "tenant",
+          aggregateType: "trace",
+          aggregateId: "agg",
+          after: undefined,
+          limit,
+        }),
+      ).rejects.toBeInstanceOf(RangeError);
+    });
+  });
+});

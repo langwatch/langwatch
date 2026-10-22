@@ -3,6 +3,7 @@ import type {
   EventStore,
   EventStoreEventReadInput,
   EventStoreReadContext,
+  PageCursor,
 } from "../stores/eventStore.types.ts";
 import { compareOrdinal } from "../utils/compareOrdinal.ts";
 import type { EventUpcaster } from "./eventUpcast.ts";
@@ -94,9 +95,9 @@ class UpcastingEventStore<EventType extends Event> implements EventStore<EventTy
   }
 
   /**
-   * A page short only when the history is exhausted. One type: its raw page, never deduped (the
-   * caller dedupes across pages). Several: one id under two types collapses, the rewritten row
-   * winning, and reading continues until the page is full or every type is exhausted.
+   * Short only when exhausted. One type: its raw page, the caller dedupes. Several: rows up to the
+   * earliest last row of a full type page (another type may hold unread rows past it), one id
+   * collapsed to its rewritten row, until the page is full or every type is exhausted.
    */
   async #page(
     request: { aggregateType: string; after: PageCursor | undefined; limit: number },
@@ -114,12 +115,15 @@ class UpcastingEventStore<EventType extends Event> implements EventStore<EventTy
     let after = request.after;
     for (;;) {
       const reads = await Promise.all(types.map((aggregateType) => read({ aggregateType, after })));
-      const fetched = reads.flat().toSorted(logOrder);
-      for (const stored of fetched) this.#keepPreferred(byId, stored);
-      const exhausted = reads.every((page) => page.length < request.limit);
-      const last = fetched.at(-1);
-      if (exhausted || last === undefined || byId.size >= request.limit) break;
-      after = { timestamp: last.createdAt, eventId: last.id };
+      const frontier = reads
+        .filter((page) => page.length >= request.limit)
+        .map((page) => page.at(-1)!)
+        .toSorted(logOrder)[0];
+      for (const stored of reads.flat()) {
+        if (!frontier || logOrder(stored, frontier) <= 0) this.#keepPreferred(byId, stored);
+      }
+      if (!frontier || byId.size >= request.limit) break;
+      after = { timestamp: frontier.createdAt, eventId: frontier.id };
     }
     return [...byId.values()]
       .map((stored) => this.#current(stored))
@@ -170,9 +174,6 @@ class UpcastingEventStore<EventType extends Event> implements EventStore<EventTy
 }
 
 /** The log's order, `EventTimestamp, EventId`, as ClickHouse and the memory repository read it. */
-/** A paged read's strict cursor: the last row of the previous page. */
-type PageCursor = { timestamp: number; eventId: string };
-
 function logOrder(left: Event, right: Event): number {
   if (left.createdAt !== right.createdAt) return left.createdAt - right.createdAt;
   return compareOrdinal(left.id, right.id);

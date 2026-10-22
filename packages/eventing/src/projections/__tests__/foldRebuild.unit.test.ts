@@ -16,6 +16,7 @@ import {
   TEST_CONSTANTS,
 } from "../../services/__tests__/testHelpers.ts";
 import { type JobRegistryEntry, QueueManager } from "../../services/queues/queueManager.ts";
+import { MAX_APPLIED_EVENT_IDS } from "../foldCache/foldCacheEntry.ts";
 import { FoldProjectionExecutor } from "../foldProjectionExecutor.ts";
 import type { ProjectionStoreContext } from "../projectionStoreContext.ts";
 
@@ -198,6 +199,24 @@ describe("rebuilding a fold's aggregate for a missed hand-off", () => {
         await paging.rebuild(built.fold, missed!, context);
 
         expect(built.current()?.state.count).toBe(events.length);
+      });
+    });
+
+    describe("when its log holds more events than the stored applied ids keep", () => {
+      /** @scenario An order-insensitive fold that missed an event is rebuilt from its log a page at a time */
+      it("folds every event and stores the trailing applied ids", async () => {
+        const events = Array.from({ length: 2 * MAX_APPLIED_EVENT_IDS + 5 }, (_, i) => at(i + 1));
+        const [first, missed] = events;
+        const { fold, current } = pagedCountingFold({ log: () => events });
+        const paging = new FoldProjectionExecutor({ refoldPageSize: 500 });
+        await paging.execute(fold, first!, context);
+
+        await paging.rebuild(fold, missed!, context);
+
+        expect(current()?.state.count).toBe(events.length);
+        expect(current()?.applied).toEqual(
+          events.slice(-MAX_APPLIED_EVENT_IDS).map((event) => event.id),
+        );
       });
     });
 

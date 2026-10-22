@@ -213,6 +213,9 @@ export class EventRepositoryMemory implements EventRepository {
     limit: number;
     occurredAtFromMs?: number;
   }): EventRecord[] {
+    if (!Number.isSafeInteger(limit) || limit < 1) {
+      throw new RangeError(`A page of event records needs a positive integer limit, got ${limit}`);
+    }
     const key = `${tenantId}:${aggregateType}:${String(aggregateId)}`;
     const records = this.eventsByKey.get(key) ?? [];
 
