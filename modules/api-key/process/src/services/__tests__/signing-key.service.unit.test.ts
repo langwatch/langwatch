@@ -87,6 +87,24 @@ describe("managing a project's signing keys", () => {
     expect(old?.verifiesUntil?.getTime()).toBe(now.epochMilliseconds + SEVEN_DAYS_MS);
   });
 
+  it("issues one key when the same key is rotated twice at once, refusing the other", async () => {
+    const issued = await service.create({
+      projectId: "orchestrator",
+      name: "Production",
+      userId: "ana",
+    });
+    const rotation = { projectId: "orchestrator", keyId: issued.signingKey.id, userId: "ana" };
+
+    const outcomes = await Promise.allSettled([service.rotate(rotation), service.rotate(rotation)]);
+    const listed = await service.find({ projectId: "orchestrator" });
+
+    expect(outcomes.map((outcome) => outcome.status).toSorted()).toEqual(["fulfilled", "rejected"]);
+    expect(outcomes.find((outcome) => outcome.status === "rejected")).toMatchObject({
+      reason: { code: "not_found" },
+    });
+    expect(listed.filter((key) => key.status === "active")).toHaveLength(1);
+  });
+
   /** @scenario "Revoking a key ends it at once" */
   it("lists a revoked key as revoked", async () => {
     const issued = await service.create({

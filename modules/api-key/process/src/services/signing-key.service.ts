@@ -92,22 +92,18 @@ export class SigningKeyService {
     if (current.rotatedAt !== null || current.revokedAt !== null) {
       throw new SigningKeyNotFoundError(keyId);
     }
-    const issued = await this.issue({
-      organizationId,
-      projectId,
-      name: current.name,
-      userId: input.userId,
-    });
     const at = this.now();
-    await this.keys.markRotated({
+    // Marked first, so of two rotations at once only one issues a key.
+    const marked = await this.keys.markRotated({
       organizationId,
       projectId,
       id: keyId,
       rotatedAt: at,
       verifiesUntil: at.add({ milliseconds: SIGNING_KEY_ROTATION_OVERLAP_MS }),
     });
+    if (!marked) throw new SigningKeyNotFoundError(keyId);
     this.braidSignatures.forget({ organizationId, publicId: current.publicId });
-    return issued;
+    return this.issue({ organizationId, projectId, name: current.name, userId: input.userId });
   }
 
   async revoke({ projectId, keyId }: { projectId: string; keyId: string }): Promise<SigningKey> {
