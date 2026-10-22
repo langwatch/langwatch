@@ -36,12 +36,6 @@ Feature: Coding-agent records a session-stored fact
     Then no fact is recorded
 
   @unit
-  Scenario: A stored session with an over-long id records no fact
-    Given a stored session whose id is longer than 256 characters
-    When the stored sessions are reported
-    Then no fact is recorded
-
-  @unit
   Scenario: A helper-thread session is reported as auxiliary
     Given the store commits a session whose state is auxiliary
     Then the sessions-stored hook receives it marked auxiliary

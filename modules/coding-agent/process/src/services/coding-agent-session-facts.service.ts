@@ -1,7 +1,4 @@
-import {
-  type CodingAgentSessionStoredEventData,
-  MAX_SESSION_ID_LENGTH,
-} from "@langwatch/coding-agent-contract";
+import type { CodingAgentSessionStoredEventData } from "@langwatch/coding-agent-contract";
 import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 
@@ -76,8 +73,6 @@ export class CodingAgentSessionFactsService {
     for (const session of sessions) {
       const { agent } = session;
       if (session.auxiliary || agent === null) continue;
-      // The fact's schema refuses a longer id, so recording it would only fail and retry.
-      if (session.sessionId.length > MAX_SESSION_ID_LENGTH) continue;
       // A client span time is never trusted past a day ahead. Clamping here fixes the value in
       // the stored fact, so every redelivery sees the same time.
       const clamped = { ...session, agent, occurredAt: Math.min(session.occurredAt, now + DAY_MS) };
