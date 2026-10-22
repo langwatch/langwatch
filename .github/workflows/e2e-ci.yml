@@ -117,6 +117,9 @@ jobs:
       NODE_ENV: "development"
       # The front-door suite runs passkey ceremonies, served only with the switch on.
       PASSKEYS_ENABLED: "on"
+      # The front-door fixtures give each test its own X-Forwarded-For address,
+      # read only from a declared hop: the runner reaches the app over loopback.
+      TRUSTED_PROXY_ADDRESSES: "127.0.0.1,::1"
       # Test runner configuration
       BASE_URL: "http://localhost:5570"
       CI: "true"
