@@ -912,7 +912,7 @@ Answers at `/api/v1/projects/:projectId/analytics/charts/:chartId`.
 
 ```typescript
 type Params = z.infer<typeof savedWorkbenchChartParamsSchema>; // ../contract/src/saved-workbench-chart-rest.schemas.ts:126
-// Response: inline, src/transport/saved-workbench-chart.rest.ts:267
+// Response: inline, src/transport/saved-workbench-chart.rest.ts:271
 type Response = unknown;
 ```
 
@@ -920,7 +920,7 @@ type Response = unknown;
 
 Place a saved workbench chart on a dashboard
 
-Permission `analytics:update`. Declared at `src/transport/saved-workbench-chart.rest.ts:289`.
+Permission `analytics:update`. Declared at `src/transport/saved-workbench-chart.rest.ts:293`.
 
 Answers at `/api/v1/projects/:projectId/analytics/charts/:chartId/placement`.
 
@@ -941,13 +941,13 @@ type Response = z.infer<typeof savedWorkbenchChartResourceSchema>; // ../contrac
 
 Remove a saved workbench chart from its dashboard
 
-Permission `analytics:update`. Declared at `src/transport/saved-workbench-chart.rest.ts:328`.
+Permission `analytics:update`. Declared at `src/transport/saved-workbench-chart.rest.ts:332`.
 
 Answers at `/api/v1/projects/:projectId/analytics/charts/:chartId/placement`.
 
 ```typescript
 type Params = z.infer<typeof savedWorkbenchChartParamsSchema>; // ../contract/src/saved-workbench-chart-rest.schemas.ts:126
-// Response: inline, src/transport/saved-workbench-chart.rest.ts:347
+// Response: inline, src/transport/saved-workbench-chart.rest.ts:355
 type Response = unknown;
 ```
 
