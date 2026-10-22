@@ -53,7 +53,8 @@ export function checkNamed({ named, known, cwd = root }) {
       problems.push(`unknown option ${arg}`);
       continue;
     }
-    const inHead = git({ args: ["ls-tree", "HEAD", "--", arg], cwd, allowFailure: true }).length > 0;
+    const tracked = git({ args: ["ls-tree", "HEAD", "--", arg], cwd, allowFailure: true });
+    const inHead = tracked.length > 0;
     if (!known(arg) && !existsSync(join(cwd, arg)) && !inHead)
       problems.push(`${arg} is not a file in this repository (paths are from the repository root)`);
   }
@@ -68,7 +69,14 @@ export function readPackages({ files, readText }) {
     .flatMap((file) => {
       try {
         const manifest = JSON.parse(readText(file));
-        return [{ dir: posix.dirname(file), name: manifest.name, test: manifest.scripts?.test, pretest: manifest.scripts?.pretest }];
+        return [
+          {
+            dir: posix.dirname(file),
+            name: manifest.name,
+            test: manifest.scripts?.test,
+            pretest: manifest.scripts?.pretest,
+          },
+        ];
       } catch {
         return [];
       }
@@ -209,7 +217,7 @@ export function planJson({ plan, changed, graphMs, walkMs }) {
 }
 
 /** One path per reached test file, as `--list` prints them. */
-export function listFiles(plan) {
+export function formatFileList(plan) {
   return plan.runs.flatMap((run) => run.files.map((file) => `${run.dir}/${file}\n`)).join("");
 }
 
@@ -222,15 +230,30 @@ async function runPackage(run) {
   process.stderr.write(
     `\n> ${run.name ?? run.dir}: ${run.script} ${[...extra, ...run.files].join(" ")}\n`,
   );
-  const start = (command, args) =>
+  const start = ({ command, args }) =>
     new Promise((resolve) => {
       const child = spawn("sh", ["-c", command, "sh", ...args], { cwd, env, stdio: "inherit" });
       child.on("close", (status) => resolve(status ?? 1));
     });
-  // pnpm runs a package's `pretest` before `test`; running the script directly must too.
-  const prepared = run.pretest === undefined ? 0 : await start(run.pretest, []);
 
-  return prepared === 0 ? start(`${run.script} "$@"`, [...extra, ...run.files]) : prepared;
+  return runCommands({ commands: commandsFor({ run, extra }), start });
+}
+
+/** pnpm runs a package's `pretest` before `test`; running the script directly must too. */
+export function commandsFor({ run, extra = [] }) {
+  const test = { command: `${run.script} "$@"`, args: [...extra, ...run.files] };
+
+  return run.pretest === undefined ? [test] : [{ command: run.pretest, args: [] }, test];
+}
+
+/** Runs the commands in order and stops at the first one that fails. */
+export async function runCommands({ commands, start }) {
+  for (const command of commands) {
+    const status = await start(command);
+    if (status !== 0) return status;
+  }
+
+  return 0;
 }
 
 async function main() {
@@ -250,7 +273,8 @@ async function main() {
     process.stderr.write(`test:changed: ${problems.join("\ntest:changed: ")}\n`);
     process.exit(2);
   }
-  const changed = normalized.length > 0 ? normalized : changedSince({ base: base ?? defaultBase() });
+  const changed =
+    normalized.length > 0 ? normalized : changedSince({ base: base ?? defaultBase() });
   if (changed.length === 0) {
     process.stderr.write("test:changed: nothing changed.\n");
     process.exit(0);
@@ -271,7 +295,7 @@ async function main() {
   }
   process.stderr.write(formatPlan({ plan, changed, graphStats: graph.stats, walkMs }));
   if (args.includes("--list")) {
-    process.stdout.write(listFiles(plan));
+    process.stdout.write(formatFileList(plan));
     process.exit(0);
   }
 

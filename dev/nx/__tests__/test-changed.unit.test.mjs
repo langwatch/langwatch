@@ -12,12 +12,14 @@ import { buildImportGraph, reachedFrom, scanSpecifiers } from "../import-graph.m
 import {
   changedSince,
   checkNamed,
+  commandsFor,
   defaultBase,
   formatPlan,
-  listFiles,
+  formatFileList,
   planJson,
   planRuns,
   readPackages,
+  runCommands,
 } from "../test-changed.mjs";
 
 const READS = { "@fixture/process": ["modules/auth/**/*"] };
@@ -58,6 +60,11 @@ function write({ root, file, content }) {
   mkdirSync(dirname(join(root, file)), { recursive: true });
   const text = typeof content === "string" ? content : JSON.stringify(content);
   writeFileSync(join(root, file), text);
+}
+
+function commitStaged({ root, message }) {
+  const identity = ["-c", "commit.gpgsign=false", "-c", "user.name=t", "-c", "user.email=t@t"];
+  execFileSync("git", [...identity, "commit", "-q", "-m", message], { cwd: root });
 }
 
 function fixtureRepo() {
@@ -175,12 +182,7 @@ void describe("test:changed", () => {
   /** @scenario "With no files named, the change is what differs from the merge base" */
   void it("collects committed, staged, unstaged and untracked files since the base", () => {
     const root = fixtureRepo();
-    const commit = (message) =>
-      execFileSync(
-        "git",
-        ["-c", "commit.gpgsign=false", "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", message],
-        { cwd: root },
-      );
+    const commit = (message) => commitStaged({ root, message });
     commit("base");
     const base = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
     write({ root, file: "packages/time/src/clock.ts", content: "export const clock = () => 2;\n" });
@@ -202,7 +204,7 @@ void describe("test:changed", () => {
   /** @scenario "With no files named, the change is what differs from the merge base" */
   void it("falls back to HEAD as the base when origin/main does not exist", () => {
     const root = fixtureRepo();
-    execFileSync("git", ["-c", "commit.gpgsign=false", "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "base"], { cwd: root });
+    commitStaged({ root, message: "base" });
 
     assert.equal(defaultBase({ cwd: root }), "HEAD");
   });
@@ -210,7 +212,7 @@ void describe("test:changed", () => {
   /** @scenario "An argument that is not a file or a known option is refused" */
   void it("refuses unknown options and files that exist nowhere, and allows deleted files", () => {
     const root = fixtureRepo();
-    execFileSync("git", ["-c", "commit.gpgsign=false", "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "base"], { cwd: root });
+    commitStaged({ root, message: "base" });
     const known = (file) => file === "packages/time/src/clock.ts";
 
     assert.deepEqual(checkNamed({ named: ["packages/time/src/clock.ts"], known, cwd: root }), []);
@@ -264,7 +266,7 @@ void describe("test:changed", () => {
   });
 
   /** @scenario "A package's pretest and a multi-line test script are handled" */
-  void it("carries a package's pretest and refuses a test script with a second line", () => {
+  void it("runs a package's pretest first and refuses a test script with a second line", async () => {
     const root = fixtureRepo();
     const result = plan({ root, changed: ["modules/trace/process/src/span.ts"] });
     const files = ["a/package.json", "b/package.json"];
@@ -282,7 +284,31 @@ void describe("test:changed", () => {
       readsTable: {},
     });
 
+    const ran = [];
+    const failing = await runCommands({
+      commands: commandsFor({ run: result.runs[0], extra: ["--x"] }),
+      start: ({ command }) => {
+        ran.push(command);
+
+        return Promise.resolve(command === "echo prepare" ? 3 : 0);
+      },
+    });
+    const order = [];
+    const passing = await runCommands({
+      commands: commandsFor({ run: result.runs[0] }),
+      start: ({ command }) => {
+        order.push(command);
+
+        return Promise.resolve(0);
+      },
+    });
+
     assert.equal(result.runs[0].pretest, "echo prepare");
+    assert.deepEqual([failing, ran], [3, ["echo prepare"]]);
+    assert.equal(passing, 0);
+    assert.equal(order.length, 2);
+    assert.equal(order[0], "echo prepare");
+    assert.match(order[1], /^vitest run /);
     assert.deepEqual(refused.notVitest, ["a/x.test.ts"]);
     assert.deepEqual(summary(refused.runs), [{ dir: "b", whole: false, files: ["x.test.ts"] }]);
   });
@@ -294,11 +320,16 @@ void describe("test:changed", () => {
     const result = plan({ root, changed });
     const graphStats = { ms: { total: 1 }, rescanned: 2 };
     const summaryText = formatPlan({ plan: result, changed, graphStats, walkMs: 0.5 });
-    const json = JSON.parse(planJson({ plan: result, changed, graphMs: { total: 1 }, walkMs: 0.5 }));
+    const json = JSON.parse(
+      planJson({ plan: result, changed, graphMs: { total: 1 }, walkMs: 0.5 }),
+    );
 
     assert.match(summaryText, /^test:changed: 1 changed file\(s\) reach /);
-    assert.match(summaryText, /not run \(no Vitest test script owns them\): dev\/scripts\/__tests__\/clock\.unit\.test\.mjs/);
-    assert.deepEqual(listFiles(result).split("\n").filter(Boolean).toSorted(), [
+    assert.match(
+      summaryText,
+      /not run \(no Vitest test script owns them\): dev\/scripts\/__tests__\/clock\.unit\.test\.mjs/,
+    );
+    assert.deepEqual(formatFileList(result).split("\n").filter(Boolean).toSorted(), [
       "modules/trace/process/src/__tests__/span.unit.test.ts",
       "packages/time/src/__tests__/clock.unit.test.ts",
     ]);
