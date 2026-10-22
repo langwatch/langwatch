@@ -210,7 +210,7 @@ describe.skipIf(!clickHouseConfigured)("event-attribute-keys facet integration",
               clickhouse_settings: { max_memory_usage: MEMORY_CAP },
             })
             .then((r) => r.json()),
-        ).rejects.toThrow(/memory limit exceeded/i);
+        ).rejects.toMatchObject({ code: "241" }); // MEMORY_LIMIT_EXCEEDED
       });
     });
   });
