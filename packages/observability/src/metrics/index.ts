@@ -9,6 +9,15 @@ export {
   type HistogramViewDescriptor,
 } from "./histogram-boundaries.ts";
 export {
+  UNMATCHED_ROUTE,
+  noteRouteTemplate,
+  normalizeHttpMethod,
+  recordHttpServerRequest,
+  routeTemplateOf,
+  statusClass,
+  type HttpServerRequest,
+} from "./http-server.ts";
+export {
   METRICS_SCOPE_NAME,
   activateMetrics,
   counter,
