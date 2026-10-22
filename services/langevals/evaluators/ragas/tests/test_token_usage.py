@@ -120,3 +120,29 @@ def test_the_handler_attaches_itself_to_langchain_calls_in_the_block():
     assert cb.successful_requests == 2
     assert cb.prompt_tokens == 24
     assert cb.completion_tokens == 8
+
+
+def test_a_nested_block_hands_the_outer_handler_back_when_it_exits():
+    """An inner block must not erase the outer one, or the outer undercounts."""
+    from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
+
+    reply = AIMessage(
+        content="pong",
+        usage_metadata={"input_tokens": 3, "output_tokens": 1, "total_tokens": 4},
+    )
+    llm = GenericFakeChatModel(messages=iter([reply, reply, reply]))
+
+    with get_token_usage_callback() as outer:
+        llm.invoke("before")
+        with get_token_usage_callback() as inner:
+            llm.invoke("inside")
+            assert token_usage_callback_var.get() is inner
+        assert token_usage_callback_var.get() is outer
+        llm.invoke("after")
+
+    assert token_usage_callback_var.get() is None
+    assert inner.successful_requests == 1
+    assert inner.prompt_tokens == 3
+    assert outer.successful_requests == 2
+    assert outer.prompt_tokens == 6
+    assert outer.completion_tokens == 2

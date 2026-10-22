@@ -88,8 +88,10 @@ register_configure_hook(token_usage_callback_var, True)
 def get_token_usage_callback() -> Generator[TokenUsageCallbackHandler, None, None]:
     """Attach a token counter to every langchain call made inside the block."""
     handler = TokenUsageCallbackHandler()
-    token_usage_callback_var.set(handler)
+    # Reset to the token rather than to None, so a nested block hands the
+    # outer handler back when it exits instead of erasing it.
+    token = token_usage_callback_var.set(handler)
     try:
         yield handler
     finally:
-        token_usage_callback_var.set(None)
+        token_usage_callback_var.reset(token)
