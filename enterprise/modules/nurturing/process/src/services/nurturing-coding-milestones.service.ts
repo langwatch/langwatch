@@ -80,19 +80,19 @@ export class NurturingCodingMilestonesService {
 
     // Each UTC day of the batch counts, oldest first: a batch over midnight loses none.
     const days = [...new Set(facts.map((fact) => utcDayOf(fact.occurredAt)))].toSorted();
-    let counted: { changed: boolean; codingActiveDays: number } | null = null;
+    let counted: { day: string; codingActiveDays: number } | null = null;
     for (const day of days) {
       const result = await this.dependencies.milestones.recordCodingActiveDay({
         organizationId,
         day,
       });
-      if (result.changed) counted = result;
+      if (result.changed) counted = { day, codingActiveDays: result.codingActiveDays };
     }
     if (counted) {
       await deliver(
         codingActiveDaysSignal({
           data: latest,
-          day: days[days.length - 1] as string,
+          day: counted.day,
           codingActiveDays: counted.codingActiveDays,
           ...common,
         }),

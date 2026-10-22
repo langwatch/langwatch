@@ -132,6 +132,7 @@ export class CodingAgentSessionFactsService {
   }): Promise<boolean> {
     try {
       // Every row is stored before this runs, so only the fold's earliest session may be first.
+      // Identity, not id: one session can be due on two days, and only one copy may be first.
       const claim = claims.get(session.tenantId);
       if (!claim || claim.earliest !== session) return false;
       let stamped = projectIsStamped.get(session.tenantId);
