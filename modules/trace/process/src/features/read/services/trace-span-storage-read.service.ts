@@ -140,6 +140,7 @@ export class SpanStorageService {
         ...mapNormalizedSpanToSpan(span),
         ...braidedOwnerOf({ authorization: params.authorization, tenantId: span.tenantId }),
       }));
+      // The cutoff is the organisation's plan, and a braid joins projects of one organisation.
       return applyVisibilityGate(owned, params.visibilityCutoffMs);
     }
     const resolvedSpans = await this.resolveOffloadedBodies({
