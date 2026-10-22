@@ -94,10 +94,10 @@ function applyBootstrap({
 /** Keeps a cached key the platform still lists, and any hand-placed credential. */
 function reconcileEntries({ cfg, liveSet }: { cfg: GovernanceConfig; liveSet: Set<string> }): {
   reconciled: GovernanceConfig["default_personal_ingest_keys"];
-  changed: boolean;
+  retired: string[];
 } {
   const reconciled: GovernanceConfig["default_personal_ingest_keys"] = {};
-  let changed = false;
+  const retired: string[] = [];
   for (const [sourceType, entry] of Object.entries(cfg.default_personal_ingest_keys ?? {})) {
     const lookupId = extractLookupIdFromToken(entry.secret ?? "");
     if (lookupId === undefined) {
@@ -109,32 +109,48 @@ function reconcileEntries({ cfg, liveSet }: { cfg: GovernanceConfig; liveSet: Se
       reconciled[sourceType] = entry;
     } else {
       // Revoked on the platform — omit from reconciled.
-      changed = true;
+      if (entry.secret) retired.push(entry.secret);
     }
   }
-  return { reconciled, changed };
+  return { reconciled, retired };
 }
 
-async function reconcileIngestKeys(cfg: GovernanceConfig): Promise<void> {
-  const cached = cfg.default_personal_ingest_keys;
-  if (!cached || Object.keys(cached).length === 0) return;
+/** How long the login waits for the platform to list the live keys. */
+const LIVE_KEYS_TIMEOUT_MS = 5_000;
+
+/**
+ * Lists the user's live ingest keys, drops cached ones the platform revoked,
+ * and returns the live lookup ids: undefined when the platform did not answer,
+ * so the wiring refresh judges no key on a guess.
+ */
+async function reconcileIngestKeys(
+  cfg: GovernanceConfig,
+): Promise<ReadonlySet<string> | undefined> {
+  let liveKeys: Awaited<ReturnType<typeof listIngestionKeys>>;
   try {
-    const liveKeys = await listIngestionKeys(cfg);
-    const liveSet = new Set(liveKeys.map((k) => `${k.sourceType}:${k.lookupId}`));
-    const { reconciled, changed } = reconcileEntries({ cfg, liveSet });
-    if (changed) {
-      cfg.default_personal_ingest_keys = reconciled;
-      saveConfig(cfg);
-    }
-  } catch (error) {
-    // Network error / older server: keep existing cache untouched
-    void error;
+    liveKeys = await listIngestionKeys(cfg, { timeoutMs: LIVE_KEYS_TIMEOUT_MS });
+  } catch {
+    // Network error / older server: keep the cache untouched.
+    return undefined;
   }
+  const liveSet = new Set(liveKeys.map((k) => `${k.sourceType}:${k.lookupId}`));
+  const { reconciled, retired } = reconcileEntries({ cfg, liveSet });
+  if (retired.length > 0) {
+    cfg.default_personal_ingest_keys = reconciled;
+    saveConfig(cfg);
+  }
+  return new Set(liveKeys.map((k) => k.lookupId));
 }
 
-async function refreshWiringAfterLogin(cfg: GovernanceConfig): Promise<void> {
+async function refreshWiringAfterLogin({
+  cfg,
+  liveKeyIds,
+}: {
+  cfg: GovernanceConfig;
+  liveKeyIds: ReadonlySet<string> | undefined;
+}): Promise<void> {
   try {
-    const refresh = await refreshTelemetryWiringForLogin(cfg);
+    const refresh = await refreshTelemetryWiringForLogin(cfg, { liveKeyIds });
     if (refresh.mintedAny) saveConfig(cfg);
     if (refresh.labels.length > 0) {
       console.log();
@@ -201,19 +217,15 @@ async function completeDeviceSession({
 
   applyBootstrap({ cfg, bootstrap });
 
-  // Reconcile cached ingestion keys (#4755): after a fresh login, drop
-  // any locally cached entries whose token was revoked on the platform.
-  // Errors are swallowed — a login must never fail on reconcile; the
-  // worst outcome is a stale cache entry that the per-invocation wrapper
-  // check will catch anyway.
-  await reconcileIngestKeys(cfg);
+  // Reconcile cached ingestion keys (#4755): drop cached entries the
+  // platform revoked. Errors are swallowed and the wait is bounded: a login
+  // never fails or hangs on reconcile.
+  const liveKeyIds = await reconcileIngestKeys(cfg);
 
-  // Latest login wins (#6202): telemetry wiring a previous install
-  // persisted (claude settings env, codex [otel] block, gemini/opencode
-  // shell functions) pointing at a DIFFERENT instance would silently
-  // reroute every plain-tool run there. Re-point it at this login now,
-  // minting fresh ingest keys where needed. Best-effort: never fails a login.
-  await refreshWiringAfterLogin(cfg);
+  // Latest login wins (#6202): re-point persisted wiring at this login when it
+  // names a DIFFERENT instance, or holds a key the platform no longer lists,
+  // whichever login retired it (spec latest-login-wins, ADR-039 v7).
+  await refreshWiringAfterLogin({ cfg, liveKeyIds });
 
   if (isQuiet) return cfg;
 

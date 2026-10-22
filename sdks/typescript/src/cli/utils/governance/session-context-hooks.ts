@@ -1,7 +1,7 @@
 /**
  * The hooks that make a session report its repository. An entry is ours only
  * when its command is ours; others are written back untouched. In a folder of
- * hook files (Copilot) we own one file and never open the user's.
+ * hook files (Copilot) we own one file, and only while it holds nothing else.
  */
 
 import * as fs from "node:fs";
@@ -12,8 +12,11 @@ import {
   writeAppSettingsFile,
 } from "./app-settings";
 import {
+  hasOwnedHookFile,
+  HOOK_TIMEOUT_SECONDS,
   type HookedTool,
   type HooksTarget,
+  ownedHookFileToolForCommand,
   SESSION_CONTEXT_AGENTS,
 } from "./session-context-agents";
 
@@ -47,9 +50,6 @@ const COPILOT_HOOK_EVENTS = ["sessionStart", "agentStop"] as const;
 /** The only version of the Copilot hook file format there is. */
 const COPILOT_HOOK_FILE_VERSION = 1;
 
-/** Seconds the agent gives the hook before it kills it. */
-const HOOK_TIMEOUT_SECONDS = 10;
-
 /** The command an installed hook entry runs, for one agent. */
 export function sessionContextHookCommand(tool: HookedTool): string {
   return `${OWNED_COMMAND_PREFIX} ${SESSION_CONTEXT_AGENTS[tool].hookArgument}`;
@@ -60,12 +60,17 @@ export function sessionContextHooksTarget(tool: HookedTool): HooksTarget {
   return SESSION_CONTEXT_AGENTS[tool].hookTarget.resolve();
 }
 
-/** Whether the tool's hooks are a whole file of ours rather than entries in one of theirs. */
-function hasOwnedHookFile(tool: HookedTool): boolean {
-  return SESSION_CONTEXT_AGENTS[tool].hookTarget.kind === "owned-file";
-}
-
-export type SessionContextHooksAction = "created" | "updated" | "unchanged";
+/**
+ * `not_ours`: a file of the user's holds our path (Copilot), so nothing was
+ * written and sessions report no repository. `user_file_runs_hook`: the same,
+ * but their file runs our hook command, so sessions still report it.
+ */
+export type SessionContextHooksAction =
+  | "created"
+  | "updated"
+  | "unchanged"
+  | "not_ours"
+  | "user_file_runs_hook";
 
 export interface SessionContextHooksInstallResult extends HooksTarget {
   action: SessionContextHooksAction;
@@ -103,6 +108,58 @@ export function installSessionContextHooks({
   return { action: existedBefore ? "updated" : "created", ...target };
 }
 
+/** Where the wrapper for `command` writes a hook file of ours, or null when it writes none. */
+export function ownedHookFileTargetFor({ command }: { command: string }): HooksTarget | null {
+  const tool = ownedHookFileToolForCommand(command);
+  return tool ? sessionContextHooksTarget(tool) : null;
+}
+
+/**
+ * Where the wrapper for `command` would write its hook file, when a file of the
+ * user's already holds that path, so a question offering to write it must not.
+ */
+export function ownedHookFilePathHeldByUser({ command }: { command: string }): HooksTarget | null {
+  const tool = ownedHookFileToolForCommand(command);
+  if (!tool) return null;
+  const target = sessionContextHooksTarget(tool);
+  if (!fs.existsSync(target.path)) return null;
+  return readOwnedHookFile({ tool, filePath: target.path }) === null ? target : null;
+}
+
+/** What the user reads when their own file holds our hook file's path. */
+export function hookFileNotOursNotice({
+  displayPath,
+  command,
+}: {
+  displayPath: string;
+  command: string;
+}): string {
+  return (
+    `${displayPath} is not a LangWatch file, so it was left alone, and Copilot ` +
+    `sessions will not report their repository or branch. Copilot loads every .json file ` +
+    `in that folder: rename yours, then run \`langwatch instrument ${command}\` again.`
+  );
+}
+
+/**
+ * Writes the hook file of the agent `command` launches, when that file is ours
+ * alone (Copilot). Null when there is none or the write failed: best-effort,
+ * because the exports it rides beside are the wiring that matters.
+ */
+export function assertOwnedHookFileFor({
+  command,
+}: {
+  command: string;
+}): SessionContextHooksInstallResult | null {
+  const tool = ownedHookFileToolForCommand(command);
+  if (!tool) return null;
+  try {
+    return installSessionContextHooks({ tool });
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Whether the tool's hook file currently carries any langwatch hook entry. Used
  * by the logout scan to decide whether there is anything to offer.
@@ -115,7 +172,7 @@ export function hasSessionContextHooks({
   filePath?: string;
 }): boolean {
   const target = resolveTarget({ tool, filePath });
-  if (hasOwnedHookFile(tool)) return readOwnedHookFile(target.path) !== null;
+  if (hasOwnedHookFile(tool)) return readOwnedHookFile({ tool, filePath: target.path }) !== null;
   const document = readAppSettingsFile(target.path);
   if (!isPlainObject(document.hooks)) return false;
   return Object.values(document.hooks).some(
@@ -136,7 +193,7 @@ export function removeSessionContextHooks({
   filePath?: string;
 }): boolean {
   const target = resolveTarget({ tool, filePath });
-  if (hasOwnedHookFile(tool)) return removeOwnedHookFile(target.path);
+  if (hasOwnedHookFile(tool)) return removeOwnedHookFile({ tool, filePath: target.path });
 
   let raw: string;
   try {
@@ -255,9 +312,9 @@ function resolveTarget({
 }
 
 /**
- * Write the tool's own hook file. A file at our path that is not ours (it
- * runs none of our commands, or is not JSON) is left exactly as it is and
- * reported `unchanged`, the same as a file already up to date.
+ * Write the tool's own hook file. A file at our path that is not ours (see
+ * `readOwnedHookFile`) is left exactly as it is and reported `not_ours`, or
+ * `user_file_runs_hook` when it runs our hook command itself.
  */
 function installOwnedHookFile({
   tool,
@@ -272,8 +329,9 @@ function installOwnedHookFile({
   } catch {
     existing = null;
   }
-  if (existing !== null && readOwnedHookFile(target.path) === null) {
-    return { action: "unchanged", ...target };
+  if (existing !== null && readOwnedHookFile({ tool, filePath: target.path }) === null) {
+    const runsOurHook = fileRunsHookCommand({ tool, filePath: target.path });
+    return { action: runsOurHook ? "user_file_runs_hook" : "not_ours", ...target };
   }
 
   const document = copilotHookFileDocument(tool);
@@ -300,11 +358,24 @@ function copilotHookFileDocument(tool: HookedTool): Record<string, unknown> {
   };
 }
 
+/** The keys an entry of ours carries, in what `copilotHookFileDocument` writes or wrote. */
+const OWNED_ENTRY_KEYS: ReadonlySet<string> = new Set(["type", "bash", "timeoutSec"]);
+
+/** The top-level keys a hook file of ours carries. */
+const OWNED_FILE_KEYS: ReadonlySet<string> = new Set(["version", "hooks"]);
+
 /**
- * The owned hook file's document when it is ours: valid JSON whose hooks run
- * one of our commands. Null when it is missing, malformed or somebody else's.
+ * The owned hook file when it holds nothing but entries running our command.
+ * Running it is not enough: a user may write it beside hooks of their own,
+ * which a rewrite or delete would lose. Null when missing, malformed or theirs.
  */
-function readOwnedHookFile(filePath: string): Record<string, unknown> | null {
+function readOwnedHookFile({
+  tool,
+  filePath,
+}: {
+  tool: HookedTool;
+  filePath: string;
+}): Record<string, unknown> | null {
   let parsed: unknown;
   try {
     parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
@@ -312,17 +383,90 @@ function readOwnedHookFile(filePath: string): Record<string, unknown> | null {
     return null;
   }
   if (!isPlainObject(parsed) || !isPlainObject(parsed.hooks)) return null;
-  const runsOurCommand = Object.values(parsed.hooks).some(
-    (entries) =>
-      Array.isArray(entries) &&
-      entries.some((entry) => isPlainObject(entry) && isOwnedCommand(entry.bash)),
+  const onlyOurKeys = Object.keys(parsed).every((key) => OWNED_FILE_KEYS.has(key));
+  if (!onlyOurKeys) return null;
+  const events = Object.values(parsed.hooks);
+  const command = sessionContextHookCommand(tool);
+  const isOurEntry = (entry: unknown): boolean => {
+    if (!isPlainObject(entry) || entry.bash !== command) return false;
+    return Object.keys(entry).every((key) => OWNED_ENTRY_KEYS.has(key));
+  };
+  const isOnlyOurs = (entries: unknown): boolean => {
+    if (!Array.isArray(entries) || entries.length === 0) return false;
+    return entries.every(isOurEntry);
+  };
+  return events.length > 0 && events.every(isOnlyOurs) ? parsed : null;
+}
+
+/**
+ * Whether a hook file, ours or the user's, runs our hook command on some event,
+ * alone or chained, which is what makes a session report its repository.
+ */
+function fileRunsHookCommand({ tool, filePath }: { tool: HookedTool; filePath: string }): boolean {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
+  } catch {
+    return false;
+  }
+  if (!isPlainObject(parsed) || !isPlainObject(parsed.hooks)) return false;
+  const hookArgs = ["ingest", "hook", SESSION_CONTEXT_AGENTS[tool].hookArgument];
+  const runsCommand = (entry: unknown): boolean =>
+    isPlainObject(entry) &&
+    typeof entry.bash === "string" &&
+    entry.bash.split(/&&|\|\||;/).some((part) => runsLangwatchWith({ part, args: hookArgs }));
+  return Object.values(parsed.hooks).some(
+    (entries) => Array.isArray(entries) && entries.some(runsCommand),
   );
-  return runsOurCommand ? parsed : null;
+}
+
+/** The words of one shell command, with the quotes taken off a quoted one. */
+function shellWords(part: string): string[] {
+  return [...part.matchAll(/"([^"]*)"|'([^']*)'|(\S+)/g)].map((m) => m[1] ?? m[2] ?? m[3] ?? "");
+}
+
+function basename(word: string): string {
+  return word.split(/[\\/]/).pop() ?? "";
+}
+
+/** The npx package spec of this CLI: `langwatch` or `langwatch@<version>`, nothing else. */
+const NPX_PACKAGE_RE = /^langwatch(@[^\s@/]+)?$/;
+
+/** The CLI's entry script under its installed package, as the codex notify argv names it. */
+const ENTRY_SCRIPT_RE = /[\\/]langwatch[\\/]dist[\\/]cli[\\/]index\.js$/;
+
+/**
+ * How many leading words launch this CLI in `words`: `langwatch` by name or
+ * path, `npx [flags] langwatch[@v]`, or `node <entry>`. Zero when they launch
+ * anything else, so `langwatch-foo` or `npx @acme/langwatch` never count.
+ */
+function langwatchLauncherLength(words: readonly string[]): number {
+  const [first = "", ...rest] = words;
+  const name = basename(first);
+  if (name === "langwatch") return 1;
+  if (name === "npx") {
+    const at = rest.findIndex((word) => !word.startsWith("-"));
+    return at !== -1 && NPX_PACKAGE_RE.test(rest[at] ?? "") ? at + 2 : 0;
+  }
+  if (name === "node") {
+    const entry = rest[0] ?? "";
+    return basename(entry) === "langwatch" || ENTRY_SCRIPT_RE.test(entry) ? 2 : 0;
+  }
+  return 0;
+}
+
+/** Whether one command of a chain runs this CLI with exactly `args`. */
+function runsLangwatchWith({ part, args }: { part: string; args: readonly string[] }): boolean {
+  const words = shellWords(part.trim());
+  const launcher = langwatchLauncherLength(words);
+  if (launcher === 0) return false;
+  const rest = words.slice(launcher);
+  return rest.length === args.length && rest.every((word, i) => word === args[i]);
 }
 
 /** Delete the owned hook file when it is ours. Returns whether it was removed. */
-function removeOwnedHookFile(filePath: string): boolean {
-  if (readOwnedHookFile(filePath) === null) return false;
+function removeOwnedHookFile({ tool, filePath }: { tool: HookedTool; filePath: string }): boolean {
+  if (readOwnedHookFile({ tool, filePath }) === null) return false;
   try {
     fs.unlinkSync(filePath);
     return true;

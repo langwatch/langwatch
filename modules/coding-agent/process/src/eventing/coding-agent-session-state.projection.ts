@@ -1,12 +1,49 @@
 import {
   AUXILIARY_SESSION_FACT,
   type CodingAgentSessionContextUsage,
+  type CodingAgentSessionModelUsage,
+  isCacheRebuild,
   parseMcpToolName,
   type SessionWorkingContext,
 } from "@langwatch/coding-agent-contract";
 
 import type { SessionTitleSource } from "../rules/coding-agent-session-state-mapper.rules.ts";
-import { contextUsageKey } from "../rules/coding-agent-session-usage-key.rules.ts";
+import { contextUsageKey, modelUsageKey } from "../rules/coding-agent-session-usage-key.rules.ts";
+
+/** Where an unstamped call's per-model usage is kept: the context no declaration named. */
+const UNSTAMPED_CONTEXT: SessionWorkingContext = {
+  repositoryHost: "",
+  repositoryOwner: "",
+  repositoryName: "",
+  branch: "",
+};
+
+/** The counters a model call moves that the per-model record follows. */
+type CountedField =
+  | "inputTokens"
+  | "outputTokens"
+  | "cacheReadTokens"
+  | "cacheCreationTokens"
+  | "costUsd"
+  | "aiUnits";
+
+function emptyModelUsage(
+  context: SessionWorkingContext,
+): Omit<CodingAgentSessionModelUsage, "model"> {
+  return {
+    repositoryHost: context.repositoryHost,
+    repositoryOwner: context.repositoryOwner,
+    repositoryName: context.repositoryName,
+    branch: context.branch,
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheReadTokens: 0,
+    cacheCreationTokens: 0,
+    costUsd: 0,
+    aiUnits: 0,
+    priced: true,
+  };
+}
 
 /** One thing the agent did, in the order it did it. */
 interface SessionStep {
@@ -99,6 +136,11 @@ export interface CodingAgentSessionData {
    * context.
    */
   usageByContext: Record<string, CodingAgentSessionContextUsage>;
+  /**
+   * The same spend split per model as well as per context, keyed by `modelUsageKey`, unstamped
+   * calls included. Kept only by agents whose calls never reach the per-call fact table.
+   */
+  usageByModel: Record<string, CodingAgentSessionModelUsage>;
   modelCallMs: number;
   toolMs: number;
   ttftMsTotal: number;
@@ -118,6 +160,10 @@ export interface CodingAgentSessionData {
   largestCacheRebuildTokens: number;
   /** Fold-only predecessor used to detect the next cache rebuild. */
   previousCallContextTokens: number;
+  /** What the predecessor left cached (read plus write), for the same rule. */
+  previousCallCachedTokens: number;
+  /** When the predecessor started; an earlier-starting call arrived late. */
+  previousCallStartedAtMs: number;
   failedTools: number;
   errorTypes: Record<string, number>;
   apiErrors: number;
@@ -162,6 +208,8 @@ export const MAX_SET = 50;
  * per pull request reaches fifty in weeks. A record of exactly this size reads as saturated.
  */
 export const MAX_USAGE_CONTEXTS = 200;
+/** How many (context, model) entries the per-model record holds; past it nothing new opens. */
+export const MAX_USAGE_MODELS = 200;
 
 const TITLE_RANK: Record<SessionTitleSource, number> = {
   prompt: 1,
@@ -169,8 +217,6 @@ const TITLE_RANK: Record<SessionTitleSource, number> = {
   name: 3,
 };
 const TRUNCATING_STOP_REASONS = new Set(["max_tokens", "refusal"]);
-const CACHE_REBUILD_RATIO_THRESHOLD = 0.5;
-const CACHE_REBUILD_MIN_TOKENS = 1_000;
 
 /**
  * Owns the bounded state transitions shared by span and log projections.
@@ -231,6 +277,7 @@ export class CodingAgentSessionStateProjection {
       agentReportedCostUsd: 0,
       aiUnits: 0,
       usageByContext: {},
+      usageByModel: {},
 
       modelCallMs: 0,
       toolMs: 0,
@@ -250,6 +297,8 @@ export class CodingAgentSessionStateProjection {
       cacheRebuildCount: 0,
       largestCacheRebuildTokens: 0,
       previousCallContextTokens: 0,
+      previousCallCachedTokens: 0,
+      previousCallStartedAtMs: 0,
 
       failedTools: 0,
       errorTypes: {},
@@ -340,6 +389,51 @@ export class CodingAgentSessionStateProjection {
           cacheCreationTokens:
             charged.cacheCreationTokens + (after.cacheCreationTokens - before.cacheCreationTokens),
           costUsd: charged.costUsd + (after.costUsd - before.costUsd),
+        },
+      },
+    };
+  }
+
+  /**
+   * Charge one model call's counter and AI-unit delta to its (context, model) entry, unstamped
+   * calls under the empty context. `priced` false marks the model's cost unknown from then on.
+   */
+  chargeModelUsage({
+    before,
+    after,
+    context,
+    model,
+    priced,
+  }: {
+    before: CodingAgentSessionData;
+    after: CodingAgentSessionData;
+    context: SessionWorkingContext | null;
+    model: string | null;
+    priced: boolean;
+  }): CodingAgentSessionData {
+    if (model === null) return after;
+    const where = context ?? UNSTAMPED_CONTEXT;
+    const key = modelUsageKey({ ...where, model });
+    // A state cached before the per-model record has none: it starts empty.
+    const held = Object.hasOwn(after, "usageByModel") ? after.usageByModel : {};
+    const existing = held[key];
+    if (existing === undefined && Object.keys(held).length >= MAX_USAGE_MODELS) return after;
+    const charged = existing ?? { ...emptyModelUsage(where), model };
+    const delta = (field: CountedField): number =>
+      this.number(after[field]) - this.number(before[field]);
+    return {
+      ...after,
+      usageByModel: {
+        ...held,
+        [key]: {
+          ...charged,
+          inputTokens: charged.inputTokens + delta("inputTokens"),
+          outputTokens: charged.outputTokens + delta("outputTokens"),
+          cacheReadTokens: charged.cacheReadTokens + delta("cacheReadTokens"),
+          cacheCreationTokens: charged.cacheCreationTokens + delta("cacheCreationTokens"),
+          costUsd: charged.costUsd + delta("costUsd"),
+          aiUnits: charged.aiUnits + delta("aiUnits"),
+          priced: charged.priced && priced,
         },
       },
     };
@@ -471,11 +565,18 @@ export class CodingAgentSessionStateProjection {
     };
   }
 
-  foldModelCall(
-    next: CodingAgentSessionData,
-    attrs: Record<string, unknown>,
-    fallbackDurationMs: number,
-  ): CodingAgentSessionData {
+  foldModelCall({
+    state: next,
+    attrs,
+    fallbackDurationMs,
+    startedAtMs,
+  }: {
+    state: CodingAgentSessionData;
+    attrs: Record<string, unknown>;
+    fallbackDurationMs: number;
+    /** 0 when unknown; such a call is taken to arrive in order. */
+    startedAtMs: number;
+  }): CodingAgentSessionData {
     const agentId = this.coerceString(attrs.agent_id);
     if (agentId !== null) Object.assign(next, this.recordSubAgent(next, agentId));
     const stopReason = this.coerceString(attrs.stop_reason);
@@ -486,14 +587,30 @@ export class CodingAgentSessionStateProjection {
 
     const cacheReadTokens = this.number(attrs.cache_read_tokens);
     const cacheCreationTokens = this.number(attrs.cache_creation_tokens);
-    const contextTokens = cacheReadTokens + cacheCreationTokens;
-    // The first call is never a "rebuild" — there is nothing to reuse yet,
-    // so a cold cache isn't the session's fault. `previousCallContextTokens`
-    // starts at 0, which doubles as that gate.
+    const inputTokens = this.number(attrs.input_tokens);
+    // Every carrier hands the fold fresh input disjoint from the cache, so the
+    // sum is the whole prompt the call sent.
+    const cachedTokens = cacheReadTokens + cacheCreationTokens;
+    const contextTokens = inputTokens + cachedTokens;
+    // A call that started before the one folded last arrived late: judging it
+    // against a later call would read its cold start as a rebuild, so it is
+    // neither judged nor taken as the next call's predecessor.
+    const arrivedLate = startedAtMs > 0 && startedAtMs < next.previousCallStartedAtMs;
     const isRebuild =
-      next.previousCallContextTokens > 0 &&
-      cacheCreationTokens >= CACHE_REBUILD_MIN_TOKENS &&
-      cacheCreationTokens / next.previousCallContextTokens >= CACHE_REBUILD_RATIO_THRESHOLD;
+      !arrivedLate &&
+      isCacheRebuild({
+        previousContextTokens: next.previousCallContextTokens,
+        previousCachedTokens: next.previousCallCachedTokens,
+        cacheReadTokens,
+        cacheCreationTokens,
+      });
+    const predecessor = arrivedLate
+      ? {}
+      : {
+          previousCallContextTokens: contextTokens,
+          previousCallCachedTokens: cachedTokens,
+          previousCallStartedAtMs: startedAtMs,
+        };
 
     return {
       ...next,
@@ -504,7 +621,7 @@ export class CodingAgentSessionStateProjection {
       // Attempts includes the first try, so attempts > modelCalls means the
       // session paid for retries somewhere.
       attempts: next.attempts + Math.max(1, this.number(attrs.attempt)),
-      inputTokens: next.inputTokens + this.number(attrs.input_tokens),
+      inputTokens: next.inputTokens + inputTokens,
       outputTokens: next.outputTokens + this.number(attrs.output_tokens),
       cacheReadTokens: next.cacheReadTokens + cacheReadTokens,
       cacheCreationTokens: next.cacheCreationTokens + cacheCreationTokens,
@@ -513,7 +630,7 @@ export class CodingAgentSessionStateProjection {
       largestCacheRebuildTokens: isRebuild
         ? Math.max(next.largestCacheRebuildTokens, cacheCreationTokens)
         : next.largestCacheRebuildTokens,
-      previousCallContextTokens: contextTokens,
+      ...predecessor,
       models: model !== null ? this.addToBoundedSet(next.models, model) : next.models,
       // The pointer back to the body that ended the session. Last call wins.
       finalRequestId: requestId ?? next.finalRequestId,

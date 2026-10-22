@@ -15,15 +15,15 @@ Feature: Prompt-cache writes are priced by how long they live
   because they were never doing different sums, only reading a rate we did not
   have.
 
-  Which bucket a write fell into is something only the provider can say. A span
-  reports how many tokens were written, never how long the entry lives, so a
-  write is priced at the hour-long rate exactly when the emitter states an
-  hour-long count and at the short-lived rate otherwise. Deriving one from the
-  other would assert a lifetime nothing measured. The gateway lanes read
-  Anthropic's own breakdown off the response body and put it on the span. Claude
-  Code sends that breakdown on its log stream rather than its span, so the
-  trace's token totals carry the real split while its per-span costs price the
-  writes short-lived, which is a known gap rather than a claim.
+  Which bucket a write fell into is something only the provider can say for
+  sure. The gateway lanes read Anthropic's own breakdown off the response body
+  and put it on the span, and a span that already states an hour-long count
+  keeps it. A Claude Code span says how many tokens were written but not how
+  long they live, so its main-thread calls, which Claude Code writes to the
+  hour-long cache, are recorded as hour-long writes and its other calls as
+  short-lived ones. The trace's per-span costs, the session's cost and each pull
+  request's model lines all price those same tokens with this one formula, so
+  they state one figure.
 
   Scenario: The catalog's one cache-write price is the short-lived one
     Given an Anthropic model priced at 5 USD per million input tokens

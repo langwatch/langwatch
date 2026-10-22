@@ -14,9 +14,10 @@ import {
   readSpooledDeclarations,
   spoolDir,
   spoolFilePath,
+  writeSpooledDeclaration,
 } from "@/cli/utils/governance/session-context-spool";
 
-import { contextCommand } from "../context";
+import { contextCommand, runContextProcess } from "../context";
 import { hookCommand } from "../hook";
 import {
   attributesOf,
@@ -441,6 +442,35 @@ describe("the declare command's refusals", () => {
     expect(lines[0]).toContain("next reports");
   });
 
+  /** @scenario "A declaration that cannot be delivered does not hold the agent's shell" */
+  it("ends the process with exit code zero after its one line", async () => {
+    const exits: number[] = [];
+    // The post fails at once, but the connection attempt behind it stays open.
+    const connecting = setInterval(() => undefined, 60_000);
+    try {
+      await runContextProcess({
+        env: { OTEL_EXPORTER_OTLP_ENDPOINT: ENDPOINT, ...CLAUDE_ENV },
+        cwd: "/repo/worktrees/review",
+        runGit: gitRunner(WORKTREE_GIT),
+        fetchImpl: unreachableCollector,
+        now: () => NOW,
+        stateDir,
+        claudeRegistryDir: path.join(stateDir, "claude-sessions"),
+        codexSessionsRoot: sessionsRoot,
+        ancestorStartPid: 100,
+        ancestorProbe: NO_ANCESTOR,
+        readCliConfig: () => ({}),
+        writeLine: (line) => lines.push(line),
+        exit: (code) => exits.push(code),
+      });
+    } finally {
+      clearInterval(connecting);
+    }
+
+    expect(lines).toHaveLength(1);
+    expect(exits).toEqual([0]);
+  });
+
   /** @scenario "A successful declaration queues nothing" */
   it("queues nothing when the collector accepts the declaration", async () => {
     await runContext();
@@ -601,5 +631,46 @@ describe("a queued declaration and the next session report", () => {
     await runHookSeam({ fetchImpl: unreachableCollector });
 
     expect(readSpooledDeclarations({ stateDir, now: () => NOW })).toHaveLength(1);
+  });
+  const queueSessions = (count: number): void => {
+    for (let index = 0; index < count; index++) {
+      writeSpooledDeclaration({
+        stateDir,
+        agent: "copilot",
+        sessionId: `queued-${index}`,
+        fingerprint: `fingerprint-${index}`,
+        payload: { queued: index },
+        now: () => NOW,
+      });
+    }
+  };
+
+  /** @scenario "A report that cannot reach the collector sends no queued declarations" */
+  it("sends nothing queued once its own post got no answer", async () => {
+    queueSessions(5);
+    let attempts = 0;
+    const silentCollector = (async () => {
+      attempts++;
+      throw new Error("connect ETIMEDOUT");
+    }) as unknown as typeof fetch;
+
+    await runHookSeam({ fetchImpl: silentCollector });
+
+    expect(attempts).toBe(1);
+    expect(readSpooledDeclarations({ stateDir, now: () => NOW })).toHaveLength(5);
+  });
+
+  /** @scenario "The queue drains once the collector answers again" */
+  it("posts every queued declaration when the collector answers again", async () => {
+    queueSessions(5);
+    await runHookSeam({ fetchImpl: unreachableCollector });
+    expect(readSpooledDeclarations({ stateDir, now: () => NOW })).toHaveLength(5);
+
+    await runHookSeam();
+
+    expect(posted.map((request) => request.body)).toEqual(
+      expect.arrayContaining([0, 1, 2, 3, 4].map((queued) => ({ queued }))),
+    );
+    expect(readSpooledDeclarations({ stateDir, now: () => NOW })).toEqual([]);
   });
 });

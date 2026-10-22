@@ -11,10 +11,14 @@ import { appSettingsTargetFor, installAppEnv } from "./app-settings";
 import { readClaudePluginState } from "./claude-plugin";
 import { assertCodexAgentGuidance } from "./codex-agents-md";
 import type { GovernanceConfig } from "./config";
-import { buildOtelEnvBlock, SOURCE_TYPE_BY_TOOL } from "./otel-env-block";
+import { buildOtelEnvBlock } from "./otel-env-block";
 import { runningCodeRestartNotice } from "./running-code";
-import { sessionContextAgentByKeySourceType } from "./session-context-agents";
-import { installSessionContextHooks, removeSessionContextHooks } from "./session-context-hooks";
+import {
+  assertOwnedHookFileFor,
+  hookFileNotOursNotice,
+  installSessionContextHooks,
+  removeSessionContextHooks,
+} from "./session-context-hooks";
 import {
   type DetectedShell,
   assertCodexTurnHarvest,
@@ -124,20 +128,6 @@ function clearCodeTerminalEnv({
 }
 
 /**
- * Both Copilot surfaces load the one hook file LangWatch owns (ADR-039 S4), so
- * wiring either writes it. Quiet, idempotent and best-effort, as claude's is.
- */
-function assertCopilotSessionHooks(tool: string): void {
-  const sourceType = SOURCE_TYPE_BY_TOOL[tool];
-  if (!sourceType || sessionContextAgentByKeySourceType(sourceType)?.id !== "copilot") return;
-  try {
-    installSessionContextHooks({ tool: "copilot" });
-  } catch {
-    void 0;
-  }
-}
-
-/**
  * Install the persistent wiring for one tool with the given credential.
  * Returns the targets written so the caller can report them. Never
  * throws for a single-target failure; it lands in `warnings` instead.
@@ -180,7 +170,7 @@ export function installTelemetryWiring({
     return { labels, warnings, requiredFailures };
   }
 
-  assertCopilotSessionHooks(tool);
+  warnings.push(...assertCopilotHookFile(tool));
 
   // Every remaining tool persists as a scoped shell function so the OTel
   // env applies to `<tool>` runs only, never to other shell children.
@@ -219,4 +209,15 @@ export function installTelemetryWiring({
     if (notice) warnings.push(notice);
   }
   return { labels, warnings, requiredFailures };
+}
+
+/**
+ * Both Copilot surfaces load the one hook file LangWatch owns (ADR-039 S4), so
+ * wiring either writes it, quietly and best-effort as claude's is. The warning
+ * it returns is for a file of the user's at its path: then linking is off.
+ */
+function assertCopilotHookFile(tool: string): string[] {
+  const hookFile = assertOwnedHookFileFor({ command: tool });
+  if (hookFile?.action !== "not_ours") return [];
+  return [hookFileNotOursNotice({ displayPath: hookFile.displayPath, command: tool })];
 }

@@ -38,6 +38,22 @@ Feature: Core OTLP protection applies Enterprise policy without owning it
     And empty resource groups are removed
     But log scopes are not filtered
 
+  # A dropped scope is a partial rejection in OTLP terms: the sender is told how
+  # many items were refused and why, never a clean answer over data thrown away.
+  @integration
+  Scenario: Spans dropped for their scope are reported back to the sender
+    Given a copilot_vscode ingestion key's trace export carries Copilot spans and unrelated instrumentation spans
+    When the receiver answers the export
+    Then the answer counts the unrelated spans as rejected
+    And its error message names the instrumentation scopes that were dropped
+
+  @unit
+  Scenario: Metric points dropped for their scope are reported back to the sender
+    Given a copilot_vscode ingestion key's metric export carries points from unrelated instrumentation
+    When the receiver answers the export
+    Then the answer counts those points as rejected beside any the collection rejected
+    And its error message names the instrumentation scopes that were dropped
+
   @unit
   Scenario: Metrics retain the existing billing distinction
     Given Governance resolves an ingestion source's bundled-plan policy

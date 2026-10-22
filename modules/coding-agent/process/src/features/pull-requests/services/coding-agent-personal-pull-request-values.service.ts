@@ -1,5 +1,6 @@
 import type { CodingAgentSession } from "@langwatch/coding-agent-contract";
 
+import { isCostUnknown } from "../../../rules/coding-agent-pull-request.rules.ts";
 import type { CodingAgentPullRequestAssignmentService } from "./coding-agent-pull-request-assignment.service.ts";
 import type {
   CodingAgentPullRequestUsageService,
@@ -18,6 +19,7 @@ type CodingAgentPersonalSession = {
   cacheReadTokens: number;
   cacheCreationTokens: number;
   costUsd: number;
+  costKnown: boolean;
   models: string[];
 };
 
@@ -77,6 +79,7 @@ export class CodingAgentPersonalPullRequestValuesService {
         cacheReadTokens: session.cacheReadTokens,
         cacheCreationTokens: session.cacheCreationTokens,
         costUsd: session.costUsd,
+        costKnown: !isCostUnknown(session.usageByModel),
         models: session.models,
       });
       groups.set(key, group);
@@ -98,9 +101,9 @@ export class CodingAgentPersonalPullRequestValuesService {
     sessionsCount: number;
     totalTokens: number;
     modelBreakdown: CodingAgentModelUsage[];
-    costUsd: number;
-    billedCostUsd: number;
-    nonBilledCostUsd: number;
+    costUsd: number | null;
+    billedCostUsd: number | null;
+    nonBilledCostUsd: number | null;
     repoCovered: boolean;
   }[] {
     const byBranch = new Map<string, CodingAgentPersonalSession[]>();
@@ -125,15 +128,31 @@ export class CodingAgentPersonalPullRequestValuesService {
         0,
       ),
       modelBreakdown: this.namedModels(sessions),
-      costUsd: sessions.reduce((total, session) => total + session.costUsd, 0),
-      billedCostUsd: sessions
-        .filter((session) => !input.nonBillableAgents.has(session.agent))
-        .reduce((total, session) => total + session.costUsd, 0),
-      nonBilledCostUsd: sessions
-        .filter((session) => input.nonBillableAgents.has(session.agent))
-        .reduce((total, session) => total + session.costUsd, 0),
+      ...this.costSplit({ sessions, nonBillableAgents: input.nonBillableAgents }),
       repoCovered: input.repoCovered,
     }));
+  }
+
+  /** The branch's cost split; unknown when no session on it had a known price. */
+  private costSplit({
+    sessions,
+    nonBillableAgents,
+  }: {
+    sessions: readonly CodingAgentPersonalSession[];
+    nonBillableAgents: ReadonlySet<string>;
+  }): { costUsd: number | null; billedCostUsd: number | null; nonBilledCostUsd: number | null } {
+    const priced = sessions.filter((session) => session.costKnown);
+    if (priced.length === 0) {
+      return { costUsd: null, billedCostUsd: null, nonBilledCostUsd: null };
+    }
+
+    const sum = (of: readonly CodingAgentPersonalSession[]) =>
+      of.reduce((total, session) => total + session.costUsd, 0);
+    return {
+      costUsd: sum(priced),
+      billedCostUsd: sum(priced.filter((session) => !nonBillableAgents.has(session.agent))),
+      nonBilledCostUsd: sum(priced.filter((session) => nonBillableAgents.has(session.agent))),
+    };
   }
 
   private namedModels(sessions: readonly { models: string[] }[]): CodingAgentModelUsage[] {
@@ -155,6 +174,7 @@ export class CodingAgentPersonalPullRequestValuesService {
       totalTokens: 0,
       costUsd: null,
       tokensKnown: false,
+      aiUnits: null,
     }));
   }
 }

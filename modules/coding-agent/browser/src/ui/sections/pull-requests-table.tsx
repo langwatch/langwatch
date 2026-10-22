@@ -1,4 +1,8 @@
-import { formatCost, formatTokens } from "@langwatch/design-system/display-formatters";
+import {
+  compactNumber,
+  formatCost,
+  formatTokens,
+} from "@langwatch/design-system/display-formatters";
 import { GitHubIcon } from "@langwatch/design-system/icons";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
@@ -28,6 +32,7 @@ import {
   encodePullRequestRef,
   PULL_REQUEST_QUERY_KEY,
 } from "../../model/pull-request-detail-address.ts";
+import { MODEL_FIGURES_NOT_KNOWN } from "../../model/pull-request-detail.ts";
 import {
   derivePullRequestStatus,
   type PullRequestStatus,
@@ -733,9 +738,20 @@ const StatusCell: React.FC<{
   return <PullRequestStatusBadge status={row.snapshotStatus} source="payload" />;
 };
 
+/** A known model's tokens, its AI units as their own count, then its cost when it has one. */
+function modelUsageSummary(model: ModelUsage): string {
+  return [
+    `${formatTokens(model.totalTokens)} tokens`,
+    ...(model.aiUnits !== null && model.aiUnits > 0
+      ? [`${compactNumber({ value: model.aiUnits })} AI units`]
+      : []),
+    ...(model.costUsd === null ? [] : [formatCost(model.costUsd)]),
+  ].join(", ");
+}
+
 /**
  * The leading model, and how many others rode along. An entry whose totals
- * are not known carries its name alone — this cell only draws the answer the
+ * are not known says so beside its name — this cell only draws the answer the
  * read already computed.
  */
 const ModelsCell: React.FC<{ models: ModelUsage[] }> = ({ models }) => {
@@ -754,9 +770,7 @@ const ModelsCell: React.FC<{ models: ModelUsage[] }> = ({ models }) => {
           {models.map((model) => (
             <Text key={model.model}>
               {model.model}
-              {model.tokensKnown
-                ? `: ${formatTokens(model.totalTokens)} tokens${model.costUsd === null ? "" : `, ${formatCost(model.costUsd)}`}`
-                : ""}
+              {`: ${model.tokensKnown ? modelUsageSummary(model) : MODEL_FIGURES_NOT_KNOWN.toLowerCase()}`}
             </Text>
           ))}
         </VStack>

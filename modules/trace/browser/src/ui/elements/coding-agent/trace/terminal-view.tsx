@@ -45,6 +45,7 @@ import {
 import {
   type CacheRebuildEvent,
   findCacheRebuilds,
+  modelCallContextTokens,
 } from "../../../../model/coding-agent/trace/token-timeline.ts";
 import { toolResultBodyToString } from "../../../../model/coding-agent/trace/tool-result-body.ts";
 import {
@@ -141,7 +142,7 @@ type ContextMarker =
       kind: "deadSite";
       atMs: number;
       cacheCreationTokens: number;
-      previousContextTokens: number;
+      previousCachedTokens: number;
     };
 
 /**
@@ -173,11 +174,11 @@ function markersForModelCall({
       kind: "deadSite",
       atMs: entry.atMs,
       cacheCreationTokens: rebuild.cacheCreationTokens,
-      previousContextTokens: rebuild.previousContextTokens,
+      previousCachedTokens: rebuild.previousCachedTokens,
     });
   }
 
-  const contextTokens = entry.cacheReadTokens + entry.cacheCreationTokens;
+  const contextTokens = modelCallContextTokens(entry);
   const band = contextHeatBand(contextTokens);
   if (!band) return { markers, band: bandState };
 
@@ -674,11 +675,12 @@ export const TerminalView = memo(function TerminalView({
   const { screenRef, contentRef, setRowRef, isAtBottom, trackedFullIndex, onScroll, jumpToBottom } =
     useTerminalScroll({ entries, visibleIndices, lastVisibleFullIndex, scrollback });
 
-  // Where the bottom bar counts to. Normally the beat the reader is on; when
-  // the transcript renders nothing at all (an agent that reported economics
-  // and no content), there is no row to stand on and the bar counts the whole
-  // loaded window, which is what the message on screen calls real.
-  const barIndex = visibleIndices.length === 0 ? entries.length - 1 : trackedFullIndex;
+  // Where the bottom bar counts to: the beat the reader is on, or the whole loaded
+  // window when there is no row to stand on or the reader is on the last one, since
+  // the calls after the last line have happened by then.
+  const countsWholeWindow =
+    visibleIndices.length === 0 || trackedFullIndex === lastVisibleFullIndex;
+  const barIndex = countsWholeWindow ? entries.length - 1 : trackedFullIndex;
   const point = timeline[barIndex];
   const modelAtScroll = useMemo(
     () => modelAt({ entries, fullIndex: barIndex }) ?? banner?.model ?? null,
@@ -1517,7 +1519,7 @@ function ContextMarkerLine({ marker }: { marker: ContextMarker }) {
     marker.kind === "deadSite"
       ? [
           TERMINAL_TOKENS.red,
-          `Cache rebuilt: ${formatTokens(marker.cacheCreationTokens)} tokens re-sent instead of reusing ${formatTokens(marker.previousContextTokens)} tokens cached`,
+          `Cache rebuilt: ${formatTokens(marker.cacheCreationTokens)} tokens re-sent instead of reusing ${formatTokens(marker.previousCachedTokens)} tokens cached`,
         ]
       : [marker.color, `Context ${marker.label}: ${formatTokens(marker.contextTokens)} tokens`];
   return (
@@ -1698,7 +1700,7 @@ function StatusLine({
 
 /**
  * Cost stat format: "$X of $Y" where first number follows scroll, second is
- * session total (drops when same as running figure when fully loaded).
+ * session total (dropped when both read the same, however small the session).
  */
 export function statusLineCostLabel({
   costUsd,
@@ -1710,7 +1712,7 @@ export function statusLineCostLabel({
   const running = costUsd !== null && costUsd > 0 ? costUsd : null;
   const session = sessionCostUsd !== null && sessionCostUsd > 0 ? sessionCostUsd : null;
   if (running === null) return session === null ? null : formatCost(session);
-  if (session === null || session <= running + 0.01) {
+  if (session === null || session <= running || formatCost(session) === formatCost(running)) {
     return formatCost(running);
   }
   return `${formatCost(running)} of ${formatCost(session)}`;

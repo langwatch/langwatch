@@ -40,6 +40,7 @@ export type { CodingAgentTranscript, TranscriptEntry } from "./coding-agent-tran
 export type { TranscriptLogRecord } from "./coding-agent-transcript-state.ts";
 export * from "./injected-notice.ts";
 export * from "./leading-context.ts";
+export * from "./coding-agent-cache-rebuild.ts";
 export * from "./coding-agent-span-admission.ts";
 export * from "./coding-agent-lent-components.ts";
 export * from "./coding-agent-project-milestones.events.ts";

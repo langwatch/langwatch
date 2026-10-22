@@ -210,14 +210,30 @@ function typeChangeFindings({ up, liveUp }: { up: string; liveUp: string }): Fin
     });
 }
 
+/** The column definition from `start` to the next comma or semicolon outside parentheses. */
+function columnDefinitionFrom({ text, start }: { text: string; start: number }): string {
+  let depth = 0;
+  for (let index = start; index < text.length; index++) {
+    const char = text[index]!;
+    if (depth === 0 && (char === "," || char === ";")) return text.slice(start, index);
+    if (char === "(") depth++;
+    if (char === ")") depth--;
+  }
+  return text.slice(start);
+}
+
 function variableSizeFindings(liveUp: string): Finding[] {
-  const pattern = /\bADD\s+COLUMN\s+(?:IF\s+NOT\s+EXISTS\s+)?`?(\w+)`?\s+([^,;]*)/gi;
+  const pattern = /\bADD\s+COLUMN\s+(?:IF\s+NOT\s+EXISTS\s+)?`?(\w+)`?\s+/gi;
   return [...liveUp.matchAll(pattern)]
-    .filter((match) => /^\s*(Array|Map|Tuple|Nested)\s*\(/i.test(match[2] ?? ""))
-    .filter((match) => !/\bDEFAULT\b/i.test(match[2] ?? ""))
     .map((match) => ({
+      column: match[1],
+      definition: columnDefinitionFrom({ text: liveUp, start: match.index + match[0].length }),
+    }))
+    .filter(({ definition }) => /^\s*(Array|Map|Tuple|Nested)\s*\(/i.test(definition))
+    .filter(({ definition }) => !/\bDEFAULT\b/i.test(definition))
+    .map(({ column }) => ({
       rule: "add-variable-size-column-without-default",
-      problem: `adds variable-size column ${match[1]} with no DEFAULT`,
+      problem: `adds variable-size column ${column} with no DEFAULT`,
       fix:
         "write `DEFAULT []` (or the empty value of the type). A variable-size column added by " +
         "ALTER is unmaterialised in every part written before it, and a read of such a part " +

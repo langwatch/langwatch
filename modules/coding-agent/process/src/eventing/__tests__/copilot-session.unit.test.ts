@@ -94,11 +94,11 @@ function lift(captured: CapturedSpan) {
   });
 }
 
-function makeProjection() {
+function makeProjection(modelProviders = new TestModelProviderService(() => PRICE_PER_CALL_USD)) {
   return CodingAgentSessionFoldProjection.create({
     store: { store: async () => {}, get: async () => ({ kind: "empty" as const }) },
     traceCanonicalisation: ClaudeAnswersTraceCanonicalisation.create(),
-    modelProviders: new TestModelProviderService(() => PRICE_PER_CALL_USD),
+    modelProviders,
   });
 }
 
@@ -106,8 +106,8 @@ function makeProjection() {
 function foldSessions(
   spans: CapturedSpan[],
   initial?: CodingAgentSessionState,
+  projection = makeProjection(),
 ): Map<string, CodingAgentSessionState> {
-  const projection = makeProjection();
   const sessions = new Map<string, CodingAgentSessionState>();
   for (const captured of spans) {
     const lifted = lift(captured);
@@ -451,6 +451,119 @@ describe("Copilot session fold", () => {
     });
   });
 
+  describe("given two Copilot session roots, each carrying its turn's user message", () => {
+    /** The root's input as the CLI sends it: the prompt behind Copilot's injected date block. */
+    function rootWithPrompt({ startMs, prompt }: { startMs: number; prompt: string }) {
+      return {
+        ...cliRoot,
+        startMs,
+        endMs: startMs + 5_000,
+        attributes: {
+          ...cliRoot.attributes,
+          "gen_ai.input.messages": JSON.stringify([
+            {
+              role: "user",
+              parts: [
+                {
+                  type: "text",
+                  content: `<current_datetime>2026-10-21T15:36:06.315+02:00</current_datetime>\n\n${prompt}`,
+                },
+              ],
+            },
+          ]),
+        },
+      };
+    }
+
+    describe("when the session is folded", () => {
+      const row = foldSessions([
+        rootWithPrompt({ startMs: 1_000, prompt: "Count the files in this folder" }),
+        rootWithPrompt({ startMs: 30_000, prompt: "Now list them by size" }),
+      ]).get(CLI_CONVERSATION);
+
+      /** @scenario "A Copilot session is named by its first prompt" */
+      it("names the row by the first prompt's own words, without the date block", () => {
+        expect(row?.title).toBe("Count the files in this folder");
+        expect(row?.titleSource).toBe("prompt");
+      });
+    });
+  });
+
+  describe("given a Copilot CLI conversation that called two models, one with no price", () => {
+    const UNPRICED_MODEL = "oswe-vscode-prime";
+    const unpricedCall: CapturedSpan = {
+      ...secondCall,
+      name: `chat ${UNPRICED_MODEL}`,
+      attributes: { ...secondCall.attributes, "gen_ai.request.model": UNPRICED_MODEL },
+    };
+    const projection = makeProjection(
+      new TestModelProviderService(
+        (input) => (input.model === UNPRICED_MODEL ? 0 : PRICE_PER_CALL_USD),
+        (input) => input.model !== UNPRICED_MODEL,
+      ),
+    );
+    const usageOf = (state: CodingAgentSessionState | undefined) =>
+      Object.values(state?.usageByModel ?? {}).toSorted((a, b) => a.model.localeCompare(b.model));
+
+    describe("when they are folded", () => {
+      const row = foldSessions([firstCall, unpricedCall], undefined, projection).get(
+        CLI_CONVERSATION,
+      );
+
+      /** @scenario "Each Copilot model on a pull request has known tokens" */
+      /** @scenario "AI units are their own count and never enter the dollar total" */
+      /** @scenario "A model with no price shows its tokens and an unknown cost" */
+      it("keeps each model's own tokens, cost and AI units, and marks the unpriced one", () => {
+        const unstamped = {
+          repositoryHost: "",
+          repositoryOwner: "",
+          repositoryName: "",
+          branch: "",
+        };
+        expect(usageOf(row)).toEqual([
+          {
+            ...unstamped,
+            model: "gpt-6-luna",
+            inputTokens: 3,
+            outputTokens: 38,
+            cacheReadTokens: 0,
+            cacheCreationTokens: 17039,
+            costUsd: expect.closeTo(PRICE_PER_CALL_USD, 9),
+            aiUnits: expect.closeTo(0.2149175, 9),
+            priced: true,
+          },
+          {
+            ...unstamped,
+            model: UNPRICED_MODEL,
+            inputTokens: 13,
+            outputTokens: 50,
+            cacheReadTokens: 17039,
+            cacheCreationTokens: 0,
+            costUsd: 0,
+            aiUnits: expect.closeTo(0.038424, 9),
+            priced: false,
+          },
+        ]);
+        expect(row?.costUsd).toBeCloseTo(PRICE_PER_CALL_USD, 9);
+      });
+    });
+
+    describe("when they fold onto a state cached before the per-model column", () => {
+      const { usageByModel: _addedLater, ...beforeColumn } = projection.init();
+      const cached = decodeFoldCacheEntry<CodingAgentSessionState>(
+        encodeFoldCacheEntry({ state: beforeColumn, updatedAt: 1, appliedEventIds: [] }),
+      ).state;
+
+      /** @scenario "Each Copilot model on a pull request has known tokens" */
+      it("starts the per-model record empty rather than failing", () => {
+        const row = foldSessions([firstCall, unpricedCall], cached, projection).get(
+          CLI_CONVERSATION,
+        );
+        expect(usageOf(row).map((usage) => usage.model)).toEqual(["gpt-6-luna", UNPRICED_MODEL]);
+      });
+    });
+  });
+
   describe("given a VS Code title call, which carries no conversation id", () => {
     const titleCall: CapturedSpan = {
       name: "chat gpt-4o-mini-2024-07-18",
@@ -536,19 +649,25 @@ describe("Copilot session fold", () => {
       const claudeRow = sessions.get("claude-session");
       const codexRow = [...sessions.values()].find((row) => row.agent === "codex");
 
-      /** @scenario Claude Code and Codex rows are unchanged by the Copilot declarations */
+      /** @scenario "Claude Code and Codex rows are unchanged by the Copilot declarations" */
       it("counts no AI units on either row", () => {
         expect(claudeRow?.agent).toBe("claude_code");
         expect(claudeRow?.aiUnits).toBe(0);
         expect(codexRow?.aiUnits).toBe(0);
       });
 
-      /** @scenario Claude Code and Codex rows are unchanged by the Copilot declarations */
+      /** @scenario "Claude Code and Codex rows are unchanged by the Copilot declarations" */
+      it("keeps no per-model record on either row, so their pull-request reads are unchanged", () => {
+        expect(claudeRow?.usageByModel).toEqual({});
+        expect(codexRow?.usageByModel).toEqual({});
+      });
+
+      /** @scenario "Claude Code and Codex rows are unchanged by the Copilot declarations" */
       it("still keys the keyless codex span by its trace, rather than dropping it", () => {
         expect(codexRow?.sessionKeySource).toBe("trace_fallback");
       });
 
-      /** @scenario Claude Code and Codex rows are unchanged by the Copilot declarations */
+      /** @scenario "Claude Code and Codex rows are unchanged by the Copilot declarations" */
       it("does not fold the codex chat span as a Copilot model call", () => {
         expect(genAiOperationRoleOf({ agent: "codex", name: keylessCodexChat.name })).toBe(
           "undeclared",
@@ -703,6 +822,51 @@ describe("Copilot session context", () => {
         expect(claudeRow?.agent).toBe("claude_code");
         expect(checkoutOf(copilotRow)).toEqual(checkoutOf(claudeRow));
       });
+    });
+  });
+});
+
+describe("Copilot session cache rebuilds", () => {
+  // The call shapes of a real Copilot CLI session: three short calls, then a
+  // call that read the whole cache and wrote an 80K-token file on top.
+  const call = (startMs: number, cacheRead: number, cacheCreation: number) =>
+    cliChat({ startMs, input: 3, output: 20, cacheRead, cacheCreation, nanoAiUnits: "0" });
+  const [first, second, third, fourth, fifth] = [
+    call(1_000, 0, 14_327),
+    call(3_000, 14_327, 327),
+    call(6_000, 14_654, 140),
+    call(9_000, 14_654, 160),
+    call(12_000, 14_814, 80_016),
+  ];
+
+  describe("given the last call read every cached token and wrote a large file on top", () => {
+    describe("when the calls fold in the order they ran", () => {
+      /** @scenario "The session fold counts a rebuild only when the cache read fell" */
+      it("counts no cache rebuild", () => {
+        const row = foldSessions([first, second, third, fourth, fifth]).get(CLI_CONVERSATION);
+        expect(row?.cacheCreationTokens).toBe(94_970);
+        expect(row?.cacheRebuildCount).toBe(0);
+        expect(row?.largestCacheRebuildTokens).toBe(0);
+      });
+    });
+  });
+
+  describe("given the first call's span arrives after the calls that followed it", () => {
+    describe("when the calls fold in arrival order", () => {
+      /** @scenario "A model call that arrives after a later one is not judged a rebuild" */
+      it("counts no cache rebuild", () => {
+        const row = foldSessions([second, third, first, fourth, fifth]).get(CLI_CONVERSATION);
+        expect(row?.modelCalls).toBe(5);
+        expect(row?.cacheRebuildCount).toBe(0);
+      });
+    });
+  });
+
+  describe("given a later call read none of the cache and wrote it again", () => {
+    it("still counts that call as a rebuild", () => {
+      const row = foldSessions([first, second, call(4_000, 0, 14_700)]).get(CLI_CONVERSATION);
+      expect(row?.cacheRebuildCount).toBe(1);
+      expect(row?.largestCacheRebuildTokens).toBe(14_700);
     });
   });
 });

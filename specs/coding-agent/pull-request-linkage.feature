@@ -425,6 +425,16 @@ Rule: A session's cost splits across the pull requests it drove, by the work sta
     When each pull request's usage is read
     Then each reports the share the row recorded under its branch
 
+  # Each counter and the cost take their ratio from the record's own figure for
+  # that counter, so a pull request priced at another rate than the session's
+  # other work reports what was recorded, as its model breakdown does.
+  @unit
+  Scenario: A session that worked on two repositories at different rates reports the recorded figures
+    Given a session whose row records work on another repository at one rate and on the pull request's branch at another
+    When the pull request's usage is read
+    Then its cost and each token count are exactly what the row recorded under that branch
+    And the pull request totals match its model breakdown
+
   @unit
   Scenario: Usage from before the session declared anything follows its first declared branch
     Given a session that spent most of its tokens before its first declaration
@@ -652,6 +662,24 @@ Rule: Each pull request reports what every model consumed
     Then each model reports its own input, output and cache tokens
     And each model reports what it cost
 
+  # The per-call rows keep what the agent said it was billed, a drift signal
+  # (specs/coding-agent/session-aggregate.feature). A model's line prices the
+  # same tokens the session's cost does, so the lines add up to the total.
+  @unit
+  Scenario: Each model's cost is the one computed from its tokens, as the total is
+    Given a pull request fed by a session whose model calls reported their own cost
+    And the session kept its cost computed from tokens for each model
+    When the pull request usage is read
+    Then each model reports its computed cost, not the reported one
+    And the models' costs add up to the pull request's cost
+
+  @unit
+  Scenario: A session whose per-model record is incomplete falls back to its per-call rows
+    Given a session whose per-model record covers only some of its tokens
+    And per-call rows for every one of its model calls
+    When the pull request usage is read
+    Then each model's figures come from the per-call rows
+
   @unit
   Scenario: A model's cost is absent when no permitted project may be priced
     Given a pull request in a project the viewer may read but not price
@@ -687,6 +715,14 @@ Rule: Each pull request reports what every model consumed
     Given a pull request whose sessions both recorded their models and logged model calls
     When the pull request usage is read
     Then the row reports each model's tokens rather than names alone
+
+  @unit
+  Scenario: A session without per-call data still names its models beside one that has them
+    Given a pull request with one session that logged model calls and one that only recorded its models
+    When the pull request usage is read
+    Then the second session's models are listed by name with unknown tokens
+    And the pull request totals are unchanged
+    And the model with per-call data stays first
 
   @integration
   Scenario: The detail names the models even without per-call data
@@ -1103,6 +1139,15 @@ Rule: The v1 usage read needs only an organization credential
   # the whole point of a restricted key — so the rollup intersects the
   # holder's cut with the key's, the same key-plus-holder decision every
   # other REST door asks.
+  # A deployment may serve GitHub's web pages from an origin other than the
+  # host its repositories live on (a stand-in, a proxy), so a read that names
+  # no host asks about the repository host, never the web origin's name.
+  @unit
+  Scenario: A read that names no host asks about the instance's repository host
+    Given an instance whose GitHub web pages are served from another origin than its repository host
+    When pull request usage is read without naming a host
+    Then the read asks about the instance's repository host
+
   @integration
   Scenario: A narrowed key reads with its own scope, not its holder's
     Given a holder who may view traces in two projects

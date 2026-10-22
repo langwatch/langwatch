@@ -3,7 +3,6 @@ import { formatCost } from "@langwatch/design-system/display-formatters";
 import { Box, Grid, HStack, Separator, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { ReactNode } from "react";
-import { useMemo } from "react";
 
 import {
   contextHealthBand,
@@ -31,16 +30,16 @@ import { TokenTimelineChart } from "./token-timeline-chart.tsx";
 interface SessionViewProps {
   session: CodingAgentSessionDisplay;
   /**
-   * Per-call token timeline. The fold above sums cache reused/rebuilt but not
+   * Per-call token timeline. The fold above sums cache reads and writes but not
    * where; optional so its absence doesn't fail the tab.
    */
   entries?: TranscriptEntry[];
 }
 
 export function SessionView({ session, entries }: SessionViewProps) {
-  const signals = useMemo(() => deriveSessionSignals(session), [session]);
-  const tokenTimeline = useMemo(() => (entries ? deriveTokenTimeline(entries) : []), [entries]);
-  const cacheRebuilds = useMemo(() => (entries ? findCacheRebuilds(entries) : []), [entries]);
+  const signals = deriveSessionSignals(session);
+  const tokenTimeline = entries ? deriveTokenTimeline(entries) : [];
+  const cacheRebuilds = entries ? findCacheRebuilds(entries) : [];
 
   return (
     <Box height="full" overflowY="auto">
@@ -48,8 +47,8 @@ export function SessionView({ session, entries }: SessionViewProps) {
         <Headline session={session} />
 
         {/*
-          Signals lead. The stat grid below can tell you the cache was rebuilt
-          318k tokens' worth, but only this can tell you that's four rebuilds and
+          Signals lead. The stat grid below can tell you 318k tokens went to the
+          cache, but only this can tell you four of those calls were rebuilds and
           it cost you money. Findings before figures.
         */}
         {signals.length > 0 && <Signals signals={signals} />}
@@ -68,6 +67,12 @@ export function SessionView({ session, entries }: SessionViewProps) {
 
         {tokenTimeline.length > 0 && (
           <Section title="Where the tokens went">
+            {/* A turn the chart could not read leaves it short of the cards' count. */}
+            {tokenTimeline.length < session.modelCalls && (
+              <Text textStyle="xs" color="fg.muted">
+                {`The chart draws ${tokenTimeline.length} of the session's ${session.modelCalls} model calls`}
+              </Text>
+            )}
             <TokenTimelineChart points={tokenTimeline} rebuilds={cacheRebuilds} />
           </Section>
         )}
@@ -328,7 +333,7 @@ function ToolTable({
 /**
  * Promoted out of the headline grid: peak context is banded against the
  * reliability curve in contextHealth.ts, and cache misses plus the worst
- * rebuild turn a raw "context rebuilt" number into a concrete story.
+ * rebuild turn a raw "written to cache" number into a concrete story.
  */
 function cacheRebuildTone(cacheRebuildCount: number): ContextHealthTone {
   if (cacheRebuildCount === 0) return "success";
@@ -357,7 +362,7 @@ function CacheHealth({ session }: { session: CodingAgentSessionDisplay }) {
           <Stat
             label="Cache misses"
             value={hasContextData ? String(session.cacheRebuildCount) : "—"}
-            hint="Model calls that re-created most of the context instead of reading it from cache. A cache WRITE costs more per token than a read, so this is the session paying twice for the same tokens."
+            hint="Model calls whose cache read fell below what the call before them left cached, and that wrote it again. A cache WRITE costs more per token than a read, so this is the session paying twice for the same tokens."
             tone={rebuildTone}
           />
           <Stat
@@ -366,9 +371,9 @@ function CacheHealth({ session }: { session: CodingAgentSessionDisplay }) {
             hint="Tokens served from the cache across the whole session. These bill at a fraction of fresh input: the more the better."
           />
           <Stat
-            label="Context rebuilt"
+            label="Written to cache"
             value={formatCompact(session.cacheCreationTokens)}
-            hint="Tokens spent writing the cache again, summed across the whole session."
+            hint="Tokens written to the cache across the whole session: new context as it grew, plus any rebuilds counted under cache misses."
           />
         </Grid>
         {session.largestCacheRebuildTokens > 0 && (

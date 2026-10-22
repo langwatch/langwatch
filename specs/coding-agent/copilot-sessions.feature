@@ -62,6 +62,27 @@ Rule: One row per conversation, every number from the model calls
     Then the row starts when the session root started
 
   @unit
+  Scenario: A Copilot session is named by its first prompt
+    Given a Copilot session root whose user message opens with Copilot's injected date block
+    And a later session root with another prompt
+    When the session is folded
+    Then the row is named by the first prompt's own words, without the date block
+    And the later prompt does not rename it
+
+  @integration
+  Scenario: A Copilot prompt in the Conversation tab opens with the user's own words
+    Given a Copilot turn whose user message opens with Copilot's injected date block
+    When the Conversation tab renders the turn
+    Then the user message shows the prompt's own words
+    And the date block is folded away as hidden context, the way the Terminal tab folds it
+
+  @unit
+  Scenario: The usage chart's rebuild note quotes the user's own words of a Copilot prompt
+    Given a Copilot session whose cache was rebuilt after a prompt that opens with Copilot's injected date block
+    When the usage chart names the prompt before the rebuild
+    Then it quotes the prompt's own words without the date block
+
+  @unit
   Scenario: Tool runs are counted with their names
     Given a Copilot session with three execute_tool spans
     When the session is folded
@@ -116,21 +137,68 @@ Rule: The session context links a Copilot session to its pull request
 
 Rule: Pull-request cost keeps AI units apart from dollars
 
-  @unit @unimplemented
+  @unit
   Scenario: Each Copilot model on a pull request has known tokens
     Given a pull request fed by one Copilot session that used two models
     When its usage is read
     Then each model shows its own known token counts
 
-  @unit @unimplemented
+  @unit
   Scenario: AI units are their own count and never enter the dollar total
     Given a Copilot session that consumed AI units
     When the pull request cost is shown
     Then the AI units appear as a count
     And the dollar total excludes them
 
-  @unit @unimplemented
+  @unit
   Scenario: A model with no price shows its tokens and an unknown cost
     Given a Copilot model call on a model with no price
     When the pull request cost is shown
     Then its tokens appear and its cost reads as unknown, not zero
+
+  @unit
+  Scenario: A pull request whose only model has no price shows an unknown cost, not zero
+    Given a pull request fed only by a Copilot session on a model with no price
+    When the pull request cost is shown
+    Then the row, the session and the pull request total read as unknown, not zero
+    And the personal pull request row and a branch with no pull request read as unknown too
+
+  @unit
+  Scenario: A pull request with priced and unpriced sessions totals the priced share
+    Given a pull request fed by a priced session and a session on a model with no price
+    When the pull request cost is shown
+    Then the total is the priced session's cost
+    And the unpriced session's own cost reads as unknown
+
+  @unit
+  Scenario: A model an older session also ran reads as not fully known
+    Given a pull request fed by a Copilot session with per-model figures for a model
+    And an older Copilot session on the same model with no per-model figures
+    When its usage is read
+    Then that model's tokens read as not known rather than the newer session's alone
+    And the pull request totals still count both sessions
+
+  @unit
+  Scenario: A model whose figures are not known reads its AI units as not known, not zero
+    Given a pull request fed by a Copilot session that consumed AI units but kept no per-model figures
+    When its usage is read
+    Then that model's AI units read as not known rather than zero
+
+  @integration
+  Scenario: The detail marks a model whose figures are not known
+    Given a pull request detail with a model whose figures are not known
+    When the detail is opened
+    Then that model's line says its figures are not known and why, rather than naming it bare
+    And the pull requests table says the same of it
+
+  @integration
+  Scenario: The per-model usage round-trips through the session row
+    Given a session that used two models, one of them unpriced, and consumed AI units
+    When the session row is written and read back
+    Then the row carries each model's tokens, cost, AI units and whether it was priced
+
+  @integration
+  Scenario: A session row from before the per-model usage column decodes with none
+    Given a session row written before the per-model usage column existed
+    When the row is read back
+    Then the session decodes with no per-model usage

@@ -252,6 +252,34 @@ describe("SessionView", () => {
     });
   });
 
+  describe("given a chart that could read fewer calls than the session made", () => {
+    const call = (atMs: number): TranscriptEntry => ({
+      kind: "model_call",
+      atMs,
+      model: "gpt-6-luna",
+      tokens: 28,
+      costUsd: 0.0007,
+      durationMs: 1_000,
+      spanId: `chat-${atMs}`,
+      inputTokens: 3,
+      outputTokens: 25,
+      cacheReadTokens: 9_000,
+      cacheCreationTokens: 5_000,
+    });
+
+    /** @scenario "The per-call chart says when it draws fewer calls than the session made" */
+    it("says how many of the session's calls the chart draws", () => {
+      renderSession({ modelCalls: 6 }, [call(1_000), call(2_000), call(3_000), call(4_000)]);
+      expect(screen.getByText("The chart draws 4 of the session's 6 model calls")).toBeTruthy();
+    });
+
+    /** @scenario "The per-call chart says when it draws fewer calls than the session made" */
+    it("adds no note when the chart holds every call", () => {
+      renderSession({ modelCalls: 2 }, [call(1_000), call(2_000)]);
+      expect(screen.queryByText(/of the session's/)).toBeNull();
+    });
+  });
+
   describe("given transcript entries with a cache rebuild", () => {
     it("shows the timeline and names the prompt that triggered the rebuild", () => {
       const entries: TranscriptEntry[] = [
@@ -321,6 +349,23 @@ describe("SessionView", () => {
       renderSession({ cacheRebuildCount: 0, largestCacheRebuildTokens: 0 });
 
       expect(screen.queryByText(/Biggest single rebuild/)).toBeNull();
+    });
+  });
+
+  describe("given a session that wrote to the cache but counted no rebuild", () => {
+    /** @scenario "The Usage tab calls the session's cache writes written, not rebuilt" */
+    it("names the writes as written to the cache, with no cache miss", () => {
+      renderSession({
+        peakContextTokens: 94_833,
+        cacheReadTokens: 58_449,
+        cacheCreationTokens: 95_000,
+        cacheRebuildCount: 0,
+        largestCacheRebuildTokens: 0,
+      });
+
+      expect(screen.queryByText("Context rebuilt")).toBeNull();
+      expect(screen.getByText("Written to cache").parentElement).toHaveTextContent("95k");
+      expect(screen.getByText("Cache misses").parentElement).toHaveTextContent("0");
     });
   });
 

@@ -127,6 +127,14 @@ Feature: Coding-agent sessions
     When a run of its model calls is written together
     Then the session's context growth, final request and stop reason match the last call in that run
 
+  # A call's context is the whole prompt it sent: the part read from the cache,
+  # the part written to it and the part sent fresh. Every agent's input count
+  # reaches the fold as the fresh part only, so adding the three counts it once.
+  Scenario: a session's peak context counts the fresh input beside the cached prompt
+    When a session's model call reads part of its prompt from the cache, writes part to it and sends the rest fresh
+    Then the session's peak context is the whole prompt the call sent
+    And a codex turn, whose input includes the cache, counts its cached input once
+
   Scenario: a reported rate limit is counted apart from an inferred one
     When an agent session reports rate-limit events and separately fails an API call with a 429
     Then the session counts the reported rate-limit events on their own
@@ -174,6 +182,11 @@ Feature: Coding-agent sessions
     # formula the trace pipeline applies to the same spans, so a session and
     # its traces cannot disagree; the reported one tells us when either our
     # price registry or the agent's own pricing went stale.
+
+  Scenario: a span-fed session keeps its computed cost per model
+    When a session's model-call spans run two models
+    Then the session records each model's tokens and the cost computed from them
+    And the per-model costs add up to the session's cost
 
   Scenario: a codex shell command counts once despite its sandbox outcome event
     When a codex session runs one shell command that reports a tool result and a sandbox outcome

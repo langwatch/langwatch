@@ -1089,6 +1089,7 @@ describe("PullRequestUsageService", () => {
           totalTokens: 180,
           costUsd: 1.5,
           tokensKnown: true,
+          aiUnits: 0,
         },
         {
           model: "gpt-5-mini",
@@ -1099,6 +1100,7 @@ describe("PullRequestUsageService", () => {
           totalTokens: 4,
           costUsd: 0.25,
           tokensKnown: true,
+          aiUnits: 0,
         },
       ]);
     });
@@ -1118,6 +1120,92 @@ describe("PullRequestUsageService", () => {
 
       expect(usage.modelBreakdown[0]?.totalTokens).toBe(180);
       expect(usage.modelBreakdown[0]?.costUsd).toBeNull();
+    });
+  });
+
+  describe("given a session whose calls reported a cost beside the one computed from tokens", () => {
+    const usage = (model: string, over: Partial<SessionModelTotalsRow> = {}) => ({
+      ...modelTotalsRow({ sessionId: "s1", model, ...over }),
+      aiUnits: 0,
+      priced: true,
+    });
+    const sonnet = { inputTokens: 1_200, outputTokens: 300, cacheReadTokens: 5_000 };
+    const haiku = { inputTokens: 400, outputTokens: 50, cacheReadTokens: 0 };
+    const mixedSession = (usageByModel: ReturnType<typeof usage>[]) =>
+      sessionRow({
+        sessionId: "s1",
+        inputTokens: 1_600,
+        outputTokens: 350,
+        cacheReadTokens: 5_000,
+        cacheCreationTokens: 800,
+        costUsd: 0.01505,
+        models: ["claude-sonnet-4-5", "claude-haiku-4-5"],
+        usageByModel,
+      });
+    const reportedTotals = [
+      modelTotalsRow({
+        sessionId: "s1",
+        model: "claude-sonnet-4-5",
+        ...sonnet,
+        cacheCreationTokens: 800,
+        costUsd: 0.0141,
+      }),
+      modelTotalsRow({
+        sessionId: "s1",
+        model: "claude-haiku-4-5",
+        ...haiku,
+        cacheCreationTokens: 0,
+        costUsd: 0.00065,
+      }),
+    ];
+
+    /** @scenario "Each model's cost is the one computed from its tokens, as the total is" */
+    it("prices each model at its computed cost, adding up to the pull request's", async () => {
+      const { service } = serviceWith({
+        pullRequests: [pullRequestRow()],
+        sessions: [
+          mixedSession([
+            usage("claude-sonnet-4-5", { ...sonnet, cacheCreationTokens: 800, costUsd: 0.0144 }),
+            usage("claude-haiku-4-5", { ...haiku, cacheCreationTokens: 0, costUsd: 0.00065 }),
+          ]),
+        ],
+        modelTotals: reportedTotals,
+      });
+
+      const result = await service.getPullRequestUsage(QUERY);
+
+      expect(result.modelBreakdown.map(({ model, costUsd }) => ({ model, costUsd }))).toEqual([
+        { model: "claude-sonnet-4-5", costUsd: 0.0144 },
+        { model: "claude-haiku-4-5", costUsd: 0.00065 },
+      ]);
+      const perModel = result.modelBreakdown.reduce((sum, each) => sum + (each.costUsd ?? 0), 0);
+      expect(perModel).toBeCloseTo(result.totals.costUsd ?? Number.NaN, 9);
+    });
+
+    /** @scenario "A session whose per-model record is incomplete falls back to its per-call rows" */
+    it("reads the per-call rows when the record misses some of the session's tokens", async () => {
+      const { service } = serviceWith({
+        pullRequests: [pullRequestRow()],
+        sessions: [
+          mixedSession([
+            usage("claude-haiku-4-5", { ...haiku, cacheCreationTokens: 0, costUsd: 0.00065 }),
+          ]),
+        ],
+        modelTotals: reportedTotals,
+      });
+
+      const result = await service.getPullRequestUsage(QUERY);
+
+      expect(
+        result.modelBreakdown.map(({ model, inputTokens, costUsd }) => ({
+          model,
+          inputTokens,
+          costUsd,
+        })),
+      ).toEqual([
+        { model: "claude-sonnet-4-5", inputTokens: 1_200, costUsd: 0.0141 },
+        { model: "claude-haiku-4-5", inputTokens: 400, costUsd: 0.00065 },
+      ]);
     });
   });
 

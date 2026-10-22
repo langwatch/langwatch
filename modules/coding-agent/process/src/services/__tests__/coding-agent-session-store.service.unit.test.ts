@@ -381,6 +381,8 @@ describe("EventingCodingAgentSessionStoreService read-back gate", () => {
       subAgents: 2,
       subAgentIds: ["sub-a", "sub-b"],
       previousCallContextTokens: 12_000,
+      previousCallCachedTokens: 11_000,
+      previousCallStartedAtMs: 8_000,
       steps: [{ name: "Read", count: 2, failed: false, startedAtMs: 9_000 }],
       metricSeries: {
         "loc-added": {
@@ -469,6 +471,8 @@ describe("EventingCodingAgentSessionStoreService read-back gate", () => {
         expect(miss).toBeUndefined();
         expect(state?.subAgentIds).toEqual(["sub-a", "sub-b"]);
         expect(state?.previousCallContextTokens).toBe(12_000);
+        expect(state?.previousCallCachedTokens).toBe(11_000);
+        expect(state?.previousCallStartedAtMs).toBe(8_000);
         expect(appliedEventIds).toEqual(["e1", "e2"]);
       });
     });

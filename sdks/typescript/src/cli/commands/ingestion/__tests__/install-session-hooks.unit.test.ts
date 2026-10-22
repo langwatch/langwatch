@@ -395,4 +395,66 @@ describe("the copilot ingestion install", () => {
       expect(fs.readdirSync(copilotHooksDir)).toEqual(["my-hooks.json"]);
     });
   });
+
+  describe("given a langwatch.json the user wrote that runs our command beside their own hooks", () => {
+    const langwatchFile = () => path.join(copilotHooksDir, COPILOT_HOOK_FILE_NAME);
+    const userBytes = JSON.stringify({
+      hooks: {
+        sessionStart: [{ bash: "langwatch ingest hook copilot" }, { bash: "echo mine" }],
+        preToolUse: [{ bash: "echo guard" }],
+      },
+    });
+
+    beforeEach(() => {
+      fs.mkdirSync(copilotHooksDir, { recursive: true });
+      fs.writeFileSync(langwatchFile(), userBytes);
+    });
+
+    /** @scenario "A langwatch.json the user wrote around the LangWatch command is never rewritten or removed" */
+    it("keeps it byte for byte through install and logout, and logout never lists it", async () => {
+      await runCopilotInstall();
+      expect(fs.readFileSync(langwatchFile(), "utf8")).toBe(userBytes);
+
+      const copilotTarget = scanTelemetryTargets({ cwd: tmpDir }).find((target) =>
+        target.label.startsWith("copilot session hooks"),
+      );
+      expect(copilotTarget?.present).toBe(false);
+
+      removeTelemetryTargets();
+      expect(fs.readFileSync(langwatchFile(), "utf8")).toBe(userBytes);
+    });
+
+    /** @scenario "A user's langwatch.json that runs the LangWatch hook is not reported as turning linking off" */
+    it("reports the file left alone, never that linking is off or a hook file was added", async () => {
+      await runCopilotInstall();
+
+      expect(stdout()).toContain(`~/.copilot/hooks/${COPILOT_HOOK_FILE_NAME}`);
+      expect(stdout()).toContain("left alone");
+      expect(stdout()).not.toContain("will not report their repository or branch");
+      expect(stdout()).not.toContain("A LangWatch hook file was added");
+    });
+  });
+
+  describe("given a langwatch.json the user wrote that runs none of our commands", () => {
+    const langwatchFile = () => path.join(copilotHooksDir, COPILOT_HOOK_FILE_NAME);
+
+    beforeEach(() => {
+      fs.mkdirSync(copilotHooksDir, { recursive: true });
+      fs.writeFileSync(
+        langwatchFile(),
+        JSON.stringify({ hooks: { preToolUse: [{ bash: "echo guard" }] } }),
+      );
+    });
+
+    /** @scenario "The copilot ingestion install reports the user's langwatch.json it left alone" */
+    it("reports the file left alone and linking off, never that a hook file was added", async () => {
+      await runCopilotInstall();
+
+      expect(stdout()).toContain(
+        `~/.copilot/hooks/${COPILOT_HOOK_FILE_NAME} is not a LangWatch file, so it was left alone`,
+      );
+      expect(stdout()).toContain("will not report their repository or branch");
+      expect(stdout()).not.toContain("A LangWatch hook file was added");
+    });
+  });
 });

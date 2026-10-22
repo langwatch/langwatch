@@ -207,3 +207,58 @@ describe("given a project key and a valid export", () => {
     });
   });
 });
+
+const otlpSpan = (spanId: string) => ({
+  traceId: "b2ca0e1d9f4a4d2ab1c0d3e4f5061728",
+  spanId,
+  name: "chat",
+  startTimeUnixNano: "1720000000000000000",
+  endTimeUnixNano: "1720000001000000000",
+});
+
+const COPILOT_ONLY = {
+  resourceAttributeKeysToRemove: [],
+  resourceAttributes: [],
+  allowedTraceScopeNames: ["github.copilot", "@github/copilot", "copilot-chat"],
+};
+
+describe("given a copilot_vscode key whose export mixes Copilot and unrelated instrumentation", () => {
+  /** @scenario "Spans dropped for their scope are reported back to the sender" */
+  it("counts the unrelated spans as rejected and names their scopes", async () => {
+    const { post } = ingestionSourceDeployment({
+      sourcePolicy: {
+        status: "ready",
+        policies: { traces: COPILOT_ONLY, logs: COPILOT_ONLY, metrics: COPILOT_ONLY },
+      },
+    });
+
+    const response = await post(
+      JSON.stringify({
+        resourceSpans: [
+          {
+            scopeSpans: [
+              { scope: { name: "copilot-chat" }, spans: [otlpSpan("a1b2c3d4e5f60701")] },
+              {
+                scope: { name: "gemini-cli" },
+                spans: [otlpSpan("a1b2c3d4e5f60702"), otlpSpan("a1b2c3d4e5f60703")],
+              },
+            ],
+          },
+          {
+            scopeSpans: [
+              { scope: { name: "@vscode/some-extension" }, spans: [otlpSpan("a1b2c3d4e5f60704")] },
+            ],
+          },
+        ],
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      partialSuccess: { rejectedSpans: number; errorMessage: string };
+    };
+    expect(body.partialSuccess.rejectedSpans).toBe(3);
+    expect(body.partialSuccess.errorMessage).toContain("gemini-cli");
+    expect(body.partialSuccess.errorMessage).toContain("@vscode/some-extension");
+  });
+});

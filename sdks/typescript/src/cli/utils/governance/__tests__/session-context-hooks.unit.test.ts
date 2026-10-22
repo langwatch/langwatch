@@ -343,6 +343,7 @@ describe("the Copilot hook file LangWatch owns", () => {
       );
     });
 
+    /** @scenario "A Copilot hook file holding only LangWatch's entries is brought up to date" */
     it("rewrites a file of ours an older CLI left in another shape", () => {
       fs.mkdirSync(path.dirname(copilotFile()), { recursive: true });
       fs.writeFileSync(
@@ -370,10 +371,84 @@ describe("the Copilot hook file LangWatch owns", () => {
     });
 
     it("neither overwrites, lists nor removes it", () => {
-      expect(install({ tool: "copilot" }).action).toBe("unchanged");
+      expect(install({ tool: "copilot" }).action).toBe("not_ours");
       expect(has("copilot")).toBe(false);
       expect(remove("copilot")).toBe(false);
       expect(fs.readFileSync(copilotFile(), "utf8")).toBe(theirs);
+    });
+  });
+
+  describe("given a file at our path that runs our command and anything else", () => {
+    const cases = {
+      "a user hook beside ours in the same event": {
+        hooks: {
+          sessionStart: [{ bash: "langwatch ingest hook copilot" }, { bash: "echo mine" }],
+        },
+      },
+      "a user hook in an event of its own": {
+        hooks: {
+          sessionStart: [{ type: "command", bash: "langwatch ingest hook copilot" }],
+          preToolUse: [{ type: "command", bash: "echo guard" }],
+        },
+      },
+      "our command chained to the user's": {
+        hooks: { sessionStart: [{ bash: "langwatch ingest hook copilot && echo mine" }] },
+      },
+      "a setting of the user's on our entry": {
+        hooks: { sessionStart: [{ bash: "langwatch ingest hook copilot", cwd: "/work" }] },
+      },
+      "a key of the user's beside the hooks": {
+        version: 1,
+        disableAllHooks: false,
+        hooks: { sessionStart: [{ bash: "langwatch ingest hook copilot" }] },
+      },
+    };
+
+    for (const [shape, document] of Object.entries(cases)) {
+      it(`treats ${shape} as the user's: never rewritten, listed or removed`, () => {
+        const theirs = JSON.stringify(document);
+        fs.mkdirSync(path.dirname(copilotFile()), { recursive: true });
+        fs.writeFileSync(copilotFile(), theirs);
+
+        expect(install({ tool: "copilot" }).action).toBe("user_file_runs_hook");
+        expect(has("copilot")).toBe(false);
+        expect(remove("copilot")).toBe(false);
+        expect(fs.readFileSync(copilotFile(), "utf8")).toBe(theirs);
+      });
+    }
+  });
+
+  describe("given a user's file that runs our hook through another launcher", () => {
+    const assertFor = (command: string) => {
+      const theirs = JSON.stringify({
+        hooks: { sessionStart: [{ bash: command }], preToolUse: [{ bash: "echo guard" }] },
+      });
+      fs.mkdirSync(path.dirname(copilotFile()), { recursive: true });
+      fs.writeFileSync(copilotFile(), theirs);
+      const action = install({ tool: "copilot" }).action;
+      expect(fs.readFileSync(copilotFile(), "utf8")).toBe(theirs);
+      return action;
+    };
+
+    /** @scenario "A user's langwatch.json running the hook by path or npx is not reported as turning linking off" */
+    it.each([
+      "/opt/homebrew/bin/langwatch ingest hook copilot",
+      '"/Users/me/My Tools/langwatch" ingest hook copilot',
+      "npx langwatch ingest hook copilot",
+      "npx -y langwatch@1.19.0 ingest hook copilot",
+      "/usr/local/bin/node /usr/local/lib/node_modules/langwatch/dist/cli/index.js ingest hook copilot",
+    ])("reports %s as the user's file that runs our hook", (command) => {
+      expect(assertFor(command)).toBe("user_file_runs_hook");
+    });
+
+    /** @scenario "A user's langwatch.json running another program named like langwatch still gets the notice" */
+    it.each([
+      "/opt/homebrew/bin/langwatch-foo ingest hook copilot",
+      "npx langwatch-foo ingest hook copilot",
+      "npx @acme/langwatch ingest hook copilot",
+      "langwatch ingest hook claude-code",
+    ])("reports %s as not ours", (command) => {
+      expect(assertFor(command)).toBe("not_ours");
     });
   });
 
@@ -382,7 +457,7 @@ describe("the Copilot hook file LangWatch owns", () => {
       fs.mkdirSync(path.dirname(copilotFile()), { recursive: true });
       fs.writeFileSync(copilotFile(), "{ not json");
 
-      expect(install({ tool: "copilot" }).action).toBe("unchanged");
+      expect(install({ tool: "copilot" }).action).toBe("not_ours");
       expect(remove("copilot")).toBe(false);
       expect(fs.readFileSync(copilotFile(), "utf8")).toBe("{ not json");
     });

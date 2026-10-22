@@ -1,4 +1,8 @@
-import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
+import {
+  isCacheRebuild,
+  splitLeadingContextBlocks,
+  type TranscriptEntry,
+} from "@langwatch/coding-agent-contract";
 
 /**
  * Per-call token composition from spans; answers "where" (not just "how much")
@@ -33,6 +37,18 @@ export function deriveTokenTimeline(entries: TranscriptEntry[]): TokenTimelinePo
   return points;
 }
 
+type ModelCall = Extract<TranscriptEntry, { kind: "model_call" }>;
+
+/** What a call read from or wrote to the cache: what the next call can reuse. */
+export function modelCallCachedTokens(entry: ModelCall): number {
+  return entry.cacheReadTokens + entry.cacheCreationTokens;
+}
+
+/** A call's context: the whole prompt it sent. Input arrives disjoint from the cache. */
+export function modelCallContextTokens(entry: ModelCall): number {
+  return entry.inputTokens + modelCallCachedTokens(entry);
+}
+
 /** A call that re-created most of the context instead of reading it from cache. */
 export interface CacheRebuildEvent {
   /**
@@ -42,56 +58,61 @@ export interface CacheRebuildEvent {
   callIndex: number;
   atMs: number;
   cacheCreationTokens: number;
-  /** The context size the PREVIOUS call had cached, for the "instead of reusing N" comparison. */
+  /** The whole prompt the PREVIOUS call sent, which the rebuild is measured against. */
   previousContextTokens: number;
+  /** What the PREVIOUS call left in the cache (read plus written), shown as "reusing N cached". */
+  previousCachedTokens: number;
   /** The nearest user message before this call — usually what caused the rebuild. */
   precedingPrompt: string | null;
 }
 
-/**
- * A cache write costs MORE than a read, so a call whose `cacheCreationTokens`
- * nears the previous call's cached context size is paying twice for the same
- * tokens. The first call is never flagged — a cold cache isn't a rebuild.
- */
-const REBUILD_RATIO_THRESHOLD = 0.5;
-const REBUILD_MIN_TOKENS = 1_000;
-
+/** The first call is never flagged: a cold cache isn't a rebuild. */
 export function findCacheRebuilds(entries: TranscriptEntry[]): CacheRebuildEvent[] {
   const events: CacheRebuildEvent[] = [];
   let previousContextTokens = 0;
+  let previousCachedTokens = 0;
   let callIndex = -1;
 
   for (const entry of entries) {
     if (entry.kind !== "model_call") continue;
     callIndex++;
-    const contextTokens = entry.cacheReadTokens + entry.cacheCreationTokens;
+    const cachedTokens = modelCallCachedTokens(entry);
+    const contextTokens = modelCallContextTokens(entry);
 
     if (
       callIndex > 0 &&
-      entry.cacheCreationTokens >= REBUILD_MIN_TOKENS &&
-      previousContextTokens > 0 &&
-      entry.cacheCreationTokens / previousContextTokens >= REBUILD_RATIO_THRESHOLD
+      isCacheRebuild({
+        previousContextTokens,
+        previousCachedTokens,
+        cacheReadTokens: entry.cacheReadTokens,
+        cacheCreationTokens: entry.cacheCreationTokens,
+      })
     ) {
       events.push({
         callIndex,
         atMs: entry.atMs,
         cacheCreationTokens: entry.cacheCreationTokens,
         previousContextTokens,
+        previousCachedTokens,
         precedingPrompt: nearestPrecedingPrompt(entries, entry.atMs),
       });
     }
 
     previousContextTokens = contextTokens;
+    previousCachedTokens = cachedTokens;
   }
 
   return events;
 }
 
+/** Quoted by the user's own words: leading context blocks (Copilot's date) peel off. */
 function nearestPrecedingPrompt(entries: TranscriptEntry[], atMs: number): string | null {
   let best: string | null = null;
   for (const entry of entries) {
     if (entry.atMs > atMs) break;
     if (entry.kind === "user_prompt" && entry.text?.trim()) best = entry.text;
   }
-  return best;
+  if (best === null) return null;
+  // A message that is only context blocks is left as written, as the Conversation tab does.
+  return splitLeadingContextBlocks(best).body || best;
 }

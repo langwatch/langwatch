@@ -224,6 +224,7 @@ export function branchSession(
     gitBranch: "main",
     gitBranches: [],
     usageByContext: [],
+    usageByModel: [],
     title: "",
     ...overrides,
   };

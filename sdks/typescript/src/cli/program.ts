@@ -6200,8 +6200,8 @@ function registerIngestCaptureCommands(ingestCmd: Command): void {
       .allowExcessArguments(true),
   ).action(async (tool: string) => {
     try {
-      const { hookCommand } = await import("./commands/ingestion/hook.js");
-      await hookCommand({ tool });
+      const { runHookProcess } = await import("./commands/ingestion/hook.js");
+      await runHookProcess({ tool });
     } catch {
       // Same contract as the command itself: never break the session.
       void 0;
@@ -6225,8 +6225,8 @@ function registerIngestCaptureCommands(ingestCmd: Command): void {
       ),
   ).action(async (options: { sessionId?: string; agent?: string }) => {
     try {
-      const { contextCommand } = await import("./commands/ingestion/context.js");
-      await contextCommand(options);
+      const { runContextProcess } = await import("./commands/ingestion/context.js");
+      await runContextProcess(options);
     } catch {
       // Never break the session the agent runs this from.
       void 0;

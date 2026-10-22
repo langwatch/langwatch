@@ -2,6 +2,7 @@ import {
   type LogFactsContributedEvent,
   logFactsContributedEventSchema,
   type CodingAgentSessionContextUsage,
+  type CodingAgentSessionModelUsage,
   extractStampedContext,
   type MetricFactsContributedEvent,
   metricFactsContributedEventSchema,
@@ -340,6 +341,8 @@ export interface CodingAgentSessionRow {
    * column, whose whole usage then reads as spent before any declaration.
    */
   usageByContext: CodingAgentSessionContextUsage[];
+  /** The per-model split (migration 00123); empty for log-fed agents and older rows. */
+  usageByModel: CodingAgentSessionModelUsage[];
 
   modelCallMs: number;
   toolMs: number;
@@ -400,6 +403,10 @@ export interface CodingAgentSessionRow {
   stepStartedAt: number[];
   /** Previous model call's context size, to detect the next cache rebuild. */
   previousCallContextTokens: number;
+  /** What the previous model call left cached (read plus write), for the same rule. */
+  previousCallCachedTokens: number;
+  /** When the previous model call started, so a late-arriving earlier call is not judged. */
+  previousCallStartedAtMs: number;
   /** The converged metric units the metric-fed fields are recomputed from. */
   metricSeries: CodingAgentSessionMetricSeriesRow[];
   /** Fold bookkeeping timestamps (createdAt/updatedAt map to CreatedAt/UpdatedAt). */

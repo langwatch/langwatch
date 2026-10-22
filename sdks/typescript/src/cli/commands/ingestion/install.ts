@@ -10,7 +10,11 @@ import { isLoggedIn, loadConfig, saveConfig } from "@/cli/utils/governance/confi
 import { installOpencodeSessionContextPlugin } from "@/cli/utils/governance/opencode-plugin";
 import { buildOtelEnvBlock, TOOL_BY_SOURCE_TYPE } from "@/cli/utils/governance/otel-env-block";
 import { sessionContextAgentByKeySourceType } from "@/cli/utils/governance/session-context-agents";
-import { installSessionContextHooks } from "@/cli/utils/governance/session-context-hooks";
+import {
+  hookFileNotOursNotice,
+  installSessionContextHooks,
+  type SessionContextHooksAction,
+} from "@/cli/utils/governance/session-context-hooks";
 import {
   CODEX_TURN_HARVEST_BLOCKED_MESSAGE,
   type CodexTurnHarvestOutcome,
@@ -56,6 +60,8 @@ interface InstallReport {
   endpoint: string;
   ingestion_token: string;
   token_prefix: string;
+  /** Whether this run minted a fresh key or reused the one already cached or pinned. */
+  key_action: "minted" | "reused";
   /** Where the telemetry lands: a pinned team project, or the personal one. */
   scope: "project" | "personal";
   /** The pinned project's slug or id, when the scope is a project. */
@@ -72,7 +78,7 @@ interface InstallReport {
    * How the session context seam was left (entries, opencode plugin, or our
    * own Copilot hook file). Absent when the Claude Code plugin took it.
    */
-  session_hooks_action?: "created" | "updated" | "unchanged";
+  session_hooks_action?: SessionContextHooksAction;
   session_hooks_path?: string;
   /**
    * What became of the Claude Code plugin, claude_code only, when the run
@@ -159,6 +165,7 @@ async function runInstall(
     endpoint,
     ingestion_token: token,
     token_prefix: prefix ?? token.slice(0, 12),
+    key_action: minted ? "minted" : "reused",
     scope,
     destination_project: projectLabel,
     env_block: envBlock,
@@ -293,7 +300,10 @@ function buildEnvBlock(tool: SupportedTool, endpoint: string, token: string): st
 }
 
 function renderHumanReport(report: InstallReport): void {
-  process.stdout.write(`${chalk.green("✓")} Minted ingestion key for ${chalk.bold(report.tool)}\n`);
+  const keyVerb = report.key_action === "minted" ? "Minted a new" : "Reused the existing";
+  process.stdout.write(
+    `${chalk.green("✓")} ${keyVerb} ingestion key for ${chalk.bold(report.tool)}\n`,
+  );
   process.stdout.write(`  endpoint: ${report.endpoint}\n`);
   process.stdout.write(`  token:    ${report.ingestion_token}\n`);
 
@@ -315,15 +325,7 @@ function renderHumanReport(report: InstallReport): void {
   }
 
   renderCodexTurnHarvest(report);
-
-  if (report.session_hooks_action) {
-    const hooksVerb =
-      report.session_hooks_action === "unchanged"
-        ? "already up to date"
-        : report.session_hooks_action;
-    const what = report.tool === "opencode" ? "session plugin" : "session hooks";
-    process.stdout.write(`${chalk.green("✓")} ${report.session_hooks_path} ${what} ${hooksVerb}\n`);
-  }
+  renderSessionHooks(report);
 
   process.stdout.write("\nAdd to your shell rc (or run in this shell):\n");
   for (const line of report.env_block) {
@@ -331,6 +333,26 @@ function renderHumanReport(report: InstallReport): void {
   }
 
   renderToolInstallationNotes(report);
+}
+
+function renderSessionHooks(report: InstallReport): void {
+  if (report.session_hooks_action === "not_ours") {
+    const displayPath = report.session_hooks_path ?? "";
+    const notice = hookFileNotOursNotice({ displayPath, command: "copilot" });
+    process.stdout.write(`${chalk.yellow("!")} ${notice}\n`);
+  } else if (report.session_hooks_action === "user_file_runs_hook") {
+    process.stdout.write(
+      `${chalk.green("✓")} ${report.session_hooks_path} is your own file and runs the LangWatch ` +
+        `hook, so it was left alone\n`,
+    );
+  } else if (report.session_hooks_action) {
+    const hooksVerb =
+      report.session_hooks_action === "unchanged"
+        ? "already up to date"
+        : report.session_hooks_action;
+    const what = report.tool === "opencode" ? "session plugin" : "session hooks";
+    process.stdout.write(`${chalk.green("✓")} ${report.session_hooks_path} ${what} ${hooksVerb}\n`);
+  }
 }
 
 function renderCodexTurnHarvest(report: InstallReport): void {
@@ -369,7 +391,11 @@ function renderToolInstallationNotes(report: InstallReport): void {
       );
     }
   } else if (report.tool === "copilot_cli") {
-    if (report.session_hooks_action) {
+    const wroteHookFile =
+      report.session_hooks_action === "created" ||
+      report.session_hooks_action === "updated" ||
+      report.session_hooks_action === "unchanged";
+    if (wroteHookFile) {
       process.stdout.write(
         `\nA LangWatch hook file was added to your Copilot hooks folder, so every Copilot CLI\n` +
           `and VS Code session reports the repository, branch and worktree it ran in. Your\n` +

@@ -64,6 +64,29 @@ Feature: Coding agent terminal view
     When the Terminal tab renders the session
     Then those events are read and rendered like any other
 
+  # Copilot sends no log events: its prompt and reply ride its `chat` spans as
+  # GenAI message parts (`{"type": "text", "content": ...}`) and each tool run is
+  # an `execute_tool` span naming `gen_ai.tool.name`. Read from there, the
+  # replay is the conversation, not only the context it carried.
+
+  @unit
+  Scenario: A Copilot session shows its prompts, replies and tool runs
+    Given a Copilot session whose model calls carry the user's message and the reply as message parts
+    And whose tool runs are execute_tool spans
+    When the Terminal tab renders the session
+    Then each prompt, the reply text and each tool run are shown
+    And the model's reasoning is not shown as its reply
+    And a prompt a log event already reported is shown once
+
+  # The trace read nests a stored span's dotted attribute keys by their dots,
+  # so `gen_ai.tool.name` reaches the transcript as `gen_ai: { tool: { name } }`.
+
+  @unit
+  Scenario: A Copilot tool run read back from storage shows in the terminal
+    Given a stored Copilot execute_tool span that names its tool, arguments and result in GenAI attributes
+    When the trace read hands it to the transcript with those attributes nested by their dots
+    Then the Terminal tab shows the tool run with its name, what it ran and its result
+
   # The system prompt is the context the user pays for on every call - CLAUDE.md,
   # MCP tool definitions, skills. It rides the first request body of the session.
 
@@ -122,6 +145,17 @@ Rule: The terminal reads back the whole session
     Given a turn short enough that the reader is at the bottom of it
     When an earlier turn is prepended above it
     Then the screen stays where the reader left it instead of following the tail
+
+  # A context note sizes a call's context as the whole prompt it sent: the part
+  # read from the cache, the part written to it and the part sent fresh, the
+  # same figure the session's peak context and the usage chart use.
+
+  @integration
+  Scenario: A context note counts the fresh part of the prompt
+    Given a model call whose cached and written input alone stay under the growing band
+    And whose fresh input takes the whole prompt into it
+    When the terminal shows the call
+    Then a context note says the context is growing, sized as the whole prompt
 
   # A context note says the context crossed into a bigger size band, which is a
   # comparison against the call BEFORE the crossing. While earlier turns are
@@ -221,6 +255,18 @@ Rule: The terminal reads back the whole session
     Given a session whose telemetry carries economics and no content
     When the reader reads the bottom bar
     Then the cost and tokens cover every call of the loaded window
+
+  # A turn can end on model calls that draw nothing after its last line (a reply
+  # the agent did not send, a call that only read the context). At the last line
+  # they have happened, so the bar counts them; a running figure that differs
+  # from the session total is stated beside it however small the gap.
+
+  @integration
+  Scenario: The footer at the last line counts the calls after it
+    Given the loaded window ends on model calls that come after its last line
+    When the reader is at the last line
+    Then the cost and tokens cover every call of the loaded window
+    And a running cost short of the session total is stated beside that total
 
   @integration
   Scenario: A reader who may not see cost still reads the session's tokens

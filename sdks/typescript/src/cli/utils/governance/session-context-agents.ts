@@ -9,6 +9,7 @@ import * as path from "node:path";
 
 import { appSettingsTargetFor } from "./app-settings";
 import { opencodePluginTarget } from "./opencode-plugin";
+import { SOURCE_TYPE_BY_TOOL } from "./otel-env-block";
 
 /** Where one agent's hook lives on disk. */
 export interface HooksTarget {
@@ -68,6 +69,9 @@ function copilotHookFile(): HooksTarget {
     displayPath: `~/.copilot/hooks/${COPILOT_HOOK_FILE_NAME}`,
   };
 }
+
+/** Seconds every hook file we write gives the hook before the agent kills it. */
+export const HOOK_TIMEOUT_SECONDS = 10;
 
 /** The name of LangWatch's own file in the Copilot hook folder. */
 export const COPILOT_HOOK_FILE_NAME = "langwatch.json";
@@ -140,6 +144,29 @@ export type SessionContextAgentId = keyof AgentTable;
 export type HookedTool = {
   [K in SessionContextAgentId]: AgentTable[K]["hookTarget"]["kind"] extends "plugin" ? never : K;
 }[SessionContextAgentId];
+
+/** The agents whose hook is a whole file of ours, in a folder the agent loads. */
+export type OwnedHookFileTool = {
+  [K in SessionContextAgentId]: AgentTable[K]["hookTarget"]["kind"] extends "owned-file"
+    ? K
+    : never;
+}[SessionContextAgentId];
+
+/** Whether the agent's hook is a whole file of ours rather than entries in one of the user's. */
+export function hasOwnedHookFile(id: SessionContextAgentId): id is OwnedHookFileTool {
+  return SESSION_CONTEXT_AGENTS[id].hookTarget.kind === "owned-file";
+}
+
+/**
+ * The agent a wrapped command (`copilot`, `code`) launches, when that agent's
+ * hook is a file of ours alone, so the wrapper may write it under the grant it
+ * asks for. Null for an agent whose hook shares a user's file, or a plugin.
+ */
+export function ownedHookFileToolForCommand(command: string): OwnedHookFileTool | null {
+  const sourceType = SOURCE_TYPE_BY_TOOL[command];
+  const row = sourceType ? sessionContextAgentByKeySourceType(sourceType) : null;
+  return row && hasOwnedHookFile(row.id) ? row.id : null;
+}
 
 /** Whether `slug` names an agent with a row in the table. */
 export function isSessionContextAgentId(slug: string): slug is SessionContextAgentId {

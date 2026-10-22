@@ -8,8 +8,11 @@ import * as path from "node:path";
 
 import { parseGitRemoteUrl, type SessionContext } from "@/cli/utils/governance/session-context";
 
-/** How long a single git invocation may take. */
-const GIT_TIMEOUT_MS = 2_000;
+/**
+ * How long a single git invocation may take. Each blocks the process, and the
+ * hook makes four, so together they must fit its budget with room to spare.
+ */
+const GIT_TIMEOUT_MS = 1_000;
 
 /** Runs one git command in a directory. Trimmed stdout, or null on any failure. */
 export type GitRunner = (args: { args: string[]; cwd: string }) => string | null;

@@ -108,7 +108,7 @@ describe("applyOtlpReceiverPolicy", () => {
       },
     });
 
-    expect(result).toEqual({ droppedScopes: 1 });
+    expect(result).toEqual({ droppedScopes: 1, droppedItems: 0, droppedScopeNames: ["drop"] });
     expect(request.resourceMetrics).toHaveLength(1);
     expect(request.resourceMetrics?.[0]?.scopeMetrics).toHaveLength(1);
     const metric = request.resourceMetrics?.[0]?.scopeMetrics?.[0]?.metrics?.[0];
@@ -160,7 +160,7 @@ describe("applyOtlpReceiverPolicy", () => {
       resourceSpans: [
         { scopeSpans: null },
         { scopeSpans: [] },
-        { scopeSpans: [{ scope: null, spans: [] }] },
+        { scopeSpans: [{ scope: null, spans: [{}, {}] }] },
       ],
     };
     const metrics = {
@@ -179,10 +179,10 @@ describe("applyOtlpReceiverPolicy", () => {
 
     expect(
       applyOtlpReceiverPolicy({ request: traces, signal: "traces", apiKeyId: null, policy }),
-    ).toEqual({ droppedScopes: 1 });
+    ).toEqual({ droppedScopes: 1, droppedItems: 2, droppedScopeNames: [""] });
     expect(
       applyOtlpReceiverPolicy({ request: metrics, signal: "metrics", apiKeyId: null, policy }),
-    ).toEqual({ droppedScopes: 1 });
+    ).toEqual({ droppedScopes: 1, droppedItems: 0, droppedScopeNames: ["blocked"] });
     expect(traces.resourceSpans).toEqual([]);
     expect(metrics.resourceMetrics).toEqual([]);
   });
@@ -271,6 +271,34 @@ describe("applyOtlpReceiverPolicy", () => {
     },
   );
 
+  it("counts every data point a dropped metric scope carried, across metric kinds", () => {
+    const request = {
+      resourceMetrics: [
+        {
+          scopeMetrics: [
+            {
+              scope: { name: "foreign" },
+              metrics: [{ sum: { dataPoints: [{}, {}] } }, { histogram: { dataPoints: [{}] } }],
+            },
+          ],
+        },
+      ],
+    };
+
+    const result = applyOtlpReceiverPolicy({
+      request,
+      signal: "metrics",
+      apiKeyId: null,
+      policy: {
+        resourceAttributeKeysToRemove: [],
+        resourceAttributes: [],
+        allowedMetricScopeNames: ["allowed"],
+      },
+    });
+
+    expect(result).toEqual({ droppedScopes: 1, droppedItems: 3, droppedScopeNames: ["foreign"] });
+  });
+
   it("removes null scopes and their empty resources under a scope restriction", () => {
     const request = { resourceSpans: [{ scopeSpans: [null] }] };
 
@@ -285,7 +313,7 @@ describe("applyOtlpReceiverPolicy", () => {
       },
     });
 
-    expect(result).toEqual({ droppedScopes: 1 });
+    expect(result).toEqual({ droppedScopes: 1, droppedItems: 0, droppedScopeNames: [""] });
     expect(request.resourceSpans).toEqual([]);
   });
 

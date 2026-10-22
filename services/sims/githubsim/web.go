@@ -138,11 +138,14 @@ func (s *Server) handleInstallPage(w http.ResponseWriter, r *http.Request) {
 }
 
 // installOn is the installation on an account, created (with a default repository) when it has none.
+// An existing one is dated now, as a reinstall is on GitHub: the stack accepts only an installation
+// created during its own connect flow, so a seed-time stamp refused every later connect.
 func (s *Server) installOn(login, kind string) *installation {
 	s.mu.Lock()
 	for _, in := range s.installs {
 		if strings.EqualFold(in.Account.Login, login) {
 			in.Suspended = false
+			in.CreatedAt = s.stamp()
 			s.mu.Unlock()
 			return in
 		}

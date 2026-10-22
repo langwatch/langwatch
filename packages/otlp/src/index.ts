@@ -30,6 +30,8 @@ export {
 } from "./errors.ts";
 export {
   applyReceiverProvenance,
+  joinRejectionMessages,
+  type OtlpReceiverRejection,
   ingestDoorRefusalBody,
   ingestDoorRefusalStatus,
   isIngestDoorRefusal,

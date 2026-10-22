@@ -81,6 +81,23 @@ describe("findCacheRebuilds", () => {
     });
   });
 
+  describe("given a call that sent most of its prompt fresh", () => {
+    /** @scenario "A cache rebuild is measured against the whole prompt the call before it sent" */
+    it("measures the next call's rebuild against the whole prompt it sent", () => {
+      const events = findCacheRebuilds([
+        modelCall({ atMs: 1_000, inputTokens: 60_000, cacheReadTokens: 20_000 }),
+        modelCall({ atMs: 2_000, cacheCreationTokens: 50_000 }),
+      ]);
+
+      expect(events).toHaveLength(1);
+      expect(events[0]).toMatchObject({
+        callIndex: 1,
+        previousContextTokens: 80_000,
+        previousCachedTokens: 20_000,
+      });
+    });
+  });
+
   describe("given a call whose cache write is small relative to prior context", () => {
     it("does not flag ordinary incremental cache growth", () => {
       const events = findCacheRebuilds([
@@ -92,6 +109,43 @@ describe("findCacheRebuilds", () => {
         }),
       ]);
       expect(events).toEqual([]);
+    });
+  });
+
+  describe("given a call that read every cached token and wrote a large file on top", () => {
+    /** @scenario "The usage chart does not flag a large write on top of a full cache read" */
+    it("flags no call, since the context grew rather than being rebuilt", () => {
+      const events = findCacheRebuilds([
+        modelCall({
+          atMs: 1_000,
+          inputTokens: 3,
+          cacheReadTokens: 14_654,
+          cacheCreationTokens: 160,
+        }),
+        modelCall({
+          atMs: 2_000,
+          inputTokens: 3,
+          cacheReadTokens: 14_814,
+          cacheCreationTokens: 80_016,
+        }),
+      ]);
+      expect(events).toEqual([]);
+    });
+  });
+
+  describe("given a rebuild after a Copilot prompt that opens with its date block", () => {
+    /** @scenario "The usage chart's rebuild note quotes the user's own words of a Copilot prompt" */
+    it("names the prompt by the user's own words", () => {
+      const events = findCacheRebuilds([
+        modelCall({ atMs: 1_000, cacheReadTokens: 100_000 }),
+        prompt(
+          1_500,
+          "<current_datetime>2026-10-21T20:49:36.032+02:00</current_datetime>\n\nRead the whole file",
+        ),
+        modelCall({ atMs: 2_000, cacheCreationTokens: 90_000 }),
+      ]);
+
+      expect(events[0]?.precedingPrompt).toBe("Read the whole file");
     });
   });
 

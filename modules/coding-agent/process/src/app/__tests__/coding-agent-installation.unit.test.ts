@@ -77,6 +77,7 @@ function installation() {
         }),
       }),
       github: createApiFixture<GithubApi>({
+        getWebBase: () => "https://githubsim.example.localhost",
         normalizeRepositoryHost: (host) => host || "github.com",
         findByNumber: async () => pullRequest({ repositoryFullName: "acme/widgets" }),
         findAllByBranches: async () => [],
@@ -175,6 +176,20 @@ describe("given coding-agent installed the way a process installs it", () => {
             ],
           },
         ]);
+      } finally {
+        await runtime.stop();
+      }
+    });
+  });
+
+  describe("when a read names no host and GitHub's pages live on another origin", () => {
+    /** @scenario "A read that names no host asks about the instance's repository host" */
+    it("answers the repository host, not the web origin's name", async () => {
+      const { process } = installation();
+      const runtime = await process.boot();
+
+      try {
+        expect(runtime.service(CodingAgentApi).githubRepositoryHost()).toBe("github.com");
       } finally {
         await runtime.stop();
       }

@@ -65,6 +65,8 @@ export function toCodingAgentSessionRow({
     agentReportedCostUsd: state.agentReportedCostUsd,
     aiUnits: state.aiUnits,
     usageByContext: Object.values(state.usageByContext),
+    // A state cached before the per-model record has none.
+    usageByModel: Object.hasOwn(state, "usageByModel") ? Object.values(state.usageByModel) : [],
 
     modelCallMs: state.modelCallMs,
     toolMs: state.toolMs,
@@ -119,6 +121,8 @@ export function toCodingAgentSessionRow({
     subAgentIds: state.subAgentIds,
     stepStartedAt: state.steps.map((s) => s.startedAtMs),
     previousCallContextTokens: state.previousCallContextTokens,
+    previousCallCachedTokens: state.previousCallCachedTokens,
+    previousCallStartedAtMs: state.previousCallStartedAtMs,
     metricSeries: Object.entries(state.metricSeries).map(([seriesId, fact]) => ({
       seriesId,
       metricName: fact.metricName,

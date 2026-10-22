@@ -449,9 +449,9 @@ export class CodingAgentModule implements CodingAgentApi {
     });
   }
 
-  /** The GitHub web origin this instance is bound to. */
-  githubWebBase(): string {
-    return this.#github.getWebBase();
+  /** The host pull requests are mapped under: an empty host normalises to the configured one. */
+  githubRepositoryHost(): string {
+    return this.#github.normalizeRepositoryHost("");
   }
 
   /** The organization a project belongs to, or undefined for an orphan. */
