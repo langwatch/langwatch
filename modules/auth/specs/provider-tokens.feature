@@ -1,7 +1,7 @@
 Feature: Sign-in keeps no provider token
   As an operator holding sign-in accounts
   I want no OAuth or OIDC token stored once a sign-in is verified
-  So that a leaked account table holds nothing that reaches a provider
+  So that the account table keeps no credential that can reach a provider
 
   Sign-in asks providers for profile and email only, never calls them back on
   a person's behalf and never signs out at the provider, so the access,

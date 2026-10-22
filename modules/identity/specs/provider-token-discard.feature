@@ -1,7 +1,7 @@
 Feature: Sign-in credentials keep no provider token
   As an operator holding sign-in credentials
   I want the OAuth tokens already stored on credentials cleared
-  So that a leaked credential table holds nothing that reaches a provider
+  So that the credential table keeps no credential that can reach a provider
 
   Auth stops writing provider tokens and clears them from `Account`
   (modules/auth/specs/provider-tokens.feature). The secret heal copies an
