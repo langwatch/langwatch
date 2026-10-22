@@ -85,6 +85,11 @@ markers = [
 
 [dependency-groups]
 dev = ["black>=26.5.1", "langwatch-scenario>=1.3.0"]
+# unstructured[pdf] (and the nltk it pulls) is not in this group: the fixed
+# unstructured (>=0.24.1, #2786, #2830) needs wrapt 2, which
+# langwatch-scenario in the dev group above caps below 2, and nltk has an
+# unfixed advisory (#2785). Only examples/pdf_parsing_evaluation.ipynb uses
+# it, and it installs it itself.
 examples = [
   "anthropic>=0.36.0,<0.122.0",
   # Floor is for this repo's own lock, not a consumer requirement: the SDK
@@ -124,11 +129,6 @@ examples = [
   "pypdf>=6.21.1", # security: pypdf advisories (#543, #2198-#2200, #2807-#2813, #3037)
   "strands-agents[otel]>=1.51.0,<2.0.0",
 ]
-# unstructured[pdf] (and the nltk it pulls) is not in the examples group:
-# the fixed unstructured (>=0.24.1, #2786, #2830) needs wrapt 2, which
-# langwatch-scenario in the dev group caps below, and nltk has an unfixed
-# advisory (#2785). Only examples/pdf_parsing_evaluation.ipynb uses it, and
-# it installs it itself.
 tests = ["factory-boy>=3.3.3", "pytest-asyncio>=1.4.0", "python-dotenv==1.2.2"]
 
 # The examples group resolves for Python 3.11+ only. Pillow 13 (#2955-#2963,
