@@ -68,6 +68,7 @@ async function writerOver(stored: Record<string, string>) {
     ),
   });
   const writer = ModelProviderDefaultsWriteService.create({
+    decisionModels: { assertMayStore: () => Promise.resolve() },
     defaults,
     catalog: new OfflineModelProviderCatalog(),
     writeAuthorization: ModelProviderWriteAuthorizationService.create(

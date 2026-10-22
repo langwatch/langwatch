@@ -13,21 +13,32 @@ import {
 } from "@langwatch/design-system/provider-model-selector";
 import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/design-system/scope-chip-picker";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { useFeatureFlag } from "@langwatch/feature-flag-client";
+import { FrontendFlags, NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import {
   buildCustomModelDisplayNames,
   isModelAllowedAsRoleDefault,
   isModelAllowedForFeature,
+  LANGWATCH_DECISION_MODEL_ID,
   LATEST_ALIAS_PROVIDERS,
+  MODEL_ROLES,
   modelDisplayLabel,
   modelPickerOption,
   modelSelectorOptions,
   type ModelDefaultInheritedValues,
   type ModelDefaultSnapshot,
+  type ModelPickerOption,
+  type ModelRole,
 } from "@langwatch/model-provider-contract";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { modelProviderApi } from "../../behavior/model-provider-api.ts";
+import {
+  DECISION_MODEL_DISPLAY_NAMES,
+  decisionModelPickerOptions,
+} from "../../model/decision-model-options.ts";
+import { MODEL_ROLE_LABEL } from "../../model/default-model-cascade.ts";
 import { useModelProviderHost } from "../../model/model-provider-host.ts";
 
 /** The snapshot as the browser holds one: its instants are ISO strings. */
@@ -35,29 +46,26 @@ type Payload = WireOf<ModelDefaultSnapshot>;
 
 type FeatureProjection = Payload["features"][number];
 type ScopeType = "ORGANIZATION" | "TEAM" | "PROJECT";
-type ModelRoleKey = "DEFAULT" | "FAST" | "LANGY" | "EMBEDDINGS";
-
-const ROLES: ModelRoleKey[] = ["DEFAULT", "FAST", "LANGY", "EMBEDDINGS"];
 
 /** Stands in for "no row" in the hydration latch, which tracks which
  *  target the drawer's state belongs to and cannot use a config id
  *  for create mode. */
 const CREATE_TARGET = "__create__";
 
-const ROLE_LABEL: Record<ModelRoleKey, string> = {
-  DEFAULT: "Default",
-  FAST: "Fast",
-  LANGY: "Langy",
-  EMBEDDINGS: "Embeddings",
-};
-
-const ROLE_BLURB: Record<ModelRoleKey, string> = {
+const ROLE_BLURB: Record<ModelRole, string> = {
   DEFAULT:
     "Picked when a prompt or evaluator is created, and any high-stakes call without a specific override.",
   FAST: "Background and assistive surfaces like search, autocomplete, commit messages, topic clustering.",
   LANGY: "The model Langy chats and works with.",
   EMBEDDINGS: "Semantic vectors used by topic clustering and similar features.",
+  INSTANT_EVALS:
+    "The decision model Instant Evals answer with. LangWatch Instant Preview unless you pick your own.",
 };
+
+/** One empty slot per role, so a per-role map never misses a column. */
+function perRole<T>(make: () => T): Record<ModelRole, T> {
+  return Object.fromEntries(MODEL_ROLES.map((role) => [role, make()])) as Record<ModelRole, T>;
+}
 
 /**
  * Restricted-provider gating (codex is the only restricted provider today): a role-level
@@ -69,7 +77,7 @@ export function roleSelectModelOptions({
   role,
 }: {
   options: string[];
-  role: ModelRoleKey;
+  role: ModelRole;
 }): string[] {
   return options.filter((model) => isModelAllowedAsRoleDefault(model, role));
 }
@@ -95,14 +103,9 @@ type ProviderRow = {
 
 function groupFeaturesByRole(
   features: FeatureProjection[],
-): Record<ModelRoleKey, FeatureProjection[]> {
-  const byRole: Record<ModelRoleKey, FeatureProjection[]> = {
-    DEFAULT: [],
-    FAST: [],
-    LANGY: [],
-    EMBEDDINGS: [],
-  };
-  for (const f of features) byRole[f.role as ModelRoleKey]?.push(f);
+): Record<ModelRole, FeatureProjection[]> {
+  const byRole = perRole<FeatureProjection[]>(() => []);
+  for (const f of features) byRole[f.role as ModelRole]?.push(f);
 
   return byRole;
 }
@@ -250,14 +253,16 @@ function modelOptionsForMode({
 }
 
 function modelOptionsByRoleFor({
+  decisionOptions,
   hasProviderLoadError,
   isLoading,
   providers,
 }: {
+  decisionOptions: ModelPickerOption[];
   hasProviderLoadError: boolean;
   isLoading: boolean;
   providers: ProviderRow[];
-}): Record<ModelRoleKey, string[]> {
+}): Record<ModelRole, string[]> {
   const enabledEntries: [string, ProviderRow][] = providers
     .filter((p) => p.enabled === true)
     .map((p) => [p.provider, p]);
@@ -279,6 +284,8 @@ function modelOptionsByRoleFor({
       isLoading,
       mode: "embedding",
     }),
+    // Decision models only, never the chat catalogue (ADR-182 decision 2).
+    INSTANT_EVALS: decisionOptions.map((option) => option.value),
   };
 }
 
@@ -343,8 +350,13 @@ interface Props {
 export function DefaultModelOverrideDrawer({ editingId }: Props) {
   const host = useModelProviderHost();
   const { closeDrawer } = useDrawer();
-  const { projectId } = host.scope();
+  const { projectId, organizationId } = host.scope();
   const utils = modelProviderApi.useUtils();
+  // Asked of the organization only, so the picker agrees with the server's write check.
+  const { enabled: ownDecisionModelsEnabled } = useFeatureFlag(
+    FrontendFlags.release_instant_evals_own_decision_model,
+    { projectId: NOT_TARGETED, organizationId, enabled: !!organizationId },
+  );
   const saveMutation = modelProviderApi.modelProvider.saveDefaultModelsConfig.useMutation();
 
   // Pulls the same Payload DefaultModelsSection consumes - tRPC
@@ -362,10 +374,7 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
     teams: [],
     projects: [],
   };
-  const features = useMemo<FeatureProjection[]>(
-    () => dataQuery.data?.features ?? [],
-    [dataQuery.data?.features],
-  );
+  const features: FeatureProjection[] = dataQuery.data?.features ?? [];
 
   // Treat the drawer as always-open while mounted - the registry only
   // renders it when `drawer.open === "defaultModelOverride"`. closeDrawer
@@ -386,12 +395,7 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
 
   const [scopes, setScopes] = useState<ScopeTriadEntry[]>([]);
   const [config, setConfig] = useState<Record<string, string>>({});
-  const [expanded, setExpanded] = useState<Record<ModelRoleKey, boolean>>({
-    DEFAULT: false,
-    FAST: false,
-    LANGY: false,
-    EMBEDDINGS: false,
-  });
+  const [expanded, setExpanded] = useState<Record<ModelRole, boolean>>(() => perRole(() => false));
   const [busy, setBusy] = useState(false);
   const [attempted, setAttempted] = useState(false);
   const scopeRef = useRef<HTMLDivElement>(null);
@@ -424,7 +428,7 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
   );
   const inherited = inheritedQuery.data?.inherited ?? {};
 
-  const featuresByRole = useMemo(() => groupFeaturesByRole(features), [features]);
+  const featuresByRole = groupFeaturesByRole(features);
 
   // Narrow the picker to explicitly configured providers only. The legacy
   // `getAllForProject` Record merges in env-fed defaults, surfacing unrelated
@@ -435,33 +439,38 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
     { enabled: !!projectId && open, refetchOnMount: false },
   );
 
-  const modelOptionsByRole = useMemo(
-    () =>
-      modelOptionsByRoleFor({
-        hasProviderLoadError: projectProviders.isError,
-        isLoading: projectProviders.isLoading,
-        providers: projectProviders.data ?? [],
-      }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [projectProviders.data],
-  );
+  const decisionOptions = decisionModelPickerOptions({
+    ownModelsEnabled: ownDecisionModelsEnabled,
+    enabledProviderKeys: projectProviders.data
+      ? new Set(projectProviders.data.filter((p) => p.enabled === true).map((p) => p.provider))
+      : null,
+  });
+  const modelOptionsByRole = modelOptionsByRoleFor({
+    decisionOptions,
+    hasProviderLoadError: projectProviders.isError,
+    isLoading: projectProviders.isLoading,
+    providers: projectProviders.data ?? [],
+  });
 
   // Configured custom-model display names for every provider row this
-  // project can see, keyed by `<provider>/<modelId>`.
-  const displayNames = useMemo(
-    () => buildCustomModelDisplayNames(projectProviders.data ?? []),
-    [projectProviders.data],
-  );
+  // project can see, keyed by `<provider>/<modelId>`, plus the decision models' labels.
+  const displayNames = {
+    ...buildCustomModelDisplayNames(projectProviders.data ?? []),
+    ...DECISION_MODEL_DISPLAY_NAMES,
+  };
+  const pickerOptionFor = (modelValue: string): ModelPickerOption =>
+    decisionOptions.find((option) => option.value === modelValue) ??
+    modelPickerOption({ displayNames, modelValue });
 
-  const setOverride = useCallback((key: string, model: string | null) => {
+  const setOverride = (key: string, model: string | null) => {
     setConfig((prev) => withOverride(prev, key, model));
-  }, []);
+  };
 
   const hasAnyKey = Object.keys(config).length > 0;
   const problems = configProblems({ editingId, hasAnyKey, scopes });
   const targetPending = !!editingId && !editing;
 
-  const handleSave = useCallback(async () => {
+  const handleSave = async () => {
     if (busy || targetPending) return;
 
     setAttempted(true);
@@ -490,20 +499,7 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
     } finally {
       setBusy(false);
     }
-  }, [
-    busy,
-    targetPending,
-    problems.scope,
-    problems.models,
-    saveMutation,
-    editingId,
-    hasAnyKey,
-    config,
-    scopes,
-    utils,
-    host,
-    onClose,
-  ]);
+  };
 
   return (
     <Drawer
@@ -544,7 +540,7 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
               {problems.models}
             </Text>
           )}
-          {ROLES.map((role) => (
+          {MODEL_ROLES.map((role) => (
             <RoleRow
               key={role}
               role={role}
@@ -557,6 +553,7 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
               modelOptions={modelOptionsByRole[role]}
               onSetOverride={setOverride}
               displayNames={displayNames}
+              pickerOptionFor={pickerOptionFor}
             />
           ))}
         </VStack>
@@ -583,8 +580,9 @@ function RoleRow({
   modelOptions,
   onSetOverride,
   displayNames,
+  pickerOptionFor,
 }: {
-  role: ModelRoleKey;
+  role: ModelRole;
   config: Record<string, string>;
   features: FeatureProjection[];
   /** Server's cascade answer for this role at the picked scopes. Null
@@ -598,9 +596,11 @@ function RoleRow({
   onSetOverride: (key: string, model: string | null) => void;
   /** Configured custom-model display names, keyed by `<provider>/<modelId>`. */
   displayNames: Record<string, string>;
+  /** The picker entry for one model id: its label and the line under it. */
+  pickerOptionFor: (modelValue: string) => ModelPickerOption;
 }) {
   const current = config[role] ?? "";
-  const inheritOption = buildInheritOption(inheritedForRole);
+  const inheritOption = buildInheritOption(inheritedForRole, role);
   const canExpand = features.length > 0;
   const ChevronIcon = expanded ? ChevronDown : ChevronRight;
 
@@ -623,7 +623,7 @@ function RoleRow({
         <Tooltip content={ROLE_BLURB[role]}>
           <Box flexShrink={0} cursor="help" data-testid={`role-row-${role.toLowerCase()}-label`}>
             <Text fontWeight="medium" fontSize="sm">
-              {ROLE_LABEL[role]}
+              {MODEL_ROLE_LABEL[role]}
             </Text>
           </Box>
         </Tooltip>
@@ -632,9 +632,7 @@ function RoleRow({
           <ProviderModelSelector
             model={current}
             query={{
-              data: roleSelectModelOptions({ options: modelOptions, role }).map((modelValue) =>
-                modelPickerOption({ displayNames, modelValue }),
-              ),
+              data: roleSelectModelOptions({ options: modelOptions, role }).map(pickerOptionFor),
               isLoading: false,
             }}
             onChange={(m) => onSetOverride(role, m)}
@@ -690,6 +688,7 @@ function RoleRow({
               modelOptions={modelOptions}
               onSetOverride={onSetOverride}
               displayNames={displayNames}
+              pickerOptionFor={pickerOptionFor}
             />
           ))}
         </VStack>
@@ -707,6 +706,7 @@ function FeatureRow({
   modelOptions,
   onSetOverride,
   displayNames,
+  pickerOptionFor,
 }: {
   feature: FeatureProjection;
   override: string;
@@ -719,6 +719,7 @@ function FeatureRow({
   onSetOverride: (key: string, model: string | null) => void;
   /** Configured custom-model display names, keyed by `<provider>/<modelId>`. */
   displayNames: Record<string, string>;
+  pickerOptionFor: (modelValue: string) => ModelPickerOption;
 }) {
   // The feature's inherit entry follows the resolver's cascade: a role-level
   // pick in THIS config wins over the server's per-feature cascade, which
@@ -731,7 +732,9 @@ function FeatureRow({
       label: "Inherit (role default in this config)",
     };
   } else {
-    inheritOption = inheritHitOption(inheritedForFeature) ?? buildInheritOption(inheritedForRole);
+    inheritOption =
+      inheritHitOption(inheritedForFeature) ??
+      buildInheritOption(inheritedForRole, feature.role as ModelRole);
   }
   return (
     <HStack gap={2} align="center" data-testid={`feature-row-${feature.key}`}>
@@ -752,7 +755,7 @@ function FeatureRow({
             data: featureRowModelOptions({
               options: modelOptions,
               featureKey: feature.key,
-            }).map((modelValue) => modelPickerOption({ displayNames, modelValue })),
+            }).map(pickerOptionFor),
             isLoading: false,
           }}
           onChange={(m) => onSetOverride(feature.key, m)}
@@ -803,11 +806,14 @@ export function inheritHitOption(entry: InheritedEntry): InheritOptionShape | un
 
 /**
  * Builds the `inheritOption` payload `ProviderModelSelector` consumes. With no cascade
- * hit it reads "Not configured" with no model attached, so an edit can clear a pinned
- * key back to inherit without implying a value flows down from somewhere.
+ * hit it reads "Not configured" with no model attached, so an edit can clear a pinned key
+ * back to inherit; the Instant Evals column instead falls back to LangWatch Instant Preview.
  */
-export function buildInheritOption(entry: InheritedEntry): InheritOptionShape {
-  return inheritHitOption(entry) ?? { label: "Not configured" };
+export function buildInheritOption(entry: InheritedEntry, role?: ModelRole): InheritOptionShape {
+  const hit = inheritHitOption(entry);
+  if (hit) return hit;
+  if (role === "INSTANT_EVALS") return { model: LANGWATCH_DECISION_MODEL_ID, label: "Default" };
+  return { label: "Not configured" };
 }
 
 /**
@@ -844,10 +850,7 @@ function ReplacedConfigsNote({
   configs: Payload["configs"];
   editingId?: string;
 }) {
-  const replacedNames = useMemo(
-    () => replacedScopeNames({ scopes, configs, editingId }),
-    [scopes, configs, editingId],
-  );
+  const replacedNames = replacedScopeNames({ scopes, configs, editingId });
   if (replacedNames.length === 0) return null;
   const isSingle = replacedNames.length === 1;
   return (
