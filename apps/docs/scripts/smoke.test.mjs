@@ -199,7 +199,8 @@ await it("serves directory URLs, redirects and the generated 404", async () => {
       assert.equal(location.pathname, expected.pathname, source);
       assert.equal(location.hash, expected.hash, source);
       assert.equal(location.searchParams.get("docs-smoke"), "1", source);
-      if (/[:*]/.test(source)) continue;
+      /* Pattern sources and moved exports are host rules, with no static page. */
+      if (/[:*]|\.(md|claude|agent)$/.test(source)) continue;
       const page = await readFile(path.join(outDir, source.slice(1), "index.html"), "utf8");
       if (!page.includes('name="robots" content="noindex"')) continue;
       assert.ok(page.includes(`url=${destination.replaceAll("&", "&amp;")}"`), source);
