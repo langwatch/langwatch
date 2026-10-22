@@ -64,6 +64,7 @@ def uncached_score(target: str, content: str) -> float:
     return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
 
 
+# @scenario "The second call with the same target makes one embedding request"
 def test_second_call_with_same_target_makes_one_embedding_request(
     embedding_requests,
 ):
@@ -76,6 +77,7 @@ def test_second_call_with_same_target_makes_one_embedding_request(
     assert embedding_requests[2]["input"] == "second answer"
 
 
+# @scenario "Scores match embedding both texts every time"
 def test_scores_are_identical_to_embedding_both_texts(embedding_requests):
     first = make_evaluator().evaluate(CustomSimilarityEntry(output="first answer"))
     second = make_evaluator().evaluate(CustomSimilarityEntry(output="second answer"))
@@ -88,6 +90,7 @@ def test_scores_are_identical_to_embedding_both_texts(embedding_requests):
     )
 
 
+# @scenario "A batch of entries embeds the target once"
 def test_batch_of_entries_embeds_the_target_once(embedding_requests):
     entries = [CustomSimilarityEntry(output=f"answer {i}") for i in range(10)]
 
@@ -100,6 +103,7 @@ def test_batch_of_entries_embeds_the_target_once(embedding_requests):
     assert len(embedding_requests) == 11
 
 
+# @scenario "Different credentials embed the target again"
 def test_different_credentials_embed_the_target_again(embedding_requests):
     entry = CustomSimilarityEntry(output="an answer")
 
@@ -109,6 +113,7 @@ def test_different_credentials_embed_the_target_again(embedding_requests):
     assert [r["input"] for r in embedding_requests].count("You suck") == 2
 
 
+# @scenario "A different embeddings model embeds the target again"
 def test_different_model_embeds_the_target_again(embedding_requests):
     entry = CustomSimilarityEntry(output="an answer")
 
@@ -122,6 +127,7 @@ def test_different_model_embeds_the_target_again(embedding_requests):
     ]
 
 
+# @scenario "Entry content is never cached"
 def test_entry_content_is_not_cached(embedding_requests):
     entry = CustomSimilarityEntry(output="the same answer")
 
@@ -131,6 +137,7 @@ def test_entry_content_is_not_cached(embedding_requests):
     assert [r["input"] for r in embedding_requests].count("the same answer") == 2
 
 
+# @scenario "The cache keeps digests, not text or credentials"
 def test_cache_keeps_digests_not_text_or_credentials(embedding_requests):
     make_evaluator(env={"OPENAI_API_KEY": "sk-secret"}).evaluate_batch(
         [CustomSimilarityEntry(output="an answer")]
@@ -141,6 +148,7 @@ def test_cache_keeps_digests_not_text_or_credentials(embedding_requests):
     assert "sk-secret" not in repr(key)
 
 
+# @scenario "A target over the token limit is skipped and not cached"
 def test_target_over_the_token_limit_is_skipped_and_not_cached(embedding_requests):
     too_long = "word " * (DEFAULT_MAX_TOKENS + 1)
 
@@ -153,6 +161,7 @@ def test_target_over_the_token_limit_is_skipped_and_not_cached(embedding_request
     assert len(similarity.target_embedding_cache) == 0
 
 
+# @scenario "The cache is bounded and drops the least recently used entry"
 def test_cache_is_bounded_and_drops_the_least_recently_used():
     cache = TargetEmbeddingCache(max_entries=2)
     a, b, c = (TargetEmbeddingCache.key("m", {}, text) for text in "abc")
