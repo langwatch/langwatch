@@ -71,11 +71,18 @@ export function instantEvalOwnDecisionModelOf(
   return { model, wire, providerModel, endpoint, apiKey };
 }
 
+/** Why an own decision model cannot run; model-provider's list, as no contract imports another. */
+export type InstantEvalUnavailableDecisionModelReason =
+  | "not_enabled"
+  | "provider_missing"
+  | "provider_disabled"
+  | "key_missing";
+
 /** The skip an own model that cannot run answers with; never LangWatch's classifier (ADR-182). */
 export function instantEvalUnavailableDecisionModelSkipOf({
   reason,
 }: {
-  reason: string;
+  reason: InstantEvalUnavailableDecisionModelReason;
 }): "classifier_not_configured" | "classifier_key_invalid" {
   return reason === "not_enabled" ? "classifier_not_configured" : "classifier_key_invalid";
 }

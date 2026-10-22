@@ -9,7 +9,14 @@ import {
   instantEvalOwnDecisionModelOf,
   instantEvalUnavailableDecisionModelSkipOf,
   type InstantEvalOwnDecisionModel,
+  type InstantEvalUnavailableDecisionModelReason,
 } from "../instant-eval-judge.api.ts";
+
+const UNUSABLE_PROVIDER_REASONS: InstantEvalUnavailableDecisionModelReason[] = [
+  "provider_missing",
+  "provider_disabled",
+  "key_missing",
+];
 
 describe("given a resolved own decision model", () => {
   describe("when it is handed to the judge", () => {
@@ -43,14 +50,9 @@ describe("given an own decision model that cannot run", () => {
     });
   });
 
-  describe.each(["provider_missing", "provider_disabled", "key_missing"])(
-    "when its provider is unusable (%s)",
-    (reason) => {
-      it("skips as a key the project must fix", () => {
-        expect(instantEvalUnavailableDecisionModelSkipOf({ reason })).toBe(
-          "classifier_key_invalid",
-        );
-      });
-    },
-  );
+  describe.each(UNUSABLE_PROVIDER_REASONS)("when its provider is unusable (%s)", (reason) => {
+    it("skips as a key the project must fix", () => {
+      expect(instantEvalUnavailableDecisionModelSkipOf({ reason })).toBe("classifier_key_invalid");
+    });
+  });
 });
