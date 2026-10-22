@@ -77,6 +77,13 @@ export function bindProcessFleetMetricsSource(read: FleetReader): void {
   lastSuccessAt = 0;
 }
 
+/** Drop the source on shutdown so the stopped graph's store is not kept reachable by the gauges. */
+export function unbindProcessFleetMetricsSource(): void {
+  readFleet = null;
+  cached = null;
+  lastSuccessAt = 0;
+}
+
 function fleetGauge(
   name: (typeof metricNames)[number],
   help: string,

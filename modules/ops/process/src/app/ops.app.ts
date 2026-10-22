@@ -35,6 +35,10 @@ import type {
   RegisteredStateProjection,
   ReplayService as EventingReplayService,
 } from "@langwatch/eventing";
+import {
+  bindProcessFleetMetricsSource,
+  unbindProcessFleetMetricsSource,
+} from "@langwatch/eventing";
 import { ExperimentApi } from "@langwatch/experiment-contract";
 import {
   FeatureFlagApi,
@@ -350,6 +354,7 @@ import {
   type InstanceAdminShares,
   type OrganizationSsoRouting,
 } from "../services/instance-admin.service.ts";
+import { OVERDUE_PENDING_MS, OVERDUE_WAKE_MS } from "../services/manager-explorer.service.ts";
 import { ManagerExplorerService } from "../services/manager-explorer.service.ts";
 import { OpsHealthService } from "../services/ops-health.service.ts";
 import { OpsUpgradeService } from "../services/ops-upgrade.service.ts";
@@ -906,6 +911,7 @@ export class OpsModule implements OpsApi {
       resolveInstances: async () => [sharedStorageStatsInstance(repositories.storageFootprint)],
       readings: storageReadings,
       collectBackups: setup.config.collectClickHouseBackupMetrics,
+      clusterName: setup.config.clickhouseCluster,
       logger,
     });
 
@@ -2459,6 +2465,18 @@ function buildOpsInfrastructure(input: {
     },
     stop: () => queueMetricsWriter.stop(),
   });
+
+  // pm_instances / pm_outbox_* are observable gauges that report nothing until a
+  // source is bound; this is the only place that binds one. Every serving role
+  // reports the same global counts, so dashboards aggregate with max().
+  bindProcessFleetMetricsSource(() =>
+    repositories.processFleet.countByProcessName({
+      now: nowInstant().epochMilliseconds,
+      overdueWakeMs: OVERDUE_WAKE_MS,
+      overduePendingMs: OVERDUE_PENDING_MS,
+    }),
+  );
+  resources.own("process fleet metrics source", () => unbindProcessFleetMetricsSource());
 
   const explainRuntime = OpsClickHouseRuntime.create({
     url: config.clickhouseOpsUrl,

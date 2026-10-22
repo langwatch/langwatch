@@ -2,7 +2,7 @@
 import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { bindProcessFleetMetricsSource } from "../metrics.ts";
+import { bindProcessFleetMetricsSource, unbindProcessFleetMetricsSource } from "../metrics.ts";
 
 const metrics = createRecordingMeterProvider();
 
@@ -58,6 +58,25 @@ describe("process-manager fleet gauges", () => {
       expect(metrics.descriptionOf("pm_outbox_dead")).toMatch(
         /aggregate with max\(\), not sum\(\)/,
       );
+    });
+  });
+
+  describe("given the source is unbound at shutdown", () => {
+    it("reports nothing, including collection success", async () => {
+      bindProcessFleetMetricsSource(async () => [
+        {
+          processName: "p",
+          instances: 1,
+          overdueWakes: 0,
+          pendingMessages: 0,
+          overduePending: 0,
+          lapsedLeases: 0,
+          deadMessages: 0,
+        },
+      ]);
+      unbindProcessFleetMetricsSource();
+
+      expect(await collectOnce()).toEqual([]);
     });
   });
 
