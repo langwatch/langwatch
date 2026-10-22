@@ -208,11 +208,19 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # Bedrock cells. The role trusts this workflow on pull requests and on
-      # main, and can only invoke models. Setting the MATRIX_AWS_ROLE_ARN
-      # repository variable switches to it; the stored-key step goes after.
+      # Bedrock cells. Both steps export the session into the job environment,
+      # which the gateway started below inherits. The gateway signs a Bedrock
+      # call with the virtual key's own access key when its credential carries
+      # one, and falls back to the AWS default credential chain (these
+      # variables) when it carries none, so the session only reaches Bedrock
+      # once TEST_VK_BEDROCK's credential is keyless. The role trusts this
+      # workflow on pull requests and on main, and can only invoke models.
+      # Setting the MATRIX_AWS_ROLE_ARN repository variable switches to it;
+      # the stored-key step goes after.
       - name: Configure AWS credentials (OIDC)
         if: ${{ vars.MATRIX_AWS_ROLE_ARN != '' }}
+        # A refused assumption fails only the Bedrock cells, not the matrix.
+        continue-on-error: true
         uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
         with:
           aws-region: eu-central-1

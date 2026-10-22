@@ -43,3 +43,38 @@ Feature: Workflows reach AWS through OIDC roles, not stored keys
     And its job has no step assuming a role, or does not grant id-token write
     When ciguard runs
     Then it fails
+
+  @unit
+  Scenario: A fallback gate that can run while the role variable is set fails CI
+    Given a stored-key step whose condition tests the role variable is unset
+    But the condition also has an "or" branch or wraps the test in parentheses
+    When ciguard runs
+    Then it fails, because the step can still run once the role is in use
+
+  @unit
+  Scenario: A stored key outside the sanctioned fallback step fails CI
+    Given a workflow with a sanctioned stored-key fallback step
+    And another step in the same file reads a stored AWS key
+    When ciguard runs
+    Then it fails and names only the line outside the fallback step
+
+  @unit
+  Scenario: A fallback whose job's effective permissions lack id-token write fails CI
+    Given the workflow grants id-token write
+    But the fallback's job declares its own permissions without id-token write
+    When ciguard runs
+    Then it fails, because a job's permissions replace the workflow's
+    And a job granted write-all counts as granting id-token write
+
+  @unit
+  Scenario: A fallback that assumes the role with its own stored key fails CI
+    Given a stored-key step that also sets role-to-assume
+    And no separate credentials step assumes that role only while the variable is set
+    When ciguard runs
+    Then it fails, because assuming a role with a stored key still needs the key
+
+  @unit
+  Scenario: A change to a composite action runs the guard
+    Given a pull request that only changes a file under .github/actions
+    When go-ci decides which jobs to run
+    Then the CI guards job runs
