@@ -16,9 +16,9 @@ export interface CacheRebuildInput {
 }
 
 /**
- * A rebuild is a call whose cache READ fell below half of what the previous
- * call left cached, and that wrote about that much again. A large write on top
- * of a full read is the context growing, not a rebuild.
+ * A rebuild is a call whose cache READ fell to half or less of what the
+ * previous call left cached, and that wrote at least that half again. A large
+ * write on top of a full read is the context growing, not a rebuild.
  */
 export function isCacheRebuild({
   previousCachedTokens,

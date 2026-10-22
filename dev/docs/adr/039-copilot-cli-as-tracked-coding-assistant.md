@@ -346,7 +346,7 @@ Per-model tokens, cost and AI units come from the per-call table (`coding_agent_
 
 ### Open questions
 
-- Whether every VS Code release runs `~/.copilot/hooks` with default settings. The docs say yes (`chat.useHooks` is on by default); one report on VS Code 1.135 says no. The implementer checks on a clean profile before the user docs claim it.
+- Whether a VS Code chat session runs `~/.copilot/hooks` depends on its harness. A Copilot-harness session loads the folder whatever the editor settings say; `chat.useHooks` governs only Local sessions. One report on VS Code 1.135 of the hooks not running is still unexplained; the user docs tell the reader which harness to check.
 - A repository may carry its own `.github/hooks` file, so a session can run the same event twice. The hook's existing per-session fingerprint store already drops the repeat.
 
 ## Changelog

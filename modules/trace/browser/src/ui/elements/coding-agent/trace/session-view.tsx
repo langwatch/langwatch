@@ -362,7 +362,7 @@ function CacheHealth({ session }: { session: CodingAgentSessionDisplay }) {
           <Stat
             label="Cache misses"
             value={hasContextData ? String(session.cacheRebuildCount) : "—"}
-            hint="Model calls whose cache read fell below what the call before them left cached, and that wrote it again. A cache WRITE costs more per token than a read, so this is the session paying twice for the same tokens."
+            hint="Model calls whose cache read fell to half or less of what the call before them left cached, and that wrote at least that half again (1,000 tokens or more). A cache WRITE costs more per token than a read, so this is the session paying twice for the same tokens."
             tone={rebuildTone}
           />
           <Stat
