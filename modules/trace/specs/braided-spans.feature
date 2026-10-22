@@ -6,8 +6,8 @@
 #   braided span  an owner project's span shown in a reader project's trace through a braid
 #   owner         the project that recorded the span; reader, the project showing it
 #
-# EVERY SCENARIO IS @unimplemented: none of this is built. Each carries the level its
-# binding is expected at, and the pull request that builds it binds it.
+# Scenarios still @unimplemented carry the level their binding is expected at, and the
+# pull request that builds it binds it.
 
 @trace @braids
 Feature: Braided spans in the reader's traces
@@ -35,14 +35,14 @@ Feature: Braided spans in the reader's traces
       When sam opens the trace
       Then only the spans carrying orchestrator "web" are read for "orchestrator"
 
-    @integration @unimplemented
+    @integration
     Scenario: A trace only the owner holds is not listed for the reader
       Given a "specialists" trace that "orchestrator" recorded nothing in
       When sam lists or searches "orchestrator" traces
       Then that trace is not listed
       And opening its id from "orchestrator" is answered as not found
 
-    @integration @unimplemented
+    @integration
     Scenario: Spans are matched per owner by trace id
       Given a third project "search" braided into "orchestrator"
       And "specialists" and "search" each hold spans under the trace id of one "orchestrator" trace
@@ -62,7 +62,7 @@ Feature: Braided spans in the reader's traces
       When sam opens the trace
       Then only the spans from 1 October onwards appear
 
-    @integration @unimplemented
+    @integration
     Scenario: Two braids on one pair show spans matching either, each inside its own window
       Given a second live braid from "specialists" into "orchestrator" with the condition name == "payments_agent" and data from 1 October
       And an "orchestrator" trace holding "specialists" spans that match only the first braid, only the second, and neither

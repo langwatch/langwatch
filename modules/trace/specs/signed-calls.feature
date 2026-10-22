@@ -93,7 +93,7 @@ Feature: Signed calls
 
   Rule: Verified() in a braid's condition means the reader made the call
 
-    @unit @unimplemented
+    @integration
     Scenario: Verified matches only a mark made with a key of the braid's reader
       Given a braid from "specialists" into "orchestrator" with the condition Verified("orchestrator")
       And a "specialists" span whose orchestrator entry was verified with a key of a third project
