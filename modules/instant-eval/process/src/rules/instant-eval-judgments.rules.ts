@@ -82,8 +82,8 @@ function isAnswered(cell: unknown): boolean {
 
 /**
  * The reason a page's unjudged cells carry: the commonest the hydration stage
- * reported. `classifier_failed` breaks a tie, so a page that lost rows is
- * never reported as having declined them.
+ * reported. A failure breaks a tie, so a page that lost rows is never
+ * reported as having declined them.
  */
 export function instantEvalSkipReason(skipped: Readonly<Record<string, number>>): string {
   const entries = Object.entries(skipped);
@@ -92,7 +92,10 @@ export function instantEvalSkipReason(skipped: Readonly<Record<string, number>>)
   let best = entries[0] as [string, number];
   for (const entry of entries.slice(1)) {
     const isMoreCommon = entry[1] > best[1];
-    const breaksTieAsFailure = entry[1] === best[1] && entry[0] === "classifier_failed";
+    const breaksTieAsFailure =
+      entry[1] === best[1] &&
+      FAILED_SKIP_REASONS.has(entry[0]) &&
+      !FAILED_SKIP_REASONS.has(best[0]);
     if (isMoreCommon || breaksTieAsFailure) best = entry;
   }
 
