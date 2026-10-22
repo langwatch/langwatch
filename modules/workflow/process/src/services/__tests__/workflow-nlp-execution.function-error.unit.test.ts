@@ -71,6 +71,10 @@ const failedWith = (body: string): WorkflowNlpDispatchResponse => ({
 /** pino's numeric error level. */
 const ERROR_LEVEL = 50;
 
+const WARN_LEVEL = 40;
+
+const warnLine = () => captured.lines.find((line) => line.level === WARN_LEVEL);
+
 const errorLine = () => captured.lines.find((line) => line.level === ERROR_LEVEL);
 
 describe("WorkflowNlpExecutionService", () => {
@@ -100,6 +104,28 @@ describe("WorkflowNlpExecutionService", () => {
       });
       expect(String(line?.errorMessage)).toHaveLength(1000);
       expect(line).not.toHaveProperty("trace");
+    });
+  });
+
+  describe("when the workflow's answer is over the synchronous response cap", () => {
+    it("refuses as the sender's to shrink and logs a warning, not an error", async () => {
+      const body = JSON.stringify({
+        errorType: "Function.ResponseSizeTooLarge",
+        errorMessage:
+          "Response payload size exceeded maximum allowed payload size (6291556 bytes).",
+      });
+
+      await expect(executeAnswering(failedWith(body))).rejects.toMatchObject({
+        code: "workflow_result_too_large",
+        fault: "customer",
+        httpStatus: 422,
+      });
+
+      expect(errorLine()).toBeUndefined();
+      expect(warnLine()).toMatchObject({
+        status: 502,
+        errorType: "Function.ResponseSizeTooLarge",
+      });
     });
   });
 
