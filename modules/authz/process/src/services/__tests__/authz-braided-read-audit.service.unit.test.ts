@@ -27,6 +27,7 @@ function braid(grantId: string, ownerProjectId: string): LedgerBraidRow {
     occurredAt: fromDate(new Date(0)),
     revokedReason: null,
     isLive: true,
+    replacesGrantId: null,
   };
 }
 

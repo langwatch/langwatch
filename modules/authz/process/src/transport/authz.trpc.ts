@@ -8,8 +8,10 @@ import {
   authzBraidRemovedSchema,
   authzBraidSchema,
   authzChangeBraidInputSchema,
+  authzCountProjectMembersHoldingInputSchema,
   authzCreateBraidInputSchema,
   authzListBraidsInputSchema,
+  authzProjectMembersHoldingSchema,
   authzOrganizationBraidsSchema,
   authzOrganizationInputSchema,
   authzOrganizationPolicySchema,
@@ -98,6 +100,10 @@ export const authzTrpc = defineTrpcContract("authz")
   .query("listOrganizationBraids")
   .withInput(authzOrganizationInputSchema)
   .withOutput(authzOrganizationBraidsSchema)
+
+  .query("countProjectTraceViewers")
+  .withInput(authzCountProjectMembersHoldingInputSchema.pick({ projectId: true }))
+  .withOutput(authzProjectMembersHoldingSchema)
   .build();
 
 /** The session as the escalation ceiling: a person, or the key a CLI session arrived on. */
@@ -219,4 +225,11 @@ export const authzTrpcTransport: TrpcRouterDeclaration<AuthzApi, typeof authzTrp
     .procedure("listOrganizationBraids")
     .withPermission("organization:manage")
     .handle(async ({ app, input }) => app.listOrganizationBraids(input))
+
+    /** ADR-183 §7: the braid dialog's "<n> people in <reader> will see these spans". */
+    .procedure("countProjectTraceViewers")
+    .withPermission("traces:view", { via: "projectId" })
+    .handle(async ({ app, input }) =>
+      app.countProjectMembersHolding({ ...input, permission: "traces:view" }),
+    )
     .build();

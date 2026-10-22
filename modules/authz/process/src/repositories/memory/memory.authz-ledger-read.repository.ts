@@ -220,6 +220,7 @@ export class MemoryAuthzLedgerReadRepository extends AuthzLedgerReadRepository {
         occurredAt: row.occurredAt,
         revokedReason: row.revokedReason ?? null,
         isLive: row.revokedAt === null,
+        replacesGrantId: row.replacesGrantId ?? null,
       }));
   }
 

@@ -75,6 +75,22 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
     return rows.map((row) => row.userId);
   };
 
+  findActiveMemberIds = async ({
+    organizationId,
+    limit,
+  }: {
+    organizationId: string;
+    limit: number;
+  }): Promise<string[]> => {
+    const rows = (await this.database.organizationUser.findMany({
+      where: { organizationId, disabledAt: null },
+      select: { userId: true },
+      orderBy: { userId: "asc" },
+      take: limit,
+    })) as { userId: string }[];
+    return rows.map((row) => row.userId);
+  };
+
   findUserBindings = async ({
     userId,
     organizationId,

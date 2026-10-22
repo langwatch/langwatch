@@ -87,6 +87,8 @@ export interface GrantRowShape {
   /** The shared grant's window (ADR-177); absent on own grants. Read back untyped,
    *  so {@link grantRowToFact} parses it. */
   condition?: unknown;
+  /** ADR-183 §2: the braid a braid change's attach replaces; absent on every other grant. */
+  replacesGrantId?: string | null;
   occurredAt: Instant;
 }
 

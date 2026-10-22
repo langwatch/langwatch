@@ -20,6 +20,7 @@ export function makeReader(
   const base: ReaderStub = {
     findOrganizationMembership: vi.fn().mockResolvedValue(null),
     findActiveAdministratorIds: vi.fn().mockResolvedValue([]),
+    findActiveMemberIds: vi.fn().mockResolvedValue([]),
     findUserBindings: vi.fn().mockResolvedValue([]),
     findGroupBindings: vi.fn().mockResolvedValue([]),
     findApiKeyBindings: vi.fn().mockResolvedValue([]),

@@ -127,8 +127,12 @@ export class AuthzBraidService {
         }
         if (keyOf(old) === terms.key) return braidOf(old);
         const others = live.filter((row) => row.grantId !== braidId);
-        // A repeat after a failed revoke finds its own earlier attach: it revokes the old only.
+        // A repeat after a failed revoke finds its own earlier attach and revokes the old only;
+        // an identical braid that does not replace this one is another braid, never merged.
         const earlier = others.find((row) => keyOf(row) === terms.key);
+        if (earlier && earlier.replacesGrantId !== braidId) {
+          throw new BraidAlreadyExistsError({ braidId: earlier.grantId });
+        }
         if (!earlier) assertWithinConditionLimit({ live: others, readerProjectId, terms });
         const changed = earlier
           ? braidOf(earlier)

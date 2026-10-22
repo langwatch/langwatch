@@ -213,6 +213,10 @@ export interface AuthzApi {
   listOrganizationBraids(
     args: Braids.AuthzOrganizationInput,
   ): Promise<Braids.AuthzOrganizationBraids>;
+  /** ADR-183 §7: the organisation's active members holding `permission` at the project. */
+  countProjectMembersHolding(
+    args: Braids.AuthzCountProjectMembersHoldingInput,
+  ): Promise<Braids.AuthzProjectMembersHolding>;
   changeBindingRole(
     args: Commands.AuthzChangeBindingRoleInput,
   ): Promise<Commands.AuthzChangeBindingRoleOutput>;

@@ -40,6 +40,7 @@ function setup({ beyondCaller = [] as string[], failRevokeOnce = false } = {}) {
         ownerProjectId: string;
         condition: GrantCondition;
         expiresAtMs?: number;
+        replacesGrantId?: string;
       }) => {
         const grantId = `grant_${++ids}`;
         rows.push({
@@ -52,6 +53,7 @@ function setup({ beyondCaller = [] as string[], failRevokeOnce = false } = {}) {
           occurredAt: fromDate(new Date(FROM_MS)),
           revokedReason: null,
           isLive: true,
+          replacesGrantId: input.replacesGrantId ?? null,
         });
         return { grantId };
       },
@@ -256,6 +258,35 @@ describe("AuthzBraidService", () => {
 
       expect(rows).toHaveLength(2);
       expect(rows.find((row) => row.grantId === braid.braidId)?.isLive).toBe(false);
+    });
+
+    describe("when another live braid already has the new terms", () => {
+      /** @scenario "A change that would make a braid identical to another live braid is refused" */
+      it("refuses with braid_already_exists and leaves both braids live as they were", async () => {
+        const { create, service, ledger, rows } = setup();
+        const kept = await create({ where: 'name == "a"' });
+        const changing = await create({ where: 'name == "b"' });
+
+        const code = await refusalOf(
+          service.changeBraid({
+            projectId: OWNER,
+            readerProjectId: READER,
+            braidId: changing.braidId,
+            where: 'name == "a"',
+            fromMs: FROM_MS,
+            actor: ANA,
+            caller: CALLER,
+          }),
+        );
+
+        expect(code).toBe("braid_already_exists");
+        expect(ledger.attachBraidGrant).toHaveBeenCalledTimes(2);
+        expect(ledger.revokeBindings).not.toHaveBeenCalled();
+        expect(rows.map((row) => [row.grantId, row.isLive])).toEqual([
+          [kept.braidId, true],
+          [changing.braidId, true],
+        ]);
+      });
     });
   });
 

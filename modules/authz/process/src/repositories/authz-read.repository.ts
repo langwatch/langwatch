@@ -123,6 +123,11 @@ export abstract class AuthzReadRepository extends ScopeLineageRepository {
   }) => Promise<OrganizationMembership | null>;
   /** User ids of the ADMIN memberships whose seat is not disabled; none for an unknown org. */
   abstract findActiveAdministratorIds: (args: { organizationId: string }) => Promise<string[]>;
+  /** User ids of every membership whose seat is not disabled, by id, at most `limit`. */
+  abstract findActiveMemberIds: (args: {
+    organizationId: string;
+    limit: number;
+  }) => Promise<string[]>;
   /** Direct user bindings - viaGroupId null. Fenced on an ACTIVE membership. */
   abstract findUserBindings: (args: {
     userId: string;

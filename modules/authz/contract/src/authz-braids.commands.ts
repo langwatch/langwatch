@@ -1,4 +1,4 @@
-import { actorSchema, ledgerActorSchema } from "@langwatch/authorization";
+import { actorSchema, authzPermissionSchema, ledgerActorSchema } from "@langwatch/authorization";
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
@@ -72,6 +72,30 @@ export interface AuthzListBraidsInputSchema extends Named<
 export const authzListBraidsInputSchema: AuthzListBraidsInputSchema =
   authzListBraidsInputSchemaDefinition;
 export type AuthzListBraidsInput = z.infer<typeof authzListBraidsInputSchema>;
+
+/** ADR-183 §7: which permission to count a project's members holding, for the braid dialog. */
+const authzCountProjectMembersHoldingInputSchemaDefinition = z
+  .object({ projectId: z.string().min(1), permission: authzPermissionSchema })
+  .strict();
+export interface AuthzCountProjectMembersHoldingInputSchema extends Named<
+  typeof authzCountProjectMembersHoldingInputSchemaDefinition
+> {}
+export const authzCountProjectMembersHoldingInputSchema: AuthzCountProjectMembersHoldingInputSchema =
+  authzCountProjectMembersHoldingInputSchemaDefinition;
+export type AuthzCountProjectMembersHoldingInput = z.infer<
+  typeof authzCountProjectMembersHoldingInputSchema
+>;
+
+/** How many members hold it; `exact` is false past the decided limit, and `count` a floor. */
+const authzProjectMembersHoldingSchemaDefinition = z
+  .object({ count: z.number().int().nonnegative(), exact: z.boolean() })
+  .strict();
+export interface AuthzProjectMembersHoldingSchema extends Named<
+  typeof authzProjectMembersHoldingSchemaDefinition
+> {}
+export const authzProjectMembersHoldingSchema: AuthzProjectMembersHoldingSchema =
+  authzProjectMembersHoldingSchemaDefinition;
+export type AuthzProjectMembersHolding = z.infer<typeof authzProjectMembersHoldingSchema>;
 
 /** One live braid as both projects' settings show it. */
 const authzBraidSchemaDefinition = z

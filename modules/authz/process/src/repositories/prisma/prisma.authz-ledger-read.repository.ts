@@ -38,6 +38,7 @@ const braidRowsSchema = z.array(
     occurredAt: z.date(),
     revokedAt: z.date().nullable(),
     revokedReason: z.string().nullable(),
+    replacesGrantId: z.string().nullable(),
   }),
 );
 
@@ -220,6 +221,7 @@ export class PrismaAuthzLedgerReadRepository extends AuthzLedgerReadRepository {
       occurredAt: true,
       revokedAt: true,
       revokedReason: true,
+      replacesGrantId: true,
     };
     const rows = braidRowsSchema.parse(
       includeRevoked
@@ -236,6 +238,7 @@ export class PrismaAuthzLedgerReadRepository extends AuthzLedgerReadRepository {
       occurredAt: fromDate(row.occurredAt),
       revokedReason: row.revokedReason,
       isLive: row.revokedAt === null,
+      replacesGrantId: row.replacesGrantId,
     }));
   }
 

@@ -17,6 +17,8 @@ export type LedgerBraidRow = Readonly<{
   occurredAt: Instant;
   revokedReason: string | null;
   isLive: boolean;
+  /** The braid a change replaced; null on a created braid or one older than the column. */
+  replacesGrantId: string | null;
 }>;
 
 /** A binding's identity as the canonical Grant head stores it. */

@@ -400,6 +400,8 @@ model Grant {
   /// ADR-183: a braid's condition gains `compiledWhere` ({ version, tree }) beside `where`.
   /// Shape: { type: "trace" | "span" | "log", where?, compiledWhere?, from?, until? }.
   condition Json?
+  /// ADR-183 §2: on a braid change's attach, the braid it replaces; null on every other grant.
+  replacesGrantId String?
 }
 
 /// ADR-183: a project's key for signing the tags on its calls. Owned by the API key module.
@@ -431,7 +433,11 @@ model AuthzOrganizationPolicy {
 ```
 
 `Grant.condition` is JSON already, so the braid shape needs no migration; the condition schema gains the
-optional `compiledWhere`. `SigningKey` and `AuthzOrganizationPolicy` are new tables, created by one forward-only
+optional `compiledWhere`. `Grant.replacesGrantId` is a nullable column from a forward-only migration, with
+no default and no backfill: the grant fold writes it from the attach event, so a replay rebuilds it, and a
+braid attached before the column reads null. A change reuses an identical live braid only when that braid
+replaces the one being changed; any other identical braid refuses it with `braid_already_exists`.
+`SigningKey` and `AuthzOrganizationPolicy` are new tables, created by one forward-only
 migration (a migration never drops a table here); an organisation with no row has the setting off. The new source and
 grant shape need no event version and no upcast, but an older worker would refuse an event it cannot parse:
 the schemas that read `braid` and `compiledWhere` ship one release before any route writes them.
@@ -531,3 +537,7 @@ the schemas that read `braid` and `compiledWhere` ship one release before any ro
   migrations, as every migration here is; none drops a table. Removing a braid needs no Enterprise plan, so
   an admin can stop sharing after a downgrade (§9). A compiled condition is one flat, deduplicated, sorted
   conjunction, so equal conditions share one digest and count once towards the reader's limit (§3).
+- v1.7 (2026-10-22, from building, no decision of Alex's changed). The grant projection stores
+  `replacesGrantId` (Schema), so a repeated change finds its own earlier attach and never merges into
+  another identical braid. The dialog's member count decides each active member of the organisation at
+  the reader, at most 500 per count, and says when the count is a floor (§7).

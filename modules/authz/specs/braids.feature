@@ -278,6 +278,20 @@ Feature: Braids
       Then the change reports failure
       And repeating the change revokes the old grant without attaching a third
 
+    @unit
+    Scenario: A change that would make a braid identical to another live braid is refused
+      Given two live braids from "specialists" into "orchestrator" with different conditions
+      When ana changes one braid's condition to the other's
+      Then the change is refused with braid_already_exists
+      And both braids stay live as they were
+
+    @integration
+    Scenario: Replaying the grant events rebuilds which braid each change replaced
+      Given a braid made by changing another, and a braid attached before changes named what they replace
+      When the grant events are replayed into the grant projection
+      Then the changed braid names the braid it replaced
+      And the older braid names none
+
     @integration @unimplemented
     Scenario: Removing and making a braid again within one second leaves one live braid
       Given a live braid from "specialists" into "orchestrator"
@@ -336,6 +350,26 @@ Feature: Braids
       When sam lists braids on "orchestrator"
       Then the braid from "specialists" is listed
       And listing braids on "specialists" is refused to sam as a permission denial
+
+  Rule: The braid dialog names how many people will see the braided spans
+
+    @unit
+    Scenario: The people who will see braided spans are the reader's members who can read its traces
+      Given ana is an organisation admin and tom a member of the team holding "orchestrator"
+      And sam is a member of another team only, and a member of the team holding "orchestrator" is on a disabled seat
+      When the number of people who will see spans braided into "orchestrator" is asked for
+      Then the answer is 2, and it is exact
+
+    @unit
+    Scenario: In a large organisation the number of people is a floor
+      Given an organisation with more active members than one count decides
+      When the number of people who will see spans braided into one of its projects is asked for
+      Then the answer counts the members decided and says it is not exact
+
+    @unit
+    Scenario: Only someone who can read the reader's traces may ask how many people will see them
+      When the number of people who will see spans braided into "orchestrator" is asked for
+      Then the route declares traces:view at "orchestrator" before it answers
 
   Rule: Every braid change and every read through a braid is audited
 

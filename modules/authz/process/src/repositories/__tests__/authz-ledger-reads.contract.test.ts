@@ -6,7 +6,13 @@
  */
 import { randomUUID } from "node:crypto";
 
-import { PROJECT_READER_ROLE_KEY, STORED_PRINCIPAL_KIND } from "@langwatch/authz-contract";
+import {
+  AUTHZ_GRANTS_EVENT_VERSION_LATEST,
+  GRANT_ATTACHED_EVENT_TYPE,
+  GRANT_SOURCE_BRAID,
+  PROJECT_READER_ROLE_KEY,
+  STORED_PRINCIPAL_KIND,
+} from "@langwatch/authz-contract";
 import { createTenantId } from "@langwatch/eventing";
 import { PrismaDriverAdapterService } from "@langwatch/prisma-client";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -14,6 +20,7 @@ import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { type Instant, Temporal, toDate } from "@langwatch/time";
 import { afterAll, afterEach, describe, expect, it } from "vitest";
 
+import { AuthzGrantProjection } from "../../eventing/authz-grant.projection.ts";
 import type { AuthzRepositories } from "../authz.repositories.ts";
 import { AuthzMemoryStore } from "../memory/authz-memory.store.ts";
 import { MemoryAuthzGrantProjectionRepository } from "../memory/memory.authz-grant-projection.repository.ts";
@@ -367,6 +374,55 @@ describe.each(backends)("given the ledger reads on the $name backend", (backend)
       ).toEqual([
         { grantId: windowed.id, memberProjectId: "member_a", condition },
         { grantId: malformed.id, memberProjectId: "member_b", condition: null },
+      ]);
+    });
+
+    /** @scenario "Replaying the grant events rebuilds which braid each change replaced" */
+    it("reads the braid a change replaced from the fold, and none on a braid attached before", async () => {
+      const fixture = await open();
+      const { organizationId, repositories } = fixture;
+      const ownerProjectId = id("project");
+      const readerProjectId = id("project");
+      const projection = AuthzGrantProjection.create(repositories.grantProjection);
+      const replay = (input: { grantId: string; occurredAt: number; replacesGrantId?: string }) =>
+        repositories.grantProjection.append(
+          projection.map({
+            id: `event_${input.grantId}`,
+            aggregateId: input.grantId,
+            aggregateType: "authz_grant",
+            tenantId: createTenantId(organizationId),
+            createdAt: input.occurredAt,
+            occurredAt: input.occurredAt,
+            version: AUTHZ_GRANTS_EVENT_VERSION_LATEST,
+            type: GRANT_ATTACHED_EVENT_TYPE,
+            data: {
+              grantId: input.grantId,
+              principal: { type: "project", id: readerProjectId },
+              roleKey: PROJECT_READER_ROLE_KEY,
+              scope: { type: "PROJECT", id: ownerProjectId },
+              condition: { type: "span", from: "2026-10-01T00:00:00Z" },
+              source: GRANT_SOURCE_BRAID,
+              actor: { type: "user", id: "user_ana" },
+              ...(input.replacesGrantId === undefined
+                ? {}
+                : { replacesGrantId: input.replacesGrantId }),
+            },
+          }),
+          CONTEXT,
+        );
+      const older = id("grant");
+      const changed = id("grant");
+      await replay({ grantId: older, occurredAt: T0 });
+      await replay({ grantId: changed, occurredAt: T0 + 1, replacesGrantId: older });
+
+      const braids = await repositories.ledgerReads.findBraids({
+        organizationId,
+        projectId: readerProjectId,
+      });
+
+      expect(braids.map(({ grantId, replacesGrantId }) => ({ grantId, replacesGrantId }))).toEqual([
+        { grantId: older, replacesGrantId: null },
+        { grantId: changed, replacesGrantId: older },
       ]);
     });
 

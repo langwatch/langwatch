@@ -298,4 +298,7 @@ export class TestAuthzApi implements AuthzApi {
   setBraidsPolicy = unsupported<AuthzApi["setBraidsPolicy"]>("setBraidsPolicy");
   listOrganizationBraids =
     unsupported<AuthzApi["listOrganizationBraids"]>("listOrganizationBraids");
+  countProjectMembersHolding = unsupported<AuthzApi["countProjectMembersHolding"]>(
+    "countProjectMembersHolding",
+  );
 }
