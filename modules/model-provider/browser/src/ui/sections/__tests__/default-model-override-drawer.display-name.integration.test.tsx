@@ -30,6 +30,10 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawerParams: () => ({}),
 }));
 
+vi.mock("@langwatch/feature-flag-client", () => ({
+  useFeatureFlag: () => ({ enabled: false, isLoading: false }),
+}));
+
 // Orthogonal to display-name threading and pulls in its own data hooks.
 vi.mock("@langwatch/design-system/scope-chip-picker", async () => {
   const actual = await vi.importActual<typeof actualModule>(

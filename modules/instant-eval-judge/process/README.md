@@ -34,7 +34,7 @@ classify(input: InstantEvalClassification): Promise<InstantEvalJudgement>;
 
 #### `judge`
 
-One metered judge call: cloud only, unknown project, budget, classify, price, priced event. A refusal is returned, never thrown, and calls no classifier.
+One metered judge call: cloud only, unknown project, budget, classify, price, priced event. A refusal is returned, never thrown, and calls no classifier. With an own decision model it only classifies, at no price (ADR-182 decision 7).
 
 ```typescript
 judge(input: InstantEvalJudgeCall): Promise<InstantEvalJudgeAnswer>;
@@ -91,7 +91,7 @@ Declared at `src/eventing/instant-eval-judge-spend.pipeline.ts:41`. Events: `ins
 
 | Kind   | Leaf                    | Environment variable                    | Declared at                                       |
 | ------ | ----------------------- | --------------------------------------- | ------------------------------------------------- |
-| secret | `classifierApiKey`      | `JEV_API_KEY`                           | `src/app/instant-eval-judge.app.ts:62`            |
+| secret | `classifierApiKey`      | `JEV_API_KEY`                           | `src/app/instant-eval-judge.app.ts:63`            |
 | config | `classifierBaseUrl`     | `JEV_BASE_URL`                          | `../contract/src/instant-eval-judge.config.ts:10` |
 | config | `classifierModel`       | `JEV_MODEL`                             | `../contract/src/instant-eval-judge.config.ts:18` |
 | config | `globalTokensPerSecond` | `INSTANT_EVAL_GLOBAL_TOKENS_PER_SECOND` | `../contract/src/instant-eval-judge.config.ts:20` |

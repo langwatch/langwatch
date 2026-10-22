@@ -1,4 +1,7 @@
+import type { ModelErrorRole } from "@langwatch/browser-host/model-error";
 import { toaster } from "@langwatch/design-system/toaster";
+
+import { MODEL_ROLE_LABEL } from "../../model/default-model-cascade.ts";
 
 /**
  * Toast for `ModelNotConfiguredError` (cause `MODEL_NOT_CONFIGURED`): sticky
@@ -11,7 +14,7 @@ export type MissingModelInfo = {
   /** User-facing label for the feature, from the dev-side registry. */
   featureDisplayName: string;
   /** Role the unresolved feature belongs to. */
-  role: "DEFAULT" | "FAST" | "LANGY" | "EMBEDDINGS";
+  role: ModelErrorRole;
   /** Project slug used to deep-link the action button. */
   projectSlug?: string;
   /** Whether the caller has permission to configure model providers. */
@@ -22,13 +25,6 @@ export type MissingModelInfo = {
    * `window.location` itself.
    */
   navigate: (href: string) => void;
-};
-
-const ROLE_LABEL: Record<MissingModelInfo["role"], string> = {
-  DEFAULT: "Default",
-  FAST: "Fast",
-  LANGY: "Langy",
-  EMBEDDINGS: "Embeddings",
 };
 
 export function missingModelToastId(info: MissingModelInfo): string {
@@ -46,7 +42,7 @@ function settingsHref(info: { role: MissingModelInfo["role"] }): string {
 export function showMissingModelToast(info: MissingModelInfo): void {
   const id = missingModelToastId(info);
   if (toaster.isVisible(id)) return;
-  const roleLabel = ROLE_LABEL[info.role];
+  const roleLabel = MODEL_ROLE_LABEL[info.role];
   const href = settingsHref(info);
 
   const description =
@@ -94,7 +90,7 @@ export function aiCallFailedToastId(info: AiCallFailedInfo): string {
 export function showAiCallFailedToast(info: AiCallFailedInfo): void {
   const id = aiCallFailedToastId(info);
   if (toaster.isVisible(id)) return;
-  const roleLabel = ROLE_LABEL[info.role];
+  const roleLabel = MODEL_ROLE_LABEL[info.role];
   const href = settingsHref(info);
 
   const description = `Double-check your ${roleLabel} model configuration in Model Providers.`;

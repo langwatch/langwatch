@@ -68,7 +68,8 @@ The handler receives one object.
 | `messages` | `Message[]` | The whole conversation so far, as OpenAI-style messages |
 | `newMessages` | `Message[]` | The messages added since the previous turn |
 | `threadId` | `string` | The platform's conversation id, the same on every turn of one run |
-| `session` | `unknown` | What the handler returned as `session` on the previous turn, `undefined` on the first |
+| `session` | `unknown` | What the handler returned as `session` on the previous turn, `null` on the first |
+| `state` | `Record<string, unknown> \| null` | The scenario's state: what the setup hook returned, as the latest turn updated it, `null` without one |
 | `params` | typed from `parameters` | The run's values for the declared parameters |
 | `traceId` | `string` | The id of the turn's trace |
 
@@ -125,9 +126,31 @@ Values arrive validated against the declaration. A value the declaration refuses
 | `string` | The reply text |
 | `Message` | One message |
 | `Message[]` | Several messages |
-| `{ output, session }` | A reply plus the session value for the next turn |
+| `{ output, session, state }` | A reply, plus the session value for the next turn and an update to the scenario's state. `session` and `state` are optional. |
 
 `session` is an opaque JSON value the platform echoes on the next turn of the same conversation, up to 64 kilobytes.
+
+### `agent.scenario.setup()` and `agent.scenario.teardown()`
+
+The object `connectAgent` returns has a `scenario` property that declares the hooks LangWatch calls around a scenario run. See [Setup and teardown hooks](/agent-testing/setup-and-teardown-hooks) for when they run and how they fail.
+
+```typescript
+agent.scenario.setup(async (run, params) => {
+  return { customerId: "cus_123" }; // the state the run starts with
+});
+
+agent.scenario.teardown(async (run, state, params) => {
+  return { deleted: state?.customerId }; // shown on the run
+});
+```
+
+| Argument | Type | Value |
+|---|---|---|
+| `run` | `ScenarioRun` | `scenarioRunId`, `scenarioName` and `batchRunId` of the run, each optional |
+| `state` | `Record<string, unknown> \| null` | Teardown only: the latest state |
+| `params` | typed from `parameters` | The run's values for the parameters declared in `connectAgent` |
+
+Each hook returns a JSON object, up to 64 kilobytes, or no value. Declared before the process yields, the hooks are part of the first registration. Declared later, the SDK registers the agent again.
 
 ### Lifecycle
 
@@ -157,7 +180,7 @@ With the default transport, a proxy that answers the WebSocket upgrade with an H
 
 ### Errors
 
-A failing call answers with a typed code rather than a stack trace. `agent_offline`, `agent_owner_only`, `agent_call_timeout`, `agent_call_failed`, `agent_disconnected`, `agent_instance_lost`, `agent_busy`, `agent_parameter_invalid`, `agent_register_refused`, `agent_payload_too_large`.
+A failing call answers with a typed code rather than a stack trace. `agent_offline`, `agent_owner_only`, `agent_call_timeout`, `agent_call_failed`, `agent_disconnected`, `agent_instance_lost`, `agent_busy`, `agent_parameter_invalid`, `agent_register_refused`, `agent_payload_too_large`, `hook_not_declared`.
 
 ## Next steps
 

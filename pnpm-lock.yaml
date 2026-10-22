@@ -10010,6 +10010,9 @@ importers:
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
+      '@langwatch/model-provider-contract':
+        specifier: workspace:*
+        version: link:../../model-provider/contract
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
@@ -10968,6 +10971,9 @@ importers:
       '@langwatch/enterprise-managed-provider-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/managed-provider/contract
+      '@langwatch/feature-flag-contract':
+        specifier: workspace:*
+        version: link:../../feature-flag/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error

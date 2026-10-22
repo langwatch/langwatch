@@ -287,7 +287,7 @@ interface Input {
 
 // codingAgents.pullRequestUsage
 type Input = z.infer<typeof codingAgentTrpcProjectScopeSchema>; // ../contract/src/coding-agent-trpc.schemas.ts:15
-type Output = z.infer<typeof codingAgentPersonalPullRequestUsageWithConnectionSchema>; // ../contract/src/coding-agent.ts:867
+type Output = z.infer<typeof codingAgentPersonalPullRequestUsageWithConnectionSchema>; // ../contract/src/coding-agent.ts:870
 
 // codingAgents.pullRequestDetail
 // Input: codingAgentTrpcPullRequestDetailInputSchema, ../contract/src/coding-agent-trpc.schemas.ts:63
@@ -297,7 +297,7 @@ interface Input {
   repositoryFullName: string;
   prNumber: number;
 }
-type Output = z.infer<typeof codingAgentPullRequestDetailSchema>; // ../contract/src/coding-agent.ts:776
+type Output = z.infer<typeof codingAgentPullRequestDetailSchema>; // ../contract/src/coding-agent.ts:779
 
 // codingAgents.session
 // Input: inline, ../contract/src/coding-agent.trpc.ts:58
