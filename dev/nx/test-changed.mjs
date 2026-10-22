@@ -14,7 +14,7 @@ import { reads } from "./test-reads-plugin.mjs";
 const root = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const CACHE_FILE = join(root, "node_modules/.cache/test-changed/import-graph.json");
 const DEFAULT_CONFIG = /^vitest\.config\.[cm]?[jt]s$/;
-const VITEST_SCRIPT = /^vitest run(?:\s[^&|;<>`$]*)?$/;
+const VITEST_SCRIPT = /^vitest run(?: [^&|;<>`$\n\r]*)?$/;
 
 function git({ args, cwd = root, allowFailure = false }) {
   const result = spawnSync("git", args, { cwd, encoding: "utf8" });
@@ -68,7 +68,7 @@ export function readPackages({ files, readText }) {
     .flatMap((file) => {
       try {
         const manifest = JSON.parse(readText(file));
-        return [{ dir: posix.dirname(file), name: manifest.name, test: manifest.scripts?.test }];
+        return [{ dir: posix.dirname(file), name: manifest.name, test: manifest.scripts?.test, pretest: manifest.scripts?.pretest }];
       } catch {
         return [];
       }
@@ -94,7 +94,7 @@ function configOf({ pkg, defaults }) {
 }
 
 /** Packages whose whole suite runs: a reached config, or a changed file their tests read. */
-function wholeSuites({ graph, packages, changed, reached }) {
+function wholeSuites({ graph, packages, changed, reached, readsTable }) {
   const defaults = new Map(
     graph.files
       .filter((file) => DEFAULT_CONFIG.test(basename(file)))
@@ -104,7 +104,7 @@ function wholeSuites({ graph, packages, changed, reached }) {
 
   return packages.flatMap((pkg) => {
     const config = configOf({ pkg, defaults });
-    const readers = reads[pkg.name] ?? [];
+    const readers = readsTable[pkg.name] ?? [];
     const read = changed.find((file) => readers.some((glob) => matchesGlob(file, glob)));
     const imported = reachedSet.has(config) ? config : void 0;
     if (imported === undefined && read === undefined) return [];
@@ -118,10 +118,23 @@ function wholeSuites({ graph, packages, changed, reached }) {
  * only reads the change from disk runs with `withReads`, else it is listed, as
  * are tests no Vitest package owns. Ordered so the first result comes soonest.
  */
-export function planRuns({ graph, packages, changed, reached, withReads = false }) {
+export function planRuns({
+  graph,
+  packages,
+  changed,
+  reached,
+  withReads = false,
+  readsTable = reads,
+}) {
   const isVitest = (pkg) => pkg !== undefined && VITEST_SCRIPT.test(pkg.test ?? "");
   const packagesByDir = new Map(packages.map((pkg) => [pkg.dir, pkg]));
-  const suites = wholeSuites({ graph, packages: packages.filter(isVitest), changed, reached });
+  const suites = wholeSuites({
+    graph,
+    packages: packages.filter(isVitest),
+    changed,
+    reached,
+    readsTable,
+  });
   const whole = suites.filter((suite) => withReads || !suite.onlyRead);
   const readers = suites.filter((suite) => !withReads && suite.onlyRead);
   const wholeDirs = new Set(whole.map(({ pkg }) => pkg.dir));
@@ -140,6 +153,7 @@ export function planRuns({ graph, packages, changed, reached, withReads = false 
     dir: pkg.dir,
     name: pkg.name,
     script: pkg.test,
+    pretest: pkg.pretest,
     whole: because.length > 0,
     because,
     files: files.toSorted(),
@@ -163,7 +177,8 @@ export function planRuns({ graph, packages, changed, reached, withReads = false 
   };
 }
 
-function printPlan({ plan, changed, graphStats, walkMs }) {
+/** The summary of a plan, as the lines test:changed prints to stderr. */
+export function formatPlan({ plan, changed, graphStats, walkMs }) {
   const testFiles = plan.runs.reduce((sum, run) => sum + run.files.length, 0);
   const whole = plan.runs.filter((run) => run.whole).length;
   const lines = [
@@ -185,11 +200,21 @@ function printPlan({ plan, changed, graphStats, walkMs }) {
   if (plan.notVitest.length > 0) {
     lines.push(`  not run (no Vitest test script owns them): ${plan.notVitest.join(", ")}`);
   }
-  process.stderr.write(`${lines.join("\n")}\n`);
+  return `${lines.join("\n")}\n`;
+}
+
+/** The plan as one JSON line, as `--json` prints it. */
+export function planJson({ plan, changed, graphMs, walkMs }) {
+  return `${JSON.stringify({ changed, ...plan, graph: graphMs, walkMs })}\n`;
+}
+
+/** One path per reached test file, as `--list` prints them. */
+export function listFiles(plan) {
+  return plan.runs.flatMap((run) => run.files.map((file) => `${run.dir}/${file}\n`)).join("");
 }
 
 /** Runs one package's `test` script with the reached files appended. */
-function runPackage(run) {
+async function runPackage(run) {
   const extra = run.script.includes("--passWithNoTests") ? [] : ["--passWithNoTests"];
   const cwd = join(root, run.dir);
   const bins = [join(cwd, "node_modules/.bin"), join(root, "node_modules/.bin")];
@@ -197,13 +222,15 @@ function runPackage(run) {
   process.stderr.write(
     `\n> ${run.name ?? run.dir}: ${run.script} ${[...extra, ...run.files].join(" ")}\n`,
   );
-  const child = spawn("sh", ["-c", `${run.script} "$@"`, "sh", ...extra, ...run.files], {
-    cwd,
-    env,
-    stdio: "inherit",
-  });
+  const start = (command, args) =>
+    new Promise((resolve) => {
+      const child = spawn("sh", ["-c", command, "sh", ...args], { cwd, env, stdio: "inherit" });
+      child.on("close", (status) => resolve(status ?? 1));
+    });
+  // pnpm runs a package's `pretest` before `test`; running the script directly must too.
+  const prepared = run.pretest === undefined ? 0 : await start(run.pretest, []);
 
-  return new Promise((resolve) => child.on("close", (status) => resolve(status ?? 1)));
+  return prepared === 0 ? start(`${run.script} "$@"`, [...extra, ...run.files]) : prepared;
 }
 
 async function main() {
@@ -212,9 +239,13 @@ async function main() {
   const base = baseFlag === -1 ? void 0 : args[baseFlag + 1];
   const flags = new Set(["--list", "--json", "--reads", "--base", base]);
   const named = args.filter((arg) => !flags.has(arg));
+  const baseMissing = baseFlag !== -1 && (base === undefined || base.startsWith("-"));
   const normalized = named.map((file) => posix.normalize(file).replace(/^\.\//, ""));
   const graph = buildImportGraph({ root, cacheFile: CACHE_FILE });
-  const problems = checkNamed({ named: normalized, known: (file) => graph.index.has(file) });
+  const problems = [
+    ...(baseMissing ? ["--base needs a ref"] : []),
+    ...checkNamed({ named: normalized, known: (file) => graph.index.has(file) }),
+  ];
   if (problems.length > 0) {
     process.stderr.write(`test:changed: ${problems.join("\ntest:changed: ")}\n`);
     process.exit(2);
@@ -235,15 +266,12 @@ async function main() {
   const plan = planRuns({ graph, packages, changed, reached, withReads: args.includes("--reads") });
 
   if (args.includes("--json")) {
-    process.stdout.write(
-      `${JSON.stringify({ changed, ...plan, graph: graph.stats.ms, walkMs })}\n`,
-    );
+    process.stdout.write(planJson({ plan, changed, graphMs: graph.stats.ms, walkMs }));
     process.exit(0);
   }
-  printPlan({ plan, changed, graphStats: graph.stats, walkMs });
+  process.stderr.write(formatPlan({ plan, changed, graphStats: graph.stats, walkMs }));
   if (args.includes("--list")) {
-    for (const run of plan.runs)
-      for (const file of run.files) process.stdout.write(`${run.dir}/${file}\n`);
+    process.stdout.write(listFiles(plan));
     process.exit(0);
   }
 

@@ -9,7 +9,18 @@ import { dirname, join } from "node:path";
 import { describe, it } from "node:test";
 
 import { buildImportGraph, reachedFrom, scanSpecifiers } from "../import-graph.mjs";
-import { changedSince, checkNamed, defaultBase, planRuns, readPackages } from "../test-changed.mjs";
+import {
+  changedSince,
+  checkNamed,
+  defaultBase,
+  formatPlan,
+  listFiles,
+  planJson,
+  planRuns,
+  readPackages,
+} from "../test-changed.mjs";
+
+const READS = { "@fixture/process": ["modules/auth/**/*"] };
 
 const FILES = {
   "package.json": { name: "@langwatch/workspace", private: true },
@@ -26,9 +37,9 @@ const FILES = {
   "packages/time/src/__tests__/clock.unit.test.ts": `import { clock } from "../clock";\n`,
   "packages/time/src/__tests__/shape.unit.test.ts": `import type { Shape } from "../shape";\n`,
   "modules/trace/process/package.json": {
-    name: "@langwatch/identity-process",
+    name: "@fixture/process",
+    scripts: { pretest: "echo prepare", test: "vitest run --exclude '**/*.integration.test.ts'" },
     imports: { "#*": { types: "./dist/*.d.ts", default: "./src/*.ts" } },
-    scripts: { test: "vitest run --exclude '**/*.integration.test.ts'" },
   },
   "modules/trace/process/src/span.ts": `import { clock } from "@langwatch/time";\nexport const span = clock;\n`,
   "modules/trace/process/src/rules/limit.ts": "export const limit = 3;\n",
@@ -67,7 +78,7 @@ function plan({ root, changed, withReads }) {
 
   const reached = reachedFrom({ graph, changed });
 
-  return planRuns({ graph, packages, changed, reached, withReads });
+  return planRuns({ graph, packages, changed, reached, withReads, readsTable: READS });
 }
 
 const summary = (runs) => runs.map(({ dir, whole, files }) => ({ dir, whole, files }));
@@ -208,6 +219,92 @@ void describe("test:changed", () => {
     assert.equal(checkNamed({ named: ["src/clock.ts"], known, cwd: root }).length, 1);
     execFileSync("git", ["rm", "-q", "packages/time/src/shape.ts"], { cwd: root });
     assert.deepEqual(checkNamed({ named: ["packages/time/src/shape.ts"], known, cwd: root }), []);
+  });
+
+  /** @scenario "Every way a file names another is followed" */
+  void it("scans dynamic imports, mocks, requires, URLs and globs, and expands a glob", () => {
+    const text = [
+      `const a = await import("./dynamic");`,
+      `vi.mock("./mocked");`,
+      `vi.doMock("./domocked");`,
+      `const b = require("./required");`,
+      `const c = new URL("./asset.json", import.meta.url);`,
+      `const d = import.meta.glob("./cases/*.ts");`,
+      `import "./side-effect";`,
+    ].join("\n");
+
+    assert.deepEqual(scanSpecifiers({ file: "a.ts", text }).toSorted(), [
+      "./asset.json",
+      "./domocked",
+      "./dynamic",
+      "./mocked",
+      "./required",
+      "./side-effect",
+      "glob:./cases/*.ts",
+    ]);
+
+    const root = mkdtempSync(join(tmpdir(), "test-changed-glob-"));
+    const files = {
+      "pkg/package.json": { name: "pkg", scripts: { test: "vitest run" } },
+      "pkg/src/loader.ts": `export const all = import.meta.glob("./cases/*.ts");\n`,
+      "pkg/src/cases/one.ts": "export const one = 1;\n",
+      "pkg/src/cases/two.ts": "export const two = 2;\n",
+      "pkg/src/__tests__/loader.unit.test.ts": `import { all } from "../loader";\n`,
+    };
+    for (const [file, content] of Object.entries(files)) write({ root, file, content });
+    execFileSync("git", ["init", "-q"], { cwd: root });
+    execFileSync("git", ["add", "-A"], { cwd: root });
+    const graph = buildImportGraph({ root });
+
+    assert.deepEqual(reachedFrom({ graph, changed: ["pkg/src/cases/two.ts"] }).toSorted(), [
+      "pkg/src/__tests__/loader.unit.test.ts",
+      "pkg/src/cases/two.ts",
+      "pkg/src/loader.ts",
+    ]);
+  });
+
+  /** @scenario "A package's pretest and a multi-line test script are handled" */
+  void it("carries a package's pretest and refuses a test script with a second line", () => {
+    const root = fixtureRepo();
+    const result = plan({ root, changed: ["modules/trace/process/src/span.ts"] });
+    const files = ["a/package.json", "b/package.json"];
+    const manifests = {
+      "a/package.json": { name: "a", scripts: { test: "vitest run\ncurl evil" } },
+      "b/package.json": { name: "b", scripts: { test: "vitest run" } },
+    };
+    const packages = readPackages({ files, readText: (file) => JSON.stringify(manifests[file]) });
+    const graph = { files: [...files, "a/x.test.ts", "b/x.test.ts"] };
+    const refused = planRuns({
+      graph,
+      packages,
+      changed: ["a/x.test.ts", "b/x.test.ts"],
+      reached: ["a/x.test.ts", "b/x.test.ts"],
+      readsTable: {},
+    });
+
+    assert.equal(result.runs[0].pretest, "echo prepare");
+    assert.deepEqual(refused.notVitest, ["a/x.test.ts"]);
+    assert.deepEqual(summary(refused.runs), [{ dir: "b", whole: false, files: ["x.test.ts"] }]);
+  });
+
+  /** @scenario "--list and --json print the plan" */
+  void it("prints the plan as a summary, a file list and a JSON line", () => {
+    const root = fixtureRepo();
+    const changed = ["packages/time/src/clock.ts"];
+    const result = plan({ root, changed });
+    const graphStats = { ms: { total: 1 }, rescanned: 2 };
+    const summaryText = formatPlan({ plan: result, changed, graphStats, walkMs: 0.5 });
+    const json = JSON.parse(planJson({ plan: result, changed, graphMs: { total: 1 }, walkMs: 0.5 }));
+
+    assert.match(summaryText, /^test:changed: 1 changed file\(s\) reach /);
+    assert.match(summaryText, /not run \(no Vitest test script owns them\): dev\/scripts\/__tests__\/clock\.unit\.test\.mjs/);
+    assert.deepEqual(listFiles(result).split("\n").filter(Boolean).toSorted(), [
+      "modules/trace/process/src/__tests__/span.unit.test.ts",
+      "packages/time/src/__tests__/clock.unit.test.ts",
+    ]);
+    assert.deepEqual(json.changed, changed);
+    assert.deepEqual(json.runs, JSON.parse(JSON.stringify(result.runs)));
+    assert.deepEqual(json.notVitest, ["dev/scripts/__tests__/clock.unit.test.mjs"]);
   });
 
   /** @scenario "The graph rescans only the files that changed since the last run" */

@@ -52,6 +52,23 @@ Feature: test:changed runs the tests a change reaches by imports
     Then every one of those files is in the change set
     And the base is HEAD when origin/main does not exist
 
+  Scenario: Every way a file names another is followed
+    Given files that name another by dynamic import, mock, require, URL, side-effect import or glob
+    When test:changed scans them
+    Then each named file is an edge, and a glob names every file it matches
+
+  Scenario: A package's pretest and a multi-line test script are handled
+    Given a package with a pretest script, and another whose test script has a second line
+    When test:changed plans the run
+    Then the pretest runs before the package's tests
+    And the package with the second line is listed as not run
+
+  Scenario: --list and --json print the plan
+    Given a plan with reached tests
+    When test:changed prints it
+    Then --list prints one path per reached test file
+    And --json prints the changed files and the plan as one JSON line
+
   Scenario: An argument that is not a file or a known option is refused
     Given an unknown option, or a path that is in no part of the repository
     When test:changed checks its arguments
