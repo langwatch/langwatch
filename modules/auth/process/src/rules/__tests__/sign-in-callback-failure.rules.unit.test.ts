@@ -6,6 +6,7 @@ import {
   isSignInCallbackPath,
   signInErrorRedirectOf,
   signInFailureLocation,
+  signInRefusalCause,
 } from "../sign-in-callback-failure.rules.ts";
 
 describe("isSignInCallbackPath", () => {
@@ -122,5 +123,21 @@ describe("signInErrorRedirectOf", () => {
         { kind: "pass" },
       );
     });
+  });
+});
+
+describe("signInRefusalCause", () => {
+  it("names the provider's code so a log record reads the real cause", () => {
+    const cause = signInRefusalCause({ code: "state_not_found", description: "" });
+
+    expect(cause.name).toBe("SignInRefusal");
+    expect(cause.message).toBe('sign-in refused with "state_not_found"');
+  });
+
+  it("carries a clipped description when the provider sent one", () => {
+    const cause = signInRefusalCause({ code: "access_denied", description: "x".repeat(900) });
+
+    expect(cause.message.startsWith('sign-in refused with "access_denied": xxx')).toBe(true);
+    expect(cause.message.length).toBeLessThan(260);
   });
 });

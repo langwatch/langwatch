@@ -70,6 +70,26 @@ export function signInErrorRedirectOf({
   };
 }
 
+/**
+ * The cause of a withheld sign-in failure, as an error a log record can carry: the provider's
+ * own code and description, so a record reads "state_not_found" and not "a reason we have not
+ * written down". The code is the provider's refusal, never a secret, and the description is
+ * clipped.
+ */
+export function signInRefusalCause({
+  code,
+  description,
+}: {
+  code: string;
+  description: string;
+}): Error {
+  const detail = description.slice(0, 200);
+  const cause = new Error(`sign-in refused with "${code}"${detail ? `: ${detail}` : ""}`);
+  cause.name = "SignInRefusal";
+
+  return cause;
+}
+
 /** The redirect target when it is the sign-in error page itself; a relative Location resolves. */
 function errorPageTargetOf({
   location,

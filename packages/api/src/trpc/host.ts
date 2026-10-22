@@ -184,7 +184,10 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
       },
       audit: { record: (entry) => this.#record(entry) },
       errorReporting: {
-        capture: (failure: unknown) => this.#logger.error({ error: failure }, "tRPC call failed"),
+        // The "trpc call" record already carries the failure at error level
+        // (path, status, duration, error). A second "tRPC call failed" line for the
+        // same call only doubled the volume, so reporting adds nothing here.
+        capture: () => void 0,
         asError: (failure: unknown): Error =>
           failure instanceof Error ? failure : new Error(String(failure)),
       },
@@ -390,7 +393,8 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
         ...this.#organizationOf(options.audit),
       },
       errors: {
-        report: (failure) => this.#logger.error({ error: failure }, "tRPC call failed"),
+        // Same as the legacy host: the "trpc call" record carries the failure.
+        report: () => void 0,
         asError: (failure) => (failure instanceof Error ? failure : new Error(String(failure))),
         translate: () => void 0,
       },

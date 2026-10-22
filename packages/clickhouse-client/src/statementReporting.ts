@@ -4,6 +4,8 @@
  * so a catch-site throw from a counter or log sink never masks the real error.
  */
 
+import { nowInstant } from "@langwatch/time";
+
 import { QUERY_CAUSE_FIELD, quietly, RETRY_CAUSE_FIELD } from "./resilience.ts";
 import type { RetryAttemptNotice } from "./retry.ts";
 import {
@@ -82,7 +84,29 @@ const NOOP_METRICS: StatementMetrics = {
   incrementCount: () => undefined,
 };
 
+/** How long a cold-scan warning for one query shape stays quiet after it is logged. */
+const COLD_SCAN_WARN_INTERVAL_MS = 60 * 60 * 1000;
+
+/** The most query shapes the cold-scan warning remembers; the oldest falls out first. */
+const COLD_SCAN_SHAPES_REMEMBERED = 500;
+
+/**
+ * A query with its literals and layout removed, so the same statement run for another tenant,
+ * time window or limit is one shape. The warning is about the statement's form (no time filter),
+ * which does not change with its values.
+ */
+function queryShapeOf(rawQuery: string): string {
+  return rawQuery
+    .replace(/'(?:[^'\\]|\\.)*'/g, "?")
+    .replace(/\b\d+(?:\.\d+)?\b/g, "?")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 1000);
+}
+
 export interface StatementReporterOptions {
+  /** Epoch milliseconds; injectable so a test steps the cold-scan quiet window. */
+  now?: (() => number) | undefined;
   cluster?: string | undefined;
   metrics?: StatementMetrics | undefined;
   noticeLogger?: StatementLogSink | undefined;
@@ -99,8 +123,12 @@ export class StatementReporter {
   /** Raw on purpose: a failure here is worth a line on the notice sink. */
   private readonly outcomeLogger: StatementLogSink;
   private readonly detectColdScan: (rawQuery: string) => string | null;
+  private readonly now: () => number;
+  /** Query shape -> when its cold-scan warning last went out, and what it held back since. */
+  private readonly coldScanWarned = new Map<string, { at: number; suppressed: number }>();
 
   constructor({
+    now = () => nowInstant().epochMilliseconds,
     cluster = "shared",
     metrics = NOOP_METRICS,
     noticeLogger = NOOP_SINK,
@@ -112,6 +140,33 @@ export class StatementReporter {
     this.noticeLogger = guardedLogSink(noticeLogger);
     this.outcomeLogger = outcomeLogger;
     this.detectColdScan = detectColdScan;
+    this.now = now;
+  }
+
+  /**
+   * Claims the right to warn about one cold-scan query shape. A hot path runs the same shape
+   * thousands of times an hour; one warning per shape per interval says it, and the count of
+   * those held back rides on the next one. Returns null while the shape is quiet.
+   */
+  private claimColdScanWarning(rawQuery: string): { suppressedSincePrevious: number } | null {
+    const shape = queryShapeOf(rawQuery);
+    const at = this.now();
+    const previous = this.coldScanWarned.get(shape);
+
+    if (previous && at - previous.at < COLD_SCAN_WARN_INTERVAL_MS) {
+      previous.suppressed += 1;
+
+      return null;
+    }
+
+    this.coldScanWarned.delete(shape);
+    this.coldScanWarned.set(shape, { at, suppressed: 0 });
+    if (this.coldScanWarned.size > COLD_SCAN_SHAPES_REMEMBERED) {
+      const oldest = this.coldScanWarned.keys().next().value;
+      if (oldest !== undefined) this.coldScanWarned.delete(oldest);
+    }
+
+    return { suppressedSincePrevious: previous?.suppressed ?? 0 };
   }
 
   /** Count one finished statement. */
@@ -207,7 +262,10 @@ export class StatementReporter {
           ? this.detectColdScan(extractRawQuery(params))
           : null;
 
-      if (coldScanTable !== null) {
+      const coldScanClaim =
+        coldScanTable !== null ? this.claimColdScanWarning(extractRawQuery(params)) : null;
+
+      if (coldScanTable !== null && coldScanClaim !== null) {
         this.outcomeLogger.warn(
           {
             source: "clickhouse",
@@ -219,6 +277,7 @@ export class StatementReporter {
             query: extractQueryPreview(params),
             coldScan: true,
             coldScanTable,
+            suppressedSincePrevious: coldScanClaim.suppressedSincePrevious,
           },
           `ClickHouse cold-scan ${operation}: cold scan of ${coldScanTable} (no time filter, walks S3 partitions)`,
         );
