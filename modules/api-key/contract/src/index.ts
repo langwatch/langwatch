@@ -3,6 +3,7 @@ export * from "./api-key.errors.ts";
 export * from "./api-key.list.ts";
 export * from "./api-key.api.ts";
 export * from "./api-key.tokens.ts";
+export * from "./api-key.credential-type.ts";
 export * from "./api-key.names.ts";
 export * from "./api-key.run-key.ts";
 export * from "./api-key.responses.ts";

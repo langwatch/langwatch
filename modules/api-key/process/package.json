@@ -35,6 +35,7 @@
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/module": "workspace:*",
     "@langwatch/observability": "workspace:*",
+    "@opentelemetry/api": "catalog:",
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/process": "workspace:*",
@@ -53,6 +54,8 @@
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/process-stores": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
+    "@opentelemetry/sdk-trace-base": "catalog:",
+    "@opentelemetry/sdk-trace-node": "catalog:",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

@@ -1,6 +1,8 @@
+import { CREDENTIAL_TYPE_SPAN_ATTRIBUTE } from "@langwatch/api-key-contract";
 import type { SessionCaller } from "@langwatch/api/hosting";
 import type { AuthApi, BrowserSessionVerification } from "@langwatch/auth-contract";
 import { createLogger } from "@langwatch/observability";
+import { trace } from "@opentelemetry/api";
 
 const logger = createLogger("langwatch:api:auth");
 
@@ -50,6 +52,7 @@ export class BrowserSessionVerificationService {
       return { kind: "anonymous" };
     }
     const { session } = resolution;
+    trace.getActiveSpan()?.setAttribute(CREDENTIAL_TYPE_SPAN_ATTRIBUTE, "session");
 
     return {
       kind: "caller",

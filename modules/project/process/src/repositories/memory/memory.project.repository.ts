@@ -57,6 +57,7 @@ function contains(haystack: string, needle: string): boolean {
 
 export class MemoryProjectRepository implements ProjectRepository {
   readonly #database: MemoryProjectDatabase;
+  readonly #legacyApiKeyLastUsedAt = new Map<string, Instant>();
 
   private constructor(database: MemoryProjectDatabase) {
     this.#database = database;
@@ -654,6 +655,12 @@ export class MemoryProjectRepository implements ProjectRepository {
   }
 
   /** Answers false for a project this memory holds no live row for, as the fenced UPDATE does. */
+  async markLegacyApiKeyUsed(input: { projectId: string; at: Instant }): Promise<void> {
+    if (this.#database.findProject(input.projectId)) {
+      this.#legacyApiKeyLastUsedAt.set(input.projectId, input.at);
+    }
+  }
+
   async rotateLegacyApiKey(input: { projectId: string; token: string }): Promise<boolean> {
     const project = this.#database.findProject(input.projectId);
     if (!project || project.archivedAt !== null) return false;

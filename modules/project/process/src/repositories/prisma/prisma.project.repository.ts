@@ -809,6 +809,13 @@ export class PrismaProjectRepository
     return row?.id ?? null;
   }
 
+  async markLegacyApiKeyUsed(input: { projectId: string; at: Instant }): Promise<void> {
+    await this.prisma.project.updateMany({
+      where: { id: input.projectId },
+      data: { legacyApiKeyLastUsedAt: toDate(input.at) },
+    });
+  }
+
   async rotateLegacyApiKey(input: { projectId: string; token: string }): Promise<boolean> {
     const result = await this.prisma.project.updateMany({
       where: { id: input.projectId, archivedAt: null },

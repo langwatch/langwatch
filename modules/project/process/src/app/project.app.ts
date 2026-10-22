@@ -596,6 +596,10 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     return this.#projectService.findIdByLegacyApiKey(input);
   }
 
+  markLegacyApiKeyUsed(input: Readonly<{ projectId: string }>): Promise<void> {
+    return this.#projectService.markLegacyApiKeyUsed(input);
+  }
+
   /** Both kill switches a trace share is minted under, read off this module's rows. */
   findTraceSharingConfig(
     input: Readonly<{ projectId: string }>,
