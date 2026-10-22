@@ -14,9 +14,10 @@ describe("featureProjectColour", () => {
     const ids = ["project_a", "project_b", "project_c", "project_d", "project_e", "project_f"];
     const colours = ids.map((projectId) => featureProjectColour({ feature: "braids", projectId }));
 
-    for (const { index, fill, ink } of colours) {
+    for (const { index, fill, ink, count } of colours) {
+      expect(count).toBe(3);
       expect(index).toBeGreaterThanOrEqual(1);
-      expect(index).toBeLessThanOrEqual(3);
+      expect(index).toBeLessThanOrEqual(count);
       expect(fill).toBe(`feature.braids.project.${index}`);
       expect(ink).toBe(`feature.braids.projectInk.${index}`);
     }

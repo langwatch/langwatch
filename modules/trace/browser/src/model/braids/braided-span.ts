@@ -8,9 +8,6 @@ export interface BraidStrand {
   colour: string;
 }
 
-/** The Braids brand's project colours (`projectColours` on its brand). */
-const STRAND_COUNT = 3;
-
 export const BRAIDED_ACTION_DISABLED_REASON = "Not available on spans braided from another project";
 
 /**
@@ -33,11 +30,10 @@ export function braidColourIndexes(
   const taken = new Set<number>();
   for (const { projectId } of owners) {
     if (indexes.has(projectId)) continue;
-    const own = featureProjectColour({ feature: "braids", projectId }).index;
-    const free = Array.from(
-      { length: STRAND_COUNT },
-      (_, step) => ((own - 1 + step) % STRAND_COUNT) + 1,
-    ).find((index) => !taken.has(index));
+    const { index: own, count } = featureProjectColour({ feature: "braids", projectId });
+    const free = Array.from({ length: count }, (_, step) => ((own - 1 + step) % count) + 1).find(
+      (index) => !taken.has(index),
+    );
     const index = free ?? own;
     taken.add(index);
     indexes.set(projectId, index);

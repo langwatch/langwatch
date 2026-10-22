@@ -75,7 +75,9 @@ landing or docs pages, as Langy and the front door already use it.
     project colour is paired with initials, so colour is never the only cue.
 11. **One project, one colour, on every screen.** A feature that colours projects sets
     `projectColours` on its `FEATURE_BRANDS` entry and asks `featureProjectColour({ feature,
-projectId })` for the tokens, never its own hash or the order a list happens to hold.
+projectId })` for the tokens, never its own hash or the order a list happens to hold. When two
+    projects on one screen land on the same colour, move the later one to the next free index,
+    counting up to the `count` the helper returns, never a copied number.
 
 ## Branding the next feature
 

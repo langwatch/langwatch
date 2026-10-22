@@ -8,6 +8,8 @@ export interface FeatureProjectColour {
   fill: string;
   /** Text drawn on `fill`, such as the project's initials. */
   ink: string;
+  /** How many project colours the brand has, so a screen can move to the next free one. */
+  count: number;
 }
 
 export function featureProjectColour({
@@ -26,5 +28,6 @@ export function featureProjectColour({
     index,
     fill: `feature.${feature}.project.${index}`,
     ink: `feature.${feature}.projectInk.${index}`,
+    count,
   };
 }
