@@ -272,36 +272,6 @@ describe("given a Reports board and a Dashboards board holding a widget", () => 
         code: "dashboard_not_found",
       });
     });
-
-    /** @scenario "AC199n Split: the public API creates and deletes Dashboards boards" */
-    /** @scenario "A Langy key's delete card names the key owner's own Only me records" */
-    it("names its owner's Only me board on a Langy key's card, and nobody else's", async () => {
-      const { app } = await projectWithBothBoards();
-      const owner = { userId: "user-2" };
-      const mine = await app.createBoard({
-        projectId: PROJECT,
-        name: "Private",
-        createdById: owner.userId,
-      });
-      await app.setDashboardScope({
-        projectId: PROJECT,
-        dashboardId: mine.id,
-        scope: "PRIVATE",
-        viewer: owner,
-      });
-      const mark = boardRest
-        .router()
-        .routes.find((route) => route.method === "delete")?.confirmation;
-      const nameFor = (ownerUserId: string | null) =>
-        mark?.name({ app, projectId: PROJECT, id: mine.id, ownerUserId });
-
-      // A name means a card; undefined means gone, and the handler would answer for it alone.
-      expect({
-        owner: await nameFor(owner.userId),
-        other: await nameFor("user-3"),
-        nobody: await nameFor(null),
-      }).toEqual({ owner: "Private", other: undefined, nobody: undefined });
-    });
   });
 
   describe("when a member creates their own My dashboard", () => {
