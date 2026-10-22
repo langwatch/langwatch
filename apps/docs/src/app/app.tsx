@@ -19,7 +19,7 @@ import { docsTheme } from "./theme-config.ts";
 
 import "./docs.css";
 
-/** Every recipe, for the prerender; browser islands use `docsIslandSystem` instead. */
+/** Every recipe, for the prerender; each browser island selects its own (`island-theme.ts`). */
 const docsSystem = createDesignSystem(docsTheme);
 
 export type AppProps = {

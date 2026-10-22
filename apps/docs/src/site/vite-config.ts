@@ -9,9 +9,35 @@ import { docsPagesPlugin } from "../features/content/compile/pages-plugin.ts";
 import { docsNavPlugin } from "../features/navigation/compile/nav-plugin.ts";
 import { openapiPages } from "../features/navigation/compile/nav.ts";
 import { appRoot, docsRoot } from "../paths.ts";
+import { browserRuntimePlugin } from "./browser-runtime-plugin.ts";
 import { docsDevPlugin } from "./dev-server.ts";
 import { ISLAND_NAMES, ISLANDS } from "./document.ts";
 import { runtimePlugin } from "./runtime-plugin.ts";
+
+/* Chakra's and Ark's config helpers and component factories are identity or pure wrappers the
+   bundler cannot prove pure across modules, so an unused theme, recipe or part stayed in every
+   island. Getter-free reads drop theme objects built from other ones. */
+const CLIENT_TREESHAKE = {
+  propertyReadSideEffects: false,
+  /* The design system declares no `sideEffects`; its TypeScript modules only declare things. */
+  moduleSideEffects: (id: string) =>
+    /\/packages\/design-system\/src\/.*\.tsx?$/.test(id) ? false : undefined,
+  manualPureFunctions: [
+    ...["Config", "Recipe", "SlotRecipe", "Style", "Tokens", "SemanticTokens"].map(
+      (n) => `define${n}`,
+    ),
+    ...["GlobalStyles", "Keyframes", "TextStyles", "LayerStyles", "AnimationStyles"].map(
+      (n) => `define${n}`,
+    ),
+    "createAnatomy",
+    "withContext",
+    "withProvider",
+    "withRootProvider",
+    "withPropsProvider",
+    "forwardRef",
+    "memo",
+  ],
+} as const;
 
 /** The one Vite configuration: dev server, client build and the prerender (SSR) build. */
 export function createViteConfig({
@@ -27,6 +53,7 @@ export function createViteConfig({
     define: { __DOCS_BASE_PATH__: JSON.stringify(basePath) },
     publicDir: "public",
     plugins: [
+      browserRuntimePlugin(),
       runtimePlugin(),
       docsNavPlugin({ docsRoot: sourceRoot }),
       docsOpenapiPlugin({ docsRoot: sourceRoot, openapiBySlug }),
@@ -65,6 +92,7 @@ export function createViteConfig({
       emptyOutDir: true,
       manifest: true,
       rollupOptions: {
+        treeshake: CLIENT_TREESHAKE,
         input: {
           index: path.join(appRoot, "index.html"),
           ...Object.fromEntries(

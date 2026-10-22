@@ -1,11 +1,12 @@
-import { CommandBarSurface } from "@langwatch/design-system/app-shell";
 import { DialogTitle } from "@langwatch/design-system/dialog";
 import { SystemProvider } from "@langwatch/design-system/system-provider";
 import { createRoot } from "react-dom/client";
 
-import { docsIslandSystem } from "../../../app/island-theme.ts";
+import { docsSearchSystem } from "../../../app/island-theme.ts";
 import { SearchContent } from "./search-content.tsx";
+import { SearchFallback } from "./search-fallback.tsx";
 import { currentBuild, loadSearchIndex } from "./search-index-store.ts";
+import { SearchSurface } from "./search-surface.tsx";
 
 /* The index starts downloading as soon as the island runs, before the dialog first renders. */
 loadSearchIndex({ build: currentBuild() }).catch(() => {});
@@ -25,11 +26,13 @@ function openSearch() {
   open = true;
   opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   root.render(
-    <SystemProvider system={docsIslandSystem}>
-      <CommandBarSurface open onClose={closeSearch} maxWidth="680px" topMargin="12vh">
+    <SystemProvider system={docsSearchSystem}>
+      <SearchSurface onClose={closeSearch}>
         <DialogTitle className="docs-sr-only">Search the LangWatch docs</DialogTitle>
-        <SearchContent close={closeSearch} />
-      </CommandBarSurface>
+        <SearchFallback>
+          <SearchContent close={closeSearch} />
+        </SearchFallback>
+      </SearchSurface>
     </SystemProvider>,
   );
 }

@@ -5,6 +5,7 @@ import { it } from "node:test";
 import { parseArgs } from "node:util";
 
 import { withPreviewBrowser } from "./browser-fixture.mjs";
+import { INTERACTION_BUDGETS, interactionSizes, readManifest } from "./interaction-sizes.mjs";
 
 const { values } = parseArgs({ options: { "out-dir": { type: "string" } } });
 const outDir = path.resolve(values["out-dir"] ?? "dist");
@@ -639,4 +640,12 @@ await it("follows a dark colour scheme without JavaScript and costs scripted rea
       }
     },
   });
+});
+
+/** @scenario "Answer a first click on search, a context menu or the playground on a small download" */
+await it("keeps each interactive island's first download within its budget", async () => {
+  const manifest = await readManifest({ directory: outDir });
+  const sizes = await interactionSizes({ directory: outDir, manifest });
+  for (const [field, limit] of Object.entries(INTERACTION_BUDGETS))
+    assert.ok(sizes[field] <= limit, `${field} is ${sizes[field]} gzip bytes, over ${limit}`);
 });

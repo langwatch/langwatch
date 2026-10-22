@@ -557,6 +557,9 @@ catalogs:
     posthog-node:
       specifier: ^5.39.4
       version: 5.48.1
+    preact:
+      specifier: 11.0.1
+      version: 11.0.1
     prisma:
       specifier: 7.10.0
       version: 7.10.0
@@ -1255,6 +1258,9 @@ importers:
       playwright:
         specifier: 'catalog:'
         version: 1.63.0
+      preact:
+        specifier: 'catalog:'
+        version: 11.0.1
       rehype-slug:
         specifier: 'catalog:'
         version: 6.0.0
@@ -28272,6 +28278,14 @@ packages:
       preact-render-to-string:
         optional: true
 
+  preact@11.0.1:
+    resolution: {integrity: sha512-TNNwEq++jYNHy747LziCjPRVgEwnLSOIOAw/oYcjI3Tdnubx2EXtt76I0an8PATvUWtx/DX1kFIg1eFN+O/fkw==}
+    peerDependencies:
+      preact-render-to-string: '>=6.7.0'
+    peerDependenciesMeta:
+      preact-render-to-string:
+        optional: true
+
   prelude-ls@1.2.1:
     resolution: {integrity: sha512-vkcDPrRZo1QZLbn5RLGPpg/WmIQ65qoWWhcGKf/b5eplkkarX0m9z8ppCat4mlOqUsWpyNuYgO3VRyrYHSzX5g==}
     engines: {node: '>= 0.8.0'}
@@ -41082,6 +41096,8 @@ snapshots:
   pprof-format@2.3.1: {}
 
   preact@10.29.8: {}
+
+  preact@11.0.1: {}
 
   prelude-ls@1.2.1: {}
 

@@ -1,7 +1,7 @@
 import { SystemProvider } from "@langwatch/design-system/system-provider";
 import { createRoot } from "react-dom/client";
 
-import { docsIslandSystem } from "../../../app/island-theme.ts";
+import { docsMenuSystem } from "../../../app/island-theme.ts";
 import { contextualOptions } from "../../navigation/model/nav.ts";
 import { PageMenu } from "../ui/page-menu.tsx";
 import { ThemeMenu } from "../ui/theme-menu.tsx";
@@ -18,7 +18,7 @@ document.addEventListener("click", (event) => {
   roots.set(container, root);
   container.dataset.mounted = "true";
   root.render(
-    <SystemProvider system={docsIslandSystem}>
+    <SystemProvider system={docsMenuSystem}>
       {container.dataset.docsMenuRoot === "theme" ? (
         <ThemeMenu initialOpen />
       ) : (

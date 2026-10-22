@@ -50,6 +50,7 @@
     "mermaid": "catalog:",
     "oxc-transform-react": "catalog:",
     "playwright": "catalog:",
+    "preact": "catalog:",
     "rehype-slug": "catalog:",
     "remark-frontmatter": "catalog:",
     "remark-gfm": "catalog:",

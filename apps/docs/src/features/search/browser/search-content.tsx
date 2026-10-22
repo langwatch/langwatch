@@ -6,7 +6,7 @@ import {
 } from "@langwatch/design-system/app-shell";
 import { Box, Button, Text } from "@langwatch/design-system/primitives";
 import { ArrowUpRight, FileText, Hash, Zap } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
 
 import { pagePath } from "../../../lib/site-path.ts";
@@ -74,7 +74,9 @@ export function SearchContent({ close }: { close: () => void }) {
   useEffect(() => {
     input.current?.focus();
   }, []);
-  useEffect(() => {
+  /* A layout effect, so the active option is announced in the same frame as the key press;
+     Preact runs plain effects a frame later than React does for a discrete event. */
+  useLayoutEffect(() => {
     input.current?.setAttribute(
       "aria-activedescendant",
       rows.length ? `docs-command-${selected}` : "",

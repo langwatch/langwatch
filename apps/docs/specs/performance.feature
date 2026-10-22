@@ -46,6 +46,13 @@ Feature: Static documentation with progressive interaction
     But any other query string, another build's index or extra parameters beside v bypass the worker
     And at most one search index is ever cached
 
+  @integration
+  Scenario: Explain a search that fails to render
+    Given the search dialog is open
+    When rendering the results fails
+    Then the dialog says search stopped working and how to carry on
+    And the rest of the page keeps working
+
   @unit
   Scenario: Reuse the parsed search index and retry a failed load
     Given search loaded the index for the current build
@@ -144,6 +151,16 @@ Feature: Static documentation with progressive interaction
     When a reader opens a guide with an accordion
     Then its content expands with keyboard activation
     And it collapses again without loading a page renderer
+
+  @e2e
+  Scenario: Answer a first click on search, a context menu or the playground on a small download
+    Given the islands render on a React compatible runtime a tenth of React's size
+    And each island loads only the theme recipes it renders
+    When a reader first opens search, a page or theme menu, or the API playground
+    Then search downloads at most 85,500 gzip bytes of script before it answers
+    And a context menu downloads at most 95,000
+    And the playground downloads at most 24,500
+    And the page itself still loads under 3,000 gzip bytes of script before any interaction
 
   @e2e
   Scenario: Use the shared command surface
