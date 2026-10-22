@@ -25,6 +25,18 @@ type Input struct {
 	Password          string `env:"CLICKHOUSE_PASSWORD" validate:"required"`
 	ClusterSecretFile string `env:"CLICKHOUSE_CLUSTER_SECRET_FILE"` // path to mounted cluster secret
 
+	// Read from ClusterSecretFile by Load: ClickHouse has no from_file substitution.
+	ClusterSecret string
+
+	// Interserver HTTP credentials (replica part fetches); rendered only when
+	// the password file is set. InterserverPassword is read from it by Load.
+	InterserverUser         string `env:"CLICKHOUSE_INTERSERVER_USER" default:"interserver"`
+	InterserverPasswordFile string `env:"CLICKHOUSE_INTERSERVER_PASSWORD_FILE"`
+	InterserverPassword     string
+
+	// nil means true: default gets access_management and named_collection_control.
+	DefaultUserAccessManagement *bool `env:"DEFAULT_USER_ACCESS_MANAGEMENT"`
+
 	// Backups — independent of cold storage, uses same S3-compatible credentials
 	BackupEnabled bool `env:"BACKUP_ENABLED"`
 
@@ -45,6 +57,7 @@ type Input struct {
 	// Logging
 	LogLevel         string `env:"LOG_LEVEL" default:"warning" validate:"oneof=trace debug information warning error"`
 	LogFormat        string `env:"LOG_FORMAT" default:"json"   validate:"oneof=json plain"`
+	LogToFile        bool   `env:"LOG_TO_FILE"` // false: console only, no server log files
 	SystemLogTTLDays int    `env:"SYSTEM_LOG_TTL_DAYS" default:"30"`
 
 	// System logs — each log has enable + TTL + optional flush settings
@@ -144,5 +157,42 @@ func Load() (*Input, error) {
 		i.Password = strings.TrimSpace(string(data))
 	}
 
+	for _, f := range []struct {
+		env, path string
+		dst       *string
+	}{
+		{"CLICKHOUSE_CLUSTER_SECRET_FILE", i.ClusterSecretFile, &i.ClusterSecret},
+		{"CLICKHOUSE_INTERSERVER_PASSWORD_FILE", i.InterserverPasswordFile, &i.InterserverPassword},
+	} {
+		if f.path == "" {
+			continue
+		}
+		secret, err := readSecretFile(f.path)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", f.env, err)
+		}
+		*f.dst = secret
+	}
+
 	return i, nil
+}
+
+// GrantsDefaultAccessManagement reports whether ch-config grants the default
+// user access_management and named_collection_control (unset means yes).
+func (i *Input) GrantsDefaultAccessManagement() bool {
+	return i.DefaultUserAccessManagement == nil || *i.DefaultUserAccessManagement
+}
+
+// readSecretFile returns the trimmed content of a mounted secret, refusing an
+// empty one: an empty credential would render as no credential at all.
+func readSecretFile(path string) (string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	secret := strings.TrimSpace(string(data))
+	if secret == "" {
+		return "", fmt.Errorf("%s is empty", path)
+	}
+	return secret, nil
 }

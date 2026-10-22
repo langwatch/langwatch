@@ -1,5 +1,12 @@
 package config
 
+import (
+	"os"
+	"strconv"
+
+	"go.uber.org/zap"
+)
+
 const (
 	gb1  int64 = 1 << 30
 	gb4  int64 = 4 << 30
@@ -71,6 +78,12 @@ type Computed struct {
 	PoolFreeEntryLowerMerge        int   `env:"NUMBER_OF_FREE_ENTRIES_IN_POOL_TO_LOWER_MAX_SIZE_OF_MERGE"`
 	PoolFreeEntryOptimizePartition int   `env:"NUMBER_OF_FREE_ENTRIES_IN_POOL_TO_EXECUTE_OPTIMIZE_ENTIRE_PARTITION"`
 
+	// SELECTs' own ceiling inside max_concurrent_queries; 0 = no separate cap.
+	MaxConcurrentSelectQueries int `env:"MAX_CONCURRENT_SELECT_QUERIES"`
+
+	// Byte cap on one merge block; 0 leaves the ClickHouse default.
+	MergeMaxBlockSizeBytes int64 `env:"MERGE_MAX_BLOCK_SIZE_BYTES"`
+
 	// Async Insert
 	AsyncInsertEnabled       int `env:"ASYNC_INSERT_ENABLED"`
 	AsyncInsertWait          int `env:"ASYNC_INSERT_WAIT"`
@@ -79,6 +92,11 @@ type Computed struct {
 
 	// Insert performance
 	OptimizeOnInsert int `env:"OPTIMIZE_ON_INSERT"`
+
+	// Default profile: inter-server compression and abandoned HTTP reads.
+	NetworkCompressionMethod               string `env:"NETWORK_COMPRESSION_METHOD"`
+	NetworkZstdCompressionLevel            int    `env:"NETWORK_ZSTD_COMPRESSION_LEVEL"`
+	CancelHTTPReadonlyQueriesOnClientClose int    `env:"CANCEL_HTTP_READONLY_QUERIES_ON_CLIENT_CLOSE"`
 
 	// Query limits
 	MaxExecutionTime    int    `env:"MAX_EXECUTION_TIME"`
@@ -155,9 +173,7 @@ func ComputeFromResources(cpu int, ramBytes int64, input *Input) *Computed {
 	c.MergeWithTTLTimeout = 86400
 	c.MergeSelectingSleepMs = 1000
 
-	c.PoolFreeEntryMutation = max(1, c.BackgroundPoolSize/2)
-	c.PoolFreeEntryLowerMerge = max(1, c.BackgroundPoolSize/4)
-	c.PoolFreeEntryOptimizePartition = max(1, c.BackgroundPoolSize/2)
+	derivePoolFreeEntries(c)
 
 	if ramBytes <= smallPodRAM {
 		c.ConcurrencyRatio = 1 // at most background_pool_size merges at once
@@ -171,6 +187,11 @@ func ComputeFromResources(cpu int, ramBytes int64, input *Input) *Computed {
 
 	// --- Insert performance ---
 	c.OptimizeOnInsert = 0
+
+	// --- Default profile (constants) ---
+	c.NetworkCompressionMethod = "zstd"
+	c.NetworkZstdCompressionLevel = 3
+	c.CancelHTTPReadonlyQueriesOnClientClose = 1
 
 	// --- Query limits (from input, passthrough) ---
 	if input != nil {
@@ -192,6 +213,45 @@ func ComputeFromResources(cpu int, ramBytes int64, input *Input) *Computed {
 	}
 
 	return c
+}
+
+// Env names of the pool-entry thresholds; an explicit value wins over derivation.
+const (
+	envPoolFreeEntryMutation          = "NUMBER_OF_FREE_ENTRIES_IN_POOL_TO_EXECUTE_MUTATION"
+	envPoolFreeEntryLowerMerge        = "NUMBER_OF_FREE_ENTRIES_IN_POOL_TO_LOWER_MAX_SIZE_OF_MERGE"
+	envPoolFreeEntryOptimizePartition = "NUMBER_OF_FREE_ENTRIES_IN_POOL_TO_EXECUTE_OPTIMIZE_ENTIRE_PARTITION"
+)
+
+// derivePoolFreeEntries sets the pool-entry thresholds from BackgroundPoolSize.
+func derivePoolFreeEntries(c *Computed) {
+	c.PoolFreeEntryMutation = max(1, c.BackgroundPoolSize/2)
+	c.PoolFreeEntryLowerMerge = max(1, c.BackgroundPoolSize/4)
+	c.PoolFreeEntryOptimizePartition = max(1, c.BackgroundPoolSize/2)
+}
+
+// ApplyOverrides applies env overrides to c, then re-derives each pool-entry
+// threshold not set explicitly from the effective background_pool_size, so a
+// BACKGROUND_POOL_SIZE override moves them too.
+func ApplyOverrides(log *zap.Logger, c *Computed) {
+	ApplyEnvOverrides(log, c)
+	derived := *c
+	derivePoolFreeEntries(&derived)
+	for _, f := range []struct {
+		env string
+		dst *int
+		val int
+	}{
+		{envPoolFreeEntryMutation, &c.PoolFreeEntryMutation, derived.PoolFreeEntryMutation},
+		{envPoolFreeEntryLowerMerge, &c.PoolFreeEntryLowerMerge, derived.PoolFreeEntryLowerMerge},
+		{envPoolFreeEntryOptimizePartition, &c.PoolFreeEntryOptimizePartition, derived.PoolFreeEntryOptimizePartition},
+	} {
+		if raw, set := os.LookupEnv(f.env); set {
+			if _, err := strconv.Atoi(raw); err == nil {
+				continue
+			}
+		}
+		*f.dst = f.val
+	}
 }
 
 // applySmallPodBudget bounds the caches ClickHouse otherwise sizes at up to

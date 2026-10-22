@@ -1,7 +1,9 @@
 package render
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 
@@ -39,7 +41,7 @@ func RenderAll(log *zap.Logger, input *config.Input, computed *config.Computed, 
 		}
 	}
 
-	config.ApplyEnvOverrides(log, computed)
+	config.ApplyOverrides(log, computed)
 
 	// Core config files (ordered slice for deterministic rendering).
 	type step struct {
@@ -53,7 +55,6 @@ func RenderAll(log *zap.Logger, input *config.Input, computed *config.Computed, 
 		{"logging", func() error { return renderLogging(input, configD) }},
 		{"network", func() error { return renderNetwork(computed, configD) }},
 		{"custom-settings-prefixes", func() error { return renderCustomSettingsPrefixes(configD) }},
-		{"access-management", func() error { return renderAccessManagement(usersD) }},
 		{"access-control", func() error { return renderAccessControl(input, configD) }},
 	} {
 		if err := s.fn(); err != nil {
@@ -61,39 +62,44 @@ func RenderAll(log *zap.Logger, input *config.Input, computed *config.Computed, 
 		}
 	}
 
-	// Replicated mode: zookeeper client, macros and remote_servers for the
-	// ReplicatedMergeTree engine. The server writes NO keeper-backed access or
-	// named-collection store: the app owns the LangWatchQL access model, and on
-	// chart-managed ClickHouse (which this replicated topology is) the chart
-	// DELIVERS it as rendered users.d/config.d files mounted on every pod, not
-	// via SQL DDL — DDL is the bring-your-own path only (issue #8258). Either
-	// way the renderer never has to accept SQL-created entities into a replicated
-	// directory. That deletes the AC8 defect class outright — no
-	// `user_directories` merge hazard, no startup-fatal keeper-backed
-	// named-collection dependency — instead of patching it.
-	if input.Replicated {
-		if err := renderKeeper(input, configD); err != nil {
-			return fmt.Errorf("keeper: %w", err)
+	// Conditional files: rendered when enabled, otherwise a copy left by an
+	// earlier run is removed. Only these names, never anything else in the
+	// directories: a deployment may mount its own files there.
+	for _, s := range []struct {
+		name    string
+		path    string
+		enabled bool
+		fn      func() error
+	}{
+		{"access-management", filepath.Join(usersD, accessManagementFile), input.GrantsDefaultAccessManagement(),
+			func() error { return renderAccessManagement(usersD) }},
+		// No keeper-backed access or named-collection store: the app owns the
+		// LangWatchQL access model (issue #8258).
+		{"keeper", filepath.Join(configD, "keeper.yaml"), input.Replicated,
+			func() error { return renderKeeper(input, configD) }},
+		{"interserver", filepath.Join(configD, "interserver.yaml"), input.InterserverPasswordFile != "",
+			func() error { return renderInterserver(input, configD) }},
+		{"prometheus", filepath.Join(configD, "prometheus.yaml"), input.EnablePrometheus,
+			func() error { return renderPrometheus(configD) }},
+		{"storage", filepath.Join(configD, "storage.yaml"), input.ColdEnabled || input.BackupEnabled,
+			func() error { return renderStorage(input, computed, configD) }},
+	} {
+		if !s.enabled {
+			if err := os.Remove(s.path); err != nil && !errors.Is(err, fs.ErrNotExist) {
+				return fmt.Errorf("%s: remove stale %s: %w", s.name, s.path, err)
+			}
+			continue
+		}
+		if err := s.fn(); err != nil {
+			return fmt.Errorf("%s: %w", s.name, err)
 		}
 	}
 
-	if input.EnablePrometheus {
-		if err := renderPrometheus(configD); err != nil {
-			return fmt.Errorf("prometheus: %w", err)
-		}
+	if input.ColdEnabled {
+		log.Info("cold storage configured")
 	}
-
-	// Object storage (cold tiering and/or backups).
-	if input.ColdEnabled || input.BackupEnabled {
-		if err := renderStorage(input, computed, configD); err != nil {
-			return fmt.Errorf("storage: %w", err)
-		}
-		if input.ColdEnabled {
-			log.Info("cold storage configured")
-		}
-		if input.BackupEnabled {
-			log.Info("backups configured")
-		}
+	if input.BackupEnabled {
+		log.Info("backups configured")
 	}
 
 	log.Info("configuration rendered", zap.String("dir", outputDir))

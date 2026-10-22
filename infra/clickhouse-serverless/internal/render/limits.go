@@ -23,6 +23,7 @@ type mergeTreeConfig struct {
 	FreeEntriesMutation               int   `yaml:"number_of_free_entries_in_pool_to_execute_mutation"`
 	FreeEntriesLowerMerge             int   `yaml:"number_of_free_entries_in_pool_to_lower_max_size_of_merge"`
 	FreeEntriesOptimize               int   `yaml:"number_of_free_entries_in_pool_to_execute_optimize_entire_partition"`
+	MergeMaxBlockSizeBytes            int64 `yaml:"merge_max_block_size_bytes,omitempty"`
 
 	// On-disk format pins that keep parts readable by 25.x, so an install
 	// that upgraded to 26.8 can still roll back to an older image. Lifting
@@ -66,6 +67,7 @@ func renderLimits(input *config.Input, c *config.Computed, configD string) error
 			FreeEntriesMutation:               c.PoolFreeEntryMutation,
 			FreeEntriesLowerMerge:             c.PoolFreeEntryLowerMerge,
 			FreeEntriesOptimize:               c.PoolFreeEntryOptimizePartition,
+			MergeMaxBlockSizeBytes:            c.MergeMaxBlockSizeBytes,
 
 			PropagateTypesSerializationVersionsToNestedTypes: 0,
 			EscapeIndexFilenames:                             0,
@@ -80,6 +82,7 @@ func renderLimits(input *config.Input, c *config.Computed, configD string) error
 		"max_server_memory_usage":                       c.MaxServerMemoryUsage,
 		"max_server_memory_usage_to_ram_ratio":          c.MaxServerMemoryRatio,
 		"max_concurrent_queries":                        c.MaxConcurrentQueries,
+		"max_concurrent_select_queries":                 c.MaxConcurrentSelectQueries,
 		"uncompressed_cache_size":                       c.UncompressedCacheSize,
 		"background_pool_size":                          c.BackgroundPoolSize,
 		"background_merges_mutations_concurrency_ratio": c.ConcurrencyRatio,

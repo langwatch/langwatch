@@ -23,6 +23,29 @@ CPU and RAM are auto-detected from cgroups. Override with `CH_CPU` and `CH_RAM` 
 | `S3_ACCESS_KEY` / `S3_SECRET_KEY` | —            | Static credentials (or use `USE_ENVIRONMENT_CREDENTIALS=true` for IRSA)                                                                                                                                                                                                                                                                                                                                                                                                    |
 | `CH_REPLICATED`                   | `false`      | Enable Keeper-coordinated ReplicatedMergeTree replication (requires keeper + data node env vars). Keeper replicates table data only — the LangWatchQL access model (users, profiles, row policies) is never stored in Keeper: on chart-managed ClickHouse it is delivered to every pod as rendered `users.d`/`config.d` files, and on bring-your-own ClickHouse the app provisions it via SQL; see [ADR-159](../../dev/docs/adr/159-the-app-owns-the-lwql-access-model.md) |
 
+Settings with a fixed default rather than one computed from CPU + RAM:
+
+| Variable                                       | Default       | Description                                                                                                                         |
+| ---------------------------------------------- | ------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `CLICKHOUSE_CLUSTER_SECRET_FILE`               | —             | File holding the `remote_servers` cluster secret (replicated mode). Read by `ch-config`; ClickHouse has no `from_file` substitution |
+| `CLICKHOUSE_INTERSERVER_PASSWORD_FILE`         | —             | File holding the interserver HTTP password. When set, `interserver_http_credentials` is rendered                                    |
+| `CLICKHOUSE_INTERSERVER_USER`                  | `interserver` | Interserver HTTP user, used only with `CLICKHOUSE_INTERSERVER_PASSWORD_FILE`                                                        |
+| `DEFAULT_USER_ACCESS_MANAGEMENT`               | `true`        | `false` leaves the `default` user without `access_management` and `named_collection_control` from `ch-config`                       |
+| `LOG_TO_FILE`                                  | `false`       | `false` removes the server's file loggers, so it logs to the console only                                                           |
+| `MERGE_MAX_BLOCK_SIZE_BYTES`                   | `0`           | `merge_tree.merge_max_block_size_bytes`; `0` leaves the ClickHouse default                                                          |
+| `MAX_CONCURRENT_SELECT_QUERIES`                | `0`           | SELECTs' own admission cap inside `max_concurrent_queries`; `0` means none                                                          |
+| `NETWORK_COMPRESSION_METHOD`                   | `zstd`        | Default profile `network_compression_method`                                                                                        |
+| `NETWORK_ZSTD_COMPRESSION_LEVEL`               | `3`           | Default profile `network_zstd_compression_level`                                                                                    |
+| `CANCEL_HTTP_READONLY_QUERIES_ON_CLIENT_CLOSE` | `1`           | Default profile; `0` keeps running a read whose HTTP client has gone                                                                |
+
+The `NUMBER_OF_FREE_ENTRIES_IN_POOL_TO_*` thresholds are derived from the
+effective `background_pool_size`, including a `BACKGROUND_POOL_SIZE` override;
+each one set explicitly wins.
+
+`ch-config` only writes, and removes when disabled, the files it renders itself.
+Any other file in `config.d/` or `users.d/` (for example a Kubernetes `subPath`
+mount) is left alone, so a deployment can layer its own settings on top.
+
 All other parameters (memory limits, pool sizes, merge settings, logging, network) are computed from CPU + RAM. See `internal/config/config.go` for the full list of overridable env vars.
 
 For Kubernetes deployment with the [Helm chart](../../charts/clickhouse-serverless/), most of this is handled automatically via `values.yaml`.
@@ -49,7 +72,8 @@ per-query tenant capability rides on, and `access-control.yaml` sets
 `access_control_improvements.settings_constraints_replace_previous` to `true`
 (without it, ClickHouse rejects the `<database>_profile` settings profile's
 `CHANGEABLE_IN_READONLY` constraint on `custom_api_key_hash`). The image also
-grants its `default` user `access_management` + `named_collection_control` — the
+grants its `default` user `access_management` + `named_collection_control`
+(unless `DEFAULT_USER_ACCESS_MANAGEMENT=false`) — the
 right to create users, profiles, row policies and named collections through SQL,
 which **only `sql` mode uses**; rendered delivery runs no access DDL. See
 `internal/render/access.go`.

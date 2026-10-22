@@ -145,6 +145,7 @@ func replicatedInput() *config.Input {
 	input.DataNodes = "ch-0.ch-headless,ch-1.ch-headless,ch-2.ch-headless"
 	input.DataNodePort = 9000
 	input.ClusterSecretFile = "/mnt/secrets/cluster-secret"
+	input.ClusterSecret = "cluster-secret-value"
 	return input
 }
 
@@ -171,12 +172,15 @@ func TestRenderAll_KeeperWrittenForReplicated(t *testing.T) {
 		"shard_01",
 		"node-0",
 		"internal_replication: true",
-		"from_file",
-		"/mnt/secrets/cluster-secret",
+		"secret: cluster-secret-value",
 	} {
 		if !strings.Contains(content, want) {
 			t.Errorf("keeper.yaml missing %q\n--- actual content ---\n%s", want, content)
 		}
+	}
+	// ClickHouse has no from_file substitution; the attribute would leave the secret empty.
+	if strings.Contains(content, "from_file") {
+		t.Errorf("keeper.yaml must carry the secret value, not a from_file attribute\n%s", content)
 	}
 }
 
