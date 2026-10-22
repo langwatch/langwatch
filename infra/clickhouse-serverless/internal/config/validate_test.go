@@ -6,7 +6,7 @@ import (
 )
 
 func validInput() *Input {
-	return &Input{
+	i := &Input{
 		CPU:                 2,
 		RAMBytes:            4 << 30,
 		Password:            "testpass",
@@ -14,6 +14,8 @@ func validInput() *Input {
 		LogFormat:           "json",
 		GroupByOverflowMode: "throw",
 	}
+	i.ReadTierMaxExecutionTime = 300
+	return i
 }
 
 func TestValidate_ValidInput(t *testing.T) {

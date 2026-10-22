@@ -18,7 +18,7 @@ import (
 const gb1 int64 = 1 << 30
 
 func testInput() *config.Input {
-	return &config.Input{
+	i := &config.Input{
 		CPU:                  4,
 		RAMBytes:             16 * gb1,
 		Replicated:           false,
@@ -60,6 +60,8 @@ func testInput() *config.Input {
 		MetricLogCollectMs:   10000,
 		TextLogLevel:         "warning",
 	}
+	i.ReadTierMaxExecutionTime = 300
+	return i
 }
 
 func testLogger() *zap.Logger {
