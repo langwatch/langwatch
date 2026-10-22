@@ -10,8 +10,8 @@
 # Who may braid: braids:manage on the owner and traces:view on the reader. Project roles come
 # from teams, so a team admin holds braids:manage on every project in that team (ADR-183 §2).
 #
-# A scenario still tagged @unimplemented is not built yet; it names the level its binding
-# is expected at, and the change that builds it binds it.
+# A scenario still tagged @unimplemented is not bound whole yet; it names the level its binding
+# is expected at, and the note above it says which test is still missing.
 
 @authz @grants @braids
 Feature: Braids
@@ -27,7 +27,7 @@ Feature: Braids
 
   Rule: A braid is a shared grant from the owner project to the reader project
 
-    @integration @unimplemented
+    @integration
     Scenario: Creating a braid attaches a span read from the owner to the reader
       When ana braids "specialists" into "orchestrator" with the condition attributes["orchestrator"] == "web"
       Then the ledger holds a live project-reader grant whose principal is "orchestrator" and whose scope is "specialists"
@@ -41,7 +41,7 @@ Feature: Braids
       And the same grant with a where but no compiled form is refused
       And a trace condition carrying a where is still refused
 
-    @integration @unimplemented
+    @integration
     Scenario: Braids need the Enterprise plan
       Given an organisation below Enterprise
       When ana asks to create or change a braid
@@ -74,13 +74,13 @@ Feature: Braids
       Then the second braid is refused with braid_already_exists
       And the live braid is unchanged
 
-    @integration @unimplemented
+    @integration
     Scenario: Two admins making the same braid at once leave one braid
       When ana and another organisation admin each ask for the same braid from "specialists" into "orchestrator" at the same moment
       Then exactly one of the two is live
       And the other request is refused with braid_already_exists
 
-    @unit @unimplemented
+    @unit
     Scenario: Braids do not chain
       Given a live braid from "specialists" into "orchestrator"
       And a live braid from "orchestrator" into a third project "frontdesk"
@@ -89,13 +89,13 @@ Feature: Braids
 
   Rule: Whoever holds braids:manage on the owner and can read the reader may braid
 
-    @integration @unimplemented
+    @integration
     Scenario: A member may not create, change or remove a braid
       When sam, who may create public share links, asks to braid "specialists" into "orchestrator"
       Then the braid is refused as a permission denial
       And no grant is attached
 
-    @integration @unimplemented
+    @integration
     Scenario: A project's admin may braid out of it into a project they can read
       Given tom is an admin of the team holding "specialists" and a viewer of "orchestrator"
       When tom braids "specialists" into "orchestrator"
@@ -109,7 +109,7 @@ Feature: Braids
       Then tom holds braids:manage on "specialists" and on "billing"
       And on no project of another team
 
-    @integration @unimplemented
+    @integration
     Scenario: Nobody braids into a project they cannot read
       Given tom is an admin of the team holding "specialists" and cannot read "orchestrator" traces
       When tom asks to braid "specialists" into "orchestrator"
@@ -129,7 +129,7 @@ Feature: Braids
       When rui asks to braid "specialists" into "orchestrator"
       Then the braid is refused as beyond the caller's permissions
 
-    @integration @unimplemented
+    @integration
     Scenario: Either project's admins may remove a braid
       Given a live braid from "specialists" into "orchestrator"
       And olu is an admin of the team holding "orchestrator" with no role on "specialists"
@@ -153,7 +153,7 @@ Feature: Braids
       When tom's permissions are read
       Then tom holds braids:manage on "specialists"
 
-    @integration @unimplemented
+    @integration
     Scenario: With braids kept to organisation admins, a team admin may not braid
       Given the organisation keeps braids to its admins
       And tom is an admin of the team holding "specialists" and a viewer of "orchestrator"
@@ -161,20 +161,20 @@ Feature: Braids
       Then the braid is refused as a permission denial
       And ana's request for the same braid is accepted
 
-    @integration @unimplemented
+    @integration
     Scenario: Keeping braids to organisation admins leaves live braids in place
       Given a live braid from "specialists" into "orchestrator" that tom created
       When ana keeps braids to the organisation's admins
       Then the braid stays live
       And within thirty seconds tom may no longer change or remove it
 
-    @integration @unimplemented
+    @integration
     Scenario: Only an organisation admin may change who can braid
       When tom asks to keep braids to the organisation's admins
       Then the change is refused as a permission denial
       And ana's change is accepted and in the audit log
 
-    @integration @unimplemented
+    @integration
     Scenario: Changing who can braid needs the Enterprise plan
       Given an organisation below Enterprise
       When ana asks to keep braids to the organisation's admins
@@ -213,12 +213,16 @@ Feature: Braids
         | attributes["a"] == ""                                           | an empty string          |
         | attributes["orchestrator"] matches "w.*"                        | the operator matches     |
 
+    # Unimplemented: the proof is bound (an unconditioned span window); no fence or trace-read test
+    # yet shows every owner span of the reader's trace read through a braid with no condition.
     @unit @unimplemented
     Scenario: A braid with no condition braids every owner span in the reader's traces
       When ana saves a braid from "specialists" into "orchestrator" with no condition
       Then the braid is accepted
       And every "specialists" span sharing a trace id with an "orchestrator" trace is braided
 
+    # Unimplemented until the fence's cache-key test ("when the cache key is taken") names this
+    # scenario; the stored version and the read scope key are bound in modules/authz.
     @unit @unimplemented
     Scenario: A compiled condition carries the compiler's version
       When ana saves a braid with a condition
@@ -231,6 +235,8 @@ Feature: Braids
       Then the braid is refused with braid_condition_too_large
       And the refusal says which limit it passed
 
+    # Unimplemented: the limit's refusal is unit-tested; no test yet runs the largest legal braided
+    # read against ClickHouse.
     @integration @unimplemented
     Scenario: A reader's distinct conditions fit in one statement
       Given "orchestrator" receives braids with the most distinct conditions a reader may hold
@@ -240,7 +246,7 @@ Feature: Braids
 
   Rule: Changing a braid replaces it, and removing one ends it
 
-    @integration @unimplemented
+    @integration
     Scenario: Changing a braid replaces it and names the braid it replaced
       Given a live braid from "specialists" into "orchestrator"
       When ana changes its condition
@@ -248,7 +254,7 @@ Feature: Braids
       And the new grant names the grant it replaces
       And the old braid is no longer live
 
-    @integration @unimplemented
+    @integration
     Scenario: Two people changing one braid at once leave one change
       Given a live braid from "specialists" into "orchestrator"
       When ana and another organisation admin each change its condition at the same moment
@@ -263,7 +269,7 @@ Feature: Braids
       Then the change is refused with braid_condition_unsupported
       And the live braid is unchanged
 
-    @integration @unimplemented
+    @integration
     Scenario: A change whose new grant cannot be attached leaves the braid as it was
       Given a live braid from "specialists" into "orchestrator"
       And attaching a grant fails
@@ -271,7 +277,7 @@ Feature: Braids
       Then the change reports failure
       And the old braid is still live with its old condition
 
-    @integration @unimplemented
+    @integration
     Scenario: A change whose old grant cannot be revoked reports failure and finishes when repeated
       Given a live braid from "specialists" into "orchestrator"
       And revoking a grant fails once
@@ -293,34 +299,36 @@ Feature: Braids
       Then the changed braid names the braid it replaced
       And the older braid names none
 
-    @integration @unimplemented
+    @integration
     Scenario: Removing and making a braid again within one second leaves one live braid
       Given a live braid from "specialists" into "orchestrator"
       When ana removes it and braids the same pair again within the same second
       Then the new braid is live under a grant id of its own
       And the removed braid stays removed
 
-    @integration @unimplemented
+    @integration
     Scenario: A removed braid stops showing within thirty seconds
       Given a live braid from "specialists" into "orchestrator"
       When ana removes the braid
       Then the grant is revoked with reason braid_removed
       And within thirty seconds no "orchestrator" trace shows a "specialists" span
 
-    @integration @unimplemented
+    @integration
     Scenario: A read holding its proof stops showing a removed braid within thirty seconds
       Given sam keeps a live view of an "orchestrator" trace holding braided "specialists" spans
       When ana removes the braid
       Then within thirty seconds the live view shows no "specialists" span
       And no proof carrying a braid is used after thirty seconds from its minting
 
-    @unit @unimplemented
+    @unit
     Scenario: A braid stops showing at its end date
       Given a braid from "specialists" into "orchestrator" that ends at a date
       When the date passes
       Then no "orchestrator" trace shows a "specialists" span
       And the braid is not recorded as removed
 
+    # Unimplemented until the trace read's data-window test names this scenario; the proof's side
+    # (the window's start, no end, still granted months later) is bound in modules/authz.
     @unit @unimplemented
     Scenario: "Data from" limits which spans show, not how long the reader sees them
       Given a braid whose data starts on 1 October and which never ends
@@ -328,6 +336,8 @@ Feature: Braids
       Then only the span from 2 October is braided
       And the braid keeps granting after 1 October
 
+    # Unimplemented until the trace read's data-window test names this scenario; the earlier start
+    # reaching the reader's proof is bound in modules/authz.
     @integration @unimplemented
     Scenario: A braid's data may start before the day it was made
       Given an "orchestrator" trace from last month holding matching "specialists" spans
@@ -337,14 +347,14 @@ Feature: Braids
 
   Rule: Both projects list the braid
 
-    @integration @unimplemented
+    @integration
     Scenario: The owner lists the braids out of it and the reader the braids into it
       Given a live braid from "specialists" into "orchestrator"
       When ana lists braids on "specialists"
       Then the braid is listed under the braids into other projects with its condition, window, end date and creator
       And listing braids on "orchestrator" shows the same braid under the braids from other projects
 
-    @integration @unimplemented
+    @integration
     Scenario: Members of either project may list the braids that touch it
       Given a live braid from "specialists" into "orchestrator"
       And sam is a member of "orchestrator" and not of "specialists"
@@ -395,7 +405,7 @@ Feature: Braids
 
   Rule: Every braid change and every read through a braid is audited
 
-    @integration @unimplemented
+    @integration
     Scenario: Creating, changing and removing a braid is in the audit log
       When ana creates, changes and then removes a braid
       Then the audit log holds an entry for the creation, two for the change and one for the removal
@@ -420,7 +430,7 @@ Feature: Braids
       When sam opens an "orchestrator" trace holding "specialists" spans
       Then the braided spans viewed entry is filed under "orchestrator"
 
-    @integration @unimplemented
+    @integration
     Scenario: Opening traces with braided spans is audited once per five minutes
       Given a live braid from "specialists" into "orchestrator"
       When sam opens three "orchestrator" traces holding "specialists" spans within five minutes
