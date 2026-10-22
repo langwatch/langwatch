@@ -58,6 +58,7 @@ function setup() {
 
 describe("AuthzBraidedReadAuditService", () => {
   describe("when sam opens three traces holding the same owner's spans within five minutes", () => {
+    /** @scenario "A read through a braid is filed under the reader project" */
     it("writes one row naming sam, the reader, the owner and the braid, and no span", async () => {
       const { service, rows, advance } = setup();
 
@@ -74,6 +75,7 @@ describe("AuthzBraidedReadAuditService", () => {
       expect(rows()[0]).toMatchObject({
         userId: "user_sam",
         organizationId: ORG,
+        projectId: READER,
         metadata: {
           actor: SAM,
           readerProjectId: READER,

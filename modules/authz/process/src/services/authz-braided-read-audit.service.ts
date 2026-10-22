@@ -99,6 +99,7 @@ export class AuthzBraidedReadAuditService {
       createdAt: Temporal.Instant.fromEpochMilliseconds(now),
       userId: actor.type === "user" ? actor.id : null,
       organizationId,
+      projectId: readerProjectId,
       action: BRAIDED_SPANS_VIEWED_ACTION,
       metadata: {
         actor: who,

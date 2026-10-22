@@ -1,7 +1,9 @@
 import { SYSTEM_ACTORS } from "@langwatch/authorization";
 import {
+  BRAID_AUDIT_TARGET_KIND,
   GRANT_ATTACHED_EVENT_TYPE,
   GRANT_REVOKED_EVENT_TYPE,
+  GRANT_SOURCE_BRAID,
   GRANT_ROLE_CHANGED_EVENT_TYPE,
   ROLE_DEFINED_EVENT_TYPE,
   ROLE_DELETED_EVENT_TYPE,
@@ -145,25 +147,60 @@ interface EventingAuthzAuditAdapterOptions {
   braids?: BraidReads;
 }
 
-/** A revoke names only the grant; a braid's entry also names both projects and the condition. */
-async function revokedBraidTerms({
+/**
+ * ADR-183 §8: a braid's entry is filed under the braid and its owner, so its audit link finds it.
+ * An attach says it is a braid's by its own source; a revoke names only the grant, so the braid
+ * is read back from authz's projection, which also gives the entry both projects and the condition.
+ */
+async function withBraidTerms({
+  row,
   event,
   braids,
 }: {
+  row: AuthzAuditRow;
   event: AuthzGrantsEvent;
   braids: BraidReads | undefined;
-}): Promise<Record<string, unknown>> {
-  if (event.type !== GRANT_REVOKED_EVENT_TYPE || !braids) return {};
+}): Promise<AuthzAuditRow> {
+  if (event.type === GRANT_ATTACHED_EVENT_TYPE) {
+    if (event.data.source !== GRANT_SOURCE_BRAID) return row;
+    return braidRow({ row, grantId: event.data.grantId, ownerProjectId: event.data.scope.id });
+  }
+  if (event.type !== GRANT_REVOKED_EVENT_TYPE || !braids) return row;
   const [braid] = await braids.findBraids({
     organizationId: event.tenantId,
     grantId: event.data.grantId,
     includeRevoked: true,
   });
-  if (!braid) return {};
+  if (!braid) return row;
+  return braidRow({
+    row,
+    grantId: event.data.grantId,
+    ownerProjectId: braid.ownerProjectId,
+    terms: {
+      principal: { type: "project", id: braid.readerProjectId },
+      scope: { type: "PROJECT", id: braid.ownerProjectId },
+      ...(braid.condition ? { condition: braid.condition } : {}),
+    },
+  });
+}
+
+function braidRow({
+  row,
+  grantId,
+  ownerProjectId,
+  terms = {},
+}: {
+  row: AuthzAuditRow;
+  grantId: string;
+  ownerProjectId: string;
+  terms?: Record<string, unknown>;
+}): AuthzAuditRow {
   return {
-    principal: { type: "project", id: braid.readerProjectId },
-    scope: { type: "PROJECT", id: braid.ownerProjectId },
-    ...(braid.condition ? { condition: braid.condition } : {}),
+    ...row,
+    projectId: ownerProjectId,
+    targetKind: BRAID_AUDIT_TARGET_KIND,
+    targetId: grantId,
+    metadata: { ...row.metadata, ...terms },
   };
 }
 
@@ -186,8 +223,8 @@ export class EventingAuthzAuditAdapter {
 
   async handler(event: AuthzGrantsEvent, _context?: TriggerContext<unknown>): Promise<void> {
     if (!isAuditable(event)) return;
-    const row = toRow(event);
-    const braid = await revokedBraidTerms({ event, braids: this.braids });
-    await this.store.insert({ ...row, metadata: { ...row.metadata, ...braid } });
+    await this.store.insert(
+      await withBraidTerms({ row: toRow(event), event, braids: this.braids }),
+    );
   }
 }

@@ -28,6 +28,7 @@ export function makeReader(
     findCustomRolePermissions: vi.fn().mockResolvedValue([]),
     findShareLinks: vi.fn().mockResolvedValue([]),
     findProjectLineage: vi.fn().mockResolvedValue(null),
+    findProjectLineages: vi.fn().mockResolvedValue(new Map()),
     findTeamOrganization: vi.fn().mockResolvedValue(null),
     findLiveSharedReads: vi.fn().mockResolvedValue([]),
   };

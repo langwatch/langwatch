@@ -5,7 +5,7 @@
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { AuthzMemoryStore } from "../../repositories/memory/authz-memory.store.ts";
 import { MemoryAuthzGrantProjectionRepository } from "../../repositories/memory/memory.authz-grant-projection.repository.ts";
@@ -22,7 +22,10 @@ const SPECIALISTS_TEAM = "team_specialists";
 const ORCHESTRATOR_TEAM = "team_orchestrator";
 const EPOCH = Temporal.Instant.fromEpochMilliseconds(0);
 
-function composeOver(memory: AuthzMemoryStore) {
+function composeOver(
+  memory: AuthzMemoryStore,
+  read: MemoryAuthzReadRepository = MemoryAuthzReadRepository.create({ memory }),
+) {
   return AuthzModule.create({
     dependencies: {},
     config: {
@@ -35,7 +38,7 @@ function composeOver(memory: AuthzMemoryStore) {
     secrets: createApiFixture<AuthzSetup["secrets"]>(),
     repositories: {
       ...MemoryAuthzRepositories.create(),
-      read: MemoryAuthzReadRepository.create({ memory }),
+      read,
     },
   });
 }
@@ -126,6 +129,27 @@ describe("AuthzApi.listBraidTargets", () => {
         { projectId: ORCHESTRATOR, selectable: true },
         { projectId: ROLLUP, selectable: false, reason: "aggregate" },
       ]);
+    });
+  });
+
+  describe("when many projects are asked about", () => {
+    /** @scenario "The picker decides every listed project for the viewer at once" */
+    it("reads every project's lineage, the braid's own included, in one call", async () => {
+      const memory = await organisation();
+      const read = MemoryAuthzReadRepository.create({ memory });
+      const batched = vi.spyOn(read, "findProjectLineages");
+      const single = vi.spyOn(read, "findProjectLineage");
+      const app = composeOver(memory, read);
+
+      await app.listBraidTargets({
+        projectId: SPECIALISTS,
+        projectIds: EVERY_PROJECT,
+        caller: { type: "user", id: "user_ana" },
+      });
+
+      expect(batched).toHaveBeenCalledTimes(1);
+      expect(batched).toHaveBeenCalledWith({ projectIds: [SPECIALISTS, ...EVERY_PROJECT] });
+      expect(single).not.toHaveBeenCalled();
     });
   });
 

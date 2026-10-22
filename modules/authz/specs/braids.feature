@@ -211,6 +211,7 @@ Feature: Braids
         | attributes["a"] != "x"                                          | != with a value          |
         | attributes["flag"] == true                                      | a comparison with true   |
         | attributes["a"] == ""                                           | an empty string          |
+        | attributes["orchestrator"] matches "w.*"                        | the operator matches     |
 
     @unit @unimplemented
     Scenario: A braid with no condition braids every owner span in the reader's traces
@@ -379,6 +380,7 @@ Feature: Braids
       When ana, an organisation admin, asks where a braid from "specialists" may go
       Then "orchestrator" may be picked
       And "specialists" is refused as the braid's own project and "rollup" as an aggregate
+      And every asked project's team and organisation come from one read, not one per project
 
     @unit
     Scenario: Projects whose traces the viewer cannot read are left out
@@ -399,6 +401,24 @@ Feature: Braids
       Then the audit log holds an entry for the creation, two for the change and one for the removal
       And the change's entries are a removal and a creation naming the braid it replaced
       And every entry names both projects and the condition
+
+    @unit
+    Scenario: A braid's audit entries are filed under the braid and its owner project
+      When ana creates, changes and then removes a braid from "specialists" into "orchestrator"
+      Then every entry names the braid it is about as its target and "specialists" as its project
+      And the change's creation names the braid it replaced
+      And so "View in audit log" on a braid finds its entries
+
+    @unit
+    Scenario: A shared read that is not a braid names no braid in the audit log
+      When an aggregate project's shared read of "specialists" is attached and later revoked
+      Then both entries are written exactly as any other grant's, naming no target and no project
+
+    @unit
+    Scenario: A read through a braid is filed under the reader project
+      Given a live braid from "specialists" into "orchestrator"
+      When sam opens an "orchestrator" trace holding "specialists" spans
+      Then the braided spans viewed entry is filed under "orchestrator"
 
     @integration @unimplemented
     Scenario: Opening traces with braided spans is audited once per five minutes

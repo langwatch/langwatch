@@ -1,6 +1,6 @@
 import type { AuthzBraidTargets, AuthzListBraidTargetsInput } from "@langwatch/authz-contract";
 
-import type { ScopeLineageRepository } from "../repositories/authz-read.repository.ts";
+import type { AuthzReadRepository } from "../repositories/authz-read.repository.ts";
 import type { AuthzService } from "./authz.service.ts";
 
 /**
@@ -9,7 +9,7 @@ import type { AuthzService } from "./authz.service.ts";
  */
 export class AuthzBraidTargetsService {
   static create(deps: {
-    lineage: Pick<ScopeLineageRepository, "findProjectLineage">;
+    lineage: Pick<AuthzReadRepository, "findProjectLineages">;
     decisions: Pick<AuthzService, "canBatchPermissionsByIds">;
   }): AuthzBraidTargetsService {
     return new AuthzBraidTargetsService(deps);
@@ -24,22 +24,21 @@ export class AuthzBraidTargetsService {
     projectIds,
     caller,
   }: AuthzListBraidTargetsInput): Promise<AuthzBraidTargets> {
-    const owner = await this.deps.lineage.findProjectLineage({ projectId });
-    if (!owner) return [];
     const asked = [...new Set(projectIds)];
-    const lineages = await Promise.all(
-      asked.map(async (id) => ({
-        projectId: id,
-        lineage: await this.deps.lineage.findProjectLineage({ projectId: id }),
-      })),
-    );
-    const candidates = lineages.flatMap(({ projectId: id, lineage }) =>
-      lineage &&
-      lineage.organizationId === owner.organizationId &&
-      lineage.kind !== "internal_governance"
+    // One lineage read for the braid's own project and every asked one.
+    const lineages = await this.deps.lineage.findProjectLineages({
+      projectIds: [projectId, ...asked],
+    });
+    const owner = lineages.get(projectId);
+    if (!owner) return [];
+    const candidates = asked.flatMap((id) => {
+      const lineage = lineages.get(id);
+      return lineage &&
+        lineage.organizationId === owner.organizationId &&
+        lineage.kind !== "internal_governance"
         ? [{ projectId: id, teamId: lineage.teamId, kind: lineage.kind }]
-        : [],
-    );
+        : [];
+    });
     if (candidates.length === 0) return [];
     const { byPermission } = await this.deps.decisions.canBatchPermissionsByIds({
       principal: caller,
