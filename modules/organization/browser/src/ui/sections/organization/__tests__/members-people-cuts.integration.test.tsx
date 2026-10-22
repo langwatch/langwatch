@@ -345,6 +345,40 @@ describe("given the directory's people tab", () => {
     });
   });
 
+  describe("when a member joined by accepting an invitation", () => {
+    beforeEach(() => {
+      state.provenance = { user_sam: { source: "invited" } };
+      state.invites = [
+        invite("inv_1", "dana@acme.com", "PENDING"),
+        invite("inv_3", "sam@acme.com", "ACCEPTED"),
+      ];
+    });
+
+    /** @scenario A member who accepted an invitation is a member, not an invitation */
+    it("says he joined from an invitation, without the word outstanding invitations carry", () => {
+      renderPeople();
+
+      const samRow = screen
+        .getAllByTestId("member-row")
+        .find((row) => within(row).queryByText("Sam Rivera"))!;
+      expect(within(samRow).getByTestId("provenance-invited")).toHaveTextContent(
+        "Joined by invite",
+      );
+      expect(within(samRow).queryByText(/^Invited$/)).toBeNull();
+      expect(cut(/^Members, 2 people/)).toBeInTheDocument();
+    });
+
+    /** @scenario An invitation nobody has accepted still reads as invited */
+    it("still marks the outstanding invitation as invited and counts only it", () => {
+      renderPeople();
+
+      expect(cut(/^Invited, 1 person/)).toBeInTheDocument();
+      const [pending] = screen.getAllByTestId("invite-row");
+      expect(within(pending!).getByText("dana@acme.com")).toBeInTheDocument();
+      expect(within(pending!).getByTestId("invite-status").textContent).toBe("Invited");
+    });
+  });
+
   describe("when somebody walked in on the domain policy", () => {
     /** @scenario A member who walked in on the domain policy says nobody approved */
     it("names the domain and says nobody approved it", () => {

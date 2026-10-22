@@ -123,7 +123,7 @@ describe("given a rendered-mode install whose PostgreSQL engine tables work", ()
       startLangWatchQLPostgres(),
     ]);
     names = { ...harness.names, database: harness.factDatabase };
-    collection = selfProvisioning.namedCollection({ names });
+    collection = selfProvisioning.namedCollection({ names, mode: "rendered" });
     // The SQL stand-in for the collection the config store mounts; the containers share a bridge.
     await harness.applyAsAdmin([
       `DROP NAMED COLLECTION IF EXISTS ${collection}`,

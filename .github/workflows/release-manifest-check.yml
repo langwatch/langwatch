@@ -1,0 +1,50 @@
+name: release-manifest-check
+
+# The app's release PR must carry packages/upgrade/releases/<version>.json naming every step of
+# its tree, or the image it tags reports itself as a development build and records no release.
+# release-please rewrites the branch on every merge to main, which drops the stamp commit until
+# the stamp job in release-please-sdks pushes it again, so this check is red in that window.
+# Spec: specs/upgrade/release-manifests.feature (RELEASE-IDENTITY).
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  release-manifest:
+    name: Release manifest
+    if: >-
+      github.head_ref == 'release-please--branches--main--components--langwatch'
+      && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout the release PR
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          sparse-checkout: |
+            /*
+            !/docs/media/
+            !/docs/images/
+          sparse-checkout-cone-mode: false
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: 12.6.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: "24.22.1"
+      - name: Check the tree names itself the release
+        run: |
+          set -euo pipefail
+          CI=true pnpm install --frozen-lockfile --filter "@langwatch/upgrade..."
+          node --disable-warning=ExperimentalWarning --experimental-transform-types packages/upgrade/scripts/check-release-manifest.ts

@@ -20,6 +20,7 @@ import {
   type LwqlAppOwnedDrift,
   type LwqlPostgresGap,
   type LwqlSelfProvisionRequest,
+  NO_COLLECTION_STATE,
 } from "../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
 import { ClickHouseLangWatchQLProvisioningRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts";
 import type { LwqlProvisioningDatabase } from "../repositories/langwatch-ql-postgres.repository.ts";
@@ -258,6 +259,13 @@ async function convergeClickHouse({
   if (mode === "sql") {
     await clusterGuard.assertSafe({ query: (sql) => repository.queryRows(sql), source });
   }
+  const server =
+    mode === "rendered"
+      ? await repository.readCollectionState({
+          database: names.database,
+          candidates: selfProvisioning.renderedCollectionCandidates({ names }),
+        })
+      : NO_COLLECTION_STATE;
   const result = await repository.runStatements({
     configStoreEntities,
     failureLevel,
@@ -268,6 +276,7 @@ async function convergeClickHouse({
       postgres: { endpoint: request.endpoint, readerPassword: request.postgresReaderPassword },
       includeAppFunctions,
       mode,
+      server,
       ...(only === undefined ? {} : { only }),
     }),
   });

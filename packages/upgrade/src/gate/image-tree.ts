@@ -114,6 +114,96 @@ export function imageRelease({
   return manifests.at(-1)?.release ?? baseline.release;
 }
 
+/** What writes a release's manifest; a refusal names it. */
+export const STAMP_RELEASE_COMMAND =
+  "node --experimental-transform-types packages/upgrade/scripts/stamp-release.ts";
+
+const LISTED_UNSTAMPED = 10;
+
+export type ReleaseIdentityRefusal = {
+  code: "manifest_missing" | "steps_unstamped" | "release_mismatch";
+  message: string;
+};
+
+/**
+ * Why a tree cut as `release` would not name itself that release, or null when it would. The
+ * release PR and the image publish refuse on it. Spec: specs/upgrade/release-manifests.feature.
+ */
+export function releaseIdentityRefusal({
+  release,
+  manifests,
+  tree,
+  baseline = loadReleaseBaseline(),
+}: {
+  release: string;
+  manifests: readonly ReleaseManifest[];
+  tree: ReleaseTreeSteps;
+  baseline?: ReleaseBaseline;
+}): ReleaseIdentityRefusal | null {
+  if (!manifests.some((manifest) => manifest.release === release)) {
+    return {
+      code: "manifest_missing",
+      message: `packages/upgrade/releases/${release}.json is missing; stamp it with \`${STAMP_RELEASE_COMMAND}\``,
+    };
+  }
+  const unstamped = unstampedSteps({ manifests, tree, baseline });
+  if (unstamped.length > 0) {
+    const listed = unstamped.slice(0, LISTED_UNSTAMPED).join(", ");
+    const more =
+      unstamped.length > LISTED_UNSTAMPED ? ` and ${unstamped.length - LISTED_UNSTAMPED} more` : "";
+    return {
+      code: "steps_unstamped",
+      message: `${unstamped.length} steps of this tree are in no manifest (${listed}${more}); stamp ${release} again with \`${STAMP_RELEASE_COMMAND}\``,
+    };
+  }
+  const named = imageRelease({ manifests, tree, baseline });
+  if (named !== release) {
+    return {
+      code: "release_mismatch",
+      message: `this tree names itself ${named ?? "unreleased"}, not ${release}: it ships a manifest newer than the release`,
+    };
+  }
+  return null;
+}
+
+/**
+ * The release's manifest over a whole tree, code steps included: every step no earlier manifest
+ * and no baseline names, so a release after one cut without its manifest also carries that one's
+ * steps. Refused when the result would still not name the tree this release.
+ */
+export function stampTreeRelease({
+  release,
+  previous,
+  cutAt,
+  tree,
+  earlier,
+  baseline = loadReleaseBaseline(),
+  ownerOf,
+}: {
+  release: string;
+  previous: string | null;
+  cutAt: string;
+  tree: ReleaseTreeSteps;
+  earlier: readonly ReleaseManifest[];
+  baseline?: ReleaseBaseline;
+  ownerOf: ({ id }: { id: string }) => string | null;
+}):
+  | { manifest: ReleaseManifest; refusal: null }
+  | { manifest: null; refusal: ReleaseIdentityRefusal } {
+  const shipped = new Set([
+    ...baseline.steps,
+    ...earlier.flatMap((manifest) => manifest.steps.map(({ id }) => id)),
+  ]);
+  const manifest = stampRelease({ release, previous, cutAt, current: tree, shipped, ownerOf });
+  const refusal = releaseIdentityRefusal({
+    release,
+    manifests: [...earlier, manifest],
+    tree,
+    baseline,
+  });
+  return refusal ? { manifest: null, refusal } : { manifest, refusal: null };
+}
+
 /** Every Prisma folder and goose file this image ships, as steps (ids per blitz plan 5.3). */
 export function imageSteps({
   release,

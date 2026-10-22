@@ -966,10 +966,41 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
   # every other stack's engine tables at its own PostgreSQL database.
   @unit
   Scenario: Each ClickHouse database provisions its own named collection
-    Given two LangWatchQL databases on the same ClickHouse server
+    Given two LangWatchQL databases on the same ClickHouse server, in sql mode
     When the self-provisioning statements are rendered for each
     Then each creates a named collection whose name carries its own database
     And each database's PostgreSQL-engine tables read only through its own collection
+
+  # A config store belongs to one server, and released chart installs bound their engine
+  # tables to lwql_postgres. ClickHouse refuses to attach a table whose collection is gone,
+  # and the upgrade converges before the ClickHouse pods roll onto the new config.
+  @unit
+  Scenario: Rendered mode keeps the named collection released chart installs bound their engine tables to
+    Given LWQL_ACCESS_MODEL_MODE is unset or "rendered"
+    When the access config is rendered and the provisioning statements run
+    Then the delivered collection and every PostgreSQL-engine table name lwql_postgres
+    And an upgrade's converge that runs before the ClickHouse pods roll finds that collection already mounted
+    And the rolled pods attach every engine table the previous release created
+
+  # A server whose previous config delivered only lwql_postgres_<database> keeps its tables
+  # bound to that name through the pre-roll converge, so the new config must deliver it too.
+  # Only a hand-made SQL collection of that name on a chart ClickHouse would clash (670).
+  @unit
+  Scenario: Rendered mode also delivers the per-database collection name a previous config bound tables to
+    Given LWQL_ACCESS_MODEL_MODE is unset or "rendered"
+    When the access config is rendered
+    Then config.d delivers lwql_postgres_<database> beside lwql_postgres with the same connection
+    And a table bound to either name still attaches once the ClickHouse pods roll
+
+  # One catalog read per converge.
+  @unit
+  Scenario: A rendered converge binds each engine table to a collection the server holds
+    Given LWQL_ACCESS_MODEL_MODE is unset or "rendered"
+    And the server may hold lwql_postgres, lwql_postgres_<database>, or both
+    When a converge or the reconvergence check creates or replaces an engine table
+    Then the table keeps its current binding while that collection exists on the server
+    And otherwise it binds to lwql_postgres when the server holds it, else to lwql_postgres_<database>
+    And with neither on the server it binds to lwql_postgres and fails with 669, as before
 
   # A 669 outside a NAMED COLLECTION statement means the collection is absent: the
   # engine table was never created, and every view over it would fail later as
