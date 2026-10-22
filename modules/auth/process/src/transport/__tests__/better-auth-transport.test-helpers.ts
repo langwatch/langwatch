@@ -21,6 +21,7 @@ import {
   type BetterAuthDeploymentConfiguration,
 } from "../../channels/http/http.better-auth.channel.ts";
 import { CredentialSessionGuard } from "../../channels/http/http.credential-session-guard.channel.ts";
+import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
 import { MemoryBetterAuthSecondaryStorageRepository } from "../../repositories/memory/memory.better-auth-secondary-storage.repository.ts";
 import { signInSecurityFixture } from "../../services/__tests__/sign-in-security.fixture.ts";
 import { CredentialSignInPolicyService } from "../../services/credential-sign-in-policy.service.ts";
@@ -51,7 +52,10 @@ export function betterAuthTransportFor(
 ) {
   return createBetterAuthTransport({
     auth: {} as never,
-    database: {} as never,
+    /** A completed reset lifts the forced-reset mark; nothing else is read unless a test says so. */
+    database: createApiFixture<BetterAuthHooksRepository>({
+      clearPasswordResetRequirement: async () => undefined,
+    }),
     storage: memoryAdapter({
       user: [],
       session: [],

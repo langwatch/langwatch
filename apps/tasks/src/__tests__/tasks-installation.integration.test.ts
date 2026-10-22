@@ -163,6 +163,7 @@ describe("the tasks process installation", () => {
         "request-system-migrations-pass",
         "topic-clustering-run",
         "user-data-erase",
+        "require-password-reset",
         "webhook-signature-vectors",
       ]);
     } finally {

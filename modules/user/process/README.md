@@ -6,7 +6,7 @@ The server half of [user](../README.md). Users: profiles and avatars, account an
 
 ## Installation
 
-`defineProcessModule("user").withRepositories(userRepositories).withChannels(userChannels).withApi(UserModule).withTransports(meRest, userAvatarRest, userTrpcTransport).withEventing(userLifecycleEventing).withTasks(…).withMigrations(…)`, `src/user.module.ts:19`.
+`defineProcessModule("user").withRepositories(userRepositories).withChannels(userChannels).withApi(UserModule).withTransports(meRest, userAvatarRest, userTrpcTransport).withEventing(userLifecycleEventing).withTasks(…).withMigrations(…)`, `src/user.module.ts:20`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -632,6 +632,14 @@ Declared at `src/eventing/user-lifecycle.pipeline.ts:57`. Events: `userDeactivat
 | command         | `recordUserCreated`     | –                                                                                                                                                    | `src/eventing/user-lifecycle.pipeline.ts:71` |
 | command         | `recordUserErased`      | –                                                                                                                                                    | `src/eventing/user-lifecycle.pipeline.ts:72` |
 | process manager | `userLifecycleFacts`    | every 1 d (`USER_FACTS_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `pruneFacts`, `recordErased`, `recordRegistered`, `recordCreated` (outbox) | `src/eventing/user-lifecycle.pipeline.ts:73` |
+
+### Tasks
+
+Run by the tasks process, before serve.
+
+| Task                     | Class                      | Declared at                                   |
+| ------------------------ | -------------------------- | --------------------------------------------- |
+| `require-password-reset` | `RequirePasswordResetTask` | `src/tasks/require-password-reset.task.ts:43` |
 
 ## Configuration
 

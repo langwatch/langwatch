@@ -3228,6 +3228,11 @@ const presentations = {
     describe: () =>
       "Choose one of at least 8 characters, with at least one character that is not a space.",
   },
+  identity_password_reset_required: {
+    title: "Choose a new password to sign in",
+    describe: () =>
+      "Your password needs to be replaced before you can use it again. We will email you a link to set a new one.",
+  },
   identity_reset_link_invalid: {
     // Expired, already spent and never issued collapse to one answer on purpose.
     title: "That password reset link no longer works",

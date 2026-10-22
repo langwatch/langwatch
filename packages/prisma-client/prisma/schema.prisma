@@ -239,6 +239,10 @@ model User {
   /// answered. The browser's own permission is not stored here.
   /// Spec: specs/langy/langy-notifications.feature
   notificationPreferences       Json                     @default("{}")
+  /// When an operator marked this person's password as no longer trusted. A
+  /// password sign-in opens no session while it is set; any write of a new
+  /// password hash clears it. Spec: modules/auth/specs/forced-password-reset.feature
+  passwordResetRequiredAt       DateTime?
   Annotation                    Annotation[]
   shareLinks                    ShareLink[]
   Workflow                      Workflow[]

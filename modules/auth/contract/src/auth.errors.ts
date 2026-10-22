@@ -218,6 +218,20 @@ export class IdentitySignInRefusedError extends IdentityCommandRefusedError {
   }
 }
 
+/** A correct password an operator marked as no longer trusted; choose a new one by reset link. */
+export class IdentityPasswordResetRequiredError extends IdentityCommandRefusedError {
+  declare readonly code: "identity_password_reset_required";
+
+  constructor(detail: string) {
+    super("identity_password_reset_required", "identity_password_reset_required", {
+      httpStatus: 403,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "IdentityPasswordResetRequiredError";
+  }
+}
+
 /** A password the policy will not take; type a different one. */
 export class IdentityPasswordRejectedError extends IdentityCommandRefusedError {
   declare readonly code: "identity_password_rejected";

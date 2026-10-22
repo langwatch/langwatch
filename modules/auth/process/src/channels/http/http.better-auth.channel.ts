@@ -1179,6 +1179,7 @@ const transportOptions = ({
         await sendResetPassword({ email: user.email, token });
       },
       onPasswordReset: async ({ user }, request) => {
+        await database.clearPasswordResetRequirement({ userId: user.id });
         await auth.revokeAllBrowserSessions({ userId: user.id });
         passwordResetSession.recordPasswordReset({ userId: user.id, request });
       },
