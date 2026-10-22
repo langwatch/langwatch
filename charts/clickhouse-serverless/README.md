@@ -216,19 +216,54 @@ has no kube-state-metrics series and cannot be watched from here.
 | `preflight.image`                  | Container image (needs `sh` + `kubectl` + `jq`; the Job fails fast if `jq` is missing)                                                                                                           | `alpine/k8s:1.30.0` |
 | `preflight.activeDeadlineSeconds`  | Hard timeout for the preflight Job                                                                                                                                                               | `60`                |
 
-### Users
+### Access: tiers, rolling passwords and token logins
 
-| Name    | Description                                                                 | Default |
-| ------- | --------------------------------------------------------------------------- | ------- |
-| `users` | Custom users string: `user1:pass1:readwrite:db1,db2;user2:pass2:readonly:*` | `""`    |
+Off by default. Every server carries four tiers as roles and settings profiles:
+`tier_inspect` (names only), `tier_read` (`SELECT` on its databases),
+`tier_write` (plus `INSERT`, `ALTER UPDATE`, `ALTER DELETE`, no DDL) and
+`tier_admin`. With `access.enabled`, an access file declares users with one tier
+each, and a sidecar container keeps them current and verifies OIDC token logins
+on `127.0.0.1` inside the pod. Design and limits: [ADR-184](../../dev/docs/adr/184-clickhouse-serverless-access-tiers-rolling-passwords-and-token-logins.md).
 
-Example:
+| Name                              | Description                                                                                         | Default |
+| --------------------------------- | --------------------------------------------------------------------------------------------------- | ------- |
+| `access.enabled`                  | Run the access sidecar and mount the access file                                                    | `false` |
+| `access.config`                   | The access file (`issuers`, `users`), rendered into a ConfigMap                                     | `{}`    |
+| `access.extraFiles`               | More files next to `access.yaml` at `/etc/clickhouse-access/config/<name>`, such as a `ca_file`      | `{}`    |
+| `access.existingConfigMap`        | Use this ConfigMap (its `access.yaml` key and any others) instead of `access.config`                | `""`    |
+| `access.passwordSecrets`          | Secrets mounted as password directories at `/etc/clickhouse-access/secrets/<name>`                  | `[]`    |
+| `access.sidecar.resources`        | Sidecar requests and limits                                                                         | small   |
+| `env.CLICKHOUSE_ACCESS_LISTEN`    | Loopback address the sidecar listens on, for ClickHouse's token checks                              | `127.0.0.1:8124` |
+| `env.READ_TIER_MAX_EXECUTION_TIME`| Execution-time cap (seconds) of the inspect and read tiers                                          | `300`   |
 
 ```yaml
-users: "analyst:s3cret:readonly:*;etl_user:p4ssword:readwrite:default,analytics"
+access:
+  enabled: true
+  passwordSecrets: [metabase-passwords]
+  config:
+    issuers:
+      - name: cluster
+        url: https://oidc.eks.eu-west-1.amazonaws.com/id/EXAMPLE
+    users:
+      - name: metabase
+        tier: read
+        databases: [langwatch]
+        login:
+          rolling: { dir: /etc/clickhouse-access/secrets/metabase-passwords }
+      - name: report-job
+        tier: read
+        databases: [langwatch]
+        login:
+          token: { issuer: cluster, subject: "system:serviceaccount:reports:report-job" }
 ```
 
-This creates two users: `analyst` with read-only access to all databases, and `etl_user` with read-write access to `default` and `analytics`.
+Every key of `metabase-passwords` is a valid password (16 characters or more),
+so a rotation is: add a key with the new password, move the client to it, delete
+the old key. A key `<name>.valid_until` holding an RFC 3339 instant ends `<name>`
+at that instant instead. Each change applies within about 10 seconds without a
+restart. Under the umbrella `langwatch` chart these values sit under
+`clickhouse.access`. The operator guide is in the docs: Self-hosting,
+Configuration, ClickHouse access.
 
 ### Advanced
 
