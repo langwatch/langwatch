@@ -22,6 +22,8 @@ export interface FeatureBrand {
   name: string;
   tagline: string;
   mark: { standard: MarkMaster; small: MarkMaster };
+  /** How many `feature.<name>.project.N` and `projectInk.N` pairs the brand defines, if any. */
+  projectColours?: number;
 }
 
 /** At or below this many pixels a mark draws its small master. */
@@ -32,6 +34,7 @@ export const FEATURE_BRANDS = {
     name: "Braids",
     tagline: "One trace. Every project.",
     mark: { standard: BRAIDS_MARK_STANDARD, small: BRAIDS_MARK_SMALL },
+    projectColours: 3,
   },
 } satisfies Record<string, FeatureBrand>;
 

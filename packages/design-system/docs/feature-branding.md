@@ -73,6 +73,9 @@ landing or docs pages, as Langy and the front door already use it.
    replay on purpose, remount it with a new `key`.
 10. **Example data is fictional and labelled.** Project names in the art are invented, and every
     project colour is paired with initials, so colour is never the only cue.
+11. **One project, one colour, on every screen.** A feature that colours projects sets
+    `projectColours` on its `FEATURE_BRANDS` entry and asks `featureProjectColour({ feature,
+projectId })` for the tokens, never its own hash or the order a list happens to hold.
 
 ## Branding the next feature
 

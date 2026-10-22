@@ -186,6 +186,10 @@
       "types": "./dist/components/brand/feature-illustration.d.ts",
       "default": "./src/components/brand/feature-illustration.tsx"
     },
+    "./feature-project-colour": {
+      "types": "./dist/components/brand/feature-project-colour.d.ts",
+      "default": "./src/components/brand/feature-project-colour.ts"
+    },
     "./enterprise-pill": {
       "types": "./dist/components/brand/enterprise-pill.d.ts",
       "default": "./src/components/brand/enterprise-pill.tsx"

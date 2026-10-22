@@ -2,6 +2,7 @@
 // Spec: modules/authz/specs/braids-screen.feature. Decisions: ADR-183.
 
 import type { AuthzBraid } from "@langwatch/authz-contract";
+import { featureProjectColour } from "@langwatch/design-system/feature-project-colour";
 
 /** Into other projects (this project owns the spans) or from other projects (it reads them). */
 export type BraidSide = "into" | "from";
@@ -51,11 +52,9 @@ export function projectInitials(name: string): string {
   return letters.length > 0 ? letters : "?";
 }
 
-/** Stable per project, so a project keeps its colour on every row and screen. */
+/** Stable per project, so a project keeps one colour on every screen, the trace view included. */
 export function strandOf(projectId: string): BraidStrand {
-  let sum = 0;
-  for (const character of projectId) sum = (sum * 31 + character.charCodeAt(0)) % 9973;
-  return ((sum % 3) + 1) as BraidStrand;
+  return featureProjectColour({ feature: "braids", projectId }).index as BraidStrand;
 }
 
 /** A project the viewer cannot see by name is still a project, never a blank. */
