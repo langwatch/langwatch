@@ -199,7 +199,7 @@ Feature: Braided spans in the reader's traces
 
   Rule: Evaluations are not shared in either direction
 
-    @integration @unimplemented
+    @integration
     Scenario: The owner's evaluation results are not shown on braided spans
       Given a "specialists" monitor scored a span that is braided into an "orchestrator" trace
       When sam opens the trace

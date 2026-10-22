@@ -36,6 +36,7 @@ export function BraidedSpanCallout({
         <Text as="span" textStyle="sm">
           <ShownBecause braid={braid} />
           {braid.signedBy ? ` Signed by ${braid.signedBy.name}.` : null}
+          {` Evaluations from ${braid.ownerName} stay in that project.`}
         </Text>
       </Banner>
     </Box>

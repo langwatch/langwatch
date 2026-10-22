@@ -34,6 +34,17 @@ describe("BraidedSpanCallout", () => {
     });
   });
 
+  describe("given a span whose owner's monitors scored it", () => {
+    /** @scenario "The owner's evaluation results are not shown on braided spans" */
+    it("says the owner's evaluations stay in the owner's project", () => {
+      renderWithDesignSystem(<BraidedSpanCallout braid={braid()} ownerHref={null} />);
+
+      expect(screen.getByTestId("braided-span-callout")).toHaveTextContent(
+        "Evaluations from Specialists stay in that project.",
+      );
+    });
+  });
+
   describe("given a braid that shares every span of the owner", () => {
     it("says so instead of naming a condition", () => {
       renderWithDesignSystem(
