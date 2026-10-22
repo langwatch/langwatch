@@ -14,17 +14,6 @@ Feature: Trace rollups and span storage fold idempotently
     Then each is cached under main's keyspace, trace_summaries and trace_analytics
     And a cache miss falls through to the durable projection
 
-  # Spans of one batch reach the fold in no fixed order, so "the first span to
-  # name a service" is whichever arrived first: a trace whose root ran in one
-  # service and one child in another could be labelled with the child's.
-
-  @unit
-  Scenario: The root span's service names the trace whatever order its spans arrive in
-    Given a trace whose root span ran in one service and a child span in another
-    When the child's span is folded before the root's
-    Then the trace's service is the root span's
-    And a child folded after the root does not replace it
-
   @unit @unimplemented
   Scenario: A trace rolled up twice reports one set of totals, not doubled ones
     Given a trace whose spans have already been rolled up

@@ -67,7 +67,6 @@ export function accumulateTraceAttributes({
   maxCausalityDepth({ merged, spanAttrs, state });
   mergeMetadataObjects({ merged, spanAttrs, state });
   preferUserModelMetadata({ merged, spanAttrs });
-  preferRootServiceName({ merged, spanAttrs, span });
 
   stripLegacyTraceOriginMarkers(merged);
   hoistTraceOrigin({ state, span, mergedAttributes: merged });
@@ -83,20 +82,6 @@ export function accumulateTraceAttributes({
   recordMediaAndRedaction({ merged, span, inputMediaRefs, outputMediaRefs });
 
   return merged;
-}
-
-/** The root span's service names the trace; a child's only fills it until the root folds. */
-function preferRootServiceName({
-  merged,
-  spanAttrs,
-  span,
-}: {
-  merged: Record<string, string>;
-  spanAttrs: Record<string, string>;
-  span: NormalizedSpan;
-}): void {
-  const service = spanAttrs["service.name"];
-  if (span.parentSpanId === null && service !== undefined) merged["service.name"] = service;
 }
 
 /** Labels are a set across the whole trace, not the last span's list. */

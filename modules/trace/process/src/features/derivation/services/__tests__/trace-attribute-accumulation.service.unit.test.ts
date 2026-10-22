@@ -8,12 +8,6 @@ import {
 import { TraceOriginService } from "../../../../services/trace-origin.service.ts";
 import { TraceAttributeAccumulationService } from "../trace-attribute-accumulation.service.ts";
 
-interface SpanIn {
-  spanId: string;
-  name: string;
-  parentSpanId: string | null;
-}
-
 describe("TraceAttributeAccumulationService", () => {
   describe("given spans marked partial and fully-skipped by PII redaction", () => {
     /** @scenario "Trace summary separates partial and fully-skipped span IDs" */
@@ -110,42 +104,6 @@ describe("TraceAttributeAccumulationService", () => {
       });
 
       expect(state.attributes["langwatch.reserved.causality_depth"]).toBe("1");
-    });
-  });
-
-  describe("given a root span and a child span from another service", () => {
-    const service = TraceAttributeAccumulationService.create(TraceOriginService.create());
-    const spanIn = ({ spanId, name, parentSpanId }: SpanIn) => ({
-      ...createTestSpan({ spanId, parentSpanId }),
-      resourceAttributes: { "service.name": name },
-    });
-    const fold = (spans: ReturnType<typeof spanIn>[]) => {
-      const state = createInitState();
-      for (const span of spans) {
-        state.attributes = service.accumulateAttributes({
-          state,
-          span,
-          outputSource: "test",
-          inputIsFallback: false,
-          outputIsFallback: false,
-          inputSpanStartTimeMs: null,
-          inputMediaRefs: null,
-          outputMediaRefs: null,
-        });
-      }
-      return state.attributes["service.name"];
-    };
-    const root = spanIn({ spanId: "root", name: "copilot-cli", parentSpanId: null });
-    const child = spanIn({ spanId: "child", name: "gemini-cli", parentSpanId: "root" });
-
-    /** @scenario "The root span's service names the trace whatever order its spans arrive in" */
-    it("names the trace by the root's service when the child folds first", () => {
-      expect(fold([child, root])).toBe("copilot-cli");
-    });
-
-    /** @scenario "The root span's service names the trace whatever order its spans arrive in" */
-    it("keeps the root's service when the child folds after it", () => {
-      expect(fold([root, child])).toBe("copilot-cli");
     });
   });
 
