@@ -6,7 +6,9 @@
  */
 
 import {
+  instantEvalOwnDecisionModelOf,
   instantEvalSkipped,
+  instantEvalUnavailableDecisionModelSkipOf,
   type InstantEvalJudgeApi,
   type InstantEvalJudgement,
 } from "@langwatch/instant-eval-judge-contract";
@@ -56,17 +58,14 @@ export class InstantEvalDecisionModelJudgeService implements InstantEvalJudgeCha
     if (resolved.kind === "langwatch") return this.options.hosted.classify(request, signal);
     if (resolved.kind === "own_unavailable") {
       // Never LangWatch's classifier in its place (ADR-182 decision 9).
-      return instantEvalSkipped(
-        resolved.reason === "not_enabled" ? "classifier_not_configured" : "classifier_key_invalid",
-      );
+      return instantEvalSkipped(instantEvalUnavailableDecisionModelSkipOf(resolved));
     }
 
-    const { model, wire, providerModel, endpoint, apiKey } = resolved;
     return this.options.own.classify({
       projectId: request.projectId,
       text: request.text,
       questions: request.questions,
-      decisionModel: { model, wire, providerModel, endpoint, apiKey },
+      decisionModel: instantEvalOwnDecisionModelOf(resolved),
       ...(signal ? { signal } : {}),
     });
   }

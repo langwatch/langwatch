@@ -6,13 +6,13 @@
  */
 import type { GuardrailCheckDirection } from "@langwatch/evaluation-contract";
 import type { EvaluatorApi, SingleEvaluationResult } from "@langwatch/evaluator-contract";
-import type { InstantEvalJudgeApi } from "@langwatch/instant-eval-judge-contract";
+import {
+  instantEvalOwnDecisionModelOf,
+  instantEvalUnavailableDecisionModelSkipOf,
+  type InstantEvalJudgeApi,
+} from "@langwatch/instant-eval-judge-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 
-import {
-  ownDecisionModelOf,
-  unavailableDecisionModelSkipOf,
-} from "../../../rules/instant-eval-decision-model.rules.ts";
 import { instantEvalGuardrailSkipOf } from "../../../rules/instant-eval-guardrail-skip.rules.ts";
 import { instantEvalJudgeInputsOf } from "../../../rules/instant-eval-judge-dispatch.rules.ts";
 import {
@@ -92,7 +92,7 @@ export class EvaluationJudgingService {
     const resolved = await this.deps.decisionModels.resolveDecisionModel({ projectId });
     // A broken own key never falls back to LangWatch's classifier (ADR-182 decision 9).
     if (resolved.kind === "own_unavailable") {
-      return instantEvalSkipResultOf(unavailableDecisionModelSkipOf(resolved));
+      return instantEvalSkipResultOf(instantEvalUnavailableDecisionModelSkipOf(resolved));
     }
     const answer = await this.deps.judges.judge({
       projectId,
@@ -100,7 +100,9 @@ export class EvaluationJudgingService {
       questions: [request.question],
       ...(idempotencyKey === undefined ? {} : { requestKey: idempotencyKey }),
       ...(signal === undefined ? {} : { signal }),
-      ...(resolved.kind === "own" ? { decisionModel: ownDecisionModelOf(resolved) } : {}),
+      ...(resolved.kind === "own"
+        ? { decisionModel: instantEvalOwnDecisionModelOf(resolved) }
+        : {}),
     });
     if (answer.outcome === "refused") {
       return instantEvalRefusalResultOf({ code: answer.code, message: answer.message });

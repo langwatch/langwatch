@@ -63,6 +63,23 @@ export interface InstantEvalOwnDecisionModel {
   readonly apiKey: string;
 }
 
+/** The judge's view of a resolved own model; every caller of the judge maps it here. */
+export function instantEvalOwnDecisionModelOf(
+  resolved: InstantEvalOwnDecisionModel,
+): InstantEvalOwnDecisionModel {
+  const { model, wire, providerModel, endpoint, apiKey } = resolved;
+  return { model, wire, providerModel, endpoint, apiKey };
+}
+
+/** The skip an own model that cannot run answers with; never LangWatch's classifier (ADR-182). */
+export function instantEvalUnavailableDecisionModelSkipOf({
+  reason,
+}: {
+  reason: string;
+}): "classifier_not_configured" | "classifier_key_invalid" {
+  return reason === "not_enabled" ? "classifier_not_configured" : "classifier_key_invalid";
+}
+
 /** One text and every question about it, judged for a project. */
 export interface InstantEvalClassification {
   /** Names the share of the rate the request draws on; the classifier never sees it. */
