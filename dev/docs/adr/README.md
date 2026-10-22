@@ -100,6 +100,7 @@ Reusable framework decisions live with their packages:
 | [180](./180-scenario-run-hooks.md)                                     | Scenario run hooks: setup and teardown on connected agents                                                                 | Proposed                  |
 | [181](./181-tsrs-runs-behind-tsc.md)                                   | tsrs runs behind `tsc`                                                                                                     | Proposed                  |
 | [184](./184-isolated-jsdom-files-share-a-worker.md)                    | Isolated jsdom test files share a worker instead of starting a process each                                                | Proposed                  |
+| [187](./187-outbound-proxy-in-the-egress-fence.md)                     | The egress fence carries a request through the outbound proxy                                                              | Proposed                  |
 
 Package-local decisions are indexed beside their owners. The framework
 records are the [Eventing ADR index](../../../packages/eventing/adrs/README.md)
