@@ -167,8 +167,12 @@ describe("the shared fs module cache", () => {
         const stored = readFileSync(file, "utf8");
         expect(stored).not.toContain(firstRoot);
         // the inline source map is base64, out of reach of a plain-text check
-        for (const [, encoded] of stored.matchAll(/sourceMappingURL=data:application\/json;base64,(\S+)/g)) {
-          expect(Buffer.from(encoded as string, "base64").toString("utf8")).not.toContain(firstRoot);
+        for (const [, encoded] of stored.matchAll(
+          /sourceMappingURL=data:application\/json;base64,(\S+)/g,
+        )) {
+          expect(Buffer.from(encoded as string, "base64").toString("utf8")).not.toContain(
+            firstRoot,
+          );
         }
       }
     });
