@@ -140,7 +140,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
   # On push:[main], skip the images a commit cannot have affected so a docs-only
-  # merge does not pay for four multi-arch builds. Release and dispatch always
+  # merge does not pay for every image's build. Release and dispatch always
   # build everything — those are the runs someone is waiting on a complete set
   # from.
   changes:
@@ -148,7 +148,7 @@ jobs:
     needs: meta
     outputs:
       # A JSON `include:` list, one entry per (image, arch) worth rebuilding, and
-      # the matching list of image names. A matrix rather than four booleans
+      # the matching list of image names. A matrix rather than one boolean each
       # because `jobs.<job_id>.if` cannot read the `matrix` context, so a
       # per-image gate has to be applied before the matrix is expanded.
       #
@@ -238,6 +238,16 @@ jobs:
               - '*/go.mod'
               - '*/go.sum'
               - '.github/workflows/publish-docker-ecr.yml'
+            # Its own build context, so the paths are relative to that directory.
+            langwatch-clickhouse-serverless:
+              - 'infra/clickhouse-serverless/Dockerfile'
+              - 'infra/clickhouse-serverless/.dockerignore'
+              - 'infra/clickhouse-serverless/go.mod'
+              - 'infra/clickhouse-serverless/go.sum'
+              - 'infra/clickhouse-serverless/cmd/**'
+              - 'infra/clickhouse-serverless/internal/**'
+              - 'infra/clickhouse-serverless/scripts/**'
+              - '.github/workflows/publish-docker-ecr.yml'
 
       - name: Select the images to build
         id: select
@@ -247,6 +257,7 @@ jobs:
           LANGWATCH_NLP_SERVICE: ${{ steps.filter.outputs.langwatch-nlp-service }}
           LANGWATCH_LANGEVALS: ${{ steps.filter.outputs.langwatch-langevals }}
           LANGWATCH_GATEWAY: ${{ steps.filter.outputs.langwatch-gateway }}
+          LANGWATCH_CLICKHOUSE_SERVERLESS: ${{ steps.filter.outputs.langwatch-clickhouse-serverless }}
         run: |
           set -euo pipefail
 
@@ -259,12 +270,16 @@ jobs:
           # Runner labels mirror publish-docker-app.yml: the app's build needs
           # the 32GB larger runner for the pnpm/vite bundle, everything else
           # fits on the standard hosted arm runner.
+          #
+          # `context` defaults to the repository root; clickhouse-serverless is
+          # a self-contained build under its own directory.
           ALL=$(cat <<'JSON'
           [
             {"image":"langwatch-app",         "dockerfile":"infra/docker/Dockerfile",              "arch":"arm64","platform":"linux/arm64/v8","runner":"arm64-runner-32gb"},
             {"image":"langwatch-nlp-service", "dockerfile":"infra/docker/Dockerfile.langwatch_nlp","arch":"arm64","platform":"linux/arm64/v8","runner":"ubuntu-24.04-arm"},
             {"image":"langwatch-langevals",   "dockerfile":"infra/docker/Dockerfile.langevals",    "arch":"arm64","platform":"linux/arm64/v8","runner":"ubuntu-24.04-arm"},
-            {"image":"langwatch-gateway",     "dockerfile":"infra/docker/Dockerfile.go_service",   "arch":"arm64","platform":"linux/arm64/v8","runner":"ubuntu-24.04-arm"}
+            {"image":"langwatch-gateway",     "dockerfile":"infra/docker/Dockerfile.go_service",   "arch":"arm64","platform":"linux/arm64/v8","runner":"ubuntu-24.04-arm"},
+            {"image":"langwatch-clickhouse-serverless","dockerfile":"infra/clickhouse-serverless/Dockerfile","context":"infra/clickhouse-serverless","arch":"arm64","platform":"linux/arm64/v8","runner":"ubuntu-24.04-arm"}
           ]
           JSON
           )
@@ -275,10 +290,12 @@ jobs:
               --arg nlp "${LANGWATCH_NLP_SERVICE}" \
               --arg evals "${LANGWATCH_LANGEVALS}" \
               --arg gateway "${LANGWATCH_GATEWAY}" \
+              --arg clickhouse "${LANGWATCH_CLICKHOUSE_SERVERLESS}" \
               '[{"langwatch-app": $app,
                  "langwatch-nlp-service": $nlp,
                  "langwatch-langevals": $evals,
-                 "langwatch-gateway": $gateway}
+                 "langwatch-gateway": $gateway,
+                 "langwatch-clickhouse-serverless": $clickhouse}
                 | to_entries[] | select(.value == "true") | .key]')
           else
             BUILT=$(printf '%s' "${ALL}" | jq -c '[.[].image] | unique')
@@ -352,7 +369,7 @@ jobs:
       - name: Build and push ${{ matrix.image }} (${{ matrix.arch }})
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
-          context: .
+          context: ${{ matrix.context || '.' }}
           file: ${{ matrix.dockerfile }}
           push: true
           platforms: ${{ matrix.platform }}
@@ -447,16 +464,16 @@ jobs:
   # skipped. The point of the whole workflow is that SaaS can pin one `git-<sha>`
   # across the whole deployment; if a docs-plus-gateway commit published
   # `langwatch-gateway:git-abc` and nothing else, that pin would fail to resolve
-  # for the other three. A skipped image is re-tagged from the manifest it
+  # for the others. A skipped image is re-tagged from the manifest it
   # already has, which costs a manifest PUT and no build.
   #
-  # One job looping over the four images rather than a four-way matrix: each
-  # image is a few seconds of manifest writes, and four runners queued and booted
+  # One job looping over the images rather than a per-image matrix: each
+  # image is a few seconds of manifest writes, and a runner per image queued and booted
   # one after another added over a minute to the end of every run. A failure on
   # one image still lets the others publish; the job fails at the end.
   #
   # `!cancelled()` because build-and-push reports `skipped` when nothing needed
-  # rebuilding, and this job still has four tags to write in that case. It brings
+  # rebuilding, and this job still has every tag to write in that case. It brings
   # the implicit "all needs succeeded" check with it, hence the explicit results.
   create-manifest:
     needs: [meta, changes, build-and-push]
@@ -551,7 +568,7 @@ jobs:
 
               if [ -z "${previous}" ]; then
                 # Expected until every image has been published once. A dispatch
-                # run builds all four and seeds them.
+                # run builds them all and seeds them.
                 echo "::warning::${image} has no previous git-* manifest to re-tag as ${IMAGE_TAG}; run this workflow via workflow_dispatch to seed it"
                 return 0
               fi
@@ -577,7 +594,7 @@ jobs:
           }
 
           FAILED=()
-          for IMAGE in langwatch-app langwatch-nlp-service langwatch-langevals langwatch-gateway; do
+          for IMAGE in langwatch-app langwatch-nlp-service langwatch-langevals langwatch-gateway langwatch-clickhouse-serverless; do
             echo "::group::${IMAGE}"
             # Not `if ! ( ... )`: bash ignores `set -e` inside a subshell whose
             # status a condition tests, so a failed command would not stop it.
