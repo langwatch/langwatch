@@ -171,3 +171,74 @@ describe("ClickHouseTraceSpanRepository braided reads", () => {
     });
   });
 });
+
+describe("ClickHouseTraceSpanRepository span tree cursor", () => {
+  const TENANT_TUPLE =
+    "(toUnixTimestamp64Milli(StartTime), SpanId, TenantId) > ({cursorStart:Int64}, {cursorSpan:String}, {cursorTenant:String})";
+  const SPAN_TUPLE =
+    "(toUnixTimestamp64Milli(StartTime), SpanId) > ({cursorStart:Int64}, {cursorSpan:String})";
+  const braided = braidedProof({
+    projectId: READER,
+    braids: [{ owner: OWNER, compiledWhere: WEB }],
+  });
+
+  async function pageAfter({
+    authorization,
+    ownerProjectId,
+  }: {
+    authorization: Authorization;
+    ownerProjectId?: string | null;
+  }) {
+    const { repo, spanRead } = treeRepository([]);
+    await repo.listSummaryPage({
+      authorization,
+      traceId: "trace-1",
+      limit: 1,
+      cursor: {
+        startTimeMs: 1_700_000_000_000,
+        spanId: "shared",
+        ...(ownerProjectId === undefined ? {} : { ownerProjectId }),
+      },
+    });
+    return spanRead();
+  }
+
+  describe("when the reader holds a braid", () => {
+    /** @scenario "Two projects holding the same span id show both spans" */
+    it("starts after the owner's span, so the reader's span of that id is its own position", async () => {
+      const { sql, params } = await pageAfter({ authorization: braided, ownerProjectId: OWNER });
+
+      expect(sql).toContain(TENANT_TUPLE);
+      expect(sql).toContain("AND StartTime >= fromUnixTimestamp64Milli({cursorStart:Int64})");
+      expect(sql).toContain("ORDER BY StartTimeMs ASC, SpanId ASC, TenantId ASC");
+      expect(params).toMatchObject({ cursorSpan: "shared", cursorTenant: OWNER });
+    });
+
+    /** @scenario "Two projects holding the same span id show both spans" */
+    it("places a cursor on the reader's own span in the reader's project", async () => {
+      const { sql, params } = await pageAfter({ authorization: braided, ownerProjectId: null });
+
+      expect(sql).toContain(TENANT_TUPLE);
+      expect(params).toMatchObject({ cursorTenant: READER });
+    });
+
+    it("pages a cursor made before braids by start and span id, as before", async () => {
+      const { sql, params } = await pageAfter({ authorization: braided });
+
+      expect(sql).toContain(SPAN_TUPLE);
+      expect(params).not.toHaveProperty("cursorTenant");
+    });
+  });
+
+  describe("when the reader holds no braid", () => {
+    it("pages by start and span id, naming no tenant", async () => {
+      const { sql, params } = await pageAfter({
+        authorization: ownProof({ projectId: READER }),
+        ownerProjectId: null,
+      });
+
+      expect(sql).toContain(SPAN_TUPLE);
+      expect(params).not.toHaveProperty("cursorTenant");
+    });
+  });
+});

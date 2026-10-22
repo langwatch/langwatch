@@ -691,7 +691,7 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
     })
 
     /**
-     * One page of the span tree in `(startTimeMs, spanId)` order — the only
+     * One page of the span tree in `(startTimeMs, spanId, owner)` order — the only
      * fetch path the frontend uses; traces can carry 20k-100k+ spans.
      */
     .procedure("spanTreePaginated")

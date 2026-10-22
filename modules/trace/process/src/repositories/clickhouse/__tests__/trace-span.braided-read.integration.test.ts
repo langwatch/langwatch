@@ -5,6 +5,7 @@
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { CompiledWhere } from "@langwatch/authorization";
+import type { SpanTreeCursor } from "@langwatch/trace-contract";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -24,6 +25,7 @@ const search = `test-braid-search-${nanoid()}`;
 const third = `test-braid-third-${nanoid()}`;
 const traceId = `trace-${nanoid()}`;
 const otherTraceId = `trace-${nanoid()}`;
+const pagingTraceId = `trace-${nanoid()}`;
 const base = Date.now() - 60 * 60 * 1000;
 const WEB: CompiledWhere = {
   version: 1,
@@ -134,6 +136,16 @@ beforeAll(async () => {
       offsetMs: 95,
       attributes: { [MARK]: third },
     }),
+    spanRow({ tenantId: reader, spanId: "paged-root", traceId: pagingTraceId, offsetMs: 0 }),
+    spanRow({ tenantId: reader, spanId: "shared", traceId: pagingTraceId, offsetMs: 10 }),
+    spanRow({
+      tenantId: owner,
+      spanId: "shared",
+      traceId: pagingTraceId,
+      offsetMs: 10,
+      attributes: web,
+    }),
+    spanRow({ tenantId: reader, spanId: "paged-tail", traceId: pagingTraceId, offsetMs: 20 }),
   ]) {
     await ch.insert({
       table: "stored_spans",
@@ -164,6 +176,34 @@ async function readTree(from = 0, braids: Braids = [{ owner, compiledWhere: WEB,
     occurredAtMs: base - 180_000,
   });
   return page.rows.map((row) => [row.spanId, row.ownerProjectId ?? null]);
+}
+
+/** Walks the tree page by page, keying each next page as the span tree service does. */
+async function walkPages(limit: number): Promise<string[]> {
+  const authorization = braidedProof({
+    projectId: reader,
+    braids: [{ owner, compiledWhere: WEB }],
+  });
+  const read: string[] = [];
+  let cursor: SpanTreeCursor | undefined;
+  for (let page = 0; page < 20; page++) {
+    const { rows, hasMore } = await repo.listSummaryPage({
+      authorization,
+      traceId: pagingTraceId,
+      limit,
+      cursor,
+      occurredAtMs: base - 180_000,
+    });
+    read.push(...rows.map((row) => `${row.spanId}@${row.ownerProjectId ?? reader}`));
+    const last = rows.at(-1);
+    if (!hasMore || !last) return read;
+    cursor = {
+      startTimeMs: last.startTimeMs,
+      spanId: last.spanId,
+      ownerProjectId: last.ownerProjectId ?? null,
+    };
+  }
+  throw new Error("the span tree did not finish within 20 pages");
 }
 
 const braidedIds = async (braids: Braids) =>
@@ -204,6 +244,27 @@ describe.skipIf(!clickHouseConfigured)("ClickHouseTraceSpanRepository under a br
       expect(spanIds).not.toContain("owner-early");
     });
   });
+
+  describe.each([1, 2])(
+    "when the reader and the owner hold one span id at one start and pages hold %i spans",
+    (limit) => {
+      /** @scenario "Two projects holding the same span id show both spans" */
+      it("returns both spans across the page boundary, neither twice", async () => {
+        const read = await walkPages(limit);
+
+        expect(read.toSorted()).toEqual(
+          [
+            `paged-root@${reader}`,
+            `shared@${reader}`,
+            `shared@${owner}`,
+            `paged-tail@${reader}`,
+          ].toSorted(),
+        );
+        expect(read[0]).toBe(`paged-root@${reader}`);
+        expect(read.at(-1)).toBe(`paged-tail@${reader}`);
+      });
+    },
+  );
 
   describe("when a second owner is braided into the reader", () => {
     /** @scenario "Spans are matched per owner by trace id" */

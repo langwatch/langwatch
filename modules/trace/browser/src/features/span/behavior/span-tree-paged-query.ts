@@ -3,6 +3,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import { getQueryKey } from "@trpc/react-query";
 
 import { api } from "../../../behavior/trace-api.ts";
+import { spanNodeKey } from "../../../model/braids/braided-span.ts";
 
 /*
  * Traces can carry 20k–100k+ spans, so the span tree is never fetched as a single
@@ -56,10 +57,10 @@ export async function fetchSpanTreePages({
   signal?: AbortSignal;
   onPage?: (nodes: SpanTreeNode[]) => void;
 }): Promise<SpanTreeNode[]> {
-  // Accumulate by spanId, last write wins: pages are keyed by
-  // (startTimeMs, spanId), so a span re-emitted with a corrected start time
-  // mid-walk could land on two pages — deduping here keeps it a single
-  // waterfall row (and a single React key).
+  // Accumulate by span key (span id, plus owner for a braided span), last write
+  // wins: a span re-emitted with a corrected start time mid-walk could land on
+  // two pages, and deduping keeps it one waterfall row; two owners holding one
+  // span id stay two rows.
   const nodesById = new Map<string, SpanTreeNode>();
   // Pages arrive in (startTimeMs, spanId) order, and `Map.set` keeps an
   // updated key at its original position — so the assembled tree only falls
@@ -85,8 +86,9 @@ export async function fetchSpanTreePages({
       throw new DOMException("span tree fetch aborted", "AbortError");
     }
     for (const node of page.nodes) {
-      if (nodesById.has(node.spanId)) needsSort = true;
-      nodesById.set(node.spanId, node);
+      const key = spanNodeKey(node);
+      if (nodesById.has(key)) needsSort = true;
+      nodesById.set(key, node);
     }
     if (!page.nextCursor) break;
     cursor = page.nextCursor;
@@ -143,19 +145,20 @@ function sameNode(a: SpanTreeNode, b: SpanTreeNode): boolean {
   return keysA.every((key) => a[key] === b[key]);
 }
 
-// Merge spanTreeDelta: dedupe by spanId, maintain order, return same
+// Merge spanTreeDelta: dedupe by span key, maintain order, return same
 // reference when unchanged (avoid React Query re-renders on quiet polls).
 export function mergeSpanTreeDelta(
   existing: SpanTreeNode[],
   delta: SpanTreeNode[],
 ): SpanTreeNode[] {
   if (delta.length === 0) return existing;
-  const byId = new Map(existing.map((node) => [node.spanId, node]));
+  const byId = new Map(existing.map((node) => [spanNodeKey(node), node]));
   let changed = false;
   for (const node of delta) {
-    const prev = byId.get(node.spanId);
+    const key = spanNodeKey(node);
+    const prev = byId.get(key);
     if (prev !== undefined && sameNode(prev, node)) continue;
-    byId.set(node.spanId, node);
+    byId.set(key, node);
     changed = true;
   }
   if (!changed) return existing;

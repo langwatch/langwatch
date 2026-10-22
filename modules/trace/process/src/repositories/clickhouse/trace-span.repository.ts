@@ -1,4 +1,4 @@
-import type { Authorization } from "@langwatch/authorization";
+import { type Authorization, ownProjectIdReadBy } from "@langwatch/authorization";
 import {
   type AuthorizedClickHouse,
   type IdBoundOptions,
@@ -330,8 +330,18 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
     idBound: IdBoundOptions | undefined,
   ): Promise<TraceSpanPage> {
     const client = this.clickhouse.as(input.authorization, { reads: "spans" });
+    const cursorTenant = input.cursor
+      ? ClickHouseTraceSpanRepository.cursorTenantOf({
+          authorization: input.authorization,
+          cursor: input.cursor,
+        })
+      : null;
+    const cursorTuple =
+      cursorTenant === null
+        ? "(toUnixTimestamp64Milli(StartTime), SpanId) > ({cursorStart:Int64}, {cursorSpan:String})"
+        : "(toUnixTimestamp64Milli(StartTime), SpanId, TenantId) > ({cursorStart:Int64}, {cursorSpan:String}, {cursorTenant:String})";
     const cursor = input.cursor
-      ? "AND StartTime >= fromUnixTimestamp64Milli({cursorStart:Int64}) AND (toUnixTimestamp64Milli(StartTime), SpanId) > ({cursorStart:Int64}, {cursorSpan:String})"
+      ? `AND StartTime >= fromUnixTimestamp64Milli({cursorStart:Int64}) AND ${cursorTuple}`
       : "";
     // A cursor page is bounded by the cursor's own start, so it reads no index.
     const timeFilter = idBound === undefined ? "" : STORED_SPANS_ID_BOUND;
@@ -344,7 +354,7 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
           ${timeFilter}
           ${cursor}
           AND ${fencedDedupInTuple(timeFilter)}
-        ORDER BY StartTimeMs ASC, SpanId ASC
+        ORDER BY StartTimeMs ASC, SpanId ASC, TenantId ASC
         LIMIT {limit:UInt32}
       `,
       query_params: {
@@ -354,6 +364,7 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
           ? {
               cursorStart: Math.trunc(input.cursor.startTimeMs),
               cursorSpan: input.cursor.spanId,
+              ...(cursorTenant === null ? {} : { cursorTenant }),
             }
           : {}),
       },
@@ -368,6 +379,21 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
       rows: mapped.slice(0, input.limit),
       hasMore: mapped.length > input.limit,
     };
+  }
+
+  /**
+   * The tenant a cursor's last span sits in, so one span id held by two tenants is two positions.
+   * Null when the read spans no braid or the cursor predates braids: those page as before.
+   */
+  private static cursorTenantOf({
+    authorization,
+    cursor,
+  }: {
+    authorization: Authorization;
+    cursor: SpanTreeCursor;
+  }): string | null {
+    if (!readsBraidedSpans(authorization) || cursor.ownerProjectId === undefined) return null;
+    return cursor.ownerProjectId ?? ownProjectIdReadBy(authorization);
   }
 
   private async resolveTraceOccurredAtMs(

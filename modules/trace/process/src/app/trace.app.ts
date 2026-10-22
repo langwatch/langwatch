@@ -3296,7 +3296,7 @@ export class TraceModule implements TraceApi, CollectorApp {
   // The span tree
   // -------------------------------------------------------------------------
 
-  /** One page of the span tree, in `(startTimeMs, spanId)` order. */
+  /** One page of the span tree, in `(startTimeMs, spanId, owner)` order. */
   async readSpanTreePage(
     input: SpanTreeInput & { authorization: Authorization },
   ): Promise<SpanTreePage> {
