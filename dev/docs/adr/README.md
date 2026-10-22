@@ -63,18 +63,13 @@ Reusable framework decisions live with their packages:
 | [092](./092-unified-authorization-engine.md)                           | Unified authorization engine — one registry, one resolver, every principal                                                 | Proposed                  |
 | [094](./094-simulation-execution-on-process-manager-substrate.md)      | Simulation execution on the process-manager substrate — durable execute/cancel intents, stall & cancel-grace watchdogs     | Accepted                  |
 | [101](./101-feature-package-surfaces.md)                               | Feature ownership roots contain physical contract, server, and optional web packages                                       | Accepted                  |
-| [102](./102-runtime-composition-roots.md)                              | One application package contains separate app and worker runtimes                                                          | Superseded in part by 111 |
 | [103](./103-standard-schema-api-boundary.md)                           | Feature contracts use Zod 4 behind Standard Schema                                                                         | Accepted                  |
-| [104](./104-runtime-environment-configuration.md)                      | Runtime roots validate environment and inject semantic configuration                                                       | Accepted                  |
 | [105](./105-mcp-access-via-discover-catalogues.md)                     | RPC services are MCP-accessible through one adapter over the rpc.discover catalogues                                       | Proposed                  |
 | [110](./110-grant-aggregates-are-grants.md)                            | A grant aggregate is a grant, not an organization                                                                          | Proposed                  |
-| [111](./111-physical-application-workspaces.md)                        | Physical application workspaces preserve the current deployment topology                                                   | Accepted                  |
-| [112](./112-singular-feature-ownership.md)                             | Product domains use singular feature ownership                                                                             | Accepted                  |
 | [113](./113-explicit-runtime-boot.md)                                  | Explicit runtime boot owns configuration and application construction                                                      | Accepted                  |
 | [128](./128-public-rest-and-internal-trpc.md)                          | Public REST and internal tRPC are separate transport surfaces                                                              | Accepted                  |
 | [131](./131-better-auth-is-a-boundary-over-identity-services.md)       | better-auth is a boundary tier of classes over identity services, not a place that queries Prisma                          | Accepted                  |
 | [135](./135-lint-and-format-toolchain.md)                              | One linter, one formatter, and four places a rule may live                                                                 | Proposed                  |
-| [136](./136-package-and-layer-boundaries.md)                           | Which package may name which, and in which direction                                                                       | Proposed                  |
 | [137](./137-module-source-grammar.md)                                  | A module's source layout is a grammar, not a convention                                                                    | Proposed                  |
 | [138](./138-persistence-containment.md)                                | Prisma stops at the repository seam                                                                                        | Proposed                  |
 | [139](./139-errors-results-and-naming.md)                              | A name states what a call answers with                                                                                     | Proposed                  |
@@ -101,6 +96,7 @@ Reusable framework decisions live with their packages:
 | [181](./181-tsrs-runs-behind-tsc.md)                                   | tsrs runs behind `tsc`                                                                                                     | Proposed                  |
 | [183](./183-vitest-workers-cache-module-loading.md)                    | Vitest workers cache how they load installed packages                                                                      | Proposed                  |
 | [184](./184-isolated-jsdom-files-share-a-worker.md)                    | Isolated jsdom test files share a worker instead of starting a process each                                                | Proposed                  |
+| [184](./184-clickhouse-serverless-access-tiers-rolling-passwords-and-token-logins.md) | clickhouse-serverless access: tiers, rolling passwords and OIDC token logins, rendered as files | Accepted |
 
 Package-local decisions are indexed beside their owners. The framework
 records are the [Eventing ADR index](../../../packages/eventing/adrs/README.md)
