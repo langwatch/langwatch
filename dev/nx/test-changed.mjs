@@ -55,7 +55,9 @@ export function checkNamed({ named, known, cwd = root }) {
     }
     const tracked = git({ args: ["ls-tree", "HEAD", "--", arg], cwd, allowFailure: true });
     const inHead = tracked.length > 0;
-    if (!known(arg) && !existsSync(join(cwd, arg)) && !inHead)
+    const inGraph = known(arg);
+    const onDisk = existsSync(join(cwd, arg));
+    if (!inGraph && !onDisk && !inHead)
       problems.push(`${arg} is not a file in this repository (paths are from the repository root)`);
   }
 
