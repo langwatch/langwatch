@@ -246,8 +246,13 @@ describe("given a page of judged rows", () => {
       expect(counters).toMatchObject({ failed: 1, skipped: 0 });
     });
 
-    it.each(["classifier_key_invalid", "classifier_provider_unavailable"])(
-      "records a failure where an own decision model could not answer (%s)",
+    /** @scenario "A run whose own decision model cannot answer skips its rows by reason" */
+    it.each([
+      "classifier_key_invalid",
+      "classifier_rate_limited",
+      "classifier_provider_unavailable",
+    ])(
+      "records a skip named by its reason where an own decision model could not answer (%s)",
       (skipReason) => {
         const { records, counters } = mapInstantEvalPage({
           tenantId: "project-1",
@@ -259,8 +264,9 @@ describe("given a page of judged rows", () => {
           now: NOW,
         });
 
-        expect(records[0]).toMatchObject({ Status: "failed", Error: skipReason });
-        expect(counters).toMatchObject({ failed: 1, skipped: 0 });
+        expect(records[0]).toMatchObject({ Status: "skipped", Error: skipReason });
+        expect(counters).toMatchObject({ skipped: 1, failed: 0 });
+        expect(instantEvalPageFailureRate({ counters, questions: 1 })).toBe(0);
       },
     );
 
@@ -300,12 +306,6 @@ describe("given a page's skip reasons", () => {
       expect(instantEvalSkipReason({ classifier_input_too_large: 2, classifier_failed: 2 })).toBe(
         "classifier_failed",
       );
-    });
-
-    it("prefers an own model's failure over a decline on a tie", () => {
-      expect(
-        instantEvalSkipReason({ classifier_input_too_large: 2, classifier_key_invalid: 2 }),
-      ).toBe("classifier_key_invalid");
     });
 
     it("reports nothing when nothing was skipped", () => {

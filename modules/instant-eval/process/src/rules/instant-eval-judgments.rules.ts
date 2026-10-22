@@ -82,8 +82,8 @@ function isAnswered(cell: unknown): boolean {
 
 /**
  * The reason a page's unjudged cells carry: the commonest the hydration stage
- * reported. A failure breaks a tie, so a page that lost rows is never
- * reported as having declined them.
+ * reported. `classifier_failed` breaks a tie, so a page that lost rows is
+ * never reported as having declined them.
  */
 export function instantEvalSkipReason(skipped: Readonly<Record<string, number>>): string {
   const entries = Object.entries(skipped);
@@ -92,10 +92,7 @@ export function instantEvalSkipReason(skipped: Readonly<Record<string, number>>)
   let best = entries[0] as [string, number];
   for (const entry of entries.slice(1)) {
     const isMoreCommon = entry[1] > best[1];
-    const breaksTieAsFailure =
-      entry[1] === best[1] &&
-      FAILED_SKIP_REASONS.has(entry[0]) &&
-      !FAILED_SKIP_REASONS.has(best[0]);
+    const breaksTieAsFailure = entry[1] === best[1] && entry[0] === "classifier_failed";
     if (isMoreCommon || breaksTieAsFailure) best = entry;
   }
 
@@ -238,13 +235,6 @@ function judgementsForRow({
   );
 }
 
-/** The judge lost these cells; an own decision model's key or outage counts too (ADR-182). */
-const FAILED_SKIP_REASONS: ReadonlySet<string> = new Set([
-  "classifier_failed",
-  "classifier_key_invalid",
-  "classifier_provider_unavailable",
-]);
-
 /** What a cell's own status is: answered, lost by the judge, or declined. */
 function statusOf({
   answered,
@@ -255,7 +245,7 @@ function statusOf({
 }): InstantEvalJudgmentStatus {
   if (answered) return "judged";
 
-  return FAILED_SKIP_REASONS.has(skipReason) ? "failed" : "skipped";
+  return skipReason === "classifier_failed" ? "failed" : "skipped";
 }
 
 /** One cell of one row as the judgement row it is written as. */
