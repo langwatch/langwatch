@@ -34854,7 +34854,7 @@ LangWatch does not schedule runs itself: a run plan has no schedule or cron sett
 
 A scenario that reads or writes real data needs that data to exist before the first turn and to be gone after the last, or one run changes what the next one sees. Setup and teardown hooks on a connected agent create the test data for each run and remove it afterwards.
 
-You declare them on the connected agent in the SDK. In Python, decorate the functions with `@support_agent.scenario.setup` and `@support_agent.scenario.teardown`, where `support_agent` is the object `connect_agent` returns. In TypeScript, call `supportAgent.scenario.setup(...)` and `supportAgent.scenario.teardown(...)` on the agent you defined with `connectAgent`. See [Connect your agent](/agent-testing/connect-your-agent).
+You declare them on the connected agent in the SDK. In Python, decorate the functions with `@support_agent.scenario.setup` and `@support_agent.scenario.teardown`, where `support_agent` is the agent function you decorated with `@langwatch.connect_agent`. In TypeScript, call `supportAgent.scenario.setup(...)` and `supportAgent.scenario.teardown(...)`, where `supportAgent` is what `connectAgent(...)` returns. See [Connect your agent](/agent-testing/connect-your-agent).
 
 Give each run its own names for the data it makes, such as a trace name or a board name with the run id in it. Runs of one plan share a project, so counting "every trace named `checkout`" includes what other runs left behind. For example, the Langy suite gives every run its own trace name so its totals stay exact, because traces have no delete route and teardown cannot remove them.
 
@@ -36335,7 +36335,7 @@ This puts the pieces together in one place. The names and counts are an example;
 | **Test suite `Order lookup`** | Field `expected_status`. Required evaluator "Status matches". |
 | **Labels** | `smoke`: fast and core. `critical`: a mistake costs money or trust. `regression`: broke in production before. |
 
-The scenarios are the cells of the [coverage matrix](#how-to-build-the-coverage-matrix), and and every plan except the canary adds a PII scanner as a plan evaluator.
+The scenarios are the cells of the [coverage matrix](#how-to-build-the-coverage-matrix). Every run plan in [the refund agent table](/agent-testing/build-a-scenario-suite#run-a-smoke-set-on-every-change-and-the-full-suite-on-a-schedule), except the production canary, adds a PII scanner as a plan evaluator.
 
 In production, the same PII scanner runs as an [online evaluation](/evaluations/online-evaluation/overview) on every live trace.
 
@@ -38986,7 +38986,7 @@ Write criteria about outcomes, not wording. For example, "The agent looks up the
 
 ## The Scenarios tab
 
-Open **Agent Testing** in the sidebar. The **Scenarios** tab lists the test suites of the project in the rail on the left, and the scenarios of the open test suite in the table. A test suite is a named group of scenarios, for example the ones about refunds. Every project has a **Default** test suite. Labels organize scenarios inside a test suite and across test suites.
+Open **Agent Testing** in the sidebar. The **Scenarios** tab lists the test suites of the project in the rail on the left, and the scenarios of the open test suite in the table. A test suite is a named group of scenarios, for example the ones about refunds. Every project has a **Default** test suite. Labels organise scenarios inside a test suite and across test suites.
 
 <Frame>
   <img

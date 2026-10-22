@@ -151,7 +151,7 @@ This puts the pieces together in one place. The names and counts are an example;
 | **Test suite `Order lookup`** | Field `expected_status`. Required evaluator "Status matches". |
 | **Labels** | `smoke`: fast and core. `critical`: a mistake costs money or trust. `regression`: broke in production before. |
 
-The scenarios are the cells of the [coverage matrix](#how-to-build-the-coverage-matrix), and and every plan except the canary adds a PII scanner as a plan evaluator.
+The scenarios are the cells of the [coverage matrix](#how-to-build-the-coverage-matrix). Every run plan in [the refund agent table](/agent-testing/build-a-scenario-suite#run-a-smoke-set-on-every-change-and-the-full-suite-on-a-schedule), except the production canary, adds a PII scanner as a plan evaluator.
 
 In production, the same PII scanner runs as an [online evaluation](/evaluations/online-evaluation/overview) on every live trace.
 
