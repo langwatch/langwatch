@@ -42,6 +42,22 @@ Feature: Usage decisions when the count cannot be taken
       # a cached unknown would outlive the outage by the length of the cache TTL,
       # leaving enforcement off for minutes after ClickHouse came back
 
+  # Prod 2026-10-22: one organization's count ran out of memory on every ingested batch.
+  @unit
+  Scenario: Concurrent limit checks for one organization share one count
+    Given several limit checks for the same organization arrive while its count is being read
+    When the count is read
+    Then the counting store is read once and every check gets its answer
+
+  @unit
+  Scenario: A count that failed is not read again until its retry window passes
+    Given the counting store failed to read an organization's count
+    When limit checks for that organization run within the 30-second retry window
+    Then each fails with the same error without reading the store
+    And the first check after the window reads the store again
+      # the doors admit a batch whose check failed, so the window costs at most
+      # one count-cache TTL of enforcement after the store recovers
+
   @unit
   Scenario: A partial per-project breakdown is reported as unknown, not as zeros
     Given the counting store cannot report usage for one of the projects

@@ -180,6 +180,13 @@ function meterTraceCounter({
 /** Main's 30-second count and meter-decision windows. */
 const USAGE_CACHE_TTL_MS = 30_000;
 
+/**
+ * How long a count that failed is answered with its failure instead of being read again. The
+ * ingest doors ask on every batch and admit on a failure, so re-reading a count that just ran out
+ * of memory only repeats the same expensive failure on the cluster the batch is written to.
+ */
+const FAILED_COUNT_RETRY_AFTER_MS = 30_000;
+
 /** A plan resolved for one organization. */
 type PlanResolver = (organizationId: string) => Promise<PlanInfo>;
 
@@ -204,6 +211,8 @@ interface UsageServiceDependencies {
   /** Both caches are 30-second windows in production; absent means uncached. */
   countCache?: UsageCache;
   decisionCache?: UsageCache;
+  /** The clock a failed count's retry window is measured on. */
+  now?: () => number;
 }
 
 /**
@@ -219,6 +228,11 @@ export class UsageService {
   private readonly deployment: UsageDeployment;
   private readonly countCache: UsageCache;
   private readonly decisionCache: UsageCache;
+  private readonly now: () => number;
+  /** One read per count key at a time: concurrent batches of one organization share it. */
+  readonly #countsInFlight = new Map<string, Promise<UsageCount>>();
+  /** The last failure per count key, answered again until its retry window passes. */
+  readonly #failedCounts = new Map<string, { error: unknown; retryAt: number }>();
 
   static create(deps: UsageServiceDependencies): UsageService {
     return new UsageService(deps);
@@ -257,6 +271,7 @@ export class UsageService {
     this.deployment = deps.deployment;
     this.countCache = deps.countCache ?? new NoUsageCache();
     this.decisionCache = deps.decisionCache ?? new NoUsageCache();
+    this.now = deps.now ?? Date.now;
   }
 
   async checkLimitForOrganization({
@@ -363,6 +378,42 @@ export class UsageService {
       return cached;
     }
 
+    const failed = this.#failedCounts.get(cacheKey);
+    if (failed && failed.retryAt > this.now()) {
+      throw failed.error;
+    }
+
+    const inFlight = this.#countsInFlight.get(cacheKey);
+    if (inFlight) {
+      return inFlight;
+    }
+
+    const count = this.readCurrentMonthCount({ organizationId, decision, cacheKey });
+    this.#countsInFlight.set(cacheKey, count);
+    try {
+      const value = await count;
+      this.#failedCounts.delete(cacheKey);
+      return value;
+    } catch (error) {
+      this.#failedCounts.set(cacheKey, {
+        error,
+        retryAt: this.now() + FAILED_COUNT_RETRY_AFTER_MS,
+      });
+      throw error;
+    } finally {
+      this.#countsInFlight.delete(cacheKey);
+    }
+  }
+
+  private async readCurrentMonthCount({
+    organizationId,
+    decision,
+    cacheKey,
+  }: {
+    organizationId: string;
+    decision: UsageMeterReading;
+    cacheKey: string;
+  }): Promise<UsageCount> {
     const projectIds = await this.organizations.getProjectIds(organizationId);
     if (projectIds.length === 0) {
       // A real measurement: an organization with no projects has sent nothing.
