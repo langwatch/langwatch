@@ -81,23 +81,6 @@ describe("findCacheRebuilds", () => {
     });
   });
 
-  describe("given a call that sent most of its prompt fresh", () => {
-    /** @scenario "A cache rebuild is measured against the whole prompt the call before it sent" */
-    it("measures the next call's rebuild against the whole prompt it sent", () => {
-      const events = findCacheRebuilds([
-        modelCall({ atMs: 1_000, inputTokens: 60_000, cacheReadTokens: 20_000 }),
-        modelCall({ atMs: 2_000, cacheCreationTokens: 50_000 }),
-      ]);
-
-      expect(events).toHaveLength(1);
-      expect(events[0]).toMatchObject({
-        callIndex: 1,
-        previousContextTokens: 80_000,
-        previousCachedTokens: 20_000,
-      });
-    });
-  });
-
   describe("given a call whose cache write is small relative to prior context", () => {
     it("does not flag ordinary incremental cache growth", () => {
       const events = findCacheRebuilds([

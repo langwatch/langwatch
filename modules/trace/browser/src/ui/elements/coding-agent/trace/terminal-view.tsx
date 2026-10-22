@@ -45,7 +45,6 @@ import {
 import {
   type CacheRebuildEvent,
   findCacheRebuilds,
-  modelCallContextTokens,
 } from "../../../../model/coding-agent/trace/token-timeline.ts";
 import { toolResultBodyToString } from "../../../../model/coding-agent/trace/tool-result-body.ts";
 import {
@@ -142,7 +141,7 @@ type ContextMarker =
       kind: "deadSite";
       atMs: number;
       cacheCreationTokens: number;
-      previousCachedTokens: number;
+      previousContextTokens: number;
     };
 
 /**
@@ -174,11 +173,11 @@ function markersForModelCall({
       kind: "deadSite",
       atMs: entry.atMs,
       cacheCreationTokens: rebuild.cacheCreationTokens,
-      previousCachedTokens: rebuild.previousCachedTokens,
+      previousContextTokens: rebuild.previousContextTokens,
     });
   }
 
-  const contextTokens = modelCallContextTokens(entry);
+  const contextTokens = entry.cacheReadTokens + entry.cacheCreationTokens;
   const band = contextHeatBand(contextTokens);
   if (!band) return { markers, band: bandState };
 
@@ -1519,7 +1518,7 @@ function ContextMarkerLine({ marker }: { marker: ContextMarker }) {
     marker.kind === "deadSite"
       ? [
           TERMINAL_TOKENS.red,
-          `Cache rebuilt: ${formatTokens(marker.cacheCreationTokens)} tokens re-sent instead of reusing ${formatTokens(marker.previousCachedTokens)} tokens cached`,
+          `Cache rebuilt: ${formatTokens(marker.cacheCreationTokens)} tokens re-sent instead of reusing ${formatTokens(marker.previousContextTokens)} tokens cached`,
         ]
       : [marker.color, `Context ${marker.label}: ${formatTokens(marker.contextTokens)} tokens`];
   return (

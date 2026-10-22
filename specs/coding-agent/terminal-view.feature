@@ -146,17 +146,6 @@ Rule: The terminal reads back the whole session
     When an earlier turn is prepended above it
     Then the screen stays where the reader left it instead of following the tail
 
-  # A context note sizes a call's context as the whole prompt it sent: the part
-  # read from the cache, the part written to it and the part sent fresh, the
-  # same figure the trace's context size uses.
-
-  @integration
-  Scenario: A context note counts the fresh part of the prompt
-    Given a model call whose cached and written input alone stay under the growing band
-    And whose fresh input takes the whole prompt into it
-    When the terminal shows the call
-    Then a context note says the context is growing, sized as the whole prompt
-
   # A context note says the context crossed into a bigger size band, which is a
   # comparison against the call BEFORE the crossing. While earlier turns are
   # still unloaded that call is unknown, and a note drawn from a guess gets

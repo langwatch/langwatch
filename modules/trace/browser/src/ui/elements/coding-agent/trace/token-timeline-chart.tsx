@@ -125,7 +125,7 @@ export function TokenTimelineChart({
           {rebuilds.slice(0, 3).map((rebuild, index) => (
             <HStack key={index} gap={2} align="baseline">
               <Text textStyle="xs" color="red.fg" fontWeight="medium" flexShrink={0}>
-                {`Call ${rebuild.callIndex + 1} rebuilt ${formatCompact(rebuild.cacheCreationTokens)} tokens instead of reusing ${formatCompact(rebuild.previousCachedTokens)} cached`}
+                {`Call ${rebuild.callIndex + 1} rebuilt ${formatCompact(rebuild.cacheCreationTokens)} tokens instead of reusing ${formatCompact(rebuild.previousContextTokens)}`}
               </Text>
               {rebuild.precedingPrompt && (
                 <Text textStyle="xs" color="fg.muted" truncate minWidth={0}>

@@ -428,21 +428,17 @@ export class TraceSummaryFoldProjection
   }
 
   // Record earliest model call's context window (NOT a sum; agents re-send
-  // whole conversation). Input reaches the fold disjoint from the cache, so
-  // fresh + read + written is the whole prompt the call sent.
+  // whole conversation, so context matters more than summed cache reads)
   private static recordContextSize({
     attributes,
     span,
-    inputTokens,
     cacheTokens,
   }: {
     attributes: Record<string, string>;
     span: NormalizedSpan;
-    inputTokens: number;
     cacheTokens: { cacheReadTokens: number; cacheCreationTokens: number };
   }): void {
-    const contextTokens =
-      inputTokens + cacheTokens.cacheReadTokens + cacheTokens.cacheCreationTokens;
+    const contextTokens = cacheTokens.cacheReadTokens + cacheTokens.cacheCreationTokens;
     if (contextTokens <= 0) return;
     const priorAtMs = Number(attributes[RESERVED_CONTEXT_SIZE_AT_MS]);
     if (Number.isFinite(priorAtMs) && priorAtMs <= span.startTimeUnixMs) return;
@@ -664,8 +660,7 @@ export class TraceSummaryFoldProjection
     // The merged attribute map only carries identity/metadata keys, so the
     // raw gen_ai.usage.cache_* numbers never reach the drawer — fold the sums
     // in under reserved keys the popover reads directly.
-    const isTokenAccumulationSkipped = runtime.spanCost.isTokenAccumulationSkipped(span);
-    const cacheTokens = isTokenAccumulationSkipped
+    const cacheTokens = runtime.spanCost.isTokenAccumulationSkipped(span)
       ? { cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0 }
       : runtime.spanCost.extractCacheTokens(span);
     TraceSummaryFoldProjection.addReservedTokenSum(
@@ -683,12 +678,7 @@ export class TraceSummaryFoldProjection
       RESERVED_REASONING_TOKENS,
       cacheTokens.reasoningTokens,
     );
-    TraceSummaryFoldProjection.recordContextSize({
-      attributes,
-      span,
-      inputTokens: isTokenAccumulationSkipped ? 0 : runtime.spanCost.extractInputTokens(span),
-      cacheTokens,
-    });
+    TraceSummaryFoldProjection.recordContextSize({ attributes, span, cacheTokens });
 
     const newModels = runtime.spanCost.extractModelsFromSpan(span);
     const models = TraceSummaryFoldProjection.mergeModelsMostRecentFirst(state.models, newModels);

@@ -68,11 +68,6 @@ export class SpanCostService {
     };
   }
 
-  /** The span's fresh input tokens, which every carrier reports disjoint from its cache. */
-  extractInputTokens(span: NormalizedSpan): number {
-    return extractSpanTokenCounts(span).promptTokens;
-  }
-
   extractCacheTokens(span: NormalizedSpan): SpanCacheTokens {
     return extractSpanCacheTokens(span);
   }

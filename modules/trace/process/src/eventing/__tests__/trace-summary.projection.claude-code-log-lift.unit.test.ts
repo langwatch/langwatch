@@ -450,14 +450,11 @@ describe("TraceSummaryFoldProjection context size", () => {
     startTimeUnixMs,
     cacheRead,
     cacheCreation,
-    input = 0,
   }: {
     spanId: string;
     startTimeUnixMs: number;
     cacheRead: number;
     cacheCreation: number;
-    /** The fresh input, disjoint from the cache as every carrier reports it. */
-    input?: number;
   }) => ({
     ...createTestSpan({
       spanId,
@@ -467,7 +464,6 @@ describe("TraceSummaryFoldProjection context size", () => {
       spanAttributes: {
         "langwatch.span.type": "llm",
         "gen_ai.request.model": "claude-opus-5",
-        "gen_ai.usage.input_tokens": input,
         "gen_ai.usage.cache_read.input_tokens": cacheRead,
         "gen_ai.usage.cache_creation.input_tokens": cacheCreation,
       },
@@ -479,7 +475,7 @@ describe("TraceSummaryFoldProjection context size", () => {
 
   describe("when the trace's calls each carry cached and written input", () => {
     /** @scenario "The context a trace started from is lifted onto the trace summary" */
-    it("records the FIRST call's whole prompt, not the sum across calls", () => {
+    it("records the FIRST call's context, not the sum across calls", () => {
       let state = createInitState();
       state = applySpanToSummary({
         state,
@@ -489,7 +485,6 @@ describe("TraceSummaryFoldProjection context size", () => {
           startTimeUnixMs: 1_000,
           cacheRead: 150_000,
           cacheCreation: 6_800,
-          input: 1_200,
         }),
       });
       state = applySpanToSummary({
@@ -503,7 +498,7 @@ describe("TraceSummaryFoldProjection context size", () => {
         }),
       });
 
-      expect(state.attributes["langwatch.reserved.context_size_tokens"]).toBe("158000");
+      expect(state.attributes["langwatch.reserved.context_size_tokens"]).toBe("156800");
       // The summed cache read keeps its own, much larger, number: the two
       // answer different questions and both stay available.
       expect(state.attributes["langwatch.reserved.cache_read_tokens"]).toBe("1050000");
@@ -538,32 +533,13 @@ describe("TraceSummaryFoldProjection context size", () => {
   });
 
   describe("when no call reports cached or written input", () => {
-    /** @scenario "A trace whose calls use no cache carries its input as its context size" */
-    it("records the first call's fresh input as its context", () => {
-      const state = applySpanToSummary({
-        state: createInitState(),
-        runtime,
-        span: modelCallSpan({
-          spanId: "ccccccccccccccc1",
-          startTimeUnixMs: 1_000,
-          cacheRead: 0,
-          cacheCreation: 0,
-          input: 4_300,
-        }),
-      });
-
-      expect(state.attributes["langwatch.reserved.context_size_tokens"]).toBe("4300");
-    });
-  });
-
-  describe("when no call reports any input", () => {
-    /** @scenario "A trace whose calls report no input carries no context size" */
+    /** @scenario "A trace whose calls report no cache carries no context size" */
     it("carries no context size attribute", () => {
       const state = applySpanToSummary({
         state: createInitState(),
         runtime,
         span: modelCallSpan({
-          spanId: "ddddddddddddddd1",
+          spanId: "ccccccccccccccc1",
           startTimeUnixMs: 1_000,
           cacheRead: 0,
           cacheCreation: 0,
