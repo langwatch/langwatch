@@ -53,6 +53,8 @@ export const prismaTableCatalogue = {
   "DatasetRecord": "DatasetRecord",
   "Dashboard": "Dashboard",
   "DashboardFavourite": "DashboardFavourite",
+  "DashboardsV2": "DashboardsV2",
+  "DashboardWidget": "DashboardWidget",
   "InsightProjection": "InsightProjection",
   "InsightReaderProjection": "InsightReaderProjection",
   "InsightDailyScheduleProjection": "InsightDailyScheduleProjection",
@@ -176,6 +178,7 @@ export const prismaTableCatalogue = {
   "ConnectedStatement": "ConnectedStatement",
   "InstanceIdentity": "InstanceIdentity",
   "SelfHostedInstance": "SelfHostedInstance",
+  "SelfHostedInstanceDiagnostic": "SelfHostedInstanceDiagnostic",
   "SelfHostedInstanceReport": "SelfHostedInstanceReport",
   "WebPushSubscription": "WebPushSubscription",
   "WebPushVapidKey": "WebPushVapidKey",
@@ -1068,6 +1071,30 @@ export const prismaModelFieldCatalogue = {
     "projectId",
     "position",
     "createdAt"
+  ],
+  "DashboardsV2": [
+    "id",
+    "projectId",
+    "name",
+    "description",
+    "createdById",
+    "scope",
+    "organizationId",
+    "createdAt",
+    "updatedAt"
+  ],
+  "DashboardWidget": [
+    "id",
+    "projectId",
+    "dashboardId",
+    "name",
+    "definition",
+    "gridColumn",
+    "gridRow",
+    "colSpan",
+    "rowSpan",
+    "createdAt",
+    "updatedAt"
   ],
   "InsightProjection": [
     "id",
@@ -2904,7 +2931,8 @@ export const prismaModelFieldCatalogue = {
     "lastReportAt",
     "lastReportError",
     "optionalMetricsOptOut",
-    "hostnameOptOut"
+    "hostnameOptOut",
+    "upgradeDiagnosticsOptOut"
   ],
   "SelfHostedInstance": [
     "id",
@@ -2930,6 +2958,20 @@ export const prismaModelFieldCatalogue = {
     "raisedSignals",
     "createdAt",
     "updatedAt"
+  ],
+  "SelfHostedInstanceDiagnostic": [
+    "id",
+    "instanceId",
+    "stepId",
+    "stepDescription",
+    "release",
+    "attempt",
+    "trigger",
+    "byteLength",
+    "objectKey",
+    "receivedAt",
+    "expiresAt",
+    "slackAnnouncedAt"
   ],
   "SelfHostedInstanceReport": [
     "id",
@@ -3191,6 +3233,8 @@ export const prismaRelationCatalogue = {
     "graphs": "CustomGraph"
   },
   "DashboardFavourite": {},
+  "DashboardsV2": {},
+  "DashboardWidget": {},
   "InsightProjection": {},
   "InsightReaderProjection": {},
   "InsightDailyScheduleProjection": {},
@@ -3556,6 +3600,7 @@ export const prismaRelationCatalogue = {
   "ConnectedStatement": {},
   "InstanceIdentity": {},
   "SelfHostedInstance": {},
+  "SelfHostedInstanceDiagnostic": {},
   "SelfHostedInstanceReport": {},
   "WebPushSubscription": {},
   "WebPushVapidKey": {},

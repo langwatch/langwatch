@@ -20,6 +20,8 @@ import {
 import { nowInstant } from "@langwatch/time";
 
 import type { ClickHouseQueryClient } from "./client.ts";
+import type { IdBoundOptions } from "./idBound.ts";
+import { StatementScopeError, TENANT_SCOPE_PARAM_PREFIX } from "./statementScopeError.ts";
 
 /** Resolves the routed client a project's reads are sent through. */
 export type ClickHouseClientResolver = (tenantId: string) => Promise<ClickHouseQueryClient>;
@@ -46,9 +48,6 @@ export type ReadResource = keyof typeof READ_RESOURCES;
 export const PROOF_BEARING_PERMISSIONS: ReadonlySet<AuthzPermission> = new Set([
   READ_RESOURCES.traces.permission,
 ]);
-
-/** Every parameter the fence binds starts with this; callers may not. */
-const TENANT_SCOPE_PARAM_PREFIX = "tenantScope";
 
 const MARKER = /\{\{tenantScope:([A-Za-z_][A-Za-z0-9_]*)\}\}/g;
 const SET_MARKER = /\{\{tenantSet\}\}/g;
@@ -81,35 +80,6 @@ export function tenantScopeKey({
     .join("|");
   const digest = createHash("sha256").update(windows).digest("hex");
   return `${own}+${fence.shared.length}:${digest}`;
-}
-
-export type StatementScopeViolation =
-  | { kind: "missing-marker" }
-  | { kind: "unknown-time-column"; column: string }
-  | { kind: "hand-written-tenant-predicate" }
-  | { kind: "reserved-param"; param: string };
-
-/** A statement the reader will not send. Named so a test can tell which
- *  refusal fired without reading prose. */
-export class StatementScopeError extends Error {
-  readonly code = "store_statement_scope";
-  constructor(public readonly violation: StatementScopeViolation) {
-    super(describe(violation));
-    this.name = "StatementScopeError";
-  }
-}
-
-function describe(violation: StatementScopeViolation): string {
-  switch (violation.kind) {
-    case "missing-marker":
-      return "Statement carries no {{tenantScope:<TimeColumn>}} marker, so the window on a shared grant would never be applied. A {{tenantSet}} marker alone is not enough.";
-    case "unknown-time-column":
-      return `Marker names "${violation.column}", which is not a time column the window can be applied to.`;
-    case "hand-written-tenant-predicate":
-      return "Statement names TenantId in a predicate of its own. The fence is the only predicate allowed to pick tenants.";
-    case "reserved-param":
-      return `Parameter "${violation.param}" uses the reserved "${TENANT_SCOPE_PARAM_PREFIX}" prefix.`;
-  }
 }
 
 /** One shared project and the window its grant opens, as the fence binds it. */
@@ -283,6 +253,8 @@ type ScopedQueryParams = {
   clickhouse_settings?: Record<string, string | number>;
   /** Set when the read must walk every partition; see the member's cold-scan warning. */
   SKIP_COLD_SCAN_CHECK?: true | undefined;
+  /** For a statement carrying `{{idBound}}`: a time the caller has, and today's fallback. */
+  idBound?: IdBoundOptions | undefined;
 };
 
 /**
@@ -323,9 +295,8 @@ export class TenantScopedReader {
       queryParams: params.query_params ?? {},
       fence: this.deps.fence,
     });
-    const client = await this.deps.client().catch((cause: unknown) => {
-      throw new TenantReaderClientUnavailableError({ cause });
-    });
+    const client = await this.resolvedClient();
+    // The client expands an `{{idBound}}` marker, reading the index under this fence's tenants.
     const result = await client.query<Row>({
       tenantId: this.deps.tenantId,
       tenantIds: tenantsOf(this.deps.fence),
@@ -333,8 +304,17 @@ export class TenantScopedReader {
       params: expanded.queryParams,
       ...(params.clickhouse_settings ? { settings: params.clickhouse_settings } : {}),
       ...(params.SKIP_COLD_SCAN_CHECK === true ? { SKIP_COLD_SCAN_CHECK: true } : {}),
+      ...(params.idBound === undefined ? {} : { idBound: params.idBound }),
     });
     return { json: async () => result.rows };
+  }
+
+  private async resolvedClient(): Promise<ClickHouseQueryClient> {
+    try {
+      return await this.deps.client();
+    } catch (cause: unknown) {
+      throw new TenantReaderClientUnavailableError({ cause });
+    }
   }
 }
 

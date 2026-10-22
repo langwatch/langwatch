@@ -6,7 +6,7 @@ The server half of [analytics](../README.md). Analytics reads: timeseries, feedb
 
 ## Installation
 
-`defineProcessModule("analytics").withRepositories(analyticsRepositories).withChannels(analyticsChannels).withApi(AnalyticsModule).withTransports(analyticsRest, analyticsLegacyRest, queryRest, analyticsTrpcTransport, analyticsLwqlTrpcTransport).provideMiddlewareContext(…).withEventing(lwqlReconvergenceEventing).withMigrations(…)`, `src/analytics.module.ts:21`.
+`defineProcessModule("analytics").withRepositories(analyticsRepositories).withChannels(analyticsChannels).withApi(AnalyticsModule).withTransports(analyticsRest, analyticsLegacyRest, queryRest, analyticsTrpcTransport, analyticsLwqlTrpcTransport).provideMiddlewareContext(…).withEventing(lwqlReconvergenceEventing).withMigrations(…).withIdIndexes(ANALYTICS_ID_INDEXES, …)`, `src/analytics.module.ts:22`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -262,7 +262,7 @@ Permission `analytics:view`. Declared at `src/transport/analytics-legacy.rest.ts
 Answers at `/api/analytics`, `/api/v1/analytics`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/analytics-legacy.rest.ts:51)
+// Rawbody: "text" (inline, src/transport/analytics-legacy.rest.ts:52)
 ```
 
 ### `analyticsRest`
@@ -328,7 +328,7 @@ type Response = z.infer<typeof lwqlResultSchema>; // ../contract/src/analytics.i
 
 Discover the queryable LangWatchQL schema
 
-Authenticated: Any API key reaches the projects it holds analytics:view on: the fan-out and the row policy enforce the scope, and a key that reads no project is a valid empty scope rather than a refusal. Declared at `src/transport/query.rest.ts:143`.
+Authenticated: Any API key reaches the projects it holds analytics:view on: the fan-out and the row policy enforce the scope, and a key that reads no project is a valid empty scope rather than a refusal. Declared at `src/transport/query.rest.ts:144`.
 
 Answers at `/api/v1/query/schema`.
 
@@ -340,7 +340,7 @@ type Response = z.infer<typeof lwqlSchemaSchema>; // ../contract/src/analytics.i
 
 Discover both query languages
 
-Authenticated: Any credential for the project may read the reference: half of what it describes is the traces family's own filter vocabulary, so a key without analytics:view is answered with the LangWatchQL half withheld rather than refused. Declared at `src/transport/query.rest.ts:167`.
+Authenticated: Any credential for the project may read the reference: half of what it describes is the traces family's own filter vocabulary, so a key without analytics:view is answered with the LangWatchQL half withheld rather than refused. Declared at `src/transport/query.rest.ts:168`.
 
 Answers at `/api/v1/query/reference`.
 
@@ -475,19 +475,19 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `lwql_reconvergence` (aggregate `global`)
 
-Declared at `src/eventing/analytics-lwql-reconvergence.pipeline.ts:51`.
+Declared at `src/eventing/analytics-lwql-reconvergence.pipeline.ts:53`.
 
-| Kind            | Name                | Handles                                                                          | Declared at                                                |
-| --------------- | ------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| process manager | `lwqlReconvergence` | every 5 s (`LWQL_RECONVERGENCE_INITIAL_DELAY_MS`); intents `reconverge` (outbox) | `src/eventing/analytics-lwql-reconvergence.pipeline.ts:61` |
-| peer subscriber | `syncLwqlKeyMapRow` | `lw.project.created` from [project](../../project/README.md)                     | `src/eventing/analytics-lwql-reconvergence.pipeline.ts:56` |
+| Kind            | Name                | Handles                                                                                    | Declared at                                                |
+| --------------- | ------------------- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------- |
+| process manager | `lwqlReconvergence` | every 5 min (`LWQL_RECONVERGENCE_INTERVAL_MS = 5 * 60_000`); intents `reconverge` (outbox) | `src/eventing/analytics-lwql-reconvergence.pipeline.ts:63` |
+| peer subscriber | `syncLwqlKeyMapRow` | `lw.project.created` from [project](../../project/README.md)                               | `src/eventing/analytics-lwql-reconvergence.pipeline.ts:58` |
 
 ## Configuration
 
 | Kind   | Leaf                          | Environment variable                      | Declared at                              |
 | ------ | ----------------------------- | ----------------------------------------- | ---------------------------------------- |
-| secret | `lwqlClickHousePassword`      | `LWQL_CLICKHOUSE_PASSWORD`                | `src/app/analytics.app.ts:353`           |
-| secret | `lwqlPostgresReaderPassword`  | `LWQL_POSTGRES_READER_PASSWORD`           | `src/app/analytics.app.ts:354`           |
+| secret | `lwqlClickHousePassword`      | `LWQL_CLICKHOUSE_PASSWORD`                | `src/app/analytics.app.ts:401`           |
+| secret | `lwqlPostgresReaderPassword`  | `LWQL_POSTGRES_READER_PASSWORD`           | `src/app/analytics.app.ts:402`           |
 | config | `langwatchQl.url`             | `LWQL_CLICKHOUSE_URL`                     | `../contract/src/analytics.config.ts:11` |
 | config | `langwatchQl.username`        | `LWQL_CLICKHOUSE_USER`                    | `../contract/src/analytics.config.ts:12` |
 | config | `langwatchQl.database`        | `LWQL_DATABASE`                           | `../contract/src/analytics.config.ts:13` |

@@ -131,6 +131,7 @@ describe("suite app installation", () => {
       const saved: MigrationStepReport[] = [];
       const pass = () =>
         step?.run({
+          log: { info: () => undefined, warn: () => undefined },
           checkpoint: { resumeFrom: null, save: async ({ report }) => void saved.push(report) },
           dryRun: false,
           signal: new AbortController().signal,

@@ -121,7 +121,7 @@ function phaseOf(phase: UpgradeRunPhaseView): OpsUpgradeRunPhase {
 }
 
 function stepDetailOf(step: UpgradeStepDetail): OpsUpgradeStepDetail {
-  return { ...stepOf(step), targets: step.targets.map(targetOf) };
+  return { ...stepOf(step), logTail: [...step.logTail], targets: step.targets.map(targetOf) };
 }
 
 function runOf(run: UpgradeRunDetail): OpsUpgradeRun {

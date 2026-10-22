@@ -7,6 +7,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { TraceDerivationSpanClickHouseRepository } from "../trace-derivation-span.repository.ts";
+import { traceResolverFor } from "./support/authorized-clickhouse.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -61,7 +62,7 @@ function versionRow({ offsetMs, version }: { offsetMs: number; version: string }
 beforeAll(async () => {
   if (!clickHouseConfigured) return;
   ch = await startMigratedTraceClickHouse();
-  repo = TraceDerivationSpanClickHouseRepository.create({ resolveClient: async () => ch });
+  repo = TraceDerivationSpanClickHouseRepository.create({ resolveClient: traceResolverFor(ch) });
 
   // Separate inserts leave unmerged parts; the newest goes first so insertion
   // order cannot pick the winner, and it starts latest so a merge keeps it too.

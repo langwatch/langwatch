@@ -173,6 +173,7 @@ export const organizationManagementRest = defineRestRouter(OrganizationApi)
   .handle(({ app, scope }) => app.getSettings({ organizationId: scope.id }))
 
   .patch("/", "updateOrganization")
+  .keepsRecords()
   .withPermission("organization:manage")
   .withInput(organizationManagementRestUpdateSchema)
   .withOutput(organizationManagementRestSettingsSchema)
@@ -257,6 +258,7 @@ export const organizationManagementRest = defineRestRouter(OrganizationApi)
   })
 
   .patch("/members/:userId", "updateOrganizationMember")
+  .keepsRecords()
   .withPermission("organization:manage")
   .withParams(organizationManagementRestUserIdParamsSchema)
   .withInput(organizationManagementRestUpdateMemberSchema)
@@ -294,6 +296,7 @@ export const organizationManagementRest = defineRestRouter(OrganizationApi)
   })
   .withEntitlement("enterprise", { feature: "MANAGEMENT_API" })
   .withAudit("management.member.delete")
+  .withoutConfirmation("Langy keys cannot hold organization:manage")
   .handle(async ({ app, input, scope, actor }) => {
     await app.deleteMember({ organizationId: scope.id, userId: input.userId }, deriveCaller(actor));
 
@@ -316,6 +319,7 @@ export const organizationManagementRest = defineRestRouter(OrganizationApi)
   })
 
   .post("/invites", "createOrganizationInvites")
+  .keepsRecords()
   .withPermission("organization:manage")
   .withInput(organizationManagementRestCreateInvitesSchema)
   .withOutput(organizationManagementRestCreatedInvitesSchema)
@@ -371,6 +375,7 @@ export const organizationManagementRest = defineRestRouter(OrganizationApi)
   })
   .withEntitlement("enterprise", { feature: "MANAGEMENT_API" })
   .withAudit("management.invite.delete")
+  .withoutConfirmation("Langy keys cannot hold organization:manage")
   .handle(async ({ app, input, scope }) => {
     await app.revokeInvitation({ organizationId: scope.id, inviteId: input.inviteId });
 

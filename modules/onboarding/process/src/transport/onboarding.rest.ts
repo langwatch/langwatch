@@ -40,6 +40,7 @@ export const onboardingRest = defineRestRouter(OnboardingApi)
   .handle(async ({ app }, credential) => app.getGuidedState(credential))
 
   .post("/guided/paths/:path/complete", "postApiOnboardingGuidedPathComplete")
+  .keepsRecords()
   .withAudit("onboarding.completePath")
   .withParams(guidedPathRestParamsSchema)
   .withInput(guidedPathCompleteRestInputSchema)

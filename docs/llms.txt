@@ -363,6 +363,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ### Anthropic (Claude)
 
+- [Claude Platform (Claude API OpenTelemetry)](https://langwatch.ai/docs/integration/anthropic/claude-platform.md): Send OpenTelemetry traces from the Claude API and the Claude SDK to LangWatch, with no code changes for API tracing.
 - [Anthropic Instrumentation](https://langwatch.ai/docs/integration/python/integrations/anthropic.md): Instrument Anthropic API calls with LangWatch’s Python SDK to trace usage, debug issues, and support AI agent testing.
 - [Anthropic (Claude) Integration](https://langwatch.ai/docs/integration/go/integrations/anthropic.md): Instrument Anthropic Claude API calls in Go using LangWatch to track performance, detect errors, and improve AI agent testing.
 
@@ -386,6 +387,10 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Groq Integration](https://langwatch.ai/docs/integration/go/integrations/groq.md): Instrument Groq API calls in Go using LangWatch for LLM observability, cost tracking, and agent evaluation insights.
 - [Grok (xAI) Integration](https://langwatch.ai/docs/integration/go/integrations/grok.md): Instrument Grok (xAI) API calls in Go using LangWatch to capture traces and improve AI agent evaluations.
 - [Ollama (Local Models) Integration](https://langwatch.ai/docs/integration/go/integrations/ollama.md): Instrument local Ollama models in Go to monitor performance, debug RAG flows, and support AI agent testing environments.
+
+### OpenRouter
+
+- [OpenRouter Broadcast Integration](https://langwatch.ai/docs/integration/openrouter-broadcast.md): Send a trace of every OpenRouter request to LangWatch with OpenRouter Broadcast, with no SDK or code change in your application.
 - [OpenRouter Integration](https://langwatch.ai/docs/integration/go/integrations/openrouter.md): Instrument OpenRouter model calls in Go with LangWatch to compare models, track quality, and run AI agent evaluations.
 
 ### LiteLLM
@@ -1096,6 +1101,8 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Create project](https://langwatch.ai/docs/api-reference/projects/create-project.md)
 - [Get project](https://langwatch.ai/docs/api-reference/projects/get-project.md)
 - [Get project API key](https://langwatch.ai/docs/api-reference/projects/get-api-key.md)
+- [List Dashboards boards](https://langwatch.ai/docs/api-reference/projects/list-dashboards-boards.md)
+- [Get a Dashboards board](https://langwatch.ai/docs/api-reference/projects/get-a-dashboards-board.md)
 - [Update project](https://langwatch.ai/docs/api-reference/projects/update-project.md)
 - [Regenerate project API key](https://langwatch.ai/docs/api-reference/projects/regenerate-api-key.md)
 - [Archive project](https://langwatch.ai/docs/api-reference/projects/archive-project.md)

@@ -541,6 +541,7 @@
               {
                 "group": "Anthropic (Claude)",
                 "pages": [
+                  "integration/anthropic/claude-platform",
                   "integration/python/integrations/anthropic",
                   "integration/go/integrations/anthropic"
                 ]
@@ -571,7 +572,13 @@
               "integration/go/integrations/groq",
               "integration/go/integrations/grok",
               "integration/go/integrations/ollama",
-              "integration/go/integrations/openrouter",
+              {
+                "group": "OpenRouter",
+                "pages": [
+                  "integration/openrouter-broadcast",
+                  "integration/go/integrations/openrouter"
+                ]
+              },
               {
                 "group": "LiteLLM",
                 "pages": [
@@ -1488,6 +1495,8 @@
               "api-reference/projects/create-project",
               "api-reference/projects/get-project",
               "api-reference/projects/get-api-key",
+              "api-reference/projects/list-dashboards-boards",
+              "api-reference/projects/get-a-dashboards-board",
               "api-reference/projects/update-project",
               "api-reference/projects/regenerate-api-key",
               "api-reference/projects/archive-project"
@@ -1740,7 +1749,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1792015783",
+      "source": "/ci/cache/busted/1792617910",
       "destination": "/introduction"
     },
     {

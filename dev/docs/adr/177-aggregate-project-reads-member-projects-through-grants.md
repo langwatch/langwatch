@@ -201,7 +201,11 @@ AND StartTime within the grant's window))` onto the query. A trace from a
    list and detail show the owner's existing evaluation results. No monitor
    can be created on an aggregate, and the evaluation trigger subscriber is
    untouched. Online Evals, Test and Build are hidden from the aggregate's
-   navigation; Observe shows Traces. Analytics leaves the navigation until
+   navigation; Observe shows Traces and, since v4.12, Sessions: the
+   coding-agent session list reads through the route's proof, so the page
+   spans the members under their grants' windows on `StartedAt`, and the
+   aggregate offers the destination on its kind alone, since it records no
+   session of its own to grow it from. Analytics leaves the navigation until
    analytics across members ships (v4.8). Annotations on member traces are
    out of scope. (Block D.)
 
@@ -592,8 +596,9 @@ side keeps its existing guards until ADR-166's `prisma.as` lands.
   the proof, the fold store and the settle confirm with an own-only
   internal one. The lint gate refuses any call from a trace router into a
   proof-taking service whose own arguments carry no proof, positional or
-  named; log records and coding-agent sessions stay behind a counted
-  baseline. An aggregate is never the project the app lands on. Not
+  named; log records and the coding-agent reads other than the session
+  list (proof-fenced since v4.12) stay behind a counted baseline. An
+  aggregate is never the project the app lands on. Not
   delivered: analytics across members, because every analytics read goes
   through a raw client over three tables and the rollup windows on
   `BucketStart`, a time column the client does not admit; the scenario
@@ -818,3 +823,21 @@ side keeps its existing guards until ADR-166's `prisma.as` lands.
   throws, so the outbox tries it again on the same ladder, and the grants
   already attached read as held on that try. (The "next reconcile" that
   v4.10 relied on for a refused attach was the sweep.)
+- v4.12 (2026-10-13, decision 8 changed: Sessions on the aggregate). The
+  coding-agent session list (`codingAgents.sessionsList`) takes the proof
+  its route already minted and reads `coding_agent_sessions` through the
+  proof-checked client, `StartedAt` admitted as a fence time column (it is
+  the table's partition key). An aggregate's page therefore spans its
+  members under their windows; a plain project's reads its own rows as
+  before. The latest-version group is bound to the same tenant set, and the
+  in-memory collapse keys on tenant and session, since one session id in
+  two members is two sessions. The metric-series fill runs per tenant the
+  rows came back under. Viewer protections for the list fold the proof in
+  (decision 9), so the title and cost gates are the strictest across the
+  members. The navigation offers Sessions on the aggregate kind alone, no
+  recency signal, because an aggregate owns no session to touch
+  `lastCodingAgentSessionAt`. Not moved: the other coding-agent procedures
+  (`usageTotals`, `recentSessions`, `pullRequestUsage`, the session and
+  transcript reads) keep their own tenant and find nothing on an aggregate;
+  the session rows carry no member name, so the page does not yet say which
+  member a session belongs to.

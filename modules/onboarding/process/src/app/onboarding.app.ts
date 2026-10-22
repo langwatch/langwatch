@@ -34,6 +34,7 @@ import {
 import { withInstanceFacts } from "../rules/guided-onboarding-instance.rules.ts";
 import { GuidedOnboardingService } from "../services/guided-onboarding.service.ts";
 import { OnboardingChecksService } from "../services/onboarding-checks.service.ts";
+import { OnboardingVariantService } from "../services/onboarding-variant.service.ts";
 import type { IntegrationsChecksApi } from "../transport/integrations-checks.trpc.ts";
 
 type OnboardingSetup = FeatureSetup<typeof OnboardingModule.dependencies, undefined>;
@@ -58,6 +59,7 @@ export class OnboardingModule implements OnboardingApiContract, IntegrationsChec
   };
 
   readonly #guided: GuidedOnboardingService;
+  readonly #variants: OnboardingVariantService;
   readonly #checks: OnboardingChecksService;
   readonly #permissions: AuthzApi;
   readonly #gateway: Pick<GatewayApi, "getDeploymentAddresses">;
@@ -71,6 +73,7 @@ export class OnboardingModule implements OnboardingApiContract, IntegrationsChec
 
   private constructor(parts: {
     guided: GuidedOnboardingService;
+    variants: OnboardingVariantService;
     checks: OnboardingChecksService;
     permissions: AuthzApi;
     gateway: Pick<GatewayApi, "getDeploymentAddresses">;
@@ -80,6 +83,7 @@ export class OnboardingModule implements OnboardingApiContract, IntegrationsChec
     senders: { commands?: EventingCommands<GuidedOnboardingLifecyclePipeline> };
   }) {
     this.#guided = parts.guided;
+    this.#variants = parts.variants;
     this.#checks = parts.checks;
     this.#permissions = parts.permissions;
     this.#gateway = parts.gateway;
@@ -92,13 +96,25 @@ export class OnboardingModule implements OnboardingApiContract, IntegrationsChec
   static create(setup: OnboardingSetup): OnboardingModule {
     const lifecycle = buildGuidedOnboardingLifecyclePipeline();
     const senders: { commands?: EventingCommands<GuidedOnboardingLifecyclePipeline> } = {};
+    const connected = () => {
+      if (!senders.commands) {
+        throw new Error("guided_onboarding_lifecycle pipeline senders are not connected yet");
+      }
+      return senders.commands;
+    };
     const guided = GuidedOnboardingService.create({
       organizations: setup.dependencies.organizations,
       announce: async (input) => {
-        if (!senders.commands) {
-          throw new Error("guided_onboarding_lifecycle pipeline senders are not connected yet");
-        }
-        await senders.commands.recordGuidedOnboarding.send({
+        await connected().recordGuidedOnboarding.send({
+          tenantId: input.organizationId,
+          occurredAt: nowInstant().epochMilliseconds,
+          ...input,
+        });
+      },
+    });
+    const variants = OnboardingVariantService.create({
+      announce: async (input) => {
+        await connected().recordOnboardingVariantAssigned.send({
           tenantId: input.organizationId,
           occurredAt: nowInstant().epochMilliseconds,
           ...input,
@@ -124,6 +140,7 @@ export class OnboardingModule implements OnboardingApiContract, IntegrationsChec
 
     return new OnboardingModule({
       guided,
+      variants,
       checks,
       permissions: setup.dependencies.permissions,
       gateway: setup.dependencies.gateway,
@@ -177,6 +194,14 @@ export class OnboardingModule implements OnboardingApiContract, IntegrationsChec
     await this.authorizeOrganizationView(input.userId, input.organizationId);
 
     return this.#guided.recordProviderSkipped(this.actorOf(input));
+  }
+
+  async recordProviderPromptDismissed(
+    input: OnboardingCallerInput,
+  ): Promise<GuidedOnboardingState> {
+    await this.authorizeOrganizationView(input.userId, input.organizationId);
+
+    return this.#guided.recordProviderPromptDismissed(this.actorOf(input));
   }
 
   async recordVirtualKeyReveal(
@@ -240,6 +265,15 @@ export class OnboardingModule implements OnboardingApiContract, IntegrationsChec
         : { ...rest, signUpData: { ...rest.signUpData, onboardingVariant } },
       by,
     );
+    // The welcome screen sends the variant inside the sign-up data; other callers name it on top.
+    const assignedVariant = onboardingVariant ?? rest.signUpData?.onboardingVariant;
+    if (assignedVariant) {
+      await this.#variants.recordAssigned({
+        organizationId: initialized.organizationId,
+        userId: by.id,
+        variant: assignedVariant,
+      });
+    }
     // A null slug lands the coding-agent track on its personal portal (ADR-038 v6).
     if (input.primaryIntent === "AGENT_GOVERNANCE") return { ...initialized, projectSlug: null };
 

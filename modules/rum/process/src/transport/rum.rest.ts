@@ -22,6 +22,7 @@ export const rumRest = defineRestRouter(RumApi)
   .withAddressing("literal", { v1Twin: false })
 
   .post(RUM_TRACES_PATH, "ingestBrowserTraces")
+  .keepsRecords()
   .withoutAudit("ingestion")
   .withRawBody("text")
   .withBodyLimit({

@@ -9,8 +9,10 @@ import { clearTimeout, setTimeout } from "node:timers";
 import {
   CHILD_PROCESS,
   ScenarioAgentInstanceSchema,
+  scenarioRunHooksSchema,
   type ChildProcessJobData,
   type ScenarioExecutionResult,
+  type ScenarioRunHooks,
 } from "@langwatch/scenario-contract";
 import { z } from "zod";
 
@@ -30,6 +32,7 @@ type ScenarioChildProcessResult = {
   reasoning?: string;
   agentInstance?: { hostname: string; label: string | null };
   isCutAtLimit?: boolean;
+  hooks?: ScenarioRunHooks;
 };
 
 const scenarioChildProcessResultSchema = z.object({
@@ -40,6 +43,8 @@ const scenarioChildProcessResultSchema = z.object({
   agentInstance: ScenarioAgentInstanceSchema.optional(),
   /** LangWatch ended the voice call at the maximum call duration. */
   isCutAtLimit: z.boolean().optional(),
+  /** The setup and teardown results, on a passing and a failing line alike (ADR-180). */
+  hooks: scenarioRunHooksSchema.optional(),
 });
 
 /** Registers a spawned child with the pool and reads its exit, whichever runner it is. */
@@ -223,7 +228,8 @@ function childExitResult({
       exitCode: code,
       stderr,
     });
-    return { success: false, error };
+    // A failed run still ran its teardown, and its record matters most then.
+    return { success: false, error, ...(childResult?.hooks ? { hooks: childResult.hooks } : {}) };
   }
 
   log("info", "Scenario completed successfully", { exitCode: code });
@@ -236,5 +242,6 @@ function childExitResult({
     ...(childResult?.reasoning ? { reasoning: childResult.reasoning } : {}),
     ...(childResult?.agentInstance ? { agentInstance: childResult.agentInstance } : {}),
     ...(childResult?.isCutAtLimit ? { isCutAtLimit: true } : {}),
+    ...(childResult?.hooks ? { hooks: childResult.hooks } : {}),
   };
 }

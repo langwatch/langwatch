@@ -61,7 +61,7 @@ export function useBoardFromTemplate() {
     widgetSource: BoardSource["widgetSource"];
     dashboardId: string;
   }) => {
-    await client.dashboards.updateDetails.mutate({ projectId, dashboardId, description });
+    await client.boards.update.mutate({ projectId, dashboardId, description });
     // Independent rows, so the creates run together; the layout lands in one write after.
     const layouts = await Promise.all(
       widgets.map(async (widget) => {
@@ -95,13 +95,13 @@ export function useBoardFromTemplate() {
     setCreatingId(source.id);
     const refresh = () =>
       Promise.all([
-        utils.dashboards.getAll.invalidate({ projectId }),
+        utils.boards.getAll.invalidate({ projectId }),
         utils.dashboardWidgets.list.invalidate({ projectId }),
       ]);
     let dashboardId: string | undefined;
     try {
       const widgets = await source.widgets();
-      const board = await client.dashboards.create.mutate({
+      const board = await client.boards.create.mutate({
         projectId,
         name: templateBoardName({ templateName: source.name, existingNames }),
       });
@@ -119,7 +119,7 @@ export function useBoardFromTemplate() {
     } catch (error) {
       host.failed({ error, fallbackTitle });
       if (dashboardId !== void 0) {
-        await client.dashboards.delete.mutate({ projectId, dashboardId }).catch(() => {
+        await client.boards.delete.mutate({ projectId, dashboardId }).catch(() => {
           // Best effort: a leftover board stays listed and can be deleted by hand.
         });
       }

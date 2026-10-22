@@ -24,13 +24,17 @@ import {
   fireGuidedOnboardingPostHog,
   fireGuidedOnboardingProgress,
   fireGuidedTurnFailedPostHog,
+  fireOnboardingVariantAssignedPostHog,
   postHogUuidFor,
 } from "../rules/nurturing-guided-onboarding-service.rules.ts";
 import {
   fireInviteAccepted,
   fireSsoAutoAdded,
 } from "../rules/nurturing-membership-join-service.rules.ts";
-import { activationTrackInput } from "../rules/nurturing-posthog-activation.rules.ts";
+import {
+  activationTrackInput,
+  evaluationsCompletedEvent,
+} from "../rules/nurturing-posthog-activation.rules.ts";
 import {
   fireIntegrationMethod,
   integrationMethodFor,
@@ -286,6 +290,8 @@ export class NurturingDeliveryService {
             currentPath: signal.state.currentPath,
           }),
         );
+      case "onboarding_variant_assigned":
+        return posthog.track(fireOnboardingVariantAssignedPostHog(signal));
       case "scenario_created":
       case "scenario_run_succeeded":
       case "first_trace_integrated":
@@ -294,6 +300,8 @@ export class NurturingDeliveryService {
       case "experiment_ran":
       case "evaluation_ran":
         return track({ userId: signal.userId, event: "evaluation_ran" });
+      case "evaluation_completed":
+        return track(evaluationsCompletedEvent(signal));
       case "user_registered":
         return track({ userId: signal.userId, event: "signed_up" });
       case "user_created":
@@ -404,7 +412,11 @@ export class NurturingDeliveryService {
       {
         type: "identify",
         userId,
-        traits: { has_simulations: true, simulation_count: 1, first_simulation_at: at },
+        traits: {
+          has_simulations: true,
+          simulation_count: organizationRunCount,
+          first_simulation_at: at,
+        },
       },
       {
         type: "track",
@@ -415,7 +427,7 @@ export class NurturingDeliveryService {
     ]);
   }
 
-  /** Main's evaluation sync, plus `evaluation_ran` for every one; `first` picks the milestone. */
+  /** Main's evaluation sync once per batch; `first` picks the milestone, `count` the batch's. */
   private evaluationCompleted(signal: NurturingSignalOf<"evaluation_completed">): void {
     const { userId, projectId, organizationEvaluationCount: count } = signal;
     const at = isoOf(signal.occurredAt);
@@ -424,7 +436,7 @@ export class NurturingDeliveryService {
           {
             type: "identify",
             userId,
-            traits: { has_evaluations: true, evaluation_count: 1, first_evaluation_at: at },
+            traits: { has_evaluations: true, evaluation_count: count, first_evaluation_at: at },
           },
           {
             type: "track",
@@ -442,6 +454,7 @@ export class NurturingDeliveryService {
         evaluation_id: signal.evaluationId,
         score: signal.score,
         passed: signal.passed,
+        count: signal.evaluationsCounted ?? 1,
       },
     });
     this.sendCustomerIoCalls(calls);

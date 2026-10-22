@@ -86,6 +86,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
 
   // ── POST /:slug/run  (CI/CD execution) ────────────────────────────────
   .post("/:slug/run", "postApiExperimentsBySlugRun")
+  .keepsRecords()
   .withParams(slugParamsSchema)
   // The body is read unparsed under any Content-Type, as main read it: an
   // empty one is a full run, malformed JSON is a 400 in this family's own
@@ -228,6 +229,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
 
   // ── PUT /:slug/workbench-state ───────────────────────────────────────
   .put("/:slug/workbench-state", "putApiExperimentsBySlugWorkbenchState")
+  .keepsRecords()
   .withParams(slugParamsSchema)
   .withInput(saveWorkbenchStateBodySchema)
   .withPermission("experiments:update")
@@ -284,6 +286,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
 
   // ── POST /:slug/versions/:version/restore ────────────────────────────
   .post("/:slug/versions/:version/restore", "postApiExperimentsBySlugVersionsByVersionRestore")
+  .keepsRecords()
   .withParams(slugVersionParamsSchema)
   .withPermission("experiments:update")
   .withAudit("experiments.restoreWorkbenchVersion")

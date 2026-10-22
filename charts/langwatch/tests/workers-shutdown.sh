@@ -234,6 +234,30 @@ test_raised_drain_alone_refuses_to_render() {
     "too short for a 60s shutdown drain"
 }
 
+# @scenario "The app pod sleeps before SIGTERM so its endpoint removal propagates"
+test_app_pre_stop_sleep() {
+  local block
+  block=$(render_component "app" "$BASE")
+  case "$block" in
+    *'command: ["sleep", "5"]'*) echo "ok   [app preStop] sleeps 5s before SIGTERM" ;;
+    *) fail "app preStop" "the app container has no 5s preStop sleep" ;;
+  esac
+  expect_render_refused "preStop too long for the grace" \
+    "--set app.preStopSleepSeconds=10" \
+    "too short for a 10s preStop sleep"
+  local bad
+  for bad in "--set-string app.preStopSleepSeconds=5.5" "--set-string app.preStopSleepSeconds=abc" \
+    "--set app.preStopSleepSeconds=-1" "--set-string app.preStopSleepSeconds=99999999999999999999"; do
+    expect_render_refused "preStop ${bad#*=}" "$bad" \
+      "app.preStopSleepSeconds must be a whole number of seconds"
+  done
+  block=$(render_component "app" "$BASE --set app.preStopSleepSeconds=0")
+  case "$block" in
+    *preStop*) fail "app preStop off" "preStopSleepSeconds=0 still rendered a preStop" ;;
+    *) echo "ok   [app preStop off] zero renders no preStop" ;;
+  esac
+}
+
 # Raising both together is the supported path and must still render.
 test_raising_both_together_renders() {
   local block got
@@ -256,6 +280,7 @@ test_raised_drain_alone_refuses_to_render
 test_junk_drain_refuses_to_render
 test_extra_envs_cannot_override_the_drain
 test_raising_both_together_renders
+test_app_pre_stop_sleep
 
 if [ "$failures" -gt 0 ]; then
   echo "$failures assertion(s) failed"

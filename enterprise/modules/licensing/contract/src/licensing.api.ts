@@ -30,7 +30,7 @@ import type {
   SignedIssuedLicense,
 } from "./issued-license.ts";
 import type { PlanInfo } from "./license-constants.ts";
-import type { IssueLicenseInput } from "./license-registry.ts";
+import type { IssuedLicenseFilters, IssueLicenseInput } from "./license-registry.ts";
 import type {
   ConnectCredentialResolution,
   ConnectActivationCaller,
@@ -54,9 +54,18 @@ import type {
 import type {
   IncomingUsageReport,
   SelfHostedInstanceDetail,
+  SelfHostedInstanceFilters,
   SelfHostedInstancePage,
+  SelfHostedInstanceSummary,
   SelfHostedSignal,
 } from "./self-hosted-instance.ts";
+import type {
+  UpgradeDiagnosticsAvailability,
+  UpgradeDiagnosticsDownload,
+  UpgradeDiagnosticsReceipt,
+  UpgradeDiagnosticsReport,
+  UpgradeDiagnosticsSubmission,
+} from "./upgrade-diagnostics.ts";
 
 /** The portable signed-license capability supplied to process peers. */
 export interface LicensingApi {
@@ -140,11 +149,13 @@ export interface LicensingApi {
     operatorId: string;
   }): Promise<IssuedLicenseView>;
   getIssuedLicense(input: { id: string }): Promise<IssuedLicenseView>;
-  listIssuedLicenses(input: {
-    page: number;
-    pageSize: number;
-    search?: string;
-  }): Promise<IssuedLicensePage>;
+  listIssuedLicenses(
+    input: {
+      page: number;
+      pageSize: number;
+      search?: string;
+    } & IssuedLicenseFilters,
+  ): Promise<IssuedLicensePage>;
 
   /** Who a presented `lwl_` bearer is, for a hosted route on LangWatch Cloud. */
   resolveConnectCredential(input: {
@@ -222,6 +233,8 @@ export interface LicensingApi {
     optionalMetricsOptOut?: boolean;
     hostnameOptOut?: boolean;
   }): Promise<void>;
+  /** Keeps the hourly check from sending a failed upgrade step's diagnostics by itself. */
+  setUpgradeDiagnosticsOptOut(input: { optOut: boolean }): Promise<void>;
 
   /** What a customer's licenses add up to commercially, right now. */
   getContractTerms(input: { organizationId: string }): Promise<ContractTerms>;
@@ -275,12 +288,34 @@ export interface LicensingApi {
    * license bound to that instance and never from the report.
    */
   recordUsageReport(input: IncomingUsageReport): Promise<SelfHostedSignal[]>;
-  listSelfHostedInstances(input: {
-    page: number;
-    pageSize: number;
-    search?: string;
-  }): Promise<SelfHostedInstancePage>;
+  listSelfHostedInstances(
+    input: {
+      page: number;
+      pageSize: number;
+      search?: string;
+    } & SelfHostedInstanceFilters,
+  ): Promise<SelfHostedInstancePage>;
   getSelfHostedInstance(input: { id: string }): Promise<SelfHostedInstanceDetail>;
+  summarizeSelfHostedInstances(): Promise<SelfHostedInstanceSummary>;
+
+  /**
+   * A failed upgrade step's diagnostics (dev/docs/plans/upgrade-diagnostics-via-connect.md).
+   * The install sends a bundle with its licence credential; Cloud keeps it 30 days.
+   */
+  sendUpgradeDiagnostics(
+    submission: UpgradeDiagnosticsSubmission,
+  ): Promise<UpgradeDiagnosticsReceipt>;
+  /** Whether this install can send one: Connect permitted and a licence that carries a token. */
+  getUpgradeDiagnosticsAvailability(): Promise<UpgradeDiagnosticsAvailability>;
+  /** The licence host's intake, from the install its door verified; a refusal throws its code. */
+  recordUpgradeDiagnostics(input: {
+    caller: ConnectLicenceCaller;
+    submission: UpgradeDiagnosticsSubmission;
+  }): Promise<UpgradeDiagnosticsReceipt>;
+  /** Every report one instance sent, newest first; empty for an instance that sent none. */
+  findUpgradeDiagnostics(input: { instanceRowId: string }): Promise<UpgradeDiagnosticsReport[]>;
+  /** A five-minute link to one report's bundle; an unknown id throws its code. */
+  getUpgradeDiagnosticsDownload(input: { id: string }): Promise<UpgradeDiagnosticsDownload>;
 }
 
 /** Re-exported so a peer naming a service does not reach past the api file. */

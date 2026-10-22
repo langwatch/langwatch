@@ -35,6 +35,7 @@ export const TEST_LICENSING_CONFIG: LicensingServerConfig = {
   isSaas: false,
   serviceVersion: "test",
   otelResourceAttributes: void 0,
+  publicBaseUrl: "https://app.langwatch.test",
   outboundProxy: {
     HTTPS_PROXY: void 0,
     https_proxy: void 0,
