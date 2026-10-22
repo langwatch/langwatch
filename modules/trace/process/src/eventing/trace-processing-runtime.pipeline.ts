@@ -1,3 +1,4 @@
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EventingParticipation, FoldReadAuthorizer } from "@langwatch/eventing";
@@ -14,6 +15,7 @@ import type { TraceBlobStoreService } from "../features/media/services/trace-blo
 import { TraceMediaReferenceService } from "../features/media/services/trace-media-reference.service.ts";
 import { leanForProjection } from "../features/projection/rules/trace-projection-lean.rules.ts";
 import { OtlpSpanCostEnrichmentService } from "../features/span/services/span-cost-enrichment.service.ts";
+import { SpanSignatureVerificationService } from "../features/span/services/span-signature-verification.service.ts";
 import { OtlpSpanTokenEstimationService } from "../features/span/services/span-token-estimation.service.ts";
 import { TraceSpanNormalizationAdapterService } from "../features/span/services/trace-span-normalization-adapter.service.ts";
 import type { TraceRepositories } from "../repositories/trace.repositories.ts";
@@ -48,6 +50,8 @@ import {
 } from "./tracked-event-sync.subscriber.ts";
 
 interface TraceProcessingPeers {
+  /** Checks a span's braid signature at admission (ADR-183 §4). */
+  apiKeys: Pick<ApiKeyApi, "verifyBraidSignature">;
   dataPrivacy: Pick<DataPrivacyApi, "redactSpan" | "dropSpanContent">;
   dataRetention: Pick<
     DataRetentionApi,
@@ -55,7 +59,7 @@ interface TraceProcessingPeers {
   >;
   featureFlags: FeatureFlagApi;
   modelProviders: Pick<ModelProviderApi, "listCosts">;
-  projects: Pick<ProjectApi, "findById" | "updateMetadata" | "resolveOrgAdmin">;
+  projects: Pick<ProjectApi, "findById" | "findIdentity" | "updateMetadata" | "resolveOrgAdmin">;
 }
 
 export interface TraceProcessingPipelineInput {
@@ -154,6 +158,10 @@ export class TraceProcessingRuntimeAdapter {
         costEnrichment: this.#costEnrichment(),
         tokenEstimation: this.#tokenEstimation(),
         spool: this.#spool(),
+        signatures: SpanSignatureVerificationService.create({
+          signatures: peers.apiKeys,
+          projects: peers.projects,
+        }),
       }),
     })
       .build()

@@ -9,8 +9,9 @@
 # A signature covers the trace, not one hop: it travels down the whole call chain, and
 # never into another trace. Verified("k") means "the reader signed k for this trace".
 #
-# EVERY SCENARIO IS @unimplemented: none of this is built. Each carries the level its
-# binding is expected at, and the pull request that builds it binds it.
+# Admission is bound at the record-span command with an honest key directory double; key
+# rotation, revocation timing and counting are the API key module's own (signing-keys.feature).
+# Scenarios still @unimplemented carry the level their binding is expected at.
 
 @trace @braids @ingestion
 Feature: Signed calls
@@ -24,7 +25,7 @@ Feature: Signed calls
 
   Rule: Ingest marks an entry verified only when its signature checks out
 
-    @integration @unimplemented
+    @unit
     Scenario: A span carrying a valid signature is marked verified
       Given "orchestrator" signed the entry orchestrator "web" for a call into "specialists"
       When "specialists" sends a span carrying the entry and the signature
@@ -37,38 +38,38 @@ Feature: Signed calls
       Then the span is stored without a verified mark
       And the failure is counted against the key the signature named
 
-    @unit @unimplemented
+    @unit
     Scenario: A signature made in one trace does not verify in another
       Given a valid signature taken from a call in one trace
       When a span in a different trace carries the same entry and signature
       Then the span is stored without a verified mark
 
-    @integration @unimplemented
+    @unit
     Scenario: A signed entry stays verified down the call chain within its trace
       Given "orchestrator" signed the entry orchestrator "web" for a call into "specialists"
       And "specialists" called a third project "search" within the same trace, passing the baggage on
       When "search" sends a span carrying the entry and the signature
       Then the stored span marks orchestrator as verified by "orchestrator"
 
-    @unit @unimplemented
+    @unit
     Scenario: A signed entry with a changed value does not verify
       Given "orchestrator" signed the entry orchestrator "web"
       When a span carries the signature with the entry changed to orchestrator "app"
       Then the span is stored without a verified mark
 
-    @unit @unimplemented
+    @unit
     Scenario: A client cannot send its own verified mark
       When a span arrives carrying an attribute under langwatch.reserved.verified
       Then the attribute is removed before the span is stored
       And the verified prefix is never on the list of reserved attributes clients may send
 
-    @unit @unimplemented
+    @unit
     Scenario: A signing key is only looked up inside the span's own organisation
       Given a signature made with a key of a project in another organisation
       When "specialists" sends a span carrying it
       Then the span is stored without a verified mark
 
-    @unit @unimplemented
+    @unit
     Scenario: A key lookup that cannot run leaves the span unverified, not refused
       Given the signing key lookup is unavailable
       When "specialists" sends a span carrying a valid signature
@@ -84,7 +85,7 @@ Feature: Signed calls
       Then it is marked verified
       And one signed with the old key after seven days is not
 
-    @integration @unimplemented
+    @unit
     Scenario: A revoked key stops verifying within a minute
       Given "orchestrator" revoked its signing key
       When a span signed with that key arrives a minute later

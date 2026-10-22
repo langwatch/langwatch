@@ -61,6 +61,14 @@ export interface TraceSpanContentDrop {
   drop(span: OtlpSpan, projectId: string): Promise<TraceSpanContentDropResult>;
 }
 
+/**
+ * ADR-183 §4: the verified marks a signed span earns; never rejects, empty when unverified.
+ * Reads the span before its first await, so later steps may change the span meanwhile.
+ */
+export interface TraceSpanSignatureVerification {
+  verifiedMarks(input: { span: OtlpSpan; projectId: string }): Promise<OtlpSpan["attributes"]>;
+}
+
 export type TraceSpanSpoolIdentity = {
   spoolRef: string;
   projectId: string;
@@ -109,6 +117,8 @@ export type RecordSpanCommandOptions = {
   tokenEstimation: TraceSpanTokenEstimation;
   contentDrop: TraceSpanContentDrop;
   spool?: TraceSpanSpool;
+  /** Absent, no span is marked verified: the safe direction (ADR-183 §4, no forged mark). */
+  signatures?: TraceSpanSignatureVerification;
 };
 
 /** Turns one prepared raw span into Trace's one durable aggregate event. */
@@ -123,7 +133,8 @@ export class EventingRecordSpanAdapter implements CommandHandler<
   );
 
   private static readonly RESERVED_ATTRIBUTE_PREFIX = "langwatch.reserved.";
-  private static readonly RESERVED_ATTRIBUTE_PASSTHROUGH = new Set([
+  /** Never holds the verified prefix: only verification at ingest writes a mark (ADR-183 §4). */
+  static readonly RESERVED_ATTRIBUTE_PASSTHROUGH: ReadonlySet<string> = new Set([
     "langwatch.reserved.causality_depth",
     "langwatch.reserved.skip_token_accumulation",
   ]);
@@ -206,6 +217,8 @@ export class EventingRecordSpanAdapter implements CommandHandler<
     const resource = commandData.resource ? clonePayload(commandData.resource) : null;
 
     this.stripReservedAttributes(span, resource);
+    // Read off the stripped span before any later step rewrites a signed value.
+    const verifiedMarks = this.verifiedMarksOf({ span, projectId: command.tenantId });
     this.capAttributes({ span, resource, tenantId, traceId, spanId });
 
     const piiRedactionLevel = commandData.piiRedactionLevel ?? DEFAULT_PII_REDACTION_LEVEL;
@@ -246,6 +259,8 @@ export class EventingRecordSpanAdapter implements CommandHandler<
         "Dropped span content per data-privacy policy",
       );
     }
+
+    span.attributes.push(...(await verifiedMarks));
 
     const spanReceivedEvent = EventUtils.createEvent<SpanReceivedEvent>({
       aggregateType: "trace",
@@ -348,6 +363,22 @@ export class EventingRecordSpanAdapter implements CommandHandler<
       { tenantId, traceId, spanId, cappedAttributeCount },
       "Capped oversized span attribute value(s) before ingestion",
     );
+  }
+
+  /** Started alongside the other enrichments; a failure leaves the span unverified. */
+  private verifiedMarksOf({
+    span,
+    projectId,
+  }: {
+    span: OtlpSpan;
+    projectId: string;
+  }): Promise<OtlpSpan["attributes"]> {
+    const { signatures } = this.options;
+    if (!signatures) return Promise.resolve([]);
+    return signatures.verifiedMarks({ span, projectId }).catch((error) => {
+      this.logger.warn({ error }, "Signature verification failed, span stays unverified");
+      return [];
+    });
   }
 
   private reportNonCriticalFailure(result: PromiseSettledResult<void>, message: string): void {
