@@ -102,8 +102,7 @@ export interface CodingAgentApi {
   ): Promise<TracesSessionsPage>;
   /** Records who read an answer that names people. */
   recordPullRequestUsageRead(read: CodingAgentPullRequestUsageRead): Promise<void>;
-  /** The host pull requests are mapped under, never the web origin's name. */
-  githubRepositoryHost(): string;
+  githubWebBase(): string;
   findOrganizationForProject(projectId: string): Promise<string | undefined>;
   getPullRequestUsage(
     pullRequest: {

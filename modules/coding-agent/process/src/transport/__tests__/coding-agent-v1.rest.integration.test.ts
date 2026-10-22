@@ -219,7 +219,7 @@ function mount(overrides: Overrides) {
   const hono = runtime.mount(codingAgentV1Rest.router(), {
     app: () =>
       createApiFixture<CodingAgentApi>({
-        githubRepositoryHost: () => "github.com",
+        githubWebBase: () => "https://github.com",
         getOrganizationPullRequestUsage,
         recordPullRequestUsageRead,
       }),

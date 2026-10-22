@@ -71,7 +71,7 @@ export const codingAgentV1Rest = defineRestRouter(CodingAgentApi)
     responses: baseResponses,
   })
   .handle(async ({ app, input, scope }, caller) => {
-    const host = input.host ?? app.githubRepositoryHost();
+    const host = input.host ?? new URL(app.githubWebBase()).hostname;
 
     // The credential is the principal, not its holder: a deliberately narrowed
     // key must read with its own scope rather than the full reach of whoever

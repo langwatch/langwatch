@@ -129,7 +129,7 @@ export const codingAgentRollupRest = defineRestRouter(CodingAgentApi)
             apiKeyId: caller.credential.apiKeyId,
             userId: caller.credential.userId,
           };
-    const host = input.host ?? app.githubRepositoryHost();
+    const host = input.host ?? new URL(app.githubWebBase()).hostname;
 
     // The application resolves the organization behind the project, refuses an
     // orphan as "not mapped", and applies the same permission cut the in-app
