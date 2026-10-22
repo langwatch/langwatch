@@ -107,6 +107,13 @@ Feature: The Braids screen
       Then the create button reads "Braid into orchestrator"
       And creating closes the dialog and lists the new braid
 
+    @integration
+    Scenario: Editing a braid saves only a change
+      Given a live braid from "specialists" into "orchestrator"
+      When ana opens Edit on it
+      Then the reader is fixed and Save stays off until the condition, start or end changes
+      And saving the changed braid replaces it
+
   Rule: The list shows each braid and what it is doing
 
     @integration

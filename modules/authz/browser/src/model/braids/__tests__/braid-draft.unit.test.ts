@@ -5,6 +5,8 @@ import type { AuthzBraid } from "@langwatch/authz-contract";
 import { describe, expect, it } from "vitest";
 
 import {
+  braidDraftChanged,
+  braidDraftOf,
   braidTargetLabel,
   braidsOnPair,
   insertAttribute,
@@ -157,5 +159,36 @@ describe("braidsOnPair", () => {
     expect(
       pairBraidsPhrase({ readerName: "checkout-web", ownerName: "payments-agent", count: 2 }),
     ).toBe("checkout-web already sees spans from 2 braids from payments-agent");
+  });
+});
+
+describe("braidDraftChanged", () => {
+  const saved: AuthzBraid = {
+    braidId: "b-1",
+    ownerProjectId: "p-spec",
+    readerProjectId: "p-orch",
+    where: 'attributes["team"] == "a"',
+    fromMs: 1_000,
+    expiresAtMs: null,
+    createdByUserId: null,
+    createdAtMs: 0,
+  };
+  const nowMs = 5_000;
+
+  it("says an edit that keeps every term is unchanged", () => {
+    const draft = { ...braidDraftOf(saved), where: ' attributes["team"] == "a" ' };
+
+    expect(braidDraftChanged({ draft, braid: saved, nowMs })).toBe(false);
+  });
+
+  it.each([
+    ["the condition", { where: 'attributes["team"] == "b"' }],
+    ["the start", { fromMs: 2_000 }],
+    ["the end", { ends: { kind: "date" as const, dateMs: 9_000 } }],
+    ["a relative end", { ends: { kind: "days" as const, days: 30 as const } }],
+  ])("says an edit to %s is a change", (_term, edit) => {
+    const draft = { ...braidDraftOf(saved), ...edit };
+
+    expect(braidDraftChanged({ draft, braid: saved, nowMs })).toBe(true);
   });
 });

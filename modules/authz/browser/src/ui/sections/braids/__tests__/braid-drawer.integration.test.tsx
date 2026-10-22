@@ -397,16 +397,21 @@ describe("the braid drawer", () => {
   });
 
   describe("when ana edits a braid into another project", () => {
+    /** @scenario Editing a braid saves only a change */
     it("opens it prefilled with the reader fixed and saves the change", async () => {
       braidsFake.state.project = { intoOtherProjects: [liveBraid()], fromOtherProjects: [] };
       const { user } = openDrawer({ braid: "b-1" });
 
       expect(screen.getByTestId("braid-condition")).toHaveValue(CONDITION);
       expect(screen.getByTestId("braid-into")).toBeDisabled();
+      expect(screen.getByTestId("braid-save")).toBeDisabled();
+
+      const changed = `${CONDITION} and attributes["team"] == "billing"`;
+      await writeCondition(user, changed);
       await user.click(screen.getByTestId("braid-save"));
 
       expect(braidsFake.state.change).toHaveBeenCalledWith(
-        expect.objectContaining({ braidId: "b-1", readerProjectId: "p-orch", where: CONDITION }),
+        expect.objectContaining({ braidId: "b-1", readerProjectId: "p-orch", where: changed }),
       );
     });
   });

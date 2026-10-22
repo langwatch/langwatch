@@ -83,6 +83,23 @@ export function braidDraftReady({ draft, nowMs }: { draft: BraidDraft; nowMs: nu
   return expiresAtMs === undefined || expiresAtMs > nowMs;
 }
 
+/** Whether an edit saves terms other than the braid it opened; a relative end always does. */
+export function braidDraftChanged({
+  draft,
+  braid,
+  nowMs,
+}: {
+  draft: BraidDraft;
+  braid: AuthzBraid;
+  nowMs: number;
+}): boolean {
+  return (
+    draft.where.trim() !== (braid.where ?? "").trim() ||
+    draft.fromMs !== braid.fromMs ||
+    (expiresAtMsOf({ ends: draft.ends, nowMs }) ?? null) !== braid.expiresAtMs
+  );
+}
+
 const VERIFIED = /Verified\("([^"]*)"\)/;
 
 /** The key `Verified("k")` names in the condition, when it holds one. */

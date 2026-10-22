@@ -25,6 +25,7 @@ import {
 import { useAuthzHost } from "../../../model/authz-host.ts";
 import {
   type BraidDraft,
+  braidDraftChanged,
   braidDraftOf,
   braidsOnPair,
   braidDraftReady,
@@ -123,7 +124,7 @@ function saveBlockedReason({
   if (!conditionOk) return "Fix the condition first";
   const expiresAtMs = expiresAtMsOf({ ends: draft.ends, nowMs });
   if (expiresAtMs !== undefined && expiresAtMs <= nowMs) return "Pick an end after today";
-  return "Finish the braid first";
+  return "Change the braid to save it";
 }
 
 export function BraidDrawer({ projectId, editing, braidsInto, onClose }: BraidDrawerProps) {
@@ -169,7 +170,8 @@ export function BraidDrawer({ projectId, editing, braidsInto, onClose }: BraidDr
     draft,
     nowMs,
   });
-  const ready = braidDraftReady({ draft, nowMs });
+  const unchanged = !!editing && !braidDraftChanged({ draft, braid: editing, nowMs });
+  const ready = braidDraftReady({ draft, nowMs }) && !unchanged;
 
   return (
     <Drawer
