@@ -325,18 +325,14 @@ Feature: Braids
       Then no "orchestrator" trace shows a "specialists" span
       And the braid is not recorded as removed
 
-    # Unimplemented until the trace read's data-window test names this scenario; the proof's side
-    # (the window's start, no end, still granted months later) is bound in modules/authz.
-    @unit @unimplemented
+    @unit
     Scenario: "Data from" limits which spans show, not how long the reader sees them
       Given a braid whose data starts on 1 October and which never ends
       When an "orchestrator" trace holds "specialists" spans from 30 September and 2 October
       Then only the span from 2 October is braided
       And the braid keeps granting after 1 October
 
-    # Unimplemented until the trace read's data-window test names this scenario; the earlier start
-    # reaching the reader's proof is bound in modules/authz.
-    @integration @unimplemented
+    @integration
     Scenario: A braid's data may start before the day it was made
       Given an "orchestrator" trace from last month holding matching "specialists" spans
       When ana braids "specialists" into "orchestrator" today with data from the start of last month

@@ -195,6 +195,8 @@ describe.skipIf(!clickHouseConfigured)("ClickHouseTraceSpanRepository under a br
     });
 
     /** @scenario "Spans outside the braid's data window do not appear" */
+    /** @scenario '"Data from" limits which spans show, not how long the reader sees them' */
+    /** @scenario "A braid's data may start before the day it was made" */
     it("returns only owner spans that started inside the braid's window", async () => {
       const spanIds = (await readTree(base - 60_000)).map(([spanId]) => spanId);
 
