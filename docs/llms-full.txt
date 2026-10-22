@@ -16843,12 +16843,12 @@ Open **Sessions** at [/me/sessions](https://app.langwatch.ai/me/sessions). One r
 
 Open a session and the **Usage** tab prices it. Read the **Cache health** block first: cache reads and cache writes decide a large share of a coding agent's bill.
 
-| Stat                 | Why it costs you                                                                                                                                         |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Peak context**     | The most tokens the session carried into one call. Every later call pays to keep that context alive.                                                     |
-| **Cache misses**     | Calls that rebuilt the context instead of reading it: the cache read fell below what the call before left cached. A miss pays twice for the same tokens. |
-| **Context reused**   | Tokens served from cache, billed at a fraction of fresh input.                                                                                           |
-| **Written to cache** | Tokens written to the cache: new context as it grew, plus any rebuilds.                                                                                  |
+| Stat                 | Why it costs you                                                                                                                                                                                                                                |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Peak context**     | The most tokens the session carried into one call. Every later call pays to keep that context alive.                                                                                                                                            |
+| **Cache misses**     | Model calls whose cache read fell to half or less of what the call before them left cached (that call's cache read plus its cache write), and that wrote at least that half again, 1,000 tokens or more. A miss pays twice for the same tokens. |
+| **Context reused**   | Tokens served from cache, billed at a fraction of fresh input.                                                                                                                                                                                  |
+| **Written to cache** | Tokens written to the cache: new context as it grew, plus any rebuilds.                                                                                                                                                                         |
 
 <Frame caption="Session detail with the Cache health section. This session compacted twice, missed its cache three times, and re-sent 393k tokens on its biggest rebuild.">
   ![Claude Code session cost detail](/images/coding-agents/session-detail.png)
@@ -17832,7 +17832,7 @@ The events are the raw material: every model call with its input, output, cache-
 Write a small local script (python3 or jq) over the events. Per session, compute:
 
 1. **Peak context**: the largest (input + cache-read) of any model call, and its share of the model's context window.
-2. **Cache rebuilds**: model calls whose cache-read tokens fell below half of what the call before them left cached (that call's cache read plus cache write), and that wrote the context again. A large write on top of a full cache read is the context growing, not a rebuild. The first cache-creating call of a session builds the cache rather than rebuilding it, and it pays for the context once, so it is a setup cost and not a rebuild. Count a write from the first call that follows a call with cache-read tokens, or that follows an explicit cache miss. Each rebuild re-paid for context that was already paid for, at the provider's cache-write rate. That rate is specific to the provider and the model: some price a write above fresh input, some price it the same, and some charge for cache storage by time instead. Take it from the price card of the model in question, never from a rule of thumb.
+2. **Cache rebuilds**: model calls whose cache read fell to half or less of what the call before them left cached (that call's cache read plus its cache write), and that wrote at least that half again, 1,000 tokens or more. This is the rule the LangWatch session detail counts as a cache miss. A large write on top of a full cache read is the context growing, not a rebuild. The first cache-creating call of a session has nothing cached before it, so it builds the cache rather than rebuilding it: it pays for the context once, as a setup cost. Every call after it can rebuild, including one that follows a call that only wrote. Each rebuild re-paid for context that was already paid for, at the provider's cache-write rate. That rate is specific to the provider and the model: some price a write above fresh input, some price it the same, and some charge for cache storage by time instead. Take it from the price card of the model in question, never from a rule of thumb.
 3. **Compaction count and where they landed**: a compaction late in a session marks the point where the carried context stopped fitting.
 4. **Cost per model call over session lifetime**: split each session into thirds by call order and compare the average cost per call between the first and last third.
 5. **Waiting time around rebuilds**: rebuilt context is also re-uploaded and re-processed, so rebuild-heavy sessions are slower per turn.
@@ -18121,7 +18121,7 @@ Each one has two ways to set it up:
 - `langwatch copilot` or `langwatch code` starts the tool and sets up the connection on the first run. Use it on a machine you work on.
 - `langwatch instrument copilot` or `langwatch instrument code` writes the same setup and exits. Use it on a server, or when the telemetry must go to a team project.
 
-Both install the hook file that links each session to its repository and pull request. See [Link sessions to their pull requests](#link-sessions-to-their-pull-requests).
+`langwatch instrument` always installs the hook file that links each session to its repository and pull request. The wrapper installs it only when you keep the plain command reporting, and a run that takes the gateway route writes no hook file. See [Link sessions to their pull requests](#link-sessions-to-their-pull-requests).
 
 ## Before you start
 
@@ -18295,7 +18295,7 @@ Set `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=false` in your own envir
   <Accordion title="Copilot sessions show no repository or pull request">
     Check that `~/.copilot/hooks/langwatch.json` exists, or the same file under `$COPILOT_HOME/hooks/`. If it does not, run `langwatch instrument copilot` or `langwatch instrument code`. Then check that `langwatch --version` works in a new terminal, since the hook runs the command by name.
 
-    For Copilot Chat, Visual Studio Code runs hook files only while its `chat.useHooks` setting is on. Check the setting, then start a new chat.
+    For Copilot Chat, check which harness the chat session runs on. A Copilot session loads the hook file from the folder above whatever the editor settings say. A Local session runs hook files only while the `chat.useHooks` setting is on. To see whether the hook ran, open the agent debug logs from the chat view.
 
     A session that worked outside any git checkout, or on a branch with no pull request, has no pull request to show.
 
@@ -18408,7 +18408,9 @@ langwatch instrument claude --key ik-lw-...
 langwatch instrument codex --key ik-lw-...
 ```
 
-GitHub Copilot CLI is different: `langwatch instrument copilot` writes a shell function to your shell's startup file, which a non-interactive bash or zsh shell, such as a CI step or a service, does not load. On those machines, export the lines that `langwatch ingest install copilot_cli --env-only` prints instead, as [Bake it into an image](#bake-it-into-an-image) shows.
+GitHub Copilot CLI is different: `langwatch instrument copilot` writes a shell function to your shell's startup file, which a non-interactive bash or zsh shell, such as a CI step or a service, does not load. On those machines, export the Copilot settings in the job or the image instead.
+
+`langwatch ingest install copilot_cli --env-only` prints those settings, but it needs a signed-in device, so run it on a machine where you are signed in and copy the lines, as [Bake it into an image](#bake-it-into-an-image) shows. With an ingest key alone, write the same lines by hand from [Manual OpenTelemetry setup](/coding-agents/github-copilot-cli#manual-opentelemetry-setup).
 
 The command reads the same value from the environment, which is how you keep the key out of shell history and provisioning scripts:
 
@@ -19781,12 +19783,12 @@ Click a row to open the session. The **Usage** tab opens on the totals: cost, mo
 
 The **Cache health** section is where the money goes:
 
-| Stat                 | What it tells you                                                                                                                                                                                                                                                                  |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Peak context**     | The largest context the session carried, as a share of the model's window, banded against the current reliability guidance for long-context sessions.                                                                                                                              |
-| **Cache misses**     | Model calls whose cache read fell below what the call before them left cached, and that wrote it again. A cache write costs more per token than a read, so each miss pays twice for the same tokens. A large write on top of a full cache read is the context growing, not a miss. |
-| **Context reused**   | Tokens served from the prompt cache across the session. These bill at a fraction of fresh input.                                                                                                                                                                                   |
-| **Written to cache** | Tokens written to the cache across the session: new context as it grew, plus any rebuilds.                                                                                                                                                                                         |
+| Stat                 | What it tells you                                                                                                                                                                                                                                                                                                                                                                   |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Peak context**     | The largest context the session carried, as a share of the model's window, banded against the current reliability guidance for long-context sessions.                                                                                                                                                                                                                               |
+| **Cache misses**     | Model calls whose cache read fell to half or less of what the call before them left cached (that call's cache read plus its cache write), and that wrote at least that half again, 1,000 tokens or more. A cache write costs more per token than a read, so each miss pays twice for the same tokens. A large write on top of a full cache read is the context growing, not a miss. |
+| **Context reused**   | Tokens served from the prompt cache across the session. These bill at a fraction of fresh input.                                                                                                                                                                                                                                                                                    |
+| **Written to cache** | Tokens written to the cache across the session: new context as it grew, plus any rebuilds.                                                                                                                                                                                                                                                                                          |
 
 The detail also shows the biggest single rebuild: how many tokens one model call re-sent instead of reusing from cache.
 
@@ -55821,7 +55823,7 @@ The events are the raw material: every model call with its input, output, cache-
 Write a small local script (python3 or jq) over the events. Per session, compute:
 
 1. **Peak context**: the largest (input + cache-read) of any model call, and its share of the model's context window.
-2. **Cache rebuilds**: model calls whose cache-creation tokens are the bulk of their input, counted only once the session already holds cached context. The first cache-creating call of a session builds the cache rather than rebuilding it, and it pays for the context once, so it is a setup cost and not a rebuild. Count a write from the first call that follows a call with cache-read tokens, or that follows an explicit cache miss. Each rebuild re-paid for context that was already paid for, at the provider's cache-write rate. That rate is specific to the provider and the model: some price a write above fresh input, some price it the same, and some charge for cache storage by time instead. Take it from the price card of the model in question, never from a rule of thumb.
+2. **Cache rebuilds**: model calls whose cache read fell to half or less of what the call before them left cached (that call's cache read plus its cache write), and that wrote at least that half again, 1,000 tokens or more. This is the rule the LangWatch session detail counts as a cache miss. A large write on top of a full cache read is the context growing, not a rebuild. The first cache-creating call of a session has nothing cached before it, so it builds the cache rather than rebuilding it: it pays for the context once, as a setup cost. Every call after it can rebuild, including one that follows a call that only wrote. Each rebuild re-paid for context that was already paid for, at the provider's cache-write rate. That rate is specific to the provider and the model: some price a write above fresh input, some price it the same, and some charge for cache storage by time instead. Take it from the price card of the model in question, never from a rule of thumb.
 3. **Compaction count and where they landed**: a compaction late in a session marks the point where the carried context stopped fitting.
 4. **Cost per model call over session lifetime**: split each session into thirds by call order and compare the average cost per call between the first and last third.
 5. **Waiting time around rebuilds**: rebuilt context is also re-uploaded and re-processed, so rebuild-heavy sessions are slower per turn.

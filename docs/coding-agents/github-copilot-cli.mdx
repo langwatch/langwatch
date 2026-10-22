@@ -22,7 +22,7 @@ Each one has two ways to set it up:
 - `langwatch copilot` or `langwatch code` starts the tool and sets up the connection on the first run. Use it on a machine you work on.
 - `langwatch instrument copilot` or `langwatch instrument code` writes the same setup and exits. Use it on a server, or when the telemetry must go to a team project.
 
-Both install the hook file that links each session to its repository and pull request. See [Link sessions to their pull requests](#link-sessions-to-their-pull-requests).
+`langwatch instrument` always installs the hook file that links each session to its repository and pull request. The wrapper installs it only when you keep the plain command reporting, and a run that takes the gateway route writes no hook file. See [Link sessions to their pull requests](#link-sessions-to-their-pull-requests).
 
 ## Before you start
 
@@ -196,7 +196,7 @@ Set `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=false` in your own envir
   <Accordion title="Copilot sessions show no repository or pull request">
     Check that `~/.copilot/hooks/langwatch.json` exists, or the same file under `$COPILOT_HOME/hooks/`. If it does not, run `langwatch instrument copilot` or `langwatch instrument code`. Then check that `langwatch --version` works in a new terminal, since the hook runs the command by name.
 
-    For Copilot Chat, Visual Studio Code runs hook files only while its `chat.useHooks` setting is on. Check the setting, then start a new chat.
+    For Copilot Chat, check which harness the chat session runs on. A Copilot session loads the hook file from the folder above whatever the editor settings say. A Local session runs hook files only while the `chat.useHooks` setting is on. To see whether the hook ran, open the agent debug logs from the chat view.
 
     A session that worked outside any git checkout, or on a branch with no pull request, has no pull request to show.
 
