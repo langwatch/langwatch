@@ -38,14 +38,23 @@ export class HttpInstantEvalDecisionModelChannel implements InstantEvalDecisionM
   private constructor(
     private readonly dispatcher: Dispatcher | undefined,
     private readonly sleep: Sleep,
+    private readonly baseUrl: string | undefined,
   ) {}
 
-  /** `dispatcher` is a suite's stand-in for the socket; undici's global pool otherwise. */
+  /**
+   * `dispatcher` is a suite's stand-in for the socket; undici's global pool otherwise.
+   * `baseUrl` swaps the catalogue URL's origin, for a local stack's simulator only.
+   */
   static create({
     dispatcher,
     sleep = abortableSleep,
-  }: { dispatcher?: Dispatcher; sleep?: Sleep } = {}): HttpInstantEvalDecisionModelChannel {
-    return new HttpInstantEvalDecisionModelChannel(dispatcher, sleep);
+    baseUrl,
+  }: {
+    dispatcher?: Dispatcher;
+    sleep?: Sleep;
+    baseUrl?: string;
+  } = {}): HttpInstantEvalDecisionModelChannel {
+    return new HttpInstantEvalDecisionModelChannel(dispatcher, sleep, baseUrl);
   }
 
   async classify(
@@ -68,7 +77,7 @@ export class HttpInstantEvalDecisionModelChannel implements InstantEvalDecisionM
     let lastReason: InstantEvalSkipReason = "classifier_provider_unavailable";
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       const sent = await this.send({
-        endpoint: decisionModel.endpoint,
+        endpoint: rebasedEndpoint({ endpoint: decisionModel.endpoint, baseUrl: this.baseUrl }),
         apiKey: decisionModel.apiKey,
         body,
         signal,
@@ -158,6 +167,12 @@ export class HttpInstantEvalDecisionModelChannel implements InstantEvalDecisionM
     logger.warn({ model, reason, status }, "Own decision model call did not answer");
     return instantEvalSkipped(reason);
   }
+}
+
+function rebasedEndpoint({ endpoint, baseUrl }: { endpoint: string; baseUrl?: string }): string {
+  if (!baseUrl) return endpoint;
+  const original = new URL(endpoint);
+  return new URL(`${original.pathname}${original.search}`, baseUrl).toString();
 }
 
 function waitMs({ attempt, retryAfter }: { attempt: number; retryAfter: string | null }): number {

@@ -31,6 +31,7 @@ async function judgeAppWith({
   const config = {
     classifierBaseUrl: undefined,
     classifierModel: undefined,
+    decisionModelBaseUrl: undefined,
     globalTokensPerSecond: 300_000,
     tenantTokensPerSecond: 150_000,
     isSaas: isCloud,

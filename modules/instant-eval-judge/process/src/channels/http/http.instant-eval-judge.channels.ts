@@ -33,6 +33,11 @@ export class HttpInstantEvalJudgeChannels {
         ...(config.classifierModel ? { model: config.classifierModel } : {}),
       });
     });
-    return { classifier, decisionModels: HttpInstantEvalDecisionModelChannel.create() };
+    const isCheckout = config.nodeEnvironment !== "production";
+    const baseUrl = isCheckout ? config.decisionModelBaseUrl : undefined;
+    return {
+      classifier,
+      decisionModels: HttpInstantEvalDecisionModelChannel.create(baseUrl ? { baseUrl } : {}),
+    };
   }
 }

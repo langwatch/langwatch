@@ -91,6 +91,23 @@ describe("HttpInstantEvalDecisionModelChannel", () => {
     });
   });
 
+  describe("when a local stack names a stand-in origin", () => {
+    it("sends the catalogue path to that origin instead of the provider", async () => {
+      const standIn = "http://127.0.0.1:21000";
+      agent
+        .get(standIn)
+        .intercept({ path: PATH, method: "POST" })
+        .reply(200, { answers: { annoyed: { type: "noul", noul: 0.3 } } });
+
+      const judgement = await HttpInstantEvalDecisionModelChannel.create({
+        dispatcher: agent,
+        baseUrl: standIn,
+      }).classify({ text: "I am fed up", questions: [QUESTION], decisionModel: MODEL });
+
+      expect(judgement.verdicts).toEqual([{ questionId: "annoyed", probability: 0.3 }]);
+    });
+  });
+
   describe("when the key is refused", () => {
     /** @scenario "A refused key is not retried and names the key as the reason" */
     it("skips as classifier_key_invalid after one attempt", async () => {

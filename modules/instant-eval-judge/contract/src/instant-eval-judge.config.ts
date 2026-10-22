@@ -16,6 +16,11 @@ export const instantEvalJudgeConfig = Config.define((c) => ({
       .optional(),
   ),
   classifierModel: c.env("JEV_MODEL", z.string().optional()),
+  /**
+   * A repository checkout's stand-in origin for every own decision model URL, so a local stack
+   * sends those calls to llmsim. Ignored outside development and test.
+   */
+  decisionModelBaseUrl: c.env("INSTANT_EVAL_DECISION_BASE_URL", z.string().url().optional()),
   /** Input tokens per second the whole deployment may send. */
   globalTokensPerSecond: c.env(
     "INSTANT_EVAL_GLOBAL_TOKENS_PER_SECOND",
