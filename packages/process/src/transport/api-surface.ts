@@ -33,6 +33,7 @@ import {
   loggerMiddleware,
   openConfirmationGate,
   recordAnsweredCause,
+  recordRequestPrincipal,
   RestHost,
   type RestConfirmationGate,
 } from "@langwatch/api/rest";
@@ -454,6 +455,14 @@ function trpcLanes(trpc: TrpcHost): Hono {
     });
     for (const [name, value] of Object.entries(versionHeaders)) response.headers.set(name, value);
     recordTrpcFailure({ context, failure, status: response.status });
+    const caller = resolved ? await resolved.catch(() => void 0) : void 0;
+    recordRequestPrincipal({
+      context,
+      read: () => {
+        const userId = caller?.tryActor()?.id;
+        return userId ? { userId } : {};
+      },
+    });
 
     return response;
   });

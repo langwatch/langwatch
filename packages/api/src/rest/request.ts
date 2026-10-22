@@ -40,6 +40,11 @@ import { ClientAddress } from "../policy/client-address.ts";
 import type { ResponseCache } from "../ports.ts";
 import { parseApiSchema, type ApiSchema, type ApiSchemaOutput } from "../schema.ts";
 import type { RestDoorCredential } from "./declaration.ts";
+import {
+  REQUEST_PRINCIPAL,
+  type RequestPrincipal,
+  requestPrincipalLogFields,
+} from "./request-principal.ts";
 import type { RestProtocolRefusal } from "./response-kind.ts";
 import {
   DECLARED_ANSWER,
@@ -774,12 +779,15 @@ function logRequestOutcome({
   error,
   start,
   name,
+  clientAddress,
 }: {
   logger: ReturnType<typeof createLogger>;
   c: Context;
   error: unknown;
   start: number;
   name: string | undefined;
+  /** Read when the request arrived: a body cap replaces the request it was resolved on. */
+  clientAddress: string | undefined;
 }): void {
   const duration = nowInstant().epochMilliseconds - start;
   // Prefer what the error handler resolved. Re-deriving the error and
@@ -816,6 +824,10 @@ function logRequestOutcome({
       ...(route ? { route } : {}),
       ...(family ? { family } : {}),
       ...(resolved?.traceId ? { traceId: resolved.traceId } : {}),
+      ...requestPrincipalLogFields({
+        principal: c.get(REQUEST_PRINCIPAL) as RequestPrincipal | undefined,
+        clientAddress,
+      }),
     },
   };
 
@@ -910,6 +922,8 @@ export function loggerMiddleware(options?: { name?: string }) {
       userId: c.get("user")?.id,
     };
 
+    const clientAddress = ClientAddress.resolvedFor(c.req.raw);
+
     return runWithContext(ctx, async () => {
       const start = nowInstant().epochMilliseconds;
       let error: unknown = c.error;
@@ -929,7 +943,7 @@ export function loggerMiddleware(options?: { name?: string }) {
         throw err;
       } finally {
         const logRequest = () =>
-          logRequestOutcome({ logger, c, error, start, name: options?.name });
+          logRequestOutcome({ logger, c, error, start, name: options?.name, clientAddress });
 
         runAfterSSECompletion({
           c,

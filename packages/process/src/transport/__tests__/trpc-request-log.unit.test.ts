@@ -104,6 +104,16 @@ describe("the tRPC lane's access record", () => {
     });
   });
 
+  describe("when a signed-in user's procedure call is answered", () => {
+    /** @scenario "The request log names the user behind a session" */
+    it("names the session's user on the access record", async () => {
+      const answer = await composeSweeper(() => ({ swept: 1 })).request("/api/trpc/sweeper.sweep");
+
+      expect(answer.status).toBe(200);
+      expect(records[0]?.fields).toMatchObject({ "user.id": "user_ada" });
+    });
+  });
+
   describe("when the procedure fails with a handled platform error", () => {
     /** @scenario "A tRPC failure with a handled cause is logged by its fault" */
     it("carries the handled code and fault on the record", async () => {
