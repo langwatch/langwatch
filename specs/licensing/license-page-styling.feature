@@ -42,6 +42,12 @@ Feature: The License page says where a license stands
       Given a license whose Lite seats are unlimited
       Then the page shows no Lite seats tile
 
+    @integration @unit
+    Scenario: A license that states no Lite limit shows the one Lite seat it enforces
+      Given a valid license signed before licenses stated a Lite seat limit
+      Then its status reports a Lite seat limit of 1, the default the seat guards enforce
+      And a Lite seats tile shows 0 of 1, so the admin sees why a second Lite invite is refused
+
     @integration
     Scenario: A license can be removed from the page
       Given a valid license is installed

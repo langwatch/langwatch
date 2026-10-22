@@ -6,7 +6,7 @@
  */
 
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
-import type { LicenseStatus } from "@langwatch/enterprise-licensing-contract";
+import { DEFAULT_MEMBERS_LITE, type LicenseStatus } from "@langwatch/enterprise-licensing-contract";
 import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
@@ -156,6 +156,15 @@ describe("the License page", () => {
 
       expect(screen.queryByTestId("license-lite-seats")).toBeNull();
       expect(screen.getByTestId("license-seats")).toBeDefined();
+    });
+  });
+
+  describe("given a license that states no Lite limit", () => {
+    /** @scenario "A license that states no Lite limit shows the one Lite seat it enforces" */
+    it("shows the one Lite seat the default allows", () => {
+      renderCard({ ...valid, currentMembersLite: 0, maxMembersLite: DEFAULT_MEMBERS_LITE });
+
+      expect(within(screen.getByTestId("license-lite-seats")).getByText("0 / 1")).toBeDefined();
     });
   });
 

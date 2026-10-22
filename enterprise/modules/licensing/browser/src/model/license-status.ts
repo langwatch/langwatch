@@ -92,7 +92,10 @@ export function isCappedLimit(value: number): boolean {
   return Number.isFinite(value) && value < 1_000_000;
 }
 
-/** The Lite seats in use against the license's limit, or null when it does not cap them. */
+/**
+ * The Lite seats in use against the license's limit, or null when it does not cap them. A
+ * license that states no Lite limit arrives as the default of 1, which the seat guards enforce.
+ */
 export function cappedLiteSeatsOf(
   status: Pick<LicenseStatusWithMetadata, "currentMembersLite" | "maxMembersLite">,
 ): { current: number; max: number } | null {
