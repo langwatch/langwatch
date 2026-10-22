@@ -27,12 +27,12 @@ export interface NurturingMilestonesRepository {
       seeded: boolean;
     }>,
   ): Promise<void>;
-  /** Counts one more evaluation for the organization; empty when it is not learned. */
+  /** Counts `by` more evaluations for the organization in one step; empty when it is not learned. */
   countEvaluation(
-    input: Readonly<{ organizationId: string }>,
+    input: Readonly<{ organizationId: string; by: number }>,
   ): Promise<NurturingOrganizationCounts[]>;
-  /** Counts one more finished simulation run; empty when the organization is not learned. */
+  /** Counts `by` more finished simulation runs in one step; empty when the organization is not learned. */
   countSimulationRun(
-    input: Readonly<{ organizationId: string }>,
+    input: Readonly<{ organizationId: string; by: number }>,
   ): Promise<NurturingOrganizationCounts[]>;
 }

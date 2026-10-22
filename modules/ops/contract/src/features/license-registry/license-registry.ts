@@ -56,6 +56,15 @@ export type IssuedLicenseView = z.infer<typeof issuedLicenseViewSchema>;
 const issuedLicensePageSchemaDefinition = z.object({
   licenses: z.array(issuedLicenseViewSchema),
   total: z.number(),
+  /** How many licenses each filter choice would list, the search and the other filter applied. */
+  counts: z.object({
+    active: z.number(),
+    inactive: z.number(),
+    customer: z.number(),
+    internal: z.number(),
+    /** What the search alone matches, whatever the filters. */
+    all: z.number(),
+  }),
 });
 export interface IssuedLicensePageSchema extends Named<typeof issuedLicensePageSchemaDefinition> {}
 export const issuedLicensePageSchema: IssuedLicensePageSchema = issuedLicensePageSchemaDefinition;
@@ -65,8 +74,10 @@ const listIssuedLicensesInputSchemaDefinition = z.object({
   page: z.number().int().min(0).default(0),
   pageSize: z.number().int().min(1).max(100).default(25),
   search: z.string().max(200).optional(),
-  onlyActive: z.boolean().optional(),
-  hideInternal: z.boolean().optional(),
+  /** Absent lists every status: active, or the rest (revoked, superseded or expired). */
+  status: z.enum(["active", "inactive"]).optional(),
+  /** Absent lists both: customers' licenses, or internal test ones. */
+  audience: z.enum(["customer", "internal"]).optional(),
 });
 export interface ListIssuedLicensesInputSchema extends Named<
   typeof listIssuedLicensesInputSchemaDefinition

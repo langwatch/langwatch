@@ -405,7 +405,7 @@ interface Response {
 
 Update a config's JSON payload and/or its scope attachments. Sending `scopes: []` deletes the config.
 
-Permission `project:manage`. Declared at `src/transport/model-defaults.rest.ts:125`.
+Permission `project:manage`. Declared at `src/transport/model-defaults.rest.ts:126`.
 
 Answers at `/api/model-defaults/:id`, `/api/v1/model-defaults/:id`; also, undocumented, `/api/model-defaults/2026-08-07/:id`, `/api/v1/model-defaults/2026-08-07/:id`, `/api/model-defaults/latest/:id`, `/api/v1/model-defaults/latest/:id`.
 
@@ -422,7 +422,7 @@ interface Body {
     scopeId: string;
   }[];
 }
-// Response: inline, src/transport/model-defaults.rest.ts:129
+// Response: inline, src/transport/model-defaults.rest.ts:131
 type Response = unknown;
 ```
 
@@ -430,13 +430,13 @@ type Response = unknown;
 
 Delete a default-model config. Scope attachments cascade.
 
-Permission `project:manage`. Declared at `src/transport/model-defaults.rest.ts:159`.
+Permission `project:manage`. Declared at `src/transport/model-defaults.rest.ts:161`.
 
 Answers at `/api/model-defaults/:id`, `/api/v1/model-defaults/:id`; also, undocumented, `/api/model-defaults/2026-08-07/:id`, `/api/v1/model-defaults/2026-08-07/:id`, `/api/model-defaults/latest/:id`, `/api/v1/model-defaults/latest/:id`.
 
 ```typescript
 type Params = z.infer<typeof modelDefaultsRestParamsSchema>; // ../contract/src/model-provider-rest.schemas.ts:88
-// Response: inline, src/transport/model-defaults.rest.ts:162
+// Response: inline, src/transport/model-defaults.rest.ts:165
 type Response = unknown;
 ```
 
@@ -500,7 +500,7 @@ interface Body {
   messages: unknown[];
 }
 type Headers = z.infer<typeof playgroundRestHeadersSchema>; // ../contract/src/model-provider-rest.schemas.ts:204
-// Response: inline, src/transport/playground.rest.ts:27
+// Response: inline, src/transport/playground.rest.ts:28
 type Response = unknown;
 ```
 

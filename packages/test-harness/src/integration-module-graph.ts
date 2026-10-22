@@ -5,11 +5,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-/**
- * Module mock pattern: vi.mock/doMock/hoisted. Shallow read (transitive
- * reaches fail loudly).
- */
-const MODULE_MOCK_PATTERN = /\bvi\s*\.\s*(mock|doMock|hoisted)\s*\(/;
+import { mocksModules } from "@langwatch/vitest-config/mocks-modules";
 
 export type GraphLane = "mocking" | "shared";
 
@@ -19,7 +15,7 @@ export type GraphLane = "mocking" | "shared";
  * filesystem behind it, or it can't be tested at the level it is made.
  */
 export function graphLaneForSource(source: string): GraphLane {
-  return MODULE_MOCK_PATTERN.test(source) ? "mocking" : "shared";
+  return mocksModules(source) ? "mocking" : "shared";
 }
 
 export interface GraphPartition {

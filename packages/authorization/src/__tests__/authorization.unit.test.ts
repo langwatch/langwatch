@@ -9,6 +9,7 @@ import {
   isSealedAuthorization,
   narrowAuthorization,
   sealAuthorization,
+  sharedWindowsReadBy,
 } from "../index";
 
 /**
@@ -242,6 +243,40 @@ describe("the authorization proof", () => {
       expect(() => sealAuthorization({ ...proof(), narrowedTo: "proj_outsider" })).toThrow(
         /a narrowed proof names a project/,
       );
+    });
+  });
+
+  describe("when a reader asks for the windows its shared grants open", () => {
+    const read = (authorization: Authorization, permission: "traces:view" | "analytics:view") =>
+      sharedWindowsReadBy({ authorization, permission, condition: "trace" });
+
+    it("lists each shared grant carrying the permission, with its bounds", () => {
+      const authorization = sealAuthorization(proof());
+
+      expect(read(authorization, "traces:view")).toEqual([
+        { projectId: "proj_member", from: NOW - 1_000, until: null },
+      ]);
+    });
+
+    it("leaves out a shared grant that does not carry the permission", () => {
+      expect(read(sealAuthorization(proof()), "analytics:view")).toEqual([]);
+    });
+
+    it("lists none for a proof whose only grant is its own", () => {
+      const [own] = proof().grants;
+      if (!own) throw new Error("the fixture proof has an own grant");
+
+      expect(read(sealAuthorization(proof({ grants: [own] })), "traces:view")).toEqual([]);
+    });
+
+    it("keeps only the project a narrowed proof is cut to", () => {
+      const narrowed = narrowAuthorization({
+        authorization: sealAuthorization(proof()),
+        projectId: "proj_aggregate",
+      });
+      if (!narrowed) throw new Error("expected a narrowed proof");
+
+      expect(read(narrowed, "traces:view")).toEqual([]);
     });
   });
 });

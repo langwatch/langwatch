@@ -61,10 +61,15 @@ function buildService({ judge = judgedTrue }: { judge?: Judge } = {}) {
     .mockResolvedValue({ status: "processed", passed: true, score: 1 });
 
   const service = EvaluationExecutionService.create({
+    runs: { findTraceEvaluations: async () => [] },
+    authz: {
+      authorizeInternal: async () => {
+        throw new Error("these cases read no earlier evaluations");
+      },
+    },
     traces: {
       readTracesWithSpans: vi.fn().mockResolvedValue([buildTrace()]),
       readThreadsTraces: vi.fn().mockResolvedValue([]),
-      readEvaluations: vi.fn().mockResolvedValue({}),
     },
     spanDigest: {
       format: vi.fn().mockResolvedValue(""),

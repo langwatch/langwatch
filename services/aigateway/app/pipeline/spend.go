@@ -97,6 +97,9 @@ func Spend(emit SpendEmitter) Interceptor {
 		Name: "spend",
 		Sync: func(next DispatchFunc) DispatchFunc {
 			return func(ctx context.Context, call *Call) (*domain.Response, error) {
+				if !admissible(call) {
+					return next(ctx, call)
+				}
 				start := time.Now()
 				admission := admissionFor(ctx, call, start)
 				emit.AdmitSpend(admission)
@@ -114,6 +117,9 @@ func Spend(emit SpendEmitter) Interceptor {
 		},
 		Stream: func(next StreamFunc) StreamFunc {
 			return func(ctx context.Context, call *Call) (domain.StreamIterator, error) {
+				if !admissible(call) {
+					return next(ctx, call)
+				}
 				start := time.Now()
 				admission := admissionFor(ctx, call, start)
 				emit.AdmitSpend(admission)
@@ -132,6 +138,15 @@ func Spend(emit SpendEmitter) Interceptor {
 			}
 		},
 	}
+}
+
+// admissible reports whether a request can open a spend record at all. One
+// that names no model cannot: the control plane refuses an admission without
+// one, and the model resolver answers the caller with its own customer error
+// before anything could be spent, so there is nothing to bill and nothing to
+// record.
+func admissible(call *Call) bool {
+	return call.Request != nil && call.Request.Model != ""
 }
 
 // deferredOutcome reports the request types whose spend record this dispatch

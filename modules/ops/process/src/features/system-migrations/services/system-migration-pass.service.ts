@@ -241,8 +241,8 @@ export class SystemMigrationPassService {
 
   /**
    * Whether a pass on this installation could still move or discover a tenant, asked only about
-   * the steps it runs: a held or parked tenant, a step this process's last pass left pending, or
-   * an automatic step no tenant has finished yet (a new declaration, a fresh install).
+   * the steps it runs: a held (a person's hold too) or parked tenant, a step this process's last
+   * pass left pending, or an automatic step no tenant has finished yet (a new declaration).
    */
   async hasTenantAwaitingRedrive(): Promise<boolean> {
     const isSaaS = this.options.isSaaS();
@@ -250,7 +250,7 @@ export class SystemMigrationPassService {
     if (this.#pendingDeclaredSteps.length > 0) return true;
     const steps = this.released({ migrations: declared.steps().map(migrationOf), isSaaS });
     for (const step of steps) {
-      if (await declared.state.hasUnsettledTenant({ migrationName: step.name })) return true;
+      if (await couldStillMove({ state: declared.state, migrationName: step.name })) return true;
       if (!admitsUnenrolled({ isSaaS, migration: step })) continue;
       if (await declared.state.hasFinalizedTenant({ migrationName: step.name })) continue;
       // A step whose every touched tenant an operator rolled back has met them all.
@@ -375,4 +375,25 @@ function admitsUnenrolled({
   migration: SystemMigration;
 }): boolean {
   return !isSaaS || migration.enrolledAutomatically;
+}
+
+/**
+ * A parked or held tenant. A hold waiting on a person settles its step yet still wakes a pass:
+ * once the person acts (proves the account, lifts a pin) only a pass moves the tenant.
+ */
+async function couldStillMove({
+  state,
+  migrationName,
+}: {
+  state: DeclaredTenantSteps["state"];
+  migrationName: string;
+}): Promise<boolean> {
+  if (await state.hasUnsettledTenant({ migrationName })) return true;
+  const waiting = await state.findRecordsByStatus({
+    migrationName,
+    statuses: ["migrated"],
+    heldReason: "person",
+    limit: 1,
+  });
+  return waiting.length > 0;
 }
