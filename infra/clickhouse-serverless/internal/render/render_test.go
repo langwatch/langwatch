@@ -247,6 +247,7 @@ func TestRenderAll_UpgradePinsHold25_10Behaviour(t *testing.T) {
 			"string_serialization_version: single_stream",
 			"patch_parts_version: v1",
 			"asynchronous_metrics_key_values_mode: legacy_names",
+			"memory_worker_dynamic_hard_limit: 0",
 		},
 		"users.d/profiles.yaml": {
 			`compatibility: "25.10"`,

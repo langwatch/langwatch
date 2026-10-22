@@ -22,7 +22,6 @@ type Computed struct {
 	MaxBytesBeforeExternalSort    int64   `env:"MAX_BYTES_BEFORE_EXTERNAL_SORT"`
 	UncompressedCacheSize         int64   `env:"UNCOMPRESSED_CACHE_SIZE"`
 	UseUncompressedCache          int     `env:"USE_UNCOMPRESSED_CACHE"`
-	CacheMaxSize                  int64   `env:"CACHE_MAX_SIZE"`
 
 	// Small-pod budget: server settings in config.d. Zero (or false) leaves
 	// the ClickHouse default, so pods above smallPodRAM render none of these.
@@ -120,8 +119,6 @@ func ComputeFromResources(cpu int, ramBytes int64, input *Input) *Computed {
 		c.UncompressedCacheSize = ramBytes / 8 // 12.5%
 		c.UseUncompressedCache = 1
 	}
-
-	c.CacheMaxSize = ramBytes / 4 // 25% for S3 cache
 
 	if ramBytes <= smallPodRAM {
 		applySmallPodBudget(c, ramBytes, input != nil && input.Replicated)

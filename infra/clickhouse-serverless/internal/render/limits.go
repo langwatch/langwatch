@@ -83,6 +83,11 @@ func renderLimits(input *config.Input, c *config.Computed, configD string) error
 		"uncompressed_cache_size":                       c.UncompressedCacheSize,
 		"background_pool_size":                          c.BackgroundPoolSize,
 		"background_merges_mutations_concurrency_ratio": c.ConcurrencyRatio,
+		// Hold the hard memory limit at the static cap. Otherwise MemoryWorker
+		// re-derives it each tick from (RSS + MemAvailable) times
+		// max_server_memory_usage_to_ram_ratio, which can shrink it below
+		// max_server_memory_usage.
+		"memory_worker_dynamic_hard_limit": 0,
 	}
 
 	if c.MaxTempDataOnDisk != 0 {

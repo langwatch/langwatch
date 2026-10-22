@@ -65,7 +65,6 @@ From 3 inputs (CPU, RAM, replicated), the Go binary derives ~40 parameters:
 | Background pool    | max(2, CPU/2)            |
 | Concurrent queries | min(CPU*25, 200)         |
 | Merge parts limit  | 5 / 8 / 15 (by CPU tier) |
-| S3 cache           | RAM * 25%                |
 
 Pods with 4 GiB of RAM or less also get an explicit memory budget, because
 ClickHouse otherwise lets each cache grow to half of RAM. Larger pods keep the
