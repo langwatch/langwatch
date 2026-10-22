@@ -104,6 +104,9 @@ if (isEntrypoint()) {
     );
     console.log(`${name} from run ${runId} (${picked?.created_at}) in ${dir}`);
   } catch {
-    console.log(`could not download ${name} from run ${runId}`);
+    // The listing found it, so a failed download is not a first night: going on
+    // would compare against nothing and read green.
+    console.error(`::error::could not download ${name} from run ${runId}`);
+    process.exit(1);
   }
 }

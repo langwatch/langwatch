@@ -5,6 +5,7 @@ import {
   classify,
   collectOutcomes,
   FILE_DID_NOT_RUN,
+  missingSuites,
   newlyFlaky,
   renderFlaky,
   type FlakyReport,
@@ -97,6 +98,23 @@ void describe("given three shuffled runs of a package suite", () => {
   });
 });
 
+void describe("given a suite that wrote no report under one seed", () => {
+  void describe("when the missing suites are listed", () => {
+    /** @scenario "A suite that wrote no report under some seeds is named with those seeds" */
+    void it("names the suite and the seeds it is missing from, and not a suite present in all", () => {
+      const runs = [
+        run("11", { a: "passed" }),
+        run("12", { a: "passed" }),
+        run("13", { a: "passed" }),
+        { ...run("11", { b: "passed" }), pkg: "@langwatch/b", script: "test:integration" },
+      ];
+      assert.deepEqual(missingSuites({ runs, seeds: ["11", "12", "13"] }), [
+        { pkg: "@langwatch/b", script: "test:integration", seeds: ["12", "13"] },
+      ]);
+    });
+  });
+});
+
 void describe("given last night's flaky tests", () => {
   void describe("when tonight has the same one and another", () => {
     /** @scenario "A newly flaky test goes red, one already flaky last night does not" */
@@ -146,6 +164,10 @@ void describe("given the package suite runner in the hunt", () => {
         pkg: "@langwatch/trace_process",
         script: "test:integration",
       });
+      assert.deepEqual(
+        parseReportFileName(reportFileName({ pkg: "@langwatch/a", script: "test_ci:unit" })),
+        { pkg: "@langwatch/a", script: "test_ci:unit" },
+      );
     });
   });
 });

@@ -231,11 +231,11 @@ function ownGenericKey({ type, root }) {
 /**
  * One pass over one checker's types file: the types the hot relations name, and
  * the count of instantiations of each of our own generics. Lines are filtered as
- * text before any JSON is parsed, since most of a types file is neither.
+ * text before any JSON is parsed. `lines` may be async, so a types file is never held whole.
  */
-export function scanTypes({ lines, wanted, root, generics }) {
+export async function scanTypes({ lines, wanted, root, generics }) {
   const found = new Map();
-  for (const line of lines) {
+  for await (const line of lines) {
     const id = Number(/^\[?\{"id":(\d+),/.exec(line)?.[1]);
     const isWanted = wanted.has(id);
     const maybeGeneric =
@@ -256,12 +256,6 @@ export function scanTypes({ lines, wanted, root, generics }) {
 async function* linesOf(file) {
   const reader = createInterface({ input: createReadStream(file), crlfDelay: Infinity });
   for await (const line of reader) yield line;
-}
-
-async function collect(iterable) {
-  const out = [];
-  for await (const item of iterable) out.push(item);
-  return out;
 }
 
 /** Trace events, read a line at a time and kept only when they can matter. */
@@ -331,8 +325,8 @@ async function measure({ root, tsc, file }) {
           .filter((relation) => relation.checker === checker)
           .flatMap((relation) => [relation.sourceId, relation.targetId]),
       );
-      const found = scanTypes({
-        lines: await collect(linesOf(join(scratch, name))),
+      const found = await scanTypes({
+        lines: linesOf(join(scratch, name)),
         wanted,
         root,
         generics,

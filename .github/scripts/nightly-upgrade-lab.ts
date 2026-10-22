@@ -2,6 +2,7 @@
 // and exit code (cell/command.go). Spec: specs/ci/nightly-suite.feature
 //   node --experimental-strip-types .github/scripts/nightly-upgrade-lab.ts --cell <name> \
 //     --run-dir "$RUNNER_TEMP/cell" --exit-code 1 --markdown upgrade-lab.md
+//   ... --exit-code 1 --verdict --known-failing B1,N4   exits 1 when the night is red
 
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -58,6 +59,28 @@ export const renderUpgradeCell = ({
   return out.join("\n");
 };
 
+/**
+ * Why the job goes red, or undefined when it stays green. An invariant listed in `knownFailing`
+ * cannot pass on a hosted runner yet (dev/docs/nightly-suite.md, "The upgrade lab on a hosted
+ * runner"), so only a failure outside it, or a cell that could not judge, turns the night red.
+ */
+export const upgradeLabFailure = ({
+  exitCode,
+  report,
+  knownFailing,
+}: {
+  exitCode: number;
+  report: CellReport | null;
+  knownFailing: readonly string[];
+}): string | undefined => {
+  if (exitCode === 0) return undefined;
+  if (report === null || exitCode !== 1) return VERDICT[2];
+  const failed = (report.verdicts ?? [])
+    .filter((verdict) => verdict.result === "fail" && !knownFailing.includes(verdict.id))
+    .map((verdict) => verdict.id);
+  return failed.length > 0 ? `${failed.join(", ")} did not pass` : undefined;
+};
+
 const option = (args: string[], name: string): string | undefined => {
   const at = args.indexOf(`--${name}`);
   return at === -1 ? undefined : args[at + 1];
@@ -73,6 +96,13 @@ if (isEntrypoint()) {
   const report = existsSync(reportPath)
     ? (JSON.parse(readFileSync(reportPath, "utf8")) as CellReport)
     : null;
+  const exitCode = Number(option(args, "exit-code") ?? "2");
+  if (args.includes("--verdict")) {
+    const knownFailing = (option(args, "known-failing") ?? "").split(",").filter(Boolean);
+    const failure = upgradeLabFailure({ exitCode, report, knownFailing });
+    console.log(failure ?? `green; known to fail on a hosted runner: ${knownFailing.join(", ")}`);
+    process.exit(failure === undefined ? 0 : 1);
+  }
   const section = [
     "## Upgrade lab",
     "",
@@ -80,7 +110,7 @@ if (isEntrypoint()) {
     "",
     renderUpgradeCell({
       cell: option(args, "cell") ?? "cell",
-      exitCode: Number(option(args, "exit-code") ?? "2"),
+      exitCode,
       report,
     }),
   ].join("\n");

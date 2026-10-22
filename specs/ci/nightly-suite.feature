@@ -91,6 +91,13 @@ Feature: One nightly suite runs the slow checks and reports them on one dashboar
       Then misspell counts two and gosec counts one
 
     @unit
+    Scenario: Architecture findings are counted per policy from the enforcer's summary
+      Given the enforcer's summary with two findings of one policy and one of another
+      Then each policy counts its findings
+      And a summary of zero findings is a report with nothing in it
+      But output with no summary line, such as a crash, is no report
+
+    @unit
     Scenario: The first night is the baseline and goes green
       Given no report from last night
       When tonight's report is compared
@@ -147,6 +154,13 @@ Feature: One nightly suite runs the slow checks and reports them on one dashboar
       Then only the other one is new
 
     @unit
+    Scenario: A suite that wrote no report under some seeds is named with those seeds
+      Given three shuffled runs in which one suite wrote a report under seed 11 only
+      When the missing suites are listed
+      Then that suite is named with seeds 12 and 13
+      And a suite with a report under every seed is not listed
+
+    @unit
     Scenario: The suite runner shuffles only scripts that end in vitest
       Given the hunt's shuffle and seed arguments
       Then a "vitest run" script receives them with a JSON report named after its package and script
@@ -165,13 +179,20 @@ Feature: One nightly suite runs the slow checks and reports them on one dashboar
       Then the section names the release it upgraded from, the verdict and the failing invariant
       But a cell that wrote no report says so and points at the job log
 
+    @unit
+    Scenario: Only an invariant outside the hosted runner's known failures turns the upgrade lab red
+      Given B1 and N4 cannot pass on a hosted runner until the upgrade lab's own gaps are closed
+      When only B1 and N4 did not pass
+      Then the upgrade lab stays green and its section still lists them
+      But any other failing invariant, or a cell that could not judge, turns it red
+
     # Not checkable by a unit test: it needs the hosted runner and two builds.
     @unimplemented
     Scenario: A representative cell runs on a hosted runner and keeps its evidence
       Given the newest release manifest names the last release
       When the cloud deployment at tier S with typical data and seed 1 is upgraded to head
       Then the cell's report, screenshots and logs are kept as the run's artifact
-      And the job goes red when an invariant does not pass or the cell could not judge
+      And the job goes red when an invariant outside the known failures does not pass, or the cell could not judge
 
   Rule: Earlier nights are found by artifact, on the default branch only
 

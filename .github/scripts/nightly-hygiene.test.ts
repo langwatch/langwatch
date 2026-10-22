@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import {
   buildReport,
   compareReports,
+  parseArchitecture,
   parseChecks,
   parseGolangci,
   parseOxlint,
@@ -50,6 +51,36 @@ void describe("given the findings of tonight's tools", () => {
       ]);
       assert.equal(report.categories["oxlint/eslint/no-nested-ternary"]?.count, 3);
       assert.equal(report.categories["oxlint/unused-directive"]?.count, 1);
+    });
+  });
+
+  void describe("when the architecture enforcer's summary is counted", () => {
+    /** @scenario "Architecture findings are counted per policy from the enforcer's summary" */
+    void it("counts each policy's findings, reads a clean run as zero and a crash as no report", () => {
+      const result = parseArchitecture({
+        text: [
+          "architecture-enforcer: 3 findings across 2 policies, exit 1 (findings)",
+          "      2  cycles",
+          "      1  manifests",
+          "",
+          "--- cycles: 2 findings ---",
+        ].join("\n"),
+      });
+      const report = night({ results: { architecture: result } });
+      assert.equal(result.reported, true);
+      assert.equal(report.categories["architecture/cycles"]?.count, 2);
+      assert.equal(report.categories["architecture/manifests"]?.count, 1);
+      assert.deepEqual(
+        parseArchitecture({
+          text: "architecture-enforcer: 0 findings, exit 0 (no policy refused anything)\n",
+        }),
+        { reported: true, findings: [] },
+      );
+      assert.equal(parseArchitecture({ text: "pnpm: command not found\n" }).reported, false);
+      assert.equal(
+        parseArchitecture({ text: "architecture-enforcer: the run crashed\n  boom\n" }).reported,
+        false,
+      );
     });
   });
 

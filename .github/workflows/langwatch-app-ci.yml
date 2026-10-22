@@ -138,6 +138,12 @@ jobs:
               # repo-wide cost decision, not part of this change; tracked
               # separately.
               - '.github/workflows/langwatch-app-ci.yml'
+              # Read by .github/scripts/nightly-workflows.test.ts in ci-scripts-test.
+              - '.github/workflows/nightly.yml'
+              - '.github/workflows/codebase-health.yml'
+              - '.github/workflows/migration-compat.yml'
+              - '.github/workflows/npx-server-smoke.yml'
+              - '.github/workflows/gateway-matrix.yaml'
               - '.github/.release-please-manifest.json'
               - '.github/scripts/**'
               # Composite actions are covered by ci-scripts-test through the

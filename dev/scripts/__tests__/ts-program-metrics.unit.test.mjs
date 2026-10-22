@@ -101,9 +101,9 @@ void describe("tsgo's trace", () => {
     assert.equal(parseTraceLine({ line: '{"ph":"B","name":"x"},' }).name, "x");
   });
 
-  void it("resolves the types a relation names, and counts our own generics", () => {
+  void it("resolves the types a relation names, and counts our own generics", async () => {
     const generics = {};
-    const found = scanTypes({
+    const found = await scanTypes({
       lines: [
         '[{"id":1,"intrinsicName":"any","flags":["Any"]},',
         '{"id":7,"symbolName":"Router","aliasTypeArguments":[1],"firstDeclaration":{"path":"/work/repo/src/router.ts","start":{"line":3,"character":1}},"display":"Router<any>"},',

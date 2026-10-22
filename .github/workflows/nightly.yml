@@ -132,17 +132,18 @@ jobs:
           check generated-readmes pnpm check:readmes
           cat hygiene/checks.tsv
 
-      # Every policy, not only the ones the pull request job blocks on. Exit 1
-      # means findings, which is what this counts.
-      - name: Architecture enforcer, every policy
-        run: pnpm lint:architecture > hygiene/architecture.txt 2>&1 || test $? -eq 1
-
       - name: Typecheck, whole workspace
         run: |
           set +e
           pnpm typecheck --skip-nx-cache > hygiene/typecheck.log 2>&1
           echo $? > hygiene/typecheck-exit.txt
           tail -n 20 hygiene/typecheck.log
+
+      # Every policy the pull request job can run, not only the ones it blocks on.
+      # `declarations` needs `tsc -b`'s output, which nothing here builds. Exit 1
+      # means findings, which is what this counts.
+      - name: Architecture enforcer, every policy
+        run: pnpm lint:architecture --no-declarations > hygiene/architecture.txt 2>&1 || test $? -eq 1
 
       # Exit 1 is findings. stderr is kept with them: a process that failed to
       # run says so there, which is how the report tells a crash from a clean tree.
@@ -519,7 +520,7 @@ jobs:
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
         with:
-          node-version: 24
+          node-version: "24.22.1"
 
       # node-pty's postinstall rebuilds with pnpm's vendored node-gyp, whose
       # gyp_main.py ships without the execute bit; e2e-ci.yml explains it.
@@ -586,8 +587,14 @@ jobs:
           retention-days: 35
           if-no-files-found: warn
 
+      # B1 and N4 cannot pass on a hosted runner until upgradelab's gaps 6 and 7 are
+      # closed (dev/docs/nightly-suite.md); any other failure, or no verdict, is red.
       - name: Verdict
-        run: test "${{ steps.cell.outputs.exit }}" = "0"
+        working-directory: head
+        run: >-
+          node --experimental-strip-types .github/scripts/nightly-upgrade-lab.ts --verdict
+          --run-dir "$RUNNER_TEMP/cell" --exit-code "${{ steps.cell.outputs.exit || '2' }}"
+          --known-failing B1,N4
 
   # ---------------------------------------------------------------------------
 

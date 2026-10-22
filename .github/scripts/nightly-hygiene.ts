@@ -87,10 +87,13 @@ export const parseTypecheck = ({
   return { reported: exitCode === 0 || findings.length > 0, findings };
 };
 
-/** The enforcer's text summary: `architecture-enforcer: …` then `   12  policy` lines. */
+/**
+ * The enforcer's text summary: `architecture-enforcer: N findings …` then `   12  policy` lines.
+ * Its crash and usage messages share the prefix but count nothing, so they are no report.
+ */
 export const parseArchitecture = ({ text }: { text: string }): ToolResult => {
   const all = lines(text);
-  const header = all.findIndex((line) => line.startsWith("architecture-enforcer: "));
+  const header = all.findIndex((line) => /^architecture-enforcer: \d+ findings?\b/.test(line));
   if (header === -1) return { reported: false, findings: [] };
   const findings: Finding[] = [];
   for (const line of all.slice(header + 1)) {

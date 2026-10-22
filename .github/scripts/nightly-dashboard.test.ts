@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 
 import { pickArtifact, type ArtifactRecord } from "./nightly-artifacts.ts";
 import { failedJobs, jobOutcomes, JOBS, renderNightlyDashboard } from "./nightly-dashboard.ts";
-import { renderUpgradeCell } from "./nightly-upgrade-lab.ts";
+import { renderUpgradeCell, upgradeLabFailure } from "./nightly-upgrade-lab.ts";
 
 const allPassed = Object.fromEntries(JOBS.map((job) => [job.id, { result: "success" }]));
 
@@ -98,6 +98,37 @@ void describe("given an upgrade lab cell", () => {
         renderUpgradeCell({ cell: "c", exitCode: 2, report: null }),
         /No report\.json \(exit 2\).*job log/,
       );
+    });
+  });
+
+  void describe("when only invariants known to fail on a hosted runner did not pass", () => {
+    /** @scenario "Only an invariant outside the hosted runner's known failures turns the upgrade lab red" */
+    void it("stays green for B1 and N4, and goes red for any other failure or no verdict", () => {
+      const report = (failing: string[]) => ({
+        verdicts: [
+          { id: "I1", name: "no request lost", result: "pass" },
+          { id: "I5", name: "read models", result: "inconclusive" },
+          ...failing.map((id) => ({ id, name: id, result: "fail" })),
+        ],
+      });
+      const knownFailing = ["B1", "N4"];
+      assert.equal(
+        upgradeLabFailure({ exitCode: 1, report: report(["B1", "N4"]), knownFailing }),
+        undefined,
+      );
+      assert.match(
+        renderUpgradeCell({ cell: "c", exitCode: 1, report: report(["B1", "N4"]) }),
+        /\| B1 B1 \| fail \|[\s\S]*\| N4 N4 \| fail \|/,
+      );
+      assert.equal(
+        upgradeLabFailure({ exitCode: 1, report: report(["B1", "I7"]), knownFailing }),
+        "I7 did not pass",
+      );
+      assert.match(
+        upgradeLabFailure({ exitCode: 2, report: report([]), knownFailing }) ?? "",
+        /before it could judge/,
+      );
+      assert.notEqual(upgradeLabFailure({ exitCode: 1, report: null, knownFailing }), undefined);
     });
   });
 });

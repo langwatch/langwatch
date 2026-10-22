@@ -249,7 +249,7 @@ export const reportFileName = ({ pkg, script }: { pkg: string; script: string })
   `${encodeURIComponent(pkg)}__${script.replaceAll(":", "~")}.json`;
 
 export const parseReportFileName = (name: string): { pkg: string; script: string } | undefined => {
-  const match = /^(.+)__([^_]+)\.json$/.exec(name);
+  const match = /^(.+)__([^_]+(?:_[^_]+)*)\.json$/.exec(name);
   if (!match) return undefined;
   return { pkg: decodeURIComponent(match[1]), script: match[2].replaceAll("~", ":") };
 };
