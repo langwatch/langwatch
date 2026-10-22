@@ -138,5 +138,20 @@ export const identityProcessModule: PublishedProcessModule<
           return dryRun ? { wouldCopy: copied } : { copied };
         },
       }),
+      // After auth clears `Account`: before that, the secret heal could carry a token still on
+      // an `Account` row back into its credential (provider-token-discard.feature).
+      defineMigrationStep({
+        id: "identity:discard-provider-tokens",
+        kind: "data",
+        mode: "background",
+        description:
+          "Clears the OAuth access, refresh and ID tokens kept on sign-in credentials; sign-in no longer stores them.",
+        needsOldWritersGone: true,
+        after: ["auth:discard-provider-tokens"],
+        run: async ({ dryRun }) => {
+          const cleared = await repositories.migration.discardProviderTokens({ dryRun });
+          return dryRun ? { wouldClear: cleared } : { cleared };
+        },
+      }),
     ];
   });
