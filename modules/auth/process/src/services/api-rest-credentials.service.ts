@@ -5,14 +5,11 @@ import {
 } from "@langwatch/api";
 import {
   AggregateProjectHasNoCredentialError,
-  ApiKeyPermissionDeniedError,
   ApiKeyPermissionNotDelegableError,
-  LegacyProjectKeyIngestionOnlyError,
   type ApiKeyApi,
 } from "@langwatch/api-key-contract";
 import { assertKeyKind, keyCredentialOf, type RestKeyKind } from "@langwatch/api/rest";
 import {
-  PermissionDeniedError,
   type AuthzPermission,
   type PermissionDecision,
   type RestKeyDoorPrincipal,
@@ -22,7 +19,7 @@ import {
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { HandledError } from "@langwatch/handled-error";
-import { createLogger, createWarnThrottle, type Logger } from "@langwatch/observability";
+import { createLogger, type Logger } from "@langwatch/observability";
 import { type OrganizationApi } from "@langwatch/organization-contract";
 import { isAggregateProjectKind } from "@langwatch/project-contract";
 
@@ -33,6 +30,7 @@ import {
   type ApiKeyRequestCredentials,
 } from "../rules/api-credential-request.rules.ts";
 import { isUndelegatedForLangy } from "../rules/langy-key-delegation.rules.ts";
+import { ApiCredentialRefusalService } from "./api-credential-refusal.service.ts";
 import { ApiKeyHoldsService } from "./api-key-holds.service.ts";
 import {
   ApiOrganizationCredentialsService,
@@ -94,9 +92,6 @@ export type ApiRestCredentialPeers = Readonly<{
   now?: () => number;
 }>;
 
-/** How long a refused key stays quiet after its ceiling-refusal line. */
-const CEILING_REFUSAL_LOG_WINDOW_MS = 5 * 60_000;
-
 /** Resolves project and organization API-key credentials for the API door (record §8). */
 export class ApiRestCredentialsService {
   static create(peers: ApiRestCredentialPeers): ApiRestCredentialsService {
@@ -112,9 +107,7 @@ export class ApiRestCredentialsService {
   private readonly organizations: ApiRestCredentialPeers["organizations"];
   private readonly cliProjects: ApiRestCredentialPeers["cliProjects"];
   private readonly logger: Pick<Logger, "error" | "warn">;
-  private readonly now: () => number;
-  /** One ceiling-refusal line per key per window: a refused client retries the same fact. */
-  private readonly ceilingRefusalLog = createWarnThrottle(CEILING_REFUSAL_LOG_WINDOW_MS);
+  private readonly refusals: ApiCredentialRefusalService;
   private readonly keyHolds: ApiKeyHoldsService;
   private readonly legacyKeys: LegacyProjectKeyScopeService;
   private readonly organizationCredentials: ApiOrganizationCredentialsService;
@@ -128,7 +121,7 @@ export class ApiRestCredentialsService {
     this.organizations = peers.organizations;
     this.cliProjects = peers.cliProjects;
     this.logger = peers.logger;
-    this.now = peers.now;
+    this.refusals = ApiCredentialRefusalService.create({ logger: peers.logger, now: peers.now });
   }
 
   /** Every permission the route asks, in order, after one resolve; the first missing refuses. */
@@ -154,7 +147,7 @@ export class ApiRestCredentialsService {
 
     for (const permission of asked(input.permissions)) {
       if (!(await this.#projectHolds({ credential, permission }))) {
-        throw this.#projectRefusal({ credential, permission });
+        throw this.refusals.project({ credential, permission });
       }
     }
 
@@ -196,29 +189,6 @@ export class ApiRestCredentialsService {
     if (resolved.type !== "apiKey") return Promise.resolve(true);
 
     return this.isWithinCeiling({ resolved, permission });
-  }
-
-  #projectRefusal(input: {
-    credential: ApiProjectCredential;
-    permission: AuthzPermission;
-  }): HandledError {
-    const { credential, permission } = input;
-    if (!credential.actsAsPerson && credential.resolved.type === "legacyProjectKey") {
-      return new LegacyProjectKeyIngestionOnlyError({ permission });
-    }
-    if (!credential.actsAsPerson && credential.resolved.type === "apiKey") {
-      return apiKeyCeilingRefusal({
-        resolved: credential.resolved,
-        permission,
-        logger: this.logger,
-        suppressedRefusals: this.ceilingRefusalLog.claim({
-          key: credential.resolved.apiKeyId,
-          now: this.now(),
-        }),
-      });
-    }
-
-    return new ApiKeyPermissionDeniedError(permission);
   }
 
   /** The caller with nothing asked of it; a legacy key passes only with full access. */
@@ -351,11 +321,9 @@ export class ApiRestCredentialsService {
         permission,
         reach,
       });
-      if (!allowed && credential.principal.kind === "project") {
-        throw new LegacyProjectKeyIngestionOnlyError({ permission });
+      if (!allowed) {
+        throw this.refusals.key({ credential, permission, ...(reach ? { reach } : {}) });
       }
-      if (!allowed)
-        throw keyPermissionRefusal({ credential, permission, ...(reach ? { reach } : {}) });
     }
 
     return credential;
@@ -477,57 +445,4 @@ export class ApiRestCredentialsService {
       permission,
     });
   }
-}
-
-/** The one denial every tier answers with, at the scope the key was asked at. */
-function keyPermissionRefusal(input: {
-  credential: ApiKeyDoorCredential;
-  permission: AuthzPermission;
-  reach?: ApiKeyPermissionReach;
-}): PermissionDeniedError {
-  const { principal, organizationId } = input.credential;
-  const projectId =
-    principal.kind === "apiKey" ? principal.resolvedProject?.id : principal.projectId;
-
-  return new PermissionDeniedError({
-    permission: input.permission,
-    scope:
-      input.reach !== "organization" && projectId
-        ? { type: "project", id: projectId }
-        : { type: "organization", id: organizationId },
-    denialReason: "no-grant",
-  });
-}
-
-/**
- * The key's own configuration refuses the permission: a customer fault, so a
- * warning, and only when the key's log window let it through.
- */
-function apiKeyCeilingRefusal({
-  resolved,
-  permission,
-  logger,
-  suppressedRefusals,
-}: {
-  resolved: Extract<RestResolvedProjectCredential, { type: "apiKey" }>;
-  permission: AuthzPermission;
-  logger: Pick<Logger, "warn">;
-  /** Refusals held back since the key's last line; undefined holds this one back too. */
-  suppressedRefusals: number | undefined;
-}): HandledError {
-  if (suppressedRefusals !== undefined) {
-    logger.warn(
-      {
-        apiKeyId: resolved.apiKeyId,
-        userId: resolved.userId ?? null,
-        projectId: resolved.project.id,
-        permission,
-        suppressedRefusals,
-      },
-      "API key ceiling denial",
-    );
-  }
-  return isUndelegatedForLangy({ key: resolved, permission })
-    ? new ApiKeyPermissionNotDelegableError(permission, { subject: "Langy" })
-    : new ApiKeyPermissionDeniedError(permission);
 }

@@ -1,3 +1,7 @@
+/**
+ * The key door (#8085): any API key authenticates without naming a project, and resolves to the
+ * principal the query door fans out from. Only a missing or unusable token is refused.
+ */
 import type {
   ApiKeyApi,
   ApiKeyProject,
@@ -5,10 +9,6 @@ import type {
   OrganizationApiKeyResolution,
   ResolvedApiKeyCredential,
 } from "@langwatch/api-key-contract";
-/**
- * The key door (#8085): any API key authenticates without naming a project, and resolves to the
- * principal the query door fans out from. Only a missing or unusable token is refused.
- */
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { PROJECT_KIND } from "@langwatch/project-contract";

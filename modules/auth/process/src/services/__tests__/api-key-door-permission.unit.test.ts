@@ -1,15 +1,15 @@
-import type {
-  ApiKeyApi,
-  OrganizationApiKeyResolution,
-  ResolvedApiKeyCredential,
-} from "@langwatch/api-key-contract";
-import type { AuthzApi } from "@langwatch/authz-contract";
 /**
  * The key door asking a route's permission: at the project a key acts in, at its organization,
  * or on any scope it is granted at. A refusal is the one permission denial every tier gives.
  * @see specs/ai-gateway/public-rest-api.feature
  * @see specs/ai-gateway/per-team-budget-reorganization.feature
  */
+import type {
+  ApiKeyApi,
+  OrganizationApiKeyResolution,
+  ResolvedApiKeyCredential,
+} from "@langwatch/api-key-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";

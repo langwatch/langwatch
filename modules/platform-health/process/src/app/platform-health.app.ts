@@ -2,7 +2,7 @@ import { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { RestIdentity } from "@langwatch/api/hosting";
 import { BearerIdentity } from "@langwatch/api/rest";
 import { AutomationApi } from "@langwatch/automation-contract";
-import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { FeatureFlagApi, legacyProjectKeyHasFullAccess } from "@langwatch/feature-flag-contract";
 import { LangyApi, type LangyKeyCaller } from "@langwatch/langy-contract";
 import {
   PlatformHealthApi,
@@ -129,10 +129,9 @@ export class PlatformHealthModule implements PlatformHealthApiContract {
           const isApiKey = resolved.type === "apiKey";
           const ingestionOnly =
             resolved.type === "legacyProjectKey" &&
-            !(await dependencies.featureFlags.isEnabled("legacy_project_key_full_access", {
-              kind: "project",
-              projectId: resolved.project.id,
-              organizationId: resolved.project.organizationId,
+            !(await legacyProjectKeyHasFullAccess({
+              featureFlags: dependencies.featureFlags,
+              project: resolved.project,
             }));
           return {
             projectId: resolved.project.id,

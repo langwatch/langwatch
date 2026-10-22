@@ -48,7 +48,9 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
       Then the answer is 403, as on main
       And no key is revealed or rotated
 
-  Rule: a legacy project key keeps working until it is revoked, and nobody can find it
+  Rule: a legacy project key keeps working until it is revoked, and no page reveals it
+    # Beyond ingestion it works only while its project is on the full-access
+    # allowlist (modules/auth/specs/legacy-project-key-scope.feature).
 
     @integration
     Scenario: A legacy project key still authenticates
@@ -56,7 +58,7 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
       When a trace is sent with that key in X-Auth-Token
       Then the key resolves to project "alpha"
 
-    # Alex 2026-10-09: keys created on main keep main's access.
+    # Alex 2026-10-09: keys created on main keep main's access, while their project is on the allowlist.
     @unit
     Scenario: A legacy project key on the full-access allowlist reads its own project's traces
       Given project "alpha" holds the legacy key "sk-lw-<48 characters>" on the project itself

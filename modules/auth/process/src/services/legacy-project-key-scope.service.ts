@@ -3,7 +3,10 @@ import {
   LegacyProjectKeyIngestionOnlyError,
 } from "@langwatch/api-key-contract";
 import type { AuthzPermission } from "@langwatch/authorization";
-import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import {
+  legacyProjectKeyHasFullAccess,
+  type FeatureFlagApi,
+} from "@langwatch/feature-flag-contract";
 
 /** The project a legacy key is, as far as its scope is concerned. */
 export type LegacyKeyProject = Readonly<{ id: string; organizationId: string }>;
@@ -29,11 +32,7 @@ export class LegacyProjectKeyScopeService {
   }
 
   holdsFullAccess(project: LegacyKeyProject): Promise<boolean> {
-    return this.featureFlags.isEnabled("legacy_project_key_full_access", {
-      kind: "project",
-      projectId: project.id,
-      organizationId: project.organizationId,
-    });
+    return legacyProjectKeyHasFullAccess({ featureFlags: this.featureFlags, project });
   }
 
   /** A route that asks no permission is never ingestion, so only full access opens it. */

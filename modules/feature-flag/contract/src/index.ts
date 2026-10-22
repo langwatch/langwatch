@@ -27,6 +27,7 @@ export type {
 } from "./feature-flag-rules.ts";
 export {
   emailDomainsOf,
+  projectIdsOf,
   deriveRuleOutcome,
   featureFlagRuleSchema,
   featureFlagRulesSchema,
@@ -154,4 +155,8 @@ export {
 } from "./frontend-feature-flags.ts";
 export { FRONTEND_FEATURE_FLAGS, FrontendFlags } from "./frontend-feature-flags.ts";
 export { VOICE_AGENTS_DISABLED_MESSAGE, VOICE_AGENTS_FLAG_KEY } from "./voice-agents.ts";
+export {
+  LEGACY_PROJECT_KEY_FULL_ACCESS_FLAG_KEY,
+  legacyProjectKeyHasFullAccess,
+} from "./legacy-project-key.ts";
 export * from "./feature-flag.api.ts";

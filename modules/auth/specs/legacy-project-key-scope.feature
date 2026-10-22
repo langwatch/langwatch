@@ -3,7 +3,7 @@ Feature: Legacy project keys are ingestion-only
   not an API key. It can send traces, logs, metrics and tracked events, which ask
   `traces:create`, and nothing else. A project on the `legacy_project_key_full_access`
   flag keeps the old full access while its owners move to an API key; operators
-  target it with a `{ projectId }` rule. Every other request is refused with the
+  list those projects in one `{ projectId: [ids] }` rule. Every other request is refused with the
   handled error "legacy_project_key_ingestion_only" at status 403.
 
   Rule: a legacy project key still sends data

@@ -12,17 +12,13 @@ import {
   type OrganizationApiKeyResolution,
   type ResolvedApiKeyCredential,
   API_KEY_PREFIX,
-  CREDENTIAL_PROJECT_SPAN_ATTRIBUTE,
-  CREDENTIAL_TYPE_SPAN_ATTRIBUTE,
   LANGY_SESSION_API_KEY_NAME,
   WORKFLOW_RUN_API_KEY_NAME,
-  type RequestCredentialType,
 } from "@langwatch/api-key-contract";
 import type * as apiKeyContractModule from "@langwatch/api-key-contract";
 import { createLogger } from "@langwatch/observability";
 import { projectIdentitySchema, type ProjectIdentity } from "@langwatch/project-contract";
 import { Temporal, fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
-import { trace } from "@opentelemetry/api";
 import { z } from "zod";
 
 import {
@@ -33,8 +29,8 @@ import {
 import type { ApiKeyRepository, StoredApiKey } from "../repositories/api-key.repository.ts";
 import { bindingsReachProject, findGrantedProjectIds } from "../rules/api-key-grant-reach.rules.ts";
 import { ApiKeyGrantsService } from "./api-key-grants.service.ts";
-import { ApiKeyLastUsedService } from "./api-key-last-used.service.ts";
 import type { ApiKeyDependencies } from "./api-key.service.ts";
+import { RequestCredentialRecorderService } from "./request-credential-recorder.service.ts";
 
 const logger = createLogger("langwatch:api-key:answers");
 
@@ -74,8 +70,7 @@ export class ApiKeyTokenResolutionService {
   }
 
   private readonly bindings: ApiKeyGrantsService;
-  /** Legacy key uses, keyed by project id: one stamp a minute per project in this process. */
-  private readonly legacyUses: ApiKeyLastUsedService;
+  private readonly credentials: RequestCredentialRecorderService;
   private readonly answerReads = new Map<string, Promise<HeldAnswer | null>>();
   private readonly legacyReads = new Map<string, Promise<ProjectIdentity | null>>();
 
@@ -85,16 +80,8 @@ export class ApiKeyTokenResolutionService {
     private readonly options: ApiKeyDependencies & { now?: () => Instant },
   ) {
     this.bindings = ApiKeyGrantsService.create({ authz: options.authz });
-    this.legacyUses = ApiKeyLastUsedService.create({
-      repository: {
-        updateLastUsedAt: async ({ id }) => {
-          await options.projects.markLegacyApiKeyUsed({ projectId: id });
-          logger.info(
-            { credentialType: "legacy_project_key", projectId: id },
-            "a legacy project key authenticated a request",
-          );
-        },
-      },
+    this.credentials = RequestCredentialRecorderService.create({
+      projects: options.projects,
       now: options.now,
     });
   }
@@ -275,7 +262,7 @@ export class ApiKeyTokenResolutionService {
     if (getTokenType(parsed.token) === "apiKey") {
       const apiKey = await this.findVerifiedToken({ token: parsed.token });
       if (apiKey) {
-        this.recordCredential({
+        this.credentials.record({
           credentialType: apiKeyCredentialTypeOf(apiKey),
           organizationId: apiKey.organizationId,
         });
@@ -322,25 +309,10 @@ export class ApiKeyTokenResolutionService {
   ): Promise<ResolvedApiKeyCredential | null> {
     const resolved = await this.findLegacyProjectKeyResolution(token);
     if (resolved?.type === "legacyProjectKey") {
-      const projectId = resolved.project.id;
-      this.recordCredential({ credentialType: "legacy_project_key", projectId });
-      this.legacyUses.markUsed({ id: projectId });
+      this.credentials.recordLegacyKeyUse(resolved.project.id);
     }
 
     return resolved;
-  }
-
-  /** Tags the request's span and logs the credential kind, never the token. */
-  private recordCredential(input: {
-    credentialType: RequestCredentialType;
-    projectId?: string;
-    organizationId?: string;
-  }): void {
-    trace.getActiveSpan()?.setAttributes({
-      [CREDENTIAL_TYPE_SPAN_ATTRIBUTE]: input.credentialType,
-      ...(input.projectId ? { [CREDENTIAL_PROJECT_SPAN_ATTRIBUTE]: input.projectId } : {}),
-    });
-    logger.debug(input, "request credential resolved");
   }
 
   private async findLegacyProjectKeyResolution(
@@ -382,7 +354,7 @@ export class ApiKeyTokenResolutionService {
       return null;
     }
 
-    this.recordCredential({
+    this.credentials.record({
       credentialType: apiKeyCredentialTypeOf(apiKey),
       projectId: project.id,
       organizationId: apiKey.organizationId,

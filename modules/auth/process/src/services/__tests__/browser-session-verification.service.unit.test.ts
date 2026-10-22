@@ -213,5 +213,10 @@ describe("given a request whose session is live", () => {
     expect(exporter.getFinishedSpans()[0]?.attributes[CREDENTIAL_TYPE_SPAN_ATTRIBUTE]).toBe(
       "session",
     );
+    expect(loggerSpies.debug).toHaveBeenCalledWith(
+      { credentialType: "session" },
+      "request credential resolved",
+    );
+    expect(JSON.stringify(loggerSpies.debug.mock.calls)).not.toContain(COOKIE_VALUE);
   });
 });

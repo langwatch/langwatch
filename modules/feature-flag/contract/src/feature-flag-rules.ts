@@ -20,7 +20,8 @@ type KnownMatchKey = (typeof KNOWN_MATCH_KEYS)[number];
 
 const featureFlagRuleMatchSchema = z
   .object({
-    projectId: z.string().optional(),
+    /** One project, or several so one rule carries a per-project allowlist. */
+    projectId: z.union([z.string(), z.array(z.string())]).optional(),
     organizationId: z.string().optional(),
     /**
      * "New users": matches organizations created on or after this instant
@@ -57,24 +58,30 @@ const featureFlagRulesSchemaDefinition = z.array(featureFlagRuleSchema);
 export interface FeatureFlagRulesSchema extends Named<typeof featureFlagRulesSchemaDefinition> {}
 export const featureFlagRulesSchema: FeatureFlagRulesSchema = featureFlagRulesSchemaDefinition;
 
-/** Room for a per-project allowlist of a hundred or so projects, one rule each. */
-const MAX_WRITABLE_RULES = 200;
-
 /**
  * Rules operators can write; narrower set than what we read to prevent dead
  * rules (blank/padded ids or unparseable dates).
  */
 const featureFlagRulesWriteSchemaDefinition = featureFlagRulesSchema
-  .max(MAX_WRITABLE_RULES)
+  .max(50)
   .refine(
     (rules) =>
       rules.every((rule) =>
-        [rule.match.projectId, rule.match.organizationId].every(
+        [rule.match.organizationId, ...projectIdsOf(rule.match.projectId)].every(
           (id) => id === undefined || (id.length > 0 && id === id.trim()),
         ),
       ),
     {
       message: "A targeting rule's project/organization id must not be blank or padded",
+    },
+  )
+  .refine(
+    (rules) =>
+      rules.every(
+        (rule) => !Array.isArray(rule.match.projectId) || rule.match.projectId.length > 0,
+      ),
+    {
+      message: "A project rule naming a list needs at least one project id",
     },
   )
   .refine(
@@ -117,6 +124,12 @@ export interface FeatureFlagRulesWriteSchema extends Named<
 > {}
 export const featureFlagRulesWriteSchema: FeatureFlagRulesWriteSchema =
   featureFlagRulesWriteSchemaDefinition;
+
+/** The projects a `projectId` condition names, one or several, as a list. */
+export function projectIdsOf(projectId: string | string[] | undefined): string[] {
+  if (projectId === undefined) return [];
+  return Array.isArray(projectId) ? projectId : [projectId];
+}
 
 /** The domains an `emailDomain` condition names, one or several, as a list. */
 export function emailDomainsOf(emailDomain: string | string[] | undefined): string[] {
@@ -248,7 +261,10 @@ function matchesContext(
   }
   // Every specified field must match the context. An entirely empty
   // match acts as a default-rule and matches every context.
-  if (match.projectId !== undefined && match.projectId !== ctx.projectId) {
+  if (
+    match.projectId !== undefined &&
+    (ctx.projectId === undefined || !projectIdsOf(match.projectId).includes(ctx.projectId))
+  ) {
     return false;
   }
   if (match.organizationId !== undefined && match.organizationId !== ctx.organizationId) {

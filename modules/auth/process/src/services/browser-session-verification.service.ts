@@ -53,6 +53,7 @@ export class BrowserSessionVerificationService {
     }
     const { session } = resolution;
     trace.getActiveSpan()?.setAttribute(CREDENTIAL_TYPE_SPAN_ATTRIBUTE, "session");
+    logger.debug({ credentialType: "session" }, "request credential resolved");
 
     return {
       kind: "caller",

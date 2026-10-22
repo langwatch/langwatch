@@ -1,4 +1,7 @@
-import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import {
+  legacyProjectKeyHasFullAccess,
+  type FeatureFlagApi,
+} from "@langwatch/feature-flag-contract";
 import { isAggregateProjectKind, type ProjectApi } from "@langwatch/project-contract";
 
 /**
@@ -42,10 +45,9 @@ export class ProjectMcpProjectLookupService {
     if (!identity || isAggregateProjectKind(identity.kind)) return { kind: "unknown" };
 
     // The bearer is the project's legacy key, which only sends traces unless its project is kept.
-    const fullAccess = await this.#featureFlags.isEnabled("legacy_project_key_full_access", {
-      kind: "project",
-      projectId: identity.id,
-      organizationId: identity.organizationId,
+    const fullAccess = await legacyProjectKeyHasFullAccess({
+      featureFlags: this.#featureFlags,
+      project: identity,
     });
 
     return fullAccess

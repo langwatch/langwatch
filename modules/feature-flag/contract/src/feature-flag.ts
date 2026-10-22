@@ -338,7 +338,7 @@ export const FEATURE_FLAGS = [
     scope: "PRODUCT",
     defaultValue: false,
     description:
-      "Lets a project's legacy key, the one stored on the project itself rather than an API key, do everything in its project. Off by default: a legacy key can only send traces, logs, metrics and tracked events, and every other route, the hosted MCP and the project-keyed health probes refuse it with legacy_project_key_ingestion_only. Enable per project with a { projectId } rule while its owners move to an API key; remove the rule to end it. A self-hosted install can set LEGACY_PROJECT_KEY_FULL_ACCESS=1 to keep full access for every legacy key (spec: modules/auth/specs/legacy-project-key-scope.feature).",
+      "Lets a project's legacy key, the one stored on the project itself rather than an API key, do everything in its project. Off by default: a legacy key can only send traces, logs, metrics and tracked events, and every other route, the hosted MCP and the project-keyed health probes refuse it with legacy_project_key_ingestion_only. Enable it for the projects whose owners are still moving to an API key with one rule naming them all, { projectId: [ids] }; remove an id from the list to end it for that project. A self-hosted install can set LEGACY_PROJECT_KEY_FULL_ACCESS=1 to keep full access for every legacy key (spec: modules/auth/specs/legacy-project-key-scope.feature).",
   },
   // NOTE: `release_webhook_automations` (ADR-040) was retired — the webhook
   // delivery channel is offered to every project, so there is no picker card,

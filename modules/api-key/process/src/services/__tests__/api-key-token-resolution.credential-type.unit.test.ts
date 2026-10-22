@@ -9,15 +9,34 @@ import {
   CREDENTIAL_PROJECT_SPAN_ATTRIBUTE,
   CREDENTIAL_TYPE_SPAN_ATTRIBUTE,
 } from "@langwatch/api-key-contract";
+import type * as observabilityModule from "@langwatch/observability";
 import { Temporal, type Instant } from "@langwatch/time";
 import { context, propagation, trace } from "@opentelemetry/api";
 import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { MemoryApiKeyAnswerCacheRepository } from "../../repositories/memory/memory.api-key-answer-cache.repository.ts";
 import { API_KEY_LAST_USED_WINDOW_MS } from "../api-key-last-used.service.ts";
 import { ApiKeyTokenResolutionService } from "../api-key-token-resolution.service.ts";
+
+const loggerSpies = vi.hoisted(() => ({
+  warn: vi.fn(),
+  info: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+}));
+vi.mock("@langwatch/observability", async (importOriginal) => ({
+  ...(await importOriginal<typeof observabilityModule>()),
+  createLogger: () => loggerSpies,
+}));
+
+/** The `request credential resolved` lines this test logged, as their structured fields. */
+function credentialLogLines(): unknown[] {
+  return loggerSpies.debug.mock.calls
+    .filter(([, message]) => message === "request credential resolved")
+    .map(([fields]) => fields);
+}
 
 const CURRENT_TOKEN = `sk-lw-${"a".repeat(16)}_${"b".repeat(48)}`;
 const LEGACY_TOKEN = "sk-lw-legacy-project-key";
@@ -123,6 +142,7 @@ describe("the credential a request authenticated with", () => {
 
   afterEach(() => {
     exporter.reset();
+    Object.values(loggerSpies).forEach((spy) => spy.mockClear());
   });
 
   /** Runs `resolve` inside a request span and answers that span's attributes. */
@@ -148,6 +168,21 @@ describe("the credential a request authenticated with", () => {
     expect(JSON.stringify(attributes)).not.toContain(CURRENT_TOKEN);
   });
 
+  /** @scenario "An API key request is recorded as an API key" */
+  it("logs one line with the kind and project, never the token", async () => {
+    const { service } = serviceWith();
+
+    await inRequestSpan(() =>
+      service.findResolvedToken({ token: CURRENT_TOKEN, projectId: "project-1" }),
+    );
+
+    expect(credentialLogLines()).toEqual([
+      { credentialType: "api_key", projectId: "project-1", organizationId: "organization-1" },
+    ]);
+    expect(JSON.stringify(loggerSpies.debug.mock.calls)).not.toContain(CURRENT_TOKEN);
+    expect(JSON.stringify(loggerSpies.info.mock.calls)).not.toContain(CURRENT_TOKEN);
+  });
+
   /** @scenario "A CLI login token is recorded as a CLI token" */
   it("tags a key a CLI login minted as a CLI token", async () => {
     const { service } = serviceWith({ name: `${CLI_LOGIN_KEY_NAME_PREFIX}laptop` });
@@ -169,6 +204,10 @@ describe("the credential a request authenticated with", () => {
 
     expect(attributes[CREDENTIAL_TYPE_SPAN_ATTRIBUTE]).toBe("legacy_project_key");
     expect(attributes[CREDENTIAL_PROJECT_SPAN_ATTRIBUTE]).toBe("project-1");
+    expect(credentialLogLines()).toEqual([
+      { credentialType: "legacy_project_key", projectId: "project-1" },
+    ]);
+    expect(JSON.stringify(loggerSpies.debug.mock.calls)).not.toContain(LEGACY_TOKEN);
   });
 
   /** @scenario "A token that does not resolve records nothing" */
@@ -180,6 +219,7 @@ describe("the credential a request authenticated with", () => {
     );
 
     expect(attributes[CREDENTIAL_TYPE_SPAN_ATTRIBUTE]).toBeUndefined();
+    expect(credentialLogLines()).toEqual([]);
     expect(stamps).toEqual([]);
   });
 
@@ -204,5 +244,16 @@ describe("the credential a request authenticated with", () => {
       type: "legacyProjectKey",
       project: { id: "project-1" },
     });
+  });
+
+  it("logs a failed stamp under the project id, not as an API key id", async () => {
+    const { service } = serviceWith({ legacyProjectId: "project-1", markFails: true });
+
+    await service.findResolvedToken({ token: LEGACY_TOKEN });
+
+    await vi.waitFor(() => expect(loggerSpies.warn).toHaveBeenCalled());
+    const [fields] = loggerSpies.warn.mock.calls[0] ?? [];
+    expect(fields).toMatchObject({ projectId: "project-1" });
+    expect(fields).not.toHaveProperty("apiKeyId");
   });
 });

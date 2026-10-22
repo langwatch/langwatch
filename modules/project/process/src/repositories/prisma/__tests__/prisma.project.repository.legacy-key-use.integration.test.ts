@@ -70,4 +70,16 @@ describe.skipIf(!DB_URL)("PrismaProjectRepository legacy key use over Postgres",
     });
     expect(row.legacyApiKeyLastUsedAt?.toISOString()).toBe("2026-10-22T12:00:00.000Z");
   });
+
+  it("still reads the project back once it carries a stamp", async () => {
+    await repository.markLegacyApiKeyUsed({
+      projectId: ids.project,
+      at: Temporal.Instant.from("2026-10-22T12:00:00Z"),
+    });
+
+    const project = await repository.findById(ids.project);
+
+    expect(project?.id).toBe(ids.project);
+    expect(project).not.toHaveProperty("legacyApiKeyLastUsedAt");
+  });
 });
