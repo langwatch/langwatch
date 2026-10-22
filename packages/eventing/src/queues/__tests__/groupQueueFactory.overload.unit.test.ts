@@ -1,4 +1,5 @@
 import { GroupQueueError } from "@langwatch/group-queue";
+import { HandledError } from "@langwatch/handled-error";
 import { describe, expect, it } from "vitest";
 
 import { backOffWhenOverloaded } from "../groupQueueFactory.ts";
@@ -65,6 +66,18 @@ describe("backOffWhenOverloaded", () => {
       const error = await failed(wrapped);
 
       expect(error).toMatchObject({ retryAfterMs: undefined, cause: wrapped });
+    });
+  });
+
+  describe("when the client sheds an insert before it reaches the server", () => {
+    it("names a retry delay, so the batch is retried whole and its writes are not lost", async () => {
+      const shed = new HandledError("clickhouse_overloaded", "clickhouse_overloaded", {
+        reasons: [new Error("statement queue full")],
+      });
+
+      const error = await failed(shed);
+
+      expect(error).toMatchObject({ retryable: true, retryAfterMs: 0, cause: shed });
     });
   });
 
