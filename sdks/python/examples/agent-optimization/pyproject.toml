@@ -13,6 +13,14 @@ dependencies = [
 
 [tool.uv]
 package = false
+# exclude-newer-package below needs uv 0.9.25+ (dev/docs/best_practices/dependency-age-gates.md).
+required-version = ">=0.9.25"
+exclude-newer = "7 days"
+
+# Security fix released inside the 7-day window above, admitted up to a fixed
+# date so the rest of the tree keeps the cooldown. Drop it once the date is
+# more than 7 days old (#8958).
+exclude-newer-package = { certifi = "2026-10-21T00:00:00Z" }
 
 # Transitive-dependency security pins, so a re-resolution can't pull a
 # vulnerable version back in.

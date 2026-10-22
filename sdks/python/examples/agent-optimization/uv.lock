@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.10, <3.14"
 resolution-markers = [
     "python_full_version >= '3.13'",
@@ -7,6 +7,13 @@ resolution-markers = [
     "python_full_version == '3.11.*'",
     "python_full_version < '3.11'",
 ]
+
+[options]
+exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for backwards compatibility when using relative exclude-newer values.
+exclude-newer-span = "P7D"
+
+[options.exclude-newer-package]
+certifi = "2026-10-21T00:00:00Z"
 
 [manifest]
 constraints = [
