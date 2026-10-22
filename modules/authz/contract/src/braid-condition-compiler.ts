@@ -441,7 +441,6 @@ class ConditionParser {
 
 type Path = { on: "span" | "resource" | "name"; key: string; text: string; at: number };
 
-/** Compiles `text` once, on save; the browser runs the same call for live feedback. */
 /** A term as JSON with its fields in a fixed order, so equal terms compare equal. */
 function canonicalTerm(term: BraidConditionTerm): string {
   switch (term.kind) {
@@ -466,6 +465,7 @@ function canonicalTree(node: BraidConditionNode): BraidConditionNode {
   return terms.length === 1 ? terms[0]! : { kind: "and", terms };
 }
 
+/** Compiles `text` once, on save; the browser runs the same call for live feedback. */
 export function compileBraidCondition({ text }: { text: string }): BraidConditionCompileResult {
   if (text.length > BRAID_CONDITION_MAX_LENGTH) {
     return {

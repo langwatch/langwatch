@@ -40,7 +40,7 @@ import { SectionErrorNotice } from "../../elements/section-error-notice.tsx";
 import { BraidDrawer } from "./braid-drawer.tsx";
 import { BraidsSigningKeys } from "./braids-signing-keys.tsx";
 
-export const BRAIDS_MANAGE_PERMISSION = "braids:manage";
+const BRAIDS_MANAGE_PERMISSION = "braids:manage";
 
 /** The braid drawer is URL-routed: `?braid=new`, or `?braid=<id>` for Edit. */
 const BRAID_QUERY_KEY = "braid";
@@ -71,7 +71,7 @@ function GuideLink() {
   );
 }
 
-export function BraidsHeader({
+function BraidsHeader({
   actions,
   projectName,
 }: {
