@@ -39,10 +39,9 @@ import { StatementScopeError, TENANT_SCOPE_PARAM_PREFIX } from "./statementScope
 export type ClickHouseClientResolver = (tenantId: string) => Promise<ClickHouseQueryClient>;
 
 /**
- * What a reader may be asked for: the proof-bearing permission each one needs, and the resources
- * a shared grant's window must apply to for that grant to open rows of it. Trace, analytics and
- * cost reads take `trace` windows alone (ADR-177 v4.9, v4.15); span reads also take `span` ones,
- * a braid's (ADR-183).
+ * What a reader may be asked for: the proof-bearing permission each needs, and the resources a
+ * shared grant's window must apply to. Trace, analytics and cost reads take `trace` windows
+ * (ADR-177 v4.9, v4.15); span reads also take a braid's `span` ones (ADR-183).
  */
 const READ_RESOURCES = {
   traces: { permission: "traces:view", conditions: ["trace"] },

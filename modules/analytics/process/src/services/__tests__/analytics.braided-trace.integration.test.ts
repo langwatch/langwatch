@@ -13,7 +13,9 @@ import {
   deleteMigratedTenantRows,
   startMigratedClickHouse,
 } from "../../__tests__/migrated-clickhouse.harness.ts";
+import { analyticsTestAuthz } from "../../repositories/__tests__/analytics-proof.fixture.ts";
 import { NullAnalyticsEvaluationRepository } from "../../repositories/analytics-persistence.repository.ts";
+import { clickHouseQueryClientOver } from "../../repositories/clickhouse/__tests__/support/clickhouse-query-client.support.ts";
 import { ClickHouseAnalyticsRepository } from "../../repositories/clickhouse/clickhouse.analytics.repository.ts";
 import { AnalyticsService } from "../analytics.service.ts";
 
@@ -91,8 +93,9 @@ const settings = { async_insert: 0, wait_for_async_insert: 0 } as const;
 beforeAll(async () => {
   ch = (await startMigratedClickHouse()).client;
   analytics = AnalyticsService.create({
-    repository: ClickHouseAnalyticsRepository.create({ resolveClient: async () => ch }),
+    repository: ClickHouseAnalyticsRepository.create({ clickhouse: clickHouseQueryClientOver(ch) }),
     evaluationRepository: NullAnalyticsEvaluationRepository.create(),
+    authz: analyticsTestAuthz(),
     tenantLimiter: new InProcessTenantStatementLimiter({
       maxConcurrent: 4,
       maxQueued: 64,
