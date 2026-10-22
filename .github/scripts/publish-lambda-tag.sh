@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+# Give one Lambda function image this commit's tag in ECR. Called by the
+# create-manifest job of publish-docker-ecr.yml, once per Lambda repository.
+#
+# A Lambda function image cannot be an image index, so these tags are plain
+# manifests, and `docker buildx imagetools create` (which always writes an
+# index) cannot copy them. This copies a manifest under a new tag with the ECR
+# API instead, keeping its media type.
+#
+#   publish-lambda-tag.sh <repository>
+#
+# Env:
+#   IMAGE_TAG   the tag to publish, e.g. git-<short sha>
+#   BUILT       "true" when build-and-push-lambda rebuilt this image this run
+#               (it pushed IMAGE_TAG itself); otherwise the newest bare
+#               `git-<sha>` image is re-tagged as IMAGE_TAG
+#   IS_RELEASE  "true" to also write VERSION
+#   VERSION     the release version tag
+set -euo pipefail
+
+image="${1:?repository name required}"
+: "${IMAGE_TAG:?}"
+BUILT="${BUILT:-false}"
+IS_RELEASE="${IS_RELEASE:-false}"
+VERSION="${VERSION:-}"
+
+is_single_manifest() {
+  case "$1" in
+    application/vnd.oci.image.manifest.v1+json | application/vnd.docker.distribution.manifest.v2+json) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+media_type_of() {
+  aws ecr describe-images --repository-name "${image}" --image-ids imageTag="$1" \
+    --query 'imageDetails[0].imageManifestMediaType' --output text
+}
+
+# Copy the manifest tagged $1 to tag $2. A re-run finds the tag already naming
+# the same manifest, which ECR reports as ImageAlreadyExistsException.
+put_manifest() {
+  local from="$1" to="$2" manifest media_type out
+  manifest=$(aws ecr batch-get-image --repository-name "${image}" \
+    --image-ids imageTag="${from}" --query 'images[0].imageManifest' --output text)
+  media_type=$(aws ecr batch-get-image --repository-name "${image}" \
+    --image-ids imageTag="${from}" --query 'images[0].imageManifestMediaType' --output text)
+  if out=$(aws ecr put-image --repository-name "${image}" --image-tag "${to}" \
+      --image-manifest "${manifest}" --image-manifest-media-type "${media_type}" 2>&1); then
+    return 0
+  fi
+  if grep -q ImageAlreadyExistsException <<<"${out}"; then
+    return 0
+  fi
+  echo "${out}" >&2
+  return 1
+}
+
+if [ "${BUILT}" = "true" ]; then
+  # build-and-push-lambda pushed the bare tag itself. Missing means that leg
+  # failed.
+  if ! aws ecr describe-images --repository-name "${image}" \
+      --image-ids imageTag="${IMAGE_TAG}" >/dev/null 2>&1; then
+    echo "::error::${image}:${IMAGE_TAG} was due to be built this run and is not in ECR; see build-and-push-lambda"
+    exit 1
+  fi
+else
+  # Not rebuilt: re-tag the newest bare `git-<sha>` image. awk reads to the end:
+  # exiting early SIGPIPEs `tr`.
+  candidates=$(aws ecr describe-images --repository-name "${image}" \
+    --query 'reverse(sort_by(imageDetails, &imagePushedAt))[].imageTags[]' \
+    --output text)
+  previous=$(printf '%s' "${candidates}" | tr '\t' '\n' \
+    | awk '/^git-[0-9a-f]+$/ && !found { print; found=1 }')
+  if [ -z "${previous}" ]; then
+    echo "::warning::${image} has no previous git-* image to re-tag as ${IMAGE_TAG}; run this workflow via workflow_dispatch to seed it"
+    exit 0
+  fi
+  # Checked rather than assumed, so an index never reaches a function.
+  media_type=$(media_type_of "${previous}")
+  if ! is_single_manifest "${media_type}"; then
+    echo "::error::${image}:${previous} is ${media_type}, not a single manifest; dispatch this workflow to rebuild it"
+    exit 1
+  fi
+  echo "Re-tagging ${image} ${previous} -> ${IMAGE_TAG} (unchanged by this commit)"
+  put_manifest "${previous}" "${IMAGE_TAG}"
+fi
+
+tags="${IMAGE_TAG}"
+if [ "${IS_RELEASE}" = "true" ]; then
+  put_manifest "${IMAGE_TAG}" "${VERSION}"
+  tags="${tags}, ${VERSION}"
+fi
+if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+  echo "Published \`${image}\` to ECR with tags: ${tags}" >> "${GITHUB_STEP_SUMMARY}"
+fi
+echo "Published ${image} with tags: ${tags}"
