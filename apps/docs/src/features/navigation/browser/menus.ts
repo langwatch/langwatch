@@ -1,3 +1,5 @@
+import { fillMobileNav } from "./mobile-tree.ts";
+
 function closeMenus() {
   document.querySelectorAll<HTMLElement>(".docs-menu").forEach((menu) => {
     menu.hidden = true;
@@ -22,6 +24,7 @@ function applyTheme({ choice }: { choice: string }) {
 function openMobile() {
   const dialog = document.getElementById("docs-mobile-nav");
   if (!(dialog instanceof HTMLDialogElement)) return;
+  fillMobileNav({ dialog });
   dialog.showModal();
   const active = dialog.querySelector<HTMLElement>('[aria-current="page"]');
   active?.focus({ preventScroll: true });

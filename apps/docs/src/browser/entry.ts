@@ -3,6 +3,7 @@ import { startNavigation } from "./navigation.ts";
 
 import "./islands.css";
 import "../app/docs.css";
+import "../features/navigation/ui/nav.css";
 
 /** Enables server-disabled controls and applies stored dismissals; reruns after navigation. */
 function prepareControls() {

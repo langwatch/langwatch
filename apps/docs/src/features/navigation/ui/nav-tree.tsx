@@ -1,5 +1,4 @@
 import { Box, chakra, Text } from "@langwatch/design-system/primitives";
-import { ChevronRight } from "lucide-react";
 import nav from "virtual:docs-nav";
 
 import { pagePath, sitePath } from "../../../lib/site-path.ts";
@@ -96,7 +95,7 @@ function PageRow({
   const method = methodOf({ meta });
   const glyph = meta?.icon || meta?.logo;
   return (
-    <Box as="li" listStyleType="none">
+    <li>
       <chakra.a
         href={pagePath({ slug: item.slug })}
         aria-current={active ? "page" : undefined}
@@ -136,7 +135,7 @@ function PageRow({
           {item.title}
         </span>
       </chakra.a>
-    </Box>
+    </li>
   );
 }
 
@@ -221,12 +220,8 @@ function GroupRow({
         color="fg.muted"
         cursor="pointer"
         _hover={{ bg: "bg.hover", color: "fg" }}
-        css={{
-          "& svg": { transition: "transform 120ms ease" },
-          "&[aria-expanded=true] svg": { transform: "rotate(90deg)" },
-        }}
       >
-        <ChevronRight size={14} aria-hidden="true" style={{ flexShrink: 0 }} />
+        <span className="docs-nav-chevron" aria-hidden="true" />
       </chakra.button>
       <Box
         hidden={!open}
@@ -257,7 +252,7 @@ function NavList({
   trail: string;
 }) {
   return (
-    <Box as="ul" margin="0" padding="0">
+    <ul>
       {items.map((item) =>
         item.type === "page" ? (
           <PageRow key={item.slug} item={item} current={current} nested={depth > 0} />
@@ -265,7 +260,7 @@ function NavList({
           <GroupRow key={item.title} item={item} current={current} depth={depth} trail={trail} />
         ),
       )}
-    </Box>
+    </ul>
   );
 }
 

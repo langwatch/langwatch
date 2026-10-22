@@ -2,17 +2,16 @@ import { Box, Button, Flex, Link, Text } from "@langwatch/design-system/primitiv
 
 import { sitePath } from "../../../lib/site-path.ts";
 import { GithubLink } from "../../shell/ui/github-link.tsx";
-import type { Section } from "../model/nav.ts";
-import { SideNav } from "./side-nav.tsx";
 import { site } from "./site-nav.ts";
 
-export function MobileNav({
-  active,
-  slug,
-}: {
+/**
+ * The drawer ships empty: opening it copies the left rail's sections and page tree in, so
+ * every page carries its navigation once. The drawer needs JavaScript to open either way.
+ */
+export function MobileNav(_props: {
   open: boolean;
   onClose: () => void;
-  active: Section | undefined;
+  active: unknown;
   slug: string;
 }) {
   return (
@@ -40,9 +39,14 @@ export function MobileNav({
           Close
         </Button>
       </Flex>
-      <Box padding="4" overflowY="auto" minHeight="0" flex="1" data-docs-scroll="">
-        <SideNav active={active} slug={slug} />
-      </Box>
+      <Box
+        padding="4"
+        overflowY="auto"
+        minHeight="0"
+        flex="1"
+        data-docs-scroll=""
+        data-docs-mobile-body=""
+      />
       <Flex padding="4" gap="3" borderTopWidth="1px" borderColor="border" wrap="wrap">
         <Link href={sitePath({ path: site.llms })}>Docs for agents</Link>
         <Link href={site.signIn}>Open app</Link>

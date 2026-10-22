@@ -28,7 +28,6 @@ function sectionOf({ root }: { root: HTMLElement }) {
 
 function setOpen({ button, open }: { button: HTMLButtonElement; open: boolean }) {
   button.setAttribute("aria-expanded", String(open));
-  button.querySelector("svg")?.style.removeProperty("transform");
   const panel = button.nextElementSibling;
   if (panel instanceof HTMLElement) panel.hidden = !open;
 }
