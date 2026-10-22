@@ -1,22 +1,27 @@
-/**
- * The key door asking a route's permission: at the project a key acts in, at its organization,
- * or on any scope it is granted at. A refusal is the one permission denial every tier gives.
- * @see specs/ai-gateway/public-rest-api.feature
- * @see specs/ai-gateway/per-team-budget-reorganization.feature
- */
 import type {
   ApiKeyApi,
   OrganizationApiKeyResolution,
   ResolvedApiKeyCredential,
 } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
+/**
+ * The key door asking a route's permission: at the project a key acts in, at its organization,
+ * or on any scope it is granted at. A refusal is the one permission denial every tier gives.
+ * @see specs/ai-gateway/public-rest-api.feature
+ * @see specs/ai-gateway/per-team-budget-reorganization.feature
+ */
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { HandledError } from "@langwatch/handled-error";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import {
   ApiRestCredentialsService,
   type ApiKeyPermissionReach,
 } from "../api-rest-credentials.service.ts";
+
+/** Every legacy key in this suite keeps full access; the default is legacy-project-key-scope's. */
+const KEEPS_FULL_ACCESS = createApiFixture<FeatureFlagApi>({ isEnabled: async () => true });
 
 const ORGANIZATION_ID = "org-1";
 const PROJECT = {
@@ -123,6 +128,7 @@ const authz = {
 const door = ApiRestCredentialsService.create({
   apiKeys,
   authz,
+  featureFlags: KEEPS_FULL_ACCESS,
   cliProjects: {
     getCliAccessProject: () =>
       Promise.resolve({ userId: "user-9", organizationId: ORGANIZATION_ID, project: PROJECT }),
@@ -300,7 +306,7 @@ describe("the key door asking a permission", () => {
   });
 
   describe("given a legacy project key", () => {
-    /** @scenario "A legacy project key passes the key door by its class" */
+    /** @scenario "A legacy project key on the full-access allowlist passes the key door by its class" */
     it.each([void 0, "grants", "organization"] as const)(
       "is admitted with no grant asked (reach %s)",
       async (reach) => {

@@ -63,6 +63,7 @@ export type ApiDoorPeers = Readonly<{
   >;
   entitlements: Pick<EntitlementApi, "getActivePlan">;
   auditLog: Pick<AuditLogApi, "record">;
+  featureFlags: ApiRestCredentialPeers["featureFlags"];
 }>;
 
 /** The API door auth binds for the process: who is calling, and what they may do (record §8). */
@@ -86,6 +87,7 @@ export class ApiDoorService {
       authz: peers.authz,
       cliProjects: peers.cliProjects,
       organizations: peers.organizations,
+      featureFlags: peers.featureFlags,
     });
     this.#sessions = BrowserSessionVerificationService.create({ sessions: peers.sessions });
     this.#audit = ApiDoorAuditService.create({ authz: peers.authz, auditLog: peers.auditLog });

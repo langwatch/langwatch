@@ -125,6 +125,28 @@ export class ApiKeyPermissionDeniedError extends HandledError {
   }
 }
 
+/** A legacy project key (`Project.apiKey`) asked for anything beyond sending traces. */
+export class LegacyProjectKeyIngestionOnlyError extends HandledError {
+  declare readonly code: "legacy_project_key_ingestion_only";
+
+  constructor(options: { permission?: string; meta?: Record<string, unknown> } = {}) {
+    super(
+      "legacy_project_key_ingestion_only",
+      "Legacy project keys can only send traces, logs, metrics and events. Create an API key with the permissions this call needs and send it instead.",
+      {
+        meta: {
+          ...(options.permission ? { permission: options.permission } : {}),
+          ...options.meta,
+        },
+        httpStatus: 403,
+        fault: "customer",
+        ...remediation("legacy_project_key_ingestion_only"),
+      },
+    );
+    this.name = "LegacyProjectKeyIngestionOnlyError";
+  }
+}
+
 export class ApiKeyPermissionNotDelegableError extends HandledError {
   declare readonly code: "api_key_permission_not_delegable";
 

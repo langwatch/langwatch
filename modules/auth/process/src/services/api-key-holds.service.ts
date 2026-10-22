@@ -2,39 +2,42 @@ import type { AuthzPermission, RestKeyDoorPrincipal } from "@langwatch/authoriza
 import type { AuthzApi } from "@langwatch/authz-contract";
 
 import type { ApiKeyPermissionReach } from "./api-rest-credentials.service.ts";
+import type { LegacyProjectKeyScopeService } from "./legacy-project-key-scope.service.ts";
+
+type HoldsAuthz = Pick<
+  AuthzApi,
+  "hasApiKeyPermission" | "getApiKeyProjectDecision" | "hasProjectPermission" | "listApiKeyBindings"
+>;
 
 /** Whether a key door principal holds a permission at the reach the route asks. */
 export class ApiKeyHoldsService {
   static create(peers: {
-    authz: Pick<
-      AuthzApi,
-      | "hasApiKeyPermission"
-      | "getApiKeyProjectDecision"
-      | "hasProjectPermission"
-      | "listApiKeyBindings"
-    >;
+    authz: HoldsAuthz;
+    legacyKeys: Pick<LegacyProjectKeyScopeService, "holds">;
   }): ApiKeyHoldsService {
-    return new ApiKeyHoldsService(peers.authz);
+    return new ApiKeyHoldsService(peers.authz, peers.legacyKeys);
   }
 
   private constructor(
-    private readonly authz: Pick<
-      AuthzApi,
-      | "hasApiKeyPermission"
-      | "getApiKeyProjectDecision"
-      | "hasProjectPermission"
-      | "listApiKeyBindings"
-    >,
+    private readonly authz: HoldsAuthz,
+    private readonly legacyKeys: Pick<LegacyProjectKeyScopeService, "holds">,
   ) {}
 
-  /** A legacy project key holds everything by its class, as on the project door. */
+  /** A legacy project key holds what it holds on the project door, whatever the reach. */
   async holds(input: {
     principal: RestKeyDoorPrincipal;
+    /** The organization the credential resolved in. */
+    organizationId: string;
     permission: AuthzPermission;
     reach: ApiKeyPermissionReach | undefined;
   }): Promise<boolean> {
     const { principal, permission, reach } = input;
-    if (principal.kind === "project") return true;
+    if (principal.kind === "project") {
+      return this.legacyKeys.holds({
+        project: { id: principal.projectId, organizationId: input.organizationId },
+        permission,
+      });
+    }
     if (principal.kind === "cliAccessToken") {
       // The token is its person inside one project, so it holds nothing organization-wide.
       if (reach === "organization") return false;

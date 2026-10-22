@@ -167,5 +167,9 @@ function wireBodyOf(error: HandledError): Record<string, string> {
       error_description: "No metadata document is published at this path",
     };
   }
+  // A refusal newer than main's MCP bodies carries its code, so a client can tell it apart.
+  if (error.code === "legacy_project_key_ingestion_only") {
+    return { error: error.message, code: error.code };
+  }
   return { error: WIRE_TEXT[error.code] ?? error.message };
 }

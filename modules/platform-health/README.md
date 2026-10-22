@@ -20,22 +20,23 @@ Platform health: checks of the services a deployment depends on, all at once or 
 | Kind            | Name                                                                              | Declared at                                                    |
 | --------------- | --------------------------------------------------------------------------------- | -------------------------------------------------------------- |
 | Stores required |                                                                                   | `process/src/channels/http/http.platform-health.channels.ts:8` |
-| Secrets         | `probeApiKey` (PLATFORM_HEALTH_PROBE_API_KEY), `apiKey` (PLATFORM_HEALTH_API_KEY) | `process/src/app/platform-health.app.ts:60`                    |
+| Secrets         | `probeApiKey` (PLATFORM_HEALTH_PROBE_API_KEY), `apiKey` (PLATFORM_HEALTH_API_KEY) | `process/src/app/platform-health.app.ts:63`                    |
 | Config          | `publicBaseUrl` (BASE_HOST)                                                       | `contract/src/platform-health.config.ts:4`                     |
 
 Anything else platform-health needs belongs to another module and is reached through its `*Api`.
 
 ## Peers (static dependencies)
 
-| Name         | Token           | Module                                |
-| ------------ | --------------- | ------------------------------------- |
-| `apiKeys`    | `ApiKeyApi`     | [api-key](../api-key/README.md)       |
-| `automation` | `AutomationApi` | [automation](../automation/README.md) |
-| `langy`      | `LangyApi`      | [langy](../langy/README.md)           |
-| `projects`   | `ProjectApi`    | [project](../project/README.md)       |
-| `scenarios`  | `ScenarioApi`   | [scenario](../scenario/README.md)     |
-| `suites`     | `SuiteApi`      | [suite](../suite/README.md)           |
-| `workflow`   | `WorkflowApi`   | [workflow](../workflow/README.md)     |
+| Name           | Token            | Module                                    |
+| -------------- | ---------------- | ----------------------------------------- |
+| `apiKeys`      | `ApiKeyApi`      | [api-key](../api-key/README.md)           |
+| `automation`   | `AutomationApi`  | [automation](../automation/README.md)     |
+| `featureFlags` | `FeatureFlagApi` | [feature-flag](../feature-flag/README.md) |
+| `langy`        | `LangyApi`       | [langy](../langy/README.md)               |
+| `projects`     | `ProjectApi`     | [project](../project/README.md)           |
+| `scenarios`    | `ScenarioApi`    | [scenario](../scenario/README.md)         |
+| `suites`       | `SuiteApi`       | [suite](../suite/README.md)               |
+| `workflow`     | `WorkflowApi`    | [workflow](../workflow/README.md)         |
 
 ## Who depends on platform-health
 

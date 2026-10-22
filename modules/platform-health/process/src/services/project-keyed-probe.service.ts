@@ -1,3 +1,4 @@
+import { LegacyProjectKeyIngestionOnlyError } from "@langwatch/api-key-contract";
 import type { ProjectKeyedProbeRequest } from "@langwatch/platform-health-contract";
 import { deriveRunActor } from "@langwatch/scenario-contract";
 
@@ -5,8 +6,16 @@ import { canaryAnswer, MAX_CANARY_QUERY_PARAM_LENGTH } from "../rules/scenario-c
 import type { ScenarioCanaryService } from "./scenario-canary.service.ts";
 import type { SubsystemProbeOutcome, SubsystemProbeService } from "./subsystem-probe.service.ts";
 
-/** Who a probe's key acts as: its project, and the key and its owner when it is an API key. */
-type ProbeCaller = Readonly<{ projectId: string; userId: string | null; apiKeyId: string | null }>;
+/**
+ * Who a probe's key acts as: its project, and the key and its owner when it is an API key.
+ * `ingestionOnly` marks a legacy project key that may only send traces.
+ */
+type ProbeCaller = Readonly<{
+  projectId: string;
+  userId: string | null;
+  apiKeyId: string | null;
+  ingestionOnly: boolean;
+}>;
 
 /** Resolves a raw token, project key or API key, to its caller as main's TokenResolver did. */
 type ProbeCallerResolver = (
@@ -79,6 +88,11 @@ export class ProjectKeyedProbeService {
     });
     if (!caller) return json(401, { message: "Invalid auth token." });
     const { projectId } = caller;
+    // Only the collector canary is ingestion; every other probe reads or runs project data.
+    if (caller.ingestionOnly && request.check !== "collector") {
+      const refusal = new LegacyProjectKeyIngestionOnlyError();
+      return json(refusal.httpStatus, { code: refusal.code, message: refusal.message });
+    }
 
     if (request.check === "scenarios")
       return this.#runScenarioCanary({ caller, requested: request.runPlanId });

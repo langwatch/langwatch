@@ -58,7 +58,7 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
 
     # Alex 2026-10-09: keys created on main keep main's access.
     @unit
-    Scenario: A legacy project key reads its own project's traces
+    Scenario: A legacy project key on the full-access allowlist reads its own project's traces
       Given project "alpha" holds the legacy key "sk-lw-<48 characters>" on the project itself
       When a trace search is sent with that key
       Then the traces of project "alpha" are read on an own-only proof

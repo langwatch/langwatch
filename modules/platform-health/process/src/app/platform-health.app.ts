@@ -2,6 +2,7 @@ import { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { RestIdentity } from "@langwatch/api/hosting";
 import { BearerIdentity } from "@langwatch/api/rest";
 import { AutomationApi } from "@langwatch/automation-contract";
+import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { LangyApi, type LangyKeyCaller } from "@langwatch/langy-contract";
 import {
   PlatformHealthApi,
@@ -55,6 +56,8 @@ export class PlatformHealthModule implements PlatformHealthApiContract {
     suites: SuiteApi,
     /** The Langy canary sends one greeting turn as the key's owner and awaits its settlement. */
     langy: LangyApi,
+    /** Which projects' legacy keys keep full access (`legacy_project_key_full_access`). */
+    featureFlags: FeatureFlagApi,
   };
   static readonly secrets = {
     probeApiKey: Secret.load("PLATFORM_HEALTH_PROBE_API_KEY", { optional: true }),
@@ -124,10 +127,18 @@ export class PlatformHealthModule implements PlatformHealthApiContract {
           const resolved = await dependencies.apiKeys.findResolvedToken(input);
           if (!resolved) return null;
           const isApiKey = resolved.type === "apiKey";
+          const ingestionOnly =
+            resolved.type === "legacyProjectKey" &&
+            !(await dependencies.featureFlags.isEnabled("legacy_project_key_full_access", {
+              kind: "project",
+              projectId: resolved.project.id,
+              organizationId: resolved.project.organizationId,
+            }));
           return {
             projectId: resolved.project.id,
             userId: isApiKey ? resolved.userId : null,
             apiKeyId: isApiKey ? resolved.apiKeyId : null,
+            ingestionOnly,
           };
         },
         scenarioCanary: ScenarioCanaryService.create({

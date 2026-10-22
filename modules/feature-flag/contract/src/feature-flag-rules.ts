@@ -57,12 +57,15 @@ const featureFlagRulesSchemaDefinition = z.array(featureFlagRuleSchema);
 export interface FeatureFlagRulesSchema extends Named<typeof featureFlagRulesSchemaDefinition> {}
 export const featureFlagRulesSchema: FeatureFlagRulesSchema = featureFlagRulesSchemaDefinition;
 
+/** Room for a per-project allowlist of a hundred or so projects, one rule each. */
+const MAX_WRITABLE_RULES = 200;
+
 /**
  * Rules operators can write; narrower set than what we read to prevent dead
  * rules (blank/padded ids or unparseable dates).
  */
 const featureFlagRulesWriteSchemaDefinition = featureFlagRulesSchema
-  .max(50)
+  .max(MAX_WRITABLE_RULES)
   .refine(
     (rules) =>
       rules.every((rule) =>

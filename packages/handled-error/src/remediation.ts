@@ -313,6 +313,12 @@ const registry = {
     tips: ["Re-create the API key with the required scope, or ask an admin to raise your role"],
     docsPath: "/api-reference/api-keys/create-api-key",
   },
+  legacy_project_key_ingestion_only: {
+    tips: [
+      "A project key can only send traces, logs, metrics and events; create an API key with the permissions this call needs and send it instead",
+    ],
+    docsPath: "/api-reference/api-keys/create-api-key",
+  },
   api_key_permission_not_delegable: {
     tips: [
       "A wider key or a higher role does not change this; make the change in LangWatch instead",

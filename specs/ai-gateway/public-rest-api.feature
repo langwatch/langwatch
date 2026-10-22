@@ -113,7 +113,7 @@ Feature: Public REST API — /api/gateway/v1/*
     And a project-bound access token is refused
 
   @unit @rest @pat
-  Scenario: A legacy project key passes the key door by its class
+  Scenario: A legacy project key on the full-access allowlist passes the key door by its class
     When a legacy project key calls a virtual key or budget route
     Then the key door admits it without asking a grant
 

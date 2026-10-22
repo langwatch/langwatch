@@ -26,6 +26,7 @@
     "@langwatch/auth-contract": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/enterprise-governance-contract": "workspace:*",
+    "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/hosted-mcp-contract": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
