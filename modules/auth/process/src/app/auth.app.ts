@@ -153,7 +153,11 @@ import {
   type LegacySsoAccessConnections,
   type LegacySsoAccessMemberships,
 } from "../services/legacy-sso-access.service.ts";
-import { type CredentialAccounts, OwnPasswordService } from "../services/own-password.service.ts";
+import {
+  type CredentialAccounts,
+  OwnPasswordService,
+  type PasswordResetMarks,
+} from "../services/own-password.service.ts";
 import { OwnSignInMethodService } from "../services/own-sign-in-method.service.ts";
 import { PriorSessionService } from "../services/prior-session.service.ts";
 import { ProjectAuthTokenService } from "../services/project-auth-token.service.ts";
@@ -401,6 +405,7 @@ export class AuthModule implements AuthApiContract {
     addressConfirmation,
     priorSessions,
     twoStep,
+    passwordResetMarks,
   }: {
     sessions: BrowserSessionService;
     cliSessions: CliDeviceSessionService;
@@ -418,6 +423,7 @@ export class AuthModule implements AuthApiContract {
     addressConfirmation: AddressConfirmationService;
     priorSessions: PriorSessionService;
     twoStep: TwoStepVerificationService;
+    passwordResetMarks: PasswordResetMarks;
   }) {
     this.#sessions = sessions;
     this.#cliSessions = cliSessions;
@@ -457,6 +463,7 @@ export class AuthModule implements AuthApiContract {
       credentials: credentialAccounts,
       auth: this,
       issuesOwnPasswords: () => this.#issuesOwnPasswords,
+      passwordResetMarks,
     });
     this.#ownSignInMethods = OwnSignInMethodService.create({
       credentials: credentialAccounts,
@@ -551,6 +558,7 @@ export class AuthModule implements AuthApiContract {
     };
 
     const app = new AuthModule({
+      passwordResetMarks: accountRows,
       sessions,
       cliSessions,
       cliDeviceFlow: {

@@ -57,6 +57,7 @@ function repoFor({
       deactivatedAt: null,
       pendingSsoSetup: false,
       signupConfirmationPending: false,
+      passwordResetRequiredAt: null,
       lastLoginAt: null,
       emailVerified: true,
     }),
