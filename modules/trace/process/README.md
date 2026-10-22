@@ -1910,11 +1910,12 @@ interface Input {
   cursor?: {
     startTimeMs: number;
     spanId: string;
+    ownerProjectId?: string | null;
   };
   occurredAtMs?: number;
   tenantId?: string;
 }
-type Output = z.infer<typeof spanTreePageSchema>; // ../contract/src/trace.ts:44
+type Output = z.infer<typeof spanTreePageSchema>; // ../contract/src/trace.ts:46
 
 // traces.spanTreeDelta
 // Input: inline, ../contract/src/traces.trpc.ts:537
