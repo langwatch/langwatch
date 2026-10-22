@@ -47,3 +47,32 @@ Feature: Vitest's transform cache is shared across checkouts
     When its tests import a workspace file and an installed package
     Then the copies the forks pool keeps of transformed modules name the checkout's own path
     And both imports resolve
+
+  @integration
+  Scenario: A run removes cache directories no run has used for a week
+    Given the cache holds a lockfile directory unused for eight days
+    And another lockfile directory used yesterday
+    When a checkout runs its tests
+    Then the unused directory is removed
+    And the directory used yesterday is kept
+
+  @integration
+  Scenario: A lockfile change starts a new directory and leaves the other alone
+    Given the cache holds a directory for another lockfile
+    When a checkout with a different lockfile runs its tests
+    Then its modules are written to a directory of their own
+    And the other lockfile's directory is unchanged
+
+  @integration
+  Scenario: A checkout's old node_modules cache is removed
+    Given a checkout with a node_modules/.vitest-cache directory
+    When it runs its tests with the shared cache
+    Then that directory is removed
+
+  @integration
+  Scenario: A config's fsModuleCachePath keeps its cache and leaves node_modules alone
+    Given a checkout with a node_modules/.vitest-cache directory
+    And a config that sets fsModuleCachePath
+    When it runs its tests
+    Then modules are cached at that path
+    And the node_modules/.vitest-cache directory is untouched

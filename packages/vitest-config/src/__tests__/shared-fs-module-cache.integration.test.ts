@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
@@ -7,6 +8,7 @@ import {
   realpathSync,
   rmSync,
   statSync,
+  utimesSync,
   writeFileSync,
 } from "node:fs";
 import { createRequire } from "node:module";
@@ -62,7 +64,12 @@ describe("the shared fs module cache", () => {
   let base: string;
   let cacheDir: string;
 
-  const checkout = (name: string, files: Record<string, string>, fsModuleCache = true) => {
+  const checkout = (
+    name: string,
+    files: Record<string, string>,
+    fsModuleCache = true,
+    extraConfig = "",
+  ) => {
     const root = join(base, name);
     const all: Record<string, string> = {
       "pnpm-workspace.yaml": "packages: [pkg]\n",
@@ -71,7 +78,7 @@ describe("the shared fs module cache", () => {
         '{ "name": "probe-dep", "type": "module", "exports": "./index.js" }\n',
       "node_modules/probe-dep/index.js": DEP,
       "pkg/package.json": '{ "name": "probe", "type": "module" }\n',
-      "pkg/vitest.config.mjs": `export default { test: { fsModuleCache: ${fsModuleCache}, globals: true, maxWorkers: 1 } };\n`,
+      "pkg/vitest.config.mjs": `export default { test: { fsModuleCache: ${fsModuleCache}, ${extraConfig} globals: true, maxWorkers: 1 } };\n`,
       "pkg/src/probe.test.ts": PROBE,
       ...files,
     };
@@ -82,7 +89,11 @@ describe("the shared fs module cache", () => {
     return root;
   };
 
-  const runVitest = async (root: string, expectedWhere: string): Promise<CheckoutRun> => {
+  const runVitest = async (
+    root: string,
+    expectedWhere: string,
+    cache = cacheDir,
+  ): Promise<CheckoutRun> => {
     const report = join(root, "report.json");
     const child = await run(
       process.execPath,
@@ -91,16 +102,25 @@ describe("the shared fs module cache", () => {
         cwd: join(root, "pkg"),
         env: {
           ...process.env,
-          VITEST_FS_MODULE_CACHE_DIR: cacheDir,
+          VITEST_FS_MODULE_CACHE_DIR: cache,
           VITEST_FS_MODULE_CACHE_ROOT: "",
           // a child of a run that already holds a machine slot
           LANGWATCH_VITEST_SLOT: "held-by-parent",
           DEBUG: "vitest:cache:fs",
+          // the log is matched as plain text, so no colour codes in it
+          FORCE_COLOR: "0",
+          NO_COLOR: "1",
+          DEBUG_COLORS: "no",
           CHECKOUT_ROOT: root,
           EXPECTED_WHERE: expectedWhere,
         },
       },
     ).catch((error: { stdout: string; stderr: string }) => error);
+    if (!existsSync(report)) {
+      throw new Error(
+        `the child Vitest wrote no report\nstdout:\n${child.stdout}\nstderr:\n${child.stderr}`,
+      );
+    }
     const json = JSON.parse(readFileSync(report, "utf8")) as {
       testResults: {
         assertionResults: { title: string; status: string; failureMessages: string[] }[];
@@ -144,7 +164,12 @@ describe("the shared fs module cache", () => {
     it("stores the transformed modules without the checkout's path", () => {
       expect(writtenByFirst.length).toBeGreaterThanOrEqual(2);
       for (const { file } of writtenByFirst) {
-        expect(readFileSync(file, "utf8")).not.toContain(firstRoot);
+        const stored = readFileSync(file, "utf8");
+        expect(stored).not.toContain(firstRoot);
+        // the inline source map is base64, out of reach of a plain-text check
+        for (const [, encoded] of stored.matchAll(/sourceMappingURL=data:application\/json;base64,(\S+)/g)) {
+          expect(Buffer.from(encoded as string, "base64").toString("utf8")).not.toContain(firstRoot);
+        }
       }
     });
 
@@ -208,6 +233,72 @@ describe("the shared fs module cache", () => {
 
       expect(moved.cacheLog).toContain("doesn't exist here, re-transforming");
       expect(moved.results["imports the helper this checkout has"]?.status).toBe("passed");
+    }, 60_000);
+  });
+
+  describe("when a run starts", () => {
+    const hoursAgo = (hours: number) => new Date(Date.now() - hours * 60 * 60 * 1000);
+    const seedDirectory = (cache: string, name: string, age: Date) => {
+      mkdirSync(join(cache, name), { recursive: true });
+      writeFileSync(join(cache, name, "module"), "cached");
+      utimesSync(join(cache, name), age, age);
+    };
+
+    /** @scenario "A run removes cache directories no run has used for a week" */
+    it("removes the directory unused for a week and keeps the recent one", async () => {
+      const pruneCache = join(base, "prune-cache");
+      seedDirectory(pruneCache, "deadbeef", hoursAgo(8 * 24));
+      seedDirectory(pruneCache, "cafef00d", hoursAgo(24));
+      const pruneRoot = checkout("prune", { "shared/helper.ts": HELPER });
+
+      await runVitest(pruneRoot, "file", pruneCache);
+
+      const remaining = readdirSync(pruneCache);
+      expect(remaining).not.toContain("deadbeef");
+      expect(remaining).toContain("cafef00d");
+      expect(remaining.filter((name) => name.startsWith(".removing-"))).toEqual([]);
+    }, 60_000);
+
+    /** @scenario "A lockfile change starts a new directory and leaves the other alone" */
+    it("keeps this lockfile's modules in a directory of their own", async () => {
+      const lockCache = join(base, "lock-cache");
+      seedDirectory(lockCache, "cafef00d", hoursAgo(1));
+      const lockRoot = checkout("lock", { "shared/helper.ts": HELPER });
+
+      await runVitest(lockRoot, "file", lockCache);
+
+      const own = readdirSync(lockCache).filter((name) => name !== "cafef00d");
+      expect(own).toHaveLength(1);
+      expect(readdirSync(join(lockCache, "cafef00d"))).toEqual(["module"]);
+      expect(readdirSync(join(lockCache, own[0] as string)).length).toBeGreaterThan(1);
+    }, 60_000);
+
+    /** @scenario "A checkout's old node_modules cache is removed" */
+    it("removes the checkout's own node_modules/.vitest-cache", async () => {
+      const legacyRoot = checkout("legacy", {
+        "shared/helper.ts": HELPER,
+        "node_modules/.vitest-cache/old-module": "stale",
+      });
+
+      await runVitest(legacyRoot, "file", join(base, "legacy-cache"));
+
+      expect(existsSync(join(legacyRoot, "node_modules/.vitest-cache"))).toBe(false);
+    }, 60_000);
+
+    /** @scenario "A config's fsModuleCachePath keeps its cache and leaves node_modules alone" */
+    it("leaves node_modules/.vitest-cache alone when the config sets fsModuleCachePath", async () => {
+      const ownCache = join(base, "own-cache");
+      const ownRoot = checkout(
+        "own-path",
+        { "shared/helper.ts": HELPER, "node_modules/.vitest-cache/old-module": "kept" },
+        true,
+        `fsModuleCachePath: ${JSON.stringify(ownCache)},`,
+      );
+
+      await runVitest(ownRoot, "file", join(base, "unused-cache"));
+
+      expect(existsSync(join(ownRoot, "node_modules/.vitest-cache/old-module"))).toBe(true);
+      expect(readdirSync(ownCache).length).toBeGreaterThan(0);
     }, 60_000);
   });
 });

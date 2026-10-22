@@ -53,7 +53,7 @@ index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..208b264d9da4d38ec90f32a97fa16754
  		if (!cachedModule) return;
 +		// LangWatch: the cache is shared with checkouts at other commits, where an
 +		// import may have resolved to a file this checkout doesn't have
-+		const missing = this.findMissingImport(environment, cachedModule.deps) ?? this.findMissingImport(environment, cachedModule.dynamicDeps);
++		const missing = this.findMissingImport(environment, cachedModule.importedUrls) ?? this.findMissingImport(environment, cachedModule.deps) ?? this.findMissingImport(environment, cachedModule.dynamicDeps);
 +		if (missing) {
 +			debugFs$1?.(`cached ${cachedModule.id} imports ${missing}, which doesn't exist here, re-transforming`);
 +			return;
@@ -138,7 +138,7 @@ index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..208b264d9da4d38ec90f32a97fa16754
  	fsCacheRoots = /* @__PURE__ */ new WeakMap();
  	fsEnvironmentHashMap = /* @__PURE__ */ new WeakMap();
  	fsCacheKeyGenerators = /* @__PURE__ */ new Set();
-@@ -7130,8 +7176,49 @@ class FileSystemModuleCache {
+@@ -7130,8 +7176,54 @@ class FileSystemModuleCache {
  	fsCacheKeys = /* @__PURE__ */ new WeakMap();
  	constructor(vitest) {
  		this.vitest = vitest;
@@ -179,7 +179,12 @@ index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..208b264d9da4d38ec90f32a97fa16754
 +			if (json.includes(this.workspaceRoot)) {
 +				const map = JSON.parse(json);
 +				if (typeof map.file === "string") map.file = basename(cleanUrl(map.file));
-+				if (Array.isArray(map.sources) && file) {
++				if (Array.isArray(map.sources) && !file) {
++					// no module directory to make the sources relative to: drop the map
++					// rather than keep this checkout's paths in it
++					return this.toPortable(`${code.slice(0, at)}${code.slice(end)}`);
++				}
++				if (Array.isArray(map.sources)) {
 +					const dir = dirname(file);
 +					map.sources = map.sources.map((source) => typeof source === "string" && source.startsWith(`${this.workspaceRoot}/`) ? relative(dir, source) : source);
 +				}
@@ -190,7 +195,7 @@ index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..208b264d9da4d38ec90f32a97fa16754
  	}
  	defineCacheKeyGenerator(callback) {
  		this.fsCacheKeyGenerators.add(callback);
-@@ -7159,7 +7246,8 @@ class FileSystemModuleCache {
+@@ -7159,7 +7251,8 @@ class FileSystemModuleCache {
  		if (log) this.vitest.logger.log(`[cache] cleared fs module cache at ${uniquePaths.join(", ")}`);
  	}
  	readCachedFileConcurrently(cachedFilePath) {
@@ -200,7 +205,7 @@ index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..208b264d9da4d38ec90f32a97fa16754
  			const matchIndex = code.lastIndexOf(cacheComment);
  			if (matchIndex === -1) {
  				debugFs?.(`${y.red("[empty]")} ${cachedFilePath} exists, but doesn't have a ${cacheComment} comment, transforming by vite instead`);
-@@ -7169,6 +7257,9 @@ class FileSystemModuleCache {
+@@ -7169,6 +7262,9 @@ class FileSystemModuleCache {
  				code,
  				meta: this.fromBase64(code.slice(matchIndex + cacheCommentLength))
  			};
@@ -210,7 +215,7 @@ index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..208b264d9da4d38ec90f32a97fa16754
  		}).finally(() => {
  			parallelFsCacheRead.delete(cachedFilePath);
  		}));
-@@ -7196,7 +7287,7 @@ class FileSystemModuleCache {
+@@ -7196,7 +7292,7 @@ class FileSystemModuleCache {
  			staticMocks: meta.staticMocks
  		};
  	}
@@ -219,7 +224,7 @@ index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..208b264d9da4d38ec90f32a97fa16754
  		if ("code" in fetchResult) {
  			const result = {
  				file: fetchResult.file,
-@@ -7210,15 +7301,16 @@ class FileSystemModuleCache {
+@@ -7210,15 +7306,16 @@ class FileSystemModuleCache {
  				staticMocks: transformResult?.__vitestStaticMocks
  			};
  			debugFs?.(`${y.yellow("[write]")} ${fetchResult.id} is cached in ${cachedFilePath}`);
@@ -230,7 +235,7 @@ index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..208b264d9da4d38ec90f32a97fa16754
  	}
 -	toBase64(obj) {
 -		const json = stringify(obj);
-+	toBase64(obj, portable = true) {
++	toBase64(obj, portable = false) {
 +		const json = portable ? this.toPortable(stringify(obj)) : stringify(obj);
  		return Buffer.from(json).toString("base64");
  	}
@@ -240,7 +245,7 @@ index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..208b264d9da4d38ec90f32a97fa16754
  		return parse(json);
  	}
  	invalidateCachePath(environment, id) {
-@@ -7243,6 +7335,12 @@ class FileSystemModuleCache {
+@@ -7243,6 +7340,12 @@ class FileSystemModuleCache {
  			debugMemory?.(`${y.yellow("[write]")} ${id} was bailed out because it has "import.meta.glob"`);
  			return null;
  		}
@@ -253,7 +258,7 @@ index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..208b264d9da4d38ec90f32a97fa16754
  		let hashString = "";
  		for (const generator of this.fsCacheKeyGenerators) {
  			const result = generator({
-@@ -7279,20 +7377,29 @@ class FileSystemModuleCache {
+@@ -7279,20 +7382,29 @@ class FileSystemModuleCache {
  				configFileDependencies: config.configFileDependencies.map((file) => tryReadFileSync(file)),
  				environment: environment.name,
  				// this affects Vitest CSS plugin
@@ -287,7 +292,7 @@ index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..208b264d9da4d38ec90f32a97fa16754
  			this.fsCacheRoots.set(vitestConfig, cacheRoot);
  			if (!existsSync(cacheRoot)) mkdirSync(cacheRoot, { recursive: true });
  		}
-@@ -7309,49 +7416,54 @@ class FileSystemModuleCache {
+@@ -7309,49 +7421,54 @@ class FileSystemModuleCache {
  		}
  		environmentKeys.set(id, cache);
  	}
