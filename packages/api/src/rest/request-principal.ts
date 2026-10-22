@@ -24,9 +24,10 @@ export function requestPrincipalOf({
   actor: Actor | null | undefined;
   key: RestKeyCredential | null | undefined;
 }): RequestPrincipal {
-  const userId = actor?.type === "user" && typeof actor.id === "string" ? actor.id : void 0;
-  const actorKeyId = actor?.type === "api_key" && typeof actor.id === "string" ? actor.id : void 0;
-  const apiKeyId = actorKeyId ?? key?.apiKeyId ?? void 0;
+  const userId = actor?.type === "user" ? actor.id : void 0;
+  // The key id comes from the credential the door recorded, never from the actor: other doors
+  // (SCIM, for one) mint an `api_key` actor whose id is not an API key id.
+  const apiKeyId = key?.apiKeyId ?? void 0;
 
   return {
     ...(userId ? { userId } : {}),

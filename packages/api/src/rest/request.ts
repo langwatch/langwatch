@@ -824,6 +824,7 @@ function logRequestOutcome({
       ...(route ? { route } : {}),
       ...(family ? { family } : {}),
       ...(resolved?.traceId ? { traceId: resolved.traceId } : {}),
+      // The client address is logged on purpose: the access record exists to tell callers apart.
       ...requestPrincipalLogFields({
         principal: c.get(REQUEST_PRINCIPAL) as RequestPrincipal | undefined,
         clientAddress,
