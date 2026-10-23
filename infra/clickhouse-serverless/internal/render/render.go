@@ -11,6 +11,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/access"
+	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/bootstrap"
 	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/config"
 	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/storage"
 )
@@ -90,6 +91,10 @@ func RenderAll(log *zap.Logger, input *config.Input, computed *config.Computed, 
 			func() error { return renderAccessUsers(log, input, usersD) }},
 		{"access-auth", filepath.Join(configD, access.AuthFileName), input.AccessFile != "",
 			func() error { return renderAccessAuth(input, configD) }},
+		{"local-admin", filepath.Join(usersD, bootstrap.UsersFileName), input.DynamicOnly,
+			func() error { return renderLocalAdmin(input, usersD) }},
+		{"dynamic-only", filepath.Join(configD, dynamicOnlyFile), input.DynamicOnly,
+			func() error { return renderDynamicOnlyServer(configD) }},
 	} {
 		if !s.enabled {
 			if err := os.Remove(s.path); err != nil && !errors.Is(err, fs.ErrNotExist) {
@@ -102,8 +107,19 @@ func RenderAll(log *zap.Logger, input *config.Input, computed *config.Computed, 
 		}
 	}
 
-	if w := input.WeakPasswordWarning(); w != "" {
-		log.Warn(w)
+	if input.DynamicOnly {
+		if err := refuseStaticCredentials(outputDir); err != nil {
+			return err
+		}
+	} else {
+		if input.AccessBootstrapDir != "" {
+			if err := bootstrap.Remove(input.AccessBootstrapDir); err != nil {
+				return fmt.Errorf("local-admin: remove stale password: %w", err)
+			}
+		}
+		if w := input.WeakPasswordWarning(); w != "" {
+			log.Warn(w)
+		}
 	}
 	if input.Replicated && !input.ClusterSecretEnabled {
 		log.Warn("remote_servers carries no cluster secret; set CLICKHOUSE_CLUSTER_SECRET_ENABLED=true " +

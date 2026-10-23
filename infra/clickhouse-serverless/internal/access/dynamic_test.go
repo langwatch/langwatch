@@ -8,6 +8,9 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 func writeFile(t *testing.T, name, content string) string {
@@ -50,6 +53,8 @@ users:
     "@remove": 1
   token:
     http_authentication: {server: access, scheme: basic}
+  locked:
+    password: {"@remove": "1"}
 profiles:
   langwatch_profile: {readonly: 1}
 `
@@ -146,4 +151,26 @@ func TestPasswordLogins(t *testing.T) {
 			t.Error("want an error")
 		}
 	})
+}
+
+// @scenario "The sidecar reports any password login left on a dynamic-only server"
+func TestAuditor_LogsWhenTheSetChanges(t *testing.T) {
+	core, logs := observer.New(zap.InfoLevel)
+	q := &fakeQuerier{out: []byte("legacy\tlocal_directory\tsha256_password\n")}
+	a := &Auditor{Q: q, Log: zap.New(core)}
+	a.Check(context.Background())
+	a.Check(context.Background())
+	if n := logs.FilterLevelExact(zap.ErrorLevel).Len(); n != 1 {
+		t.Errorf("logged %d errors for one unchanged finding, want 1", n)
+	}
+	q.out = []byte("")
+	a.Check(context.Background())
+	if logs.FilterMessageSnippet("only the local admin has a password").Len() != 1 {
+		t.Error("the cleared finding was not logged")
+	}
+	q.err = errors.New("connection refused")
+	a.Check(context.Background())
+	if logs.FilterMessage("password login audit failed").Len() != 1 {
+		t.Error("an audit failure was not logged")
+	}
 }

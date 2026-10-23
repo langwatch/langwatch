@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"math"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -17,7 +18,10 @@ func (i *Input) Validate() error {
 
 	// As before, only an empty password is refused; a published or blank-looking
 	// one starts with a warning (WeakPasswordWarning).
-	if i.Password == "" {
+	switch {
+	case i.DynamicOnly:
+		errs = append(errs, i.dynamicOnlyErrors()...)
+	case i.Password == "":
 		errs = append(errs, "CLICKHOUSE_PASSWORD or CLICKHOUSE_PASSWORD_FILE must set a password for the default user")
 	}
 
@@ -89,5 +93,23 @@ func validateObjectStorage(i *Input) []string {
 		errs = append(errs, "S3_ACCESS_KEY and S3_SECRET_KEY must both be set or both empty")
 	}
 
+	return errs
+}
+
+// dynamicOnlyErrors are the inputs dynamic-only mode refuses (ADR-184).
+func (i *Input) dynamicOnlyErrors() []string {
+	var errs []string
+	const mode = "dynamic-only mode (access.yaml): "
+	if i.Password != "" {
+		errs = append(errs, mode+"unset CLICKHOUSE_PASSWORD and CLICKHOUSE_PASSWORD_FILE; "+
+			"the default user gets no password and no network, logins are tokens only")
+	}
+	if !filepath.IsAbs(i.AccessBootstrapDir) {
+		errs = append(errs, mode+"CLICKHOUSE_ACCESS_BOOTSTRAP_DIR must be an absolute path (mount a tmpfs there)")
+	}
+	if i.Replicated && !i.ClusterSecretEnabled {
+		errs = append(errs, mode+"set CLICKHOUSE_CLUSTER_SECRET_ENABLED=true; without the cluster secret "+
+			"replicas log in to each other as default, which is locked")
+	}
 	return errs
 }

@@ -14,6 +14,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/access"
+	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/bootstrap"
 	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/config"
 	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/render"
 )
@@ -111,6 +112,17 @@ func sidecar(log *zap.Logger, outputDir string) {
 			log.Fatal("token verifier stopped", zap.Error(err))
 		}
 	}()
+	// Dynamic-only: audit the server for password logins as the local admin.
+	bootstrapDir := os.Getenv("CLICKHOUSE_ACCESS_BOOTSTRAP_DIR")
+	if bootstrapDir == "" {
+		bootstrapDir = bootstrap.DefaultDir
+	}
+	auditor := &access.Auditor{Q: &bootstrap.Client{Dir: bootstrapDir}, Log: log}
+	go auditor.Run(ctx, access.AuditInterval, func() bool {
+		_, err := os.Stat(filepath.Join(syncer.UsersD, bootstrap.UsersFileName))
+		return err == nil
+	})
+
 	log.Info("access sidecar started", zap.String("access_file", accessFile), zap.String("listen", listen))
 	syncer.Run(ctx)
 

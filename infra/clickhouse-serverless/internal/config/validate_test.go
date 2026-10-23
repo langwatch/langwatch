@@ -177,3 +177,52 @@ func TestValidate_AccessListenMustBeLoopback(t *testing.T) {
 		t.Errorf("loopback listen refused: %v", err)
 	}
 }
+
+func dynamicOnlyInput() *Input {
+	i := validInput()
+	i.Password = ""
+	i.DynamicOnly = true
+	i.AccessFile = "/etc/clickhouse-access/config/access.yaml"
+	i.AccessListen = "127.0.0.1:8124"
+	i.AccessBootstrapDir = "/run/clickhouse-access"
+	return i
+}
+
+// @scenario "Dynamic-only mode starts without any password for the default user"
+func TestValidate_DynamicOnlyNeedsNoPassword(t *testing.T) {
+	if err := dynamicOnlyInput().Validate(); err != nil {
+		t.Errorf("dynamic-only without a password refused: %v", err)
+	}
+	i := dynamicOnlyInput()
+	i.Replicated, i.KeeperNodes, i.Replica, i.DataNodes = true, "k", "r", "d"
+	i.ClusterSecretEnabled, i.ClusterSecretFile = true, "/mnt/secrets/cluster-secret"
+	if err := i.Validate(); err != nil {
+		t.Errorf("replicated dynamic-only with the cluster secret refused: %v", err)
+	}
+}
+
+// @scenario "Dynamic-only mode refuses a long-lived password for the default user"
+func TestValidate_DynamicOnlyRefusals(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		edit func(*Input)
+		want string
+	}{
+		{"a default password", func(i *Input) { i.Password = "from-env-or-file-0123" },
+			"unset CLICKHOUSE_PASSWORD and CLICKHOUSE_PASSWORD_FILE"},
+		{"a relative bootstrap directory", func(i *Input) { i.AccessBootstrapDir = "run/access" },
+			"CLICKHOUSE_ACCESS_BOOTSTRAP_DIR must be an absolute path"},
+		{"replicas without the cluster secret", func(i *Input) {
+			i.Replicated, i.KeeperNodes, i.Replica, i.DataNodes = true, "k", "r", "d"
+		}, "set CLICKHOUSE_CLUSTER_SECRET_ENABLED=true"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			i := dynamicOnlyInput()
+			tc.edit(i)
+			err := i.Validate()
+			if err == nil || !strings.Contains(err.Error(), "dynamic-only mode") || !strings.Contains(err.Error(), tc.want) {
+				t.Errorf("Validate = %v, want %q", err, tc.want)
+			}
+		})
+	}
+}

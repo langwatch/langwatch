@@ -28,7 +28,12 @@ func runWrapper(t *testing.T, initdbFiles []string, env map[string]string, args 
 	if err := os.Mkdir(bin, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	writeExec(t, filepath.Join(bin, "ch-config"), "#!/usr/bin/env bash\nexit 0\n")
+	chConfig := "#!/usr/bin/env bash\nexit 0\n"
+	if pw := env["TEST_BOOTSTRAP_PASSWORD"]; pw != "" {
+		// Stands in for `ch-config generate` in dynamic-only mode.
+		chConfig = "#!/usr/bin/env bash\nmkdir -p " + filepath.Join(dir, "bootstrap") + " && echo " + pw + " > " + filepath.Join(dir, "bootstrap", "password") + "\n"
+	}
+	writeExec(t, filepath.Join(bin, "ch-config"), chConfig)
 	out := filepath.Join(dir, "out")
 	official := filepath.Join(dir, "entrypoint.sh")
 	writeExec(t, official, "#!/usr/bin/env bash\nenv > "+out+".env\necho \"$*\" > "+out+".args\n")
@@ -39,6 +44,7 @@ func runWrapper(t *testing.T, initdbFiles []string, env map[string]string, args 
 	}
 	script := strings.NewReplacer(
 		"exec /entrypoint.sh", "exec "+official,
+		"/run/clickhouse-access", filepath.Join(dir, "bootstrap"),
 		"/docker-entrypoint-initdb.d", initdb,
 	).Replace(string(src))
 	wrapper := filepath.Join(dir, "wrapper.sh")
@@ -143,4 +149,23 @@ func TestWrapper_NoPasswordWithoutInitdb(t *testing.T) {
 			}
 		})
 	}
+}
+
+// @scenario "Initialisation scripts log in as the local admin in dynamic-only mode"
+func TestWrapper_DynamicOnlyInitdbUsesTheLocalAdmin(t *testing.T) {
+	pw := strings.Repeat("ab", 32)
+	env, _ := runWrapper(t, []string{"01-schema.sql"}, map[string]string{"TEST_BOOTSTRAP_PASSWORD": pw}, "--listen_host=0.0.0.0")
+	if env["CLICKHOUSE_USER"] != "local_admin" || env["CLICKHOUSE_PASSWORD"] != pw {
+		t.Errorf("initdb runs as %q with password %q, want local_admin with this start's password", env["CLICKHOUSE_USER"], env["CLICKHOUSE_PASSWORD"])
+	}
+
+	t.Run("without initdb nothing is handed on", func(t *testing.T) {
+		env, _ := runWrapper(t, nil, map[string]string{"TEST_BOOTSTRAP_PASSWORD": pw})
+		if _, set := env["CLICKHOUSE_PASSWORD"]; set {
+			t.Error("the local admin password reached the server's environment")
+		}
+		if _, set := env["CLICKHOUSE_USER"]; set {
+			t.Error("CLICKHOUSE_USER set without initdb")
+		}
+	})
 }

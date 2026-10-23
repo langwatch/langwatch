@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/access"
 )
 
 // Input holds all user-provided configuration, loaded from env vars via struct tags.
@@ -42,6 +44,10 @@ type Input struct {
 	AccessFile    string `env:"CLICKHOUSE_ACCESS_FILE"`
 	AccessListen  string `env:"CLICKHOUSE_ACCESS_LISTEN" default:"127.0.0.1:8124"`
 	AccessSidecar string `env:"CLICKHOUSE_ACCESS_SIDECAR" default:"embedded" validate:"oneof=embedded external"`
+	// Where dynamic-only mode writes the local admin's per-boot password; a
+	// tmpfs shared with the sidecar. DynamicOnly is read from the access file.
+	AccessBootstrapDir string `env:"CLICKHOUSE_ACCESS_BOOTSTRAP_DIR" default:"/run/clickhouse-access"`
+	DynamicOnly        bool
 	// The tier roles and profiles render with an access file, or with this
 	// for operator-written users that GRANT a tier. Off, no tier_* name exists.
 	AccessTiers bool `env:"CLICKHOUSE_ACCESS_TIERS"`
@@ -170,6 +176,15 @@ func Load() (*Input, error) {
 			return nil, fmt.Errorf("CLICKHOUSE_PASSWORD_FILE: %w", err)
 		}
 		i.Password = strings.TrimSpace(string(data))
+	}
+
+	// The mode decides which passwords are required and which refused.
+	if i.AccessFile != "" {
+		f, err := access.Load(i.AccessFile)
+		if err != nil {
+			return nil, fmt.Errorf("CLICKHOUSE_ACCESS_FILE: %w", err)
+		}
+		i.DynamicOnly = f.DynamicOnly()
 	}
 
 	for _, f := range []struct {
