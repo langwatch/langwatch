@@ -84,8 +84,8 @@ describe("given 2 insights in the inbox, both already seen", () => {
 });
 
 describe("given release_insights on and 2 unseen insights in the inbox", () => {
-  /** @scenario "Insights shows nothing while release_dashboards is off" */
   describe("when release_dashboards is off", () => {
+    /** @scenario "Insights shows nothing while release_dashboards is off" */
     it("shows no bell, because the Insights page is closed", async () => {
       const enabled = insightsReleased({ insights: true, dashboards: false });
       const { host } = renderWithInsightHost({
@@ -101,8 +101,8 @@ describe("given release_insights on and 2 unseen insights in the inbox", () => {
     });
   });
 
-  /** @scenario "Insights shows nothing while release_dashboards is off" */
   describe("when release_dashboards is on too", () => {
+    /** @scenario "Insights shows nothing while release_dashboards is off" */
     it("shows the bell with the unread count", async () => {
       const enabled = insightsReleased({ insights: true, dashboards: true });
       renderWithInsightHost({
