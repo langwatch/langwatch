@@ -156,9 +156,15 @@ Two vitest projects mean two labels in the output, `shared-modules` and
 suite's `include` moves onto `shared-modules` instead of staying on the
 root; left there, `isolated` would collect every file as well as its own.
 
-`apps/ui` and `packages/browser` use `isolate: "all"`: their files share
-module-level singletons (the capability host, the feedback host, the posthog
-client), which no mock scan can see.
+`packages/browser` uses `isolate: "all"`: its files share module-level
+singletons (the capability host, the feedback host, the posthog client), which
+no mock scan can see. `apps/ui` used to, for the same stated reason, but its
+failures with files sharing a worker turned out to be two tests leaving the
+jsdom window changed: one left a `navigator.clipboard` stand-in behind, and one
+emptied `document.head`, dropping the style tags the design system's style
+cache still pointed at. With those two cleaning up after themselves it uses
+`isolate: true`. In a jsdom suite, a file that changes `navigator`, `document`
+or `window` puts back exactly what it changed, not a blanket reset.
 
 ## Isolated jsdom files can share a worker
 
