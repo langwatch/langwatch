@@ -1,4 +1,4 @@
-# ADR-185: Vitest's transform cache is shared across checkouts
+# ADR-193: Vitest's transform cache is shared across checkouts
 
 **Date:** 2026-10-22
 
