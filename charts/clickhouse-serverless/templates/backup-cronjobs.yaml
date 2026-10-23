@@ -146,6 +146,9 @@ spec:
                 - name: BACKUP_DATABASE
                   value: {{ .Values.backup.database | quote }}
 {{- end }}
+{{- /* Dynamic-only has no password a Job could hold: restore with
+       kubectl exec into the access container (ADR-185). */}}
+{{- if not (include "clickhouse-serverless.dynamicOnly" .) }}
 ---
 # Restore template, in every mode (suspended — manual trigger only)
 apiVersion: batch/v1
@@ -218,4 +221,5 @@ spec:
                   value: ""
                 - name: CONFIRM_RESTORE
                   value: "no"
+{{- end }}
 {{- end }}

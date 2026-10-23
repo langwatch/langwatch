@@ -4,9 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
+	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/bootstrap"
 	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/chclient"
 )
 
@@ -32,6 +35,9 @@ type Config struct {
 	PasswordFile string
 	// envPassword is CLICKHOUSE_PASSWORD, which only one-shot commands take.
 	envPassword string
+	// BootstrapDir holds dynamic-only mode's per-boot local admin password
+	// (CLICKHOUSE_ACCESS_BOOTSTRAP_DIR); when present it is the login.
+	BootstrapDir string
 
 	Database      string // BACKUP_DATABASE
 	RetentionDays int    // BACKUP_RETENTION_DAYS
@@ -64,6 +70,7 @@ func LoadConfig(getenv func(string) string) (Config, error) {
 		User:                or(getenv("BACKUP_USER"), getenv("CLICKHOUSE_USER")),
 		PasswordFile:        or(getenv("BACKUP_PASSWORD_FILE"), getenv("CLICKHOUSE_PASSWORD_FILE")),
 		envPassword:         getenv("CLICKHOUSE_PASSWORD"),
+		BootstrapDir:        or(getenv("CLICKHOUSE_ACCESS_BOOTSTRAP_DIR"), bootstrap.DefaultDir),
 		Database:            or(getenv("BACKUP_DATABASE"), DefaultDatabase),
 		Cluster:             getenv("BACKUP_CLUSTER"),
 		Sidecar:             SidecarMode(or(strings.ToLower(getenv("BACKUP_SIDECAR")), string(SidecarOff))),
@@ -137,6 +144,13 @@ func (c Config) Policy() Policy {
 // Credentials picks the login. The sidecar takes a password file only;
 // a one-shot command also takes CLICKHOUSE_PASSWORD, as the scripts did.
 func (c Config) Credentials(allowEnvPassword bool) (chclient.Credentials, error) {
+	// Dynamic-only (ADR-184): the local admin, re-read per request since it
+	// changes at every server start. It logs in from loopback only.
+	if c.isLoopback() {
+		if _, err := os.Stat(filepath.Join(c.BootstrapDir, bootstrap.PasswordFile)); err == nil {
+			return bootstrapLogin{dir: c.BootstrapDir}, nil
+		}
+	}
 	if c.User == "" {
 		return nil, errors.New("set BACKUP_USER (or CLICKHOUSE_USER) to the ClickHouse user that runs backups")
 	}
@@ -150,6 +164,21 @@ func (c Config) Credentials(allowEnvPassword bool) (chclient.Credentials, error)
 		return nil, errors.New("set BACKUP_PASSWORD_FILE, CLICKHOUSE_PASSWORD_FILE or CLICKHOUSE_PASSWORD")
 	}
 	return nil, errors.New("set BACKUP_PASSWORD_FILE (or CLICKHOUSE_PASSWORD_FILE): the sidecar reads its password from a file only")
+}
+
+type bootstrapLogin struct{ dir string }
+
+func (b bootstrapLogin) Login() (string, string, error) {
+	c, err := bootstrap.Read(b.dir)
+	return c.User, c.Password, err
+}
+
+func (c Config) isLoopback() bool {
+	if c.Host == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(c.Host)
+	return ip != nil && ip.IsLoopback()
 }
 
 // BaseURL is the server's HTTP interface.

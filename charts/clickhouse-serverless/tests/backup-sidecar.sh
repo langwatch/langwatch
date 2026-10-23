@@ -85,8 +85,29 @@ test_sidecar_alerts() {
   echo "PASS: sidecar alerts read the sidecar's metrics"
 }
 
+# @scenario "Dynamic-only mode refuses backup CronJobs and runs sidecar backups as the local admin"
+test_dynamic_only() {
+  local sts sidecar out
+  for mode in cronjob cronjob-observe; do
+    if helm template t . -f tests/values-dynamic-only.yaml "${BASE[@]}" --set backup.mode=$mode >/dev/null 2>&1; then
+      fail "dynamic-only should refuse backup.mode=$mode: its CronJobs cannot log in"
+    fi
+  done
+  out="$(helm template t . -f tests/values-dynamic-only.yaml "${BASE[@]}" --set backup.mode=sidecar)"
+  ! grep -q 'name: t-clickhouse-backup-\(full\|incremental\)$\|name: t-clickhouse-restore-template$' <<<"$out" \
+    || fail "dynamic-only sidecar mode should render no CronJob, restore template included"
+  sts="$(helm template t . -f tests/values-dynamic-only.yaml "${BASE[@]}" --set backup.mode=sidecar --show-only templates/statefulset.yaml)"
+  sidecar="$(sed -n '/^        - name: access$/,/^      volumes:/p' <<<"$sts")"
+  grep -A1 'name: BACKUP_SIDECAR' <<<"$sidecar" | grep -q 'value: run' || fail "the access container should run backups"
+  grep -q 'name: CLICKHOUSE_ACCESS_BOOTSTRAP_DIR' <<<"$sidecar" || fail "the runner needs the local admin's directory"
+  grep -q 'mountPath: /run/clickhouse-access' <<<"$sidecar" || fail "the local admin's directory is not mounted"
+  ! grep -q 'BACKUP_PASSWORD_FILE\|backup-credentials' <<<"$sts" || fail "dynamic-only mounts no static backup password"
+  echo "PASS: dynamic-only refuses CronJobs and backs up from the sidecar"
+}
+
 echo "--- backup sidecar assertions ---"
 test_cronjob_default
 test_sidecar_mode
 test_observe_mode
 test_sidecar_alerts
+test_dynamic_only

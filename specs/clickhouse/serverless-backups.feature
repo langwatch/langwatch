@@ -146,6 +146,20 @@ Feature: clickhouse-serverless takes chained native backups from CronJobs or its
     Then each mode has a stale and a failing alert on the sidecar's metrics
     And a missing runner, two runners or an invalid configuration alert too
 
+  @unit
+  Scenario: In dynamic-only mode the backup runner logs in as the per-boot local admin
+    Given the local admin's password directory is present and the server is on loopback
+    When the backup runner or a one-shot command logs in
+    Then it uses the local admin, re-reading the password on every request
+    And against a remote host, or without the directory, it uses the password file
+
+  @unit
+  Scenario: Dynamic-only mode refuses backup CronJobs and runs sidecar backups as the local admin
+    Given access.dynamicOnly.enabled and backups enabled
+    When the chart is rendered in cronjob or cronjob-observe mode
+    Then it is refused, since a CronJob has no password to log in with
+    And in sidecar mode the access container runs backups with the local admin's directory and no static password
+
   @integration
   Scenario: A real ClickHouse takes, chains and restores backups, and the sidecar survives a restart mid-backup
     Given the image with a backups disk on an S3-compatible store

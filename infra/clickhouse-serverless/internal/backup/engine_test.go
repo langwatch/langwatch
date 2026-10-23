@@ -11,6 +11,9 @@ import (
 	"time"
 
 	"go.uber.org/zap"
+
+	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/bootstrap"
+	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/chclient"
 )
 
 var errBoom = errors.New("boom")
@@ -335,5 +338,46 @@ func TestConfig(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Error("RunSidecar did not stop with its context")
+	}
+}
+
+// @scenario "In dynamic-only mode the backup runner logs in as the per-boot local admin"
+func TestCredentialsPreferTheLocalAdmin(t *testing.T) {
+	dir := t.TempDir()
+	env := map[string]string{"CLICKHOUSE_ACCESS_BOOTSTRAP_DIR": dir, "BACKUP_USER": "backup", "BACKUP_PASSWORD_FILE": "/nonexistent"}
+	get := func(k string) string { return env[k] }
+
+	c, _ := LoadConfig(get)
+	creds, err := c.Credentials(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := creds.(chclient.PasswordFile); !ok {
+		t.Errorf("without a bootstrap password: %T, want the password file", creds)
+	}
+
+	first, err := bootstrap.Generate(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	creds, err = c.Credentials(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	user, pw, err := creds.Login()
+	if err != nil || user != bootstrap.User || pw != first.Password {
+		t.Errorf("login = %s/%v, want the local admin", user, err)
+	}
+	second, _ := bootstrap.Generate(dir) // a server restart
+	if _, pw, _ := creds.Login(); pw != second.Password {
+		t.Error("the local admin password is not re-read after a restart")
+	}
+
+	// The local admin is loopback-only, so a remote host keeps the file login.
+	env["CLICKHOUSE_HOST"] = "ch-0.ch-headless"
+	c, _ = LoadConfig(get)
+	creds, _ = c.Credentials(false)
+	if _, ok := creds.(chclient.PasswordFile); !ok {
+		t.Errorf("remote host: %T, want the password file", creds)
 	}
 }

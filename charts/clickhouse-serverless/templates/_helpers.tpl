@@ -99,8 +99,8 @@ app.kubernetes.io/component: keeper
     {{- if and (gt (int .Values.replicas) 1) (not .Values.auth.clusterSecretEnabled) }}
       {{- fail "access.dynamicOnly.enabled with replicas > 1 needs auth.clusterSecretEnabled: replicas would otherwise log in to each other as default, which is locked" }}
     {{- end }}
-    {{- if .Values.backup.enabled }}
-      {{- fail "access.dynamicOnly.enabled cannot run the backup CronJobs: they log in as default with the static password, which this mode removes" }}
+    {{- if and .Values.backup.enabled (ne (include "clickhouse-serverless.backupMode" .) "sidecar") }}
+      {{- fail "access.dynamicOnly.enabled cannot run the backup CronJobs: they log in as default with the static password, which this mode removes. Set backup.mode=sidecar: the sidecar logs in as the per-boot local admin" }}
     {{- end }}
     {{- if .Values.access.passwordSecrets }}
       {{- fail "access.dynamicOnly.enabled refuses access.passwordSecrets: rolling passwords are long-lived, use token logins" }}
