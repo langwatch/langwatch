@@ -4,7 +4,7 @@
  * Spec: modules/authz/specs/braids-screen.feature (design: dev/docs/plans/braids/, step 3).
  */
 
-import type { AuthzBraid } from "@langwatch/authz-contract";
+import { type AuthzBraid, BRAID_TARGETS_LIMIT } from "@langwatch/authz-contract";
 import { Banner } from "@langwatch/design-system/banner";
 import { Card } from "@langwatch/design-system/card";
 import { Dialog } from "@langwatch/design-system/dialog";
@@ -136,7 +136,11 @@ export function BraidDialog({ projectId, editing, braidsInto, onClose }: BraidDi
   const [testedTraceId, setTestedTraceId] = useState<string>();
   const change = (next: Partial<BraidDraft>) => setDraft((current) => ({ ...current, ...next }));
 
-  const targets = useBraidTargets({ projectId, projectIds: projects.map((project) => project.id) });
+  const targetProjects = projects.slice(0, BRAID_TARGETS_LIMIT);
+  const targets = useBraidTargets({
+    projectId,
+    projectIds: targetProjects.map((project) => project.id),
+  });
   const attributeKeys = useOwnerAttributeKeys({ projectId });
   const signing = useReaderSigning({ readerProjectId: draft.readerProjectId });
   const viewers = useTraceViewers({ readerProjectId: draft.readerProjectId });
@@ -160,7 +164,10 @@ export function BraidDialog({ projectId, editing, braidsInto, onClose }: BraidDi
     editingBraidId: editing?.braidId,
     nowMs,
   });
-  const { options, someLeftOut } = braidTargetOptions({ projects, targets: targets.data ?? [] });
+  const { options, someLeftOut } = braidTargetOptions({
+    projects: targetProjects,
+    targets: targets.data ?? [],
+  });
   const check = checkCondition(draft.where);
   const verifiedKey = verifiedKeyIn(draft.where);
   const entryKey =
@@ -215,6 +222,7 @@ export function BraidDialog({ projectId, editing, braidsInto, onClose }: BraidDi
             reader={reader}
             options={options}
             someLeftOut={someLeftOut}
+            listedOnly={projects.length > targetProjects.length ? targetProjects.length : undefined}
             isLoading={targets.isLoading}
             readerFixed={!!editing}
             onPick={(readerProjectId) => change({ readerProjectId })}

@@ -1,6 +1,6 @@
 /**
  * Verifying a braid signature against the SDK's pinned vector
- * (.claude/handoffs/braids-a4-sdk-signing.md), and the ways it fails.
+ * (ADR-185 section 4, signed calls), and the ways it fails.
  * @see modules/api-key/specs/signing-keys.feature
  */
 import { fromDate, type Instant } from "@langwatch/time";

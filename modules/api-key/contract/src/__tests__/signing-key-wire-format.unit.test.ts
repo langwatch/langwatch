@@ -1,6 +1,6 @@
 /**
  * Braid wire format v1 as the contract reads it: the SDK's pinned vector
- * (.claude/handoffs/braids-a4-sdk-signing.md) and what v1 never writes.
+ * (ADR-185 section 4, signed calls) and what v1 never writes.
  */
 import { describe, expect, it } from "vitest";
 

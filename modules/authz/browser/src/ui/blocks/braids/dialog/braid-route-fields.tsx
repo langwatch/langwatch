@@ -14,6 +14,8 @@ export type BraidRouteFieldsProps = {
   reader: BraidProject | undefined;
   options: readonly BraidTargetOption[];
   someLeftOut: boolean;
+  /** Set when the organisation has more projects than the picker asks about: how many it lists. */
+  listedOnly?: number;
   isLoading: boolean;
   /** Edit keeps the reader: a braid into another project is a new braid. */
   readerFixed: boolean;
@@ -129,6 +131,11 @@ export function BraidRouteFields(props: BraidRouteFieldsProps) {
       {props.someLeftOut ? (
         <Text fontSize="xs" color="fg.muted" data-testid="braid-targets-note">
           A braid can only go into a project whose traces you can read.
+        </Text>
+      ) : null}
+      {props.listedOnly ? (
+        <Text fontSize="xs" color="fg.muted" data-testid="braid-targets-limit-note">
+          Only the first {props.listedOnly} projects of the organisation are listed.
         </Text>
       ) : null}
     </Stack>
