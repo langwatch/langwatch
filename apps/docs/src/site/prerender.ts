@@ -21,7 +21,7 @@ import {
 } from "../features/discovery/compile/discovery-files.ts";
 import { pageLastModified } from "../features/discovery/compile/last-modified.ts";
 import { pageMarkdown } from "../features/discovery/compile/markdown-export.ts";
-import { breadcrumbTrail, pageHead } from "../features/discovery/compile/page-head.ts";
+import { breadcrumbTrail, FONT_SOURCE, pageHead } from "../features/discovery/compile/page-head.ts";
 import { buildNav } from "../features/navigation/compile/nav.ts";
 import {
   isStaticRedirect,
@@ -32,7 +32,7 @@ import {
 import type { Nav } from "../features/navigation/model/nav.ts";
 import { publishSearchIndex, searchEntry } from "../features/search/compile/search-index.ts";
 import { publicSlug, withBasePath } from "../lib/site-path.ts";
-import { docsRoot, readBuildOptions } from "../paths.ts";
+import { appRoot, cacheRoot, docsRoot, readBuildOptions } from "../paths.ts";
 import { writeVersionedPages } from "./build-version.ts";
 import { compressedSearchIndex } from "./compressed-index.ts";
 import { inlinePageStyles } from "./css/page-styles.ts";
@@ -41,10 +41,9 @@ import {
   islandHead,
   NOT_FOUND_HEAD,
   pageTargets,
-  STATIC_DIRS,
-  STATIC_FILES,
   extractStyles,
 } from "./document.ts";
+import { builtFontPaths, publishMedia } from "./hashed-assets.ts";
 import { optimisePageImages } from "./image-variants.ts";
 import { writeOutputFiles } from "./output-files.ts";
 import { renderCache, renderedPageSchema, type RenderedPage } from "./render-cache.ts";
@@ -55,6 +54,7 @@ import {
   type PrerenderPlan,
 } from "./render-keys.ts";
 import { renderWorkerCount, runOnWorkers, type WorkerOutcome } from "./render-workers.ts";
+import { optimisePageVideos } from "./video-variants.ts";
 
 /* Runs as the SSR bundle (see build.ts) after the client build. The main thread reads one
    build context, renders pages on worker threads of this same bundle (or reuses them from the
@@ -282,15 +282,86 @@ function redirectPages({
   }
 }
 
-async function copySources({ dist }: { dist: string }) {
-  for (const name of [...STATIC_DIRS, ...STATIC_FILES]) {
-    if (existsSync(path.join(docsRoot, name)))
-      await cp(path.join(docsRoot, name), path.join(dist, name), { recursive: true });
-  }
+/** Authored media pages reference (see hashed-assets.ts) and the OpenAPI specs, copied as files. */
+async function copySources({
+  dist,
+  copies,
+}: {
+  dist: string;
+  copies: ReadonlyMap<string, string>;
+}) {
+  for (const folder of new Set(
+    [...copies.keys()].map((name) => path.dirname(path.join(dist, name))),
+  ))
+    await mkdir(folder, { recursive: true });
+  await Promise.all([...copies].map(([name, file]) => cp(file, path.join(dist, name))));
   for (const file of SPEC_FILES) {
     await mkdir(path.dirname(path.join(dist, file)), { recursive: true });
     await cp(path.join(docsRoot, file), path.join(dist, file));
   }
+}
+
+const AGENT_TEXT = /\.(md|claude|agent|txt)$/;
+
+/* Screenshots become AVIF and WebP, videos AV1 and H.264 with a poster, then every authored file a
+   page or agent export still names is published under its content hash. Media caches live beside
+   the render cache, under their own root, so CI can restore them keyed on the media alone. */
+async function publishPageMedia({
+  dist,
+  pages,
+  files,
+  basePath,
+  cache,
+}: {
+  dist: string;
+  pages: ReadonlyMap<string, string>;
+  files: ReadonlyMap<string, string | Uint8Array>;
+  basePath: string;
+  cache: boolean;
+}) {
+  const mediaCache = (name: string) => (cache ? path.join(cacheRoot, "docs-media", name) : null);
+  const images = await optimisePageImages({
+    pages,
+    docsRoot,
+    basePath,
+    cacheDir: mediaCache("images"),
+  });
+  const videos = await optimisePageVideos({
+    pages: images.pages,
+    docsRoot,
+    basePath,
+    cacheDir: mediaCache("videos"),
+  });
+  const texts = new Map<string, string>();
+  for (const [name, contents] of files)
+    if (typeof contents === "string" && AGENT_TEXT.test(name)) texts.set(name, contents);
+  const fonts = builtFontPaths({
+    fonts: await readdir(path.join(appRoot, FONT_SOURCE)),
+    assets: await readdir(path.join(dist, "assets")),
+  });
+  const published = await publishMedia({
+    pages: videos.pages,
+    texts,
+    docsRoot,
+    basePath,
+    aliases: new Map([...images.aliases, ...videos.aliases, ...fonts]),
+  });
+  const output = new Map<string, string | Uint8Array>([
+    ...images.files,
+    ...videos.files,
+    ...published.texts,
+  ]);
+  if (videos.unencoded.length > 0)
+    console.warn(
+      `[docs-site] no ffmpeg with libx264 and an AV1 or VP9 encoder: ${videos.unencoded.length} videos published as authored`,
+    );
+  return {
+    pages: published.pages,
+    files: output,
+    copies: published.copies,
+    images: images.sources,
+    videos: videos.encoded,
+  };
 }
 
 function reportSkipped({ skipped }: { skipped: { slug: string; reason: string }[] }) {
@@ -354,18 +425,23 @@ async function generate() {
   });
   for (const [name, contents] of styled.files) files.set(name, contents);
   for (const [target, page] of styled.pages) pages.set(target, page);
-  const images = await optimisePageImages({
+  const mediaStarted = performance.now();
+  const media = await publishPageMedia({
+    dist,
     pages,
-    docsRoot,
+    files,
     basePath,
-    cacheDir: plan.cacheDir ? path.join(path.dirname(plan.cacheDir), "images") : null,
+    cache: plan.cacheDir !== null,
   });
-  for (const [target, page] of images.pages) pages.set(target, page);
-  for (const [name, contents] of images.files) files.set(name, contents);
+  for (const [target, page] of media.pages) pages.set(target, page);
+  for (const [name, contents] of media.files) files.set(name, contents);
   redirectPages({ dist, redirects, pages });
   files.set("skipped.json", JSON.stringify(skipped, null, 2));
   await writeOutputFiles({ root: dist, files });
-  await copySources({ dist });
+  await copySources({ dist, copies: media.copies });
+  console.log(
+    `[docs-site] media: ${media.images} images, ${media.videos} videos encoded, ${media.copies.size} authored files published in ${((performance.now() - mediaStarted) / 1000).toFixed(1)}s`,
+  );
 
   const seconds = ((renderedAt - started) / 1000).toFixed(1);
   console.log(

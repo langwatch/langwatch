@@ -32,7 +32,10 @@ export const DOCS_JSON_KEYS: Record<string, KeyHandling> = {
   logo: honoured("shell/ui/header.tsx renders the design-system logo for both themes"),
   "logo.light": pinned("/logo/dark.svg", "the design-system FullLogo is this artwork"),
   "logo.dark": pinned("/logo/light.svg", "the design-system FullLogo is this artwork"),
-  favicon: pinned("/favicon.svg", "index.html links it; site/document.ts STATIC_FILES copies it"),
+  favicon: pinned(
+    "/favicon.svg",
+    "index.html links it; site/hashed-assets.ts publishes it under this name",
+  ),
   description: honoured("site.description: page-head.ts meta description fallback"),
   seo: honoured("discovery/compile/page-head.ts"),
   "seo.indexing": pinned("navigable", "only pages listed in navigation are published or mapped"),

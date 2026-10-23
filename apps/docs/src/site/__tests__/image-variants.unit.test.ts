@@ -5,7 +5,8 @@ import path from "node:path";
 import sharp from "sharp";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { encodeImage, optimisePageImages } from "../image-variants.ts";
+import { hashedName } from "../hashed-assets.ts";
+import { encodeImage, optimisePageImages, variantWidths } from "../image-variants.ts";
 
 let root = "";
 
@@ -29,21 +30,63 @@ afterEach(() => rmSync(root, { recursive: true, force: true }));
 
 describe("modern image encodings", () => {
   /** @scenario "Serve authored screenshots as modern images" */
-  it("encodes AVIF and WebP no wider than twice the column and reuses the cache", async () => {
+  it("encodes AVIF and WebP at the column's 1x and 2x widths and reuses the cache", async () => {
     const input = await capture({ width: 2000, height: 40 });
     const cacheDir = path.join(root, "cache");
-    const first = await encodeImage({ input, cacheDir });
-    expect(first.map((encoded) => encoded.type)).toEqual(["image/avif", "image/webp"]);
+    const first = await encodeImage({ input, sitePath: "/images/a/shot.png", cacheDir });
+    expect(first.map(({ type, width }) => `${type} ${width}`)).toEqual([
+      "image/avif 840",
+      "image/avif 1680",
+      "image/webp 840",
+      "image/webp 1680",
+    ]);
     for (const encoded of first) {
-      expect(encoded.width).toBe(1680);
       expect(encoded.bytes.length).toBeLessThan(input.length);
-      expect((await sharp(encoded.bytes).metadata()).width).toBe(1680);
+      expect((await sharp(encoded.bytes).metadata()).width).toBe(encoded.width);
+      expect(encoded.name).toBe(
+        hashedName({
+          name: `images/a/shot-${encoded.width}.${encoded.type.slice(6)}`,
+          bytes: encoded.bytes,
+        }),
+      );
     }
-    expect(readdirSync(cacheDir)).toHaveLength(2);
+    expect(readdirSync(cacheDir)).toHaveLength(4);
     writeFileSync(path.join(cacheDir, readdirSync(cacheDir)[0] ?? ""), "corrupt");
-    const second = await encodeImage({ input, cacheDir });
+    const second = await encodeImage({ input, sitePath: "/images/a/shot.png", cacheDir });
     expect(second.map((encoded) => encoded.name)).toEqual(first.map((encoded) => encoded.name));
-    expect((await sharp(second[0]?.bytes).metadata()).width).toBe(1680);
+  });
+
+  /** @scenario "Serve authored screenshots as modern images" */
+  it("publishes one width for an image near the column's width", () => {
+    expect(variantWidths({ width: 3000 })).toEqual([840, 1680]);
+    expect(variantWidths({ width: 1200 })).toEqual([840, 1200]);
+    expect(variantWidths({ width: 1000 })).toEqual([1000]);
+    expect(variantWidths({ width: 300 })).toEqual([300]);
+  });
+
+  /** @scenario "Serve authored screenshots as modern images" */
+  it("strips metadata and drops cache entries a build no longer uses", async () => {
+    const input = await sharp(await capture({ width: 300, height: 60 }))
+      .withExif({ IFD0: { Copyright: "ACME" } })
+      .jpeg({ quality: 100 })
+      .toBuffer();
+    expect((await sharp(input).metadata()).exif).toBeDefined();
+    const cacheDir = path.join(root, "cache");
+    mkdirSync(cacheDir);
+    writeFileSync(path.join(cacheDir, "stale.avif"), "old");
+    mkdirSync(path.join(root, "images"));
+    writeFileSync(path.join(root, "images/shot.jpg"), input);
+    const html = `<html><head><title>T</title></head><body><article class="docs-prose"><img class="docs-img" src="/images/shot.jpg"/></article></body></html>`;
+    const result = await optimisePageImages({
+      pages: new Map([["guide/index.html", html]]),
+      docsRoot: root,
+      basePath: "",
+      cacheDir,
+    });
+    for (const bytes of result.files.values())
+      expect((await sharp(bytes).metadata()).exif).toBeUndefined();
+    expect(readdirSync(cacheDir)).not.toContain("stale.avif");
+    expect(readdirSync(cacheDir)).toHaveLength(2);
   });
 
   /** @scenario "Serve authored screenshots as modern images" */
@@ -53,7 +96,11 @@ describe("modern image encodings", () => {
     })
       .png()
       .toBuffer();
-    const encoded = await encodeImage({ input: flat, cacheDir: null });
+    const encoded = await encodeImage({
+      input: flat,
+      sitePath: "/images/flat.png",
+      cacheDir: null,
+    });
     expect(encoded.length).toBeLessThan(2);
     for (const { bytes } of encoded) expect(bytes.length).toBeLessThan(flat.length);
   });
@@ -72,12 +119,16 @@ describe("modern image encodings", () => {
       basePath: "",
       cacheDir: null,
     });
-    expect(
-      [...result.files.keys()].map((name) => name.replace(/[0-9a-f]{20}/, "<digest>")),
-    ).toEqual(["media/optimized/<digest>-300.avif", "media/optimized/<digest>-300.webp"]);
+    const names = [...result.files.keys()];
+    expect(names.map((name) => name.replace(/\.[0-9a-f]{12}\./, ".<hash>."))).toEqual([
+      "images/shot-300.<hash>.avif",
+      "images/shot-300.<hash>.webp",
+    ]);
+    expect(result.aliases).toEqual(new Map([["/images/shot.png", `/${names[1]}`]]));
     for (const page of result.pages.values()) {
       expect(page.match(/<picture/g)).toHaveLength(1);
       expect(page).toContain('rel="preload" as="image" type="image/avif"');
+      expect(page).toContain(`<img class="docs-img" src="/${names[1]}"`);
     }
   });
 });

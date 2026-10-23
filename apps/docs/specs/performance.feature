@@ -58,11 +58,34 @@ Feature: Static documentation with progressive interaction
   Scenario: Serve authored screenshots as modern images
     Given a guide shows a local PNG or JPEG image
     When the site is built
-    Then the page offers AVIF and WebP encodings of it in a picture, with the original as the fallback
+    Then the page offers AVIF and WebP encodings of it in a picture, at the article column's width and twice it
+    And the image element names the largest WebP encoding, so the original is not published
     And the image keeps its intrinsic width and height
     And no encoding wider than twice the article column or larger than the original is published
-    And unchanged images are reused from the build cache instead of being encoded again
+    And no encoding carries the original's metadata
+    And unchanged images are reused from the build cache, and cache entries no build uses are removed
     But SVG, GIF, external and already responsive images are left as authored
+
+  @unit
+  Scenario: Serve videos as small web encodings with a poster
+    Given a guide plays a local video
+    When the site is built
+    Then the video offers an AV1 WebM and an H.264 MP4, each naming its codecs
+    And neither is wider than twice the article column or plays more than 30 frames a second
+    And a source without sound publishes no audio track
+    And a video without an authored poster shows a WebP of its first frame and fetches nothing until it plays
+    And it autoplays only where authored and muted
+    And unchanged videos are reused from the build cache instead of being encoded again
+    But without ffmpeg the video is published as authored
+
+  @unit
+  Scenario: Name every published media file by its content
+    Given the pages reference authored images, videos, posters, downloads and fonts
+    When the site is built
+    Then each is published under a name carrying a hash of its content, and every page and agent export names that file
+    And a host may cache any file so named for a year
+    And authored media no page or agent export references is left out of the build
+    But the logos, the favicon and the social card keep their authored names, because other sites and browser scripts ask for them by name
 
   @unit
   Scenario: Preload the first image a reader sees

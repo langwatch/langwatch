@@ -25,9 +25,10 @@ RUN find . ! -type d ! -name package.json -delete && find . -depth -type d -empt
 
 # ── Build ───────────────────────────────────────────────────────────
 # Debian, not Alpine: the build renders Mermaid diagrams in Playwright's
-# headless Chromium, which has no musl build. git reads each page's commit date.
+# headless Chromium, which has no musl build. git reads each page's commit date; ffmpeg
+# transcodes the videos (apps/docs/src/site/video-variants.ts).
 FROM node:24.22.1-bookworm-slim AS build
-RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates \
+RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates ffmpeg \
     && rm -rf /var/lib/apt/lists/* \
     && git config --global --add safe.directory '*'
 RUN npm install -g pnpm@12.6.0 && npm cache clean --force
@@ -51,6 +52,7 @@ COPY apps/docs ./apps/docs
 # missing history builds a sitemap without dates, so the check refuses that.
 RUN --mount=type=bind,source=.git,target=/src/.git \
     --mount=type=cache,id=docs-site-render,target=/src/apps/docs/node_modules/.cache/docs-site \
+    --mount=type=cache,id=docs-site-media,target=/src/apps/docs/node_modules/.cache/docs-media \
     pnpm --filter @langwatch/docs-site build --base-path /docs --out-dir /out \
     && test -f /out/index.html && test -f /out/404.html \
     && grep -q '<lastmod>' /out/sitemap.xml

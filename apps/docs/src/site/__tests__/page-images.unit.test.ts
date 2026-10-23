@@ -23,12 +23,12 @@ const preloads = ({ html }: { html: string }) => html.match(/<link rel="preload"
 
 describe("authored raster images", () => {
   /** @scenario "Serve authored screenshots as modern images" */
-  it("offers AVIF and WebP before the original and keeps the intrinsic size", () => {
+  it("offers AVIF and WebP, names the WebP in the img and keeps the intrinsic size", () => {
     const html = rewrite({
       article: `<p>Intro</p>${img({ src: "/docs/images/first.png" })}<h2>Next</h2><p>${"x".repeat(900)}</p>${img({ src: "/docs/images/second.jpg" })}`,
     });
     expect(html).toContain(
-      '<picture style="display:contents"><source type="image/avif" srcset="/docs/media/optimized/first-1440.avif 1440w" sizes="(min-width: 64rem) 840px, 100vw"/><source type="image/webp" srcset="/docs/media/optimized/first-1440.webp 1440w" sizes="(min-width: 64rem) 840px, 100vw"/><img class="docs-img" src="/docs/images/first.png"',
+      '<picture style="display:contents"><source type="image/avif" srcset="/docs/media/optimized/first-1440.avif 1440w" sizes="(min-width: 64rem) 840px, 100vw"/><source type="image/webp" srcset="/docs/media/optimized/first-1440.webp 1440w" sizes="(min-width: 64rem) 840px, 100vw"/><img class="docs-img" src="/docs/media/optimized/first-1440.webp"',
     );
     expect(html.match(/<picture/g)).toHaveLength(2);
     expect(html.match(/width="1440" height="900"/g)).toHaveLength(2);
@@ -61,10 +61,10 @@ describe("the first image a reader sees", () => {
     ]);
     expect(html.indexOf('<title>Guide</title><link rel="preload"')).toBeGreaterThan(0);
     expect(html).toMatch(
-      /first\.png" alt="" loading="eager" decoding="async"[^>]*fetchpriority="high"\/>/,
+      /first-1440\.webp" alt="" loading="eager" decoding="async"[^>]*fetchpriority="high"\/>/,
     );
     expect(html).toMatch(
-      /second\.jpg" alt="" loading="lazy" decoding="async" width="1440" height="900"\/>/,
+      /second-1440\.webp" alt="" loading="lazy" decoding="async" width="1440" height="900"\/>/,
     );
   });
 

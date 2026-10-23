@@ -10,8 +10,17 @@ import {
   type Section,
 } from "../../navigation/model/nav.ts";
 
+/** Where the web fonts live: dev serves them at this path, a build renames each to Vite's hashed file. */
+export const FONT_SOURCE = "/src/app/fonts";
+
 /* The body font and the title font paint above the fold on every page; the rest load on demand. */
-const ABOVE_THE_FOLD_FONTS = ["/fonts/Inter-Variable-latin.woff2", "/fonts/Sentient-Regular.woff2"];
+const ABOVE_THE_FOLD_FONTS = [
+  `${FONT_SOURCE}/Inter-Variable-latin.woff2`,
+  `${FONT_SOURCE}/Sentient-Regular.woff2`,
+];
+
+/** The social card: shared links fetch it by this address, so it keeps its authored name. */
+export const SOCIAL_IMAGE = "/images/coding-agents/optimized/session-detail-1560.webp";
 
 /* Absolute links to the agent discovery files, the same on every page. */
 const DISCOVERY_LINKS = [
@@ -223,7 +232,7 @@ export function pageHead({
   const url = canonicalUrl({ slug });
   const description = trimDescription({ text: authored || settings.description });
   const modified = settings.dates.get(slug);
-  const image = docsUrl({ path: "/images/coding-agents/optimized/session-detail-1560.webp" });
+  const image = docsUrl({ path: SOCIAL_IMAGE });
   const article = slug !== "introduction";
   const handle = twitterHandle({ organization: settings.organization });
   const tags = [

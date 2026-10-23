@@ -130,6 +130,17 @@ export function pageImages({ html }: { html: string }): PageImage[] {
   return scan.images;
 }
 
+/** The largest WebP encoding, which an `<img>` names so the original need not be published. */
+export function fallbackVariant<T extends { type: string; width: number }>({
+  variants,
+}: {
+  variants: readonly T[];
+}) {
+  return variants
+    .filter((variant) => variant.type === "image/webp")
+    .toSorted((a, b) => b.width - a.width)[0];
+}
+
 function srcSet({ variants }: { variants: readonly ImageVariant[] }) {
   return variants.map((variant) => `${variant.path} ${variant.width}w`).join(", ");
 }
@@ -160,6 +171,8 @@ function picture({
     return `<source type="${type}" srcset="${set}" sizes="${IMAGE_SIZES}"/>`;
   });
   let image = withLoading({ tag, eager });
+  const fallback = fallbackVariant({ variants });
+  if (fallback) image = image.replace(/\ssrc="[^"]*"/, ` src="${fallback.path}"`);
   if (first) image = image.replace(/\s*\/?>$/, ` fetchpriority="high"/>`);
   return `<picture style="display:contents">${sources.join("")}${image}</picture>`;
 }

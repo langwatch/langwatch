@@ -42,6 +42,6 @@ Feature: Agents discover the documentation and its skills
   @unit
   Scenario: Serve files with the caching a production host gives them
     When the preview serves a build
-    Then content-hashed assets may be cached for a year without asking again
-    And fonts and media for a day, revalidated in the background for a week
+    Then content-hashed assets, fonts and media may be cached for a year without asking again
+    And media keeping its authored name for a day, revalidated in the background for a week
     And pages, the search index and agent files are revalidated every time

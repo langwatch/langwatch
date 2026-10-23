@@ -195,7 +195,7 @@ await it("skips speculative fetches under Save-Data, waits for hover intent and 
 
 const CLIP_PAGE = "prompt-management/prompt-playground";
 const CLIP_SOURCE =
-  /\/media\/videos\/(add-variable|prompt-messages-editor|prompt-split-view)\.(webm|mp4)$/;
+  /\/media\/videos\/(add-variable|prompt-messages-editor|prompt-split-view)\.([0-9a-f]{12}\.)?(webm|mp4)$/;
 
 /** @scenario "Play an instructional clip in place of an animated GIF" */
 await it("serves silent clips with posters that play only while visible and allowed", async () => {
@@ -226,7 +226,14 @@ await it("serves silent clips with posters that play only while visible and allo
             [clip.controls, clip.muted, clip.preload, clip.sized],
             [true, true, "none", true],
           );
-          assert.deepEqual(clip.sources, ["video/webm", "video/mp4"]);
+          assert.deepEqual(
+            clip.sources.map((type) => type.split(";")[0]),
+            ["video/webm", "video/mp4"],
+          );
+          assert.ok(
+            clip.sources.every((type) => type.includes("codecs=")),
+            "codecs named",
+          );
         }
       } finally {
         await noScript.close();

@@ -196,9 +196,10 @@ void describe("the app front", () => {
     const guide = await (
       await get(`${front.origin}${base}/prompt-management/prompt-playground`)
     ).text();
-    assert.ok(
-      guide.includes(`${base}/media/videos/add-prompt.mp4`),
-      "the legacy video is prefixed",
+    assert.match(
+      guide,
+      new RegExp(`${base}/media/videos/add-prompt\\.[0-9a-f]{12}\\.mp4`),
+      "the legacy video is transcoded, hashed and prefixed",
     );
   });
 

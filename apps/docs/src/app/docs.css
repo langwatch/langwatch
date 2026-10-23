@@ -3,7 +3,7 @@
    late font never moves a page; on a slow first visit the fallback stays for that view. */
 @font-face {
   font-family: "Inter";
-  src: url("/fonts/Inter-Variable-latin.woff2") format("woff2");
+  src: url("./fonts/Inter-Variable-latin.woff2") format("woff2");
   font-weight: 100 900;
   font-style: normal;
   font-display: optional;
@@ -14,7 +14,7 @@
 }
 @font-face {
   font-family: "Inter";
-  src: url("/fonts/Inter-Variable-latin-ext.woff2") format("woff2");
+  src: url("./fonts/Inter-Variable-latin-ext.woff2") format("woff2");
   font-weight: 100 900;
   font-style: normal;
   font-display: swap;
@@ -25,21 +25,21 @@
 }
 @font-face {
   font-family: "Sentient";
-  src: url("/fonts/Sentient-Regular.woff2") format("woff2");
+  src: url("./fonts/Sentient-Regular.woff2") format("woff2");
   font-weight: 400;
   font-style: normal;
   font-display: optional;
 }
 @font-face {
   font-family: "Sentient";
-  src: url("/fonts/Sentient-Medium.woff2") format("woff2");
+  src: url("./fonts/Sentient-Medium.woff2") format("woff2");
   font-weight: 500;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: "JetBrains Mono";
-  src: url("/fonts/JetBrainsMono-Variable-latin.woff2") format("woff2");
+  src: url("./fonts/JetBrainsMono-Variable-latin.woff2") format("woff2");
   font-weight: 400 600;
   font-style: normal;
   font-display: swap;
@@ -50,7 +50,7 @@
 }
 @font-face {
   font-family: "JetBrains Mono";
-  src: url("/fonts/JetBrainsMono-Variable-latin-ext.woff2") format("woff2");
+  src: url("./fonts/JetBrainsMono-Variable-latin-ext.woff2") format("woff2");
   font-weight: 400 600;
   font-style: normal;
   font-display: swap;

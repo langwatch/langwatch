@@ -11,9 +11,20 @@ describe("when the preview serves a build", () => {
     expect(cachePolicy({ sitePathname: "/assets/docs-1a8a2835acafc98e.css" })).toContain(
       "immutable",
     );
-    expect(cachePolicy({ sitePathname: "/fonts/Inter-Variable-latin.woff2" })).toBe(
-      "public, max-age=86400, stale-while-revalidate=604800",
+    expect(cachePolicy({ sitePathname: "/assets/Inter-Variable-latin-C1d2E3f4.woff2" })).toContain(
+      "immutable",
     );
+    expect(cachePolicy({ sitePathname: "/images/a/shot-1680.0123456789ab.webp" })).toContain(
+      "immutable",
+    );
+    for (const sitePathname of [
+      "/logo/light.svg",
+      "/images/logos/acme.svg",
+      "/fonts/Inter-LICENSE.txt",
+    ])
+      expect(cachePolicy({ sitePathname })).toBe(
+        "public, max-age=86400, stale-while-revalidate=604800",
+      );
     for (const sitePathname of [
       "/integration/quick-start/index.html",
       "/search-index.json",

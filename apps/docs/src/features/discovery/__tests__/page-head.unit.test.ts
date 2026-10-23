@@ -263,8 +263,8 @@ describe("when a page head is built", () => {
     });
     const preloads = [...head.matchAll(/<link rel="preload"[^>]*>/g)].map((match) => match[0]);
     expect(preloads).toEqual([
-      `<link rel="preload" href="${sitePath({ path: "/fonts/Inter-Variable-latin.woff2" })}" as="font" type="font/woff2" crossorigin>`,
-      `<link rel="preload" href="${sitePath({ path: "/fonts/Sentient-Regular.woff2" })}" as="font" type="font/woff2" crossorigin>`,
+      `<link rel="preload" href="${sitePath({ path: "/src/app/fonts/Inter-Variable-latin.woff2" })}" as="font" type="font/woff2" crossorigin>`,
+      `<link rel="preload" href="${sitePath({ path: "/src/app/fonts/Sentient-Regular.woff2" })}" as="font" type="font/woff2" crossorigin>`,
     ]);
   });
 });

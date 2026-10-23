@@ -197,6 +197,7 @@ export function DocsVideo({ autoPlay, children, src, poster, ...rest }: Componen
       <Box position="relative">
         <video
           ref={ref}
+          data-docs-tour={introduction ? "" : undefined}
           playsInline
           preload={introduction ? "none" : "metadata"}
           src={mediaPath({ path: src })}

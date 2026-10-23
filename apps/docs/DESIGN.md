@@ -107,8 +107,8 @@ mount) and runs Lighthouse with the default mobile emulation and throttling and 
 preset on eight representative pages, held to `src/site/audit/budgets.json`: accessibility, best
 practices and SEO at 100, performance floors with room for CI runners. It also reports
 Lighthouse's experimental agentic browsing checklist without gating on it, as the marketing site
-does. The preview serves like the production host should: gzip, hashed assets immutable for a
-year, fonts and media for a day, documents revalidated; a page request preferring
+does. The preview serves like the production host should: gzip, hashed assets, fonts and media
+immutable for a year, media keeping its authored name for a day, documents revalidated; a page request preferring
 `text/markdown` gets the page's Markdown twin, and every page names its twin in a `Link` header.
 
 Beside that gate, `.github/workflows/docs-site-lighthouse-all.yml` runs the same audit on every

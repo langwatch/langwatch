@@ -218,7 +218,14 @@ take precedence. Pattern redirects need hosting rules; they remain in
 
 Keep old hashed assets long enough for cached documents to finish loading their
 lazy chunks. Revalidate mutable HTML and search files; immutable hashed
-assets can use a long cache lifetime. These are hosting requirements, not cloud
+assets can use a long cache lifetime. A file is hashed when its name carries its
+content hash: Vite's `assets/name-<8 characters>.ext`, or `name.<12 hex>.ext` for
+the media the build publishes (`isHashedFile` in `src/site/hashed-assets.ts`).
+The build publishes only the authored images, videos and posters a page or agent
+export names, under hashed names: screenshots as AVIF and WebP at 840 and 1680px,
+videos as AV1 WebM and H.264 MP4 with a WebP poster (ffmpeg, cached in
+`node_modules/.cache/docs-media`). Logos, the favicon and the social card keep
+their names, with a short cache lifetime. These are hosting requirements, not cloud
 configuration emitted by the compiler. The existing Mintlify release workflow
 and DNS cutover remain separate decisions.
 

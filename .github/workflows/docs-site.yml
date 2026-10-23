@@ -113,6 +113,18 @@ jobs:
           key: docs-site-${{ matrix.mount }}-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
           restore-keys: |
             docs-site-${{ matrix.mount }}-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
+      # Encoded images and videos, keyed on the media and the encoders' settings alone, so a
+      # docs-only change never re-encodes; the build prunes entries it no longer uses.
+      - name: Restore the encoded docs media
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: apps/docs/node_modules/.cache/docs-media
+          key: docs-media-${{ runner.os }}-${{ hashFiles('docs/images/**', 'docs/media/**', 'apps/docs/src/site/image-variants.ts', 'apps/docs/src/site/video-variants.ts') }}
+          restore-keys: |
+            docs-media-${{ runner.os }}-
+      # The build transcodes the docs videos to AV1 and H.264 (src/site/video-variants.ts).
+      - name: Install ffmpeg
+        run: command -v ffmpeg || { sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg; }
       - name: Read the Playwright version
         id: playwright
         run: |

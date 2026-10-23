@@ -74,12 +74,12 @@ export async function assertCapabilityErrors({ page, base }) {
       },
     });
   });
-  await page.route("**/media/videos/introduction.webm", (route) => route.abort());
+  await page.route("**/media/videos/introduction.*", (route) => route.abort());
   await page.goto(`${base}introduction`);
   await page.getByRole("button", { name: "Watch the product tour" }).click();
   await page.getByRole("alert").filter({ hasText: "The video could not load" }).waitFor();
   assert.ok(await page.getByRole("button", { name: "Watch the product tour" }).isVisible());
-  await page.unroute("**/media/videos/introduction.webm");
+  await page.unroute("**/media/videos/introduction.*");
   await page.getByRole("button", { name: "Watch the product tour" }).click();
   await page.waitForFunction(() => document.querySelector("video").currentTime > 0);
   await page.getByRole("button", { name: "Copy setup prompt" }).click();

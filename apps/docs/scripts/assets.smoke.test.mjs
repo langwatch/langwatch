@@ -177,10 +177,17 @@ await it("preloads the body and title fonts and never fetches extended Latin", a
                 .filter((entry) => entry.name.endsWith(".woff2") && entry.initiatorType === "link")
                 .map((entry) => entry.name.split("/").pop()),
             );
-            assert.deepEqual(preloaded.toSorted(), [
-              "Inter-Variable-latin.woff2",
-              "Sentient-Regular.woff2",
-            ]);
+            /* Vite names each font by its content: Inter-Variable-latin-<hash>.woff2. */
+            assert.deepEqual(
+              preloaded
+                .map((name) => name.replace(/-[A-Za-z0-9_-]{8}\.woff2$/, ".woff2"))
+                .toSorted(),
+              ["Inter-Variable-latin.woff2", "Sentient-Regular.woff2"],
+            );
+            assert.ok(
+              preloaded.every((name) => name !== "Inter-Variable-latin.woff2"),
+              "hashed",
+            );
           }
           assert.deepEqual(
             fonts.filter((font) => font.includes("latin-ext")),

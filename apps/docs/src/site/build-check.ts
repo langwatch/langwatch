@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
 import { access, readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 
@@ -13,6 +14,7 @@ import {
 } from "../features/navigation/compile/redirects.ts";
 import { docsRoot } from "../paths.ts";
 import { pageTargets } from "./document.ts";
+import { htmlMediaPaths, isHashedFile, isStableAsset } from "./hashed-assets.ts";
 
 /** Slugs straight from docs.json, independent of the navigation compiler, in authored order. */
 function configuredSlugs({ items }: { items: DocsItem[] }): string[] {
@@ -47,11 +49,25 @@ export async function assertBuild({ outDir }: { outDir: string }) {
   const actualHtml = builtHtml.filter((file) => !PROMPT_FRAGMENT_FILE.test(file));
   const fragments = builtHtml.filter((file) => PROMPT_FRAGMENT_FILE.test(file));
   const named = new Set<string>();
-  for (const file of actualHtml)
-    for (const match of (await readFile(path.join(outDir, file), "utf8")).matchAll(
+  const media = new Set<string>();
+  for (const file of actualHtml) {
+    const html = await readFile(path.join(outDir, file), "utf8");
+    for (const match of html.matchAll(
       /\sdata-docs-prompt-fragment="[^"]*\/(assets\/skill-prompt-[0-9a-f]{16}\.html)"/g,
     ))
       named.add(match[1] ?? "");
+    for (const sitePath of htmlMediaPaths({ html, basePath: "" })) media.add(sitePath);
+  }
+  assert.deepEqual(
+    [...media].filter((sitePath) => !existsSync(path.join(outDir, sitePath))),
+    [],
+    "Every media file a page names must be published",
+  );
+  assert.deepEqual(
+    [...media].filter((sitePath) => !isHashedFile({ sitePath }) && !isStableAsset({ sitePath })),
+    [],
+    "Every media file a page names must carry its content hash, or be a stable logo or social card",
+  );
   assert.deepEqual(
     fragments.toSorted(),
     [...named].toSorted(),

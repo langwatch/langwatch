@@ -8,13 +8,13 @@ import type { Mermaid } from "mermaid";
 import { chromium, type Browser, type Page } from "playwright";
 import { z } from "zod";
 
-import { cacheRoot, publicRoot } from "../../../paths.ts";
+import { appRoot, cacheRoot } from "../../../paths.ts";
 import { diagramTheme } from "./diagram-theme.ts";
 
 const require = createRequire(import.meta.url);
 const mermaidRoot = path.dirname(require.resolve("mermaid/package.json"));
 const cacheDir = path.join(cacheRoot, "docs-site/diagrams");
-const fontFile = path.join(publicRoot, "fonts/Inter-Variable-latin.woff2");
+const fontFile = path.join(appRoot, "src/app/fonts/Inter-Variable-latin.woff2");
 let rendererVersion: Promise<string> | undefined;
 const diagramSchema = z.object({ light: z.string(), dark: z.string() });
 export type Diagram = z.infer<typeof diagramSchema>;

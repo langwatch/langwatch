@@ -29,7 +29,7 @@ export function pageTargets({ slug }: { slug: string }) {
   return [`${slug}/index.html`];
 }
 
-/** Authored docs directories and files copied verbatim into the output and served by dev. */
+/** Authored media folders and files dev serves; a build publishes only what pages name. */
 export const STATIC_DIRS = ["images", "media", "logo"];
 export const STATIC_FILES = ["favicon.svg"];
 
