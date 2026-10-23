@@ -1,9 +1,9 @@
 package codeblock
 
 import (
+	"encoding"
 	"encoding/json"
 	"reflect"
-	"strconv"
 	"unicode/utf8"
 )
 
@@ -11,7 +11,7 @@ import (
 // It walks the values instead of encoding them: escaping can grow a string
 // sixfold, so encoding first would allocate the oversized payload it refuses.
 func requestFits(req Request, limit int) bool {
-	budget := sizeBudget{left: limit}
+	budget := sizeBudget{left: limit - len(requestEnvelope)}
 	budget.value(reflect.ValueOf(req.Code), 0)
 	budget.value(reflect.ValueOf(req.Inputs), 0)
 	budget.value(reflect.ValueOf(req.DeclaredOutputs), 0)
@@ -19,6 +19,14 @@ func requestFits(req Request, limit int) bool {
 	budget.value(reflect.ValueOf(req.Params), 0)
 	return budget.left >= 0
 }
+
+// requestEnvelope is what marshalRequest writes around the five values.
+const requestEnvelope = `{"code":,"inputs":,"outputs":,"params":,"secrets":}`
+
+var (
+	jsonMarshaler = reflect.TypeFor[json.Marshaler]()
+	textMarshaler = reflect.TypeFor[encoding.TextMarshaler]()
+)
 
 // maxEncodedDepth refuses values nested past what encoding/json would walk sensibly.
 const maxEncodedDepth = 128
@@ -37,6 +45,10 @@ func (b *sizeBudget) value(v reflect.Value, depth int) {
 	}
 	if depth > maxEncodedDepth {
 		b.left = -1
+		return
+	}
+	if v.IsValid() && (v.Type().Implements(jsonMarshaler) || v.Type().Implements(textMarshaler)) {
+		b.leaf(v)
 		return
 	}
 	switch v.Kind() {
@@ -70,13 +82,26 @@ func (b *sizeBudget) mapValue(v reflect.Value, depth int) {
 	}
 	b.spend(2)
 	for it := v.MapRange(); it.Next() && b.left >= 0; {
-		key := it.Key()
-		if key.Kind() == reflect.String {
-			b.spend(encodedStringSize(key.String()) + 2)
-		} else {
-			b.spend(len(strconv.Quote(key.String())) + 34)
-		}
+		b.key(it.Key())
 		b.value(it.Value(), depth+1)
+	}
+}
+
+// key sizes a map key as encoding/json writes it: a string kind as itself, a
+// TextMarshaler as its text, any other key as its quoted number.
+func (b *sizeBudget) key(k reflect.Value) {
+	switch {
+	case k.Kind() == reflect.String:
+		b.spend(encodedStringSize(k.String()) + 2)
+	case k.Type().Implements(textMarshaler) && k.CanInterface():
+		text, err := k.Interface().(encoding.TextMarshaler).MarshalText()
+		if err != nil {
+			b.left = -1
+			return
+		}
+		b.spend(encodedStringSize(string(text)) + 2)
+	default:
+		b.spend(32 + 4)
 	}
 }
 
@@ -85,8 +110,8 @@ func (b *sizeBudget) listValue(v reflect.Value, depth int) {
 		b.spend(len("null"))
 		return
 	}
-	if v.Type().Elem().Kind() == reflect.Uint8 {
-		b.spend(v.Len()*4/3 + 4)
+	if v.Kind() == reflect.Slice && v.Type().Elem().Kind() == reflect.Uint8 {
+		b.spend(4*((v.Len()+2)/3) + 2)
 		return
 	}
 	b.spend(2)

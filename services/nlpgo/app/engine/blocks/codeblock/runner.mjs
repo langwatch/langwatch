@@ -165,6 +165,25 @@ function describe(value) {
   }
 }
 
+// text reads a field the customer's error controls; a getter that throws or a
+// name that is not a string must not stop the result from being written.
+function text(read, fallback) {
+  try {
+    const value = read();
+    return value === undefined || value === null ? fallback : String(value);
+  } catch {
+    return fallback;
+  }
+}
+
+function errorOf(e) {
+  if (!(e instanceof Error))
+    return { type: "Error", message: text(() => describe(e), "Error"), traceback: "" };
+  const type = text(() => e.name, "Error");
+  const message = text(() => e.message, "");
+  return { type, message, traceback: `${type}: ${message}\n${text(() => e.stack, "")}` };
+}
+
 const captured = { stdout: "", stderr: "" };
 const writer =
   (stream) =>
@@ -290,14 +309,7 @@ async function main() {
     }
     outputs = result;
   } catch (e) {
-    error =
-      e instanceof Error
-        ? {
-            type: e.name,
-            message: e.message,
-            traceback: `${e.name}: ${e.message}\n${e.stack ?? ""}`,
-          }
-        : { type: "Error", message: describe(e), traceback: "" };
+    error = errorOf(e);
   }
   writeResult({ outputs, error, duration_ms: Date.now() - started });
 }

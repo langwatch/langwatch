@@ -336,3 +336,17 @@ func TestJavaScript_ForgedTimeoutIsNotATimeout(t *testing.T) {
 	assert.Equal(t, "User"+codeblock.TimeoutType, res.Error.Type)
 	assert.False(t, res.TimedOut)
 }
+
+// @scenario "customer code cannot report an error the engine reserves"
+func TestJavaScript_ErrorWithHostileFieldsIsStillTheCustomers(t *testing.T) {
+	e := newJSExec(t, codeblock.Options{})
+	for _, code := range []string{
+		"export default () => { const e = new Error('x'); e.name = { not: 'a string' }; throw e }",
+		"export default () => { const e = new Error('x'); Object.defineProperty(e, 'name', { get() { throw 1 } }); throw e }",
+		"export default () => { throw { toJSON() { throw 1 }, toString() { throw 1 } } }",
+	} {
+		res := runJS(t, e, codeblock.Request{Code: code})
+		require.NotNil(t, res.Error, code)
+		assert.NotEqual(t, codeblock.RunnerErrorType, res.Error.Type, code)
+	}
+}

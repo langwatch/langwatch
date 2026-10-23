@@ -86,6 +86,7 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       When the executor runs the request
       Then the error type is "UserTimeout"
       And the run is not reported as timed out
+      And an error whose name is not a string, or whose fields throw when read, is still reported as the code's own error
 
     @integration
     Scenario: ZeroDivisionError aborts the node and the workflow with the traceback intact
@@ -292,6 +293,8 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       When the executor runs the request on the wasm runtime
       Then it is refused for exceeding the 16 MiB limit
       And the engine never allocated the encoded request
+      And the measure counts the request's own keys, byte strings as base64, and values that encode themselves
+      And an encoded request over the limit is refused even if the measure let it through
 
     # /work is held in engine memory with no links, so no path a guest builds
     # resolves on the host; host calls and concurrent runs have budgets too.
@@ -530,6 +533,13 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       When the executor runs the request
       Then it is refused as a RunnerError saying TypeScript is limited to 64 KB
       And the most deeply nested code that fits the limit is refused as a SyntaxError without stopping the engine
+
+    @unit
+    Scenario: a TypeScript traceback is remapped only up to a bounded length
+      # The guest writes the traceback, so the engine rewrites at most 64 KB of it.
+      Given a TypeScript code block whose error carries a traceback of many megabytes
+      When the engine points the traceback back at the TypeScript lines
+      Then it rewrites at most the first 64 KB and drops the rest
 
   Rule: The wasm runtime runs each execution in its own WebAssembly instance
 

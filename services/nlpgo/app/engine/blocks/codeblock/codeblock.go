@@ -566,15 +566,25 @@ func (e *Executor) executeWasm(runCtx context.Context, guest *wasmGuest, req Req
 	}
 	defer admission.release()
 	stripped, failure := erasedTypes(&req)
+	if runCtx.Err() != nil {
+		return collectResult(runResult{}, runOutcome{
+			timedOut: errors.Is(runCtx.Err(), context.DeadlineExceeded),
+			elapsed:  time.Since(started),
+			err:      runCtx.Err(),
+		}), nil
+	}
 	if failure != nil {
 		return &Result{Error: failure, DurationMS: time.Since(started).Milliseconds()}, nil
 	}
 	if !requestFits(req, maxWasmPayloadBytes) {
-		return &Result{Error: &Error{Type: RunnerErrorType, Message: fmt.Sprintf("the code block's code and inputs exceed the %d MiB limit", maxWasmPayloadBytes>>20)}}, nil
+		return requestTooLarge(), nil
 	}
 	payload, err := marshalRequest(req)
 	if err != nil {
 		return nil, err
+	}
+	if len(payload) > maxWasmPayloadBytes {
+		return requestTooLarge(), nil
 	}
 	admission.fit(e.wasm.runWeight, len(payload))
 	run := e.wasm.run(runCtx, guest, wasmRunRequest{
@@ -591,6 +601,10 @@ func (e *Executor) executeWasm(runCtx context.Context, guest *wasmGuest, req Req
 		outcome.err = fmt.Errorf("the interpreter exited with status %d", run.exitCode)
 	}
 	return stripped.remapResult(collectResult(run.result, outcome)), nil
+}
+
+func requestTooLarge() *Result {
+	return &Result{Error: &Error{Type: RunnerErrorType, Message: fmt.Sprintf("the code block's code and inputs exceed the %d MiB limit", maxWasmPayloadBytes>>20)}}
 }
 
 // disownReservedType renames an error the run reported under a type only the

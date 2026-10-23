@@ -8,6 +8,7 @@ import (
 	"io"
 	"math"
 	"reflect"
+	"sort"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -276,6 +277,40 @@ func TestPayload_SizeMatchesTheEncoder(t *testing.T) {
 	}
 	assert.False(t, requestFits(Request{Inputs: map[string]any{"x": strings.Repeat("<", 3<<20)}}, 16<<20))
 	assert.True(t, requestFits(Request{Inputs: map[string]any{"x": strings.Repeat("a", 3<<20)}}, 16<<20))
+}
+
+type textKey struct{ n int }
+
+func (k textKey) MarshalText() ([]byte, error) { return []byte(strings.Repeat("<", k.n)), nil }
+
+type bulky struct{}
+
+func (bulky) MarshalJSON() ([]byte, error) { return []byte(`"` + strings.Repeat("a", 4096) + `"`), nil }
+
+// @scenario "a request's size is known before it is encoded"
+func TestPayload_SizeIsAnUpperBoundOfTheWholeRequest(t *testing.T) {
+	samples := []Request{
+		{Code: strings.Repeat("a", 1000)},
+		{Inputs: map[string]any{"b": []byte("a"), "c": []byte("abcd"), "d": [4]byte{1, 2, 3, 4}}},
+		{Inputs: map[string]any{"k": map[textKey]int{{n: 300}: 1}}},
+		{Inputs: map[string]any{"m": bulky{}}, Params: map[string]any{"p": map[int]string{123456: "x"}}},
+		{Secrets: map[string]string{"s": "v"}, DeclaredOutputs: []string{"out"}},
+	}
+	for _, req := range samples {
+		encoded, err := marshalRequest(req)
+		require.NoError(t, err)
+		measured := sort.Search(len(encoded)*4, func(limit int) bool { return requestFits(req, limit) })
+		assert.GreaterOrEqual(t, measured, len(encoded), "under-counted %+v", req)
+		assert.Less(t, measured, len(encoded)*4, "never fits %+v", req)
+	}
+}
+
+// @scenario "a TypeScript traceback is remapped only up to a bounded length"
+func TestTypeScript_TracebackRemapIsBounded(t *testing.T) {
+	stripped := &strippedCode{lines: []int{3}}
+	res := stripped.remapResult(&Result{Error: &Error{Traceback: strings.Repeat("at code-block.mjs:1\n", 1<<20)}})
+	assert.LessOrEqual(t, len(res.Error.Traceback), maxRemappedTraceback)
+	assert.Contains(t, res.Error.Traceback, "code-block.ts:3")
 }
 
 // @scenario "customer code cannot report an error the engine reserves"

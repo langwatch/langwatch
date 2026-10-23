@@ -43,10 +43,18 @@ func erasedTypes(req *Request) (*strippedCode, *Error) {
 	return &stripped, nil
 }
 
+// maxRemappedTraceback bounds the traceback remap rewrites; the guest writes
+// the traceback, so its length is the customer's to choose.
+const maxRemappedTraceback = 64 << 10
+
 // remapResult points a traceback back at the TypeScript lines; nil leaves it be.
 func (s *strippedCode) remapResult(res *Result) *Result {
 	if s != nil && res != nil && res.Error != nil {
-		res.Error.Traceback = s.remap(res.Error.Traceback)
+		traceback := res.Error.Traceback
+		if len(traceback) > maxRemappedTraceback {
+			traceback = strings.ToValidUTF8(traceback[:maxRemappedTraceback], "")
+		}
+		res.Error.Traceback = s.remap(traceback)
 	}
 	return res
 }
