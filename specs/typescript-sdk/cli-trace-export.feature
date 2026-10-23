@@ -17,6 +17,7 @@ Feature: CLI trace export paging and span depth
     Given the search endpoint serves at most 1000 traces per page with a scrollId cursor
     When I run "langwatch trace export --limit 2500"
     Then the CLI requests successive pages passing the scrollId from the previous response
+    And every request asks for the same page size, so the server keeps the cursor
     And the exported output contains 2500 traces
 
   @unit
@@ -35,7 +36,8 @@ Feature: CLI trace export paging and span depth
   @unit
   Scenario: export requests one page when the limit fits in a single page
     When I run "langwatch trace export --limit 50"
-    Then the CLI makes exactly one search request with pageSize 50
+    Then the CLI makes exactly one search request at the page cap
+    And the exported output is trimmed to 50 traces
 
   @unit
   Scenario: export keeps paging through a page the server answered short
@@ -58,7 +60,7 @@ Feature: CLI trace export paging and span depth
   Scenario: export with --include-spans walks past the server's page cap
     Given the server answers at most 100 traces per page with spans
     When I run "langwatch trace export --include-spans" with a limit of 250
-    Then the CLI follows the cursor until 250 traces are exported
+    Then the CLI follows the cursor, asking for 100 traces on every page, until 250 are exported
 
   @unit
   Scenario: export with --include-spans requests span data and preserves it in the output

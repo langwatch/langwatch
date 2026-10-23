@@ -11,9 +11,6 @@ import { resolveRequestBound } from "@langwatch/plans";
 import { Temporal, toEpochMs } from "@langwatch/time";
 import { z } from "zod";
 
-/** The most traces one `includeSpans` search page answers; the REST handler clamps to it. */
-const TRACES_WITH_SPANS_PAGE_SIZE_MAX = resolveRequestBound("tracesWithSpansPageSizeMax", "FREE");
-
 import {
   projectionRequestSchema,
   type ProjectionRequest,
@@ -26,6 +23,9 @@ import {
   traceSchema,
 } from "./trace-format.schemas.ts";
 import type { TraceDateField } from "./trace-legacy-read.types.ts";
+
+/** The most traces one `includeSpans` search page answers; the REST handler clamps to it. */
+const TRACES_WITH_SPANS_PAGE_SIZE_MAX = resolveRequestBound("tracesWithSpansPageSizeMax", "FREE");
 
 /** Longest `filter` string the boundary accepts; a shape ceiling, not a cost one. */
 const MAX_TRACE_FILTER_LENGTH = 4_000;

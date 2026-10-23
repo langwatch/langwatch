@@ -188,10 +188,9 @@ async function fetchExportPages({
   // than asked (it clamps the size, or skips rows that failed to serialise), so
   // only a missing cursor or an empty page ends the walk.
   for (;;) {
-    const pageSize = Math.min(
-      limit - traces.length,
-      search.includeSpans ? SPANS_PAGE_CAP : SERVER_PAGE_CAP,
-    );
+    // Every request asks for the same size: the server drops a cursor minted at another
+    // page size and starts over. The output is trimmed to the limit on write instead.
+    const pageSize = search.includeSpans ? SPANS_PAGE_CAP : SERVER_PAGE_CAP;
 
     const response = await requestSearchPage({ search, pageSize, scrollId });
 

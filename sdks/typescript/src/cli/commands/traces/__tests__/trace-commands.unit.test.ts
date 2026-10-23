@@ -507,7 +507,7 @@ describe("exportTracesCommand()", () => {
       expect(bodies[0]!.pageSize).toBe(1000);
       expect(bodies[1]!.scrollId).toBe("s1");
       expect(bodies[2]!.scrollId).toBe("s2");
-      expect(bodies[2]!.pageSize).toBe(500);
+      expect(bodies[2]!.pageSize).toBe(1000);
       expect(writtenOutput().trim().split("\n")).toHaveLength(2500);
     });
 
@@ -544,15 +544,16 @@ describe("exportTracesCommand()", () => {
     });
 
     /** @scenario export requests one page when the limit fits in a single page */
-    it("makes exactly one request with pageSize matching the limit", async () => {
+    it("makes exactly one request at the page cap and trims it to the limit", async () => {
       fetchMock.mockResolvedValueOnce(
-        pageResponse({ count: 50, from: 0, scrollId: "s1", totalHits: 500 }),
+        pageResponse({ count: 500, from: 0, scrollId: "s1", totalHits: 500 }),
       );
 
       await exportTracesCommand({ limit: "50" });
 
       expect(fetchMock).toHaveBeenCalledTimes(1);
-      expect(requestBodies()[0]!.pageSize).toBe(50);
+      expect(requestBodies()[0]!.pageSize).toBe(1000);
+      expect(writtenOutput().trim().split("\n")).toHaveLength(50);
     });
 
     /** @scenario export keeps paging through a page the server answered short */
@@ -627,13 +628,15 @@ describe("exportTracesCommand()", () => {
           pageResponse({ count: 100, from: 100, scrollId: "s2", totalHits: 400 }),
         )
         .mockResolvedValueOnce(
-          pageResponse({ count: 50, from: 200, scrollId: "s3", totalHits: 400 }),
+          pageResponse({ count: 100, from: 200, scrollId: "s3", totalHits: 400 }),
         );
 
       await exportTracesCommand({ includeSpans: true, limit: "250" });
 
       expect(fetchMock).toHaveBeenCalledTimes(3);
       expect(requestBodies()[2]!.scrollId).toBe("s2");
+      // A limit that is not a multiple of the cap still asks the cap, so the cursor holds.
+      expect(requestBodies().map((body) => body.pageSize)).toEqual([100, 100, 100]);
       expect(writtenOutput().trim().split("\n")).toHaveLength(250);
     });
 
