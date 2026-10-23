@@ -123,4 +123,20 @@ describe("a REST request the caller's credential fails", () => {
     const requestLines = logged.lines.filter((line) => line.fields.statusCode === 401);
     expect(requestLines.map((line) => line.level)).toEqual(["warn", "debug", "debug"]);
   });
+
+  /** @scenario A handled customer failure is logged below error */
+  it("logs the first customer fault in a minute at warn, repeats at debug, with code and fault", async () => {
+    const host = hostRefusing();
+
+    for (let i = 0; i < 2; i++) await host.app.request("/internal/read", { headers });
+
+    const requestLines = logged.lines.filter((line) => line.fields.statusCode === 401);
+    expect(requestLines.map((line) => line.level)).toEqual(["warn", "debug"]);
+    for (const line of requestLines) {
+      expect(line.fields).toMatchObject({
+        handledErrorCode: "invalid_credentials",
+        handledErrorFault: "customer",
+      });
+    }
+  });
 });

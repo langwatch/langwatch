@@ -72,6 +72,12 @@ describe("recordIngestDoorRefusal", () => {
           status: 401,
         }),
       ).toBe(4);
+      const labelSets = metrics.recorded
+        .filter((write) => write.instrument === "langwatch_ingest_door_refusals_total")
+        .map((write) => write.attributes);
+      // The whole label set, so no tenant, key or token rides along.
+      const only = { signal: "traces", code: "invalid_credentials", status: 401 };
+      expect(labelSets).toEqual([only, only, only, only]);
     });
   });
 
