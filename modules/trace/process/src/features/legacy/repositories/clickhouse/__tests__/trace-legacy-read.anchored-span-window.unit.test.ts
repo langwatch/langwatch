@@ -119,20 +119,25 @@ function matchRows({
   );
 }
 
-/** Drives the read and hands back the span query it issued. Missing span
- * read is a broken fixture, not a failed expectation. Throws to report setup
- * break as a setup break, keeping assertions in the it blocks. */
-async function readTraces(traceIds: string[]) {
+/** Drives the read; a page with no summaries issues no span read at all. */
+function findTraces(traceIds: string[]) {
   const service = mappedLegacyRead({
     resolveClickHouseClient: testResolveClickHouseClient,
     traceCanonicalisation,
   });
-  await service.findTracesWithSpans({
+  return service.findTracesWithSpans({
     authorization: OWN_READ,
     projectId: "proj-1",
     traceIds,
     protections,
   });
+}
+
+/** Drives the read and hands back the span query it issued. Missing span
+ * read is a broken fixture, not a failed expectation. Throws to report setup
+ * break as a setup break, keeping assertions in the it blocks. */
+async function readTraces(traceIds: string[]) {
+  await findTraces(traceIds);
   const spanCall = mockClickHouseQuery.mock.calls.find(([args]) =>
     String(args.query).includes("FROM stored_spans AS t"),
   );
@@ -241,7 +246,7 @@ describe("given trace ids read by id alone", () => {
     it("bounds the summary read to the epoch partition", async () => {
       mockReads({ resolved: { fromMs: null, toMs: null }, summaries: [] });
 
-      await readTraces(["missing-1"]).catch(() => undefined);
+      await expect(findTraces(["missing-1"])).resolves.toBeDefined();
 
       const summaryRead = summaryReadIssued();
       expect(summaryRead.query).toContain(
@@ -261,7 +266,7 @@ describe("given trace ids read by id alone", () => {
         return Promise.resolve({ json: () => Promise.resolve(rows) });
       });
 
-      await readTraces(["t1"]).catch(() => undefined);
+      await expect(findTraces(["t1"])).resolves.toBeDefined();
 
       const summaryRead = summaryReadIssued();
       expect(summaryRead.query).not.toContain("t.OccurredAt >=");
