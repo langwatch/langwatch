@@ -25,10 +25,10 @@ exclude-newer-package = { certifi = "2026-10-21T00:00:00Z" }
 # Transitive-dependency security pins, so a re-resolution can't pull a
 # vulnerable version back in.
 constraint-dependencies = [
-    "pyjwt>=2.15.0",  # security: PyJWT advisories covering <=2.14.0 (#2492, #2632)
-    "urllib3>=2.8.0",  # security: urllib3 advisories covering <2.8.0 (#2597, #2598, #2610)
-    "aiohttp>=3.14.4",  # security: aiohttp advisories covering <=3.14.3, two HIGH (#2848-#2850)
-    "mako>=1.4.2",  # security: Mako advisory covering <=1.4.1 (#2748)
-    "certifi>=2026.10.19",  # security: certifi advisory covering <2026.10.19 (#2918)
-    "multidict>=6.9.1",  # security: multidict advisory covering 6.7.0-6.9.0 (#2747)
+  "pyjwt>=2.15.0", # security: PyJWT advisories covering <=2.14.0 (#2492, #2632)
+  "urllib3>=2.8.0", # security: urllib3 advisories covering <2.8.0 (#2597, #2598, #2610)
+  "aiohttp>=3.14.4", # security: aiohttp advisories covering <=3.14.3, two HIGH (#2848-#2850)
+  "mako>=1.4.2", # security: Mako advisory covering <=1.4.1 (#2748)
+  "certifi>=2026.10.19", # security: certifi advisory covering <2026.10.19 (#2918)
+  "multidict>=6.9.1", # security: multidict advisory covering 6.7.0-6.9.0 (#2747)
 ]
