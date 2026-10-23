@@ -36,7 +36,7 @@ const OLDEST_BACKLOG_SAMPLE_GROUPS = 50;
 const STAGING_DEPTH_GROUPS_PER_CYCLE = 1000;
 
 /** The gauge cannot name a group; a warning naming the deepest one is rate-limited to this. */
-export const STAGING_DEPTH_WARN_INTERVAL_MS = 5 * 60_000;
+const STAGING_DEPTH_WARN_INTERVAL_MS = 5 * 60_000;
 
 /**
  * Blocked groups broken down by pipeline/job per cycle; any beyond read as
