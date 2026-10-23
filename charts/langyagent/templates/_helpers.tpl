@@ -44,8 +44,12 @@ app.kubernetes.io/instance: {{ .Release.Name }}
        labels win on a shared key, because a pod whose labels stop matching its
        Deployment's selector is rejected by the API server. */ -}}
 {{- define "langyagent.podLabels" -}}
-{{- $selector := include "langyagent.selectorLabels" . | fromYaml }}
-{{- toYaml (merge $selector (deepCopy (.Values.podLabels | default dict))) }}
+{{- $labels := deepCopy (.Values.podLabels | default dict) }}
+{{- /* set, not merge: merge treats an empty selector value as unset. */ -}}
+{{- range $key, $value := include "langyagent.selectorLabels" . | fromYaml }}
+{{- $_ := set $labels $key $value }}
+{{- end }}
+{{- toYaml $labels }}
 {{- end }}
 
 {{- /* The environment variable names the chart writes itself, comma-joined: the
