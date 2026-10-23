@@ -23,7 +23,11 @@ import {
   LWQL_CLICKHOUSE_EVENT_TABLES,
   LWQL_TRACES_CATALOGUE,
 } from "./lwql-catalogue.rules.ts";
-import { contentFilteredMapSql, plainStringMapSql } from "./lwql-content-gating.rules.ts";
+import {
+  contentFilteredMapSql,
+  plainKeyedMapSql,
+  plainStringMapSql,
+} from "./lwql-content-gating.rules.ts";
 import {
   catalogueColumnGates,
   type UngatedViewDefinition,
@@ -1592,7 +1596,11 @@ const CODING_AGENT_SESSIONS: UngatedViewDefinition = {
       type: "Map(String, UInt32)",
       description: "Calls per tool.",
       sourceColumns: ["ToolCounts"],
-      expression: (source) => contentFilteredMapSql(source("ToolCounts")),
+      expression: (source) =>
+        plainKeyedMapSql({
+          mapSql: contentFilteredMapSql(source("ToolCounts")),
+          valueType: "UInt32",
+        }),
     },
     {
       name: "ToolDurationMs",
@@ -1600,7 +1608,11 @@ const CODING_AGENT_SESSIONS: UngatedViewDefinition = {
       unit: "ms",
       description: "Milliseconds spent per tool.",
       sourceColumns: ["ToolDurationMs"],
-      expression: (source) => contentFilteredMapSql(source("ToolDurationMs")),
+      expression: (source) =>
+        plainKeyedMapSql({
+          mapSql: contentFilteredMapSql(source("ToolDurationMs")),
+          valueType: "UInt64",
+        }),
     },
     {
       name: "FilesTouched",
@@ -1755,7 +1767,11 @@ const CODING_AGENT_SESSIONS: UngatedViewDefinition = {
       type: "Map(String, UInt32)",
       description: "Compactions by trigger kind.",
       sourceColumns: ["CompactionTriggers"],
-      expression: (source) => contentFilteredMapSql(source("CompactionTriggers")),
+      expression: (source) =>
+        plainKeyedMapSql({
+          mapSql: contentFilteredMapSql(source("CompactionTriggers")),
+          valueType: "UInt32",
+        }),
     },
     {
       name: "CompactionTokensBefore",
@@ -1802,7 +1818,11 @@ const CODING_AGENT_SESSIONS: UngatedViewDefinition = {
       type: "Map(String, UInt32)",
       description: "Failures by error class.",
       sourceColumns: ["ErrorTypes"],
-      expression: (source) => contentFilteredMapSql(source("ErrorTypes")),
+      expression: (source) =>
+        plainKeyedMapSql({
+          mapSql: contentFilteredMapSql(source("ErrorTypes")),
+          valueType: "UInt32",
+        }),
     },
     {
       name: "ApiErrors",
