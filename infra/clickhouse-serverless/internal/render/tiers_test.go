@@ -60,6 +60,17 @@ func TestRenderAll_Tiers(t *testing.T) {
 		}
 	})
 
+	t.Run("no tier can stop its queries reaching the query log", func(t *testing.T) {
+		for _, name := range []string{"tier_inspect", "tier_read", "tier_write", "tier_admin"} {
+			constraints := section(t, section(t, profiles, name), "constraints")
+			for _, setting := range []string{"log_queries", "log_queries_min_type", "log_queries_min_query_duration_ms", "log_queries_probability"} {
+				if _, ok := section(t, constraints, setting)["const"]; !ok {
+					t.Errorf("%s: %s is not const", name, setting)
+				}
+			}
+		}
+	})
+
 	t.Run("read tiers are readonly=2 and cannot raise their caps", func(t *testing.T) {
 		for _, name := range []string{"tier_inspect", "tier_read"} {
 			profile := section(t, profiles, name)
