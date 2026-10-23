@@ -8,6 +8,7 @@ import type { TenancyRepository } from "../repositories/tenancy.repository.ts";
 import type { TraceCountRepository } from "../repositories/trace-count.repository.ts";
 import { buildLimitMessage, type UsageDeployment } from "../rules/usage-limit-message.rules.ts";
 import { resolveUsageMeter } from "../rules/usage-meter-policy.rules.ts";
+import { CountReadCoalescerService } from "./count-read-coalescer.service.ts";
 
 const logger = createLogger("langwatch:usage");
 
@@ -180,13 +181,6 @@ function meterTraceCounter({
 /** Main's 30-second count and meter-decision windows. */
 const USAGE_CACHE_TTL_MS = 30_000;
 
-/**
- * How long a count that failed is answered with its failure instead of being read again. The
- * ingest doors ask on every batch and admit on a failure, so re-reading a count that just ran out
- * of memory only repeats the same expensive failure on the cluster the batch is written to.
- */
-const FAILED_COUNT_RETRY_AFTER_MS = 30_000;
-
 /** A plan resolved for one organization. */
 type PlanResolver = (organizationId: string) => Promise<PlanInfo>;
 
@@ -228,11 +222,7 @@ export class UsageService {
   private readonly deployment: UsageDeployment;
   private readonly countCache: UsageCache;
   private readonly decisionCache: UsageCache;
-  private readonly now: () => number;
-  /** One read per count key at a time: concurrent batches of one organization share it. */
-  readonly #countsInFlight = new Map<string, Promise<UsageCount>>();
-  /** The last failure per count key, answered again until its retry window passes. */
-  readonly #failedCounts = new Map<string, { error: unknown; retryAt: number }>();
+  private readonly counts: CountReadCoalescerService<UsageCount>;
 
   static create(deps: UsageServiceDependencies): UsageService {
     return new UsageService(deps);
@@ -271,7 +261,7 @@ export class UsageService {
     this.deployment = deps.deployment;
     this.countCache = deps.countCache ?? new NoUsageCache();
     this.decisionCache = deps.decisionCache ?? new NoUsageCache();
-    this.now = deps.now ?? Date.now;
+    this.counts = CountReadCoalescerService.create({ now: deps.now ?? Date.now });
   }
 
   async checkLimitForOrganization({
@@ -348,11 +338,7 @@ export class UsageService {
       return "unlimited";
     }
 
-    return this.computeCurrentMonthCount({
-      organizationId,
-      plan: activePlan,
-      reuseFailure: true,
-    });
+    return this.computeCurrentMonthCount({ organizationId, plan: activePlan, reuseFailure: true });
   }
 
   /**
@@ -384,44 +370,16 @@ export class UsageService {
       return cached;
     }
 
-    const failed = this.#failedCounts.get(cacheKey);
-    if (failed && failed.retryAt <= this.now()) {
-      this.#failedCounts.delete(cacheKey);
-    } else if (failed && reuseFailure) {
-      throw failed.error;
-    }
-
-    const inFlight = this.#countsInFlight.get(cacheKey);
-    if (inFlight) {
-      return inFlight;
-    }
-
-    const count = this.readCurrentMonthCount({ organizationId, decision, cacheKey });
-    this.#countsInFlight.set(cacheKey, count);
-    try {
-      const value = await count;
-      this.#failedCounts.delete(cacheKey);
-      return value;
-    } catch (error) {
-      this.#failedCounts.set(cacheKey, {
-        error,
-        retryAt: this.now() + FAILED_COUNT_RETRY_AFTER_MS,
-      });
-      throw error;
-    } finally {
-      this.#countsInFlight.delete(cacheKey);
-    }
+    const read = () => this.readCurrentMonthCount({ organizationId, decision, cacheKey });
+    return this.counts.run({ key: cacheKey, reuseFailure, read });
   }
 
-  private async readCurrentMonthCount({
-    organizationId,
-    decision,
-    cacheKey,
-  }: {
+  private async readCurrentMonthCount(args: {
     organizationId: string;
     decision: UsageMeterReading;
     cacheKey: string;
   }): Promise<UsageCount> {
+    const { organizationId, decision, cacheKey } = args;
     const projectIds = await this.organizations.getProjectIds(organizationId);
     if (projectIds.length === 0) {
       // A real measurement: an organization with no projects has sent nothing.
