@@ -71,6 +71,12 @@ func TestAccessAgainstRealClickHouse(t *testing.T) {
 		if _, err := h.query("metabase", pw, "SELECT max_execution_time FROM system.settings SETTINGS max_execution_time = 100000"); err == nil {
 			t.Error("a read user raised max_execution_time past its cap")
 		}
+		for _, hide := range []string{"log_queries = 0", "log_queries_min_type = 'EXCEPTION_WHILE_PROCESSING'",
+			"log_queries_min_query_duration_ms = 100000", "log_queries_probability = 0"} {
+			if _, err := h.query("metabase", pw, "SELECT 1 SETTINGS "+hide); err == nil {
+				t.Errorf("a read user kept its query out of the query log with %s", hide)
+			}
+		}
 	})
 
 	t.Run("a removed password stops working, the other keeps working", func(t *testing.T) {
