@@ -86,9 +86,14 @@ func Read(dir string) (Credential, error) {
 }
 
 // Remove deletes the password, if any: a server out of dynamic-only mode
-// leaves no stale credential behind.
+// leaves no stale credential behind. It looks before it deletes: on a
+// read-only root, unlinking a missing file fails EROFS, not ENOENT.
 func Remove(dir string) error {
-	err := os.Remove(filepath.Join(dir, PasswordFile))
+	path := filepath.Join(dir, PasswordFile)
+	if _, err := os.Lstat(path); errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	err := os.Remove(path)
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return err
 	}
