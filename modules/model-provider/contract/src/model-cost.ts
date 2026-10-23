@@ -204,12 +204,13 @@ export const findMatchingModelCost = (
   return match ? [match] : [];
 };
 
-type CostListScan = { costs: readonly ModelCostRate[] };
-
 function findCandidateModelCost({
   candidate,
   costs,
-}: CostListScan & { candidate: string }): ModelCostRate | undefined {
+}: {
+  candidate: string;
+  costs: readonly ModelCostRate[];
+}): ModelCostRate | undefined {
   const raw = findModelCost(candidate, costs);
   if (raw) return raw;
   const normalized = normalizeModelName(candidate);
@@ -219,21 +220,24 @@ function findCandidateModelCost({
 function findSubtypeStrippedModelCost({
   model,
   costs,
-}: CostListScan & { model: string }): ModelCostRate | undefined {
+}: {
+  model: string;
+  costs: readonly ModelCostRate[];
+}): ModelCostRate | undefined {
   const slash = model.indexOf("/");
   if (slash === -1) return undefined;
   const provider = model.slice(0, slash);
   if (!provider.includes(".")) return undefined;
-  return findCandidateModelCost({
-    candidate: provider.split(".")[0] + model.slice(slash),
-    costs,
-  });
+  return findCandidateModelCost({ candidate: provider.split(".")[0] + model.slice(slash), costs });
 }
 
 function findBedrockModelCost({
   model,
   costs,
-}: CostListScan & { model: string }): ModelCostRate | undefined {
+}: {
+  model: string;
+  costs: readonly ModelCostRate[];
+}): ModelCostRate | undefined {
   const bedrock = normalizeBedrockModelId(model);
   return bedrock === model ? undefined : findCandidateModelCost({ candidate: bedrock, costs });
 }
