@@ -5,13 +5,9 @@
 name: codeql
 
 on:
-  # Pull requests and the merge queue reach this through pr.yml.
+  # Pull requests reach this through pr.yml; main through the nightly suite.
   workflow_call:
-  push:
-    branches: ["main"]
-  schedule:
-    - cron: "00 08 * * *"
-
+  workflow_dispatch:
 concurrency:
   group: codeql-${{ github.ref }}
   # A newer commit supersedes an older run, on main too: the newest verdict

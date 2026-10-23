@@ -5,11 +5,8 @@
 name: langevals-ci
 
 on:
-  # Pull requests and the merge queue reach this through pr.yml.
+  # Pull requests reach this through pr.yml; main through the nightly suite.
   workflow_call:
-  push:
-    branches:
-      - main
   pull_request_target:
     types: [labeled]
   workflow_dispatch:
@@ -74,7 +71,7 @@ jobs:
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
-          save-cache: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          save-cache: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
           cache-dependency-glob: "services/langevals/uv.lock"
 
       - name: Install dependencies
@@ -103,7 +100,7 @@ jobs:
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
-          save-cache: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          save-cache: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
           cache-dependency-glob: "services/langevals/uv.lock"
 
       - name: Install dependencies
@@ -200,7 +197,7 @@ jobs:
           # evicted each other's layers on every run — and with mode=max
           # against a 10 GB per-repo budget, images this size evict a lot.
           cache-from: type=gha,scope=langevals
-          cache-to: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'type=gha,mode=max,scope=langevals' || '' }}
+          cache-to: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && 'type=gha,mode=max,scope=langevals' || '' }}
 
   langevals-complete:
     needs: [changes, lint, test, docker-build]

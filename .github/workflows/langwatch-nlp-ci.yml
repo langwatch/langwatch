@@ -9,11 +9,8 @@
 name: langwatch-nlp-ci
 
 on:
-  # Pull requests and the merge queue reach this through pr.yml.
+  # Pull requests reach this through pr.yml; main through the nightly suite.
   workflow_call:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 concurrency:
@@ -76,7 +73,7 @@ jobs:
           # Scoped: see the note in langevals-ci.yml. These two were the only
           # unscoped buildx caches left, which meant they shared one.
           cache-from: type=gha,scope=langwatch-nlp
-          cache-to: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'type=gha,mode=max,scope=langwatch-nlp' || '' }}
+          cache-to: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && 'type=gha,mode=max,scope=langwatch-nlp' || '' }}
 
   langwatch-nlp-complete:
     needs: [changes, docker-build]

@@ -26,8 +26,7 @@ name: readme-links
 # Spec: specs/ci/readme-link-check.feature
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
+  # Pull requests run this in pr.yml's checks job.
   schedule:
     # Mondays, 07:00 UTC — a dead link found at the start of the week gets
     # fixed that week.

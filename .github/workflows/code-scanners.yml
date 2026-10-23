@@ -20,17 +20,9 @@ name: code-scanners
 # behaviour is version-sensitive. Bump them together.
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-  merge_group:
+  # Pull requests reach this through pr.yml; main through the nightly suite.
+  workflow_call:
   workflow_dispatch:
-  schedule:
-    # The dependency scanners below are report-only on a PR because they fail
-    # on upstream advisories nobody in the PR caused. This is where they get
-    # looked at on their own schedule instead.
-    - cron: "17 6 * * 1"
 
 permissions:
   contents: read

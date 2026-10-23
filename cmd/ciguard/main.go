@@ -47,7 +47,7 @@ func main() {
 	}
 
 	if failed := runAll(guards, repoRoot); failed {
-		fmt.Fprintln(os.Stderr, "\nSee specs/ci/lean-checkout.feature, specs/ci/go-version-consistency.feature, specs/ci/pr-review-bot.feature and specs/ci/one-pull-request-workflow.feature")
+		fmt.Fprintln(os.Stderr, "\nSee specs/ci/lean-checkout.feature, specs/ci/go-version-consistency.feature, specs/ci/pr-review-bot.feature, specs/ci/one-pull-request-workflow.feature and specs/ci/quiet-branch.feature")
 		os.Exit(1)
 	}
 }

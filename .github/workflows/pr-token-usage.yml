@@ -20,8 +20,7 @@ name: pr-token-usage
 # Spec: specs/ci/pr-token-usage.feature
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
+  # Pull requests run this in pr.yml's checks job.
   workflow_dispatch:
     inputs:
       pull_request:

@@ -4,16 +4,8 @@
 name: go-ci
 
 on:
-  push:
-    branches: [main]
-  # ready_for_review is not a default activity type; without it, taking a PR
-  # out of draft fires no event and the heavy jobs below never get their run.
-  pull_request:
-    # No `labeled`: a label starts no run, and `ci:full` counts from the next push.
-    types: [opened, synchronize, reopened, ready_for_review]
-  # Evaluate against the queued merge commit too, so the generated-code drift
-  # check can gate the queue rather than only the PR head.
-  merge_group:
+  # Pull requests reach this through pr.yml; main through the nightly suite.
+  workflow_call:
   workflow_dispatch:
 
 permissions:
@@ -187,7 +179,7 @@ jobs:
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
-          save-cache: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          save-cache: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
           cache-dependency-glob: "uv.lock"
       - name: Install the code-block sandbox packages
         run: |

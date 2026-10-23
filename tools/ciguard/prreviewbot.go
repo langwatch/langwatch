@@ -51,9 +51,17 @@ func PRReviewBot(repoRoot string) ([]string, error) {
 		return nil, err
 	}
 
+	// pr.yml calls the bot: its pull_request types are the ones that start a review.
+	triggers := workflow
+	if len(workflow.On.PullRequest.Types) == 0 {
+		if pr, err := ciscan.Load(repoRoot, PRWorkflowFile); err == nil {
+			triggers = pr
+		}
+	}
+
 	var problems []string
 	problems = append(problems, prReviewBotGates(workflow)...)
-	problems = append(problems, prReviewBotTriggers(workflow)...)
+	problems = append(problems, prReviewBotTriggers(triggers)...)
 	problems = append(problems, prReviewBotConcurrency(workflow)...)
 	problems = append(problems, prReviewBotPermissions(workflow)...)
 	problems = append(problems, prReviewBotPinning(workflow)...)

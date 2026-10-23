@@ -3,6 +3,8 @@ name: nightly
 # The nightly suite: every check too slow or too costly for a pull request, once
 # a night at 01:00 UTC when the runners are idle, reported on one pinned issue.
 #
+# - main-checks: pr.yml on main, every check a pull request runs. A merge to
+#   main runs only the app checks; everything else is caught here once a day.
 # - codebase-health, migration-compat, npx-server-smoke and gateway-matrix are
 #   the workflows that used to schedule themselves. They are reusable now
 #   (workflow_call) and keep their own manual and pull request or push triggers;
@@ -48,6 +50,19 @@ jobs:
       actions: read
     with:
       publish: ${{ github.ref_name == github.event.repository.default_branch }}
+
+  # Every pull request check, on main: a merge runs only the app checks, the
+  # rest once a day here (specs/ci/quiet-branch.feature).
+  main-checks:
+    uses: ./.github/workflows/pr.yml
+    secrets: inherit
+    permissions:
+      contents: write
+      actions: write
+      packages: read
+      pull-requests: write
+      security-events: write
+      statuses: write
 
   migration-compat:
     uses: ./.github/workflows/migration-compat.yml
@@ -603,6 +618,7 @@ jobs:
     name: nightly dashboard
     needs:
       [
+        main-checks,
         codebase-health,
         migration-compat,
         npx-server-smoke,
