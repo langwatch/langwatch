@@ -50,7 +50,7 @@ const projectTokens = new Map<string, ResolvedApiKeyCredential>([
   ["sk-lw-unowned", projectKey("key-unowned", null)],
   ["sk-lw-unattended-run", { ...projectKey("key-run", null), isUnattendedRunKey: true }],
   ["legacy-key", { type: "legacyProjectKey", project: PROJECT }],
-  ["sk-lw-ingest", { ...projectKey("key-ingest", null), ingestionTemplateId: "template-1" }],
+  ["sk-lw-ingest", { ...projectKey("key-ingest", null), ingestSourceType: "openai" }],
 ]);
 const organizationTokens = new Map<string, OrganizationApiKeyResolution>([
   ["sk-lw-org-owned", organizationKey("key-org-owned", "user-2")],

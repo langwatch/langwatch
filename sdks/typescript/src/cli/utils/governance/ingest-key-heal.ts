@@ -6,6 +6,8 @@ import { type GovernanceConfig, isLoggedIn, loadConfig, saveConfig } from "./con
  * to a null and a debug line, so a dead key can't be why a running agent's session breaks.
  */
 import { installTelemetryWiring } from "./instrument-wiring";
+import { TOOL_BY_SOURCE_TYPE } from "./otel-env-block";
+import { sessionContextAgentByKeySourceType } from "./session-context-agents";
 import { resolveLiveIngestionKey } from "./telemetry-refresh";
 
 /** The wiring target for one agent's OTLP logs, and what authenticates it. */
@@ -75,29 +77,33 @@ const USER_REVOCATION_CAUSE = "user";
  */
 const OFFBOARDED_REVOCATION_CAUSE = "offboarded";
 
-/** The wiring tool slug for each agent the hook runs for. */
-const TOOL_BY_AGENT: Record<string, string> = {
-  claude_code: "claude",
-  codex: "codex",
-  opencode: "opencode",
-};
+/**
+ * The wiring tool slug for a personal key the hook posts with, or null when no
+ * hooked agent's key is cached under that source type. Only those keys are the
+ * hook's to repair; the slug is the one `langwatch instrument` wires.
+ */
+function wiringToolFor(sourceType: string): string | null {
+  if (!sessionContextAgentByKeySourceType(sourceType)) return null;
+  return TOOL_BY_SOURCE_TYPE[sourceType] ?? null;
+}
 
 /**
- * Re-mints the personal ingest key for `agent` and rewrites its wiring, declining without a
- * platform call when this device can't repair the 401. {@link revocationBlocksHeal} decides
- * whether the platform withholds the repair instead of granting it.
+ * Re-mints the personal ingest key cached under `sourceType` and rewrites its tool's wiring,
+ * declining without a platform call when this device can't repair the 401.
+ * {@link revocationBlocksHeal} decides whether the platform withholds the repair.
  */
 export async function healRevokedIngestKey({
-  agent,
+  sourceType,
   rejectedToken,
   deps = REAL_DEPS,
 }: {
-  agent: string;
+  /** The source type the rejected personal key is cached and minted under. */
+  sourceType: string;
   /** The bearer the collector answered 401 to, without the `Bearer ` word. */
   rejectedToken: string | undefined;
   deps?: HealDeps;
 }): Promise<HealOutcome> {
-  const tool = TOOL_BY_AGENT[agent];
+  const tool = wiringToolFor(sourceType);
   if (!tool) return DECLINED;
 
   const cfg = deps.loadConfig();
@@ -107,7 +113,7 @@ export async function healRevokedIngestKey({
   // Only the cached personal key is ours to replace, and only when it is
   // demonstrably the credential that was rejected. A 401 the device carried
   // no bearer for, or carried someone else's, is not this key's failure.
-  const cached = cfg.default_personal_ingest_keys?.[agent]?.secret;
+  const cached = cfg.default_personal_ingest_keys?.[sourceType]?.secret;
   if (!cached || rejectedToken !== cached) return DECLINED;
 
   const blocked = await revocationBlocksHeal({ cfg, cached, deps });
@@ -115,12 +121,12 @@ export async function healRevokedIngestKey({
 
   const resolved = await deps.resolveLiveIngestionKey({
     cfg,
-    sourceType: agent,
+    sourceType,
     allowOfflineFallback: false,
   });
   if (!resolved.minted) return { status: "failed" };
 
-  return adoptMintedKey({ agent, tool, cfg, resolved, deps });
+  return adoptMintedKey({ sourceType, tool, cfg, resolved, deps });
 }
 
 /**
@@ -162,13 +168,13 @@ async function revocationBlocksHeal({
  * The cache is written first and put back when the wiring lands no target.
  */
 function adoptMintedKey({
-  agent,
+  sourceType,
   tool,
   cfg,
   resolved,
   deps,
 }: {
-  agent: string;
+  sourceType: string;
   tool: string;
   cfg: GovernanceConfig;
   resolved: Awaited<ReturnType<HealDeps["resolveLiveIngestionKey"]>>;
@@ -177,7 +183,7 @@ function adoptMintedKey({
   const cachedKeys = cfg.default_personal_ingest_keys;
   cfg.default_personal_ingest_keys = {
     ...cachedKeys,
-    [agent]: { secret: resolved.token, prefix: resolved.prefix },
+    [sourceType]: { secret: resolved.token, prefix: resolved.prefix },
   };
   try {
     deps.saveConfig(cfg);

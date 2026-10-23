@@ -73,7 +73,7 @@ function setup({
 function report(extra: Record<string, unknown> = {}) {
   return {
     report: { event: "daily_usage_stats", instance_id: "install-1", version: "3.1.0", ...extra },
-    addressHeaders: { "x-forwarded-for": "203.0.113.7" },
+    callerAddress: "203.0.113.7",
   };
 }
 
@@ -245,11 +245,21 @@ describe("UsageReportReceiverService", () => {
       expect(facts).toEqual([]);
     });
 
-    it("counts no per-address bucket where the sender named no address", async () => {
+    /** @scenario "A sender's IPv6 address is limited like any other" */
+    it("counts the per-address bucket on the address the door resolved", async () => {
       const limiter = limiterRefusing();
       const { receiver } = setup({ rateLimits: limiter });
 
-      await receiver.receive({ ...report(), addressHeaders: {} });
+      await receiver.receive({ ...report(), callerAddress: "2001:db8::1" });
+
+      expect(limiter.asked).toContain("track_usage:ip:2001:db8::1");
+    });
+
+    it("counts no per-address bucket where the door resolved no address", async () => {
+      const limiter = limiterRefusing();
+      const { receiver } = setup({ rateLimits: limiter });
+
+      await receiver.receive({ ...report(), callerAddress: null });
 
       expect(limiter.asked).toEqual(["track_usage:global", "track_usage:instance:install-1"]);
     });

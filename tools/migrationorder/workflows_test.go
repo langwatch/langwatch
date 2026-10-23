@@ -275,14 +275,14 @@ func TestCompatWorkflowFailsADiffThatErrors(t *testing.T) {
 func TestCompatWorkflowBootsThePreviousReleaseImageNightly(t *testing.T) {
 	workflow, _ := loadWorkflow(t, "migration-compat.yml")
 	if _, ok := workflow.On["workflow_call"]; !ok {
-		t.Error("the nightly suite cannot call it")
+		t.Error("not callable by the nightly suite")
 	}
 	nightly, _ := loadWorkflow(t, "nightly.yml")
 	if _, ok := nightly.On["schedule"]; !ok {
-		t.Error("the nightly suite has no schedule")
+		t.Error("no nightly schedule")
 	}
-	if uses := nightly.Jobs["migration-compat"].Uses; uses != "./.github/workflows/migration-compat.yml" {
-		t.Errorf("the nightly suite does not run it: uses = %q", uses)
+	if job, ok := nightly.Jobs["migration-compat"]; !ok || job.Uses != "./.github/workflows/migration-compat.yml" {
+		t.Error("the nightly suite does not call migration-compat")
 	}
 	if _, ok := workflow.On["workflow_dispatch"]; !ok {
 		t.Error("no manual dispatch")

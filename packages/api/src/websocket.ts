@@ -8,6 +8,13 @@ import type {
   RestResolvedProjectCredential,
 } from "@langwatch/authorization";
 import { createLogger } from "@langwatch/observability";
+import {
+  censusClientOf,
+  noteRequestCredential,
+  recordCredentialCensus,
+  runWithCredentialSlot,
+  type RequestCredential,
+} from "@langwatch/observability/credential-census";
 import { WebSocket, WebSocketServer } from "ws";
 import type { z } from "zod";
 
@@ -15,6 +22,7 @@ import { SurfaceUnverifiedError } from "./errors.ts";
 import type { ApiDoor, RestIdentity } from "./hosting/api-door.ts";
 import type { MiddlewareBinding } from "./hosting/transport-hosts.ts";
 import { ConnectUpgradeRouter, type UpgradeHandler } from "./ports.ts";
+import { projectCredentialOf } from "./rest/credential-census.ts";
 import { projectCredentialOfRequest } from "./rest/credential.ts";
 import { assertKeyKind, keyCredentialOf, type RestKeyKinds } from "./rest/key-credential.ts";
 import { isRestCredentialBinding } from "./rest/request.ts";
@@ -354,7 +362,48 @@ function openAfter<Caller>({
 }
 
 /** The project door asked at upgrade time, as a REST route behind it asks it per request. */
-async function admit({
+function admit(input: {
+  door: WebSocketDoor;
+  identity: RestIdentity;
+  request: IncomingMessage;
+}): Promise<Admission<WebSocketCaller>> {
+  return runWithCredentialSlot(async (slot) => {
+    const admission = await admitThroughDoor(input);
+    if ("caller" in admission) {
+      noteRequestCredential(projectCredentialOf(admission.caller.credential));
+      if (slot.credential) countUpgrade({ request: input.request, credential: slot.credential });
+    }
+
+    return admission;
+  });
+}
+
+/** One admitted upgrade into the credential census, at its socket path; never fails the upgrade. */
+function countUpgrade({
+  request,
+  credential,
+}: {
+  request: IncomingMessage;
+  credential: RequestCredential;
+}): void {
+  try {
+    const header = (name: string) => {
+      const value = request.headers[name];
+      return Array.isArray(value) ? value[0] : value;
+    };
+    recordCredentialCensus({
+      ...credential,
+      ...censusClientOf(header),
+      method: request.method ?? "GET",
+      route: new URL(request.url ?? "/", "http://localhost").pathname,
+      status: 101,
+    });
+  } catch {
+    // The census only observes.
+  }
+}
+
+async function admitThroughDoor({
   door,
   identity,
   request,

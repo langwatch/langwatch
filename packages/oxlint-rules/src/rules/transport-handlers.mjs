@@ -213,6 +213,7 @@ function fieldsProducedBy(link) {
   const name = propertyName(link.callee);
   if (name === "withPermission") return declaresPermissionTarget(link) ? ["target"] : [];
   if (name === "withCredential") return declaresKey(link) ? ["key"] : [];
+  if (name === "withAccess") return declaresPublicRoute(link) ? ["recordKey"] : [];
   if (name !== "withResponse") return PRODUCED_BY_DECLARATION.get(name) ?? [];
   const [kind] = link.arguments;
   const readsRequest = kind?.type === "Literal" && REQUEST_READING_KINDS.has(kind.value);
@@ -232,6 +233,13 @@ function declaresKey(link) {
         property.value.value === true,
     )
   );
+}
+
+/** `.withAccess(publicRoute(...))` hands the handler `recordKey`: no door names its key. */
+function declaresPublicRoute(link) {
+  const [access] = link.arguments;
+
+  return access?.type === "CallExpression" && access.callee?.name === "publicRoute";
 }
 
 /** `.withPermission(perm, { at })` hands the handler the target its door authorised. */

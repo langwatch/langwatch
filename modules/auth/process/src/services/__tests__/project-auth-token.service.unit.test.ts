@@ -40,19 +40,19 @@ function tokenCheck(resolved: ResolvedApiKeyCredential | null) {
 
 describe("ProjectAuthTokenService", () => {
   describe("when a token names a project", () => {
-    it("answers its slug, counted against the caller's nearest forwarding hop", async () => {
+    it("answers its slug, counted against the address the door resolved", async () => {
       const { service, counted } = tokenCheck(ACME);
 
       await expect(
-        service.validateProjectAuthToken({ token: "tok", forwardedFor: "1.1.1.1, 2.2.2.2" }),
+        service.validateProjectAuthToken({ token: "tok", callerAddress: "198.51.100.11" }),
       ).resolves.toEqual({ projectSlug: "acme" });
-      expect(counted).toEqual(["auth-validate:ip:2.2.2.2"]);
+      expect(counted).toEqual(["auth-validate:ip:198.51.100.11"]);
     });
 
-    it("counts a caller that named no hop as unknown rather than skipping the count", async () => {
+    it("counts a caller with no resolved address as unknown rather than skipping the count", async () => {
       const { service, counted } = tokenCheck(ACME);
 
-      await service.validateProjectAuthToken({ token: "tok", forwardedFor: undefined });
+      await service.validateProjectAuthToken({ token: "tok", callerAddress: null });
 
       expect(counted).toEqual(["auth-validate:ip:unknown"]);
     });
@@ -63,7 +63,7 @@ describe("ProjectAuthTokenService", () => {
       const { service, counted } = tokenCheck(ACME);
 
       await expect(
-        service.validateProjectAuthToken({ token: undefined, forwardedFor: undefined }),
+        service.validateProjectAuthToken({ token: undefined, callerAddress: null }),
       ).rejects.toMatchObject({ code: "missing_credentials", httpStatus: 401 });
       expect(counted).toEqual([]);
     });
@@ -79,7 +79,7 @@ describe("ProjectAuthTokenService", () => {
       });
 
       await expect(
-        service.validateProjectAuthToken({ token: "tok", forwardedFor: undefined }),
+        service.validateProjectAuthToken({ token: "tok", callerAddress: null }),
       ).rejects.toMatchObject({ code: "aggregate_project_has_no_credential", httpStatus: 403 });
     });
   });
@@ -89,7 +89,7 @@ describe("ProjectAuthTokenService", () => {
       const { service } = tokenCheck(null);
 
       await expect(
-        service.validateProjectAuthToken({ token: "tok", forwardedFor: undefined }),
+        service.validateProjectAuthToken({ token: "tok", callerAddress: null }),
       ).rejects.toMatchObject({ code: "invalid_credentials", httpStatus: 401 });
     });
   });
