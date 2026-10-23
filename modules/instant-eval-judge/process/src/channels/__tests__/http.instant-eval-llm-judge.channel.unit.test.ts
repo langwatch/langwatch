@@ -162,11 +162,13 @@ describe("HttpInstantEvalLlmJudgeChannel", () => {
 describe("HttpInstantEvalHostedDecisionsChannel", () => {
   it("asks the Decisions API with LangWatch's key and keeps the billed input tokens", async () => {
     let authorization: unknown;
+    let body: unknown;
     agent
       .get("https://api.openai.com")
       .intercept({ path: "/v1/decisions", method: "POST" })
       .reply(200, (options) => {
         authorization = (options.headers as Record<string, string>).authorization;
+        body = typeof options.body === "string" ? JSON.parse(options.body) : undefined;
         return {
           answers: [{ type: "predicate", name: "upset", probability: 0.81 }],
           usage: { input_tokens: 1000 },
@@ -177,10 +179,16 @@ describe("HttpInstantEvalHostedDecisionsChannel", () => {
       apiKey: "lw-decisions",
     });
 
-    const judgement = await channel.classify({ text: "user: late", questions: [QUESTION] });
+    const judgement = await channel.classify({
+      text: "user: late",
+      questions: [QUESTION],
+      model: "decision-model-a",
+    });
 
     expect(judgement.verdicts).toEqual([{ questionId: "upset", probability: 0.81 }]);
     expect(judgement.inputTokens).toBe(1000);
     expect(authorization).toBe("Bearer lw-decisions");
+    // The model is the table's, never a default the code holds.
+    expect(body).toMatchObject({ model: "decision-model-a" });
   });
 });
