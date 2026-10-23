@@ -13,6 +13,7 @@ import { type Instant, nowInstant, Temporal } from "@langwatch/time";
 import type { SubsystemProbeChannel } from "../channels/subsystem-probe.channel.ts";
 import {
   canaryHeaders,
+  canaryAnswerOf,
   otelCanaryPayload,
   readbackHeaders,
   restCanaryPayload,
@@ -80,6 +81,13 @@ type CanaryProbe = "collector" | "processor";
 
 /** How long a canary POST may hang before the probe calls it a failure. */
 const CANARY_TIMEOUT_MS = 30_000;
+
+/**
+ * How many times a canary is sent while a starting or draining pod refuses it.
+ * A rollout drains one pod at a time, so the next attempt lands on another.
+ */
+const CANARY_NOT_HANDLED_ATTEMPTS = 3;
+const CANARY_NOT_HANDLED_WAIT_MS = 1_000;
 
 const failure = (
   httpStatus: 404 | 500,
@@ -361,9 +369,9 @@ export class SubsystemProbeService {
   }
 
   /**
-   * One canary POST back through our own boundary. A network-level failure and
-   * a refusal are the same handled outcome, and the transport cause is logged
-   * here because the wire masks a non-handled reason.
+   * One canary POST back through our own boundary. A network failure and a refusal are the
+   * same handled outcome; the transport cause is logged because the wire masks it. A refusal
+   * no handler saw (a pod starting or draining) is sent again first: nothing was stored.
    */
   async #sendCanary({
     probe,
@@ -382,14 +390,28 @@ export class SubsystemProbeService {
   }): Promise<Response> {
     const deadline = new AbortController();
     const timer = setTimeout(() => deadline.abort(), CANARY_TIMEOUT_MS);
-    let response: Response;
-    try {
-      response = await this.#collaborators.canaries.post({
+    const send = () =>
+      this.#collaborators.canaries.post({
         path,
         headers,
         body,
         signal: signal === undefined ? deadline.signal : AbortSignal.any([signal, deadline.signal]),
       });
+    let response: Response;
+    try {
+      response = await send();
+      for (
+        let attempt = 1;
+        attempt < CANARY_NOT_HANDLED_ATTEMPTS && canaryAnswerOf(response).notHandled;
+        attempt++
+      ) {
+        this.#logger.info(
+          { probe, transport, path, attempt, ...canaryAnswerOf(response) },
+          "Health canary landed on a pod that is starting or shutting down, sending it again",
+        );
+        await sleep(CANARY_NOT_HANDLED_WAIT_MS);
+        response = await send();
+      }
     } catch (error) {
       this.#logger.error({ probe, transport, path, error }, "Health canary transport failed");
       throw new HealthCheckFailedError({
@@ -402,7 +424,13 @@ export class SubsystemProbeService {
     }
     if (!response.ok) {
       this.#logger.error(
-        { probe, transport, path, upstreamStatus: response.status },
+        {
+          probe,
+          transport,
+          path,
+          upstreamStatus: response.status,
+          ...canaryAnswerOf(response),
+        },
         "Health canary refused by our own boundary",
       );
       throw new HealthCheckFailedError({ probe, transport, upstreamStatus: response.status });

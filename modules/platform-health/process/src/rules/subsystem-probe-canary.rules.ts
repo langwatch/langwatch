@@ -1,3 +1,15 @@
+/** Set by packages/process/src/server.ts only on refusals no handler saw. */
+const NOT_HANDLED_HEADER = "x-langwatch-not-handled";
+
+/** Whether a handler saw the request; a refusal before one ran stored nothing. */
+export type CanaryAnswer = Readonly<{ notHandled: false } | { notHandled: true; reason: string }>;
+
+/** Reads a 503 our own door answered before any handler ran ("starting", "draining"). */
+export function canaryAnswerOf(response: Response): CanaryAnswer {
+  const reason = response.status === 503 ? response.headers.get(NOT_HANDLED_HEADER) : null;
+  return reason === null ? { notHandled: false } : { notHandled: true, reason };
+}
+
 export function canaryHeaders(authToken: string, projectId: string | null): Record<string, string> {
   return {
     "X-Auth-Token": authToken,

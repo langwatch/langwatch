@@ -110,6 +110,62 @@ describe("a probe sending a canary", () => {
     });
   });
 
+  describe("when a pod that is shutting down refuses the canary", () => {
+    const draining = () =>
+      new Response("api is shutting down", {
+        status: 503,
+        headers: { "x-langwatch-not-handled": "draining" },
+      });
+
+    /** @scenario "A canary refused by a pod that is shutting down is sent again" */
+    it("sends it again and passes when the next attempt is accepted", async () => {
+      vi.useFakeTimers();
+      let refusals = 1;
+      const canaries = MemorySubsystemProbeChannel.create({
+        answer: () => (refusals-- > 0 ? draining() : new Response("{}", { status: 200 })),
+      });
+
+      const outcome = probes(canaries).runCollector(CREDENTIAL);
+      await vi.advanceTimersByTimeAsync(1_000);
+
+      await expect(outcome).resolves.toMatchObject({ ok: true, status: 200 });
+      expect(canaries.requests()).toHaveLength(3);
+      expect(logger.error).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A canary refused by a pod that is shutting down on every attempt still fails" */
+    it("fails with the health check code after its last attempt", async () => {
+      vi.useFakeTimers();
+      const canaries = MemorySubsystemProbeChannel.create({ answer: draining });
+
+      const outcome = probes(canaries)
+        .runProcessor(CREDENTIAL)
+        .catch((error: unknown) => error);
+      await vi.advanceTimersByTimeAsync(2_000);
+
+      const failed = await outcome;
+      expect(failed).toBeInstanceOf(HealthCheckFailedError);
+      expect((failed as HealthCheckFailedError).meta).toMatchObject({ upstreamStatus: 503 });
+      expect(canaries.requests()).toHaveLength(6);
+      expect(logger.error).toHaveBeenCalledWith(
+        expect.objectContaining({ upstreamStatus: 503, notHandled: true, reason: "draining" }),
+        "Health canary refused by our own boundary",
+      );
+    });
+
+    it("does not send again a 503 a handler answered", async () => {
+      const canaries = MemorySubsystemProbeChannel.create({
+        answer: () => new Response("{}", { status: 503 }),
+      });
+
+      await probes(canaries)
+        .runCollector(CREDENTIAL)
+        .catch(() => undefined);
+
+      expect(canaries.requests()).toHaveLength(2);
+    });
+  });
+
   describe("when the boundary never answers", () => {
     /** @scenario "A canary that hangs is not waited on forever" */
     it("abandons the request after thirty seconds and fails the probe", async () => {

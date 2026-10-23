@@ -362,10 +362,16 @@ export class Server {
     }
 
     // A draining process still answers its probes — that is why the health
-    // door stops last — but it takes no new work, and says so by name.
+    // door stops last — but it takes no new work, and says so by name. It
+    // closes the connection too: a proxy reuses a pooled one for up to a
+    // minute and would keep sending work here until it did.
     if (this.draining) {
       response
-        .writeHead(503, { "Content-Type": "text/plain", [NOT_HANDLED_HEADER]: "draining" })
+        .writeHead(503, {
+          "Content-Type": "text/plain",
+          Connection: "close",
+          [NOT_HANDLED_HEADER]: "draining",
+        })
         .end(`${this.name} is shutting down`);
       return;
     }
