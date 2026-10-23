@@ -313,6 +313,11 @@ type PublicHandlerArguments<Input, App> = Omit<
   readonly actor: null;
   readonly scope: null;
   readonly target: null;
+  /**
+   * Names the key the handler resolved on the request's access record, by id and kind only: a
+   * public route that authenticates in its handler has no door to record it.
+   */
+  readonly recordKey: (key: RestKeyCredential) => void;
 };
 /**
  * A route the door answers with or without a credential: both halves of the
@@ -373,6 +378,8 @@ export type StoredHandlerArguments<Api> = Readonly<{
   /** The producer for the kind a route declared; undefined everywhere else. */
   response: RestProducerFor<RestResponseKind> | undefined;
   request: Request;
+  /** A public route's handler names the key it resolved; undefined on every other route. */
+  recordKey?: ((key: RestKeyCredential) => void) | undefined;
 }>;
 type StoredHandler<Api> = {
   invoke(args: StoredHandlerArguments<Api>, ...context: unknown[]): unknown;

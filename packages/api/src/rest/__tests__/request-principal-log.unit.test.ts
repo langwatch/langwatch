@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { authorizationPort } from "../../__tests__/api-double.ts";
-import { anyAuthenticated } from "../../access/access.ts";
+import { anyAuthenticated, publicRoute } from "../../access/access.ts";
 import type { RestCaller, RestIdentity } from "../../hosting/api-door.ts";
 import { ClientAddress } from "../../policy/client-address.ts";
 import { MANAGEMENT_API_VERSION } from "../addressing.ts";
@@ -15,6 +15,7 @@ import { BearerIdentity } from "../bearer-identity.ts";
 import { recordKeyCredential } from "../credential.ts";
 import { defineRestRouter } from "../declaration.ts";
 import { RestHost } from "../host.ts";
+import { keyCredentialOf } from "../key-credential.ts";
 import { requestPrincipalOf, requestPrincipalLogFields } from "../request-principal.ts";
 import { bindRestCredential } from "../request.ts";
 
@@ -255,6 +256,73 @@ describe("requestPrincipalOf", () => {
       expect(
         requestPrincipalOf({ actor: { type: "internal", codePath: "tests" }, key: null }),
       ).toEqual({});
+    });
+  });
+});
+
+const PublicApi = moduleApi<{ read(): { ok: boolean } }>()("langy");
+const publicDeclaration = defineRestRouter(PublicApi)
+  .withNamespace("open")
+  .withVersion(MANAGEMENT_API_VERSION)
+  .withAddressing("literal", { v1Twin: false })
+  .get("/open/read", "read")
+  .withAccess(publicRoute({ reason: "a route that resolves its key in its handler" }))
+  .withOutput(z.object({ ok: z.boolean() }))
+  .handle(({ app, recordKey }) => {
+    recordKey({ kind: "api_key", apiKeyId: "key_public", ownerUserId: null });
+    return app.read();
+  })
+  .build();
+
+describe("the request access record of a public route", () => {
+  beforeEach(() => {
+    records.length = 0;
+  });
+
+  describe("when the handler names the key it resolved", () => {
+    /** @scenario "The request log names the API key and its kind, never the key" */
+    it("carries the key id and kind", async () => {
+      const closed = BearerIdentity.create({ name: "unconfigured", token: void 0 });
+      const host = RestHost.create({
+        authz: authorizationPort.forRequest(),
+        identities: {
+          project: closed,
+          organization: closed,
+          api_key: closed,
+          instance_admin: closed,
+          browser: closed,
+        },
+        audit: { record: async () => {} },
+      });
+      host.mount(publicDeclaration.router(), () => ({ read: () => ({ ok: true }) }));
+
+      const response = await host.app.request(
+        new Request("http://localhost/open/read", {
+          headers: { authorization: `Bearer ${SECRET}` },
+        }),
+      );
+
+      expect(response.status).toBe(200);
+      expect(records[0]).toMatchObject({ "api_key.id": "key_public", "api_key.type": "api_key" });
+      expect(JSON.stringify(records[0])).not.toContain(SECRET);
+    });
+  });
+});
+
+describe("keyCredentialOf", () => {
+  describe("when a project key carries a source type and no template", () => {
+    it("names it an ingestion key", () => {
+      const key = keyCredentialOf({
+        type: "apiKey",
+        apiKeyId: "key_ingest",
+        userId: null,
+        organizationId: "org-1",
+        ingestSourceType: "otel",
+        ingestionTemplateId: null,
+        project: { id: "project-1", teamId: "team-1", organizationId: "org-1" },
+      } as Parameters<typeof keyCredentialOf>[0]);
+
+      expect(key.kind).toBe("ingestion_key");
     });
   });
 });

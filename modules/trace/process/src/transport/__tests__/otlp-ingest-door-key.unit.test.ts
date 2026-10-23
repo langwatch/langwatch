@@ -34,7 +34,21 @@ function identifiedWith(identity: Partial<OtlpIngestCredential["identity"]>) {
 describe("the OTLP ingest door", () => {
   /** @scenario "The request log names the key behind OTLP ingestion" */
   it("names an ingestion key by its id and kind", async () => {
-    const caller = await identifiedWith({ apiKeyId: "key_ingest", ingestionTemplateId: "tpl_1" });
+    const caller = await identifiedWith({
+      apiKeyId: "key_ingest",
+      ingestSourceType: "openai",
+      ingestionTemplateId: "tpl_1",
+    });
+
+    expect(caller.key).toEqual({
+      kind: "ingestion_key",
+      apiKeyId: "key_ingest",
+      ownerUserId: null,
+    });
+  });
+
+  it("names an ingestion key that has no template as an ingestion key", async () => {
+    const caller = await identifiedWith({ apiKeyId: "key_ingest", ingestSourceType: "openai" });
 
     expect(caller.key).toEqual({
       kind: "ingestion_key",

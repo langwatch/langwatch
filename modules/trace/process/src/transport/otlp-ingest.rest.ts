@@ -8,7 +8,6 @@ import {
   defineRestDoor,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
-  type RestKeyCredential,
   type RestProtocolRefusal,
 } from "@langwatch/api/rest";
 import { createLogger } from "@langwatch/observability";
@@ -28,7 +27,11 @@ import {
   readOtlpBody,
   OTLP_REFUSED_MEDIA_TYPES,
 } from "@langwatch/otlp";
-import { otlpIngestCredentialSchema, type OtlpIngestCredential } from "@langwatch/otlp/door";
+import {
+  otlpIngestCredentialSchema,
+  otlpIngestKeyOf,
+  type OtlpIngestCredential,
+} from "@langwatch/otlp/door";
 import { resolveRequestBound } from "@langwatch/plans";
 import { TraceApi, type TraceOtlpIngestApi } from "@langwatch/trace-contract";
 import { SpanKind, type Span } from "@opentelemetry/api";
@@ -71,7 +74,7 @@ export const otlpIngestDoor = defineRestDoor("otlp_ingest", {
         actor,
         scope: { tier: "project", id: resolution.project.id },
         session: resolution,
-        key: ingestKeyOf(resolution.identity),
+        key: otlpIngestKeyOf(resolution.identity),
       };
     } catch (error) {
       if (!isIngestDoorRefusal(error)) throw error;
@@ -86,14 +89,6 @@ export const otlpIngestDoor = defineRestDoor("otlp_ingest", {
     }
   },
 });
-
-/** The key an OTLP bearer is, as the access record names it: no key id is the legacy key. */
-function ingestKeyOf(identity: OtlpIngestCredential["identity"]): RestKeyCredential {
-  if (!identity.apiKeyId) return { kind: "legacy_project_key", apiKeyId: null, ownerUserId: null };
-  const kind = identity.ingestionTemplateId === null ? "api_key" : "ingestion_key";
-
-  return { kind, apiKeyId: identity.apiKeyId, ownerUserId: null };
-}
 
 /**
  * Best-effort extraction of customer trace_ids from an OTLP traces body.

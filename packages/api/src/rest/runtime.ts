@@ -1442,6 +1442,11 @@ function handlerMiddleware<Api>({
           actor: null,
           scope: null,
           target: null,
+          recordKey: (key) =>
+            recordRequestPrincipal({
+              context,
+              read: () => requestPrincipalOf({ actor: null, key }),
+            }),
         }),
         ...(await resolveContexts({ route, contexts, context, input })),
       );
@@ -1976,6 +1981,7 @@ function handlerArguments<Api>({
   authorization = null,
   session,
   key,
+  recordKey,
 }: {
   context: Context;
   route: RestTransportRoute<Api>;
@@ -1987,6 +1993,7 @@ function handlerArguments<Api>({
   authorization?: Authorization | null;
   session?: unknown;
   key?: RestKeyCredential | undefined;
+  recordKey?: ((key: RestKeyCredential) => void) | undefined;
 }): StoredHandlerArguments<Api> {
   return {
     app: options.app(),
@@ -2008,6 +2015,7 @@ function handlerArguments<Api>({
     response: route.response
       ? producerFor({ kind: route.response.kind, accept: context.req.header("Accept") ?? "" })
       : undefined,
+    ...(recordKey ? { recordKey } : {}),
   };
 }
 
