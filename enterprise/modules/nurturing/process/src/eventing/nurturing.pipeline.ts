@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import {
+  APP_PAGE_OPENED_EVENT_TYPE,
+  appPageOpenedEventDataSchema,
   SESSION_STARTED_EVENT_TYPE,
   sessionStartedEventDataSchema,
   SIGNED_UP_EVENT_TYPE,
@@ -7,6 +9,11 @@ import {
   SSO_AUTO_ADDED_EVENT_TYPE,
   ssoAutoAddedEventDataSchema,
 } from "@langwatch/auth-contract";
+import {
+  CODING_AGENT_SESSION_STORED_EVENT_TYPE,
+  type CodingAgentSessionStoredEventData,
+  codingAgentSessionStoredEventDataSchema,
+} from "@langwatch/coding-agent-contract";
 import {
   CHECKOUT_COMPLETED_EVENT_TYPE,
   checkoutCompletedEventDataSchema,
@@ -101,6 +108,7 @@ import {
 import { z } from "zod";
 
 import type { NurturingModule } from "../app/nurturing.app.ts";
+import { appOpenedSignals } from "../rules/nurturing-app-opened.rules.ts";
 import {
   checkoutCompletedSignal,
   evaluationRanSignal,
@@ -229,6 +237,11 @@ export function buildNurturingPipeline(deps: {
       aggregateId: string;
       tenantId: string;
     }[];
+    deliver: (signal: NurturingSignal) => Promise<void>;
+  }) => Promise<void>;
+  /** Decides the first session, agent types and active days from a project's stored sessions. */
+  codingSessionsStored: (input: {
+    sessions: readonly CodingAgentSessionStoredEventData[];
     deliver: (signal: NurturingSignal) => Promise<void>;
   }) => Promise<void>;
 }): NurturingPipeline {
@@ -498,6 +511,23 @@ export function buildNurturingPipeline(deps: {
           },
         }),
       )
+      .withPeerSubscriber(
+        "codingAgentSessionStored",
+        nurturingBatchLane({
+          eventType: CODING_AGENT_SESSION_STORED_EVENT_TYPE,
+          data: codingAgentSessionStoredEventDataSchema,
+          handleBatch: (items) =>
+            deps.codingSessionsStored({
+              sessions: items.map(({ data }) => data),
+              deliver: deliverSignal,
+            }),
+        }),
+      )
+      .withPeerSubscriber("appPageOpened", {
+        eventType: APP_PAGE_OPENED_EVENT_TYPE,
+        data: appPageOpenedEventDataSchema,
+        handle: (data) => deliverEach(appOpenedSignals({ data })),
+      })
       .withCommand("recordSignal", RecordNurturingSignalCommand)
       .withLaneAliases(MAIN_NURTURING_LANE_ALIASES)
       .build()

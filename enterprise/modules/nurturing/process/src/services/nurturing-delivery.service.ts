@@ -7,13 +7,14 @@ import type {
 import type { UsageReportReceivedEventData } from "@langwatch/enterprise-saas-contract";
 import type { GuidedOnboardingTurnFailedEventData } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
-import { Temporal } from "@langwatch/time";
 import type { UserApi } from "@langwatch/user-contract";
 
 import type { PostHogChannel } from "../channels/posthog.channel.ts";
 import type { NurturingClaimRepository } from "../repositories/nurturing-claim.repository.ts";
 import { fire as fireActivity } from "../rules/nurturing-activity-tracking-service.rules.ts";
+import { fireCodingOrApp, isCodingOrAppSignal } from "../rules/nurturing-coding-delivery.rules.ts";
 import { selfHostedTraits, unixSecondsOf } from "../rules/nurturing-customer-io-timestamp.rules.ts";
+import { pickCustomerIoDebounce } from "../rules/nurturing-delivery-debounce.rules.ts";
 import {
   fireExperimentRan,
   fireScenarioCreated,
@@ -38,6 +39,7 @@ import {
 } from "../rules/nurturing-posthog-activation.rules.ts";
 import {
   fireIntegrationMethod,
+  fireUsesCodingAgent,
   integrationMethodFor,
 } from "../rules/nurturing-product-interest-service.rules.ts";
 import { firePromptCreated } from "../rules/nurturing-prompt-creation-service.rules.ts";
@@ -49,6 +51,7 @@ import {
   fireSubscriptionStarted,
   fireSubscriptionSync,
 } from "../rules/nurturing-subscription-sync-service.rules.ts";
+import { isoOf } from "../rules/nurturing-time.rules.ts";
 import type { NurturingService } from "./nurturing.service.ts";
 
 const nurturingLogger = createLogger("langwatch:nurturing");
@@ -64,23 +67,6 @@ function reportFailure(error: unknown): void {
 
 /** How long a delivered signal is remembered against a redelivered source event. */
 const DELIVERED_WINDOW_SECONDS = 7 * 24 * 60 * 60;
-
-/**
- * Main's CRM contract, not a queue tunable: a tenant's trace, simulation or evaluation
- * update reaches Customer.io at most once in this window.
- */
-const CIO_SYNC_DEBOUNCE_SECONDS = 5 * 60;
-const CIO_SYNC_DEBOUNCED_KINDS = new Set<NurturingSignal["kind"]>([
-  "trace_received",
-  "simulation_run_finished",
-  "evaluation_completed",
-]);
-
-function isoOf(epochMilliseconds: number): string {
-  return Temporal.Instant.fromEpochMilliseconds(epochMilliseconds).toString({
-    fractionalSecondDigits: 3,
-  });
-}
 
 /**
  * Sends each recorded signal once, as main sent it: Customer.io through the
@@ -104,13 +90,28 @@ export class NurturingDeliveryService {
     return new NurturingDeliveryService(deps);
   }
 
-  /** `key` names the signal: its kind and source event. */
+  /** `key` names the signal: its kind and source event. A first session also tells its members. */
   async deliver({ key, signal }: { key: string; signal: NurturingSignal }): Promise<void> {
     if (!this.deps.customerIo && !this.deps.posthog) return;
     if (!(await this.deps.claims.claim(`nurturing:${key}`, DELIVERED_WINDOW_SECONDS))) return;
     if (await this.withinCustomerIoDebounce(signal)) return this.toPostHogSafely(signal);
     this.toCustomerIo(signal);
     this.toPostHogSafely(signal);
+    await this.identifyCodingAgentMembers(signal);
+  }
+
+  /**
+   * A coding-agent organization's members each get uses_coding_agent once, claimed per person
+   * so a redelivery or a second organization of theirs does not send it again in the window.
+   */
+  private async identifyCodingAgentMembers(signal: NurturingSignal): Promise<void> {
+    if (signal.kind !== "coding_agent_first_session" || !this.deps.customerIo) return;
+    for (const userId of new Set(signal.memberUserIds)) {
+      const claimKey = `nurturing:uses_coding_agent:${userId}`;
+      if (!(await this.deps.claims.claim(claimKey, DELIVERED_WINDOW_SECONDS))) continue;
+      // Sent at once, so a later member's claim failing never strands one already claimed.
+      this.sendCustomerIoCalls(fireUsesCodingAgent({ userId }));
+    }
   }
 
   /** Langy's failed guided turn: PostHog only, once per source event, never failing the fact. */
@@ -159,14 +160,11 @@ export class NurturingDeliveryService {
     }
   }
 
-  /** True when this tenant's trace/simulation/evaluation update already sent this window. */
+  /** True when this signal's debounce window already sent for its tenant or person. */
   private async withinCustomerIoDebounce(signal: NurturingSignal): Promise<boolean> {
-    if (!CIO_SYNC_DEBOUNCED_KINDS.has(signal.kind)) return false;
-    const claimed = await this.deps.claims.claim(
-      `nurturing:cio-sync:${signal.kind}:${signal.tenantId}`,
-      CIO_SYNC_DEBOUNCE_SECONDS,
-    );
-    return !claimed;
+    const debounce = pickCustomerIoDebounce(signal);
+    if (!debounce) return false;
+    return !(await this.deps.claims.claim(debounce.claimKey, debounce.seconds));
   }
 
   /** Runs a rule's decision against the configured Customer.io sink, one call at a time. */
@@ -196,6 +194,7 @@ export class NurturingDeliveryService {
 
   private toCustomerIo(signal: NurturingSignal): void {
     if (!this.deps.customerIo) return;
+    if (isCodingOrAppSignal(signal)) return this.sendCustomerIoCalls(fireCodingOrApp(signal));
     switch (signal.kind) {
       case "scenario_created":
         return this.sendCustomerIoCalls(fireScenarioCreated(signal));
@@ -250,7 +249,8 @@ export class NurturingDeliveryService {
 
   private toPostHog(signal: NurturingSignal): void {
     const posthog = this.deps.posthog;
-    if (!posthog) return;
+    // The coding-agent and app-open signals go to Customer.io only.
+    if (!posthog || isCodingOrAppSignal(signal)) return;
     const track = ({
       userId,
       event,

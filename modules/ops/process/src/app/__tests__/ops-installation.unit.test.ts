@@ -77,6 +77,7 @@ function process(
           chartVersion: undefined,
         },
         collectClickHouseBackupMetrics: true,
+        noticesDisabled: false,
         upgradeDiagnosticsAutoSendDisabled: false,
         productAnalytics: { key: undefined, host: undefined },
         grafana: {
