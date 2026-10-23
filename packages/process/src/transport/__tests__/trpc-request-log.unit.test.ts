@@ -54,12 +54,20 @@ const sweepTrpc = defineTrpcContract("sweeper")
   .query("sweep")
   .withInput(z.void())
   .withOutput(z.object({ swept: z.number() }))
+  .subscription("ticks")
+  .withInput(z.void())
+  .withOutput(z.object({ tick: z.number() }))
   .build();
 
 const router = defineTrpcRouter(SweepApi, sweepTrpc)
   .procedure("sweep")
   .noPermission({ reason: "a test namespace; no permission applies" })
   .handle(({ app }) => app.sweep())
+  .procedure("ticks")
+  .noPermission({ reason: "a test namespace; no permission applies" })
+  .handle(async function* () {
+    yield { tick: 1 };
+  })
   .build();
 
 function composeSweeper(sweep: () => { swept: number }) {
@@ -111,6 +119,20 @@ describe("the tRPC lane's access record", () => {
 
       expect(answer.status).toBe(200);
       expect(records[0]?.fields).toMatchObject({ "user.id": "user_ada" });
+    });
+  });
+
+  describe("when a signed-in user's subscription is streamed", () => {
+    /** @scenario "The request log names the user behind a live subscription" */
+    it("names the session's user on the access record", async () => {
+      const answer = await composeSweeper(() => ({ swept: 0 })).request("/api/sse/sweeper.ticks", {
+        headers: { "sec-fetch-site": "same-origin" },
+      });
+      await answer.text();
+      await vi.waitFor(() => expect(records).toHaveLength(1));
+
+      expect(answer.status).toBe(200);
+      expect(records[0]?.fields).toMatchObject({ family: "sse", "user.id": "user_ada" });
     });
   });
 

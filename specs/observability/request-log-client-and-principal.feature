@@ -37,6 +37,18 @@ Feature: The request log names who called and from where
     And it carries nothing of the key's secret
 
   @unit
+  Scenario: The request log names the key behind OTLP ingestion
+    Given an OTLP export authenticated by an ingestion key
+    When the request is answered
+    Then its access record carries the key's id and the kind ingestion_key
+
+  @unit
+  Scenario: The request log names the user behind a live subscription
+    Given a signed-in user opening a subscription on the live stream lane
+    When the stream is answered
+    Then its access record carries that user's id
+
+  @unit
   Scenario: A request with no caller names no principal
     Given a request that presented no credential
     When the request is answered
