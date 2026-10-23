@@ -12,9 +12,9 @@
 # Env:
 #   IMAGE_TAG        the tag to publish, e.g. git-<short sha>
 #   IMAGE_WAS_BUILT  "true" when build-and-push-lambda rebuilt this image this run
-#                    (it pushed IMAGE_TAG itself); otherwise the newest bare
-#                    `git-<sha>` image whose commit is an ancestor of HEAD_COMMIT
-#                    is re-tagged as IMAGE_TAG
+#                    (it pushed IMAGE_TAG itself); otherwise the `git-<sha>` image
+#                    of the nearest ancestor of HEAD_COMMIT is re-tagged as
+#                    IMAGE_TAG
 #   HEAD_COMMIT      the commit being published (default HEAD); needs its history
 #                    in the working directory's repository
 #   IS_RELEASE       "true" to also write VERSION
@@ -27,6 +27,7 @@ IMAGE_WAS_BUILT="${IMAGE_WAS_BUILT:-false}"
 IS_RELEASE="${IS_RELEASE:-false}"
 VERSION="${VERSION:-}"
 HEAD_COMMIT="${HEAD_COMMIT:-HEAD}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 is_single_manifest() {
   case "$1" in
@@ -69,33 +70,11 @@ if [ "${IMAGE_WAS_BUILT}" = "true" ]; then
   fi
 else
   # Not rebuilt: re-tag the image built from the nearest ancestor of this
-  # commit. Images pushed from other lines of history are skipped: re-tagging
-  # one would publish code this commit does not contain. Push time does not
-  # decide between ancestors either: an older commit rebuilt later (a release
-  # re-run, say) is older code, so the latest commit in history wins.
+  # commit (see nearest-ancestor-tag.sh).
   candidates=$(aws ecr describe-images --repository-name "${image}" \
     --query 'reverse(sort_by(imageDetails, &imagePushedAt))[].imageTags[]' \
     --output text | tr '\t' '\n')
-  # A shallow clone would make every candidate look unrelated.
-  if [ "$(git rev-parse --is-shallow-repository 2>/dev/null)" != "false" ] \
-      || ! git rev-parse --verify --quiet "${HEAD_COMMIT}^{commit}" >/dev/null; then
-    echo "::error::the history of ${HEAD_COMMIT} is not available; check out with full history to choose a previous ${image} image"
-    exit 1
-  fi
-  previous=""
-  previous_commit=""
-  while IFS= read -r tag; do
-    [[ "${tag}" =~ ^git-[0-9a-f]+$ ]] || continue
-    commit=$(git rev-parse --verify --quiet "${tag#git-}^{commit}" 2>/dev/null) || continue
-    git merge-base --is-ancestor "${commit}" "${HEAD_COMMIT}" 2>/dev/null || continue
-    # Keep the candidate closest to HEAD: replace the current pick only when
-    # it is itself an ancestor of this one.
-    if [ -z "${previous_commit}" ] \
-        || git merge-base --is-ancestor "${previous_commit}" "${commit}" 2>/dev/null; then
-      previous="${tag}"
-      previous_commit="${commit}"
-    fi
-  done <<<"${candidates}"
+  previous=$(printf '%s\n' "${candidates}" | HEAD_COMMIT="${HEAD_COMMIT}" "${SCRIPT_DIR}/nearest-ancestor-tag.sh")
   if [ -z "${previous}" ]; then
     echo "::warning::${image} has no previous git-* image from an ancestor commit to re-tag as ${IMAGE_TAG}; run this workflow via workflow_dispatch to seed it"
     exit 0

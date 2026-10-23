@@ -669,9 +669,9 @@ jobs:
       contents: read
       id-token: write # OIDC assume-role into the artifacts account
     steps:
-      # Only the Lambda tag script is read from the tree. The full commit
-      # history (without file contents) lets it re-tag only images built from
-      # an ancestor of this commit.
+      # Only the publish scripts are read from the tree. The full commit
+      # history (without file contents) lets them re-tag only images built from
+      # the nearest ancestor of this commit.
       - name: Checkout the publish scripts
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
@@ -748,16 +748,18 @@ jobs:
               # rebuilt this run or re-tagged below.
               sources=("${repo}:${IMAGE_TAG}-arm64")
             else
-              # Not rebuilt: copy the index of the newest bare `git-<sha>` tag, never
-              # an `-arm64` manifest (a different media type). The lookup and the
-              # match are separate statements so a failed `describe-images` still
-              # trips `set -e`. awk reads to the end: exiting early SIGPIPEs `tr`.
+              # Not rebuilt: copy the index of the bare `git-<sha>` tag of the
+              # nearest ancestor of this commit (nearest-ancestor-tag.sh), never
+              # an `-arm64` manifest (a different media type) and never an image
+              # built from another line of history. The lookup and the choice are
+              # separate statements so a failed `describe-images` still trips
+              # `set -e`.
               local candidates
               candidates=$(aws ecr describe-images --repository-name "${image}" \
                 --query 'reverse(sort_by(imageDetails, &imagePushedAt))[].imageTags[]' \
                 --output text)
-              previous=$(printf '%s' "${candidates}" | tr '\t' '\n' \
-                | awk '/^git-[0-9a-f]+$/ && !found { print; found=1 }')
+              previous=$(printf '%s\n' "${candidates}" | tr '\t' '\n' \
+                | HEAD_COMMIT="${GITHUB_SHA}" .github/scripts/nearest-ancestor-tag.sh)
 
               if [ -z "${previous}" ]; then
                 # Expected until every image has been published once. A dispatch

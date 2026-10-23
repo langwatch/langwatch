@@ -38,16 +38,38 @@ if grep -E '^ *context: ' "$WORKFLOW" | grep -vqE 'context: \.$'; then
   exit 1
 fi
 
+# Read once: piping `patterns` into `grep -q` under pipefail would SIGPIPE awk
+# whenever grep matched early, failing a valid filter.
+ALL_PATTERNS="$(patterns)"
+
 # @scenario "A .dockerignore change rebuilds every image"
-for filter in $filters; do
-  if patterns | grep -qxF "$filter '.dockerignore'"; then
-    echo "PASS: $filter rebuilds on a .dockerignore change"
+test_every_filter_rebuilds_on_a_dockerignore_change() {
+  local filter
+  for filter in $filters; do
+    if grep -qxF "$filter '.dockerignore'" <<<"$ALL_PATTERNS"; then
+      echo "PASS: $filter rebuilds on a .dockerignore change"
+      PASS=$((PASS + 1))
+    else
+      echo "FAIL: $filter rebuilds on a .dockerignore change"
+      FAIL=$((FAIL + 1))
+    fi
+  done
+}
+
+# @scenario "An image the commit did not change is re-tagged only from an ancestor commit"
+test_service_images_are_retagged_from_the_nearest_ancestor() {
+  if grep -qF '.github/scripts/nearest-ancestor-tag.sh' "$WORKFLOW" \
+      && ! grep -qE "awk '/\^git-\[0-9a-f\]\+\$/ && !found" "$WORKFLOW"; then
+    echo "PASS: service images pick their previous tag with nearest-ancestor-tag.sh"
     PASS=$((PASS + 1))
   else
-    echo "FAIL: $filter rebuilds on a .dockerignore change"
+    echo "FAIL: service images pick their previous tag with nearest-ancestor-tag.sh"
     FAIL=$((FAIL + 1))
   fi
-done
+}
+
+test_every_filter_rebuilds_on_a_dockerignore_change
+test_service_images_are_retagged_from_the_nearest_ancestor
 
 echo
 echo "publish-docker-ecr.yml path filters: ${PASS} passed, ${FAIL} failed"

@@ -33,9 +33,9 @@ Feature: Publish every deployable image to the artifacts registry
 
   @unit
   Scenario: An image the commit did not change is re-tagged only from an ancestor commit
-    Given the newest git-<sha> image of an evaluator was built from a commit the published commit does not contain
-    When publish-docker-ecr re-tags that image for a commit that did not change it
-    Then the commit tag names the newest image built from an ancestor of that commit
+    Given git-<sha> images of an unchanged image built from other lines of history and from older ancestors pushed later
+    When publish-docker-ecr re-tags that image for a commit that did not change it, Lambda or service image alike
+    Then the commit tag names the image built from the nearest ancestor of that commit
 
   @unit
   Scenario: A .dockerignore change rebuilds every image
