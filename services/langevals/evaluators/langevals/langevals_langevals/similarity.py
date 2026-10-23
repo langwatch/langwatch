@@ -18,6 +18,12 @@ from pydantic import Field
 import litellm
 import numpy as np
 
+# Sent by the app beside the credentials; names the project an evaluation runs for.
+PROJECT_SCOPE_ENV = "LANGWATCH_EVALUATION_PROJECT_ID"
+
+# The project, the embeddings model, the env digest and the text digest.
+CacheKey = tuple[str, str, str, str]
+
 
 class TargetEmbeddingCache:
     """Embeddings of the fixed target text from the settings, kept in memory.
@@ -26,44 +32,49 @@ class TargetEmbeddingCache:
     entry per request, so the target text would be embedded again on every
     call. This cache lives for the whole process instead.
 
-    An entry is looked up by the embeddings model, a digest of the request env
-    (the credentials and endpoint the call goes out with) and a digest of the
-    text. Two projects only ever share an entry when they send the exact same
-    credentials and endpoint, so a project never gets a vector computed with
-    someone else's key. Only digests are kept, never the text or the keys, and
-    nothing is written outside the process. The entry content of a trace is
-    never cached, only the target text from the settings.
+    An entry is looked up by the project the request names, the embeddings
+    model, a digest of the request env (the credentials and endpoint the call
+    goes out with) and a digest of the text. Two projects never share an entry,
+    even when both fall back to the install's own credentials, so one project
+    cannot learn from a fast answer that another used the same target text. A
+    request that names no project is not cached at all. Only digests are kept,
+    never the text or the keys, and nothing is written outside the process.
+    The entry content of a trace is never cached, only the target text.
     """
 
     def __init__(self, max_entries: int = 256):
         self.max_entries = max_entries
-        self._entries: OrderedDict[tuple[str, str, str], np.ndarray] = OrderedDict()
+        self._entries: OrderedDict[CacheKey, np.ndarray] = OrderedDict()
         self._lock = threading.Lock()
-        self._in_flight: dict[tuple[str, str, str], Future] = {}
+        self._in_flight: dict[CacheKey, Future] = {}
 
     @staticmethod
-    def key(model: str, env: dict[str, str], text: str) -> tuple[str, str, str]:
+    def key(model: str, env: dict[str, str], text: str) -> "CacheKey | None":
+        """The entry's key, or None when the request names no project to scope it to."""
+        project = env.get(PROJECT_SCOPE_ENV)
+        if not project:
+            return None
         env_digest = hashlib.sha256(
             json.dumps(env, sort_keys=True).encode("utf-8")
         ).hexdigest()
         text_digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
-        return (model, env_digest, text_digest)
+        return (project, model, env_digest, text_digest)
 
-    def get(self, key: tuple[str, str, str]) -> np.ndarray | None:
+    def get(self, key: "CacheKey") -> np.ndarray | None:
         with self._lock:
             embedding = self._entries.get(key)
             if embedding is not None:
                 self._entries.move_to_end(key)
             return embedding
 
-    def put(self, key: tuple[str, str, str], embedding: np.ndarray) -> None:
+    def put(self, key: "CacheKey", embedding: np.ndarray) -> None:
         with self._lock:
             self._entries[key] = embedding
             self._entries.move_to_end(key)
             while len(self._entries) > self.max_entries:
                 self._entries.popitem(last=False)
 
-    def get_or_compute(self, key: tuple[str, str, str], compute):
+    def get_or_compute(self, key: "CacheKey", compute):
         """Return the cached embedding, or compute it once for all waiting threads.
 
         Threads that miss on the same key wait for the one call already in
@@ -193,6 +204,8 @@ class CustomSimilarityEvaluator(
         key = TargetEmbeddingCache.key(
             self.settings.embeddings_model, current_request_env(), text
         )
+        if key is None:
+            return self.embed_target(text)
         return target_embedding_cache.get_or_compute(
             key, lambda: self.embed_target(text)
         )

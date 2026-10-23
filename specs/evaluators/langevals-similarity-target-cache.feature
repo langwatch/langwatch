@@ -10,6 +10,7 @@ Feature: Semantic similarity embeds its fixed target text once per process
   # Bindings:
   #   services/langevals/evaluators/langevals/langevals_langevals/similarity.py
   #   services/langevals/evaluators/langevals/tests/test_similarity_cache.py
+  #   modules/evaluation/process/src/features/execution/services/__tests__/evaluation-execution.settings-to-judge.unit.test.ts
 
   @unit
   Scenario: The second call with the same target makes one embedding request
@@ -40,6 +41,25 @@ Feature: Semantic similarity embeds its fixed target text once per process
     Given the target was embedded with one set of credentials
     When the same target is evaluated with other credentials
     Then the target is embedded again
+
+  # Projects that fall back to the install's own credentials send the same env, so
+  # the app names the project and an entry is never shared between projects.
+  @unit
+  Scenario: Projects on the install's own credentials never share a target
+    Given two projects evaluate the same target with the install's own credentials
+    When each evaluates it
+    Then the target is embedded once for each project
+
+  @unit
+  Scenario: A request that names no project is not cached
+    Given a request that names no project
+    When the same target is evaluated twice
+    Then the target is embedded both times and nothing is cached
+
+  @unit
+  Scenario: The app names the project on every evaluation it sends
+    When the app sends an evaluation to langevals
+    Then the request env names the project the evaluation runs for
 
   @unit
   Scenario: A different embeddings model embeds the target again

@@ -17,6 +17,7 @@ from langevals_langevals.similarity import (
     CustomSimilarityEntry,
     CustomSimilarityEvaluator,
     CustomSimilaritySettings,
+    PROJECT_SCOPE_ENV,
     TargetEmbeddingCache,
 )
 
@@ -49,7 +50,9 @@ def embedding_requests(monkeypatch):
     similarity.target_embedding_cache.clear()
 
 
-def make_evaluator(value="You suck", env=None, **settings):
+def make_evaluator(value="You suck", env=None, project="project-a", **settings):
+    if project is not None:
+        env = {**(env or {}), PROJECT_SCOPE_ENV: project}
     return CustomSimilarityEvaluator(
         settings=CustomSimilaritySettings(
             field="output",
@@ -120,7 +123,7 @@ def test_waiters_share_a_failed_target_embedding(monkeypatch):
     monkeypatch.setattr(litellm, "encode", lambda model, text: text.split())
     similarity.target_embedding_cache.clear()
     cache = similarity.target_embedding_cache
-    key = TargetEmbeddingCache.key("m", {}, "You suck")
+    key = TargetEmbeddingCache.key("m", {PROJECT_SCOPE_ENV: "p"}, "You suck")
     outcomes: list[str] = []
 
     def wait_on_target():
@@ -150,6 +153,29 @@ def test_different_credentials_embed_the_target_again(embedding_requests):
     make_evaluator(env={"OPENAI_API_KEY": "sk-project-b"}).evaluate_batch([entry])
 
     assert [r["input"] for r in embedding_requests].count("You suck") == 2
+
+
+# @scenario "Projects on the install's own credentials never share a target"
+def test_projects_on_install_credentials_never_share_a_target(embedding_requests):
+    entry = CustomSimilarityEntry(output="an answer")
+    install = {"OPENAI_API_KEY": "sk-install"}
+
+    make_evaluator(env=install, project="project-a").evaluate_batch([entry])
+    make_evaluator(env=install, project="project-b").evaluate_batch([entry])
+    make_evaluator(env=install, project="project-b").evaluate_batch([entry])
+
+    assert [r["input"] for r in embedding_requests].count("You suck") == 2
+
+
+# @scenario "A request that names no project is not cached"
+def test_request_without_a_project_is_not_cached(embedding_requests):
+    entry = CustomSimilarityEntry(output="an answer")
+
+    make_evaluator(project=None).evaluate(entry)
+    make_evaluator(project=None).evaluate(entry)
+
+    assert [r["input"] for r in embedding_requests].count("You suck") == 2
+    assert len(similarity.target_embedding_cache) == 0
 
 
 # @scenario "A different embeddings model embeds the target again"
@@ -203,7 +229,9 @@ def test_target_over_the_token_limit_is_skipped_and_not_cached(embedding_request
 # @scenario "The cache is bounded and drops the least recently used entry"
 def test_cache_is_bounded_and_drops_the_least_recently_used():
     cache = TargetEmbeddingCache(max_entries=2)
-    a, b, c = (TargetEmbeddingCache.key("m", {}, text) for text in "abc")
+    a, b, c = (
+        TargetEmbeddingCache.key("m", {PROJECT_SCOPE_ENV: "p"}, text) for text in "abc"
+    )
 
     cache.put(a, np.zeros(1))
     cache.put(b, np.zeros(1))
