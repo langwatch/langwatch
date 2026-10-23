@@ -2,6 +2,7 @@
  * What a code block hands Langy: secret names only, and Langy only where it is on offer.
  * Spec: specs/langy/langy-studio-code-blocks.feature.
  */
+import { STUDIO_CODE_MAX_BYTES } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -17,7 +18,11 @@ const SECRET_VALUE = "sk-live-do-not-leak-0123456789";
 
 function snapshotWith(overrides: Partial<CodeBlockSnapshot> = {}): CodeBlockSnapshot {
   return {
-    subject: { nodeId: "code_1", nodeName: "Shout", lastError: "NameError: name 'x' is not defined" },
+    subject: {
+      nodeId: "code_1",
+      nodeName: "Shout",
+      lastError: "NameError: name 'x' is not defined",
+    },
     language: "python",
     code: "class Code:\n    def __call__(self, question: str):\n        return {'answer': question}",
     savedCode: "class Code:\n    pass",
@@ -93,5 +98,20 @@ describe("codeBlockReadAnswer", () => {
     expect(
       codeBlockReadAnswer(snapshotWith({ code: "same", savedCode: "same" })).hasUnsavedChanges,
     ).toBe(false);
+  });
+});
+
+describe("codeBlockReadAnswer for a large buffer", () => {
+  /** @scenario "A code block too large to hand over is read without its code" */
+  it("hands over code at the proposal cap and withholds a buffer too large to return", () => {
+    const atCap = "a".repeat(STUDIO_CODE_MAX_BYTES);
+    const fits = codeBlockReadAnswer(snapshotWith({ code: atCap }));
+    expect(fits.codeTooLarge).toBe(false);
+    expect(fits.code).toBe(atCap);
+
+    const tooLarge = codeBlockReadAnswer(snapshotWith({ code: "é".repeat(40 * 1024) }));
+    expect(tooLarge.codeTooLarge).toBe(true);
+    expect(tooLarge.code).toBe("");
+    expect(tooLarge.hasUnsavedChanges).toBe(true);
   });
 });

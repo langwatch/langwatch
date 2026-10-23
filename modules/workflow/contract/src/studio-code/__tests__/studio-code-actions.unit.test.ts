@@ -34,7 +34,7 @@ describe("given the studio code action manifest", () => {
     });
   });
 
-  describe("when studio.code.propose is given more than 100 KB of code", () => {
+  describe("when studio.code.propose is given more than 32 KB of code", () => {
     /** @scenario "A proposal over the code size cap is refused by the schema" */
     it("refuses the payload", () => {
       const parsed = studioCodeProposePayloadSchema.safeParse({

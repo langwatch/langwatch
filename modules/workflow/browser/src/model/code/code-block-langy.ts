@@ -5,7 +5,11 @@
  */
 
 import type { LangyAskContext, LangyAskRequest } from "@langwatch/langy-contract";
-import type { StudioCodeProposal, StudioCodeReadResult } from "@langwatch/workflow-contract";
+import {
+  STUDIO_CODE_READ_MAX_BYTES,
+  type StudioCodeProposal,
+  type StudioCodeReadResult,
+} from "@langwatch/workflow-contract";
 
 import type { CodeLanguage } from "../code-language.ts";
 
@@ -94,17 +98,20 @@ function fieldsText(fields: readonly CodeField[]): string {
 
 /** The code block as `studio.code.read` answers it. */
 export function codeBlockReadAnswer(snapshot: CodeBlockSnapshot): StudioCodeReadResult {
-  return {
+  const answer = {
     nodeId: snapshot.subject.nodeId,
     nodeName: snapshot.subject.nodeName,
     language: snapshot.language,
     code: snapshot.code,
+    codeTooLarge: false,
     inputs: snapshot.inputs.map(({ identifier, type }) => ({ identifier, type })),
     outputs: snapshot.outputs.map(({ identifier, type }) => ({ identifier, type })),
     secretNames: [...snapshot.secretNames],
     lastError: lastErrorOf(snapshot.subject),
     hasUnsavedChanges: snapshot.code !== snapshot.savedCode,
   };
+  const size = new TextEncoder().encode(JSON.stringify(answer)).byteLength;
+  return size > STUDIO_CODE_READ_MAX_BYTES ? { ...answer, code: "", codeTooLarge: true } : answer;
 }
 
 /** The code block as the agent reads it beside the question: data, never instructions. */

@@ -1,15 +1,15 @@
 import { Banner, BannerAction } from "@langwatch/design-system/banner";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Box, HStack, VStack } from "@langwatch/design-system/primitives";
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useState } from "react";
 
-const MonacoDiffEditor = lazy(async () => ({
-  default: (await import("@monaco-editor/react")).DiffEditor,
-}));
+const MonacoDiffEditor = lazy(() =>
+  import("@monaco-editor/react").then((monaco) => ({ default: monaco.DiffEditor })),
+);
 
 /**
  * Langy's proposal beside the buffer it would replace. Accept hands the code back for the
- * buffer; Reject drops it. Neither saves: the reader still does.
+ * buffer once the diff is on screen; Reject drops it. Neither saves: the reader still does.
  */
 export function CodeProposalReview({
   original,
@@ -27,6 +27,7 @@ export function CodeProposalReview({
   onReject: () => void;
 }) {
   const { colorMode } = useColorMode();
+  const [shown, setShown] = useState(false);
 
   return (
     <VStack gap={0} height="full" align="stretch" data-testid="code-proposal-review">
@@ -37,7 +38,9 @@ export function CodeProposalReview({
         action={
           <HStack gap={2}>
             <BannerAction onClick={onReject}>Reject</BannerAction>
-            <BannerAction onClick={onAccept}>Accept</BannerAction>
+            <BannerAction onClick={onAccept} disabled={!shown}>
+              Accept
+            </BannerAction>
           </HStack>
         }
       >
@@ -52,6 +55,7 @@ export function CodeProposalReview({
             language={language}
             theme={colorMode === "dark" ? "vs-dark" : "vs"}
             options={{ readOnly: true, originalEditable: false, minimap: { enabled: false } }}
+            onMount={() => setShown(true)}
           />
         </Suspense>
       </Box>

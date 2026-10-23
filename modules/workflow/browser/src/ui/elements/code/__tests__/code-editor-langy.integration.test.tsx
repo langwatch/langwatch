@@ -34,6 +34,12 @@ const fakeMonaco = {
   KeyCode: { KeyI: 39 },
 };
 
+/** Whether the stand-in diff reports itself rendered at once, or when a test finishes it. */
+const diffRendering: { immediate: boolean; finish: (() => void) | null } = {
+  immediate: true,
+  finish: null,
+};
+
 // Monaco does not run in jsdom: the stand-in edits through a textarea and shows a diff as data.
 vi.mock("@monaco-editor/react", () => ({
   default: ({
@@ -59,9 +65,21 @@ vi.mock("@monaco-editor/react", () => ({
       />
     );
   },
-  DiffEditor: ({ original, modified }: { original: string; modified: string }) => (
-    <div data-testid="monaco-diff" data-original={original} data-modified={modified} />
-  ),
+  DiffEditor: ({
+    original,
+    modified,
+    onMount,
+  }: {
+    original: string;
+    modified: string;
+    onMount: () => void;
+  }) => {
+    useEffect(() => {
+      if (diffRendering.immediate) onMount();
+      else diffRendering.finish = onMount;
+    }, [onMount]);
+    return <div data-testid="monaco-diff" data-original={original} data-modified={modified} />;
+  },
 }));
 vi.mock("monacopilot", () => ({ registerCompletion: vi.fn() }));
 vi.mock("../../../../model/code/python-providers.ts", () => ({
@@ -79,6 +97,8 @@ const langy: { handlers: LangyUiActionHandlers | null; withdrawals: number } = {
 };
 
 beforeEach(() => {
+  diffRendering.immediate = true;
+  diffRendering.finish = null;
   langy.handlers = null;
   langy.withdrawals = 0;
   defineSlice<LangyRegistrationsState>({
@@ -106,14 +126,16 @@ function Harness({
   ask,
   setCode,
   onClose,
+  nodeId = "code_1",
 }: {
+  nodeId?: string;
   open: boolean;
   ask: ((request: LangyAskRequest) => void) | undefined;
   setCode: (code: string) => void;
   onClose: () => void;
 }) {
   const assistant = useCodeEditorAssistant({
-    subject: { nodeId: "code_1", nodeName: "Shout", lastError: "NameError: name 'x'" },
+    subject: { nodeId, nodeName: "Shout", lastError: "NameError: name 'x'" },
     open,
     language: "python",
     savedCode: SAVED_CODE,
@@ -146,9 +168,10 @@ function openEditor({ available = true }: { available?: boolean } = {}) {
   const view = renderWithDesignSystem(
     <Harness open ask={available ? ask : undefined} setCode={setCode} onClose={onClose} />,
   );
-  const rerender = (open: boolean) =>
+  const rerender = (open: boolean, nodeId?: string) =>
     view.rerender(
       <Harness
+        nodeId={nodeId}
         open={open}
         ask={available ? ask : undefined}
         setCode={setCode}
@@ -164,12 +187,9 @@ function handler(kind: string) {
   return found;
 }
 
-async function propose() {
+async function propose(code = PROPOSED_CODE) {
   await act(async () => {
-    await handler("studio.code.propose").run({
-      code: PROPOSED_CODE,
-      summary: "Upper-cases the answer",
-    } as never);
+    await handler("studio.code.propose").run({ code, summary: "Upper-cases the answer" } as never);
   });
 }
 
@@ -228,7 +248,7 @@ describe("the Studio code editor with Langy", () => {
     });
   });
 
-  describe("while the editor is open", () => {
+  describe("when the editor is open", () => {
     /** @scenario "The open code editor registers its actions with Langy while it is open" */
     it("registers exactly read and propose, and withdraws them when it closes", async () => {
       const { rerender } = openEditor();
@@ -259,6 +279,7 @@ describe("the Studio code editor with Langy", () => {
         nodeName: "Shout",
         language: "python",
         code: "class Code: # edited",
+        codeTooLarge: false,
         inputs: [{ identifier: "question", type: "str" }],
         outputs: [{ identifier: "answer", type: "str" }],
         secretNames: ["OPENAI_KEY"],
@@ -327,6 +348,54 @@ describe("the Studio code editor with Langy", () => {
         "studio.code.propose",
         "studio.code.read",
       ]);
+    });
+
+    /** @scenario "Accept waits until the diff is on screen" */
+    it("keeps Accept disabled until the diff has rendered", async () => {
+      diffRendering.immediate = false;
+      openEditor();
+      await screen.findByTestId("monaco");
+      await propose();
+
+      const accept = screen.getByRole<HTMLButtonElement>("button", { name: "Accept" });
+      expect(accept.disabled).toBe(true);
+
+      act(() => diffRendering.finish?.());
+
+      expect(screen.getByRole<HTMLButtonElement>("button", { name: "Accept" }).disabled).toBe(
+        false,
+      );
+    });
+
+    /** @scenario "A proposal belongs to the code block it was made for" */
+    it("drops the proposal when the editor switches to another code block", async () => {
+      const { rerender, setCode } = openEditor();
+      await screen.findByTestId("monaco");
+      await propose();
+      expect(screen.getByTestId("monaco-diff")).toBeTruthy();
+
+      rerender(true, "code_2");
+
+      expect(screen.queryByTestId("monaco-diff")).toBeNull();
+      expect(screen.queryByRole("button", { name: "Accept" })).toBeNull();
+      expect((await screen.findByTestId<HTMLTextAreaElement>("monaco")).value).toBe(SAVED_CODE);
+      expect(setCode).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A second proposal is refused while one awaits review" */
+    it("refuses another proposal until the first is accepted or rejected", async () => {
+      openEditor();
+      await screen.findByTestId("monaco");
+      await propose();
+
+      await expect(propose("print('other')")).rejects.toMatchObject({
+        code: "studio_code_proposal_pending",
+      });
+      expect(screen.getByTestId("monaco-diff").dataset.modified).toBe(PROPOSED_CODE);
+
+      fireEvent.click(screen.getByRole("button", { name: "Reject" }));
+      await propose("print('other')");
+      expect(screen.getByTestId("monaco-diff").dataset.modified).toBe("print('other')");
     });
   });
 });

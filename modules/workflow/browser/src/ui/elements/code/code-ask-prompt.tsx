@@ -1,6 +1,6 @@
 import { Box, HStack, Input, Text } from "@langwatch/design-system/primitives";
 import { Sparkles } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /**
  * The inline prompt Cmd/Ctrl+I opens over the code editor: one line to Langy. Enter asks,
@@ -14,6 +14,11 @@ export function CodeAskPrompt({
   onClose: () => void;
 }) {
   const [instruction, setInstruction] = useState("");
+  const field = useRef<HTMLInputElement>(null);
+  // The reader opened the prompt with a keystroke or a click, so focus follows them into it.
+  useEffect(() => {
+    field.current?.focus();
+  }, []);
 
   return (
     <Box
@@ -36,7 +41,7 @@ export function CodeAskPrompt({
           <Sparkles size={16} />
         </Box>
         <Input
-          autoFocus
+          ref={field}
           size="sm"
           variant="flushed"
           aria-label="Describe what this code should do"

@@ -80,7 +80,7 @@ Feature: Langy writes and edits Studio code blocks from the code editor
 
     @unit
     Scenario: A proposal over the code size cap is refused by the schema
-      When studio.code.propose is given more than 100 KB of code
+      When studio.code.propose is given more than 32 KB of code
       Then the payload is refused by the schema
 
     @unit
@@ -140,6 +140,33 @@ Feature: Langy writes and edits Studio code blocks from the code editor
       When the user rejects it
       Then the editor holds the code it held before
       And nothing is saved
+
+    @integration
+    Scenario: Accept waits until the diff is on screen
+      Given Langy proposed new code
+      When the diff has not rendered yet
+      Then Accept is disabled
+      And it is enabled once the diff is shown
+
+    @integration
+    Scenario: A proposal belongs to the code block it was made for
+      Given Langy proposed new code for one code block
+      When the editor switches to another code block
+      Then the proposal is gone and Accept cannot put it in the other block's buffer
+
+    @integration
+    Scenario: A second proposal is refused while one awaits review
+      Given Langy proposed new code the user has not reviewed
+      When Langy calls studio.code.propose again
+      Then the call is refused with studio_code_proposal_pending
+      And the diff still shows the first proposal
+
+    @unit
+    Scenario: A code block too large to hand over is read without its code
+      Given a code buffer whose read answer would exceed what a page action may return
+      When Langy calls studio.code.read
+      Then the answer says codeTooLarge and holds no code
+      And code at the proposal cap is still read in full
 
     @integration
     Scenario: A proposal never saves the workflow or runs the node

@@ -10,7 +10,13 @@ import { z } from "zod";
  */
 
 /** The most code one proposal may carry, in UTF-8 bytes. */
-export const STUDIO_CODE_MAX_BYTES = 100 * 1024;
+export const STUDIO_CODE_MAX_BYTES = 32 * 1024;
+
+/**
+ * The largest read answer the editor hands Langy, in UTF-8 bytes of JSON: under the 64 KiB a
+ * page action's result may hold, so code Langy can propose it can also read back.
+ */
+export const STUDIO_CODE_READ_MAX_BYTES = 60 * 1024;
 
 /** The longest summary a proposal may carry. */
 export const STUDIO_CODE_MAX_SUMMARY_LENGTH = 500;
@@ -30,8 +36,10 @@ const studioCodeReadResultSchemaDefinition = z.object({
   nodeId: z.string(),
   nodeName: z.string(),
   language: z.enum(["python", "javascript"]),
-  /** The buffer as the editor holds it, unsaved edits included. */
+  /** The buffer as the editor holds it, unsaved edits included; empty when `codeTooLarge`. */
   code: z.string(),
+  /** The buffer is too large to hand over; Langy says so rather than propose blind. */
+  codeTooLarge: z.boolean(),
   inputs: z.array(codeFieldSchema),
   outputs: z.array(codeFieldSchema),
   /** Names only: a secret's value never leaves the browser. */

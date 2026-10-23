@@ -52,6 +52,17 @@ export type WorkflowCodeEditorModalHost = (input: {
   children: ReactNode;
 }) => ReactNode;
 
+type EditorShortcut = "save" | "save-and-close" | "ask";
+
+/** Cmd/Ctrl+S saves and stays open, Cmd/Ctrl+Enter saves and closes, Cmd/Ctrl+I asks Langy. */
+function editorShortcut(e: KeyboardEvent): EditorShortcut | undefined {
+  if (!e.ctrlKey && !e.metaKey) return undefined;
+  if (e.key === "s") return "save";
+  if (e.key === "Enter") return "save-and-close";
+  if (e.key.toLowerCase() === "i") return "ask";
+  return undefined;
+}
+
 export function WorkflowCodeEditorModal({
   code,
   setCode,
@@ -135,38 +146,32 @@ export function WorkflowCodeEditorModal({
     onClose();
   };
 
+  // The shortcuts act on the latest buffer and handlers, read when a key is pressed.
+  const shortcutActions = useRef<Record<EditorShortcut, (() => void) | undefined>>({
+    save: undefined,
+    "save-and-close": undefined,
+    ask: undefined,
+  });
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Cmd/Ctrl+S → Save (don't close)
-      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
-        e.preventDefault();
-        setCode(localCode);
-        return;
-      }
-      // Cmd/Ctrl+Enter → Save & Close
-      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-        e.preventDefault();
-        setCode(localCode);
-        onClose();
-        return;
-      }
-      // Cmd/Ctrl+I → ask Langy, where Langy is on offer
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "i" && openAsk) {
-        e.preventDefault();
-        openAsk();
-      }
+    shortcutActions.current = {
+      save: handleSave,
+      "save-and-close": handleSaveAndClose,
+      ask: openAsk,
     };
+  });
 
-    if (open) {
-      window.addEventListener("keydown", handleKeyDown);
-      return () => window.removeEventListener("keydown", handleKeyDown);
-    }
-    // Nothing was subscribed while the editor is closed, so there is nothing to
-    // tear down. Stated rather than fallen through: `apps/ui` compiles this
-    // source under `noImplicitReturns`, and an effect that returns on one branch
-    // and not the other is exactly the shape that rule is looking for.
-    return undefined;
-  }, [setCode, onClose, open, localCode, openAsk]);
+  useEffect(() => {
+    if (!open) return undefined;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const shortcut = editorShortcut(e);
+      const action = shortcut ? shortcutActions.current[shortcut] : undefined;
+      if (!action) return;
+      e.preventDefault();
+      action();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [open]);
 
   const insertAtCursor = (text: string) => {
     const ed = editorRef.current;

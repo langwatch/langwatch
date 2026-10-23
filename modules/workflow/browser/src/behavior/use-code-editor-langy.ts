@@ -14,14 +14,16 @@ import {
   LANGY_REGISTRATIONS_SLICE,
   type LangyAskRequest,
   type LangyRegistrationsState,
+  type LangyUiActionHandlers,
 } from "@langwatch/langy-contract";
 import {
   STUDIO_CODE_ACTIONS,
   type StudioCodeProposal,
   type StudioCodeProposeResult,
 } from "@langwatch/workflow-contract";
-import { useEffect, useRef, useState } from "react";
+import { type RefObject, useEffect, useRef, useState } from "react";
 
+import type { CodeLanguage } from "../model/code-language.ts";
 import {
   CODE_PROPOSE_PERMISSION,
   type CodeBlockLangySubject,
@@ -32,7 +34,6 @@ import {
   isCodeLangyAvailable,
   LANGY_ASK_PERMISSION,
 } from "../model/code/code-block-langy.ts";
-import type { CodeLanguage } from "../model/code-language.ts";
 import { useWorkflowHost } from "../model/workflow-host.ts";
 
 /** How the editor hands Langy its actions, read from `langy:registrations`; Langy fills it in. */
@@ -40,6 +41,8 @@ const useLangyRegistrations = readSlice<LangyRegistrationsState>({
   name: LANGY_REGISTRATIONS_SLICE,
   absent: LANGY_ABSENT_REGISTRATIONS,
 });
+
+type PendingProposal = StudioCodeProposal & { nodeId: string; language: CodeLanguage };
 
 /** A refusal the page reports back to the agent by its `code`. */
 class StudioCodeActionError extends Error {
@@ -83,15 +86,30 @@ export function useCodeEditorAssistant({
   ask: ((request: LangyAskRequest) => void) | undefined;
   mayPropose: boolean;
 }): CodeEditorAssistant | undefined {
-  const [proposal, setProposal] = useState<StudioCodeProposal | null>(null);
-  const [wasOpen, setWasOpen] = useState(open);
-  if (wasOpen !== open) {
-    setWasOpen(open);
+  // A proposal belongs to the code block and language it was made for; any
+  // change of either, or closing the editor, drops it.
+  const [proposal, setProposal] = useState<PendingProposal | null>(null);
+  const pending = useRef<PendingProposal | null>(null);
+  const reviewKey = `${open}:${subject?.nodeId ?? ""}:${language}`;
+  const [wasKey, setWasKey] = useState(reviewKey);
+  if (wasKey !== reviewKey) {
+    setWasKey(reviewKey);
     setProposal(null);
   }
+  useEffect(() => {
+    pending.current = proposal;
+  });
 
   const buffer = useRef(savedCode);
-  const latest = useRef({ subject, language, savedCode, inputs, outputs, secretNames, mayPropose });
+  const latest = useRef<EditorState>({
+    subject,
+    language,
+    savedCode,
+    inputs,
+    outputs,
+    secretNames,
+    mayPropose,
+  });
   useEffect(() => {
     latest.current = { subject, language, savedCode, inputs, outputs, secretNames, mayPropose };
   });
@@ -102,33 +120,7 @@ export function useCodeEditorAssistant({
 
   useEffect(() => {
     if (!enabled) return undefined;
-    const snapshot = (): CodeBlockSnapshot | undefined => {
-      const { subject: current, ...rest } = latest.current;
-      return current ? { ...rest, subject: current, code: buffer.current } : undefined;
-    };
-    registerActions({
-      "studio.code.read": {
-        payloadSchema: STUDIO_CODE_ACTIONS["studio.code.read"].payloadSchema,
-        run: () => {
-          const now = snapshot();
-          if (!now) throw new StudioCodeActionError("studio_code_editor_closed", "No code block.");
-          return codeBlockReadAnswer(now);
-        },
-      },
-      "studio.code.propose": {
-        payloadSchema: STUDIO_CODE_ACTIONS["studio.code.propose"].payloadSchema,
-        run: (payload: StudioCodeProposal): StudioCodeProposeResult => {
-          if (!latest.current.mayPropose) {
-            throw new StudioCodeActionError(
-              "studio_code_permission_denied",
-              "The reader may not edit this workflow.",
-            );
-          }
-          setProposal({ code: payload.code, summary: payload.summary });
-          return { status: "awaiting_review" };
-        },
-      },
-    });
+    registerActions(studioCodeHandlers({ latest, buffer, pending, setProposal }));
     return () => clearActions();
   }, [enabled, registerActions, clearActions]);
 
@@ -150,10 +142,91 @@ export function useCodeEditorAssistant({
           },
         }),
       ),
-    proposal,
-    settle: () => setProposal(null),
+    proposal: proposalFor({ proposal, nodeId: subject.nodeId, language }),
+    settle: () => {
+      pending.current = null;
+      setProposal(null);
+    },
     observe: (code) => {
       buffer.current = code;
+    },
+  };
+}
+
+type EditorState = {
+  subject: CodeBlockLangySubject | undefined;
+  language: CodeLanguage;
+  savedCode: string;
+  inputs: CodeBlockSnapshot["inputs"];
+  outputs: CodeBlockSnapshot["outputs"];
+  secretNames: readonly string[];
+  mayPropose: boolean;
+};
+
+/** The proposal as the editor shows it: only on the code block and language it was made for. */
+function proposalFor({
+  proposal,
+  nodeId,
+  language,
+}: {
+  proposal: PendingProposal | null;
+  nodeId: string;
+  language: CodeLanguage;
+}): StudioCodeProposal | null {
+  if (!proposal || proposal.nodeId !== nodeId || proposal.language !== language) return null;
+  return { code: proposal.code, summary: proposal.summary };
+}
+
+/** The read and propose handlers, over the editor's latest state rather than a render's. */
+function studioCodeHandlers({
+  latest,
+  buffer,
+  pending,
+  setProposal,
+}: {
+  latest: RefObject<EditorState>;
+  buffer: RefObject<string>;
+  pending: RefObject<PendingProposal | null>;
+  setProposal: (proposal: PendingProposal) => void;
+}): LangyUiActionHandlers {
+  return {
+    "studio.code.read": {
+      payloadSchema: STUDIO_CODE_ACTIONS["studio.code.read"].payloadSchema,
+      run: () => {
+        const { subject, ...rest } = latest.current;
+        if (!subject)
+          throw new StudioCodeActionError("studio_code_editor_closed", "No code block.");
+        return codeBlockReadAnswer({ ...rest, subject, code: buffer.current });
+      },
+    },
+    "studio.code.propose": {
+      payloadSchema: STUDIO_CODE_ACTIONS["studio.code.propose"].payloadSchema,
+      run: (payload: StudioCodeProposal): StudioCodeProposeResult => {
+        const { mayPropose, subject, language } = latest.current;
+        if (!mayPropose) {
+          throw new StudioCodeActionError(
+            "studio_code_permission_denied",
+            "The reader may not edit this workflow.",
+          );
+        }
+        if (!subject)
+          throw new StudioCodeActionError("studio_code_editor_closed", "No code block.");
+        if (pending.current) {
+          throw new StudioCodeActionError(
+            "studio_code_proposal_pending",
+            "A proposal is awaiting the reader's review; wait until they accept or reject it.",
+          );
+        }
+        const next = {
+          code: payload.code,
+          summary: payload.summary,
+          nodeId: subject.nodeId,
+          language,
+        };
+        pending.current = next;
+        setProposal(next);
+        return { status: "awaiting_review" };
+      },
     },
   };
 }
