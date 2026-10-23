@@ -68,10 +68,11 @@ if [ "${IMAGE_WAS_BUILT}" = "true" ]; then
     exit 1
   fi
 else
-  # Not rebuilt: re-tag the newest bare `git-<sha>` image built from an ancestor
-  # of this commit. Images pushed from other lines of history (a release rebuilt
-  # from an older commit, say) are skipped: re-tagging one would publish code
-  # this commit does not contain.
+  # Not rebuilt: re-tag the image built from the nearest ancestor of this
+  # commit. Images pushed from other lines of history are skipped: re-tagging
+  # one would publish code this commit does not contain. Push time does not
+  # decide between ancestors either: an older commit rebuilt later (a release
+  # re-run, say) is older code, so the latest commit in history wins.
   candidates=$(aws ecr describe-images --repository-name "${image}" \
     --query 'reverse(sort_by(imageDetails, &imagePushedAt))[].imageTags[]' \
     --output text | tr '\t' '\n')
@@ -82,12 +83,17 @@ else
     exit 1
   fi
   previous=""
+  previous_commit=""
   while IFS= read -r tag; do
     [[ "${tag}" =~ ^git-[0-9a-f]+$ ]] || continue
     commit=$(git rev-parse --verify --quiet "${tag#git-}^{commit}" 2>/dev/null) || continue
-    if git merge-base --is-ancestor "${commit}" "${HEAD_COMMIT}" 2>/dev/null; then
+    git merge-base --is-ancestor "${commit}" "${HEAD_COMMIT}" 2>/dev/null || continue
+    # Keep the candidate closest to HEAD: replace the current pick only when
+    # it is itself an ancestor of this one.
+    if [ -z "${previous_commit}" ] \
+        || git merge-base --is-ancestor "${previous_commit}" "${commit}" 2>/dev/null; then
       previous="${tag}"
-      break
+      previous_commit="${commit}"
     fi
   done <<<"${candidates}"
   if [ -z "${previous}" ]; then

@@ -180,6 +180,21 @@ test_an_image_from_another_line_is_never_retagged() {
   fi
 }
 
+# @scenario "An image the commit did not change is re-tagged only from an ancestor commit"
+test_an_older_ancestor_pushed_later_does_not_win() {
+  local reg
+  reg="$(new_registry)"
+  push "$reg" "git-$MID" "$PLAIN" '{"mid":true}'
+  # An older commit on the same line, rebuilt after MID (a release re-run).
+  push "$reg" "git-$OLD" "$PLAIN" '{"old":true}'
+  run_subject "$reg" IMAGE_TAG="git-$HEAD_SHA" IMAGE_WAS_BUILT=false
+  if [ "$LAST_STATUS" -eq 0 ] && [ "$(manifest_at "$reg" "git-$HEAD_SHA")" = '{"mid":true}' ]; then
+    record yes "the nearest ancestor wins over an older ancestor pushed later"
+  else
+    record no "the nearest ancestor wins over an older ancestor pushed later"
+  fi
+}
+
 # @scenario "A Lambda image is never re-tagged from an index"
 test_a_lambda_image_is_never_retagged_from_an_index() {
   local reg
@@ -263,6 +278,7 @@ test_a_tag_that_cannot_be_written_fails() {
 
 test_an_unchanged_image_gets_the_commit_tag
 test_an_image_from_another_line_is_never_retagged
+test_an_older_ancestor_pushed_later_does_not_win
 test_an_image_with_no_earlier_image_warns_and_writes_nothing
 test_a_tag_that_cannot_be_written_fails
 test_a_lambda_image_is_never_retagged_from_an_index
