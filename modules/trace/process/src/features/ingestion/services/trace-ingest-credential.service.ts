@@ -194,7 +194,9 @@ function collectorKeyOf(resolved: ResolvedApiKeyCredential): RestKeyCredential {
   };
 }
 
-function collectorKeyKindOf(resolved: ResolvedApiKeyCredential): RestKeyCredential["kind"] {
+function collectorKeyKindOf(
+  resolved: Exclude<ResolvedApiKeyCredential, { type: "legacyProjectKey" }>,
+): RestKeyCredential["kind"] {
   if (resolved.isLangySessionKey) return "langy_session_key";
   // A source type is what makes a key an ingestion key; a template is optional on one.
   if (resolved.ingestSourceType) return "ingestion_key";
