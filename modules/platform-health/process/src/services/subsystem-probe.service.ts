@@ -409,6 +409,7 @@ export class SubsystemProbeService {
           { probe, transport, path, attempt, ...canaryAnswerOf(response) },
           "Health canary landed on a pod that is starting or shutting down, sending it again",
         );
+        await response.body?.cancel();
         await sleep(CANARY_NOT_HANDLED_WAIT_MS);
         response = await send();
       }
