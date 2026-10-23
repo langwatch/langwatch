@@ -7,7 +7,7 @@ import {
 } from "../index";
 
 /**
- * ADR-183 §3: a braid's condition read in its compiled form, one release before braids write it.
+ * ADR-185 §3: a braid's condition read in its compiled form, one release before braids write it.
  * @see specs/rbac/authz-grants.feature
  */
 

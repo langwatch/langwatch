@@ -9,7 +9,7 @@ import {
   type LedgerRoleDefinition,
 } from "../authz-ledger-read.repository.ts";
 import type { AuthzReadRepository } from "../authz-read.repository.ts";
-import { sharedProjectReadsOf } from "../eventing/eventing.authz-read.mapper.ts";
+import { NOT_A_BRAID, sharedProjectReadsOf } from "../eventing/eventing.authz-read.mapper.ts";
 import type { GrantRowShape } from "../prisma/prisma.authz-grant.mapper.ts";
 import type { AuthzGrantFilter } from "../prisma/prisma.authz-ledger.mapper.ts";
 import type { AuthzMemoryGrantRow, AuthzMemoryStore } from "./authz-memory.store.ts";
@@ -170,7 +170,7 @@ export class MemoryAuthzLedgerReadRepository extends AuthzLedgerReadRepository {
     organizationId: string;
     readerProjectId: string;
   }): Promise<AuthzSharedProjectGrant[]> {
-    const where = sharedProjectReadsOf({ organizationId, readerProjectId });
+    const where = { ...sharedProjectReadsOf({ organizationId, readerProjectId }), ...NOT_A_BRAID };
     return this.liveGrants()
       .filter((row) => matchesFilter({ row, where }))
       .map((row) => ({

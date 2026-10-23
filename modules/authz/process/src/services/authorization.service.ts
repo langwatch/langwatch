@@ -296,7 +296,7 @@ function sharedGrantsFrom({
  * row out of the proof rather than in it unfiltered.
  */
 function proofCondition(condition: GrantCondition): AuthorizationCondition | "not_applicable" {
-  // ADR-183 §1, §9: a braid is honoured only from the release that ships its fence.
+  // ADR-185 §1, §9: a braid is honoured only from the release that ships its fence.
   if (condition.type === "span" || condition.compiledWhere !== undefined) return "not_applicable";
   if (condition.where !== undefined && condition.where !== "") return "not_applicable";
   if (condition.from === undefined) return "not_applicable";

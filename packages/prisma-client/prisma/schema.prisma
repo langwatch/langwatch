@@ -4617,7 +4617,7 @@ model Grant {
   // like every other fact column; the proof minted at the door copies it.
   condition Json?
 
-  // ADR-183 §2: on a braid change's attach, the braid it replaces. Null on every other grant and
+  // ADR-185 §2: on a braid change's attach, the braid it replaces. Null on every other grant and
   // on braids attached before the column; the fold writes it from the attach event, so a replay
   // rebuilds it.
   replacesGrantId String?

@@ -68,7 +68,7 @@ export const GRANT_EVENT_SOURCES = [
   "aggregate-reconciler",
   "braid",
 ] as const;
-/** ADR-183 §1: a braid's grant, a `span` read from the owner project to the reader project. */
+/** ADR-185 §1: a braid's grant, a `span` read from the owner project to the reader project. */
 export const GRANT_SOURCE_BRAID = "braid" as const satisfies (typeof GRANT_EVENT_SOURCES)[number];
 export const grantEventSourceSchema = z.enum(GRANT_EVENT_SOURCES);
 export type GrantEventSource = z.infer<typeof grantEventSourceSchema>;
@@ -93,7 +93,7 @@ export type ResourceGrantTerms = z.infer<typeof resourceGrantTermsSchema>;
 
 /**
  * A `project` principal sits at RESOURCE scope, as its own project's credential, or as a shared
- * `project-reader` read of another project carrying a condition. Only a braid (ADR-183 §1) has a
+ * `project-reader` read of another project carrying a condition. Only a braid (ADR-185 §1) has a
  * `where`, on a `span` condition with its `compiledWhere`; a braid is only that shared span read.
  */
 export const grantShapeRefinement = {
@@ -183,7 +183,7 @@ const grantAttachedPayloadSchemaDefinition = z
     /** Present when the writer asked to skip an identical live grant: the fold
      *  drops this fact when one already landed, so a write inside the lag adds no row. */
     onDuplicate: z.literal("skip").optional(),
-    /** A braid change (ADR-183 §2): the grant this one replaces, revoked after it attaches. */
+    /** A braid change (ADR-185 §2): the grant this one replaces, revoked after it attaches. */
     replacesGrantId: z.string().min(1).optional(),
   })
   .strict()

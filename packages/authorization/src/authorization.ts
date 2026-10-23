@@ -42,7 +42,7 @@ const actorSchema = z.discriminatedUnion("type", [
 ]);
 
 /** The window a shared grant opens. `from` and `until` are epoch milliseconds; `until` null
- *  means open-ended. Only a `span` condition (a braid, ADR-183 §3) carries `compiledWhere`, and
+ *  means open-ended. Only a `span` condition (a braid, ADR-185 §3) carries `compiledWhere`, and
  *  one with a non-empty `where` must, so no condition reaches a fence it cannot apply. */
 export const authorizationConditionSchema = z
   .object({

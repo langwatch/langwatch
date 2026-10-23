@@ -392,7 +392,7 @@ describe("the grants ledger's wire boundary", () => {
      *  @scenario "The wire accepts every source the vocabulary names" */
     it("accepts every source the vocabulary names", () => {
       for (const source of GRANT_EVENT_SOURCES) {
-        // ADR-183 §1: a braid exists only as the shared span read, so it is driven in that shape.
+        // ADR-185 §1: a braid exists only as the shared span read, so it is driven in that shape.
         const shape = source === "braid" ? BRAID_SHAPE : {};
         expect(parse({}, { source, ...shape }).success).toBe(true);
       }

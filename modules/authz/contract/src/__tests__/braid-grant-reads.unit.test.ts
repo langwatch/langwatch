@@ -1,5 +1,5 @@
 /**
- * ADR-183: a braid's attach is read one release before braids write it, so a worker still on
+ * ADR-185: a braid's attach is read one release before braids write it, so a worker still on
  * this build during a rolling upgrade folds the fact instead of refusing it.
  * @see specs/rbac/authz-grants.feature
  */

@@ -647,7 +647,7 @@ Feature: Authorization grants
     And the platform is never an anonymous actor
 
   # ═══ Braid grants, read before they are written ═══════════════════════
-  # ADR-183 (Braids) writes a braid as a shared project-reader grant on a
+  # ADR-185 (Braids) writes a braid as a shared project-reader grant on a
   # span condition, with its compiled where and the braid a change replaces.
   # The release before it reads those facts, so a worker still on it during a
   # rolling upgrade folds a braid's attach rather than refusing and retrying
@@ -696,6 +696,12 @@ Feature: Authorization grants
     When a proof is minted for the reader
     Then the trace read is in the proof
     And no braid is
+
+  @integration
+  Scenario: The aggregate reconciler never revokes or reattaches a braid
+    Given a reader project holding an aggregate's shared read and a braid
+    When its shared reads are listed for the aggregate reconciler
+    Then only the aggregate's shared read is listed
 
   # ═══ Provenance ═══════════════════════════════════════════════════════
   # Two facts, not one. The SOURCE is which surface authored the grant, which

@@ -11,7 +11,7 @@ import {
 } from "../index";
 
 /**
- * ADR-183 §3: the compiled condition a braid stores and its bounds. The OTTL compiler is
+ * ADR-185 §3: the compiled condition a braid stores and its bounds. The OTTL compiler is
  * authz's; this is only the tree it writes.
  */
 
