@@ -28,9 +28,9 @@ func TestStripeNotice(t *testing.T) {
 		want     string
 	}{
 		{map[string]string{}, true, "Stripe: paymentsim"},
-		{map[string]string{"STRIPE_SECRET_KEY": "sk_test_x"}, true, "Stripe: your test key from .env or 1Password"},
-		{map[string]string{"STRIPE_SECRET_KEY": "sk_test_x"}, false, "Stripe: your test key from .env or 1Password"},
-		{map[string]string{"STRIPE_SECRET_KEY": "sk_test_x", "STRIPE_API_BASE": "http://stripe.local"}, true, "Stripe: custom base http://stripe.local"},
+		{map[string]string{"STRIPE_SECRET_KEY": "sk_test_x"}, true, "Stripe: your own test keys"},
+		{map[string]string{"STRIPE_SECRET_KEY": "sk_test_x"}, false, "Stripe: your own test keys"},
+		{map[string]string{"STRIPE_SECRET_KEY": "sk_test_x", "STRIPE_API_BASE": "http://stripe.local"}, true, "Stripe: your own base (STRIPE_API_BASE)"},
 		{map[string]string{}, false, "Stripe: none, billing is off (`haven up +payment` starts paymentsim)"},
 	}
 	for _, c := range cases {

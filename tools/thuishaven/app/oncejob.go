@@ -22,6 +22,9 @@ type onceJob struct {
 	Dir         string
 	Shell       string
 	Env         []string
+	// WithItem hands the run the 1Password item's fields, read now, in memory.
+	// Opt-in, and never for a fork PR's checkout.
+	WithItem bool
 }
 
 // runOnceJob runs a one-shot lane and journals the run. The journal is the only
@@ -33,7 +36,11 @@ type onceJob struct {
 // still ran, and failing the up over an unwritable log line would be absurd.
 func (o *Orchestrator) runOnceJob(ctx context.Context, job onceJob) error {
 	started := o.sys.Now()
-	err := o.sup.RunOnce(ctx, job.Name, job.Dir, job.Shell, withItemEnv(job.WorktreeDir, job.Env))
+	env := job.Env
+	if job.WithItem {
+		env = withItemEnv(job.WorktreeDir, env)
+	}
+	err := o.sup.RunOnce(ctx, job.Name, job.Dir, job.Shell, env)
 	o.journalOnceJob(job.WorktreeDir, job.Slug, domain.OnceJobRun{
 		Name:       job.Name,
 		At:         started,

@@ -1,8 +1,7 @@
 package app
 
 import (
-	"bytes"
-	"fmt"
+	"errors"
 	"os"
 	"path/filepath"
 	"slices"
@@ -28,88 +27,6 @@ func TestMain(m *testing.M) {
 	code := m.Run()
 	_ = os.RemoveAll(dir)
 	os.Exit(code)
-}
-
-// opStubScript is a fake op: it logs its argv, answers `item get` from
-// item.json (or the error in fail), and stores what create/edit read on stdin.
-const opStubScript = `#!/bin/sh
-dir="$(dirname "$0")"
-printf '%s\n' "$*" >> "$dir/argv.log"
-case "$1 $2" in
-"item get")
-  if [ -f "$dir/fail" ]; then cat "$dir/fail" >&2; exit 1; fi
-  if [ -f "$dir/item.json" ]; then cat "$dir/item.json"; exit 0; fi
-  echo '[ERROR] "LangWatch haven secrets" isn'"'"'t an item in the "Private" vault.' >&2; exit 1 ;;
-"item create"|"item edit")
-  if [ -f "$dir/readonly" ]; then cat > /dev/null; exit 0; fi
-  cat > "$dir/item.json"; echo '{"id":"stored"}'; exit 0 ;;
-esac
-exit 1
-`
-
-type opStub struct{ dir string }
-
-// stubOnePassword puts the fake op first on PATH and forgets any cached read.
-func stubOnePassword(t *testing.T) opStub {
-	t.Helper()
-	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "op"), []byte(opStubScript), 0o700); err != nil { //nolint:gosec // an executable stub
-		t.Fatal(err)
-	}
-	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
-	forgetOnePassword()
-	t.Cleanup(forgetOnePassword)
-	return opStub{dir: dir}
-}
-
-func (s opStub) holds(t *testing.T, fields map[string]string) {
-	t.Helper()
-	raw, err := domain.NewOnePasswordItem(fields)
-	if err != nil {
-		t.Fatal(err)
-	}
-	s.write(t, "item.json", string(raw))
-}
-
-func (s opStub) write(t *testing.T, name, content string) {
-	t.Helper()
-	if err := os.WriteFile(filepath.Join(s.dir, name), []byte(content), 0o600); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func (s opStub) calls(t *testing.T) []string {
-	t.Helper()
-	raw, err := os.ReadFile(filepath.Join(s.dir, "argv.log"))
-	if os.IsNotExist(err) {
-		return nil
-	}
-	if err != nil {
-		t.Fatal(err)
-	}
-	return strings.Split(strings.TrimSpace(string(raw)), "\n")
-}
-
-func (s opStub) stored(t *testing.T) map[string]string {
-	t.Helper()
-	raw, err := os.ReadFile(filepath.Join(s.dir, "item.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	fields, err := domain.OnePasswordFields(raw)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return fields
-}
-
-func checkoutWithDotenv(t *testing.T, content string) string {
-	t.Helper()
-	repo := t.TempDir()
-	if err := os.WriteFile(filepath.Join(repo, ".env"), []byte(content), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	return repo
 }
 
 // @scenario "A key only 1Password holds counts as configured"
@@ -173,8 +90,8 @@ func TestALockedOrMissingOpLeavesTheStackAsItWas(t *testing.T) {
 
 	op := stubOnePassword(t)
 	op.write(t, "fail", "[ERROR] account is not signed in\n")
-	if _, err := onePasswordFields("acme"); err == nil || !strings.Contains(err.Error(), "not signed in") {
-		t.Errorf("a locked vault answered %v, want op's reason", err)
+	if _, err := onePasswordFields("acme"); err == nil || err.Error() != "op is signed out" {
+		t.Errorf("a locked vault answered %v, want the fixed reason", err)
 	}
 	if env := onePasswordChildEnv(repo); env != nil {
 		t.Errorf("a locked vault injected %d entries, want none", len(env))
@@ -210,7 +127,8 @@ func TestEveryLaneReadsTheItemWhenItStarts(t *testing.T) {
 		}
 	}
 	once := withItemEnv(repo, []string{"OPENAI_API_KEY=mine"})
-	if slices.Index(once, "OPENAI_API_KEY=fromitem") > slices.Index(once, "OPENAI_API_KEY=mine") {
+	item, own := slices.Index(once, "OPENAI_API_KEY=fromitem"), slices.Index(once, "OPENAI_API_KEY=mine")
+	if item < 0 || own < 0 || item > own {
 		t.Error("a one-shot run's own env does not win over the item")
 	}
 }
@@ -247,134 +165,71 @@ func TestThePlanFileHoldsNoItemValue(t *testing.T) {
 	}
 }
 
-const pemValue = "-----BEGIN PRIVATE KEY-----\nMIIBVQIBADANBg\n-----END PRIVATE KEY-----"
-
-func moveFixture() string {
-	return "# local config\nBASE_HOST=http://localhost:5560\nOPENAI_API_KEY=sk-openai-value\n" +
-		"DATABASE_URL=postgresql://localhost:5432/langwatch\n" +
-		"GITHUB_APP_PRIVATE_KEY=\"" + pemValue + "\"\nEMPTY_API_KEY=\n"
+// @scenario "op failures are named in fixed words"
+func TestOpFailuresAreNamedInFixedWords(t *testing.T) {
+	cases := map[string]string{
+		"[ERROR] You are not currently signed in. Please run `op signin` sk-leak": "op is signed out",
+		"[ERROR] authorization prompt dismissed sk-leak":                          "op is signed out",
+		"[ERROR] the vault is locked sk-leak":                                     "1Password is locked",
+		`[ERROR] More than one item matches "LangWatch haven secrets". sk-leak`:   "more than one item has the item's title",
+		"[ERROR] no account found for filter acme sk-leak":                        "op does not know the account",
+		"panic: something else entirely sk-leak":                                  "op failed",
+	}
+	for stderr, want := range cases {
+		if err := opFailure(stderr, nil); err == nil || err.Error() != want {
+			t.Errorf("op saying %q answered %v, want %q", stderr, err, want)
+		}
+	}
+	if err := opFailure(`[ERROR] "x" isn't an item in the "Private" vault.`, nil); !errors.Is(err, errNoItem) {
+		t.Errorf("a missing item answered %v, want errNoItem", err)
+	}
 }
 
-// @scenario "The move is a dry run until it is applied"
-func TestTheMoveIsADryRunUntilApplied(t *testing.T) {
+// @scenario "A later start reads the item afresh"
+func TestALaterStartReadsTheItemAfresh(t *testing.T) {
 	op := stubOnePassword(t)
-	repo := checkoutWithDotenv(t, moveFixture())
-	var out bytes.Buffer
-
-	if err := (&Orchestrator{}).SecretsMove(SecretsMoveParams{WorktreeDir: repo, Account: "acme"}, &out); err != nil {
+	op.write(t, "fail", "[ERROR] the vault is locked\n")
+	for range 2 {
+		if _, err := onePasswordFields("acme"); err == nil {
+			t.Fatal("a locked vault answered fields")
+		}
+	}
+	if calls := op.calls(t); len(calls) != 1 {
+		t.Fatalf("one launch called op %d times, want once", len(calls))
+	}
+	if err := os.Remove(filepath.Join(op.dir, "fail")); err != nil {
 		t.Fatal(err)
 	}
-	printed := out.String()
-	for _, key := range []string{"OPENAI_API_KEY", "GITHUB_APP_PRIVATE_KEY"} {
-		if !strings.Contains(printed, key) {
-			t.Errorf("the dry run did not name %s:\n%s", key, printed)
-		}
-	}
-	for _, kept := range []string{"BASE_HOST", "DATABASE_URL", "EMPTY_API_KEY", "sk-openai-value", "MIIBVQ"} {
-		if strings.Contains(printed, kept) {
-			t.Errorf("the dry run printed %q:\n%s", kept, printed)
-		}
-	}
-	if raw, _ := os.ReadFile(filepath.Join(repo, ".env")); string(raw) != moveFixture() {
-		t.Error("the dry run changed .env")
-	}
-	if calls := op.calls(t); calls != nil {
-		t.Errorf("the dry run called op: %v", calls)
+	op.holds(t, map[string]string{"OPENAI_API_KEY": "fromitem"})
+	onePasswordCache.Lock()
+	read := onePasswordCache.reads["acme"]
+	read.at = read.at.Add(-onePasswordBatch)
+	onePasswordCache.reads["acme"] = read
+	onePasswordCache.Unlock()
+
+	fields, err := onePasswordFields("acme")
+	if err != nil || fields["OPENAI_API_KEY"] != "fromitem" {
+		t.Errorf("a start after the launch answered %v, %v; want a fresh read", len(fields), err)
 	}
 }
 
-// @scenario "Applying the move fills the item, then rewrites .env"
-func TestApplyingTheMoveFillsTheItemThenRewritesDotenv(t *testing.T) {
-	for _, existing := range []bool{false, true} {
-		t.Run(fmt.Sprintf("item exists %v", existing), func(t *testing.T) {
-			op := stubOnePassword(t)
-			if existing {
-				op.write(t, "item.json", `{"id":"abc","title":"LangWatch haven secrets","category":"SECURE_NOTE","fields":[`+
-					`{"id":"notesPlain","purpose":"NOTES","label":"notesPlain","value":"mine"},`+
-					`{"id":"k1","label":"KEEP_TOKEN","type":"CONCEALED","value":"kept"},`+
-					`{"id":"k2","label":"OPENAI_API_KEY","type":"CONCEALED","value":"stale"}]}`)
-			}
-			repo := checkoutWithDotenv(t, moveFixture())
-			var out bytes.Buffer
-
-			err := (&Orchestrator{}).SecretsMove(SecretsMoveParams{WorktreeDir: repo, Account: "acme", Apply: true}, &out)
-			if err != nil {
-				t.Fatal(err)
-			}
-			for _, call := range op.calls(t) {
-				if strings.Contains(call, "sk-openai-value") || strings.Contains(call, "MIIBVQ") {
-					t.Fatalf("a value reached op's arguments: %q", call)
-				}
-			}
-			if strings.Contains(out.String(), "sk-openai-value") {
-				t.Error("the move printed a value")
-			}
-			stored := op.stored(t)
-			if stored["OPENAI_API_KEY"] != "sk-openai-value" || stored["GITHUB_APP_PRIVATE_KEY"] != pemValue {
-				t.Error("the item does not hold the moved values")
-			}
-			if existing && stored["KEEP_TOKEN"] != "kept" {
-				t.Error("editing the item dropped a field it already had")
-			}
-			raw, _ := os.ReadFile(filepath.Join(repo, ".env"))
-			want := "# local config\nBASE_HOST=http://localhost:5560\n" +
-				"DATABASE_URL=postgresql://localhost:5432/langwatch\nEMPTY_API_KEY=\nLANGWATCH_OP_ACCOUNT=\"acme\"\n"
-			if string(raw) != want {
-				t.Errorf(".env after the move is\n%s\nwant\n%s", raw, want)
-			}
-		})
-	}
-}
-
-// @scenario "Applying the move fills the item, then rewrites .env"
-func TestAMoveTheItemDoesNotReadBackLeavesDotenvAlone(t *testing.T) {
-	op := stubOnePassword(t)
-	op.write(t, "readonly", "")
-	repo := checkoutWithDotenv(t, moveFixture())
-
-	err := (&Orchestrator{}).SecretsMove(SecretsMoveParams{WorktreeDir: repo, Account: "acme", Apply: true}, &bytes.Buffer{})
-	if err == nil || !strings.Contains(err.Error(), ".env is untouched") {
-		t.Fatalf("a write the item did not keep answered %v", err)
-	}
-	if strings.Contains(err.Error(), "sk-openai-value") {
-		t.Error("the refusal carries a value")
-	}
-	if raw, _ := os.ReadFile(filepath.Join(repo, ".env")); string(raw) != moveFixture() {
-		t.Error(".env was rewritten although the item did not read back")
-	}
-}
-
-// @scenario "A credential back in .env is named at haven up"
-func TestACredentialBackInDotenvIsNamed(t *testing.T) {
-	repo := checkoutWithDotenv(t, moveFixture())
-	warning := dotenvCredentialWarning(repo)
-	if !strings.Contains(warning, "OPENAI_API_KEY") || !strings.Contains(warning, "haven secrets move") {
-		t.Errorf("the warning is %q", warning)
-	}
-	if strings.Contains(warning, "sk-openai-value") || strings.Contains(warning, "BASE_HOST") {
-		t.Errorf("the warning names a value or a config key: %q", warning)
-	}
-	if got := dotenvCredentialWarning(checkoutWithDotenv(t, "BASE_HOST=http://x\n")); got != "" {
-		t.Errorf("a config-only .env warned %q", got)
-	}
-}
-
-func TestSecretsExecEnvCarriesEachKeyOnce(t *testing.T) {
+// @scenario "A fork PR or a play sandbox gets nothing from 1Password"
+func TestAnUntrustedCheckoutGetsNothingFromTheItem(t *testing.T) {
 	op := stubOnePassword(t)
 	op.holds(t, map[string]string{"OPENAI_API_KEY": "fromitem"})
-	t.Setenv(domain.OnePasswordAccountKey, "acme")
 	t.Setenv("OPENAI_API_KEY", "")
+	repo := checkoutWithDotenv(t, "LANGWATCH_OP_ACCOUNT=acme\n")
 
-	env := SecretsExecEnv(t.TempDir())
-	seen := map[string]int{}
-	for _, kv := range env {
-		key, _, _ := strings.Cut(kv, "=")
-		seen[key]++
+	if env := itemEnvFor(UpParams{WorktreeDir: repo, UntrustedCheckout: true}, []string{"A=1"}); !slices.Equal(env, []string{"A=1"}) {
+		t.Errorf("a fork PR's one-shot run got %d entries, want its own env only", len(env))
 	}
-	if seen[domain.OnePasswordAccountKey] != 1 || seen["OPENAI_API_KEY"] != 1 { // the account passes through
-		t.Errorf("keys repeat: account %d, OPENAI_API_KEY %d", seen[domain.OnePasswordAccountKey], seen["OPENAI_API_KEY"])
+	if env := itemEnvFor(UpParams{WorktreeDir: repo}, nil); !slices.Contains(env, "OPENAI_API_KEY=fromitem") {
+		t.Error("a trusted one-shot run does not get the item")
 	}
-	if !slices.Contains(env, "OPENAI_API_KEY=fromitem") || !slices.Contains(env, SecretsExecMarker+"=1") {
-		t.Error("the exec env lacks the item's field or the marker")
+	lanes := []Child{{Name: APILane}, {Name: GoLane}}
+	for _, lane := range readItemAtStart(lanes, domain.Stack{UntrustedCheckout: true}, repo) {
+		if lane.SecretsFrom != "" || withSecretsAtStart(lane).EnvAtStart != nil {
+			t.Errorf("a fork PR's %s lane reads the item at start", lane.Name)
+		}
 	}
 }

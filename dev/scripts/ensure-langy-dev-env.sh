@@ -57,7 +57,7 @@ note() {
   written=$((written + 1))
 }
 
-if [ -z "${LANGY_INTERNAL_SECRET:-}" ] && [ -z "$(env_file_key_value "$ENV_FILE" LANGWATCH_OP_ACCOUNT || true)" ] &&
+if [ -z "${LANGY_INTERNAL_SECRET:-}" ] && [ -z "${LANGWATCH_OP_ACCOUNT:-}" ] && [ -z "$(env_file_key_value "$ENV_FILE" LANGWATCH_OP_ACCOUNT || true)" ] &&
   env_file_key_is_empty_or_missing "$ENV_FILE" LANGY_INTERNAL_SECRET; then
   if ! command -v openssl >/dev/null 2>&1; then
     echo "ERROR: openssl not found — cannot generate LANGY_INTERNAL_SECRET." >&2

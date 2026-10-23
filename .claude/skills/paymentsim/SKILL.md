@@ -19,7 +19,7 @@ spec: `specs/setup/payment-simulator.feature`. State is in memory: a restart for
   `STRIPE_API_BASE=https://payment.<slug>.langwatch.localhost`, `STRIPE_SECRET_KEY=sk_test_paymentsim`,
   `STRIPE_WEBHOOK_SECRET=whsec_paymentsim`. Set your own Stripe test keys in `.env` and those are
   used as they are. `haven up` prints which: `Stripe: paymentsim` or
-  `Stripe: your test key from .env or 1Password`.
+  `Stripe: your own test keys`.
 - `haven up -payment` drops the lane (sticky). Restart the API (`haven down` + `up`) after toggling.
 - Without haven: `make service svc=paymentsim` with `PAYMENTSIM_ADDR` (default `:5599`),
   `PAYMENTSIM_WEBHOOK_URL`, `PAYMENTSIM_WEBHOOK_SECRET`, `PAYMENTSIM_CATALOG`, `PAYMENTSIM_PUBLIC_URL`.

@@ -39,7 +39,10 @@ func (o *Orchestrator) SecretsMove(p SecretsMoveParams, out io.Writer) error {
 		return err
 	}
 	text := string(raw)
-	values := movableCredentials(p.WorktreeDir, text)
+	values, err := movableCredentials(p.WorktreeDir, text)
+	if err != nil {
+		return fmt.Errorf("nothing moved: %w", err)
+	}
 	if len(values) == 0 {
 		_, _ = fmt.Fprintln(out, ".env holds no credential: nothing to move")
 		return nil
@@ -63,12 +66,16 @@ func (o *Orchestrator) SecretsMove(p SecretsMoveParams, out io.Writer) error {
 }
 
 // movableCredentials is key to value for every credential line of the .env text.
-func movableCredentials(repoDir, text string) map[string]string {
+func movableCredentials(repoDir, text string) (map[string]string, error) {
+	entries, err := domain.ParseDotenvEntries(text)
+	if err != nil {
+		return nil, err
+	}
 	values := map[string]string{}
-	for _, entry := range domain.DotenvCredentials(domain.SecretClasses(repoDir), domain.ParseDotenvEntries(text)) {
+	for _, entry := range domain.DotenvCredentials(domain.SecretClasses(repoDir), entries) {
 		values[entry.Key] = entry.Value
 	}
-	return values
+	return values, nil
 }
 
 type applyMoveParams struct {
@@ -88,8 +95,12 @@ func applyMove(p applyMoveParams, out io.Writer) error {
 	for key := range p.values {
 		moved[key] = true
 	}
-	if err := writeFileInPlace(p.path, []byte(domain.RewriteDotenv(p.text, moved, p.account))); err != nil {
-		return fmt.Errorf("the item holds every value, but .env could not be rewritten: %w", err)
+	rewritten, err := domain.RewriteDotenv(p.text, moved, p.account)
+	if err == nil {
+		err = replaceIfUnchanged(p.path, p.text, rewritten)
+	}
+	if err != nil {
+		return fmt.Errorf("the item holds every value, but .env was not rewritten: %w", err)
 	}
 	forgetOnePassword()
 	_, _ = fmt.Fprintf(out, "moved %d keys; .env sets %s=%q. Restart the stack: haven down && haven up\n", len(p.values), domain.OnePasswordAccountKey, p.account)
@@ -100,7 +111,7 @@ func applyMove(p applyMoveParams, out io.Writer) error {
 func writeOnePasswordItem(account string, values map[string]string) error {
 	where := []string{domain.OnePasswordItem, "--vault", domain.OnePasswordVault}
 	current, err := runOnePassword(account, nil, append([]string{"item", "get"}, append(where, "--format", "json", "--reveal")...)...)
-	if err != nil && !notAnItem.MatchString(err.Error()) {
+	if err != nil && !errors.Is(err, errNoItem) {
 		return err
 	}
 	if err != nil {
@@ -137,6 +148,19 @@ func verifyOnePasswordItem(account string, values map[string]string) error {
 		return fmt.Errorf("the item did not read back %s", strings.Join(missing, ", "))
 	}
 	return nil
+}
+
+// replaceIfUnchanged rewrites path only while it still holds the text the move
+// read at its start, so an edit made meanwhile is never overwritten.
+func replaceIfUnchanged(path, read, rewritten string) error {
+	current, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	if string(current) != read {
+		return errors.New(".env changed while the move ran; run it again")
+	}
+	return writeFileInPlace(path, []byte(rewritten))
 }
 
 // writeFileInPlace replaces path through a sibling and a rename, keeping its mode.

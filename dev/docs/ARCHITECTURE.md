@@ -1204,8 +1204,8 @@ telemetry initializes. The app builds only the READER — a fluent adapter chain
 `.withSecrets((_, secrets) => secrets.withEnv().withFile())` — installed on the
 Server preamble AFTER `withConfig`, so config can feed secrets; the builder is
 never imported and chains directly. **The
-chain is a lookup order, not a store**: env and
-`.env` hold no values — each declared handle is fetched singly, at its
+chain is a lookup order, not a store**: it keeps no value it reads from env or
+`.env` — each declared handle is fetched singly, at its
 owner's construction site, and handed straight to its closure. `boot()`
 scopes the resolver per module: a `create()` can resolve only the handles
 its own module declared, each resolve validates against the handle's

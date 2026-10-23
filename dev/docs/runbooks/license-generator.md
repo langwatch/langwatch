@@ -53,7 +53,7 @@ seed both import, so the seed signs exactly what the verifier checks.
    rm dev-license.pem dev-license.pub.pem
    ```
 
-   The private key may live in 1Password instead: the `LangWatch` item of your
+   The private key may live in 1Password instead: the `LangWatch haven secrets` item of your
    `Private` vault, field `LANGWATCH_LICENSE_PRIVATE_KEY`, with
    `LANGWATCH_OP_ACCOUNT` set; haven hands it to the seed in memory.
 

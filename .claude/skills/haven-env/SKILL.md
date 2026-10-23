@@ -11,6 +11,7 @@ argument-hint: "[--reveal] | machine limits [set <name> <value> | unset <name>]"
 haven env                         # this stack's resolved environment, every secret masked
 haven env --json                  # machine-readable
 eval "$(haven env --reveal)"      # real values into your shell; never paste or print this
+haven secrets exec -- <cmd>       # runs <cmd> with the 1Password item too; --reveal never prints it
 haven help env                    # every knob and where it resolves from
 ```
 
@@ -42,7 +43,7 @@ haven help env                    # every knob and where it resolves from
   `LANGWATCH_INSTANCE_ADMIN_API_KEY`, `HAVEN_SEED_SCIM_TOKEN`. They live in haven's own state, survive
   down/up and rotate only on `haven down --destroy`. No real key, no 1Password.
 - Stripe is paymentsim on every stack unless `.env` or 1Password sets a Stripe key; `haven up` prints
-  `Stripe: paymentsim` or `Stripe: your test key from .env or 1Password` (`paymentsim` skill).
+  `Stripe: paymentsim` or `Stripe: your own test keys` (`paymentsim` skill).
 
 ## Credentials in 1Password
 

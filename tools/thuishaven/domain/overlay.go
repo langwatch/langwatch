@@ -609,9 +609,9 @@ func RefuseLiveStripe(resolved map[string]string) error {
 func StripeNotice(resolved map[string]string, isPaymentSimOn bool) string {
 	switch {
 	case resolved["STRIPE_API_BASE"] != "":
-		return "Stripe: custom base " + resolved["STRIPE_API_BASE"]
+		return "Stripe: your own base (STRIPE_API_BASE)"
 	case HasOwnStripe(resolved):
-		return "Stripe: your test key from .env or 1Password"
+		return "Stripe: your own test keys"
 	case isPaymentSimOn:
 		return "Stripe: paymentsim"
 	}

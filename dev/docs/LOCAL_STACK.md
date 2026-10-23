@@ -53,7 +53,7 @@ headless shell per stack with a signed-in context per lane, for agent testers: s
 Stripe is paymentsim on every local and CI stack: `haven up` runs it and points
 billing at it unless `.env`, the shell or the 1Password item sets `STRIPE_SECRET_KEY`,
 `STRIPE_WEBHOOK_SECRET` or `STRIPE_API_BASE`, in which case your keys are used.
-`haven up` prints which (`Stripe: paymentsim` or `Stripe: your test key from .env or 1Password`).
+`haven up` prints which (`Stripe: paymentsim` or `Stripe: your own test keys`).
 
 ### Keeping your credentials in 1Password
 

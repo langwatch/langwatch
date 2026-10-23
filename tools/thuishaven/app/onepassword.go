@@ -22,15 +22,28 @@ import (
 // onePasswordTimeout bounds one op call; an unlock prompt counts against it.
 const onePasswordTimeout = 30 * time.Second
 
-// onePasswordTTL is how long one in-memory read answers, so a long-lived keeper
-// picks up a rotated key at a later restart without asking op per lane.
-const onePasswordTTL = 5 * time.Minute
+// onePasswordBatch is how long one read answers: the lanes of one launch share
+// it, and a later start or restart reads afresh, so a rotated key, or an unlock
+// after a failure, reaches the next start.
+const onePasswordBatch = 10 * time.Second
 
 // accountPattern is what an account shorthand, sign-in address or id looks like.
 var accountPattern = regexp.MustCompile(`^[A-Za-z0-9._@-]+$`)
 
-// notAnItem is how op says the item does not exist: an empty item, not a failure.
-var notAnItem = regexp.MustCompile(`(?i)isn't an item|no item matched`)
+// errNoItem is op saying the item does not exist: an empty item, not a failure.
+var errNoItem = errors.New("the item does not exist")
+
+// opFailures maps op's stderr to fixed words: op's own text is never forwarded.
+var opFailures = []struct {
+	pattern *regexp.Regexp
+	err     error
+}{
+	{regexp.MustCompile(`(?i)isn't an item|no item matched`), errNoItem},
+	{regexp.MustCompile(`(?i)more than one item matches`), errors.New("more than one item has the item's title")},
+	{regexp.MustCompile(`(?i)locked`), errors.New("1Password is locked")},
+	{regexp.MustCompile(`(?i)not (currently )?signed in|sign in|session|authori[sz]|unauthenticated`), errors.New("op is signed out")},
+	{regexp.MustCompile(`(?i)account`), errors.New("op does not know the account")},
+}
 
 type onePasswordRead struct {
 	fields map[string]string
@@ -50,9 +63,9 @@ func forgetOnePassword() {
 	onePasswordCache.reads = map[string]onePasswordRead{}
 }
 
-// onePasswordFields is the item's fields for account, read at most once per
-// TTL. No account is no fields. A failure warns once, naming the reason, and
-// answers no fields, so the stack comes up exactly as it did without 1Password.
+// onePasswordFields is the item's fields for account, shared within one launch
+// batch. No account is no fields. A failure warns, naming the reason, and
+// answers no fields, so a process starts exactly as it would without 1Password.
 func onePasswordFields(account string) (map[string]string, error) {
 	account = strings.TrimSpace(account)
 	if account == "" {
@@ -60,7 +73,7 @@ func onePasswordFields(account string) (map[string]string, error) {
 	}
 	onePasswordCache.Lock()
 	defer onePasswordCache.Unlock()
-	if read, ok := onePasswordCache.reads[account]; ok && time.Since(read.at) < onePasswordTTL {
+	if read, ok := onePasswordCache.reads[account]; ok && time.Since(read.at) < onePasswordBatch {
 		return read.fields, read.err
 	}
 	fields, err := readOnePasswordItem(account)
@@ -72,25 +85,25 @@ func onePasswordFields(account string) (map[string]string, error) {
 }
 
 // readOnePasswordItem is one `op item get`: the item's fields, an empty map
-// when it does not exist, or an error carrying op's first stderr line.
+// when it does not exist, or a fixed reason.
 func readOnePasswordItem(account string) (map[string]string, error) {
 	raw, err := runOnePassword(account, nil, "item", "get", domain.OnePasswordItem, "--vault", domain.OnePasswordVault, "--format", "json", "--reveal")
+	if errors.Is(err, errNoItem) {
+		return map[string]string{}, nil
+	}
 	if err != nil {
-		if notAnItem.MatchString(err.Error()) {
-			return map[string]string{}, nil
-		}
 		return nil, err
 	}
 	fields, err := domain.OnePasswordFields(raw)
 	if err != nil {
-		return nil, fmt.Errorf("op answered something that is not an item: %w", err)
+		return nil, errors.New("op answered something that is not an item")
 	}
 	return fields, nil
 }
 
 // runOnePassword runs op with stdin (nil for none) and answers its stdout.
-// A value only ever travels on stdin or stdout, never in args, and stdout is
-// never printed; an error carries op's first stderr line.
+// A value only ever travels on stdin or stdout, never in args; stdout is never
+// printed and stderr is mapped to fixed words (opFailure).
 func runOnePassword(account string, stdin []byte, args ...string) ([]byte, error) {
 	if !accountPattern.MatchString(account) {
 		return nil, fmt.Errorf("%s is not an account shorthand, sign-in address or id", domain.OnePasswordAccountKey)
@@ -110,88 +123,20 @@ func runOnePassword(account string, stdin []byte, args ...string) ([]byte, error
 	case ctx.Err() != nil:
 		return nil, fmt.Errorf("op timed out after %s", onePasswordTimeout)
 	case err != nil:
-		line, _, _ := strings.Cut(strings.TrimSpace(stderr.String()), "\n")
-		if line == "" {
-			line = err.Error()
-		}
-		return nil, errors.New(line)
+		return nil, opFailure(stderr.String(), cmd.ProcessState)
 	}
 	return stdout.Bytes(), nil
 }
 
-// localDevEnv is the developer's own environment: .env under the shell.
-func localDevEnv(repoDir string) map[string]string {
-	resolved := domain.LoadDotenv(repoDir)
-	for _, kv := range os.Environ() {
-		if key, val, ok := strings.Cut(kv, "="); ok && val != "" {
-			resolved[key] = val
+// opFailure is the fixed reason for a failed op run.
+func opFailure(stderr string, state *os.ProcessState) error {
+	for _, failure := range opFailures {
+		if failure.pattern.MatchString(stderr) {
+			return failure.err
 		}
 	}
-	return resolved
-}
-
-// onePasswordChildEnv is what a process gets from the item when it starts:
-// each field the shell and .env leave unset. Nothing when the read failed.
-func onePasswordChildEnv(repoDir string) []string {
-	local := localDevEnv(repoDir)
-	fields, err := onePasswordFields(local[domain.OnePasswordAccountKey])
-	if err != nil {
-		return nil
+	if state != nil {
+		return fmt.Errorf("op failed (exit %d)", state.ExitCode())
 	}
-	return domain.OnePasswordEnv(fields, local)
-}
-
-// withItemEnv puts the item's fields before env for a one-shot run, read now
-// and handed to that run only; env wins a clash.
-func withItemEnv(repoDir string, env []string) []string {
-	return append(onePasswordChildEnv(repoDir), env...)
-}
-
-// withSecretsAtStart gives a lane that names a checkout its start-time read of
-// the item. It is set after the plan file is read, so no value is ever in it.
-func withSecretsAtStart(c Child) Child {
-	if dir := c.SecretsFrom; dir != "" {
-		c.EnvAtStart = func() []string { return onePasswordChildEnv(dir) }
-	}
-	return c
-}
-
-// SecretsExecMarker tells a script `haven secrets exec` already ran it.
-const SecretsExecMarker = "HAVEN_SECRETS_EXEC"
-
-// SecretsExecEnv is the environment `haven secrets exec` runs a command in:
-// this process's own plus the item's fields the shell and .env leave unset and
-// the marker, each key once (a later duplicate is not what getenv reads).
-func SecretsExecEnv(worktreeDir string) []string {
-	added := append(onePasswordChildEnv(worktreeDir), SecretsExecMarker+"=1")
-	replaced := map[string]bool{}
-	for _, kv := range added {
-		key, _, _ := strings.Cut(kv, "=")
-		replaced[key] = true
-	}
-	env := make([]string, 0, len(os.Environ())+len(added))
-	for _, kv := range os.Environ() {
-		if key, _, _ := strings.Cut(kv, "="); !replaced[key] {
-			env = append(env, kv)
-		}
-	}
-	return append(env, added...)
-}
-
-// dotenvCredentialWarning is the line `haven up` prints when .env holds a
-// credential, naming the keys and never a value; "" when it holds none.
-func dotenvCredentialWarning(repoDir string) string {
-	raw, err := os.ReadFile(dotenvPath(repoDir))
-	if err != nil {
-		return ""
-	}
-	found := domain.DotenvCredentials(domain.SecretClasses(repoDir), domain.ParseDotenvEntries(string(raw)))
-	if len(found) == 0 {
-		return ""
-	}
-	keys := make([]string, 0, len(found))
-	for _, entry := range found {
-		keys = append(keys, entry.Key)
-	}
-	return fmt.Sprintf(".env holds credentials (%s): keep them in 1Password with `haven secrets move`", strings.Join(keys, ", "))
+	return errors.New("op failed")
 }

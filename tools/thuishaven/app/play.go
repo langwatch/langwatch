@@ -979,7 +979,7 @@ func (o *Orchestrator) PlayLaunch(ctx context.Context, pl PlaySandbox) error {
 	opts := PlanOptions{Selection: playSelection(), RepoRoot: pl.Checkout}
 	children := o.planChildren(st, opts, pl.Checkout)
 	for i := range children {
-		children[i] = withSecretsAtStart(children[i])
+		children[i].SecretsFrom = "" // a throwaway sandbox gets none of the developer's credentials
 	}
 	o.sup.Supervise(ctx, children)
 	// Both stop on the same canceled context, but the seeder writes to the

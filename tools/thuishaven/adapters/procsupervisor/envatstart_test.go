@@ -19,7 +19,7 @@ func TestEnvAtStartIsReadAtEachStartAndEnvWins(t *testing.T) {
 	for range 2 {
 		cmd := c.command(context.Background())
 		item, shared := slices.Index(cmd.Env, "SHARED=item"), slices.Index(cmd.Env, "SHARED=plan")
-		if !slices.Contains(cmd.Env, "FROM_ITEM=x") || shared < item {
+		if !slices.Contains(cmd.Env, "FROM_ITEM=x") || item < 0 || shared < 0 || shared < item {
 			t.Fatalf("env = %v, want the start-time entries before the plan's", cmd.Env[len(cmd.Env)-3:])
 		}
 	}

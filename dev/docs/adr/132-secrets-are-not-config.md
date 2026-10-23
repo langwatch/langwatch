@@ -212,22 +212,29 @@ This replaces the "1Password is opt-in" section above and the Node adapter it de
   env, then `.env`, then the refusal. A pod therefore holds no vault code at all.
 - **haven reads, in memory.** `LANGWATCH_OP_ACCOUNT` (in `.env` or the shell) names the account;
   the item is `Private/LangWatch haven secrets`, one field per env key. haven reads it with one
-  `op item get`, cached in its own process memory only, and treats the fields as the layer after
-  the shell and `.env`. Provider detection (paymentsim, mailsim and the other stand-ins) sees
-  them, and `haven env` masks every value that came from the item.
+  `op item get`, kept in its own process memory and shared only by the processes of one launch
+  (a later start or restart reads afresh), and treats the fields as the layer after the shell and
+  `.env`. Provider detection (paymentsim, mailsim and the other stand-ins) sees them; `haven env`
+  never prints one, and op's failures are shown as fixed words, never op's own text.
 - **Handed in as env at start.** Each process haven starts (Node, Go, Python, and the one-shot
   jobs) gets the fields the shell and `.env` leave unset, read at the moment it starts or
   restarts and placed before its planned env so that env wins a clash. The keeper plan records
   only which checkout a lane reads from, never a value: **no 1Password value is written to any
   file haven keeps** (Alex, 2026-10-23). A failed read prints one line and changes nothing.
+- **Untrusted code gets nothing.** A fork PR's stack (`haven pr`) and a throwaway play sandbox
+  read nothing from the item; neither do dependency installs, codegen and builds, which run
+  third-party scripts.
 - **Outside haven,** `haven secrets exec -- <command>` runs any command the same way;
   `pnpm dev` re-runs itself through it when the account is set and haven is installed, and the
-  two `ensure-*.sh` writers skip a key the environment already holds.
+  two `ensure-*.sh` writers skip a key the environment already holds. A `haven up` run under
+  it leaves the keys it took from the item out of the keeper plan.
 - **The move is `haven secrets move`.** It replaces the unbuilt `SecretMigrationService` and
   the `haven secrets push` note above: a dry run naming keys, then `--apply` creates or edits
   the item through a JSON template on stdin, reads it back, and only then deletes the moved
-  lines and sets `LANGWATCH_OP_ACCOUNT`. A credential line is a secret-class key with a value,
-  except a connection string with no password.
+  lines and sets `LANGWATCH_OP_ACCOUNT`. It reads `.env` exactly as Node's dotenv parser does and
+  stops before touching either side on a quote never closed, or when `.env` changed meanwhile. A
+  credential line is a secret-class key with a value, except a database, ClickHouse, Redis or SMTP
+  connection string with no password.
 - **Guard.** `haven up` warns, naming keys only, whenever `.env` holds a credential line.
 
 ## Alternatives considered

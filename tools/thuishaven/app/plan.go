@@ -173,14 +173,18 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir s
 		out = append(out, langy)
 	}
 	if st.Layout.IsMonolith() || isBuiltUI || !isAppOn {
-		return readItemAtStart(out, repoDir)
+		return readItemAtStart(out, st, repoDir)
 	}
 	// --hmr: Vite runs as its own ui lane beside the backend (ADR-168, 2026-10-10).
-	return readItemAtStart(append(out, p.backendChild()), repoDir)
+	return readItemAtStart(append(out, p.backendChild()), st, repoDir)
 }
 
-// readItemAtStart tells every lane to read the 1Password item in memory when it starts.
-func readItemAtStart(children []Child, repoDir string) []Child {
+// readItemAtStart tells every lane to read the 1Password item in memory when it
+// starts; a fork PR's stack reads nothing.
+func readItemAtStart(children []Child, st domain.Stack, repoDir string) []Child {
+	if st.UntrustedCheckout {
+		return children
+	}
 	for i := range children {
 		children[i].SecretsFrom = repoDir
 	}

@@ -73,3 +73,33 @@ Feature: haven resolves development secrets from 1Password
     Given .env holds a credential line
     When the developer runs haven up
     Then one warning names the key, never its value, and points at haven secrets move
+
+  @unit
+  Scenario: op failures are named in fixed words
+    Given op fails for any reason
+    When haven reads or writes the item
+    Then the reason is one of a fixed set of words and none of op's own text is shown
+
+  @unit
+  Scenario: A later start reads the item afresh
+    Given the item was read for one launch
+    When a lane starts or restarts after that launch
+    Then haven reads the item again, so a rotated key or an unlock reaches it
+
+  @unit
+  Scenario: A fork PR or a play sandbox gets nothing from 1Password
+    Given a stack runs an untrusted checkout or a throwaway play sandbox
+    When haven starts its lanes and one-shot jobs
+    Then none of them reads the item
+
+  @unit
+  Scenario: haven env never prints a 1Password value
+    Given the item holds a key the shell and .env leave unset
+    When the developer runs haven env, or haven up runs under haven secrets exec
+    Then haven env prints no item value and the keeper plan holds none
+
+  @unit
+  Scenario: The move stops before 1Password when .env cannot be read
+    Given .env has a quote that is never closed, or changes while the move runs
+    When the developer runs haven secrets move --apply
+    Then the move names the line and writes neither the item nor .env

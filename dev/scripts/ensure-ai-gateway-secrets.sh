@@ -31,6 +31,7 @@ ENV_FILE="$(cd "$(dirname "$0")/../.." && pwd)/.env"
 [ -f "$ENV_FILE" ] || exit 0
 
 # Credentials kept in 1Password (haven secrets move) are never generated here.
+[ -n "${LANGWATCH_OP_ACCOUNT:-}" ] && exit 0
 [ -n "$(env_file_key_value "$ENV_FILE" LANGWATCH_OP_ACCOUNT || true)" ] && exit 0
 
 REQUIRED_SECRETS=(

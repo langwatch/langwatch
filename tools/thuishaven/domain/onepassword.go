@@ -3,10 +3,8 @@ package domain
 import (
 	"encoding/json"
 	"errors"
-	"net/url"
 	"regexp"
 	"sort"
-	"strings"
 )
 
 // 1Password addressing is the same convention the Node secrets chain uses
@@ -105,125 +103,6 @@ func OnePasswordEnv(fields, resolved map[string]string) []string {
 		}
 	}
 	return env
-}
-
-// DotenvEntry is one assignment in a dotenv file and the lines it spans
-// (0-based, inclusive), so a rewrite can drop it without touching the lines around it.
-type DotenvEntry struct {
-	Key, Value  string
-	First, Last int
-}
-
-// ParseDotenvEntries reads every assignment in a dotenv text, including a
-// quoted value that spans lines (a PEM key). Comments and blank lines are not entries.
-func ParseDotenvEntries(text string) []DotenvEntry {
-	lines := strings.Split(text, "\n")
-	var entries []DotenvEntry
-	for i := 0; i < len(lines); i++ {
-		line := strings.TrimPrefix(strings.TrimSpace(lines[i]), "export ")
-		key, rest, ok := strings.Cut(line, "=")
-		key = strings.TrimSpace(key)
-		if strings.HasPrefix(line, "#") || !ok || !envKeyPattern.MatchString(key) {
-			continue
-		}
-		value, last := dotenvValue(strings.TrimSpace(rest), lines, i)
-		entries = append(entries, DotenvEntry{Key: key, Value: value, First: i, Last: last})
-		i = last
-	}
-	return entries
-}
-
-// dotenvValue reads the value starting on line first: a quoted one up to its
-// closing quote, however many lines on; an unquoted one cut at " #".
-func dotenvValue(rest string, lines []string, first int) (string, int) {
-	if rest == "" || (rest[0] != '"' && rest[0] != '\'') {
-		if i := strings.Index(rest, " #"); i >= 0 {
-			rest = rest[:i]
-		}
-		return strings.TrimSpace(rest), first
-	}
-	quote, body := rest[0], rest[1:]
-	for last := first; ; last++ {
-		if end := strings.IndexByte(body, quote); end >= 0 {
-			return body[:end], last
-		}
-		if last+1 >= len(lines) {
-			return body, last
-		}
-		body += "\n" + lines[last+1]
-	}
-}
-
-// CarriesCredential reports whether one .env assignment holds a credential: a
-// set value of a secret-class key, except a connection string with no password
-// in it (a local database URL is config).
-func CarriesCredential(classes map[string]SecretClass, key, value string) bool {
-	if value == "" || key == OnePasswordAccountKey || ClassOf(classes, key) != ClassSecret {
-		return false
-	}
-	parsed, err := url.Parse(strings.TrimSpace(value))
-	if err != nil || parsed.Host == "" {
-		return true
-	}
-	_, hasPassword := parsed.User.Password()
-	return hasPassword
-}
-
-// DotenvCredentials are the entries that carry a credential, one per key: the
-// first, which is the line the secrets chain reads.
-func DotenvCredentials(classes map[string]SecretClass, entries []DotenvEntry) []DotenvEntry {
-	seen := map[string]bool{}
-	var out []DotenvEntry
-	for _, entry := range entries {
-		if seen[entry.Key] || !CarriesCredential(classes, entry.Key, entry.Value) {
-			continue
-		}
-		seen[entry.Key] = true
-		out = append(out, entry)
-	}
-	return out
-}
-
-// RewriteDotenv drops every line of every entry whose key is in moved and sets
-// LANGWATCH_OP_ACCOUNT to account, replacing its line or appending one. Every
-// other line is kept byte for byte.
-func RewriteDotenv(text string, moved map[string]bool, account string) string {
-	lines := strings.Split(text, "\n")
-	drop, accountLine := dotenvEdits(text, len(lines), moved)
-	assignment := OnePasswordAccountKey + `="` + account + `"`
-	kept := make([]string, 0, len(lines)+1)
-	for i, line := range lines {
-		if i == accountLine {
-			line = assignment
-		}
-		if !drop[i] {
-			kept = append(kept, line)
-		}
-	}
-	if accountLine >= 0 {
-		return strings.Join(kept, "\n")
-	}
-	if n := len(kept); n > 0 && kept[n-1] == "" {
-		return strings.Join(append(kept[:n-1], assignment, ""), "\n")
-	}
-	return strings.Join(append(kept, assignment), "\n")
-}
-
-// dotenvEdits marks the lines of every moved entry and finds the first
-// LANGWATCH_OP_ACCOUNT line (-1 when there is none).
-func dotenvEdits(text string, lineCount int, moved map[string]bool) ([]bool, int) {
-	drop := make([]bool, lineCount)
-	accountLine := -1
-	for _, entry := range ParseDotenvEntries(text) {
-		if moved[entry.Key] {
-			for i := entry.First; i <= entry.Last; i++ {
-				drop[i] = true
-			}
-		} else if entry.Key == OnePasswordAccountKey && accountLine < 0 {
-			accountLine = entry.First
-		}
-	}
-	return drop, accountLine
 }
 
 func sortedKeys(values map[string]string) []string {

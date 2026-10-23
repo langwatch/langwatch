@@ -86,14 +86,15 @@ stays as free to print, log and paste into an issue as it is today.
 Each application resolves the classified keys through an ordered chain before
 its Zod parse: shell environment and `.env` first, then a refusal naming exactly
 what is missing. Do nothing and nothing changes. To keep credentials off your
-disk, keep them in your `Private` vault's `LangWatch` item and run
+disk, keep them in your `Private` vault's `LangWatch haven secrets` item and run
 `haven secrets move` ([LOCAL_STACK.md](LOCAL_STACK.md#keeping-your-credentials-in-1password)):
 haven reads the item in memory and hands the values to every process it starts.
 A pod reads the environment Kubernetes gave it and holds no vault client.
 
 One rule, and it is not negotiable: never read `.env` to find a value, and never
 print one. `haven env` masks every classified key, `haven env --reveal` is the
-one you do not paste anywhere, and module code never reads `process.env` at all
+one you do not paste anywhere (it never prints a 1Password value: run a command
+that needs one under `haven secrets exec -- <cmd>`), and module code never reads `process.env` at all
 (`node/no-process-env`). See [ADR-132](adr/132-secrets-are-not-config.md).
 
 ## Starting the stack
