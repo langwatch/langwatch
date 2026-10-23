@@ -49,21 +49,27 @@ export interface JavaScriptLanguageServiceHandle {
 
 let nextLibId = 0;
 
-/** QuickJS speaks ES2023 modules and has no DOM, so neither does the checker. */
+/**
+ * QuickJS speaks ES2023 modules and has no DOM, so neither does the checker. The editor's
+ * model has no file extension, which the worker reads as JavaScript only under allowJs.
+ */
 export function codeBlockCompilerOptions({
   enums,
+  flavour = "javascript",
 }: {
   enums: {
     ModuleKind: { readonly ESNext: number };
     ScriptTarget: { readonly ESNext: number };
   };
+  flavour?: "javascript" | "typescript";
 }) {
+  const javascript = flavour === "javascript";
   return {
     target: enums.ScriptTarget.ESNext,
     module: enums.ModuleKind.ESNext,
     lib: ["es2023"],
-    allowJs: true,
-    checkJs: true,
+    allowJs: javascript,
+    checkJs: javascript,
     noEmit: true,
     allowNonTsExtensions: true,
   };
@@ -90,7 +96,9 @@ export function registerJavaScriptLanguageService({
     flavour === "typescript" ? typescript.typescriptDefaults : typescript.javascriptDefaults;
   const previousCompilerOptions = defaults.getCompilerOptions();
   const previousDiagnosticsOptions = defaults.getDiagnosticsOptions();
-  defaults.setCompilerOptions(codeBlockCompilerOptions({ enums: { ModuleKind, ScriptTarget } }));
+  defaults.setCompilerOptions(
+    codeBlockCompilerOptions({ enums: { ModuleKind, ScriptTarget }, flavour }),
+  );
   defaults.setDiagnosticsOptions({ noSemanticValidation: false, noSyntaxValidation: false });
 
   const uri = `file:///langwatch/code-block-runtime-${nextLibId++}.d.ts`;

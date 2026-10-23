@@ -30,16 +30,22 @@ function serviceFor({ code, typescript = false }: { code: string; typescript?: b
     [RUNTIME_URI, buildJavaScriptRuntimeDts(contract)],
   ]);
   const read = (name: string) => files.get(name) ?? libText(name);
+  const options = codeBlockCompilerOptions({
+    enums: ts,
+    flavour: typescript ? "typescript" : "javascript",
+  });
   const service = ts.createLanguageService({
-    getCompilationSettings: () => codeBlockCompilerOptions({ enums: ts }),
+    getCompilationSettings: () => options,
     getScriptFileNames: () => [...files.keys()],
     getScriptVersion: () => "1",
     getScriptSnapshot: (name) => {
       const text = read(name);
       return text === undefined ? undefined : ts.ScriptSnapshot.fromString(text);
     },
+    // As Monaco's worker decides: by extension, and an extensionless model is
+    // JavaScript under allowJs.
     getScriptKind: (name) =>
-      name === CODE_URI && !typescript ? ts.ScriptKind.JS : ts.ScriptKind.TS,
+      name.endsWith(".ts") || !options.allowJs ? ts.ScriptKind.TS : ts.ScriptKind.JS,
     getCurrentDirectory: () => "",
     getDefaultLibFileName: () => "lib.es2023.d.ts",
     fileExists: (name) => read(name) !== undefined,

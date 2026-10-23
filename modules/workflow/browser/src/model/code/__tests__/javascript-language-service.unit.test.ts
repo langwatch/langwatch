@@ -96,7 +96,12 @@ describe("registerJavaScriptLanguageService", () => {
         flavour: "typescript",
       });
 
-      expect(fake.typescript.compilerOptions()).toMatchObject({ lib: ["es2023"] });
+      // The editor's model has no extension: under allowJs the worker would read it as JavaScript.
+      expect(fake.typescript.compilerOptions()).toMatchObject({
+        lib: ["es2023"],
+        allowJs: false,
+        checkJs: false,
+      });
       expect(fake.typescript.diagnosticsOptions()).toEqual({
         noSemanticValidation: false,
         noSyntaxValidation: false,
