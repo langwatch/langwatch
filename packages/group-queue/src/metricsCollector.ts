@@ -19,12 +19,7 @@ import {
   STAGING_DEPTH_REPORT_FLOOR,
 } from "./metrics.ts";
 import { isPlausibleReadyScore, MIN_PLAUSIBLE_EPOCH_MS } from "./readyScore.ts";
-import {
-  type DispatchResult,
-  type GroupStagingScripts,
-  pendingGroupsKey,
-  ROUTING_META_HELPER_LUA,
-} from "./scripts.ts";
+import { type GroupStagingScripts, pendingGroupsKey, ROUTING_META_HELPER_LUA } from "./scripts.ts";
 
 /**
  * Sample size for backlog-age gauge; samples nearest deferred groups. Bounded
@@ -61,7 +56,8 @@ const UNKNOWN_LABELS: GroupLabels = {
  * Reads each group's head job routing header (p/t/n) on Redis, so the payload
  * never crosses the wire. KEYS[1] only routes the call to the queue's slot.
  */
-const groupRoutingLabelsScript = new CachedLuaScript(`${ROUTING_META_HELPER_LUA}
+const groupRoutingLabelsScript = new CachedLuaScript(`#!lua flags=no-writes,allow-oom
+${ROUTING_META_HELPER_LUA}
 local keyPrefix = ARGV[1]
 local out = {}
 for index = 2, #ARGV do
@@ -118,7 +114,7 @@ export class GroupQueueMetricsCollector {
   constructor(
     private readonly params: {
       scripts: GroupStagingScripts;
-      processingQueue: fastq.queueAsPromised<DispatchResult, void>;
+      processingQueue: Pick<fastq.queueAsPromised<unknown, void>, "length">;
       redisConnection: IORedis | Cluster;
       queueName: string;
       activeJobCountFn: () => number;

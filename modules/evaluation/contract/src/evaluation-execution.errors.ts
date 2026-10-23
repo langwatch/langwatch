@@ -44,7 +44,8 @@ export class EvaluatorInputTooLargeError extends HandledError {
 export class EvaluatorExecutionError extends HandledError {
   declare readonly code: "evaluator_execution_error";
 
-  constructor(message: string, options: HandledErrorOptions = {}) {
+  /** `httpStatus` 503 with `retryable` marks an evaluator service that is not up yet. */
+  constructor(message: string, options: HandledErrorOptions & { httpStatus?: number } = {}) {
     super("evaluator_execution_error", message, {
       httpStatus: 502,
       // The evaluator backend failed to run — an execution failure on our

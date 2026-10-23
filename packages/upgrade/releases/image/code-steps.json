@@ -15,6 +15,14 @@
     "description": "Fills LangWatchQL's key map with every project's key that it lacks."
   },
   {
+    "id": "analytics:fill-id-indexes",
+    "kind": "data",
+    "mode": "background",
+    "owner": "analytics",
+    "description": "Fills the evaluation analytics id index from rows older than its view, then turns the lookup on per ClickHouse target.",
+    "needsOldWritersGone": false
+  },
+  {
     "id": "annotation:record-trace-annotations",
     "kind": "data",
     "mode": "background",
@@ -93,6 +101,14 @@
     "needsOldWritersGone": true
   },
   {
+    "id": "coding-agent:fill-id-indexes",
+    "kind": "data",
+    "mode": "background",
+    "owner": "coding-agent",
+    "description": "Fills the id indexes of coding-agent sessions, events and trace mappings from older rows, then marks them ready on each ClickHouse target.",
+    "needsOldWritersGone": false
+  },
+  {
     "id": "data-retention:keep-control-plane-events-forever",
     "kind": "data",
     "mode": "background",
@@ -107,6 +123,46 @@
     "owner": "dataset",
     "description": "Moves each dataset's content out of Postgres and into object-storage chunks.",
     "needsOldWritersGone": true
+  },
+  {
+    "id": "evaluation:fill-id-indexes",
+    "kind": "data",
+    "mode": "background",
+    "owner": "evaluation",
+    "description": "Fills the evaluation run id index from rows older than its view, then turns the lookup on per ClickHouse target.",
+    "needsOldWritersGone": false
+  },
+  {
+    "id": "evaluation:fill-second-id-indexes",
+    "kind": "data",
+    "mode": "background",
+    "owner": "evaluation",
+    "description": "Fills the second id index of evaluation runs (by trace id) from older rows, then marks it ready on each ClickHouse target.",
+    "needsOldWritersGone": false
+  },
+  {
+    "id": "experiment:fill-id-indexes",
+    "kind": "data",
+    "mode": "background",
+    "owner": "experiment",
+    "description": "Fills the id indexes of experiment runs and DSPy steps from older rows, then marks them ready on each ClickHouse target.",
+    "needsOldWritersGone": false
+  },
+  {
+    "id": "experiment:fill-second-id-indexes",
+    "kind": "data",
+    "mode": "background",
+    "owner": "experiment",
+    "description": "Fills the second id index of experiment runs (by experiment id) from older rows, then marks it ready on each ClickHouse target.",
+    "needsOldWritersGone": false
+  },
+  {
+    "id": "gateway:fill-id-indexes",
+    "kind": "data",
+    "mode": "background",
+    "owner": "gateway",
+    "description": "Fills the id indexes of gateway spend and the budget ledger from older rows, then marks them ready on each ClickHouse target.",
+    "needsOldWritersGone": false
   },
   {
     "id": "governance:record-coding-assistant-billing",
@@ -241,6 +297,14 @@
     "description": "Grants the platform-operator role to the verified users a still-set ADMIN_EMAILS names, while nobody holds it."
   },
   {
+    "id": "ops:fill-event-log-id-index",
+    "kind": "data",
+    "mode": "background",
+    "owner": "ops",
+    "description": "Fills the event log's aggregate index from older events, then marks it ready on each ClickHouse target.",
+    "needsOldWritersGone": false
+  },
+  {
     "id": "organization:record-presence-settings",
     "kind": "data",
     "mode": "background",
@@ -272,6 +336,22 @@
     "needsOldWritersGone": true
   },
   {
+    "id": "scenario:fill-id-indexes",
+    "kind": "data",
+    "mode": "background",
+    "owner": "scenario",
+    "description": "Fills the id index of simulation runs from older rows, then marks them ready on each ClickHouse target.",
+    "needsOldWritersGone": false
+  },
+  {
+    "id": "scenario:fill-second-id-indexes",
+    "kind": "data",
+    "mode": "background",
+    "owner": "scenario",
+    "description": "Fills the second id indexes of simulation runs (by batch run id, by scenario set id) from older rows, then marks them ready on each ClickHouse target.",
+    "needsOldWritersGone": false
+  },
+  {
     "id": "scim:replay-sso-connection-view",
     "kind": "data",
     "mode": "background",
@@ -294,6 +374,14 @@
     "owner": "suite",
     "description": "Counts scenario runs that suite runs open at deploy missed during the cut.",
     "needsOldWritersGone": true
+  },
+  {
+    "id": "suite:fill-id-indexes",
+    "kind": "data",
+    "mode": "background",
+    "owner": "suite",
+    "description": "Fills the id index of suite runs from older rows, then marks them ready on each ClickHouse target.",
+    "needsOldWritersGone": false
   },
   {
     "id": "topic:seed-topic-model-history",
@@ -326,6 +414,14 @@
     "owner": "trace",
     "description": "Sends each project's trace ids seen so far this month, so plan trace limits count from a complete month.",
     "needsOldWritersGone": true
+  },
+  {
+    "id": "trace:fill-id-indexes",
+    "kind": "data",
+    "mode": "background",
+    "owner": "trace",
+    "description": "Fills the trace id indexes from rows older than their views, then marks them ready.",
+    "needsOldWritersGone": false
   },
   {
     "id": "user:record-created-facts",

@@ -7,8 +7,10 @@ import {
   BLOB_RELEASE_GRACE_TTL_SECONDS,
   LEGACY_HOLDER_LEASE_GUARD,
 } from "../blobConstants.ts";
+import { BlobLeases } from "../blobLeases.ts";
 import { BlobSweeper } from "../blobSweeper.ts";
 import { GROUP_QUEUE_REGISTRY_KEY } from "../scripts.ts";
+import { createTenantId } from "../storage.ts";
 
 const QUEUE_NAME = "{test/sweeper}";
 const PREFIX = `${QUEUE_NAME}:gq:`;
@@ -75,6 +77,19 @@ describe("BlobSweeper", () => {
   const notOnGraceWindow = (ttls: number[]) =>
     ttls.filter((ttl) => ttl <= 0 || ttl > BLOB_RELEASE_GRACE_TTL_SECONDS);
 
+  /** Every member and expiry the sweep could touch, for before/after comparison. */
+  const keyState = async () => ({
+    leaseMembers: await redis.zrange(leaseKey(), 0, -1, "WITHSCORES"),
+    holderMembers: (await redis.smembers(holderKey())).toSorted(),
+    // Seconds can tick between reads; whole-minute buckets keep the comparison honest.
+    ttlMinutes: await Promise.all(
+      [blobKey(), leaseKey(), holderKey()].map(async (key) => {
+        const ttl = await redis.ttl(key);
+        return ttl < 0 ? ttl : Math.ceil(ttl / 60);
+      }),
+    ),
+  });
+
   beforeAll(() => {
     redis = new IORedis(process.env.REDIS_URL ?? "redis://localhost:6379", {
       maxRetriesPerRequest: 0,
@@ -91,19 +106,116 @@ describe("BlobSweeper", () => {
 
   describe("given a blob whose holder died without releasing", () => {
     describe("when the runner sweeps", () => {
-      /** @scenario "An unreferenced blob is put on the grace window even though a stale holder token withheld it" */
-      it("grants the grace window the stale token would have withheld", async () => {
+      /** @scenario "A holder token outliving its expired lease withholds the sweep until it is released" */
+      it("leaves the backstop alone while the token names a holder no lease measures", async () => {
         await redis.set(blobKey(), "body", "EX", BLOB_BACKSTOP_TTL_SECONDS);
-        // No lease member: the holder's deadline already lapsed. But its mirrored
-        // token survives, because only a clean release ever removes one.
+        await redis.zadd(leaseKey(), (await redisNowMs()) - 1, "died-mid-flight");
+        // The mirrored token survives the lapsed deadline, because only a clean
+        // release ever removes one; the sweep cannot tell it from an old reader.
         await redis.sadd(holderKey(), LEGACY_HOLDER_LEASE_GUARD, "died-mid-flight");
 
         const tally = await sweepOnce();
 
+        expect(tally.leased).toBe(1);
+        expect(await redis.ttl(blobKey())).toBeGreaterThan(BLOB_RELEASE_GRACE_TTL_SECONDS);
+        expect((await redis.smembers(holderKey())).toSorted()).toEqual(
+          [LEGACY_HOLDER_LEASE_GUARD, "died-mid-flight"].toSorted(),
+        );
+      });
+
+      /** @scenario "A holder token outliving its expired lease withholds the sweep until it is released" */
+      it("puts the blob on the grace window once the token is released", async () => {
+        await redis.set(blobKey(), "body", "EX", BLOB_BACKSTOP_TTL_SECONDS);
+        await redis.sadd(holderKey(), LEGACY_HOLDER_LEASE_GUARD, "died-mid-flight");
+        await sweepOnce();
+
+        await redis.srem(holderKey(), "died-mid-flight");
+        const tally = await sweepOnce();
+
         expect(tally.repaired).toBe(1);
-        expect(await redis.exists(blobKey())).toBe(1);
         expect(await redis.ttl(blobKey())).toBeLessThanOrEqual(BLOB_RELEASE_GRACE_TTL_SECONDS);
         expect(await redis.ttl(blobKey())).toBeGreaterThan(0);
+      });
+    });
+  });
+
+  describe("given a holder set an old release wrote, with one holder and no sentinel", () => {
+    describe("when the runner sweeps", () => {
+      /** @scenario "A blob an old release still holds keeps its backstop" */
+      it("refuses to shorten the deadline under that holder", async () => {
+        await redis.set(blobKey(), "body", "EX", BLOB_BACKSTOP_TTL_SECONDS);
+        await redis.sadd(holderKey(), "old-release-holder");
+
+        const tally = await sweepOnce();
+
+        expect(tally.leased).toBe(1);
+        expect(await redis.ttl(blobKey())).toBeGreaterThan(BLOB_RELEASE_GRACE_TTL_SECONDS);
+      });
+
+      /** @scenario "A blob an old release still holds keeps its backstop" */
+      it("refuses to destroy bytes already inside the reclaim margin", async () => {
+        await redis.set(blobKey(), "body", "EX", BLOB_RECLAIM_TTL_THRESHOLD_SECONDS - 1);
+        await redis.sadd(holderKey(), "old-release-holder");
+
+        const tally = await sweepOnce();
+
+        expect(tally.leased).toBe(1);
+        expect(tally.reclaimed).toBe(0);
+        expect(await redis.exists(blobKey())).toBe(1);
+        expect(await redis.smembers(holderKey())).toEqual(["old-release-holder"]);
+      });
+
+      /** @scenario "A blob an old release still holds keeps its backstop" */
+      it("reclaims the bytes once the old release lets go", async () => {
+        await redis.set(blobKey(), "body", "EX", BLOB_RECLAIM_TTL_THRESHOLD_SECONDS - 1);
+        await redis.sadd(holderKey(), "old-release-holder");
+        await sweepOnce();
+
+        await redis.srem(holderKey(), "old-release-holder");
+        const tally = await sweepOnce();
+
+        expect(tally.reclaimed).toBe(1);
+        expect(await redis.exists(blobKey())).toBe(0);
+      });
+    });
+  });
+
+  describe("given a holder set holding only the migration sentinel", () => {
+    describe("when the runner sweeps", () => {
+      /** @scenario "The migration sentinel alone does not hold a blob" */
+      it("puts the blob on the grace window", async () => {
+        await redis.set(blobKey(), "body", "EX", BLOB_BACKSTOP_TTL_SECONDS);
+        await redis.sadd(holderKey(), LEGACY_HOLDER_LEASE_GUARD);
+
+        const tally = await sweepOnce();
+
+        expect(tally.repaired).toBe(1);
+        expect(await redis.ttl(blobKey())).toBeLessThanOrEqual(BLOB_RELEASE_GRACE_TTL_SECONDS);
+      });
+    });
+  });
+
+  describe("given a blob two jobs share", () => {
+    describe("when one releases and the runner sweeps, then the other releases", () => {
+      /** @scenario "A shared blob is swept only after its last holder retires" */
+      it("leaves the blob alone until the last lease is gone", async () => {
+        const leases = new BlobLeases({ redis, queueName: QUEUE_NAME });
+        const projectId = createTenantId(PROJECT);
+        await redis.set(blobKey(), "body", "EX", BLOB_BACKSTOP_TTL_SECONDS);
+        for (const holderId of ["staying", "leaving"]) {
+          await leases.take({ projectId, hash: HASH, holderId, tier: "redis" });
+        }
+
+        await leases.release({ projectId, hash: HASH, holderId: "leaving", tier: "redis" });
+        const whileShared = await sweepOnce();
+        await leases.release({ projectId, hash: HASH, holderId: "staying", tier: "redis" });
+        const afterLast = await sweepOnce();
+
+        expect(whileShared.leased).toBe(1);
+        // The last release already graced the blob, so the sweep leaves it counting down.
+        expect(afterLast.leased).toBe(0);
+        expect(afterLast.pending).toBe(1);
+        expect(await redis.ttl(blobKey())).toBeLessThanOrEqual(BLOB_RELEASE_GRACE_TTL_SECONDS);
       });
     });
   });
@@ -168,6 +280,38 @@ describe("BlobSweeper", () => {
 
         expect(tally.reclaimed).toBe(1);
         expect(await redis.exists(blobKey())).toBe(1);
+      });
+    });
+  });
+
+  describe("given a reclaimable blob with an expired lease member", () => {
+    describe("when the runner sweeps in dry-run mode", () => {
+      /** @scenario "A dry run changes no lease, holder or expiry" */
+      it("leaves every key, member and expiry as it found them", async () => {
+        await redis.set(blobKey(), "body", "EX", BLOB_RECLAIM_TTL_THRESHOLD_SECONDS - 1);
+        await redis.zadd(leaseKey(), (await redisNowMs()) - 1, "expired-holder");
+        await redis.expire(leaseKey(), BLOB_BACKSTOP_TTL_SECONDS);
+        await redis.sadd(holderKey(), LEGACY_HOLDER_LEASE_GUARD);
+        await redis.expire(holderKey(), BLOB_BACKSTOP_TTL_SECONDS);
+        const before = await keyState();
+
+        const tally = await sweepOnce(true);
+
+        expect(tally.reclaimed).toBe(1);
+        expect(await keyState()).toEqual(before);
+      });
+
+      /** @scenario "A dry run changes no lease, holder or expiry" */
+      it("leaves a blob it would repair on its backstop", async () => {
+        await redis.set(blobKey(), "body", "EX", BLOB_BACKSTOP_TTL_SECONDS);
+        await redis.sadd(holderKey(), LEGACY_HOLDER_LEASE_GUARD);
+        await redis.expire(holderKey(), BLOB_BACKSTOP_TTL_SECONDS);
+        const before = await keyState();
+
+        const tally = await sweepOnce(true);
+
+        expect(tally.repaired).toBe(1);
+        expect(await keyState()).toEqual(before);
       });
     });
   });
