@@ -468,3 +468,20 @@ describe("given what the reconvergence check finds in PostgreSQL", () => {
     ]);
   });
 });
+
+describe("given the collection probe", () => {
+  it("names the collection it reads through", () => {
+    expect(selfProvisioning.collectionProbe({ names: NAMES, postgres: POSTGRES }).collection).toBe(
+      `lwql_postgres_${NAMES.database}`,
+    );
+  });
+
+  it("refuses a database name that is not an identifier before any SQL is built", () => {
+    expect(() =>
+      selfProvisioning.collectionProbe({
+        names: { ...NAMES, database: "lwql'; DROP" },
+        postgres: POSTGRES,
+      }),
+    ).toThrow(/named collection must match/);
+  });
+});

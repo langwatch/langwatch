@@ -23,6 +23,7 @@ import {
   LangWatchQLConnectionService,
   LWQL_CONNECTION_DEFAULTS,
 } from "../../../services/langwatch-ql-connection.service.ts";
+import { LangWatchQLSqlTextService } from "../../../services/langwatch-ql-sql-text.service.ts";
 import { LWQL_APP_FUNCTION_CATALOG } from "../../app-functions/rules/langwatch-ql-app-function-catalog.rules.ts";
 import { LangWatchQLAppFunctionStatementsService } from "./langwatch-ql-app-function-statements.service.ts";
 import {
@@ -43,6 +44,7 @@ const connections = LangWatchQLConnectionService.create();
 const postgresMapping = LangWatchQLPostgresMappingService.create();
 const postgresViews = LangWatchQLPostgresViewsService.create();
 const viewProvisioning = LangWatchQLViewProvisioningService.create();
+const sqlText = LangWatchQLSqlTextService.create();
 
 /** The SaaS-convention names every self-provisioning distribution shares. */
 export const LWQL_SELF_PROVISION_DEFAULTS = {
@@ -222,6 +224,7 @@ export class LangWatchQLSelfProvisioningService {
     const { collection, ...connection } = this.namedCollectionValues({ names, postgres });
     const [first] = catalogShapes.postgresViews(LWQL_VIEW_CATALOG);
     if (!first) throw new Error("lwql self-provisioning: the catalog maps no PostgreSQL dataset");
+    sqlText.assertIdentifier(collection, "named collection");
     return { collection, relation: first.postgres.approvedView, connection };
   }
 

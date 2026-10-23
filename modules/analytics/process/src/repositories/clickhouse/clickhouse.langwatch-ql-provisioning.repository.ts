@@ -259,7 +259,7 @@ export class ClickHouseLangWatchQLProvisioningRepository extends LangWatchQLProv
     return readClickHouseInventory({ client: this.client, ...input });
   }
 
-  /** @param collection Already validated as an identifier by the provisioning service. */
+  /** @param collection Validated as an identifier by `collectionProbe`. */
   probePostgresCollection({
     collection,
     relation,
