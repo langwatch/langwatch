@@ -554,6 +554,8 @@ jobs:
       - name: Migrate with head's tasks
         env:
           CLICKHOUSE_URL: ${{ env.CLICKHOUSE_BASE_URL }}/langwatch
+          BASE_HOST: http://localhost:5560
+          NEXTAUTH_URL: http://localhost:5560
         run: |
           set -euo pipefail
           # Head's upgrade refuses to start without its secrets (api-key.pepper reads
