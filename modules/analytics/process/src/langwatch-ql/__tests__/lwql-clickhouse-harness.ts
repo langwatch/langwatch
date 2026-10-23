@@ -74,6 +74,9 @@ export const TEST_POSTGRES_IMAGE = "postgres:17";
 const ADMIN_USER = "test";
 const ADMIN_PASSWORD = "test";
 
+/** The 26.2 setting behind NAMED_COLLECTION_IS_USED; absent on older servers. */
+const NAMED_COLLECTION_DEPENDENCY_CHECK = "check_named_collection_dependencies";
+
 /** Password of the restricted identity. Never leaves the harness. */
 const RESTRICTED_PASSWORD = "lwql-reader-test-password";
 
@@ -247,6 +250,11 @@ export interface LangWatchQLClickHouseHarness {
   };
   /** Runs statements as the administrator, in order. */
   applyAsAdmin(statements: string[]): Promise<void>;
+  /**
+   * Drops a SQL named collection even while engine tables use it, as a config store unmounting
+   * one does. From 26.2 a plain DROP with dependents fails with NAMED_COLLECTION_IS_USED.
+   */
+  dropNamedCollection(collection: string): Promise<void>;
   /**
    * Renders the whole access model from one definition and applies it, exactly
    * as production does (#8258). Run after the views exist. `views` overrides the
@@ -436,6 +444,18 @@ export async function startLangWatchQLClickHouse({
     container,
     applyAsAdmin,
     applyAccessModel,
+    async dropNamedCollection(collection) {
+      const known = await selectRows<{ name: string }>(
+        admin,
+        `SELECT name FROM system.settings WHERE name = '${NAMED_COLLECTION_DEPENDENCY_CHECK}'`,
+      );
+      await admin.command({
+        query: `DROP NAMED COLLECTION IF EXISTS ${collection}`,
+        ...(known.length > 0
+          ? { clickhouse_settings: { [NAMED_COLLECTION_DEPENDENCY_CHECK]: 0 } }
+          : {}),
+      });
+    },
     async restrictedClient(options) {
       const keyHash = options?.keyHash;
       const client = createClient({
