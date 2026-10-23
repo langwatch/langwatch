@@ -134,11 +134,62 @@
   line-gap-override: 6.71%;
   unicode-range: U+0020-007E, U+00A0-00FF, U+2013-2014, U+2018-201A, U+201C-201E, U+2022, U+2026;
 }
+/* Linux without the Liberation fonts draws with DejaVu, scaled the same way. */
+@font-face {
+  font-family: "Inter Fallback DejaVu";
+  src: local("DejaVu Sans"), local("DejaVuSans");
+  font-weight: 100 450;
+  size-adjust: 94.11%;
+  ascent-override: 102.94%;
+  descent-override: 25.63%;
+  line-gap-override: 0%;
+  unicode-range: U+0020-007E, U+00A0-00FF, U+2013-2014, U+2018-201A, U+201C-201E, U+2022, U+2026;
+}
+@font-face {
+  font-family: "Inter Fallback DejaVu";
+  src: local("DejaVu Sans"), local("DejaVuSans");
+  font-weight: 451 550;
+  size-adjust: 95.08%;
+  ascent-override: 101.88%;
+  descent-override: 25.37%;
+  line-gap-override: 0%;
+  unicode-range: U+0020-007E, U+00A0-00FF, U+2013-2014, U+2018-201A, U+201C-201E, U+2022, U+2026;
+}
+@font-face {
+  font-family: "Inter Fallback DejaVu";
+  src: local("DejaVu Sans Bold"), local("DejaVuSans-Bold");
+  font-weight: 551 900;
+  size-adjust: 85.35%;
+  ascent-override: 113.5%;
+  descent-override: 28.26%;
+  line-gap-override: 0%;
+  unicode-range: U+0020-007E, U+00A0-00FF, U+2013-2014, U+2018-201A, U+201C-201E, U+2022, U+2026;
+}
+@font-face {
+  font-family: "Sentient Fallback DejaVu";
+  src: local("DejaVu Serif"), local("DejaVuSerif");
+  font-weight: 100 450;
+  size-adjust: 92.7%;
+  ascent-override: 103.56%;
+  descent-override: 34.52%;
+  line-gap-override: 8.63%;
+  unicode-range: U+0020-007E, U+00A0-00FF, U+2013-2014, U+2018-201A, U+201C-201E, U+2022, U+2026;
+}
+@font-face {
+  font-family: "Sentient Fallback DejaVu";
+  src: local("DejaVu Serif"), local("DejaVuSerif");
+  font-weight: 451 900;
+  size-adjust: 94.4%;
+  ascent-override: 101.7%;
+  descent-override: 33.9%;
+  line-gap-override: 8.47%;
+  unicode-range: U+0020-007E, U+00A0-00FF, U+2013-2014, U+2018-201A, U+201C-201E, U+2022, U+2026;
+}
 @font-face {
   font-family: "JetBrains Mono Fallback";
   src:
-    local("Menlo Regular"), local("Menlo-Regular"), local("Courier New"), local("CourierNewPSMT"),
-    local("Liberation Mono");
+    local("Menlo Regular"), local("Menlo-Regular"), local("DejaVu Sans Mono"),
+    local("DejaVuSansMono"), local("Courier New"), local("CourierNewPSMT"), local("Liberation Mono");
   font-weight: 100 900;
   size-adjust: 99.66%;
   ascent-override: 102.35%;
@@ -147,10 +198,11 @@
   unicode-range: U+0020-007E, U+00A0-00FF, U+2013-2014, U+2018-201A, U+201C-201E, U+2022, U+2026;
 }
 :root {
-  --chakra-fonts-body: Inter, "Inter Fallback", ui-sans-serif, system-ui, sans-serif;
+  --chakra-fonts-body:
+    Inter, "Inter Fallback", "Inter Fallback DejaVu", ui-sans-serif, system-ui, sans-serif;
   --chakra-fonts-heading:
-    Sentient, "Sentient Fallback", "Sentient Fallback Liberation", Charter, "Source Serif Pro",
-    ui-serif, Georgia, serif;
+    Sentient, "Sentient Fallback", "Sentient Fallback Liberation", "Sentient Fallback DejaVu",
+    Charter, "Source Serif Pro", ui-serif, Georgia, serif;
   --chakra-fonts-mono:
     "JetBrains Mono", "JetBrains Mono Fallback", ui-monospace, SFMono-Regular, monospace;
 }
