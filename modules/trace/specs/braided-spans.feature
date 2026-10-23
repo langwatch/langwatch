@@ -293,3 +293,9 @@ Feature: Braided spans in the reader's traces
       When the "orchestrator" Braids page shows the braid
       Then it counts the braided spans "orchestrator" can see from "specialists" in the last 24 hours
       And neither page reads the other project's data
+
+    @unit
+    Scenario: A paused braid counts no braided spans on the reader's Braids page
+      Given the organisation has left Enterprise
+      When the "orchestrator" Braids page shows the braid from "specialists"
+      Then it counts no "specialists" spans

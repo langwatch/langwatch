@@ -1905,12 +1905,14 @@ export class TraceModule implements TraceApi, CollectorApp {
     return this.#braidPreview.attributeKeys(input);
   }
 
-  readBraidActivity(input: {
+  async readBraidActivity(input: {
     projectId: string;
     authorization: Authorization;
     braidIds: readonly string[];
   }): Promise<BraidActivity> {
-    return this.#braidPreview.activity(input);
+    // A paused braid counts nothing on the reader's page (ADR-183 §9).
+    const authorization = await this.#braidPause.honoured({ authorization: input.authorization });
+    return this.#braidPreview.activity({ ...input, authorization });
   }
 
   readBraidTestTrace(input: {
