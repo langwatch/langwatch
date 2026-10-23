@@ -1775,6 +1775,10 @@ export interface LwqlPrismaRows {
     readonly seeded: "Boolean";
     readonly evaluationCount: "Int";
     readonly simulationRunCount: "Int";
+    readonly codingFirstSessionAt: "DateTime?";
+    readonly codingAgentTypes: "String[]";
+    readonly codingActiveDays: "Int";
+    readonly codingLastActiveDay: "String?";
     readonly updatedAt: "DateTime";
   };
   readonly BillingMeterCheckpoint: {

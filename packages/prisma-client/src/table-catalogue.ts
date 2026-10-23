@@ -2239,6 +2239,10 @@ export const prismaModelFieldCatalogue = {
     "seeded",
     "evaluationCount",
     "simulationRunCount",
+    "codingFirstSessionAt",
+    "codingAgentTypes",
+    "codingActiveDays",
+    "codingLastActiveDay",
     "updatedAt"
   ],
   "BillingMeterCheckpoint": [
