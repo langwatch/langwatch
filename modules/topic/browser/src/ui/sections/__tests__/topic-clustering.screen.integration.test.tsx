@@ -112,6 +112,22 @@ describe("given the last run failed for a reason the customer can fix", () => {
 
     expect(screen.getByText("No model is set up for topic clustering")).toBeTruthy();
   });
+
+  describe("when the model is restricted to coding-assistant features", () => {
+    /** @scenario "A clustering run refused for its Codex model is recorded as failed" */
+    it("explains the restriction and where to pick another model", () => {
+      state.status = settledStatus({
+        lastRunOutcome: "failed",
+        lastRunErrorCode: "model_restricted",
+        isLastRunErrorUserActionable: true,
+      });
+
+      renderWithTopicHost(<TopicClusteringScreen />);
+
+      expect(screen.getByText("This model can't run topic clustering")).toBeTruthy();
+      expect(screen.getByText(/licensed for coding-assistant features only/)).toBeTruthy();
+    });
+  });
 });
 
 describe("given the last run failed for a reason the customer cannot fix", () => {

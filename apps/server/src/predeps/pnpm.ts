@@ -1,4 +1,5 @@
 import { chmodSync, existsSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { execa } from "execa";
@@ -28,9 +29,13 @@ function downloadUrl(platform: string): string {
   return `https://github.com/pnpm/pnpm/releases/download/v${PNPM_VERSION}/pnpm-${platform}.tar.gz`;
 }
 
+/**
+ * Asked from the temp dir: in a project whose `packageManager` pins another pnpm, a system
+ * pnpm would fetch that version first, and detection would wait on the download.
+ */
 async function resolveVersion(bin: string): Promise<string | null> {
   try {
-    const { stdout } = await execa(bin, ["--version"], { reject: false });
+    const { stdout } = await execa(bin, ["--version"], { reject: false, cwd: tmpdir() });
     return stdout.trim() || null;
   } catch {
     return null;

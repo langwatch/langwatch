@@ -53,6 +53,39 @@ describe("renderUpgradeAlertEmail", () => {
       });
     });
 
+    describe("when the hourly check already sent the details", () => {
+      /** @scenario "A self-hosted upgrade alert says the details were already sent" */
+      it("says LangWatch already has the details and asks for nothing to be sent", async () => {
+        const { html } = await renderFixture("several steps failed, details already sent");
+
+        expect(html).toContain("We have already received the details and are looking into it.");
+        expect(html).not.toContain("download the diagnostics");
+        expect(html).not.toContain("send the details to the LangWatch team");
+      });
+    });
+
+    describe("when the install can send the details over Connect", () => {
+      /** @scenario "A self-hosted upgrade alert points at Send to LangWatch where Connect is available" */
+      it("points at the step page to send them", async () => {
+        const { html } = await renderFixture(
+          "several steps failed, details sendable from the step page",
+        );
+
+        expect(html).toContain("send the details to the LangWatch team from the step page");
+        expect(html).not.toContain("download the diagnostics");
+      });
+    });
+
+    describe("when the install cannot reach LangWatch", () => {
+      /** @scenario "A self-hosted upgrade alert offers a retry and a way to reach the LangWatch team" */
+      it("asks for the downloaded diagnostics by email", async () => {
+        const { html } = await renderFixture("several steps failed");
+
+        expect(html).toContain("download the diagnostics from the step page");
+        expect(html).toContain("mailto:support@langwatch.ai");
+      });
+    });
+
     describe("when a blocking step failed", () => {
       /** @scenario "A self-hosted upgrade alert for a failed blocking step does not say LangWatch keeps running" */
       it("says the new version can't serve until the step finishes", async () => {

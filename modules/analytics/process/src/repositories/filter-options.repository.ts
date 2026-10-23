@@ -4,6 +4,7 @@
  * at the call ({@link FilterService}) instead of failing on its first query.
  */
 import type { FilterField } from "@langwatch/analytics-contract";
+import type { Authorization } from "@langwatch/authorization";
 
 import type { ClickHouseFilterQueryParams } from "./clickhouse/clickhouse.filter-shapes.mapper.ts";
 
@@ -16,6 +17,8 @@ export type FilterOption = {
 
 export interface FindFilterOptionsInput extends ClickHouseFilterQueryParams {
   field: FilterField;
+  /** The route's `analytics:view` proof; its fence picks the tenants the options come from. */
+  authorization: Authorization;
 }
 
 export abstract class FilterOptionsRepository {

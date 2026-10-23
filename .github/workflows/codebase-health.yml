@@ -2,18 +2,32 @@ name: codebase-health
 
 # Nightly codebase health: type-check cost per program, root typecheck time and
 # peak RSS, longest reference chain, emitted .d.ts size, architecture findings
-# per policy, UI bundle size and test:repo time, compared with the previous
-# successful run's health.json. A jump opens (or comments on) the issue labelled
-# codebase-health; one pinned issue labelled codebase-health-dashboard has its
-# body rewritten every night. A failing typecheck or UI build is a breach, not
-# an aborted job.
+# per policy, UI bundle size and test:repo time, compared with last night's,
+# a week ago's and a month ago's health.json. A jump opens (or comments on) the
+# issue labelled codebase-health. Its section of the nightly dashboard (the
+# pinned issue labelled codebase-health-dashboard) is the dashboard-body.md
+# artifact; the nightly suite's last job writes the issue. A failing typecheck
+# or UI build is a breach, not an aborted job.
 #
-# Spec: specs/tooling/codebase-health.feature
+# Runs inside .github/workflows/nightly.yml, which owns the schedule. Its runs
+# are the nightly's, so earlier nights are found by artifact name
+# (.github/scripts/nightly-artifacts.ts), never by this workflow's run list.
+#
+# Spec: specs/tooling/codebase-health.feature, specs/ci/nightly-suite.feature
 
 on:
-  schedule:
-    - cron: "13 1 * * *"
+  workflow_call:
+    inputs:
+      publish:
+        description: "Open or comment on the codebase-health issue on a regression"
+        type: boolean
+        default: true
   workflow_dispatch:
+    inputs:
+      publish:
+        description: "Open or comment on the codebase-health issue on a regression"
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -82,26 +96,18 @@ jobs:
       - name: Architecture findings
         run: pnpm lint:architecture > architecture.txt 2>&1 || test $? -eq 1
 
-      - name: Previous run's health.json
+      # Last night's, the newest at least six days old and the newest at least
+      # 29 days old, all from the default branch. The artifact is kept 35 days
+      # so the month-ago one still exists.
+      - name: Health.json from earlier nights
         run: |
-          run_id=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow codebase-health.yml --status success --limit 1 --json databaseId --jq '.[0].databaseId // empty')
-          if [ -n "$run_id" ]; then
-            gh run download "$run_id" --repo "$GITHUB_REPOSITORY" --name codebase-health --dir previous || echo "no artifact on run $run_id"
-          else
-            echo "no previous successful run"
-          fi
-
-      # The newest successful run at least six days old, for the weekly column.
-      - name: Health.json from about a week ago
-        run: |
-          run_id=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow codebase-health.yml --status success --limit 14 --json databaseId,createdAt --jq '[.[] | select(.createdAt < (now - 6*86400 | todate))][0].databaseId // empty')
-          if [ -n "$run_id" ]; then
-            gh run download "$run_id" --repo "$GITHUB_REPOSITORY" --name codebase-health --dir weekago || echo "no artifact on run $run_id"
-          else
-            echo "no run from a week ago"
-          fi
+          node --experimental-strip-types .github/scripts/nightly-artifacts.ts --name codebase-health --min-age-days 0 --dir previous
+          node --experimental-strip-types .github/scripts/nightly-artifacts.ts --name codebase-health --min-age-days 6 --dir weekago
+          node --experimental-strip-types .github/scripts/nightly-artifacts.ts --name codebase-health --min-age-days 29 --dir monthago
 
       - name: Compare and report
+        env:
+          PUBLISH: ${{ inputs.publish }}
         run: >-
           node dev/scripts/codebase-health.mjs
           --metrics=ts-program-metrics.jsonl
@@ -114,9 +120,11 @@ jobs:
           --test-repo-seconds=test-repo-seconds.txt
           --previous=previous/health.json
           --weekago=weekago/health.json
+          --monthago=monthago/health.json
           --out=health.json
+          --dashboard=dashboard-body.md
           --commit="$GITHUB_SHA"
-          --publish
+          --publish="$PUBLISH"
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
@@ -128,5 +136,5 @@ jobs:
             architecture.txt
             typecheck.log
             dashboard-body.md
-          retention-days: 30
+          retention-days: 35
           if-no-files-found: warn

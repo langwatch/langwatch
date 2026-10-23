@@ -17,6 +17,7 @@ import {
   subscriptionCancelledNotice,
   subscriptionProspectiveNotice,
 } from "./subscription-notices.ts";
+import { upgradeDiagnosticsNotice } from "./upgrade-diagnostics-notice.ts";
 
 /** Every notice LangWatch posts to its own team, in the order the preview lists them. */
 export const slackNotices: readonly RegisteredNotice[] = [
@@ -31,6 +32,7 @@ export const slackNotices: readonly RegisteredNotice[] = [
   planLimitReachedNotice,
   resourceLimitReachedNotice,
   selfHostedSignalNotice,
+  upgradeDiagnosticsNotice,
 ];
 
 export type { NewOrganizationNoticeProps, NewUserNoticeProps, ScimSyncSummaryNoticeProps };
@@ -47,4 +49,5 @@ export {
   subscriptionActivatedNotice,
   subscriptionCancelledNotice,
   subscriptionProspectiveNotice,
+  upgradeDiagnosticsNotice,
 };

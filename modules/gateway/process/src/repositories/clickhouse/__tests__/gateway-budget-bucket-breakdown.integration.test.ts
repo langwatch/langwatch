@@ -16,6 +16,7 @@ import {
 } from "../clickhouse.gateway-budget.repository.ts";
 import {
   createTestClickHouseClient,
+  gatewayClickHouseOver,
   testClickHouseUrl,
 } from "./support/clickhouse-endpoint.support.ts";
 
@@ -110,7 +111,9 @@ function overCap(buckets: BucketSpend[], limitUsd = Number(LIMIT_USD)): number {
 
 describe.skipIf(!chUrl)("given per-user buckets recorded against attributed-user templates", () => {
   beforeAll(async () => {
-    repo = new GatewayBudgetClickHouseRepository(async () => createTestClickHouseClient(chUrl!));
+    repo = new GatewayBudgetClickHouseRepository(
+      gatewayClickHouseOver(createTestClickHouseClient(chUrl!)),
+    );
   }, 120_000);
 
   describe("when ten people have spent and three have reached the cap", () => {

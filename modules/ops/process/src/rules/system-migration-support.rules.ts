@@ -3,12 +3,16 @@
 import type { RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import type { OpsMigrationEnrollmentRecord, OpsMigrationOverview } from "@langwatch/ops-contract";
 import type {
+  HeldReason,
   MigrationPassSummary,
   TenantMigrationRecord,
   TenantMigrationStatus,
 } from "@langwatch/system-migrations";
 import type { CodeStepId } from "@langwatch/upgrade/step";
-import type { TenantStepStateRow } from "@langwatch/upgrade/step/tenant-state";
+import type {
+  TenantStepStateQuery,
+  TenantStepStateRow,
+} from "@langwatch/upgrade/step/tenant-state";
 
 /** The identity and authz migrations ops held, now their owners' steps. Never edit (S6-COPY). */
 export const MOVED_TO_OWNERS = {
@@ -77,12 +81,10 @@ export interface SystemMigrationStateReader {
   findStatusCounts(args: { migrationName: string }): Promise<Record<TenantMigrationStatus, number>>;
 
   /** Newest movement first; no `migrationName` reads every step's rows. */
-  findRecordsByStatus(args: {
-    migrationName?: string | undefined;
-    statuses: TenantMigrationStatus[];
-    limit: number;
-    offset?: number;
-  }): Promise<TenantStepStateRow[]>;
+  findRecordsByStatus(args: TenantStepStateQuery): Promise<TenantStepStateRow[]>;
+
+  /** How many of one step's tenants are held for this reason. */
+  countHeld(args: { migrationName: string; heldReason: HeldReason }): Promise<number>;
 
   getRecord(args: { migrationName: string; tenantId: string }): Promise<TenantMigrationRecord>;
 

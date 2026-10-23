@@ -6,20 +6,29 @@ import type {
   AnalyticsTimeseriesResult,
   SharedFiltersInput,
 } from "@langwatch/analytics-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
+import { fenceFor } from "@langwatch/clickhouse-client";
 import { InProcessTenantStatementLimiter } from "@langwatch/limiter";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { clickHouseClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
-import { addDays, differenceInCalendarDays, Temporal } from "@langwatch/time";
+import { addDays, differenceInCalendarDays, nowInstant, Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import { AnalyticsService } from "../../services/analytics.service.ts";
 import { NullAnalyticsEvaluationRepository } from "../analytics-persistence.repository.ts";
-import { AnalyticsRepository, type AnalyticsTimeseriesQuery } from "../analytics.repository.ts";
 import {
-  ClickHouseAnalyticsEvaluationRepository,
-  type EvaluationAnalyticsClickHouseClient,
-} from "../clickhouse/clickhouse.analytics-persistence.repository.ts";
+  AnalyticsRepository,
+  type AnalyticsTableReadScope,
+  type AnalyticsTimeseriesQuery,
+} from "../analytics.repository.ts";
+import {
+  clickHouseQueryClientOver,
+  deferredVendor,
+} from "../clickhouse/__tests__/support/clickhouse-query-client.support.ts";
+import { ClickHouseAnalyticsEvaluationRepository } from "../clickhouse/clickhouse.analytics-persistence.repository.ts";
 import { pickAnalyticsTable } from "../clickhouse/clickhouse.analytics-route-table.mapper.ts";
 import { ClickHouseAnalyticsRepository } from "../clickhouse/clickhouse.analytics.repository.ts";
+import { analyticsProof, analyticsTestAuthz } from "./analytics-proof.fixture.ts";
 
 const tenantLimiter = ({ maxConcurrent = 4 }: { maxConcurrent?: number } = {}) =>
   new InProcessTenantStatementLimiter({
@@ -30,18 +39,28 @@ const tenantLimiter = ({ maxConcurrent = 4 }: { maxConcurrent?: number } = {}) =
     overloadErrorFactory: { create: ({ cause }: { cause: unknown }) => cause },
   });
 
+/** A cost-gated read's proof for the one project these reads ask about. */
+const COST = {
+  authorization: analyticsProof({ projectId: "project-1", permission: "cost:view" }),
+};
+
 const serviceOver = (options: {
-  resolveClient: (tenantId: string) => Promise<EvaluationAnalyticsClickHouseClient | null>;
+  resolveClient: (tenantId: string) => Promise<ClickHouseClient | null>;
   clickhouseEnabled: boolean;
 }): AnalyticsService =>
   AnalyticsService.create({
-    repository: ClickHouseAnalyticsRepository.create({ resolveClient: options.resolveClient }),
+    repository: ClickHouseAnalyticsRepository.create({
+      clickhouse: clickHouseQueryClientOver(
+        deferredVendor(() => options.resolveClient("project-1")),
+      ),
+    }),
     evaluationRepository: options.clickhouseEnabled
       ? ClickHouseAnalyticsEvaluationRepository.create({
           resolveClient: options.resolveClient,
           defaultRetentionDays: () => 30,
         })
       : NullAnalyticsEvaluationRepository.create(),
+    authz: analyticsTestAuthz(),
     tenantLimiter: tenantLimiter(),
   });
 
@@ -90,17 +109,22 @@ const evaluationRow: AnalyticsEvaluationRow = {
 
 class RecordingRepository extends AnalyticsRepository {
   lastQuery: AnalyticsTimeseriesQuery | undefined;
+  readonly queries: AnalyticsTimeseriesQuery[] = [];
   lastFeedbackInput: unknown;
   lastDocumentsInput: unknown;
 
   // The real routing, because what these cases claim is which table a read is
   // sent to — a double that answered a fixed table would assert itself.
-  tableFor(timeseriesInput: AnalyticsTimeseriesInput): AnalyticsTable {
-    return pickAnalyticsTable(timeseriesInput);
+  tableFor(
+    timeseriesInput: AnalyticsTimeseriesInput,
+    scope?: AnalyticsTableReadScope,
+  ): AnalyticsTable {
+    return pickAnalyticsTable(timeseriesInput, scope);
   }
 
   async runTimeseries(query: AnalyticsTimeseriesQuery): Promise<AnalyticsTimeseriesResult> {
     this.lastQuery = query;
+    this.queries.push(query);
     return result;
   }
 
@@ -126,6 +150,7 @@ function createService(
   return AnalyticsService.create({
     repository,
     evaluationRepository: NullAnalyticsEvaluationRepository.create(),
+    authz: analyticsTestAuthz(),
     tenantLimiter: limiter,
   });
 }
@@ -139,7 +164,7 @@ describe("AnalyticsService", () => {
     await service.getTimeseries(input());
 
     expect(repository.lastQuery?.table).toBe("trace_analytics_rollup");
-    expect(repository.lastQuery?.tenantId).toBe("project-1");
+    expect(repository.lastQuery?.input.projectId).toBe("project-1");
     expect(repository.lastQuery?.input.timeZone).toBe("Europe/Amsterdam");
   });
 
@@ -187,9 +212,74 @@ describe("AnalyticsService", () => {
     const service = createService(new RecordingRepository(), limiter);
 
     await service.getTimeseries(input());
-    await service.getTopUsedDocuments({ projectId: "project-1", startDate: 0, endDate: 1 });
+    await service.getTopUsedDocuments({ projectId: "project-1", startDate: 0, endDate: 1 }, COST);
 
     expect(run.mock.calls.map(([call]) => call.tenantId)).toEqual(["project-1", "project-1"]);
+  });
+
+  describe("given an aggregate whose proof opens two members", () => {
+    const aggregateProof = (permission: "analytics:view" | "cost:view" = "analytics:view") =>
+      analyticsProof({
+        projectId: "project-1",
+        permission,
+        shared: [
+          { projectId: "member-b", from: 0 },
+          { projectId: "member-a", from: 0 },
+        ],
+      });
+
+    /** @scenario "A chart on the aggregate waits for each member's share" */
+    it("takes the aggregate's slot and each member's, in one sorted order", async () => {
+      const limiter = tenantLimiter({ maxConcurrent: 1 });
+      const run = vi.spyOn(limiter, "run");
+      const service = createService(new RecordingRepository(), limiter);
+
+      await service.getTimeseries(input(), { authorization: aggregateProof() });
+      await service.getTopUsedDocuments(
+        { projectId: "project-1", startDate: 0, endDate: 1 },
+        { authorization: aggregateProof("cost:view") },
+      );
+
+      const order = ["member-a", "member-b", "project-1"];
+      expect(run.mock.calls.map(([call]) => call.tenantId)).toEqual([...order, ...order]);
+    });
+
+    /** @scenario "The aggregate counts a member's evaluations by when their trace occurred" */
+    it("sends the evaluations summary to the legacy builder, which windows each trace", async () => {
+      const repository = new RecordingRepository();
+      const service = createService(repository);
+
+      await service.getTimeseries(
+        input({
+          series: [{ metric: "evaluations.evaluation_runs", aggregation: "cardinality", key: "" }],
+          groupBy: "evaluations.evaluation_passed",
+          timeScale: "full",
+        }),
+        { authorization: aggregateProof() },
+      );
+
+      expect(repository.lastQuery?.table).toBe("evaluation_runs");
+    });
+
+    /** @scenario "A chart on an aggregate with too many members is refused before any read" */
+    it("refuses a read over more members than the cap before it queues", async () => {
+      const repository = new RecordingRepository();
+      const limiter = tenantLimiter();
+      const run = vi.spyOn(limiter, "run");
+      const service = AnalyticsService.create({
+        repository,
+        evaluationRepository: NullAnalyticsEvaluationRepository.create(),
+        authz: analyticsTestAuthz(),
+        tenantLimiter: limiter,
+        maxMembers: 1,
+      });
+
+      await expect(
+        service.getTimeseries(input(), { authorization: aggregateProof() }),
+      ).rejects.toMatchObject({ code: "lwql_too_many_members" });
+      expect(run).not.toHaveBeenCalled();
+      expect(repository.queries).toHaveLength(0);
+    });
   });
 
   /** @scenario "Unsafe query shapes use the legacy trace table" */
@@ -310,28 +400,36 @@ describe("AnalyticsService", () => {
     const filters = { "metadata.user_id": ["user-1"] };
 
     await expect(
-      service.getFeedbacks({
-        projectId: "project-1",
-        startDate: 10,
-        endDate: 20,
-        filters,
-      }),
+      service.getFeedbacks(
+        {
+          projectId: "project-1",
+          startDate: 10,
+          endDate: 20,
+          filters,
+        },
+        COST,
+      ),
     ).resolves.toEqual({ events: [] });
     await expect(
-      service.getTopUsedDocuments({
-        projectId: "project-1",
-        startDate: 10,
-        endDate: 20,
-        filters,
-      }),
+      service.getTopUsedDocuments(
+        {
+          projectId: "project-1",
+          startDate: 10,
+          endDate: 20,
+          filters,
+        },
+        COST,
+      ),
     ).resolves.toEqual({ topDocuments: [], totalUniqueDocuments: 0 });
     expect(repository.lastFeedbackInput).toEqual({
+      authorization: COST.authorization,
       projectId: "project-1",
       startDate: 10,
       endDate: 20,
       filters,
     });
     expect(repository.lastDocumentsInput).toEqual({
+      authorization: COST.authorization,
       projectId: "project-1",
       startDate: 10,
       endDate: 20,
@@ -351,10 +449,16 @@ describe("AnalyticsService", () => {
       query: "refund",
       negateFilters: true,
     };
-    const expected = { projectId: "project-1", startDate: 10, endDate: 20, filters: {} };
+    const expected = {
+      authorization: COST.authorization,
+      projectId: "project-1",
+      startDate: 10,
+      endDate: 20,
+      filters: {},
+    };
 
-    await expect(service.getFeedbacks(toolbarRead)).resolves.toEqual({ events: [] });
-    await expect(service.getTopUsedDocuments(toolbarRead)).resolves.toEqual({
+    await expect(service.getFeedbacks(toolbarRead, COST)).resolves.toEqual({ events: [] });
+    await expect(service.getTopUsedDocuments(toolbarRead, COST)).resolves.toEqual({
       topDocuments: [],
       totalUniqueDocuments: 0,
     });
@@ -401,12 +505,15 @@ describe("AnalyticsService", () => {
     });
 
     await expect(
-      service.getFeedbacks({
-        projectId: "project-1",
-        startDate: 10,
-        endDate: 20,
-        filters: {},
-      }),
+      service.getFeedbacks(
+        {
+          projectId: "project-1",
+          startDate: 10,
+          endDate: 20,
+          filters: {},
+        },
+        COST,
+      ),
     ).resolves.toEqual({
       events: [
         {
@@ -425,12 +532,15 @@ describe("AnalyticsService", () => {
       ],
     });
     await expect(
-      service.getTopUsedDocuments({
-        projectId: "project-1",
-        startDate: 10,
-        endDate: 20,
-        filters: {},
-      }),
+      service.getTopUsedDocuments(
+        {
+          projectId: "project-1",
+          startDate: 10,
+          endDate: 20,
+          filters: {},
+        },
+        COST,
+      ),
     ).resolves.toEqual({
       topDocuments: [{ documentId: "doc-1", count: 3, traceId: "trace-1", content: "hello" }],
       totalUniqueDocuments: 7,
@@ -523,6 +633,85 @@ describe("AnalyticsService", () => {
         meta: { fieldErrors: { "series.1.metric": expect.any(Array) } },
       });
       expect(repository.lastQuery).toBeUndefined();
+    });
+  });
+});
+
+describe("AnalyticsService under a proof (ADR-177)", () => {
+  const member = (from: number) => ({ projectId: "member-1", from });
+
+  describe("given a caller with no proof", () => {
+    /** @scenario "A series asked without a proof reads its own project alone" */
+    it("mints the platform's proof for the asked project and reads under it", async () => {
+      const repository = new RecordingRepository();
+      const minted: { projectId: string; permission: string }[] = [];
+      const service = AnalyticsService.create({
+        repository,
+        evaluationRepository: NullAnalyticsEvaluationRepository.create(),
+        authz: createApiFixture<AuthzApi>({
+          authorizeInternal: async ({ projectId, permission }) => {
+            minted.push({ projectId, permission });
+            return analyticsProof({ projectId });
+          },
+        }),
+        tenantLimiter: tenantLimiter(),
+      });
+
+      await service.getTimeseries(input());
+
+      expect(minted).toEqual([{ projectId: "project-1", permission: "analytics:view" }]);
+      const authorization = repository.lastQuery?.authorization;
+      expect(authorization).toBeDefined();
+      expect(fenceFor({ authorization: authorization!, reads: "analytics" })).toEqual({
+        own: ["project-1"],
+        shared: [],
+      });
+    });
+  });
+
+  describe("given two callers on one aggregate whose proofs open different members", () => {
+    /** @scenario "Callers with different grants on one aggregate do not share a cached series" */
+    it("reads each caller's series under its own proof and serves a repeat from the cache", async () => {
+      const repository = new RecordingRepository();
+      const service = createService(repository);
+      const memberProof = analyticsProof({
+        projectId: "project-1",
+        shared: [member(Date.UTC(2026, 0, 1))],
+      });
+      const alone = analyticsProof({ projectId: "project-1" });
+
+      await service.getTimeseries(input(), { authorization: memberProof });
+      await service.getTimeseries(input(), { authorization: alone });
+      // A fresh proof fencing the same windows is the same scope, so it is answered from cache.
+      await service.getTimeseries(input(), {
+        authorization: analyticsProof({
+          projectId: "project-1",
+          shared: [member(Date.UTC(2026, 0, 1))],
+        }),
+      });
+
+      expect(repository.queries.map((query) => query.authorization)).toEqual([memberProof, alone]);
+    });
+  });
+
+  describe("given a series already cached and a repeat under a proof that has expired", () => {
+    /** @scenario "A cached series is not served under an expired proof" */
+    it("refuses the repeat instead of answering it from the cache", async () => {
+      const repository = new RecordingRepository();
+      const service = createService(repository);
+      await service.getTimeseries(input(), {
+        authorization: analyticsProof({ projectId: "project-1" }),
+      });
+
+      const repeat = service.getTimeseries(input(), {
+        authorization: analyticsProof({
+          projectId: "project-1",
+          expiresAt: nowInstant().epochMilliseconds - 1,
+        }),
+      });
+
+      await expect(repeat).rejects.toMatchObject({ code: "authorization_expired" });
+      expect(repository.queries).toHaveLength(1);
     });
   });
 });

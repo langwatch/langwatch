@@ -205,6 +205,7 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordReposito
     );
   }
 
+  /** Bounded by the id index once ready; an id it has never seen reads unbounded, as before. */
   private async summary(
     client: TraceClickHouseClient,
     input: TraceFullReadInput,
@@ -214,10 +215,11 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordReposito
         TimeToFirstTokenMs, TotalDurationMs, TotalPromptTokenCount, TotalCompletionTokenCount, TotalCost, TokensEstimated,
         toUnixTimestamp64Milli(OccurredAt) AS OccurredAtMs, toUnixTimestamp64Milli(CreatedAt) AS CreatedAtMs,
         toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAtMs FROM trace_summaries WHERE TenantId = {tenantId:String}
-        AND TraceId = {traceId:String} AND (TenantId, TraceId, UpdatedAt) IN (SELECT TenantId, TraceId, max(UpdatedAt)
-          FROM trace_summaries WHERE TenantId = {tenantId:String} AND TraceId = {traceId:String} GROUP BY TenantId, TraceId) LIMIT 1`,
+        AND TraceId = {traceId:String} {{idBound:trace_summaries.TraceId:traceId}} AND (TenantId, TraceId, UpdatedAt) IN (SELECT TenantId, TraceId, max(UpdatedAt)
+          FROM trace_summaries WHERE TenantId = {tenantId:String} AND TraceId = {traceId:String} {{idBound:trace_summaries.TraceId:traceId}} GROUP BY TenantId, TraceId) LIMIT 1`,
       query_params: { tenantId: input.tenantId, traceId: input.traceId },
       format: "JSONEachRow",
+      idBound: { occurredAtHint: input.occurredAtMs ?? null, onMiss: "unbounded" },
     });
     return summaryRowsSchema.parse(await result.json())[0] ?? null;
   }
@@ -232,6 +234,7 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordReposito
         ? "AND StartTime BETWEEN fromUnixTimestamp64Milli({fromMs:Int64}) AND fromUnixTimestamp64Milli({toMs:Int64})"
         : "";
       const result = await client.query({
+        // ID_BOUND_SKIP: bounded by the summary's own occurred time, which the read above found.
         query: `SELECT SpanId, TraceId, TenantId, ParentSpanId, ParentTraceId, ParentIsRemote, Sampled,
           toUnixTimestamp64Milli(StartTime) AS StartTimeMs, toUnixTimestamp64Milli(EndTime) AS EndTimeMs, DurationMs,
           SpanName, SpanKind, ResourceAttributes, SpanAttributes, StatusCode, StatusMessage, ScopeName, ScopeVersion,

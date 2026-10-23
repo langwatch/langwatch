@@ -2,15 +2,20 @@ import { authFailureMessage, isCredentialRejection } from "../model/auth-failure
 import { credentialSignInFailure } from "../model/credential-sign-in.ts";
 import { signIn } from "./auth-client.tsx";
 
+/** The handled error a correct but untrusted password is refused with. */
+const PASSWORD_RESET_REQUIRED = "identity_password_reset_required";
+
 /**
- * Password attempt with four outcomes. A refused credential for an address
- * the router says nobody holds becomes a sign-up; nothing is mailed here.
- * A correct password that owes a second factor is a challenge, not a session.
+ * Password attempt with five outcomes. A refused credential for an unheld address becomes a
+ * sign-up; nothing is mailed here. A correct password owing a second factor is a challenge, and
+ * one marked for a reset sends the person to choose a new password.
  */
 export type CredentialAttempt =
   | { outcome: "signed_in" }
   | { outcome: "signing_up" }
   | { outcome: "two_step_required" }
+  /** A correct password an operator marked as no longer trusted: choose a new one first. */
+  | { outcome: "password_reset_required" }
   | {
       outcome: "refused";
       message: string;
@@ -44,6 +49,7 @@ export async function attemptCredentialSignIn({
   }
 
   if (response?.twoStepRequired) return { outcome: "two_step_required" };
+  if (response?.code === PASSWORD_RESET_REQUIRED) return { outcome: "password_reset_required" };
 
   const failure = credentialSignInFailure({ response });
   if (!failure) return { outcome: "signed_in" };

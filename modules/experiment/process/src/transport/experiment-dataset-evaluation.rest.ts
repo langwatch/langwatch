@@ -60,6 +60,7 @@ export const experimentDatasetEvaluationRest = defineRestRouter(ExperimentApi)
   .withAddressing("literal", { v1Twin: true })
 
   .post("/api/dataset/evaluate", "postApiDatasetEvaluate")
+  .keepsRecords()
   .withSharedPath(DATASET_NAMESPACE)
   .withInput(z.looseObject({}), { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
   .withPermission("evaluations:manage")

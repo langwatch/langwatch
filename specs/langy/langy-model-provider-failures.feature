@@ -113,6 +113,17 @@ Feature: A turn that the model provider refused says so
       And a 400 that names neither carries no such reason
       And the provider's sentence is not recorded
 
+    # The AI gateway replaces a spent balance's message with its own
+    # exhausted-access message, so the proxy's sentence check never matched
+    # and the card fell back to the invalid-request copy.
+    @unit
+    Scenario: A spent balance behind the AI gateway still rides as out of credit
+      Given the provider answers a streaming call with its 400 credit balance error
+      And the AI gateway forwards it with its own exhausted-access message
+      When the proxy records the failure
+      Then it carries "llm_provider_out_of_credit" as a reason
+      And the agent's SDK gets a 400 it does not retry
+
     @unit
     Scenario: A spent provider balance reads as the account to top up, with no retry
       Given a turn that failed with the proxy's "llm_provider_out_of_credit" reason

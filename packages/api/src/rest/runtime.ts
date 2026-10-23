@@ -7,7 +7,7 @@ import {
   internalActor,
 } from "@langwatch/authorization";
 import { HandledError } from "@langwatch/handled-error";
-import { createLogger, validationMeta } from "@langwatch/observability";
+import { createLogger, REQUEST_CAUSE_FIELD, validationMeta } from "@langwatch/observability";
 import type { Context, ErrorHandler, Hono as HonoApp, MiddlewareHandler } from "hono";
 import { Hono } from "hono";
 import { uniqueSymbol, validator as openApiValidator } from "hono-openapi";
@@ -69,6 +69,11 @@ import {
   type HttpMethod,
   type VersionStatus,
 } from "./addressing.ts";
+import {
+  confirmMarkedRequest,
+  type RestConfirmationGate,
+  type RestConfirmationReceipt,
+} from "./confirmation.ts";
 import {
   admittedOwnerlessProjectKeyFor,
   OWNERLESS_PROJECT_KEY_PROOF_CODE_PATH,
@@ -146,6 +151,19 @@ import {
 
 const outputLogger = createLogger("langwatch:api:output-validation");
 
+/** The logger a failed give-back of confirmation clicks is reported through. */
+const confirmationLogger = createLogger("langwatch:api:confirmation");
+
+/** The default report: both errors under keys the log serialises in full. */
+const loggedConfirmations: RestConfirmationLog = {
+  refundFailed: ({ refundError, routeError }) => {
+    confirmationLogger.warn(
+      { error: refundError, [REQUEST_CAUSE_FIELD]: routeError },
+      "a failed route could not give back its confirmation clicks",
+    );
+  },
+};
+
 // The one REST execution path: authenticate, parse, decide, handle, check answer, respond.
 // The caller is authenticated BEFORE the body is parsed, so a refused credential never learns
 // the body failed its schema (ARCHITECTURE.md §8). Routes answer at three addresses (dated
@@ -184,7 +202,52 @@ export type RestRuntimeMembers = Readonly<{
   idempotency?: IdempotentRunner;
   /** Where the first call of each deprecated route is recorded. */
   deprecationLog?: RestDeprecationLog;
+  /**
+   * Where a Langy key's confirmation clicks are kept. Absent, a route that removes something
+   * refuses a Langy key outright rather than run unconfirmed.
+   */
+  confirmations?: RestConfirmationGate;
+  /**
+   * Set by the host that serves real doors, each of which records the key it lets in: there a
+   * key door that recorded none is refused on a marked route, gate or no gate. A test's runtime
+   * fakes its identity and records nothing, so it leaves this unset.
+   */
+  servedDoors?: true;
+  /** Told when a failed route could not give back its clicks. Defaults to a warning log. */
+  confirmationLog?: RestConfirmationLog;
 }>;
+
+/** Where a failed give-back of confirmation clicks is reported, beside the route's own fault. */
+export type RestConfirmationLog = Readonly<{
+  refundFailed(input: { refundError: unknown; routeError: unknown }): void;
+}>;
+
+/** Runs the handler; a fault on our side leaves the record in place, so the click is given back. */
+async function refundingOnFault<Result>({
+  receipt,
+  log,
+  run,
+}: {
+  receipt: RestConfirmationReceipt | void;
+  log: RestConfirmationLog;
+  run: () => Promise<Result>;
+}): Promise<Result> {
+  try {
+    return await run();
+  } catch (error) {
+    if (receipt && !isCustomerFault(error)) {
+      await receipt.refund().catch((refundError: unknown) => {
+        log.refundFailed({ refundError, routeError: error });
+      });
+    }
+    throw error;
+  }
+}
+
+/** A refusal the caller caused, which a retry of the same request meets again. */
+function isCustomerFault(error: unknown): boolean {
+  return HandledError.isHandled(error) && error.httpStatus < 500;
+}
 
 /**
  * Told once per process the first time a deprecated route is called, so an
@@ -1451,22 +1514,40 @@ function handlerMiddleware<Api>({
         credential,
         scope: resolved,
         context,
-        run: async () =>
-          route.handler(
-            handlerArguments({
-              context,
-              route,
-              options,
-              input,
-              actor,
-              scope: handlerScopeOf({ route, credential, caller }),
-              target,
-              authorization,
-              session: sessionOf({ route, credential, caller }),
-              key: keyOf({ route, credential, request: context.req.raw }),
-            }),
-            ...(await resolveContexts({ route, contexts, context, input })),
-          ),
+        run: async () => {
+          // After every permission check and inside the trail, so a refusal is recorded too.
+          const receipt = await confirmMarkedRequest({
+            mark: route.confirmation,
+            gate: ports.confirmations,
+            servedDoors: ports.servedDoors === true,
+            credential,
+            request: context.req.raw,
+            input,
+            scope: resolved,
+            app: options.app,
+          });
+
+          return refundingOnFault({
+            receipt,
+            log: ports.confirmationLog ?? loggedConfirmations,
+            run: async () =>
+              route.handler(
+                handlerArguments({
+                  context,
+                  route,
+                  options,
+                  input,
+                  actor,
+                  scope: handlerScopeOf({ route, credential, caller }),
+                  target,
+                  authorization,
+                  session: sessionOf({ route, credential, caller }),
+                  key: keyOf({ route, credential, request: context.req.raw }),
+                }),
+                ...(await resolveContexts({ route, contexts, context, input })),
+              ),
+          });
+        },
       });
 
       caller.markUsed?.();

@@ -7,6 +7,7 @@ import { Redis as IORedis } from "ioredis";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { GroupQueueRuntimeDefinition } from "../contracts.ts";
+import { isQueueStagingClosed, QueueStagingClosedError } from "../errors.ts";
 import { GroupQueueProcessor } from "../groupQueue.ts";
 import { GroupStagingScripts } from "../scripts.ts";
 
@@ -131,18 +132,43 @@ describe("GroupQueueProcessor staging gate during shutdown", () => {
   });
 
   describe("given a queue whose drain has finished", () => {
-    /** @scenario Staging is refused once the drain is over */
-    it("refuses further work, naming shutdown as the reason", async () => {
-      const processor = makeProcessor();
+    let processor: GroupQueueProcessor<TestPayload>;
+
+    beforeEach(async () => {
+      processor = makeProcessor();
       const closing = processor.close();
       await drainIsOpen();
       releaseDrain?.();
       await closing;
+    });
 
+    /** @scenario Staging is refused once the drain is over */
+    it("refuses further work, naming shutdown as the reason", async () => {
       await expect(processor.send({ id: "a", groupId: "g" })).rejects.toThrow(/drain has finished/);
       await expect(processor.sendBatch([{ id: "a", groupId: "g" }])).rejects.toThrow(
         /drain has finished/,
       );
+    });
+
+    /** @scenario A refusal after the drain is typed, and recognised across package copies */
+    it("refuses with a QueueStagingClosedError that isQueueStagingClosed recognises", async () => {
+      const refusal = await processor.send({ id: "a", groupId: "g" }).then(
+        () => undefined,
+        (error: unknown) => error,
+      );
+      expect(refusal).toBeInstanceOf(QueueStagingClosedError);
+      expect(isQueueStagingClosed(refusal)).toBe(true);
+    });
+  });
+
+  describe("given an error from another copy of this package", () => {
+    describe("when it carries the QueueStagingClosedError name", () => {
+      /** @scenario A refusal after the drain is typed, and recognised across package copies */
+      it("is still recognised as a drained-queue refusal", () => {
+        const foreign = Object.assign(new Error("drained"), { name: "QueueStagingClosedError" });
+        expect(isQueueStagingClosed(foreign)).toBe(true);
+        expect(isQueueStagingClosed(new Error("Redis connection lost"))).toBe(false);
+      });
     });
   });
 
