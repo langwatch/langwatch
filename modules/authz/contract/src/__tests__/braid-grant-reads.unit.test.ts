@@ -125,6 +125,19 @@ describe("a braid's attach on a build that does not write braids", () => {
     });
   });
 
+  describe("when a grant that is not a braid names a grant it replaces", () => {
+    it("refuses the grant a braid replaces on any other source's grant", () => {
+      const trace = { type: "trace", from: "2026-10-01T00:00:00.000Z" };
+      const sources = GRANT_EVENT_SOURCES.filter((source) => source !== "braid");
+
+      for (const source of sources) {
+        expect(attach({ source, condition: trace }).success).toBe(false);
+        expect(command({ source, condition: trace }).success).toBe(false);
+        expect(attach({ source, condition: trace, replacesGrantId: undefined }).success).toBe(true);
+      }
+    });
+  });
+
   describe("when a braid is anything but the shared span read", () => {
     it("refuses one on the reader's own project, with another role, or on a trace window", () => {
       expect(attach({ scope: { type: "PROJECT", id: "proj_orchestrator" } }).success).toBe(false);

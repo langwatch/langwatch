@@ -105,7 +105,9 @@ export const grantShapeRefinement = {
     expiresAtMs?: number;
     source?: string;
     condition?: { type?: string; where?: string; compiledWhere?: unknown };
+    replacesGrantId?: string;
   }): boolean => {
+    if (grant.replacesGrantId !== undefined && grant.source !== GRANT_SOURCE_BRAID) return false;
     const isResourceScope = grant.scope.type === "RESOURCE";
     if (grant.principal.type === "anyone" && !isResourceScope) return false;
     if (isResourceScope && grant.expiresAtMs !== undefined) return false;
@@ -135,7 +137,7 @@ export const grantShapeRefinement = {
     );
   },
   message:
-    "a RESOURCE grant carries resource terms and a null roleKey, every other scope carries a roleKey and no resource terms; a RESOURCE grant states its expiry inside those terms and never as the grant's own `expiresAtMs`; `anyone` principals exist only at RESOURCE scope, a `project` principal exists at RESOURCE scope, as its own project's credential (a PROJECT scope whose id is the principal's), or as a `project-reader` on another project's PROJECT scope carrying a non-span condition with an empty where, or, from a braid alone, a span condition whose where carries its compiled form; only that shared read carries a condition or the `project-reader` role, and a braid is only that shared span read",
+    "a RESOURCE grant carries resource terms and a null roleKey, every other scope carries a roleKey and no resource terms; a RESOURCE grant states its expiry inside those terms and never as the grant's own `expiresAtMs`; `anyone` principals exist only at RESOURCE scope, a `project` principal exists at RESOURCE scope, as its own project's credential (a PROJECT scope whose id is the principal's), or as a `project-reader` on another project's PROJECT scope carrying a non-span condition with an empty where, or, from a braid alone, a span condition whose where carries its compiled form; only that shared read carries a condition or the `project-reader` role, and a braid is only that shared span read; only a braid names the grant it replaces",
   path: ["resource"] as const,
 };
 
