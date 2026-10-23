@@ -12,7 +12,10 @@ import { fileURLToPath } from "node:url";
 
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import type { LangWatchQLResourceLimits } from "@langwatch/analytics-contract/langwatch-ql-limits";
-import { TEST_CLICKHOUSE_IMAGE } from "@langwatch/clickhouse-client/testing";
+import {
+  TEST_CLICKHOUSE_IMAGE,
+  testClickHouseProfilePins,
+} from "@langwatch/clickhouse-client/testing";
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
 import { ClickHouseContainer, type StartedClickHouseContainer } from "@testcontainers/clickhouse";
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
@@ -299,12 +302,14 @@ export async function startLangWatchQLClickHouse({
   const accessManagementXml = serverConfig.accessManagementConfigXml({
     administrativeUser: ADMIN_USER,
   });
+  const pins = testClickHouseProfilePins();
   const configDigest = extraConfigFiles
     .reduce(
       (hash, file) => hash.update(file.target).update(file.contents),
       createHash("sha256")
         .update(CLICKHOUSE_CUSTOM_SETTINGS_PREFIX_CONFIG_XML)
-        .update(accessManagementXml),
+        .update(accessManagementXml)
+        .update(pins.file.content),
     )
     .digest("hex")
     .slice(0, 16);
@@ -332,6 +337,11 @@ export async function startLangWatchQLClickHouse({
       {
         source: writeConfigFile(configDirectory, "access-management.xml", accessManagementXml),
         target: CLICKHOUSE_ACCESS_MANAGEMENT_CONFIG_PATH,
+      },
+      // The image's default-profile pins, so these suites run the query behaviour it ships.
+      {
+        source: writeConfigFile(configDirectory, "profile-pins.yaml", pins.file.content),
+        target: pins.file.target,
       },
       ...extraConfigFiles.map((file) => ({
         source: writeConfigFile(configDirectory, file.name, file.contents),

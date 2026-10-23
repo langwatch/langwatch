@@ -1,10 +1,36 @@
 package render
 
 import (
+	_ "embed"
+	"fmt"
+	"maps"
 	"path/filepath"
+
+	"gopkg.in/yaml.v3"
 
 	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/config"
 )
+
+// profilePinsYAML holds 25.10's query behaviour on 26.8, shared with CI's servers.
+//
+//go:embed profile-pins.yaml
+var profilePinsYAML []byte
+
+// profilePins reads the default profile's settings out of profile-pins.yaml.
+func profilePins() (map[string]any, error) {
+	var doc struct {
+		Profiles struct {
+			Default map[string]any `yaml:"default"`
+		} `yaml:"profiles"`
+	}
+	if err := yaml.Unmarshal(profilePinsYAML, &doc); err != nil {
+		return nil, fmt.Errorf("profile-pins.yaml: %w", err)
+	}
+	if len(doc.Profiles.Default) == 0 {
+		return nil, fmt.Errorf("profile-pins.yaml: no profiles.default settings")
+	}
+	return doc.Profiles.Default, nil
+}
 
 // renderProfiles writes profiles.yaml with the default user profile settings.
 func renderProfiles(c *config.Computed, usersD string) error {
@@ -24,16 +50,12 @@ func renderProfiles(c *config.Computed, usersD string) error {
 		"http_receive_timeout":               c.HTTPReceiveTimeout,
 		"http_send_timeout":                  c.HTTPSendTimeout,
 		"tcp_keep_alive_timeout":             c.TCPKeepAliveTimeout,
-
-		// Query-level defaults as of 25.10. Among the ones 26.4 to 26.8
-		// change: an unquoted JSON integer into DateTime64 is read as Unix
-		// seconds instead of ticks (ClickHouse #108091), so an epoch-ms
-		// timestamp lands at 9999-12-31. Settings set above still win.
-		"compatibility": "25.10",
-		// 26.2 turns insert deduplication on for async inserts and
-		// materialized views (#95970), which would change the ingest path.
-		"deduplicate_insert": "backward_compatible_choice",
 	}
+	pins, err := profilePins()
+	if err != nil {
+		return err
+	}
+	maps.Copy(profile, pins)
 
 	// Opt-in, user-level settings (in config.d the server refuses to boot):
 	// inter-server compression, and stopping a read whose HTTP client has gone.

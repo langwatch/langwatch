@@ -1,0 +1,12 @@
+# The query defaults ClickHouse 26.8 keeps from 25.10. The one copy: the image merges it into
+# its default profile, and CI and the test containers mount it as a users.d file
+# (.github/scripts/start-clickhouse-with-storage-policy.sh, testClickHouseProfilePins).
+profiles:
+  default:
+    # 25.10's defaults for every setting nothing sets explicitly. Among those 26.x changes: an
+    # unquoted JSON integer into DateTime64 reads as Unix seconds (#108091), FINAL stops pruning
+    # partitions whose key is outside the sorting key (26.3), and column statistics prune parts
+    # (26.4). Settings the profile sets explicitly still win.
+    compatibility: "25.10"
+    # 26.2 turns insert deduplication on for async inserts and materialized views (#95970).
+    deduplicate_insert: backward_compatible_choice

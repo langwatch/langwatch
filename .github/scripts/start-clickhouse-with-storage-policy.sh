@@ -38,6 +38,15 @@ cat > /tmp/storage_policy.xml << 'EOF'
 </clickhouse>
 EOF
 
+# The clickhouse-serverless image's default-profile pins (25.10 query behaviour
+# on 26.8), mounted from the file the image embeds, so CI runs what it ships.
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+PROFILE_PINS="$REPO_ROOT/infra/clickhouse-serverless/internal/render/profile-pins.yaml"
+if [ ! -r "$PROFILE_PINS" ]; then
+  echo "ClickHouse profile pins not found at $PROFILE_PINS" >&2
+  exit 1
+fi
+
 # ---------------------------------------------------------------------------
 # Step 2: Start ClickHouse container with config mounted (loads at startup)
 # ---------------------------------------------------------------------------
@@ -53,6 +62,7 @@ docker run -d \
   -e CLICKHOUSE_USER=default \
   -e CLICKHOUSE_PASSWORD="${CLICKHOUSE_PASSWORD}" \
   -v /tmp/storage_policy.xml:/etc/clickhouse-server/config.d/storage_policy.xml:ro \
+  -v "$PROFILE_PINS":/etc/clickhouse-server/users.d/zz-langwatch-profile-pins.yaml:ro \
   clickhouse/clickhouse-server:26.8.34.13
 
 # ---------------------------------------------------------------------------
