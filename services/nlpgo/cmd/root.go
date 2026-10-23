@@ -197,9 +197,11 @@ func newEngine(cfg *nlpgo.Config, parts engineParts) *engine.Engine {
 }
 
 // codeBlockEgress is the HTTP block's policy with private and loopback
-// addresses refused unless the operator allows them for code blocks.
+// addresses refused unless the operator allows them for code blocks. The HTTP
+// block's allow-listed hosts skip the address checks, so code never inherits them.
 func codeBlockEgress(egress ssrf.Options, allowLocal bool) ssrf.Options {
 	egress.AllowLocal = allowLocal
+	egress.AllowedHosts = nil
 	return egress
 }
 

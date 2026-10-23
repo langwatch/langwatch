@@ -17,6 +17,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -431,7 +432,15 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 	if guest != nil {
 		// A wasm run never touches the host disk: its /work, result included,
 		// lives in engine memory for the length of the run.
+		if len(payload) > maxWasmPayloadBytes {
+			return &Result{Error: &Error{Type: RunnerErrorType, Message: fmt.Sprintf("the code block's code and inputs exceed the %d MiB limit", maxWasmPayloadBytes>>20)}}, nil
+		}
 		started := time.Now()
+		release, err := e.wasm.admit(runCtx, len(payload))
+		if err != nil {
+			return collectResult(runResult{}, runOutcome{elapsed: time.Since(started), err: err}), nil
+		}
+		defer release()
 		run := e.wasm.run(runCtx, guest, wasmRunRequest{
 			payload: payload,
 			env:     withSandboxCredential(nil, req.SandboxAPIKey, e.opts.SandboxEndpoint),
@@ -611,7 +620,7 @@ func collectResult(result runResult, outcome runOutcome) *Result {
 			Stderr:     stderr,
 			Error: &Error{
 				Type:    RunnerErrorType,
-				Message: runErr.Error(),
+				Message: firstLine(runErr.Error()),
 			},
 		}
 	}
@@ -628,4 +637,11 @@ func killGroup(pid int) error {
 		return err
 	}
 	return syscall.Kill(-pgid, syscall.SIGKILL)
+}
+
+// firstLine keeps an engine error to its message: a wasm trap's error carries
+// the guest's stack trace after it, which is engine detail, not the user's.
+func firstLine(message string) string {
+	head, _, _ := strings.Cut(message, "\n")
+	return head
 }

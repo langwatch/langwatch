@@ -315,14 +315,26 @@ func TestCodeBlockTimeout_ReachesTheExecutorFromTheEnvironment(t *testing.T) {
 
 // @scenario "code blocks reach private addresses only when the operator allows it"
 func TestCodeBlockEgress_RefusesLocalUnlessAllowed(t *testing.T) {
-	shared := ssrf.Options{AllowLocal: true, AllowedHosts: []string{"internal.example"}, StrictPublicOnly: true}
+	shared := ssrf.Options{AllowLocal: true, AllowedHosts: []string{"169.254.169.254"}, StrictPublicOnly: true}
 
 	refused := codeBlockEgress(shared, false)
 	if refused.AllowLocal {
 		t.Fatal("code blocks inherited the HTTP block's permission to reach private addresses")
 	}
-	if len(refused.AllowedHosts) != 1 || !refused.StrictPublicOnly {
+	if !refused.StrictPublicOnly {
 		t.Fatalf("the rest of the shared policy was not kept: %+v", refused)
+	}
+}
+
+// @scenario "code blocks do not inherit the HTTP block's allow-listed hosts"
+func TestCodeBlockEgress_DropsAllowListedHosts(t *testing.T) {
+	shared := ssrf.Options{AllowedHosts: []string{"169.254.169.254"}}
+	egress := codeBlockEgress(shared, true)
+	if len(egress.AllowedHosts) != 0 {
+		t.Fatalf("code blocks inherited allow-listed hosts, which skip the address checks: %v", egress.AllowedHosts)
+	}
+	if err := ssrf.CheckURL("http://169.254.169.254/latest/meta-data/", egress); err == nil {
+		t.Fatal("a code block could reach the metadata address through the HTTP block's allow-list")
 	}
 	if !codeBlockEgress(shared, true).AllowLocal {
 		t.Fatal("the operator's explicit allowance was ignored")

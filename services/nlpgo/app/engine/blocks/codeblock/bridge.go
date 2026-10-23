@@ -117,16 +117,19 @@ func (b *bridge) endLine() {
 	overflowed := b.skip
 	b.skip = false
 	defer b.line.Reset()
-	if overflowed {
-		b.failed++
-		b.reply(bridgeFailure("limit", "host call exceeds the frame size limit"))
-		return
-	}
-	if !bytes.HasPrefix(line, []byte(bridgeFramePrefix)) {
+	switch {
+	case overflowed:
+		b.answer(bridgeFailure("limit", "host call exceeds the frame size limit"))
+	case !bytes.HasPrefix(line, []byte(bridgeFramePrefix)):
 		b.keepStray(line)
-		return
+	default:
+		b.answer(b.handle(line[len(bridgeFramePrefix):]))
 	}
-	reply := b.handle(line[len(bridgeFramePrefix):])
+}
+
+// answer replies to one host call. Every failed call counts towards
+// maxFailedCalls, whatever made it fail; past it the run is stopped.
+func (b *bridge) answer(reply bridgeReply) {
 	if !reply.OK {
 		b.failed++
 		if b.failed > maxFailedCalls {

@@ -325,6 +325,62 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       And the rest of the egress policy is kept
       And setting the variable allows them
 
+    @unit
+    Scenario: code blocks do not inherit the HTTP block's allow-listed hosts
+      Given the HTTP block allow-lists the cloud metadata address
+      When the code-block egress policy is built
+      Then the allow-list is empty
+      And the metadata address is still refused
+
+    @unit
+    Scenario: a run's files are charged for the memory they hold
+      Given a run that writes one byte into each of many files
+      When the run creates files past the byte budget's worth of storage units
+      Then the next write is refused although few bytes were written
+      And truncating or deleting a file returns its storage to the budget
+
+    @unit
+    Scenario: a deleted file still open keeps its storage until the last handle closes
+      Given a run that opens a file, deletes it and keeps writing to the handle
+      When the handle is closed
+      Then the file's storage is returned to the budget only then
+
+    @unit
+    Scenario: a run's file offsets cannot overflow the engine
+      Given a run that seeks, writes and truncates at offsets near the largest integer
+      When the executor runs the request
+      Then each call is refused with an error and the engine keeps running
+
+    @unit
+    Scenario: a run's file names are bounded
+      Given a run that creates a file whose name is longer than 255 bytes
+      When the executor runs the request
+      Then the create is refused as a name too long
+
+    @unit
+    Scenario: oversized host calls count towards the failed-call limit
+      Given a JavaScript code node that writes host calls past the frame size limit without end
+      When the executor runs the request
+      Then the run is stopped with an error naming failing host calls
+
+    @unit
+    Scenario: an engine whose memory budget cannot admit one run refuses to start
+      Given a total wasm memory budget smaller than one run's footprint
+      When the executor is built
+      Then building it fails with an error naming both sizes
+
+    @unit
+    Scenario: a run's request is charged to the memory budget and capped
+      Given a code node whose code and inputs exceed 16 MiB
+      When the executor runs the request
+      Then the run is refused before it starts with an error naming the limit
+
+    @unit
+    Scenario: an engine error reaches the user without the guest's stack trace
+      Given a JavaScript code node that exhausts its memory
+      When the executor runs the request
+      Then the error message is one line and names no wasm stack trace
+
   Rule: JavaScript code blocks run on QuickJS inside the engine
 
     # A code node whose `language` parameter is "javascript" runs on QuickJS

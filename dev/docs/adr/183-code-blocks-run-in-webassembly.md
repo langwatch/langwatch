@@ -31,7 +31,10 @@ default until the wasm runtime has run in production.
   from memory, read-only), the runner and its stand-ins (`/runner`,
   read-only), and its own run directory (`/work`). `/work` is held in engine
   memory (`codeblock/workfs.go`), never on the host disk, with no links of any
-  kind and a budget of 64 MiB, 4096 entries and 256 open files; the runner's
+  kind and a budget of 64 MiB, 4096 entries, 256 open files and 255-byte
+  names. Files are stored and charged in 64 KiB chunks, so the budget counts
+  what the engine holds; a deleted file still open keeps its charge until the
+  last handle closes. The runner's
   result is read from it. A host directory mount was rejected: wazero refuses
   absolute link targets but follows relative ones. Nothing else on the host
   exists for the guest. It receives no host environment variable; the run's own
@@ -43,14 +46,18 @@ default until the wasm runtime has run in production.
   and `httpx` are stand-ins built on that call, covering the verb helpers,
   sessions/clients and responses.
 - **Budgets.** Concurrent runs share a memory budget
-  (`NLPGO_ENGINE_CODE_BLOCK_TOTAL_MEMORY_MIB`, 2048 by default); a run waits
-  for room within its own deadline. Host calls are bounded per run: 64
+  (`NLPGO_ENGINE_CODE_BLOCK_TOTAL_MEMORY_MIB`, 2048 by default) held by the
+  executor (the engine builds one). A run is charged its memory ceiling,
+  `/work`, unread replies and twice its request, which is capped at 16 MiB; it
+  holds the charge until its result is collected, and waits for room within
+  its own deadline. A budget below one run's charge refuses to start. Host calls are bounded per run: 64
   requests, 256 failing calls and 32 MiB of unread replies stop the run, and
   the result it hands back is capped at 32 MiB.
 - **Egress.** Code blocks use the HTTP block's policy but never reach private
   or loopback addresses unless `NLPGO_ENGINE_CODE_BLOCK_ALLOW_LOCAL_EGRESS` is
   set, whatever `BLOCK_LOCAL_HTTP_CALLS` says: a code block is arbitrary code,
-  not a configured request. DNS lookups for the policy end with the request.
+  not a configured request. The HTTP block's allow-listed hosts skip the
+  address checks, so code blocks do not inherit them. DNS lookups for the policy end with the request.
 - **Time is the engine's.** A run is stopped at its deadline wherever it is.
   `time.sleep` and the asyncio event loop wait through the engine, so a
   sleeping run also ends at its deadline.

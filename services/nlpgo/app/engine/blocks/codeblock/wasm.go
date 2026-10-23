@@ -110,7 +110,9 @@ func newWasmRuntime(ctx context.Context, opts Options, sources runnerPair) (*was
 	if totalMiB <= 0 {
 		totalMiB = defaultWasmTotalMemoryMiB
 	}
-	totalMiB = max(totalMiB, runWeight)
+	if largest := runWeight + payloadWeight(maxWasmPayloadBytes); totalMiB < largest {
+		return nil, fmt.Errorf("codeblock: a total wasm memory of %d MiB cannot admit one run, which needs up to %d MiB", totalMiB, largest)
+	}
 	w := &wasmRuntime{
 		runtime:    wazero.NewRuntimeWithConfig(ctx, config),
 		client:     newFetchClient(opts.Egress),
@@ -258,14 +260,26 @@ type wasmRunRequest struct {
 // errEngineAtCapacity is a run that could not be admitted before it was cancelled.
 var errEngineAtCapacity = errors.New("the engine is running as many code blocks as its memory allows")
 
-// run executes one code block on guest. The guest sees no host path at all:
-// its /work is a workFS in engine memory.
-func (w *wasmRuntime) run(parent context.Context, guest *wasmGuest, req wasmRunRequest) wasmRun {
-	if err := w.admission.Acquire(parent, w.runWeight); err != nil {
-		return wasmRun{err: errEngineAtCapacity}
-	}
-	defer w.admission.Release(w.runWeight)
+// maxWasmPayloadBytes bounds one run's request: code, inputs, secrets, params.
+const maxWasmPayloadBytes = 16 << 20
 
+// payloadWeight is what a payload costs the budget: the engine holds it, and
+// the guest a copy, until the run's result is collected.
+func payloadWeight(size int) int64 { return 2 * ((int64(size) + 1<<20 - 1) >> 20) }
+
+// admit takes a run's share of the memory budget, waiting for room until ctx
+// ends. The caller releases it once the run's result is collected.
+func (w *wasmRuntime) admit(ctx context.Context, payloadBytes int) (func(), error) {
+	weight := w.runWeight + payloadWeight(payloadBytes)
+	if err := w.admission.Acquire(ctx, weight); err != nil {
+		return nil, errEngineAtCapacity
+	}
+	return func() { w.admission.Release(weight) }, nil
+}
+
+// run executes one code block on guest, admitted by the caller. The guest sees
+// no host path at all: its /work is a workFS in engine memory.
+func (w *wasmRuntime) run(parent context.Context, guest *wasmGuest, req wasmRunRequest) wasmRun {
 	ctx, cancel := context.WithCancelCause(parent)
 	defer cancel(nil)
 	channel := w.newBridge(ctx, cancel, req.payload)
@@ -323,11 +337,11 @@ func (w *wasmRuntime) run(parent context.Context, guest *wasmGuest, req wasmRunR
 
 // workResult reads the result the runner left in /work, bounded like a host file.
 func workResult(work *workFS) runResult {
-	data, ok := work.readFile("result.json")
+	data, exists, fits := work.readFile("result.json", maxResultBytes)
 	switch {
-	case !ok:
+	case !exists:
 		return runResult{}
-	case len(data) > maxResultBytes:
+	case !fits:
 		return runResult{tooLarge: true}
 	default:
 		return runResult{data: data}

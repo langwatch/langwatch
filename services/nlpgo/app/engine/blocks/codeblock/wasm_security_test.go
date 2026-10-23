@@ -383,8 +383,9 @@ export default ({ url }) => {
 
 // @scenario "concurrent wasm runs share a memory budget"
 func TestWasmSecurity_ConcurrentRunsWaitForMemory(t *testing.T) {
-	// A budget of one run's footprint admits one run at a time.
-	e := newJSExec(t, codeblock.Options{WasmMemoryMiB: 64, WasmTotalMemoryMiB: 1})
+	// One run's footprint (64 memory + 64 /work + 32 replies + 32 request)
+	// is 192 MiB, so this budget admits one run at a time.
+	e := newJSExec(t, codeblock.Options{WasmMemoryMiB: 64, WasmTotalMemoryMiB: 200})
 	var wg sync.WaitGroup
 	start := time.Now()
 	for range 3 {
@@ -418,4 +419,41 @@ func TestWasmSecurity_ConcurrentRunsWaitForMemory(t *testing.T) {
 	require.NotNil(t, res.Error, "a cancelled run waiting for room was not reported")
 	assert.Contains(t, res.Error.Message, "as many code blocks as its memory allows")
 	<-release
+}
+
+// @scenario "an engine whose memory budget cannot admit one run refuses to start"
+func TestWasmSecurity_BudgetBelowOneRunIsRefused(t *testing.T) {
+	_, err := codeblock.New(codeblock.Options{
+		QuickJSWasm:        codeblock.QuickJSWasmForTests(),
+		WasmMemoryMiB:      64,
+		WasmTotalMemoryMiB: 100,
+	})
+	require.ErrorContains(t, err, "100 MiB")
+	require.ErrorContains(t, err, "192 MiB")
+}
+
+// @scenario "a run's request is charged to the memory budget and capped"
+func TestWasmSecurity_OversizedRequestIsRefused(t *testing.T) {
+	e := newJSExec(t, codeblock.Options{})
+	res := runJS(t, e, codeblock.Request{
+		Code:   "export default () => ({})",
+		Inputs: map[string]any{"blob": strings.Repeat("x", 17<<20)},
+	})
+	require.NotNil(t, res.Error)
+	assert.Equal(t, codeblock.RunnerErrorType, res.Error.Type)
+	assert.Contains(t, res.Error.Message, "16 MiB")
+}
+
+// @scenario "an engine error reaches the user without the guest's stack trace"
+func TestWasmSecurity_EngineErrorsAreOneLine(t *testing.T) {
+	e := newJSExec(t, codeblock.Options{WasmMemoryMiB: 64})
+	res := runJS(t, e, codeblock.Request{
+		Code: `export default () => {
+  const chunks = []
+  for (;;) chunks.push(new Uint8Array(8 * 1024 * 1024))
+}`,
+	})
+	require.NotNil(t, res.Error)
+	assert.NotContains(t, res.Error.Message, "\n")
+	assert.NotContains(t, res.Error.Message, "wasm stack trace")
 }
