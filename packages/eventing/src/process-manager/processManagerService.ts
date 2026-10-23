@@ -175,6 +175,7 @@ export class ProcessManagerService<State> {
     ) {
       this.logger.debug(
         {
+          processName: ref.processName,
           processKey: ref.processKey,
           projectId: ref.projectId,
           sourceEventId: envelope.eventId,
