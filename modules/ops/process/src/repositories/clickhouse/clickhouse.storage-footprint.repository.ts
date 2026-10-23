@@ -1,11 +1,14 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { createLogger } from "@langwatch/observability";
 
-import { isPlainClusterName } from "../../rules/cluster-name.rules.ts";
+import { isClusterReadRefusal, isPlainClusterName } from "../../rules/cluster-name.rules.ts";
 import {
   type BackupStatusRow,
   StorageFootprintRepository,
 } from "../storage-footprint.repository.ts";
 import type { StorageStatsReading } from "../storage-stats-readings.repository.ts";
+
+const logger = createLogger("langwatch:ops:storage-footprint");
 
 /** One endpoint's system tables, read unscoped (`tenantId: ""`): none carries a tenant column. */
 export class ClickHouseStorageFootprintRepository extends StorageFootprintRepository {
@@ -88,11 +91,14 @@ export class ClickHouseStorageFootprintRepository extends StorageFootprintReposi
   async findBackupStatuses({ cluster }: { cluster?: string | undefined } = {}): Promise<
     BackupStatusRow[]
   > {
-    if (!(await this.hasBackupLog({ cluster }))) return [];
-    // A replica without the table refuses the cluster-wide read; the local log still answers.
-    const rows = await this.readBackupRows({ cluster }).catch((error: unknown) => {
-      if (!plainClusterName(cluster)) throw error;
-      return this.readBackupRows({ cluster: undefined });
+    const named = await this.orLocal({
+      cluster,
+      read: (source) => this.hasBackupLog({ cluster: source }),
+    });
+    if (!named.answer) return [];
+    const { answer: rows } = await this.orLocal({
+      cluster: named.cluster,
+      read: (source) => this.readBackupRows({ cluster: source }),
     });
     return rows.map((row) => ({
       status: row.status,
@@ -100,6 +106,30 @@ export class ClickHouseStorageFootprintRepository extends StorageFootprintReposi
       lastSuccessTime: row.last_success_time,
       lastSuccessSizeBytes: Number.parseInt(row.last_success_size, 10),
     }));
+  }
+
+  /**
+   * The read across the cluster, or on the local node when the cluster refuses it in a way the
+   * local node can still answer; that degradation is logged, and any other failure is thrown.
+   */
+  private async orLocal<T>({
+    cluster,
+    read,
+  }: {
+    cluster: string | undefined;
+    read: (cluster: string | undefined) => Promise<T>;
+  }): Promise<{ answer: T; cluster: string | undefined }> {
+    if (!plainClusterName(cluster)) return { answer: await read(void 0), cluster: void 0 };
+    try {
+      return { answer: await read(cluster), cluster };
+    } catch (error) {
+      if (!isClusterReadRefusal(error)) throw error;
+      logger.warn(
+        { cluster, error },
+        "ClickHouse refused the cluster-wide backup read; reading the local node's backup log",
+      );
+      return { answer: await read(void 0), cluster: void 0 };
+    }
   }
 
   private async readBackupRows({ cluster }: { cluster: string | undefined }) {

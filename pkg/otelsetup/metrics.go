@@ -18,7 +18,7 @@ type metricSink struct {
 }
 
 // newMetricReader builds an OTLP/HTTP metric reader (an otlpmetrichttp exporter
-// behind a PeriodicReader) for endpointURL — the FULL per-signal URL, already
+// behind a PeriodicReader) for the sink's endpointURL — the FULL per-signal URL, already
 // carrying /v1/metrics. Callers assemble one or more readers into a single
 // MeterProvider (see installMetrics) so the same instruments fan out to every
 // configured sink.
@@ -27,19 +27,18 @@ type metricSink struct {
 // services that keep instruments outside the OTel API (a Prometheus registry
 // bridged in, say). Without one, those instruments exist only on a pull door.
 func newMetricReader(ctx context.Context, sink metricSink) (sdkmetric.Reader, error) {
-	endpointURL, headers, producers := sink.endpointURL, sink.headers, sink.producers
 	exporterOpts := []otlpmetrichttp.Option{
-		otlpmetrichttp.WithEndpointURL(endpointURL),
+		otlpmetrichttp.WithEndpointURL(sink.endpointURL),
 	}
-	if len(headers) > 0 {
-		exporterOpts = append(exporterOpts, otlpmetrichttp.WithHeaders(headers))
+	if len(sink.headers) > 0 {
+		exporterOpts = append(exporterOpts, otlpmetrichttp.WithHeaders(sink.headers))
 	}
 	exp, err := otlpmetrichttp.New(ctx, exporterOpts...)
 	if err != nil {
 		return nil, err
 	}
 	var readerOpts []sdkmetric.PeriodicReaderOption
-	for _, p := range producers {
+	for _, p := range sink.producers {
 		if p == nil {
 			continue
 		}

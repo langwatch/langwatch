@@ -96,6 +96,18 @@ Feature: ClickHouse backup status metrics are opt-out
     Then the local node's backup history is read instead
 
   @unit
+  Scenario: A cluster the server does not know, or may not read, falls back to the local node
+    Given CLICKHOUSE_CLUSTER names the cluster
+    When the cluster-wide probe for the backup log is refused for an unknown cluster or missing rights
+    Then the local node is probed and read instead, and the fallback is logged
+
+  @unit
+  Scenario: Any other cluster-wide failure is reported, not hidden
+    Given CLICKHOUSE_CLUSTER names the cluster
+    When the cluster-wide backup read times out
+    Then the failure reaches the collector rather than a local answer standing in for it
+
+  @unit
   Scenario: A cluster name that is not a plain identifier reads the local node
     Given CLICKHOUSE_CLUSTER holds something that is not a plain identifier
     When the backup history is read

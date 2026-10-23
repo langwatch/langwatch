@@ -183,13 +183,10 @@ Feature: Gateway Prometheus metrics
       When a caller sends an unrecognised model
       Then no new series is created for that caller-supplied value
 
-  Scenario: gateway series are pushed over OTLP as well as scraped
-    Given a deployment that pushes metrics over OTLP and never scrapes the pull door
-    When the OTLP reader exports
-    Then gateway_http_requests_total and its latency histogram are carried
-    And the Go runtime and process families are not sent twice
+  Rule: a deployment that never scrapes still receives the gateway's series
 
-  Scenario: a missing producer does not break the metric reader
-    Given the reader is configured with a nil producer beside a real one
-    When the reader collects
-    Then the real producer's series arrive and nothing panics
+    Scenario: gateway series are pushed over OTLP as well as scraped
+      Given a deployment that pushes metrics over OTLP and never scrapes the pull door
+      When the OTLP reader exports
+      Then gateway_http_requests_total and its latency histogram are carried
+      And the Go runtime and process families are not sent twice

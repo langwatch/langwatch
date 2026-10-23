@@ -640,7 +640,7 @@ func metricReaders(ctx context.Context, opts Options) ([]sdkmetric.Reader, error
 		if metricsURL == "" {
 			metricsURL = metricsEndpointFromTraces(opts.OTLPEndpoint)
 		}
-		r, err := newMetricReader(ctx, metricSink{metricsURL, opts.OTLPHeaders, opts.MetricProducers})
+		r, err := newMetricReader(ctx, metricSink{endpointURL: metricsURL, headers: opts.OTLPHeaders, producers: opts.MetricProducers})
 		if err != nil {
 			return nil, err
 		}
@@ -652,7 +652,11 @@ func metricReaders(ctx context.Context, opts Options) ([]sdkmetric.Reader, error
 	if opts.DebugCollectorEndpoint == "" || (len(readers) > 0 && sameCollectorBase(opts.OTLPEndpoint, opts.DebugCollectorEndpoint)) {
 		return readers, nil
 	}
-	r, err := newMetricReader(ctx, metricSink{withSignalPath(opts.DebugCollectorEndpoint, "/v1/metrics"), opts.DebugCollectorHeaders, opts.MetricProducers})
+	r, err := newMetricReader(ctx, metricSink{
+		endpointURL: withSignalPath(opts.DebugCollectorEndpoint, "/v1/metrics"),
+		headers:     opts.DebugCollectorHeaders,
+		producers:   opts.MetricProducers,
+	})
 	if err != nil {
 		return nil, err
 	}

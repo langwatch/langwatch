@@ -76,7 +76,9 @@ describe("given an endpoint's system tables", () => {
           statements.push(request);
           if (request.sql.includes("system.tables")) return { rows: [{ present: "1" }] };
           if (request.sql.includes("clusterAllReplicas('default', system.backup_log)")) {
-            throw new Error("UNKNOWN_TABLE");
+            throw Object.assign(new Error("Table system.backup_log does not exist"), {
+              code: "60",
+            });
           }
           return { rows: [] };
         },
@@ -86,6 +88,43 @@ describe("given an endpoint's system tables", () => {
       await expect(repo.findBackupStatuses({ cluster: "default" })).resolves.toEqual([]);
 
       expect(statements.at(-1)?.sql).not.toContain("clusterAllReplicas");
+    });
+
+    /** @scenario "A cluster the server does not know, or may not read, falls back to the local node" */
+    it.each([
+      ["a cluster ClickHouse does not know", "170"],
+      ["no right to read the other replicas", "497"],
+    ])("falls back to the local node when the cluster probe meets %s", async (_label, code) => {
+      const statements: QueryRequest[] = [];
+      const clickhouse = clickHouseQueryClientDouble({
+        query: async (request: QueryRequest) => {
+          statements.push(request);
+          if (request.sql.includes("clusterAllReplicas")) {
+            throw Object.assign(new Error("refused"), { code });
+          }
+          if (request.sql.includes("system.tables")) return { rows: [{ present: "1" }] };
+          return { rows: [] };
+        },
+      });
+      const repo = ClickHouseStorageFootprintRepository.create({ clickhouse });
+
+      await expect(repo.findBackupStatuses({ cluster: "default" })).resolves.toEqual([]);
+
+      expect(statements.at(-1)?.sql).toContain("FROM system.backup_log");
+      expect(statements.at(-1)?.sql).not.toContain("clusterAllReplicas");
+    });
+
+    /** @scenario "Any other cluster-wide failure is reported, not hidden" */
+    it("throws a cluster-wide read failure the local node cannot stand in for", async () => {
+      const clickhouse = clickHouseQueryClientDouble({
+        query: async (request: QueryRequest) => {
+          if (request.sql.includes("system.tables")) return { rows: [{ present: "1" }] };
+          throw Object.assign(new Error("Timeout exceeded"), { code: "159" });
+        },
+      });
+      const repo = ClickHouseStorageFootprintRepository.create({ clickhouse });
+
+      await expect(repo.findBackupStatuses({ cluster: "default" })).rejects.toThrow("Timeout");
     });
 
     /** @scenario "A cluster name that is not a plain identifier reads the local node" */
