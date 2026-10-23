@@ -2600,10 +2600,8 @@ export class TraceModule implements TraceApi, CollectorApp {
   }): Promise<OwnedSpan[]> {
     const own = input.spans.filter((span) => span.ownerProjectId === undefined);
     if (own.length === input.spans.length) return this.#enrichOwnSpans(input);
+    // The enrichment maps one span to one, so the own spans go back into their places.
     const enriched: OwnedSpan[] = await this.#enrichOwnSpans({ ...input, spans: own });
-    if (enriched.length !== own.length) {
-      return [...enriched, ...input.spans.filter((span) => span.ownerProjectId !== undefined)];
-    }
     let next = 0;
     return input.spans.map((span) =>
       span.ownerProjectId === undefined ? (enriched[next++] ?? span) : span,
