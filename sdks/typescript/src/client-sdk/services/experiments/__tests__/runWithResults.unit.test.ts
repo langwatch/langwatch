@@ -171,6 +171,7 @@ describe("ExperimentsFacade.runWithResults", () => {
 
   describe("given a concurrency is provided", () => {
     describe("when the run starts", () => {
+      /** @scenario "The SDKs send a concurrency on the run they start" */
       it("posts the concurrency in the start body", async () => {
         mockFetch
           .mockResolvedValueOnce(jsonResponse(startResponse))
@@ -342,6 +343,7 @@ describe("ExperimentsFacade.run concurrency", () => {
   });
 
   describe("given a concurrency is provided", () => {
+    /** @scenario "The SDKs send a concurrency on the run they start" */
     it("posts the concurrency in the start body", async () => {
       mockFetch
         .mockResolvedValueOnce(jsonResponse(startResponse))

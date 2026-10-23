@@ -1612,7 +1612,7 @@ function registerExperimentCommands(program: Command): void {
       .option("--param <pair>", PARAM_FLAG_HELP, collectParam)
       .option(
         "--concurrency <n>",
-        "Rows to run at once for this run only, 1 to 24 (default: the server's setting; 1 runs rows in order)",
+        "Cells (one row against one target) to run at once for this run only, 1 to 24 (default: the server's setting; 1 runs them in order)",
       )
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (slug: string, options: { wait?: boolean; param?: string[]; concurrency?: string }) => {

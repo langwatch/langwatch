@@ -2033,7 +2033,7 @@ function registerExperimentTools(server: McpServer): void {
         .max(24)
         .optional()
         .describe(
-          "Rows to run at once for this run only (default: the server's setting). Use 1 to run rows in order.",
+          "Cells (one row against one target) to run at once, for this run only (default: the server's setting). Use 1 to run them one at a time, in order.",
         ),
     },
     withToolLogging("platform_run_experiment", async (params) => {

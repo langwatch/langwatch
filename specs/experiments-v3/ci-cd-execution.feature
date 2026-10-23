@@ -112,7 +112,7 @@ Feature: CI/CD Execution of Platform Evaluations
   # Per-run concurrency
   # ==========================================================================
 
-  Scenario: A run call that names a concurrency runs that many rows at once
+  Scenario: A run call that names a concurrency runs that many cells at once
     When I POST to /api/experiments/my-evaluation/run with body:
       """json
       { "concurrency": 1 }
@@ -138,6 +138,11 @@ Feature: CI/CD Execution of Platform Evaluations
       | 0           |
       | 25          |
       | 1.5         |
+
+  @unit
+  Scenario: The SDKs send a concurrency on the run they start
+    When I call the Python or TypeScript SDK's experiment run for "my-evaluation" with a concurrency of 1
+    Then the run request body carries a concurrency of 1
 
   @unit
   Scenario: The experiment run command passes its concurrency flag on the run

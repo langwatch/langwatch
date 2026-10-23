@@ -44,8 +44,8 @@ export type ExperimentRunSummary = {
  */
 export type RunExperimentOptions = {
   /**
-   * Rows run at once for this run only (1 to 24); the experiment's saved setting is untouched.
-   * Defaults to the server's setting. Use 1 to run rows in order.
+   * Cells (one row against one target) run at once for this run only, 1 to 24; the
+   * experiment's saved setting is untouched. Defaults to the server's. 1 runs them in order.
    */
   concurrency?: number;
   /**

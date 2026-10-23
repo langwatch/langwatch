@@ -235,13 +235,14 @@ export class ExperimentsFacade {
    * Start an experiment run
    */
   private async startRun(slug: string, concurrency?: number): Promise<ExperimentRunStartResponse> {
+    const body = toRunStartRequest({ concurrency });
     let response;
     try {
       response = await this.config.langwatchApiClient.POST("/api/v1/experiments/{slug}/run", {
         params: {
           path: { slug },
         },
-        ...(concurrency !== undefined ? { body: { concurrency } } : {}),
+        ...(body !== undefined ? { body } : {}),
       });
     } catch (error) {
       if (isLangWatchHandledError(error)) {

@@ -241,9 +241,9 @@ export const abortExperimentRunResponseSchema: AbortExperimentRunResponseSchema 
   abortExperimentRunResponseSchemaDefinition;
 
 /**
- * Optional run inputs accepted as a JSON body by the run API and the workflow
- * evaluate endpoint: inline data, a dataset id, override parameters, and a
- * row-index subset, a per-run concurrency. `data` and `dataset_id` exclude each other.
+ * Optional run inputs accepted as a JSON body by the experiment run API: inline
+ * data, a dataset id, override parameters, a row-index subset, and a per-run
+ * concurrency. `data` and `dataset_id` are mutually exclusive.
  */
 const runInputsBodySchemaDefinition = z
   .object({

@@ -326,9 +326,10 @@ def run(
             exclusive with ``data``.
         parameters: Optional constants applied to every row (e.g. ``{"model": ...}``).
         row_indices: Optional subset of row indices to evaluate.
-        concurrency: Optional number of rows to run at once (1 to 24), for this
-            run only; the experiment's saved setting is untouched. Defaults to the
-            server's setting. Use ``1`` to run rows in order.
+        concurrency: Optional number of cells (one row against one target) to
+            run at once (1 to 24), for this run only; the experiment's saved
+            setting is untouched. Defaults to the server's setting. Use ``1`` to
+            run them one at a time, in order.
         poll_interval: Seconds between status checks (default: 2.0)
         timeout: Maximum seconds to wait for completion (default: 600.0 = 10 minutes)
         on_progress: Optional callback for progress updates (completed, total)

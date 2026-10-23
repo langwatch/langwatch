@@ -146,7 +146,7 @@ By default the run uses the dataset attached to the experiment. You can override
 - `data`: inline rows to evaluate
 - `dataset_id`: a different platform dataset by id (`data` and `dataset_id` are mutually exclusive)
 - `row_indices`: a subset of dataset row indices to evaluate, instead of the whole dataset
-- `concurrency`: how many rows run at once, from 1 to 24, for this run only. Without it, the run uses the server's default. Use `1` to run rows in order, for example so the first row fills a prompt cache before the next rows read it. The experiment's saved run options stay unchanged.
+- `concurrency`: how many cells run at once, from 1 to 24, for this run only. A cell is one row against one target, so an experiment with two targets has two cells per row. Without it, the run uses the server's default. Use `1` to run the cells one at a time, in order, for example so the first row fills a prompt cache before the next rows read it. The experiment's saved run options stay unchanged.
 
 <Tabs>
   <Tab title="Python">

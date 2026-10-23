@@ -3,6 +3,7 @@ import chalk from "chalk";
 import { ExperimentsApiService } from "@/client-sdk/services/experiments/experiments-api.service";
 
 import { resolveCredentials } from "../../utils/apiKey";
+import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
 import { parseRunParameterFlags } from "../../utils/keyValueFlags";
 import type { CommandResult } from "../../utils/output";
 import { createSpinner } from "../../utils/spinner";
@@ -84,7 +85,11 @@ function parseConcurrencyFlag({ value }: { value: string | undefined }): number 
   if (value === undefined) return undefined;
   const concurrency = Number(value);
   if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 24) {
-    console.error(chalk.red(`--concurrency must be a whole number from 1 to 24, got "${value}"`));
+    reportCommandError({
+      error: commandValidationError(
+        `Invalid --concurrency value: ${value} (expected a whole number from 1 to 24)`,
+      ),
+    });
     process.exit(1);
   }
   return concurrency;

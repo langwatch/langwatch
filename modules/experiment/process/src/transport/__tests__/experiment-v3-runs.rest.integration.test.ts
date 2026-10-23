@@ -486,7 +486,7 @@ describe("POST /api/experiments/:slug/run", () => {
   });
 
   describe("when the body names a concurrency", () => {
-    /** @scenario "A run call that names a concurrency runs that many rows at once" */
+    /** @scenario "A run call that names a concurrency runs that many cells at once" */
     it("plans the run with that concurrency, reading the saved experiment only", async () => {
       const { request, starts } = await harness({ experiments: found(savedState()), redis: true });
 

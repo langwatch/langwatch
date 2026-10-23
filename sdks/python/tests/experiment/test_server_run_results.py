@@ -248,6 +248,7 @@ class TestExperimentRunWithParameters:
 class TestExperimentRunWithConcurrency:
     """when running with a concurrency"""
 
+    # @scenario "The SDKs send a concurrency on the run they start"
     def test_concurrency_is_sent_in_body(self):
         _script_full_run()
         with patch.object(platform_run, "create_client", _FakeClient):
