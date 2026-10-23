@@ -59,7 +59,9 @@ describe("the NLP Lambda fleet secret, once the composition root resolves it", (
 
   describe("given a fleet names a blank credentials role", () => {
     it("refuses the boot rather than sign through no role", () => {
-      expect(() => parseFleet({ ...fleetPlacement, credentials_role_arn: " " })).toThrow();
+      expect(() => parseFleet({ ...fleetPlacement, credentials_role_arn: " " })).toThrow(
+        /missing required fields/,
+      );
     });
   });
 
