@@ -64,6 +64,7 @@ import {
   createBeforeUserCreateHook,
   type BetterAuthHookCollaborators,
   type FindGoverningConnections,
+  PASSWORD_RESET_REQUIRED_CODE,
   type SessionMintClaims,
   type SignUpPolicy,
   toConcretePath,
@@ -284,7 +285,10 @@ async function countSignInAttempt({
   const [identifier] = findSubmittedAddresses(ctx.body);
   if (identifier === undefined) return;
 
-  const refused = ctx.context?.returned instanceof APIError;
+  const returned = ctx.context?.returned;
+  // A correct password refused only because it must be replaced is not a failed guess.
+  if (returned instanceof APIError && returned.body?.code === PASSWORD_RESET_REQUIRED_CODE) return;
+  const refused = returned instanceof APIError;
   try {
     await (refused
       ? signInLockout.recordFailure({ identifier })
@@ -1179,6 +1183,7 @@ const transportOptions = ({
         await sendResetPassword({ email: user.email, token });
       },
       onPasswordReset: async ({ user }, request) => {
+        await database.clearPasswordResetRequirement({ userId: user.id });
         await auth.revokeAllBrowserSessions({ userId: user.id });
         passwordResetSession.recordPasswordReset({ userId: user.id, request });
       },

@@ -2,6 +2,7 @@
  * @see specs/scenarios/secret-run-parameters.feature
  * @see modules/scenario/specs/simulation-run.feature
  */
+import { isRunNotScored } from "@langwatch/scenario-contract";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -125,6 +126,48 @@ describe("mapClickHouseRowToScenarioRunData", () => {
         judgeModel: "openai/gpt-5-mini",
         actorId: "user-1",
         agentInstance: { hostname: "box-1", label: null },
+      });
+    });
+
+    /** @scenario "An unreadable hooks value keeps its setup status, so a run whose setup failed stays unscored" */
+    it("keeps the setup status of an unreadable hooks value and drops one with none", () => {
+      const kept = mapClickHouseRowToScenarioRunData(
+        stored({
+          targetReferenceId: "agent_1",
+          hooks: { setup: { status: "failed", durationMs: "slow", error: 7 } },
+        }),
+      );
+      const dropped = mapClickHouseRowToScenarioRunData(
+        stored({
+          targetReferenceId: "agent_1",
+          judgeModel: "openai/gpt-5-mini",
+          hooks: { setup: { status: "bogus", durationMs: 1 } },
+        }),
+      );
+
+      expect(kept.metadata?.langwatch?.hooks).toEqual({
+        setup: { status: "failed", durationMs: 0 },
+      });
+      expect(isRunNotScored(kept.metadata?.langwatch?.hooks)).toBe(true);
+      expect(dropped.metadata?.langwatch?.hooks).toBeUndefined();
+      expect(dropped.metadata?.langwatch?.judgeModel).toBe("openai/gpt-5-mini");
+    });
+
+    /** @scenario "An unreadable hooks value keeps its setup status, so a run whose setup failed stays unscored" */
+    it("reads a valid full hooks value and keepData back unchanged", () => {
+      const hooks = {
+        setup: { status: "ok", durationMs: 400, state: { order_id: "42" } },
+        teardown: { status: "failed", durationMs: 90, error: "boom" },
+      };
+      const data = mapClickHouseRowToScenarioRunData(
+        stored({ targetReferenceId: "agent_1", targetType: "connected", hooks, keepData: true }),
+      );
+
+      expect(data.metadata?.langwatch).toMatchObject({
+        targetReferenceId: "agent_1",
+        targetType: "connected",
+        hooks,
+        keepData: true,
       });
     });
 

@@ -65,7 +65,11 @@ export function keyCredentialOf(
     case "cliAccessToken":
       return { kind: "access_token", apiKeyId: null, ownerUserId: credential.userId };
     case "apiKey":
-      return { kind: "api_key", apiKeyId: credential.apiKeyId, ownerUserId: credential.userId };
+      return {
+        kind: credential.isLangySessionKey === true ? "langy_session_key" : "api_key",
+        apiKeyId: credential.apiKeyId,
+        ownerUserId: credential.userId,
+      };
   }
 }
 
@@ -78,7 +82,11 @@ function resolvedKeyOf(
     case "cliAccessToken":
       return { kind: "access_token", apiKeyId: null, ownerUserId: credential.userId };
     case "apiKey-org":
-      return { kind: "api_key", apiKeyId: credential.apiKeyId, ownerUserId: credential.userId };
+      return {
+        kind: credential.isLangySessionKey === true ? "langy_session_key" : "api_key",
+        apiKeyId: credential.apiKeyId,
+        ownerUserId: credential.userId,
+      };
     case "apiKey":
       return {
         kind: projectKeyKindOf(credential),

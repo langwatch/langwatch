@@ -13,6 +13,21 @@ import { z } from "zod";
 
 import type { LangyTokenBufferRepository } from "../repositories/langy-token-buffer.repository.ts";
 
+/**
+ * What a confirmation card the platform raised itself asks about, and the ids of its options.
+ * The answer is read against these ids, never against what a label says.
+ */
+export const userWaitConfirmSchema = z.object({
+  /** The question as the card printed it, which an answer names. */
+  question: z.string(),
+  resource: z.string(),
+  action: z.string(),
+  id: z.string(),
+  options: z.array(z.object({ id: z.string(), label: z.string() })),
+  yesOptionId: z.string(),
+});
+export type UserWaitConfirm = z.infer<typeof userWaitConfirmSchema>;
+
 /** What the platform keeps about one card while it is on screen. */
 export const storedUserWaitSchema = z.object({
   waitId: z.string(),
@@ -43,6 +58,8 @@ export const storedUserWaitSchema = z.object({
   source: z.enum(["panel", "terminal"]).optional(),
   answers: z.unknown().optional(),
   answeredBy: z.string().optional(),
+  /** Set on a confirmation card the platform raised; such a card outlives its turn. */
+  confirm: userWaitConfirmSchema.optional(),
 });
 export type StoredUserWait = z.infer<typeof storedUserWaitSchema>;
 
@@ -143,6 +160,7 @@ export function blankUserWait({
   workspaceName,
   hostname,
   questions,
+  confirm,
 }: {
   waitId: string;
   now: number;
@@ -162,6 +180,7 @@ export function blankUserWait({
   workspaceName?: string;
   hostname?: string;
   questions?: UserWaitQuestion[];
+  confirm?: UserWaitConfirm;
 }): StoredUserWait {
   const createdAt = now;
 
@@ -187,6 +206,7 @@ export function blankUserWait({
       workspaceName,
       hostname,
       questions,
+      confirm,
     }),
   };
 }

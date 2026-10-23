@@ -9,6 +9,7 @@ import type React from "react";
 
 import { useTerminalReplay } from "../../behavior/use-terminal-replay.ts";
 import { type DetailPayload } from "../../model/pull-request-detail.ts";
+import { sessionIdentityKey } from "../../model/session-identity.ts";
 import { formatShortDate } from "../../model/short-date.ts";
 import { AgentLabel } from "../elements/agent-label.tsx";
 import { MISSING_VALUE } from "../elements/cells/missing-value.tsx";
@@ -57,22 +58,27 @@ export const SessionsSection: React.FC<{
             </ListTable.Row>
           </ListTable.Header>
           <ListTable.Body>
-            {sessions.map((session) => (
-              <SessionRow
-                key={session.sessionId}
-                session={session}
-                isOpening={replay.openingSessionId === session.sessionId}
-                // A row with no session named on it, and a drawer with no
-                // project to read one in, have nothing to open: they stay
-                // plain rows rather than controls that do nothing.
-                onOpenReplay={
-                  session.sessionId && projectId ? () => void replay.openReplay(session) : undefined
-                }
-                onPrefetch={
-                  session.sessionId && projectId ? () => replay.prefetch(session) : undefined
-                }
-              />
-            ))}
+            {sessions.map((session) => {
+              const identity = { tenantId: session.projectId, sessionId: session.sessionId };
+              return (
+                <SessionRow
+                  key={sessionIdentityKey(identity)}
+                  session={session}
+                  isOpening={replay.isOpening(identity)}
+                  // A row with no session named on it, and a drawer with no
+                  // project to read one in, have nothing to open: they stay
+                  // plain rows rather than controls that do nothing.
+                  onOpenReplay={
+                    session.sessionId && projectId
+                      ? () => void replay.openReplay(identity)
+                      : undefined
+                  }
+                  onPrefetch={
+                    session.sessionId && projectId ? () => replay.prefetch(identity) : undefined
+                  }
+                />
+              );
+            })}
           </ListTable.Body>
         </ListTable>
       )}

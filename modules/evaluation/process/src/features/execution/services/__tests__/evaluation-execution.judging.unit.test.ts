@@ -10,6 +10,7 @@ import {
   type InstantEvalJudgeApi,
   type InstantEvalJudgeCall,
 } from "@langwatch/instant-eval-judge-contract";
+import type { DecisionModelResolution, ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { Trace } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -47,7 +48,13 @@ function buildTrace(): Trace {
   };
 }
 
-function buildService({ judge = judgedTrue }: { judge?: Judge } = {}) {
+function buildService({
+  judge = judgedTrue,
+  decisionModel = { kind: "langwatch" },
+}: {
+  judge?: Judge;
+  decisionModel?: DecisionModelResolution;
+} = {}) {
   const calls: InstantEvalJudgeCall[] = [];
   const judgeSpy = vi.fn<Judge>(async (input) => {
     calls.push(input);
@@ -61,10 +68,15 @@ function buildService({ judge = judgedTrue }: { judge?: Judge } = {}) {
     .mockResolvedValue({ status: "processed", passed: true, score: 1 });
 
   const service = EvaluationExecutionService.create({
+    runs: { findTraceEvaluations: async () => [] },
+    authz: {
+      authorizeInternal: async () => {
+        throw new Error("these cases read no earlier evaluations");
+      },
+    },
     traces: {
       readTracesWithSpans: vi.fn().mockResolvedValue([buildTrace()]),
       readThreadsTraces: vi.fn().mockResolvedValue([]),
-      readEvaluations: vi.fn().mockResolvedValue({}),
     },
     spanDigest: {
       format: vi.fn().mockResolvedValue(""),
@@ -79,6 +91,9 @@ function buildService({ judge = judgedTrue }: { judge?: Judge } = {}) {
       },
     },
     judges: { judge: judgeSpy },
+    decisionModels: createApiFixture<ModelProviderApi>({
+      resolveDecisionModel: async () => decisionModel,
+    }),
     installEnvironment: {},
   });
 
@@ -292,6 +307,63 @@ describe("EvaluationExecutionService with a judge on Instant Evals", () => {
         amount: PRICE_USD,
         currency: "USD",
       });
+    });
+  });
+});
+
+describe("EvaluationExecutionService with a judge on an own decision model", () => {
+  const OWN: DecisionModelResolution = {
+    kind: "own",
+    model: "inception/decisions:mercury-decide",
+    wire: "jev",
+    providerModel: "mercury-decide",
+    endpoint: "https://api.inceptionlabs.ai/v1/decisions",
+    apiKey: "customer-key",
+  };
+
+  describe("given the project's own decision model resolves with its key", () => {
+    it("passes the own model to the judge", async () => {
+      const { service, calls } = buildService({ decisionModel: OWN });
+
+      await service.executeForTrace({
+        projectId: PROJECT_ID,
+        traceId: "trace-1",
+        evaluatorType: "langevals/llm_boolean",
+        settings: BOOLEAN_SETTINGS,
+        mappings: null,
+      });
+
+      expect(calls[0]?.decisionModel).toMatchObject({
+        model: "inception/decisions:mercury-decide",
+        apiKey: "customer-key",
+      });
+    });
+  });
+
+  describe("given the project's own decision model has no key", () => {
+    /** @scenario "An LLM judge on an unavailable own decision model says how to fix it" */
+    it("answers an error naming the key and the next step, without calling the judge", async () => {
+      const { service, judge } = buildService({
+        decisionModel: {
+          kind: "own_unavailable",
+          model: "inception/decisions:mercury-decide",
+          reason: "key_missing",
+        },
+      });
+
+      const result = await service.executeForTrace({
+        projectId: PROJECT_ID,
+        traceId: "trace-1",
+        evaluatorType: "langevals/llm_boolean",
+        settings: BOOLEAN_SETTINGS,
+        mappings: null,
+      });
+
+      expect(judge).not.toHaveBeenCalled();
+      expect(result.status).toBe("error");
+      const error = result.status === "error" ? result.error : "";
+      expect(error).toContain("classifier_key_invalid");
+      expect(error).toContain("Settings > Model Providers");
     });
   });
 });

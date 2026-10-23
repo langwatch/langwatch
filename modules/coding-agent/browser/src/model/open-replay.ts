@@ -5,20 +5,34 @@ import type { CodingAgentRouter } from "../behavior/coding-agent-router.ts";
 /** The one turn a replay opens on: the last thing the session did. */
 export type ConversationTurn = { traceId: string; timestamp: number };
 
+/** The conversation read for a session; a group project's names the member that recorded it. */
+export function conversationContextInput({
+  projectId,
+  sessionId,
+  tenantId,
+}: {
+  projectId: string;
+  sessionId: string;
+  tenantId: string | undefined;
+}): { projectId: string; conversationId: string; tenantId?: string } {
+  return { projectId, conversationId: sessionId, ...(tenantId ? { tenantId } : {}) };
+}
+
 /** The session's last stored turn, or null when none of them was stored. */
 export async function lastTurnOfSession({
   utils,
   projectId,
   sessionId,
+  tenantId,
 }: {
   utils: ReturnType<typeof codingAgentApi.useUtils>;
   projectId: string;
   sessionId: string;
+  tenantId: string | undefined;
 }): Promise<ConversationTurn | null> {
-  const context = await utils.traces.conversationContext.fetch({
-    projectId,
-    conversationId: sessionId,
-  });
+  const context = await utils.traces.conversationContext.fetch(
+    conversationContextInput({ projectId, sessionId, tenantId }),
+  );
   return context?.turns[context.turns.length - 1] ?? null;
 }
 
@@ -43,10 +57,13 @@ export function sayNothingWasStored(toaster: CodingAgentToaster): void {
 export function openReplayHere({
   turn,
   projectId,
+  tenantId,
   router,
 }: {
   turn: ConversationTurn;
   projectId: string;
+  /** The member project that owns the trace, on a group project. */
+  tenantId: string | undefined;
   router: CodingAgentRouter;
 }): void {
   // The project travels with the trace, since the chrome is still sitting in
@@ -64,6 +81,7 @@ export function openReplayHere({
     "drawer.t": String(turn.timestamp),
     "drawer.mode": "terminal",
     "drawer.projectId": projectId,
+    ...(tenantId ? { "drawer.tenantId": tenantId } : {}),
   });
 }
 
@@ -71,10 +89,12 @@ export function openReplayHere({
 export function openReplayInExplorer({
   turn,
   projectSlug,
+  tenantId,
   router,
 }: {
   turn: ConversationTurn;
   projectSlug: string;
+  tenantId: string | undefined;
   router: CodingAgentRouter;
 }): void {
   const params = new URLSearchParams({
@@ -82,6 +102,7 @@ export function openReplayInExplorer({
     "drawer.traceId": turn.traceId,
     "drawer.t": String(turn.timestamp),
     "drawer.mode": "terminal",
+    ...(tenantId ? { "drawer.tenantId": tenantId } : {}),
   });
   router.push(`/${projectSlug}/traces?${params.toString()}`);
 }

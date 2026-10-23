@@ -422,6 +422,34 @@ Feature: AI Gateway — transparent upstream error forwarding
     Then the gateway responds 503 with error code "circuit_open" and fault "provider"
     And never 500 "internal_error"
 
+  # The raw-forward stream lanes (/v1/messages to an Anthropic-wire provider,
+  # Gemini passthrough) once streamed a rejected request's error body as a 200
+  # event stream of bare JSON. SDKs read that as a stream that ended early and
+  # retried a spent credit balance as if it were transient.
+  @bdd @error-transparency @integration
+  Scenario: A streaming request the provider rejects at once is answered with the provider's status
+    Given the provider account behind "vk-demo" has a depleted credit balance
+    And the provider answers a streaming /v1/messages request with its 400 credit balance error
+    When the client sends that streaming request through the gateway
+    Then the gateway responds 400 with an application/json error body, not a 200 event stream
+    And the body keeps the provider's error type and the governance message
+    And the body carries the error code "provider_account_exhausted" for callers to classify on
+    And the provider's x-should-retry header is forwarded
+
+  @bdd @error-transparency @integration
+  Scenario: A streaming request the provider accepts still streams
+    Given the provider answers a streaming /v1/messages request with a 200 event stream
+    When the client sends that streaming request through the gateway
+    Then the gateway streams the provider's frames unchanged
+
+  # Bindings: services/aigateway/adapters/providers/bifrost_rejected_stream_test.go
+  @bdd @error-transparency @unit
+  Scenario: A rejected stream's error body is reassembled across chunks and bounded
+    Given the provider streams its rejection body in more than one chunk
+    When the gateway reads the rejection
+    Then the error body is the chunks joined in order
+    And a body past 64 KiB is cut at 64 KiB and the rest of the stream is drained
+
   # ==========================================================================
   # End-to-end: the real wrapper must fail fast, not retry-loop
   # ==========================================================================

@@ -1,4 +1,4 @@
-import { HandledError } from "@langwatch/handled-error";
+import { HandledError, remediation } from "@langwatch/handled-error";
 import {
   IdentityCommandRefusedError,
   PasskeyCommandRefusedError,
@@ -215,6 +215,21 @@ export class IdentitySignInRefusedError extends IdentityCommandRefusedError {
       reasons: [new Error(detail)],
     });
     this.name = "IdentitySignInRefusedError";
+  }
+}
+
+/** A correct password an operator marked as no longer trusted; choose a new one by reset link. */
+export class IdentityPasswordResetRequiredError extends IdentityCommandRefusedError {
+  declare readonly code: "identity_password_reset_required";
+
+  constructor(detail: string) {
+    super("identity_password_reset_required", "identity_password_reset_required", {
+      httpStatus: 403,
+      fault: "customer",
+      reasons: [new Error(detail)],
+      ...remediation("identity_password_reset_required"),
+    });
+    this.name = "IdentityPasswordResetRequiredError";
   }
 }
 

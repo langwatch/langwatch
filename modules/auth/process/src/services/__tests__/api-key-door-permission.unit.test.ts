@@ -257,6 +257,48 @@ describe("the key door asking a permission", () => {
     });
   });
 
+  describe("given the key a Langy chat mints", () => {
+    const askAsLangy = (permission: "virtualKeys:rotate" | "virtualKeys:delete") =>
+      door.authenticateKey({
+        request: new Request("http://localhost/api/gateway/v1/virtual-keys/vk-1/rotate", {
+          headers: { authorization: "Bearer sk-lw-langy" },
+        }),
+        permissions: [permission],
+        reach: "grants",
+      });
+
+    /** @scenario "Rotating stays withheld from Langy" */
+    it("refuses rotating a virtual key by policy, before any grant is asked", async () => {
+      held = ["project:project-1"];
+
+      const error = await askAsLangy("virtualKeys:rotate").then(
+        () => null,
+        (thrown: unknown) => thrown,
+      );
+
+      if (!HandledError.isHandled(error)) throw new Error("the door admitted the key");
+      expect(error).toMatchObject({
+        code: "api_key_permission_not_delegable",
+        meta: { permission: "virtualKeys:rotate" },
+      });
+      expect(asked).toEqual([]);
+    });
+
+    /** @scenario "A Langy key needs the click on every door that lets a key in" */
+    it("is let in for what Langy may hold, still marked as Langy's key", async () => {
+      held = ["project:project-1"];
+
+      const credential = await askAsLangy("virtualKeys:delete");
+
+      expect(credential.principal).toMatchObject({
+        kind: "apiKey",
+        apiKeyId: "key-langy",
+        isLangySessionKey: true,
+        resolvedProject: { id: "project-1" },
+      });
+    });
+  });
+
   describe("given a legacy project key", () => {
     /** @scenario "A legacy project key passes the key door by its class" */
     it.each([void 0, "grants", "organization"] as const)(

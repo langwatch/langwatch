@@ -180,7 +180,7 @@ func classifyServer(command string) (string, bool) {
 		return "clickhouse", true
 	case base == "postgres" || base == "postmaster":
 		return "postgres", true
-	case base == "redis-server":
+	case base == "redis-server" || base == "valkey-server":
 		return "redis", true
 	case strings.Contains(command, "Virtualization.VirtualMachine") || strings.HasPrefix(base, "qemu-system"):
 		return "containers", true
