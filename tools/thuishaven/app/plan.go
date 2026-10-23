@@ -143,6 +143,21 @@ func linguaModelsEnv(repoRoot string) string {
 	return "NLPGO_LINGUA_MODELS=" + filepath.Join(repoRoot, "services", "third_party", "lingua-go", "models.bin")
 }
 
+// wasmRuntimeEnv points nlpgo at the code-block wasm runtimes the fetch scripts
+// left in services/nlpgo/.cache, so JavaScript code blocks run locally (ADR-183).
+// A runtime that was never fetched is left unset.
+func wasmRuntimeEnv(repoRoot string) []string {
+	cache := filepath.Join(repoRoot, "services", "nlpgo", ".cache")
+	var env []string
+	if quickjs := filepath.Join(cache, "quickjs-wasm", "qjs-wasi.wasm"); fileExists(quickjs) {
+		env = append(env, "NLPGO_ENGINE_QUICKJS_WASM="+quickjs)
+	}
+	if python := filepath.Join(cache, "python-wasm"); fileExists(filepath.Join(python, "python.wasm")) {
+		env = append(env, "NLPGO_ENGINE_PYTHON_WASM_HOME="+python)
+	}
+	return env
+}
+
 // withLinguaModels generates the models once (make skips an existing
 // models.bin) before the Go lane starts, only when +go-evaluators is on.
 func withLinguaModels(repoRoot string, goEvaluators bool, shell string) string {
@@ -398,6 +413,7 @@ func (p *childPlan) goServices() ([]string, []string) {
 	if p.opts.Selection.NLP {
 		services = append(services, "nlpgo")
 		env = append(env, fmt.Sprintf("%s=:%d", NLPAddrEnv, p.port("nlp")))
+		env = append(env, wasmRuntimeEnv(p.opts.RepoRoot)...)
 	}
 	if p.opts.Selection.GoEvaluators {
 		env = append(env, linguaModelsEnv(p.opts.RepoRoot))
