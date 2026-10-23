@@ -2474,6 +2474,20 @@ export interface LwqlPrismaRows {
     readonly expiresAt: "DateTime";
     readonly slackAnnouncedAt: "DateTime?";
   };
+  readonly SelfHostedNotice: {
+    readonly id: "String";
+    readonly severity: "String";
+    readonly title: "String";
+    readonly body: "String";
+    readonly url: "String?";
+    readonly fixedIn: "String?";
+    readonly status: "String";
+    readonly expiresAt: "DateTime?";
+    readonly publishedAt: "DateTime?";
+    readonly publishedBy: "String?";
+    readonly createdAt: "DateTime";
+    readonly updatedAt: "DateTime";
+  };
   readonly SelfHostedInstanceReport: {
     readonly id: "String";
     readonly instanceId: "String";

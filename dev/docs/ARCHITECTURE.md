@@ -2986,6 +2986,15 @@ naming only the organization; on set, gateway pulls `{ baseUrl, token, instanceI
 `LicensingApi.findConnectUpstream` and seals the token itself; licensing alone derives the token, including the
 instance-wide `LANGWATCH_LICENSE_KEY` fallback (Alex, 2026-10-10, PC-G2-CONNECT-TOKEN; supersedes C3b D2).
 
+**Self-hosted notices ride the usage report reply** (Alex, 2026-10-21/22). Licensing owns the
+`SelfHostedNotice` table and its `*Api` operations; staff write, publish and withdraw them through
+enterprise-ops (`ops:view` reads, `ops:manage` writes, audited like the license registry); saas adds the
+published, unexpired notices to its usage report reply, only when there are some. The install's ops keeps
+them beside the latest release, hides one its running release fixes, and `DISABLE_LANGWATCH_NOTICES` opts
+out. Notices are public text: any install that reports receives them, so none is gated on a known
+instance. Specs: `enterprise/modules/licensing/specs/self-hosted-notices.feature`,
+`modules/ops/specs/self-hosted-notices.feature`.
+
 **Seat limits are organization's to answer** (Alex, 2026-09-28).
 `licenseEnforcement.checkLimit`, `checkAllLimits` and `reportLimitBlocked`
 keep their wire path, but the contract and transport are organization's: it
