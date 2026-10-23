@@ -227,16 +227,63 @@ func conditionTerm(condition string, term *regexp.Regexp) (string, bool) {
 		}
 		expression = inner
 	}
-	if strings.Contains(expression, "||") || strings.Contains(expression, "${{") {
+	parts, ok := conjunctionTerms(expression)
+	if !ok {
 		return "", false
 	}
-	for _, part := range strings.Split(expression, "&&") {
+	for _, part := range parts {
 		if match := term.FindStringSubmatch(strings.TrimSpace(part)); match != nil {
 			return match[1], true
 		}
 	}
 
 	return "", false
+}
+
+// conjunctionTerms splits an expression on the `&&` operators outside its
+// string literals, so a quoted `&&` cannot forge a term. It refuses an `||` or
+// a `${{` outside a literal, and a literal left open. Literals are
+// single-quoted, with `”` as an escaped quote.
+func conjunctionTerms(expression string) ([]string, bool) {
+	var parts []string
+	start := 0
+	for i := 0; i < len(expression); i++ {
+		switch {
+		case expression[i] == '\'':
+			end, closed := literalEnd(expression, i)
+			if !closed {
+				return nil, false
+			}
+			i = end
+		case strings.HasPrefix(expression[i:], "||"), strings.HasPrefix(expression[i:], "${{"):
+			return nil, false
+		case strings.HasPrefix(expression[i:], "&&"):
+			parts = append(parts, expression[start:i])
+			start = i + 2
+			i++
+		}
+	}
+
+	return append(parts, expression[start:]), true
+}
+
+// literalEnd returns the index of the quote closing the literal opened at
+// open, and false when the literal is never closed.
+func literalEnd(expression string, open int) (int, bool) {
+	for i := open + 1; i < len(expression); i++ {
+		if expression[i] != '\'' {
+			continue
+		}
+		if i+1 < len(expression) && expression[i+1] == '\'' {
+			i++
+
+			continue
+		}
+
+		return i, true
+	}
+
+	return 0, false
 }
 
 // fallbackProblem explains why a gated stored-key step is not a sanctioned

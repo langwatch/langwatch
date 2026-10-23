@@ -192,9 +192,11 @@ func TestStaticCloudKeysRequiresIDTokenWrite(t *testing.T) {
 // @scenario "A fallback gate that can run while the role variable is set fails CI"
 func TestStaticCloudKeysRejectsAGateWithAnEscape(t *testing.T) {
 	for name, condition := range map[string]string{
-		"or true":       "${{ vars.EMBEDS_AWS_ROLE_ARN == '' || true }}",
-		"or always":     "${{ always() || vars.EMBEDS_AWS_ROLE_ARN == '' }}",
-		"parenthesised": "${{ !(vars.EMBEDS_AWS_ROLE_ARN == '' && false) }}",
+		"or true":         "${{ vars.EMBEDS_AWS_ROLE_ARN == '' || true }}",
+		"or always":       "${{ always() || vars.EMBEDS_AWS_ROLE_ARN == '' }}",
+		"parenthesised":   "${{ !(vars.EMBEDS_AWS_ROLE_ARN == '' && false) }}",
+		"and in a string": "${{ 'x&&vars.EMBEDS_AWS_ROLE_ARN == ''&&' != '' }}",
+		"open string":     "${{ vars.EMBEDS_AWS_ROLE_ARN == '' && 'x }}",
 	} {
 		t.Run(name, func(t *testing.T) {
 			escaped := strings.Replace(gatedFallbackWorkflow, "${{ vars.EMBEDS_AWS_ROLE_ARN == '' }}", condition, 1)
