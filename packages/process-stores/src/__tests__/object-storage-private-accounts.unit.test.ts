@@ -84,6 +84,62 @@ describe("given the stores' DATAPLANE_S3__ family", () => {
     });
   });
 
+  describe("when an entry names a role and no key pair", () => {
+    /** @scenario "A private S3 config naming a role is read through the web identity" */
+    it("maps the organisation to an account that assumes that role", () => {
+      const roleOnly = JSON.stringify({
+        endpoint: "https://s3.eu-west-1.amazonaws.com",
+        bucket: "acme-dataplane",
+        roleArn: "arn:aws:iam::1:role/acme-dataplane",
+      });
+      const { accounts } = parse({ DATAPLANE_S3__acme__org123: roleOnly });
+
+      expect(accounts).toEqual([
+        {
+          organizationId: "org123",
+          label: "acme",
+          variable: "DATAPLANE_S3__acme__org123",
+          bucket: "acme-dataplane",
+          endpoint: "https://s3.eu-west-1.amazonaws.com",
+          roleArn: "arn:aws:iam::1:role/acme-dataplane",
+          forcePathStyle: true,
+        },
+      ]);
+    });
+  });
+
+  describe("when an entry names both a role and a key pair", () => {
+    /** @scenario "A private S3 config naming a role is read through the web identity" */
+    it("keeps the role and drops the keys", () => {
+      const both = JSON.stringify({
+        ...JSON.parse(ACME),
+        roleArn: "arn:aws:iam::1:role/acme-dataplane",
+      });
+      const [account] = parse({ DATAPLANE_S3__acme__org123: both }).accounts;
+
+      expect(account).toMatchObject({ roleArn: "arn:aws:iam::1:role/acme-dataplane" });
+      expect(account).not.toHaveProperty("credentials");
+    });
+  });
+
+  describe("when an entry names no role and only half a key pair", () => {
+    /** @scenario "S3 env var missing a field is logged and skipped" */
+    it("skips it and warns naming the missing key", () => {
+      const half = JSON.stringify({
+        endpoint: "https://s3.invalid",
+        bucket: "half",
+        accessKeyId: "k",
+      });
+      const { accounts, lines } = parse({ DATAPLANE_S3__half__org777: half });
+
+      expect(accounts).toEqual([]);
+      expect(lines.findLine("warn", "invalid fields")).toMatchObject({
+        envVar: "DATAPLANE_S3__half__org777",
+        fields: ["secretAccessKey"],
+      });
+    });
+  });
+
   describe("when two entries name the same organisation", () => {
     /** @scenario "Two S3 env vars for one organisation refuse boot" */
     it("refuses, naming the organisation", () => {

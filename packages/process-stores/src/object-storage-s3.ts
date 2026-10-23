@@ -13,6 +13,7 @@ import {
   S3Client,
   S3ServiceException,
 } from "@aws-sdk/client-s3";
+import { fromTokenFile } from "@aws-sdk/credential-providers";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 import type { ObjectStorageAccount } from "./config.ts";
@@ -46,14 +47,18 @@ interface S3Place {
  */
 export function s3Client(account: ObjectStorageAccount): S3Client {
   const endpoint = account.endpoint?.trim() || undefined;
-  const credentials = account.credentials;
+  const roleArn = account.roleArn;
+  const staticCredentials = roleArn ? undefined : account.credentials;
   const isAwsEndpoint = endpoint === undefined || endpoint.endsWith(".amazonaws.com");
-  const region = account.region ?? (isAwsEndpoint && !credentials ? undefined : "auto");
+  const region = account.region ?? (isAwsEndpoint && !staticCredentials ? undefined : "auto");
+  const credentials = roleArn
+    ? fromTokenFile({ roleArn })
+    : staticCredentials && { ...staticCredentials };
 
   return new S3Client({
     ...(region === undefined ? {} : { region }),
     ...(endpoint === undefined ? {} : { endpoint }),
-    ...(credentials === undefined ? {} : { credentials: { ...credentials } }),
+    ...(credentials === undefined ? {} : { credentials }),
     forcePathStyle: account.forcePathStyle ?? true,
     requestChecksumCalculation: "WHEN_REQUIRED",
     responseChecksumValidation: "WHEN_REQUIRED",
