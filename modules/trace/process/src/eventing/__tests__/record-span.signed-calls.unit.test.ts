@@ -9,7 +9,10 @@ import {
   type BraidSignatureVerdict,
   type VerifyBraidSignatureInput,
 } from "@langwatch/api-key-contract";
-import { braidSignatureMessage, parseBraidSignature } from "@langwatch/api-key-contract/signing-key-wire-format";
+import {
+  braidSignatureMessage,
+  parseBraidSignature,
+} from "@langwatch/api-key-contract/signing-key-wire-format";
 import { VERIFIED_ATTRIBUTE_PREFIX } from "@langwatch/authorization";
 import { createTenantId, type Command } from "@langwatch/eventing";
 import type { OtlpSpan } from "@langwatch/otlp/trace-request";
