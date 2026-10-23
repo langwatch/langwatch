@@ -72,6 +72,7 @@ function install({
   upstream = new RecordingUpstreamFacts(),
   instanceLicense,
   override = true,
+  minted = { count: 0 },
 }: {
   license: string | null;
   servicesDisabled?: string[];
@@ -82,6 +83,8 @@ function install({
   instanceLicense?: string;
   /** Whether LANGWATCH_LICENSE_PUBLIC_KEY names the test key. */
   override?: boolean;
+  /** Counts each instance id the identity service mints. */
+  minted?: { count: number };
 }) {
   const rows = new Map<string, ConnectOrganizationRecord>([
     [
@@ -109,7 +112,10 @@ function install({
     },
     identity: InstanceIdentityService.create({
       repository: MemoryInstanceIdentityRepository.create({ now: () => NOW }),
-      newInstanceId: () => "instance-1",
+      newInstanceId: () => {
+        minted.count += 1;
+        return "instance-1";
+      },
     }),
     cryptography,
     deployment: {
@@ -557,3 +563,24 @@ function activate(
     license,
   });
 }
+
+describe("whether the install holds a licence it could present", () => {
+  describe("when asked before any instance id exists", () => {
+    /** @scenario "Asking whether sending is available mints no instance id" */
+    it("answers from the licence and mints no instance id", async () => {
+      const minted = { count: 0 };
+      const { service } = install({ license: licenseNaming([]), minted });
+
+      expect(await service.holdsInstallLicence()).toBe(true);
+      expect(minted.count).toBe(0);
+    });
+  });
+
+  describe("when no organization holds a licence", () => {
+    it("answers that it holds none", async () => {
+      const { service } = install({ license: null });
+
+      expect(await service.holdsInstallLicence()).toBe(false);
+    });
+  });
+});

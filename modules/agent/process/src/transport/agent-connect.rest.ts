@@ -111,6 +111,7 @@ export function createAgentConnectRest(relayMaxPayloadMb?: number): Readonly<{
       .withAddressing("v1-only")
 
       .post("/connect/register", "registerConnectedAgentInstance")
+      .keepsRecords()
       .withAudit("agents.register")
       .withInput(agentConnectRegisterInputSchema)
       .withCredential("project", { keyKinds: CONNECT_KEY_KINDS })
@@ -168,6 +169,7 @@ export function createAgentConnectRest(relayMaxPayloadMb?: number): Readonly<{
       )
 
       .post("/connect/frames", "postConnectedAgentFrames")
+      .keepsRecords()
       .withoutAudit("agent connection protocol frame")
       .withInput(agentConnectFramesInputSchema)
       .withCredential("project", { keyKinds: CONNECT_KEY_KINDS })

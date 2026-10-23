@@ -134,8 +134,8 @@ export class EventingLangyConversationAdapter {
     const effectPorts = RedisLangyEffectRepository.create({
       handoffStore: options.handoffStore,
       worker: options.worker,
-      mintSessionKey: ({ userId, projectId, organizationId }) =>
-        options.sessionKeys.mintForUser({ userId, projectId, organizationId }),
+      mintSessionKey: ({ userId, projectId, organizationId, conversation }) =>
+        options.sessionKeys.mintForUser({ userId, projectId, organizationId, conversation }),
       revokeSessionKey: ({ apiKeyId, projectId }) =>
         options.sessionKeys.revoke({ apiKeyId, projectId }),
       titleGenerator: options.titleGenerator,

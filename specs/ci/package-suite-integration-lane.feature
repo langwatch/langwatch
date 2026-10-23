@@ -113,3 +113,90 @@ Feature: A package's integration suite runs in CI when it declares one
       Given a push to main, a merge group, a global input change or a failed affected step
       When the package suites job runs
       Then every discovered package is sharded and run
+
+  Rule: A shard runs several suites at once without letting them collide
+
+    # The patched vitest launcher gives each suite two workers, so a shard that ran
+    # them one after another left half of a runner's four cores idle. A heavy suite
+    # runs alone: design-system's story tests time out under any CPU sharing.
+    # Integration suites
+    # stay one at a time because their files share one datastore and run serially
+    # for that reason. Browser suites stay one at a time because each installs its
+    # browser through apt, which holds a machine-wide lock. Each suite's output is
+    # held back and printed as one group when it ends, so two never interleave.
+
+    @unit
+    Scenario: A shard runs several suites at once
+      Given a shard with more suites than its concurrency
+      When the package suites job runs
+      Then up to that many suites run at the same time
+
+    @unit
+    Scenario: Only one integration suite runs at a time
+      Given two packages that each declare an integration suite
+      When the package suites job runs them concurrently
+      Then their integration suites never overlap
+
+    @unit
+    Scenario: Only one browser suite runs at a time
+      Given two packages that each declare a browser suite
+      When the package suites job runs them concurrently
+      Then their browser suites never overlap
+
+    @unit
+    Scenario: A heavy suite runs alone
+      Given a shard with packages whose recorded weight marks them as heavy
+      When the package suites job runs concurrently
+      Then no other suite runs while a heavy suite runs
+      And every heavy suite starts before any light one
+
+    @unit
+    Scenario: A shard starts its heaviest suites first
+      Given a shard whose packages differ in recorded weight
+      When the package suites job runs
+      Then it starts them heaviest first, so a long suite does not run alone at the end
+
+    @unit
+    Scenario: A package's own suites run one after another, in order
+      Given a package with a unit suite and an integration suite
+      When the package suites job runs concurrently
+      Then its integration suite starts only after its unit suite finished
+      And a later suite of the package never overtakes one waiting for its slot
+
+    @unit
+    Scenario: A suite's output is printed as one group when it ends
+      Given two suites that print while both are running
+      When each of them ends
+      Then each suite's output is printed as one group, never interleaved
+
+    @unit
+    Scenario: A cancelled run prints what its unfinished suites said
+      Given a suite that is still running when the run is cancelled
+      When the runner flushes on cancellation
+      Then what that suite printed so far appears once, as an unfinished group
+
+    @unit
+    Scenario: Without a concurrency setting the suites run one at a time
+      Given PACKAGE_SUITES_CONCURRENCY is not set
+      When the package suites job runs
+      Then each suite runs alone, as before
+
+    @unit
+    Scenario: A malformed concurrency value is refused
+      Given PACKAGE_SUITES_CONCURRENCY is not a positive whole number
+      When the package suites job starts
+      Then it fails instead of guessing how many suites to run at once
+
+  Rule: An unchanged suite replays its pass instead of running again
+
+    @unit
+    Scenario: A suite Nx caches runs through Nx
+      Given a package whose suite script is one nx.json caches
+      When the package suites job runs it
+      Then it runs through Nx, so an unchanged suite replays its recorded pass
+
+    @unit
+    Scenario: An integration or browser suite runs uncached
+      Given a package's integration or browser script
+      When the package suites job runs it
+      Then it runs through pnpm, every time

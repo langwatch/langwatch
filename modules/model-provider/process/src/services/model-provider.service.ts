@@ -40,6 +40,7 @@ import {
   type TranslateOutput,
   type ModelProviderCustomKeys,
   type ModelProviderUsageCount,
+  type DecisionModelResolution,
 } from "@langwatch/model-provider-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -60,6 +61,10 @@ import type { ModelDefaultRepository } from "../repositories/model-default.repos
 import type { ModelProviderRepository } from "../repositories/model-provider.repository.ts";
 import { ModelProviderAuthorizationService } from "./model-provider-authorization.service.ts";
 import { ModelProviderCommandService } from "./model-provider-command.service.ts";
+import {
+  ModelProviderDecisionModelService,
+  type OwnDecisionModelGate,
+} from "./model-provider-decision-model.service.ts";
 import { ModelProviderExecutionService } from "./model-provider-execution.service.ts";
 import type { ModelProviderCredentialPolicy } from "./model-provider-keys.service.ts";
 import { ModelProviderQueryService } from "./model-provider-query.service.ts";
@@ -86,6 +91,8 @@ interface ModelProviderServiceOptions {
   codexGatewayPing: ModelProviderCodexGatewayPing;
   secrets: Pick<SecretApi, "getValues">;
   ids: ModelProviderIdService;
+  /** The own-decision-model flag (ADR-182 decision 4). */
+  isOwnDecisionModelAllowed: OwnDecisionModelGate;
 }
 
 /**
@@ -98,6 +105,7 @@ export class ModelProviderService {
   private readonly costs: ModelProviderCostsService;
   private readonly defaults: ModelProviderDefaultsService;
   private readonly defaultWrites: ModelProviderDefaultsWriteService;
+  private readonly decisionModels: ModelProviderDecisionModelService;
   private readonly execution: ModelProviderExecutionService;
   private readonly query: ModelProviderQueryService;
   private readonly resolution: ModelProviderResolutionService;
@@ -163,9 +171,16 @@ export class ModelProviderService {
       authorization,
       scopes,
     });
+    this.decisionModels = ModelProviderDecisionModelService.create({
+      resolution: this.resolution,
+      scopes,
+      findProviderForProject: (input) => this.query.findProviderForProject(input),
+      isOwnModelAllowed: options.isOwnDecisionModelAllowed,
+    });
     this.defaultWrites = ModelProviderDefaultsWriteService.create({
       defaults: options.defaults,
       catalog: options.catalog,
+      decisionModels: this.decisionModels,
       writeAuthorization,
       ids: options.ids,
       scopes,
@@ -326,6 +341,10 @@ export class ModelProviderService {
 
   resolveModelForFeature(input: ModelDefaultResolveInput): Promise<ModelProviderResolution> {
     return this.resolution.resolve(input);
+  }
+
+  resolveDecisionModel(input: { projectId: string }): Promise<DecisionModelResolution> {
+    return this.decisionModels.resolve(input);
   }
 
   findAlternateModel(input: {

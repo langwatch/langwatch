@@ -1,8 +1,9 @@
 import IORedis, { type Redis } from "ioredis";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { CachedLuaScript } from "../cachedLuaScript.ts";
 import type { GroupQueuePolicy, GroupQueueRuntimeDefinition } from "../contracts.ts";
-import { dlqGroupKeys, dlqIndexKey } from "../deadLetter.ts";
+import { DLQ_INDEX_PRUNE_LUA, dlqGroupKeys, dlqIndexKey } from "../deadLetter.ts";
 import { NonRetryableGroupQueueError } from "../errors.ts";
 import { GroupQueueProcessor } from "../groupQueue.ts";
 
@@ -158,6 +159,53 @@ describe("GroupQueueProcessor — dead-letter on exhaustion", () => {
         expect(committed).not.toContain("b");
         expect(committed).toContain("a");
         expect(await redis.smembers(`${keyPrefix}blocked`)).toEqual([]);
+      });
+    });
+  });
+
+  describe("given a dead-letter index whose members' entries have partly expired", () => {
+    const pruneScript = new CachedLuaScript(DLQ_INDEX_PRUNE_LUA);
+    const keyPrefix = `{test/gqdlq/prune}:gq:`;
+    const keysOf = (groupId: string) => {
+      const { jobs, data, error } = dlqGroupKeys({ keyPrefix, groupId });
+      return [jobs, data, error];
+    };
+
+    describe("when the index is pruned", () => {
+      /** @scenario "An expired dead-letter entry leaves the index only once nothing of it remains" */
+      it("removes only the member none of whose keys exist", async () => {
+        const groupIds = ["g-expired", "g-jobs", "g-data", "g-error"];
+        await redis.sadd(dlqIndexKey(keyPrefix), ...groupIds);
+        await redis.zadd(dlqGroupKeys({ keyPrefix, groupId: "g-jobs" }).jobs, 1, "j1");
+        await redis.hset(dlqGroupKeys({ keyPrefix, groupId: "g-data" }).data, "j1", "{}");
+        await redis.hset(dlqGroupKeys({ keyPrefix, groupId: "g-error" }).error, "message", "boom");
+
+        const pruned = await pruneScript.run(
+          redis,
+          1 + groupIds.length * 3,
+          dlqIndexKey(keyPrefix),
+          ...groupIds.flatMap(keysOf),
+          ...groupIds,
+        );
+
+        expect(pruned).toEqual(["g-expired"]);
+        expect((await redis.smembers(dlqIndexKey(keyPrefix))).toSorted()).toEqual([
+          "g-data",
+          "g-error",
+          "g-jobs",
+        ]);
+      });
+    });
+
+    describe("when the keys do not line up with the group ids", () => {
+      /** @scenario "An expired dead-letter entry leaves the index only once nothing of it remains" */
+      it("refuses before removing anything", async () => {
+        await redis.sadd(dlqIndexKey(keyPrefix), "g-expired");
+
+        await expect(
+          pruneScript.run(redis, 2, dlqIndexKey(keyPrefix), keysOf("g-expired")[0]!, "g-expired"),
+        ).rejects.toThrow("DLQ_INDEX_PRUNE expects three keys per group id");
+        expect(await redis.smembers(dlqIndexKey(keyPrefix))).toEqual(["g-expired"]);
       });
     });
   });

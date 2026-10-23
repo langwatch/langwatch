@@ -1,7 +1,13 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
-import { FEATURE_PREFIX, stripFeaturePrefix } from "../grammar/feature-layout-policy.mjs";
+import {
+  FEATURE_PREFIX,
+  SERVICE_MODULE_PATTERN,
+  entrySourcePaths,
+  optsIntoFeatureLayout,
+  stripFeaturePrefix,
+} from "../grammar/feature-layout-policy.mjs";
 
 // One answer to "what file am I standing in", computed once per file and read
 // by every rule. It replaces five helpers that each asked a slice of the same
@@ -39,12 +45,27 @@ const PROCESS_LAYERS = new Set([
 ]);
 const TEST_FILE = /\.(?:test|spec|unit|integration|e2e)\.[cm]?[jt]sx?$/;
 const TEST_DIRECTORY = /(?:^|\/)(?:__tests__|__mocks__|tests)(?:\/|$)/;
+const WORKSPACE_PACKAGE = /^packages\/([^/]+)\/(.+)$/;
+// A framework package that opts in has no transport; vocabulary and telemetry are its leaves.
+const FRAMEWORK_LAYERS = new Set([
+  "services",
+  "repositories",
+  "channels",
+  "rules",
+  "eventing",
+  "telemetry",
+  "vocabulary",
+]);
+const FRAMEWORK_PRISMA_SEAM = new RegExp(
+  `^${FEATURE_PREFIX}repositories/prisma/.+\\.repository\\.ts$`,
+);
 
 const APPLICATION_ROOTS = new Set(["ui", "api", "worker", "server"]);
 
 const classificationCache = new Map();
 const modulePackageCache = new Map();
 const libraryRootCache = new Map();
+const featureLayoutPackageCache = new Map();
 // Every rule classifies the same file in turn: the last answer is checked before a key is built.
 let last;
 
@@ -164,9 +185,75 @@ function classifyPath(cwd, filename) {
     };
   }
 
+  const framework = featureLayoutPackageOf(cwd, workspacePath);
+  if (framework) return frameworkClassification({ base, framework });
+
   if (SHARED_PACKAGE.test(workspacePath)) return sharedPackageOf(base, workspacePath);
 
   return base;
+}
+
+/** A `packages/*` package whose manifest opts into the feature layout (ADR-181), or undefined. */
+function featureLayoutPackageOf(cwd, workspacePath) {
+  const match = workspacePath.match(WORKSPACE_PACKAGE);
+  if (!match) return undefined;
+  const key = `${cwd}|${match[1]}`;
+  if (!featureLayoutPackageCache.has(key)) {
+    featureLayoutPackageCache.set(key, readFeatureLayoutPackage({ cwd, directory: match[1] }));
+  }
+  const pkg = featureLayoutPackageCache.get(key);
+
+  return pkg && { ...pkg, relative: match[2] };
+}
+
+function readFeatureLayoutPackage({ cwd, directory }) {
+  const manifestPath = join(cwd, "packages", directory, "package.json");
+  if (!existsSync(manifestPath)) return undefined;
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  if (!optsIntoFeatureLayout(manifest)) return undefined;
+
+  return { directory, entries: entrySourcePaths(manifest.exports) };
+}
+
+function frameworkLayerOf(sourcePath) {
+  const layerPath = stripFeaturePrefix(sourcePath);
+  const first = layerPath.slice(0, layerPath.indexOf("/"));
+
+  return FRAMEWORK_LAYERS.has(first) ? first : undefined;
+}
+
+/**
+ * An opted-in framework file: the module flags read over its `src/`, with no
+ * `feature` or `module` of its own, so the rules that mean "a module" still skip it.
+ */
+function frameworkClassification({ base, framework }) {
+  const { directory, entries, relative: packageRelative } = framework;
+  if (!PACKAGE_SOURCE_OR_TESTS.test(packageRelative)) return { ...base, role: "framework" };
+  const sourcePath = packageRelative.startsWith("src/")
+    ? packageRelative.slice("src/".length)
+    : undefined;
+  const strict = sourcePath !== undefined && !TEST_DIRECTORY.test(sourcePath);
+
+  return {
+    ...base,
+    isPrismaSeam: Boolean(sourcePath && FRAMEWORK_PRISMA_SEAM.test(sourcePath)),
+    isServiceModule: Boolean(sourcePath && SERVICE_MODULE_PATTERN.test(sourcePath)),
+    kind: "framework",
+    layer: sourcePath ? frameworkLayerOf(sourcePath) : undefined,
+    relative: packageRelative,
+    role: "framework",
+    sourcePath,
+    strictSource: strict
+      ? {
+          enterprise: false,
+          entry: entries.has(sourcePath),
+          feature: directory,
+          name: sourcePath.slice(sourcePath.lastIndexOf("/") + 1),
+          role: "framework",
+          sourcePath,
+        }
+      : undefined,
+  };
 }
 
 /** A module's portable library: any other package folder in the module (ARCHITECTURE.md §3). */
@@ -311,5 +398,6 @@ export function resetClassificationCache() {
   classificationCache.clear();
   modulePackageCache.clear();
   libraryRootCache.clear();
+  featureLayoutPackageCache.clear();
   last = undefined;
 }

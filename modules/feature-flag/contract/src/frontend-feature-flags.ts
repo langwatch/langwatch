@@ -49,6 +49,8 @@ export const FRONTEND_FEATURE_FLAGS = [
   // bar says Instant Evals are not enabled instead of starting a run
   // (specs/traces-v2/instant-eval-search.feature).
   "release_instant_evals",
+  // The own decision models in the Instant Evals column of Default models (ADR-182).
+  "release_instant_evals_own_decision_model",
   // The guided onboarding variant, read on the welcome flow with the user's
   // id, which the percentage rollout buckets on (guided-onboarding-variant.feature).
   "experiment_onboarding_langy_guided",

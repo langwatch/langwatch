@@ -2,6 +2,7 @@ import type { Authorization } from "@langwatch/authorization";
 import { moduleApi } from "@langwatch/module";
 import type { z } from "zod";
 
+import type { DecisionModelResolution } from "./catalog/decision-models.ts";
 import type { CostRuleMatchingSpansPreview, ModelLimits } from "./model-cost-preview.ts";
 import type { PlatformProviderEntry } from "./model-provider-platform-chain.ts";
 import type {
@@ -297,6 +298,12 @@ export interface ModelProviderApi {
   }): Promise<ModelDefaultInheritedValues>;
   findResolvedDefault(input: ModelDefaultResolveInput): Promise<ModelDefaultEffective | null>;
   resolveModelForFeature(input: ModelDefaultResolveInput): Promise<ModelProviderResolution>;
+  /**
+   * What the project's Instant Evals run on: LangWatch's classifier, or the organization's own
+   * decision model with its decrypted key. An own model that cannot run answers `own_unavailable`,
+   * never `langwatch` (ADR-182 decisions 4 and 5). The answer is kept a minute per project.
+   */
+  resolveDecisionModel(input: { projectId: string }): Promise<DecisionModelResolution>;
   findAlternateModel(input: {
     projectId: string;
     featureKey: string;

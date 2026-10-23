@@ -9,6 +9,7 @@ import { Alert, Skeleton, VStack } from "@langwatch/design-system/primitives";
 import { Cloud } from "lucide-react";
 
 import { useCheckupScreen } from "../../behavior/use-checkup-screen.ts";
+import { useUpgradeDiagnosticsAutoSend } from "../../behavior/use-upgrade-diagnostics-auto-send.ts";
 import { useCheckupHost } from "../../model/checkup-host.ts";
 import { CheckupRows } from "./checkup-rows.tsx";
 import { UsageReportSection } from "./usage-report-section.tsx";
@@ -33,6 +34,7 @@ function CheckupSettings({ organizationId }: { organizationId: string }) {
   const canManage = host.canManageOrganization();
   const canManageInstall = host.canManageInstall();
   const screen = useCheckupScreen(organizationId);
+  const autoSend = useUpgradeDiagnosticsAutoSend({ organizationId, canManageInstall });
   const { status, usageReport } = screen;
 
   if (status.isLoading || usageReport.isLoading) {
@@ -84,8 +86,10 @@ function CheckupSettings({ organizationId }: { organizationId: string }) {
         <UsageReportSection
           report={report}
           canManage={canManageInstall}
-          isSaving={screen.isSavingSwitches}
+          isSaving={screen.isSavingSwitches || autoSend.isSaving}
           onSwitch={(change) => screen.setSwitches.mutate({ organizationId, ...change })}
+          autoSend={autoSend.autoSend}
+          onAutoSend={autoSend.setEnabled}
         />
       ) : null}
     </VStack>

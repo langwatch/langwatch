@@ -95,3 +95,49 @@ describe("given a strict feature server module", () => {
     });
   });
 });
+
+// ADR-181: `relay` opts into the feature layout; `eventing` is a framework that has not.
+const framework = createFixtureWorkspace({
+  files: {
+    "packages/relay/package.json": JSON.stringify({
+      name: "@langwatch/relay",
+      exports: { ".": { default: "./src/index.ts" } },
+      langwatch: { group: "framework", layout: "features" },
+    }),
+    "packages/eventing/package.json": JSON.stringify({
+      name: "@langwatch/eventing",
+      langwatch: { group: "framework" },
+    }),
+  },
+});
+
+afterAll(() => framework.cleanup());
+
+const STATICS_ONLY = "export class ClaimRules {\n  static isLive() { return true; }\n}";
+
+describe("given an opted-in framework package", () => {
+  describe("when a class holds only static members", () => {
+    /** @scenario "A framework class with only static members is reported" */
+    it("reports namespaceClass", () => {
+      const found = runRule(namespaceClassRule, {
+        code: STATICS_ONLY,
+        cwd: framework.cwd,
+        filename: "packages/relay/src/features/claim/services/claim.service.ts",
+      });
+      expect(found.map((entry) => entry.messageId)).toEqual(["namespaceClass"]);
+    });
+  });
+});
+
+describe("given a framework package that has not opted in", () => {
+  /** @scenario "A framework package that has not opted in is left alone by the layered rules" */
+  it("reports nothing for the same class", () => {
+    expect(
+      runRule(namespaceClassRule, {
+        code: STATICS_ONLY,
+        cwd: framework.cwd,
+        filename: "packages/eventing/src/services/claim.service.ts",
+      }),
+    ).toEqual([]);
+  });
+});

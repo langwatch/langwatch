@@ -115,6 +115,14 @@ export interface CreatedUserSchema extends Named<typeof createdUserSchemaDefinit
 export const createdUserSchema: CreatedUserSchema = createdUserSchemaDefinition;
 export type CreatedUser = z.infer<typeof createdUserSchema>;
 
+/** A user holding a credential password, and whether it is already marked for a reset. */
+const passwordHolderSchemaDefinition = z
+  .object({ id: z.string().min(1), email: z.string().nullable(), markedForReset: z.boolean() })
+  .strict();
+export interface PasswordHolderSchema extends Named<typeof passwordHolderSchemaDefinition> {}
+export const passwordHolderSchema: PasswordHolderSchema = passwordHolderSchemaDefinition;
+export type PasswordHolder = z.infer<typeof passwordHolderSchema>;
+
 const setFirstUserPasswordInputSchemaDefinition = z
   .object({ id: z.string().min(1), passwordHash: z.string().min(1) })
   .strict();

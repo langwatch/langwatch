@@ -44,8 +44,20 @@ describe("authz's engine switch carry-over step", () => {
     };
     try {
       expect(step).toMatchObject({ mode: "background", needsOldWritersGone: true });
-      expect(await step.run({ ...context, dryRun: false })).toEqual({ copied: 0 });
-      expect(await step.run({ ...context, dryRun: true })).toEqual({ wouldCopy: 0 });
+      expect(
+        await step.run({
+          log: { info: () => undefined, warn: () => undefined },
+          ...context,
+          dryRun: false,
+        }),
+      ).toEqual({ copied: 0 });
+      expect(
+        await step.run({
+          log: { info: () => undefined, warn: () => undefined },
+          ...context,
+          dryRun: true,
+        }),
+      ).toEqual({ wouldCopy: 0 });
     } finally {
       await runtime.stop();
     }
