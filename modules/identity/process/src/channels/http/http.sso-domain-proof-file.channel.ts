@@ -3,6 +3,7 @@ import {
   type EgressTlsPolicy,
   type FencedFetchOptions,
   type OutboundProxyConfig,
+  OutboundProxyMisconfiguredError,
   RedirectRefusedError,
   type SsrfUrlValidator,
   type SsrfValidationResult,
@@ -184,6 +185,7 @@ export class HttpsSsoDomainProofFileChannel implements SsoDomainProofFileChannel
 function reasonFor({ error, aborted }: { error: unknown; aborted: boolean }): string {
   if (error instanceof ProofFileDowngradedError) return "not_https";
   if (error instanceof RedirectRefusedError) return "redirect_refused";
+  if (error instanceof OutboundProxyMisconfiguredError) return "proxy_misconfigured";
   if (aborted) return "timeout";
   const code =
     typeof error === "object" &&

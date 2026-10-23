@@ -3,7 +3,7 @@ import net from "node:net";
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { fetchValidatedDestination } from "../fenced-fetch.ts";
+import { fetchValidatedDestination, OutboundProxyMisconfiguredError } from "../fenced-fetch.ts";
 import type { SsrfUrlValidator, SsrfValidationResult } from "../url-validator.ts";
 
 /**
@@ -167,9 +167,35 @@ describe("the pinned fetch with an outbound proxy", () => {
     });
   });
 
-  describe("given a proxy setting that is not a URL", () => {
-    /** @scenario "A malformed proxy setting fails as a connection error" */
-    it("fails as a connection error naming the destination", async () => {
+  describe("given a hop the caller routes around the proxy", () => {
+    /** @scenario "A hop the caller routes around the proxy is reached directly" */
+    it("connects to the judged address without the proxy", async () => {
+      const validated = admitted({
+        hostname: "idp.example.test",
+        port: originPort,
+        path: "/",
+        resolvedIp: "127.0.0.1",
+      });
+      const asked: string[] = [];
+
+      const response = await fetchValidatedDestination(
+        validated,
+        {
+          proxy: { httpsProxy: proxyUrl },
+          bypassProxy: (hop) => {
+            asked.push(hop.hostname);
+            return true;
+          },
+        },
+        tls,
+      );
+
+      await expect(response.text()).resolves.toBe("from origin");
+      expect(tunnelled).toEqual([]);
+      expect(asked).toEqual(["idp.example.test"]);
+    });
+
+    it("still sends a hop it does not route around through the proxy", async () => {
       const validated = admitted({
         hostname: "idp.example.test",
         port: originPort,
@@ -177,9 +203,37 @@ describe("the pinned fetch with an outbound proxy", () => {
         resolvedIp: UNREACHABLE_IP,
       });
 
-      await expect(
-        fetchValidatedDestination(validated, { proxy: { httpsProxy: "proxy.corp:3128" } }, tls),
-      ).rejects.toThrow(new RegExp(`Connection failed to idp.example.test:${originPort}`));
+      const response = await fetchValidatedDestination(
+        validated,
+        { proxy: { httpsProxy: proxyUrl }, bypassProxy: () => false },
+        tls,
+      );
+
+      await expect(response.text()).resolves.toBe("from origin");
+      expect(tunnelled).toEqual([`idp.example.test:${originPort}`]);
+    });
+  });
+
+  describe("given a proxy setting that is not a URL", () => {
+    /** @scenario "A malformed proxy setting fails as a proxy configuration error" */
+    it("fails naming the proxy setting, not the destination or the setting's value", async () => {
+      const validated = admitted({
+        hostname: "idp.example.test",
+        port: originPort,
+        path: "/",
+        resolvedIp: UNREACHABLE_IP,
+      });
+
+      const failure = await fetchValidatedDestination(
+        validated,
+        { proxy: { httpsProxy: "user:secret@proxy.corp:3128" } },
+        tls,
+      ).catch((error: unknown) => error);
+
+      expect(failure).toBeInstanceOf(OutboundProxyMisconfiguredError);
+      expect((failure as Error).message).toMatch(/HTTPS_PROXY/);
+      expect((failure as Error).message).not.toMatch(/idp\.example\.test|secret|proxy\.corp/);
+      expect((failure as Error).cause).toBeUndefined();
       expect(tunnelled).toEqual([]);
     });
   });

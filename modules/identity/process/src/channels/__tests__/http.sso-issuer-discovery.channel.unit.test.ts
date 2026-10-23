@@ -333,6 +333,35 @@ describe("given a deployment that reaches the internet only through an outbound 
     expect(asked).toEqual([]);
   });
 
+  /** @scenario "An issuer origin an operator vouched for is reached directly, not through the proxy" */
+  it("routes the vouched origin around the proxy and a redirect out of it through the proxy", async () => {
+    const vouched = "https://idp.corp.internal";
+    const routes: [string, boolean][] = [];
+    const channel = HttpsSsoIssuerDiscoveryChannel.create({
+      policy: POLICY,
+      proxy,
+      dialableInternalOrigins: () => [vouched],
+      validate: async (url) => admitted(url),
+      validateVouched: async (url) => ({ ...admitted(url), resolvedIp: "10.0.0.7" }),
+      fetchValidated: async (validated, init) => {
+        expect(init.proxy).toEqual(proxy);
+        routes.push([validated.originalUrl, init.bypassProxy?.(validated) ?? false]);
+        if (!init.revalidate) throw new Error("discovery follows redirects by its own judge");
+        const next = await init.revalidate(ENDPOINT);
+        routes.push([next.originalUrl, init.bypassProxy?.(next) ?? false]);
+        return respond(200, DISCOVERY_DOCUMENT);
+      },
+    });
+
+    await expect(channel.discover({ issuer: `${vouched}/realms/acme` })).resolves.toMatchObject({
+      reachable: true,
+    });
+    expect(routes).toEqual([
+      [`${vouched}/realms/acme/.well-known/openid-configuration`, true],
+      [ENDPOINT, false],
+    ]);
+  });
+
   /** @scenario "NO_PROXY does not lift the public-address check on discovery" */
   it("refuses an issuer NO_PROXY names when it resolves privately", async () => {
     const asked: string[] = [];

@@ -41,6 +41,16 @@ the request options, so every hop sees it.
 directly; it is still judged. Reaching a private identity provider still takes
 `SSO_TRUSTED_IDP_ORIGINS`.
 
+**A caller may route a judged hop around the proxy.** `bypassProxy` is asked per
+hop, redirects included. Issuer discovery uses it for an origin in
+`SSO_TRUSTED_IDP_ORIGINS`: that origin answers inside the network, so it keeps
+the direct connection pinned to the address it resolved to, and an install that
+sets `HTTPS_PROXY` for email does not lose its internal identity provider.
+
+**A malformed proxy setting is the operator's error, not the destination's.**
+It fails as `OutboundProxyMisconfiguredError`, which names the setting and not
+its value, since the value may carry credentials.
+
 **Callers opt in.** Leaving `proxy` out keeps today's behaviour. A module passes
 `parseOutboundProxyConfig(config.outboundProxy)` from the leaf it picks. Identity
 does so for issuer discovery and the domain proof file.

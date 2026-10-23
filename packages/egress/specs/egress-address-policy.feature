@@ -66,10 +66,18 @@ Feature: Egress address policy and the pinned fetch
     Then the next hop is refused without being sent to the proxy
 
   @unit
-  Scenario: A malformed proxy setting fails as a connection error
+  Scenario: A hop the caller routes around the proxy is reached directly
+    Given an outbound proxy is configured
+    And the caller routes a destination's hop around the proxy
+    When that destination is fetched
+    Then the request is sent to the judged address, without the proxy
+
+  @unit
+  Scenario: A malformed proxy setting fails as a proxy configuration error
     Given the outbound proxy setting is not a URL
     When a destination the policy admitted is fetched
-    Then the fetch fails with a connection error naming the destination
+    Then the fetch fails with an error naming the proxy setting, not the destination
+    And the error does not repeat the setting's value
 
   # Every caller opts in by passing its proxy setting (ADR-187). These have not yet.
   @integration @unimplemented

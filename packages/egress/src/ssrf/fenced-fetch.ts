@@ -78,6 +78,18 @@ function formatConnectionError(err: Error, hostname: string, port: number): Erro
 }
 
 /**
+ * The outbound proxy setting could not be turned into a proxy. A class, so the
+ * catch below does not blame the destination. It carries no cause: the parse
+ * error repeats the setting's value, which may hold proxy credentials.
+ */
+export class OutboundProxyMisconfiguredError extends Error {
+  constructor() {
+    super("The outbound proxy setting (HTTPS_PROXY or HTTP_PROXY) is not a valid proxy URL");
+    this.name = "OutboundProxyMisconfiguredError";
+  }
+}
+
+/**
  * The receiver redirected and this caller declined the hop. A class, not a
  * message, so it passes untouched through the catch below that rewrites
  * every plain `Error` as "Connection failed" via `formatConnectionError`.
@@ -110,6 +122,12 @@ export interface FencedFetchOptions extends RequestInit {
   bodyTimeoutMs?: number;
   /** The deployment's outbound proxy. Absent, or excluded by `NO_PROXY`: the pinned connection. */
   proxy?: OutboundProxyConfig;
+  /**
+   * A judged hop the caller routes around `proxy`, on the pinned connection.
+   * Asked per hop, redirects included. A route, never a policy: the hop was
+   * already judged, and the pinned socket still refuses a metadata address.
+   */
+  bypassProxy?: (hop: SsrfValidationResult) => boolean;
 }
 
 interface AgentTimeoutOptions {
@@ -213,8 +231,21 @@ function createDispatcher({
   tls: EgressTlsPolicy;
 }): Dispatcher {
   const timeouts = resolveAgentTimeouts(init);
-  const proxyUrl = init?.proxy && resolveProxyForHost(init.proxy, validated.hostname);
-  if (proxyUrl) return createProxyAgent({ proxyUrl, tls, timeouts });
+  const proxyUrl =
+    init?.proxy && !init.bypassProxy?.(validated)
+      ? resolveProxyForHost(init.proxy, validated.hostname)
+      : undefined;
+  if (proxyUrl) {
+    logger.debug(
+      { hostname: validated.hostname },
+      "Sending the judged hop through the outbound proxy",
+    );
+    try {
+      return createProxyAgent({ proxyUrl, tls, timeouts });
+    } catch {
+      throw new OutboundProxyMisconfiguredError();
+    }
+  }
 
   const resolvedIp = getResolvedIpForPinning(validated);
   return createGuardedAgent({
@@ -256,7 +287,7 @@ export async function fetchValidatedDestination(
   let dispatcher: Dispatcher | undefined;
 
   try {
-    // Inside the try: a malformed proxy URL fails here and is normalised below.
+    // Inside the try, so the dispatcher is destroyed on every later failure.
     dispatcher = createDispatcher({ validated, init, tls });
     const response = await undiciFetch(requestUrl, {
       method: init?.method,
@@ -293,10 +324,10 @@ export async function fetchValidatedDestination(
     return response;
   } catch (err) {
     void dispatcher?.destroy().catch(() => undefined);
-    // Our own refusal, not the network's. Everything below rewrites an error
-    // into "Connection failed to host:port: …", the right shape for a socket
-    // problem and the wrong one for a decision this module made.
-    if (err instanceof RedirectRefusedError) {
+    // Our own refusal, or the operator's proxy setting, not the network's.
+    // Everything below rewrites an error into "Connection failed to host:port: …",
+    // the right shape for a socket problem and the wrong one for these.
+    if (err instanceof RedirectRefusedError || err instanceof OutboundProxyMisconfiguredError) {
       throw err;
     }
     if (err instanceof Error) {
