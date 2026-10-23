@@ -8,8 +8,9 @@ Feature: The insights inbox
 
   Rule: Filing an insight
 
-    # The page has no "Save as insight" any more (#8998); a daily run files insights. The
-    # filing route stays, for the run and for insights stored with a Langy source.
+    # The page has no "Save as insight" any more (#8998); a daily run files insights through
+    # the insight command, not this route. The filing route stays available, for insights
+    # stored with a Langy source.
     @integration
     Scenario: A member files an insight through the filing route
       Given a member with analytics:view on the project
@@ -387,7 +388,7 @@ Feature: The insights inbox
 
     @integration
     Scenario: The Dashboards side menu holds the one Insights entry with its unread count
-      Given the release_insights flag is on and a member with analytics:view
+      Given the release_insights and release_dashboards flags are on and a member with analytics:view
       When they look at the Dashboards side menu
       Then it holds one Insights entry above the saved dashboards, with the unread pill
       And the entry is marked current on the Insights page
