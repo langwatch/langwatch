@@ -22,6 +22,8 @@ export interface InstantEvalJudgedSpend {
   readonly inputTokens: number;
   /** Classifications made, which is one per judged text. */
   readonly requests: number;
+  /** The summed cost of routed calls; zero or absent prices the tokens as before. */
+  readonly costNanoUsd?: number;
   readonly occurredAt: Instant;
 }
 
@@ -47,6 +49,7 @@ export class InstantEvalJudgedSpendService {
     runId,
     inputTokens,
     requests,
+    costNanoUsd,
     occurredAt,
   }: InstantEvalJudgedSpend): Promise<void> {
     const organizationId = await this.peers.findOrganizationId({ projectId });
@@ -66,6 +69,7 @@ export class InstantEvalJudgedSpendService {
       requestId,
       inputTokens,
       requests,
+      ...(costNanoUsd ? { costNanoUsd } : {}),
       ...(runId ? { runId } : {}),
       occurredAt: occurredAt.epochMilliseconds,
     });

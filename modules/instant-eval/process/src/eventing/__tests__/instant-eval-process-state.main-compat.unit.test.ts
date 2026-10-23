@@ -28,6 +28,7 @@ describe("process state stored by the main release", () => {
       remaining: 10,
       inputTokens: 100,
       requests: 2,
+      costNanoUsd: 0,
       lastActivityAtMs: 1,
       cancelRequestedAtMs: null,
     });

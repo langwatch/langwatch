@@ -235,3 +235,21 @@ describe("given a run's event stream", () => {
     });
   });
 });
+
+describe("given a routed run", () => {
+  /** @scenario "A routed judgement is priced from the summed cost of every call" */
+  it("carries the routed cost so far on the running row, for the page budget check", () => {
+    const state = fold([
+      requested(),
+      planned(1000),
+      page({ costNanoUsd: 1_500 }),
+      page({ costNanoUsd: 2_500 }),
+    ]);
+    expect(state.costUsd).toBe(0.000004);
+  });
+
+  /** @scenario "A page event without a routed cost still reads and prices from tokens" */
+  it("leaves an unrouted running row's cost at zero until it finishes", () => {
+    expect(fold([requested(), planned(1000), page({})]).costUsd).toBe(0);
+  });
+});

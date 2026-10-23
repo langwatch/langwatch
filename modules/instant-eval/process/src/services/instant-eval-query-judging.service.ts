@@ -121,6 +121,7 @@ export class InstantEvalQueryJudgingService {
         projectId,
         inputTokens: usage.inputTokens,
         requests: usage.requests,
+        ...(usage.costNanoUsd > 0 ? { costNanoUsd: usage.costNanoUsd } : {}),
         occurredAt: this.options.now(),
       });
 

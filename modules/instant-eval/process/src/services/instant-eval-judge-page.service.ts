@@ -5,7 +5,10 @@
  * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
-import { instantEvalCostUsd, instantEvalPriceUsd } from "@langwatch/instant-eval-judge-contract";
+import {
+  instantEvalPriceUsd,
+  instantEvalSpentCostUsd,
+} from "@langwatch/instant-eval-judge-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
@@ -65,6 +68,9 @@ const EMPTY_INSTANT_EVAL_PAGE: InstantEvalPageOutcome = {
   skipped: 0,
   inputTokens: 0,
   requests: 0,
+  costNanoUsd: 0,
+  escalated: 0,
+  answeredBy: {},
   cursor: null,
   cursorSpanId: null,
   hasNextPage: false,
@@ -187,7 +193,7 @@ export class InstantEvalJudgePageService {
     await this.budget.assertWithinBudget({
       projectId,
       reservationId: runId,
-      inFlightUsd: this.#spentSoFarUsd(loaded.row.tokens),
+      inFlightUsd: this.#spentSoFarUsd(loaded.row),
     });
 
     const startedPage = this.now();
@@ -307,12 +313,14 @@ export class InstantEvalJudgePageService {
    * off the run row rather than tracked here: the process that judges page six
    * need not be the one that judged page five, and the row is what they share.
    */
-  #spentSoFarUsd(inputTokens: number): number {
-    if (inputTokens <= 0) return 0;
+  #spentSoFarUsd({ tokens, costUsd }: { tokens: number; costUsd: number }): number {
+    if (tokens <= 0) return 0;
     const { pricing } = this.judge;
+    // A routed run's row carries its cost so far; an unrouted one prices its tokens.
+    const costNanoUsd = Math.round(costUsd * 1_000_000_000);
 
     return instantEvalPriceUsd({
-      costUsd: instantEvalCostUsd({ inputTokens, pricing }),
+      costUsd: instantEvalSpentCostUsd({ inputTokens: tokens, costNanoUsd, pricing }),
       pricing,
     });
   }
@@ -484,6 +492,9 @@ function outcomeFor({
     ...counters,
     inputTokens: usage.inputTokens,
     requests: usage.requests,
+    costNanoUsd: usage.costNanoUsd,
+    escalated: usage.escalated,
+    answeredBy: usage.answeredBy,
     cursor: cursor.traceId,
     // Empty when the statement has one row per trace, which is what tells the
     // next key pass to compare the trace alone.

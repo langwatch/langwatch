@@ -53,6 +53,11 @@ export interface InstantEvalPageOutcome {
   readonly skipped: number;
   readonly inputTokens: number;
   readonly requests: number;
+  /** What the page's routed calls cost us; zero when the run is not routed. */
+  readonly costNanoUsd: number;
+  /** Questions the page escalated, and verdicts per routed backend. */
+  readonly escalated: number;
+  readonly answeredBy: Readonly<Record<string, number>>;
   /** The last trace id of the page, or null when it judged nothing. */
   readonly cursor: string | null;
   /** The last span id of the page, for a statement keyed by the pair. */
@@ -92,6 +97,7 @@ export interface InstantEvalRunExecutor {
     outcome: InstantEvalOutcome;
     inputTokens: number;
     requests: number;
+    costNanoUsd: number;
   }): Promise<InstantEvalSpend>;
 }
 
@@ -118,6 +124,9 @@ export interface InstantEvalOutcomeCommands {
     skipped: number;
     inputTokens: number;
     requests: number;
+    costNanoUsd: number;
+    escalated: number;
+    answeredBy: Record<string, number>;
     cursor: string | null;
     cursorSpanId: string | null;
     hasNextPage: boolean;
@@ -130,6 +139,7 @@ export interface InstantEvalOutcomeCommands {
     errorCode: string | null;
     inputTokens: number;
     requests: number;
+    costNanoUsd: number;
     costUsd: number;
     priceUsd: number;
   }): Promise<unknown>;
@@ -177,7 +187,7 @@ async function recordInstantEvalFailure({
   code: string;
   context: Record<string, unknown>;
   /** What the run had spent by the time it failed, when the intent knows. */
-  spend?: { inputTokens: number; requests: number };
+  spend?: { inputTokens: number; requests: number; costNanoUsd?: number };
 }): Promise<void> {
   try {
     await deps.commands().recordFinished({
@@ -188,6 +198,7 @@ async function recordInstantEvalFailure({
       errorCode: code,
       inputTokens: spend?.inputTokens ?? 0,
       requests: spend?.requests ?? 0,
+      costNanoUsd: spend?.costNanoUsd ?? 0,
       costUsd: 0,
       priceUsd: 0,
     });
@@ -218,7 +229,7 @@ async function handleInstantEvalIntentFailure({
   error: unknown;
   intentContext: IntentContext;
   context: Record<string, unknown>;
-  spend?: { inputTokens: number; requests: number };
+  spend?: { inputTokens: number; requests: number; costNanoUsd?: number };
 }): Promise<void> {
   const maxAttempts = deps.maxAttempts ?? INSTANT_EVAL_MAX_ATTEMPTS;
   if (intentContext.attempt < maxAttempts) {
@@ -312,6 +323,9 @@ export function createInstantEvalJudgePageHandler(
         skipped: outcome.skipped,
         inputTokens: outcome.inputTokens,
         requests: outcome.requests,
+        costNanoUsd: outcome.costNanoUsd,
+        escalated: outcome.escalated,
+        answeredBy: { ...outcome.answeredBy },
         cursor: outcome.cursor,
         cursorSpanId: outcome.cursorSpanId,
         hasNextPage: outcome.hasNextPage,
@@ -345,6 +359,7 @@ export function createInstantEvalFinishHandler(
         outcome: payload.outcome,
         inputTokens: payload.inputTokens,
         requests: payload.requests,
+        costNanoUsd: payload.costNanoUsd,
       });
     } catch (error) {
       // The payload already carries what every judged page spent, so a finish
@@ -355,7 +370,11 @@ export function createInstantEvalFinishHandler(
         error,
         intentContext,
         context,
-        spend: { inputTokens: payload.inputTokens, requests: payload.requests },
+        spend: {
+          inputTokens: payload.inputTokens,
+          requests: payload.requests,
+          costNanoUsd: payload.costNanoUsd,
+        },
       });
 
       return;
@@ -370,6 +389,7 @@ export function createInstantEvalFinishHandler(
         errorCode: payload.errorCode,
         inputTokens: payload.inputTokens,
         requests: payload.requests,
+        costNanoUsd: payload.costNanoUsd,
         costUsd: spend.costUsd,
         priceUsd: spend.priceUsd,
       });

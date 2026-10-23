@@ -130,3 +130,38 @@ describe("given a run that judged nothing", () => {
     });
   });
 });
+
+describe("given a routed run", () => {
+  /** @scenario "A routed judgement is priced from the summed cost of every call" */
+  it("prices the summed routed cost and hands it to the judge with the tokens", async () => {
+    const { service, recorded } = finishing();
+
+    const spend = await service.finish({
+      runId: RUN_ID,
+      projectId: PROJECT_ID,
+      outcome: "finished",
+      inputTokens: 1_000_000,
+      requests: 10,
+      costNanoUsd: 2_000_000_000,
+    });
+
+    expect(spend.costUsd).toBe(2);
+    expect(spend.priceUsd).toBe(2 * INSTANT_EVAL_PRICING.markup);
+    expect(recorded[0]).toMatchObject({ inputTokens: 1_000_000, costNanoUsd: 2_000_000_000 });
+  });
+
+  /** @scenario "A page event without a routed cost still reads and prices from tokens" */
+  it("prices the tokens as before when the run carries no routed cost", async () => {
+    const { service, recorded } = finishing();
+
+    await service.finish({
+      runId: RUN_ID,
+      projectId: PROJECT_ID,
+      outcome: "finished",
+      inputTokens: 1_000_000,
+      requests: 10,
+    });
+
+    expect(recorded[0]).not.toHaveProperty("costNanoUsd");
+  });
+});

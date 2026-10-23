@@ -147,6 +147,7 @@ export const handleInstantEvalPlanned: EventHandler<
           errorCode: null,
           inputTokens: state.inputTokens,
           requests: state.requests,
+          costNanoUsd: state.costNanoUsd,
         }),
       ],
     });
@@ -176,6 +177,7 @@ export const handleInstantEvalPlanned: EventHandler<
           errorCode: null,
           inputTokens: state.inputTokens,
           requests: state.requests,
+          costNanoUsd: state.costNanoUsd,
         }),
       ],
     });
@@ -220,6 +222,7 @@ export const handleInstantEvalPageJudged: EventHandler<
     remaining: Math.max(0, state.remaining - data.rows),
     inputTokens: state.inputTokens + data.inputTokens,
     requests: state.requests + data.requests,
+    costNanoUsd: state.costNanoUsd + data.costNanoUsd,
   };
 
   const isCancelling = state.phase === "cancelling";
@@ -242,6 +245,7 @@ export const handleInstantEvalPageJudged: EventHandler<
             errorCode: null,
             inputTokens: advanced.inputTokens,
             requests: advanced.requests,
+            costNanoUsd: advanced.costNanoUsd,
           },
         ),
       ],
@@ -324,6 +328,7 @@ export const instantEvalWake: WakeHandler<InstantEvalProcessState, InstantEvalIn
           errorCode: null,
           inputTokens: state.inputTokens,
           requests: state.requests,
+          costNanoUsd: state.costNanoUsd,
         }),
       ],
     };
@@ -346,6 +351,7 @@ export const instantEvalWake: WakeHandler<InstantEvalProcessState, InstantEvalIn
         errorCode: "instant_eval_stalled",
         inputTokens: state.inputTokens,
         requests: state.requests,
+        costNanoUsd: state.costNanoUsd,
       }),
     ],
   };
@@ -375,6 +381,7 @@ export function buildInstantEvalProcessEventView(
     skipped: number("skipped"),
     inputTokens: number("inputTokens"),
     requests: number("requests"),
+    costNanoUsd: number("costNanoUsd"),
     cursor: typeof data.cursor === "string" ? data.cursor : null,
     cursorSpanId: typeof data.cursorSpanId === "string" ? data.cursorSpanId : null,
     hasNextPage: data.hasNextPage === true,

@@ -6,7 +6,10 @@
 
 import type { InstantEvalOutcome } from "@langwatch/instant-eval-contract";
 import type { InstantEvalPricing } from "@langwatch/instant-eval-judge-contract";
-import { instantEvalCostUsd, instantEvalPriceUsd } from "@langwatch/instant-eval-judge-contract";
+import {
+  instantEvalPriceUsd,
+  instantEvalSpentCostUsd,
+} from "@langwatch/instant-eval-judge-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant, type Instant } from "@langwatch/time";
 
@@ -55,14 +58,17 @@ export class InstantEvalFinishService {
     outcome,
     inputTokens,
     requests,
+    costNanoUsd = 0,
   }: {
     runId: string;
     projectId: string;
     outcome: InstantEvalOutcome;
     inputTokens: number;
     requests: number;
+    /** A routed run's summed cost; zero prices its tokens as before. */
+    costNanoUsd?: number;
   }): Promise<InstantEvalSpend> {
-    const costUsd = instantEvalCostUsd({ inputTokens, pricing: this.pricing });
+    const costUsd = instantEvalSpentCostUsd({ inputTokens, costNanoUsd, pricing: this.pricing });
     const priceUsd = instantEvalPriceUsd({ costUsd, pricing: this.pricing });
 
     // A run that judged no row records no spend: a record of zero is one a
@@ -73,6 +79,7 @@ export class InstantEvalFinishService {
         runId,
         inputTokens,
         requests,
+        ...(costNanoUsd > 0 ? { costNanoUsd } : {}),
         occurredAt: this.now(),
       });
       logger.debug(
