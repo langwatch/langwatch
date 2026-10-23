@@ -16,7 +16,7 @@ root `.env`.
 2. **The private key lives only in secrets.** `LANGWATCH_LICENSE_PRIVATE_KEY`
    (`licensingSecrets.licensePrivateKey`) resolves through the ADR-132 chain:
    the environment, then the root `.env`. Under haven (or `haven secrets exec`)
-   the environment includes the 1Password item `Private/LangWatch Dev` when
+   the environment includes the 1Password item `Private/LangWatch haven secrets` when
    `LANGWATCH_OP_ACCOUNT` names an account.
 3. **The storage seed signs a fresh licence**
    (`apps/tasks/src/storage-seed/seed-license.ts`, `chooseSeedLicense`), in

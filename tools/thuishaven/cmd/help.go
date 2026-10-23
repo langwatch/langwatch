@@ -107,7 +107,7 @@ Shared, machine-wide (one daemon, all worktrees):
 var envHelpText = `Environment variables.
 
     Credentials: .env holds config only. With LANGWATCH_OP_ACCOUNT set, haven
-    reads the 1Password item Private/LangWatch Dev once and hands its fields to
+    reads the 1Password item Private/LangWatch haven secrets once and hands its fields to
     every lane after the shell and .env. "haven secrets move" moves .env's
     credential lines there; "haven secrets exec -- <cmd>" runs a command with them.
 

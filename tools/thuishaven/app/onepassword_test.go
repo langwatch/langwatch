@@ -39,7 +39,7 @@ case "$1 $2" in
 "item get")
   if [ -f "$dir/fail" ]; then cat "$dir/fail" >&2; exit 1; fi
   if [ -f "$dir/item.json" ]; then cat "$dir/item.json"; exit 0; fi
-  echo '[ERROR] "LangWatch Dev" isn'"'"'t an item in the "Private" vault.' >&2; exit 1 ;;
+  echo '[ERROR] "LangWatch haven secrets" isn'"'"'t an item in the "Private" vault.' >&2; exit 1 ;;
 "item create"|"item edit")
   if [ -f "$dir/readonly" ]; then cat > /dev/null; exit 0; fi
   cat > "$dir/item.json"; echo '{"id":"stored"}'; exit 0 ;;
@@ -162,7 +162,7 @@ func TestTheItemIsReadOnce(t *testing.T) {
 	if len(calls) != 1 {
 		t.Fatalf("op was called %d times, want once: %v", len(calls), calls)
 	}
-	if !strings.HasPrefix(calls[0], "item get LangWatch Dev --vault Private") || !strings.HasSuffix(calls[0], "--account acme") {
+	if !strings.HasPrefix(calls[0], "item get LangWatch haven secrets --vault Private") || !strings.HasSuffix(calls[0], "--account acme") {
 		t.Errorf("op was called as %q", calls[0])
 	}
 }
@@ -289,7 +289,7 @@ func TestApplyingTheMoveFillsTheItemThenRewritesDotenv(t *testing.T) {
 		t.Run(fmt.Sprintf("item exists %v", existing), func(t *testing.T) {
 			op := stubOnePassword(t)
 			if existing {
-				op.write(t, "item.json", `{"id":"abc","title":"LangWatch Dev","category":"SECURE_NOTE","fields":[`+
+				op.write(t, "item.json", `{"id":"abc","title":"LangWatch haven secrets","category":"SECURE_NOTE","fields":[`+
 					`{"id":"notesPlain","purpose":"NOTES","label":"notesPlain","value":"mine"},`+
 					`{"id":"k1","label":"KEEP_TOKEN","type":"CONCEALED","value":"kept"},`+
 					`{"id":"k2","label":"OPENAI_API_KEY","type":"CONCEALED","value":"stale"}]}`)

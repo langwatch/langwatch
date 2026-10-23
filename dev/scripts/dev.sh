@@ -537,7 +537,7 @@ LAST=""
 cat <<'EOF'
 
 ╔════════════════════════════════════════════════════════════╗
-║              LangWatch Development Environment             ║
+║              LangWatch haven secretselopment Environment             ║
 ╚════════════════════════════════════════════════════════════╝
 
 Pick a preset:

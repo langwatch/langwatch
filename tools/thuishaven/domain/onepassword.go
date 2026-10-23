@@ -15,7 +15,7 @@ import (
 const (
 	OnePasswordAccountKey = "LANGWATCH_OP_ACCOUNT"
 	OnePasswordVault      = "Private"
-	OnePasswordItem       = "LangWatch Dev"
+	OnePasswordItem       = "LangWatch haven secrets"
 )
 
 // envKeyPattern is what a field label must look like to become a variable.

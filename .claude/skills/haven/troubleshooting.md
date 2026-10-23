@@ -160,7 +160,7 @@ haven's own injected variables (hostnames, ports, database URLs; see
 `tools/thuishaven/app/overlayenv.go`) go straight into each child's OS environment;
 nothing writes them to a file. haven is the only 1Password reader: with
 `LANGWATCH_OP_ACCOUNT` set in the workspace `.env` (a personal choice, never set by haven)
-it reads the item `Private/LangWatch Dev` in memory each time it starts or restarts a process
+it reads the item `Private/LangWatch haven secrets` in memory each time it starts or restarts a process
 and puts the fields the shell and `.env` leave unset into that process's env; the keeper
 plan holds no value (`tools/thuishaven/app/onepassword.go`). The Node secrets chain is
 env then `.env`; it has no 1Password adapter. A key you just added in 1Password needs a
