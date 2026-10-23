@@ -113,6 +113,7 @@ import {
   documentRoute,
   requiresBody,
 } from "./openapi.ts";
+import { recordRequestPrincipal, requestPrincipalOf } from "./request-principal.ts";
 import {
   bodyLimit,
   cachedRestAnswer,
@@ -924,6 +925,17 @@ function authenticateMiddleware({
         noteRequestCredential(doorCredentialOf({ credential, caller, request: context.req.raw }));
       }
       callers.set(context, caller);
+      recordRequestPrincipal({
+        context,
+        read: () =>
+          requestPrincipalOf({
+            actor: caller?.actor,
+            key:
+              caller && isKeyDoor(credential)
+                ? recordedKeyOfDoor({ door: credential, request: context.req.raw })
+                : (caller?.key ?? null),
+          }),
+      });
     }
 
     await next();
@@ -1443,6 +1455,11 @@ function handlerMiddleware<Api>({
           actor: null,
           scope: null,
           target: null,
+          recordKey: (key) =>
+            recordRequestPrincipal({
+              context,
+              read: () => requestPrincipalOf({ actor: null, key }),
+            }),
         }),
         ...(await resolveContexts({ route, contexts, context, input })),
       );
@@ -1977,6 +1994,7 @@ function handlerArguments<Api>({
   authorization = null,
   session,
   key,
+  recordKey,
 }: {
   context: Context;
   route: RestTransportRoute<Api>;
@@ -1988,6 +2006,7 @@ function handlerArguments<Api>({
   authorization?: Authorization | null;
   session?: unknown;
   key?: RestKeyCredential | undefined;
+  recordKey?: ((key: RestKeyCredential) => void) | undefined;
 }): StoredHandlerArguments<Api> {
   return {
     app: options.app(),
@@ -2009,6 +2028,7 @@ function handlerArguments<Api>({
     response: route.response
       ? producerFor({ kind: route.response.kind, accept: context.req.header("Accept") ?? "" })
       : undefined,
+    ...(recordKey ? { recordKey } : {}),
   };
 }
 

@@ -7,7 +7,9 @@ import type { Actor, AuthzDeclaredScopeId } from "@langwatch/authorization";
 import type { FeatureApiIdentity, ModuleApiToken, ModuleName } from "@langwatch/module";
 
 import type { RestCaller } from "../hosting/api-door.ts";
+import { ClientAddress } from "../policy/client-address.ts";
 import { bearerTokenOf } from "./bearer-identity.ts";
+import type { RestKeyCredential } from "./key-credential.ts";
 import type { RestDoor } from "./request.ts";
 import type { RestProtocolRefusal } from "./response-kind.ts";
 import { collectAuthDiagnostics, type AuthDiagnostics } from "./security.ts";
@@ -61,6 +63,8 @@ export type DoorIdentified<Credential extends DoorCredential> = Readonly<{
   scope: Extract<AuthzDeclaredScopeId, { tier: DoorContract[Credential]["tier"] }>;
   actor?: Actor | null;
   session?: DoorContract[Credential]["session"];
+  /** The key the bearer is, named on the request's access record by id and kind only. */
+  key?: RestKeyCredential;
 }>;
 
 /** The Api a module token stands for. */
@@ -107,6 +111,7 @@ const PRESENTED: {
       path: new URL(request.url).pathname,
       method: request.method,
       header: (name) => request.headers.get(name) ?? undefined,
+      clientAddress: ClientAddress.resolvedFor(request),
     }),
   }),
 };
@@ -154,6 +159,7 @@ export function defineRestDoor<
           actor: identified.actor ?? null,
           scope: identified.scope,
           ...(identified.session === undefined ? {} : { session: identified.session }),
+          ...(identified.key === undefined ? {} : { key: identified.key }),
         };
       },
     }),
