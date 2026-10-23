@@ -315,7 +315,7 @@ type Response = z.infer<typeof evaluatorWireSchema>; // ../contract/src/evaluato
 
 Update an existing evaluator
 
-Permission `evaluations:update`. Declared at `src/transport/evaluator.rest.ts:220`.
+Permission `evaluations:update`. Declared at `src/transport/evaluator.rest.ts:221`.
 
 Answers at `/api/evaluators/:id`, `/api/v1/evaluators/:id`; also, undocumented, `/api/evaluators/2026-08-07/:id`, `/api/v1/evaluators/2026-08-07/:id`, `/api/evaluators/latest/:id`, `/api/v1/evaluators/latest/:id`.
 
@@ -336,7 +336,7 @@ type Response = z.infer<typeof evaluatorWireSchema>; // ../contract/src/evaluato
 
 Archive (soft-delete) an evaluator
 
-Permission `evaluations:manage`. Declared at `src/transport/evaluator.rest.ts:236`.
+Permission `evaluations:manage`. Declared at `src/transport/evaluator.rest.ts:238`.
 
 Answers at `/api/evaluators/:id`, `/api/v1/evaluators/:id`; also, undocumented, `/api/evaluators/2026-08-07/:id`, `/api/v1/evaluators/2026-08-07/:id`, `/api/evaluators/latest/:id`, `/api/v1/evaluators/latest/:id`.
 

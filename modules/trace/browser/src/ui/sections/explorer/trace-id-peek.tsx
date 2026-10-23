@@ -146,9 +146,9 @@ function TraceIdPeekButton({
 
   const handleOpenDrawer = (e: React.MouseEvent) => {
     e.stopPropagation();
-    // Forward the timestamp as the drawer's `t` partition hint so the
-    // opened drawer's per-trace reads prune partitions instead of
-    // walking every weekly partition by id.
+    // Forward the timestamp as the drawer's `t` hint so the opened
+    // drawer's per-trace reads prune partitions directly; without it
+    // the id index bounds them.
     openDrawer("traceV2Details", traceDrawerParams({ traceId, occurredAtMs, tenantId }));
   };
 

@@ -272,6 +272,8 @@ export interface InstanceIdentityView {
   readonly lastReportError?: string;
   readonly optionalMetricsOptOut: boolean;
   readonly hostnameOptOut: boolean;
+  /** The operator switched off sending a failed upgrade step's diagnostics automatically. */
+  readonly upgradeDiagnosticsOptOut: boolean;
 }
 
 /** One hosted service's answer in its two halves, since each refusal has its own remedy. */

@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Portable User use cases exposed to process peers and transports.
 
-Peers call these through the token, declared at `../contract/src/user.api.ts:56`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/user.api.ts:57`; nothing else in this package is public.
 
 #### `findById`
 
@@ -172,6 +172,22 @@ hasPassword(input: UserIdInput): Promise<boolean>;
 
 ```typescript
 setFirstPassword(input: SetFirstUserPasswordInput): Promise<SetFirstUserPasswordResult>;
+```
+
+#### `findPasswordHolders`
+
+Holders of a credential password, oldest id first; `emails` narrows to those addresses, matched in any case. Read by auth's require-password-reset task.
+
+```typescript
+findPasswordHolders(input: { emails: readonly string[] | null }): Promise<PasswordHolder[]>;
+```
+
+#### `markPasswordResetRequired`
+
+Marks these users' passwords as requiring a reset now; a mark already set keeps its time.
+
+```typescript
+markPasswordResetRequired(input: { userIds: readonly string[] }): Promise<{ marked: number }>;
 ```
 
 #### `getPasskeyOffer`
@@ -449,7 +465,7 @@ Contract `../contract/src/user.trpc.ts:39`, router `src/transport/user.trpc.ts:3
 ```typescript
 // user.getAvatarUrl
 type Input = z.infer<typeof userAvatarRestParamsSchema>; // ../contract/src/user-rest.schemas.ts:32
-// Output: userAvatarUrlSchema, ../contract/src/user.ts:383
+// Output: userAvatarUrlSchema, ../contract/src/user.ts:391
 interface Output {
   url: string;
 }
@@ -457,7 +473,7 @@ interface Output {
 // user.getTraceExplorerTourPreference
 // Input: userApiEmptyInputSchema, ../contract/src/user.schemas.ts:18
 type Input = Record<string, unknown>;
-// Output: userTourPreferenceSchema, ../contract/src/user.ts:274
+// Output: userTourPreferenceSchema, ../contract/src/user.ts:282
 interface Output {
   dismissed: boolean;
   dismissedAt: unknown | null;
@@ -465,14 +481,14 @@ interface Output {
 
 // user.dismissTraceExplorerTour
 type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:18
-type Output = z.infer<typeof userTourPreferenceSchema>; // ../contract/src/user.ts:274
+type Output = z.infer<typeof userTourPreferenceSchema>; // ../contract/src/user.ts:282
 
 // user.getNotificationPreference
 // Input: userApiNotificationTopicInputSchema, ../contract/src/user.schemas.ts:28
 interface Input {
   topic: "langy";
 }
-// Output: userNotificationPreferenceSchema, ../contract/src/user.ts:299
+// Output: userNotificationPreferenceSchema, ../contract/src/user.ts:307
 interface Output {
   topic: "langy";
   choice: "enabled" | "declined" | null;
@@ -484,7 +500,7 @@ interface Input {
   topic: "langy";
   choice: "enabled" | "declined";
 }
-type Output = z.infer<typeof userNotificationPreferenceSchema>; // ../contract/src/user.ts:299
+type Output = z.infer<typeof userNotificationPreferenceSchema>; // ../contract/src/user.ts:307
 
 // user.isAdmin
 type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:18
@@ -498,14 +514,14 @@ type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.sc
 
 // user.getSsoStatus
 type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:18
-// Output: userSsoStatusSchema, ../contract/src/user.ts:261
+// Output: userSsoStatusSchema, ../contract/src/user.ts:269
 interface Output {
   pendingSsoSetup: boolean;
 }
 
 // user.getAccountInfo
 type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:18
-// Output: userAccountInfoSchema, ../contract/src/user.ts:256
+// Output: userAccountInfoSchema, ../contract/src/user.ts:264
 interface Output {
   createdAt: unknown;
 }
@@ -521,7 +537,7 @@ type Output = {
 
 // user.secureAccountNudge
 type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:18
-// Output: userSecureAccountOfferSchema, ../contract/src/user.ts:511
+// Output: userSecureAccountOfferSchema, ../contract/src/user.ts:519
 interface Output {
   offer: boolean;
   passkey: boolean;
@@ -566,7 +582,7 @@ interface Input {
   organizationId: string;
   imageDataUrl: string;
 }
-// Output: userAvatarResultSchema, ../contract/src/user.ts:377
+// Output: userAvatarResultSchema, ../contract/src/user.ts:385
 interface Output {
   image: string;
 }

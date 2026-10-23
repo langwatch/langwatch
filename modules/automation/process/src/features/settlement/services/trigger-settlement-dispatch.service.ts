@@ -1,4 +1,5 @@
-import { type IntentContext, isDispatchError } from "@langwatch/eventing";
+import type { IntentContext } from "@langwatch/eventing";
+import { refusesRetry } from "@langwatch/group-queue";
 import { createLogger } from "@langwatch/observability";
 
 import type { AutomationNotificationDelivery } from "../../../channels/automation-notification-delivery.channel.ts";
@@ -12,6 +13,7 @@ import {
 import type { AutomationSettlementLedgerRepository } from "../../../repositories/automation-settlement-ledger.repository.ts";
 import type { AutomationSettlementTraceRepository } from "../../../repositories/automation-settlement-read.repository.ts";
 import type { AutomationClock } from "../../../repositories/automation.repositories.ts";
+import { isCustomerConfigurationRefusal } from "../../../rules/settlement-refusal.rules.ts";
 import type { AutomationWebhookProvider } from "../../../services/automation-webhook-secrets.service.ts";
 import type { AutomationProjectDirectory } from "../../../services/automation.service.ts";
 import type { AutomationEmailCapService } from "../../runaway/services/email-cap.service.ts";
@@ -108,11 +110,23 @@ export class AutomationSettlementDispatchService extends AutomationSettlementExe
     );
   }
 
+  /**
+   * One line per failure. A refusal the customer fixes in the automation is a
+   * warning and ends the dispatch; anything else is reported once through the
+   * process's error capture, and rethrown when another attempt could succeed.
+   */
   private rethrowIfRetryable(error: unknown, context: Record<string, unknown>): void {
-    const retryable = isDispatchError(error) ? error.retryable : true;
+    const retryable = !refusesRetry(error);
+    if (!retryable && isCustomerConfigurationRefusal(error)) {
+      logger.warn(
+        { ...context, code: error.code, fault: error.fault, error: error.message },
+        "Settlement dispatch refused by the automation's saved configuration; not retrying",
+      );
+      return;
+    }
+
     const handled = error instanceof Error ? error : new Error(String(error));
-    logger.error({ ...context, retryable, error: handled.message }, "Settlement dispatch failed");
-    this.composition.observability.capture(handled, context);
+    this.composition.observability.capture(handled, { ...context, retryable });
     if (retryable) {
       throw error;
     }

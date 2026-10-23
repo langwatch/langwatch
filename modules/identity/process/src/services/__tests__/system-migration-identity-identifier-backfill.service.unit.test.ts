@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { MemoryIdentityLatchRepository } from "../../repositories/memory/memory.identity-latch.repository.ts";
 import { MemoryIdentityStore } from "../../repositories/memory/memory.identity.store.ts";
 import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../../rules/identity-migration-names.rules.ts";
+import type { IdentityBackfillOutcome } from "../identity-backfill.service.ts";
 import { IdentityIdentifierBackfillMigrationService } from "../system-migration-identity-identifier-backfill.service.ts";
 
 describe("the identifier backfill migration", () => {
@@ -27,6 +28,45 @@ describe("the identifier backfill migration", () => {
         status: "migrated",
         report: { kind: "parity", diffs: [] },
       });
+    });
+  });
+
+  describe("when the backfill holds a user", () => {
+    function holding(outcome: Extract<IdentityBackfillOutcome, { status: "migrated" }>) {
+      const migrateUser = vi.fn(async (): Promise<IdentityBackfillOutcome> => outcome);
+      return IdentityIdentifierBackfillMigrationService.create({
+        latch: MemoryIdentityLatchRepository.create(MemoryIdentityStore.create()),
+        backfill: { migrateUser },
+        maxQueuedJobs: 5_000,
+      });
+    }
+
+    /** @scenario "The identifier backfill holds an unproven account on the person and a disagreeing proof on the proof" */
+    it("holds an unproven account on the person", async () => {
+      const outcome = await holding({
+        status: "migrated",
+        report: { kind: "unproven_account" },
+      }).migrateTenant({
+        tenantId: "user_sam",
+      });
+
+      expect(outcome).toEqual({
+        status: "migrated",
+        report: { kind: "unproven_account" },
+        heldReason: "person",
+      });
+    });
+
+    /** @scenario "The identifier backfill holds an unproven account on the person and a disagreeing proof on the proof" */
+    it("leaves a disagreeing proof on the default reason", async () => {
+      const outcome = await holding({
+        status: "migrated",
+        report: { kind: "parity", diffs: [] },
+      }).migrateTenant({
+        tenantId: "user_kim",
+      });
+
+      expect(outcome).not.toHaveProperty("heldReason");
     });
   });
 

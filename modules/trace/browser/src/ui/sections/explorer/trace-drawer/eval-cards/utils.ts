@@ -79,6 +79,7 @@ export type EvalEntry = EvalSummary & {
   errorMessage?: string;
   errorStacktrace?: string[];
   retries?: number;
+  attempts?: number;
   executionTime?: number;
   evalCost?: number;
   runHistory?: EvalRunHistoryEntry[];

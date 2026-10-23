@@ -115,6 +115,7 @@ export { opsOperatorsTrpc } from "./ops-operators.trpc.ts";
 export { opsProcessTrpc } from "./features/process/ops-process.trpc.ts";
 export { opsQueueTrpc } from "./features/queue/ops-queue.trpc.ts";
 export * from "./features/migrations/ops-upgrade.ts";
+export * from "./features/migrations/ops-upgrade-diagnostics.ts";
 export * from "./features/migrations/ops-upgrade.errors.ts";
 export * from "./ops.config.ts";
 export * from "./usage-report.ts";
@@ -124,9 +125,12 @@ export * from "./features/checkup/checkup-usage-report.ts";
 export {
   checkupAnswerSchema,
   checkupTrpc,
+  upgradeDiagnosticsAutoSendAnswerSchema,
   usageReportAnswerSchema,
   type CheckupAnswer,
+  type UpgradeDiagnosticsAutoSendAnswer,
   type UsageReportAnswer,
   type CheckupAnswerSchema,
+  type UpgradeDiagnosticsAutoSendAnswerSchema,
   type UsageReportAnswerSchema,
 } from "./features/checkup/checkup.trpc.ts";

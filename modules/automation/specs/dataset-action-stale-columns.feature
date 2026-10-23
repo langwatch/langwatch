@@ -27,7 +27,8 @@ Feature: An automation's dataset action against a dataset whose columns changed
   Scenario: A dataset that is gone or archived is not retried
     Given an automation that appends matched traces to a dataset
     When the dataset is gone or archived
-    Then the dispatch fails as terminal and is not redelivered
+    Then the refusal carries the code "automation_dataset_unavailable" with customer fault
+    And the dispatch fails as terminal and is not redelivered
 
   @unit
   Scenario: A row left with no dataset column is not written
