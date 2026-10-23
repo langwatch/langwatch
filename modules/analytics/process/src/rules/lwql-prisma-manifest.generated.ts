@@ -579,6 +579,7 @@ export interface LwqlPrismaRows {
     readonly name: "String";
     readonly slug: "String";
     readonly apiKey: "String";
+    readonly legacyApiKeyLastUsedAt: "DateTime?";
     readonly lwqlKey: "String";
     readonly teamId: "String";
     readonly language: "String";

@@ -188,6 +188,7 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
   .withParams(evaluatorParamsSchema)
   .withInput(z.looseObject({}), { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
   .withPermission("evaluations:manage")
+  .withLegacyKeyScope("legacy_project_key_evaluations", "legacy_project_key_experiments")
   .withBodyLimit({ maxBytes: EVALUATE_MAX_BYTES })
   .withResponse("protocol", {
     produces: PRODUCES_JSON,
@@ -223,6 +224,7 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
   .withParams(namespacedEvaluatorParamsSchema)
   .withInput(z.looseObject({}), { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
   .withPermission("evaluations:manage")
+  .withLegacyKeyScope("legacy_project_key_evaluations", "legacy_project_key_experiments")
   .withBodyLimit({ maxBytes: EVALUATE_MAX_BYTES })
   .withResponse("protocol", {
     produces: PRODUCES_JSON,
@@ -254,6 +256,7 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
   .withParams(evaluatorParamsSchema)
   .withInput(z.looseObject({}), { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
   .withPermission("evaluations:manage")
+  .withLegacyKeyScope("legacy_project_key_evaluations")
   .withBodyLimit({ maxBytes: EVALUATE_MAX_BYTES })
   .withResponse("protocol", {
     produces: PRODUCES_JSON,

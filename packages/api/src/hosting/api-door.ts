@@ -124,7 +124,11 @@ export type RestIdentity = Readonly<{
      * resolves and before the permission, with `KeyKindRefusedError`. Absent admits every kind.
      */
     keyKinds?: readonly RestKeyKind[];
+    /** The legacy key scope flags the route names (`withLegacyKeyScope`); project door only. */
+    legacyKeyScopes?: readonly string[];
   }): Promise<RestCaller> | RestCaller;
+  /** Every legacy key scope flag this door knows; a route naming another is refused at mount. */
+  legacyKeyScopes?: readonly string[];
   /**
    * The door, opened with no permission asked of it. Only a declaration
    * carrying an `anyAuthenticated` route needs it, and a mount that supplies

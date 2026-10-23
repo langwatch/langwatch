@@ -170,6 +170,7 @@ const organizationCredentials = new WeakMap<Request, RestResolvedOrganizationCre
 const scimCredentials = new WeakMap<Request, RestResolvedScimCredential>();
 const keyCredentials = new WeakMap<Request, RestKeyDoorPrincipal>();
 const browserCallers = new WeakMap<Request, RestBrowserCaller>();
+const routeTemplates = new WeakMap<Request, string>();
 
 /** The project door states what it resolved, once per request. */
 export function recordProjectCredential(
@@ -203,6 +204,16 @@ export function recordKeyCredential(request: Request, credential: RestKeyDoorPri
 /** The byte door states who it verified, once per request. */
 export function recordBrowserCaller(request: Request, caller: RestBrowserCaller): void {
   browserCallers.set(request, caller);
+}
+
+/** The runtime states the route a request matched, as `METHOD /path/:template`, before its door. */
+export function recordRouteTemplate(request: Request, template: string): void {
+  routeTemplates.set(request, template);
+}
+
+/** The route template the runtime recorded, never the concrete URL; outside a route, says so. */
+export function routeTemplateOf(request: Request): string {
+  return routeTemplates.get(request) ?? `${request.method} (no route template)`;
 }
 
 /**

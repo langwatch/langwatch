@@ -173,6 +173,7 @@ export function createEvaluatorRest(): Readonly<{
 
       .get("/", "getApiEvaluators")
       .withPermission("evaluations:view")
+      .withLegacyKeyScope("legacy_project_key_evaluations")
       .withOutput(z.array(evaluatorWireSchema))
       .withDocs({ description: "Get all evaluators for a project" })
       .withMiddlewareContext(projectRequestContext)
@@ -188,6 +189,7 @@ export function createEvaluatorRest(): Readonly<{
       .get("/:idOrSlug", "getApiEvaluatorsByIdOrSlug")
       .withParams(evaluatorIdOrSlugParamsSchema)
       .withPermission("evaluations:view")
+      .withLegacyKeyScope("legacy_project_key_evaluations")
       .withOutput(evaluatorWireSchema)
       .withDocs({
         description: "Get a specific evaluator by ID or slug",
