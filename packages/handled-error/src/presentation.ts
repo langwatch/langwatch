@@ -532,7 +532,7 @@ const presentations = {
   lwql_table_modifier_unsupported: {
     title: "FINAL and SAMPLE can't be used here",
     describe: () =>
-      "This read keeps each project to its own dates, and that can't be combined with FINAL or SAMPLE. The datasets already keep one row per item, so remove them and run it again.",
+      "FINAL and SAMPLE can't be used on this read: a read that keeps each project to its own dates, or a view over PostgreSQL data, supports neither. The datasets already keep one row per item, so remove them and run it again.",
   },
   lwql_view_shadowed: {
     title: "A WITH name repeats a view's name",

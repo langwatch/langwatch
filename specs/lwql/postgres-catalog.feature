@@ -228,3 +228,9 @@ Feature: Every catalogued Postgres model is queryable through LangWatchQL
       When ana runs a statement that reads a Postgres view with FINAL or SAMPLE
       Then the run is refused saying FINAL and SAMPLE cannot be used on this read
       And no statement reaches the store
+
+    @unit
+    Scenario: A pass over a PostgreSQL-resident view with FINAL is refused too
+      When an instant-eval pass runs a statement that reads a Postgres view with FINAL
+      Then the pass is refused saying FINAL and SAMPLE cannot be used on this read
+      And no statement reaches the store

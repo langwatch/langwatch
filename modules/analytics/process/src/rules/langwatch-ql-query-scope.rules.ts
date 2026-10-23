@@ -204,7 +204,7 @@ function postgresReferences({
  * A statement that does not parse is left for the validator to refuse, as before.
  * @throws {LangWatchQLTableModifierError} naming the modifiers written.
  */
-function assertNoPostgresTableModifiers({
+export function assertNoPostgresTableModifiers({
   sql,
   views,
   database,
