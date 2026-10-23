@@ -167,7 +167,7 @@ export class WorkflowsApiService {
    */
   async run(
     workflowId: string,
-    options: Omit<RunWithResultsOptions, "concurrency"> & { versionId?: string } = {},
+    options: RunWithResultsOptions & { versionId?: string } = {},
   ): Promise<ExperimentRunWithResults> {
     const body: WorkflowEvaluateRequest = {};
     if (options.versionId !== undefined) body.version_id = options.versionId;

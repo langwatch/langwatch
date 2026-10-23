@@ -20,6 +20,7 @@ import {
   ExperimentRunFailedError,
 } from "./platformErrors";
 import type {
+  ExperimentConcurrencyOptions,
   ExperimentRunResult,
   RunExperimentOptions,
   RunWithResultsOptions,
@@ -83,7 +84,10 @@ export class ExperimentsFacade {
    * summary and exits with code 1 on failure, unless `exitOnFailure: false`.
    * @param slug - The slug of the experiment (found in the experiment URL)
    */
-  async run(slug: string, options?: RunExperimentOptions): Promise<ExperimentRunResult> {
+  async run(
+    slug: string,
+    options?: RunExperimentOptions & ExperimentConcurrencyOptions,
+  ): Promise<ExperimentRunResult> {
     this.config.logger.info(`Running platform experiment: ${slug}`);
     const result = await this.runWithPolling(slug, options);
     return result;
@@ -96,7 +100,7 @@ export class ExperimentsFacade {
    */
   async runWithResults(
     slug: string,
-    options: RunWithResultsOptions = {},
+    options: RunWithResultsOptions & ExperimentConcurrencyOptions = {},
   ): Promise<ExperimentRunWithResults> {
     this.config.logger.info(`Running platform experiment with results: ${slug}`);
 
@@ -151,7 +155,7 @@ export class ExperimentsFacade {
    */
   private async runWithPolling(
     slug: string,
-    options: RunExperimentOptions = {},
+    options: RunExperimentOptions & ExperimentConcurrencyOptions = {},
   ): Promise<ExperimentRunResult> {
     const pollInterval = options.pollInterval ?? DEFAULT_POLL_INTERVAL;
     const timeout = options.timeout ?? DEFAULT_TIMEOUT;

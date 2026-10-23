@@ -40,14 +40,20 @@ export type ExperimentRunSummary = {
 };
 
 /**
- * Options for running a platform experiment
+ * Experiment-only run options: the workflow evaluate endpoint has no such field.
  */
-export type RunExperimentOptions = {
+export type ExperimentConcurrencyOptions = {
   /**
    * Cells (one row against one target) run at once for this run only, 1 to 24; the
    * experiment's saved setting is untouched. Defaults to the server's. 1 runs them in order.
    */
   concurrency?: number;
+};
+
+/**
+ * Options for running a platform experiment
+ */
+export type RunExperimentOptions = {
   /**
    * Polling interval in milliseconds (default: 2000)
    */
