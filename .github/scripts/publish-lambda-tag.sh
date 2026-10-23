@@ -13,7 +13,10 @@
 #   IMAGE_TAG        the tag to publish, e.g. git-<short sha>
 #   IMAGE_WAS_BUILT  "true" when build-and-push-lambda rebuilt this image this run
 #                    (it pushed IMAGE_TAG itself); otherwise the newest bare
-#                    `git-<sha>` image is re-tagged as IMAGE_TAG
+#                    `git-<sha>` image whose commit is an ancestor of HEAD_COMMIT
+#                    is re-tagged as IMAGE_TAG
+#   HEAD_COMMIT      the commit being published (default HEAD); needs its history
+#                    in the working directory's repository
 #   IS_RELEASE       "true" to also write VERSION
 #   VERSION          the release version tag
 set -euo pipefail
@@ -23,6 +26,7 @@ image="${1:?repository name required}"
 IMAGE_WAS_BUILT="${IMAGE_WAS_BUILT:-false}"
 IS_RELEASE="${IS_RELEASE:-false}"
 VERSION="${VERSION:-}"
+HEAD_COMMIT="${HEAD_COMMIT:-HEAD}"
 
 is_single_manifest() {
   case "$1" in
@@ -64,15 +68,30 @@ if [ "${IMAGE_WAS_BUILT}" = "true" ]; then
     exit 1
   fi
 else
-  # Not rebuilt: re-tag the newest bare `git-<sha>` image. awk reads to the end:
-  # exiting early SIGPIPEs `tr`.
+  # Not rebuilt: re-tag the newest bare `git-<sha>` image built from an ancestor
+  # of this commit. Images pushed from other lines of history (a release rebuilt
+  # from an older commit, say) are skipped: re-tagging one would publish code
+  # this commit does not contain.
   candidates=$(aws ecr describe-images --repository-name "${image}" \
     --query 'reverse(sort_by(imageDetails, &imagePushedAt))[].imageTags[]' \
-    --output text)
-  previous=$(printf '%s' "${candidates}" | tr '\t' '\n' \
-    | awk '/^git-[0-9a-f]+$/ && !found { print; found=1 }')
+    --output text | tr '\t' '\n')
+  # A shallow clone would make every candidate look unrelated.
+  if [ "$(git rev-parse --is-shallow-repository 2>/dev/null)" != "false" ] \
+      || ! git rev-parse --verify --quiet "${HEAD_COMMIT}^{commit}" >/dev/null; then
+    echo "::error::the history of ${HEAD_COMMIT} is not available; check out with full history to choose a previous ${image} image"
+    exit 1
+  fi
+  previous=""
+  while IFS= read -r tag; do
+    [[ "${tag}" =~ ^git-[0-9a-f]+$ ]] || continue
+    commit=$(git rev-parse --verify --quiet "${tag#git-}^{commit}" 2>/dev/null) || continue
+    if git merge-base --is-ancestor "${commit}" "${HEAD_COMMIT}" 2>/dev/null; then
+      previous="${tag}"
+      break
+    fi
+  done <<<"${candidates}"
   if [ -z "${previous}" ]; then
-    echo "::warning::${image} has no previous git-* image to re-tag as ${IMAGE_TAG}; run this workflow via workflow_dispatch to seed it"
+    echo "::warning::${image} has no previous git-* image from an ancestor commit to re-tag as ${IMAGE_TAG}; run this workflow via workflow_dispatch to seed it"
     exit 0
   fi
   # Checked rather than assumed, so an index never reaches a function.

@@ -5,7 +5,8 @@ Feature: Publish every deployable image to the artifacts registry
 
   # These scenarios describe .github/workflows/publish-docker-ecr.yml. How a
   # Lambda image gets its tag is .github/scripts/publish-lambda-tag.sh, bound
-  # by .github/scripts/__tests__/publish-lambda-tag.test.sh. The rest is the
+  # by .github/scripts/__tests__/publish-lambda-tag.test.sh. The path filters
+  # are bound by .github/scripts/__tests__/publish-ecr-filters.test.sh. The rest is the
   # workflow's own build steps, which no test suite can run: those scenarios
   # are @unimplemented and are proved by the first run on main.
 
@@ -29,6 +30,18 @@ Feature: Publish every deployable image to the artifacts registry
     When publish-docker-ecr runs for that commit
     Then each langwatch-eval-<package> image gets the git-<short sha> tag of that commit
     And the tag names the manifest the image already had, with no rebuild
+
+  @unit
+  Scenario: An image the commit did not change is re-tagged only from an ancestor commit
+    Given the newest git-<sha> image of an evaluator was built from a commit the published commit does not contain
+    When publish-docker-ecr re-tags that image for a commit that did not change it
+    Then the commit tag names the newest image built from an ancestor of that commit
+
+  @unit
+  Scenario: A .dockerignore change rebuilds every image
+    Given a merge to main changes .dockerignore
+    When publish-docker-ecr selects the images to build
+    Then every image is rebuilt, because every build reads the repository root as its context
 
   @unimplemented
   Scenario: A failed Lambda build does not hold back the service images

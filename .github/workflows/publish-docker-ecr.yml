@@ -246,6 +246,7 @@ jobs:
               - 'packages/ksuid-python/**'
               - '*/go.mod'
               - '*/go.sum'
+              - '.dockerignore'
               - '.github/workflows/publish-docker-ecr.yml'
             langwatch-nlp-lambda:
               - 'infra/docker/Dockerfile.langwatch_nlp.lambda'
@@ -259,6 +260,7 @@ jobs:
               - 'sdks/python/**'
               - 'packages/ksuid-python/**'
               - 'infra/clickhouse-serverless/go.*'
+              - '.dockerignore'
               - '.github/workflows/publish-docker-ecr.yml'
             langwatch-langy-agent:
               - 'infra/docker/Dockerfile.langyagent'
@@ -291,11 +293,13 @@ jobs:
               - 'infra/docker/Dockerfile.langevals.lambda'
               - 'services/langevals/**'
               - 'modules/model-provider/contract/src/catalog/model-catalog*.json'
+              - '.dockerignore'
               - '.github/workflows/publish-docker-ecr.yml'
             langwatch-langevals:
               - 'infra/docker/Dockerfile.langevals'
               - 'services/langevals/**'
               - 'modules/model-provider/contract/src/catalog/model-catalog*.json'
+              - '.dockerignore'
               - '.github/workflows/publish-docker-ecr.yml'
             langwatch-gateway:
               - 'infra/docker/Dockerfile.go_service'
@@ -305,6 +309,7 @@ jobs:
               - 'sdks/go/**'
               - '*/go.mod'
               - '*/go.sum'
+              - '.dockerignore'
               - '.github/workflows/publish-docker-ecr.yml'
 
       - name: Select the images to build
@@ -664,12 +669,16 @@ jobs:
       contents: read
       id-token: write # OIDC assume-role into the artifacts account
     steps:
-      # Only the Lambda tag script is read from the tree.
+      # Only the Lambda tag script is read from the tree. The full commit
+      # history (without file contents) lets it re-tag only images built from
+      # an ancestor of this commit.
       - name: Checkout the publish scripts
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           persist-credentials: false
           sparse-checkout: .github/scripts
+          fetch-depth: 0
+          filter: blob:none
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
