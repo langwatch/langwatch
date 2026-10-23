@@ -6,7 +6,8 @@ Feature: Publish every deployable image to the artifacts registry
   # These scenarios describe .github/workflows/publish-docker-ecr.yml. How a
   # Lambda image gets its tag is .github/scripts/publish-lambda-tag.sh, bound
   # by .github/scripts/__tests__/publish-lambda-tag.test.sh. The path filters
-  # are bound by .github/scripts/__tests__/publish-ecr-filters.test.sh. The rest is the
+  # are bound by .github/scripts/__tests__/publish-ecr-filters.test.sh, and where a Lambda
+  # image starts by tools/ciguard/lambdaworkdir_test.go. The rest is the
   # workflow's own build steps, which no test suite can run: those scenarios
   # are @unimplemented and are proved by the first run on main.
 

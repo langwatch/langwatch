@@ -1343,9 +1343,6 @@ jobs:
       - name: Test nearest-ancestor-tag.sh
         run: bash .github/scripts/__tests__/nearest-ancestor-tag.test.sh
 
-      - name: Test Lambda Dockerfiles start where Lambda's user can enter
-        run: bash .github/scripts/__tests__/lambda-dockerfiles.test.sh
-
       - name: Test detect-changes-source.sh
         run: bash .github/scripts/__tests__/detect-changes-source.test.sh
 
