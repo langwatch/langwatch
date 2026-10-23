@@ -396,7 +396,7 @@ describe("ProcessManagerService", () => {
   });
 
   describe("given a concurrent commit bumps the revision mid-handling", () => {
-    /** Makes the next `count` reads race a competing commit that lands before the service writes. */
+    /** Makes the next `count` reads race a competing commit that lands before the write. */
     function interleaveCompetingCommits(count: number): { competingCommits: () => number } {
       const originalFindByRef = store.findByRef.bind(store);
       let committed = 0;
