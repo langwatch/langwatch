@@ -7,6 +7,7 @@
 
 import {
   estimateJudgedTextTokens,
+  instantEvalQuestionTokens,
   INSTANT_EVAL_JUDGE_ARITHMETIC_SLOT,
   INSTANT_EVAL_JUDGE_MODES,
   instantEvalJudgeEntryBackends,
@@ -18,7 +19,11 @@ import {
   type InstantEvalJudgeRouteEntry,
   type InstantEvalJudgeRouteSlot,
   type InstantEvalJudgeRouteTable,
+  type InstantEvalQuestion,
+  type InstantEvalSkipReason,
 } from "@langwatch/instant-eval-judge-contract";
+
+import type { InstantEvalPermit } from "../channels/instant-eval-classifier.channel.ts";
 
 export interface InstantEvalJudgeRoutePlan {
   readonly job: InstantEvalJudgeJob;
@@ -263,4 +268,77 @@ const ARITHMETIC_PATTERN = new RegExp(
 
 export function isArithmeticQuestion(instructions: string): boolean {
   return ARITHMETIC_PATTERN.test(instructions);
+}
+
+/** P(yes) per question one backend answered, or why it could not. */
+export type InstantEvalJudgeLeg =
+  | Readonly<{
+      outcome: "answered";
+      backend: string;
+      probabilities: ReadonlyMap<string, number>;
+      isTextTruncated: boolean;
+      limiterWaitMs: number;
+    }>
+  | Readonly<{ outcome: "failed"; reason: InstantEvalSkipReason; error?: unknown }>;
+
+export type InstantEvalJudgeAnsweredLeg = Extract<InstantEvalJudgeLeg, { outcome: "answered" }>;
+
+export function isInstantEvalJudgeLegAnswered(
+  leg: InstantEvalJudgeLeg,
+): leg is InstantEvalJudgeAnsweredLeg {
+  return leg.outcome === "answered";
+}
+
+/** Only yes-or-no questions are routed. */
+export function isInstantEvalBooleanQuestion(
+  question: InstantEvalQuestion,
+): question is InstantEvalBooleanQuestion {
+  return question.kind === "boolean";
+}
+
+/** Per question the first leg (or `pick`) holding an answer supplies the verdict. */
+export function instantEvalRoutedVerdictsOf({
+  questions,
+  legs,
+  pick,
+}: {
+  questions: readonly InstantEvalBooleanQuestion[];
+  legs: readonly InstantEvalJudgeAnsweredLeg[];
+  pick?: ((questionId: string) => InstantEvalJudgeAnsweredLeg | undefined) | undefined;
+}): {
+  verdicts: { questionId: string; probability: number }[];
+  answeredBy: Record<string, number>;
+} {
+  const answeredBy: Record<string, number> = {};
+  const verdicts: { questionId: string; probability: number }[] = [];
+  for (const question of questions) {
+    const leg = pick?.(question.id) ?? legs.find((l) => l.probabilities.has(question.id));
+    const probability = leg?.probabilities.get(question.id);
+    if (!leg || probability === undefined) continue;
+    verdicts.push({ questionId: question.id, probability });
+    answeredBy[leg.backend] = (answeredBy[leg.backend] ?? 0) + 1;
+  }
+  return { verdicts, answeredBy };
+}
+/** One send's ask of the limiter: a tenant share per leg kind, under the shared global cap. */
+export function instantEvalJudgeLegPermitOf({
+  projectId,
+  pool,
+  text,
+  questions,
+}: {
+  projectId: string;
+  pool: "decisions" | "llm";
+  text: string;
+  questions: readonly InstantEvalBooleanQuestion[];
+}): InstantEvalPermit {
+  return {
+    tokens: estimateJudgedTextTokens({ text }) + instantEvalQuestionTokens(questions),
+    tenantId: `${projectId}:${pool}`,
+  };
+}
+
+/** A leg's own timeout or the stop it caused, as the channels and the limiter throw it. */
+export function isInstantEvalJudgeLegStop(error: unknown): boolean {
+  return error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
 }

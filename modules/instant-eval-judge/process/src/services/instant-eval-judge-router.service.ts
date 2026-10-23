@@ -6,38 +6,42 @@
  */
 
 import {
-  estimateJudgedTextTokens,
-  instantEvalCostUsd,
   InstantEvalJudgeStoppedError,
-  instantEvalQuestionTokens,
   instantEvalSkipped,
-  NANO_USD_PER_USD,
   type InstantEvalBooleanQuestion,
   type InstantEvalClassification,
   type InstantEvalJudgeRoute,
   type InstantEvalJudgeRoutePricing,
   type InstantEvalJudgeRouteTable,
   type InstantEvalJudgement,
-  type InstantEvalQuestion,
   type InstantEvalSkipReason,
 } from "@langwatch/instant-eval-judge-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
-import { nowInstant } from "@langwatch/time";
 
 import type {
   InstantEvalClassifierChannel,
-  InstantEvalPermit,
   InstantEvalRateLimiter,
 } from "../channels/instant-eval-classifier.channel.ts";
 import type { InstantEvalHostedDecisionsChannel } from "../channels/instant-eval-hosted-decisions.channel.ts";
 import type { InstantEvalLlmJudgeChannel } from "../channels/instant-eval-llm-judge.channel.ts";
-import { instantEvalJudgeCallCostOf } from "../rules/instant-eval-judge-route-cost.rules.ts";
 import {
+  instantEvalJudgeCallCostOf,
+  instantEvalJudgeClassifierCostOf,
+} from "../rules/instant-eval-judge-route-cost.rules.ts";
+import {
+  instantEvalJudgeLegPermitOf,
   instantEvalJudgeRoutePlanOf,
+  instantEvalRoutedVerdictsOf,
   instantEvalVerdictConfidence,
+  isInstantEvalBooleanQuestion,
+  isInstantEvalJudgeLegAnswered,
+  isInstantEvalJudgeLegStop,
   isUnsureVerdict,
+  type InstantEvalJudgeAnsweredLeg,
+  type InstantEvalJudgeLeg as Leg,
   type InstantEvalJudgeRoutePlan,
 } from "../rules/instant-eval-judge-route.rules.ts";
+import { InstantEvalJudgeLegDeadlineService } from "./instant-eval-judge-leg-deadline.service.ts";
 
 const defaultLogger: Logger = createLogger("langwatch:instant-eval-judge:router");
 
@@ -56,17 +60,6 @@ type RoutedClassification = Omit<InstantEvalClassification, "route" | "decisionM
   readonly route: InstantEvalJudgeRoute;
 };
 
-/** P(yes) per question one backend answered, or why it could not. */
-type Leg =
-  | Readonly<{
-      outcome: "answered";
-      backend: string;
-      probabilities: ReadonlyMap<string, number>;
-      isTextTruncated: boolean;
-      limiterWaitMs: number;
-    }>
-  | Readonly<{ outcome: "failed"; reason: InstantEvalSkipReason; error?: unknown }>;
-
 export class InstantEvalJudgeRouterService {
   private readonly logger: Pick<Logger, "error">;
 
@@ -84,7 +77,7 @@ export class InstantEvalJudgeRouterService {
    */
   async classify(input: RoutedClassification): Promise<InstantEvalJudgement> {
     const { projectId, text, questions, signal, route } = input;
-    const booleans = questions.filter(isBooleanQuestion);
+    const booleans = questions.filter(isInstantEvalBooleanQuestion);
     if (booleans.length !== questions.length) {
       return this.unrouted({ projectId, text, questions, signal });
     }
@@ -110,23 +103,13 @@ export class InstantEvalJudgeRouterService {
       { projectId, text, questions, limiter },
       ...(signal ? [signal] : []),
     );
-    return { ...judgement, costNanoUsd: this.classifierCostNanoUsd(judgement.inputTokens) };
-  }
-
-  /** The hosted classifier's cost: its backend's routed price, else the published rate. */
-  private classifierCostNanoUsd(inputTokens: number): number {
     const { table, pricing } = this.deps;
-    for (const [backend, config] of Object.entries(table.backends)) {
-      if (config.kind !== "jev") continue;
-      const cost = instantEvalJudgeCallCostOf({ backend, inputTokens, outputTokens: 0, pricing });
-      if (cost.outcome === "priced") return cost.costNanoUsd;
-    }
-    return Math.round(instantEvalCostUsd({ inputTokens }) * NANO_USD_PER_USD);
+    const { inputTokens } = judgement;
+    return {
+      ...judgement,
+      costNanoUsd: instantEvalJudgeClassifierCostOf({ table, pricing, inputTokens }),
+    };
   }
-}
-
-function isBooleanQuestion(question: InstantEvalQuestion): question is InstantEvalBooleanQuestion {
-  return question.kind === "boolean";
 }
 
 /** One routed call's legs, the calls they paid for and what the routing reports. */
@@ -189,7 +172,7 @@ class RouteRun {
     first,
   }: {
     questions: readonly InstantEvalBooleanQuestion[];
-    first: Extract<Leg, { outcome: "answered" }>;
+    first: InstantEvalJudgeAnsweredLeg;
   }): Promise<InstantEvalJudgement> {
     const { escalateTo, threshold } = this.plan;
     const unsure =
@@ -227,9 +210,9 @@ class RouteRun {
     ]);
     if (a.outcome === "failed" && b.outcome === "failed") return this.nothingAnswered(a);
     if (a.outcome === "failed" || b.outcome === "failed") {
-      return this.result({ questions, legs: [a, b].filter(isAnswered) });
+      return this.result({ questions, legs: [a, b].filter(isInstantEvalJudgeLegAnswered) });
     }
-    const winners = new Map<string, Extract<Leg, { outcome: "answered" }>>();
+    const winners = new Map<string, InstantEvalJudgeAnsweredLeg>();
     for (const question of questions) {
       const pa = instantEvalVerdictConfidence(a.probabilities.get(question.id));
       const pb = instantEvalVerdictConfidence(b.probabilities.get(question.id));
@@ -286,7 +269,7 @@ class RouteRun {
         timeoutMs: config.timeoutMs,
       });
     }
-    const deadline = LegDeadline.start(config.timeoutMs);
+    const deadline = InstantEvalJudgeLegDeadlineService.create(config.timeoutMs);
     try {
       return await this.askDecisionModel({
         backend,
@@ -297,7 +280,8 @@ class RouteRun {
       });
     } catch (error) {
       if (this.signal?.aborted) throw error;
-      if (!isStop(error)) return { outcome: "failed", reason: "classifier_failed", error };
+      if (!isInstantEvalJudgeLegStop(error))
+        return { outcome: "failed", reason: "classifier_failed", error };
       this.flags.push(`${backend}_timed_out`);
       return { outcome: "failed", reason: "classifier_provider_unavailable" };
     } finally {
@@ -316,7 +300,7 @@ class RouteRun {
     kind: "jev" | "decisions";
     model: string | undefined;
     questions: readonly InstantEvalBooleanQuestion[];
-    deadline: LegDeadline;
+    deadline: InstantEvalJudgeLegDeadlineService;
   }): Promise<Leg> {
     const text = this.textFor({ backend, kind });
     const judgement = await this.callDecisionModel({ kind, model, text, questions, deadline });
@@ -358,7 +342,7 @@ class RouteRun {
     model: string | undefined;
     text: string;
     questions: readonly InstantEvalBooleanQuestion[];
-    deadline: LegDeadline;
+    deadline: InstantEvalJudgeLegDeadlineService;
   }): Promise<InstantEvalJudgement | undefined> {
     const { classifier, hostedDecisions } = this.deps;
     const signal = deadline.signalWith(this.signal);
@@ -367,7 +351,10 @@ class RouteRun {
       return classifier?.classify({ projectId: this.projectId, text, questions, limiter }, signal);
     }
     if (!hostedDecisions || !model) return undefined;
-    await limiter.acquire(this.permitOf({ pool: "decisions", text, questions }));
+    const { projectId } = this;
+    await limiter.acquire(
+      instantEvalJudgeLegPermitOf({ projectId, pool: "decisions", text, questions }),
+    );
     return hostedDecisions.classify({ text, questions, model }, signal);
   }
 
@@ -382,22 +369,6 @@ class RouteRun {
     if (allowed.includes(kind)) return text;
     this.flags.push(`${inputView}_view_refused:${backend}`);
     return fullText;
-  }
-
-  /** One send's ask of the limiter: a tenant share per leg kind, under the shared global cap. */
-  private permitOf({
-    pool,
-    text,
-    questions,
-  }: {
-    pool: "decisions" | "llm";
-    text: string;
-    questions: readonly InstantEvalBooleanQuestion[];
-  }): InstantEvalPermit {
-    return {
-      tokens: estimateJudgedTextTokens({ text }) + instantEvalQuestionTokens(questions),
-      tenantId: `${this.projectId}:${pool}`,
-    };
   }
 
   /** One LLM call per question, in parallel; a verdict reads as P(yes) of one or zero. */
@@ -421,7 +392,12 @@ class RouteRun {
       questions.map(async (question) => {
         // Each question is a send of the full text, so each one draws on the limiter.
         await this.deps.limiter.acquire(
-          this.permitOf({ pool: "llm", text, questions: [question] }),
+          instantEvalJudgeLegPermitOf({
+            projectId: this.projectId,
+            pool: "llm",
+            text,
+            questions: [question],
+          }),
           this.signal,
         );
         return this.deps.llmJudge.judge(
@@ -483,7 +459,7 @@ class RouteRun {
     return { ...instantEvalSkipped(leg.reason), ...this.spent(), routing: this.routing({}) };
   }
 
-  /** Per question the first leg (or `pick`) holding an answer supplies the verdict. */
+  /** The verdicts the legs supplied; a pair's legs waited side by side, so the longer wait. */
   private result({
     questions,
     legs,
@@ -491,23 +467,16 @@ class RouteRun {
     pick,
   }: {
     questions: readonly InstantEvalBooleanQuestion[];
-    legs: readonly Extract<Leg, { outcome: "answered" }>[];
+    legs: readonly InstantEvalJudgeAnsweredLeg[];
     escalated?: number;
-    pick?: (questionId: string) => Extract<Leg, { outcome: "answered" }> | undefined;
+    pick?: (questionId: string) => InstantEvalJudgeAnsweredLeg | undefined;
   }): InstantEvalJudgement {
-    const answeredBy: Record<string, number> = {};
-    const verdicts = [];
-    for (const question of questions) {
-      const leg = pick?.(question.id) ?? legs.find((l) => l.probabilities.has(question.id));
-      const probability = leg?.probabilities.get(question.id);
-      if (!leg || probability === undefined) continue;
-      verdicts.push({ questionId: question.id, probability });
-      answeredBy[leg.backend] = (answeredBy[leg.backend] ?? 0) + 1;
-    }
+    const { verdicts, answeredBy } = instantEvalRoutedVerdictsOf({ questions, legs, pick });
+    const waits = legs.map((leg) => leg.limiterWaitMs);
     return {
       verdicts,
       isTextTruncated: legs.some((leg) => leg.isTextTruncated),
-      limiterWaitMs: legs.reduce((sum, leg) => sum + leg.limiterWaitMs, 0),
+      limiterWaitMs: pick ? Math.max(0, ...waits) : waits.reduce((sum, ms) => sum + ms, 0),
       ...this.spent(),
       routing: this.routing({ answeredBy, escalated }),
     };
@@ -526,86 +495,5 @@ class RouteRun {
   }) {
     const { mode, slot, inputView } = this.plan;
     return { answeredBy, escalated, mode, slot, inputView, flags: [...this.flags] };
-  }
-}
-
-function isAnswered(leg: Leg): leg is Extract<Leg, { outcome: "answered" }> {
-  return leg.outcome === "answered";
-}
-
-/** A leg's own timeout or the stop it caused, as the channels and the limiter throw it. */
-function isStop(error: unknown): boolean {
-  return error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
-}
-
-/**
- * A leg's provider timeout, apart from the caller's stop. Its clock runs only while the leg is
- * with the provider: waiting on a rate limiter pauses it, so queueing never times a leg out.
- */
-class LegDeadline {
-  private readonly controller = new AbortController();
-  private timer: ReturnType<typeof setTimeout> | undefined;
-  private startedAtMs = 0;
-  private isStopped = false;
-
-  private constructor(private remainingMs: number) {}
-
-  static start(timeoutMs: number): LegDeadline {
-    const deadline = new LegDeadline(timeoutMs);
-    deadline.resume();
-    return deadline;
-  }
-
-  /** What the channel is handed: the leg's timeout, and the caller's stop when there is one. */
-  signalWith(caller: AbortSignal | undefined): AbortSignal {
-    const own = this.controller.signal;
-    return caller ? AbortSignal.any([caller, own]) : own;
-  }
-
-  pausing({
-    limiter,
-    signal,
-  }: {
-    limiter: InstantEvalRateLimiter;
-    signal: AbortSignal | undefined;
-  }): InstantEvalRateLimiter {
-    return {
-      acquire: async (permit) => {
-        this.pause();
-        try {
-          await limiter.acquire(permit, signal);
-        } finally {
-          this.resume();
-        }
-      },
-    };
-  }
-
-  stop(): void {
-    this.isStopped = true;
-    this.clear();
-  }
-
-  private clear(): void {
-    clearTimeout(this.timer);
-    this.timer = undefined;
-  }
-
-  private pause(): void {
-    if (this.timer === undefined) return;
-    this.clear();
-    this.remainingMs -= nowInstant().epochMilliseconds - this.startedAtMs;
-  }
-
-  private resume(): void {
-    if (this.isStopped || this.controller.signal.aborted || this.timer !== undefined) return;
-    this.startedAtMs = nowInstant().epochMilliseconds;
-    this.timer = setTimeout(
-      () => {
-        this.timer = undefined;
-        this.controller.abort(new DOMException("The routed leg timed out", "TimeoutError"));
-      },
-      Math.max(0, this.remainingMs),
-    );
   }
 }

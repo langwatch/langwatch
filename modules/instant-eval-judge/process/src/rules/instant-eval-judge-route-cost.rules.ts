@@ -4,7 +4,12 @@
  * @see modules/instant-eval-judge/specs/instant-eval-judge-router.feature
  */
 
-import type { InstantEvalJudgeRoutePricing } from "@langwatch/instant-eval-judge-contract";
+import {
+  instantEvalCostUsd,
+  type InstantEvalJudgeRoutePricing,
+  type InstantEvalJudgeRouteTable,
+  NANO_USD_PER_USD,
+} from "@langwatch/instant-eval-judge-contract";
 
 const NANO_USD_PER_MILLION_TOKENS_PER_USD = 1_000;
 
@@ -35,4 +40,25 @@ export function instantEvalJudgeCallCostOf({
     (inputTokens * rate.usdPerMillionInputTokens + outputTokens * rate.usdPerMillionOutputTokens) *
     NANO_USD_PER_MILLION_TOKENS_PER_USD;
   return { outcome: "priced", costNanoUsd: Math.round(nano) };
+}
+
+/**
+ * The hosted classifier's cost for a call the router does not route: its routed price, else the
+ * published rate, so every judgement a routed call returns carries a cost.
+ */
+export function instantEvalJudgeClassifierCostOf({
+  table,
+  pricing,
+  inputTokens,
+}: {
+  table: InstantEvalJudgeRouteTable;
+  pricing: InstantEvalJudgeRoutePricing;
+  inputTokens: number;
+}): number {
+  for (const [backend, config] of Object.entries(table.backends)) {
+    if (config.kind !== "jev") continue;
+    const cost = instantEvalJudgeCallCostOf({ backend, inputTokens, outputTokens: 0, pricing });
+    if (cost.outcome === "priced") return cost.costNanoUsd;
+  }
+  return Math.round(instantEvalCostUsd({ inputTokens }) * NANO_USD_PER_USD);
 }

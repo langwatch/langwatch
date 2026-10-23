@@ -15,9 +15,6 @@ import {
   type InstantEvalJudgeRouteTable,
 } from "@langwatch/instant-eval-judge-contract";
 
-/** Which backend kinds this install holds a channel and key for. */
-export type InstantEvalJudgeRouteChannelsHeld = (kind: InstantEvalJudgeBackendKind) => boolean;
-
 export function instantEvalJudgeRouteBootIssues({
   table,
   pricing,
@@ -25,8 +22,8 @@ export function instantEvalJudgeRouteBootIssues({
 }: {
   table: InstantEvalJudgeRouteTable;
   pricing: InstantEvalJudgeRoutePricing;
-  /** Absent, keys are not checked: the table is the public default. */
-  isHeld?: InstantEvalJudgeRouteChannelsHeld;
+  /** Whether this install holds a channel and key for a kind; absent, keys are not checked. */
+  isHeld?: (kind: InstantEvalJudgeBackendKind) => boolean;
 }): string[] {
   const issues: string[] = [];
   for (const name of reachableBackendsOf(table)) {
