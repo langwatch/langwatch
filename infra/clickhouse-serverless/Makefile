@@ -34,9 +34,9 @@ e2e-cold-move: build ## E2E: verify data moves from hot to cold (S3) storage via
 e2e-backup: build ## E2E: native BACKUP/RESTORE cycle via S3 backups disk
 	@tests/e2e-backup-test.sh $(IMAGE):$(TAG)
 
-e2e-access: build ## E2E: tiers, rolling passwords and token logins (Linux: host network)
+e2e-access: build ## E2E: tiers, rolling passwords, token logins and dynamic-only mode (Linux: host network)
 	CH_ACCESS_E2E_IMAGE=$(IMAGE):$(TAG) go test -count=1 -v ./tests/accesse2e/
 
 clean: ## Stop and remove test containers
-	@docker rm -f ch-e2e ch-e2e-access garage-e2e 2>/dev/null || true
+	@docker rm -f ch-e2e ch-e2e-access ch-e2e-dynamic garage-e2e 2>/dev/null || true
 	@docker network rm ch-test-net 2>/dev/null || true
