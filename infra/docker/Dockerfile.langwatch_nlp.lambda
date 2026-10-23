@@ -61,13 +61,14 @@ RUN set -eux; \
     find /pylibs/babel/locale-data -type f ! -name 'en*.dat' ! -name 'root.dat' -delete 2>/dev/null || true
 
 # ─── Runtime ───────────────────────────────────────────────────────────────────
-# The default distroless variant, as the function runs today. On Lambda its
-# USER does not decide who runs the code: Lambda runs a container image as its
-# own default Linux user with least-privileged permissions, not as root, so
-# nlpgo and every code block run without uid 0. That user must be able to read
-# every file the function needs.
+# The nonroot variant, as in Dockerfile.langwatch_nlp: the code-block sandbox
+# isolates by file mode, which uid 0 bypasses. On Lambda the image's USER does
+# not decide who runs the code (Lambda runs a container image as its own
+# least-privileged user), so this changes nothing there; it keeps the image
+# non-root anywhere else it runs. Every file the function needs must be
+# readable by a non-root user.
 # https://docs.aws.amazon.com/lambda/latest/dg/images-create.html#images-reqs
-FROM gcr.io/distroless/python3-debian12
+FROM gcr.io/distroless/python3-debian12:nonroot
 COPY --from=lambda-adapter /lambda-adapter /opt/extensions/lambda-adapter
 COPY --from=sandbox-build /pylibs /opt/sandbox-libs
 COPY --from=go-build /out/service /usr/local/bin/service
