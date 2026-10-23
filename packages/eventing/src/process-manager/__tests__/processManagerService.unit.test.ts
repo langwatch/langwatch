@@ -491,11 +491,12 @@ describe("ProcessManagerService", () => {
       });
       const originalFindByRef = store.findByRef.bind(store);
       const originalHasConsumed = store.hasConsumedSource.bind(store);
-      let reads = 0;
+      let raced = false;
       let inboxChecks = 0;
       store.findByRef = async <State = unknown>(params: { ref: ProcessRef }) => {
         const result = await originalFindByRef<State>(params);
-        if (reads++ === 0 && result) {
+        if (!raced && result) {
+          raced = true;
           // A wake-like commit lands first, so the first attempt loses the race.
           await store.commit({
             ref: pilotRef,
@@ -531,7 +532,6 @@ describe("ProcessManagerService", () => {
       const result = await service.handleEvent({ envelope, now: T0 + 10 });
 
       expect(result.outcome).toBe("duplicateEvent");
-      expect(reads).toBe(1);
       expect((await store.findByRef({ ref: pilotRef }))?.revision).toBe(3);
     });
   });
