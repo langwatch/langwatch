@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { moduleApi, type Named } from "@langwatch/module";
-import { USAGE_REPORT_MAX_BODY_BYTES, usageReportBodySchema } from "@langwatch/ops-contract";
+import {
+  selfHostedNoticeSchema,
+  USAGE_REPORT_MAX_BODY_BYTES,
+  usageReportBodySchema,
+} from "@langwatch/ops-contract";
 import { z } from "zod";
 
 /** The report as either door reads it: ops' body, with unknown fields kept so they can be counted. */
@@ -22,10 +26,15 @@ const releaseIdentitySchemaDefinition = z.object({
 export interface ReleaseIdentitySchema extends Named<typeof releaseIdentitySchemaDefinition> {}
 export const releaseIdentitySchema: ReleaseIdentitySchema = releaseIdentitySchemaDefinition;
 
-/** What an accepted usage report is answered with, on either door; release fields only when configured. */
+/**
+ * What an accepted usage report is answered with, on either door: release fields only when
+ * configured, notices only when staff published some that have not expired.
+ */
 const usageReportReceiptSchemaDefinition = z.object({
   message: z.literal("Event captured"),
   latest_release: releaseIdentitySchema.optional(),
+  /** Notices LangWatch staff send every install (self-hosted-notices.feature). */
+  notices: z.array(selfHostedNoticeSchema).optional(),
 });
 export interface UsageReportReceiptSchema extends Named<
   typeof usageReportReceiptSchemaDefinition

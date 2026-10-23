@@ -18,8 +18,8 @@ serve (ARCHITECTURE.md section 3).
 
 ## Public surfaces and transports
 
-Two tRPC namespaces: `licenseRegistry.*` and `selfHostedInstances.*`
-(read only). They carry no org RBAC permission: the signed-in operator is a
+Three tRPC namespaces: `licenseRegistry.*`, `selfHostedInstances.*`
+(read only) and `selfHostedNotices.*`. They carry no org RBAC permission: the signed-in operator is a
 fact, and the application admits only Cloud admin staff. Reads need staff;
 writes need `ops:manage` as well. Anyone else, or any deployment where ops's
 cloud-ops capability is off, is answered `not_found`.
@@ -34,7 +34,7 @@ None; licensing owns every row.
 
 ## Runtime and registration
 
-`enterpriseOpsProcessModule` registers the Api and the two tRPC transports.
+`enterpriseOpsProcessModule` registers the Api and the three tRPC transports.
 No repository, pipeline, job or subscriber.
 
 ## Environment and configuration

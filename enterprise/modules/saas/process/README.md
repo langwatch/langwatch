@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 LangWatch Cloud's own surface. Every operation refuses on any other deployment.
 
-Peers call these through the token, declared at `../contract/src/saas.api.ts:46`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/saas.api.ts:55`; nothing else in this package is public.
 
 #### `receiveUsageReport`
 
@@ -40,15 +40,8 @@ Public: anonymous product telemetry: a self-hosted install presents no credentia
 Answers at `/api/track_usage`.
 
 ```typescript
-type Body = z.infer<typeof usageReportRequestSchema>; // ../contract/src/saas.api.ts:12
-// Response: usageReportReceiptSchema, ../contract/src/saas.api.ts:34
-interface Response {
-  message: "Event captured";
-  latest_release?: {
-    release: string;
-    commit: string | null;
-  };
-}
+type Body = z.infer<typeof usageReportRequestSchema>; // ../contract/src/saas.api.ts:16
+type Response = z.infer<typeof usageReportReceiptSchema>; // ../contract/src/saas.api.ts:43
 ```
 
 #### `POST /api/connect/v1/stats` · `receiveConnectUsageReport`
@@ -58,8 +51,8 @@ Public: anonymous product telemetry: a self-hosted install presents no credentia
 Answers at `/api/connect/v1/stats`.
 
 ```typescript
-type Body = z.infer<typeof usageReportRequestSchema>; // ../contract/src/saas.api.ts:12
-type Response = z.infer<typeof usageReportReceiptSchema>; // ../contract/src/saas.api.ts:34
+type Body = z.infer<typeof usageReportRequestSchema>; // ../contract/src/saas.api.ts:16
+type Response = z.infer<typeof usageReportReceiptSchema>; // ../contract/src/saas.api.ts:43
 ```
 
 ## tRPC transport
