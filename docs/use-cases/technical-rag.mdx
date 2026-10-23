@@ -4,7 +4,7 @@ description: Use LangWatch to evaluate a technical RAG chatbot by measuring retr
 keywords: RAG, technical documentation, evaluation, LangWatch, embeddings, chunking, faithfulness, retrieval evaluation, ground truth
 ---
 
-This guide shows you how to evaluate a RAG (Retrieval-Augmented Generation) chatbot designed to answer technical questions from complex product manuals. In this example, the chatbot is for technicians servicing advanced milking machines.
+A RAG (Retrieval-Augmented Generation) chatbot that answers technical questions from complex product manuals is evaluated on accuracy, relevance and faithfulness to the documentation. In this example, the chatbot is for technicians servicing advanced milking machines.
 
 The goal is to verify that the chatbot provides accurate, relevant, and faithful answers based on the official documentation. We'll use LangWatch to automate this evaluation so it can run in a CI/CD workflow.
 
@@ -89,6 +89,8 @@ Now, we'll use LangWatch to evaluate our RAG pipeline against the golden dataset
 This script can be triggered automatically in a CI workflow whenever the RAG pipeline or its underlying model is updated.
 
 ```python
+import langwatch
+
 # Initialize a new evaluation run. Use descriptive names to track experiments.
 evaluation = langwatch.experiment.init("model-a-rag-evaluation-v2")
 

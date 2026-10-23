@@ -52,6 +52,12 @@ print(result["last_message"].text)
 
 The `HaystackInstrumentor` automatically captures Haystack pipeline operations, component executions, and model interactions. Use `@langwatch.trace()` to create a parent trace under which Haystack operations will be nested.
 
+## Check it worked
+
+Run the example. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds. Open it to see the Haystack pipeline, its components and the model calls as spans.
+
+If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
+
 ## Related
 
 - [Capturing RAG](/integration/python/tutorials/capturing-rag) - Learn how to capture RAG data from retrievers and tools

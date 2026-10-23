@@ -4,7 +4,7 @@ description: Evaluate structured data extraction using LangWatch to validate out
 keywords: structured data extraction, evaluation, LangWatch, ground truth
 ---
 
-This guide walks you through evaluating an LLM that powers a taxi booking chatbot. The goal is to see how well the model extracts structured data (like pickup addresses and passenger counts) from vague, real-world customer messages.
+An evaluation script measures how well the LLM behind a taxi booking chatbot extracts structured data (like pickup addresses and passenger counts) from vague, real-world customer messages.
 
 We'll use LangWatch to create a simple, repeatable evaluation script to measure and track the model's accuracy.
 
@@ -86,6 +86,8 @@ Now, let's tie it all together with LangWatch. We'll initialize an evaluation, l
 This script gives us a precise, field-by-field view of our model's performance.
 
 ```python
+import langwatch
+
 # Initialize a new evaluation run in LangWatch
 evaluation = langwatch.experiment.init("taxi-bot-extraction-v2")
 

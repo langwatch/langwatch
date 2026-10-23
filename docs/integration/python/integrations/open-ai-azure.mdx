@@ -12,6 +12,14 @@ LangWatch captures information about your Azure OpenAI LLM calls automatically. 
 
 This guide walks you through both methods.
 
+## Installation
+
+```bash
+pip install langwatch openai
+```
+
+The SDK reads `LANGWATCH_API_KEY` from the environment.
+
 ## Using `autotrack_openai_calls()`
 
 The `autotrack_openai_calls()` function provides a straightforward way to capture all Azure OpenAI calls made with a specific client instance for the duration of the current trace.
@@ -164,6 +172,12 @@ if __name__ == "__main__":
 - These instrumentors often patch the `openai` library at a global level, meaning all calls from any `OpenAI` or `AzureOpenAI` client instance will be captured once instrumented.
 - If using `langwatch.setup(instrumentors=[...])`, LangWatch handles the instrumentor's setup.
 - If instrumenting directly (e.g., `OpenAIInstrumentor().instrument()`), ensure that the `TracerProvider` used by the instrumentor is the same one LangWatch is exporting from. This typically happens automatically if LangWatch initializes the global provider or if you configure them to use the same explicit provider.
+
+## Check it worked
+
+Run the example. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds. Open it to see the Azure OpenAI call nested inside the trace named in the decorator, for example "Azure OpenAI Chat Completion".
+
+If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
 
 <Note>
 ### Which Approach to Choose?

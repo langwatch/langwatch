@@ -95,3 +95,9 @@ The middleware captures input and output content **by default**. Pass `otelopena
 <Note>
 Using OpenRouter is a great way to experiment with different models without changing your core instrumentation logic. All calls will be traced by LangWatch, regardless of the underlying model you choose.
 </Note>
+
+## Check it worked
+
+Run the program with `go run .`. The deferred `tp.Shutdown(ctx)` flushes the spans when `main` returns. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds, with the OpenRouter call as an LLM span carrying its input, output and token counts.
+
+If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the program runs in.

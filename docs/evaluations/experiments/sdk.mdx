@@ -120,11 +120,14 @@ The evaluation is started by creating an evaluation session with a descriptive n
 
 <Tabs>
   <Tab title="Python">
-    ```python evaluation = langwatch.experiment.init("rag-pipeline-openai-vs-claude") ```
+    ```python
+    evaluation = langwatch.experiment.init("rag-pipeline-openai-vs-claude")
+    ```
   </Tab>
   <Tab title="TypeScript">
-    ```typescript const evaluation = await
-    langwatch.experiments.init("rag-pipeline-openai-vs-claude"); ```
+    ```typescript
+    const evaluation = await langwatch.experiments.init("rag-pipeline-openai-vs-claude");
+    ```
   </Tab>
 </Tabs>
 
@@ -205,6 +208,8 @@ Once a row's targets have each produced an output, [Comparison](#comparison) jud
 Use `evaluation.target()` for automatic latency capture and context inference:
 
 ```python
+import langwatch
+
 evaluation = langwatch.experiment.init("model-comparison")
 
 for index, row in evaluation.loop(df.iterrows()):
@@ -250,6 +255,10 @@ evaluation.log(
 Use `withTarget()` for automatic latency capture and context inference:
 
 ```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
 const evaluation = await langwatch.experiments.init("model-comparison");
 
 await evaluation.run(dataset, async ({ item, index }) => {
@@ -374,6 +383,8 @@ LLM calls can be slow. Both SDKs support parallel execution to speed up your eva
 Use the built-in parallelization by putting the content of the loop in a function and submitting it:
 
 ```python {4,8}
+import langwatch
+
 evaluation = langwatch.experiment.init("parallel-eval-example")
 
 for index, row in evaluation.loop(df.iterrows(), threads=4):
@@ -393,6 +404,8 @@ The default `loop()`, `submit()` path above already parallelises, each submitted
 Reach for `aloop()`, `asubmit()` only when your code is fully async-first and your task relies on async state whose identity is tied to one event loop. The threading path spins up a fresh event loop per worker, so those objects raise `"Future attached to a different loop"` on first use. `aloop`, `asubmit` keep every submitted task on the caller's event loop, so that state stays valid across concurrent items.
 
 ```python
+import langwatch
+
 evaluation = langwatch.experiment.init("async-eval-example")
 
 async def task(index, row):
@@ -532,6 +545,10 @@ The candidates are whatever `log_response()` recorded inside each `target()` blo
   </Tab>
   <Tab title="TypeScript">
 ```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
 const evaluation = await langwatch.experiments.init("model-comparison");
 
 await evaluation.run(dataset, async ({ item }) => {
@@ -797,6 +814,8 @@ evaluation.printSummary();
 In async-native mode, use `acompare()` so the judge is awaited rather than blocked on, leaving the event loop free for the rows running alongside it. It takes the same options and records the same verdict:
 
 ```python
+import langwatch
+
 evaluation = langwatch.experiment.init("async-comparison")
 
 async def task(index, row):
@@ -949,6 +968,8 @@ To get complete visibility into your LLM pipeline, add tracing to your functions
 <Tabs>
   <Tab title="Python">
 ```python
+import langwatch
+
 @langwatch.trace()
 def agent(question):
     # Your RAG pipeline, chain, or agent logic

@@ -1679,7 +1679,7 @@ A `replace` clears the membership only when `members` is an empty list or an exp
 
 `GET /Groups` filters by `displayName` with a case-insensitive `eq`:
 
-```
+```http
 GET /api/scim/v2/Groups?filter=displayName eq "Engineering"
 ```
 
@@ -1758,7 +1758,7 @@ SCIM (System for Cross-domain Identity Management) 2.0 lets your identity provid
 
 Open **Settings > Authentication > Connectors**. The base URL is shown at the top of the page:
 
-```
+```text
 https://<your-langwatch-domain>/api/scim/v2
 ```
 
@@ -2455,7 +2455,7 @@ sidebarTitle: Audio (TTS + STT)
 
 ## Endpoints
 
-```
+```http
 POST /v1/audio/speech
 POST /v1/audio/transcriptions
 Authorization: Bearer vk-lw-<ULID>
@@ -2605,7 +2605,7 @@ curl -N https://gateway.langwatch.ai/v1/audio/speech \
   -d '{"model": "openai/gpt-4o-mini-tts", "voice": "nova", "input": "Hello.", "stream_format": "sse"}'
 ```
 
-```
+```text
 data: {"type":"speech.audio.delta","audio":"//PkxAAAAAAAAAAA..."}
 
 data: {"type":"speech.audio.done","usage":{"input_tokens":14,"output_tokens":101,"total_tokens":115}}
@@ -2623,7 +2623,7 @@ curl -N https://gateway.langwatch.ai/v1/audio/transcriptions \
   -F "file=@call-recording.wav"
 ```
 
-```
+```text
 data: {"type":"transcript.text.delta","delta":"Hello"}
 
 data: {"type":"transcript.text.done","text":"Hello from the gateway.","usage":{"type":"duration","seconds":2}}
@@ -2672,7 +2672,7 @@ sidebarTitle: Chat Completions
 
 ## Endpoint
 
-```
+```http
 POST /v1/chat/completions
 Authorization: Bearer vk-lw-<ULID>
 Content-Type: application/json
@@ -2752,7 +2752,7 @@ Non-streaming calls that run long receive a single space character before the JS
 
 Set `"stream": true`. The response is `text/event-stream`, one `data:` frame per chunk, ending with `data: [DONE]`:
 
-```
+```text
 data: {"id":"chatcmpl-abc123","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"role":"assistant","content":"Hi"}}]}
 
 data: {"id":"chatcmpl-abc123","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":"!"}}]}
@@ -2796,7 +2796,7 @@ sidebarTitle: ElevenLabs
 
 ## Endpoints
 
-```
+```http
 POST /v1/text-to-speech/{voice_id}
 POST /v1/text-to-speech/{voice_id}/stream
 POST /v1/text-to-speech/{voice_id}/stream/with-timestamps
@@ -3003,7 +3003,7 @@ A relayed socket is closed by the gateway on an exhausted budget (`1008`), a rev
 
 ## Post-call webhook
 
-```
+```http
 POST /v1/convai/webhook/{model_provider_id}
 ElevenLabs-Signature: t=<timestamp>,v0=<hmac>
 ```
@@ -3048,7 +3048,7 @@ sidebarTitle: Embeddings
 
 ## Endpoint
 
-```
+```http
 POST /v1/embeddings
 Authorization: Bearer vk-lw-<ULID>
 Content-Type: application/json
@@ -3235,7 +3235,7 @@ When only the status and the message are available, the gateway writes the same 
 
 Once the stream is open the status is already `200`, so a failure arrives as a terminal `event: error` frame and the stream ends:
 
-```
+```text
 event: error
 data: {"type":"error","error":{"type":"provider_error","message":"upstream connection reset"}}
 
@@ -3257,7 +3257,7 @@ sidebarTitle: Gemini Native
 
 ## Endpoint
 
-```
+```text
 ALL /v1beta/*
 x-goog-api-key: vk-lw-<ULID>
 ```
@@ -3351,7 +3351,7 @@ Models: `openai/gpt-image-2`, `openai/gpt-image-1` and `openai/gpt-image-1-mini`
 
 ## Generation
 
-```
+```http
 POST /v1/images/generations
 Authorization: Bearer vk-lw-<ULID>
 Content-Type: application/json
@@ -3389,7 +3389,7 @@ const png = Buffer.from(image.data[0].b64_json, "base64");
 
 ## Editing
 
-```
+```http
 POST /v1/images/edits
 Authorization: Bearer vk-lw-<ULID>
 Content-Type: multipart/form-data
@@ -3460,7 +3460,7 @@ Authentication uses existing LangWatch API tokens (`Authorization: Bearer lwp_..
 
 ## Base
 
-```
+```text
 Base URL: https://app.langwatch.ai/api/gateway/v1
 Auth:     Authorization: Bearer <project_api_token>
 Content:  application/json
@@ -3606,7 +3606,7 @@ curl -sS "https://app.langwatch.ai/api/gateway/v1/budgets?external_id=acme-tenan
 
 ### List
 
-```
+```http
 GET /virtual-keys
 GET /virtual-keys?limit=100&cursor=<next_cursor>
 ```
@@ -3654,7 +3654,7 @@ Response:
 
 ### Create
 
-```
+```http
 POST /virtual-keys
 ```
 
@@ -3700,7 +3700,7 @@ Response `201`:
 
 ### Get
 
-```
+```http
 GET /virtual-keys/:id
 ```
 
@@ -3708,7 +3708,7 @@ Response: `{ "virtual_key": {...} }`. No secret.
 
 ### Spend
 
-```
+```http
 GET /virtual-keys/:id/spend?from=1782950400000&to=1784160000000
 ```
 
@@ -3718,7 +3718,7 @@ On deployments without a ClickHouse spend source the endpoint answers `412` with
 
 ### Update
 
-```
+```http
 PATCH /virtual-keys/:id
 ```
 
@@ -3742,7 +3742,7 @@ Body (all fields optional):
 
 ### Rotate, disable, enable, revoke
 
-```
+```http
 POST /virtual-keys/:id/rotate
 POST /virtual-keys/:id/disable      { "reason": "payment overdue" }   // reason optional
 POST /virtual-keys/:id/enable
@@ -3761,7 +3761,7 @@ All four are idempotent, audit-logged, propagate to the gateway in seconds, and 
 
 ### List
 
-```
+```http
 GET /budgets
 GET /budgets?scope_type=virtual_key,principal
 GET /budgets?limit=100&cursor=<next_cursor>
@@ -3812,7 +3812,7 @@ Response:
 
 ### Create
 
-```
+```http
 POST /budgets
 ```
 
@@ -3847,7 +3847,7 @@ Body:
 
 ### Get
 
-```
+```http
 GET /budgets/:id
 ```
 
@@ -3855,7 +3855,7 @@ Response: `{ "budget": {...} }`, the same row shape the list returns, including 
 
 ### Update
 
-```
+```http
 PATCH /budgets/:id
 ```
 
@@ -3863,7 +3863,7 @@ Updatable fields: `name`, `description`, `limit_usd`, `on_breach`, `timezone`. S
 
 ### Reset period
 
-```
+```http
 POST /budgets/:id/reset
 POST /budgets/:id/reset?end_user_id=u_123      // one end-user bucket of a template
 ```
@@ -3878,7 +3878,7 @@ Per-end-user usage and the caps that apply to it are served on the billing surfa
 
 ### Archive
 
-```
+```http
 DELETE /budgets/:id
 ```
 
@@ -3892,7 +3892,7 @@ Provider credentials, rate limits, and fallback priority live on the platform-wi
 
 Organization-scoped overrides that modulate cache behaviour for gateway requests. Evaluated first-match-wins by priority descending; a matched rule beats the per-key default but loses to a per-request `X-LangWatch-Cache` header.
 
-```
+```text
 GET    /cache-rules            gatewayCacheRules:view
 GET    /cache-rules/:id        gatewayCacheRules:view
 POST   /cache-rules            gatewayCacheRules:create
@@ -3947,7 +3947,7 @@ This API and the dashboard call the same service layer on the server, so a rule 
 
 Every route on this API is described in LangWatch's OpenAPI 3.1 document, served unauthenticated at:
 
-```
+```http
 GET https://app.langwatch.ai/api/gateway/v1/openapi.json
 ```
 
@@ -3971,7 +3971,7 @@ sidebarTitle: Messages
 
 ## Endpoint
 
-```
+```http
 POST /v1/messages
 x-api-key: vk-lw-<ULID>
 anthropic-version: 2023-06-01
@@ -4042,7 +4042,7 @@ The same set as [Chat Completions](/ai-gateway/api/chat-completions#response-hea
 
 Set `"stream": true`. The response is `text/event-stream` in Anthropic's own event framing, and there is no `data: [DONE]` trailer. On an Anthropic-compatible provider the frames reach the client as the provider wrote them. On a translated lane the gateway builds the Anthropic events itself from the provider's own stream. A failure after the stream opens adds one terminal `event: error` frame:
 
-```
+```text
 event: message_start
 data: {"type":"message_start","message":{"id":"msg_01ABC","type":"message","role":"assistant","content":[],"model":"claude-sonnet-4-5","stop_reason":null,"usage":{"input_tokens":8,"output_tokens":1}}}
 
@@ -4138,7 +4138,7 @@ A model from a provider that has an [instance handle](/ai-gateway/model-naming#i
 
 A provider the key can dispatch to can contribute no models to the catalog. The response then carries `X-Langwatch-Models-Discovery-Incomplete` with one `provider:reason` token per gap, comma separated:
 
-```
+```http
 X-Langwatch-Models-Discovery-Incomplete: bedrock:not-enumerable,openai:probe-failed
 ```
 
@@ -4548,7 +4548,7 @@ sidebarTitle: Responses
 
 ## Endpoint
 
-```
+```http
 POST /v1/responses
 Authorization: Bearer vk-lw-<ULID>
 Content-Type: application/json
@@ -4619,7 +4619,7 @@ The same set as [Chat Completions](/ai-gateway/api/chat-completions#response-hea
 
 Set `"stream": true`. On OpenAI and Azure the response is `text/event-stream` with one `data:` frame per Responses event and a `data: [DONE]` trailer:
 
-```
+```text
 data: {"type":"response.created","response":{"id":"resp_abc123","status":"in_progress"}}
 
 data: {"type":"response.output_text.delta","delta":"Hello"}
@@ -5240,7 +5240,7 @@ curl -sS -D - -o /dev/null https://gateway.langwatch.ai/v1/messages \
   | grep -i x-langwatch-cache-mode
 ```
 
-```
+```http
 X-LangWatch-Cache-Mode: force
 ```
 
@@ -6296,7 +6296,7 @@ Vocabulary used on this page: a **tenant** is your customer and has one **virtua
 
 ## The shape
 
-```
+```text
 End user's app
       |
       v
@@ -8719,7 +8719,7 @@ Dropped fields are reported on the `X-LangWatch-Params-Dropped` header and on th
 
 Claude models take a thinking budget in tokens. On the anthropic lane and on the bedrock lane, the gateway derives that budget from your output cap:
 
-```
+```text
 budget = 1024 + ratio x (max_tokens - 1024)
 ```
 
@@ -8816,26 +8816,26 @@ Policy changes are written to the audit log and reach the gateway on its next ch
 
 Refuse shell execution and a destructive tool:
 
-```
+```text
 ^shell_.*
 delete_user
 ```
 
 Allow only the tools an agent is meant to use:
 
-```
+```text
 ^(read_file|list_files|search_docs)$
 ```
 
 Keep web addresses inside your own domain (Allow only on Web addresses):
 
-```
+```text
 ^https://api\.acme\.example/
 ```
 
 Refuse a model family on every key of the policy (Refuse on Models):
 
-```
+```text
 ^gpt-4o-search.*
 ```
 
@@ -9341,7 +9341,7 @@ For a streaming request the gateway falls back only while opening the stream. On
 
 The response carries `X-LangWatch-Fallback-Count` with the number of failovers that happened, and only when it is at least 1. A request served by the first provider has no header.
 
-```
+```http
 HTTP/1.1 200 OK
 X-LangWatch-Fallback-Count: 1
 X-LangWatch-Gateway-Request-Id: req_3e8385c4e62cbe4e31ca9c410c5891
@@ -10183,6 +10183,16 @@ Two settings change: the base URL points at the gateway, and the API key is a vi
 | Google GenAI | `https://gateway.langwatch.ai`    | `api_key`, sent as `X-Goog-Api-Key`        |
 | ElevenLabs   | `https://gateway.langwatch.ai`    | `api_key`, sent as `Xi-Api-Key`            |
 
+## Install
+
+```bash
+pip install openai
+# add the SDK you use: anthropic, google-genai, langchain-openai, llama-index-llms-openai
+# and langwatch, to link the gateway span to your trace
+```
+
+The virtual key (`vk-lw-...`) is not your LangWatch API key. `LANGWATCH_API_KEY` is only needed by the LangWatch SDK: to link the gateway span to your own trace, and to manage keys and budgets from code.
+
 ## OpenAI SDK
 
 ```python
@@ -10263,6 +10273,10 @@ llm = OpenAI(
     model="openai/gpt-5-mini",
 )
 ```
+
+## Check it worked
+
+Run the OpenAI SDK sample. It prints the model's answer. Then open the project the virtual key traces to in LangWatch: the gateway's `gen_ai.<request type>` span appears in the traces list within a few seconds, as its own trace, with the model, the tokens and the cost.
 
 ## Link the gateway span to your trace
 
@@ -10359,6 +10373,16 @@ Two settings change: the base URL points at the gateway, and the API key is a vi
 | Anthropic    | `https://gateway.langwatch.ai`    | `apiKey`, sent as `X-Api-Key`             |
 | Google GenAI | `https://gateway.langwatch.ai`    | `apiKey`, sent as `X-Goog-Api-Key`        |
 
+## Install
+
+```bash
+npm install openai
+# add the SDK you use: @anthropic-ai/sdk, ai with @ai-sdk/openai, @langchain/openai
+# and langwatch, to link the gateway span to your trace
+```
+
+The virtual key (`vk-lw-...`) is not your LangWatch API key. `LANGWATCH_API_KEY` is only needed by the LangWatch SDK: to link the gateway span to your own trace, and to manage keys and budgets from code.
+
 ## OpenAI SDK
 
 ```typescript
@@ -10425,6 +10449,10 @@ const llm = new ChatOpenAI({
   configuration: { baseURL: "https://gateway.langwatch.ai/v1" },
 });
 ```
+
+## Check it worked
+
+Run the OpenAI SDK sample. It prints the model's answer. Then open the project the virtual key traces to in LangWatch: the gateway's `gen_ai.<request type>` span appears in the traces list within a few seconds, as its own trace, with the model, the tokens and the cost.
 
 ## Link the gateway span to your trace
 
@@ -10913,7 +10941,7 @@ kubectl -n ingress-nginx get svc ingress-nginx-controller \
   -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
 ```
 
-```
+```text
 Type:   CNAME
 Name:   gateway
 Target: <load balancer hostname>
@@ -11113,7 +11141,7 @@ Chart values: `probes.liveness.*`. The handler does no network I/O.
 
 After `SIGTERM` the endpoint answers:
 
-```
+```http
 HTTP/1.1 503 Service Unavailable
 {"status":"draining","version":"local","uptime_s":1812.74}
 ```
@@ -11810,7 +11838,7 @@ The frame shape follows the endpoint you called, not the provider that served th
 
 `POST /v1/chat/completions` sends OpenAI chunk objects, one per `data:` line, and closes with `data: [DONE]`.
 
-```
+```text
 data: {"id":"chatcmpl-...","choices":[{"delta":{"content":"1"}}]}
 
 data: [DONE]
@@ -11828,7 +11856,7 @@ Tool-call deltas arrive in the endpoint's own shape and keep their order. On `/v
 
 The gateway writes `200 OK` and the `text/event-stream` headers before the first frame, so a failure after that point cannot change the status. The gateway ends the stream with an `event: error` frame instead.
 
-```
+```text
 event: error
 data: {"type":"error","error":{"type":"provider_error","message":"upstream connection closed"}}
 ```
@@ -11885,7 +11913,7 @@ for chunk in client.chat.completions.create(
 
 On `/v1/chat/completions`, a stream that closes with zero total tokens carries one more frame before `data: [DONE]`:
 
-```
+```text
 event: warning
 data: {"warning":"provider_did_not_report_usage_on_stream"}
 ```
@@ -12058,7 +12086,7 @@ The client received part of a response and then silence.
 
 **Confirm it:** the gateway never switches providers mid-stream. When an upstream stream fails after the first chunk, the gateway writes one terminal SSE frame and closes:
 
-```
+```text
 data: {"type":"error","error":{"type":"provider_error","message":"..."}}
 ```
 
@@ -13143,7 +13171,7 @@ This page maps each compliance framework you might need to the mechanisms in Lan
 
 ## The substrate, in one diagram
 
-```
+```text
                   PUBLIC URLS (auth boundary)
    /api/otel/v1/traces     /api/v1/ingest/otel/:sourceId    /api/v1/ingest/webhook/:sourceId
        (project key)             (lw_is_* Bearer)              (lw_is_* Bearer)
@@ -13368,7 +13396,7 @@ anomaly rules and no recent gateway activity gets
 
 ## The split: control plane vs data plane
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────┐
 │                         LangWatch control plane                     │
 │                                                                     │
@@ -13427,7 +13455,7 @@ Tier 1 is everything documented under
 is to acquire a virtual key, then `exec` the underlying tool with
 the gateway's base URL injected:
 
-```
+```text
 Dev terminal              LangWatch                  Provider
 ─────────────             ─────────                  ────────
 $ langwatch               app.langwatch.ai           api.anthropic.com
@@ -13705,7 +13733,7 @@ After sign-in you'll land on `/governance` (the org governance home, see the [co
 
 [Routing Policies](/ai-gateway/governance/routing-policies) are the gateway's per-virtual-key behaviour bundle: which providers to try first, what fallback chain to follow on outage, what models are allowed, what tools `policy_rules` denies. Every Personal Virtual Key minted on first developer sign-in binds to your org's **default** routing policy, so without a default policy, `langwatch login` returns:
 
-```
+```text
 HTTP 409, error: "no_default_routing_policy"
 Ask your admin to publish a default routing policy at Gateway → Routing Policies.
 ```
@@ -15286,7 +15314,7 @@ The MCP server is the most agent-native of the three governance surfaces. For se
 
 Every governance MCP tool's name starts with `governance_`:
 
-```
+```text
 governance_ingestion_templates_list
 governance_ingestion_templates_admin_list
 governance_ingestion_templates_get
@@ -15931,7 +15959,7 @@ Click expands the tile inline with the setup walkthrough:
 
 ![Claude Code tile expanded, setup command + walkthrough](/images/ai-governance/portal/tile-claude-expanded.png)
 
-```
+```text
 ┌─ Claude Code ──────────────────────────── [×] collapse ────────────┐
 │  Run this in your terminal:                                        │
 │   $ langwatch claude                                         [📋]  │
@@ -15976,7 +16004,7 @@ Click expands the tile inline with a virtual-key creation form:
 
 ![Anthropic tile expanded, VK creation form before issuance](/images/ai-governance/portal/tile-anthropic-form.png)
 
-```
+```text
 ┌─ OpenAI ───────────────────────────────── [×] collapse ────────────┐
 │  Create a virtual key for your apps                                │
 │                                                                     │
@@ -15994,7 +16022,7 @@ with the issued state:
 
 ![Anthropic tile issued, masked secret + reveal/copy + base URL](/images/ai-governance/portal/tile-anthropic-issued.png)
 
-```
+```text
 ┌─ OpenAI ───────────────────────────────── [×] collapse ────────────┐
 │  ✓ Key created                                                      │
 │                                                                     │
@@ -16051,7 +16079,7 @@ Click expands the tile inline with admin-authored markdown:
 
 ![Copilot Studio tile expanded, admin markdown body + external CTA link](/images/ai-governance/portal/tile-copilot-studio.png)
 
-```
+```text
 ┌─ Copilot Studio ───────────────────────── [×] collapse ────────────┐
 │  Microsoft Copilot Studio is approved for org-wide use.            │
 │  See the internal wiki for setup instructions:                     │
@@ -16232,7 +16260,7 @@ last used, and how to revoke any device you no longer need.
 
 ## What you see at /me/devices
 
-```
+```text
 ┌─ Your CLI sessions ─────────────────────────────────────────────────┐
 │  Active sessions on your account                                    │
 │                                                                      │
@@ -16489,7 +16517,7 @@ Reference implementations using `http_polling` ship for:
 
 ## How the framework works
 
-```
+```text
 ┌──────────────────────┐     ┌─────────────────────┐
 │  Admin creates       │     │  governancePuller   │
 │  IngestionSource     │────▶│  BullMQ worker      │
@@ -16824,7 +16852,7 @@ npx langwatch claude
 
 The first run opens a browser to sign you in, then asks one question:
 
-```
+```text
 How should `langwatch claude` run?
 ❯ Using a Claude subscription   keep your own plan, send only telemetry to LangWatch
   Using an API key              route calls through LangWatch with a virtual key
@@ -20773,6 +20801,12 @@ agent.print_response("Tell me a joke.")
 
 The `AgnoInstrumentor` automatically captures all Agno agent activity. All traces will be sent to your LangWatch dashboard without requiring manual OpenTelemetry configuration.
 
+## Check it worked
+
+Run the example. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds. Open it to see the Agno agent run and the model calls it made.
+
+If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
+
 ## Related
 
 - [Capturing RAG](/integration/python/tutorials/capturing-rag) - Learn how to capture RAG data from retrievers and tools
@@ -20844,6 +20878,12 @@ if __name__ == "__main__":
 ```
 
 The `AnthropicInstrumentor` automatically captures all Anthropic API calls globally once instrumented. Use `@langwatch.trace()` to create a parent trace under which API calls will be nested.
+
+## Check it worked
+
+Run the example. Then open your project in LangWatch: a new trace named "Anthropic Call with Community Instrumentor" appears in the traces list within a few seconds. Open it to see the Anthropic call nested inside it, with its input and output.
+
+If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
 
 ## Related
 
@@ -21192,6 +21232,12 @@ For more details on the specific attributes captured by the OpenInference Bedroc
 
 Remember to replace placeholder values for AWS credentials and adapt the model IDs and prompts to your specific use case.
 
+## Check it worked
+
+Run the example. Then open your project in LangWatch: a new trace named "Bedrock - Example Usage" appears in the traces list within a few seconds. Open it to see the Bedrock calls nested inside it.
+
+If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
+
 ---
 
 # FILE: ./integration/python/integrations/azure-ai.mdx
@@ -21286,6 +21332,12 @@ if __name__ == "__main__":
   `AIInferenceInstrumentor` will work with both synchronous and asynchronous clients.
 </Note>
 
+## Check it worked
+
+Run the example. Then open your project in LangWatch: a new trace named "Azure AI Inference Chat" appears in the traces list within a few seconds. Open it to see the `complete` call recorded by `AIInferenceInstrumentor` nested inside it.
+
+If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
+
 ## How it Works
 
 1.  `langwatch.setup()`: Initializes the LangWatch SDK, which includes setting up an OpenTelemetry trace exporter. This exporter is ready to receive spans from any OpenTelemetry-instrumented library in your application.
@@ -21329,6 +21381,18 @@ For more information and setup guides, please visit their GitHub repository:
 </CodeGroup>
 
 To use these instrumentors with LangWatch, you would typically configure them to export telemetry data via OpenTelemetry, which LangWatch can then ingest.
+
+## Installation
+
+Install LangWatch, CrewAI and one of the two instrumentors:
+
+```bash
+pip install langwatch crewai openinference-instrumentation-crewai
+# or, for OpenLLMetry:
+pip install langwatch crewai opentelemetry-instrumentation-crewai
+```
+
+The SDK reads `LANGWATCH_API_KEY` from the environment.
 
 ## Integrating Community Instrumentors with LangWatch
 
@@ -21542,6 +21606,12 @@ if __name__ == "__main__":
 - If instrumenting directly (e.g., `CrewAIInstrumentor().instrument()`), ensure that the `TracerProvider` used by the instrumentor is the same one LangWatch is exporting from. This usually means LangWatch is configured to use an existing global provider or one you explicitly pass to `langwatch.setup()`.
 - Always refer to the specific documentation of the community instrumentor (OpenLLMetry or OpenInference) for the most accurate and up-to-date installation and usage instructions, including the correct class names for instrumentors and any specific setup requirements.
 
+## Check it worked
+
+Run the example. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds. Open it to see the crew's agents, tasks and model calls nested inside the trace named in the decorator, for example "CrewAI Execution with OpenInference".
+
+If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
+
 ---
 
 # FILE: ./integration/python/integrations/dspy.mdx
@@ -21614,6 +21684,12 @@ if __name__ == "__main__":
 ```
 
 The `@langwatch.trace()` decorator creates a parent trace, and `autotrack_dspy()` enables automatic tracking of all DSPy operations, including module calls and underlying LM interactions, for the duration of that trace.
+
+## Check it worked
+
+Run the example. Then open your project in LangWatch: a new trace named "DSPy RAG Execution" appears in the traces list within a few seconds. Open it to see the DSPy module calls nested inside it.
+
+If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
 
 ## Related
 
@@ -21888,6 +21964,12 @@ print(result["last_message"].text)
 ```
 
 The `HaystackInstrumentor` automatically captures Haystack pipeline operations, component executions, and model interactions. Use `@langwatch.trace()` to create a parent trace under which Haystack operations will be nested.
+
+## Check it worked
+
+Run the example. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds. Open it to see the Haystack pipeline, its components and the model calls as spans.
+
+If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
 
 ## Related
 
@@ -22206,6 +22288,12 @@ if __name__ == "__main__":
 
 The `@langwatch.trace()` decorator creates a parent trace, and `get_langchain_callback()` provides a callback handler that captures Langchain events as spans. Pass the callback to your agent or chain's `RunnableConfig` to enable instrumentation.
 
+## Check it worked
+
+Run the example. Then open your project in LangWatch: a new trace named "Langchain - Weather Agent" appears in the traces list within a few seconds. Open it to see the LangChain chain, tool and LLM steps nested inside it.
+
+If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
+
 ## Related
 
 - [Capturing RAG](/integration/python/tutorials/capturing-rag) - Learn how to capture RAG data from LangChain retrievers and tools
@@ -22352,6 +22440,12 @@ The `@langwatch.trace()` decorator creates a parent trace for your graph executi
 
 A callback attached only to the model call inside one node produces LLM spans alone. The tool nodes and the plain function nodes never appear, so the trace does not show which step the graph ran.
 
+## Check it worked
+
+Run the example. Then open your project in LangWatch: a new trace named "LangGraph - Calculator Agent" appears in the traces list within a few seconds. Open it to see the graph's nodes, tool calls and LLM calls nested inside it.
+
+If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
+
 ## Related
 
 - [Capturing RAG](/integration/python/tutorials/capturing-rag) - Learn how to capture RAG data from LangChain retrievers and tools
@@ -22429,6 +22523,12 @@ if __name__ == "__main__":
 ```
 
 The `@langwatch.trace()` decorator creates a parent trace, and `autotrack_litellm_calls()` enables automatic tracking of all LiteLLM calls for the duration of that trace.
+
+## Check it worked
+
+Run the example. Then open your project in LangWatch: a new trace named "LiteLLM Autotrack Example" appears in the traces list within a few seconds. Open it to see the LiteLLM completion call nested inside it, with its input and output.
+
+If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
 
 ## Related
 
@@ -22684,6 +22784,12 @@ if __name__ == "__main__":
 
 The `OpenAIAgentsInstrumentor` automatically captures agent activities, LLM calls, and tool usage. Use `@langwatch.trace()` to create a parent trace under which agent operations will be nested.
 
+## Check it worked
+
+Run the example. Then open your project in LangWatch: a new trace named "OpenAI Agent Run with OpenInference" appears in the traces list within a few seconds. Open it to see the agent run, its LLM calls and tool calls nested inside it.
+
+If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
+
 ## Related
 
 - [Capturing RAG](/integration/python/tutorials/capturing-rag) - Learn how to capture RAG data from retrievers and tools
@@ -22707,6 +22813,14 @@ LangWatch captures information about your Azure OpenAI LLM calls automatically. 
 2.  **Using Community OpenTelemetry Instrumentors**: Use existing OpenTelemetry instrumentation libraries like those from OpenInference or OpenLLMetry. These can be integrated with LangWatch by either passing them to the `langwatch.setup()` function or by using their native `instrument()` methods if you're managing your OpenTelemetry setup more directly.
 
 This guide walks you through both methods.
+
+## Installation
+
+```bash
+pip install langwatch openai
+```
+
+The SDK reads `LANGWATCH_API_KEY` from the environment.
 
 ## Using `autotrack_openai_calls()`
 
@@ -22861,6 +22975,12 @@ if __name__ == "__main__":
 - If using `langwatch.setup(instrumentors=[...])`, LangWatch handles the instrumentor's setup.
 - If instrumenting directly (e.g., `OpenAIInstrumentor().instrument()`), ensure that the `TracerProvider` used by the instrumentor is the same one LangWatch is exporting from. This typically happens automatically if LangWatch initializes the global provider or if you configure them to use the same explicit provider.
 
+## Check it worked
+
+Run the example. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds. Open it to see the Azure OpenAI call nested inside the trace named in the decorator, for example "Azure OpenAI Chat Completion".
+
+If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
+
 <Note>
 ### Which Approach to Choose?
 
@@ -22939,6 +23059,12 @@ if __name__ == "__main__":
 ```
 
 The `@langwatch.trace()` decorator creates a parent trace, and `autotrack_openai_calls()` enables automatic tracking of all calls made with the specified client instance for the duration of that trace.
+
+## Check it worked
+
+Run the example. Then open your project in LangWatch: a new trace named "OpenAI Chat Completion" appears in the traces list within a few seconds. Open it to see the OpenAI chat completion nested inside it, with its input and output.
+
+If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
 
 ## Related
 
@@ -23045,6 +23171,12 @@ Many Python libraries, especially in the AI/ML space, are instrumented by commun
     - And more (explore their repository for details).
 
 You can browse these repositories to find instrumentors for other libraries you might be using. If an instrumentor from these projects (or any other source) adheres to the `BaseInstrumentor` interface, you can integrate it with LangWatch using the `langwatch.setup(instrumentors=[...])` method described above.
+
+## Check it worked
+
+Run the example. Then open your project in LangWatch: a new trace named "Task with Instrumented Logging" appears in the traces list within a few seconds. Open it to see the spans your instrumentor created nested inside it.
+
+If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
 
 ### Key Considerations:
 
@@ -23320,6 +23452,12 @@ if __name__ == "__main__":
 ```
 
 LangWatch automatically captures all PydanticAI agent runs and model interactions through PydanticAI's built-in OpenTelemetry support. Use `@langwatch.trace()` decorators to add custom traces and metadata as needed.
+
+## Check it worked
+
+Run the example. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds. Open it to see the PydanticAI agent run and its model calls.
+
+If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
 
 ## Related
 
@@ -23832,6 +23970,12 @@ print(response)
 
 LangWatch automatically captures all agent interactions, model calls, and tool executions through Strands Agents' built-in OpenTelemetry support. Use `@langwatch.trace()` decorators to add custom traces and metadata as needed.
 
+## Check it worked
+
+Run the example. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds. Open it to see the agent run, its model calls and its tool executions.
+
+If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
+
 ## Related
 
 - [Capturing RAG](/integration/python/tutorials/capturing-rag) - Learn how to capture RAG data from retrievers and tools
@@ -23971,6 +24115,12 @@ if __name__ == "__main__":
     print(f"Story Start: {story_start}")
     print(f"AI's Ending: {ending}")
 ```
+
+## Check it worked
+
+Run the example. Then open your project in LangWatch: a new trace named "Vertex AI Call with OpenInference" appears in the traces list within a few seconds. Open it to see the Vertex AI call nested inside it.
+
+If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
 
 <Note>
 ### Which Approach to Choose?
@@ -24544,6 +24694,8 @@ Guardrails are evaluations used to make decisions or enforce policies within you
 Set `as_guardrail=True` when calling `evaluate` or `async_evaluate`.
 
 ```python
+import langwatch
+
 # ... (inside a function with a current span)
 eval_data = BasicEvaluateData(output=llm_response)
 pii_check_result = langwatch.evaluate(
@@ -25170,6 +25322,8 @@ def handle_message(user_id: str, message: str):
 You can call `.update()` multiple times throughout your function as more context becomes available:
 
 ```python
+import langwatch
+
 @langwatch.trace()
 def handle_message(user_id: str, message: str):
     trace = langwatch.get_current_trace()
@@ -25192,6 +25346,8 @@ def handle_message(user_id: str, message: str):
 Labels are a special type of trace metadata that allows you to organize, filter, and categorize your traces in the LangWatch dashboard:
 
 ```python
+import langwatch
+
 @langwatch.trace()
 def handle_message(user_id: str, request_type: str):
     trace = langwatch.get_current_trace()
@@ -25997,6 +26153,8 @@ This warning exists because replacing a globally configured provider can sometim
 If you are intentionally running LangWatch alongside an existing global OpenTelemetry setup and want LangWatch to add its exporter to that setup, you can silence this warning by setting:
 
 ```python
+import langwatch
+
 langwatch.setup(
     # ... other options
     ignore_global_tracer_provider_override_warning=True
@@ -26367,6 +26525,8 @@ LangWatch computes TTFT as `first_token_at - started_at`. You don't need to set 
 When your code measures the elapsed time instead of the wall-clock timestamp, report it through either of these equivalents:
 
 ```python
+import langwatch
+
 span = langwatch.get_current_span()
 
 # Option A: OTel GenAI semconv attribute, duration in milliseconds
@@ -26676,6 +26836,12 @@ results of your custom evaluator on the current trace or span by using the `.add
 <TypeScriptCustomEvaluation />
 
 
+## Check it worked
+
+Run the example. The SDK flushes pending spans when the process exits. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds. Open it to see the `llm-call` span with the Azure OpenAI request.
+
+If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the process runs in.
+
 ## Related Documentation
 
 For more advanced Azure AI integration patterns and best practices:
@@ -26760,6 +26926,12 @@ console.log(await main("Hey, tell me a joke"));
 ```
 
 The `LangWatchCallbackHandler` captures Langchain events and converts them into detailed LangWatch spans. Pass the callback handler to your Langchain components via the `callbacks` option in `withConfig()`.
+
+## Check it worked
+
+Run the example. The SDK flushes pending spans when the process exits. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds. Open it to see the LangChain steps and the LLM call.
+
+If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the process runs in.
 
 ## Related
 
@@ -26857,6 +27029,12 @@ console.log(await main("Hey, tell me a joke"));
 
 The `LangWatchCallbackHandler` captures LangGraph node executions and workflow patterns. Pass the callback handler to your compiled graph via `withConfig()`.
 
+## Check it worked
+
+Run the example. The SDK flushes pending spans when the process exits. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds. Open it to see the graph's nodes and LLM calls.
+
+If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the process runs in.
+
 ## Related
 
 - [Capturing RAG](/integration/typescript/tutorials/capturing-rag) - Learn how to capture RAG data from LangChain retrievers and tools
@@ -26943,6 +27121,12 @@ export const mastra = new Mastra({
 ```
 
 Mastra automatically sends traces to LangWatch through the OpenTelemetry exporter. All agent interactions, tool calls, and workflow executions will be captured.
+
+## Check it worked
+
+Run the example. The SDK flushes pending spans when the process exits. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds. Open it to see the Mastra agent run and its model calls.
+
+If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the process runs in.
 
 ## Related
 
@@ -27083,6 +27267,12 @@ results of your custom evaluator on the current trace or span by using the `.add
 
 <TypeScriptCustomEvaluation />
 
+
+## Check it worked
+
+Run the example. The SDK flushes pending spans when the process exits. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds. Open it to see the `main` span with the OpenAI call nested inside it.
+
+If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the process runs in.
 
 ## Related
 
@@ -27228,6 +27418,12 @@ span attribute wins over the one you pass here. Labels are the exception: the
 two sets are combined, so the trace keeps both. See
 [Capturing Metadata and Attributes](/integration/typescript/tutorials/capturing-metadata)
 for the attribute names.
+
+## Check it worked
+
+Run the example. The SDK flushes pending spans when the process exits. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds. Open it to see the `generateText` call and its model request as spans.
+
+If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the process runs in.
 
 ## Related
 
@@ -28579,6 +28775,8 @@ const handle = setupObservability({
 ### Development Environment
 
 ```typescript
+import { setupObservability } from "langwatch/observability/node";
+
 const handle = setupObservability({
   langwatch: {
     apiKey: process.env.LANGWATCH_API_KEY,
@@ -28596,6 +28794,8 @@ const handle = setupObservability({
 ### Production Environment
 
 ```typescript
+import { setupObservability } from "langwatch/observability/node";
+
 const handle = setupObservability({
   langwatch: {
     apiKey: process.env.LANGWATCH_API_KEY,
@@ -29091,6 +29291,8 @@ async function processWithContext(userId: string) {
 Implement error handling for manual span management:
 
 ```typescript
+import { getLangWatchTracer } from "langwatch";
+
 class SpanManager {
   private tracer = getLangWatchTracer("my-service");
 
@@ -29515,6 +29717,8 @@ process.on('SIGTERM', async () => {
 Implement sophisticated sampling strategies for different use cases:
 
 ```typescript
+import { setupObservability } from "langwatch/observability/node";
+
 import { TraceIdRatioBasedSampler, ParentBasedSampler } from "@opentelemetry/sdk-trace-base";
 
 // Sample based on trace ID ratio
@@ -29543,6 +29747,8 @@ const handle = setupObservability({
 Configure custom resource detection for better service identification:
 
 ```typescript
+import { setupObservability } from "langwatch/observability/node";
+
 import { Resource } from "@opentelemetry/resources";
 import { SemanticResourceAttributes } from "@opentelemetry/semantic-conventions";
 
@@ -29574,6 +29780,8 @@ const handle = setupObservability({
 Add custom instrumentations for specific libraries or frameworks:
 
 ```typescript
+import { setupObservability } from "langwatch/observability/node";
+
 import { HttpInstrumentation } from "@opentelemetry/instrumentation-http";
 import { ExpressInstrumentation } from "@opentelemetry/instrumentation-express";
 import { MongoDBInstrumentation } from "@opentelemetry/instrumentation-mongodb";
@@ -29599,6 +29807,8 @@ const handle = setupObservability({
 Configure custom context propagation for distributed tracing:
 
 ```typescript
+import { setupObservability } from "langwatch/observability/node";
+
 import { W3CTraceContextPropagator, W3CBaggagePropagator } from "@opentelemetry/core";
 import { CompositePropagator } from "@opentelemetry/core";
 
@@ -29620,6 +29830,8 @@ const handle = setupObservability({
 Create different configurations for different environments:
 
 ```typescript
+import { setupObservability } from "langwatch/observability/node";
+
 const getObservabilityConfig = (environment: string) => {
   const baseConfig = {
     serviceName: "my-service",
@@ -29683,6 +29895,9 @@ const handle = setupObservability(getObservabilityConfig(process.env.NODE_ENV));
 Optimize performance for high-volume applications:
 
 ```typescript
+import { setupObservability } from "langwatch/observability/node";
+import { LangWatch } from "langwatch";
+
 const handle = setupObservability({
   langwatch: {
     apiKey: process.env.LANGWATCH_API_KEY,
@@ -29788,6 +30003,8 @@ const handle = setupObservability({
 Enable detailed logging during migration to identify issues:
 
 ```typescript
+import { setupObservability } from "langwatch/observability/node";
+
 // Enable detailed logging during migration
 const handle = setupObservability({
   langwatch: {
@@ -30831,6 +31048,12 @@ The middleware captures input and output content **by default** (`langwatch.Data
 The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in memory will be lost when your application exits.
 </Warning>
 
+## Check it worked
+
+Run the program with `go run .`. The deferred `tp.Shutdown(ctx)` flushes the spans when `main` returns. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds, with the Bedrock call as an LLM span carrying its input, output and token counts.
+
+If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the program runs in.
+
 ## Related
 
 - [Go Integration Guide](/integration/go/guide) - Setup, manual spans, data capture and the REST client
@@ -30925,6 +31148,12 @@ The middleware captures input and output content **by default** (`langwatch.Data
   The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in memory will be lost
   when your application exits.
 </Warning>
+
+## Check it worked
+
+Run the program with `go run .`. The deferred `tp.Shutdown(ctx)` flushes the spans when `main` returns. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds, with the Anthropic call as an LLM span carrying its input, output and token counts.
+
+If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the program runs in.
 
 ## Related
 
@@ -31032,6 +31261,12 @@ The middleware captures input and output content **by default** (`langwatch.Data
   when your application exits.
 </Warning>
 
+## Check it worked
+
+Run the program with `go run .`. The deferred `tp.Shutdown(ctx)` flushes the spans when `main` returns. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds, with the Azure OpenAI call as an LLM span carrying its input, output and token counts.
+
+If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the program runs in.
+
 ## Related
 
 - [Go Integration Guide](/integration/go/guide) - Setup, manual spans, data capture and the REST client
@@ -31110,6 +31345,12 @@ lwgenkit.RegisterLangWatch(g,
 <Note>
 LangWatch captures whatever `gen_ai.*` attributes Genkit records; there is no extra parsing in this package. If you build your own `sdktrace.TracerProvider`, use `lwgenkit.SpanProcessor(opts...)` to obtain the processor and register it yourself (Genkit reads the global tracer provider).
 </Note>
+
+## Check it worked
+
+Run one of your flows. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds, with the spans Genkit recorded for the flow and its model calls.
+
+If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the program runs in.
 
 ## Related
 
@@ -31200,6 +31441,12 @@ For the **Vertex AI** backend set `Backend: genai.BackendVertexAI`. If you build
   The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in memory will be lost
   when your application exits.
 </Warning>
+
+## Check it worked
+
+Run the program with `go run .`. The deferred `tp.Shutdown(ctx)` flushes the spans when `main` returns. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds, with the Gemini call as an LLM span carrying its input, output and token counts.
+
+If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the program runs in.
 
 ## Related
 
@@ -31295,6 +31542,12 @@ The middleware captures input and output content **by default**. Pass `otelopena
   when your application exits.
 </Warning>
 
+## Check it worked
+
+Run the program with `go run .`. The deferred `tp.Shutdown(ctx)` flushes the spans when `main` returns. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds, with the Grok call as an LLM span carrying its input, output and token counts.
+
+If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the program runs in.
+
 ## Related
 
 - [Go Integration Guide](/integration/go/guide#openai-compatible-providers)
@@ -31388,6 +31641,12 @@ The middleware captures input and output content **by default**. Pass `otelopena
   The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in memory will be lost
   when your application exits.
 </Warning>
+
+## Check it worked
+
+Run the program with `go run .`. The deferred `tp.Shutdown(ctx)` flushes the spans when `main` returns. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds, with the Groq call as an LLM span carrying its input, output and token counts.
+
+If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the program runs in.
 
 ## Related
 
@@ -31483,6 +31742,12 @@ If you'd rather build the `*http.Client` yourself, use `ollama.NewTransport()` (
   when your application exits.
 </Warning>
 
+## Check it worked
+
+Run the program with `go run .`. The deferred `tp.Shutdown(ctx)` flushes the spans when `main` returns. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds, with the Ollama call as an LLM span carrying its input and output.
+
+If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the program runs in.
+
 ## Related
 
 - [Go Integration Guide](/integration/go/guide) - Setup, manual spans, data capture and the REST client
@@ -31576,6 +31841,12 @@ The middleware captures input and output content **by default** (`langwatch.Data
   The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in memory will be lost
   when your application exits.
 </Warning>
+
+## Check it worked
+
+Run the program with `go run .`. The deferred `tp.Shutdown(ctx)` flushes the spans when `main` returns. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds, with the OpenAI call as an LLM span carrying its input, output and token counts.
+
+If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the program runs in.
 
 ## Related
 
@@ -31684,6 +31955,12 @@ The middleware captures input and output content **by default**. Pass `otelopena
 <Note>
 Using OpenRouter is a great way to experiment with different models without changing your core instrumentation logic. All calls will be traced by LangWatch, regardless of the underlying model you choose.
 </Note>
+
+## Check it worked
+
+Run the program with `go run .`. The deferred `tp.Shutdown(ctx)` flushes the spans when `main` returns. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds, with the OpenRouter call as an LLM span carrying its input, output and token counts.
+
+If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the program runs in.
 
 ---
 
@@ -31836,7 +32113,7 @@ This guide shows you how to set up OpenTelemetry instrumentation in any language
 
 LangWatch provides a standard OpenTelemetry Protocol (OTLP) endpoint for receiving traces:
 
-```
+```text
 https://app.langwatch.ai/api/otel/v1/traces
 ```
 
@@ -32105,6 +32382,10 @@ does not touch the global one, so each SDK operates independently.
 
 ## Python
 
+```bash
+pip install langwatch opentelemetry-sdk
+```
+
 Pass a dedicated `TracerProvider` to `langwatch.setup()`. LangWatch uses it
 exclusively, leaving the global provider for the other SDK:
 
@@ -32147,6 +32428,10 @@ def chat(user_message: str):
 ```
 
 ## TypeScript
+
+```bash
+npm install langwatch @opentelemetry/sdk-trace-node
+```
 
 Pass a dedicated `NodeTracerProvider` via the `tracerProvider` option.
 LangWatch attaches its exporter to it and skips global provider detection:
@@ -32194,6 +32479,8 @@ If you don't need full isolation and just want LangWatch to receive spans from
 an existing provider, use `advanced.attachToExistingProvider`:
 
 ```typescript
+import { setupObservability } from "langwatch/observability/node";
+
 setupObservability({
   langwatch: { apiKey: process.env.LANGWATCH_API_KEY },
   advanced: { attachToExistingProvider: true },
@@ -32231,6 +32518,12 @@ langwatch.setup(
 ```
 
 This is a name-based blocklist. The dedicated provider approach is more reliable.
+
+## Check it worked
+
+Run a function decorated with `@langwatch.trace()` (Python) or wrapped in a LangWatch tracer span (TypeScript). Then open your project in LangWatch: the trace appears in the traces list within a few seconds, and the other tool does not receive it. Application spans recorded on the global provider stay in the other tool and do not appear in LangWatch.
+
+If nothing appears in LangWatch, check that `LANGWATCH_API_KEY` is set, or that the key passed to the setup call is right.
 
 ---
 
@@ -32342,7 +32635,53 @@ This method of integration sends traces from any system capable of making HTTP r
 
 Remember to handle errors and retries as needed. You might need to script additional logic around the `curl` command to handle these cases.
 
-After following the above guide, your interactions with LLMs should now be captured by LangWatch. Once integrated, you can visit your LangWatch dashboard to view and analyze the traces collected from your applications.
+### The same request from Python
+
+```bash
+pip install requests
+```
+
+```python
+import os
+import time
+
+import requests
+
+endpoint = os.environ.get("LANGWATCH_ENDPOINT", "https://app.langwatch.ai")
+now = int(time.time() * 1000)
+
+response = requests.post(
+    f"{endpoint}/api/v1/collector",
+    headers={"X-Auth-Token": os.environ["LANGWATCH_API_KEY"]},
+    json={
+        "trace_id": "trace-123",
+        "spans": [
+            {
+                "type": "llm",
+                "span_id": "span-456",
+                "vendor": "openai",
+                "model": "gpt-5",
+                "input": {
+                    "type": "chat_messages",
+                    "value": [{"role": "user", "content": "Input to the LLM"}],
+                },
+                "output": {
+                    "type": "chat_messages",
+                    "value": [{"role": "assistant", "content": "Output from the LLM"}],
+                },
+                "timestamps": {"started_at": now, "finished_at": now + 1000},
+            }
+        ],
+    },
+)
+response.raise_for_status()
+```
+
+### Check it worked
+
+A successful request returns a `2xx` status. Then open your project in LangWatch: the trace `trace-123` appears in the traces list within a few seconds, with one LLM span holding the input and output you sent. Use a new `trace_id` for each trace you send.
+
+If the request is refused or nothing appears, check that `LANGWATCH_API_KEY` holds a valid project API key.
 
 ---
 
@@ -32392,6 +32731,12 @@ That's it! You should now see your Langflow component traces on the LangWatch da
 You can customize what LangWatch captures as the final input and output of your Langflow component for better observability.
 
 To do this, you can add this two lines of code in the execution function of any Langflow component:
+
+If `langwatch` is not installed in the Python environment Langflow runs in, install it there first:
+
+```bash
+pip install langwatch
+```
 
 ```python
 import langwatch
@@ -32863,7 +33208,7 @@ node -e "console.log(require.resolve('@langwatch/n8n-observability/hooks'))"
 
 Look for this startup message:
 
-```
+```text
 [@langwatch/n8n-observability] observability ready and patches applied
 ```
 
@@ -34367,6 +34712,8 @@ span.end();
 <CodeGroup>
 
 ```python Python Best Practices
+import langwatch
+
 # Use context managers for automatic span management
 with langwatch.span(name="operation") as span:
     # Your code here
@@ -34470,6 +34817,8 @@ provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))
 ```
 
 ```typescript TypeScript Debugging Migration
+import { setupObservability } from "langwatch/observability/node";
+
 // Enable detailed logging during migration
 const handle = setupObservability({
   langwatch: {
@@ -34834,6 +35183,8 @@ The claim uses the entry's own name with `_CLAIM` after it, so there is no secon
 ### Cache API
 
 ```python
+import langwatch
+
 langwatch.cache.set("ACME_SESSION", session, ttl_seconds=840)
 langwatch.cache.get("ACME_SESSION", default=None)
 langwatch.cache.claim("ACME_SESSION_CLAIM", "taken", ttl_seconds=15)
@@ -35124,6 +35475,8 @@ A Python parameter that is not a turn field is a run parameter. The platform off
 ```python
 from typing import Literal
 
+import langwatch
+
 @langwatch.connect_agent(name="support-agent")
 async def support_agent(
     messages: list[dict],
@@ -35153,6 +35506,8 @@ Declare a parameter for a value the tests must vary: a model, a plan, a tenant, 
 `thread_id` is the platform's conversation id. `session` is the agent's own memory of the conversation: any JSON value, `None` on the first turn, and whatever the function returns comes back on the next turn of the same conversation.
 
 ```python
+import langwatch
+
 @langwatch.connect_agent(name="support-agent")
 async def support_agent(messages: list[dict], session: str | None = None):
     conversation_id = session or await my_agent.create_conversation()
@@ -35661,6 +36016,8 @@ Scenario-declared parameters and agent-declared parameters share one list. See [
   ### Python
 
     ```python
+    import langwatch
+
     @langwatch.connect_agent(name="support-agent")
     async def support_agent(messages: list[dict], session: str | None = None):
         conversation_id = session or await my_agent.create_conversation()
@@ -35692,6 +36049,8 @@ To keep the state in your own process instead, use an in-memory map. Key it by `
   ### Python
 
     ```python
+    import langwatch
+
     SESSIONS: dict[str, str] = {}
 
     @langwatch.connect_agent(name="support-agent", sticky=True)
@@ -39079,7 +39438,7 @@ A filled `image` cell shows the picture. A filled `file` cell shows a chip with 
 
 After an upload the cell holds a LangWatch reference:
 
-```
+```text
 /api/files/{projectId}/{objectId}/{fileName}
 ```
 
@@ -39125,7 +39484,7 @@ An evaluator reads an uploaded file as base64 data. An external URL goes to the 
 
 An agent runs outside LangWatch, so it cannot open a LangWatch reference. When an `image` or a `file` column is mapped to an HTTP agent input, to a connected agent parameter, to a code agent input or to a workflow input, LangWatch reads the file first and sends a base64 data URL:
 
-```
+```text
 data:<mediaType>;name=<urlencoded file name>;base64,<data>
 ```
 
@@ -39382,6 +39741,8 @@ Retrieve all datasets for your project with pagination support.
   ### Python
 
 ```python
+import langwatch
+
 # List all datasets (first page, default limit)
 result = langwatch.dataset.list_datasets()
 
@@ -39399,6 +39760,10 @@ result = langwatch.dataset.list_datasets(page=2, limit=10)
   ### TypeScript
 
 ```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
 // List all datasets (first page, default limit)
 const result = await langwatch.datasets.list();
 
@@ -39423,6 +39788,8 @@ Create a new dataset with an optional column schema.
   ### Python
 
 ```python
+import langwatch
+
 # Create with name and column types
 info = langwatch.dataset.create_dataset(
     "User Feedback",
@@ -39442,6 +39809,10 @@ info = langwatch.dataset.create_dataset("Simple Dataset")
   ### TypeScript
 
 ```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
 // Create with name and column types
 const info = await langwatch.datasets.create({
   name: "User Feedback",
@@ -39467,6 +39838,8 @@ Fetch a dataset by slug or ID, including all its entries.
   ### Python
 
 ```python
+import langwatch
+
 # Fetch dataset by slug or ID
 dataset = langwatch.dataset.get_dataset("your-dataset-slug")
 
@@ -39485,6 +39858,10 @@ print(df.head())
   ### TypeScript
 
 ```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
 // Fetch dataset by slug or ID
 const dataset = await langwatch.datasets.get("your-dataset-slug");
 
@@ -39505,6 +39882,8 @@ Update a dataset's name or column types.
   ### Python
 
 ```python
+import langwatch
+
 # Update the name
 updated = langwatch.dataset.update_dataset("my-dataset", name="New Name")
 print(f"New slug: {updated.slug}")
@@ -39521,6 +39900,10 @@ columns=[{"name": "question", "type": "string"}, {"name": "answer", "type": "str
   ### TypeScript
 
 ```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
 // Update the name
 const updated = await langwatch.datasets.update("my-dataset", {
   name: "New Name",
@@ -39558,6 +39941,8 @@ Retrieve records from a dataset with pagination.
   ### Python
 
 ```python
+import langwatch
+
 # List records (first page, default limit)
 result = langwatch.dataset.list_records("my-dataset")
 
@@ -39575,6 +39960,10 @@ result = langwatch.dataset.list_records("my-dataset", page=2, limit=20)
   ### TypeScript
 
 ```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
 // List records (first page, default limit)
 const result = await langwatch.datasets.listRecords("my-dataset");
 
@@ -39602,6 +39991,8 @@ Batch-add records to an existing dataset.
   ### Python
 
 ```python
+import langwatch
+
 records = langwatch.dataset.create_records(
     "my-dataset",
     entries=[
@@ -39616,6 +40007,10 @@ for r in records:
   ### TypeScript
 
 ```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
 const records = await langwatch.datasets.createRecords("my-dataset", [
   { input: "What is LangWatch?", output: "An LLM observability platform." },
   { input: "How do I get started?", output: "Install the SDK and call setup()." },
@@ -39635,6 +40030,8 @@ Update (or upsert) a single record by ID.
   ### Python
 
 ```python
+import langwatch
+
 record = langwatch.dataset.update_record(
     "my-dataset",
     "rec-1",
@@ -39646,6 +40043,10 @@ print(f"Updated: {record.id} -> {record.entry}")
   ### TypeScript
 
 ```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
 const record = await langwatch.datasets.updateRecord("my-dataset", "rec-1", {
   input: "updated question", output: "updated answer",
 });
@@ -39661,13 +40062,22 @@ Batch-delete records by their IDs.
 
   ### Python
 
-    ```python deleted_count = langwatch.dataset.delete_records( "my-dataset", record_ids=["rec-1",
-    "rec-2"], ) print(f"Deleted {deleted_count} records") ```
+    ```python
+    import langwatch
+
+    deleted_count = langwatch.dataset.delete_records(
+        "my-dataset",
+        record_ids=["rec-1", "rec-2"],
+    )
+    print(f"Deleted {deleted_count} records")
+    ```
 
   ### TypeScript
 
-    ```typescript const result = await langwatch.datasets.deleteRecords("my-dataset", ["rec-1",
-    "rec-2"]); console.log(`Deleted ${result.deletedCount} records`); ```
+    ```typescript
+    const result = await langwatch.datasets.deleteRecords("my-dataset", ["rec-1", "rec-2"]);
+    console.log(`Deleted ${result.deletedCount} records`);
+    ```
 
 
 
@@ -39679,6 +40089,8 @@ Upload a CSV, JSON, or JSONL file to a dataset. If the dataset does not exist, i
   ### Python
 
 ```python
+import langwatch
+
 # Upload to existing or create new (default: append)
 result = langwatch.dataset.upload("my-dataset", file_path="data.csv")
 print(f"Created {result.recordsCreated} records")
@@ -39705,6 +40117,10 @@ The `if_exists` parameter controls how conflicts are handled:
   ### TypeScript
 
 ```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
 // Upload to existing or create new (default: append)
 const file = new File([csvContent], "data.csv", { type: "text/csv" });
 const result = await langwatch.datasets.upload("my-dataset", file);
@@ -39805,6 +40221,10 @@ Which fields you get back depends on the operation. `list_records` returns all s
 You can define types for your dataset entries for better type safety:
 
 ```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
 type MyDatasetEntry = {
   input: string;
   expected_output: string;
@@ -40148,7 +40568,7 @@ langwatch prompt pull
 
 This creates materialized YAML files:
 
-```
+```text
 prompts/
 └── .materialized/
     ├── customer-support-bot.prompt.yaml
@@ -40633,7 +41053,7 @@ langwatch prompt init
 
 This creates the essential files:
 
-```
+```text
 your-repo/
 ├── prompts/
 │   └── .materialized/      # Add to .gitignore
@@ -40930,7 +41350,7 @@ curl -H "X-Auth-Token: $LANGWATCH_API_KEY" \
 
 Use `platform_get_prompt` with the `tag` parameter to fetch a specific tagged version:
 
-```
+```typescript
 platform_get_prompt({ idOrHandle: "pizza-prompt", tag: "production" })
 ```
 
@@ -41084,7 +41504,7 @@ langwatch.prompts.update(
 
 Tags can also be assigned during prompt creation and updates via MCP:
 
-```
+```typescript
 // Create with tags
 platform_create_prompt({
   name: "My Prompt",
@@ -41524,6 +41944,8 @@ metric = langwatch.dspy.track_metric(metric)
 Now at each step your optimizer progresses, call `langwatch.dspy.log_step` to capture the score at the current step index, optimizer info and predictors being used on this step evaluation:
 
 ```python
+import langwatch
+
 langwatch.dspy.log_step(
     optimizer=DSPyOptimizer(
         name="MyAwesomeOptimizer",
@@ -41564,9 +41986,17 @@ LangWatch DSPy Visualization tracks your DSPy experiments in real time, so you c
 
 
   ### Notebook
-```bash !pip install langwatch ```
+
+    ```bash
+    !pip install langwatch
+    ```
+
   ### Command Line
-```bash pip install langwatch ```
+
+    ```bash
+    pip install langwatch
+    ```
+
 
 
 ## 2. Login to LangWatch
@@ -41579,7 +42009,7 @@ import langwatch
 langwatch.login()
 ```
 
-Be sure to log in or create an account using the displayed link, then provide your API key when prompted.
+Be sure to log in or create an account using the displayed link, then provide your API key when prompted. If `LANGWATCH_API_KEY` is already set in the environment, `langwatch.login()` uses it and does not prompt.
 
 ## 3. Start tracking
 
@@ -41694,6 +42124,8 @@ Last step is to actually run the prompt optitmizer. In this example `BootstrapFe
 bootstrap our prompt with the best demos from our dataset.
 
 ```python
+import langwatch
+
 from dspy.teleprompt import BootstrapFewShot
 from dspy import evaluate
 from dotenv import load_dotenv
@@ -42132,7 +42564,7 @@ Treat an absent report as "unknown", not as "complete".
 
 ### Example prompt
 
-```
+```text
 Add a widget to my Agent health board that shows p95 latency by model
 for the last 7 days.
 ```
@@ -42291,13 +42723,13 @@ The question goes first, or as `--ask` when you want several. `estimate` takes t
 
 The statement it wrote and the two window values, then one progress line that updates in place:
 
-```
+```text
 Judging 3,200/10,000 · 412 matched · 1.9M tokens · 12s
 ```
 
 When the run ends, the headline replaces it, followed by the first rows and the `results` command that reads the rest:
 
-```
+```text
 Found 412 matches in 10,000 conversations · 20.4s · 6.1M tokens · $0.33
 ```
 
@@ -42430,7 +42862,7 @@ For example, the first run on the [overview](/features/instant-evals/overview) j
 langwatch instant-eval estimate "the customer sounds annoyed" --target threads --last 30d --limit 10000
 ```
 
-```
+```text
   This run would judge:
     Rows:     10,000
     Requests: 10,000  Tokens: 11,870,000 (1,187 per row)
@@ -42747,7 +43179,7 @@ description: Page through a run's verdicts, read the text the judge saw beside e
 
 A result is one verdict per row and question. When a run finishes, the CLI prints one line with the totals and then the first twenty matched rows:
 
-```
+```text
 Found 3,351 matches in 10,000 conversations · 2m 26s · 11.4M tokens · $0.62
 ```
 
@@ -42858,7 +43290,7 @@ Read the run and look at the `Unjudged` line:
 langwatch instant-eval status <run-id>
 ```
 
-```
+```text
 Unjudged: 12 failed, 3 skipped
 ```
 
@@ -43273,7 +43705,7 @@ An endpoint belongs to your **organization** and carries:
 
 Manage endpoints under **AI Gateway > Webhooks** (`/gateway/webhooks`) or over REST with an organization API key:
 
-```
+```text
 POST   /api/webhooks/v1/endpoints                    webhookEndpoints:manage
 GET    /api/webhooks/v1/endpoints                    webhookEndpoints:view
 GET    /api/webhooks/v1/endpoints/:id                webhookEndpoints:view
@@ -43441,7 +43873,7 @@ The envelope id embeds the budget, the bucket, the kind, and the period start, w
 
 Every delivery carries:
 
-```
+```http
 Content-Type: application/json
 X-LangWatch-Delivery-Id: <delivery id, stable across retries of this batch>
 X-LangWatch-Signature: t=<unix seconds>,v1=<hex hmac-sha256(secret, "<t>.<raw body>")>
@@ -44049,6 +44481,8 @@ Always provide a descriptive `name` when using evaluators in online evaluation. 
 </Warning>
 
 ```python
+import langwatch
+
 # Good - descriptive name
 langwatch.evaluation.evaluate(
     "langevals/llm_category",
@@ -44123,7 +44557,7 @@ With custom scoring, you:
 2. Send the results (score, passed, label, details) to LangWatch
 3. View results in traces, analytics, and dashboards
 
-```
+```text
 Your Code → Your Evaluation Logic → Score/Pass/Fail → LangWatch
                                                           ↓
                                               Traces, Analytics, Alerts
@@ -44287,6 +44721,8 @@ At least one of `passed`, `score`, or `label` should be provided for meaningful 
 ### Code Quality Check
 
 ```python
+import langwatch
+
 def check_code_quality(generated_code: str) -> dict:
     # Your custom logic
     has_syntax_errors = check_syntax(generated_code)
@@ -44366,6 +44802,8 @@ def validate_response(response: str, context: dict) -> dict:
 You can use custom scoring alongside built-in evaluators:
 
 ```python
+import langwatch
+
 @langwatch.span()
 def my_llm_step(user_input: str):
     output = my_llm(user_input)
@@ -44669,7 +45107,7 @@ You can score an output in three ways:
 | **Custom Scoring** | N/A - you send the score directly | Proprietary logic, domain-specific metrics |
 
 <Accordion title="Decision flowchart">
-```
+```text
 Do you have your own evaluation logic?
 ├─ Yes → Use Custom Scoring
 └─ No → Do you want to configure via UI and reuse?
@@ -44682,7 +45120,7 @@ Do you have your own evaluation logic?
 
 An evaluator takes inputs (like the user question, LLM response, and optionally context or expected output) and returns a score indicating quality along some dimension.
 
-```
+```text
 Input + Output + Context → Evaluator → Score
                                         ↓
                               passed: true/false
@@ -44763,6 +45201,8 @@ langwatch.get_current_span().add_evaluation(
 Run evaluators on each row of your test dataset for batch evaluation:
 
 ```python
+import langwatch
+
 experiment = langwatch.experiment.init("my-experiment")
 
 for idx, row in experiment.loop(df.iterrows()):
@@ -44797,6 +45237,8 @@ Run evaluators automatically on production traces:
 Use evaluators to block harmful content in real-time:
 
 ```python
+import langwatch
+
 guardrail = langwatch.evaluation.evaluate(
     "azure/jailbreak",
     name="Jailbreak Detection",
@@ -44831,6 +45273,8 @@ Check each evaluator's documentation for required and optional inputs.
 </Warning>
 
 ```python
+import langwatch
+
 # Good - descriptive name
 langwatch.evaluation.evaluate(
     "langevals/llm_category",
@@ -45219,7 +45663,7 @@ Configure your experiment once in the LangWatch Experiments via UI, then trigger
    - Run it once to verify it works
 
 2. **Get your experiment slug** from the URL:
-   ```
+   ```text
    https://app.langwatch.ai/your-project/experiments/your-experiment-slug
                                                       ^^^^^^^^^^^^^^^^^^^^
    ```
@@ -45297,6 +45741,8 @@ jobs:
 ### Options
 
 ```python
+import langwatch
+
 result = langwatch.experiment.run(
     "my-experiment",
     timeout=300.0,           # Max wait time (seconds)
@@ -45314,6 +45760,8 @@ result.print_summary(exit_on_failure=True)  # Exit with code 1 on failures
   ### Python
 
 ```python
+import langwatch
+
 result = langwatch.experiment.run("my-experiment")
 result.print_summary()      # CI-friendly summary; exits 1 on failures
 df = result.results         # per-row results as a pandas DataFrame
@@ -45343,6 +45791,8 @@ By default the run uses the dataset attached to the experiment. You can override
   ### Python
 
 ```python
+import langwatch
+
 # Inline rows
 langwatch.experiment.run("my-experiment", data=[{"input": "What is 2 + 2?"}])
 # A platform dataset by id
@@ -45354,6 +45804,10 @@ langwatch.experiment.run("my-experiment", parameters={"model": "gpt-5-mini"})
   ### TypeScript
 
 ```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
 // Inline rows
 await langwatch.experiments.runWithResults("my-experiment", { data: [{ input: "What is 2 + 2?" }] });
 // A platform dataset by id
@@ -45528,7 +45982,7 @@ experiment.print_summary()
 
 Both approaches output a CI-friendly summary:
 
-```
+```text
 ════════════════════════════════════════════════════════════
   EXPERIMENT RESULTS
 ════════════════════════════════════════════════════════════
@@ -46341,12 +46795,15 @@ The evaluation is started by creating an evaluation session with a descriptive n
 
   ### Python
 
-    ```python evaluation = langwatch.experiment.init("rag-pipeline-openai-vs-claude") ```
+    ```python
+    evaluation = langwatch.experiment.init("rag-pipeline-openai-vs-claude")
+    ```
 
   ### TypeScript
 
-    ```typescript const evaluation = await
-    langwatch.experiments.init("rag-pipeline-openai-vs-claude"); ```
+    ```typescript
+    const evaluation = await langwatch.experiments.init("rag-pipeline-openai-vs-claude");
+    ```
 
 
 
@@ -46432,6 +46889,8 @@ Once a row's targets have each produced an output, [Comparison](#comparison) jud
 Use `evaluation.target()` for automatic latency capture and context inference:
 
 ```python
+import langwatch
+
 evaluation = langwatch.experiment.init("model-comparison")
 
 for index, row in evaluation.loop(df.iterrows()):
@@ -46478,6 +46937,10 @@ evaluation.log(
 Use `withTarget()` for automatic latency capture and context inference:
 
 ```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
 const evaluation = await langwatch.experiments.init("model-comparison");
 
 await evaluation.run(dataset, async ({ item, index }) => {
@@ -46607,6 +47070,8 @@ LLM calls can be slow. Both SDKs support parallel execution to speed up your eva
 Use the built-in parallelization by putting the content of the loop in a function and submitting it:
 
 ```python {4,8}
+import langwatch
+
 evaluation = langwatch.experiment.init("parallel-eval-example")
 
 for index, row in evaluation.loop(df.iterrows(), threads=4):
@@ -46626,6 +47091,8 @@ The default `loop()`, `submit()` path above already parallelises, each submitted
 Reach for `aloop()`, `asubmit()` only when your code is fully async-first and your task relies on async state whose identity is tied to one event loop. The threading path spins up a fresh event loop per worker, so those objects raise `"Future attached to a different loop"` on first use. `aloop`, `asubmit` keep every submitted task on the caller's event loop, so that state stays valid across concurrent items.
 
 ```python
+import langwatch
+
 evaluation = langwatch.experiment.init("async-eval-example")
 
 async def task(index, row):
@@ -46770,6 +47237,10 @@ The candidates are whatever `log_response()` recorded inside each `target()` blo
   ### TypeScript
 
 ```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
 const evaluation = await langwatch.experiments.init("model-comparison");
 
 await evaluation.run(dataset, async ({ item }) => {
@@ -47042,6 +47513,8 @@ evaluation.printSummary();
 In async-native mode, use `acompare()` so the judge is awaited rather than blocked on, leaving the event loop free for the rows running alongside it. It takes the same options and records the same verdict:
 
 ```python
+import langwatch
+
 evaluation = langwatch.experiment.init("async-comparison")
 
 async def task(index, row):
@@ -47198,6 +47671,8 @@ To get complete visibility into your LLM pipeline, add tracing to your functions
   ### Python
 
 ```python
+import langwatch
+
 @langwatch.trace()
 def agent(question):
     # Your RAG pipeline, chain, or agent logic
@@ -47441,7 +47916,7 @@ Under **Datasets**, click **Add** and pick **Select existing dataset**. To start
 <Step title="Add a prompt column">
 Under **Prompts or Agents**, click **Add** and pick **Prompt**, then **New Prompt**. In the editor, pick the model and write the system prompt. For example:
 
-```
+```text
 You are the customer support assistant for ACME.
 Answer only from the ACME policies below. If the answer is not in the policies, say that you do not know and refer the customer to support@acme.example.
 
@@ -47566,7 +48041,7 @@ On the prompt column, click **Add evaluator**, then **New Evaluator**. Pick the 
 
 Name it, pick the judge model, and replace the default prompt with your criteria. Write the criteria as a checklist the judge can apply to one answer at a time. For example:
 
-```
+```text
 You are evaluating a business coaching assistant.
 The output passes only if all of these are true:
 1. It answers the question the user asked, not a different one.
@@ -47842,7 +48317,7 @@ description: Add guardrails to your LLM application to block harmful content in 
   **Let your agent set this up.** [Copy the evaluations prompt](/skills/directory) into your coding agent to get started automatically.
 </Tip>
 
-This guide shows how to integrate guardrails into your application using the LangWatch SDK. Guardrails run evaluators synchronously and return results you can act on immediately.
+Guardrails run LangWatch evaluators synchronously from your code, through the LangWatch SDK, and return a result you can act on immediately.
 
 ## Basic Usage
 
@@ -48330,7 +48805,7 @@ Guardrails are evaluators that run in real-time and **act** on the results - blo
 
 ## How Guardrails Work
 
-```
+```text
 User Input → Guardrail Check → [Pass] → LLM → Response → Guardrail Check → [Pass] → User
                     ↓                                           ↓
                [Fail] → Return Error                     [Fail] → Return Safe Response
@@ -48475,6 +48950,8 @@ if not guardrail.passed:
 Track when guardrails fire for monitoring and improvement:
 
 ```python
+import langwatch
+
 if not guardrail.passed:
     langwatch.get_current_trace().update(
         metadata={"guardrail_triggered": guardrail.name}
@@ -48548,7 +49025,7 @@ A monitor is an evaluator attached to your production traffic. It scores the tra
 
 ## How it works
 
-```
+```text
 User request → Your application → Response → Trace in LangWatch → Monitor → Score
                                                                        ↓
                                                      Trace drawer, analytics, automations
@@ -49609,6 +50086,8 @@ async def evaluate_conversation(conversation: List[Dict], tools_used: List[str],
 Below we define a method to simulate conversations between our agent and a user. The outputs will be evaluated by our Evaluator Agent.
 
 ```python
+import langwatch
+
 async def simulate_conversation(ticket: Dict[str, Any], criteria: List[str], max_turns: int = 5):
     """Simulate a conversation with a customer and evaluate against criteria"""
     # Initialize LangWatch evaluation
@@ -50431,6 +50910,8 @@ datasets = [("train", train_transactions), ("evals", evals_transactions)]
 Now we can set up our parametrized retrieval pipeline. I'll vary the number of retrieved documents to see how it affects recall and MRR. Note that you can vary other parameters (like the embedding models or rerankers) as well with this parametrized pipeline.
 
 ```python
+import langwatch
+
 def run_evaluation(collections=None, transactions=None, k_values=[1, 3, 5]):
     """Run evaluation across different k values using LangWatch tracking"""
     # Initialize a new LangWatch evaluation experiment
@@ -50806,6 +51287,8 @@ Note that you don't need a lot of examples to begin with. The first few tests ar
 ## Run the Tests
 
 ```python
+import langwatch
+
 def extract_tool_calls(response):
     """Extract tool calls from the new response format"""
     tool_calls = []
@@ -51338,6 +51821,8 @@ To objectively compare our search methods, we'll use two standard information re
 2. **Mean Reciprocal Rank (MRR)**: How high relevant items appear in our results
 
 ```python
+import langwatch
+
 def recall(retrieved, expected):
     return float(len(set(retrieved).intersection(set(expected)))) / len(expected)
 
@@ -51458,6 +51943,8 @@ Now we can run the experiments. The code does the following:
 3. Organizes the results in a DataFrame for comparison
 
 ```python
+import langwatch
+
 k_values = [3, 5, 10]
 results = []
 
@@ -51534,7 +52021,7 @@ description: Evaluate AI coaching systems using LangWatch with LLM-as-a-Judge sc
 keywords: AI coach, evaluation, LangWatch, AI therapist, AI Leadership
 ---
 
-This guide demonstrates how to build an evaluation pipeline for a conversational AI, like an AI coach. Since coaching quality is subjective, we'll use a panel of specialized LLM-as-a-Judge evaluators to score different aspects of the conversation.
+To evaluate a conversational AI such as an AI coach, score each response with a panel of specialised LLM-as-a-Judge evaluators, one per aspect of the conversation. Coaching quality is subjective, so several narrow judges are more reliable than one broad one.
 
 We'll use LangWatch to orchestrate this evaluation, track the boolean (pass/fail) outputs from each judge, and compare them against an expert-annotated dataset.
 
@@ -51637,6 +52124,8 @@ def run_looping_judge_llm(model_output: str, history_json: str) -> bool:
 Now we'll use LangWatch to run our judges against the dataset and log the results. We'll use `evaluation.submit()` to run the evaluations in parallel, which is highly effective when running multiple independent judges per data sample.
 
 ```python
+import langwatch
+
 # Initialize a new evaluation run in LangWatch
 evaluation = langwatch.experiment.init("ai-coach-quality-v3-run-001")
 
@@ -51709,7 +52198,7 @@ description: Evaluate structured data extraction using LangWatch to validate out
 keywords: structured data extraction, evaluation, LangWatch, ground truth
 ---
 
-This guide walks you through evaluating an LLM that powers a taxi booking chatbot. The goal is to see how well the model extracts structured data (like pickup addresses and passenger counts) from vague, real-world customer messages.
+An evaluation script measures how well the LLM behind a taxi booking chatbot extracts structured data (like pickup addresses and passenger counts) from vague, real-world customer messages.
 
 We'll use LangWatch to create a simple, repeatable evaluation script to measure and track the model's accuracy.
 
@@ -51791,6 +52280,8 @@ Now, let's tie it all together with LangWatch. We'll initialize an evaluation, l
 This script gives us a precise, field-by-field view of our model's performance.
 
 ```python
+import langwatch
+
 # Initialize a new evaluation run in LangWatch
 evaluation = langwatch.experiment.init("taxi-bot-extraction-v2")
 
@@ -51883,7 +52374,7 @@ description: Use LangWatch to evaluate a technical RAG chatbot by measuring retr
 keywords: RAG, technical documentation, evaluation, LangWatch, embeddings, chunking, faithfulness, retrieval evaluation, ground truth
 ---
 
-This guide shows you how to evaluate a RAG (Retrieval-Augmented Generation) chatbot designed to answer technical questions from complex product manuals. In this example, the chatbot is for technicians servicing advanced milking machines.
+A RAG (Retrieval-Augmented Generation) chatbot that answers technical questions from complex product manuals is evaluated on accuracy, relevance and faithfulness to the documentation. In this example, the chatbot is for technicians servicing advanced milking machines.
 
 The goal is to verify that the chatbot provides accurate, relevant, and faithful answers based on the official documentation. We'll use LangWatch to automate this evaluation so it can run in a CI/CD workflow.
 
@@ -51968,6 +52459,8 @@ Now, we'll use LangWatch to evaluate our RAG pipeline against the golden dataset
 This script can be triggered automatically in a CI workflow whenever the RAG pipeline or its underlying model is updated.
 
 ```python
+import langwatch
+
 # Initialize a new evaluation run. Use descriptive names to track experiments.
 evaluation = langwatch.experiment.init("model-a-rag-evaluation-v2")
 
@@ -65024,14 +65517,14 @@ check.
 
 Every connection has its own redirect URI, shown on the setup page:
 
-```
+```text
 https://<your LangWatch host>/api/auth/sso/callback/<connection id>
 ```
 
 A SAML connection posts to its assertion consumer service instead, also shown
 on the setup page:
 
-```
+```text
 https://<your LangWatch host>/api/auth/sso/saml2/sp/acs/<connection id>
 ```
 
@@ -65306,7 +65799,7 @@ Both endpoints must be `https`; plain `http` is accepted for a loopback host onl
 
 Connect needs two destinations open, both on port 443:
 
-```
+```text
 gateway.langwatch.ai:443
 connect.langwatch.ai:443
 ```
@@ -68886,7 +69379,7 @@ For example:
 
 Deja View encodes its full state in the URL fragment, making every view shareable:
 
-```
+```text
 /ops/dejaview#query=trace_abc&tenant=project_xyz&event=5&proj=TraceAnalytics
 ```
 
@@ -70316,7 +70809,7 @@ kubectl -n langwatch exec deploy/langwatch-app -- \
 
 The redirect URI registered in your identity provider must exactly match the one shown on the connection's setup page:
 
-```
+```text
 https://<your LangWatch host>/api/auth/sso/callback/<connection id>
 ```
 
@@ -70500,7 +70993,7 @@ On EKS with IRSA, put the role on the ServiceAccount the app and workers use (`g
 
 With local storage active, the chart now refuses to install or upgrade when `workers.replicaCount` is greater than 1:
 
-```
+```text
 app.storedObjects.localFilesystem.enabled requires workers.replicaCount=1
 ... Enable app.dataplane for multi-replica deployments.
 ```
@@ -71666,7 +72159,7 @@ If your network requires an egress allowlist at the firewall, the platform's del
 
 Development setups and some internal architectures legitimately need receivers on private addresses. The escape hatch:
 
-```
+```bash
 WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS=1
 ```
 
@@ -71678,7 +72171,7 @@ An endpoint can deliver to an Amazon SQS queue instead of an HTTPS receiver ([ho
 
 It can also run on **this deployment's own AWS identity** (an instance role, IRSA, or a developer's SSO session), which needs an explicit opt-in:
 
-```
+```bash
 WEBHOOKS_UNSAFE_ALLOW_AMBIENT_CREDENTIALS=1
 ```
 
@@ -71701,7 +72194,7 @@ Webhook and billing REST surfaces authenticate with an **organization API key** 
 
 A gateway request that was admitted but never confirmed is settled after a grace window and delivered as `gateway.request.settled` with unknown cost (see [settled semantics](/ai-gateway/billing-events#event-lifecycle)). The default grace is **30 minutes**. Tune it with:
 
-```
+```bash
 LW_SPEND_SETTLEMENT_GRACE_MS=1800000
 ```
 
@@ -72165,7 +72658,7 @@ The API Keys API lets you create, list, and revoke API keys for your organizatio
 
 Requires an **organization-level API key**. Pass it as a Bearer token:
 
-```
+```http
 Authorization: Bearer sk-lw-<id>_<secret>
 ```
 
@@ -73076,7 +73569,7 @@ Without unique names, all results would be grouped under the same auto-generated
 
 All evaluator endpoints follow a similar pattern:
 
-```
+```http
 POST /api/v1/evaluations/{evaluator_path}/evaluate
 ```
 
@@ -73664,7 +74157,7 @@ For the concepts behind it, including who may grant what, read [Roles & access](
 
 Requires an **organization-level API key** with `organization:manage`. Pass it as a Bearer token:
 
-```
+```http
 Authorization: Bearer sk-lw-<id>_<secret>
 ```
 
@@ -73946,7 +74439,7 @@ Groups can be created manually via the API or provisioned automatically from you
 
 The Groups API requires an **organization-level API key** with `organization:manage` permission (created in Settings > API Keys). Pass it as a Bearer token:
 
-```
+```http
 Authorization: Bearer sk-lw-<id>_<secret>
 ```
 
@@ -74215,7 +74708,7 @@ When the statement matches more rows than the limit, the run judges the first pa
 
 `GET /api/v1/instant-evals/{id}/results` pages through what the run wrote, keyset-paged with a `cursor`. Filter with `questionId`, `matched` and `status`:
 
-```
+```http
 GET /api/v1/instant-evals/run_123/results?questionId=refused&matched=true&limit=200
 ```
 
@@ -74298,7 +74791,7 @@ Accepting stays a browser step: the person opens the link, signs in or signs up,
 
 Requires an **organization-level API key** with `organization:manage`. Pass it as a Bearer token:
 
-```
+```http
 Authorization: Bearer sk-lw-<id>_<secret>
 ```
 
@@ -74435,7 +74928,7 @@ Adding someone new is a different thing: people join through an invite they acce
 
 Requires an **organization-level API key**. Pass it as a Bearer token:
 
-```
+```http
 Authorization: Bearer sk-lw-<id>_<secret>
 ```
 
@@ -74649,7 +75142,7 @@ The Organization API reads and updates the organization your API key belongs to.
 
 Requires an **organization-level API key**. Pass it as a Bearer token:
 
-```
+```http
 Authorization: Bearer sk-lw-<id>_<secret>
 ```
 
@@ -74743,7 +75236,7 @@ This is the one LangWatch API that exists before any organization does, which is
 
 Creating an organization hands back an organization admin API key along with it. That key is what the rest of the management APIs take, so a run can go from an empty deployment to a fully configured organization without a browser step:
 
-```
+```text
 instance key  ->  POST /api/v1/organizations  ->  organization + admin API key
                                                      |
                                                      v
@@ -74755,7 +75248,7 @@ instance key  ->  POST /api/v1/organizations  ->  organization + admin API key
 
 The instance administrator credential, as a Bearer token:
 
-```
+```http
 Authorization: Bearer <LANGWATCH_INSTANCE_ADMIN_API_KEY>
 ```
 
@@ -74878,7 +75371,7 @@ This API is designed for service-to-service automation (e.g. an internal tool th
 
 The Projects API requires an **organization-level API key** (created in Settings > API Keys). Pass it as a Bearer token:
 
-```
+```http
 Authorization: Bearer sk-lw-<id>_<secret>
 ```
 
@@ -75692,7 +76185,7 @@ Each binding names exactly one principal, and there are three kinds:
 
 Requires an **organization-level API key** with `organization:manage`. Pass it as a Bearer token:
 
-```
+```http
 Authorization: Bearer sk-lw-<id>_<secret>
 ```
 
@@ -75871,7 +76364,7 @@ A role on its own grants no access. It becomes access when a [grant](/api-refere
 
 Requires an **organization-level API key** with `organization:manage`. Pass it as a Bearer token:
 
-```
+```http
 Authorization: Bearer sk-lw-<id>_<secret>
 ```
 
@@ -76057,7 +76550,7 @@ description: "Create and manage scenario execution events to power the Simulatio
 
 The Simulations visualizer is powered by a single endpoint that receives events from your test runs. All events are sent via a `POST` request to the following endpoint:
 
-```
+```text
 /api/v1/scenario-events
 ```
 
@@ -76234,7 +76727,7 @@ A SCIM token is the credential your identity provider presents to the [SCIM 2.0 
 
 Requires an **organization-level API key** with `organization:manage`. Pass it as a Bearer token:
 
-```
+```http
 Authorization: Bearer sk-lw-<id>_<secret>
 ```
 
@@ -76381,7 +76874,7 @@ For the setup walkthrough on the provider side, see [SCIM Provisioning](/platfor
 
 ## Base URL
 
-```
+```text
 https://app.langwatch.ai/api/scim/v2
 ```
 
@@ -76391,7 +76884,7 @@ Self-hosted: the same path on your own domain.
 
 A SCIM bearer token, minted through the [SCIM Tokens](/api-reference/scim-tokens/overview) API or under **Settings > SCIM**:
 
-```
+```http
 Authorization: Bearer <scim-token>
 ```
 
@@ -76771,7 +77264,7 @@ This API is designed for service-to-service automation (e.g. provisioning team s
 
 The Teams API requires an **organization-level API key** with `team:manage` permission (created in Settings > API Keys). Pass it as a Bearer token:
 
-```
+```http
 Authorization: Bearer sk-lw-<id>_<secret>
 ```
 

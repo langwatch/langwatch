@@ -37,7 +37,7 @@ Guardrails are evaluators that run in real-time and **act** on the results - blo
 
 ## How Guardrails Work
 
-```
+```text
 User Input → Guardrail Check → [Pass] → LLM → Response → Guardrail Check → [Pass] → User
                     ↓                                           ↓
                [Fail] → Return Error                     [Fail] → Return Safe Response
@@ -180,6 +180,8 @@ if not guardrail.passed:
 Track when guardrails fire for monitoring and improvement:
 
 ```python
+import langwatch
+
 if not guardrail.passed:
     langwatch.get_current_trace().update(
         metadata={"guardrail_triggered": guardrail.name}

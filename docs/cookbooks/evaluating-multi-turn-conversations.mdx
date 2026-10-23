@@ -383,6 +383,8 @@ async def evaluate_conversation(conversation: List[Dict], tools_used: List[str],
 Below we define a method to simulate conversations between our agent and a user. The outputs will be evaluated by our Evaluator Agent.
 
 ```python
+import langwatch
+
 async def simulate_conversation(ticket: Dict[str, Any], criteria: List[str], max_turns: int = 5):
     """Simulate a conversation with a customer and evaluate against criteria"""
     # Initialize LangWatch evaluation

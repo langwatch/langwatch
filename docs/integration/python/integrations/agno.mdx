@@ -56,6 +56,12 @@ agent.print_response("Tell me a joke.")
 
 The `AgnoInstrumentor` automatically captures all Agno agent activity. All traces will be sent to your LangWatch dashboard without requiring manual OpenTelemetry configuration.
 
+## Check it worked
+
+Run the example. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds. Open it to see the Agno agent run and the model calls it made.
+
+If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
+
 ## Related
 
 - [Capturing RAG](/integration/python/tutorials/capturing-rag) - Learn how to capture RAG data from retrievers and tools

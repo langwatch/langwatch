@@ -72,26 +72,26 @@ Policy changes are written to the audit log and reach the gateway on its next ch
 
 Refuse shell execution and a destructive tool:
 
-```
+```text
 ^shell_.*
 delete_user
 ```
 
 Allow only the tools an agent is meant to use:
 
-```
+```text
 ^(read_file|list_files|search_docs)$
 ```
 
 Keep web addresses inside your own domain (Allow only on Web addresses):
 
-```
+```text
 ^https://api\.acme\.example/
 ```
 
 Refuse a model family on every key of the policy (Refuse on Models):
 
-```
+```text
 ^gpt-4o-search.*
 ```
 

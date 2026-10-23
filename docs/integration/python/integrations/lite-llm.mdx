@@ -66,6 +66,12 @@ if __name__ == "__main__":
 
 The `@langwatch.trace()` decorator creates a parent trace, and `autotrack_litellm_calls()` enables automatic tracking of all LiteLLM calls for the duration of that trace.
 
+## Check it worked
+
+Run the example. Then open your project in LangWatch: a new trace named "LiteLLM Autotrack Example" appears in the traces list within a few seconds. Open it to see the LiteLLM completion call nested inside it, with its input and output.
+
+If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
+
 ## Related
 
 - [Capturing RAG](/integration/python/tutorials/capturing-rag) - Learn how to capture RAG data from retrievers and tools

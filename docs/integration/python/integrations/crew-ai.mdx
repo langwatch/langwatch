@@ -30,6 +30,18 @@ For more information and setup guides, please visit their GitHub repository:
 
 To use these instrumentors with LangWatch, you would typically configure them to export telemetry data via OpenTelemetry, which LangWatch can then ingest.
 
+## Installation
+
+Install LangWatch, CrewAI and one of the two instrumentors:
+
+```bash
+pip install langwatch crewai openinference-instrumentation-crewai
+# or, for OpenLLMetry:
+pip install langwatch crewai opentelemetry-instrumentation-crewai
+```
+
+The SDK reads `LANGWATCH_API_KEY` from the environment.
+
 ## Integrating Community Instrumentors with LangWatch
 
 Community-provided OpenTelemetry instrumentors for CrewAI, like those from OpenLLMetry or OpenInference, capture trace data from your CrewAI agents and tasks. LangWatch reads that data through OpenTelemetry.
@@ -241,3 +253,9 @@ if __name__ == "__main__":
 - If using `langwatch.setup(instrumentors=[...])`, LangWatch handles the setup and lifecycle of the instrumentor.
 - If instrumenting directly (e.g., `CrewAIInstrumentor().instrument()`), ensure that the `TracerProvider` used by the instrumentor is the same one LangWatch is exporting from. This usually means LangWatch is configured to use an existing global provider or one you explicitly pass to `langwatch.setup()`.
 - Always refer to the specific documentation of the community instrumentor (OpenLLMetry or OpenInference) for the most accurate and up-to-date installation and usage instructions, including the correct class names for instrumentors and any specific setup requirements.
+
+## Check it worked
+
+Run the example. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds. Open it to see the crew's agents, tasks and model calls nested inside the trace named in the decorator, for example "CrewAI Execution with OpenInference".
+
+If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.

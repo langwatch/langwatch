@@ -380,6 +380,10 @@ const prompt = await langwatch.prompts.get("prompt-id");
 Creates a new prompt in the LangWatch platform.
 
 ```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
 // Create a basic prompt
 const prompt = await langwatch.prompts.create({
   handle: "customer-support-bot",
@@ -404,6 +408,10 @@ const prompt = await langwatch.prompts.create({
 Updates an existing prompt, creating a new version automatically.
 
 ```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
 // Update prompt content
 const updatedPrompt = await langwatch.prompts.update("customer-support-bot", {
   prompt: "You are a helpful and friendly customer support assistant.",

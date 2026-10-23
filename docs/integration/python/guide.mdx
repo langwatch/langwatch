@@ -101,6 +101,8 @@ async def handle_message():
 You can customize the trace name and add initial metadata if needed:
 
 ```python
+import langwatch
+
 @langwatch.trace(name="My Custom Trace Name", metadata={"foo": "bar"})
 async def handle_message():
     # ...
@@ -152,6 +154,12 @@ async def handle_message(message: cl.Message):
 Spans created within a function **decorated** with `@langwatch.trace()` will automatically be nested under the main trace span. You can add additional `type`, `name`, `metadata`, and `events`, or override the automatic input/output using decorator arguments or the `update()` method on the span object obtained via `langwatch.get_current_span()`.
 
 For detailed guidance on manually creating traces and spans using context managers or direct start/end calls, see the [Manual Instrumentation Tutorial](/integration/python/tutorials/manual-instrumentation).
+
+## Check it worked
+
+Call a function decorated with `@langwatch.trace()`, for example `handle_message()` above. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds. Open it to see the root span and any spans nested under it, such as the autotracked OpenAI call.
+
+If nothing appears, check that `LANGWATCH_API_KEY` (and `LANGWATCH_PROJECT_ID` for a key from Settings → API Keys) is set in the environment your code runs in. The SDK flushes pending spans when the process exits.
 
 ## Full Setup
 

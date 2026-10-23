@@ -94,6 +94,12 @@ Many Python libraries, especially in the AI/ML space, are instrumented by commun
 
 You can browse these repositories to find instrumentors for other libraries you might be using. If an instrumentor from these projects (or any other source) adheres to the `BaseInstrumentor` interface, you can integrate it with LangWatch using the `langwatch.setup(instrumentors=[...])` method described above.
 
+## Check it worked
+
+Run the example. Then open your project in LangWatch: a new trace named "Task with Instrumented Logging" appears in the traces list within a few seconds. Open it to see the spans your instrumentor created nested inside it.
+
+If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
+
 ### Key Considerations:
 
 1.  **`BaseInstrumentor` Compliance:** Ensure the instrumentor correctly implements the `BaseInstrumentor` interface, particularly the `instrument()` and `uninstrument()` methods, and `instrumentation_dependencies()`.

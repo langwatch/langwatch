@@ -31,7 +31,7 @@ Configure your experiment once in the LangWatch Experiments via UI, then trigger
    - Run it once to verify it works
 
 2. **Get your experiment slug** from the URL:
-   ```
+   ```text
    https://app.langwatch.ai/your-project/experiments/your-experiment-slug
                                                       ^^^^^^^^^^^^^^^^^^^^
    ```
@@ -107,6 +107,8 @@ jobs:
 ### Options
 
 ```python
+import langwatch
+
 result = langwatch.experiment.run(
     "my-experiment",
     timeout=300.0,           # Max wait time (seconds)
@@ -123,6 +125,8 @@ result.print_summary(exit_on_failure=True)  # Exit with code 1 on failures
 <Tabs>
   <Tab title="Python">
 ```python
+import langwatch
+
 result = langwatch.experiment.run("my-experiment")
 result.print_summary()      # CI-friendly summary; exits 1 on failures
 df = result.results         # per-row results as a pandas DataFrame
@@ -150,6 +154,8 @@ By default the run uses the dataset attached to the experiment. You can override
 <Tabs>
   <Tab title="Python">
 ```python
+import langwatch
+
 # Inline rows
 langwatch.experiment.run("my-experiment", data=[{"input": "What is 2 + 2?"}])
 # A platform dataset by id
@@ -160,6 +166,10 @@ langwatch.experiment.run("my-experiment", parameters={"model": "gpt-5-mini"})
   </Tab>
   <Tab title="TypeScript">
 ```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
 // Inline rows
 await langwatch.experiments.runWithResults("my-experiment", { data: [{ input: "What is 2 + 2?" }] });
 // A platform dataset by id
@@ -332,7 +342,7 @@ experiment.print_summary()
 
 Both approaches output a CI-friendly summary:
 
-```
+```text
 ════════════════════════════════════════════════════════════
   EXPERIMENT RESULTS
 ════════════════════════════════════════════════════════════

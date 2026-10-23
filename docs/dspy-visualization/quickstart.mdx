@@ -11,8 +11,16 @@ LangWatch DSPy Visualization tracks your DSPy experiments in real time, so you c
 ## 1. Install the Python library
 
 <Tabs>
-  <Tab title="Notebook">```bash !pip install langwatch ```</Tab>
-  <Tab title="Command Line">```bash pip install langwatch ```</Tab>
+  <Tab title="Notebook">
+    ```bash
+    !pip install langwatch
+    ```
+  </Tab>
+  <Tab title="Command Line">
+    ```bash
+    pip install langwatch
+    ```
+  </Tab>
 </Tabs>
 
 ## 2. Login to LangWatch
@@ -25,7 +33,7 @@ import langwatch
 langwatch.login()
 ```
 
-Be sure to log in or create an account using the displayed link, then provide your API key when prompted.
+Be sure to log in or create an account using the displayed link, then provide your API key when prompted. If `LANGWATCH_API_KEY` is already set in the environment, `langwatch.login()` uses it and does not prompt.
 
 ## 3. Start tracking
 

@@ -67,6 +67,12 @@ if __name__ == "__main__":
 
 The `@langwatch.trace()` decorator creates a parent trace, and `autotrack_dspy()` enables automatic tracking of all DSPy operations, including module calls and underlying LM interactions, for the duration of that trace.
 
+## Check it worked
+
+Run the example. Then open your project in LangWatch: a new trace named "DSPy RAG Execution" appears in the traces list within a few seconds. Open it to see the DSPy module calls nested inside it.
+
+If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
+
 ## Related
 
 - [Capturing RAG](/integration/python/tutorials/capturing-rag) - Learn how to capture RAG data from retrievers and tools

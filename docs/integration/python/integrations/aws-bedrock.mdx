@@ -114,3 +114,9 @@ By following these steps, your application's interactions with AWS Bedrock will 
 For more details on the specific attributes captured by the OpenInference Bedrock instrumentor, please refer to the [OpenInference Semantic Conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/). (Note: Link to general OTel AI/OpenInference conventions, specific Bedrock attributes might be detailed in OpenInference's own docs).
 
 Remember to replace placeholder values for AWS credentials and adapt the model IDs and prompts to your specific use case.
+
+## Check it worked
+
+Run the example. Then open your project in LangWatch: a new trace named "Bedrock - Example Usage" appears in the traces list within a few seconds. Open it to see the Bedrock calls nested inside it.
+
+If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.

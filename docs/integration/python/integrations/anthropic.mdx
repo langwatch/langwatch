@@ -60,6 +60,12 @@ if __name__ == "__main__":
 
 The `AnthropicInstrumentor` automatically captures all Anthropic API calls globally once instrumented. Use `@langwatch.trace()` to create a parent trace under which API calls will be nested.
 
+## Check it worked
+
+Run the example. Then open your project in LangWatch: a new trace named "Anthropic Call with Community Instrumentor" appears in the traces list within a few seconds. Open it to see the Anthropic call nested inside it, with its input and output.
+
+If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
+
 ## Related
 
 - [Capturing RAG](/integration/python/tutorials/capturing-rag) - Learn how to capture RAG data from retrievers and tools

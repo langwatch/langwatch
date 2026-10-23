@@ -46,6 +46,12 @@ if __name__ == "__main__":
 
 LangWatch automatically captures all PydanticAI agent runs and model interactions through PydanticAI's built-in OpenTelemetry support. Use `@langwatch.trace()` decorators to add custom traces and metadata as needed.
 
+## Check it worked
+
+Run the example. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds. Open it to see the PydanticAI agent run and its model calls.
+
+If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
+
 ## Related
 
 - [Capturing RAG](/integration/python/tutorials/capturing-rag) - Learn how to capture RAG data from retrievers and tools

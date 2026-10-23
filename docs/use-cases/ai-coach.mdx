@@ -4,7 +4,7 @@ description: Evaluate AI coaching systems using LangWatch with LLM-as-a-Judge sc
 keywords: AI coach, evaluation, LangWatch, AI therapist, AI Leadership
 ---
 
-This guide demonstrates how to build an evaluation pipeline for a conversational AI, like an AI coach. Since coaching quality is subjective, we'll use a panel of specialized LLM-as-a-Judge evaluators to score different aspects of the conversation.
+To evaluate a conversational AI such as an AI coach, score each response with a panel of specialised LLM-as-a-Judge evaluators, one per aspect of the conversation. Coaching quality is subjective, so several narrow judges are more reliable than one broad one.
 
 We'll use LangWatch to orchestrate this evaluation, track the boolean (pass/fail) outputs from each judge, and compare them against an expert-annotated dataset.
 
@@ -107,6 +107,8 @@ def run_looping_judge_llm(model_output: str, history_json: str) -> bool:
 Now we'll use LangWatch to run our judges against the dataset and log the results. We'll use `evaluation.submit()` to run the evaluations in parallel, which is highly effective when running multiple independent judges per data sample.
 
 ```python
+import langwatch
+
 # Initialize a new evaluation run in LangWatch
 evaluation = langwatch.experiment.init("ai-coach-quality-v3-run-001")
 

@@ -42,6 +42,8 @@ Retrieve all datasets for your project with pagination support.
 <Tabs>
   <Tab title="Python">
 ```python
+import langwatch
+
 # List all datasets (first page, default limit)
 result = langwatch.dataset.list_datasets()
 
@@ -58,6 +60,10 @@ result = langwatch.dataset.list_datasets(page=2, limit=10)
   </Tab>
   <Tab title="TypeScript">
 ```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
 // List all datasets (first page, default limit)
 const result = await langwatch.datasets.list();
 
@@ -81,6 +87,8 @@ Create a new dataset with an optional column schema.
 <Tabs>
   <Tab title="Python">
 ```python
+import langwatch
+
 # Create with name and column types
 info = langwatch.dataset.create_dataset(
     "User Feedback",
@@ -99,6 +107,10 @@ info = langwatch.dataset.create_dataset("Simple Dataset")
   </Tab>
   <Tab title="TypeScript">
 ```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
 // Create with name and column types
 const info = await langwatch.datasets.create({
   name: "User Feedback",
@@ -123,6 +135,8 @@ Fetch a dataset by slug or ID, including all its entries.
 <Tabs>
   <Tab title="Python">
 ```python
+import langwatch
+
 # Fetch dataset by slug or ID
 dataset = langwatch.dataset.get_dataset("your-dataset-slug")
 
@@ -140,6 +154,10 @@ print(df.head())
   </Tab>
   <Tab title="TypeScript">
 ```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
 // Fetch dataset by slug or ID
 const dataset = await langwatch.datasets.get("your-dataset-slug");
 
@@ -159,6 +177,8 @@ Update a dataset's name or column types.
 <Tabs>
   <Tab title="Python">
 ```python
+import langwatch
+
 # Update the name
 updated = langwatch.dataset.update_dataset("my-dataset", name="New Name")
 print(f"New slug: {updated.slug}")
@@ -174,6 +194,10 @@ columns=[{"name": "question", "type": "string"}, {"name": "answer", "type": "str
   </Tab>
   <Tab title="TypeScript">
 ```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
 // Update the name
 const updated = await langwatch.datasets.update("my-dataset", {
   name: "New Name",
@@ -208,6 +232,8 @@ Retrieve records from a dataset with pagination.
 <Tabs>
   <Tab title="Python">
 ```python
+import langwatch
+
 # List records (first page, default limit)
 result = langwatch.dataset.list_records("my-dataset")
 
@@ -224,6 +250,10 @@ result = langwatch.dataset.list_records("my-dataset", page=2, limit=20)
   </Tab>
   <Tab title="TypeScript">
 ```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
 // List records (first page, default limit)
 const result = await langwatch.datasets.listRecords("my-dataset");
 
@@ -250,6 +280,8 @@ Batch-add records to an existing dataset.
 <Tabs>
   <Tab title="Python">
 ```python
+import langwatch
+
 records = langwatch.dataset.create_records(
     "my-dataset",
     entries=[
@@ -263,6 +295,10 @@ for r in records:
   </Tab>
   <Tab title="TypeScript">
 ```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
 const records = await langwatch.datasets.createRecords("my-dataset", [
   { input: "What is LangWatch?", output: "An LLM observability platform." },
   { input: "How do I get started?", output: "Install the SDK and call setup()." },
@@ -281,6 +317,8 @@ Update (or upsert) a single record by ID.
 <Tabs>
   <Tab title="Python">
 ```python
+import langwatch
+
 record = langwatch.dataset.update_record(
     "my-dataset",
     "rec-1",
@@ -291,6 +329,10 @@ print(f"Updated: {record.id} -> {record.entry}")
   </Tab>
   <Tab title="TypeScript">
 ```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
 const record = await langwatch.datasets.updateRecord("my-dataset", "rec-1", {
   input: "updated question", output: "updated answer",
 });
@@ -305,12 +347,21 @@ Batch-delete records by their IDs.
 
 <Tabs>
   <Tab title="Python">
-    ```python deleted_count = langwatch.dataset.delete_records( "my-dataset", record_ids=["rec-1",
-    "rec-2"], ) print(f"Deleted {deleted_count} records") ```
+    ```python
+    import langwatch
+
+    deleted_count = langwatch.dataset.delete_records(
+        "my-dataset",
+        record_ids=["rec-1", "rec-2"],
+    )
+    print(f"Deleted {deleted_count} records")
+    ```
   </Tab>
   <Tab title="TypeScript">
-    ```typescript const result = await langwatch.datasets.deleteRecords("my-dataset", ["rec-1",
-    "rec-2"]); console.log(`Deleted ${result.deletedCount} records`); ```
+    ```typescript
+    const result = await langwatch.datasets.deleteRecords("my-dataset", ["rec-1", "rec-2"]);
+    console.log(`Deleted ${result.deletedCount} records`);
+    ```
   </Tab>
 </Tabs>
 
@@ -321,6 +372,8 @@ Upload a CSV, JSON, or JSONL file to a dataset. If the dataset does not exist, i
 <Tabs>
   <Tab title="Python">
 ```python
+import langwatch
+
 # Upload to existing or create new (default: append)
 result = langwatch.dataset.upload("my-dataset", file_path="data.csv")
 print(f"Created {result.recordsCreated} records")
@@ -346,6 +399,10 @@ The `if_exists` parameter controls how conflicts are handled:
   </Tab>
   <Tab title="TypeScript">
 ```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
 // Upload to existing or create new (default: append)
 const file = new File([csvContent], "data.csv", { type: "text/csv" });
 const result = await langwatch.datasets.upload("my-dataset", file);
@@ -444,6 +501,10 @@ Which fields you get back depends on the operation. `list_records` returns all s
 You can define types for your dataset entries for better type safety:
 
 ```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
 type MyDatasetEntry = {
   input: string;
   expected_output: string;
