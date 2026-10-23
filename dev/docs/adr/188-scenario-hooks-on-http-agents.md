@@ -1,4 +1,4 @@
-# ADR-182: Scenario setup and teardown hooks on HTTP agents
+# ADR-188: Scenario setup and teardown hooks on HTTP agents
 
 **Date:** 2026-10-22
 
@@ -6,7 +6,7 @@
 
 ## Context
 
-ADR-180 added setup and teardown hooks to scenario runs, for connected agents only. A connected agent is a process that its owner keeps online. The platform calls the hooks over the connection that process holds open. With no live instance, setup does not run and the run ends `ERROR`.
+ADR-180 ([180-scenario-run-hooks.md](180-scenario-run-hooks.md)) added setup and teardown hooks to scenario runs, for connected agents only. A connected agent is a process that its owner keeps online. The platform calls the hooks over the connection that process holds open. With no live instance, setup does not run and the run ends `ERROR`.
 
 This has two costs:
 
@@ -77,7 +77,7 @@ For Langy, the hook service is still something to host. But a CI deploy keeps it
 
 ## References
 
-- Related ADRs: ADR-128 (connected agents), ADR-180 (scenario run hooks).
+- Related ADRs: ADR-128 ([128-connected-agents.md](128-connected-agents.md)), ADR-180 ([180-scenario-run-hooks.md](180-scenario-run-hooks.md)).
 - Issue: https://github.com/langwatch/langwatch/issues/8955
 - Hooks PR: https://github.com/langwatch/langwatch/pull/8765
 - Discussion: Convoz conv 114.
