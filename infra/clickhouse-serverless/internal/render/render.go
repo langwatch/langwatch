@@ -99,6 +99,10 @@ func RenderAll(log *zap.Logger, input *config.Input, computed *config.Computed, 
 		log.Warn("remote_servers carries no cluster secret; set CLICKHOUSE_CLUSTER_SECRET_ENABLED=true " +
 			"to apply CLICKHOUSE_CLUSTER_SECRET_FILE (README: Cluster secret)")
 	}
+	if input.RetiredCacheMaxSize != "" {
+		log.Warn("CACHE_MAX_SIZE is no longer read and can be unset: ClickHouse never built a cache " +
+			"from it on the s3 disk")
+	}
 	if input.ColdEnabled {
 		log.Info("cold storage configured")
 	}

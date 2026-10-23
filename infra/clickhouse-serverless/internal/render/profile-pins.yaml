@@ -1,6 +1,6 @@
 # The query defaults ClickHouse 26.8 keeps from 25.10. The one copy: the image merges it into
-# its default profile, and CI and the test containers mount it as a users.d file
-# (.github/scripts/start-clickhouse-with-storage-policy.sh, testClickHouseProfilePins).
+# its default profile, and the storage-policy CI script and the test containers mount it as a
+# users.d file (.github/scripts/start-clickhouse-with-storage-policy.sh, testClickHouseProfilePins).
 profiles:
   default:
     # 25.10's defaults for every setting nothing sets explicitly. Among those 26.x changes: an
@@ -8,9 +8,9 @@ profiles:
     # partitions whose key is outside the sorting key (26.3), and column statistics prune parts
     # (26.4). Settings the profile sets explicitly still win.
     compatibility: "25.10"
-    # Named as well: the app writes epoch milliseconds into DateTime64 as bare JSON integers,
-    # and from 26.8 those read as seconds and saturate at 9999-12-31. Raising compatibility
-    # past 26.7 must not silently change every timestamp it writes.
+    # Named as well: this app now sends instants as strings, but an older app still running
+    # in a rolling upgrade, or any other client, may send epoch milliseconds as bare JSON
+    # integers, which 26.8 reads as seconds (9999-12-31). Raising compatibility must not.
     input_format_read_datetime_number_as_raw_value: 1
     # 26.2 turns insert deduplication on for async inserts and materialized views (#95970).
     deduplicate_insert: backward_compatible_choice

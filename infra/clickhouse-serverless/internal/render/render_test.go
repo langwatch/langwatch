@@ -212,6 +212,26 @@ func TestRenderAll_ClusterSecretOffKeepsEarlierShape(t *testing.T) {
 	}
 }
 
+// @scenario "A deployment that still sets CACHE_MAX_SIZE is told it is no longer read"
+func TestRenderAll_RetiredCacheMaxSizeWarns(t *testing.T) {
+	for _, tc := range []struct {
+		value string
+		warns int
+	}{{"", 0}, {"10737418240", 1}} {
+		input := testInput()
+		input.RetiredCacheMaxSize = tc.value
+		computed := config.ComputeFromResources(input.CPU, input.RAMBytes, input)
+
+		core, logs := observer.New(zap.WarnLevel)
+		if err := render.RenderAll(zap.New(core), input, computed, t.TempDir()); err != nil {
+			t.Fatalf("RenderAll: %v", err)
+		}
+		if got := logs.FilterMessageSnippet("CACHE_MAX_SIZE").Len(); got != tc.warns {
+			t.Errorf("CACHE_MAX_SIZE=%q: %d warnings, want %d: %v", tc.value, got, tc.warns, logs.All())
+		}
+	}
+}
+
 func TestRenderAll_PrometheusEnabled(t *testing.T) {
 	dir := t.TempDir()
 	input := testInput()
@@ -262,6 +282,7 @@ func TestRenderAll_LimitsContainsMergeTreeSettings(t *testing.T) {
 	}
 }
 
+// @scenario "ClickHouse 26.8 keeps the 25.10 behaviour and on-disk formats"
 func TestRenderAll_UpgradePinsHold25_10Behaviour(t *testing.T) {
 	dir := t.TempDir()
 	input := testInput()
@@ -285,6 +306,7 @@ func TestRenderAll_UpgradePinsHold25_10Behaviour(t *testing.T) {
 		},
 		"users.d/profiles.yaml": {
 			`compatibility: "25.10"`,
+			"input_format_read_datetime_number_as_raw_value: 1",
 			"deduplicate_insert: backward_compatible_choice",
 		},
 	}
