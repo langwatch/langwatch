@@ -666,38 +666,6 @@ const PROJECT_GONE_NAME = "ProjectNotFoundError";
 const PROJECT_GONE_CODE = "project_not_found";
 const MAX_CAUSE_DEPTH = 8;
 
-/** ClickHouse's per-query memory limit, in both its older and newer wording. */
-const QUERY_MEMORY_LIMIT_FRAGMENTS = [
-  "Query memory limit exceeded",
-  "Memory limit (for query) exceeded",
-] as const;
-
-/**
- * Whether one statement outgrew its own memory limit, read through causes and handled
- * reasons. The server-wide `(total)` limit and the client's own shedding are load, not size.
- */
-export function isQueryMemoryLimitExceeded(error: unknown): boolean {
-  return queryMemoryLimitAt({ error, depth: 0 });
-}
-
-function queryMemoryLimitAt({ error, depth }: { error: unknown; depth: number }): boolean {
-  if (depth > MAX_CAUSE_DEPTH || error === null || typeof error !== "object") return false;
-  const message = Reflect.get(error, "message");
-  if (
-    typeof message === "string" &&
-    QUERY_MEMORY_LIMIT_FRAGMENTS.some((fragment) => message.includes(fragment))
-  ) {
-    return true;
-  }
-  const reasons: unknown = HandledError.isHandled(error) ? error.reasons : undefined;
-  if (Array.isArray(reasons)) {
-    for (const reason of reasons) {
-      if (queryMemoryLimitAt({ error: reason, depth: depth + 1 })) return true;
-    }
-  }
-  return queryMemoryLimitAt({ error: Reflect.get(error, "cause"), depth: depth + 1 });
-}
-
 /**
  * Whether a failure says its project no longer exists: authorization's and project's
  * ProjectNotFoundError, read by name or code anywhere in the cause chain, or every member
