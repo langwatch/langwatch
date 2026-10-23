@@ -8,7 +8,7 @@ import { docsFixture } from "../../../testing/docs-fixture.ts";
 import { withoutFrontmatter } from "../../content/compile/frontmatter.ts";
 import { promptFileName } from "../../content/compile/skill-prompts.ts";
 import { mdxComponents } from "../../content/ui/mdx-components.ts";
-import { agentInstructions, pageMarkdown } from "../compile/markdown-export.ts";
+import { agentInstructions, pageMarkdown, readableSchema } from "../compile/markdown-export.ts";
 import { MARKDOWN_COMPONENTS, mdxToMarkdown } from "../compile/mdx-markdown.ts";
 
 describe("when an API page contains only OpenAPI frontmatter", () => {
@@ -93,6 +93,31 @@ describe("when an API operation has no description", () => {
     } finally {
       fixture.dispose();
     }
+  });
+});
+
+describe("when an object schema restates its additionalProperties per property", () => {
+  /** @scenario "State a repeated property schema once in API exports" */
+  it("keeps only the required and the distinct properties", () => {
+    const shared = { type: "array", items: { type: "string" } };
+    const schema = {
+      type: "object",
+      required: ["b"],
+      propertyNames: { enum: ["a", "b", "c", "d"] },
+      additionalProperties: shared,
+      properties: { a: shared, b: shared, c: { type: "number" }, d: shared },
+    };
+    expect(readableSchema({ schema: { anyOf: [schema] } })).toEqual({
+      anyOf: [
+        {
+          type: "object",
+          required: ["b"],
+          propertyNames: { enum: ["a", "b", "c", "d"] },
+          additionalProperties: shared,
+          properties: { b: shared, c: { type: "number" } },
+        },
+      ],
+    });
   });
 });
 

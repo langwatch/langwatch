@@ -15,6 +15,13 @@ Feature: Generate documentation data from authored sources
     Then a sentence naming the method and path follows the title
 
   @unit
+  Scenario: State a repeated property schema once in API exports
+    Given an object schema lists properties whose schema equals its additionalProperties
+    When the schema is written into a Markdown export
+    Then those properties are left to additionalProperties, unless one is required
+    And a property with its own schema is kept
+
+  @unit
   Scenario: Preserve guide metadata in Markdown exports
     Given a guide has a title, description and authored MDX
     When its Markdown export is generated

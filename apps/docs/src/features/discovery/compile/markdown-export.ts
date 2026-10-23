@@ -34,12 +34,42 @@ function jsonBlock({ value }: { value: unknown }) {
   return `\`\`\`json\n${compactJson({ value })}\n\`\`\``;
 }
 
+type SchemaNode = Record<string, unknown>;
+
+const isNode = (value: unknown): value is SchemaNode =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+/** Properties the additionalProperties schema already states, dropped where none is required. */
+function restatedDropped({ node }: { node: SchemaNode }): SchemaNode {
+  const { properties, additionalProperties: rest } = node;
+  if (!isNode(properties) || !isNode(rest)) return node;
+  const required = new Set(Array.isArray(node.required) ? node.required : []);
+  const shared = JSON.stringify(rest);
+  const kept = Object.entries(properties).filter(
+    ([name, schema]) => required.has(name) || JSON.stringify(schema) !== shared,
+  );
+  const { properties: _all, ...others } = node;
+  return kept.length ? { ...others, properties: Object.fromEntries(kept) } : others;
+}
+
+/** A schema as an agent reads it: the same constraints, each stated once. */
+export function readableSchema({ schema }: { schema: unknown }): unknown {
+  if (Array.isArray(schema)) return schema.map((item) => readableSchema({ schema: item }));
+  if (!isNode(schema)) return schema;
+  const node = Object.fromEntries(
+    Object.entries(schema).map(([key, value]) => [key, readableSchema({ schema: value })]),
+  );
+  return restatedDropped({ node });
+}
+
 function contentMarkdown({ contents }: { contents: Content[] }) {
   return contents
     .map((content) =>
       [
         `#### ${content.type}`,
-        content.schema ? `Schema:\n\n${jsonBlock({ value: content.schema })}` : "",
+        content.schema
+          ? `Schema:\n\n${jsonBlock({ value: readableSchema({ schema: content.schema }) })}`
+          : "",
         content.example !== void 0 ? `Example:\n\n${jsonBlock({ value: content.example })}` : "",
       ]
         .filter(Boolean)

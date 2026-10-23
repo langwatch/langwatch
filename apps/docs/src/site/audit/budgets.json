@@ -17,11 +17,7 @@
   "maxCumulativeLayoutShift": 0.02,
   "maxTransferBytes": 760000,
   "maxRequests": 25,
-  "gatedAuditCategories": [
-    "accessibility",
-    "best-practices",
-    "seo"
-  ],
+  "gatedAuditCategories": ["accessibility", "best-practices", "seo"],
   "pages": [
     {
       "id": "home",
@@ -256,8 +252,6 @@
       "tokens-over-budget": [
         "/agent-testing/connect-your-agent",
         "/api-reference/agents/create-agents",
-        "/api-reference/analytics/create-timeseries",
-        "/api-reference/analytics/query-analytics-timeseries-legacy-path",
         "/api-reference/query/discover-both-query-languages",
         "/api-reference/query/overview",
         "/api-reference/scenario-events/create-scenario-events",
