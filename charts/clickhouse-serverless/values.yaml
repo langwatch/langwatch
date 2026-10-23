@@ -256,6 +256,22 @@ access:
   # `<key>.valid_until` (RFC 3339) ends `<key>`. Add a key, move the client,
   # remove the old key: the sidecar applies each change within ~10 seconds.
   passwordSecrets: []
+  # Dynamic-only mode (ADR-184): no static password anywhere in ClickHouse.
+  # Every person and workload logs in with a short-lived OIDC token; default
+  # is locked; the only password is a local admin generated at every start
+  # into an in-memory volume, valid from inside the pod only. Needs
+  # access.enabled, token users only (no passwordSecrets), backup.enabled off,
+  # and auth.clusterSecretEnabled when replicas > 1. The chart adds
+  # `mode: dynamic-only` to access.config; with existingConfigMap, set it there.
+  # Clients mount a projected service-account token and re-read it for every
+  # connection, for example:
+  #   volumes:
+  #     - name: clickhouse-token
+  #       projected:
+  #         sources:
+  #           - serviceAccountToken: {audience: clickhouse, expirationSeconds: 600, path: token}
+  dynamicOnly:
+    enabled: false
   sidecar:
     resources:
       requests:
