@@ -96,6 +96,8 @@ jobs:
               - 'cmd/prfilters/**'
               - 'tools/ciguard/**'
               - 'pkg/ciscan/**'
+              # The static-cloud-keys guard walks composite actions too.
+              - '.github/actions/**'
       - name: Force the filter true on non-PR events
         if: github.event_name != 'pull_request'
         id: force
