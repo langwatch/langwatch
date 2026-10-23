@@ -12,8 +12,8 @@ import { isCustomerConfigurationRefusal } from "../../../rules/settlement-refusa
 import type { AutomationProjectDirectory } from "../../../services/automation.service.ts";
 import type { AutomationPersistActionService } from "../../runaway/services/persist-action.service.ts";
 import type { AutomationSettlementMatchConfirmation } from "./automation-settlement-match-confirmation.service.ts";
-import { ConfigurationRefusalThrottle } from "./configuration-refusal-throttle.ts";
 import type { AutomationSettlementObservability } from "./automation-settlement-observability.service.ts";
+import { ConfigurationRefusalThrottle } from "./configuration-refusal-throttle.ts";
 
 const logger = createLogger("langwatch:automation:settlement-persistence");
 const CONFIRM_CONCURRENCY = 4;
