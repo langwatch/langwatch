@@ -40,10 +40,9 @@ function parseChunk(text: string): object | undefined {
 }
 
 /**
- * A mapped conversation as the list of turns langevals reads. langevals refuses a turn that is
- * not an object, and a mapping that resolves to nothing arrives as an empty string, which
- * `convertTo` wraps as one empty turn (a 422 on every run). Empty strings are dropped, so an
- * unmapped conversation is an empty list, as an unmapped contexts field is.
+ * A mapped conversation as langevals' turns. A mapping that resolves to nothing arrives as "",
+ * which `convertTo` wraps as one empty turn and langevals refuses (a 422 on every run), so empty
+ * strings are dropped: an unmapped conversation is an empty list, like unmapped contexts.
  */
 export function toLangevalsConversation(value: unknown): unknown[] | undefined {
   const decoded = convertTo(value, "array");

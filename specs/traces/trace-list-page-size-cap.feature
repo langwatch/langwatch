@@ -45,6 +45,12 @@ Feature: Trace list page size cap
     When the public trace search is called with pageSize 5000
     Then the request is accepted
 
+  @unit
+  Scenario: Public trace search with spans answers at most 100 traces per page
+    When the public trace search asks for spans with pageSize 4000
+    Then the page holds at most 100 traces and the caller pages on with scrollId
+    And a smaller page, or a search without spans, keeps the size it asked for
+
   @integration
   Scenario: The filtered annotations list walks trace pages at the cap
     Given filters match more traces than one page holds

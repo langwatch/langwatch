@@ -77027,7 +77027,7 @@ To find failed evaluations across every evaluator, send
 
 <Note>
 With `includeSpans: true`, a page holds at most 100 traces, whatever `pageSize`
-asks for. Page on with the `scrollId` each response returns.
+asks for. When a response carries a `scrollId`, send it to fetch the next page.
 </Note>
 
 ---

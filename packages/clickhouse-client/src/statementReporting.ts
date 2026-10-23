@@ -4,6 +4,9 @@
  * so a catch-site throw from a counter or log sink never masks the real error.
  */
 
+import { createHash } from "node:crypto";
+
+import { createWarnThrottle, type WarnThrottle } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
 import { QUERY_CAUSE_FIELD, quietly, RETRY_CAUSE_FIELD } from "./resilience.ts";
@@ -87,21 +90,35 @@ const NOOP_METRICS: StatementMetrics = {
 /** How long a cold-scan warning for one query shape stays quiet after it is logged. */
 const COLD_SCAN_WARN_INTERVAL_MS = 60 * 60 * 1000;
 
-/** The most query shapes the cold-scan warning remembers; the oldest falls out first. */
-const COLD_SCAN_SHAPES_REMEMBERED = 500;
+/** Replaces each quoted literal with `?`, in one pass (a backtracking regex is quadratic). */
+function withoutStringLiterals(query: string): string {
+  let out = "";
+  let inside = false;
+  for (let i = 0; i < query.length; i++) {
+    const ch = query[i];
+    if (!inside) {
+      if (ch === "'") {
+        inside = true;
+        out += "?";
+      } else out += ch;
+    } else if (ch === "\\") i++;
+    else if (ch === "'") inside = false;
+  }
+
+  return out;
+}
 
 /**
- * A query with its literals and layout removed, so the same statement run for another tenant,
- * time window or limit is one shape. The warning is about the statement's form (no time filter),
- * which does not change with its values.
+ * A query with its literals and layout removed, hashed, so the same statement run for another
+ * tenant, time window or limit is one key. The warning is about the statement's form.
  */
 function queryShapeOf(rawQuery: string): string {
-  return rawQuery
-    .replace(/'(?:[^'\\]|\\.)*'/g, "?")
+  const shape = withoutStringLiterals(rawQuery)
     .replace(/\b\d+(?:\.\d+)?\b/g, "?")
     .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 1000);
+    .trim();
+
+  return createHash("sha256").update(shape).digest("base64url");
 }
 
 export interface StatementReporterOptions {
@@ -124,8 +141,8 @@ export class StatementReporter {
   private readonly outcomeLogger: StatementLogSink;
   private readonly detectColdScan: (rawQuery: string) => string | null;
   private readonly now: () => number;
-  /** Query shape -> when its cold-scan warning last went out, and what it held back since. */
-  private readonly coldScanWarned = new Map<string, { at: number; suppressed: number }>();
+  /** One cold-scan warning per query shape per interval; per reporter, so tests stay apart. */
+  private readonly coldScanThrottle: WarnThrottle = createWarnThrottle(COLD_SCAN_WARN_INTERVAL_MS);
 
   constructor({
     now = () => nowInstant().epochMilliseconds,
@@ -143,30 +160,11 @@ export class StatementReporter {
     this.now = now;
   }
 
-  /**
-   * Claims the right to warn about one cold-scan query shape. A hot path runs the same shape
-   * thousands of times an hour; one warning per shape per interval says it, and the count of
-   * those held back rides on the next one. Returns null while the shape is quiet.
-   */
+  /** Null while the shape is quiet; otherwise how many warnings it held back since the last. */
   private claimColdScanWarning(rawQuery: string): { suppressedSincePrevious: number } | null {
-    const shape = queryShapeOf(rawQuery);
-    const at = this.now();
-    const previous = this.coldScanWarned.get(shape);
+    const suppressed = this.coldScanThrottle.claim({ key: queryShapeOf(rawQuery), now: this.now() });
 
-    if (previous && at - previous.at < COLD_SCAN_WARN_INTERVAL_MS) {
-      previous.suppressed += 1;
-
-      return null;
-    }
-
-    this.coldScanWarned.delete(shape);
-    this.coldScanWarned.set(shape, { at, suppressed: 0 });
-    if (this.coldScanWarned.size > COLD_SCAN_SHAPES_REMEMBERED) {
-      const oldest = this.coldScanWarned.keys().next().value;
-      if (oldest !== undefined) this.coldScanWarned.delete(oldest);
-    }
-
-    return { suppressedSincePrevious: previous?.suppressed ?? 0 };
+    return suppressed === undefined ? null : { suppressedSincePrevious: suppressed };
   }
 
   /** Count one finished statement. */

@@ -70,21 +70,15 @@ export function signInErrorRedirectOf({
   };
 }
 
+/** A provider's refusal code as an error a log record carries as its cause. */
+export type SignInRefusal = Error & { readonly code: string };
+
 /**
- * The cause of a withheld sign-in failure, as an error a log record can carry: the provider's
- * own code and description, so a record reads "state_not_found" and not "a reason we have not
- * written down". The code is the provider's refusal, never a secret, and the description is
- * clipped.
+ * The cause of a withheld sign-in failure: the provider's own code, so a record reads
+ * "state_not_found" and not "a reason we have not written down". The code is never a secret.
  */
-export function signInRefusalCause({
-  code,
-  description,
-}: {
-  code: string;
-  description: string;
-}): Error {
-  const detail = description.slice(0, 200);
-  const cause = new Error(`sign-in refused with "${code}"${detail ? `: ${detail}` : ""}`);
+export function signInRefusalCause({ code }: { code: string }): SignInRefusal {
+  const cause = Object.assign(new Error(`sign-in refused with "${code}"`), { code });
   cause.name = "SignInRefusal";
 
   return cause;
