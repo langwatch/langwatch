@@ -45,7 +45,7 @@ export function recordRequestSpanFailure({
   error: unknown;
   answeredStatus?: number;
 }): void {
-  span.recordException(error instanceof Error ? error : failureMessage(error) || String(error));
+  span.recordException(error instanceof Error ? error : String(error));
 
   const code = clientFaultCodeOf(error, answeredStatus);
   if (code !== undefined) {
