@@ -25,6 +25,7 @@ export type BraidsApiState = {
   remove: Mock<(input: unknown) => void>;
   setPolicy: Mock<(input: unknown) => void>;
   targets: { projectId: string; selectable: boolean; reason?: "this_project" | "aggregate" }[];
+  targetsAsked: Mock<(input: unknown) => void>;
   viewers: { count: number; exact: boolean };
   /** Whether the reader signs its calls: its key in use, or null. */
   readerSigning: { keyName: string; lastUsedAt: string | null } | null;
@@ -61,6 +62,7 @@ export function braidsApiFake() {
     remove: vi.fn(),
     setPolicy: vi.fn(),
     targets: [],
+    targetsAsked: vi.fn(),
     viewers: { count: 0, exact: true },
     readerSigning: null,
     create: vi.fn(),
@@ -86,9 +88,10 @@ export function braidsApiFake() {
       return { data, isLoading: false, isError: false };
     },
   });
-  const asked = (read: () => unknown) => ({
-    useQuery: (_input: unknown, options?: { enabled?: boolean }) => {
+  const asked = (read: () => unknown, record?: () => Mock<(input: unknown) => void>) => ({
+    useQuery: (input: unknown, options?: { enabled?: boolean }) => {
       const enabled = options?.enabled !== false;
+      if (enabled) record?.()(input);
       return { data: enabled ? read() : undefined, isLoading: false, isError: false };
     },
   });
@@ -115,7 +118,10 @@ export function braidsApiFake() {
         () => state.remove,
         (input: { braidId: string }) => ({ braidId: input.braidId }),
       ),
-      listBraidTargets: asked(() => state.targets),
+      listBraidTargets: asked(
+        () => state.targets,
+        () => state.targetsAsked,
+      ),
       countProjectTraceViewers: asked(() => state.viewers),
       createBraid: mutation(() => state.create, saved),
       changeBraid: mutation(() => state.change, saved),

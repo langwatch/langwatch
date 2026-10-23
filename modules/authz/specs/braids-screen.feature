@@ -41,6 +41,14 @@ Feature: The Braids screen
       And the picker says a braid can only go into a project whose traces you can read
 
     @integration
+    Scenario: The picker asks about at most 500 projects and says when it left some out
+      Given an organisation with 501 projects
+      When ana starts a new braid
+      Then the picker asks which of the first 500 projects she can braid into
+      And it says only the first 500 projects of the organisation are listed
+      And with 500 projects or fewer it asks about every project and says nothing of a limit
+
+    @integration
     Scenario: The dialog says what the reader already sees from this project
       Given a live braid from "specialists" into "orchestrator"
       When ana picks "orchestrator" for a new braid

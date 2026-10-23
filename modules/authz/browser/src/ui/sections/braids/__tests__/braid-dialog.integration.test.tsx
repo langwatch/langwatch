@@ -68,6 +68,7 @@ beforeEach(() => {
     { projectId: "p-spec", selectable: false, reason: "this_project" },
     { projectId: "p-roll", selectable: false, reason: "aggregate" },
   ];
+  state.targetsAsked.mockClear();
   state.viewers = { count: 14, exact: true };
   state.readerSigning = null;
   state.saveError = undefined;
@@ -230,6 +231,48 @@ describe("the braid dialog", () => {
       expect(screen.getByTestId("braid-targets-note")).toHaveTextContent(
         "A braid can only go into a project whose traces you can read.",
       );
+    });
+  });
+
+  describe("when the organisation holds more projects than the picker asks about", () => {
+    /** @scenario The picker asks about at most 500 projects and says when it left some out */
+    it("asks about the first 500 and says only those are listed", async () => {
+      const projects = Array.from({ length: 501 }, (_, index) => ({
+        id: `p-${index}`,
+        name: `project ${index}`,
+        teamId: "t-1",
+        slug: `project-${index}`,
+      }));
+      const host = new FakeAuthzHost({
+        scope: { organizationId: "org-1", projectId: "p-0" },
+        grants: new Set(["project:view", "braids:manage"]),
+        plan: { isEnterprise: true, isLoading: false },
+        query: { braid: "new" },
+        structure: { ...STRUCTURE, projects },
+      });
+      braidsFake.state.targets = projects.slice(0, 500).map((project) => ({
+        projectId: project.id,
+        selectable: true,
+      }));
+      renderWithAuthzHost(<BraidsScreen />, host);
+
+      const asked = braidsFake.state.targetsAsked.mock.lastCall?.[0] as { projectIds: string[] };
+      expect(asked.projectIds).toHaveLength(500);
+      expect(asked.projectIds).not.toContain("p-500");
+      expect(screen.getByTestId("braid-targets-limit-note")).toHaveTextContent(
+        "Only the first 500 projects of the organisation are listed.",
+      );
+    });
+  });
+
+  describe("when the organisation holds no more projects than the picker asks about", () => {
+    /** @scenario The picker asks about at most 500 projects and says when it left some out */
+    it("asks about every project and shows no limit note", () => {
+      openDialog();
+
+      const asked = braidsFake.state.targetsAsked.mock.lastCall?.[0] as { projectIds: string[] };
+      expect(asked.projectIds).toEqual(["p-orch", "p-spec", "p-roll"]);
+      expect(screen.queryByTestId("braid-targets-limit-note")).not.toBeInTheDocument();
     });
   });
 
