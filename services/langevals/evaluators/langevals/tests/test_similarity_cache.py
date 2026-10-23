@@ -5,6 +5,7 @@ request the evaluator makes.
 """
 
 import hashlib
+import time
 
 import litellm
 import numpy as np
@@ -35,6 +36,7 @@ def embedding_requests(monkeypatch):
 
     def fake_embedding(*, model, input, **kwargs):
         requests.append({"model": model, "input": input})
+        time.sleep(0.02)  # long enough for parallel misses to overlap
         return FakeEmbeddingResponse(fake_embedding_of(input))
 
     monkeypatch.setattr(litellm, "embedding", fake_embedding)
@@ -94,8 +96,9 @@ def test_scores_are_identical_to_embedding_both_texts(embedding_requests):
 def test_batch_of_entries_embeds_the_target_once(embedding_requests):
     entries = [CustomSimilarityEntry(output=f"answer {i}") for i in range(10)]
 
+    # The server's default width, so every entry misses the cold cache at once.
     results = make_evaluator(env={"OPENAI_API_KEY": "sk-a"}).evaluate_batch(
-        entries, max_evaluations_in_parallel=1
+        entries, max_evaluations_in_parallel=50
     )
 
     assert [r.status for r in results] == ["processed"] * 10

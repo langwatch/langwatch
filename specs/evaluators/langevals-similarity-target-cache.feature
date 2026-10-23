@@ -24,7 +24,7 @@ Feature: Semantic similarity embeds its fixed target text once per process
 
   @unit
   Scenario: A batch of entries embeds the target once
-    Given a batch of ten entries and one target
+    Given a batch of ten entries and one target, evaluated in parallel
     When the batch is evaluated
     Then the target is embedded once and each entry is embedded once
 
