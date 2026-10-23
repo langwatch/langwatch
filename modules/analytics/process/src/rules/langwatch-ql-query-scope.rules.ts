@@ -180,8 +180,8 @@ function assertNoTableModifiers({
 }
 
 /**
- * The references to a PostgreSQL-resident view. ClickHouse pushes `FINAL` or `SAMPLE` through the
- * view to its PostgreSQL engine table, which supports neither and fails with ILLEGAL_FINAL.
+ * The references to a PostgreSQL-resident view. Its PostgreSQL engine table refuses `FINAL` with
+ * ILLEGAL_FINAL, and the view already keeps one row per key, so neither modifier buys anything.
  */
 function postgresReferences({
   references,

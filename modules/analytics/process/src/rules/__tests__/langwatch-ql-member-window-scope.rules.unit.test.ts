@@ -31,8 +31,11 @@ const UNTENANTED: LangWatchQLViewDefinition = {
   columns: traces.columns.filter((column) => column.name !== "TenantId"),
 };
 const VIEWS = [...LWQL_VIEW_CATALOG, UNDATED, UNTENANTED];
-const [POSTGRES_VIEW] = LangWatchQLCatalogShapesService.create().postgresViews(LWQL_VIEW_CATALOG);
-if (!POSTGRES_VIEW) throw new Error("the catalogue has no PostgreSQL-resident view");
+// A view with neither column is one the origin exclusion leaves as written.
+const POSTGRES_VIEW = LangWatchQLCatalogShapesService.create()
+  .postgresViews(LWQL_VIEW_CATALOG)
+  .find((view) => !view.columns.some(({ name }) => name === "Origin" || name === "TraceId"));
+if (!POSTGRES_VIEW) throw new Error("the catalogue has no un-narrowed PostgreSQL-resident view");
 
 const B_FROM = `(TenantId = 'project_b' AND OccurredAt >= fromUnixTimestamp64Milli(toInt64(${SHARED_FROM})))`;
 const MEMBERS = `(TenantId IN ('project_a') OR ${B_FROM})`;
