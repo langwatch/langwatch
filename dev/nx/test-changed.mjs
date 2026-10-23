@@ -69,13 +69,14 @@ export function checkNamed({ named, known, cwd = root }) {
   const problems = [];
   for (const arg of named) {
     const path = join(cwd, arg);
-    if (existsSync(path) && statSync(path).isDirectory()) {
+    const exists = existsSync(path);
+    if (exists && statSync(path).isDirectory()) {
       problems.push(`${arg} is a directory; name the files in it`);
       continue;
     }
     const tracked = git({ args: ["ls-tree", "HEAD", "--", arg], cwd, allowFailure: true });
     const inHead = tracked.some((line) => line.includes(" blob "));
-    if (!known(arg) && !existsSync(path) && !inHead)
+    if (!known(arg) && !exists && !inHead)
       problems.push(`${arg} is not a file in this repository (paths are from the repository root)`);
   }
 
