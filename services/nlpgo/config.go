@@ -53,7 +53,8 @@ type Config struct {
 	// Evaluators configures the evaluator runtime (NLPGO_EVALUATORS_*).
 	Evaluators evaluators.Config `env:"NLPGO_EVALUATORS"`
 	// EvaluatorsInternalSecret is the bearer secret the evaluator runtime
-	// requires. Not required to boot: unset, the runtime refuses every request.
+	// requires. Not required to boot: unset, the runtime is not built and its
+	// route is not mounted.
 	EvaluatorsInternalSecret string `env:"NLPGO_INTERNAL_SECRET"`
 	// PIIAnalyzerURL is the operator's PII model service; empty leaves PERSON and LOCATION unsupported.
 	PIIAnalyzerURL string `env:"NLPGO_PII_ANALYZER_URL"`

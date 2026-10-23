@@ -1,6 +1,6 @@
 // Package gateway is the LLMChannel over the AI gateway's in-process
 // dispatcher. Credentials come from the tenant's request env only, translated
-// by pkg/litellmparams exactly as the studio does. Plan: §3.1, §5.2.
+// by services/nlpgo/litellmparams exactly as the studio does. Plan: §3.1, §5.2.
 package gateway
 
 import (

@@ -68,6 +68,7 @@ nlp:
   - "services/nlpgo/**"
   - "cmd/service/**"
   - "pkg/**"
+  - "services/third_party/lingua-go/**"
   - "*/go.mod"
   - "*/go.sum"
   - ".github/workflows/langwatch-nlp-ci.yml"
