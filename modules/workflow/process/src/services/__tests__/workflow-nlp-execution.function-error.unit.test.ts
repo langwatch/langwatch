@@ -108,6 +108,7 @@ describe("WorkflowNlpExecutionService", () => {
   });
 
   describe("when the workflow's answer is over the synchronous response cap", () => {
+    /** @scenario "A workflow result too large for one synchronous answer is the sender's to shrink" */
     it("refuses as the sender's to shrink and logs a warning, not an error", async () => {
       const body = JSON.stringify({
         errorType: "Function.ResponseSizeTooLarge",

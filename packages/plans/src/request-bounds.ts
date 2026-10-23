@@ -59,6 +59,15 @@ export const requestBounds = [
     enterprise: 10_000,
   },
   {
+    key: "tracesWithSpansPageSizeMax",
+    description:
+      "Trace search page size when spans are included; each page is buffered whole, REST.",
+    unit: "items",
+    free: 100,
+    paid: 100,
+    enterprise: 100,
+  },
+  {
     key: "traceIdsMax",
     description: "Trace id arrays above this are refused, traces tRPC.",
     unit: "items",

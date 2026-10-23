@@ -56,6 +56,7 @@ describe("toLangevalsContexts", () => {
 });
 
 describe("toLangevalsConversation", () => {
+  /** @scenario "A conversation mapping that resolves to nothing reaches langevals as no turns" */
   it.each(["", "   "])("reads an unmapped %j conversation as no turns", (value) => {
     expect(toLangevalsConversation(value)).toEqual([]);
   });
@@ -72,6 +73,7 @@ describe("toLangevalsConversation", () => {
     expect(toLangevalsConversation(turns)).toEqual(turns);
   });
 
+  /** @scenario "A conversation mapping that resolves to nothing reaches langevals as no turns" */
   it("drops an empty turn beside real ones", () => {
     expect(toLangevalsConversation([{ input: "hi", output: "yo" }, ""])).toEqual([
       { input: "hi", output: "yo" },

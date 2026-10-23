@@ -114,6 +114,7 @@ describe("StatementReporter", () => {
         detectColdScan: () => "evaluation_runs",
       });
 
+    /** @scenario "A cold scan warns once per query shape per hour" */
     it("warns once per shape, whatever its literals", () => {
       const outcomeLogger = recordingSink();
       const reporter = coldScanning(outcomeLogger, () => 0);
@@ -126,6 +127,7 @@ describe("StatementReporter", () => {
       expect(outcomeLogger.lines.filter((line) => line.level === "debug")).toHaveLength(2);
     });
 
+    /** @scenario "A cold scan warns once per query shape per hour" */
     it("warns again after the quiet window and counts what it held back", () => {
       const outcomeLogger = recordingSink();
       let clock = 0;
@@ -145,6 +147,7 @@ describe("StatementReporter", () => {
       expect(warns[1]!.fields.suppressedSincePrevious).toBe(2);
     });
 
+    /** @scenario "A cold scan warns once per query shape per hour" */
     it("warns separately for a different shape", () => {
       const outcomeLogger = recordingSink();
       const reporter = coldScanning(outcomeLogger, () => 0);
@@ -157,6 +160,36 @@ describe("StatementReporter", () => {
       });
 
       expect(outcomeLogger.lines.filter((line) => line.level === "warn")).toHaveLength(2);
+    });
+
+    /** @scenario "A cold scan warns once per query shape per hour" */
+    it("warns separately for long queries that differ only near their end", () => {
+      const outcomeLogger = recordingSink();
+      const reporter = coldScanning(outcomeLogger, () => 0);
+      const columns = Array.from({ length: 300 }, (_, i) => `column_${i}`).join(", ");
+
+      for (const tail of ["ORDER BY a", "ORDER BY b"]) {
+        reporter.success({
+          operation: "query",
+          durationMs: 5,
+          params: { query: `SELECT ${columns} FROM evaluation_runs ${tail}` },
+        });
+      }
+
+      expect(outcomeLogger.lines.filter((line) => line.level === "warn")).toHaveLength(2);
+    });
+
+    it("reads an unterminated literal without stalling", () => {
+      const outcomeLogger = recordingSink();
+      const reporter = coldScanning(outcomeLogger, () => 0);
+
+      reporter.success({
+        operation: "query",
+        durationMs: 5,
+        params: { query: `SELECT * FROM evaluation_runs WHERE x = '${"\\'".repeat(50_000)}` },
+      });
+
+      expect(outcomeLogger.lines.filter((line) => line.level === "warn")).toHaveLength(1);
     });
   });
 });

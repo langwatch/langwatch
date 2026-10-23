@@ -8,10 +8,10 @@ import { recordForwardedFailure } from "../request.ts";
 
 async function resolvedAfter(response: Response): Promise<ResolvedError | undefined> {
   let resolved: ResolvedError | undefined;
-  const app = new Hono();
-  app.get("/probe", async (c) => {
-    await recordForwardedFailure(c, response);
-    resolved = c.get(RESOLVED_ERROR) as ResolvedError | undefined;
+  const app = new Hono<{ Variables: { [RESOLVED_ERROR]?: ResolvedError } }>();
+  app.get("/probe", (c) => {
+    recordForwardedFailure(c, response);
+    resolved = c.get(RESOLVED_ERROR);
 
     return c.text("ok");
   });
@@ -20,30 +20,41 @@ async function resolvedAfter(response: Response): Promise<ResolvedError | undefi
   return resolved;
 }
 
+function causeOf(resolved: ResolvedError | undefined): Error {
+  if (!(resolved?.error instanceof Error)) throw new Error("no cause was recorded");
+
+  return resolved.error;
+}
+
 describe("recordForwardedFailure()", () => {
   describe("when a route forwards a 5xx answer", () => {
-    it("names the forwarded body as the cause and keeps the status", async () => {
-      const response = new Response('{"message":"canary timed out"}', { status: 503 });
-
-      const resolved = await resolvedAfter(response);
+    /** @scenario "A forwarded server failure names its status as the cause, never its body" */
+    it("names the forwarded status as the cause", async () => {
+      const resolved = await resolvedAfter(
+        new Response('{"message":"canary timed out"}', { status: 503 }),
+      );
 
       expect(resolved?.status).toBe(503);
-      expect((resolved?.error as Error).name).toBe("ForwardedServerError");
-      expect((resolved?.error as Error).message).toContain("canary timed out");
+      expect(causeOf(resolved).name).toBe("ForwardedServerError");
     });
 
-    it("leaves the forwarded response readable", async () => {
+    /** @scenario "A forwarded server failure names its status as the cause, never its body" */
+    it("keeps the forwarded body out of the cause", async () => {
+      const resolved = await resolvedAfter(
+        new Response('{"message":"user prompt: secret"}', { status: 500 }),
+      );
+
+      expect(causeOf(resolved).message).not.toContain("secret");
+    });
+
+    /** @scenario "A forwarded server failure names its status as the cause, never its body" */
+    it("leaves the forwarded response unread", async () => {
       const response = new Response("still here", { status: 502 });
 
       await resolvedAfter(response);
 
+      expect(response.bodyUsed).toBe(false);
       expect(await response.text()).toBe("still here");
-    });
-
-    it("bounds the body it quotes", async () => {
-      const resolved = await resolvedAfter(new Response("x".repeat(5000), { status: 500 }));
-
-      expect((resolved?.error as Error).message.length).toBeLessThan(400);
     });
   });
 

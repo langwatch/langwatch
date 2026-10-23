@@ -1050,27 +1050,15 @@ export function recordAnsweredCause(
   c.set(RESOLVED_ERROR, resolved);
 }
 
-/** The most of a forwarded failure's body that a log record names. */
-const FORWARDED_FAILURE_BODY_CHARS = 300;
-
 /**
- * Names the cause of a 5xx a route forwarded from elsewhere (a health probe passing its canary's
- * answer through), so the access record carries the canary's own words rather than reading
- * "request failed without a cause attached". The response itself is left untouched: only a
- * clone is read, and only its first {@link FORWARDED_FAILURE_BODY_CHARS} characters are kept.
+ * Names a 5xx a route forwarded from elsewhere, so the access record says so rather than "failed
+ * without a cause attached". Status only: the forwarded body can quote customer input, and
+ * reading it would hold the request open until the upstream stream ends.
  */
-export async function recordForwardedFailure(c: Context, response: Response): Promise<void> {
+export function recordForwardedFailure(c: Context, response: Response): void {
   if (response.status < 500 || c.get(RESOLVED_ERROR) !== undefined) return;
 
-  let body = "";
-  try {
-    body = (await response.clone().text()).slice(0, FORWARDED_FAILURE_BODY_CHARS);
-  } catch {
-    // An unreadable body only costs the detail; the status and route still name the failure.
-  }
-  const cause = new Error(
-    `forwarded a ${response.status} answer${body ? `: ${body}` : " with no body"}`,
-  );
+  const cause = new Error(`forwarded a ${response.status} answer`);
   cause.name = "ForwardedServerError";
   recordAnsweredCause(c, { error: cause, status: response.status });
 }

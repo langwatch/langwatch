@@ -261,7 +261,7 @@ function withholdInternalSignInError({
   } else {
     logger.error(
       {
-        error: signInRefusalCause({ code: redirect.code, description: redirect.description }),
+        error: signInRefusalCause({ code: redirect.code }),
         code: redirect.code,
         description: redirect.description,
         traceId: traceId ?? null,

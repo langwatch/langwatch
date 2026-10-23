@@ -3826,9 +3826,8 @@ export class TraceModule implements TraceApi, CollectorApp {
 
   /**
    * A failure the door answered but did not raise, kept off the customer's body. Every report is
-   * a body the collector refused with a 400 (the SDK sent a span, metadata or body that fails
-   * validation), so it is the sender's fault: a warn, with the detail on the "invalid span
-   * received" record beside it, not an error that pages as a platform fault.
+   * a 400 for a body the SDK sent, so it is the sender's fault: a warn, with the detail on the
+   * "invalid span received" record beside it, not an error that pages as a platform fault.
    */
   collectorReportError(
     error: Error,

@@ -244,6 +244,7 @@ describe("POST /search", () => {
   });
 
   describe("when includeSpans asks for a page larger than a spans page may be", () => {
+    /** @scenario "Public trace search with spans answers at most 100 traces per page" */
     it("clamps the page to the spans page bound, leaving scrollId to page on", async () => {
       const { send, listTraces } = mount();
       await send({ startDate: 1000, endDate: 5000, includeSpans: true, pageSize: 4000 });
@@ -254,6 +255,7 @@ describe("POST /search", () => {
       );
     });
 
+    /** @scenario "Public trace search with spans answers at most 100 traces per page" */
     it("keeps a smaller requested page as it is", async () => {
       const { send, listTraces } = mount();
       await send({ startDate: 1000, endDate: 5000, includeSpans: true, pageSize: 20 });
@@ -262,6 +264,7 @@ describe("POST /search", () => {
       );
     });
 
+    /** @scenario "Public trace search with spans answers at most 100 traces per page" */
     it("leaves a search without spans at the requested size", async () => {
       const { send, listTraces } = mount();
       await send({ startDate: 1000, endDate: 5000, pageSize: 4000 });

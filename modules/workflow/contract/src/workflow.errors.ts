@@ -1,5 +1,5 @@
 import { formatDatasetByteLimit } from "@langwatch/dataset-contract";
-import { HandledError } from "@langwatch/handled-error";
+import { HandledError, remediation } from "@langwatch/handled-error";
 
 export class WorkflowNotFoundError extends HandledError {
   declare readonly code: "workflow_not_found";
@@ -81,7 +81,7 @@ export class WorkflowResultTooLargeError extends HandledError {
     super(
       "workflow_result_too_large",
       "The workflow's result is too large to return. Make it return less data, for example fewer rows or shorter text.",
-      { httpStatus: 422, fault: "customer" },
+      { httpStatus: 422, fault: "customer", ...remediation("workflow_result_too_large") },
     );
     this.name = "WorkflowResultTooLargeError";
   }

@@ -34,12 +34,15 @@
     },
     {
       "path": "../authorization/tsconfig.build.json"
+    },
+    {
+      "path": "../observability/tsconfig.build.json"
     }
   ],
   // Dependencies the build does not import get no reference; tsconfig.test.json holds test-only ones (tsconfig-shape-codemod).
   "nx": {
     "sync": {
-      "ignoredDependencies": ["@langwatch/observability", "@langwatch/task"]
+      "ignoredDependencies": ["@langwatch/task"]
     }
   }
 }

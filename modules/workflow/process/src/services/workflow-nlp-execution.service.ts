@@ -142,7 +142,7 @@ export class WorkflowNlpExecutionService {
     if (!response.ok) {
       const failure = await WorkflowNlpExecutionService.engineFailureOf(response);
       // The function ran and its answer was bigger than a synchronous call carries: the
-      // workflow's own output is the cause, so it is the sender's to shrink and not an engine fault.
+      // workflow's own output is the cause, the sender's to shrink, not an engine fault.
       const isOversizedAnswer = failure.errorType === ENGINE_RESPONSE_TOO_LARGE;
       logger[isOversizedAnswer ? "warn" : "error"](
         {
