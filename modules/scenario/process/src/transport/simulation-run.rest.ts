@@ -54,6 +54,7 @@ export function createSimulationRunsRest(): Readonly<{
     .get("/", "getApiSimulationRuns")
     .withQuery(simulationRunListQuerySchema)
     .withPermission("scenarios:view")
+    .withLegacyKeyScope("legacy_project_key_scenarios")
     .withOutput(simulationRunListResponseSchema)
     .withDocs({
       description:
@@ -73,6 +74,7 @@ export function createSimulationRunsRest(): Readonly<{
     .get("/:scenarioRunId", "getApiSimulationRunsByScenarioRunId")
     .withParams(scenarioRunIdParamsSchema)
     .withPermission("scenarios:view")
+    .withLegacyKeyScope("legacy_project_key_scenarios")
     .withOutput(scenarioRunRestResponseWithPlatformUrlSchema)
     .withDocs({
       description: "Get a single simulation run by its ID",
@@ -92,6 +94,7 @@ export function createSimulationRunsRest(): Readonly<{
     .get("/batches/list", "getApiSimulationRunsBatchesList")
     .withQuery(simulationBatchQuerySchema)
     .withPermission("scenarios:view")
+    .withLegacyKeyScope("legacy_project_key_scenarios")
     .withOutput(simulationBatchListResponseSchema)
     .withDocs({
       description: "List batch summaries for a scenario set (pass/fail counts per batch)",
@@ -118,6 +121,7 @@ export function createSimulationRunsRest(): Readonly<{
     .get("/batches/:batchRunId", "getApiSimulationRunsBatchesByBatchRunId")
     .withParams(batchRunIdParamsSchema)
     .withPermission("scenarios:view")
+    .withLegacyKeyScope("legacy_project_key_scenarios")
     .withOutput(simulationBatchSummaryRestSchema)
     .withDocs({
       description: "Get the summary of a single batch run, including its completion flag",

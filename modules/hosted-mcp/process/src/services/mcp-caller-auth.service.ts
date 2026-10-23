@@ -1,3 +1,4 @@
+import { LegacyProjectKeyIngestionOnlyError } from "@langwatch/api-key-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { McpDoorAnswer } from "@langwatch/hosted-mcp-contract";
 import {
@@ -181,6 +182,12 @@ export class McpCallerAuthService {
     if (lookup.kind === "unknown") {
       this.#authFailures.track(this.clientIpOf(request));
       return { kind: "answered", answer: answers.refusal(new McpInvalidApiKeyError()) };
+    }
+    if (lookup.kind === "ingestion_only") {
+      return {
+        kind: "answered",
+        answer: answers.refusal(new LegacyProjectKeyIngestionOnlyError()),
+      };
     }
     const projectId = lookup.project.id;
 

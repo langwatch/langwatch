@@ -31,7 +31,7 @@ four at once across worktrees and the machine stops. So:
   the applications), `pnpm lint`, `pnpm format`, or `tsc -b apps/...`, unless
   the task you were given is explicitly to run one.
 - While working: `tsc --noEmit --ignoreConfig <file>` on the file you just
-  edited, or `tslsp-cli diagnostics --file F`.
+  edited, or `rush ts diagnostics --file F`.
 - Once, at the end, for the package you touched: `pnpm --filter <package> typecheck`.
 
 These go through the machine-wide slot queue and can block for minutes. That is
@@ -97,21 +97,26 @@ shared if two lanes could plausibly need it in the same hour.
 
 ## 5. Identifiers go through the language server
 
-Never grep or `sed` for a symbol you intend to rename or move. From the package
-directory holding the `tsconfig.json`:
+Never grep or `sed` for a symbol you intend to rename or move. Use rush's
+`ts` plugin (`rush plugin on ts` once). In a rush session it is the `ts` tools;
+from a shell (rush is machine-local and may be absent: check `command -v rush`
+once; without it, use your editor's TypeScript rename, the language service's
+`findRenameLocations`):
 
 ```
-pnpm exec tslsp-cli references --symbol Name --summary
-pnpm exec tslsp-cli rename --symbol Old --new-name New --dry-run
-pnpm exec tslsp-cli rename-file OLD NEW    # rewrites imports
-pnpm exec tslsp-cli diagnostics --file F
+rush ts references --file F --line N --symbol Name
+rush ts rename --file F --line N --symbol Old --new-name New   # writes the files
+rush ts rename-file --file OLD --to NEW                        # rewrites imports
+rush ts diagnostics --file F
 ```
 
-A package's program sees its own files and its workspace dependencies, so run
-the same command from `apps/api` or `apps/worker` to find consumers there.
+Always give the file and line where the symbol stands. One language server
+serves the whole checkout, shared by every agent in it. `rename` writes at
+once: check `git diff` after it.
 
-Memory: run one rename lane at a time. tsgo needs several GB on a large
-package and is OOM-killed on a small host. The TypeScript language service
+Memory: run one rename lane at a time. The server starts through rush's gate
+and is stopped past its memory cap (4 GB by default); the next call starts a
+fresh one. The TypeScript language service
 `findRenameLocations` is the allowed fallback, never grep or sed.
 
 Two things the language server cannot see, so check them by hand after any
@@ -136,7 +141,7 @@ starting:
 - Declare a new dependency in `package.json` and run `env -u CI pnpm install
 --filter "<package>..."` **before** the first import of it is written.
 - Delete an export only in the same step that repoints or removes its importers.
-  Check with `tslsp-cli references` first.
+  Check with `rush ts references` first.
 - Change a constructor's shape and every caller in the same step.
 
 After a step lands, read `haven logs api --since 2m --agent`. A
@@ -151,11 +156,11 @@ fatter turns**, not a warmer cache.
 
 - Join shell commands with `&&` into one call rather than three, and send
   independent tool calls together in one response, never one per response.
-- Read a file once. Prefer `tslsp-cli outline FILE`, then read the one range you
+- Read a file once. Prefer `rush ts outline --file F`, then read the one range you
   need. Never read a large file whole to find one function.
 - Filter every tool output: `tail`, `grep`, `--reporter=dot`. A raw log is re-read
   on every subsequent turn, at full price, forever.
-- A framework signature is `tslsp-cli hover --symbol X`, not a read of the
+- A framework signature is `rush ts hover --file F --line N --symbol X`, not a read of the
   framework's source.
 - `rtk` shrinks the output of the commands you run most (`rtk git`, `rtk pnpm`,
   `rtk grep`) and passes through the ones it has no filter for. It is optional

@@ -6388,6 +6388,11 @@ const presentations = {
     title: "License not found",
     describe: () => "No license with that identity exists in the registry. Check the license id.",
   },
+  legacy_project_key_ingestion_only: {
+    title: "Legacy project key is limited",
+    describe: () =>
+      "This legacy project key is limited to ingestion and the scopes enabled for its project. Create an API key in Settings > API Keys and use it here instead.",
+  },
   license_already_registered: {
     title: "License already registered",
     describe: () => "This license is already in the registry, so it cannot be registered again.",
