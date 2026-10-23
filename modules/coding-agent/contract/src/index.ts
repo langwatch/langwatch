@@ -10,6 +10,7 @@ export * from "./coding-agent-trace-pull-request.ts";
 export * from "./coding-agent-projection-persistence.ts";
 export * from "./telemetry/index.ts";
 export * from "./telemetry/coding-agent-normalization.ts";
+export * from "./telemetry/gen-ai-operations.ts";
 export * from "./telemetry/session-context.ts";
 // The pure derivations a peer imports directly, with no session store read:
 // content-key lookups, transcript building and span filtering.
@@ -41,3 +42,4 @@ export * from "./injected-notice.ts";
 export * from "./leading-context.ts";
 export * from "./coding-agent-span-admission.ts";
 export * from "./coding-agent-lent-components.ts";
+export * from "./coding-agent-project-milestones.events.ts";

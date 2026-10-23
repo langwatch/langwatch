@@ -15,10 +15,16 @@ import {
 } from "../../../../testing.tsx";
 import { PersonalSessionsScreen } from "../personal-sessions.screen.tsx";
 
-const { state } = vi.hoisted(() => ({ state: { ctx: {} as Partial<PersonalContext> } }));
+const { state, recordPageOpened } = vi.hoisted(() => ({
+  state: { ctx: {} as Partial<PersonalContext> },
+  recordPageOpened: vi.fn(),
+}));
 
 vi.mock("../../../../behavior/use-personal-context.ts", () => ({
   usePersonalContext: () => state.ctx,
+}));
+vi.mock("../../../../behavior/use-record-page-opened.ts", () => ({
+  useRecordPageOpened: recordPageOpened,
 }));
 vi.mock("../../../../behavior/lent-coding-agent-tables.tsx", () => ({
   CodingAgentSessionsTable: ({ projectId }: { projectId: string }) => (
@@ -48,6 +54,23 @@ describe("PersonalSessionsScreen", () => {
       expect(screen.getByText(/Setting up your workspace/)).toBeTruthy();
       expect(screen.queryByText("No sessions yet")).toBeNull();
       expect(screen.queryByText(/personal_workspace_pending|error|failed/i)).toBeNull();
+    });
+  });
+
+  describe("when the page is opened", () => {
+    it("announces the open of the sessions page", () => {
+      state.ctx = {
+        ready: true,
+        isPersonalProjectResolved: true,
+        isWorkspacePending: false,
+        personalProjectId: "proj_me",
+        personalProjectSlug: "me",
+      };
+      renderWithPersonalWorkspaceHost(<PersonalSessionsScreen />, {
+        host: fakePersonalWorkspaceHost(),
+      });
+
+      expect(recordPageOpened).toHaveBeenCalledWith({ page: "me_sessions" });
     });
   });
 
