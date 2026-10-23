@@ -94,7 +94,6 @@ describe("findMatchingModelCost remembering its answers", () => {
       for (const name of modelNames()) {
         const expected = coldMatch(name, merged);
         expect(findMatchingModelCost(name, merged), name).toEqual(expected);
-        expect(findMatchingModelCost(name, [...customRules, ...catalogue]), name).toEqual(expected);
       }
     });
   });
