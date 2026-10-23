@@ -21,13 +21,14 @@ const CLIENT_FAULT_LOG_WINDOW_MS = 60_000;
 const clientFaultLog = createWarnThrottle(CLIENT_FAULT_LOG_WINDOW_MS);
 
 /**
- * The reason code of a caller's fault, whatever its shape. A bare 4xx counts only when the caller
- * was answered below 500 too: the error handler may answer an odd thrown value as a 500.
+ * The reason code of a caller's fault, whatever its shape. Anything answered 500 or above is a
+ * server error, even a customer-fault class or a thrown 4xx the error handler answered as a 500.
  */
 function clientFaultCodeOf(error: unknown, answeredStatus?: number): string | undefined {
+  if (answeredStatus !== undefined && answeredStatus >= 500) return undefined;
   if (HandledError.isHandled(error)) return error.fault === "customer" ? error.code : undefined;
   const status = getStatusCodeFromError(error);
-  if (!error || (answeredStatus ?? status) >= 500) return undefined;
+  if (!error || status >= 500) return undefined;
   return status >= 400 && status < 500 ? `http_${status}` : undefined;
 }
 

@@ -62,6 +62,22 @@ describe("recordRequestSpanFailure", () => {
     });
   });
 
+  describe("when a customer-fault error is answered as a 5xx", () => {
+    it("marks the span ERROR", () => {
+      const { span, asSpan } = fakeSpan();
+
+      recordRequestSpanFailure({
+        span: asSpan,
+        error: new ProjectInvalidCredentialsError(),
+        answeredStatus: 503,
+      });
+
+      expect(span.setStatus).toHaveBeenCalledWith(
+        expect.objectContaining({ code: SpanStatusCode.ERROR }),
+      );
+    });
+  });
+
   describe("when the server fails", () => {
     /** @scenario A server fault marks the span ERROR with its cause */
     it("marks the span ERROR and carries the cause in the status message", () => {
