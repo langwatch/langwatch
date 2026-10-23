@@ -1,0 +1,19 @@
+{
+  "name": "D1: chart on the attached board",
+  "situation": "You are a LangWatch user talking to Langy, the in-product assistant. The test state is the test's own bookkeeping: take only the names it gives you (board.name, trace_name), never mention ids, facts or anything else from it. Write short, plain messages. In your first message, ask exactly (with the real values): 'Add a chart of trace volume per day over the last 2 full UTC days for my traces named <trace_name> to my \"<board.name>\" dashboard.' If Langy asks something, answer briefly. Once Langy says the chart is added, stop.",
+  "criteria": [
+    "Code check, from the test state after Langy's last reply: facts_now.board.added holds exactly one item (one new chart or widget on the dashboard named in board.name).",
+    "Code check: facts_now.board.newest_counts.total equals expected_total and facts_now.board.newest_counts.rows equals expected_days, so the chart has one value per day, not a single total.",
+    "Code check: facts_now.decoy.unchanged is true (the decoy dashboard is untouched) and facts_now.created_off_board is empty.",
+    "Langy does not ask which dashboard to use, since the user named it."
+  ],
+  "labels": ["jobs", "regression"],
+  "parameters": [
+    {
+      "name": "world",
+      "description": "Which matrix world the setup hook builds",
+      "defaultValue": "D1"
+    }
+  ],
+  "maxTurns": 2
+}

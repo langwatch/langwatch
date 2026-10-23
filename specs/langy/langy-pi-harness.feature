@@ -193,6 +193,17 @@ Feature: Langy runs a conversation on the pi worker
     And the hour-long share of the writes when the provider states it
     And the counts use the same attribute names the gateway's own span uses
 
+  # A failed call's span once showed only an error status, so a spent balance
+  # retried five times looked like five identical unexplained failures.
+  @unit
+  Scenario: The retold span of a failed model call says why it failed
+    Given a pi worker's mediated LLM call the provider rejects, or fails with an error event inside its stream
+    When the relay retells the call as a gen_ai span
+    Then the span records the upstream HTTP status
+    And it records the provider's error type and the account cause the relay classified
+    And it records a message only when it is the gateway's own exhausted-access message
+    But every provider message, billing sentences included, is left off the span, because it can quote a key
+
   # The gateway drops request options a provider cannot take and names them
   # on the response (X-LangWatch-Params-Dropped). Two production outages were
   # invisible until a live probe because nothing on the langy side recorded

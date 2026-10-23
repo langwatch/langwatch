@@ -173,7 +173,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
         with:
-          node-version: 24
+          node-version: "24.22.1"
           # No dependency cache on purpose. These legs build the binaries that
           # the publish job uploads to the release, so a poisoned cache entry
           # would become a shipped artifact. Restoring a shared store into a

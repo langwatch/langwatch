@@ -11,6 +11,7 @@ import {
   type ModelDefaultScope,
   type ModelDefaultSnapshot,
   type ModelDefaultSnapshotInput,
+  MODEL_ROLES,
 } from "@langwatch/model-provider-contract";
 
 import type { ModelDefaultRepository } from "../../../repositories/model-default.repository.ts";
@@ -199,13 +200,7 @@ export class ModelProviderDefaultsService {
     chain: ModelDefaultScope[];
   }): Record<string, ModelDefaultEffective | null> {
     const features = this.options.catalog.defaultFeatures();
-    const roles = new Set([
-      "DEFAULT",
-      "FAST",
-      "LANGY",
-      "EMBEDDINGS",
-      ...features.map((feature) => feature.role),
-    ]);
+    const roles = new Set<string>([...MODEL_ROLES, ...features.map((feature) => feature.role)]);
     const effective: Record<string, ModelDefaultEffective | null> = {};
     for (const role of roles) {
       const feature = features.find((candidate) => candidate.role === role);
@@ -235,13 +230,7 @@ export class ModelProviderDefaultsService {
     tiers: ModelDefaultScope[];
   }): Promise<ModelDefaultInheritedValues["inherited"]> {
     const features = this.options.catalog.defaultFeatures();
-    const keys = [
-      "DEFAULT",
-      "FAST",
-      "LANGY",
-      "EMBEDDINGS",
-      ...features.map((feature) => feature.key),
-    ];
+    const keys = [...MODEL_ROLES, ...features.map((feature) => feature.key)];
     const inherited: ModelDefaultInheritedValues["inherited"] = {};
     for (const key of keys) {
       const role = features.find((feature) => feature.key === key)?.role ?? key;

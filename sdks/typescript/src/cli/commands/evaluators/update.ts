@@ -8,6 +8,7 @@ import { commandValidationError } from "../../utils/errorOutput";
 import type { CommandResult } from "../../utils/output";
 import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
+import { exactLookupMissError } from "./findEvaluator";
 
 /**
  * Returns the updated evaluator rather than printing it: the output port
@@ -31,7 +32,7 @@ export const updateEvaluatorCommand = async (
   } catch (error) {
     failSpinner({
       spinner: resolveSpinner,
-      error,
+      error: exactLookupMissError({ error, reference: idOrSlug }),
       action: `find evaluator "${idOrSlug}"`,
     });
     process.exit(1);

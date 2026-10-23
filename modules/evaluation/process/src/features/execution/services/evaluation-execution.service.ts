@@ -1,3 +1,5 @@
+import { type Authorization, internalActor } from "@langwatch/authorization";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import { mappingsReadEvaluationsSource, mappingStateSchema } from "@langwatch/dataset-contract";
 import type { MappingState } from "@langwatch/dataset-contract";
 import {
@@ -17,12 +19,15 @@ import {
   isNativeEvaluatorType,
 } from "@langwatch/evaluator-contract";
 import type { InstantEvalJudgeApi } from "@langwatch/instant-eval-judge-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { Protections, Trace, TraceApi } from "@langwatch/trace-contract";
 
+import type { EvaluationRunRepository } from "../../../repositories/evaluation.repository.ts";
 import { maxCausalityDepthOfSpans } from "../../../rules/evaluation-causality.rules.ts";
 import { executionResultOf } from "../../../rules/evaluation-execution-result.rules.ts";
 import { evaluationRenderBudget } from "../../../rules/evaluation-render-budget.rules.ts";
 import { hasThreadMappings } from "../../../rules/evaluation-thread-mapping-service.rules.ts";
+import { traceEvaluationOf } from "../../../rules/evaluation-trace-evaluations.rules.ts";
 import { type EvaluatorInstallEnvironment } from "../../../rules/evaluator-availability-service.rules.ts";
 import { instantEvalJudgeOf } from "../../../rules/instant-eval-judge-dispatch.rules.ts";
 import { EvaluationDataService } from "../../../services/evaluation-data.service.ts";
@@ -47,12 +52,19 @@ const INTERNAL_PROTECTIONS: ReadProtections = {
   canSeeCapturedOutput: true,
 };
 
+/** The internal actor the earlier-evaluations read mints its proof as. */
+const EVALUATION_READ_CODE_PATH = "evaluation.execution-read";
+
 // ---------------------------------------------------------------------------
 // Dependency interfaces (colocated — not shared)
 // ---------------------------------------------------------------------------
 
 export interface EvaluationExecutionDeps {
-  traces: Pick<TraceApi, "readTracesWithSpans" | "readEvaluations" | "readThreadsTraces">;
+  traces: Pick<TraceApi, "readTracesWithSpans" | "readThreadsTraces">;
+  /** Where a field mapping's earlier evaluations are read: evaluation's own runs. */
+  runs: Pick<EvaluationRunRepository, "findTraceEvaluations">;
+  /** Mints the own-only proof the runs read is fenced by (ruling AGG-EVAL-PROOF). */
+  authz: Pick<AuthzApi, "authorizeInternal">;
   spanDigest: Pick<EvaluationSpanDigestService, "format" | "formatThread">;
   modelEnvResolver: Pick<EvaluatorModelEnvService, "resolveForEvaluator">;
   langevalsClient: Pick<LangevalsEvaluatorService, "evaluate">;
@@ -60,6 +72,8 @@ export interface EvaluationExecutionDeps {
   workflowExecutor: Pick<WorkflowEvaluationService, "run">;
   /** Answers a judge whose model is Instant Evals (ADR-174 decision 1). */
   judges: Pick<InstantEvalJudgeApi, "judge">;
+  /** The project's Instant Evals column: LangWatch's classifier or its own model (ADR-182). */
+  decisionModels: Pick<ModelProviderApi, "resolveDecisionModel">;
   /**
    * The install environment the optional evaluators read their opt-out
    * switches from. Stated by the process rather than read here, because a
@@ -254,15 +268,24 @@ export class EvaluationExecutionService {
     }
 
     if (mappingsReadEvaluationsSource(mappings)) {
-      const evaluationsByTrace = await this.deps.traces.readEvaluations({
-        projectId,
+      const evaluations = await this.deps.runs.findTraceEvaluations({
+        authorization: await this.ownProof({ projectId }),
         traceIds: [traceId],
-        protections,
       });
-      trace.evaluations = (evaluationsByTrace[traceId] ?? []) as Trace["evaluations"];
+      trace.evaluations = evaluations.map((evaluation) => traceEvaluationOf({ evaluation }));
     }
 
     return trace;
+  }
+
+  /** The platform reads the one project as itself: a monitor or queued run holds a tenant only. */
+  private ownProof({ projectId }: { projectId: string }): Promise<Authorization> {
+    return this.deps.authz.authorizeInternal({
+      actor: internalActor(EVALUATION_READ_CODE_PATH),
+      projectId,
+      permission: "traces:view",
+      purpose: { kind: "operator", entry: "EvaluationExecutionService.loadTraceForEvaluation" },
+    });
   }
 
   /**

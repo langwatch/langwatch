@@ -260,6 +260,12 @@ Feature: The checkup page of a self-hosted install
     When the usage report preview is taken
     Then the preview carries no optional field
 
+  @integration
+  Scenario: An admin switches off sending upgrade diagnostics on Checkup
+    Given an administrator reads the what we send section
+    When they switch off upgrade diagnostics
+    Then the install records that upgrade diagnostics are not sent by itself
+
   # Ops health: counts the ops dashboard, the process explorer and the
   # migrations page already read, so LangWatch can see an install struggling.
 

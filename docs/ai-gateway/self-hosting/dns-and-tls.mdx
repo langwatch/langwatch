@@ -194,9 +194,25 @@ TLS in front of the gateway is one boundary. The other is the provider endpoints
 | -------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------- |
 | `security.requireHTTPSCustomEndpoints` | `REQUIRE_HTTPS_CUSTOM_ENDPOINTS` | Refuse a provider base URL with an `http://` scheme                                         |
 | `security.blockLocalHTTPCalls`         | `BLOCK_LOCAL_HTTP_CALLS`         | Refuse a provider base URL that resolves to a private, loopback or other non-public address |
-| `security.allowedProxyHosts`           | `ALLOWED_PROXY_HOSTS`            | Hostnames that may resolve to a private address while the block is on                       |
+| `security.allowedProxyHosts`           | `ALLOWED_PROXY_HOSTS`            | Hostnames that pass the endpoint check on a private address while the block is on. Chat dispatch still refuses them |
 
 Both switches default to `false`, so a self-hosted install can route to a model server on the cluster network. Cloud metadata addresses, `0.0.0.0`, `::` and link-local ranges are refused with every setting. Setting `ENVIRONMENT` to anything other than `local` requires both switches to be `true`.
+
+### Provider endpoints on a private CA
+
+When a provider endpoint serves TLS from your own certificate authority, put the CA certificates (PEM) in a ConfigMap and name it in `gateway.security.extraCACertsConfigMap`:
+
+```bash
+kubectl -n langwatch create configmap internal-ca --from-file=internal-ca.pem
+```
+
+```yaml
+gateway:
+  security:
+    extraCACertsConfigMap: internal-ca
+```
+
+The chart mounts it at `/etc/langwatch/ca` and sets `SSL_CERT_DIR` to that path. The gateway then trusts those certificates beside the public roots for every outbound call. Outside the chart, mount a directory of PEM files and set `SSL_CERT_DIR` yourself.
 
 ## Common failures
 
@@ -206,6 +222,7 @@ Both switches default to `false`, so a self-hosted install can route to a model 
 | Streamed responses arrive all at once | Buffering is on at the proxy | With `ingress.className: nginx` the chart adds `proxy-buffering: "off"` to the gateway Ingress; on another controller, set the equivalent in `ingress.gateway.annotations` |
 | A long stream stops at 60 seconds | The load balancer idle timeout is shorter than the stream | Raise the controller's idle or read timeout |
 | CLI users get `http://localhost:5563` as the gateway URL | The control plane has no `LW_GATEWAY_PUBLIC_URL` | Set `ingress.gateway.host`, or `gateway.publicUrl` |
-| A provider credential with a private base URL fails to dispatch | `BLOCK_LOCAL_HTTP_CALLS` is on | Add the hostname to `ALLOWED_PROXY_HOSTS` |
+| A provider credential with a private base URL fails to dispatch | `BLOCK_LOCAL_HTTP_CALLS` is on | Set `BLOCK_LOCAL_HTTP_CALLS` to `false`. `ALLOWED_PROXY_HOSTS` gets the host past the endpoint check, but chat dispatch refuses private addresses while the block is on |
+| A provider call fails with `x509: certificate signed by unknown authority` | The endpoint's certificate comes from a private CA | Set `gateway.security.extraCACertsConfigMap` (see [Provider endpoints on a private CA](#provider-endpoints-on-a-private-ca)) |
 
 More symptoms are on [Troubleshooting](/ai-gateway/troubleshooting).

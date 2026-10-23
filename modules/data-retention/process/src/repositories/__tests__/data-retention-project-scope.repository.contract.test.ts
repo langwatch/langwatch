@@ -63,6 +63,20 @@ function contractCases(backend: Backend): void {
     ).resolves.toBeNull();
   });
 
+  /** @scenario "The memory and Postgres placement readers answer alike" */
+  it("answers many projects' placements in one read, leaving out a project with no row", async () => {
+    const seeded = backend.seeded();
+    const { organizationId, teamId } = seeded;
+
+    const placements = await backend.repository().findProjectPlacements({
+      projectIds: [seeded.liveProjectId, `project-without-row-${randomUUID()}`],
+    });
+
+    expect(placements).toEqual([
+      expect.objectContaining({ projectId: seeded.liveProjectId, organizationId, teamId }),
+    ]);
+  });
+
   /** @scenario "An archived project keeps its place, so its stored data still expires" */
   it("places an archived project under its team and organisation", async () => {
     const seeded = backend.seeded();
