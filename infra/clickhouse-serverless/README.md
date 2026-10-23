@@ -37,6 +37,7 @@ Settings with a fixed default rather than one computed from CPU + RAM:
 | `CLICKHOUSE_ACCESS_FILE`                       | —             | Access file declaring users, tiers and logins; see [Access](#access-tiers-rolling-passwords-and-token-logins) |
 | `CLICKHOUSE_ACCESS_LISTEN`                     | `127.0.0.1:8124` | Loopback address of the access sidecar's token check; anything else is refused |
 | `CLICKHOUSE_ACCESS_SIDECAR`                    | `embedded`    | `embedded` runs the sidecar inside this container; `external` when it runs in its own (the chart does) |
+| `CLICKHOUSE_ACCESS_TIERS`                      | `false`       | Render the tier roles and profiles without an access file, for users you write yourself |
 | `READ_TIER_MAX_EXECUTION_TIME`                 | `300`         | Execution-time cap, in seconds, of the inspect and read tiers |
 | `LOG_TO_FILE`                                  | `true`        | `false` removes the server's file loggers, so it logs to the console only                                                           |
 | `MERGE_MAX_BLOCK_SIZE_BYTES`                   | `0`           | `merge_tree.merge_max_block_size_bytes`; `0` leaves the ClickHouse default                                                          |
@@ -119,8 +120,9 @@ which **only `sql` mode uses**; rendered delivery runs no access DDL. See
 
 Design and limits: [ADR-184](../../dev/docs/adr/184-clickhouse-serverless-access-tiers-rolling-passwords-and-token-logins.md).
 
-**Tiers.** Every server renders `users.d/access-tiers.yaml` with four roles and
-settings profiles of the same names:
+**Tiers.** With `CLICKHOUSE_ACCESS_FILE` set, or `CLICKHOUSE_ACCESS_TIERS=true`
+for users you write yourself, the server renders `users.d/access-tiers.yaml` with
+four roles and settings profiles of the same names (without either, none exists):
 
 | Tier | Can | Profile |
 | --- | --- | --- |
@@ -131,7 +133,7 @@ settings profiles of the same names:
 
 `system.query_log` and the other system tables holding query text stay closed to
 every tier but admin (`select_from_system_db_requires_grant` is on in 26.8). Your
-own `users.d` users are not changed; to move one onto a tier give it
+own `users.d` users are not changed; to move one onto a tier, render the tiers and give it
 `profile: tier_read` and `grants: {query: ["GRANT tier_read", "GRANT SELECT ON db.*"]}`.
 
 **Access file.** Set `CLICKHOUSE_ACCESS_FILE` to declare users. The file is

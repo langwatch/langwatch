@@ -11,14 +11,17 @@ password** or an **OIDC token**. The feature is off until you give the image an
 access file.
 
 <Note>
-The image has no default password. Docker Compose installs must set
-`CLICKHOUSE_PASSWORD` in `.env` (for example `openssl rand -hex 24`), and the
-container refuses to start without one.
+Set your own password for the `default` user. In Docker Compose, put
+`CLICKHOUSE_PASSWORD` in `.env` (for example `openssl rand -hex 24`). Without it
+the compose file falls back to the published `langwatch`, which the server warns
+about at every boot; the next major release removes that fallback.
 </Note>
 
 ## Tiers
 
-Every server defines four roles, each with a settings profile of the same name.
+With an access file, the server defines four roles, each with a settings
+profile of the same name. Without one, none of them exists. To use the tiers
+for users you write yourself, set `CLICKHOUSE_ACCESS_TIERS=true`.
 
 | Tier           | Can                                                                                       | Limits                                    |
 | -------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------- |

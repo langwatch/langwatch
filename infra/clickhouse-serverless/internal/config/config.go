@@ -42,6 +42,9 @@ type Input struct {
 	AccessFile    string `env:"CLICKHOUSE_ACCESS_FILE"`
 	AccessListen  string `env:"CLICKHOUSE_ACCESS_LISTEN" default:"127.0.0.1:8124"`
 	AccessSidecar string `env:"CLICKHOUSE_ACCESS_SIDECAR" default:"embedded" validate:"oneof=embedded external"`
+	// The tier roles and profiles render with an access file, or with this
+	// for operator-written users that GRANT a tier. Off, no tier_* name exists.
+	AccessTiers bool `env:"CLICKHOUSE_ACCESS_TIERS"`
 
 	// nil means true: default gets access_management and named_collection_control.
 	DefaultUserAccessManagement *bool `env:"DEFAULT_USER_ACCESS_MANAGEMENT"`
@@ -188,6 +191,11 @@ func Load() (*Input, error) {
 	}
 
 	return i, nil
+}
+
+// RendersTiers reports whether ch-config writes the tier roles and profiles.
+func (i *Input) RendersTiers() bool {
+	return i.AccessFile != "" || i.AccessTiers
 }
 
 // GrantsDefaultAccessManagement reports whether ch-config grants the default
