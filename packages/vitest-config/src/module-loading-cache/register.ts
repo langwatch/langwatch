@@ -17,10 +17,17 @@ if (root !== undefined) {
   const { resolve, load } = createModuleLoadingHooks({ resolutions, sources });
   registerHooks({ resolve, load });
 
-  // Vitest ends a forked worker with SIGTERM, which skips 'exit' unless someone listens.
-  if (typeof process.send === "function") process.once("SIGTERM", () => process.exit());
-  process.once("exit", () => {
+  const save = () => {
     resolutions.save();
     sources.save();
-  });
+  };
+  // Vitest ends a forked worker with SIGTERM, which skips 'exit'. Save, then re-raise it
+  // with no listener left, so the worker still dies by the signal.
+  if (typeof process.send === "function") {
+    process.once("SIGTERM", () => {
+      save();
+      process.kill(process.pid, "SIGTERM");
+    });
+  }
+  process.once("exit", save);
 }

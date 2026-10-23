@@ -1,13 +1,21 @@
-import { mkdtempSync, readdirSync, statSync, utimesSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { CacheFile } from "../module-loading-cache/cache-file.ts";
 
+const created: string[] = [];
+
+afterEach(() => {
+  for (const dir of created.splice(0)) rmSync(dir, { recursive: true, force: true });
+});
+
 function cacheDir() {
-  return mkdtempSync(join(tmpdir(), "module-loading-cache-file-"));
+  const dir = mkdtempSync(join(tmpdir(), "module-loading-cache-file-"));
+  created.push(dir);
+  return dir;
 }
 
 describe("CacheFile", () => {
@@ -19,10 +27,12 @@ describe("CacheFile", () => {
     before.save();
 
     const after = new CacheFile({ dir, name: "sources", salt: "lockfile:2" });
+    expect(after.size).toBe(0);
+    expect(after.get("a")).toBeUndefined();
+
     after.set("b", Buffer.from("2"));
     after.save();
 
-    expect(after.get("a")).toBeUndefined();
     expect(readdirSync(dir)).toEqual([after.path.slice(dir.length + 1)]);
   });
 
@@ -48,13 +58,13 @@ describe("CacheFile", () => {
   /** @scenario "A save keeps what other workers saved before it" */
   it("merges what another worker saved since this one opened the file", () => {
     const dir = cacheDir();
-    const first = new CacheFile({ dir, name: "resolutions", salt: "s" });
-    const second = new CacheFile({ dir, name: "resolutions", salt: "s" });
-    first.set("a", Buffer.from("1"));
-    second.set("b", Buffer.from("2"));
+    const saver = new CacheFile({ dir, name: "resolutions", salt: "s" });
+    const other = new CacheFile({ dir, name: "resolutions", salt: "s" });
+    saver.set("a", Buffer.from("1"));
+    other.set("b", Buffer.from("2"));
+    other.save();
 
-    first.save();
-    second.save();
+    saver.save();
     const reopened = new CacheFile({ dir, name: "resolutions", salt: "s" });
 
     expect(reopened.get("a")?.toString()).toBe("1");

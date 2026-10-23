@@ -89,6 +89,7 @@ export function moduleVitestTestOptions(
   const resolvedIsolate = isolate === undefined ? false : isolate !== false;
   const fast = fastMode();
   const resolvedCss = css ?? !fast;
+  const cacheExecArgv = fast ? moduleLoadingCacheExecArgv() : [];
   const resolvedSetupFiles = [
     LOGGER_SETUP,
     ...(kind === "unit" ? [CONSOLE_GUARD_SETUP] : []),
@@ -110,7 +111,7 @@ export function moduleVitestTestOptions(
     fsModuleCache: fast,
     // Answers Node's resolution and reads of installed packages in each worker from one
     // file each, kept per worktree. See ./module-loading-cache.ts.
-    ...(fast ? { execArgv: moduleLoadingCacheExecArgv() } : {}),
+    ...(cacheExecArgv.length > 0 ? { execArgv: cacheExecArgv } : {}),
     // https://vitest.dev/config/#fileparallelism
     fileParallelism: true,
     // Skips CSS parse/transform on import. No package under this builder

@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createModuleLoadingHooks } from "../module-loading-cache/module-loading-hooks.ts";
 
@@ -24,8 +24,15 @@ const loadContext: LoadHookContext = {
   importAttributes: {},
 };
 
+const created: string[] = [];
+
+afterEach(() => {
+  for (const dir of created.splice(0)) rmSync(dir, { recursive: true, force: true });
+});
+
 function workspace() {
   const root = mkdtempSync(join(tmpdir(), "module-loading-cache-"));
+  created.push(root);
   const packageFile = join(root, "node_modules", "left-pad", "index.js");
   mkdirSync(join(root, "node_modules", "left-pad"), { recursive: true });
   mkdirSync(join(root, "node_modules", ".vitest-cache"), { recursive: true });
@@ -39,10 +46,12 @@ function workspace() {
   };
 }
 
+/** One worker's hooks; `laterWorker()` gives another worker's hooks over the same stores. */
 function hooksOver() {
   const resolutions = new Map<string, Buffer>();
   const sources = new Map<string, Buffer>();
-  return { resolutions, sources, ...createModuleLoadingHooks({ resolutions, sources }) };
+  const laterWorker = () => createModuleLoadingHooks({ resolutions, sources });
+  return { resolutions, sources, laterWorker, ...laterWorker() };
 }
 
 function nextLoadFromDisk() {
@@ -55,14 +64,14 @@ function nextLoadFromDisk() {
 describe("createModuleLoadingHooks", () => {
   describe("when resolving", () => {
     /** @scenario "A worker answers a package lookup it has seen before from the cache" */
-    it("answers a package name it resolved into node_modules from the cache the second time", () => {
+    it("answers a later worker's lookup of a package name from the cache", () => {
       const { packageUrl, projectUrl } = workspace();
-      const { resolve } = hooksOver();
+      const { resolve, laterWorker } = hooksOver();
       const nextResolve = vi.fn((): ResolveFnOutput => ({ url: packageUrl, format: "commonjs" }));
       const context = { ...resolveContext, parentURL: projectUrl };
 
       const first = resolve("left-pad", context, nextResolve);
-      const second = resolve("left-pad", context, nextResolve);
+      const second = laterWorker().resolve("left-pad", context, nextResolve);
 
       expect(first.url).toBe(packageUrl);
       expect(second).toEqual({ url: packageUrl, format: "commonjs", shortCircuit: true });
@@ -76,13 +85,18 @@ describe("createModuleLoadingHooks", () => {
       const nextResolve = vi.fn((): ResolveFnOutput => ({ url: packageUrl, format: "module" }));
 
       resolve("left-pad", { ...resolveContext, parentURL: projectUrl }, nextResolve);
-      resolve(
+      const second = resolve(
         "left-pad",
         { ...resolveContext, conditions: ["node", "require"], parentURL: projectUrl },
         nextResolve,
       );
 
       expect(nextResolve).toHaveBeenCalledTimes(2);
+      expect(nextResolve).toHaveBeenLastCalledWith(
+        "left-pad",
+        expect.objectContaining({ conditions: ["node", "require"] }),
+      );
+      expect(second).not.toHaveProperty("shortCircuit");
     });
 
     /** @scenario "A lookup that lands in project source is left to Node" */
@@ -116,13 +130,13 @@ describe("createModuleLoadingHooks", () => {
 
   describe("when loading", () => {
     /** @scenario "A worker reads an unchanged installed file from the cache" */
-    it("serves an unchanged installed file from the cache the second time", () => {
+    it("serves a later worker an unchanged installed file from the cache", () => {
       const { packageUrl } = workspace();
-      const { load } = hooksOver();
+      const { load, laterWorker } = hooksOver();
       const nextLoad = nextLoadFromDisk();
 
       load(packageUrl, loadContext, nextLoad);
-      const second = load(packageUrl, loadContext, nextLoad);
+      const second = laterWorker().load(packageUrl, loadContext, nextLoad);
 
       expect(second).toEqual({
         format: "commonjs",
@@ -135,14 +149,15 @@ describe("createModuleLoadingHooks", () => {
     /** @scenario "A changed installed file is read again, never served stale" */
     it("reads an edited file from disk even when its size is unchanged", () => {
       const { packageFile, packageUrl } = workspace();
-      const { load, sources } = hooksOver();
+      const { load, sources, laterWorker } = hooksOver();
       const nextLoad = nextLoadFromDisk();
       load(packageUrl, loadContext, nextLoad);
 
       writeFileSync(packageFile, "module.exports = 2;\n");
       utimesSync(packageFile, new Date(), new Date(Date.now() + 5_000));
-      const edited = load(packageUrl, loadContext, nextLoad);
-      const again = load(packageUrl, loadContext, nextLoad);
+      const later = laterWorker();
+      const edited = later.load(packageUrl, loadContext, nextLoad);
+      const again = later.load(packageUrl, loadContext, nextLoad);
 
       expect(edited.source).toBe("module.exports = 2;\n");
       expect(again.source).toBe("module.exports = 2;\n");
@@ -151,15 +166,15 @@ describe("createModuleLoadingHooks", () => {
     });
 
     /** @scenario "A deleted installed file is not served from the cache" */
-    it("serves nothing for a file that has been deleted", () => {
+    it("passes Node's error through for a file that has been deleted", () => {
       const { packageFile, packageUrl } = workspace();
-      const { load } = hooksOver();
+      const { load, laterWorker } = hooksOver();
       load(packageUrl, loadContext, nextLoadFromDisk());
       const gone = new Error("ENOENT");
       rmSync(packageFile);
 
       expect(() =>
-        load(packageUrl, loadContext, () => {
+        laterWorker().load(packageUrl, loadContext, () => {
           throw gone;
         }),
       ).toThrow(gone);
@@ -180,13 +195,14 @@ describe("createModuleLoadingHooks", () => {
     /** @scenario "A cached source is not served to a caller expecting another format" */
     it("asks Node when the caller expects another format than the one cached", () => {
       const { packageUrl } = workspace();
-      const { load } = hooksOver();
+      const { load, laterWorker } = hooksOver();
       const nextLoad = nextLoadFromDisk();
       load(packageUrl, loadContext, nextLoad);
 
-      load(packageUrl, { ...loadContext, format: "module" }, nextLoad);
+      const second = laterWorker().load(packageUrl, { ...loadContext, format: "module" }, nextLoad);
 
       expect(nextLoad).toHaveBeenCalledTimes(2);
+      expect(second).not.toHaveProperty("shortCircuit");
     });
 
     /** @scenario "A file that changes while Node reads it is not kept" */

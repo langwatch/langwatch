@@ -1,16 +1,30 @@
 import { execFileSync, fork } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, writeFileSync } from "node:fs";
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 const HOOKS_DIR = fileURLToPath(new URL("../module-loading-cache", import.meta.url));
+const created: string[] = [];
+
+afterEach(() => {
+  for (const dir of created.splice(0)) rmSync(dir, { recursive: true, force: true });
+});
 
 /** A workspace of its own with a copy of the hooks, so the real cache is never touched. */
 function workspace() {
   const root = mkdtempSync(join(tmpdir(), "module-loading-register-"));
+  created.push(root);
   const pkg = join(root, "node_modules", "left-pad");
   mkdirSync(pkg, { recursive: true });
   writeFileSync(join(root, "pnpm-lock.yaml"), "lockfileVersion: 9\n");
@@ -66,7 +80,7 @@ describe("register.ts", () => {
 
   describe("when a forked worker is ended with SIGTERM", () => {
     /** @scenario "A forked worker ended with SIGTERM still saves its cache" */
-    it("exits through its exit handler and saves", async () => {
+    it("saves, then still ends by the signal", async () => {
       const { root, exitOnSigterm, register, cacheFiles } = workspace();
       const child = fork(exitOnSigterm, [], {
         cwd: root,
@@ -74,9 +88,12 @@ describe("register.ts", () => {
         stdio: "ignore",
       });
 
-      await new Promise((resolve) => child.once("exit", resolve));
+      const signal = await new Promise((resolve) =>
+        child.once("exit", (_code, sig) => resolve(sig)),
+      );
 
       expect(cacheFiles()).toHaveLength(2);
+      expect(signal).toBe("SIGTERM");
     });
   });
 });

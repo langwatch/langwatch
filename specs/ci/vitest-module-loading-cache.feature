@@ -133,16 +133,9 @@ Feature: Vitest workers load installed packages from a cache
   @unit
   Scenario: The cache is on for local runs and off in CI unless asked
     When the shared vitest config is resolved
-    Then a local run loads the cache into every worker
-    And a CI run does not
+    Then on a local run its execArgv holds --import and the path of the register file
+    And in CI it sets no execArgv
     And LANGWATCH_VITEST_MODULE_CACHE set to 0 or 1 outranks both
-
-  @unit
-  Scenario: The shared config loads the cache into every worker
-    When the shared vitest config is resolved for a local run
-    Then its execArgv holds --import and the path of the register file
-    When it is resolved in CI
-    Then its execArgv is empty
 
   @unit
   Scenario: Fast mode off leaves the workers as they were
@@ -161,3 +154,4 @@ Feature: Vitest workers load installed packages from a cache
     Given a forked worker that loaded a package
     When Vitest ends it with SIGTERM
     Then the cache files are on disk afterwards
+    And the worker still ends by the signal
