@@ -6,8 +6,8 @@ import { useReducedMotion } from "../../use-reduced-motion.ts";
 import {
   BRAIDS_ART_DIVIDER_PATH,
   BRAIDS_ART_LOCK_SHACKLE_PATH,
-  BRAIDS_ART_PLUS_PATH,
   BRAIDS_ART_SPANS,
+  BRAIDS_ART_STRAND_ENDS,
   BRAIDS_ART_STRANDS,
   BRAIDS_ART_UNDER,
 } from "./braids-paths.ts";
@@ -46,16 +46,23 @@ const SPAN_IN = {
 };
 
 const PROJECTS = [
-  { initials: "WO", name: "Web orchestrator" },
-  { initials: "SA", name: "Specialist agents" },
-  { initials: "SE", name: "Search agent" },
+  { initial: "W", name: "Web orchestrator" },
+  { initial: "P", name: "Payments agent" },
+  { initial: "S", name: "Search agent" },
 ] as const;
+
+const STRAND_WIDTH = 3;
+/** The gap an over strand cuts in the one beneath, as in the mark. */
+const STRAND_GAP = 10;
+
+/** An illustration with no caption ends under the trace, so the page's words follow close. */
+const CANVAS_HEIGHT = { captioned: 350, bare: 304 } as const;
 
 const COPY: Record<FeatureIllustrationName, { left: string; right: string; caption: string }> = {
   "empty-state": {
     left: "Your projects",
     right: "A shared trace starts here",
-    caption: "Pick a target project and a matching condition.",
+    caption: "",
   },
   enterprise: {
     left: "Across your organisation",
@@ -72,30 +79,39 @@ const COPY: Record<FeatureIllustrationName, { left: string; right: string; capti
 const project = (index: number) => `feature.braids.project.${index}`;
 const projectInk = (index: number) => `feature.braids.projectInk.${index}`;
 
-function ProjectChip({ index, y }: { index: number; y: number }) {
-  const { initials, name } = PROJECTS[index - 1] ?? PROJECTS[0];
+/** A project as the app draws one: a round avatar with its first letter, then its name. */
+function ProjectChip({ index, centre }: { index: number; centre: number }) {
+  const { initial, name } = PROJECTS[index - 1] ?? PROJECTS[0];
   return (
     <g>
-      <chakra.rect x={28} y={y} width={179} height={46} rx={10} fill="bg.panel" stroke="border" />
-      <chakra.rect x={38} y={y + 10} width={27} height={27} rx={7} fill={project(index)} />
+      <chakra.rect
+        x={28}
+        y={centre - 23}
+        width={179}
+        height={46}
+        rx={10}
+        fill="bg.panel"
+        stroke="border"
+      />
+      <chakra.circle cx={52} cy={centre} r={12} fill={project(index)} />
       <chakra.text
-        x={51.5}
-        y={y + 28}
+        x={52}
+        y={centre + 4}
         textAnchor="middle"
-        fontSize="9px"
+        fontSize="11px"
         fontWeight="600"
         fill={projectInk(index)}
       >
-        {initials}
+        {initial}
       </chakra.text>
-      <chakra.text x={75} y={y + 28} fontSize="12px" fill="fg">
+      <chakra.text x={74} y={centre + 4} fontSize="12px" fill="fg">
         {name}
       </chakra.text>
     </g>
   );
 }
 
-type ArtState = { planned: boolean; playing: boolean; maskId: (index: number) => string };
+type ArtState = { playing: boolean; maskId: (index: number) => string };
 
 function ArtMask({
   index,
@@ -114,32 +130,26 @@ function ArtMask({
         d={BRAIDS_ART_STRANDS[over]}
         fill="none"
         stroke="black"
-        strokeWidth={11}
+        strokeWidth={STRAND_GAP}
         strokeLinecap="round"
       />
     </mask>
   );
 }
 
-function strandDash({ planned, playing }: ArtState): string | undefined {
-  if (planned) return "2 8";
-  return playing ? "1" : undefined;
-}
-
 function ArtStrand({ index, state }: { index: number; state: ArtState }) {
   const over = BRAIDS_ART_UNDER[index];
-  const cut = !state.planned && over !== undefined;
   return (
     <chakra.path
       d={BRAIDS_ART_STRANDS[index]}
       fill="none"
       stroke={project(index + 1)}
-      strokeWidth={state.planned ? 3 : 5}
+      strokeWidth={STRAND_WIDTH}
       strokeLinecap="round"
       strokeLinejoin="round"
-      strokeDasharray={strandDash(state)}
+      strokeDasharray={state.playing ? "1" : undefined}
       pathLength={state.playing ? 1 : undefined}
-      mask={cut ? `url(#${state.maskId(index)})` : undefined}
+      mask={over === undefined ? undefined : `url(#${state.maskId(index)})`}
       data-strand={index + 1}
       css={state.playing ? WEAVE_IN : undefined}
       style={state.playing ? { animationDelay: `${index * 90}ms` } : undefined}
@@ -147,45 +157,35 @@ function ArtStrand({ index, state }: { index: number; state: ArtState }) {
   );
 }
 
-function ArtSpan({ index, state }: { index: number; state: ArtState }) {
-  const span = BRAIDS_ART_SPANS[index];
-  if (!span) return null;
-  const labelled = !state.planned && index < BRAIDS_ART_SPANS.length - 1;
+/** Where a strand meets the trace: a dot on the trace's edge, level with its span's row. */
+function StrandEnd({ index }: { index: number }) {
   return (
-    <g>
-      <chakra.rect
-        x={span.x}
-        y={span.y}
-        width={span.width}
-        height={12}
-        rx={4}
-        fill={state.planned ? "transparent" : project(span.project)}
-        stroke={state.planned ? "border" : undefined}
-        data-span={span.project}
-        css={state.playing ? SPAN_IN : undefined}
-        style={state.playing ? { animationDelay: `${520 + index * 70}ms` } : undefined}
-      />
-      {labelled ? (
-        <chakra.text x={span.x + 4} y={span.y + 29} fontSize="9px" fill="fg.muted">
-          {PROJECTS[span.project - 1]?.initials}
-        </chakra.text>
-      ) : null}
-    </g>
+    <chakra.circle
+      cx={492}
+      cy={BRAIDS_ART_STRAND_ENDS[index]}
+      r={4.5}
+      fill={project(index + 1)}
+      stroke="bg.panel"
+      strokeWidth={2}
+    />
   );
 }
 
-function AddSpanButton() {
+function ArtSpan({ index, state }: { index: number; state: ArtState }) {
+  const span = BRAIDS_ART_SPANS[index];
+  if (!span) return null;
   return (
-    <g>
-      <chakra.circle cx={612} cy={175} r={23} fill="bg.panel" stroke="border" />
-      <chakra.path
-        d={BRAIDS_ART_PLUS_PATH}
-        fill="none"
-        stroke="fg.muted"
-        strokeWidth={2}
-        strokeLinecap="round"
-      />
-    </g>
+    <chakra.rect
+      x={span.x}
+      y={span.y - 6}
+      width={span.width}
+      height={12}
+      rx={3}
+      fill={project(span.project)}
+      data-span={span.project}
+      css={state.playing ? SPAN_IN : undefined}
+      style={state.playing ? { animationDelay: `${520 + index * 70}ms` } : undefined}
+    />
   );
 }
 
@@ -219,22 +219,21 @@ function BraidsArt({
 }) {
   const copy = COPY[name];
   const state: ArtState = {
-    planned: name === "empty-state",
     playing,
     maskId: (index) => `${idBase}-under-${index}`,
   };
   return (
     <>
-      <chakra.rect width={760} height={350} rx={16} fill="bg.panel" />
+      <chakra.rect width={760} height={CANVAS_HEIGHT.captioned} rx={16} fill="bg.panel" />
       <chakra.text x={28} y={34} fontSize="12px" fill="fg.muted">
         {copy.left}
       </chakra.text>
       <chakra.text x={500} y={34} fontSize="12px" fill="fg.muted">
         {copy.right}
       </chakra.text>
-      <ProjectChip index={1} y={79} />
-      <ProjectChip index={2} y={153} />
-      <ProjectChip index={3} y={227} />
+      <ProjectChip index={1} centre={118} />
+      <ProjectChip index={2} centre={186} />
+      <ProjectChip index={3} centre={254} />
       <defs>
         {BRAIDS_ART_UNDER.map((over, index) =>
           over === undefined ? null : (
@@ -257,15 +256,19 @@ function BraidsArt({
       <chakra.text x={508} y={85} fontSize="13px" fontWeight="600" fontFamily="mono" fill="fg">
         handle_message
       </chakra.text>
+      {BRAIDS_ART_STRAND_ENDS.map((end, index) => (
+        <StrandEnd key={end} index={index} />
+      ))}
       <chakra.path d={BRAIDS_ART_DIVIDER_PATH} stroke="border" strokeWidth={1} />
       {BRAIDS_ART_SPANS.map((span, index) => (
         <ArtSpan key={`${span.x}-${span.y}`} index={index} state={state} />
       ))}
-      {state.planned ? <AddSpanButton /> : null}
       {name === "enterprise" ? <SignedCallsPill /> : null}
-      <chakra.text x={28} y={326} fontSize="12px" fill="fg.muted">
-        {copy.caption}
-      </chakra.text>
+      {copy.caption ? (
+        <chakra.text x={28} y={326} fontSize="12px" fill="fg.muted">
+          {copy.caption}
+        </chakra.text>
+      ) : null}
     </>
   );
 }
@@ -287,7 +290,7 @@ export function FeatureIllustration({
   return (
     <chakra.svg
       xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 760 350"
+      viewBox={`0 0 760 ${COPY[name].caption ? CANVAS_HEIGHT.captioned : CANVAS_HEIGHT.bare}`}
       width="100%"
       height="auto"
       maxWidth="760px"
