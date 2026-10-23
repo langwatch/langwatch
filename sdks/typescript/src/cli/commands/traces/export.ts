@@ -25,11 +25,10 @@ const PROGRESS_CHUNK = 25;
 const SERVER_PAGE_CAP = 1000;
 
 /**
- * Page size used when spans are requested. Each coding-agent trace's spans are joined with
- * a bounded but heavy per-trace log read server-side, so the CLI asks for smaller pages
- * and lets the cursor walk cover the rest — same total work, no long single request.
+ * Page size used when spans are requested: the server answers at most this many traces per
+ * page with spans, so asking for more only wastes the request. The cursor walk covers the rest.
  */
-const SPANS_PAGE_CAP = 200;
+const SPANS_PAGE_CAP = 100;
 
 /** Bound each page request so a quiet socket cannot hold the export open forever. */
 const REQUEST_TIMEOUT_MS = 60_000;
@@ -184,11 +183,10 @@ async function fetchExportPages({
   let matched = 0;
   let scrollId: string | undefined;
 
-  // Page until the requested limit is met or the result set is exhausted.
-  // The cursor is authoritative for "there may be more"; a page shorter than
-  // requested only ends the walk when the shortfall is not accounted for by
-  // server-side `skipped` rows (traces dropped because they failed to
-  // serialize), since the cursor advances past those.
+  // Page until the requested limit is met or the result set is exhausted. The
+  // cursor alone says "there may be more": the server may answer a page shorter
+  // than asked (it clamps the size, or skips rows that failed to serialise), so
+  // only a missing cursor or an empty page ends the walk.
   for (;;) {
     const pageSize = Math.min(
       limit - traces.length,
@@ -219,8 +217,7 @@ async function fetchExportPages({
 
     scrollId = data.pagination?.scrollId;
     const consumed = pageTraces.length + (data.pagination?.skipped ?? 0);
-    const exhausted = pageTraces.length === 0 || consumed < pageSize;
-    if (!scrollId || exhausted || traces.length >= limit) break;
+    if (!scrollId || consumed === 0 || traces.length >= limit) break;
   }
 
   return { traces, matched };

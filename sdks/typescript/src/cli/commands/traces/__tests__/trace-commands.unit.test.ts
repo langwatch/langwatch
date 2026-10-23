@@ -555,16 +555,23 @@ describe("exportTracesCommand()", () => {
       expect(requestBodies()[0]!.pageSize).toBe(50);
     });
 
-    /** @scenario export ends the walk on a short page without skipped rows */
-    it("stops on a short page whose shortfall is not accounted for by skipped", async () => {
-      fetchMock.mockResolvedValueOnce(
-        pageResponse({ count: 990, from: 0, scrollId: "s1", totalHits: 5000 }),
-      );
+    /** @scenario export keeps paging through a page the server answered short */
+    it("follows the cursor past a short page and stops on an empty one", async () => {
+      fetchMock
+        .mockResolvedValueOnce(
+          pageResponse({ count: 990, from: 0, scrollId: "s1", totalHits: 5000 }),
+        )
+        .mockResolvedValueOnce(
+          pageResponse({ count: 10, from: 990, scrollId: "s2", totalHits: 5000 }),
+        )
+        .mockResolvedValueOnce(
+          pageResponse({ count: 0, from: 1000, scrollId: "s3", totalHits: 5000 }),
+        );
 
       await exportTracesCommand({ limit: "3000" });
 
-      expect(fetchMock).toHaveBeenCalledTimes(1);
-      expect(writtenOutput().trim().split("\n")).toHaveLength(990);
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(writtenOutput().trim().split("\n")).toHaveLength(1000);
     });
 
     /** @scenario export rejects a non-numeric limit */
@@ -602,12 +609,32 @@ describe("exportTracesCommand()", () => {
     });
 
     /** @scenario export with --include-spans requests smaller pages */
-    it("caps each page at 200 so per-trace span joining stays bounded", async () => {
-      fetchMock.mockResolvedValueOnce(pageResponse({ count: 200, from: 0, totalHits: 200 }));
+    it("asks for at most the server's 100-trace cap per page", async () => {
+      fetchMock.mockResolvedValueOnce(pageResponse({ count: 100, from: 0, totalHits: 100 }));
 
       await exportTracesCommand({ includeSpans: true });
 
-      expect(requestBodies()[0]!.pageSize).toBe(200);
+      expect(requestBodies()[0]!.pageSize).toBe(100);
+    });
+
+    /** @scenario export with --include-spans walks past the server's page cap */
+    it("follows the cursor past the server's page cap until the limit is met", async () => {
+      fetchMock
+        .mockResolvedValueOnce(
+          pageResponse({ count: 100, from: 0, scrollId: "s1", totalHits: 400 }),
+        )
+        .mockResolvedValueOnce(
+          pageResponse({ count: 100, from: 100, scrollId: "s2", totalHits: 400 }),
+        )
+        .mockResolvedValueOnce(
+          pageResponse({ count: 50, from: 200, scrollId: "s3", totalHits: 400 }),
+        );
+
+      await exportTracesCommand({ includeSpans: true, limit: "250" });
+
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(requestBodies()[2]!.scrollId).toBe("s2");
+      expect(writtenOutput().trim().split("\n")).toHaveLength(250);
     });
 
     /** @scenario export without --include-spans keeps the legacy request shape */

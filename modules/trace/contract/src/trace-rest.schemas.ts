@@ -7,8 +7,12 @@ import { sharedFiltersInputSchema } from "@langwatch/analytics-contract";
 import { flexibleDateSchema } from "@langwatch/api/dates";
 import { principalRefSchema } from "@langwatch/authorization";
 import type { Named } from "@langwatch/module";
+import { resolveRequestBound } from "@langwatch/plans";
 import { Temporal, toEpochMs } from "@langwatch/time";
 import { z } from "zod";
+
+/** The most traces one `includeSpans` search page answers; the REST handler clamps to it. */
+const TRACES_WITH_SPANS_PAGE_SIZE_MAX = resolveRequestBound("tracesWithSpansPageSizeMax", "FREE");
 
 import {
   projectionRequestSchema,
@@ -53,7 +57,8 @@ export const traceSearchBodyExtensions = {
     .optional()
     .describe(
       "When true, fetches full span data for each trace. Useful for bulk export. Default false. " +
-        "A page with spans holds at most 100 traces, whatever `pageSize` asks for. When a " +
+        `A page with spans holds at most ${TRACES_WITH_SPANS_PAGE_SIZE_MAX} traces, whatever ` +
+        "`pageSize` asks for. When a " +
         "response carries a `scrollId`, send it to fetch the next page.",
     ),
   llmMode: z.boolean().optional(),
