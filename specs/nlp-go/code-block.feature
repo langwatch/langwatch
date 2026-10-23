@@ -273,6 +273,58 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       When the executor runs the request
       Then the run fails with a runner error naming the limit and no outputs
 
+  Rule: A wasm run's files, host calls and memory are bounded
+
+    # /work is held in engine memory with no links, so no path a guest builds
+    # resolves on the host; host calls and concurrent runs have budgets too.
+
+    @unit
+    Scenario: on the wasm runtime, a relative link cannot climb out of the run directory
+      Given a code node that links "..", "../../.." and "." inside its run directory
+      When the executor runs the request
+      Then every link is refused
+
+    @unit
+    Scenario: on the wasm runtime, a run's files are held to a size, count and open-file budget
+      Given a code node that writes 200 MiB, creates 10000 files and opens 1000 handles
+      When the executor runs the request
+      Then each attempt is stopped at the run's budget
+      And the next run starts with an empty /work
+
+    @unit
+    Scenario: a run that keeps making failing host calls is stopped
+      Given a JavaScript code node that writes unknown host calls without end
+      When the executor runs the request
+      Then the run is stopped well before its deadline with an error naming failing host calls
+
+    @unit
+    Scenario: a run that ignores the host's replies is stopped, not buffered
+      Given a host that answers with large bodies
+      And a JavaScript code node that requests it repeatedly without reading the replies
+      When the executor runs the request
+      Then the run is stopped with an error naming the unread replies
+
+    @unit
+    Scenario: concurrent wasm runs share a memory budget
+      Given an executor whose total memory budget fits one run
+      When three runs start together
+      Then they run one after another
+      And a run cancelled while it waits for room reports that the engine is at capacity
+
+    @unit
+    Scenario: the engine does not follow a link left in place of the result file
+      Given a subprocess code node that replaces its result file with a link to an endless device
+      When the executor runs the request
+      Then the run fails promptly with a runner error and the device is never read
+
+    @unit
+    Scenario: code blocks reach private addresses only when the operator allows it
+      Given the HTTP block is allowed to reach private addresses
+      When the code-block executor is built without NLPGO_ENGINE_CODE_BLOCK_ALLOW_LOCAL_EGRESS
+      Then code blocks are refused private and loopback addresses
+      And the rest of the egress policy is kept
+      And setting the variable allows them
+
   Rule: JavaScript code blocks run on QuickJS inside the engine
 
     # A code node whose `language` parameter is "javascript" runs on QuickJS

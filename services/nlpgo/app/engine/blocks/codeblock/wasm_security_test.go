@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -263,4 +264,158 @@ func TestWasmSecurity_OversizedResultIsRefused(t *testing.T) {
 	assert.Equal(t, codeblock.RunnerErrorType, res.Error.Type)
 	assert.Contains(t, res.Error.Message, "result exceeds")
 	assert.Empty(t, res.Outputs)
+}
+
+// @scenario "on the wasm runtime, a relative link cannot climb out of the run directory"
+func TestWasmSecurity_RelativeLinksAreRefused(t *testing.T) {
+	e := newWasmExec(t, codeblock.Options{})
+	out := runOK(t, e, codeblock.Request{
+		Code: `
+import os
+
+def execute():
+    outcomes = {}
+    for name, target in (("up", ".."), ("deep", "../../.."), ("self", ".")):
+        try:
+            os.symlink(target, name)
+            outcomes[name] = "linked: " + ",".join(sorted(os.listdir(name))[:10])
+        except OSError as exc:
+            outcomes[name] = "refused: " + type(exc).__name__
+    return outcomes
+`,
+	})
+	for name, outcome := range out {
+		assert.Contains(t, outcome, "refused", "link %s was created: %v", name, outcome)
+	}
+}
+
+// @scenario "on the wasm runtime, a run's files are held to a size, count and open-file budget"
+func TestWasmSecurity_WorkDirectoryHasABudget(t *testing.T) {
+	e := newWasmExec(t, codeblock.Options{})
+	out := runOK(t, e, codeblock.Request{
+		Code: `
+import os
+
+def execute():
+    outcomes = {}
+    chunk = b"x" * (1 << 20)
+    written = 0
+    try:
+        with open("big.bin", "wb") as handle:
+            for _ in range(200):
+                handle.write(chunk)
+                handle.flush()
+                written += 1
+        outcomes["bytes"] = "unbounded"
+    except OSError:
+        outcomes["bytes"] = "stopped"
+    os.remove("big.bin")
+    try:
+        for i in range(10000):
+            open("f%d" % i, "w").close()
+        outcomes["files"] = "unbounded"
+    except OSError:
+        outcomes["files"] = "stopped"
+    handles = []
+    try:
+        for _ in range(1000):
+            handles.append(open("f0"))
+        outcomes["open"] = "unbounded"
+    except OSError:
+        outcomes["open"] = "stopped"
+    for handle in handles:
+        handle.close()
+    for name in os.listdir("."):
+        os.remove(name)
+    outcomes["written_mib"] = written
+    return outcomes
+`,
+	})
+	assert.Equal(t, "stopped", out["bytes"], "a run wrote 200 MiB into /work")
+	assert.Equal(t, "stopped", out["files"], "a run created 10000 files")
+	assert.Equal(t, "stopped", out["open"], "a run held 1000 files open")
+	assert.Less(t, out["written_mib"], float64(70))
+
+	after := runOK(t, e, codeblock.Request{Code: "def execute():\n    open('x', 'w').write('ok')\n    return {'ok': open('x').read()}\n"})
+	assert.Equal(t, "ok", after["ok"], "a later run inherited a full /work")
+}
+
+// @scenario "a run that keeps making failing host calls is stopped"
+func TestWasmSecurity_FailingCallsStopTheRun(t *testing.T) {
+	e := newJSExec(t, codeblock.Options{})
+	start := time.Now()
+	res := runJS(t, e, codeblock.Request{
+		Code: `import * as std from "qjs:std"
+export default () => {
+  const frame = "\x1eLWHOST " + JSON.stringify({ op: "nope", pad: "x".repeat(4096) }) + "\n"
+  for (;;) { std.out.puts(frame); std.out.flush() }
+}`,
+		Timeout: 20 * time.Second,
+	})
+	require.NotNil(t, res.Error)
+	assert.Contains(t, res.Error.Message, "failing host calls")
+	assert.Less(t, time.Since(start), 5*time.Second, "the run was not stopped when its calls kept failing")
+}
+
+// @scenario "a run that ignores the host's replies is stopped, not buffered"
+func TestWasmSecurity_UnreadRepliesStopTheRun(t *testing.T) {
+	big := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write(make([]byte, 8<<20))
+	}))
+	defer big.Close()
+
+	e := newJSExec(t, codeblock.Options{Egress: ssrf.Options{AllowLocal: true}})
+	start := time.Now()
+	res := runJS(t, e, codeblock.Request{
+		Code: `import * as std from "qjs:std"
+export default ({ url }) => {
+  const frame = "\x1eLWHOST " + JSON.stringify({ op: "fetch", method: "GET", url, headers: {}, body_b64: "" }) + "\n"
+  for (let i = 0; i < 20; i++) { std.out.puts(frame); std.out.flush() }
+  return {}
+}`,
+		Inputs:  map[string]any{"url": big.URL},
+		Timeout: 20 * time.Second,
+	})
+	require.NotNil(t, res.Error)
+	assert.Contains(t, res.Error.Message, "without reading their replies")
+	assert.Less(t, time.Since(start), 15*time.Second)
+}
+
+// @scenario "concurrent wasm runs share a memory budget"
+func TestWasmSecurity_ConcurrentRunsWaitForMemory(t *testing.T) {
+	// A budget of one run's footprint admits one run at a time.
+	e := newJSExec(t, codeblock.Options{WasmMemoryMiB: 64, WasmTotalMemoryMiB: 1})
+	var wg sync.WaitGroup
+	start := time.Now()
+	for range 3 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			res, err := e.Execute(context.Background(), codeblock.Request{
+				Language: codeblock.LanguageJavaScript,
+				Code:     "export default () => new Promise((r) => setTimeout(() => r({}), 300))",
+			})
+			assert.NoError(t, err)
+			assert.Nil(t, res.Error)
+		}()
+	}
+	wg.Wait()
+	assert.GreaterOrEqual(t, time.Since(start), 900*time.Millisecond, "runs past the memory budget were not held back")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	release := make(chan struct{})
+	go func() {
+		_, _ = e.Execute(context.Background(), codeblock.Request{
+			Language: codeblock.LanguageJavaScript,
+			Code:     "export default () => new Promise((r) => setTimeout(() => r({}), 1500))",
+		})
+		close(release)
+	}()
+	time.Sleep(200 * time.Millisecond)
+	cancel()
+	res, err := e.Execute(ctx, codeblock.Request{Language: codeblock.LanguageJavaScript, Code: "export default () => ({})"})
+	require.NoError(t, err)
+	require.NotNil(t, res.Error, "a cancelled run waiting for room was not reported")
+	assert.Contains(t, res.Error.Message, "as many code blocks as its memory allows")
+	<-release
 }

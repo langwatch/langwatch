@@ -196,6 +196,13 @@ func newEngine(cfg *nlpgo.Config, parts engineParts) *engine.Engine {
 	})
 }
 
+// codeBlockEgress is the HTTP block's policy with private and loopback
+// addresses refused unless the operator allows them for code blocks.
+func codeBlockEgress(egress ssrf.Options, allowLocal bool) ssrf.Options {
+	egress.AllowLocal = allowLocal
+	return egress
+}
+
 // newCodeExecutor builds the code-block executor from the operator-facing
 // engine config. Extracted from Root so the wiring itself — which operator
 // knob reaches which executor option — is reachable from a test without
@@ -209,9 +216,10 @@ func newCodeExecutor(engineCfg nlpgo.EngineConfig, egress ssrf.Options, getenv f
 		WasmMemoryMiB:           engineCfg.CodeBlockMemoryMiB,
 		WasmCompilationCacheDir: engineCfg.WasmCompilationCacheDir,
 		QuickJSWasm:             engineCfg.QuickJSWasm,
+		WasmTotalMemoryMiB:      engineCfg.CodeBlockTotalMemoryMiB,
 		// A wasm run reaches the network only through the engine, under the
-		// same policy as the HTTP block.
-		Egress: egress,
+		// HTTP block's policy, but never a private address unless allowed.
+		Egress: codeBlockEgress(egress, engineCfg.CodeBlockAllowLocalEgress),
 		Python: resolveSandboxPython(engineCfg.SandboxPython, getenv),
 		// The instance a code node's LangWatch SDK calls. It is the same URL
 		// the evaluator blocks call back on, and it is injected only next to

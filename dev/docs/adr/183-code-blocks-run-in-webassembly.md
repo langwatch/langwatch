@@ -29,8 +29,12 @@ default until the wasm runtime has run in production.
   (512 MiB by default, `NLPGO_ENGINE_CODE_BLOCK_MEMORY_MIB`).
 - **Mounts, not a filesystem.** The guest sees the standard library (served
   from memory, read-only), the runner and its stand-ins (`/runner`,
-  read-only), and its own run directory (`/work`). Nothing else on the host
-  exists for it. It receives no host environment variable; the run's own
+  read-only), and its own run directory (`/work`). `/work` is held in engine
+  memory (`codeblock/workfs.go`), never on the host disk, with no links of any
+  kind and a budget of 64 MiB, 4096 entries and 256 open files; the runner's
+  result is read from it. A host directory mount was rejected: wazero refuses
+  absolute link targets but follows relative ones. Nothing else on the host
+  exists for the guest. It receives no host environment variable; the run's own
   sandbox credential is the only one injected.
 - **No processes, threads or sockets.** WASI preview 1 has none. Outbound
   HTTP is a host call: the guest writes one framed request on its stdout and
@@ -38,6 +42,15 @@ default until the wasm runtime has run in production.
   performs it under the HTTP block's egress policy (`pkg/ssrf`). `requests`
   and `httpx` are stand-ins built on that call, covering the verb helpers,
   sessions/clients and responses.
+- **Budgets.** Concurrent runs share a memory budget
+  (`NLPGO_ENGINE_CODE_BLOCK_TOTAL_MEMORY_MIB`, 2048 by default); a run waits
+  for room within its own deadline. Host calls are bounded per run: 64
+  requests, 256 failing calls and 32 MiB of unread replies stop the run, and
+  the result it hands back is capped at 32 MiB.
+- **Egress.** Code blocks use the HTTP block's policy but never reach private
+  or loopback addresses unless `NLPGO_ENGINE_CODE_BLOCK_ALLOW_LOCAL_EGRESS` is
+  set, whatever `BLOCK_LOCAL_HTTP_CALLS` says: a code block is arbitrary code,
+  not a configured request. DNS lookups for the policy end with the request.
 - **Time is the engine's.** A run is stopped at its deadline wherever it is.
   `time.sleep` and the asyncio event loop wait through the engine, so a
   sleeping run also ends at its deadline.

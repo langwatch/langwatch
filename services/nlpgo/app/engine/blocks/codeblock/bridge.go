@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -27,13 +28,26 @@ const (
 	maxStrayOutputBytes = 64 << 10
 	defaultFetchTimeout = 30 * time.Second
 	maxFetchRedirects   = 10
+	// maxQueuedReplyBytes bounds replies the guest has not read yet. A guest
+	// that keeps calling without reading is stopped rather than buffered.
+	maxQueuedReplyBytes = 32 << 20
+	// maxFailedCalls stops a run whose host calls keep failing: malformed,
+	// unknown, refused or over budget. A working block never gets near it.
+	maxFailedCalls = 256
 )
+
+// errUnreadReplies stops a run that let host replies pile up unread.
+var errUnreadReplies = errors.New("the code block made host calls without reading their replies")
+
+// errTooManyFailedCalls stops a run that keeps making host calls that fail.
+var errTooManyFailedCalls = fmt.Errorf("the code block made more than %d failing host calls", maxFailedCalls)
 
 // bridge is one run's host side: the guest's stdin and stdout. Each host call
 // completes inside the guest's write, so stdin always holds the reply before
 // the guest reads it and no goroutine or pipe is needed.
 type bridge struct {
 	ctx    context.Context
+	cancel context.CancelCauseFunc
 	client *http.Client
 	egress ssrf.Options
 
@@ -42,12 +56,13 @@ type bridge struct {
 	line   bytes.Buffer
 	skip   bool
 	calls  int
+	failed int
 	stray  bytes.Buffer
 	closed bool
 }
 
-func (w *wasmRuntime) newBridge(ctx context.Context, payload []byte) *bridge {
-	b := &bridge{ctx: ctx, client: w.client, egress: w.opts.Egress}
+func (w *wasmRuntime) newBridge(ctx context.Context, cancel context.CancelCauseFunc, payload []byte) *bridge {
+	b := &bridge{ctx: ctx, cancel: cancel, client: w.client, egress: w.opts.Egress}
 	b.stdin.Write(payload)
 	b.stdin.WriteByte('\n')
 	return b
@@ -72,7 +87,7 @@ func (b *bridge) Write(p []byte) (int, error) {
 		return len(p), nil
 	}
 	rest := p
-	for len(rest) > 0 {
+	for len(rest) > 0 && b.ctx.Err() == nil {
 		i := bytes.IndexByte(rest, '\n')
 		if i < 0 {
 			b.appendLine(rest)
@@ -103,6 +118,7 @@ func (b *bridge) endLine() {
 	b.skip = false
 	defer b.line.Reset()
 	if overflowed {
+		b.failed++
 		b.reply(bridgeFailure("limit", "host call exceeds the frame size limit"))
 		return
 	}
@@ -110,7 +126,16 @@ func (b *bridge) endLine() {
 		b.keepStray(line)
 		return
 	}
-	b.reply(b.handle(line[len(bridgeFramePrefix):]))
+	reply := b.handle(line[len(bridgeFramePrefix):])
+	if !reply.OK {
+		b.failed++
+		if b.failed > maxFailedCalls {
+			b.closed = true
+			b.cancel(errTooManyFailedCalls)
+			return
+		}
+	}
+	b.reply(reply)
 }
 
 // keepStray holds output the guest wrote straight to fd 1, bounded, so it can
@@ -131,6 +156,11 @@ func (b *bridge) reply(v any) {
 	out, err := json.Marshal(v)
 	if err != nil {
 		out, _ = json.Marshal(bridgeFailure("error", "reply could not be encoded"))
+	}
+	if b.stdin.Len()+len(out)+1 > maxQueuedReplyBytes {
+		b.closed = true
+		b.cancel(errUnreadReplies)
+		return
 	}
 	b.stdin.Write(out)
 	b.stdin.WriteByte('\n')
@@ -194,7 +224,14 @@ func (b *bridge) sleep(seconds float64) bridgeReply {
 }
 
 func (b *bridge) fetch(req bridgeRequest) bridgeReply {
-	if err := ssrf.CheckURL(req.URL, b.egress); err != nil {
+	// The deadline comes first, so the policy check's own DNS lookup is held to it.
+	timeout := defaultFetchTimeout
+	if req.Timeout > 0 {
+		timeout = time.Duration(req.Timeout * float64(time.Second))
+	}
+	ctx, cancel := context.WithTimeout(b.ctx, timeout)
+	defer cancel()
+	if err := ssrf.CheckURL(req.URL, withContextResolver(ctx, b.egress)); err != nil {
 		return bridgeFailure("blocked", "this destination is not permitted by the deployment's egress policy")
 	}
 	body, err := base64.StdEncoding.DecodeString(req.BodyB64)
@@ -204,12 +241,6 @@ func (b *bridge) fetch(req bridgeRequest) bridgeReply {
 	if len(body) > maxFetchBodyBytes {
 		return bridgeFailure("limit", "request body exceeds the size limit")
 	}
-	timeout := defaultFetchTimeout
-	if req.Timeout > 0 {
-		timeout = time.Duration(req.Timeout * float64(time.Second))
-	}
-	ctx, cancel := context.WithTimeout(b.ctx, timeout)
-	defer cancel()
 
 	method := strings.ToUpper(req.Method)
 	if method == "" {
@@ -263,14 +294,36 @@ var errTooManyRedirects = errors.New("codeblock: too many redirects")
 func newFetchClient(egress ssrf.Options) *http.Client {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.Proxy = nil
-	transport.DialContext = ssrf.SafeDialer(egress)
+	transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		return ssrf.SafeDialer(withContextResolver(ctx, egress))(ctx, network, addr)
+	}
 	return &http.Client{
 		Transport: transport,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			if len(via) >= maxFetchRedirects {
 				return errTooManyRedirects
 			}
-			return ssrf.CheckURL(req.URL.String(), egress)
+			return ssrf.CheckURL(req.URL.String(), withContextResolver(req.Context(), egress))
 		},
 	}
+}
+
+// withContextResolver makes the egress policy's DNS lookups end with ctx, so a
+// slow resolver cannot hold a run past its deadline. A test's resolver is kept.
+func withContextResolver(ctx context.Context, egress ssrf.Options) ssrf.Options {
+	if egress.Resolver != nil {
+		return egress
+	}
+	egress.Resolver = func(host string) ([]net.IP, error) {
+		addrs, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+		if err != nil {
+			return nil, err
+		}
+		ips := make([]net.IP, len(addrs))
+		for i, addr := range addrs {
+			ips[i] = addr.IP
+		}
+		return ips, nil
+	}
+	return egress
 }

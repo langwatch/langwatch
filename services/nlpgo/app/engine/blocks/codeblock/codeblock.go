@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -89,6 +90,9 @@ type Options struct {
 	WasmCompilationCacheDir string
 	// Egress is the policy a wasm run's outbound requests are held to.
 	Egress ssrf.Options
+	// WasmTotalMemoryMiB caps the memory all concurrent wasm runs hold
+	// together; a run waits for room, within its own deadline. Zero means 2048.
+	WasmTotalMemoryMiB int
 	// QuickJSWasm is qjs-wasi.wasm; scripts/fetch-quickjs-wasm.sh. JavaScript
 	// always runs on wasm, so without it a JavaScript code block is refused.
 	QuickJSWasm string
@@ -230,14 +234,10 @@ const runnerFileMode = 0o400
 // newRunDir creates the directory for one execution and materializes the
 // runner pair into it. The caller removes the directory when the execution
 // ends, which also disposes of whatever the user's code wrote inside it.
-func (e *Executor) newRunDir(onWasm bool) (string, error) {
+func (e *Executor) newRunDir() (string, error) {
 	dir, err := os.MkdirTemp("", "nlpgo-codeblock-run-*")
 	if err != nil {
 		return "", fmt.Errorf("codeblock: run dir: %w", err)
-	}
-	if onWasm {
-		// A wasm guest reads the runner from its own read-only mount.
-		return dir, nil
 	}
 	for name, source := range map[string][]byte{
 		"runner.py":    e.runnerSource,
@@ -413,22 +413,10 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 	runCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	// One directory per execution, holding the runner pair and the result
-	// file, removed on the way out. Nothing the user's code writes here
-	// survives to be read, imported or executed by a later run.
 	guest, err := e.guestFor(req.Language)
 	if err != nil {
 		return nil, err
 	}
-	runDir, err := e.newRunDir(guest != nil)
-	if err != nil {
-		return nil, err
-	}
-	defer removeRunDir(runDir)
-
-	runnerPath := filepath.Join(runDir, "runner.py")
-	resultPath := filepath.Join(runDir, "result.json")
-
 	payload, err := json.Marshal(map[string]any{
 		"code":    req.Code,
 		"inputs":  req.Inputs,
@@ -441,9 +429,10 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 	}
 
 	if guest != nil {
+		// A wasm run never touches the host disk: its /work, result included,
+		// lives in engine memory for the length of the run.
 		started := time.Now()
 		run := e.wasm.run(runCtx, guest, wasmRunRequest{
-			runDir:  runDir,
 			payload: payload,
 			env:     withSandboxCredential(nil, req.SandboxAPIKey, e.opts.SandboxEndpoint),
 		})
@@ -456,8 +445,19 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 		if outcome.err == nil && run.exitCode != 0 {
 			outcome.err = fmt.Errorf("the interpreter exited with status %d", run.exitCode)
 		}
-		return collectResult(resultPath, outcome), nil
+		return collectResult(run.result, outcome), nil
 	}
+
+	// One directory per execution, holding the runner pair and the result
+	// file, removed on the way out. Nothing the user's code writes here
+	// survives to be read, imported or executed by a later run.
+	runDir, err := e.newRunDir()
+	if err != nil {
+		return nil, err
+	}
+	defer removeRunDir(runDir)
+	runnerPath := filepath.Join(runDir, "runner.py")
+	resultPath := filepath.Join(runDir, "result.json")
 
 	cmd := exec.CommandContext(runCtx, e.opts.Python, runnerPath, resultPath) //nolint:gosec // runnerPath is this execution's own copy of the engine's embedded runner
 	// Withhold the pod environment from user code. cmd.Env is always set to
@@ -494,7 +494,7 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 		_ = killGroup(cmd.Process.Pid)
 	}
 
-	return collectResult(resultPath, runOutcome{
+	return collectResult(readHostResult(resultPath), runOutcome{
 		timedOut: timedOut,
 		elapsed:  elapsed,
 		stderr:   stderrBuf.String(),
@@ -531,12 +531,39 @@ type runOutcome struct {
 	err      error
 }
 
+// runResult is the result file a run left behind, as the engine read it.
+type runResult struct {
+	data     []byte
+	tooLarge bool
+}
+
+// readHostResult reads a subprocess run's result file. The file is the run's
+// to make, so a link or a device in its place is not followed or read, and
+// nothing past the size limit is read.
+func readHostResult(path string) runResult {
+	file, err := os.OpenFile(path, os.O_RDONLY|syscall.O_NOFOLLOW, 0)
+	if err != nil {
+		return runResult{}
+	}
+	defer func() { _ = file.Close() }()
+	if info, err := file.Stat(); err != nil || !info.Mode().IsRegular() {
+		return runResult{}
+	}
+	data, err := io.ReadAll(io.LimitReader(file, maxResultBytes+1))
+	if err != nil {
+		return runResult{}
+	}
+	if len(data) > maxResultBytes {
+		return runResult{tooLarge: true}
+	}
+	return runResult{data: data}
+}
+
 // collectResult turns what a run left behind into a Result: the runner's own
 // result file when it wrote one, otherwise a synthesized timeout or error.
-func collectResult(resultPath string, outcome runOutcome) *Result {
+func collectResult(result runResult, outcome runOutcome) *Result {
 	timedOut, elapsed, stderr, runErr := outcome.timedOut, outcome.elapsed, outcome.stderr, outcome.err
-	// The result file is written by the guest, so its size is the guest's choice.
-	if info, err := os.Stat(resultPath); err == nil && info.Size() > maxResultBytes {
+	if result.tooLarge {
 		return &Result{
 			DurationMS: elapsed.Milliseconds(),
 			TimedOut:   timedOut,
@@ -544,7 +571,7 @@ func collectResult(resultPath string, outcome runOutcome) *Result {
 			Error:      &Error{Type: RunnerErrorType, Message: fmt.Sprintf("the code block's result exceeds the %d MiB limit", maxResultBytes>>20)},
 		}
 	}
-	if data, readErr := os.ReadFile(resultPath); readErr == nil && len(data) > 0 {
+	if data := result.data; len(data) > 0 {
 		var parsed struct {
 			Outputs    map[string]any `json:"outputs"`
 			Stdout     string         `json:"stdout"`

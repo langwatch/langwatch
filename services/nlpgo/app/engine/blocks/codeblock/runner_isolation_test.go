@@ -311,3 +311,23 @@ func skipOnWasm(t *testing.T, why string) {
 		t.Skip("subprocess-only: " + why)
 	}
 }
+
+// @scenario "the engine does not follow a link left in place of the result file"
+func TestRunnerIsolation_ResultFileLinkIsNotFollowed(t *testing.T) {
+	requirePython(t)
+	skipOnWasm(t, "a wasm run's result never touches the host disk")
+	start := time.Now()
+	res, err := newExec(t).Execute(context.Background(), codeblock.Request{
+		Code: `
+import os, sys
+
+def execute():
+    os.symlink("/dev/zero", sys.argv[1])
+    return {"ok": True}
+`,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, res.Error, "a result read through a link was accepted")
+	assert.Equal(t, codeblock.RunnerErrorType, res.Error.Type)
+	assert.Less(t, time.Since(start), 10*time.Second, "the engine read through the link")
+}

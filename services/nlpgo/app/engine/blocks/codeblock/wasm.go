@@ -16,8 +16,10 @@ import (
 	"time"
 
 	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/experimental/sysfs"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/sys"
+	"golang.org/x/sync/semaphore"
 )
 
 // wasmSite is the guest-only Python: the host bridge and the requests/httpx
@@ -46,16 +48,24 @@ var sharedCompilationCache = wazero.NewCompilationCache()
 // defaultWasmMemoryMiB caps one run's linear memory.
 const defaultWasmMemoryMiB = 512
 
+// defaultWasmTotalMemoryMiB caps what all concurrent runs may hold together.
+const defaultWasmTotalMemoryMiB = 2048
+
 // wasmRuntime runs code blocks inside WebAssembly guests: a WASI CPython when
 // Python runs on wasm, and QuickJS for JavaScript. Each module is compiled
 // once; every run instantiates it afresh with its own memory and mounts, so
 // nothing one run does is visible to another and no process outlives a run.
 type wasmRuntime struct {
-	runtime wazero.Runtime
-	python  *wasmGuest
-	js      *wasmGuest
-	client  *http.Client
-	opts    Options
+	runtime    wazero.Runtime
+	python     *wasmGuest
+	js         *wasmGuest
+	client     *http.Client
+	opts       Options
+	workLimits workLimits
+	// admission holds the engine to a total memory budget across concurrent
+	// runs; each run takes runWeight MiB of it before it is instantiated.
+	admission *semaphore.Weighted
+	runWeight int64
 }
 
 // wasmGuest is one interpreter: its compiled module, its read-only mounts and
@@ -94,10 +104,20 @@ func newWasmRuntime(ctx context.Context, opts Options, sources runnerPair) (*was
 		cache = dirCache
 	}
 	config = config.WithCompilationCache(cache)
+	// A run's footprint: its linear memory, its /work and its queued bridge replies.
+	runWeight := int64(memoryMiB) + defaultWorkLimits.bytes>>20 + maxQueuedReplyBytes>>20
+	totalMiB := int64(opts.WasmTotalMemoryMiB)
+	if totalMiB <= 0 {
+		totalMiB = defaultWasmTotalMemoryMiB
+	}
+	totalMiB = max(totalMiB, runWeight)
 	w := &wasmRuntime{
-		runtime: wazero.NewRuntimeWithConfig(ctx, config),
-		client:  newFetchClient(opts.Egress),
-		opts:    opts,
+		runtime:    wazero.NewRuntimeWithConfig(ctx, config),
+		client:     newFetchClient(opts.Egress),
+		opts:       opts,
+		workLimits: defaultWorkLimits,
+		admission:  semaphore.NewWeighted(totalMiB),
+		runWeight:  runWeight,
 	}
 	if _, err := wasi_snapshot_preview1.Instantiate(ctx, w.runtime); err != nil {
 		_ = w.runtime.Close(ctx)
@@ -226,27 +246,38 @@ type wasmRun struct {
 	stderr   string
 	exitCode uint32
 	err      error
+	result   runResult
 }
 
-// wasmRunRequest is one execution: the run directory, mounted read-write at
-// /work to receive result.json, the stdin payload and the run's own env.
+// wasmRunRequest is one execution: the stdin payload and the run's own env.
 type wasmRunRequest struct {
-	runDir  string
 	payload []byte
 	env     []string
 }
 
-// run executes one code block on guest. The guest sees no host path but runDir.
-func (w *wasmRuntime) run(ctx context.Context, guest *wasmGuest, req wasmRunRequest) wasmRun {
-	channel := w.newBridge(ctx, req.payload)
+// errEngineAtCapacity is a run that could not be admitted before it was cancelled.
+var errEngineAtCapacity = errors.New("the engine is running as many code blocks as its memory allows")
+
+// run executes one code block on guest. The guest sees no host path at all:
+// its /work is a workFS in engine memory.
+func (w *wasmRuntime) run(parent context.Context, guest *wasmGuest, req wasmRunRequest) wasmRun {
+	if err := w.admission.Acquire(parent, w.runWeight); err != nil {
+		return wasmRun{err: errEngineAtCapacity}
+	}
+	defer w.admission.Release(w.runWeight)
+
+	ctx, cancel := context.WithCancelCause(parent)
+	defer cancel(nil)
+	channel := w.newBridge(ctx, cancel, req.payload)
 	var stderr limitedBuffer
 	stderr.limit = maxStrayOutputBytes
 
+	work := newWorkFS(w.workLimits)
 	fsConfig := wazero.NewFSConfig()
 	for at, files := range guest.mounts {
 		fsConfig = fsConfig.WithFSMount(files, at)
 	}
-	fsConfig = fsConfig.WithDirMount(req.runDir, guestWorkDir)
+	fsConfig = fsConfig.(sysfs.FSConfig).WithSysFSMount(work, guestWorkDir)
 	config := wazero.NewModuleConfig().
 		WithName("").
 		WithArgs(guest.args...).
@@ -273,12 +304,14 @@ func (w *wasmRuntime) run(ctx context.Context, guest *wasmGuest, req wasmRunRequ
 		_ = instance.Close(context.WithoutCancel(ctx))
 	}
 	stray := channel.close()
-	out := wasmRun{stderr: stderr.String()}
+	out := wasmRun{stderr: stderr.String(), result: workResult(work)}
 	if stray != "" {
 		out.stderr += stray
 	}
 	var exit *sys.ExitError
 	switch {
+	case errors.Is(context.Cause(ctx), errUnreadReplies), errors.Is(context.Cause(ctx), errTooManyFailedCalls):
+		out.err = context.Cause(ctx)
 	case err == nil:
 	case errors.As(err, &exit):
 		out.exitCode = exit.ExitCode()
@@ -286,6 +319,19 @@ func (w *wasmRuntime) run(ctx context.Context, guest *wasmGuest, req wasmRunRequ
 		out.err = err
 	}
 	return out
+}
+
+// workResult reads the result the runner left in /work, bounded like a host file.
+func workResult(work *workFS) runResult {
+	data, ok := work.readFile("result.json")
+	switch {
+	case !ok:
+		return runResult{}
+	case len(data) > maxResultBytes:
+		return runResult{tooLarge: true}
+	default:
+		return runResult{data: data}
+	}
 }
 
 // sleepUntilDone is the guest's sleep: it ends early when the run's time is up.

@@ -119,6 +119,12 @@ type EngineConfig struct {
 	PythonWasmHome string `env:"PYTHON_WASM_HOME"`
 	// CodeBlockMemoryMiB — one wasm run's memory ceiling. Zero means 512.
 	CodeBlockMemoryMiB int `env:"CODE_BLOCK_MEMORY_MIB"`
+	// CodeBlockTotalMemoryMiB — what all concurrent wasm runs may hold together. Zero means 2048.
+	CodeBlockTotalMemoryMiB int `env:"CODE_BLOCK_TOTAL_MEMORY_MIB"`
+	// CodeBlockAllowLocalEgress — lets wasm code blocks reach private and
+	// loopback addresses. Off by default whatever BLOCK_LOCAL_HTTP_CALLS says:
+	// a code block is arbitrary code, not a configured request. ADR-183.
+	CodeBlockAllowLocalEgress bool `env:"CODE_BLOCK_ALLOW_LOCAL_EGRESS"`
 	// WasmCompilationCacheDir — keeps compiled guest binaries across restarts.
 	WasmCompilationCacheDir string `env:"WASM_COMPILATION_CACHE_DIR"`
 	// QuickJSWasm — qjs-wasi.wasm. JavaScript code blocks need it; ADR-183.

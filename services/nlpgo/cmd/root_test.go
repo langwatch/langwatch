@@ -312,3 +312,19 @@ func TestCodeBlockTimeout_ReachesTheExecutorFromTheEnvironment(t *testing.T) {
 		t.Errorf("DefaultTimeout() = %v; want %v (NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS=7)", got, want)
 	}
 }
+
+// @scenario "code blocks reach private addresses only when the operator allows it"
+func TestCodeBlockEgress_RefusesLocalUnlessAllowed(t *testing.T) {
+	shared := ssrf.Options{AllowLocal: true, AllowedHosts: []string{"internal.example"}, StrictPublicOnly: true}
+
+	refused := codeBlockEgress(shared, false)
+	if refused.AllowLocal {
+		t.Fatal("code blocks inherited the HTTP block's permission to reach private addresses")
+	}
+	if len(refused.AllowedHosts) != 1 || !refused.StrictPublicOnly {
+		t.Fatalf("the rest of the shared policy was not kept: %+v", refused)
+	}
+	if !codeBlockEgress(shared, true).AllowLocal {
+		t.Fatal("the operator's explicit allowance was ignored")
+	}
+}
