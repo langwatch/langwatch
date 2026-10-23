@@ -21,10 +21,20 @@ func roleGrants(t *testing.T, tiers map[string]any, role string) []any {
 	return queries
 }
 
-// @scenario "Every server carries the four tiers"
+// @scenario "A server without access renders no tiers"
+func TestRenderAll_NoTiersByDefault(t *testing.T) {
+	dir := t.TempDir()
+	renderInto(t, testInput(), dir)
+	for _, rel := range []string{"users.d/access-tiers.yaml", "users.d/access-users.yaml", "config.d/access-auth.yaml"} {
+		assertExists(t, filepath.Join(dir, rel), false)
+	}
+}
+
+// @scenario "Tiers are rendered with an access file or CLICKHOUSE_ACCESS_TIERS"
 func TestRenderAll_Tiers(t *testing.T) {
 	dir := t.TempDir()
 	input := testInput()
+	input.AccessTiers = true
 	renderInto(t, input, dir)
 	memoryCap := config.ComputeFromResources(input.CPU, input.RAMBytes, input).MaxMemoryUsagePerQuery
 
@@ -78,6 +88,7 @@ func TestRenderAll_Tiers(t *testing.T) {
 func TestRenderAll_TierExecutionTimeFollowsEnv(t *testing.T) {
 	dir := t.TempDir()
 	input := testInput()
+	input.AccessTiers = true
 	input.ReadTierMaxExecutionTime = 60
 	renderInto(t, input, dir)
 	profile := section(t, section(t, readYAML(t, dir, "users.d/access-tiers.yaml"), "profiles"), "tier_read")
@@ -112,6 +123,7 @@ func TestRenderAll_AccessFileOnThenOff(t *testing.T) {
 	input.AccessListen = "127.0.0.1:8124"
 	renderInto(t, input, dir)
 
+	assertExists(t, filepath.Join(dir, "users.d", "access-tiers.yaml"), true)
 	users := section(t, readYAML(t, dir, "users.d/access-users.yaml"), "users")
 	for _, name := range []string{"metabase", "alice"} {
 		section(t, users, name)
@@ -123,7 +135,7 @@ func TestRenderAll_AccessFileOnThenOff(t *testing.T) {
 	renderInto(t, input, dir)
 	assertExists(t, filepath.Join(dir, "users.d", "access-users.yaml"), false)
 	assertExists(t, filepath.Join(dir, "config.d", "access-auth.yaml"), false)
-	assertExists(t, filepath.Join(dir, "users.d", "access-tiers.yaml"), true)
+	assertExists(t, filepath.Join(dir, "users.d", "access-tiers.yaml"), false)
 }
 
 func TestRenderAll_InvalidAccessFileFails(t *testing.T) {

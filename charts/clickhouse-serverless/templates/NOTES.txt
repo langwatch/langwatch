@@ -41,3 +41,9 @@ To override any auto-tuned parameter, use the env map in values.yaml:
 WARNING: remote_servers carries no cluster secret. Set auth.clusterSecretEnabled=true
 (see "Cluster secret" in infra/clickhouse-serverless/README.md for the restart it needs).
 {{- end }}
+{{- if .Values.users }}
+
+WARNING: `users` is deprecated and has no effect: no chart version ever created
+these users. Declare them under `access` instead (README, "Access"); this value
+is removed in the next major release.
+{{- end }}

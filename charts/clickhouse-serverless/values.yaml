@@ -232,6 +232,10 @@ extraVolumeMounts: []
 lwqlAccess:
   secretName: ""
 
+# Deprecated, no effect: documented earlier but never rendered. Use `access`.
+# Accepted so existing values files keep working; removed in the next major.
+users: ""
+
 # Users, tiers and logins from an access file (ADR-184). Off by default: the
 # server then has only its default user plus whatever extraVolumes mount.
 # On, a sidecar container keeps the users current and verifies OIDC token

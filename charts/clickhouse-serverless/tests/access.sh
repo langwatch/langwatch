@@ -56,7 +56,18 @@ test_access_needs_a_file() {
   echo "PASS: access.enabled without a file is refused"
 }
 
+# @scenario "The deprecated users value is accepted and warned about"
+test_users_value_is_a_noop() {
+  diff <(helm template t . --set autogen.enabled=true | grep -v -e '^  password:' -e '^  clusterSecret:') \
+    <(helm template t . --set autogen.enabled=true --set 'users=analyst:s3cret:readonly:*' | grep -v -e '^  password:' -e '^  clusterSecret:') >/dev/null \
+    || fail "users must not change what the chart renders"
+  grep -q 'if .Values.users' templates/NOTES.txt && grep -q '`users` is deprecated' templates/NOTES.txt \
+    || fail "NOTES.txt must warn when users is set"
+  echo "PASS: users is accepted as a deprecated no-op"
+}
+
 echo "--- access sidecar assertions ---"
 test_access_off_by_default
 test_access_enabled_wires_sidecar
 test_access_needs_a_file
+test_users_value_is_a_noop

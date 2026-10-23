@@ -216,14 +216,22 @@ has no kube-state-metrics series and cannot be watched from here.
 | `preflight.image`                  | Container image (needs `sh` + `kubectl` + `jq`; the Job fails fast if `jq` is missing)                                                                                                           | `alpine/k8s:1.30.0` |
 | `preflight.activeDeadlineSeconds`  | Hard timeout for the preflight Job                                                                                                                                                               | `60`                |
 
+### Users (deprecated)
+
+| Name    | Description                                                                                                       | Default |
+| ------- | ----------------------------------------------------------------------------------------------------------------- | ------- |
+| `users` | Deprecated, no effect: earlier docs described it, but no chart version rendered it. Use `access`. Warned in NOTES | `""`    |
+
 ### Access: tiers, rolling passwords and token logins
 
-Off by default. Every server carries four tiers as roles and settings profiles:
-`tier_inspect` (names only), `tier_read` (`SELECT` on its databases),
-`tier_write` (plus `INSERT`, `ALTER UPDATE`, `ALTER DELETE`, no DDL) and
-`tier_admin`. With `access.enabled`, an access file declares users with one tier
-each, and a sidecar container keeps them current and verifies OIDC token logins
-on `127.0.0.1` inside the pod. Design and limits: [ADR-184](../../dev/docs/adr/184-clickhouse-serverless-access-tiers-rolling-passwords-and-token-logins.md).
+Off by default, and then the server has no `tier_*` role, profile or extra
+container. With `access.enabled`, the server carries four tiers as roles and
+settings profiles: `tier_inspect` (names only), `tier_read` (`SELECT` on its
+databases), `tier_write` (plus `INSERT`, `ALTER UPDATE`, `ALTER DELETE`, no DDL)
+and `tier_admin`; an access file declares users with one tier each, and a
+sidecar container keeps them current and verifies OIDC token logins on
+`127.0.0.1` inside the pod. `env.CLICKHOUSE_ACCESS_TIERS: "true"` renders the
+tiers alone, for users you write yourself. Design and limits: [ADR-184](../../dev/docs/adr/184-clickhouse-serverless-access-tiers-rolling-passwords-and-token-logins.md).
 
 | Name                              | Description                                                                                         | Default |
 | --------------------------------- | --------------------------------------------------------------------------------------------------- | ------- |
@@ -234,6 +242,7 @@ on `127.0.0.1` inside the pod. Design and limits: [ADR-184](../../dev/docs/adr/1
 | `access.passwordSecrets`          | Secrets mounted as password directories at `/etc/clickhouse-access/secrets/<name>`                  | `[]`    |
 | `access.sidecar.resources`        | Sidecar requests and limits                                                                         | small   |
 | `env.CLICKHOUSE_ACCESS_LISTEN`    | Loopback address the sidecar listens on, for ClickHouse's token checks                              | `127.0.0.1:8124` |
+| `env.CLICKHOUSE_ACCESS_TIERS`     | Render the tiers without an access file                                                             | `false` |
 | `env.READ_TIER_MAX_EXECUTION_TIME`| Execution-time cap (seconds) of the inspect and read tiers                                          | `300`   |
 
 ```yaml
