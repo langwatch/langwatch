@@ -10,26 +10,39 @@ import type {
   InstantEvalLlmJudgeRequest,
 } from "../../channels/instant-eval-llm-judge.channel.ts";
 
+type HostedDecisionsAnswer = (
+  request: InstantEvalHostedDecisionsRequest,
+  signal?: AbortSignal,
+) => InstantEvalJudgement | Promise<InstantEvalJudgement>;
+
 /** The hosted Decisions leg's twin: answers as scripted, or throws what it is given. */
 export class ScriptedInstantEvalHostedDecisionsChannel implements InstantEvalHostedDecisionsChannel {
   readonly requests: InstantEvalHostedDecisionsRequest[] = [];
 
-  private constructor(
-    private readonly answer: (request: InstantEvalHostedDecisionsRequest) => InstantEvalJudgement,
-  ) {}
+  private constructor(private readonly answer: HostedDecisionsAnswer) {}
 
   static create({
     answer,
   }: {
-    answer: (request: InstantEvalHostedDecisionsRequest) => InstantEvalJudgement;
+    answer: HostedDecisionsAnswer;
   }): ScriptedInstantEvalHostedDecisionsChannel {
     return new ScriptedInstantEvalHostedDecisionsChannel(answer);
   }
 
-  async classify(request: InstantEvalHostedDecisionsRequest): Promise<InstantEvalJudgement> {
+  async classify(
+    request: InstantEvalHostedDecisionsRequest,
+    signal?: AbortSignal,
+  ): Promise<InstantEvalJudgement> {
     this.requests.push(request);
-    return this.answer(request);
+    return this.answer(request, signal);
   }
+}
+
+/** A provider that never answers: it rejects with the signal's reason once it is aborted. */
+export function hangUntilAborted<T>(signal?: AbortSignal): Promise<T> {
+  return new Promise<T>((_, reject) => {
+    signal?.addEventListener("abort", () => reject(signal.reason), { once: true });
+  });
 }
 
 /** The LLM legs' twin: answers each question as scripted and keeps every request. */
