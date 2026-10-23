@@ -22,7 +22,7 @@ import {
   type StudioCodeProposal,
   type StudioCodeProposeResult,
 } from "@langwatch/workflow-contract";
-import { type RefObject, useEffect, useRef, useState } from "react";
+import { type RefObject, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import type { CodeLanguage } from "../model/code-language.ts";
 import {
@@ -107,8 +107,9 @@ export function useCodeEditorAssistant({
 
   const buffer = useRef(savedCode);
   const reads = useRef(new Map<string, ProposalTarget>());
-  // A read answers one visit to one code block: leaving it forgets every read.
-  useEffect(() => {
+  // A read answers one visit to one code block: leaving it forgets every read,
+  // before any handler can run against the block now open.
+  useLayoutEffect(() => {
     reads.current.clear();
   }, [reviewKey]);
   const latest = useRef<EditorState>({
@@ -120,7 +121,7 @@ export function useCodeEditorAssistant({
     secretNames,
     mayPropose,
   });
-  useEffect(() => {
+  useLayoutEffect(() => {
     latest.current = { subject, language, savedCode, inputs, outputs, secretNames, mayPropose };
   });
 
