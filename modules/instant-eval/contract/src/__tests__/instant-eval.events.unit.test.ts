@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { INSTANT_EVAL_EVENT_TYPES } from "../instant-eval-event.constants.ts";
+import {
+  INSTANT_EVAL_EVENT_TYPES,
+  INSTANT_EVAL_EVENT_VERSIONS,
+} from "../instant-eval-event.constants.ts";
 import {
   instantEvalFinishedEventSchema,
   instantEvalPageJudgedEventSchema,
@@ -54,6 +57,12 @@ describe("instant eval run events written before the router", () => {
       },
     });
     expect(event.data.costNanoUsd).toBe(0);
+  });
+
+  /** @scenario "A page event without a routed cost still reads and prices from tokens" */
+  it("writes the router's fields under the version a pod not yet rolled still reads", () => {
+    expect(INSTANT_EVAL_EVENT_VERSIONS.PAGE_JUDGED).toBe("2026-09-18");
+    expect(INSTANT_EVAL_EVENT_VERSIONS.FINISHED).toBe("2026-09-18");
   });
 
   it("refuses a version it never wrote", () => {

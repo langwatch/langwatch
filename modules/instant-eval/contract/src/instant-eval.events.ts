@@ -10,9 +10,7 @@ import { z } from "zod";
 import {
   INSTANT_EVAL_EVENT_TYPES,
   INSTANT_EVAL_EVENT_VERSIONS,
-  INSTANT_EVAL_FINISHED_EVENT_VERSIONS,
   INSTANT_EVAL_OUTCOMES,
-  INSTANT_EVAL_PAGE_JUDGED_EVENT_VERSIONS,
 } from "./instant-eval-event.constants.ts";
 
 /** Portable event envelope owned by Instant Evals; Eventing consumes it structurally. */
@@ -132,7 +130,7 @@ export type InstantEvalPageJudgedEventData = z.infer<typeof instantEvalPageJudge
 const instantEvalPageJudgedEventSchemaDefinition = z.object({
   ...instantEvalEventSchema.shape,
   type: z.literal(INSTANT_EVAL_EVENT_TYPES.PAGE_JUDGED),
-  version: z.enum(INSTANT_EVAL_PAGE_JUDGED_EVENT_VERSIONS),
+  version: z.literal(INSTANT_EVAL_EVENT_VERSIONS.PAGE_JUDGED),
   data: instantEvalPageJudgedEventDataSchema,
 });
 export interface InstantEvalPageJudgedEventSchema extends Named<
@@ -193,7 +191,7 @@ export type InstantEvalFinishedEventData = z.infer<typeof instantEvalFinishedEve
 const instantEvalFinishedEventSchemaDefinition = z.object({
   ...instantEvalEventSchema.shape,
   type: z.literal(INSTANT_EVAL_EVENT_TYPES.FINISHED),
-  version: z.enum(INSTANT_EVAL_FINISHED_EVENT_VERSIONS),
+  version: z.literal(INSTANT_EVAL_EVENT_VERSIONS.FINISHED),
   data: instantEvalFinishedEventDataSchema,
 });
 export interface InstantEvalFinishedEventSchema extends Named<
