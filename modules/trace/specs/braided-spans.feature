@@ -105,6 +105,15 @@ Feature: Braided spans in the reader's traces
       When sam, an admin of "orchestrator" with no role on "specialists", opens a braided span
       Then the span's input is hidden
 
+    @integration
+    Scenario: A braided span selected in the tree opens from its owner
+      Given sam opened a trace from a link that carried no time, and the trace has since filled it in
+      And the trace's spans have loaded, including a "specialists" span
+      When sam selects that span in the tree
+      Then the span is read from "specialists", under its privacy
+      And it is read exactly as hovering over it before the click read it
+      And a span selected before the trace's spans loaded is read from "specialists" once they have
+
     @unit
     Scenario: A braided span's cost shows only to a viewer who may see costs on its owner
       Given sam may see costs on "orchestrator" but not on "specialists"

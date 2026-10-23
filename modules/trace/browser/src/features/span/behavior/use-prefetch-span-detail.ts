@@ -15,8 +15,8 @@ import { spanTreeQueryKey } from "./span-tree-paged-query.ts";
 export function usePrefetchSpanDetail() {
   // The arguments `useSpanDetail` reads with, member included, as primitives so the
   // callback keeps its identity across renders: span rows are memoised on it.
-  const { isReady, projectId, traceId, occurredAtMs, tenantId, queryArgs } = useTraceQueryArgs();
-  const treeOccurredAtMs = queryArgs.occurredAtMs;
+  const { isReady, projectId, traceId, tenantId, queryArgs } = useTraceQueryArgs();
+  const { occurredAtMs } = queryArgs;
   const utils = api.useUtils();
   const queryClient = useQueryClient();
 
@@ -26,7 +26,7 @@ export function usePrefetchSpanDetail() {
       const treeKey = spanTreeQueryKey({
         projectId,
         traceId,
-        ...(treeOccurredAtMs !== undefined ? { occurredAtMs: treeOccurredAtMs } : {}),
+        ...(occurredAtMs !== undefined ? { occurredAtMs } : {}),
         ...(tenantId !== null ? { tenantId } : {}),
       });
       const ownerProjectId = selectedSpanOwnerIn({
@@ -36,12 +36,12 @@ export function usePrefetchSpanDetail() {
       void utils.traces.spanDetail.prefetch({
         projectId,
         traceId,
-        ...(occurredAtMs !== null ? { occurredAtMs } : {}),
+        ...(occurredAtMs !== undefined ? { occurredAtMs } : {}),
         ...(tenantId !== null ? { tenantId } : {}),
         spanId,
         ...(ownerProjectId ? { ownerProjectId } : {}),
       });
     },
-    [isReady, projectId, traceId, occurredAtMs, treeOccurredAtMs, tenantId, utils, queryClient],
+    [isReady, projectId, traceId, occurredAtMs, tenantId, utils, queryClient],
   );
 }
