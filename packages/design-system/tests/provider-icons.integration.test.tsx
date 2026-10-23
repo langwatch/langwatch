@@ -5,12 +5,12 @@
 import { cleanup } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { LOGO_LINES_PATH, LOGO_PLATE_PATH } from "../src/components/brand/logo-paths.ts";
 import {
   inferProvider,
   ProviderIconGlyph,
   type ProviderKey,
 } from "../src/components/scope/provider-icons.tsx";
-import { LOGO_LINES_PATH, LOGO_PLATE_PATH } from "../src/components/brand/logo-paths.ts";
 import { renderWithDesignSystem } from "../src/testing/index.tsx";
 
 afterEach(() => cleanup());
