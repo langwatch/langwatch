@@ -32,7 +32,8 @@ async function get<T>({ path }: { path: string }): Promise<T> {
 }
 
 // A busy hour holds 800+ runs, and a week more than an hour's API allowance:
-// take PER_HOUR runs from one random page of every hour (about 1,000 calls).
+// take PER_HOUR runs from one random full page of every hour (about 1,000
+// calls). Only full pages are picked, so a short last page never thins it.
 const PER_HOUR = 4;
 
 async function pullRequestRuns(): Promise<Run[]> {
@@ -43,7 +44,8 @@ async function pullRequestRuns(): Promise<Run[]> {
     const to = new Date((hour + 1) * 3_600_000 - 1000).toISOString().slice(0, 19);
     const query = `repos/${REPO}/actions/runs?event=pull_request&status=completed&created=${from}Z..${to}Z&per_page=100`;
     const first = await get<{ total_count: number; workflow_runs: Run[] }>({ path: query });
-    const page = 1 + Math.floor(Math.random() * Math.min(10, Math.ceil(first.total_count / 100)));
+    const fullPages = Math.max(1, Math.min(10, Math.floor(first.total_count / 100)));
+    const page = 1 + Math.floor(Math.random() * fullPages);
     const { workflow_runs } =
       page === 1 ? first : await get<{ workflow_runs: Run[] }>({ path: `${query}&page=${page}` });
     const firstAttempts = workflow_runs.filter((run) => run.run_attempt === 1);
