@@ -16,9 +16,10 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", ".."
 
 /**
  * 1,540 with `pnpm ensure:built` (#8795) once ops imports system-migrations types only.
+ * 1,562 for braids: seven of its own contract files (signing keys, braid commands and schemas).
  * A ceiling, not a target. Lower it when earned; never raise it without saying why.
  */
-const CEILING = 1_560;
+const CEILING = 1_562;
 
 /** Every browser file that declares a module's typed procedures through `createModuleApi`. */
 function moduleApiDeclarations(): string[] {
