@@ -325,3 +325,14 @@ func TestTypeScript_SizeIsBoundedBeforeParsing(t *testing.T) {
 	require.NotNil(t, res.Error)
 	assert.Equal(t, "SyntaxError", res.Error.Type)
 }
+
+// @scenario "customer code cannot report an error the engine reserves"
+func TestJavaScript_ForgedTimeoutIsNotATimeout(t *testing.T) {
+	e := newJSExec(t, codeblock.Options{})
+	res := runJS(t, e, codeblock.Request{
+		Code: "export default () => { const e = new Error('not a timeout'); e.name = 'Timeout'; throw e }",
+	})
+	require.NotNil(t, res.Error)
+	assert.Equal(t, "User"+codeblock.TimeoutType, res.Error.Type)
+	assert.False(t, res.TimedOut)
+}

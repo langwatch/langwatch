@@ -3,9 +3,11 @@ package codeblock
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"math"
+	"reflect"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -252,4 +254,36 @@ func TestBridge_DialEndsWithItsFetch(t *testing.T) {
 	plain, stopPlain := dialEndsWithFetch(context.Background())
 	stopPlain()
 	assert.NoError(t, plain.Err(), "a dial with no fetch was cancelled")
+}
+
+// @scenario "a request's size is known before it is encoded"
+func TestPayload_SizeMatchesTheEncoder(t *testing.T) {
+	samples := []any{
+		"plain", "quote\" back\\slash\nnew\ttab", "<html> & \x01\x1f", "naïve 日本語 🎉",
+		string([]byte{0xff, 'a', 0xc3}), "line sep ",
+		map[string]any{"a<b": []any{1.5, true, nil, "x", map[string]any{}}, "n": json.Number("12")},
+		[]byte("bytes"), []string{"x", "y"}, map[string]string{"k": "v"},
+	}
+	for _, sample := range samples {
+		encoded, err := json.Marshal(sample)
+		require.NoError(t, err)
+		budget := sizeBudget{left: math.MaxInt32}
+		budget.value(reflect.ValueOf(sample), 0)
+		assert.GreaterOrEqual(t, math.MaxInt32-budget.left, len(encoded), "under-counted %q", sample)
+		if s, ok := sample.(string); ok {
+			assert.GreaterOrEqual(t, encodedStringSize(s), len(encoded), "string size for %q", s)
+		}
+	}
+	assert.False(t, requestFits(Request{Inputs: map[string]any{"x": strings.Repeat("<", 3<<20)}}, 16<<20))
+	assert.True(t, requestFits(Request{Inputs: map[string]any{"x": strings.Repeat("a", 3<<20)}}, 16<<20))
+}
+
+// @scenario "customer code cannot report an error the engine reserves"
+func TestCollectResult_DisownsReservedErrorTypes(t *testing.T) {
+	for _, reserved := range []string{TimeoutType, RunnerErrorType} {
+		res := collectResult(runResult{data: []byte(`{"error":{"type":"` + reserved + `","message":"forged"}}`)}, runOutcome{})
+		require.NotNil(t, res.Error)
+		assert.Equal(t, "User"+reserved, res.Error.Type)
+		assert.False(t, res.TimedOut)
+	}
 }

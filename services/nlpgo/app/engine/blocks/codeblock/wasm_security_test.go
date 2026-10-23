@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -513,4 +514,20 @@ func TestWasmSecurity_TimeoutWhileWaitingForRoom(t *testing.T) {
 	assert.True(t, res.TimedOut)
 	assert.Equal(t, codeblock.TimeoutType, res.Error.Type)
 	<-done
+}
+
+// @scenario "a request's size is known before it is encoded"
+func TestWasmSecurity_EscapedInputIsRefusedBeforeEncoding(t *testing.T) {
+	e := newJSExec(t, codeblock.Options{})
+	input := strings.Repeat("<", 4<<20)
+	var before, after runtime.MemStats
+	runtime.ReadMemStats(&before)
+	res := runJS(t, e, codeblock.Request{
+		Code:   "export default () => ({})",
+		Inputs: map[string]any{"x": input},
+	})
+	runtime.ReadMemStats(&after)
+	require.NotNil(t, res.Error)
+	assert.Contains(t, res.Error.Message, "exceed the 16 MiB limit")
+	assert.Less(t, after.TotalAlloc-before.TotalAlloc, uint64(8<<20), "the oversized request was encoded before it was refused")
 }

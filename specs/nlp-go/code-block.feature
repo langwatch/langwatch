@@ -78,6 +78,15 @@ Feature: Code block — execute user Python with isolated subprocess and structu
   # a code it had never heard of and no copy to show for it.
   Rule: Exceptions are surfaced as structured errors with the traceback
 
+    @unit
+    Scenario: customer code cannot report an error the engine reserves
+      # "Timeout" and "RunnerError" are the engine's own error types; the engine
+      # decides those from the run's outcome, never from what the code reports.
+      Given a code node that throws an error it named "Timeout"
+      When the executor runs the request
+      Then the error type is "UserTimeout"
+      And the run is not reported as timed out
+
     @integration
     Scenario: ZeroDivisionError aborts the node and the workflow with the traceback intact
       Given a code node whose body computes 1/0
@@ -274,6 +283,15 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       Then the run fails with a runner error naming the limit and no outputs
 
   Rule: A wasm run's files, host calls and memory are bounded
+
+    @unit
+    Scenario: a request's size is known before it is encoded
+      # Escaping can grow a string sixfold, so the engine measures the encoded
+      # request by walking its values and refuses it before allocating it.
+      Given a code node whose input is 4 MiB of "<" characters
+      When the executor runs the request on the wasm runtime
+      Then it is refused for exceeding the 16 MiB limit
+      And the engine never allocated the encoded request
 
     # /work is held in engine memory with no links, so no path a guest builds
     # resolves on the host; host calls and concurrent runs have budgets too.

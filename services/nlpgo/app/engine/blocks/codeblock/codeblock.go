@@ -569,12 +569,12 @@ func (e *Executor) executeWasm(runCtx context.Context, guest *wasmGuest, req Req
 	if failure != nil {
 		return &Result{Error: failure, DurationMS: time.Since(started).Milliseconds()}, nil
 	}
+	if !requestFits(req, maxWasmPayloadBytes) {
+		return &Result{Error: &Error{Type: RunnerErrorType, Message: fmt.Sprintf("the code block's code and inputs exceed the %d MiB limit", maxWasmPayloadBytes>>20)}}, nil
+	}
 	payload, err := marshalRequest(req)
 	if err != nil {
 		return nil, err
-	}
-	if len(payload) > maxWasmPayloadBytes {
-		return &Result{Error: &Error{Type: RunnerErrorType, Message: fmt.Sprintf("the code block's code and inputs exceed the %d MiB limit", maxWasmPayloadBytes>>20)}}, nil
 	}
 	admission.fit(e.wasm.runWeight, len(payload))
 	run := e.wasm.run(runCtx, guest, wasmRunRequest{
@@ -591,6 +591,14 @@ func (e *Executor) executeWasm(runCtx context.Context, guest *wasmGuest, req Req
 		outcome.err = fmt.Errorf("the interpreter exited with status %d", run.exitCode)
 	}
 	return stripped.remapResult(collectResult(run.result, outcome)), nil
+}
+
+// disownReservedType renames an error the run reported under a type only the
+// engine may give, so customer code cannot pose as a timeout or a runner fault.
+func disownReservedType(err *Error) {
+	if err != nil && (err.Type == TimeoutType || err.Type == RunnerErrorType) {
+		err.Type = "User" + err.Type
+	}
 }
 
 // collectResult turns what a run left behind into a Result: the runner's own
@@ -623,6 +631,7 @@ func collectResult(result runResult, outcome runOutcome) *Result {
 			Error      *Error         `json:"error"`
 		}
 		if err := json.Unmarshal(data, &parsed); err == nil {
+			disownReservedType(parsed.Error)
 			res := &Result{
 				Outputs:    parsed.Outputs,
 				Stdout:     parsed.Stdout,
