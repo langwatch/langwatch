@@ -3,6 +3,7 @@
   "findings": {
     "enterprise/modules/connect/process/src/services/contract-budget-store.service.ts|GatewayApi": 4,
     "enterprise/modules/enterprise-ops/process/src/services/license-registry-audit.service.ts|LicensingApi": 13,
+    "enterprise/modules/enterprise-ops/process/src/services/self-hosted-notice-audit.service.ts|LicensingApi": 5,
     "enterprise/modules/governance/process/src/features/identity/services/department.service.ts|OrganizationApi": 4,
     "enterprise/modules/governance/process/src/features/ingestion-source/services/ingestion-source-activity.service.ts|TraceApi": 8,
     "enterprise/modules/governance/process/src/features/personal/services/personal-ingestion-key.service.ts|ApiKeyApi": 5,

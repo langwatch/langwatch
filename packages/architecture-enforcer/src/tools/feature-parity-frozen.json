@@ -5943,6 +5943,11 @@
       "A suite never touches the developer's own data",
       "The same suites still run in CI"
     ],
+    "specs/ci/publish-ecr-images.feature": [
+      "Service images are published as an index under the commit tag",
+      "Lambda images are published as a single manifest",
+      "A failed Lambda build does not hold back the service images"
+    ],
     "specs/claude/agent-admission-gate.feature": [
       "The gate answers within its own budget",
       "A rewrapped run is admitted once, not twice",
