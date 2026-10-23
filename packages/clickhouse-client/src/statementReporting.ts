@@ -121,6 +121,7 @@ function skipLiteralOrComment({
 }): { replacement: string; next: number } | null {
   const ch = query[i];
   if (ch === "'") return { replacement: "?", next: endOfQuoted({ query, i: i + 1, quote: "'" }) };
+  if (ch === "$") return heredocAt({ query, i });
   if (ch === '"' || ch === "`") {
     const next = endOfQuoted({ query, i: i + 1, quote: ch });
     return { replacement: query.slice(i, next), next };
@@ -136,6 +137,25 @@ function skipLiteralOrComment({
   }
 
   return null;
+}
+
+/** The opening tag of a ClickHouse heredoc string literal, `$$` or `$tag$`. */
+const HEREDOC_TAG = /\$[A-Za-z_]\w*\$|\$\$/y;
+
+/** A heredoc literal starting at `i`, read whole so a `--` inside it is no comment; else null. */
+function heredocAt({
+  query,
+  i,
+}: {
+  query: string;
+  i: number;
+}): { replacement: string; next: number } | null {
+  HEREDOC_TAG.lastIndex = i;
+  const tag = HEREDOC_TAG.exec(query)?.[0];
+  if (tag === undefined) return null;
+  const end = query.indexOf(tag, i + tag.length);
+
+  return { replacement: "?", next: end === -1 ? query.length : end + tag.length };
 }
 
 /** The index just past the `quote` closing a run starting at `i`; a doubled quote stays in. */

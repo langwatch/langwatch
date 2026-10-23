@@ -229,6 +229,26 @@ describe("StatementReporter", () => {
       expect(outcomeLogger.lines.filter((line) => line.level === "warn")).toHaveLength(2);
     });
 
+    /** @scenario "A cold scan warns once per query shape per hour" */
+    it("reads a heredoc as one literal, so a comment marker inside it hides nothing", () => {
+      const outcomeLogger = recordingSink();
+      const reporter = coldScanning(outcomeLogger, () => 0);
+
+      for (const [body, column] of [
+        ["$tag$-- note$tag$", "a"],
+        ["$tag$-- note$tag$", "b"],
+        ["$tag$-- other$tag$", "a"],
+      ]) {
+        reporter.success({
+          operation: "query",
+          durationMs: 5,
+          params: { query: `SELECT * FROM evaluation_runs WHERE body = ${body} AND ${column} = 1` },
+        });
+      }
+
+      expect(outcomeLogger.lines.filter((line) => line.level === "warn")).toHaveLength(2);
+    });
+
     it("reads an unterminated literal without stalling", () => {
       const outcomeLogger = recordingSink();
       const reporter = coldScanning(outcomeLogger, () => 0);
