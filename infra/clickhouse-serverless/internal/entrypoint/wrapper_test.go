@@ -8,11 +8,19 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // runWrapper runs the wrapper with args and env, returning the environment
 // and arguments the official entrypoint would have been handed.
 func runWrapper(t *testing.T, initdbFiles []string, env map[string]string, args ...string) (map[string]string, string) {
+	t.Helper()
+	got, argv, _ := runWrapperOut(t, initdbFiles, env, args...)
+	return got, argv
+}
+
+// runWrapperOut also returns the stem the stubs write their records under.
+func runWrapperOut(t *testing.T, initdbFiles []string, env map[string]string, args ...string) (map[string]string, string, string) {
 	t.Helper()
 	dir := t.TempDir()
 	initdb := filepath.Join(dir, "initdb")
@@ -28,13 +36,14 @@ func runWrapper(t *testing.T, initdbFiles []string, env map[string]string, args 
 	if err := os.Mkdir(bin, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	chConfig := "#!/usr/bin/env bash\nexit 0\n"
+	out := filepath.Join(dir, "out")
+	// As the embedded sidecar, record its env and stop the restart loop.
+	chConfig := "#!/usr/bin/env bash\nif [ \"$1\" = sidecar ]; then env > " + out + ".sidecar; kill $PPID; exit 0; fi\nexit 0\n"
 	if pw := env["TEST_BOOTSTRAP_PASSWORD"]; pw != "" {
 		// Stands in for `ch-config generate` in dynamic-only mode.
-		chConfig = "#!/usr/bin/env bash\nmkdir -p " + filepath.Join(dir, "bootstrap") + " && echo " + pw + " > " + filepath.Join(dir, "bootstrap", "password") + "\n"
+		chConfig = "#!/usr/bin/env bash\nif [ \"$1\" = sidecar ]; then env > " + out + ".sidecar; kill $PPID; exit 0; fi\nmkdir -p " + filepath.Join(dir, "bootstrap") + " && echo " + pw + " > " + filepath.Join(dir, "bootstrap", "password") + "\n"
 	}
 	writeExec(t, filepath.Join(bin, "ch-config"), chConfig)
-	out := filepath.Join(dir, "out")
 	official := filepath.Join(dir, "entrypoint.sh")
 	writeExec(t, official, "#!/usr/bin/env bash\nenv > "+out+".env\necho \"$*\" > "+out+".args\n")
 
@@ -72,7 +81,26 @@ func runWrapper(t *testing.T, initdbFiles []string, env map[string]string, args 
 	if err != nil {
 		t.Fatal(err)
 	}
-	return got, strings.TrimSpace(string(argv))
+	return got, strings.TrimSpace(string(argv)), out
+}
+
+// sidecarEnv waits for the embedded sidecar's environment, if it started.
+func sidecarEnv(t *testing.T, out string) (map[string]string, bool) {
+	t.Helper()
+	path := out + ".sidecar"
+	for i := 0; i < 50; i++ {
+		if raw, err := os.ReadFile(path); err == nil && len(raw) > 0 {
+			got := map[string]string{}
+			for _, line := range strings.Split(string(raw), "\n") {
+				if k, v, ok := strings.Cut(line, "="); ok {
+					got[k] = v
+				}
+			}
+			return got, true
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	return nil, false
 }
 
 func writeExec(t *testing.T, path, content string) {
@@ -168,4 +196,31 @@ func TestWrapper_DynamicOnlyInitdbUsesTheLocalAdmin(t *testing.T) {
 			t.Error("CLICKHOUSE_USER set without initdb")
 		}
 	})
+}
+
+// @scenario "The image runs the backup sidecar in-process when asked, logging in from a file"
+func TestWrapper_EmbeddedBackupSidecar(t *testing.T) {
+	pw := passwordFile(t, "file-pw\n")
+	_, _, out := runWrapperOut(t, nil, map[string]string{
+		"BACKUP_SIDECAR": "run", "CLICKHOUSE_PASSWORD": "env-pw", "CLICKHOUSE_PASSWORD_FILE": pw,
+		"CLICKHOUSE_ACCESS_FILE": "/etc/access.yaml", "CLICKHOUSE_ACCESS_SIDECAR": "external",
+	})
+	env, ok := sidecarEnv(t, out)
+	if !ok {
+		t.Fatal("BACKUP_SIDECAR=run started no embedded sidecar")
+	}
+	if env["BACKUP_PASSWORD_FILE"] != pw {
+		t.Errorf("BACKUP_PASSWORD_FILE = %q, want the password file %q", env["BACKUP_PASSWORD_FILE"], pw)
+	}
+	if _, set := env["CLICKHOUSE_PASSWORD"]; set {
+		t.Error("the sidecar must never get a password from the environment")
+	}
+	if _, set := env["CLICKHOUSE_ACCESS_FILE"]; set {
+		t.Error("an external access sidecar must not run here as well")
+	}
+
+	_, _, out = runWrapperOut(t, nil, map[string]string{"CLICKHOUSE_PASSWORD": "pw"})
+	if _, ok := sidecarEnv(t, out); ok {
+		t.Error("a sidecar started without an access file or BACKUP_SIDECAR")
+	}
 }
