@@ -144,7 +144,11 @@ export function CodeBlockEditor({
   );
 }
 
-const PREVIEW_EXTENSIONS: Record<string, string> = { python: "py", javascript: "mjs" };
+const PREVIEW_EXTENSIONS: Record<string, string> = {
+  python: "py",
+  javascript: "mjs",
+  typescript: "ts",
+};
 
 function previewFileName({ language }: { language: string }) {
   return `code.${PREVIEW_EXTENSIONS[language] ?? language}`;

@@ -28,7 +28,7 @@ const snakeCaseToPascalCase = (value: string) =>
     .filter(Boolean)
     .map((part) => part[0]!.toUpperCase() + part.slice(1))
     .join("");
-import { codeLanguageOf } from "../model/code-language.ts";
+import { codeLanguageOf, isEcmaScript } from "../model/code-language.ts";
 import { rewriteCodeSignature, rewriteJavaScriptSignature } from "../model/code-signature.ts";
 import {
   GATE_FIELD,
@@ -321,7 +321,7 @@ export const updateCodeClassName = (
   newId: string,
 ): Field[] => {
   // A JavaScript entrypoint is an export, not a class named after the node.
-  if (codeLanguageOf({ parameters }) === "javascript") return parameters;
+  if (isEcmaScript({ language: codeLanguageOf({ parameters }) })) return parameters;
   return parameters.map((p) =>
     p.identifier === "code"
       ? {
@@ -345,7 +345,7 @@ export const updateInputFields = (parameters: Field[], inputs: Field[]) => {
     return parameters;
   }
 
-  const javascript = codeLanguageOf({ parameters }) === "javascript";
+  const javascript = isEcmaScript({ language: codeLanguageOf({ parameters }) });
   const rewrite = (code: string) =>
     javascript ? rewriteJavaScriptSignature({ code, inputs }) : rewriteCodeSignature(code, inputs);
   return parameters.map((p) =>
@@ -380,7 +380,7 @@ export const updateOutputFields = (
     return parameters;
   }
 
-  const javascript = codeLanguageOf({ parameters }) === "javascript";
+  const javascript = isEcmaScript({ language: codeLanguageOf({ parameters }) });
   return parameters.map((p) => {
     if (p.identifier === "code") {
       let code = p.value as string;

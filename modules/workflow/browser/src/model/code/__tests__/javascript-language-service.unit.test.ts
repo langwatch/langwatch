@@ -9,34 +9,41 @@ import {
 type CompilerOptions = MonacoApi.typescript.CompilerOptions;
 type DiagnosticsOptions = MonacoApi.typescript.DiagnosticsOptions;
 
-function fakeMonaco() {
+function fakeDefaults() {
   const libs = new Map<string, string>();
   let compilerOptions: CompilerOptions = { lib: ["dom"] };
   let diagnosticsOptions: DiagnosticsOptions = { noSemanticValidation: true };
+  return {
+    libs,
+    compilerOptions: () => compilerOptions,
+    diagnosticsOptions: () => diagnosticsOptions,
+    defaults: {
+      getCompilerOptions: () => compilerOptions,
+      setCompilerOptions: (next: CompilerOptions) => (compilerOptions = next),
+      getDiagnosticsOptions: () => diagnosticsOptions,
+      setDiagnosticsOptions: (next: DiagnosticsOptions) => (diagnosticsOptions = next),
+      addExtraLib: (text: string, uri = "") => {
+        libs.set(uri, text);
+        return { dispose: () => libs.delete(uri) };
+      },
+    },
+  };
+}
+
+function fakeMonaco() {
+  const javascript = fakeDefaults();
+  const typescript = fakeDefaults();
   const monaco: JavaScriptMonaco = {
     languages: {
       typescript: {
-        javascriptDefaults: {
-          getCompilerOptions: () => compilerOptions,
-          setCompilerOptions: (next) => (compilerOptions = next),
-          getDiagnosticsOptions: () => diagnosticsOptions,
-          setDiagnosticsOptions: (next) => (diagnosticsOptions = next),
-          addExtraLib: (text, uri = "") => {
-            libs.set(uri, text);
-            return { dispose: () => libs.delete(uri) };
-          },
-        },
+        javascriptDefaults: javascript.defaults,
+        typescriptDefaults: typescript.defaults,
         ModuleKind: { ESNext: 99 },
         ScriptTarget: { ESNext: 99 },
       },
     },
   };
-  return {
-    monaco,
-    libs,
-    compilerOptions: () => compilerOptions,
-    diagnosticsOptions: () => diagnosticsOptions,
-  };
+  return { ...javascript, monaco, typescript };
 }
 
 const contract = {
@@ -74,6 +81,34 @@ describe("registerJavaScriptLanguageService", () => {
 
       expect(fake.libs.size).toBe(1);
       expect([...fake.libs.values()][0]).toContain("readonly TOKEN: string;");
+    });
+  });
+
+  describe("when a TypeScript editor opens", () => {
+    /**
+     * @scenario "TypeScript is checked against the node's contract as you write"
+     */
+    it("checks it in the TypeScript worker with the node's globals, leaving JavaScript alone", () => {
+      const fake = fakeMonaco();
+      const handle = registerJavaScriptLanguageService({
+        monaco: fake.monaco,
+        contract,
+        flavour: "typescript",
+      });
+
+      expect(fake.typescript.compilerOptions()).toMatchObject({ lib: ["es2023"] });
+      expect(fake.typescript.diagnosticsOptions()).toEqual({
+        noSemanticValidation: false,
+        noSyntaxValidation: false,
+      });
+      expect([...fake.typescript.libs.values()][0]).toContain("readonly TOKEN: string;");
+      expect(fake.libs.size).toBe(0);
+      expect(fake.compilerOptions()).toEqual({ lib: ["dom"] });
+
+      handle.dispose();
+
+      expect(fake.typescript.libs.size).toBe(0);
+      expect(fake.typescript.compilerOptions()).toEqual({ lib: ["dom"] });
     });
   });
 

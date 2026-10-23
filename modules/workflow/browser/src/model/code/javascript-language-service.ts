@@ -4,16 +4,19 @@ import { buildJavaScriptRuntimeDts, type JavaScriptField } from "./javascript-ru
 
 type Defaults = MonacoApi.typescript.LanguageServiceDefaults;
 
+type DrivenDefaults = Pick<
+  Defaults,
+  | "getCompilerOptions"
+  | "setCompilerOptions"
+  | "getDiagnosticsOptions"
+  | "setDiagnosticsOptions"
+  | "addExtraLib"
+>;
+
 /** The part of Monaco's TypeScript API this service drives. */
 export interface TypeScriptSlice {
-  javascriptDefaults: Pick<
-    Defaults,
-    | "getCompilerOptions"
-    | "setCompilerOptions"
-    | "getDiagnosticsOptions"
-    | "setDiagnosticsOptions"
-    | "addExtraLib"
-  >;
+  javascriptDefaults: DrivenDefaults;
+  typescriptDefaults: DrivenDefaults;
   ModuleKind: { readonly ESNext: number };
   ScriptTarget: { readonly ESNext: number };
 }
@@ -67,20 +70,24 @@ export function codeBlockCompilerOptions({
 }
 
 /**
- * Points Monaco's JavaScript worker at the code-block runtime: ES2023 without DOM, checkJs,
- * and this node's globals. The defaults are page-wide, so dispose puts the previous
- * options back and removes the lib, keeping other JavaScript editors untouched.
+ * Points Monaco's JavaScript or TypeScript worker at the code-block runtime: ES2023 without
+ * DOM, checked, and this node's globals. The defaults are page-wide, so dispose puts the
+ * previous options back and removes the lib, keeping other editors untouched.
  */
 export function registerJavaScriptLanguageService({
   monaco,
   contract,
+  flavour = "javascript",
 }: {
   monaco: JavaScriptMonaco;
   contract: JavaScriptContract;
+  flavour?: "javascript" | "typescript";
 }): JavaScriptLanguageServiceHandle {
   const typescript = typescriptOf({ monaco });
   if (!typescript) return { setContract: () => undefined, dispose: () => undefined };
-  const { javascriptDefaults: defaults, ModuleKind, ScriptTarget } = typescript;
+  const { ModuleKind, ScriptTarget } = typescript;
+  const defaults =
+    flavour === "typescript" ? typescript.typescriptDefaults : typescript.javascriptDefaults;
   const previousCompilerOptions = defaults.getCompilerOptions();
   const previousDiagnosticsOptions = defaults.getDiagnosticsOptions();
   defaults.setCompilerOptions(codeBlockCompilerOptions({ enums: { ModuleKind, ScriptTarget } }));

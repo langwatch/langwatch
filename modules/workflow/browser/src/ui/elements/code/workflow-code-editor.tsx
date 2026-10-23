@@ -84,7 +84,7 @@ export function WorkflowCodeEditorModal({
   setCode: (code: string) => void;
   open: boolean;
   onClose: () => void;
-  /** The code node's language; absent or anything but "javascript" edits as Python. */
+  /** The code node's language; absent or unknown edits as Python. */
   language?: string;
   /** Stable id used to persist cursor/scroll state across modal opens. */
   viewStateKey?: string;
@@ -558,8 +558,12 @@ export function WorkflowCodeEditor({
           providersRef.current = null;
           if (language === "python") {
             providersRef.current = registerPythonProviders({ monaco, contract });
-          } else if (language === "javascript") {
-            providersRef.current = registerJavaScriptLanguageService({ monaco, contract });
+          } else if (language === "javascript" || language === "typescript") {
+            providersRef.current = registerJavaScriptLanguageService({
+              monaco,
+              contract,
+              flavour: language,
+            });
           }
 
           // React Flow's `panActivationKeyCode` defaults to `Space`, so it

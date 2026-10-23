@@ -3,6 +3,7 @@ import { typescript as ts } from "monaco-editor/esm/vs/language/typescript/lib/t
 import { describe, expect, it } from "vitest";
 
 import { MODULES } from "../../studio-registry.ts";
+import { codeTemplate } from "../code-templates.ts";
 import { codeBlockCompilerOptions } from "../javascript-language-service.ts";
 import { buildJavaScriptRuntimeDts, tsTypeFor } from "../javascript-runtime-types.ts";
 
@@ -23,7 +24,7 @@ const RUNTIME_URI = "file:///langwatch/code-block-runtime-0.d.ts";
 const libText = (name: string) => libFileMap[name] ?? libFileMap[`lib.${name}.d.ts`];
 
 /** Monaco's own TypeScript over one code block, hosted the way its JS worker hosts it. */
-function serviceFor({ code }: { code: string }) {
+function serviceFor({ code, typescript = false }: { code: string; typescript?: boolean }) {
   const files = new Map([
     [CODE_URI, code],
     [RUNTIME_URI, buildJavaScriptRuntimeDts(contract)],
@@ -37,7 +38,8 @@ function serviceFor({ code }: { code: string }) {
       const text = read(name);
       return text === undefined ? undefined : ts.ScriptSnapshot.fromString(text);
     },
-    getScriptKind: (name) => (name === CODE_URI ? ts.ScriptKind.JS : ts.ScriptKind.TS),
+    getScriptKind: (name) =>
+      name === CODE_URI && !typescript ? ts.ScriptKind.JS : ts.ScriptKind.TS,
     getCurrentDirectory: () => "",
     getDefaultLibFileName: () => "lib.es2023.d.ts",
     fileExists: (name) => read(name) !== undefined,
@@ -46,8 +48,14 @@ function serviceFor({ code }: { code: string }) {
   return service;
 }
 
-function diagnosticsFor({ code }: { code: string }): string[] {
-  const service = serviceFor({ code });
+function diagnosticsFor({
+  code,
+  typescript = false,
+}: {
+  code: string;
+  typescript?: boolean;
+}): string[] {
+  const service = serviceFor({ code, typescript });
   return [
     ...service.getSyntacticDiagnostics(CODE_URI),
     ...service.getSemanticDiagnostics(CODE_URI),
@@ -185,5 +193,20 @@ export default function () {
     expect(diagnostics).toContain("Cannot find name 'document'");
     expect(diagnostics).toContain("Property 'MISSING' does not exist");
     expect(diagnostics).toContain("Type 'number' is not assignable to type 'string'");
+  });
+});
+
+describe("a TypeScript code block checked against the runtime", () => {
+  /**
+   * @scenario "TypeScript is checked against the node's contract as you write"
+   */
+  it("type-checks the TypeScript template and flags a wrongly typed output", () => {
+    const template = codeTemplate({ language: "typescript", input: "question", output: "answer" });
+    expect(diagnosticsFor({ code: template, typescript: true })).toEqual([]);
+
+    const wrong = template.replace('answer: "Hello world!"', "answer: 42");
+    expect(diagnosticsFor({ code: wrong, typescript: true }).join("\n")).toMatch(
+      /number.*not assignable to.*string/,
+    );
   });
 });

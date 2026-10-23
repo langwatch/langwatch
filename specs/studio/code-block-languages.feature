@@ -1,4 +1,4 @@
-Feature: Studio code blocks in JavaScript and Python
+Feature: Studio code blocks in JavaScript, TypeScript and Python
   As a Studio user building workflows,
   I want new code nodes to start in JavaScript with a typed editor
   so that I get accurate completion and errors, while my existing Python nodes keep working.
@@ -91,6 +91,35 @@ Feature: Studio code blocks in JavaScript and Python
     Then the status bar shows "Code.py" and "Python"
     And the Python providers are registered
     And the JavaScript language service is not registered
+
+  # Choosing a language
+  # TypeScript runs as JavaScript once the engine erases its types; types are checked
+  # only in the editor, never at run time (ADR-183).
+
+  @integration
+  Scenario: The code node's panel offers JavaScript, TypeScript and Python
+    Given a code node is open in its panel
+    Then a language picker offers JavaScript, TypeScript and Python
+    And it shows the node's current language
+
+  @unit
+  Scenario: Switching an untouched code node's language swaps in that language's template
+    Given a code node that still holds its template
+    When the user picks another language
+    Then the node holds that language's template, named after its fields
+
+  @unit
+  Scenario: Switching a code node's language keeps the code the author wrote
+    Given a code node whose code the author changed
+    When the user picks another language
+    Then only the language changes, and the code is kept for the author to port
+
+  @unit
+  Scenario: TypeScript is checked against the node's contract as you write
+    When a TypeScript editor opens
+    Then the TypeScript worker checks ES2023 with the node's Inputs, Outputs, secrets and params
+    And a wrongly typed output is flagged
+    And the JavaScript worker is left as it was
 
   # What the JavaScript editor offers and checks
 

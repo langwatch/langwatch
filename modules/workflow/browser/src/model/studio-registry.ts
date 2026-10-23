@@ -12,6 +12,8 @@ import type {
   Signature,
 } from "@langwatch/workflow-contract";
 
+import { codeTemplate } from "./code/code-templates.ts";
+
 const defaults = {
   messages: [
     { role: "system", content: "You are a helpful assistant." },
@@ -77,7 +79,7 @@ const signature: Signature = {
 /** New code nodes are JavaScript; a node without `language` predates it and stays Python. */
 const code: Code = {
   name: "Code",
-  description: "JavaScript or Python code block",
+  description: "JavaScript, TypeScript or Python code block",
   parameters: [
     {
       identifier: "language",
@@ -87,16 +89,11 @@ const code: Code = {
     {
       identifier: "code",
       type: "code",
-      value: `/**
- * @param {Inputs} inputs
- * @returns {Promise<Outputs>}
- */
-export default async function ({ ${defaultInput?.identifier ?? "input"} }) {
-  // Your code goes here
-
-  return { ${defaultOutput?.identifier ?? "output"}: "Hello world!" };
-}
-`,
+      value: codeTemplate({
+        language: "javascript",
+        input: defaultInput?.identifier,
+        output: defaultOutput?.identifier,
+      }),
     },
   ],
   inputs: defaults.inputs.map((i) => ({

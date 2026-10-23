@@ -35,7 +35,7 @@ export const studioCodeReadPayloadSchema: StudioCodeReadPayloadSchema =
 const studioCodeReadResultSchemaDefinition = z.object({
   nodeId: z.string(),
   nodeName: z.string(),
-  language: z.enum(["python", "javascript"]),
+  language: z.enum(["python", "javascript", "typescript"]),
   /** The buffer as the editor holds it, unsaved edits included; empty when `codeTooLarge`. */
   code: z.string(),
   /** The buffer is too large to hand over; Langy says so rather than propose blind. */

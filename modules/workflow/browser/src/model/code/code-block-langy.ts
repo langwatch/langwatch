@@ -65,6 +65,7 @@ export type CodeEditorAssistant = {
 const LANGUAGE_LABEL: Record<CodeLanguage, string> = {
   python: "Python",
   javascript: "JavaScript",
+  typescript: "TypeScript",
 };
 
 /** The project's secrets as the editor may hand them on: by name, and nothing else. */

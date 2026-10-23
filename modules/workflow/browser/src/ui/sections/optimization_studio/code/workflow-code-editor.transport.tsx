@@ -6,6 +6,7 @@ import { useMemo } from "react";
 import { useOrganizationTeamProject } from "../../../../behavior/studio-host/use-organization-team-project.ts";
 import { useCodeEditorLangy } from "../../../../behavior/use-code-editor-langy.ts";
 import { workflowApi } from "../../../../behavior/workflow-api.ts";
+import { codeLanguageFrom } from "../../../../model/code-language.ts";
 import {
   type CodeBlockLangySubject,
   codeBlockSecretNames,
@@ -95,7 +96,7 @@ export function CodeEditorModal({ langySubject, ...props }: EditorModalProps) {
   const assistant = useCodeEditorLangy({
     subject: langySubject,
     open: props.open,
-    language: props.language === "javascript" ? "javascript" : "python",
+    language: codeLanguageFrom({ value: props.language }),
     savedCode: props.code,
     inputs: props.inputs ?? [],
     outputs: props.outputs ?? [],

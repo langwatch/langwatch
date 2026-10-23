@@ -20,7 +20,7 @@ A Studio code block runs a small function inside the workflow engine. The user e
    langwatch ui call studio.code.read --payload '{}'
    ```
 
-   The answer holds the `language` (`python` or `javascript`), the `code` as the editor holds it with the user's unsaved edits, the declared `inputs` and `outputs` with their types, the project's `secretNames`, the node's `lastError` and `hasUnsavedChanges`. Write against this answer, not against the buffer quoted in the question, which may be cut short.
+   The answer holds the `language` (`python`, `javascript` or `typescript`), the `code` as the editor holds it with the user's unsaved edits, the declared `inputs` and `outputs` with their types, the project's `secretNames`, the node's `lastError` and `hasUnsavedChanges`. Write against this answer, not against the buffer quoted in the question, which may be cut short.
 
 2. Propose the whole new code, with a summary of one or two sentences:
 
@@ -53,6 +53,18 @@ export default async function ({ question }) {
 ```
 
 Every declared output is a key of the returned object. The globals are `secrets` (the project's secrets, by name), `params` (the run's parameters), `fetch` with `Headers` and `Response`, `console`, `setTimeout`, `setInterval`, `clearTimeout`, `clearInterval`, `atob`, `btoa` and `queueMicrotask`. There is no npm and no `require` or `import` of packages: use the standard JavaScript built-ins and `fetch`.
+
+## TypeScript
+
+A TypeScript code block is the same ES module with types. The editor declares `Inputs` and `Outputs` from the node's fields, so annotate the entrypoint with them:
+
+```typescript
+export default async function ({ question }: Inputs): Promise<Outputs> {
+  return { answer: question.trim() };
+}
+```
+
+Types are erased before the code runs and are never checked at run time, so a type error does not stop a run; the editor shows it. Keep the code free of type errors anyway, since the user sees them.
 
 ## Python
 

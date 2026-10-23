@@ -1,6 +1,8 @@
+import { codeLanguageFrom } from "../code-language.ts";
+
 /** How the code editor presents one source language: Monaco mode, tab label, completion hints. */
 export interface CodeEditorLanguage {
-  monacoLanguage: "python" | "javascript";
+  monacoLanguage: "python" | "javascript" | "typescript";
   label: string;
   fileName: string;
   technologies: string[];
@@ -23,7 +25,17 @@ const JAVASCRIPT: CodeEditorLanguage = {
   tabSize: 2,
 };
 
-/** Anything other than "javascript" (including no language at all) edits as Python. */
+const TYPESCRIPT: CodeEditorLanguage = {
+  monacoLanguage: "typescript",
+  label: "TypeScript",
+  fileName: "code.ts",
+  technologies: ["typescript"],
+  tabSize: 2,
+};
+
+const EDITOR_LANGUAGES = { python: PYTHON, javascript: JAVASCRIPT, typescript: TYPESCRIPT };
+
+/** Anything other than JavaScript or TypeScript (including no language at all) edits as Python. */
 export function codeEditorLanguage({ language }: { language: string | undefined }) {
-  return language === "javascript" ? JAVASCRIPT : PYTHON;
+  return EDITOR_LANGUAGES[codeLanguageFrom({ value: language })];
 }
