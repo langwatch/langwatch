@@ -69,6 +69,7 @@ describe("enterprise ops installation", () => {
     expect(enterpriseOpsProcessModule.transports.map((transport) => transport.namespace)).toEqual([
       "licenseRegistry",
       "selfHostedInstances",
+      "selfHostedNotices",
     ]);
   });
 

@@ -110,6 +110,8 @@ const GLOBAL_MODELS = [
   "SignInAttemptLock",
   // One row per installation: which instance this is, with no tenant at all.
   "InstanceIdentity",
+  // Cloud's notices to every self-hosted install (self-hosted-notices.feature): no tenant at all.
+  "SelfHostedNotice",
   // A person's own browsers for Web Push, per-user like Passkey: read by the
   // person's id when a push goes to them, never by a tenant.
   "WebPushSubscription",
@@ -154,6 +156,8 @@ const RELATIONAL_PARENT_SCOPED = [
   "ConnectedStatement",
   // A self-hosted instance's reports, reached through the instance row.
   "SelfHostedInstanceReport",
+  // A self-hosted instance's upgrade diagnostics, reached through the instance row.
+  "SelfHostedInstanceDiagnostic",
 ] as const;
 
 /**

@@ -82,6 +82,37 @@ Feature: License registry
     Then the held copy is erased
 
   @unit
+  Scenario: The license list filters by status and by who the license is for
+    Given an active customer license, a revoked customer license and an active license issued to a langwatch.ai address
+    When an operator lists active customer licenses
+    Then only the active customer license is listed
+    When the operator lists revoked or expired licenses of any audience
+    Then only the revoked license is listed
+    When the operator lists internal licenses of any status
+    Then only the langwatch.ai license is listed
+    When the operator asks for every license
+    Then all three are listed
+
+  @unit
+  Scenario: Each license filter choice says how many licenses it would list
+    Given an active customer license, a revoked customer license and an active license issued to a langwatch.ai address
+    When an operator lists active customer licenses
+    Then the list says 1 is active and 1 is revoked or expired, among customer licenses
+    And it says 1 is a customer license and 1 is internal, among active licenses
+
+  @integration
+  Scenario: The console's license filters say what they hide
+    Given internal licenses that are all revoked or expired
+    When an operator opens the licenses page
+    Then it lists active customer licenses, with how many licenses each filter choice would list
+    And the empty list says the filters hide every license, not that the registry is empty
+    When the operator clears the filters
+    Then every license is listed
+    When the operator searches for something no license matches
+    Then the empty list says the search matched nothing
+    And while the next answer loads, the list says nothing about being empty
+
+  @unit
   Scenario: The instance admin organizations list does not carry license keys
     When an operator lists organizations in the instance admin
     Then no organization in the response includes its license key

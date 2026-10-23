@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import {
+  APP_PAGE_OPENED_EVENT_TYPE,
+  appPageOpenedEventDataSchema,
   SESSION_STARTED_EVENT_TYPE,
   sessionStartedEventDataSchema,
   SIGNED_UP_EVENT_TYPE,
@@ -7,6 +9,11 @@ import {
   SSO_AUTO_ADDED_EVENT_TYPE,
   ssoAutoAddedEventDataSchema,
 } from "@langwatch/auth-contract";
+import {
+  CODING_AGENT_SESSION_STORED_EVENT_TYPE,
+  type CodingAgentSessionStoredEventData,
+  codingAgentSessionStoredEventDataSchema,
+} from "@langwatch/coding-agent-contract";
 import {
   CHECKOUT_COMPLETED_EVENT_TYPE,
   checkoutCompletedEventDataSchema,
@@ -52,6 +59,8 @@ import {
 import {
   GUIDED_ONBOARDING_RECORDED_EVENT_TYPE,
   guidedOnboardingRecordedEventDataSchema,
+  ONBOARDING_VARIANT_ASSIGNED_EVENT_TYPE,
+  onboardingVariantAssignedEventDataSchema,
   onboardingVariantSchema,
 } from "@langwatch/onboarding-contract";
 import {
@@ -99,6 +108,7 @@ import {
 import { z } from "zod";
 
 import type { NurturingModule } from "../app/nurturing.app.ts";
+import { appOpenedSignals } from "../rules/nurturing-app-opened.rules.ts";
 import {
   checkoutCompletedSignal,
   evaluationRanSignal,
@@ -108,6 +118,7 @@ import {
   integrationMethodChosenSignal,
   inviteAcceptedSignal,
   membersInvitedSignal,
+  onboardingVariantAssignedSignal,
   projectActiveDaySignal,
   promptCreatedSignal,
   scenarioCreatedSignal,
@@ -123,6 +134,7 @@ import {
   userRegisteredSignal,
   workflowCreatedSignal,
 } from "../rules/nurturing-owner-signals.rules.ts";
+import { nurturingBatchLane } from "./nurturing-batch.subscriber.ts";
 import { nurturingSignalKey, RecordNurturingSignalCommand } from "./nurturing-signal.commands.ts";
 import {
   NURTURING_PIPELINE_NAME,
@@ -148,7 +160,7 @@ const mainEvaluationEventSchema = z.object({
   occurredAt: z.number().int().nonnegative(),
 });
 
-/** Main's job as the settled-evaluation fact evaluation records now, keyed by its project. */
+/** Main's job as the settled-evaluation fact evaluation records now, keyed by the evaluation. */
 export function mainEvaluationSyncAsLifecycleCompleted(stored: unknown): Record<string, unknown> {
   const { event, foldState } = mainEvaluationSyncJobSchema.parse(stored);
   const { tenantId, occurredAt } = mainEvaluationEventSchema.parse(event);
@@ -161,7 +173,7 @@ export function mainEvaluationSyncAsLifecycleCompleted(stored: unknown): Record<
   return {
     ...event,
     aggregateType: EVALUATION_LIFECYCLE_AGGREGATE_TYPE,
-    aggregateId: tenantId,
+    aggregateId: foldState.evaluationId,
     type: EVALUATION_LIFECYCLE_COMPLETED_EVENT_TYPE,
     data,
   };
@@ -213,29 +225,45 @@ export function buildNurturingPipeline(deps: {
     data: UsageReportReceivedEventData;
     eventId: string;
   }) => Promise<void>;
-  evaluationCompleted: (input: {
-    data: EvaluationLifecycleCompletedEventData;
-    aggregateId: string;
-  }) => Promise<NurturingSignal[]>;
-  simulationRunFinished: (input: {
-    data: SimulationRunFinishedEventData;
-    aggregateId: string;
-    tenantId: string;
-  }) => Promise<NurturingSignal[]>;
+  /** Counts a project's batch of settled evaluations and delivers one signal per organization. */
+  evaluationsCompleted: (input: {
+    evaluations: readonly EvaluationLifecycleCompletedEventData[];
+    deliver: (signal: NurturingSignal) => Promise<void>;
+  }) => Promise<void>;
+  /** Counts a project's batch of finished runs and delivers one signal per organization. */
+  simulationRunsFinished: (input: {
+    runs: readonly {
+      data: SimulationRunFinishedEventData;
+      aggregateId: string;
+      tenantId: string;
+    }[];
+    deliver: (signal: NurturingSignal) => Promise<void>;
+  }) => Promise<void>;
+  /** Decides the first session, agent types and active days from a project's stored sessions. */
+  codingSessionsStored: (input: {
+    sessions: readonly CodingAgentSessionStoredEventData[];
+    deliver: (signal: NurturingSignal) => Promise<void>;
+  }) => Promise<void>;
 }): NurturingPipeline {
+  const deliverSignal = (signal: NurturingSignal) =>
+    deps.deliver({ key: nurturingSignalKey(signal), signal });
+  /** Each signal once, in order: a batch can raise the same day's signal many times over. */
+  const deliverEach = async (signals: readonly NurturingSignal[]) => {
+    const byKey = new Map(signals.map((signal) => [nurturingSignalKey(signal), signal]));
+    for (const [key, signal] of byKey) await deps.deliver({ key, signal });
+  };
   /** The project's first application signal of the UTC day; delivery's claim drops the rest. */
-  const deliverActiveDay = ({
+  const activeDaySignal = ({
     onboardingVariant,
     ...input
   }: Omit<Parameters<typeof projectActiveDaySignal>[0], "onboardingVariant"> & {
     onboardingVariant?: string | null;
   }) => {
     const parsed = onboardingVariantSchema.safeParse(onboardingVariant);
-    const signal = projectActiveDaySignal({
+    return projectActiveDaySignal({
       ...input,
       onboardingVariant: parsed.success ? parsed.data : null,
     });
-    return deps.deliver({ key: nurturingSignalKey(signal), signal });
   };
   return (
     definePipeline({
@@ -253,7 +281,15 @@ export function buildNurturingPipeline(deps: {
         data: guidedOnboardingRecordedEventDataSchema,
         handle: (data, { aggregateId }) => {
           const signal = guidedOnboardingSignal({ data, aggregateId });
-          return deps.deliver({ key: nurturingSignalKey(signal), signal });
+          return deliverSignal(signal);
+        },
+      })
+      .withPeerSubscriber("onboardingVariantAssigned", {
+        eventType: ONBOARDING_VARIANT_ASSIGNED_EVENT_TYPE,
+        data: onboardingVariantAssignedEventDataSchema,
+        handle: (data, { aggregateId }) => {
+          const signal = onboardingVariantAssignedSignal({ data, aggregateId });
+          return deliverSignal(signal);
         },
       })
       .withPeerSubscriber("guidedOnboardingTurnFailed", {
@@ -269,28 +305,31 @@ export function buildNurturingPipeline(deps: {
       .withPeerSubscriber("experimentRan", {
         eventType: EXPERIMENT_RAN_EVENT_TYPE,
         data: experimentRanEventDataSchema,
-        handle: (data, { aggregateId }) => {
-          const signal = experimentRanSignal({ data, aggregateId });
-          return deps.deliver({ key: nurturingSignalKey(signal), signal });
+        handle: (data) => {
+          const signal = experimentRanSignal({ data });
+          return deliverSignal(signal);
         },
       })
       .withPeerSubscriber("evaluationRan", {
         eventType: EVALUATION_RAN_EVENT_TYPE,
         data: evaluationRanEventDataSchema,
-        handle: (data, { aggregateId }) => {
-          const signal = evaluationRanSignal({ data, aggregateId });
-          return deps.deliver({ key: nurturingSignalKey(signal), signal });
+        handle: (data) => {
+          const signal = evaluationRanSignal({ data });
+          return deliverSignal(signal);
         },
       })
-      .withPeerSubscriber("evaluationCompleted", {
-        eventType: EVALUATION_LIFECYCLE_COMPLETED_EVENT_TYPE,
-        data: evaluationLifecycleCompletedEventDataSchema,
-        handle: async (data, { aggregateId }) => {
-          for (const signal of await deps.evaluationCompleted({ data, aggregateId })) {
-            await deps.deliver({ key: nurturingSignalKey(signal), signal });
-          }
-        },
-      })
+      .withPeerSubscriber(
+        "evaluationCompleted",
+        nurturingBatchLane({
+          eventType: EVALUATION_LIFECYCLE_COMPLETED_EVENT_TYPE,
+          data: evaluationLifecycleCompletedEventDataSchema,
+          handleBatch: (items) =>
+            deps.evaluationsCompleted({
+              evaluations: items.map(({ data }) => data),
+              deliver: deliverSignal,
+            }),
+        }),
+      )
       .withPeerSubscriber("projectCreated", {
         eventType: PROJECT_CREATED_EVENT_TYPE,
         data: projectCreatedEventDataSchema,
@@ -301,7 +340,7 @@ export function buildNurturingPipeline(deps: {
         data: subscriptionChangedEventDataSchema,
         handle: (data, { aggregateId }) => {
           const signal = subscriptionChangedSignal({ data, aggregateId });
-          return deps.deliver({ key: nurturingSignalKey(signal), signal });
+          return deliverSignal(signal);
         },
       })
       .withPeerSubscriber("subscriptionStarted", {
@@ -309,7 +348,7 @@ export function buildNurturingPipeline(deps: {
         data: subscriptionStartedEventDataSchema,
         handle: (data, { aggregateId }) => {
           const signal = subscriptionStartedSignal({ data, aggregateId });
-          return deps.deliver({ key: nurturingSignalKey(signal), signal });
+          return deliverSignal(signal);
         },
       })
       .withPeerSubscriber("checkoutCompleted", {
@@ -317,7 +356,7 @@ export function buildNurturingPipeline(deps: {
         data: checkoutCompletedEventDataSchema,
         handle: (data, { aggregateId }) => {
           const signal = checkoutCompletedSignal({ data, aggregateId });
-          return deps.deliver({ key: nurturingSignalKey(signal), signal });
+          return deliverSignal(signal);
         },
       })
       .withPeerSubscriber("sessionStarted", {
@@ -325,7 +364,7 @@ export function buildNurturingPipeline(deps: {
         data: sessionStartedEventDataSchema,
         handle: (data, { aggregateId }) => {
           const signal = sessionStartedSignal({ data, aggregateId });
-          return deps.deliver({ key: nurturingSignalKey(signal), signal });
+          return deliverSignal(signal);
         },
       })
       .withPeerSubscriber("ssoAutoAdded", {
@@ -333,7 +372,7 @@ export function buildNurturingPipeline(deps: {
         data: ssoAutoAddedEventDataSchema,
         handle: (data, { aggregateId }) => {
           const signal = ssoAutoAddedSignal({ data, aggregateId });
-          return deps.deliver({ key: nurturingSignalKey(signal), signal });
+          return deliverSignal(signal);
         },
       })
       .withPeerSubscriber("organizationSignedUp", {
@@ -341,7 +380,7 @@ export function buildNurturingPipeline(deps: {
         data: organizationSignedUpEventDataSchema,
         handle: (data, { aggregateId }) => {
           const signal = signedUpSignal({ data, aggregateId });
-          return deps.deliver({ key: nurturingSignalKey(signal), signal });
+          return deliverSignal(signal);
         },
       })
       .withPeerSubscriber("userRegistered", {
@@ -349,7 +388,7 @@ export function buildNurturingPipeline(deps: {
         data: userLifecycleEventDataSchema,
         handle: (data) => {
           const signal = userRegisteredSignal({ data });
-          return deps.deliver({ key: nurturingSignalKey(signal), signal });
+          return deliverSignal(signal);
         },
       })
       // Identify only (round 35): a seeded fact names an account older than the fact, never sent.
@@ -359,7 +398,7 @@ export function buildNurturingPipeline(deps: {
         handle: async (data) => {
           if (data.backfilled) return;
           const signal = userCreatedSignal({ data });
-          await deps.deliver({ key: nurturingSignalKey(signal), signal });
+          await deliverSignal(signal);
         },
       })
       .withPeerSubscriber("authSignedUp", {
@@ -367,7 +406,7 @@ export function buildNurturingPipeline(deps: {
         data: signedUpEventDataSchema,
         handle: (data) => {
           const signal = userRegisteredSignal({ data });
-          return deps.deliver({ key: nurturingSignalKey(signal), signal });
+          return deliverSignal(signal);
         },
       })
       .withPeerSubscriber("membersInvited", {
@@ -375,7 +414,7 @@ export function buildNurturingPipeline(deps: {
         data: membersInvitedEventDataSchema,
         handle: (data, { aggregateId }) => {
           const signal = membersInvitedSignal({ data, aggregateId });
-          return deps.deliver({ key: nurturingSignalKey(signal), signal });
+          return deliverSignal(signal);
         },
       })
       .withPeerSubscriber("inviteAccepted", {
@@ -383,7 +422,7 @@ export function buildNurturingPipeline(deps: {
         data: inviteAcceptedEventDataSchema,
         handle: (data, { aggregateId }) => {
           const signal = inviteAcceptedSignal({ data, aggregateId });
-          return deps.deliver({ key: nurturingSignalKey(signal), signal });
+          return deliverSignal(signal);
         },
       })
       .withPeerSubscriber("integrationMethodChosen", {
@@ -391,7 +430,7 @@ export function buildNurturingPipeline(deps: {
         data: integrationMethodChosenEventDataSchema,
         handle: (data, { aggregateId }) => {
           const signal = integrationMethodChosenSignal({ data, aggregateId });
-          return deps.deliver({ key: nurturingSignalKey(signal), signal });
+          return deliverSignal(signal);
         },
       })
       .withPeerSubscriber("promptCreated", {
@@ -399,7 +438,7 @@ export function buildNurturingPipeline(deps: {
         data: promptCreatedEventDataSchema,
         handle: (data, context) => {
           const signal = promptCreatedSignal({ data, ...context });
-          return deps.deliver({ key: nurturingSignalKey(signal), signal });
+          return deliverSignal(signal);
         },
       })
       .withPeerSubscriber("workflowCreated", {
@@ -407,7 +446,7 @@ export function buildNurturingPipeline(deps: {
         data: workflowCreatedEventDataSchema,
         handle: (data, context) => {
           const signal = workflowCreatedSignal({ data, ...context });
-          return deps.deliver({ key: nurturingSignalKey(signal), signal });
+          return deliverSignal(signal);
         },
       })
       .withPeerSubscriber("scenarioCreated", {
@@ -415,7 +454,7 @@ export function buildNurturingPipeline(deps: {
         data: scenarioCreatedEventDataSchema,
         handle: (data, context) => {
           const signal = scenarioCreatedSignal({ data, ...context });
-          return deps.deliver({ key: nurturingSignalKey(signal), signal });
+          return deliverSignal(signal);
         },
       })
       .withPeerSubscriber("scenarioRunSucceeded", {
@@ -423,39 +462,71 @@ export function buildNurturingPipeline(deps: {
         data: simulationRunFinishedEventDataSchema,
         handle: async (data, context) => {
           for (const signal of scenarioRunSucceededSignal({ data, ...context })) {
-            await deps.deliver({ key: nurturingSignalKey(signal), signal });
+            await deliverSignal(signal);
           }
           for (const signal of scenarioRunActiveDaySignal({ data, ...context })) {
-            await deps.deliver({ key: nurturingSignalKey(signal), signal });
+            await deliverSignal(signal);
           }
         },
       })
-      .withPeerSubscriber("simulationRunFinished", {
-        eventType: SIMULATION_RUN_EVENT_TYPES.FINISHED,
-        data: simulationRunFinishedEventDataSchema,
-        handle: async (data, context) => {
-          for (const signal of await deps.simulationRunFinished({ data, ...context })) {
-            await deps.deliver({ key: nurturingSignalKey(signal), signal });
-          }
-        },
-      })
+      .withPeerSubscriber(
+        "simulationRunFinished",
+        nurturingBatchLane({
+          eventType: SIMULATION_RUN_EVENT_TYPES.FINISHED,
+          data: simulationRunFinishedEventDataSchema,
+          handleBatch: (items) =>
+            deps.simulationRunsFinished({
+              runs: items.map(({ data, context }) => ({
+                data,
+                aggregateId: context.aggregateId,
+                tenantId: context.tenantId,
+              })),
+              deliver: deliverSignal,
+            }),
+        }),
+      )
       .withPeerSubscriber("firstTraceRecorded", {
         eventType: FIRST_TRACE_RECORDED_EVENT_TYPE,
         data: firstTraceRecordedEventDataSchema,
         handle: async (data, { aggregateId }) => {
           const signal = firstTraceRecordedSignal({ data, aggregateId });
-          await deps.deliver({ key: nurturingSignalKey(signal), signal });
-          await deliverActiveDay({ source: "trace", ...data });
+          await deliverSignal(signal);
+          const activeDay = activeDaySignal({ source: "trace", ...data });
+          await deliverSignal(activeDay);
         },
       })
-      .withPeerSubscriber("traceReceived", {
-        eventType: TRACE_RECEIVED_EVENT_TYPE,
-        data: traceReceivedEventDataSchema,
-        handle: async (data, { aggregateId }) => {
-          const signal = traceReceivedSignal({ data, aggregateId });
-          await deps.deliver({ key: nurturingSignalKey(signal), signal });
-          await deliverActiveDay({ source: "trace", ...data });
-        },
+      // One trace_received per batch, the latest: Customer.io debounces it per tenant anyway.
+      .withPeerSubscriber(
+        "traceReceived",
+        nurturingBatchLane({
+          eventType: TRACE_RECEIVED_EVENT_TYPE,
+          data: traceReceivedEventDataSchema,
+          handleBatch: async (items) => {
+            const datas = items.map(({ data }) => data);
+            const latest = datas.reduce((a, b) => (b.occurredAt > a.occurredAt ? b : a));
+            await deliverEach([
+              traceReceivedSignal({ data: latest }),
+              ...datas.map((data) => activeDaySignal({ source: "trace", ...data })),
+            ]);
+          },
+        }),
+      )
+      .withPeerSubscriber(
+        "codingAgentSessionStored",
+        nurturingBatchLane({
+          eventType: CODING_AGENT_SESSION_STORED_EVENT_TYPE,
+          data: codingAgentSessionStoredEventDataSchema,
+          handleBatch: (items) =>
+            deps.codingSessionsStored({
+              sessions: items.map(({ data }) => data),
+              deliver: deliverSignal,
+            }),
+        }),
+      )
+      .withPeerSubscriber("appPageOpened", {
+        eventType: APP_PAGE_OPENED_EVENT_TYPE,
+        data: appPageOpenedEventDataSchema,
+        handle: (data) => deliverEach(appOpenedSignals({ data })),
       })
       .withCommand("recordSignal", RecordNurturingSignalCommand)
       .withLaneAliases(MAIN_NURTURING_LANE_ALIASES)

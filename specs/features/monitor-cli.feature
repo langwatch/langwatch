@@ -21,6 +21,26 @@ Feature: Online Evaluation Monitor CLI Commands
     When I run "langwatch monitor get <monitor-id>"
     Then I see monitor details including name, type, mode, sample rate, and level
 
+  @unit
+  Scenario: Get a monitor by display name
+    Given my project has a monitor named "Toxicity Check" with slug "toxicity-check-x1y2z"
+    When I run "langwatch monitor get 'toxicity check'"
+    Then I see that monitor's details
+
+  @unit
+  Scenario: Get a monitor by a name nothing matches
+    Given my project has no monitor with id, slug or name "ghost"
+    When I run "langwatch monitor get ghost"
+    Then I see an error that the monitor was not found
+    And the error code is "monitor_not_found"
+
+  @unit
+  Scenario: Delete a monitor by display name is refused
+    Given my project has a monitor named "Toxicity Check"
+    When I run "langwatch monitor delete 'Toxicity Check'"
+    Then I see an error that no monitor has that id
+    And the error says to find its id with "langwatch monitor get <name>"
+
   Scenario: Create a monitor with default settings
     When I run "langwatch monitor create 'Toxicity Check' --check-type ragas/toxicity"
     Then a new monitor is created with ON_MESSAGE mode and 100% sampling

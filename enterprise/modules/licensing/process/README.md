@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The portable signed-license capability supplied to process peers.
 
-Peers call these through the token, declared at `../contract/src/licensing.api.ts:69`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/licensing.api.ts:84`; nothing else in this package is public.
 
 #### `resolve`
 
@@ -187,7 +187,7 @@ getIssuedLicense(input: { id: string }): Promise<IssuedLicenseView>;
 #### `listIssuedLicenses`
 
 ```typescript
-listIssuedLicenses(input: { page: number; pageSize: number; search?: string; }): Promise<IssuedLicensePage>;
+listIssuedLicenses(input: { page: number; pageSize: number; search?: string; } & IssuedLicenseFilters): Promise<IssuedLicensePage>;
 ```
 
 #### `resolveConnectCredential`
@@ -340,6 +340,14 @@ What a customer switched off in the usage report; an absent switch is left alone
 setUsageReportSwitches(input: { optionalMetricsOptOut?: boolean; hostnameOptOut?: boolean; }): Promise<void>;
 ```
 
+#### `setUpgradeDiagnosticsOptOut`
+
+Keeps the hourly check from sending a failed upgrade step's diagnostics by itself.
+
+```typescript
+setUpgradeDiagnosticsOptOut(input: { optOut: boolean }): Promise<void>;
+```
+
 #### `getContractTerms`
 
 What a customer's licenses add up to commercially, right now.
@@ -427,7 +435,7 @@ recordUsageReport(input: IncomingUsageReport): Promise<SelfHostedSignal[]>;
 #### `listSelfHostedInstances`
 
 ```typescript
-listSelfHostedInstances(input: { page: number; pageSize: number; search?: string; }): Promise<SelfHostedInstancePage>;
+listSelfHostedInstances(input: { page: number; pageSize: number; search?: string; } & SelfHostedInstanceFilters): Promise<SelfHostedInstancePage>;
 ```
 
 #### `getSelfHostedInstance`
@@ -484,20 +492,106 @@ listTestingLicenseTokens(input: { page: number; pageSize: number; }): Promise<Te
 revokeTestingLicenseToken(input: { id: string; operatorId: string; }): Promise<TestingLicenseTokenView>;
 ```
 
+#### `summarizeSelfHostedInstances`
+
+```typescript
+summarizeSelfHostedInstances(): Promise<SelfHostedInstanceSummary>;
+```
+
+#### `sendUpgradeDiagnostics`
+
+A failed upgrade step's diagnostics (dev/docs/plans/upgrade-diagnostics-via-connect.md). The install sends a bundle with its licence credential; Cloud keeps it 30 days.
+
+```typescript
+sendUpgradeDiagnostics(submission: UpgradeDiagnosticsSubmission): Promise<UpgradeDiagnosticsReceipt>;
+```
+
+#### `getUpgradeDiagnosticsAvailability`
+
+Whether this install can send one: Connect permitted and a licence that carries a token.
+
+```typescript
+getUpgradeDiagnosticsAvailability(): Promise<UpgradeDiagnosticsAvailability>;
+```
+
+#### `recordUpgradeDiagnostics`
+
+The licence host's intake, from the install its door verified; a refusal throws its code.
+
+```typescript
+recordUpgradeDiagnostics(input: { caller: ConnectLicenceCaller; submission: UpgradeDiagnosticsSubmission; }): Promise<UpgradeDiagnosticsReceipt>;
+```
+
+#### `findUpgradeDiagnostics`
+
+Every report one instance sent, newest first; empty for an instance that sent none.
+
+```typescript
+findUpgradeDiagnostics(input: { instanceRowId: string }): Promise<UpgradeDiagnosticsReport[]>;
+```
+
+#### `getUpgradeDiagnosticsDownload`
+
+A five-minute link to one report's bundle; an unknown id throws its code.
+
+```typescript
+getUpgradeDiagnosticsDownload(input: { id: string }): Promise<UpgradeDiagnosticsDownload>;
+```
+
+#### `findSelfHostedNotices`
+
+Notices LangWatch staff send self-hosted installs (self-hosted-notices.feature): written and published in Cloud admin, sent in the usage report reply while published and not expired. An unknown id throws `not_found`.
+
+```typescript
+findSelfHostedNotices(): Promise<SelfHostedNoticeView[]>;
+```
+
+#### `createSelfHostedNotice`
+
+```typescript
+createSelfHostedNotice(input: CreateSelfHostedNoticeInput): Promise<SelfHostedNoticeView>;
+```
+
+#### `updateSelfHostedNotice`
+
+```typescript
+updateSelfHostedNotice(input: UpdateSelfHostedNoticeInput): Promise<SelfHostedNoticeView>;
+```
+
+#### `publishSelfHostedNotice`
+
+```typescript
+publishSelfHostedNotice(input: { id: string; operatorId: string }): Promise<SelfHostedNoticeView>;
+```
+
+#### `withdrawSelfHostedNotice`
+
+```typescript
+withdrawSelfHostedNotice(input: { id: string }): Promise<SelfHostedNoticeView>;
+```
+
+#### `findPublishedSelfHostedNotices`
+
+What an install is sent now: published and not expired, the newest published first.
+
+```typescript
+findPublishedSelfHostedNotices(): Promise<SelfHostedNotice[]>;
+```
+
 ## REST transport
 
 ### `connectHostRest`
 
 |             |                                         |
 | ----------- | --------------------------------------- |
-| Declared at | `src/transport/connect-host.rest.ts:47` |
+| Declared at | `src/transport/connect-host.rest.ts:51` |
 | Base URL    | none: each route's path is its address  |
 | Addressing  | literal                                 |
 | Credential  | licence_token                           |
 
 #### `POST /api/connect/v1/license/sync` · `recordLicenseSync`
 
-Authenticated: a self-hosted install presents its license token or activation code as the bearer; the door verifies it and no permission names a licence holder. Credential `licence_token`. Hidden from the OpenAPI document. Declared at `src/transport/connect-host.rest.ts:53`.
+Authenticated: a self-hosted install presents its license token or activation code as the bearer; the door verifies it and no permission names a licence holder. Credential `licence_token`. Hidden from the OpenAPI document. Declared at `src/transport/connect-host.rest.ts:57`.
 
 Answers at `/api/connect/v1/license/sync`.
 
@@ -519,7 +613,7 @@ interface Response {
 
 #### `POST /api/connect/v1/license/activate` · `redeemActivationCode`
 
-Authenticated: a self-hosted install presents its license token or activation code as the bearer; the door verifies it and no permission names a licence holder. Credential `licence_token`. Hidden from the OpenAPI document. Declared at `src/transport/connect-host.rest.ts:63`.
+Authenticated: a self-hosted install presents its license token or activation code as the bearer; the door verifies it and no permission names a licence holder. Credential `licence_token`. Hidden from the OpenAPI document. Declared at `src/transport/connect-host.rest.ts:68`.
 
 Answers at `/api/connect/v1/license/activate`.
 
@@ -533,6 +627,21 @@ interface Response {
   maxMembers: number;
   expiresAt: string;
   services: string[];
+}
+```
+
+#### `POST /api/connect/v1/upgrade-diagnostics` · `recordUpgradeDiagnostics`
+
+Authenticated: a self-hosted install presents its license token or activation code as the bearer; the door verifies it and no permission names a licence holder. Credential `licence_token`. Hidden from the OpenAPI document. Declared at `src/transport/connect-host.rest.ts:79`.
+
+Answers at `/api/connect/v1/upgrade-diagnostics`.
+
+```typescript
+type Body = z.infer<typeof upgradeDiagnosticsSubmissionSchema>; // ../contract/src/upgrade-diagnostics.ts:22
+// Response: upgradeDiagnosticsReceiptSchema, ../contract/src/upgrade-diagnostics.ts:34
+interface Response {
+  reportId: string;
+  receivedAt: string;
 }
 ```
 
@@ -569,7 +678,7 @@ interface Response {
 
 #### `DELETE /testing-licenses/token` · `revokeOwnTestingLicenseToken`
 
-Platform permission `ops:manage`. Credential `testing_license_token`. Hidden from the OpenAPI document. Declared at `src/transport/testing-license.rest.ts:46`.
+Platform permission `ops:manage`. Credential `testing_license_token`. Hidden from the OpenAPI document. Declared at `src/transport/testing-license.rest.ts:47`.
 
 Answers at `/api/licensing/testing-licenses/token`, `/api/v1/licensing/testing-licenses/token`; also, undocumented, `/api/licensing/2026-08-07/testing-licenses/token`, `/api/v1/licensing/2026-08-07/testing-licenses/token`, `/api/licensing/latest/testing-licenses/token`, `/api/v1/licensing/latest/testing-licenses/token`.
 
@@ -758,18 +867,20 @@ Run by the tasks process, before serve.
 
 ## Configuration
 
-| Kind   | Leaf                     | Environment variable                 | Declared at                              |
-| ------ | ------------------------ | ------------------------------------ | ---------------------------------------- |
-| secret | `instanceLicenseKey`     | `LANGWATCH_LICENSE_KEY`              | `src/app/licensing.app.ts:164`           |
-| secret | `licensePrivateKey`      | `LANGWATCH_LICENSE_PRIVATE_KEY`      | `src/app/licensing.app.ts:165`           |
-| config | `publicKey`              | `LANGWATCH_LICENSE_PUBLIC_KEY`       | `../contract/src/licensing.config.ts:45` |
-| config | `connectDisabled`        | `LANGWATCH_CONNECT_DISABLED`         | `../contract/src/licensing.config.ts:53` |
-| config | `connectGatewayEndpoint` | `LANGWATCH_CONNECT_GATEWAY_ENDPOINT` | `../contract/src/licensing.config.ts:60` |
-| config | `connectLicenseEndpoint` | `LANGWATCH_CONNECT_LICENSE_ENDPOINT` | `../contract/src/licensing.config.ts:64` |
-| config | `connectInstanceId`      | `LANGWATCH_CONNECT_INSTANCE_ID`      | `../contract/src/licensing.config.ts:69` |
-| config | `isSaas`                 | `IS_SAAS`                            | `../contract/src/licensing.config.ts:77` |
-| config | `serviceVersion`         | `SERVICE_VERSION`                    | `../contract/src/licensing.config.ts:79` |
-| config | `otelResourceAttributes` | `OTEL_RESOURCE_ATTRIBUTES`           | `../contract/src/licensing.config.ts:80` |
-| config | `outboundProxy`          | `HTTPS_PROXY`                        | `../contract/src/licensing.config.ts:82` |
+| Kind   | Leaf                             | Environment variable                 | Declared at                              |
+| ------ | -------------------------------- | ------------------------------------ | ---------------------------------------- |
+| secret | `instanceLicenseKey`             | `LANGWATCH_LICENSE_KEY`              | `src/app/licensing.app.ts:185`           |
+| secret | `licensePrivateKey`              | `LANGWATCH_LICENSE_PRIVATE_KEY`      | `src/app/licensing.app.ts:186`           |
+| secret | `upgradeDiagnosticsSlackWebhook` | `SLACK_CHANNEL_UPGRADE_DIAGNOSTICS`  | `src/app/licensing.app.ts:187`           |
+| config | `publicKey`                      | `LANGWATCH_LICENSE_PUBLIC_KEY`       | `../contract/src/licensing.config.ts:46` |
+| config | `connectDisabled`                | `LANGWATCH_CONNECT_DISABLED`         | `../contract/src/licensing.config.ts:54` |
+| config | `connectGatewayEndpoint`         | `LANGWATCH_CONNECT_GATEWAY_ENDPOINT` | `../contract/src/licensing.config.ts:61` |
+| config | `connectLicenseEndpoint`         | `LANGWATCH_CONNECT_LICENSE_ENDPOINT` | `../contract/src/licensing.config.ts:65` |
+| config | `connectInstanceId`              | `LANGWATCH_CONNECT_INSTANCE_ID`      | `../contract/src/licensing.config.ts:70` |
+| config | `isSaas`                         | `IS_SAAS`                            | `../contract/src/licensing.config.ts:78` |
+| config | `serviceVersion`                 | `SERVICE_VERSION`                    | `../contract/src/licensing.config.ts:80` |
+| config | `otelResourceAttributes`         | `OTEL_RESOURCE_ATTRIBUTES`           | `../contract/src/licensing.config.ts:81` |
+| config | `outboundProxy`                  | `HTTPS_PROXY`                        | `../contract/src/licensing.config.ts:83` |
+| config | `publicBaseUrl`                  | `BASE_HOST`                          | `../contract/src/licensing.config.ts:85` |
 
 <!-- readme:generated:end -->

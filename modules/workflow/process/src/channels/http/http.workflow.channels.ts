@@ -1,8 +1,13 @@
 import { CloudWatchLogsClient } from "@aws-sdk/client-cloudwatch-logs";
 import { LambdaClient } from "@aws-sdk/client-lambda";
+import { fromTokenFile } from "@aws-sdk/credential-providers";
 import { createLogger } from "@langwatch/observability";
 import { nlpInternalSecret, type ScopedSecrets } from "@langwatch/secrets";
-import { nlpLambdaFleetFromSecret, type WorkflowServerConfig } from "@langwatch/workflow-contract";
+import {
+  nlpLambdaFleetFromSecret,
+  type NlpLambdaFleetCredentials,
+  type WorkflowServerConfig,
+} from "@langwatch/workflow-contract";
 
 import {
   buildStudioLambdaConfig,
@@ -30,6 +35,15 @@ const logger = createLogger("langwatch:workflows");
 
 /** Main's retry budget, enough to ride out a cold fleet's concurrency burst. */
 const NLP_LAMBDA_CLIENT_MAX_ATTEMPTS = 6;
+
+/** A web-identity role reads the pod's projected token (`AWS_WEB_IDENTITY_TOKEN_FILE`). */
+function fleetClientCredentials(credentials: NlpLambdaFleetCredentials) {
+  if (credentials.kind === "web-identity") {
+    return fromTokenFile({ roleArn: credentials.roleArn });
+  }
+
+  return { accessKeyId: credentials.accessKeyId, secretAccessKey: credentials.secretAccessKey };
+}
 
 /**
  * Main's precedence: a named fleet wins, and one that cannot be used refuses by
@@ -72,8 +86,7 @@ export class HttpWorkflowChannels {
       const lambdaConfig = buildStudioLambdaConfig({
         fields: {
           region: fields.AWS_REGION,
-          accessKeyId: fields.AWS_ACCESS_KEY_ID,
-          secretAccessKey: fields.AWS_SECRET_ACCESS_KEY,
+          credentials: fields.credentials,
           roleArn: fields.role_arn,
           imageUri: fields.image_uri,
           cacheBucket: fields.cache_bucket,
@@ -85,10 +98,7 @@ export class HttpWorkflowChannels {
         stagingThresholdBytesRawValue: config.stagingThresholdBytes,
         stagingTtlSecondsRawValue: config.stagingTtlSeconds,
       });
-      const credentials = {
-        accessKeyId: lambdaConfig.accessKeyId,
-        secretAccessKey: lambdaConfig.secretAccessKey,
-      };
+      const credentials = fleetClientCredentials(lambdaConfig.credentials);
       const lambda = new LambdaClient({
         region: lambdaConfig.region,
         credentials,

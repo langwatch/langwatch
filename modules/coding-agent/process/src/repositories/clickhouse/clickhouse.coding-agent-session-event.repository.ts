@@ -1,4 +1,4 @@
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { type ClickHouseQueryClient, type IdBoundOptions } from "@langwatch/clickhouse-client";
 import type {
   CodingAgentSessionEvent,
   CodingAgentSessionEventRecord,
@@ -32,6 +32,7 @@ interface SessionModelTotalsRow {
   cacheReadTokens: number;
   cacheCreationTokens: number;
   costUsd: number;
+  aiUnits: number;
 }
 
 /** The event kind that carries a model, its tokens and its cost. */
@@ -92,6 +93,7 @@ interface ClickHouseWriteRecord {
   ToolResultBytes: number;
   PromptChars: number;
   TotalTokens: number;
+  AiUnits: number;
   RepositoryHost: string;
   RepositoryOwner: string;
   RepositoryName: string;
@@ -242,12 +244,51 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
       { tenantId },
       "CodingAgentSessionEventsClickHouseRepository.findBySessionId",
     );
+    // A caller's range reads as it always did, never widening; with none, the id index bounds it.
+    const idBound: IdBoundOptions =
+      occurredAt === undefined
+        ? { fallback: "unbounded" }
+        : {
+            occurredAtHint: (occurredAt.fromMs + occurredAt.toMs) / 2,
+            windowMs: (occurredAt.toMs - occurredAt.fromMs) / 2,
+            fallback: "none",
+          };
+    const rows = await this.readSessionEvents({
+      tenantId,
+      sessionId,
+      kinds,
+      idBound,
+      cursor,
+      limit,
+    });
+
+    const events = rows.map((row) => CodingAgentSessionEventsClickHouseRepository.mapRow(row));
+    const last = events[events.length - 1];
+    return {
+      events,
+      nextCursor:
+        events.length === limit && last
+          ? { timeUnixMs: last.timeUnixMs, recordId: last.recordId }
+          : null,
+    };
+  }
+
+  private async readSessionEvents({
+    tenantId,
+    sessionId,
+    kinds,
+    idBound,
+    cursor,
+    limit,
+  }: {
+    tenantId: string;
+    sessionId: string;
+    kinds: string[] | undefined;
+    idBound: IdBoundOptions;
+    cursor: SessionEventsCursor | undefined;
+    limit: number;
+  }): Promise<ClickHouseReadRow[]> {
     const conditions = ["TenantId = {tenantId:String}", "SessionId = {sessionId:String}"];
-    if (occurredAt) {
-      conditions.push(
-        "TimeUnixMs BETWEEN fromUnixTimestamp64Milli({fromMs:Int64}) AND fromUnixTimestamp64Milli({toMs:Int64})",
-      );
-    }
     if (kinds && kinds.length > 0) {
       conditions.push("EventKind IN {kinds:Array(String)}");
     }
@@ -268,6 +309,7 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
         SELECT ${READ_COLUMNS}
         FROM ${TABLE_NAME}
         WHERE ${conditions.join(" AND ")}
+          {{idBound:coding_agent_session_events.SessionId:sessionId}}
         ORDER BY TimeUnixMs ASC, RecordId ASC, UpdatedAt DESC
         LIMIT 1 BY TimeUnixMs, RecordId
         LIMIT {limit:UInt32}
@@ -275,24 +317,14 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
       params: {
         tenantId,
         sessionId,
-        fromMs: occurredAt?.fromMs,
-        toMs: occurredAt?.toMs,
         kinds,
         cursorTimeMs: cursor?.timeUnixMs,
         cursorRecordId: cursor?.recordId,
         limit,
       },
+      idBound,
     });
-
-    const events = rows.map((row) => CodingAgentSessionEventsClickHouseRepository.mapRow(row));
-    const last = events[events.length - 1];
-    return {
-      events,
-      nextCursor:
-        events.length === limit && last
-          ? { timeUnixMs: last.timeUnixMs, recordId: last.recordId }
-          : null,
-    };
+    return rows;
   }
 
   async sumTokensByModelPerSession({
@@ -333,6 +365,7 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
       table: TABLE_NAME,
       kind: "read",
       tenantIds,
+      // ID_BOUND_SKIP: a page of sessions' totals, bounded from below by the caller's own time.
       sql: `
         SELECT
           TenantId,
@@ -346,7 +379,8 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
           sum(OutputTokens) AS OutputTokens,
           sum(CacheReadTokens) AS CacheReadTokens,
           sum(CacheCreationTokens) AS CacheCreationTokens,
-          sum(CostUsd) AS CostUsd
+          sum(CostUsd) AS CostUsd,
+          sum(AiUnits) AS AiUnits
         FROM (
           SELECT
             TenantId,
@@ -360,7 +394,8 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
             OutputTokens,
             CacheReadTokens,
             CacheCreationTokens,
-            CostUsd
+            CostUsd,
+            AiUnits
           FROM ${TABLE_NAME}
           WHERE TenantId IN ({tenantIds:Array(String)})
             AND TimeUnixMs >= fromUnixTimestamp64Milli({fromMs:Int64})
@@ -392,6 +427,7 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
       cacheReadTokens: Number(row.CacheReadTokens),
       cacheCreationTokens: Number(row.CacheCreationTokens),
       costUsd: Number(row.CostUsd),
+      aiUnits: Number(row.AiUnits),
     }));
   }
 
@@ -443,6 +479,7 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
       ToolResultBytes: record.toolResultBytes,
       PromptChars: record.promptChars,
       TotalTokens: record.totalTokens,
+      AiUnits: record.aiUnits,
       RepositoryHost: record.repositoryHost,
       RepositoryOwner: record.repositoryOwner,
       RepositoryName: record.repositoryName,
@@ -574,4 +611,5 @@ interface ClickHouseModelTotalsRow {
   CacheReadTokens: string;
   CacheCreationTokens: string;
   CostUsd: number;
+  AiUnits: number;
 }

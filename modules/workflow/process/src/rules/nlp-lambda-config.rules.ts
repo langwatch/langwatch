@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
 
+import type { NlpLambdaFleetCredentials } from "@langwatch/workflow-contract";
+
 /** Every per-project studio function is named for the project behind it. */
 export const NLP_LAMBDA_NAME_PREFIX = "langwatch_nlp-";
 
@@ -30,8 +32,7 @@ const STUDIO_STAGING_TTL_SECONDS_DEFAULT = 600;
 /** The account, image and network the studio's per-project engines live in. */
 export type StudioLambdaConfig = Readonly<{
   region: string;
-  accessKeyId: string;
-  secretAccessKey: string;
+  credentials: NlpLambdaFleetCredentials;
   roleArn: string;
   imageUri: string;
   cacheBucket: string;
@@ -117,8 +118,7 @@ export function buildStudioLambdaConfig(input: {
 
   return {
     region: fields.region,
-    accessKeyId: fields.accessKeyId,
-    secretAccessKey: fields.secretAccessKey,
+    credentials: fields.credentials,
     roleArn: fields.roleArn,
     imageUri: fields.imageUri,
     cacheBucket: fields.cacheBucket,

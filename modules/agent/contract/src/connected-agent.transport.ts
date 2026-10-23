@@ -9,10 +9,12 @@ import { z } from "zod";
 import {
   CALL_ENVELOPE_KEYS,
   type CallEnvelope,
+  type CallKind,
   callEnvelopeSchema,
   outputSchema,
   resultErrorSchema,
   sessionSchema,
+  stateSchema,
 } from "./connected-agent.protocol.ts";
 
 /** The value under `agent_call:v1:<callId>`. */
@@ -30,7 +32,7 @@ export type StoredCall = z.infer<typeof storedCallSchema>;
 
 /** What the gateway measured when it refused a payload above its cap. */
 const payloadViolationSchemaDefinition = z.object({
-  what: z.enum(["envelope", "result", "session"]),
+  what: z.enum(["envelope", "result", "session", "state"]),
   sizeBytes: z.number(),
   limitBytes: z.number(),
 });
@@ -55,6 +57,7 @@ const storedResultSchemaDefinition = z.object({
   instanceId: z.string(),
   output: outputSchema.optional(),
   session: sessionSchema,
+  state: stateSchema,
   error: storedResultErrorSchema.optional(),
   /** Set by the gateway when the socket closed before the instance answered. */
   disconnected: z.boolean().optional(),
@@ -97,9 +100,10 @@ export const instanceGoneSchema: InstanceGoneSchema = instanceGoneSchemaDefiniti
 export type InstanceGone = z.infer<typeof instanceGoneSchema>;
 
 /**
- * The envelope for one turn, holding the contract fields and nothing else.
+ * The envelope for one call, holding the contract fields and nothing else.
  */
 export function buildCallEnvelope(fields: {
+  kind?: CallKind;
   callId: string;
   agentId: string;
   threadId: string;
@@ -107,11 +111,13 @@ export function buildCallEnvelope(fields: {
   newMessages: CallEnvelope["newMessages"];
   params: CallEnvelope["params"];
   session: unknown;
+  state?: CallEnvelope["state"];
   traceparent: string | null;
   deadlineAt: number;
   run: CallEnvelope["run"];
 }): CallEnvelope {
   const envelope: CallEnvelope = {
+    kind: fields.kind ?? "turn",
     callId: fields.callId,
     agentId: fields.agentId,
     threadId: fields.threadId,
@@ -121,6 +127,7 @@ export function buildCallEnvelope(fields: {
     // Null rather than absent: the first turn of a thread has no session,
     // and the SDK reads the field on every call.
     session: fields.session ?? null,
+    state: fields.state ?? null,
     traceparent: fields.traceparent,
     deadlineAt: fields.deadlineAt,
     run: fields.run,

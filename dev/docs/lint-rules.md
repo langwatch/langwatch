@@ -509,9 +509,13 @@ Messages:
   - fix: Add the subject to the filename. Read the `process-module` skill.
   - why: The subject names what the file is about, so readers find it and the catalogue can check its owner.
 - `contractProcessArtifact`
-  - what: `{{name}}` is a process artifact: contract source holds none of `.api`, `.channel`, `.composition`, `.intent`, `.mapper`, `.migration`, `.process`, `.projection`, `.repository`, `.rules`, `.store`, `.subscriber`, `.task`.
+  - what: `{{name}}` is a process artifact: contract source holds none of `.api`, `.channel`, `.composition`, `.intent`, `.mapper`, `.migration`, `.process`, `.projection`, `.repository`, `.rules`, `.script`, `.store`, `.subscriber`, `.task`.
   - fix: Move it into `modules/{{feature}}/process/src/`: `.repository`, `.store` and `.mapper` under `repositories/`, `.channel` under `channels/`, `.projection`, `.subscriber`, `.process` and `.intent` under `eventing/`, `.rules` under `rules/`, `.task` under `tasks/`, `.migration` under `migrations/`, and any `.api` other than `{{feature}}.api.ts` as `transport/{{feature}}.<rest|trpc|ws>.ts`.
   - why: A contract is the module's public, runtime-neutral surface; a process artifact there leaks internals.
+- `frameworkPath`
+  - what: `{{path}}` has no home in the framework feature layout. Only this shape is allowed: the entry files the package.json `exports` names (`export ... from` lines only), app/<name>.app.ts, vocabulary/<name>.ts (or <name>.errors.ts, <name>.schemas.ts), rules/<name>.rules.ts, telemetry/<name>.metrics.ts, tasks/<name>.task.ts, repositories/ (interfaces and a tier folder beside them, Lua as repositories/redis/redis.<name>.script.ts), channels/ (interfaces and a tier folder beside them), features/<concern>/ holding that concern's services/<name>.service.ts, eventing/<name>.pipeline.ts and what it names, and its own vocabulary/, rules/, repositories/ and channels/ (one level, nothing else nests; no registry or bundle file).
+  - fix: Move `{{path}}` into the home its role names: a service to `features/<concern>/services/<name>.service.ts`, owned state to `repositories/<tier>/<tier>.<subject>.repository.ts`, a message to what the package does not own to `channels/<tier>/<tier>.<subject>.channel.ts`, a type, builder or error to `vocabulary/`. Read the `process-module` skill.
+  - why: An opted-in framework package nests like a process half, so each file's folder says what it is (ADR-181).
 - `processManagerService`
   - what: `{{path}}` is a process manager named as a service.
   - fix: Move it to `eventing/{{subject}}.process.ts`, beside the pipeline that names it.
@@ -692,10 +696,18 @@ Messages:
   - what: A service names {{crossed}} (`{{specifier}}`).
   - fix: Import the `channels/<subject>.channel.ts` interface instead and take the implementation from the module's channel registry.
   - why: A service works over channel interfaces; the channel registry chooses the tier.
+- `telemetryCrossing`
+  - what: A telemetry module names {{crossed}} (`{{specifier}}`).
+  - fix: Import only types here and record the measurement from the layer that has the value.
+  - why: Telemetry holds the OTel instruments every layer records on, so it takes nothing of the package as a value (ADR-181).
 - `transportCrossing`
   - what: A transport names {{crossed}} (`{{specifier}}`).
   - fix: Call the operation on the `app` the handler receives.
   - why: A transport declares; the module behind `app` owns the state, the guards and the tenancy filter.
+- `vocabularyCrossing`
+  - what: The vocabulary names {{crossed}} (`{{specifier}}`).
+  - fix: Move the behaviour into a service and keep vocabulary to types, `define*` factories, builders, abstract bases and errors; a file that only needs a type writes `import type`.
+  - why: Vocabulary is a framework's leaf: every layer imports it, so it takes only vocabulary, rules and telemetry (ADR-181).
 
 ## `langwatch/namespace-class`
 
@@ -1568,15 +1580,15 @@ Messages:
   - why: A route outside the framework skips its parsing, permission door, serialisation and OpenAPI document.
 - `rawContextAccess`
   - what: The handler reaches the raw request through `{{text}}`.
-  - fix: Take only `{ input, app, actor, scope, authorization, signal }` and the producer this route's own chain declares: `response` from `.withResponse(...)`, `request` from `.withResponse("protocol" | "forwarded", ...)`, `raw` from `.withRawBody(...)`, `files` from `.withMultipart(...)`, `target` from `.withPermission(perm, { at })`, `key` from `.withCredential(door, { key: true })`; the framework resolves the session and the headers before the handler runs.
+  - fix: Take only `{ input, app, actor, scope, authorization, signal }` and the producer this route's own chain declares: `response` from `.withResponse(...)`, `request` from `.withResponse("protocol" | "forwarded", ...)`, `raw` from `.withRawBody(...)`, `files` from `.withMultipart(...)`, `target` from `.withPermission(perm, { at })`, `key` from `.withCredential(door, { key: true })`, `recordKey` from `.withAccess(publicRoute(...))`; the framework resolves the session and the headers before the handler runs.
   - why: The raw request bypasses the declared input, so the published schema no longer says what the handler reads.
 - `rawContextField`
   - what: The handler takes `{{field}}` from its context.
-  - fix: Take only `{ input, app, actor, scope, authorization, signal }` and the producer this route's own chain declares: `response` from `.withResponse(...)`, `request` from `.withResponse("protocol" | "forwarded", ...)`, `raw` from `.withRawBody(...)`, `files` from `.withMultipart(...)`, `target` from `.withPermission(perm, { at })`, `key` from `.withCredential(door, { key: true })`; the framework resolves the session and the headers before the handler runs.
+  - fix: Take only `{ input, app, actor, scope, authorization, signal }` and the producer this route's own chain declares: `response` from `.withResponse(...)`, `request` from `.withResponse("protocol" | "forwarded", ...)`, `raw` from `.withRawBody(...)`, `files` from `.withMultipart(...)`, `target` from `.withPermission(perm, { at })`, `key` from `.withCredential(door, { key: true })`, `recordKey` from `.withAccess(publicRoute(...))`; the framework resolves the session and the headers before the handler runs.
   - why: The framework resolves the request into declared fields; a raw context read bypasses that declaration.
 - `rawContextSpread`
   - what: The handler collects the rest of its context into `{{name}}`.
-  - fix: Take only `{ input, app, actor, scope, authorization, signal }` and the producer this route's own chain declares: `response` from `.withResponse(...)`, `request` from `.withResponse("protocol" | "forwarded", ...)`, `raw` from `.withRawBody(...)`, `files` from `.withMultipart(...)`, `target` from `.withPermission(perm, { at })`, `key` from `.withCredential(door, { key: true })`; the framework resolves the session and the headers before the handler runs.
+  - fix: Take only `{ input, app, actor, scope, authorization, signal }` and the producer this route's own chain declares: `response` from `.withResponse(...)`, `request` from `.withResponse("protocol" | "forwarded", ...)`, `raw` from `.withRawBody(...)`, `files` from `.withMultipart(...)`, `target` from `.withPermission(perm, { at })`, `key` from `.withCredential(door, { key: true })`, `recordKey` from `.withAccess(publicRoute(...))`; the framework resolves the session and the headers before the handler runs.
   - why: Collecting the raw context hands the handler transport details the framework is meant to resolve.
 - `rawHonoRoute`
   - what: This transport registers the raw Hono route `{{method}}()`.

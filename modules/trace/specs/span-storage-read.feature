@@ -23,7 +23,16 @@ Feature: Reading one stored span back for a derivation consumer
     Given a derivation consumer that reads no events and no links
     When the span is read back
     Then the nested event and link columns are not selected
-    And the read keeps its lazy-materialization setting and takes the latest version only
+    And the read takes the latest version only
+
+  # ClickHouse 25.10's lazy reader fails reading Events.Attributes past a
+  # LIMIT 1 (ATTEMPT_TO_READ_AFTER_EOF), which pages as data corruption.
+  @unit
+  Scenario: A single-span read never defers its columns to the lazy reader
+    Given a derivation consumer reading one span back
+    When the span is read back
+    Then the read turns lazy materialization off
+    And it keeps its per-query memory ceiling
 
   @integration
   Scenario: The latest of several unmerged versions is the one read back

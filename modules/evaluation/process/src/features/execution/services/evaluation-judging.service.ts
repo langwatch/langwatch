@@ -6,7 +6,12 @@
  */
 import type { GuardrailCheckDirection } from "@langwatch/evaluation-contract";
 import type { EvaluatorApi, SingleEvaluationResult } from "@langwatch/evaluator-contract";
-import type { InstantEvalJudgeApi } from "@langwatch/instant-eval-judge-contract";
+import {
+  instantEvalOwnDecisionModelOf,
+  instantEvalUnavailableDecisionModelSkipOf,
+  type InstantEvalJudgeApi,
+} from "@langwatch/instant-eval-judge-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 
 import { instantEvalGuardrailSkipOf } from "../../../rules/instant-eval-guardrail-skip.rules.ts";
 import { instantEvalJudgeInputsOf } from "../../../rules/instant-eval-judge-dispatch.rules.ts";
@@ -22,6 +27,8 @@ import {
 
 type EvaluationJudgingDeps = Readonly<{
   judges: Pick<InstantEvalJudgeApi, "judge">;
+  /** The project's Instant Evals column: LangWatch's classifier or its own model (ADR-182). */
+  decisionModels: Pick<ModelProviderApi, "resolveDecisionModel">;
   /** The shared augmenter every judge's result runs through, so a leak is never hidden. */
   evaluators: Pick<EvaluatorApi, "augmentResult">;
 }>;
@@ -82,12 +89,20 @@ export class EvaluationJudgingService {
     const request = buildInstantEvalJudgeRequest({ judge, inputs });
     if (request.kind === "nothing_to_judge") return instantEvalSkipResultOf("nothing_to_judge");
 
+    const resolved = await this.deps.decisionModels.resolveDecisionModel({ projectId });
+    // A broken own key never falls back to LangWatch's classifier (ADR-182 decision 9).
+    if (resolved.kind === "own_unavailable") {
+      return instantEvalSkipResultOf(instantEvalUnavailableDecisionModelSkipOf(resolved));
+    }
     const answer = await this.deps.judges.judge({
       projectId,
       text: request.text,
       questions: [request.question],
       ...(idempotencyKey === undefined ? {} : { requestKey: idempotencyKey }),
       ...(signal === undefined ? {} : { signal }),
+      ...(resolved.kind === "own"
+        ? { decisionModel: instantEvalOwnDecisionModelOf(resolved) }
+        : {}),
     });
     if (answer.outcome === "refused") {
       return instantEvalRefusalResultOf({ code: answer.code, message: answer.message });

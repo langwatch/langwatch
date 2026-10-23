@@ -32,6 +32,7 @@ export const testingLicenseRest = defineRestRouter(LicensingApi)
   .withCredential("testing_license_token")
 
   .post("/testing-licenses", "issueTestingLicense")
+  .keepsRecords()
   .withAudit("license.issueTesting")
   .withCredential("testing_license_token", { session: testingLicenseIssuerSchema })
   .withInput(issueTestingLicenseRequestSchema)
@@ -44,6 +45,7 @@ export const testingLicenseRest = defineRestRouter(LicensingApi)
 
   // `haven logout` ends its own token here before forgetting it (ADR-180 section 2).
   .delete("/testing-licenses/token", "revokeOwnTestingLicenseToken")
+  .withoutConfirmation("only a testing-licence token reaches it, never a Langy key")
   .withAudit("license.revokeTestingToken")
   .withCredential("testing_license_token", { session: testingLicenseIssuerSchema })
   .withPermission("ops:manage", { at: "platform" })

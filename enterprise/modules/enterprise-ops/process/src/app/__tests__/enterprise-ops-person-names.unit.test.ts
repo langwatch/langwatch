@@ -128,6 +128,7 @@ async function build() {
         license({ id: "l3", issuedById: null }),
       ],
       total: 3,
+      counts: { active: 3, inactive: 0, customer: 3, internal: 0, all: 3 },
     }),
     getIssuedLicense: async () => license({ id: "l1", issuedById: "user_gone" }),
   });

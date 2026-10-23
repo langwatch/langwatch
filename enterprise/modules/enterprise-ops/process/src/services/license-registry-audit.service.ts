@@ -8,6 +8,7 @@ import type {
   ActivationCodePage,
   ActivationCodeView,
   IssuedActivationCode,
+  IssuedLicenseFilters,
   LicenseTermsInput,
   SeatChangeResult,
   SignedIssuedLicense,
@@ -59,7 +60,7 @@ export class LicenseRegistryAuditService {
   ) {}
 
   async list(
-    input: Staff & { page: number; pageSize: number; search?: string; includeTesting?: boolean },
+    input: Staff & { page: number; pageSize: number; search?: string } & IssuedLicenseFilters,
   ): Promise<NamedIssuedLicensePage> {
     const { operatorId, ...query } = input;
     await this.record(operatorId, "getAll", {
@@ -67,6 +68,8 @@ export class LicenseRegistryAuditService {
         page: query.page,
         pageSize: query.pageSize,
         hasSearch: Boolean(query.search),
+        status: query.status ?? "all",
+        audience: query.audience ?? "all",
         includeTesting: query.includeTesting === true,
       },
     });

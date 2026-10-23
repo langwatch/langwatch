@@ -17,6 +17,7 @@ import {
   LicenseKeyInvalidError,
   OrganizationNotFoundError,
   type IssuedLicenseCustomerRecord,
+  type IssuedLicenseFilters,
   type IssuedLicensePage,
   type IssuedLicenseSource,
   type IssuedLicenseView,
@@ -45,6 +46,7 @@ import {
   statusOfIssuedLicense,
 } from "../rules/issued-license.rules.ts";
 import type { ContractBudgets } from "./contract-budget.service.ts";
+import { IssuedLicenseListService } from "./issued-license-list.service.ts";
 import { IssuedLicenseWriterService } from "./issued-license-writer.service.ts";
 
 interface LicenseRegistryOptions {
@@ -70,9 +72,11 @@ export class LicenseRegistryService {
   }
 
   private readonly writer: IssuedLicenseWriterService;
+  private readonly lists: IssuedLicenseListService;
 
   private constructor(private readonly options: LicenseRegistryOptions) {
     this.writer = IssuedLicenseWriterService.create(options);
+    this.lists = IssuedLicenseListService.create(options);
   }
 
   /** Signs a new license for a customer and records it. */
@@ -376,14 +380,11 @@ export class LicenseRegistryService {
     return this.toView(await this.getRow(input.id));
   }
 
-  async list(input: {
-    page: number;
-    pageSize: number;
-    search?: string;
-    includeTesting?: boolean;
-  }): Promise<IssuedLicensePage> {
-    const { rows, total } = await this.options.repository.listAll(input);
-    return { licenses: rows.map((row) => this.toView(row)), total };
+  async list(
+    input: { page: number; pageSize: number; search?: string } & IssuedLicenseFilters,
+  ): Promise<IssuedLicensePage> {
+    const { rows, total, counts } = await this.lists.list(input);
+    return { licenses: rows.map((row) => this.toView(row)), total, counts };
   }
 
   private async resolveCustomer(customer: LicenseCustomer): Promise<IssuedLicenseCustomerRecord> {

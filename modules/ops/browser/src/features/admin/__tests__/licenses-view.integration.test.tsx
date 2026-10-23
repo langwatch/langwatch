@@ -1,142 +1,132 @@
 /** @vitest-environment jsdom */
 /**
- * The Licenses page hides testing licenses until the operator asks for them.
- * Spec: specs/self-hosting/connected-services/testing-licenses.feature
+ * The licenses page's filters: each choice says how many licenses it lists,
+ * and an empty list says whether the filters or the search emptied it.
+ * Spec: specs/self-hosting/connected-services/license-registry.feature
  */
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderWithOpsHost } from "../../../testing.tsx";
-import type { License } from "../model/license-terms.ts";
+import type { LicenseCounts } from "../model/license-terms.ts";
 import LicensesView from "../ui/sections/licenses-view.tsx";
 
-const ISSUED = "2026-09-19T12:00:00.000Z";
-const TERM_END = "2027-09-19T12:00:00.000Z";
-
-function license(overrides: Partial<License> = {}): License {
-  return {
-    id: "il_1",
-    licenseId: "lic-1",
-    organizationId: "org_1",
-    organizationName: "ACME Rockets",
-    email: "ops@acme.test",
-    planType: "ENTERPRISE",
-    maxMembers: 50,
-    maxMembersLite: 5,
-    liteSeatsUnlimited: false,
-    issuedAt: ISSUED,
-    expiresAt: TERM_END,
-    source: "BACKOFFICE",
-    kind: "standard",
-    testingOrganizationId: null,
-    issuedById: null,
-    revokedAt: null,
-    revokedReason: null,
-    replacesId: null,
-    services: [],
-    seatRateCents: null,
-    seatCurrency: null,
-    commitUsdCents: 0,
-    overageEnabled: false,
-    overageMaxUsdCents: null,
-    instanceId: null,
-    instanceBoundAt: null,
-    lastSyncAt: null,
-    lastSyncVersion: null,
-    reportedMembers: null,
-    reportedMembersLite: null,
-    status: "active",
-    hasPendingDelivery: false,
-    ...overrides,
-  };
-}
-
-const standard = license({ id: "il_std", organizationName: "ACME Rockets" });
-const testing = license({
-  id: "il_test",
-  organizationName: "Local dev org",
-  kind: "testing",
-  testingOrganizationId: "org_local",
-  issuedById: "tok_1",
-  instanceId: "inst_laptop",
-});
-
-const askedWith = vi.hoisted(() => ({ inputs: [] as { includeTesting?: boolean }[] }));
-
-const noMutation = vi.hoisted(() => ({
-  useMutation: () => ({ mutate: () => {}, isPending: false }),
+const { asked, answer } = vi.hoisted(() => ({
+  asked: [] as Record<string, unknown>[],
+  answer: { counts: {} as LicenseCounts, isPlaceholderData: false },
 }));
 
-/** Stands in for the server: testing rows come back only when asked for. */
 vi.mock("../../../behavior/ops-api.ts", () => ({
   api: {
-    useContext: () => ({ licenseRegistry: { invalidate: vi.fn() } }),
     licenseRegistry: {
       getAll: {
-        useQuery: (input: { includeTesting?: boolean }) => {
-          askedWith.inputs.push(input);
-          const licenses = input.includeTesting ? [standard, testing] : [standard];
+        useQuery: (input: Record<string, unknown>) => {
+          asked.push(input);
           return {
-            data: { licenses, total: licenses.length },
-            error: null,
+            data: { licenses: [], total: 0, counts: answer.counts },
             isLoading: false,
             isFetching: false,
+            isPlaceholderData: answer.isPlaceholderData,
+            error: null,
           };
         },
       },
-      getById: { useQuery: () => ({ data: undefined, error: null, isLoading: false }) },
-      activationCodes: {
-        useQuery: () => ({ data: { codes: [], total: 0 }, error: null, isLoading: false }),
-      },
-      testingLicenseTokens: {
-        useQuery: () => ({ data: { tokens: [], total: 0 }, error: null, isLoading: false }),
-      },
-      revoke: noMutation,
-      resetInstanceBinding: noMutation,
-      updateTerms: noMutation,
-      linkToOrganization: noMutation,
-      changeSeats: noMutation,
-      reissue: noMutation,
-      issue: noMutation,
-      registerLegacy: noMutation,
-      issueActivationCode: noMutation,
-      revokeActivationCode: noMutation,
-      createTestingLicenseServiceToken: noMutation,
-      revokeTestingLicenseToken: noMutation,
     },
   },
 }));
+vi.mock("../behavior/use-license-commands.ts", () => ({
+  useLicenseCommands: () => ({ resetInstanceBinding: { mutate: vi.fn() } }),
+}));
+vi.mock("../ui/sections/activation-codes-section.tsx", () => ({
+  ActivationCodesSection: () => null,
+}));
+vi.mock("../ui/sections/self-hosted-notices-section.tsx", () => ({
+  SelfHostedNoticesSection: () => null,
+}));
+vi.mock("../ui/sections/testing-license-tokens-section.tsx", () => ({
+  TestingLicenseTokensSection: () => null,
+}));
+vi.mock("../ui/sections/license-detail-drawer.tsx", () => ({ LicenseDetailDrawer: () => null }));
+vi.mock("../ui/sections/license-issue-drawer.tsx", () => ({ LicenseIssueDrawer: () => null }));
+vi.mock("../ui/sections/license-revoke-dialog.tsx", () => ({ LicenseRevokeDialog: () => null }));
+
+const lastAsked = () => asked.at(-1);
 
 describe("LicensesView", () => {
   beforeEach(() => {
-    askedWith.inputs = [];
+    asked.length = 0;
+    answer.isPlaceholderData = false;
   });
 
-  describe("given a standard license and a testing license in the registry", () => {
-    describe("when an operator opens the license list", () => {
-      /** @scenario "Testing licenses are hidden from the license list until asked" */
-      it("lists and counts only the standard license, asking the server to leave testing out", () => {
-        renderWithOpsHost(<LicensesView />);
-
-        expect(screen.getByText("ACME Rockets")).toBeTruthy();
-        expect(screen.queryByText("Local dev org")).toBeNull();
-        expect(screen.queryByText("Testing")).toBeNull();
-        expect(askedWith.inputs.at(-1)?.includeTesting).toBe(false);
-      });
+  describe("given internal licenses that are all revoked or expired", () => {
+    beforeEach(() => {
+      // What the service answers on the default choices: each count keeps the other filter.
+      answer.counts = { active: 0, inactive: 0, customer: 0, internal: 0, all: 2 };
     });
 
-    describe("when the operator asks to include testing licenses", () => {
-      /** @scenario "Testing licenses are hidden from the license list until asked" */
-      it("lists the testing license with a Testing badge and asks the server for it", async () => {
-        renderWithOpsHost(<LicensesView />);
+    /** @scenario The console's license filters say what they hide */
+    it("opens on active customer licenses and shows how many each choice lists", () => {
+      renderWithOpsHost(<LicensesView />);
 
-        fireEvent.click(screen.getByLabelText("Show testing licenses"));
+      expect(lastAsked()).toMatchObject({ status: "active", audience: "customer" });
+      expect(screen.getByRole("radio", { name: /Active\s*0/ })).toBeTruthy();
+      expect(screen.getByRole("radio", { name: /Internal tests\s*0/ })).toBeTruthy();
+    });
 
-        await waitFor(() => expect(screen.getByText("Local dev org")).toBeTruthy());
-        expect(screen.getByText("Testing")).toBeTruthy();
-        expect(screen.getByText("ACME Rockets")).toBeTruthy();
-        expect(askedWith.inputs.at(-1)?.includeTesting).toBe(true);
+    /** @scenario The console's license filters say what they hide */
+    it("says the filters emptied the list, and shows every license when asked", () => {
+      renderWithOpsHost(<LicensesView />);
+
+      expect(screen.getByText(/No licenses match these filters/)).toBeTruthy();
+      expect(screen.getByText(/2 licenses match other choices/)).toBeTruthy();
+      fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+
+      expect(lastAsked()).toMatchObject({ status: undefined, audience: undefined });
+    });
+  });
+
+  describe("given a search that matches no license at all", () => {
+    beforeEach(() => {
+      answer.counts = { active: 0, inactive: 0, customer: 0, internal: 0, all: 0 };
+    });
+
+    /** @scenario The console's license filters say what they hide */
+    it("blames the search, not the filters, and clearing it empties the search", async () => {
+      renderWithOpsHost(<LicensesView />);
+      fireEvent.change(screen.getByPlaceholderText(/Search by customer/), {
+        target: { value: "nobody" },
       });
+
+      expect(await screen.findByText(/No licenses match the search/)).toBeTruthy();
+      expect(screen.queryByText(/No licenses match these filters/)).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+
+      expect(screen.getByPlaceholderText<HTMLInputElement>(/Search by customer/).value).toBe("");
+      expect(lastAsked()).toMatchObject({ status: undefined, audience: undefined });
+    });
+  });
+
+  describe("given an empty registry and no search", () => {
+    beforeEach(() => {
+      answer.counts = { active: 0, inactive: 0, customer: 0, internal: 0, all: 0 };
+    });
+
+    it("says the registry is empty", () => {
+      renderWithOpsHost(<LicensesView />);
+
+      expect(screen.getByText(/No licenses in the registry yet/)).toBeTruthy();
+    });
+  });
+
+  describe("given an empty list kept on screen while the next query loads", () => {
+    /** @scenario The console's license filters say what they hide */
+    it("says nothing about the list until the answer arrives", () => {
+      answer.counts = { active: 0, inactive: 0, customer: 0, internal: 0, all: 0 };
+      answer.isPlaceholderData = true;
+      renderWithOpsHost(<LicensesView />);
+
+      expect(screen.queryByText(/No licenses in the registry yet/)).toBeNull();
+      expect(screen.queryByText(/No licenses match/)).toBeNull();
     });
   });
 });

@@ -1,5 +1,10 @@
 import { ClientAddress } from "@langwatch/api/policy";
-import { bindRestCredential, browserSessionOfRequest } from "@langwatch/api/rest";
+import {
+  bindRestCredential,
+  browserSessionOfRequest,
+  callerAddressOfRequest,
+} from "@langwatch/api/rest";
+import { EVENT_LOG_ID_INDEX } from "@langwatch/eventing/server";
 import type { OpsApi, OpsServerConfig } from "@langwatch/ops-contract";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 import { type CodeStepId, defineMigrationStep } from "@langwatch/upgrade/step";
@@ -58,6 +63,7 @@ export const opsProcessModule: PublishedProcessModule<"ops", OpsApi, OpsServerCo
     // The impersonation routes record against the session the browser door resolved.
     .provideMiddlewareContext({
       browserSession: browserSessionOfRequest,
+      callerAddress: callerAddressOfRequest,
       adminAuditRequest: (request) => ({
         headers: Object.fromEntries(request.headers),
         remoteAddress: ClientAddress.resolvedFor(request) ?? undefined,
@@ -188,4 +194,11 @@ export const opsProcessModule: PublishedProcessModule<"ops", OpsApi, OpsServerCo
           return dryRun ? { wouldGrant: granted } : { granted };
         },
       }),
-    ]);
+    ])
+    // Ops hosts operator work over the event tables (§7); the index itself is eventing's.
+    .withIdIndexes([EVENT_LOG_ID_INDEX], {
+      step: "fill-event-log-id-index",
+      after: ["gateway:fill-id-indexes"],
+      description:
+        "Fills the event log's aggregate index from older events, then marks it ready on each ClickHouse target.",
+    });

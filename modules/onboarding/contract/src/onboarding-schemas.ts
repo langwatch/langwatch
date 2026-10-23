@@ -30,6 +30,8 @@ const guidedOnboardingStateSchemaDefinition = z.object({
   tourCompletedAt: z.string().optional(),
   tourSkippedAt: z.string().optional(),
   providerSkippedAt: z.string().optional(),
+  /** "Later" on Langy's model prompt after a skipped provider: never prompt or open again. */
+  providerPromptDismissedAt: z.string().optional(),
   conversationId: z.string().optional(),
   tourReplays: z.number().int().nonnegative().optional(),
   /**

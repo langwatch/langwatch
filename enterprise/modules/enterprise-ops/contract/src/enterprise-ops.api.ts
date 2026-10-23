@@ -1,14 +1,22 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type {
+  CreateSelfHostedNoticeInput,
+  SelfHostedNoticeView,
+  UpdateSelfHostedNoticeInput,
   ActivationCodePage,
   ActivationCodeView,
   IssuedActivationCode,
+  IssuedLicenseFilters,
   IssuedLicenseView,
   LicenseCustomer,
   LicenseTermsInput,
   SeatChangeResult,
   SelfHostedInstanceDetail,
+  SelfHostedInstanceFilters,
   SelfHostedInstancePage,
+  SelfHostedInstanceSummary,
+  UpgradeDiagnosticsDownload,
+  UpgradeDiagnosticsReport,
   SignedIssuedLicense,
   MintedTestingLicenseToken,
   TestingLicenseTokenView,
@@ -29,13 +37,14 @@ import type {
 export interface EnterpriseOpsApi {
   // -- the license registry (ADR-156) ------------------------------------------
 
-  listIssuedLicenses(input: {
-    page: number;
-    pageSize: number;
-    search?: string;
-    includeTesting?: boolean;
-    operator: OpsOperator | null;
-  }): Promise<NamedIssuedLicensePage>;
+  listIssuedLicenses(
+    input: {
+      page: number;
+      pageSize: number;
+      search?: string;
+      operator: OpsOperator | null;
+    } & IssuedLicenseFilters,
+  ): Promise<NamedIssuedLicensePage>;
   getIssuedLicense(input: {
     id: string;
     operator: OpsOperator | null;
@@ -118,16 +127,49 @@ export interface EnterpriseOpsApi {
 
   // -- the registry of self-hosted installs (ADR-156, section 10); read only --
 
-  listSelfHostedInstances(input: {
-    page: number;
-    pageSize: number;
-    search?: string;
-    operator: OpsOperator | null;
-  }): Promise<SelfHostedInstancePage>;
+  listSelfHostedInstances(
+    input: {
+      page: number;
+      pageSize: number;
+      search?: string;
+      operator: OpsOperator | null;
+    } & SelfHostedInstanceFilters,
+  ): Promise<SelfHostedInstancePage>;
   getSelfHostedInstance(input: {
     id: string;
     operator: OpsOperator | null;
   }): Promise<SelfHostedInstanceDetail>;
+  summarizeSelfHostedInstances(input: {
+    operator: OpsOperator | null;
+  }): Promise<SelfHostedInstanceSummary>;
+  /** The upgrade diagnostics one install sent, newest first. */
+  findUpgradeDiagnostics(input: {
+    instanceRowId: string;
+    operator: OpsOperator | null;
+  }): Promise<UpgradeDiagnosticsReport[]>;
+  /** A five-minute link to one bundle: the sensitive read, so it asks `ops:manage`. */
+  getUpgradeDiagnosticsDownload(input: {
+    id: string;
+    operator: OpsOperator | null;
+  }): Promise<UpgradeDiagnosticsDownload>;
+
+  // -- notices to self-hosted installs (self-hosted-notices.feature); writes ask ops:manage --
+
+  findSelfHostedNotices(input: { operator: OpsOperator | null }): Promise<SelfHostedNoticeView[]>;
+  createSelfHostedNotice(
+    input: CreateSelfHostedNoticeInput & { operator: OpsOperator | null },
+  ): Promise<SelfHostedNoticeView>;
+  updateSelfHostedNotice(
+    input: UpdateSelfHostedNoticeInput & { operator: OpsOperator | null },
+  ): Promise<SelfHostedNoticeView>;
+  publishSelfHostedNotice(input: {
+    id: string;
+    operator: OpsOperator | null;
+  }): Promise<SelfHostedNoticeView>;
+  withdrawSelfHostedNotice(input: {
+    id: string;
+    operator: OpsOperator | null;
+  }): Promise<SelfHostedNoticeView>;
 
   // -- testing-licence tokens (ADR-180 section 2); ops managers only ------------
 

@@ -92,7 +92,11 @@ async function build(registry: Partial<Registry> = {}) {
   const licensing = createApiFixture<Registry>({
     listIssuedLicenses: async () => {
       commanded.push("list");
-      return { licenses: [], total: 0 };
+      return {
+        licenses: [],
+        total: 0,
+        counts: { active: 0, inactive: 0, customer: 0, internal: 0, all: 0 },
+      };
     },
     issueLicense: async () => {
       commanded.push("issue");
@@ -166,13 +170,26 @@ describe("the Cloud admin license registry", () => {
     it("lists licenses and records the read", async () => {
       const { app, entries } = await build();
 
-      await app.listIssuedLicenses({ page: 0, pageSize: 25, search: "acme", operator });
+      await app.listIssuedLicenses({
+        page: 0,
+        pageSize: 25,
+        search: "acme",
+        status: "active",
+        operator,
+      });
 
       expect(entries).toEqual([
         expect.objectContaining({
           userId: "user_olive",
           action: "licenseRegistry.getAll",
-          args: { page: 0, pageSize: 25, hasSearch: true, includeTesting: false },
+          args: {
+            page: 0,
+            pageSize: 25,
+            hasSearch: true,
+            status: "active",
+            audience: "all",
+            includeTesting: false,
+          },
           targetKind: "issuedLicense",
         }),
       ]);

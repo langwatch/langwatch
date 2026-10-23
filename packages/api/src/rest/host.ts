@@ -21,6 +21,7 @@ import {
   routeScopesOf,
   type MountableRestApp,
 } from "./addressing.ts";
+import type { RestConfirmationGate } from "./confirmation.ts";
 import type {
   RestDoorCredential,
   RestSharedPath,
@@ -106,6 +107,8 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
     entitlements?: Entitlements | undefined;
     /** The SAME decisions tRPC authorizes through: lineage, kind reads and route proofs. */
     authz: Authorize;
+    /** Where a Langy key's confirmation clicks are kept; absent, marked routes refuse it. */
+    confirmations?: RestConfirmationGate | undefined;
   }): RestHost {
     return new RestHost(options);
   }
@@ -168,7 +171,9 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
       ...(this.options.idempotency ? { idempotency: this.options.idempotency } : {}),
       ...(this.options.rateLimiter ? { rateLimiter: this.options.rateLimiter } : {}),
       ...(this.options.entitlements ? { entitlements: this.options.entitlements } : {}),
+      ...(this.options.confirmations ? { confirmations: this.options.confirmations } : {}),
       authorization: { forRequest: () => authz },
+      servedDoors: true,
       audit: this.options.audit,
       deprecationLog: restDeprecationLog,
     }).mount(declaration, {

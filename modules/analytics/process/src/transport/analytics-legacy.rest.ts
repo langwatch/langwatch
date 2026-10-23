@@ -10,6 +10,7 @@ import {
   type AnalyticsTimeseriesResult,
 } from "@langwatch/analytics-contract";
 import { defineRestRouter, MANAGEMENT_API_VERSION, resolver } from "@langwatch/api/rest";
+import type { Authorization } from "@langwatch/authorization";
 import { moduleApi } from "@langwatch/module";
 import { resolveRequestBound } from "@langwatch/plans";
 import { z } from "zod";
@@ -19,10 +20,13 @@ export type AnalyticsLegacyTimeseriesAnswer =
   | Readonly<{ status: 400; body: { readonly message: string } | { readonly error: string } }>
   | Readonly<{ status: 200; body: AnalyticsTimeseriesResult }>;
 
-/** What the legacy door reaches: the raw body, read and refused in the family's own sentences. */
+/**
+ * What the legacy door reaches: the raw body, read and refused in the family's own sentences,
+ * and the door's proof the series reads under.
+ */
 export interface AnalyticsLegacyApi {
   answerLegacyTimeseries(
-    input: Readonly<{ raw: string; projectId: string }>,
+    input: Readonly<{ raw: string; projectId: string; authorization: Authorization }>,
   ): Promise<AnalyticsLegacyTimeseriesAnswer>;
 }
 
@@ -46,6 +50,7 @@ export const analyticsLegacyRest = defineRestRouter(AnalyticsLegacyApi)
   .withAddressing("literal")
 
   .post("/api/analytics", "postApiAnalytics")
+  .keepsRecords()
   .withoutAudit("read sent as a POST")
   // Main parsed the body as JSON under any Content-Type; a mislabelled one is still read.
   .withRawBody("text", { mediaType: "application/json", mismatch: "accepted" })
@@ -68,5 +73,7 @@ export const analyticsLegacyRest = defineRestRouter(AnalyticsLegacyApi)
       },
     },
   })
-  .handle(({ app, raw, scope }) => app.answerLegacyTimeseries({ raw, projectId: scope.id }))
+  .handle(({ app, raw, scope, authorization }) =>
+    app.answerLegacyTimeseries({ raw, projectId: scope.id, authorization }),
+  )
   .build();

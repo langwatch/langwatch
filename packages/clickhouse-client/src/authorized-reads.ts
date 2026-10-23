@@ -10,56 +10,50 @@ import {
   type Authorization,
   type AuthorizationConditionType,
   type AuthorizationGrant,
+  type ProofBearingPermission,
+  type SharedWindow,
+  sharedWindowsReadBy,
   usableAuthorization,
-  type AuthzPermission,
 } from "@langwatch/authorization";
 import {
+  TENANT_SCOPE_BUCKET_WIDTH_MS,
   TENANT_SCOPE_TIME_COLUMNS,
   type TenantScopeTimeColumn,
 } from "@langwatch/clickhouse-markers";
 import { nowInstant } from "@langwatch/time";
 
 import type { ClickHouseQueryClient } from "./client.ts";
+import type { IdBoundOptions } from "./idBound.ts";
+import { StatementScopeError, TENANT_SCOPE_PARAM_PREFIX } from "./statementScopeError.ts";
 
 /** Resolves the routed client a project's reads are sent through. */
 export type ClickHouseClientResolver = (tenantId: string) => Promise<ClickHouseQueryClient>;
 
 /**
- * What a reader may be asked for: the permission each one needs, and the
- * resource a shared grant's window must apply to for that grant to open
- * rows of it. Both read trace rows, so both take a `trace` window.
+ * What a reader may be asked for: the proof-bearing permission each one needs, and the resource
+ * a shared grant's window must apply to for that grant to open rows of it. All three read trace
+ * rows, so all take a `trace` window; `cost` is the cost-gated analytics reads (ADR-177 v4.15).
  */
 const READ_RESOURCES = {
   traces: { permission: "traces:view", condition: "trace" },
   analytics: { permission: "analytics:view", condition: "trace" },
+  cost: { permission: "cost:view", condition: "trace" },
 } as const satisfies Record<
   string,
-  { permission: AuthzPermission; condition: AuthorizationConditionType }
+  { permission: ProofBearingPermission; condition: AuthorizationConditionType }
 >;
 export type ReadResource = keyof typeof READ_RESOURCES;
-
-/**
- * The permissions a route mints a proof for: only `traces:view`. No production read asks for
- * `analytics` yet, so minting under it would cost an engine pass nothing consumes; a
- * traces-minted proof asked for analytics reads its own project alone.
- */
-export const PROOF_BEARING_PERMISSIONS: ReadonlySet<AuthzPermission> = new Set([
-  READ_RESOURCES.traces.permission,
-]);
-
-/** Every parameter the fence binds starts with this; callers may not. */
-const TENANT_SCOPE_PARAM_PREFIX = "tenantScope";
 
 const MARKER = /\{\{tenantScope:([A-Za-z_][A-Za-z0-9_]*)\}\}/g;
 const SET_MARKER = /\{\{tenantSet\}\}/g;
 
 /**
- * A tenant predicate written by hand (`TenantId =`, `IN`, comparisons); a projection or dedup
- * tuple member is fine. Exported so the source scan over the converted repositories refuses
- * the same shapes the reader refuses at run time.
+ * A tenant predicate written by hand (`TenantId =`, `IN`, comparisons); a projection, a dedup
+ * tuple member or a join key equating two `TenantId` columns is fine. Exported so the source
+ * scan over the converted repositories refuses the shapes the reader refuses at run time.
  */
 export const HAND_WRITTEN_TENANT_PREDICATE =
-  /\bTenantId\s*(?:=|!=|<>|<=|>=|<|>|(?:NOT\s+)?IN\b|(?:NOT\s+)?LIKE\b)/i;
+  /\bTenantId\s*(?:=(?!\s*(?:[A-Za-z_]\w*\.)?TenantId\b)|!=|<>|<=|>=|<|>|(?:NOT\s+)?IN\b|(?:NOT\s+)?LIKE\b)/i;
 
 /**
  * A stable cache key for who a proof fences, under which windows. Own projects stay readable;
@@ -82,38 +76,6 @@ export function tenantScopeKey({
   const digest = createHash("sha256").update(windows).digest("hex");
   return `${own}+${fence.shared.length}:${digest}`;
 }
-
-export type StatementScopeViolation =
-  | { kind: "missing-marker" }
-  | { kind: "unknown-time-column"; column: string }
-  | { kind: "hand-written-tenant-predicate" }
-  | { kind: "reserved-param"; param: string };
-
-/** A statement the reader will not send. Named so a test can tell which
- *  refusal fired without reading prose. */
-export class StatementScopeError extends Error {
-  readonly code = "store_statement_scope";
-  constructor(public readonly violation: StatementScopeViolation) {
-    super(describe(violation));
-    this.name = "StatementScopeError";
-  }
-}
-
-function describe(violation: StatementScopeViolation): string {
-  switch (violation.kind) {
-    case "missing-marker":
-      return "Statement carries no {{tenantScope:<TimeColumn>}} marker, so the window on a shared grant would never be applied. A {{tenantSet}} marker alone is not enough.";
-    case "unknown-time-column":
-      return `Marker names "${violation.column}", which is not a time column the window can be applied to.`;
-    case "hand-written-tenant-predicate":
-      return "Statement names TenantId in a predicate of its own. The fence is the only predicate allowed to pick tenants.";
-    case "reserved-param":
-      return `Parameter "${violation.param}" uses the reserved "${TENANT_SCOPE_PARAM_PREFIX}" prefix.`;
-  }
-}
-
-/** One shared project and the window its grant opens, as the fence binds it. */
-type SharedWindow = { projectId: string; from: number; until: number | null };
 
 type TenantFence = {
   /**
@@ -162,11 +124,18 @@ export function fenceExpression({
   // The default is never read: `TenantId IN ids` gates every lookup.
   const edgeOf = (edge: "from" | "until") =>
     `transform(TenantId, ${ids}, ${slot(edge, "Array(Int64)")}, toInt64(0))`;
+  const width = TENANT_SCOPE_BUCKET_WIDTH_MS[column];
+  // A bucket starting at or after `from` lies wholly after it; one ending by `until` lies
+  // wholly before it.
+  const closedUntil =
+    width === undefined
+      ? `${column} < fromUnixTimestamp64Milli(${edgeOf("until")})`
+      : `${column} <= fromUnixTimestamp64Milli(${edgeOf("until")} - ${width})`;
   const windowed =
     `(TenantId IN (${ids})` +
     ` AND ${column} >= fromUnixTimestamp64Milli(${edgeOf("from")})` +
     ` AND (${edgeOf("until")} = ${OPEN_UNTIL}` +
-    ` OR ${column} < fromUnixTimestamp64Milli(${edgeOf("until")})))`;
+    ` OR ${closedUntil}))`;
   const params: Record<string, unknown> = {
     [fenceParam("all")]: tenantsOf(fence),
     [fenceParam("ids")]: fence.shared.map((window) => window.projectId),
@@ -216,14 +185,7 @@ export function fenceFor({
     .filter(carries)
     .map((grant) => grant.projectId as string);
   if (own.length === 0) throw new AccessNotGrantedError(permission);
-  const shared = authorization.grants
-    .filter((grant) => grant.kind === "shared" && grant.condition?.type === condition)
-    .filter(carries)
-    .map((grant) => ({
-      projectId: grant.projectId as string,
-      from: grant.condition?.from ?? 0,
-      until: grant.condition?.until ?? null,
-    }));
+  const shared = sharedWindowsReadBy({ authorization, permission, condition });
   const narrowedTo = authorization.narrowedTo;
   if (narrowedTo === undefined) return { own, shared };
   const narrowed = {
@@ -283,6 +245,8 @@ type ScopedQueryParams = {
   clickhouse_settings?: Record<string, string | number>;
   /** Set when the read must walk every partition; see the member's cold-scan warning. */
   SKIP_COLD_SCAN_CHECK?: true | undefined;
+  /** For a statement carrying `{{idBound}}`: a time the caller has, and today's fallback. */
+  idBound?: IdBoundOptions | undefined;
 };
 
 /**
@@ -323,9 +287,8 @@ export class TenantScopedReader {
       queryParams: params.query_params ?? {},
       fence: this.deps.fence,
     });
-    const client = await this.deps.client().catch((cause: unknown) => {
-      throw new TenantReaderClientUnavailableError({ cause });
-    });
+    const client = await this.resolvedClient();
+    // The client expands an `{{idBound}}` marker, reading the index under this fence's tenants.
     const result = await client.query<Row>({
       tenantId: this.deps.tenantId,
       tenantIds: tenantsOf(this.deps.fence),
@@ -333,8 +296,17 @@ export class TenantScopedReader {
       params: expanded.queryParams,
       ...(params.clickhouse_settings ? { settings: params.clickhouse_settings } : {}),
       ...(params.SKIP_COLD_SCAN_CHECK === true ? { SKIP_COLD_SCAN_CHECK: true } : {}),
+      ...(params.idBound === undefined ? {} : { idBound: params.idBound }),
     });
     return { json: async () => result.rows };
+  }
+
+  private async resolvedClient(): Promise<ClickHouseQueryClient> {
+    try {
+      return await this.deps.client();
+    } catch (cause: unknown) {
+      throw new TenantReaderClientUnavailableError({ cause });
+    }
   }
 }
 

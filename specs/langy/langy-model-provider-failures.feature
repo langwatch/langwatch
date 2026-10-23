@@ -92,6 +92,61 @@ Feature: A turn that the model provider refused says so
       And it offers to open the model settings
       And it does not offer to try again
 
+    # Anthropic refuses a request shape a model does not take (Claude 5.5 and
+    # the legacy thinking shape) with a 400 invalid_request_error. The same
+    # request fails the same way every time, and people retried 3 to 5 times.
+    @unit
+    Scenario: A request the provider refuses with a plain 400 offers no retry
+      Given a turn that failed with the proxy's upstream code carrying "invalid_request_error" or a bare 400 status reason
+      When the customer reads the card
+      Then it offers to open the model settings
+      And it does not offer to try again
+
+    # Anthropic files a spent balance under the same 400 invalid_request_error,
+    # with only its sentence telling the two apart. The proxy reads that sentence
+    # where it stands and files a reason of its own, so the sentence never travels.
+    @unit
+    Scenario: A spent balance or a refused key a provider names only in prose rides as a typed reason
+      Given the provider answers with a spent balance, a quota error, or a 400 naming an invalid key
+      When the proxy records the failure
+      Then it carries "llm_provider_out_of_credit" or "llm_provider_key_rejected" as a reason
+      And a 400 that names neither carries no such reason
+      And the provider's sentence is not recorded
+
+    # The AI gateway replaces a spent balance's message with its own
+    # exhausted-access message, so the proxy's sentence check never matched
+    # and the card fell back to the invalid-request copy.
+    @unit
+    Scenario: A spent balance behind the AI gateway still rides as out of credit
+      Given the provider answers a streaming call with its 400 credit balance error
+      And the AI gateway forwards it with its own exhausted-access message
+      When the proxy records the failure
+      Then it carries "llm_provider_out_of_credit" as a reason
+      And the agent's SDK gets a 400 it does not retry
+
+    @unit
+    Scenario: A spent provider balance reads as the account to top up, with no retry
+      Given a turn that failed with the proxy's "llm_provider_out_of_credit" reason
+      When the customer reads the card
+      Then its headline says the provider account is out of credit
+      And it says to check the provider's billing, or pick a model from a different provider
+      And it offers to open the model settings
+      And it does not offer to try again
+
+    @unit
+    Scenario: A plan or quota limit that resets reads as no allowance left
+      Given a turn that failed with a provider's quota, usage limit or plan limit code
+      When the customer reads the card
+      Then its headline says the provider account has no allowance left
+      And it does not say the account is out of credit
+
+    @unit
+    Scenario: A key the provider refuses on a 400 reads as a credential to check
+      Given a turn that failed with the proxy's "llm_provider_key_rejected" reason
+      When the customer reads the card
+      Then its headline says the provider rejected the API key
+      And it offers to open the model settings
+
     # A failure the gateway names in its own envelope rather than forwarding
     # the provider's body: "provider_error" when the provider answered with
     # something unusable, "provider_timeout" and

@@ -6,6 +6,7 @@
 import {
   LangWatchQLResultTooLargeError,
   type LangWatchQLCaller,
+  type LangWatchQLMemberWindow,
   type LangWatchQLProtections,
   type LangWatchQLQueryResult,
   type LangWatchQLTimeWindow,
@@ -18,7 +19,7 @@ import type {
   LangWatchQLExecutorRepository,
   LangWatchQLResultLimits,
 } from "../repositories/langwatch-ql-executor.repository.ts";
-import { scopeLangWatchQLToOrigins } from "../rules/langwatch-ql-query-scope.rules.ts";
+import { hydratableProjects, scopeLangWatchQL } from "../rules/langwatch-ql-query-scope.rules.ts";
 import {
   langWatchQLExecutionParameters,
   langWatchQLRowLimitedSql,
@@ -54,6 +55,8 @@ type LangWatchQLExecutionInput = {
   readonly tenantCapability: string;
   /** The origins the surface leaves out of every view the statement reads. */
   readonly excludeOrigins: readonly string[];
+  /** An aggregate's members and where each is read from; absent on a plain project. */
+  readonly memberWindows?: readonly LangWatchQLMemberWindow[];
   /** The window the statement follows, which bounds the origin lookup; absent, none does. */
   readonly timeWindow?: LangWatchQLTimeWindow;
   readonly signal?: AbortSignal;
@@ -78,11 +81,11 @@ export class LangWatchQLExecutionService {
     ...run
   }: LangWatchQLExecutionInput): Promise<LangWatchQLQueryResult> {
     const { database, views } = this.deps;
-    const { validation, granularity, excludeOrigins } = run;
+    const { validation, granularity, excludeOrigins, memberWindows } = run;
     const execution = await this.runRestricted(run);
     const hydrationStartedMs = this.deps.stopwatch();
     const answer = await this.deps.extraction.hydrate({
-      projects,
+      projects: hydratableProjects({ projects, memberWindows }),
       protections,
       validation,
       execution,
@@ -146,6 +149,7 @@ export class LangWatchQLExecutionService {
     granularity,
     tenantCapability,
     excludeOrigins,
+    memberWindows,
     timeWindow,
   }: Omit<
     LangWatchQLExecutionInput,
@@ -160,12 +164,13 @@ export class LangWatchQLExecutionService {
     const execution = await executor.execute({
       // The submitted statement with a default `LIMIT` when the caller named none, so an
       // unbounded query is capped rather than streamed, and the origins the surface left out.
-      sql: scopeLangWatchQLToOrigins({
+      sql: scopeLangWatchQL({
         sql: langWatchQLRowLimitedSql({ sql, validation, maxRows: limits.maxRows }),
         excludeOrigins,
         database,
         views,
         ...(timeWindow ? { timeWindow } : {}),
+        ...(memberWindows ? { memberWindows } : {}),
       }),
       // The resolved record, not the caller's: it is the one carrying the
       // window this surface injected AND the step this run was bucketed at.

@@ -604,6 +604,7 @@ function AllRunsHeader({
               failedCount: totals.failedCount,
               stalledCount: 0,
               cancelledCount: 0,
+              notScoredCount: 0,
               completedCount: totals.passedCount + totals.failedCount,
               inProgressCount: totals.pendingCount,
               queuedCount: 0,

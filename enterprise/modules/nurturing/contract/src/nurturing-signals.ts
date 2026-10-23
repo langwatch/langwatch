@@ -123,11 +123,14 @@ const nurturingSignalSchemaDefinition = z.discriminatedUnion("kind", [
     /** The organization's admin. */
     userId: id,
     projectId: id,
+    /** The latest of the evaluations this signal counts; its type, score and verdict follow. */
     evaluationId: id,
     evaluatorType: z.string().nullish(),
     score: z.number().nullish(),
     passed: z.boolean().nullish(),
-    /** Counted by nurturing since the cutover, including this one. */
+    /** The project's evaluations one batch counted together; absent on a signal from before batching. */
+    evaluationsCounted: countIncludingThis.optional(),
+    /** Counted by nurturing since the cutover, including these. */
     organizationEvaluationCount: countIncludingThis,
     /** The organization's first: never for one learned from project's backfill. */
     first: z.boolean(),
@@ -236,6 +239,14 @@ const nurturingSignalSchemaDefinition = z.discriminatedUnion("kind", [
     state: guidedOnboardingStateSchema,
   }),
   z.object({
+    kind: z.literal("onboarding_variant_assigned"),
+    ...signalSource,
+    /** The person who created the organization. */
+    userId: id,
+    organizationId: id,
+    variant: onboardingVariantSchema,
+  }),
+  z.object({
     kind: z.literal("subscription_changed"),
     ...signalSource,
     organizationId: id,
@@ -277,6 +288,55 @@ const nurturingSignalSchemaDefinition = z.discriminatedUnion("kind", [
     source: z.string(),
     daysSinceSignup: z.number().int().nonnegative().nullish(),
     onboardingVariant: variant,
+  }),
+  z.object({
+    kind: z.literal("coding_session_stored"),
+    ...signalSource,
+    /** The organization's admin. `occurredAt` is the session's. */
+    userId: id,
+    projectId: id,
+  }),
+  z.object({
+    kind: z.literal("coding_active_days"),
+    ...signalSource,
+    /** The organization's admin. */
+    userId: id,
+    projectId: id,
+    /** UTC days with a coding-agent session, counted by nurturing, this one included. */
+    codingActiveDays: countIncludingThis,
+  }),
+  z.object({
+    kind: z.literal("coding_agent_types"),
+    ...signalSource,
+    /** The organization's admin. */
+    userId: id,
+    projectId: id,
+    /** Every agent the organization has used, sorted. */
+    agentTypes: z.array(id).min(1),
+  }),
+  z.object({
+    kind: z.literal("coding_agent_first_session"),
+    ...signalSource,
+    /** The organization's admin. `occurredAt` is the first session's. */
+    userId: id,
+    projectId: id,
+    agentType: id,
+    agentTypes: z.array(id).min(1),
+    /** Every active member of the organization: each gets uses_coding_agent. */
+    memberUserIds: z.array(id).default([]),
+  }),
+  z.object({
+    /** The opening person's own profile, not the organization admin's. */
+    kind: z.literal("app_opened"),
+    ...signalSource,
+    userId: id,
+    page: id,
+  }),
+  z.object({
+    kind: z.literal("sessions_page_viewed"),
+    ...signalSource,
+    userId: id,
+    page: id,
   }),
 ]);
 export interface NurturingSignalSchema extends Named<typeof nurturingSignalSchemaDefinition> {}

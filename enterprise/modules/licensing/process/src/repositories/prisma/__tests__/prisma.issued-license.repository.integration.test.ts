@@ -60,7 +60,7 @@ describe.skipIf(!TEST_DATABASE_URL)("the license registry on Postgres", () => {
     now: () => nowInstant(),
   });
 
-  async function issue(label: string) {
+  async function issue(label: string, email = "ops@acme.test") {
     const organization = await prisma.organization.create({
       data: { name: `${label} ${RUN}`, slug: `--${RUN}-${organizationIds.length}` },
     });
@@ -68,7 +68,7 @@ describe.skipIf(!TEST_DATABASE_URL)("the license registry on Postgres", () => {
     organizationNames.set(organization.id, organization.name);
     return registry.issue({
       customer: { organizationId: organization.id },
-      email: "ops@acme.test",
+      email,
       planType: "ENTERPRISE",
       maxMembers: 50,
       expiresAt: nowInstant().add({ hours: 24 * 365 }),
@@ -305,5 +305,40 @@ describe.skipIf(!TEST_DATABASE_URL)("the license registry on Postgres", () => {
 
     expect(total).toBe(1);
     expect(rows[0]?.organizationName).toContain("Zebra Logistics");
+  });
+
+  /** @scenario The license list filters by status and by who the license is for */
+  it("keeps active or inactive licences, and internal addresses or the rest case aside", async () => {
+    const tag = `Filters ${RUN}`;
+    const { license: active } = await issue(`${tag} active`, "ops@customer.com");
+    const { license: revoked } = await issue(`${tag} revoked`, "it@customer.com");
+    const { license: superseded } = await issue(`${tag} superseded`, "it@customer.com");
+    const { license: expired } = await issue(`${tag} expired`, "it@customer.com");
+    const { license: internal } = await issue(`${tag} internal`, "Dogfood@LangWatch.AI");
+    const now = nowInstant();
+    await repository.update(revoked.id, { revokedAt: now, revokedReason: "test" });
+    await repository.update(superseded.id, { supersededAt: now });
+    await repository.update(expired.id, { expiresAt: now.subtract({ hours: 1 }) });
+    const query = { page: 0, pageSize: 25, search: tag };
+    const ids = (page: { rows: { id: string }[] }) => page.rows.map((row) => row.id).toSorted();
+    const internalOnes = (matching: boolean) => ({
+      emailSuffixes: { suffixes: ["@langwatch.ai"], matching },
+    });
+
+    const everything = await repository.listAll(query);
+    const onlyActive = await repository.listAll({ ...query, status: { at: now, active: true } });
+    const inactive = await repository.listAll({ ...query, status: { at: now, active: false } });
+    const external = await repository.listAll({
+      ...query,
+      status: { at: now, active: true },
+      ...internalOnes(false),
+    });
+
+    expect(everything.total).toBe(5);
+    expect(ids(onlyActive)).toEqual([active.id, internal.id].toSorted());
+    expect(ids(inactive)).toEqual([revoked.id, superseded.id, expired.id].toSorted());
+    expect(ids(external)).toEqual([active.id]);
+    expect(external.total).toBe(1);
+    expect(await repository.countAll({ search: tag, ...internalOnes(true) })).toBe(1);
   });
 });

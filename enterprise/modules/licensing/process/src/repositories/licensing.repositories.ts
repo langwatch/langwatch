@@ -6,8 +6,11 @@ import type { LicensingRateLimitRepository } from "./licensing-rate-limit.reposi
 import type { MemberSeatRepository } from "./member-seat.repository.ts";
 import type { OrganizationLicenseRepository } from "./organization-license.repository.ts";
 import type { SelfHostedInstanceRepository } from "./self-hosted-instance.repository.ts";
+import type { SelfHostedNoticeRepository } from "./self-hosted-notice.repository.ts";
 import type { SignInProviderMountRepository } from "./sign-in-provider-mount.repository.ts";
 import type { TestingLicenseTokenRepository } from "./testing-license-token.repository.ts";
+import type { UpgradeDiagnosticBundleRepository } from "./upgrade-diagnostic-bundle.repository.ts";
+import type { UpgradeDiagnosticRepository } from "./upgrade-diagnostic.repository.ts";
 
 /**
  * The stores this module owns. Chosen once, at boot, by the registry beside
@@ -20,9 +23,14 @@ export interface LicensingRepositories {
   /** The tokens that can only ask for a testing licence (ADR-180). */
   readonly testingLicenseTokens: TestingLicenseTokenRepository;
   readonly selfHostedInstances: SelfHostedInstanceRepository;
+  /** Cloud's notices to self-hosted installs, sent in the usage report reply. */
+  readonly selfHostedNotices: SelfHostedNoticeRepository;
   readonly connectOrganizations: ConnectOrganizationRepository;
   readonly instanceIdentity: InstanceIdentityRepository;
   readonly rateLimits: LicensingRateLimitRepository;
+  /** Cloud's rows for received upgrade diagnostics, and their bytes in object storage. */
+  readonly upgradeDiagnostics: UpgradeDiagnosticRepository;
+  readonly upgradeDiagnosticBundles: UpgradeDiagnosticBundleRepository;
   /** sso's sign-in provider fact, applied by licensing's peer subscriber (ADR-179). */
   readonly signInProviderMounts: SignInProviderMountRepository;
   /** Read through organization's shares, never OrganizationApi (R-C1f, Q9). */

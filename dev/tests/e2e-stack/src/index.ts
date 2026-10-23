@@ -336,6 +336,7 @@ export async function seededProjectId({
   for (let page = 1; ; page++) {
     const response = await fetch(`${apiUrl}/projects?page=${page}&limit=${PROJECT_PAGE_LIMIT}`, {
       headers: { authorization: `Bearer ${project.organizationApiKey}` },
+      signal: AbortSignal.timeout(15_000),
     });
     if (!response.ok) throw new Error(`GET /api/projects answered ${response.status}`);
     const { projects, total } = projectPageOf(await response.json());

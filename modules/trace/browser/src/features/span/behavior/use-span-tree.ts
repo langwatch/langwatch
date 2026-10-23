@@ -20,7 +20,7 @@ import {
  * the difference view.
  */
 function useSpanTreeCanonical() {
-  const { isLive, isReady, hintReady, queryArgs } = useTraceQueryArgs();
+  const { isLive, isReady, queryArgs } = useTraceQueryArgs();
   // `useTraceFreshness` invalidates the delta on each `span.stored` event and the
   // merge happens push-style; a reconnect asks for one catch-up delta.
   const sseConnected = useSseStatusStore((s) => s.sseConnectionState === "connected");
@@ -37,7 +37,7 @@ function useSpanTreeCanonical() {
     // Disable the real fetch when the traceId is a preview-mode synthetic —
     // `useOpenTraceDrawer` has already seeded the cache with hand-crafted span data;
     // firing a real request would just return empty and clobber the seed.
-    enabled: isReady && hintReady,
+    enabled: isReady,
     gcTime: 1_800_000,
     placeholderData: keepPreviousData,
   });

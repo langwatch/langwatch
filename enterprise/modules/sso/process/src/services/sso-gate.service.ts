@@ -46,8 +46,7 @@ const inspectionRefusalMessages: Record<
 > = {
   invalid_format: "Inspected a license candidate: could not be parsed (invalid format)",
   invalid_signature: "Inspected a license candidate: signature failed",
-  organization_mismatch:
-    "Inspected a license candidate: a testing license for another organization",
+  organization_mismatch: "Inspected a license candidate: a license for another organization",
   instance_mismatch: "Inspected a license candidate: a testing license for another instance",
   instance_override:
     "Inspected a license candidate: a testing license, refused while the instance id is configured",
@@ -190,7 +189,10 @@ export class SsoGateService {
   private startComputation(): Promise<boolean> {
     const pending: Promise<boolean> = this.readRevision()
       .then(async (revision) => {
-        const { allowed, until } = gateAnswerOf(await this.computeGate());
+        const { allowed, until } = gateAnswerOf({
+          ...(await this.computeGate()),
+          now: this.now(),
+        });
         // An invalidation while this read was in flight already replaced the memo.
         if (this.memoizedGate === pending) {
           this.denied = allowed ? null : { at: this.now(), revision };
@@ -274,14 +276,16 @@ export class SsoGateService {
   }
 }
 
-/** The gate's answer with its end time read; an end time that cannot be read counts as passed. */
+/** The gate's answer with its end time read; an end time unreadable or passed by `now` denies. */
 function gateAnswerOf({
   allowed: granted,
   allowedUntil,
+  now,
 }: {
   allowed: boolean;
   allowedUntil?: string;
+  now: number;
 }): { allowed: boolean; until: number | null } {
   const until = granted && allowedUntil !== undefined ? toEpochMs(allowedUntil) : null;
-  return { allowed: granted && (until === null || Number.isFinite(until)), until };
+  return { allowed: granted && (until === null || (Number.isFinite(until) && now < until)), until };
 }

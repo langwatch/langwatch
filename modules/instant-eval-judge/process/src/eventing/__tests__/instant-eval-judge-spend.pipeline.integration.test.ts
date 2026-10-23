@@ -29,6 +29,7 @@ import { Temporal } from "@langwatch/time";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MemoryInstantEvalRateLimiter } from "../../__tests__/support/instant-eval-rate-limiter.test-fakes.ts";
+import { MemoryInstantEvalDecisionModelChannel } from "../../channels/memory/memory.instant-eval-decision-model.channel.ts";
 import type { InstantEvalJudgeRepositories } from "../../repositories/instant-eval-judge.repositories.ts";
 import { MemoryInstantEvalJudgeRepositories } from "../../repositories/memory/memory.instant-eval-judge.repositories.ts";
 import { PostgresInstantEvalJudgeRepositories } from "../../repositories/prisma/prisma.instant-eval-judge.repositories.ts";
@@ -144,6 +145,7 @@ function spendCases(backend: Backend): void {
     });
     const registered = eventing.register(live.pipeline);
     const judge = InstantEvalJudgeService.create({
+      decisionModels: MemoryInstantEvalDecisionModelChannel.create(),
       repositories,
       limiter: MemoryInstantEvalRateLimiter.create(),
       classifier: undefined,

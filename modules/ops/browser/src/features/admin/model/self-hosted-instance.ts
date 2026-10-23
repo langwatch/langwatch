@@ -111,3 +111,67 @@ export function sortedDomains(
     .map(([domain, count]) => ({ domain, count }))
     .toSorted((a, b) => b.count - a.count || a.domain.localeCompare(b.domain));
 }
+
+export type SelfHostedSignal =
+  | "seats_crossed_threshold"
+  | "sustained_ingestion"
+  | "licensed_feature_without_license"
+  | "license_expiring"
+  | "domain_has_cloud_account"
+  | "license_sync_stale";
+
+/** Each lead signal in the words an operator reads. */
+export const SIGNAL_LABELS: Record<SelfHostedSignal, string> = {
+  seats_crossed_threshold: "Seats past threshold",
+  sustained_ingestion: "Sustained ingestion",
+  licensed_feature_without_license: "Licensed feature, no license",
+  license_expiring: "License expiring",
+  domain_has_cloud_account: "Domain has a Cloud account",
+  license_sync_stale: "License sync stale",
+};
+
+export type SelfHostedInstanceSort =
+  | "last_report"
+  | "newest"
+  | "traces_28d"
+  | "users"
+  | "active_users_28d";
+
+export const SORT_LABELS: Record<SelfHostedInstanceSort, string> = {
+  last_report: "Latest report",
+  newest: "Newest install",
+  traces_28d: "Most traces (28 days)",
+  users: "Most users",
+  active_users_28d: "Most active users (28 days)",
+};
+
+/** What the operator narrowed the list to; absent is everything. */
+export interface SelfHostedInstanceFilters {
+  sort: SelfHostedInstanceSort;
+  license?: "licensed" | "open_source";
+  activity?: SelfHostedInstance["activity"];
+  signal?: SelfHostedSignal;
+}
+
+/** What the registry adds up to, as the summary above the list reads it. */
+export interface SelfHostedInstanceSummary {
+  total: number;
+  reporting: number;
+  quiet: number;
+  gone: number;
+  licensed: number;
+  newLast7Days: number;
+  newLast30Days: number;
+  traces28d: number;
+  newPerWeek: { weekStart: string; count: number }[];
+  signals: { signal: SelfHostedSignal; count: number }[];
+  busiestOpenSource: SelfHostedInstance[];
+  releases: { version: string; count: number }[];
+}
+
+/** Who runs an install: the customer, else the largest email domain, else unknown. */
+export function instanceName(instance: SelfHostedInstance): string {
+  return (
+    instance.organizationName ?? sortedDomains(instance.userEmailDomains)[0]?.domain ?? "Unknown"
+  );
+}

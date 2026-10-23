@@ -5,6 +5,7 @@ import { fromDate, toDate, type Instant } from "@langwatch/time";
 import type {
   IssuedLicenseDraft,
   IssuedLicensePatch,
+  IssuedLicenseQuery,
   IssuedLicenseRecord,
   IssuedLicenseRepository,
 } from "../issued-license.repository.ts";
@@ -93,27 +94,12 @@ export class PrismaIssuedLicenseRepository implements IssuedLicenseRepository {
   async listAll({
     page,
     pageSize,
-    search,
-    includeTesting,
-  }: {
-    page: number;
-    pageSize: number;
-    search?: string;
-    includeTesting?: boolean;
-  }): Promise<{ rows: IssuedLicenseRecord[]; total: number }> {
-    const term = search?.trim();
-    const where: Prisma.IssuedLicenseWhereInput = {
-      ...(includeTesting === true ? {} : { kind: "standard" }),
-      ...(term
-        ? {
-            OR: [
-              { organizationName: { contains: term, mode: "insensitive" } },
-              { email: { contains: term, mode: "insensitive" } },
-              { licenseId: { contains: term, mode: "insensitive" } },
-            ],
-          }
-        : {}),
-    };
+    ...query
+  }: IssuedLicenseQuery & { page: number; pageSize: number }): Promise<{
+    rows: IssuedLicenseRecord[];
+    total: number;
+  }> {
+    const where = whereOf(query);
     const [rows, total] = await Promise.all([
       this.prisma.issuedLicense.findMany({
         where,
@@ -124,6 +110,10 @@ export class PrismaIssuedLicenseRepository implements IssuedLicenseRepository {
       this.prisma.issuedLicense.count({ where }),
     ]);
     return { rows: rows.map((row) => rowOf(row, this.cipher)), total };
+  }
+
+  async countAll(query: IssuedLicenseQuery): Promise<number> {
+    return this.prisma.issuedLicense.count({ where: whereOf(query) });
   }
 
   async update(id: string, data: IssuedLicensePatch): Promise<IssuedLicenseRecord> {
@@ -248,4 +238,46 @@ function updateColumnsOf(
       : {}),
     ...("lastSyncAt" in data ? { lastSyncAt: lastSyncAt ? toDate(lastSyncAt) : null } : {}),
   };
+}
+
+/** The query as a WHERE clause; each part narrows the rest. */
+function whereOf({
+  search,
+  status,
+  emailSuffixes,
+  includeTesting,
+}: IssuedLicenseQuery): Prisma.IssuedLicenseWhereInput {
+  const term = search?.trim();
+  const parts: Prisma.IssuedLicenseWhereInput[] = [];
+  if (includeTesting !== true) parts.push({ kind: "standard" });
+  if (term) {
+    parts.push({
+      OR: [
+        { organizationName: { contains: term, mode: "insensitive" } },
+        { email: { contains: term, mode: "insensitive" } },
+        { licenseId: { contains: term, mode: "insensitive" } },
+      ],
+    });
+  }
+  if (status) {
+    const at = toDate(status.at);
+    parts.push(
+      status.active
+        ? { revokedAt: null, supersededAt: null, expiresAt: { gt: at } }
+        : {
+            OR: [
+              { revokedAt: { not: null } },
+              { supersededAt: { not: null } },
+              { expiresAt: { lte: at } },
+            ],
+          },
+    );
+  }
+  if (emailSuffixes) {
+    const endings = emailSuffixes.suffixes.map((suffix) => ({
+      email: { endsWith: suffix, mode: "insensitive" as const },
+    }));
+    parts.push(emailSuffixes.matching ? { OR: endings } : { NOT: endings });
+  }
+  return { AND: parts };
 }
