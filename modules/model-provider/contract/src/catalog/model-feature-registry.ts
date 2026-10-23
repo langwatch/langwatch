@@ -1,6 +1,6 @@
 /** Model roles per platform surface; keys stable forever (never rename). */
 
-export const MODEL_ROLES = ["DEFAULT", "FAST", "LANGY", "EMBEDDINGS"] as const;
+export const MODEL_ROLES = ["DEFAULT", "FAST", "LANGY", "EMBEDDINGS", "INSTANT_EVALS"] as const;
 export type ModelRole = (typeof MODEL_ROLES)[number];
 
 export function isModelRole(value: string): value is ModelRole {
@@ -136,6 +136,14 @@ const REGISTRY: FeatureDescriptor[] = [
     // this is without parenthetical clutter.
     displayName: "Topic clustering",
     description: "Vectors used to group similar traces in Analytics → Topics.",
+  },
+
+  // INSTANT_EVALS — the decision model Instant Evals classify with (ADR-182).
+  {
+    key: "instant_eval.judge",
+    role: "INSTANT_EVALS",
+    displayName: "Instant Evals",
+    description: "The decision model Instant Evals and their judged columns run on.",
   },
 ];
 

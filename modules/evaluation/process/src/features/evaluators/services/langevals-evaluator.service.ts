@@ -22,6 +22,11 @@ import type { EvaluationExecutionMetricsService } from "../../execution/services
 
 const logger = createLogger("langwatch:langevals-http-client");
 
+/** LangEvals not up yet (still booting, or restarting): the queue retries the evaluation. */
+const NOT_UP_YET = { httpStatus: 503, retryable: true } as const;
+/** What a synchronous caller is told to wait (`Retry-After`) before asking again. */
+const NOT_UP_YET_RETRY_AFTER_MS = 5_000;
+
 function throwFetchFailure({
   error,
   url,
@@ -53,7 +58,8 @@ function throwFetchFailure({
   if (error instanceof Error && error.message.includes("fetch failed")) {
     logger.warn({ error, url }, "Evaluator cannot be reached");
     throw new EvaluatorExecutionError("Evaluator cannot be reached", {
-      meta: { evaluatorType },
+      meta: { evaluatorType, retryAfterMs: NOT_UP_YET_RETRY_AFTER_MS },
+      ...NOT_UP_YET,
     });
   }
 
@@ -195,7 +201,12 @@ export class LangevalsEvaluatorService {
 
     this.telemetry?.record({ evaluatorType, status: "error", durationMs: duration });
     throw new EvaluatorExecutionError(`${response.status} ${statusText}`, {
-      meta: { evaluatorType, httpStatus: response.status },
+      meta: {
+        evaluatorType,
+        httpStatus: response.status,
+        ...(response.status === 503 ? { retryAfterMs: NOT_UP_YET_RETRY_AFTER_MS } : {}),
+      },
+      ...(response.status === 503 ? NOT_UP_YET : {}),
     });
   }
 }

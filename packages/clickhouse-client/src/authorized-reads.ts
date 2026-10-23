@@ -10,10 +10,13 @@ import {
   type Authorization,
   type AuthorizationConditionType,
   type AuthorizationGrant,
+  type ProofBearingPermission,
+  type SharedWindow,
+  sharedWindowsReadBy,
   usableAuthorization,
-  type AuthzPermission,
 } from "@langwatch/authorization";
 import {
+  TENANT_SCOPE_BUCKET_WIDTH_MS,
   TENANT_SCOPE_TIME_COLUMNS,
   type TenantScopeTimeColumn,
 } from "@langwatch/clickhouse-markers";
@@ -27,38 +30,30 @@ import { StatementScopeError, TENANT_SCOPE_PARAM_PREFIX } from "./statementScope
 export type ClickHouseClientResolver = (tenantId: string) => Promise<ClickHouseQueryClient>;
 
 /**
- * What a reader may be asked for: the permission each one needs, and the
- * resource a shared grant's window must apply to for that grant to open
- * rows of it. Both read trace rows, so both take a `trace` window.
+ * What a reader may be asked for: the proof-bearing permission each one needs, and the resource
+ * a shared grant's window must apply to for that grant to open rows of it. All three read trace
+ * rows, so all take a `trace` window; `cost` is the cost-gated analytics reads (ADR-177 v4.15).
  */
 const READ_RESOURCES = {
   traces: { permission: "traces:view", condition: "trace" },
   analytics: { permission: "analytics:view", condition: "trace" },
+  cost: { permission: "cost:view", condition: "trace" },
 } as const satisfies Record<
   string,
-  { permission: AuthzPermission; condition: AuthorizationConditionType }
+  { permission: ProofBearingPermission; condition: AuthorizationConditionType }
 >;
 export type ReadResource = keyof typeof READ_RESOURCES;
-
-/**
- * The permissions a route mints a proof for: only `traces:view`. No production read asks for
- * `analytics` yet, so minting under it would cost an engine pass nothing consumes; a
- * traces-minted proof asked for analytics reads its own project alone.
- */
-export const PROOF_BEARING_PERMISSIONS: ReadonlySet<AuthzPermission> = new Set([
-  READ_RESOURCES.traces.permission,
-]);
 
 const MARKER = /\{\{tenantScope:([A-Za-z_][A-Za-z0-9_]*)\}\}/g;
 const SET_MARKER = /\{\{tenantSet\}\}/g;
 
 /**
- * A tenant predicate written by hand (`TenantId =`, `IN`, comparisons); a projection or dedup
- * tuple member is fine. Exported so the source scan over the converted repositories refuses
- * the same shapes the reader refuses at run time.
+ * A tenant predicate written by hand (`TenantId =`, `IN`, comparisons); a projection, a dedup
+ * tuple member or a join key equating two `TenantId` columns is fine. Exported so the source
+ * scan over the converted repositories refuses the shapes the reader refuses at run time.
  */
 export const HAND_WRITTEN_TENANT_PREDICATE =
-  /\bTenantId\s*(?:=|!=|<>|<=|>=|<|>|(?:NOT\s+)?IN\b|(?:NOT\s+)?LIKE\b)/i;
+  /\bTenantId\s*(?:=(?!\s*(?:[A-Za-z_]\w*\.)?TenantId\b)|!=|<>|<=|>=|<|>|(?:NOT\s+)?IN\b|(?:NOT\s+)?LIKE\b)/i;
 
 /**
  * A stable cache key for who a proof fences, under which windows. Own projects stay readable;
@@ -81,9 +76,6 @@ export function tenantScopeKey({
   const digest = createHash("sha256").update(windows).digest("hex");
   return `${own}+${fence.shared.length}:${digest}`;
 }
-
-/** One shared project and the window its grant opens, as the fence binds it. */
-type SharedWindow = { projectId: string; from: number; until: number | null };
 
 type TenantFence = {
   /**
@@ -132,11 +124,18 @@ export function fenceExpression({
   // The default is never read: `TenantId IN ids` gates every lookup.
   const edgeOf = (edge: "from" | "until") =>
     `transform(TenantId, ${ids}, ${slot(edge, "Array(Int64)")}, toInt64(0))`;
+  const width = TENANT_SCOPE_BUCKET_WIDTH_MS[column];
+  // A bucket starting at or after `from` lies wholly after it; one ending by `until` lies
+  // wholly before it.
+  const closedUntil =
+    width === undefined
+      ? `${column} < fromUnixTimestamp64Milli(${edgeOf("until")})`
+      : `${column} <= fromUnixTimestamp64Milli(${edgeOf("until")} - ${width})`;
   const windowed =
     `(TenantId IN (${ids})` +
     ` AND ${column} >= fromUnixTimestamp64Milli(${edgeOf("from")})` +
     ` AND (${edgeOf("until")} = ${OPEN_UNTIL}` +
-    ` OR ${column} < fromUnixTimestamp64Milli(${edgeOf("until")})))`;
+    ` OR ${closedUntil}))`;
   const params: Record<string, unknown> = {
     [fenceParam("all")]: tenantsOf(fence),
     [fenceParam("ids")]: fence.shared.map((window) => window.projectId),
@@ -186,14 +185,7 @@ export function fenceFor({
     .filter(carries)
     .map((grant) => grant.projectId as string);
   if (own.length === 0) throw new AccessNotGrantedError(permission);
-  const shared = authorization.grants
-    .filter((grant) => grant.kind === "shared" && grant.condition?.type === condition)
-    .filter(carries)
-    .map((grant) => ({
-      projectId: grant.projectId as string,
-      from: grant.condition?.from ?? 0,
-      until: grant.condition?.until ?? null,
-    }));
+  const shared = sharedWindowsReadBy({ authorization, permission, condition });
   const narrowedTo = authorization.narrowedTo;
   if (narrowedTo === undefined) return { own, shared };
   const narrowed = {

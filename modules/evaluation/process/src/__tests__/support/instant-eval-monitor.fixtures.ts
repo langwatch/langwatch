@@ -75,6 +75,7 @@ export function buildInstantEvalMonitor({ judge }: { judge: Judge }) {
         return judge(input);
       },
     },
+    decisionModels: { resolveDecisionModel: async () => ({ kind: "langwatch" }) },
     installEnvironment: {},
   });
   const costRecorder = new TestCostRecorder();

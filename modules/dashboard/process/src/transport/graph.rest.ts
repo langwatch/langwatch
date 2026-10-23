@@ -17,7 +17,7 @@ import {
   type Graph,
 } from "@langwatch/dashboard-contract";
 
-import { viewerOfActor } from "../rules/dashboard-viewer.rules.ts";
+import { viewerOfActor, viewerOfOwner } from "../rules/dashboard-viewer.rules.ts";
 
 const graphResponse = (graph: Graph) => ({
   id: graph.id,
@@ -127,9 +127,9 @@ export const graphRest = defineRestRouter(DashboardApi)
     resource: "graph",
     action: "delete",
     idParam: "id",
-    name: ({ app, projectId, id }) =>
+    name: ({ app, projectId, id, ownerUserId }) =>
       nameUnlessMissing({
-        read: app.getGraph({ projectId, graphId: id }),
+        read: app.getGraph({ projectId, graphId: id, ...viewerOfOwner({ ownerUserId }) }),
         missing: GraphNotFoundError,
         nameOf: (graph) => graph.name,
       }),
