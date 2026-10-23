@@ -293,6 +293,11 @@ In this mode the server:
 - generates a `local_admin` password at every start, valid only from inside the
   pod, for initialisation scripts and in-pod tools.
 
+ClickHouse treats every address of the server's own network interfaces as
+local, so "inside the pod" means its network namespace. Do not run a
+dynamic-only server with host networking: then every process on the host
+counts as local.
+
 Give each workload a token that lives for minutes. A projected ServiceAccount
 token with `expirationSeconds: 600` works; the kubelet renews the file before
 it expires. **Read the token file for each connection or request**, and never
