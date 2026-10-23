@@ -1,5 +1,6 @@
 import {
   AnnotationApi,
+  AnnotationNotFoundError,
   annotationRestDeletedSchema,
   annotationRestListResponseSchema,
   annotationRestParamsSchema,
@@ -7,7 +8,7 @@ import {
   annotationRestResponseSchema,
   annotationRestWriteSchema,
 } from "@langwatch/annotation-contract";
-import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
+import { defineRestRouter, MANAGEMENT_API_VERSION, nameUnlessMissing } from "@langwatch/api/rest";
 
 export const annotationRest = defineRestRouter(AnnotationApi)
   .withNamespace("annotations")
@@ -48,6 +49,7 @@ export const annotationRest = defineRestRouter(AnnotationApi)
   })
 
   .patch("/:id", "updateAnnotation")
+  .keepsRecords()
   .withAudit("annotation.update")
   .withParams(annotationRestParamsSchema)
   .withInput(annotationRestWriteSchema)
@@ -70,6 +72,17 @@ export const annotationRest = defineRestRouter(AnnotationApi)
   .withAudit("annotation.deleteById")
   .withParams(annotationRestParamsSchema)
   .withPermission("annotations:manage")
+  .withConfirmation({
+    resource: "annotation",
+    action: "delete",
+    idParam: "id",
+    name: ({ app, projectId, id }) =>
+      nameUnlessMissing({
+        read: app.getById({ id, projectId }),
+        missing: AnnotationNotFoundError,
+        nameOf: (annotation) => (annotation.comment ? annotation.comment.slice(0, 60) : null),
+      }),
+  })
   .withOutput(annotationRestDeletedSchema)
   .withDocs({
     operationId: "deleteApiAnnotationsId",
@@ -101,6 +114,7 @@ export const annotationRest = defineRestRouter(AnnotationApi)
   })
 
   .post("/trace/:id", "createTraceAnnotation")
+  .keepsRecords()
   .withAudit("annotation.create")
   .withParams(annotationRestParamsSchema)
   .withInput(annotationRestWriteSchema)

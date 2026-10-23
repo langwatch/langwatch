@@ -1,14 +1,18 @@
 import { stripFeaturePrefix } from "./feature-layout-policy.mjs";
 
-// The closed layer grammar of a module's process package, as tables.
-// A repository takes the store it reads, a channel the client it speaks to, a
-// transport declares and calls the module. A service works over repository
-// and channel interfaces, never the implementation below one. ARCHITECTURE.md §3.2, §8.
+// The closed layer grammar of a module's process package and of an opted-in
+// framework package (ADR-181), as tables. A repository takes the store it reads,
+// a channel the client it speaks to, a transport declares and calls the module.
+// A service works over repository and channel interfaces, never the implementation
+// below one; app/ composes the tiers. ARCHITECTURE.md §3.2, §3.4, §8.
 
 /** What a layer may value-import, by folder. A known folder absent from a row is a crossing. */
 export const LAYER_MAY_TAKE = {
-  channels: ["channels", "rules"],
-  repositories: ["repositories", "rules"],
+  channels: ["channels", "rules", "telemetry", "vocabulary"],
+  repositories: ["repositories", "rules", "telemetry", "vocabulary"],
+  // A framework's leaves: OTel instruments every layer may record on, and its own contract.
+  telemetry: ["telemetry"],
+  vocabulary: ["vocabulary", "rules", "telemetry"],
 };
 
 /** Folders a layer never names, not even as a type. */
@@ -30,7 +34,9 @@ export const LAYER_NOUN = {
   rules: "a rules module",
   services: "a service",
   tasks: "a task",
+  telemetry: "the telemetry instruments",
   transport: "a transport",
+  vocabulary: "the vocabulary",
 };
 
 /** How the implementation below an interface folder is named in a message. */

@@ -400,7 +400,7 @@ Answers at `/api/scenario/execute-sync`.
 ```typescript
 // Body: executeSyncRelayEventSchema, ../contract/src/workflow-rest.schemas.ts:210
 type Body = Record<string, unknown>;
-// Response: inline, src/transport/workflow-execute-sync.rest.ts:27
+// Response: inline, src/transport/workflow-execute-sync.rest.ts:28
 type Response = unknown;
 ```
 
@@ -436,7 +436,7 @@ type Response = z.infer<typeof workflowRunAnswerSchema>; // ../contract/src/work
 
 Run a workflow
 
-Permission `workflows:manage`. Declared at `src/transport/workflow-run.rest.ts:83`.
+Permission `workflows:manage`. Declared at `src/transport/workflow-run.rest.ts:84`.
 
 Answers at `/api/workflows/:workflowId/run`, `/api/v1/workflows/:workflowId/run`.
 
@@ -453,7 +453,7 @@ type Response = z.infer<typeof workflowRunAnswerSchema>; // ../contract/src/work
 
 Run a specific workflow version
 
-Permission `workflows:manage`. Declared at `src/transport/workflow-run.rest.ts:111`.
+Permission `workflows:manage`. Declared at `src/transport/workflow-run.rest.ts:113`.
 
 Answers at `/api/workflows/:workflowId/:versionId/run`, `/api/v1/workflows/:workflowId/:versionId/run`.
 
@@ -495,13 +495,13 @@ interface Response {
 
 #### `POST /api/workflows/post_event` · `postWorkflowStudioEvent`
 
-Permission `workflows:manage`. Declared at `src/transport/workflow-studio.rest.ts:37`.
+Permission `workflows:manage`. Declared at `src/transport/workflow-studio.rest.ts:38`.
 
 Answers at `/api/workflows/post_event`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/workflow-studio.rest.ts:39)
-// Response: inline, src/transport/workflow-studio.rest.ts:46
+// Rawbody: "text" (inline, src/transport/workflow-studio.rest.ts:41)
+// Response: inline, src/transport/workflow-studio.rest.ts:48
 type Response = unknown;
 ```
 
@@ -509,7 +509,7 @@ type Response = unknown;
 
 |             |                                            |
 | ----------- | ------------------------------------------ |
-| Declared at | `src/transport/workflow.rest.ts:67`        |
+| Declared at | `src/transport/workflow.rest.ts:69`        |
 | Base URL    | `/api/workflows`, twin `/api/v1/workflows` |
 | Addressing  | dated                                      |
 | Credential  | project                                    |
@@ -519,12 +519,12 @@ type Response = unknown;
 
 List all non-archived workflows for the project
 
-Permission `workflows:view`. Declared at `src/transport/workflow.rest.ts:72`.
+Permission `workflows:view`. Declared at `src/transport/workflow.rest.ts:74`.
 
 Answers at `/api/workflows`, `/api/v1/workflows`; also, undocumented, `/api/workflows/2026-08-07`, `/api/v1/workflows/2026-08-07`, `/api/workflows/latest`, `/api/v1/workflows/latest`.
 
 ```typescript
-// Response: inline, src/transport/workflow.rest.ts:74
+// Response: inline, src/transport/workflow.rest.ts:76
 type Response = {
   id: string;
   name: string;
@@ -542,7 +542,7 @@ type Response = {
 
 Get a workflow by its ID
 
-Permission `workflows:view`. Declared at `src/transport/workflow.rest.ts:87`.
+Permission `workflows:view`. Declared at `src/transport/workflow.rest.ts:89`.
 
 Answers at `/api/workflows/:id`, `/api/v1/workflows/:id`; also, undocumented, `/api/workflows/2026-08-07/:id`, `/api/v1/workflows/2026-08-07/:id`, `/api/workflows/latest/:id`, `/api/v1/workflows/latest/:id`.
 
@@ -569,7 +569,7 @@ interface Response {
 
 Update a workflow's metadata (name, icon, description)
 
-Permission `workflows:update`. Declared at `src/transport/workflow.rest.ts:105`.
+Permission `workflows:update`. Declared at `src/transport/workflow.rest.ts:107`.
 
 Answers at `/api/workflows/:id`, `/api/v1/workflows/:id`; also, undocumented, `/api/workflows/2026-08-07/:id`, `/api/v1/workflows/2026-08-07/:id`, `/api/workflows/latest/:id`, `/api/v1/workflows/latest/:id`.
 
@@ -588,7 +588,7 @@ type Response = z.infer<typeof workflowRestDetailSchema>; // ../contract/src/wor
 
 Archive (soft-delete) a workflow
 
-Permission `workflows:manage`. Declared at `src/transport/workflow.rest.ts:126`.
+Permission `workflows:manage`. Declared at `src/transport/workflow.rest.ts:129`.
 
 Answers at `/api/workflows/:id`, `/api/v1/workflows/:id`; also, undocumented, `/api/workflows/2026-08-07/:id`, `/api/v1/workflows/2026-08-07/:id`, `/api/workflows/latest/:id`, `/api/v1/workflows/latest/:id`.
 

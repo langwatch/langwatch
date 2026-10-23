@@ -16,6 +16,7 @@ import { LangWatchQLSqlTextService } from "../../../services/langwatch-ql-sql-te
  * @see specs/lwql/api.feature
  */
 import { LWQL_SOURCE_ALIAS } from "../../lwql-catalogue/rules/lwql-source-alias.rules.ts";
+import { postgresEngineColumnType } from "../rules/lwql-postgres-engine-type.rules.ts";
 
 const catalogShapes = LangWatchQLCatalogShapesService.create();
 const sqlText = LangWatchQLSqlTextService.create();
@@ -87,16 +88,17 @@ function postgresTenantPredicate({
   // taking for two characters.
   const keyMap = `${sqlText.assertIdentifier(sourceDatabase, "sourceDatabase")}.${sqlText.assertIdentifier(names.keyMapTable, "keyMapTable")}`;
 
-  // The self-policy narrows the subquery to one *hash*, not to one *row*. The key map is
-  // `ENGINE = MergeTree ORDER BY KeyHash`, which enforces no uniqueness, so a retried
-  // provisioning step or a re-issued key leaves two rows the policy both admits and the scalar
-  // subquery fails the whole query with `INCORRECT_RESULT_OF_SCALAR_SUBQUERY`.
+  // A group project's session holds one hash per member, so the self-policy admits one row per
+  // member and an equality kept only the first. `IN (subquery)` stays a set and is not pushed
+  // down, so the bound is a min/max range of scalars: one tenant still sends an exact match, a
+  // group sends the span of its members, and the row policy underneath decides the answer.
+  const tenantId = `${KEY_MAP_ALIAS}.${sqlText.quotedColumn(KEY_MAP_COLUMNS.tenantId)}`;
+  const bound = (fn: "min" | "max") =>
+    `(SELECT ${fn}(${tenantId}) FROM ${keyMap} AS ${KEY_MAP_ALIAS})`;
+
   return (
-    `WHERE ${sourceColumn(TENANT_COLUMN)} = (\n` +
-    `    SELECT ${KEY_MAP_ALIAS}.${sqlText.quotedColumn(KEY_MAP_COLUMNS.tenantId)}\n` +
-    `    FROM ${keyMap} AS ${KEY_MAP_ALIAS}\n` +
-    `    LIMIT 1\n` +
-    `  )`
+    `WHERE ${sourceColumn(TENANT_COLUMN)} >= ${bound("min")}\n` +
+    `  AND ${sourceColumn(TENANT_COLUMN)} <= ${bound("max")}`
   );
 }
 
@@ -189,8 +191,8 @@ function groupedColumnExpression(
 
 /**
  * One projection expression: an identity over a PostgreSQL engine table (the
- * approved view already renamed), the grouped form under `GROUP BY`, else the
- * column's own expression.
+ * approved view already renamed, a date cast back to its catalogue type), the
+ * grouped form under `GROUP BY`, else the column's own expression.
  */
 function projectedExpression({
   view,
@@ -206,7 +208,11 @@ function projectedExpression({
   joinedColumn: ((name: string) => string) | undefined;
 }): string {
   if (postgres) {
-    return sourceColumn(column.name);
+    const source = sourceColumn(column.name);
+    // The engine table widens a date to read it right; the view keeps the catalogue's type.
+    return postgresEngineColumnType(column.type) === column.type
+      ? source
+      : `CAST(${source} AS ${column.type})`;
   }
 
   if (grouped) {

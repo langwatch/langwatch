@@ -58,5 +58,6 @@ export abstract class TraceProjectedReadRepository {
     authorization: Authorization;
     traceId: string;
     sinceUpdatedAtMs: number;
+    occurredAtMs?: number;
   }): Promise<TraceSpanSummaryRecord[]>;
 }

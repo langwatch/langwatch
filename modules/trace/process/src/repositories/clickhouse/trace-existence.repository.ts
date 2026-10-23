@@ -44,9 +44,12 @@ export class ClickHouseTraceExistenceRepository extends TraceExistenceRepository
               FROM trace_summaries
               WHERE TenantId = {tenantId:String}
                 AND TraceId IN ({traceIds:Array(String)})
+                {{idBound:trace_summaries.TraceId:traceIds}}
             `,
         query_params: { tenantId: projectId, traceIds: [...traceIds] },
         format: "JSONEachRow",
+        // A ready index's miss means absent; a hit is still confirmed on the source.
+        idBound: { onMiss: "none" },
       });
       const rows = traceIdRowsSchema.parse(await result.json());
       return rows.map((row) => row.TraceId);
@@ -75,6 +78,7 @@ export class ClickHouseTraceExistenceRepository extends TraceExistenceRepository
     if (traceIds.length === 0) return [];
     const client = await this.resolveClient(projectId);
     const result = await client.query({
+      // ID_BOUND_SKIP: bounded by the caller's own occurred-time range, not by id.
       query: `
           SELECT TraceId, TotalCost
           FROM trace_summaries

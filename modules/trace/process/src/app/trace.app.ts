@@ -262,9 +262,12 @@ import { TraceIngestCredentialService } from "../features/ingestion/services/tra
 import { TraceIngestSourceBillingService } from "../features/ingestion/services/trace-ingest-source-billing.service.ts";
 import {
   TraceIngestionService,
-  TraceIngressCommand,
   type CodingAgentIngestFilter,
 } from "../features/ingestion/services/trace-ingestion.service.ts";
+import {
+  TraceIngressCommand,
+  type RecordSpanOutcome,
+} from "../features/ingestion/services/trace-span-collection.service.ts";
 import type {
   ResolveTraceSpansBatchFn,
   ResolveTraceSpansFn,
@@ -2574,6 +2577,7 @@ export class TraceModule implements TraceApi, CollectorApp {
   translateLegacyFilters(input: {
     filters: Readonly<Record<string, unknown>>;
     window?: { startDate?: number; endDate?: number };
+    fenced?: boolean;
   }): GenerateFilterConditionsResult {
     return translateLegacyFilters(input);
   }
@@ -4007,6 +4011,16 @@ class TraceComposedIngressCommand extends TraceIngressCommand {
 
   async recordSpan(data: RecordSpanCommandData): Promise<void> {
     await this.#commands.recordSpan(data);
+  }
+
+  /** A span the queue staged or folded into one already staged is recorded; else it failed. */
+  async recordSpans(data: readonly RecordSpanCommandData[]): Promise<RecordSpanOutcome[]> {
+    const results = await this.#commands.recordSpans(data);
+    return results.map((result) =>
+      result.status === "staged" || result.status === "deduplicated"
+        ? { status: "recorded" }
+        : { status: "failed", error: result.error },
+    );
   }
 }
 

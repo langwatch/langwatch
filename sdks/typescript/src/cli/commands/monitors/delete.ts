@@ -4,10 +4,10 @@ import { scopedApiKey } from "@/internal/credentialContext";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 import { resolveCredentials } from "../../utils/apiKey.ts";
-import { failSpinnerFromResponse } from "../../utils/failFromResponse.ts";
 import type { CommandResult } from "../../utils/output.ts";
 import { createSpinner } from "../../utils/spinner.ts";
 import { failSpinner } from "../../utils/spinnerError.ts";
+import { failMonitorResponse } from "./findMonitor";
 /**
  * Returns the deletion outcome rather than printing it: the output port renders
  * it in whatever format the caller asked for (utils/output.ts).
@@ -31,7 +31,7 @@ export const deleteMonitorCommand = async (id: string): Promise<CommandResult | 
     });
 
     if (!response.ok) {
-      await failSpinnerFromResponse({ spinner, response, action: "delete monitor" });
+      await failMonitorResponse({ spinner, response, action: "delete monitor", reference: id });
       process.exit(1);
     }
 
