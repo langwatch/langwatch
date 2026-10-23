@@ -1,12 +1,12 @@
 /**
- * How a REST request that failed through the caller's fault is reported: a span left UNSET with
- * its exception kept, one counter series per reason, and a request log line sampled per reason.
- * A server fault keeps the loud treatment, now with the cause on the span status. Mirrors the
- * tRPC lane (trpc/policy.ts), which has always left customer faults off the error SLOs.
+ * A REST request failed through the caller's fault: span left UNSET with its exception, one counter
+ * series per reason, a log line sampled per reason. A server fault stays loud, its cause on the
+ * span status. Mirrors trpc/policy.ts. specs/observability/client-fault-telemetry.feature
  */
 import { HandledError } from "@langwatch/handled-error";
 import { createWarnThrottle, getStatusCodeFromError } from "@langwatch/observability";
 import { counter } from "@langwatch/observability/metrics";
+import { nowInstant } from "@langwatch/time";
 import { type Span, SpanStatusCode } from "@opentelemetry/api";
 
 /** Customer-fault requests per family, reason code and status. No tenant, key or token. */
@@ -37,7 +37,13 @@ export function isClientFault(error: unknown): boolean {
  * Records a failed request on its span. The exception event is always kept. A client fault
  * leaves the status UNSET; anything else is ERROR carrying the cause in `status.message`.
  */
-export function recordRequestSpanFailure({ span, error }: { span: Span; error: unknown }): void {
+export function recordRequestSpanFailure({
+  span,
+  error,
+}: {
+  span: Pick<Span, "recordException" | "setAttributes" | "setStatus">;
+  error: unknown;
+}): void {
   span.recordException(error as Error);
 
   const code = clientFaultCodeOf(error);
@@ -46,8 +52,15 @@ export function recordRequestSpanFailure({ span, error }: { span: Span; error: u
     return;
   }
 
-  const message = error instanceof Error ? error.message : typeof error === "string" ? error : "";
+  const message = failureMessage(error);
   span.setStatus({ code: SpanStatusCode.ERROR, ...(message ? { message } : {}) });
+}
+
+/** The cause written on an ERROR span's status: the message, or nothing when there is none. */
+function failureMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  return "";
 }
 
 /**
@@ -59,7 +72,7 @@ export function sampleClientFaultLog({
   error,
   family,
   statusCode,
-  now = Date.now(),
+  now = nowInstant().epochMilliseconds,
 }: {
   error: unknown;
   family: string | undefined;

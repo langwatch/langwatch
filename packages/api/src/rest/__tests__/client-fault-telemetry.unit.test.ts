@@ -1,7 +1,7 @@
 /** @vitest-environment node */
 
 import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
-import { SpanStatusCode, type Span } from "@opentelemetry/api";
+import { SpanStatusCode } from "@opentelemetry/api";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ProjectInvalidCredentialsError } from "../../errors.ts";
@@ -18,7 +18,7 @@ function fakeSpan() {
     setAttributes: vi.fn(),
     setStatus: vi.fn(),
   };
-  return { span, asSpan: span as unknown as Span };
+  return { span, asSpan: span };
 }
 
 describe("recordRequestSpanFailure", () => {

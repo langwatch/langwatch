@@ -114,11 +114,9 @@ type FaultSpan = {
 type Held<T> = { ok: true; value: T } | { ok: false; error: unknown };
 
 /**
- * Runs `body` inside a span that `open` starts, without letting the caller's own fault mark that
- * span ERROR. A tracer's active-span helper sets ERROR on anything thrown. A refusal the sender
- * must fix (over its plan, unreadable body) is not a server error, so it is held inside the span,
- * written as an exception event with its code, and rethrown once the span has closed UNSET.
- * Anything else is thrown through the span as before.
+ * Runs `body` in a span `open` starts, without the caller's own fault marking it ERROR. A
+ * customer-fault refusal is held as an exception event with its code and rethrown once the span
+ * has closed UNSET; anything else is thrown through the span as before.
  */
 export async function withClientFaultSpan<S extends FaultSpan, T>(
   open: (run: (span: S) => Promise<Held<T>>) => Promise<Held<T>>,
@@ -147,17 +145,16 @@ export function resetIngestDoorRefusalLog(): void {
 }
 
 /**
- * Records a credential refusal at an ingestion door. The counter takes every refusal. The warn
- * line, with its request fingerprint, is sampled per caller bucket: a misconfigured exporter
- * retries its refused batch many times a second, and each retry is the same fact. A suppressed
- * refusal is still written, at debug.
+ * Records a credential refusal at an ingestion door. The counter takes every refusal; the warn
+ * line is sampled per caller bucket, since an exporter retries a refused batch many times a
+ * second. A suppressed refusal is still written, at debug.
  */
 export function recordIngestDoorRefusal({
   logger,
   signal,
   error,
   diagnostics,
-  now = Date.now(),
+  now = nowInstant().epochMilliseconds,
 }: {
   logger: Pick<Logger, "warn" | "debug">;
   signal: OtlpSignal;
