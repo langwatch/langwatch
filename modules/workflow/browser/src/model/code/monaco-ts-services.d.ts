@@ -19,6 +19,11 @@ declare module "monaco-editor/esm/vs/language/typescript/lib/typescriptServices.
   interface LanguageService {
     getSemanticDiagnostics(fileName: string): Diagnostic[];
     getSyntacticDiagnostics(fileName: string): Diagnostic[];
+    getCompletionsAtPosition(
+      fileName: string,
+      position: number,
+      options: object,
+    ): { readonly entries: readonly { readonly name: string }[] } | undefined;
   }
 
   export const typescript: {

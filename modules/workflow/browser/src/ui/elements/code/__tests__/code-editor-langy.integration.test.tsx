@@ -91,9 +91,10 @@ const PROPOSED_CODE =
   "class Code:\n    def __call__(self, question: str):\n        return {'answer': question.upper()}";
 
 /** Stands in for Langy's panel, the slice's owner: it remembers what the editor registered. */
-const langy: { handlers: LangyUiActionHandlers | null; withdrawals: number } = {
+const langy: { handlers: LangyUiActionHandlers | null; withdrawals: number; heldAbove: number } = {
   handlers: null,
   withdrawals: 0,
+  heldAbove: 0,
 };
 
 beforeEach(() => {
@@ -101,6 +102,7 @@ beforeEach(() => {
   diffRendering.finish = null;
   langy.handlers = null;
   langy.withdrawals = 0;
+  langy.heldAbove = 0;
   defineSlice<LangyRegistrationsState>({
     name: LANGY_REGISTRATIONS_SLICE,
     create: () => ({
@@ -112,6 +114,12 @@ beforeEach(() => {
       clearActions: () => {
         langy.handlers = null;
         langy.withdrawals += 1;
+      },
+      holdAbove: () => {
+        langy.heldAbove += 1;
+        return () => {
+          langy.heldAbove -= 1;
+        };
       },
     }),
   });
@@ -396,6 +404,25 @@ describe("the Studio code editor with Langy", () => {
       fireEvent.click(screen.getByRole("button", { name: "Reject" }));
       await propose("print('other')");
       expect(screen.getByTestId("monaco-diff").dataset.modified).toBe("print('other')");
+    });
+  });
+
+  describe("when the editor opens over Studio's node drawer", () => {
+    /** @scenario "Langy rides above Studio's node drawer while the code editor is open" */
+    it("holds Langy above while open and releases it on close", async () => {
+      const { rerender } = openEditor();
+      await screen.findByTestId("monaco");
+      expect(langy.heldAbove).toBe(1);
+
+      rerender(false);
+
+      expect(langy.heldAbove).toBe(0);
+    });
+
+    it("does not hold Langy where Langy is unavailable", async () => {
+      openEditor({ available: false });
+      await screen.findByTestId("monaco");
+      expect(langy.heldAbove).toBe(0);
     });
   });
 });

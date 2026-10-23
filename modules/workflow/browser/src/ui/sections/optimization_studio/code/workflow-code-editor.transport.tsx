@@ -51,8 +51,8 @@ function useEditorTransport() {
   return { projectId: project?.id, secretNames };
 }
 
-/** Langy's dock sits at this layer; beside it the editor's backdrop stays below. */
-const BELOW_LANGY_DOCK = 1199;
+/** Over Studio's node drawer (1500), under Langy's panel held above it (1600). */
+const BETWEEN_DRAWER_AND_LANGY = 1501;
 
 /**
  * The app retains its render-error boundary and overlay policy around feature content. The
@@ -81,7 +81,7 @@ export const WorkflowCodeEditorModalHost: WorkflowCodeEditorModalHostApi = ({
       flexDirection="column"
       overflow="hidden"
       pointerEvents="auto"
-      backdropProps={besideLangy ? { zIndex: BELOW_LANGY_DOCK } : undefined}
+      backdropProps={besideLangy ? { zIndex: BETWEEN_DRAWER_AND_LANGY } : undefined}
       positionerProps={{ zIndex: 1502, pointerEvents: besideLangy ? "none" : undefined }}
     >
       {children}

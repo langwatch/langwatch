@@ -115,6 +115,13 @@ Feature: Langy writes and edits Studio code blocks from the code editor
       And the reader can read and type into Langy without closing the editor
 
     @integration
+    Scenario: Langy rides above Studio's node drawer while the code editor is open
+      Given Langy is available on the code block
+      When the code editor opens over Studio's node drawer
+      Then Langy's panel is held above the drawer
+      And closing the editor releases it
+
+    @integration
     Scenario: The open code editor registers its actions with Langy while it is open
       When the code editor opens on a code block with Langy available
       Then Langy holds handlers for exactly studio.code.read and studio.code.propose

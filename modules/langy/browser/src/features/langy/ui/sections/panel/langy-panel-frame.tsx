@@ -81,7 +81,7 @@ export function LangyPanelFrame({
   guardProps: ReturnType<typeof useLangyExternalLinkGuard>["guardProps"];
   children: ReactNode;
 }) {
-  const { floating, reduceMotion, isDrawerCompanion } = placement;
+  const { floating, reduceMotion, isDrawerCompanion, heldAbove } = placement;
   const touchable = (isOpen || peek.peeking) && !peek.dismissed;
   const markPanelShown = useLangyStore((s) => s.markPanelShown);
   return (
@@ -93,7 +93,7 @@ export function LangyPanelFrame({
       layout="position"
       position="fixed"
       width={panelWidth({ floating, isDrawerCompanion })}
-      zIndex={isDrawerCompanion ? 1600 : 1200}
+      zIndex={isDrawerCompanion || heldAbove ? 1600 : 1200}
       background={isDrawerCompanion ? "bg.card/80" : "bg.card"}
       borderStyle="solid"
       borderColor={isContextDropOver ? "purple.emphasized" : "border"}

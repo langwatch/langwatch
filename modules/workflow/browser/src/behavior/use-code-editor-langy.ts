@@ -115,6 +115,7 @@ export function useCodeEditorAssistant({
   });
 
   const registerActions = useLangyRegistrations((state) => state.registerActions);
+  const holdAbove = useLangyRegistrations((state) => state.holdAbove);
   const clearActions = useLangyRegistrations((state) => state.clearActions);
   const enabled = open && subject !== undefined && ask !== undefined;
 
@@ -123,6 +124,9 @@ export function useCodeEditorAssistant({
     registerActions(studioCodeHandlers({ latest, buffer, pending, setProposal }));
     return () => clearActions();
   }, [enabled, registerActions, clearActions]);
+
+  // The editor opens over Studio's node drawer; Langy rides above both while it is open.
+  useEffect(() => (enabled ? holdAbove() : undefined), [enabled, holdAbove]);
 
   if (!enabled || !subject || !ask) return undefined;
 
