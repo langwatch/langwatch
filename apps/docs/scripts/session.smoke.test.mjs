@@ -90,13 +90,17 @@ async function checkSession({ browser, base, width, mode }) {
 }
 
 /** @scenario "Try the session seam without sending a real credential" */
-await it("connects, simulates, expires and disconnects without contacting an API", async () => {
-  await withPreviewBrowser({
-    outDir,
-    run: async ({ browser, base }) => {
-      for (const width of [1440, 390]) {
-        for (const mode of ["light", "dark"]) await checkSession({ browser, base, width, mode });
-      }
-    },
-  });
-});
+await it(
+  "connects, simulates, expires and disconnects without contacting an API",
+  { skip: "the session button is off until signed-in sessions return" },
+  async () => {
+    await withPreviewBrowser({
+      outDir,
+      run: async ({ browser, base }) => {
+        for (const width of [1440, 390]) {
+          for (const mode of ["light", "dark"]) await checkSession({ browser, base, width, mode });
+        }
+      },
+    });
+  },
+);
