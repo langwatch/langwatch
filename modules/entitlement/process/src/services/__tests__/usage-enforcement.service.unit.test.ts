@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { BillableEventsMeterRepository } from "../../repositories/billable-events-meter.repository.ts";
 import { MemoryTraceCountRepository } from "../../repositories/memory/memory.trace-count.repository.ts";
+import { MemoryUsageCacheRepository } from "../../repositories/memory/memory.usage-cache.repository.ts";
 import { RecentCountFailureError } from "../count-read-coalescer.service.ts";
 import { UsageCountingService } from "../usage-counting.service.ts";
 import {
@@ -299,6 +300,7 @@ function eventsServiceOver({
     planResolver: async () => ({ ...plan(1_000), free: true }),
     meter,
     traceMeter: { countByProjects: refuseTraceCount },
+    caches: freshCaches(),
     peers: {
       billing: createApiFixture<EntitlementUsagePeers["billing"]>({
         getPricingModel: async () => ({ pricingModel: null }),
@@ -427,6 +429,7 @@ describe("UsageService over the trace count", () => {
       planResolver: async () => plan(allowance),
       meter: { countByProjects: refuseTraceCount },
       traceMeter: meter,
+      caches: freshCaches(),
       peers: {
         billing: createApiFixture<EntitlementUsagePeers["billing"]>({
           getPricingModel: async () => ({ pricingModel: null }),
@@ -609,3 +612,10 @@ describe("given limit checks that read the counting store", () => {
     });
   });
 });
+
+function freshCaches() {
+  return {
+    counts: MemoryUsageCacheRepository.create(),
+    decisions: MemoryUsageCacheRepository.create(),
+  };
+}
