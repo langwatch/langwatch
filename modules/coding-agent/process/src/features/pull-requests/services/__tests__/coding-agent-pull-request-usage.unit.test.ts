@@ -23,6 +23,7 @@ import {
 } from "../../../../__tests__/fixtures/coding-agent.fixture.ts";
 import { MAX_USAGE_CONTEXTS } from "../../../../eventing/coding-agent-session-state.projection.ts";
 import { CodingAgentFeatureService } from "../../../../services/coding-agent.service.ts";
+import { ModelCatalogCostEstimatorService } from "../../../../services/model-catalog-cost-estimator.service.ts";
 import { USAGE_SESSION_WINDOW_MS } from "../coding-agent-personal-pull-request-read.service.ts";
 
 function serviceWith(input: {
@@ -40,6 +41,7 @@ function serviceWith(input: {
     projects: createTestProjects(),
     billing: input.billing ?? new TestBillingPolicy(),
     clock: new TestClock(),
+    modelProviders: ModelCatalogCostEstimatorService.create(),
   });
 }
 
@@ -442,6 +444,62 @@ describe("Coding Agent pull-request usage from the session's per-context record"
     expect(first.totals.costUsd).toBeCloseTo(0.5, 10);
     expect(second.totals.inputTokens).toBe(75);
     expect(second.totals.costUsd).toBeCloseTo(1.5, 10);
+  });
+
+  /** @scenario "A session that worked on two repositories at different rates reports the recorded figures" */
+  it("reports what the row recorded under the branch, matching the model breakdown", async () => {
+    const elsewhere = {
+      ...recorded("feat/early", {
+        inputTokens: 12,
+        outputTokens: 80,
+        cacheReadTokens: 43_125,
+        cacheCreationTokens: 14_487,
+        costUsd: 0.002283325,
+      }),
+      repositoryOwner: "acme",
+      repositoryName: "scratch",
+    };
+    const here = recorded("feat/next", {
+      inputTokens: 6,
+      outputTokens: 58,
+      cacheReadTokens: 24_038,
+      cacheCreationTokens: 5_099,
+      costUsd: 0.000907355,
+    });
+    const session = longLivedSession({
+      agent: "copilot",
+      models: ["gpt-6-luna"],
+      gitBranches: ["feat/early", "feat/next"],
+      inputTokens: 18,
+      outputTokens: 138,
+      cacheReadTokens: 67_163,
+      cacheCreationTokens: 19_586,
+      costUsd: 0.00319068,
+      usageByContext: [elsewhere, here],
+    });
+    // Its model calls' per-call rows, one total per context they were stamped with.
+    const events = new TestEvents();
+    events.modelTotals = [elsewhere, here].map((usage) => ({
+      ...usage,
+      tenantId: "project-1",
+      sessionId: "span-only",
+      model: "gpt-6-luna",
+      aiUnits: usage.costUsd * 100,
+    }));
+
+    const usage = await serviceFor(session, events).service.getPullRequestUsage(query);
+
+    expect(usage.totals).toMatchObject({
+      inputTokens: 6,
+      outputTokens: 58,
+      cacheReadTokens: 24_038,
+      cacheCreationTokens: 5_099,
+      totalTokens: 29_201,
+    });
+    expect(usage.totals.costUsd).toBeCloseTo(0.000907355, 12);
+    const [model] = usage.modelBreakdown;
+    expect(model?.totalTokens).toBe(usage.totals.totalTokens);
+    expect(model?.costUsd).toBeCloseTo(usage.totals.costUsd!, 12);
   });
 
   /** @scenario "Usage from before the session declared anything follows its first declared branch" */

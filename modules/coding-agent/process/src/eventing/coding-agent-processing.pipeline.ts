@@ -187,6 +187,7 @@ export class EventingCodingAgentProcessingAdapter {
             persistence: deps.projections,
             defaultRetentionDays: deps.defaultRetentionDays,
           }),
+          modelProviders: deps.modelProviders,
         }),
       )
       .withEventSubscriber(
