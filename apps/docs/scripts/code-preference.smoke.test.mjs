@@ -169,8 +169,8 @@ await it("shows one diagram variant, explicit matrix values and clear navigation
         try {
           const page = await context.newPage();
           await page.goto(base + "self-hosting/overview");
-          const light = page.locator('img[src$="self-hosting-overview-light.svg"]');
-          const dark = page.locator('img[src$="self-hosting-overview-dark.svg"]');
+          const light = page.locator('img[src*="/self-hosting-overview-light."]');
+          const dark = page.locator('img[src*="/self-hosting-overview-dark."]');
           assert.equal(await light.isVisible(), mode === "light");
           assert.equal(await dark.isVisible(), mode === "dark");
           const diagram = page.locator("figure").filter({ has: light });
