@@ -54,6 +54,7 @@ describe("given the scheduled fleet collection", () => {
     expect(dead?.value).toBe(1);
   });
 
+  /** @scenario "A failed scheduled fleet read keeps the last counts" */
   it("keeps the last counts when a read fails", async () => {
     const store = MemoryOpsStore.create();
     const readings = MemoryProcessFleetReadingsRepository.create({ store });

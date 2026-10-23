@@ -17,3 +17,9 @@ Feature: The process-manager fleet gauges report once a source is bound
     When every process's gauges are collected twice
     Then the gauges report the shared counts
     And the tables were counted once
+
+  @unit
+  Scenario: A failed scheduled fleet read keeps the last counts
+    Given the fleet has a saved reading
+    When the scheduled fleet read fails
+    Then the saved reading remains unchanged
