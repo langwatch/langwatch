@@ -6,7 +6,7 @@ Feature: One workflow starts a pull request's product checks
   @unit
   Scenario: Each product check starts only when a change reaches its own paths
     Given a product check whose detect-changes step consults some paths
-    When pr.yml builds its filter
+    When .github/pr-filters.yml is generated from the product checks
     Then that check's key holds every one of those paths
     And a change to pr.yml or its filter starts every check
 
@@ -35,3 +35,9 @@ Feature: One workflow starts a pull request's product checks
     Given a merge queue run
     When pr.yml decides what to start
     Then it starts every product check
+
+  @unit
+  Scenario: A failed change check fails every check main requires
+    Given the job that decides which checks to start failed
+    When ci-complete runs
+    Then it posts each check main requires as failed, not as skipped and passed

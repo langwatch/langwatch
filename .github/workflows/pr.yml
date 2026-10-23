@@ -37,10 +37,8 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # The filters are read from the called workflows; nothing else is needed on disk.
+          # The filter and the diff script live there; nothing else is needed on disk.
           sparse-checkout: .github
-      - name: Build one filter from the called workflows' own
-        run: node --experimental-strip-types .github/scripts/pr-workflow-filters.ts "$RUNNER_TEMP/pr-filters.yml"
       # Diff from the main the merge commit is built on, so main's newer
       # commits don't count as this pull request's changes.
       - name: Diff from the main the merge commit is built on
@@ -55,7 +53,9 @@ jobs:
           # files (specs/ci/path-filters.feature).
           token: ""
           base: ${{ steps.diff-base.outputs.sha }}
-          filters: ${{ runner.temp }}/pr-filters.yml
+          # Generated from the called workflows' own detect-changes paths by
+          # `go run ./cmd/prfilters`; ciguard fails when it is stale.
+          filters: .github/pr-filters.yml
       - name: Run everything in the merge queue
         if: github.event_name != 'pull_request'
         id: force
@@ -147,6 +147,8 @@ jobs:
         if: always()
         env:
           GH_TOKEN: ${{ github.token }}
+          # Every call needs changes: when it failed, their skips mean nothing ran.
+          CHANGES: ${{ needs.changes.result }}
           SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           RESULTS: >-
             langwatch-app-complete=${{ needs.app.result }}
@@ -165,6 +167,7 @@ jobs:
           for pair in $RESULTS; do
             context="${pair%%=*}" result="${pair#*=}"
             case "$result" in success | skipped) state=success ;; *) state=failure ;; esac
+            [ "$CHANGES" = success ] || state=failure
             gh api "repos/$GITHUB_REPOSITORY/statuses/$SHA" -f state="$state" -f context="$context" \
               -f description="pr.yml: $result" -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" >/dev/null \
               || echo "::warning::could not post $context (a fork's token cannot write statuses)"

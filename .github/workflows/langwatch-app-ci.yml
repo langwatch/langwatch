@@ -1384,9 +1384,6 @@ jobs:
       - name: Test when release pull requests refresh
         run: node --test --experimental-strip-types .github/scripts/release-please-timer.test.ts
 
-      - name: Test the pull request workflow and the checks it calls
-        run: node --test --experimental-strip-types .github/scripts/pr-workflow-filters.test.ts
-
   ci-self-test:
     needs: changes
     if: needs.changes.outputs.relevant == 'true'
