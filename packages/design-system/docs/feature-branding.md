@@ -10,7 +10,7 @@ Braids (spans from one project shown in another project's traces) as the worked 
 | `@langwatch/design-system/feature-mark`         | `FeatureMark`         | The mark: colour, one colour, or the small master         |
 | `@langwatch/design-system/feature-lockup`       | `FeatureLockup`       | Mark plus the name in the display face, optional tagline  |
 | `@langwatch/design-system/feature-illustration` | `FeatureIllustration` | The feature's art: `empty-state`, `enterprise` and `hero` |
-| `@langwatch/design-system/enterprise-pill`      | `EnterprisePill`      | "Enterprise" with the feature's mark, where it is gated   |
+| `@langwatch/design-system/enterprise-pill`      | `EnterprisePill`      | The quiet ENT chip, alike in the sidebar and a page title |
 
 In Storybook: Brand/Feature branding (the whole kit on one page), Brand/Feature mark,
 Brand/Feature lockup, Brand/Feature illustration, Brand/Enterprise pill and the feature rows in
@@ -26,18 +26,45 @@ A brand costs attention. Give one only when all of these hold:
 
 Everything else uses the product look unchanged. A settings page does not get a mark.
 
+## Inside the product
+
+A branded feature's screens are built from the app's own components. The brand sits on top in
+three places only: the mark beside the page title, the art where the feature explains itself,
+and the mark on whatever the feature adds to other screens.
+
+- **Product components first.** Page header, tabs, tables, dialogs, settings rows, empty, upgrade
+  and error states are the app's own: `PageLayout`, `ContentTabs`, `ListTable`, `Dialog`,
+  `SettingsSection` and `SettingsField`, `NoDataInfoBlock`, `AccessState`. No custom panels.
+- **The mark leads the title, in colour.** `FeatureMark` at 20px sits before the page title, and
+  the Enterprise chip after it when the plan gates the feature. Buttons and table rows carry none.
+- **One Enterprise chip.** `EnterprisePill` is the quiet ENT chip the sidebar shows, and a gated
+  page's title wears the same one. Never an orange pill or a second wording.
+- **The art explains, once.** The empty state before anything exists and the upgrade show the
+  illustration inside a `Card` or `AccessState`, with the app's type scale around it. Its lines
+  are drawn as the mark is: solid, one curve for every crossing, a clean gap where a strand passes
+  under another, each ending level with the row it feeds. Never dotted or tangled.
+- **Projects look like projects.** A project is a round avatar with its initial, in the art as in
+  the app's project switcher.
+- **Meaning through semantic tokens.** Errors, warnings and successes use `fg.error`,
+  `fg.warning` and `fg.success`. A badge, outline or bar is never painted in the feature's lead,
+  and a span bar keeps its span type's colour.
+
+Braids shows all of these: the mark and ENT chip lead its titles, its settings are plain settings
+rows, its dialog is laid out as New role is, the empty tab and the upgrade carry the braid art,
+and a braided span carries the mark and a chip naming its project, like the model chip beside it.
+
 ## The parts
 
-| Part             | What it is                                                                    | Braids                                                       |
-| ---------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| Name             | One word, title case, used in copy as a noun                                  | Braids                                                       |
-| Mark             | A small drawing on a 40 by 40 canvas, a standard master and a small master    | The open weave: three strands crossing with transparent gaps |
-| Lockup           | Mark beside the name in Sentient, the display face                            | `FeatureLockup feature="braids"`                             |
-| Tagline          | One short line for landing pages and the lockup                               | One trace. Every project.                                    |
-| Colour roles     | Named tokens under `feature.<name>.*`, light and dark values                  | `lead`, `weave`, `project.1-3`, `projectInk.1-3`             |
-| Illustration set | An empty state, an Enterprise upsell and a hero, 760 by 350                   | Project strands weaving into one trace                       |
-| Motion           | At most one arrival animation, in the hero                                    | Strands weave in over 650ms, spans land after                |
-| Enterprise pill  | Where the feature is gated, the mark in one colour beside the word Enterprise | `EnterprisePill feature="braids"`                            |
+| Part             | What it is                                                                 | Braids                                                       |
+| ---------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| Name             | One word, title case, used in copy as a noun                               | Braids                                                       |
+| Mark             | A small drawing on a 40 by 40 canvas, a standard master and a small master | The open weave: three strands crossing with transparent gaps |
+| Lockup           | Mark beside the name in Sentient, the display face                         | `FeatureLockup feature="braids"`                             |
+| Tagline          | One short line for landing pages and the lockup                            | One trace. Every project.                                    |
+| Colour roles     | Named tokens under `feature.<name>.*`, light and dark values               | `lead`, `weave`, `project.1-3`, `projectInk.1-3`             |
+| Illustration set | An empty state, an Enterprise upsell and a hero, 760 by 350                | Project strands weaving into one trace                       |
+| Motion           | At most one arrival animation, in the hero                                 | Strands weave in over 650ms, spans land after                |
+| Enterprise chip  | The sidebar's ENT chip, after the title of any page the plan gates         | `EnterprisePill`                                             |
 
 Inside the product, page titles stay in Inter. Sentient appears only in the lockup and on
 landing or docs pages, as Langy and the front door already use it.
@@ -61,7 +88,7 @@ landing or docs pages, as Langy and the front door already use it.
    an optical small master (heavier strokes, wider gaps, wider spread) and `FeatureMark` switches
    to it at 24px and below on its own; `variant="small"` forces it.
 6. **One colour where it sits beside other one-colour marks.** `variant="mono"` paints every
-   strand in `currentColor`: next to SSO and audit-log icons, in the Enterprise pill, in menus.
+   strand in `currentColor`: next to SSO and audit-log icons, in menus, as an empty state's icon.
 7. **Unique ids per instance.** Masks and gradients take their id from React's `useId`, never a
    constant. Two marks on one page must not share a mask, or the second draws with the first's
    cut-outs, or not at all.
@@ -72,12 +99,7 @@ landing or docs pages, as Langy and the front door already use it.
    `prefers-reduced-motion: reduce` or `animate={false}` it renders in its final state. To
    replay on purpose, remount it with a new `key`.
 10. **Example data is fictional and labelled.** Project names in the art are invented, and every
-    project colour is paired with initials, so colour is never the only cue.
-11. **One project, one colour, on every screen.** A feature that colours projects sets
-    `projectColours` on its `FEATURE_BRANDS` entry and asks `featureProjectColour({ feature,
-projectId })` for the tokens, never its own hash or the order a list happens to hold. When two
-    projects on one screen land on the same colour, move the later one to the next free index,
-    counting up to the `count` the helper returns, never a copied number.
+    project colour is paired with its initial, so colour is never the only cue.
 
 ## Branding the next feature
 
