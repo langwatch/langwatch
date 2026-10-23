@@ -82,13 +82,6 @@ type CanaryProbe = "collector" | "processor";
 /** How long a canary POST may hang before the probe calls it a failure. */
 const CANARY_TIMEOUT_MS = 30_000;
 
-/**
- * How many times a canary is sent while a starting or draining pod refuses it.
- * A rollout drains one pod at a time, so the next attempt lands on another.
- */
-const CANARY_NOT_HANDLED_ATTEMPTS = 3;
-const CANARY_NOT_HANDLED_WAIT_MS = 1_000;
-
 const failure = (
   httpStatus: 404 | 500,
   message: string,
@@ -295,10 +288,15 @@ export class SubsystemProbeService {
     return { ok: true, status: response.status, body: await response.json() };
   }
 
-  async #withRetries(send: () => Promise<Response>): Promise<Response> {
+  /** Sends up to three times, a second apart, while `retryWhen` holds; drops a refused body. */
+  async #withRetries(
+    send: () => Promise<Response>,
+    retryWhen: (response: Response, attempt: number) => boolean = (response) => !response.ok,
+  ): Promise<Response> {
     const maxAttempts = 3;
     let response = await send();
-    for (let attempt = 1; attempt < maxAttempts && !response.ok; attempt++) {
+    for (let attempt = 1; attempt < maxAttempts && retryWhen(response, attempt); attempt++) {
+      await response.body?.cancel();
       await sleep(1000);
       response = await send();
     }
@@ -399,20 +397,16 @@ export class SubsystemProbeService {
       });
     let response: Response;
     try {
-      response = await send();
-      for (
-        let attempt = 1;
-        attempt < CANARY_NOT_HANDLED_ATTEMPTS && canaryAnswerOf(response).notHandled;
-        attempt++
-      ) {
+      // A rollout drains one pod at a time, so the next attempt lands on another.
+      response = await this.#withRetries(send, (refused, attempt) => {
+        const answer = canaryAnswerOf(refused);
+        if (!answer.notHandled) return false;
         this.#logger.info(
-          { probe, transport, path, attempt, ...canaryAnswerOf(response) },
+          { probe, transport, path, attempt, ...answer },
           "Health canary landed on a pod that is starting or shutting down, sending it again",
         );
-        await response.body?.cancel();
-        await sleep(CANARY_NOT_HANDLED_WAIT_MS);
-        response = await send();
-      }
+        return true;
+      });
     } catch (error) {
       this.#logger.error({ probe, transport, path, error }, "Health canary transport failed");
       throw new HealthCheckFailedError({

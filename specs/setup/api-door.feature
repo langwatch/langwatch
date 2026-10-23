@@ -119,11 +119,12 @@ Feature: The one door an api process serves the product through
       # The health door stops last, so a probe during shutdown still sees the
       # process as alive while the product surface refuses by name.
 
-    @unit
+    @regression @unit
     Scenario: A draining refusal closes the connection it came in on
       Given a serving process that has begun shutting down
       When a request arrives on a kept-alive connection
       Then it is refused with 503 and the connection is closed
+      And this holds whether the main loop or the liveness thread owns the port
       # A proxy pools connections to the pod for up to a minute. Closing the
       # one a refusal went out on stops the proxy sending more work to a pod
       # that is shutting down.

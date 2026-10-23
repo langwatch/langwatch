@@ -1,5 +1,4 @@
-/** Set by packages/process/src/server.ts only on refusals no handler saw. */
-const NOT_HANDLED_HEADER = "x-langwatch-not-handled";
+import { NOT_HANDLED_HEADER } from "@langwatch/process/not-handled";
 
 /** Whether a handler saw the request; a refusal before one ran stored nothing. */
 export type CanaryAnswer = Readonly<{ notHandled: false } | { notHandled: true; reason: string }>;

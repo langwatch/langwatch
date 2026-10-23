@@ -351,7 +351,10 @@ describe("Server", () => {
       });
     });
 
-    describe("when the request arrives on a kept-alive connection", () => {
+    describe.each([
+      { door: "the main loop", offLoop: false },
+      { door: "the liveness thread", offLoop: true },
+    ])("when the request arrives on a kept-alive connection to $door", ({ offLoop }) => {
       /** @scenario "A draining refusal closes the connection it came in on" */
       it("refuses it with 503 and closes the connection", async () => {
         const server = await startServer();
@@ -360,6 +363,7 @@ describe("Server", () => {
           releaseDrain = resolve;
         });
         server.with({ name: "slow drain", stop: () => drainStarted, drain: true });
+        if (offLoop) await server.openLiveness();
         await server.serve({
           name: "api",
           start: () => undefined,

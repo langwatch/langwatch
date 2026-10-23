@@ -153,6 +153,7 @@ describe("a probe sending a canary", () => {
       );
     });
 
+    /** @scenario "A canary refused after a handler ran is not sent again" */
     it("does not send again a 503 a handler answered", async () => {
       const canaries = MemorySubsystemProbeChannel.create({
         answer: () => new Response("{}", { status: 503 }),

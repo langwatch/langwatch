@@ -35,6 +35,10 @@
       "types": "./dist/lifecycle/liveness-thread.d.ts",
       "default": "./src/lifecycle/liveness-thread.ts"
     },
+    "./not-handled": {
+      "types": "./dist/lifecycle/not-handled.d.ts",
+      "default": "./src/lifecycle/not-handled.ts"
+    },
     "./process-globals": {
       "types": "./dist/process-globals.d.ts",
       "default": "./src/process-globals.ts"
