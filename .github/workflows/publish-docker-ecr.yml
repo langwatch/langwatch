@@ -738,8 +738,10 @@ jobs:
             aws s3 sync "s3://${BUCKET}/${previous}/assets" "${dir}" \
               --no-progress --exclude "*.map"
             test -n "$(ls -A "${dir}")"
-            aws s3 sync "${dir}" "s3://${BUCKET}/${IMAGE_TAG}/assets" \
-              --size-only --no-progress --exclude "*.map" \
+            # cp, not sync: overwrite every object, so a same-size file left by
+            # an earlier failed attempt cannot keep a wrong type.
+            aws s3 cp "${dir}" "s3://${BUCKET}/${IMAGE_TAG}/assets" \
+              --recursive --no-progress --exclude "*.map" \
               --cache-control "public, max-age=31536000, immutable"
             aws s3api put-object --bucket "${BUCKET}" --key "${IMAGE_TAG}/.complete" \
               --cache-control "no-cache" --content-length 0 >/dev/null
