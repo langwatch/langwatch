@@ -100,6 +100,8 @@ export function applyInstantEvalRunEvent(
         failed: state.failed + event.data.failed,
         skipped: state.skipped + event.data.skipped,
         tokens: state.tokens + event.data.inputTokens,
+        // A routed run's cost so far, so the page budget check reads it; finish sets the total.
+        costUsd: nanoUsdRounded(state.costUsd + event.data.costNanoUsd / NANO_USD_PER_USD),
         startedAtMs: state.startedAtMs ?? event.occurredAt,
       };
 
@@ -143,4 +145,10 @@ export function createInstantEvalRunProjection(deps: {
     // row is one run.
     key: (event) => String(event.aggregateId),
   };
+}
+
+const NANO_USD_PER_USD = 1_000_000_000;
+
+function nanoUsdRounded(usd: number): number {
+  return Math.round(usd * NANO_USD_PER_USD) / NANO_USD_PER_USD;
 }

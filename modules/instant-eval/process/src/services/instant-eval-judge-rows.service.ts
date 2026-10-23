@@ -34,6 +34,11 @@ export interface InstantEvalJudgeUsage {
   inputTokens: number;
   skipped: Record<string, number>;
   limiterWaitMs: number;
+  /** The summed cost of routed judgements; zero when nothing was routed. */
+  costNanoUsd: number;
+  /** Questions escalated past a decision model, and verdicts per routed backend. */
+  escalated: number;
+  answeredBy: Record<string, number>;
 }
 
 /** The rows as they are written, and what judging them sent. */
@@ -90,6 +95,9 @@ export class InstantEvalJudgeRowsService {
       inputTokens: 0,
       skipped: {},
       limiterWaitMs: 0,
+      costNanoUsd: 0,
+      escalated: 0,
+      answeredBy: {},
     };
     const cells = new Map<number, Map<string, InstantEvalVerdict | null>>();
     let failures = 0;
@@ -176,6 +184,7 @@ function record({
   usage.requests += 1;
   usage.inputTokens += judgement.inputTokens;
   usage.limiterWaitMs += judgement.limiterWaitMs ?? 0;
+  recordRouting({ judgement, usage });
   if (judgement.skippedReason) {
     usage.skipped[judgement.skippedReason] = (usage.skipped[judgement.skippedReason] ?? 0) + 1;
   }
@@ -186,6 +195,23 @@ function record({
     row.set(question.id, byQuestion.get(question.id) ?? null);
   }
   cells.set(unit.rowIndex, row);
+}
+
+/** A routed judgement's cost and how it was answered, summed into the batch's usage. */
+function recordRouting({
+  judgement,
+  usage,
+}: {
+  judgement: InstantEvalJudgement;
+  usage: InstantEvalJudgeUsage;
+}): void {
+  usage.costNanoUsd += judgement.costNanoUsd ?? 0;
+  const { routing } = judgement;
+  if (!routing) return;
+  usage.escalated += routing.escalated;
+  for (const [backend, count] of Object.entries(routing.answeredBy)) {
+    usage.answeredBy[backend] = (usage.answeredBy[backend] ?? 0) + count;
+  }
 }
 
 /** Whether a thrown value is a stop rather than a failure. */

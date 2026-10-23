@@ -79,6 +79,9 @@ class ScriptedExecutor implements InstantEvalRunExecutor {
       skipped: 0,
       inputTokens: 900,
       requests: 500,
+      costNanoUsd: 0,
+      escalated: 0,
+      answeredBy: {},
       cursor: "t1000",
       cursorSpanId: null,
       hasNextPage: true,
@@ -138,6 +141,7 @@ const FINISH_PAYLOAD = {
   errorCode: null,
   inputTokens: 2_000,
   requests: 1_000,
+  costNanoUsd: 0,
 };
 
 describe("given a step that succeeds", () => {
@@ -203,6 +207,7 @@ describe("given a step that succeeds", () => {
           errorCode: null,
           inputTokens: 2_000,
           requests: 1_000,
+          costNanoUsd: 0,
           costUsd: 0.000021,
           priceUsd: 0.0000273,
         },
