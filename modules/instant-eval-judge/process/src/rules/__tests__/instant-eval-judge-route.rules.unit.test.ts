@@ -110,7 +110,11 @@ describe("the route plan", () => {
 
   /** @scenario "The input view follows the question category from config" */
   it("judges the text view for a category the table maps to it, and a call's own view wins", () => {
-    const route = { job: "search", questionCategory: "sentiment", textView: "user: hi" } as const;
+    const route = {
+      job: "search",
+      questionCategory: "sentiment",
+      views: { text: "user: hi" },
+    } as const;
     expect(plan(route, UPSET, "full trace")).toMatchObject({ inputView: "text", text: "user: hi" });
     expect(plan({ ...route, inputView: "full" }, UPSET, "full trace").text).toBe("full trace");
     expect(plan({ job: "search", questionCategory: "tool_args" }).inputView).toBe("full");
@@ -119,15 +123,72 @@ describe("the route plan", () => {
 
   /** @scenario "The length bucket is measured on the chosen view" */
   it("measures the bucket on the chosen view's tokens", () => {
-    const route = { job: "search", questionCategory: "sentiment", textView: "short" } as const;
+    const route = {
+      job: "search",
+      questionCategory: "sentiment",
+      views: { text: "short" },
+    } as const;
     expect(plan(route, UPSET, "a".repeat(30_000)).bucket).toBe("<=2k");
     expect(plan({ ...route, inputView: "full" }, UPSET, "a".repeat(30_000)).bucket).toBe(">8k");
+  });
+
+  /** @scenario "The text view is judged only by a decision model allowed to read it" */
+  it("plans the full view when the text view's slot names a model not allowed to read it", () => {
+    const route = {
+      job: "search",
+      questionCategory: "sentiment",
+      views: { text: "user: hi" },
+    } as const;
+    const paired = plan({ ...route, mode: "instant" }, UPSET, "full trace");
+    expect(paired).toMatchObject({
+      inputView: "full",
+      text: "full trace",
+      refusedView: "text",
+    });
+    const llm = plan({ ...route, mode: "accurate" }, UPSET, "full trace");
+    expect(llm).toMatchObject({ inputView: "full", primary: "haiku", refusedView: "text" });
+    const decisions = plan(route, UPSET, "full trace");
+    expect(decisions).toMatchObject({ inputView: "text", fullText: "full trace" });
+    expect(decisions.refusedView).toBeUndefined();
+  });
+
+  /** @scenario "The text view is judged only by a decision model allowed to read it" */
+  it("keeps the tools view off until the table lets a backend kind read it", () => {
+    const route = {
+      job: "search",
+      questionCategory: "tool_errors",
+      views: { tools: "calls" },
+    } as const;
+    const off = syntheticRouteTable({
+      inputViews: { default: "full", byCategory: { tool_errors: "tools" } },
+    });
+    const asked = instantEvalJudgeRoutePlanOf({
+      route,
+      text: "full",
+      questions: [UPSET],
+      table: off,
+    });
+    expect(asked).toMatchObject({ inputView: "full", refusedView: "tools" });
+    const on = syntheticRouteTable({
+      inputViews: {
+        default: "full",
+        byCategory: { tool_errors: "tools" },
+        allowedKinds: { text: ["decisions"], tools: ["decisions"] },
+      },
+    });
+    const allowed = instantEvalJudgeRoutePlanOf({
+      route,
+      text: "full",
+      questions: [UPSET],
+      table: on,
+    });
+    expect(allowed).toMatchObject({ inputView: "tools", text: "calls" });
   });
 
   /** @scenario "A text view the caller did not render judges the full text, flagged" */
   it("judges the full text when the text view is missing, and says so", () => {
     const p = plan({ job: "search", inputView: "text" }, UPSET, "full trace");
-    expect(p).toMatchObject({ text: "full trace", isTextViewMissing: true });
+    expect(p).toMatchObject({ text: "full trace", isViewMissing: true });
   });
 
   /** @scenario "The public default table sends every slot to the hosted classifier" */

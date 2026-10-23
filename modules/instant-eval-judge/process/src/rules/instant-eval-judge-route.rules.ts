@@ -32,9 +32,14 @@ export interface InstantEvalJudgeRoutePlan {
   readonly tokens: number;
   readonly arithmetic: boolean;
   readonly inputView: InstantEvalJudgeInputView;
-  /** The text the legs judge: the view the plan chose, or the full text when it is missing. */
+  /** The text the decision legs judge: the chosen view, or the full text when it was not sent. */
   readonly text: string;
-  readonly isTextViewMissing: boolean;
+  /** The full text, which an escalation always judges: an unsure answer may turn on the trace. */
+  readonly fullText: string;
+  /** A partial view was planned but the caller did not render it. */
+  readonly isViewMissing: boolean;
+  /** The partial view asked for that the planned decision model may not judge, if any. */
+  readonly refusedView?: InstantEvalJudgeInputView;
   readonly primary: string;
   readonly pairWith?: string;
   readonly escalateTo?: string;
@@ -55,9 +60,50 @@ export function instantEvalJudgeRoutePlanOf({
   questions: readonly InstantEvalBooleanQuestion[];
   table: InstantEvalJudgeRouteTable;
 }): InstantEvalJudgeRoutePlan {
-  const inputView = instantEvalJudgeInputViewOf({ route, table });
-  const isTextViewMissing = inputView === "text" && route.textView === undefined;
-  const judged = inputView === "text" && route.textView !== undefined ? route.textView : text;
+  const asked = instantEvalJudgeInputViewOf({ route, table });
+  const plan = planForView({ route, text, questions, table, inputView: asked });
+  if (asked === "full" || isViewAllowed({ plan, table })) return plan;
+  // A model not measured on the partial view would lose accuracy, so it gets the full one.
+  const full = planForView({
+    route: { ...route, tokens: undefined },
+    text,
+    questions,
+    table,
+    inputView: "full",
+  });
+  return { ...full, refusedView: asked };
+}
+
+function isViewAllowed({
+  plan,
+  table,
+}: {
+  plan: InstantEvalJudgeRoutePlan;
+  table: InstantEvalJudgeRouteTable;
+}): boolean {
+  if (plan.inputView === "full") return true;
+  const kinds: readonly string[] = table.inputViews.allowedKinds[plan.inputView];
+  return [plan.primary, plan.pairWith]
+    .filter((name): name is string => name !== undefined)
+    .every((name) => kinds.includes(table.backends[name]?.kind ?? ""));
+}
+
+function planForView({
+  route,
+  text,
+  questions,
+  table,
+  inputView,
+}: {
+  route: InstantEvalJudgeRoute;
+  text: string;
+  questions: readonly InstantEvalBooleanQuestion[];
+  table: InstantEvalJudgeRouteTable;
+  inputView: InstantEvalJudgeInputView;
+}): InstantEvalJudgeRoutePlan {
+  const rendered = inputView === "full" ? text : route.views?.[inputView];
+  const isViewMissing = rendered === undefined;
+  const judged = rendered ?? text;
   const tokens = route.tokens ?? estimateJudgedTextTokens({ text: judged });
   const bucket = bucketOf({ tokens, table });
   const arithmetic = isArithmeticCall({ route, questions, table });
@@ -79,7 +125,8 @@ export function instantEvalJudgeRoutePlanOf({
     arithmetic,
     inputView,
     text: judged,
-    isTextViewMissing,
+    fullText: text,
+    isViewMissing,
     primary: entry.primary,
     ...(entry.pairWith ? { pairWith: entry.pairWith } : {}),
     ...(entry.escalateTo ? { escalateTo: entry.escalateTo } : {}),

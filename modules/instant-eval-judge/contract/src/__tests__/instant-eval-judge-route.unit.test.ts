@@ -49,7 +49,11 @@ describe("judge route table", () => {
           expect(routeSlot).toEqual({ instant: { primary: "jev" } });
         }
       }
-      expect(table.inputViews).toEqual({ default: "full", byCategory: {} });
+      expect(table.inputViews).toEqual({
+        default: "full",
+        byCategory: {},
+        allowedKinds: { text: ["decisions"], tools: [] },
+      });
     });
   });
 

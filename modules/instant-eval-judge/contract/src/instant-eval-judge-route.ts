@@ -15,8 +15,11 @@ export type InstantEvalJudgeJob = (typeof INSTANT_EVAL_JUDGE_JOBS)[number];
 export const INSTANT_EVAL_JUDGE_MODES = ["instant", "balanced", "accurate"] as const;
 export type InstantEvalJudgeMode = (typeof INSTANT_EVAL_JUDGE_MODES)[number];
 
-/** `text` is the conversation only, with no tool calls or results; `full` is the whole trace. */
-export const INSTANT_EVAL_JUDGE_INPUT_VIEWS = ["text", "full"] as const;
+/**
+ * `text`: user and assistant messages, no tool calls or results. `tools`: the agent's tool calls
+ * with their arguments and results, and the user request they answer. `full`: the whole trace.
+ */
+export const INSTANT_EVAL_JUDGE_INPUT_VIEWS = ["text", "tools", "full"] as const;
 export type InstantEvalJudgeInputView = (typeof INSTANT_EVAL_JUDGE_INPUT_VIEWS)[number];
 
 /** The request shapes a routed backend speaks. */
@@ -41,6 +44,7 @@ export const INSTANT_EVAL_JUDGE_ARITHMETIC_SLOT = "arithmetic";
 const jobSchema = z.enum(INSTANT_EVAL_JUDGE_JOBS);
 const modeSchema = z.enum(INSTANT_EVAL_JUDGE_MODES);
 const inputViewSchema = z.enum(INSTANT_EVAL_JUDGE_INPUT_VIEWS);
+const backendKindsSchema = z.array(z.enum(INSTANT_EVAL_JUDGE_BACKEND_KINDS)).readonly();
 
 /** One way to answer: a primary, and either an escalation past a threshold or a parallel pair. */
 const routeEntrySchema = z
@@ -95,13 +99,24 @@ const instantEvalJudgeRouteTableSchemaDefinition = z
       maxTokens: z.number().int().nonnegative(),
       source: perJob(z.enum(INSTANT_EVAL_JUDGE_ARITHMETIC_SOURCES)),
     }),
-    /** The view a question category judges when the call names none; `full` is today's. */
+    /**
+     * The view a question category judges when the call names none, by question meaning:
+     * wording to `text`, tool use to `tools`, outcomes to `full` (today's, the default).
+     */
     inputViews: z
       .object({
         default: inputViewSchema,
         byCategory: z.record(z.string(), inputViewSchema),
+        /** Backend kinds that may judge a partial view as a primary or pair; others get `full`. */
+        allowedKinds: z
+          .object({ text: backendKindsSchema, tools: backendKindsSchema })
+          .default({ text: ["decisions"], tools: [] }),
       })
-      .default({ default: "full", byCategory: {} }),
+      .default({
+        default: "full",
+        byCategory: {},
+        allowedKinds: { text: ["decisions"], tools: [] },
+      }),
     backends: z.record(z.string(), backendSchema),
     routes: perJob(z.record(z.string(), routeSlotSchema)),
   })
@@ -188,7 +203,8 @@ export const INSTANT_EVAL_JUDGE_DEFAULT_ROUTE_TABLE: InstantEvalJudgeRouteTable 
       maxTokens: 0,
       source: { search: "request", llm_judge: "request", scenario_judge: "request" },
     },
-    backends: { jev: { kind: "jev" } },
+    // The whole page lease, so the classifier's own retries run as they do unrouted.
+    backends: { jev: { kind: "jev", timeoutMs: 600_000 } },
     routes: Object.fromEntries(
       INSTANT_EVAL_JUDGE_JOBS.map((job) => [
         job,
@@ -237,8 +253,8 @@ const instantEvalJudgeRouteSchemaDefinition = z
     inputView: inputViewSchema.optional(),
     /** e.g. sentiment, intent, language, handoff, tool_args, grounding; a key of the mapping. */
     questionCategory: z.string().min(1).optional(),
-    /** The conversation-only rendering; without it a `text` plan judges the full text, flagged. */
-    textView: z.string().optional(),
+    /** The partial views the caller rendered; a plan for a view not sent judges the full text. */
+    views: z.object({ text: z.string().optional(), tools: z.string().optional() }).optional(),
     /** Token count of the judged view; estimated from its bytes when absent. */
     tokens: z.number().int().nonnegative().optional(),
   })
@@ -259,6 +275,6 @@ export interface InstantEvalJudgeRouting {
   readonly mode: InstantEvalJudgeMode;
   readonly slot: string;
   readonly inputView: InstantEvalJudgeInputView;
-  /** e.g. `escalation_failed`, `fallback:decisions->jev`, `text_view_missing`. */
+  /** e.g. `escalation_failed`, `fallback:decisions->jev`, `tools_view_refused`. */
   readonly flags: readonly string[];
 }
