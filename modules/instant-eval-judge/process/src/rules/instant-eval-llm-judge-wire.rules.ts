@@ -10,7 +10,7 @@ import type {
 } from "@langwatch/instant-eval-judge-contract";
 import { z } from "zod";
 
-export const INSTANT_EVAL_LLM_JUDGE_WIRES = ["anthropic_messages", "openai_responses"] as const;
+const INSTANT_EVAL_LLM_JUDGE_WIRES = ["anthropic_messages", "openai_responses"] as const;
 export type InstantEvalLlmJudgeWire = (typeof INSTANT_EVAL_LLM_JUDGE_WIRES)[number];
 
 const SEARCH_SYSTEM_PROMPT =
@@ -137,8 +137,7 @@ const openAiResponseSchema = z.object({
 type Verdict = Readonly<{ outcome: "verdict"; verdict: boolean }> | Readonly<{ outcome: "none" }>;
 
 /** What one LLM answer said: a verdict, or none, and the tokens it billed either way. */
-export type InstantEvalLlmJudgeReading = Verdict &
-  Readonly<{ inputTokens: number; outputTokens: number }>;
+type InstantEvalLlmJudgeReading = Verdict & Readonly<{ inputTokens: number; outputTokens: number }>;
 
 const UNREADABLE: InstantEvalLlmJudgeReading = { outcome: "none", inputTokens: 0, outputTokens: 0 };
 

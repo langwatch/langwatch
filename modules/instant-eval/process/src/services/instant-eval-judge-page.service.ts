@@ -5,10 +5,7 @@
  * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
-import {
-  instantEvalPriceUsd,
-  instantEvalSpentCostUsd,
-} from "@langwatch/instant-eval-judge-contract";
+import { instantEvalSpentPriceUsd } from "@langwatch/instant-eval-judge-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
@@ -315,13 +312,11 @@ export class InstantEvalJudgePageService {
    */
   #spentSoFarUsd({ tokens, costUsd }: { tokens: number; costUsd: number }): number {
     if (tokens <= 0) return 0;
-    const { pricing } = this.judge;
-    // A routed run's row carries its cost so far; an unrouted one prices its tokens.
     const costNanoUsd = Math.round(costUsd * 1_000_000_000);
-
-    return instantEvalPriceUsd({
-      costUsd: instantEvalSpentCostUsd({ inputTokens: tokens, costNanoUsd, pricing }),
-      pricing,
+    return instantEvalSpentPriceUsd({
+      inputTokens: tokens,
+      costNanoUsd,
+      pricing: this.judge.pricing,
     });
   }
 
