@@ -194,7 +194,7 @@ Feature: clickhouse-serverless gives every login a tier, rotates passwords and a
     And in-pod helpers re-read it for every query
 
   @unit
-  Scenario: The local admin logs in from loopback only
+  Scenario: The local admin logs in from inside the server's network namespace only
     Given the rendered local admin
     Then its networks are 127.0.0.1 and ::1, replacing any other definition
 
@@ -230,7 +230,7 @@ Feature: clickhouse-serverless gives every login a tier, rotates passwords and a
   Scenario: A dynamic-only server accepts short-lived tokens and no password
     Given the image runs in dynamic-only mode with an OIDC issuer
     When users log in over HTTP and over the native protocol
-    Then no password logs in, not default's with any password nor local_admin's from outside loopback
+    Then no password logs in, not default's with any password nor local_admin's from another network namespace
     And a token gets exactly its tier's rights and fails the moment it expires
     And a wrong audience, issuer or key, or another user's token, is refused
     And a rotated issuer key works mid-run, and new logins return soon after the sidecar restarts

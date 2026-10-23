@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -79,6 +80,7 @@ type dynHarness struct {
 	staff  *rotatingIssuer
 	other  *rotatingIssuer
 	access string
+	image  string
 }
 
 // @scenario "A dynamic-only server accepts short-lived tokens and no password"
@@ -87,7 +89,7 @@ func TestDynamicOnlyAgainstRealClickHouse(t *testing.T) {
 	if image == "" {
 		t.Skip("CH_ACCESS_E2E_IMAGE not set; run `make e2e-access` (needs Docker)")
 	}
-	h := &dynHarness{t: t, root: t.TempDir(), staff: newRotatingIssuer(t), other: newRotatingIssuer(t)}
+	h := &dynHarness{t: t, root: t.TempDir(), staff: newRotatingIssuer(t), other: newRotatingIssuer(t), image: image}
 	if err := os.Chmod(h.root, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -133,12 +135,18 @@ users:
 				t.Errorf("native login as %s with %q succeeded", c.user, c.password)
 			}
 		}
+		// ClickHouse reads a loopback entry as "any address of this host", so
+		// the outside client runs in its own network namespace, as off-pod.
 		ip := nonLoopbackIP(t)
-		if _, err := dynQuery(ip, bootstrap.User, adminPassword, "SELECT 1"); err == nil {
-			t.Errorf("the local admin logged in over HTTP from %s", ip)
+		reader := h.token(h.staff, "reader@example.com", time.Now().Add(10*time.Minute), nil)
+		if err := h.fromOutside(ip, "reader", reader, false); err != nil {
+			t.Fatalf("control: a token login from outside failed, so the refusals below prove nothing: %v", err)
 		}
-		if _, err := h.native(ip, bootstrap.User, adminPassword, "SELECT 1"); err == nil {
-			t.Errorf("the local admin logged in over native from %s", ip)
+		if err := h.fromOutside(ip, bootstrap.User, adminPassword, true); err == nil {
+			t.Errorf("the local admin logged in over HTTP from outside the server's network namespace")
+		}
+		if err := h.fromOutside(ip, bootstrap.User, adminPassword, false); err == nil {
+			t.Errorf("the local admin logged in over native from outside the server's network namespace")
 		}
 		if _, err := dynQuery("127.0.0.1", bootstrap.User, adminPassword, "SELECT 1"); err != nil {
 			t.Errorf("control: the local admin cannot log in from loopback: %v", err)
@@ -371,6 +379,24 @@ func (h *dynHarness) native(host, user, password, sql string) (string, error) {
 		return "", fmt.Errorf("%v: %s", err, strings.TrimSpace(string(out)))
 	}
 	return strings.TrimSpace(string(out)), nil
+}
+
+// fromOutside logs in from a container on the bridge network, a network
+// namespace other than the server's, over HTTP (via url()) or native.
+func (h *dynHarness) fromOutside(host, user, password string, overHTTP bool) error {
+	args := []string{"run", "--rm", "--network", "bridge", "--entrypoint", "clickhouse", h.image}
+	if overHTTP {
+		auth := base64.StdEncoding.EncodeToString([]byte(user + ":" + password))
+		args = append(args, "local", "--query", fmt.Sprintf(
+			"SELECT * FROM url('http://%s:8123/?query=SELECT%%201', 'TSV', 'x String', headers('Authorization'='Basic %s'))", host, auth))
+	} else {
+		args = append(args, "client", "--host", host, "--user", user, "--password", password, "--query", "SELECT 1")
+	}
+	out, err := exec.Command("docker", args...).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%v: %s", err, strings.TrimSpace(string(out)))
+	}
+	return nil
 }
 
 func (h *dynHarness) token(is *rotatingIssuer, email string, exp time.Time, override map[string]any) string {

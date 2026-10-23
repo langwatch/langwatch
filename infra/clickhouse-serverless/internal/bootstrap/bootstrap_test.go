@@ -86,7 +86,7 @@ func TestRead_RefusesWhatGenerateDidNotWrite(t *testing.T) {
 	}
 }
 
-// @scenario "The local admin logs in from loopback only"
+// @scenario "The local admin logs in from inside the server's network namespace only"
 func TestUsersYAML_LoopbackOnly(t *testing.T) {
 	c := Credential{User: User, Password: strings.Repeat("ab", 32)}
 	data, err := UsersYAML(c)
