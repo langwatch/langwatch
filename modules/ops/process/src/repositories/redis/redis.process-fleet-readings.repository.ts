@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 import { z } from "zod";
@@ -8,6 +9,7 @@ import {
   processFleetReadingSchema,
 } from "../process-fleet-readings.repository.ts";
 
+const logger = createLogger("langwatch:ops:process-fleet");
 const fleetReadingsSchema = z.array(processFleetReadingSchema);
 const HELD_FOR_SECONDS = 30 * 60;
 
@@ -35,10 +37,19 @@ export class RedisProcessFleetReadingsRepository extends ProcessFleetReadingsRep
   async findAll(): Promise<ProcessFleetReading[]> {
     const raw = await this.redis.get(RedisProcessFleetReadingsRepository.key);
     if (raw === null) return [];
-    try {
-      return fleetReadingsSchema.parse(JSON.parse(raw));
-    } catch {
-      return [];
-    }
+    const readings = fleetReadingsSchema.safeParse(readJson(raw));
+    if (readings.success) return readings.data;
+
+    logger.debug({ issues: readings.error.issues }, "skipped fleet readings held in another shape");
+    return [];
+  }
+}
+
+function readJson(raw: string): unknown {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    // Not JSON at all: the schema refuses undefined and the caller logs it.
+    return undefined;
   }
 }

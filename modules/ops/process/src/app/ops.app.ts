@@ -2232,7 +2232,10 @@ export class OpsModule implements OpsApi {
     await upgradeAlerts.check(input);
   }
 
-  /** One pass of `ops_storage_stats`: measures every endpoint and saves the readings. */
+  /**
+   * One pass of `ops_storage_stats`: measures every endpoint and saves the readings, then
+   * counts the process-manager fleet and shares those counts for the pm_* gauges.
+   */
   async measureStorage(): Promise<void> {
     const { storageStats, processFleet } = this.#dependencies;
     if (!storageStats) throw new OpsCapabilityUnavailableError("storage stats");

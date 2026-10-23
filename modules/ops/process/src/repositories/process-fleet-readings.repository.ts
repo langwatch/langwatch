@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import type { ProcessNameCounts } from "./process-ops.repository.ts";
+
 export const processFleetReadingSchema = z.object({
   processName: z.string(),
   instances: z.number(),
@@ -8,10 +10,10 @@ export const processFleetReadingSchema = z.object({
   overduePending: z.number(),
   lapsedLeases: z.number(),
   deadMessages: z.number(),
-});
+}) satisfies z.ZodType<ProcessNameCounts>;
 
 /** One process manager's counts, as the last measurement of the fleet read them. */
-export type ProcessFleetReading = z.infer<typeof processFleetReadingSchema>;
+export type ProcessFleetReading = ProcessNameCounts;
 
 /**
  * The fleet's shared process counts: one process measures, every process's gauges read, so

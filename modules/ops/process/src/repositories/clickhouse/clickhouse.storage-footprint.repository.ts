@@ -12,6 +12,8 @@ const logger = createLogger("langwatch:ops:storage-footprint");
 
 /** One endpoint's system tables, read unscoped (`tenantId: ""`): none carries a tenant column. */
 export class ClickHouseStorageFootprintRepository extends StorageFootprintRepository {
+  private warnedUnknownCluster = false;
+
   private constructor(private readonly clickhouse: ClickHouseQueryClient) {
     super();
   }
@@ -110,7 +112,7 @@ export class ClickHouseStorageFootprintRepository extends StorageFootprintReposi
 
   /**
    * The read across the cluster, or on the local node when ClickHouse does not know the cluster;
-   * that degradation is logged. Any other failure is logged and thrown to the collector.
+   * that degradation is logged once per streak. Any other failure goes to the collector.
    */
   private async orLocal<T>({
     cluster,
@@ -121,13 +123,15 @@ export class ClickHouseStorageFootprintRepository extends StorageFootprintReposi
   }): Promise<{ answer: T; cluster: string | undefined }> {
     if (!plainClusterName(cluster)) return { answer: await read(void 0), cluster: void 0 };
     try {
-      return { answer: await read(cluster), cluster };
+      const answer = await read(cluster);
+      this.warnedUnknownCluster = false;
+      return { answer, cluster };
     } catch (error) {
-      if (!isUnknownClusterError(error)) {
-        logger.warn({ cluster, error }, "ClickHouse failed the cluster-wide backup read");
-        throw error;
-      }
-      logger.warn(
+      if (!isUnknownClusterError(error)) throw error;
+      // Once per streak: the setting stays wrong until an operator fixes it.
+      const level = this.warnedUnknownCluster ? "debug" : "warn";
+      this.warnedUnknownCluster = true;
+      logger[level](
         { cluster, error },
         "ClickHouse does not know the configured cluster; reading the local node's backup log",
       );
