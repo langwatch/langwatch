@@ -16,13 +16,13 @@ const KNOWN_METHODS = new Set(["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", 
 export const UNMATCHED_ROUTE = "unmatched";
 
 /** A method outside the standard set is one series, not an attacker-chosen label. */
-export function normalizeHttpMethod(method: string): string {
+function normalizeHttpMethod(method: string): string {
   const upper = method.toUpperCase();
   return KNOWN_METHODS.has(upper) ? upper : "_OTHER";
 }
 
 /** `2xx`, `4xx`, `5xx`; anything outside 100-599 is `unknown`. */
-export function statusClass(status: number): string {
+function statusClass(status: number): string {
   return status >= 100 && status <= 599 ? `${Math.floor(status / 100)}xx` : "unknown";
 }
 

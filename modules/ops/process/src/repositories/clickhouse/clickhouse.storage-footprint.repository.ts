@@ -89,6 +89,20 @@ export class ClickHouseStorageFootprintRepository extends StorageFootprintReposi
     BackupStatusRow[]
   > {
     if (!(await this.hasBackupLog({ cluster }))) return [];
+    // A replica without the table refuses the cluster-wide read; the local log still answers.
+    const rows = await this.readBackupRows({ cluster }).catch((error: unknown) => {
+      if (!clusterOf(cluster)) throw error;
+      return this.readBackupRows({ cluster: undefined });
+    });
+    return rows.map((row) => ({
+      status: row.status,
+      count: Number.parseInt(row.cnt, 10),
+      lastSuccessTime: row.last_success_time,
+      lastSuccessSizeBytes: Number.parseInt(row.last_success_size, 10),
+    }));
+  }
+
+  private async readBackupRows({ cluster }: { cluster: string | undefined }) {
     const result = await this.clickhouse.query<{
       status: string;
       cnt: string;
@@ -109,12 +123,7 @@ export class ClickHouseStorageFootprintRepository extends StorageFootprintReposi
       // System.backup_log carries no tenant column: this is the instance's backup history.
       SKIP_TENANT_CHECK: true,
     });
-    return result.rows.map((row) => ({
-      status: row.status,
-      count: Number.parseInt(row.cnt, 10),
-      lastSuccessTime: row.last_success_time,
-      lastSuccessSizeBytes: Number.parseInt(row.last_success_size, 10),
-    }));
+    return result.rows;
   }
 
   /** Asked first: a server without the table would log an HTTP error for the query. */

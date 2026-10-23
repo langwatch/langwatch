@@ -90,6 +90,12 @@ Feature: ClickHouse backup status metrics are opt-out
     And an unreachable replica does not blank the reading
 
   @unit
+  Scenario: A replica without the backup log falls back to the local node
+    Given CLICKHOUSE_CLUSTER names the cluster
+    When a replica refuses the cluster-wide read because it has no backup log
+    Then the local node's backup history is read instead
+
+  @unit
   Scenario: A cluster name that is not a plain identifier reads the local node
     Given CLICKHOUSE_CLUSTER holds something that is not a plain identifier
     When the backup history is read

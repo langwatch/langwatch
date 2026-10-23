@@ -9,6 +9,14 @@ import (
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 )
 
+// metricSink is one OTLP metric destination: its URL, auth headers and the
+// extra producers its reader pulls.
+type metricSink struct {
+	endpointURL string
+	headers     map[string]string
+	producers   []sdkmetric.Producer
+}
+
 // newMetricReader builds an OTLP/HTTP metric reader (an otlpmetrichttp exporter
 // behind a PeriodicReader) for endpointURL — the FULL per-signal URL, already
 // carrying /v1/metrics. Callers assemble one or more readers into a single
@@ -18,7 +26,8 @@ import (
 // producers are extra metric sources the reader pulls on every export, for
 // services that keep instruments outside the OTel API (a Prometheus registry
 // bridged in, say). Without one, those instruments exist only on a pull door.
-func newMetricReader(ctx context.Context, endpointURL string, headers map[string]string, producers []sdkmetric.Producer) (sdkmetric.Reader, error) {
+func newMetricReader(ctx context.Context, sink metricSink) (sdkmetric.Reader, error) {
+	endpointURL, headers, producers := sink.endpointURL, sink.headers, sink.producers
 	exporterOpts := []otlpmetrichttp.Option{
 		otlpmetrichttp.WithEndpointURL(endpointURL),
 	}

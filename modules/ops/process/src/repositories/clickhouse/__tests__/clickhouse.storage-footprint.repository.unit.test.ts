@@ -68,6 +68,26 @@ describe("given an endpoint's system tables", () => {
       expect(statements[0]?.sql).toContain("clusterAllReplicas('default', system.tables)");
     });
 
+    /** @scenario "A replica without the backup log falls back to the local node" */
+    it("falls back to the local log when the cluster-wide read is refused", async () => {
+      const statements: QueryRequest[] = [];
+      const clickhouse = clickHouseQueryClientDouble({
+        query: async (request: QueryRequest) => {
+          statements.push(request);
+          if (request.sql.includes("system.tables")) return { rows: [{ present: "1" }] };
+          if (request.sql.includes("clusterAllReplicas('default', system.backup_log)")) {
+            throw new Error("UNKNOWN_TABLE");
+          }
+          return { rows: [] };
+        },
+      });
+      const repo = ClickHouseStorageFootprintRepository.create({ clickhouse });
+
+      await expect(repo.findBackupStatuses({ cluster: "default" })).resolves.toEqual([]);
+
+      expect(statements.at(-1)?.sql).not.toContain("clusterAllReplicas");
+    });
+
     /** @scenario "A cluster name that is not a plain identifier reads the local node" */
     it("reads the local log with no cluster, or one that is not a plain name", async () => {
       for (const cluster of [undefined, "", "x'); DROP TABLE t; --"]) {

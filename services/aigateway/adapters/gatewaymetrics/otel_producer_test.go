@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// @scenario "gateway series are pushed over OTLP as well as scraped"
 func TestRecorder_OTelProducer_CarriesGatewaySeriesButNotRuntimeFamilies(t *testing.T) {
 	r := New()
 	r.ObserveHTTPRequest("/v1/chat/completions", 200, "openai", "gpt-5-mini", 0.1)

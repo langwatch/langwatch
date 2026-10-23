@@ -11,10 +11,8 @@ export {
 export {
   UNMATCHED_ROUTE,
   noteRouteTemplate,
-  normalizeHttpMethod,
   recordHttpServerRequest,
   routeTemplateOf,
-  statusClass,
   type HttpServerRequest,
 } from "./http-server.ts";
 export {
