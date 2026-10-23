@@ -460,14 +460,11 @@ describe("UsageService over the trace count", () => {
 
 describe("given limit checks that read the counting store", () => {
   class GatedCounter implements UsageVolumeCounter {
-    readonly reads: {
-      resolve: (counts: ProjectUsageCounts) => void;
-      reject: (e: Error) => void;
-    }[] = [];
+    readonly reads: { resolve: (counts: ProjectUsageCounts) => void }[] = [];
 
     getCountByProjects(): Promise<ProjectUsageCounts> {
-      return new Promise((resolve, reject) => {
-        this.reads.push({ resolve, reject });
+      return new Promise((resolve) => {
+        this.reads.push({ resolve });
       });
     }
   }
