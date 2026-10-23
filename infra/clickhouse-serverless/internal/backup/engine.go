@@ -194,19 +194,25 @@ func firstLine(s string) string {
 	return s
 }
 
-// Restore restores db from path. It needs confirm, and refuses "latest":
-// a restore always names the backup it means.
-func (e *Engine) Restore(ctx context.Context, path string, confirm bool) Result {
-	res := Result{Started: e.Now()}
+// CheckRestore refuses a restore without confirmation or an exact name;
+// "latest" is not one: a restore always names the backup it means.
+func CheckRestore(path string, confirm bool) error {
 	switch {
 	case !confirm:
-		res.Outcome, res.Err = Failed, errors.New("restore overwrites data: pass --confirm (or CONFIRM_RESTORE=yes) to proceed")
-		return res
+		return errors.New("restore overwrites data: pass --confirm (or CONFIRM_RESTORE=yes) to proceed")
 	case path == "":
-		res.Outcome, res.Err = Failed, errors.New("name the backup to restore (--name or BACKUP_NAME); list them with `ch-config backup list`")
-		return res
+		return errors.New("name the backup to restore (--name or BACKUP_NAME); list them with `ch-config backup list`")
 	case strings.EqualFold(strings.TrimRight(path, "/"), "latest"):
-		res.Outcome, res.Err = Failed, errors.New("explicit backup name required, 'latest' is not allowed; list them with `ch-config backup list`")
+		return errors.New("explicit backup name required, 'latest' is not allowed; list them with `ch-config backup list`")
+	}
+	return ValidPath(path)
+}
+
+// Restore restores db from path, after CheckRestore.
+func (e *Engine) Restore(ctx context.Context, path string, confirm bool) Result {
+	res := Result{Started: e.Now()}
+	if err := CheckRestore(path, confirm); err != nil {
+		res.Outcome, res.Err = Failed, err
 		return res
 	}
 	id := "restore_" + strings.NewReplacer("/", "_", ".", "_").Replace(strings.TrimRight(path, "/")) + "_" + res.Started.UTC().Format(nameTimeLayout)
