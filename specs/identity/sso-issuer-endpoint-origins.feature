@@ -41,7 +41,7 @@ Feature: An SSO connection reaches the endpoints its issuer's discovery document
     Then discovery is refused, and nothing is fetched directly or through the proxy
 
   # Sign-in goes through better-auth's use of Node's global fetch, which the
-  # egress fence does not carry yet (ADR-182).
+  # egress fence does not carry yet (ADR-187).
   @integration @unimplemented
   Scenario: Sign-in reaches the identity provider through the deployment's outbound proxy
     Given the deployment reaches the internet only through an outbound proxy
