@@ -5,7 +5,7 @@ import {
   ownProjectIdReadBy,
   VERIFIED_ATTRIBUTE_PREFIX,
 } from "@langwatch/authorization";
-import { compileBraidCondition } from "@langwatch/authz-contract";
+import { compileBraidCondition } from "@langwatch/authz-contract/braid-condition-compiler";
 
 /** Whether a proof reads any owner's spans through a braid (ADR-185 §5). */
 export function readsBraidedSpans(authorization: Authorization): boolean {

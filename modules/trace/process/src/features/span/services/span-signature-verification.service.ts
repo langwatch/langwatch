@@ -1,8 +1,8 @@
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import {
-  type ApiKeyApi,
   BRAID_SIGNATURE_ATTRIBUTE,
   parseBraidSignature,
-} from "@langwatch/api-key-contract";
+} from "@langwatch/api-key-contract/signing-key-wire-format";
 import { VERIFIED_ATTRIBUTE_PREFIX } from "@langwatch/authorization";
 import { createLogger } from "@langwatch/observability";
 import type { OtlpSpan } from "@langwatch/otlp/trace-request";

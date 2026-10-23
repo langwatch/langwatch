@@ -9,7 +9,7 @@ import {
   readScopeKeyOf,
 } from "@langwatch/authorization";
 import type { AuthzScopeRef } from "@langwatch/authz-contract";
-import { compileBraidCondition } from "@langwatch/authz-contract";
+import { compileBraidCondition } from "@langwatch/authz-contract/braid-condition-compiler";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";

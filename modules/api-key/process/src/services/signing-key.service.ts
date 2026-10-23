@@ -3,11 +3,11 @@ import { randomInt } from "node:crypto";
 import {
   type IssuedSigningKey,
   type ProjectSigning,
-  SIGNING_KEY_PREFIX,
   SIGNING_KEY_ROTATION_OVERLAP_MS,
   type SigningKey,
   SigningKeyNotFoundError,
 } from "@langwatch/api-key-contract";
+import { SIGNING_KEY_PREFIX } from "@langwatch/api-key-contract/signing-key-wire-format";
 import { generate } from "@langwatch/ksuid";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { type Instant, nowInstant, toDate } from "@langwatch/time";

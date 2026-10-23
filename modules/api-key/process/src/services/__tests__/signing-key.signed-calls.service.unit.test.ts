@@ -6,10 +6,10 @@
 import { createHmac } from "node:crypto";
 
 import {
-  braidSignatureMessage,
   type IssuedSigningKey,
   SIGNING_KEY_ROTATION_OVERLAP_MS,
 } from "@langwatch/api-key-contract";
+import { braidSignatureMessage } from "@langwatch/api-key-contract/signing-key-wire-format";
 import { fromDate, type Instant } from "@langwatch/time";
 import { beforeEach, describe, expect, it } from "vitest";
 

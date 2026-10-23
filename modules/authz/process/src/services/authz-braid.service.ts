@@ -14,7 +14,6 @@ import {
   BraidGovernanceProjectError,
   BraidIntoItselfError,
   BraidNotOnProjectError,
-  compileBraidCondition,
   GrantExceedsCallerPermissionsError,
   GrantExpiryInPastError,
   GrantValidationError,
@@ -29,6 +28,7 @@ import {
   type AuthzProjectBraids,
   type AuthzRemoveBraidInput,
 } from "@langwatch/authz-contract";
+import { compileBraidCondition } from "@langwatch/authz-contract/braid-condition-compiler";
 import { nowInstant, Temporal } from "@langwatch/time";
 
 import type { EventingAuthzLedgerAdapter } from "../eventing/authz-grant.store.ts";

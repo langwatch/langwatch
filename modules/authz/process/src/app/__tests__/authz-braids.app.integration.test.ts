@@ -5,7 +5,8 @@
  * @see modules/authz/specs/braids.feature
  */
 import { BRAID_CONDITION_COMPILER_VERSION, usableAuthorization } from "@langwatch/authorization";
-import { BRAID_AUDIT_TARGET_KIND, compileBraidCondition } from "@langwatch/authz-contract";
+import { BRAID_AUDIT_TARGET_KIND } from "@langwatch/authz-contract";
+import { compileBraidCondition } from "@langwatch/authz-contract/braid-condition-compiler";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {

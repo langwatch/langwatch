@@ -9,11 +9,11 @@ import {
 } from "@langwatch/authorization";
 import {
   BraidConditionRefusedError,
-  compileBraidCondition,
   type AuthzApi,
   type AuthzBraid,
   type BraidConditionRefusal,
 } from "@langwatch/authz-contract";
+import { compileBraidCondition } from "@langwatch/authz-contract/braid-condition-compiler";
 import { nowInstant } from "@langwatch/time";
 import type {
   BraidActivity,

@@ -1,12 +1,11 @@
 // The braid dialog's draft: the condition and its signed-calls switch, the window, the picker.
 // Spec: modules/authz/specs/braids-screen.feature, "The dialog builds a braid". Decisions: ADR-185.
 
+import { type AuthzBraid, type AuthzBraidTargets } from "@langwatch/authz-contract";
 import {
-  type AuthzBraid,
-  type AuthzBraidTargets,
   type BraidConditionCompileResult,
   compileBraidCondition,
-} from "@langwatch/authz-contract";
+} from "@langwatch/authz-contract/braid-condition-compiler";
 import { Temporal } from "@langwatch/time";
 
 const DAY_MS = 24 * 60 * 60 * 1000;

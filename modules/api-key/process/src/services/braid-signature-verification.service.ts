@@ -1,15 +1,17 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 import {
-  type BraidSignature,
   type BraidSignatureFailureReason,
   type BraidSignatureVerdict,
-  braidSignatureMessage,
-  parseBraidSignature,
   SIGNING_KEY_LOOKUP_CACHE_MS,
-  SIGNING_KEY_PREFIX,
   type VerifyBraidSignatureInput,
 } from "@langwatch/api-key-contract";
+import {
+  type BraidSignature,
+  braidSignatureMessage,
+  parseBraidSignature,
+  SIGNING_KEY_PREFIX,
+} from "@langwatch/api-key-contract/signing-key-wire-format";
 import { createLogger } from "@langwatch/observability";
 import { type Instant, nowInstant } from "@langwatch/time";
 

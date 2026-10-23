@@ -1,7 +1,7 @@
 // The condition, checked as it is typed: a refusal underlines where it starts and says the fix,
 // and an attribute the owner's spans carry is inserted at the cursor with the caret in its quotes.
 
-import type { BraidConditionCompileResult } from "@langwatch/authz-contract";
+import { type BraidConditionCompileResult } from "@langwatch/authz-contract/braid-condition-compiler";
 import { Menu } from "@langwatch/design-system/menu";
 import {
   Box,
