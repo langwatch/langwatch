@@ -182,22 +182,26 @@ export class TraceIngestCredentialService {
   }
 }
 
-/** The three ids both doors record a batch against. */
 /** The key a collector bearer is, as the access record names it: id and kind, never the token. */
 function collectorKeyOf(resolved: ResolvedApiKeyCredential): RestKeyCredential {
   if (resolved.type === "legacyProjectKey") {
     return { kind: "legacy_project_key", apiKeyId: null, ownerUserId: null };
   }
-  // A source type is what makes a key an ingestion key; a template is optional on one.
-  const kind = resolved.isLangySessionKey
-    ? "langy_session_key"
-    : resolved.ingestSourceType
-      ? "ingestion_key"
-      : "api_key";
-
-  return { kind, apiKeyId: resolved.apiKeyId, ownerUserId: resolved.userId };
+  return {
+    kind: collectorKeyKindOf(resolved),
+    apiKeyId: resolved.apiKeyId,
+    ownerUserId: resolved.userId,
+  };
 }
 
+function collectorKeyKindOf(resolved: ResolvedApiKeyCredential): RestKeyCredential["kind"] {
+  if (resolved.isLangySessionKey) return "langy_session_key";
+  // A source type is what makes a key an ingestion key; a template is optional on one.
+  if (resolved.ingestSourceType) return "ingestion_key";
+  return "api_key";
+}
+
+/** The three ids both doors record a batch against. */
 function projectOf(
   resolved: ResolvedApiKeyCredential,
 ): Readonly<{ id: string; teamId: string; organizationId: string }> {
