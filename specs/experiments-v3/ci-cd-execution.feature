@@ -139,6 +139,22 @@ Feature: CI/CD Execution of Platform Evaluations
       | 25          |
       | 1.5         |
 
+  @unit
+  Scenario: The experiment run command passes its concurrency flag on the run
+    When I run `langwatch experiment run my-evaluation --concurrency 1`
+    Then the run starts with a concurrency of 1
+
+  @unit
+  Scenario: The experiment run command refuses a concurrency outside 1 to 24
+    When I run `langwatch experiment run my-evaluation --concurrency 25`
+    Then the command exits non-zero
+    And no run is started
+
+  @unit
+  Scenario: The MCP run tool passes its concurrency on the run
+    When an agent calls platform_run_experiment for "my-evaluation" with a concurrency of 1
+    Then the run request body carries a concurrency of 1
+
   # ==========================================================================
   # SSE Streaming Mode
   # ==========================================================================

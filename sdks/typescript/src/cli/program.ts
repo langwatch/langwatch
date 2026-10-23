@@ -1610,8 +1610,12 @@ function registerExperimentCommands(program: Command): void {
       .description("Start an experiment run by slug")
       .option("--wait", "Wait for the experiment to complete before returning")
       .option("--param <pair>", PARAM_FLAG_HELP, collectParam)
+      .option(
+        "--concurrency <n>",
+        "Rows to run at once for this run only, 1 to 24 (default: the server's setting; 1 runs rows in order)",
+      )
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (slug: string, options: { wait?: boolean; param?: string[] }) => {
+    async (slug: string, options: { wait?: boolean; param?: string[]; concurrency?: string }) => {
       const { runExperimentCommand: impl } = await import("./commands/experiment/run.js");
       return impl(slug, options);
     },

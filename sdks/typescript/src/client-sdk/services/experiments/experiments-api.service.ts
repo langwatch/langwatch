@@ -427,9 +427,13 @@ export class ExperimentsApiService {
     slug: string,
     options: {
       parameters?: Record<string, string | number | boolean>;
+      concurrency?: number;
     } = {},
   ): Promise<ExperimentRunStartResponse> {
-    const body = toRunStartRequest({ parameters: options.parameters });
+    const body = toRunStartRequest({
+      parameters: options.parameters,
+      concurrency: options.concurrency,
+    });
     const { data, error, response } = await this.apiClient.POST("/api/v1/experiments/{slug}/run", {
       params: { path: { slug } },
       ...(body !== undefined ? { body } : {}),
