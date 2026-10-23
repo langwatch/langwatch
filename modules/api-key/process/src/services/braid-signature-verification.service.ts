@@ -24,7 +24,7 @@ const logger = createLogger("langwatch:api-key:braid-signature");
 /** Counts and last use are written at most this often from one process. */
 export const SIGNING_KEY_USAGE_FLUSH_MS = 10_000;
 /** The most lookups held at once; past it the oldest goes, costing one early re-read. */
-export const SIGNING_KEY_LOOKUP_MAX_HELD = 10_000;
+const SIGNING_KEY_LOOKUP_MAX_HELD = 10_000;
 
 type HeldLookup = {
   readonly at: number;
