@@ -641,10 +641,10 @@ translateTraceFilter(input: { query: string; tenantId: string; timeRange: { from
 
 #### `translateLegacyFilters`
 
-A legacy `filters` document compiled to parameterized ClickHouse conditions over `trace_summaries ts`. Trace owns the grammar because it owns the tables.
+A legacy `filters` document compiled to parameterized ClickHouse conditions over `trace_summaries ts`; Trace owns the grammar because it owns the tables. `fenced` writes side-table subqueries for a statement read through a proof's fence (ADR-177).
 
 ```typescript
-translateLegacyFilters(input: { filters: Readonly<Record<string, unknown>>; window?: { startDate?: number; endDate?: number }; }): { conditions: string[]; params: Record<string, unknown>; hasUnsupportedFilters: boolean };
+translateLegacyFilters(input: { filters: Readonly<Record<string, unknown>>; window?: { startDate?: number; endDate?: number }; fenced?: boolean; }): { conditions: string[]; params: Record<string, unknown>; hasUnsupportedFilters: boolean };
 ```
 
 #### `compileExplorerTraceFilter`
@@ -1031,21 +1031,21 @@ findTraceCountsByAttribute(input: { projectId: string; sinceMs: number; attribut
 
 |             |                                        |
 | ----------- | -------------------------------------- |
-| Declared at | `src/transport/collector.rest.ts:289`  |
+| Declared at | `src/transport/collector.rest.ts:300`  |
 | Base URL    | none: each route's path is its address |
 | Addressing  | literal                                |
 | Credential  | project                                |
 
 #### `POST /api/collector` · `collectTrace`
 
-Public: Trace collection API key resolved in-handler, so the refusal carries the credential chain's own body; the route itself is gated on traces:create. Hidden from the OpenAPI document. Declared at `src/transport/collector.rest.ts:295`.
+Public: Trace collection API key resolved in-handler, so the refusal carries the credential chain's own body; the route itself is gated on traces:create. Hidden from the OpenAPI document. Declared at `src/transport/collector.rest.ts:306`.
 
 Answers at `/api/collector`.
 
 ```typescript
-// Body: inline, src/transport/collector.rest.ts:298
+// Body: inline, src/transport/collector.rest.ts:309
 type Body = Record<string, unknown>;
-// Response: inline, src/transport/collector.rest.ts:306
+// Response: inline, src/transport/collector.rest.ts:317
 type Response = unknown;
 ```
 
@@ -1053,20 +1053,20 @@ type Response = unknown;
 
 |             |                                         |
 | ----------- | --------------------------------------- |
-| Declared at | `src/transport/otlp-ingest.rest.ts:266` |
+| Declared at | `src/transport/otlp-ingest.rest.ts:275` |
 | Base URL    | none: each route's path is its address  |
 | Addressing  | literal                                 |
 | Credential  | otlp_ingest                             |
 
 #### `POST /api/otel/v1/traces` · `ingestOtlpTraces`
 
-Authenticated: the OTLP ingest door's resolved key is the whole gate, as on main. Credential `otlp_ingest`. Hidden from the OpenAPI document. Declared at `src/transport/otlp-ingest.rest.ts:272`.
+Authenticated: the OTLP ingest door's resolved key is the whole gate, as on main. Credential `otlp_ingest`. Hidden from the OpenAPI document. Declared at `src/transport/otlp-ingest.rest.ts:281`.
 
 Answers at `/api/otel/v1/traces`.
 
 ```typescript
-// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:276)
-// Response: inline, src/transport/otlp-ingest.rest.ts:279
+// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:285)
+// Response: inline, src/transport/otlp-ingest.rest.ts:288
 type Response = unknown;
 ```
 

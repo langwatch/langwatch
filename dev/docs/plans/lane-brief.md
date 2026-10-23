@@ -4,7 +4,7 @@ The mechanism is now canonical elsewhere. How a lane reads, works, checks,
 budgets and stops is `.claude/coordinator/LANE.md`; the rules that bind it -
 no whole-tree checks, no git writes, never a `.env`, tests through the owning
 package with `VITEST_MAX_WORKERS`, ownership and shared files, identifiers
-through the tsrs language server, cost and reading discipline, prose style - are
+through `rush ts`, cost and reading discipline, prose style - are
 `.claude/skills/core/repository-rules.md` and `testing-rules.md`; the report
 is `.claude/skills/core/handoff-rules.md` and the template beside `LANE.md`.
 Nothing below restates them.
@@ -34,7 +34,7 @@ Rows live in `packages/architecture-enforcer/src/feature-shape-baseline.json` as
 A `git show` exemplar is read as one outline plus one handler, never whole
 (`LANE.md` section 1); a framework signature (`withModule`,
 `defineRestRouter`, `defineRestMiddleware`, `runtime.mount`) comes from
-a tsrs language-server hover, never from a read of `packages/api` or
+`rush ts hover --file F --line N --symbol X`, never from a read of `packages/api` or
 `packages/runtime-composition` source.
 
 The wire is pinned to origin/main: procedure and route names, paths, inputs,
@@ -78,7 +78,7 @@ ids.
 
 One check `repository-rules.md` section 5 leaves to the lane: before an export
 is deleted, `git grep -n "<name>" -- apps enterprise modules packages` beside
-the tsrs language server's references, because the two things the language server cannot see
+`rush ts references`, because the two things the language server cannot see
 (`vi.mock("<path>")` strings and tests that read source as text) are what the
 text search catches.
 

@@ -2052,6 +2052,10 @@ here, once, by name, so both consuming templates agree.
 - name: TRUSTED_PROXY_ADDRESSES
   value: {{ . | quote }}
 {{- end }}
+{{- if .Values.app.trustCloudflareClientIp }}
+- name: TRUST_CLOUDFLARE_CLIENT_IP
+  value: "true"
+{{- end }}
 
 # Content-hashed asset base (ADR-086). Empty by default → assets are
 # served same-origin from the pod. Set to a commit-prefixed CDN base

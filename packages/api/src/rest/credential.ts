@@ -18,6 +18,7 @@ import { HandledError, remediation } from "@langwatch/handled-error";
 import type { Context } from "hono";
 
 import { ProjectInvalidCredentialsError } from "../errors.ts";
+import { ClientAddress } from "../policy/client-address.ts";
 import type { EndpointVariables, ServiceContext } from "./response.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -240,6 +241,11 @@ export function browserSessionOfRequest(request: Request): { id: string } | null
   const sessionId = browserCallers.get(request)?.sessionId;
 
   return sessionId ? { id: sessionId } : null;
+}
+
+/** The value of `callerAddressContext`: the address the door resolved once for this request. */
+export function callerAddressOfRequest(request: Request): string | null {
+  return ClientAddress.resolvedFor(request) ?? null;
 }
 
 function actorIdOf(credential: RestResolvedProjectCredential): string {

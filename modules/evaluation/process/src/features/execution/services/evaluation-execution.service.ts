@@ -19,6 +19,7 @@ import {
   isNativeEvaluatorType,
 } from "@langwatch/evaluator-contract";
 import type { InstantEvalJudgeApi } from "@langwatch/instant-eval-judge-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { Protections, Trace, TraceApi } from "@langwatch/trace-contract";
 
 import type { EvaluationRunRepository } from "../../../repositories/evaluation.repository.ts";
@@ -71,6 +72,8 @@ export interface EvaluationExecutionDeps {
   workflowExecutor: Pick<WorkflowEvaluationService, "run">;
   /** Answers a judge whose model is Instant Evals (ADR-174 decision 1). */
   judges: Pick<InstantEvalJudgeApi, "judge">;
+  /** The project's Instant Evals column: LangWatch's classifier or its own model (ADR-182). */
+  decisionModels: Pick<ModelProviderApi, "resolveDecisionModel">;
   /**
    * The install environment the optional evaluators read their opt-out
    * switches from. Stated by the process rather than read here, because a

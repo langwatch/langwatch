@@ -18,7 +18,7 @@ import {
   type Dashboard,
 } from "@langwatch/dashboard-contract";
 
-import { viewerOfActor } from "../rules/dashboard-viewer.rules.ts";
+import { viewerOfActor, viewerOfOwner } from "../rules/dashboard-viewer.rules.ts";
 
 export const dashboardRest = defineRestRouter(DashboardApi)
   .withNamespace("dashboards")
@@ -137,9 +137,9 @@ export const dashboardRest = defineRestRouter(DashboardApi)
     resource: "dashboard",
     action: "delete",
     idParam: "id",
-    name: ({ app, projectId, id }) =>
+    name: ({ app, projectId, id, ownerUserId }) =>
       nameUnlessMissing({
-        read: app.getById({ projectId, dashboardId: id }),
+        read: app.getById({ projectId, dashboardId: id, ...viewerOfOwner({ ownerUserId }) }),
         missing: DashboardNotFoundError,
         nameOf: (dashboard) => dashboard.name,
       }),

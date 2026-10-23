@@ -33,7 +33,7 @@ export const noAliasReexportRule = defineRule({
     aliasReexport: {
       what: "`{{local}}` is re-exported here as `{{exported}}`.",
       why: "Two names for one symbol split every search and rename across both spellings.",
-      fix: "Rename `{{local}}` to `{{exported}}` with the tsrs language server and export it under one name. Read the `linting` skill.",
+      fix: "Rename `{{local}}` to `{{exported}}` with a language-server rename (`rush ts rename`, or your editor's) and export it under one name. Read the `linting` skill.",
     },
   },
   create(context, file) {

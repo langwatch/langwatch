@@ -13,11 +13,11 @@ import { ProjectApi } from "@langwatch/project-contract";
 import type { HostedMcpRepositories } from "../repositories/hosted-mcp.repositories.ts";
 import type { McpAuthorizeAnswer } from "../rules/mcp-authorize.rules.ts";
 import { AuthzMcpSessionGrantService } from "../services/authz-mcp-session-grant.service.ts";
-import { HeaderMcpClientAddressService } from "../services/header-mcp-client-address.service.ts";
 import { McpAuthorizationService } from "../services/mcp-authorization.service.ts";
 import { McpEndpointService, type McpHandler } from "../services/mcp-endpoint.service.ts";
 import type { McpCliSessions } from "../services/mcp-oauth-token.service.ts";
 import { ProjectMcpProjectLookupService } from "../services/project-mcp-project-lookup.service.ts";
+import { ResolvedMcpClientAddressService } from "../services/resolved-mcp-client-address.service.ts";
 import type { McpAuthorizeApi } from "../transport/mcp-authorize.rest.ts";
 
 /** Everything the hosted MCP endpoint needs from the process that mounts it. */
@@ -29,7 +29,7 @@ type HostedMcpDependencies = Readonly<{
   grants: Pick<AuthzMcpSessionGrantService, "stillGranted">;
   /** Mints, rotates and reads the person-bound, project-capped sessions an approval opens. */
   cliSessions: McpCliSessions;
-  address: Pick<HeaderMcpClientAddressService, "clientIp">;
+  address: Pick<ResolvedMcpClientAddressService, "clientIp">;
   /** Absent installs no extra tools. */
   sessionTools?: Pick<GovernanceRestApi, "registerMcpTools"> | undefined;
   /** The public origin the MCP client is told to come back to. */
@@ -112,7 +112,7 @@ export class HostedMcpModule implements HostedMcpApiContract, McpAuthorizeApi {
         projects: ProjectMcpProjectLookupService.create({ projects: dependencies.projects }),
         grants: AuthzMcpSessionGrantService.create({ authorization: dependencies.authorization }),
         cliSessions: dependencies.sessions,
-        address: HeaderMcpClientAddressService.create(),
+        address: ResolvedMcpClientAddressService.create(),
         baseHost: config.publicBaseUrl,
         sessionTools: dependencies.governance,
       },

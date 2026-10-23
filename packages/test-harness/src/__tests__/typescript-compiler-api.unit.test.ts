@@ -178,10 +178,21 @@ describe("given TypeScript 7 is the compiler", () => {
     );
 
     /** @scenario "The superseded preview compiler is gone" */
-    it("declares the native-preview package nowhere", () => {
-      const offenders = manifests.filter((manifest) =>
-        readFileSync(resolve(REPO_ROOT, manifest), "utf8").includes("@typescript/native-preview"),
+    it("keeps the native-preview package at the root, for tsrs to fall back to", () => {
+      const root: { devDependencies?: Record<string, string> } = JSON.parse(
+        readFileSync(resolve(REPO_ROOT, "package.json"), "utf8"),
       );
+
+      expect(root.devDependencies).toHaveProperty("@typescript/native-preview");
+    });
+
+    /** @scenario "The superseded preview compiler is gone" */
+    it("declares the native-preview package in no workspace package", () => {
+      const offenders = manifests
+        .filter((manifest) => manifest !== "package.json")
+        .filter((manifest) =>
+          readFileSync(resolve(REPO_ROOT, manifest), "utf8").includes("@typescript/native-preview"),
+        );
 
       expect(offenders).toEqual([]);
     });

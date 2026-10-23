@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@langwatch/auth-contract": "workspace:*",
+    "@langwatch/coding-agent-contract": "workspace:*",
     "@langwatch/enterprise-billing-contract": "workspace:*",
     "@langwatch/enterprise-nurturing-contract": "workspace:*",
     "@langwatch/enterprise-saas-contract": "workspace:*",
