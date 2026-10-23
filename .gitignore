@@ -231,6 +231,8 @@ dev/docs/plans/handover-*.md
 # workspace-data directory is a derived index; neither is source (ADR-150).
 .nx/cache
 .nx/workspace-data
+# CI's package suite results (langwatch-app-ci package-suites).
+.nx/suites
 
 .nx/polygraph
 .claude/worktrees

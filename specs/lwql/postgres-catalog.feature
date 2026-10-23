@@ -151,6 +151,47 @@ Feature: Every catalogued Postgres model is queryable through LangWatchQL
       Then the model's timeColumn is set to CreatedAt
       And queries can use CreatedAt to filter by time window
 
+  Rule: A Postgres date reads as the date Postgres holds
+
+    Postgres stores a Prisma DateTime as timestamp(3) or timestamptz(3).
+    ClickHouse's PostgreSQL engine reads either one at the wrong scale into a
+    DateTime64(3) column, as a date in the year 2299, and correctly into a
+    DateTime64(6) column. Issue: langwatch/tasks#958.
+
+    @unit
+    Scenario: The engine table reads a date at the scale Postgres stores it
+      Given a Postgres-backed view with a DateTime64(3) column, nullable or not
+      When its PostgreSQL-engine table statement is built
+      Then that column is declared DateTime64(6) on the engine table
+      And every other column keeps its catalogue type
+
+    @unit
+    Scenario: The view still shows millisecond dates
+      Given a Postgres-backed view with a DateTime64(3) column
+      When its LangWatchQL view statement is built
+      Then the view casts the engine column back to the catalogue type
+      And a column of any other type is projected unchanged
+
+    @integration
+    Scenario: Every date on every Postgres-backed view equals the Postgres value
+      Given every Postgres-backed view provisioned over seeded rows
+      When a project reads each of its date columns
+      Then every date equals the value Postgres holds, to the millisecond
+      And none reads as a date in the year 2299
+
+    @integration
+    Scenario: A date filter compares against the real date
+      Given a project created in March 2026
+      When the project counts its projects created from June 2026 against a date it reads from another table
+      Then it counts none
+
+    @integration
+    Scenario: Re-provisioning replaces an engine table declared at the old scale
+      Given a Postgres-backed view whose engine table still declares DateTime64(3)
+      When provisioning runs the current engine-table and view statements
+      Then the engine table declares DateTime64(6)
+      And the view reads the date Postgres holds
+
   Rule: Topics are the proving slice
 
     @integration

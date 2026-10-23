@@ -6,6 +6,9 @@ export default defineModuleVitestConfig({
   // share a worker and its jsdom window, so a test that changes a global
   // (navigator, document, a module singleton) puts it back afterwards.
   isolate: true,
+  // The isolated files get a fresh module registry and jsdom window in a worker
+  // that loads jsdom once, instead of a process each (ADR-184).
+  isolateIn: "vm-context",
   test: {
     fsModuleCache: true,
     environment: "jsdom",

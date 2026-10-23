@@ -85,7 +85,7 @@ outputs:
     value: ${{ steps.filter.outputs.codeql-python || steps.sha.outputs.codeql-python || steps.force.outputs.codeql-python }}
   heavy:
     description: >-
-      "'true' unless this is a draft pull request. Gate expensive jobs on
+      "'true' unless this is a draft or a release-please pull request. Gate expensive jobs on
       `relevant == 'true' && heavy == 'true'` so a draft keeps the cheap
       signal and releases the runner slots. Never gate a REQUIRED check on
       this alone — a skipped required check blocks the merge; pair it with an
@@ -120,7 +120,9 @@ runs:
       run: |
         case "${{ github.event_name }}" in
           pull_request | pull_request_target)
-            if [ "${{ github.event.pull_request.draft }}" = "true" ]; then
+            # A release-please PR is rewritten on every merge and carries only versions and
+            # changelogs; the branch and the opening account together identify it.
+            if [ "${{ github.event.pull_request.draft }}" = "true" ] || [ "${{ startsWith(github.head_ref, 'release-please--') && github.event.pull_request.user.login == 'langwatch-agent' }}" = "true" ]; then
               echo "heavy=false" >> "$GITHUB_OUTPUT"
             else
               echo "heavy=true" >> "$GITHUB_OUTPUT"

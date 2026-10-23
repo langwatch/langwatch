@@ -34,7 +34,7 @@ specifier can become `@langwatch/test-harness/vitest-config` in one pass.
 
 | key                    | value                                    | why                                                                                                                                                                                                              |
 | ---------------------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `test.pool`            | `"forks"`                                | vitest 5's own default, declared so a package never drifts onto `vmThreads`, which cannot disable isolation                                                                                                      |
+| `test.pool`            | `"forks"`                                | vitest 5's own default, declared so a package never drifts onto `vmThreads`, which cannot disable isolation. `isolateIn: "vm-context"` moves only the isolated files onto `vmForks`, see below                   |
 | `test.isolate`         | `false` for every kind, `jsdom` included | a fresh worker per test file re-evaluates the whole module graph per file; off, the graph is evaluated once per worker. `true` isolates only the files that mock modules, see below                              |
 | `test.maxWorkers`      | `1` in fast mode, when isolation is off  | collapses the run onto one child process instead of one per core, cutting fork/spawn overhead on top of the isolation win. Not set when a package asks for `isolate: true`, where separate workers are the point |
 | `test.fsModuleCache`   | `true` in fast mode                      | persists transformed modules to `node_modules/.vitest-cache` between runs, so a rerun skips the transform share                                                                                                  |
@@ -165,6 +165,43 @@ emptied `document.head`, dropping the style tags the design system's style
 cache still pointed at. With those two cleaning up after themselves it uses
 `isolate: true`. In a jsdom suite, a file that changes `navigator`, `document`
 or `window` puts back exactly what it changed, not a blanket reset.
+
+## Isolated jsdom files can share a worker
+
+An isolated file on the forks pool gets a process of its own, and every one of
+those processes loads jsdom's code again: about 700ms of CPU, against about
+6ms to build another window once jsdom is loaded. `isolateIn: "vm-context"`
+runs a suite's isolated files on `vmForks` instead. A worker loads jsdom once,
+and each file still gets a fresh module registry and a fresh window, in a `vm`
+context of its own. The files that share modules stay on forks. See ADR-184.
+
+```ts
+export default defineModuleVitestConfig({
+  kind: "jsdom",
+  isolate: true,
+  isolateIn: "vm-context",
+  needsOwnProcess: [
+    // Stubs `window.location`, which a vm context's window will not let go.
+    "src/__tests__/reload.integration.test.tsx",
+  ],
+});
+```
+
+Two kinds of file can't run in a `vm` context. List them in `needsOwnProcess`
+and say why; they run under `own-process`, a process each:
+
+- a file that stubs or spies on `window.location`, which is fixed on a
+  context's window (`Cannot redefine property: location`);
+- a file that loads a native module checking its arguments against Node's own
+  `String` or `RegExp`, such as Vite's bundler (`Value is none of these types`).
+
+A file that asks for `@vitest-environment node` gets a process without being
+listed. Each worker restarts once its heap passes 1 GB after a file. The trace
+UI suite and `apps/ui` opt in; fast mode off keeps a process per file.
+
+With isolation off, the summary's "environment" share overstates the cost:
+vitest sets the environment up once per worker but adds that one setup time to
+every file the worker runs.
 
 ## Reading `vitest doctor`
 

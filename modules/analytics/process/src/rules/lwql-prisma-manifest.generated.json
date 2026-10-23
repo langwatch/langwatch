@@ -799,6 +799,15 @@
           "documentation": "This person's answer about browser notifications, one entry per topic:\n{ \"langy\": \"enabled\" | \"declined\" }. A topic that is absent was never\nanswered. The browser's own permission is not stored here.\nSpec: specs/langy/langy-notifications.feature"
         },
         {
+          "name": "passwordResetRequiredAt",
+          "columnName": "passwordResetRequiredAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "When an operator marked this person's password as no longer trusted. A\npassword sign-in opens no session while it is set; any write of a new\npassword hash clears it. Spec: modules/auth/specs/forced-password-reset.feature"
+        },
+        {
           "name": "Annotation",
           "columnName": "Annotation",
           "type": "Annotation",
