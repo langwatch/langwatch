@@ -71,7 +71,7 @@ export type InstantEvalJudgeRouteSlot = z.infer<typeof routeSlotSchema>;
 const backendSchema = z
   .object({
     kind: z.enum(INSTANT_EVAL_JUDGE_BACKEND_KINDS),
-    /** The provider's model id; absent, the channel's own default. */
+    /** The provider's model id; a Decisions backend must name one, there is no default. */
     model: z.string().min(1).optional(),
     enabled: z.boolean().default(true),
     timeoutMs: z.number().int().positive().default(30_000),
@@ -149,9 +149,26 @@ function routeTableIssues(table: RouteTableShape): string[] {
     }
   }
   for (const [name, backend] of Object.entries(table.backends)) {
-    for (const fallback of backend.fallbacks) {
-      if (!table.backends[fallback]) issues.push(`backend ${name}: unknown fallback ${fallback}`);
-    }
+    issues.push(...backendIssues({ table, name, backend }));
+  }
+  return issues;
+}
+
+function backendIssues({
+  table,
+  name,
+  backend,
+}: {
+  table: RouteTableShape;
+  name: string;
+  backend: InstantEvalJudgeBackend;
+}): string[] {
+  const issues: string[] = [];
+  if (backend.kind === "decisions" && !backend.model) {
+    issues.push(`backend ${name}: a ${backend.kind} backend must name its model`);
+  }
+  for (const fallback of backend.fallbacks) {
+    if (!table.backends[fallback]) issues.push(`backend ${name}: unknown fallback ${fallback}`);
   }
   return issues;
 }

@@ -33,9 +33,10 @@ const PRICING: InstantEvalJudgeRoutePricing = {
   version: "test",
   markup: 1.3,
   backends: {
-    decisions: { usdPerMillionInputTokens: 0.1, usdPerMillionOutputTokens: 0 },
-    jev: { usdPerMillionInputTokens: 0.05, usdPerMillionOutputTokens: 0 },
-    haiku: { usdPerMillionInputTokens: 1, usdPerMillionOutputTokens: 5 },
+    "decision-a": { usdPerMillionInputTokens: 0.1, usdPerMillionOutputTokens: 0 },
+    "decision-b": { usdPerMillionInputTokens: 0.05, usdPerMillionOutputTokens: 0 },
+    "llm-a": { usdPerMillionInputTokens: 2, usdPerMillionOutputTokens: 8 },
+    "llm-b": { usdPerMillionInputTokens: 1, usdPerMillionOutputTokens: 5 },
   },
 };
 
@@ -95,7 +96,7 @@ describe("InstantEvalJudgeRouterService", () => {
       const { classify, llmJudge } = harness({ decisions: () => judged(0.05) });
       const judgement = await classify(SHORT);
       expect(judgement.verdicts).toEqual([{ questionId: "q", probability: 0.05 }]);
-      expect(judgement.routing).toMatchObject({ answeredBy: { decisions: 1 }, escalated: 0 });
+      expect(judgement.routing).toMatchObject({ answeredBy: { "decision-a": 1 }, escalated: 0 });
       expect(llmJudge.requests).toHaveLength(0);
     });
 
@@ -104,9 +105,9 @@ describe("InstantEvalJudgeRouterService", () => {
       const { classify, llmJudge } = harness({ decisions: () => judged(0.4) });
       const judgement = await classify(SHORT);
       expect(judgement.verdicts).toEqual([{ questionId: "q", probability: 1 }]);
-      expect(judgement.routing).toMatchObject({ answeredBy: { haiku: 1 }, escalated: 1 });
-      expect(llmJudge.requests[0]).toMatchObject({ wire: "anthropic_messages", job: "search" });
-      // decisions 1000 x 0.1 + haiku 2000 x 1 + 100 x 5, in nano-USD per thousand tokens
+      expect(judgement.routing).toMatchObject({ answeredBy: { "llm-b": 1 }, escalated: 1 });
+      expect(llmJudge.requests[0]).toMatchObject({ wire: "openai_responses", job: "search" });
+      // decision-a 1000 x 0.1 + llm-b 2000 x 1 + 100 x 5, in nano-USD per thousand tokens
       expect(judgement.costNanoUsd).toBe(100_000 + 2_000_000 + 500_000);
       expect(judgement.inputTokens).toBe(3000);
     });
@@ -127,7 +128,7 @@ describe("InstantEvalJudgeRouterService", () => {
       expect(judgement.routing?.flags).toEqual(
         expect.arrayContaining([
           "escalation_failed",
-          "haiku_failed:classifier_provider_unavailable",
+          "llm-b_failed:classifier_provider_unavailable",
         ]),
       );
       expect(judgement.routing?.escalated).toBe(0);
@@ -169,14 +170,14 @@ describe("InstantEvalJudgeRouterService", () => {
       const { classify } = harness({ decisions: () => judged(0.55), jev: () => judged(0.1, 2000) });
       const judgement = await classify(PAIRED);
       expect(judgement.verdicts).toEqual([{ questionId: "q", probability: 0.1 }]);
-      expect(judgement.routing?.answeredBy).toEqual({ jev: 1 });
+      expect(judgement.routing?.answeredBy).toEqual({ "decision-b": 1 });
       expect(judgement.costNanoUsd).toBe(100_000 + 100_000);
     });
 
     /** @scenario "The confident pair keeps the more confident answer" */
     it("keeps the primary on a tie, and the other leg when one is down", async () => {
       const tie = harness({ decisions: () => judged(0.9), jev: () => judged(0.1) });
-      expect((await tie.classify(PAIRED)).routing?.answeredBy).toEqual({ decisions: 1 });
+      expect((await tie.classify(PAIRED)).routing?.answeredBy).toEqual({ "decision-a": 1 });
       const down = harness({
         decisions: () => instantEvalSkipped("classifier_provider_unavailable"),
         jev: () => judged(0.7),
@@ -195,7 +196,7 @@ describe("InstantEvalJudgeRouterService", () => {
       const judgement = await classify({ job: "search", tokens: 20_000, mode: "instant" });
       expect(judgement.verdicts).toEqual([{ questionId: "q", probability: 0.2 }]);
       expect(judgement.routing?.flags).toEqual(
-        expect.arrayContaining(["decisions_unavailable", "fallback:decisions->jev"]),
+        expect.arrayContaining(["decision-a_unavailable", "fallback:decision-a->decision-b"]),
       );
     });
 

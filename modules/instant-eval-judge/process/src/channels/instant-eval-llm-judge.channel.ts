@@ -13,12 +13,12 @@ import { Secret } from "@langwatch/secrets";
 
 import type { InstantEvalLlmJudgeWire } from "../rules/instant-eval-llm-judge-wire.rules.ts";
 
-/** LangWatch's Anthropic key for the router's Haiku leg; read on LangWatch Cloud only. */
+/** LangWatch's Anthropic key for the router's Anthropic legs; read on LangWatch Cloud only. */
 export const llmJudgeAnthropicApiKey = Secret.load("INSTANT_EVAL_ANTHROPIC_API_KEY", {
   optional: true,
 });
 
-/** LangWatch's OpenAI key for the router's Responses leg; read on LangWatch Cloud only. */
+/** LangWatch's OpenAI key for the router's OpenAI Responses legs; read on LangWatch Cloud only. */
 export const llmJudgeOpenAiApiKey = Secret.load("INSTANT_EVAL_OPENAI_API_KEY", { optional: true });
 
 export interface InstantEvalLlmJudgeRequest {

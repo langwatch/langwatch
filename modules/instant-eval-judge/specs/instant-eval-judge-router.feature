@@ -28,6 +28,12 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     Then the configuration is refused, naming the slot
 
   @unit
+  Scenario: A decision-model backend names its model in the table
+    Given a route table with a Decisions backend that names no model
+    When the deployment boots
+    Then the configuration is refused, naming the backend, since the code holds no default model
+
+  @unit
   Scenario: A slot is picked by job, length bucket and arithmetic flag
     Given a route table with length buckets and an arithmetic slot
     When a call is routed
@@ -49,7 +55,7 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
   @unit
   Scenario: The text view is judged only by a decision model allowed to read it
     Given a route table that lets only the Decisions API judge the conversation text
-    And lets no backend judge the tools view until it is measured
+    And lets no backend judge the tools view unless the table allows its kind
     When a question maps to a partial view but its slot plans a model not allowed to read it
     Then the plan judges the full trace instead and the routing names the refused view
     And an escalation always judges the full trace, since an outcome may turn on a tool result

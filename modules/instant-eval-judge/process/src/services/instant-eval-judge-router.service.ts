@@ -273,7 +273,7 @@ class RouteRun {
   }): Promise<Leg> {
     const { classifier, hostedDecisions, limiter } = this.deps;
     const text = this.plan.text;
-    const channelMissing = kind === "jev" ? !classifier : !hostedDecisions;
+    const channelMissing = kind === "jev" ? !classifier : !hostedDecisions || !model;
     if (channelMissing) {
       this.flags.push(`${backend}_unavailable`);
       return { outcome: "failed", reason: "classifier_provider_unavailable" };
@@ -284,7 +284,7 @@ class RouteRun {
             { projectId: this.projectId, text, questions, limiter },
             signal,
           )
-        : await hostedDecisions!.classify({ text, questions, ...(model ? { model } : {}) }, signal);
+        : await hostedDecisions!.classify({ text, questions, model: model! }, signal);
     this.paid({ backend, inputTokens: judgement.inputTokens, outputTokens: 0 });
     if (judgement.skippedReason) return { outcome: "failed", reason: judgement.skippedReason };
     const probabilities = new Map<string, number>();
