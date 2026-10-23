@@ -32,12 +32,12 @@ e2e-cold: build ## E2E with cold storage: build image, start Garage + ClickHouse
 e2e-cold-move: build ## E2E: verify data moves from hot to cold (S3) storage via TTL
 	@tests/e2e-cold-move-test.sh $(IMAGE):$(TAG)
 
-e2e-backup: build ## E2E: native BACKUP/RESTORE cycle via S3 backups disk
-	@tests/e2e-backup-test.sh $(IMAGE):$(TAG)
+e2e-backup: build ## E2E: backups via the scripts and the sidecar (restart mid-backup), S3 disk
+	CH_BACKUP_E2E_IMAGE=$(IMAGE):$(TAG) go test -count=1 -v -timeout 20m ./tests/backupe2e/
 
 e2e-access: build ## E2E: tiers, rolling passwords, token logins and dynamic-only mode (Linux: host network)
 	CH_ACCESS_E2E_IMAGE=$(IMAGE):$(TAG) go test -count=1 -v ./tests/accesse2e/
 
 clean: ## Stop and remove test containers
-	@docker rm -f ch-e2e ch-e2e-access ch-e2e-dynamic garage-e2e 2>/dev/null || true
+	@docker rm -f ch-e2e ch-e2e-access ch-e2e-dynamic ch-backup rustfs-backup garage-e2e 2>/dev/null || true
 	@docker network rm ch-test-net 2>/dev/null || true

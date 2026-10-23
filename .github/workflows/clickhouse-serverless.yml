@@ -99,6 +99,7 @@ jobs:
         run: |
           docker logs ch-e2e 2>&1 | tail -100 || true
           docker logs garage-e2e 2>&1 | tail -50 || true
+          docker logs ch-backup 2>&1 | tail -100 || true
 
   clickhouse-serverless-complete:
     needs: [changes, test, e2e]
