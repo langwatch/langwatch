@@ -6,7 +6,6 @@ import {
   DeveloperSeatRestrictedError,
   LiteMemberRestrictedError,
   MembershipDisabledError,
-  type Actor,
   type AuthzScopeLineageResult,
   type PermissionDecision,
 } from "@langwatch/authorization";
@@ -21,7 +20,7 @@ import { createLogger, type Logger } from "@langwatch/observability";
 import type { AnyTRPCRouter } from "@trpc/server";
 import { TRPCError } from "@trpc/server";
 
-import type { Authorize, Entitlements, PlatformDecision } from "../access/access.ts";
+import type { AccessActor, Authorize, Entitlements, PlatformDecision } from "../access/access.ts";
 import { retryAfterOf } from "../errors.ts";
 import type { TrpcAuditSink, TrpcSessionVersions } from "../hosting/api-door.ts";
 import type { SessionCaller, SessionReader } from "../hosting/session-reader.ts";
@@ -569,7 +568,7 @@ function isTrpcRouterDeclaration(
 }
 
 /** The session's person as an actor, naming the operator when one is acting as them. */
-function sessionActorOf(ctx: TrpcRequestContext): Actor | null {
+function sessionActorOf(ctx: TrpcRequestContext): AccessActor | null {
   const actor = ctx.tryActor?.();
   if (!actor) return null;
   const impersonatorId = ctx.session?.user.impersonator?.id;
