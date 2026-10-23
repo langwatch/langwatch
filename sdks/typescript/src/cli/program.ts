@@ -1494,13 +1494,13 @@ function registerEvaluatorCommands(program: Command): void {
 
   emitsResult(
     evaluatorCmd
-      .command("get <idOrSlug>")
-      .description("Get evaluator details by ID or slug")
+      .command("get <idSlugOrName>")
+      .description("Get evaluator details by ID, slug or display name")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (idOrSlug: string) => {
+    async (idSlugOrName: string) => {
       try {
         const { getEvaluatorCommand: impl } = await import("./commands/evaluators/get.js");
-        return await impl(idOrSlug);
+        return await impl(idSlugOrName);
       } catch (error) {
         const { reportCommandError } = await import("./utils/errorOutput.js");
         reportCommandError({ error });
@@ -1550,7 +1550,7 @@ function registerEvaluatorCommands(program: Command): void {
   emitsResult(
     evaluatorCmd
       .command("update <idOrSlug>")
-      .description("Update an evaluator name or settings")
+      .description("Update an evaluator by id or slug (find the id with `evaluator get <name>`)")
       .option("--name <name>", "New evaluator name")
       .option("--settings <json>", "Evaluator config settings as JSON")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
@@ -1569,7 +1569,9 @@ function registerEvaluatorCommands(program: Command): void {
   emitsResult(
     evaluatorCmd
       .command("delete <idOrSlug>")
-      .description("Archive (soft-delete) an evaluator")
+      .description(
+        "Archive (soft-delete) an evaluator by id or slug (find the id with `evaluator get <name>`)",
+      )
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (idOrSlug: string) => {
       try {
@@ -4190,9 +4192,24 @@ function registerDashboardWidgetCommands(program: Command): void {
 
   emitsResult(
     dashboardWidgetCmd
+      .command("boards")
+      .description("List the Dashboards boards a widget can be pinned to")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { project?: string }) => {
+      const { listDashboardWidgetBoardsCommand: impl } =
+        await import("./commands/dashboard-widgets/boards.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    dashboardWidgetCmd
       .command("pin <widget>")
-      .description("Add a dashboard widget to a dashboard (widget and dashboard by id or name)")
-      .requiredOption("--dashboard <id-or-name>", "Dashboard to add the widget to")
+      .description(
+        "Add a dashboard widget to a Dashboards board (widget and board by id or name, from `dashboard-widget boards`)",
+      )
+      .requiredOption("--dashboard <id-or-name>", "Dashboards board to add the widget to")
       .option("--project <slug-or-id>", "Project to run against")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (widget: string, options: { dashboard?: string; project?: string }) => {
@@ -4507,12 +4524,12 @@ function registerMonitorCommands(program: Command): void {
 
   emitsResult(
     monitorCmd
-      .command("get <id>")
-      .description("Get monitor details by ID")
+      .command("get <idOrSlugOrName>")
+      .description("Get monitor details by id, slug or name")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (id: string) => {
+    async (idOrSlugOrName: string) => {
       const { getMonitorCommand: impl } = await import("./commands/monitors/get.js");
-      return impl(id);
+      return impl(idOrSlugOrName);
     },
   );
 
@@ -4556,7 +4573,7 @@ function registerMonitorCommands(program: Command): void {
   emitsResult(
     monitorCmd
       .command("update <id>")
-      .description("Update a monitor")
+      .description("Update a monitor by id (find the id with `monitor get <name>`)")
       .option("--name <name>", "New monitor name")
       .option("--enabled <boolean>", "Enable or disable the monitor (true/false)")
       .option("--execution-mode <mode>", "Execution mode: ON_MESSAGE, AS_GUARDRAIL, MANUALLY")
@@ -4581,7 +4598,7 @@ function registerMonitorCommands(program: Command): void {
   emitsResult(
     monitorCmd
       .command("delete <id>")
-      .description("Delete a monitor")
+      .description("Delete a monitor by id (find the id with `monitor get <name>`)")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (id: string) => {
       const { deleteMonitorCommand: impl } = await import("./commands/monitors/delete.js");
@@ -6183,8 +6200,8 @@ function registerIngestCaptureCommands(ingestCmd: Command): void {
       .allowExcessArguments(true),
   ).action(async (tool: string) => {
     try {
-      const { hookCommand } = await import("./commands/ingestion/hook.js");
-      await hookCommand({ tool });
+      const { runHookProcess } = await import("./commands/ingestion/hook.js");
+      await runHookProcess({ tool });
     } catch {
       // Same contract as the command itself: never break the session.
       void 0;
@@ -6202,11 +6219,14 @@ function registerIngestCaptureCommands(ingestCmd: Command): void {
         "Declare the repository and branch this coding-agent session is working on. Run it from inside the checkout after you switch repository, branch or worktree.",
       )
       .option("--session-id <id>", "declare for this session instead of resolving the live one")
-      .option("--agent <tool>", "the agent the session belongs to: claude-code, codex or opencode"),
+      .option(
+        "--agent <tool>",
+        "the agent the session belongs to: claude-code, codex, opencode or copilot",
+      ),
   ).action(async (options: { sessionId?: string; agent?: string }) => {
     try {
-      const { contextCommand } = await import("./commands/ingestion/context.js");
-      await contextCommand(options);
+      const { runContextProcess } = await import("./commands/ingestion/context.js");
+      await runContextProcess(options);
     } catch {
       // Never break the session the agent runs this from.
       void 0;

@@ -122,6 +122,15 @@ export {
   migrationStepsOf,
 } from "./migration/migration-steps.ts";
 export { migrationStepsOverMemory } from "./migration/memory-migration-steps.ts";
+export type {
+  IdIndexFillOptions,
+  IdIndexFillStep,
+  IdIndexRetention,
+} from "./migration/id-index-fill-step.ts";
+export {
+  ID_INDEX_FILL_STEP,
+  IdIndexRetentionUnavailableError,
+} from "./migration/id-index-fill-step.ts";
 export {
   loadTaskModules,
   parseTaskModuleSpecifiers,

@@ -8,7 +8,6 @@
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { Box, Icon, Skeleton, VStack } from "@langwatch/design-system/primitives";
 import {
-  SECTION_RAIL_WIDTH,
   SectionNavigationRail,
   type SectionNavigationLink,
 } from "@langwatch/design-system/section-navigation-frame";
@@ -29,9 +28,6 @@ import { SuiteArchiveDialog } from "../../../elements/suite/dialogs/suite-archiv
 import type { SuiteLastRun } from "../cases/use-test-cases-data.ts";
 import { SuiteRailFooter } from "./suite-rail-footer.tsx";
 import { SuiteRailMenu } from "./suite-rail-menu.tsx";
-
-/** How wide the rail is when it is open: the shared section rail's width. */
-export const SUITE_RAIL_WIDTH = SECTION_RAIL_WIDTH;
 
 /** What the section of the sets a code run writes into is called. */
 export const FROM_CODE_HEADING = "From code";

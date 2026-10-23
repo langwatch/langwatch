@@ -20,14 +20,17 @@ from .archive_run_plan_response_404 import ArchiveRunPlanResponse404
 from .archive_test_suite_response_200 import ArchiveTestSuiteResponse200
 from .archive_test_suite_response_404 import ArchiveTestSuiteResponse404
 from .call_connected_agent_body import CallConnectedAgentBody
+from .call_connected_agent_body_kind import CallConnectedAgentBodyKind
 from .call_connected_agent_body_messages_item import CallConnectedAgentBodyMessagesItem
 from .call_connected_agent_body_new_messages_item import CallConnectedAgentBodyNewMessagesItem
 from .call_connected_agent_body_params import CallConnectedAgentBodyParams
 from .call_connected_agent_body_run import CallConnectedAgentBodyRun
+from .call_connected_agent_body_state_type_0 import CallConnectedAgentBodyStateType0
 from .call_connected_agent_response_200 import CallConnectedAgentResponse200
 from .call_connected_agent_response_200_instance import CallConnectedAgentResponse200Instance
 from .call_connected_agent_response_200_output_type_1 import CallConnectedAgentResponse200OutputType1
 from .call_connected_agent_response_200_output_type_2_item import CallConnectedAgentResponse200OutputType2Item
+from .call_connected_agent_response_200_state_type_0 import CallConnectedAgentResponse200StateType0
 from .cancel_instant_eval_run_response_200 import CancelInstantEvalRunResponse200
 from .cancel_instant_eval_run_response_200_matched_by_question import CancelInstantEvalRunResponse200MatchedByQuestion
 from .cancel_instant_eval_run_response_200_parameters import CancelInstantEvalRunResponse200Parameters
@@ -1383,6 +1386,9 @@ from .get_api_model_defaults_response_200_effective_embeddings_type_0 import (
     GetApiModelDefaultsResponse200EffectiveEMBEDDINGSType0,
 )
 from .get_api_model_defaults_response_200_effective_fast_type_0 import GetApiModelDefaultsResponse200EffectiveFASTType0
+from .get_api_model_defaults_response_200_effective_instantevals_type_0 import (
+    GetApiModelDefaultsResponse200EffectiveINSTANTEVALSType0,
+)
 from .get_api_model_defaults_response_200_scope import GetApiModelDefaultsResponse200Scope
 from .get_api_model_defaults_response_400 import GetApiModelDefaultsResponse400
 from .get_api_model_defaults_response_401 import GetApiModelDefaultsResponse401
@@ -2032,6 +2038,129 @@ from .get_api_triggers_response_200_item_report_type_0_source_type_2_filters imp
 from .get_api_triggers_response_200_item_templates import GetApiTriggersResponse200ItemTemplates
 from .get_api_triggers_response_200_item_templates_slack_template_type_type_0 import (
     GetApiTriggersResponse200ItemTemplatesSlackTemplateTypeType0,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_200 import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse200,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_200_scope import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse200Scope,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_400 import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_400_fault import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400Fault,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_400_meta import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400Meta,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_400_trace import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400Trace,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_401 import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse401,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_401_fault import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse401Fault,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_401_meta import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse401Meta,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_401_trace import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse401Trace,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_403 import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse403,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_403_fault import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse403Fault,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_403_meta import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse403Meta,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_403_trace import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse403Trace,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_404 import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse404,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_404_fault import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse404Fault,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_404_meta import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse404Meta,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_404_trace import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse404Trace,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_500 import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse500,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_500_fault import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse500Fault,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_500_meta import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse500Meta,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_500_trace import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse500Trace,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_response_200 import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse200,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_response_200_data_item import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse200DataItem,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_response_200_data_item_scope import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse200DataItemScope,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_response_400 import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse400,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_response_400_fault import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse400Fault,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_response_400_meta import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse400Meta,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_response_400_trace import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse400Trace,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_response_401 import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse401,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_response_401_fault import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse401Fault,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_response_401_meta import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse401Meta,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_response_401_trace import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse401Trace,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_response_403 import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse403,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_response_403_fault import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse403Fault,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_response_403_meta import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse403Meta,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_response_403_trace import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse403Trace,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_response_500 import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse500,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_response_500_fault import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse500Fault,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_response_500_meta import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse500Meta,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_response_500_trace import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse500Trace,
 )
 from .get_api_v1_projects_by_project_id_analytics_charts_by_chart_id_response_200 import (
     GetApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse200,
@@ -3464,6 +3593,9 @@ from .poll_connected_agent_instance_response_200 import PollConnectedAgentInstan
 from .poll_connected_agent_instance_response_200_frames_item_type_0 import (
     PollConnectedAgentInstanceResponse200FramesItemType0,
 )
+from .poll_connected_agent_instance_response_200_frames_item_type_0_kind import (
+    PollConnectedAgentInstanceResponse200FramesItemType0Kind,
+)
 from .poll_connected_agent_instance_response_200_frames_item_type_0_messages_item import (
     PollConnectedAgentInstanceResponse200FramesItemType0MessagesItem,
 )
@@ -3475,6 +3607,9 @@ from .poll_connected_agent_instance_response_200_frames_item_type_0_params impor
 )
 from .poll_connected_agent_instance_response_200_frames_item_type_0_run import (
     PollConnectedAgentInstanceResponse200FramesItemType0Run,
+)
+from .poll_connected_agent_instance_response_200_frames_item_type_0_state_type_0 import (
+    PollConnectedAgentInstanceResponse200FramesItemType0StateType0,
 )
 from .poll_connected_agent_instance_response_200_frames_item_type_1 import (
     PollConnectedAgentInstanceResponse200FramesItemType1,
@@ -7243,6 +7378,9 @@ from .post_connected_agent_frames_body_frames_item_type_1_output_type_1 import (
 from .post_connected_agent_frames_body_frames_item_type_1_output_type_2_item import (
     PostConnectedAgentFramesBodyFramesItemType1OutputType2Item,
 )
+from .post_connected_agent_frames_body_frames_item_type_1_state_type_0 import (
+    PostConnectedAgentFramesBodyFramesItemType1StateType0,
+)
 from .post_connected_agent_frames_body_frames_item_type_2 import PostConnectedAgentFramesBodyFramesItemType2
 from .post_connected_agent_frames_response_200 import PostConnectedAgentFramesResponse200
 from .post_langy_control_frames_body import PostLangyControlFramesBody
@@ -7655,6 +7793,7 @@ from .receive_stripe_webhook_response_200 import ReceiveStripeWebhookResponse200
 from .regenerate_project_api_key_response_200 import RegenerateProjectApiKeyResponse200
 from .register_connected_agent_instance_body import RegisterConnectedAgentInstanceBody
 from .register_connected_agent_instance_body_agents_item import RegisterConnectedAgentInstanceBodyAgentsItem
+from .register_connected_agent_instance_body_agents_item_hooks import RegisterConnectedAgentInstanceBodyAgentsItemHooks
 from .register_connected_agent_instance_body_agents_item_parameters import (
     RegisterConnectedAgentInstanceBodyAgentsItemParameters,
 )
@@ -8397,14 +8536,17 @@ __all__ = (
     "ArchiveTestSuiteResponse200",
     "ArchiveTestSuiteResponse404",
     "CallConnectedAgentBody",
+    "CallConnectedAgentBodyKind",
     "CallConnectedAgentBodyMessagesItem",
     "CallConnectedAgentBodyNewMessagesItem",
     "CallConnectedAgentBodyParams",
     "CallConnectedAgentBodyRun",
+    "CallConnectedAgentBodyStateType0",
     "CallConnectedAgentResponse200",
     "CallConnectedAgentResponse200Instance",
     "CallConnectedAgentResponse200OutputType1",
     "CallConnectedAgentResponse200OutputType2Item",
+    "CallConnectedAgentResponse200StateType0",
     "CancelInstantEvalRunResponse200",
     "CancelInstantEvalRunResponse200MatchedByQuestion",
     "CancelInstantEvalRunResponse200Parameters",
@@ -9286,6 +9428,7 @@ __all__ = (
     "GetApiModelDefaultsResponse200EffectiveDEFAULTType0",
     "GetApiModelDefaultsResponse200EffectiveEMBEDDINGSType0",
     "GetApiModelDefaultsResponse200EffectiveFASTType0",
+    "GetApiModelDefaultsResponse200EffectiveINSTANTEVALSType0",
     "GetApiModelDefaultsResponse200Scope",
     "GetApiModelDefaultsResponse400",
     "GetApiModelDefaultsResponse401",
@@ -9624,6 +9767,47 @@ __all__ = (
     "GetApiTriggersResponse200ItemReportType0SourceType2Filters",
     "GetApiTriggersResponse200ItemTemplates",
     "GetApiTriggersResponse200ItemTemplatesSlackTemplateTypeType0",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse200",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse200Scope",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400Fault",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400Meta",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400Trace",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse401",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse401Fault",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse401Meta",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse401Trace",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse403",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse403Fault",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse403Meta",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse403Trace",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse404",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse404Fault",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse404Meta",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse404Trace",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse500",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse500Fault",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse500Meta",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse500Trace",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse200",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse200DataItem",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse200DataItemScope",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse400",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse400Fault",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse400Meta",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse400Trace",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse401",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse401Fault",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse401Meta",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse401Trace",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse403",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse403Fault",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse403Meta",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse403Trace",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse500",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse500Fault",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse500Meta",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse500Trace",
     "GetApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse200",
     "GetApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse200Definition",
     "GetApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse200DefinitionParameters",
@@ -10417,10 +10601,12 @@ __all__ = (
     "PatchApiWorkflowsByIdResponse200",
     "PollConnectedAgentInstanceResponse200",
     "PollConnectedAgentInstanceResponse200FramesItemType0",
+    "PollConnectedAgentInstanceResponse200FramesItemType0Kind",
     "PollConnectedAgentInstanceResponse200FramesItemType0MessagesItem",
     "PollConnectedAgentInstanceResponse200FramesItemType0NewMessagesItem",
     "PollConnectedAgentInstanceResponse200FramesItemType0Params",
     "PollConnectedAgentInstanceResponse200FramesItemType0Run",
+    "PollConnectedAgentInstanceResponse200FramesItemType0StateType0",
     "PollConnectedAgentInstanceResponse200FramesItemType1",
     "PollLangyControlSessionResponse200",
     "PollLangyControlSessionResponse200FramesItemType0",
@@ -12172,6 +12358,7 @@ __all__ = (
     "PostConnectedAgentFramesBodyFramesItemType1Error",
     "PostConnectedAgentFramesBodyFramesItemType1OutputType1",
     "PostConnectedAgentFramesBodyFramesItemType1OutputType2Item",
+    "PostConnectedAgentFramesBodyFramesItemType1StateType0",
     "PostConnectedAgentFramesBodyFramesItemType2",
     "PostConnectedAgentFramesResponse200",
     "PostLangyControlFramesBody",
@@ -12456,6 +12643,7 @@ __all__ = (
     "RegenerateProjectApiKeyResponse200",
     "RegisterConnectedAgentInstanceBody",
     "RegisterConnectedAgentInstanceBodyAgentsItem",
+    "RegisterConnectedAgentInstanceBodyAgentsItemHooks",
     "RegisterConnectedAgentInstanceBodyAgentsItemParameters",
     "RegisterConnectedAgentInstanceBodyInstance",
     "RegisterConnectedAgentInstanceBodySdk",

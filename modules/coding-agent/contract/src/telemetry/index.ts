@@ -10,6 +10,7 @@ export type {
   CodingAgentEvent,
   CodingAgentMetric,
   CodingAgentSignal,
+  GenAiOperationRole,
   TokenType,
 } from "./coding-agent-definition.ts";
 export { codingAgentSchema } from "./coding-agent-definition.ts";
@@ -73,6 +74,20 @@ export const WRAPPER_TOOL_NAMES_BY_AGENT_ID: ReadonlyMap<string, ReadonlySet<str
  */
 export const LOGS_REQUIRE_SESSION_KEY_AGENT_IDS: ReadonlySet<string> = new Set(
   CODING_AGENT_REGISTRY.filter((agent) => agent.logsRequireSessionKey === true).map(
+    (agent) => agent.id,
+  ),
+);
+
+/** Agents whose keyless spans are ambient telemetry, never a session of their own trace. */
+export const SPANS_REQUIRE_SESSION_KEY_AGENT_IDS: ReadonlySet<string> = new Set(
+  CODING_AGENT_REGISTRY.filter((agent) => agent.spansRequireSessionKey === true).map(
+    (agent) => agent.id,
+  ),
+);
+
+/** Agents whose per-call fact rows come from model-call spans, priced by the catalogue. */
+export const SPAN_FED_MODEL_CALL_AGENT_IDS: ReadonlySet<string> = new Set(
+  CODING_AGENT_REGISTRY.filter((agent) => agent.modelCallsOnSpansOnly === true).map(
     (agent) => agent.id,
   ),
 );

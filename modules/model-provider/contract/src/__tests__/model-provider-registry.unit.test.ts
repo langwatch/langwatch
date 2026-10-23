@@ -54,9 +54,12 @@ describe("Model Provider registry", () => {
     expect(modelProviders.openai.type).toBe("llm");
     expect(modelProviders.anthropic.type).toBe("llm");
     expect(modelProviders.azure.type).toBe("llm");
+    expect(modelProviders.inception.type).toBe("decision");
 
     for (const [providerId, provider] of Object.entries(modelProviders)) {
-      expect(provider.type, `${providerId} must have a provider type`).toMatch(/^(llm|safety)$/);
+      expect(provider.type, `${providerId} must have a provider type`).toMatch(
+        /^(llm|safety|decision)$/,
+      );
     }
   });
 });

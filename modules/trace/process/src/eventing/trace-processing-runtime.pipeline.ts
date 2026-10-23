@@ -10,6 +10,7 @@ import type { TraceCanonicalisationService, TraceSummaryData } from "@langwatch/
 import type { TraceTokenCounter } from "../channels/token-counter.channel.ts";
 import { TraceIoExtractionAdapterService } from "../features/derivation/services/trace-io-extraction-adapter.service.ts";
 import { TraceModelCostService } from "../features/derivation/services/trace-model-cost.service.ts";
+import type { TraceBlobStoreService } from "../features/media/services/trace-blob-store.service.ts";
 import { TraceMediaReferenceService } from "../features/media/services/trace-media-reference.service.ts";
 import { leanForProjection } from "../features/projection/rules/trace-projection-lean.rules.ts";
 import { OtlpSpanCostEnrichmentService } from "../features/span/services/span-cost-enrichment.service.ts";
@@ -17,12 +18,19 @@ import { OtlpSpanTokenEstimationService } from "../features/span/services/span-t
 import { TraceSpanNormalizationAdapterService } from "../features/span/services/trace-span-normalization-adapter.service.ts";
 import type { TraceRepositories } from "../repositories/trace.repositories.ts";
 import type { TraceProcessingCommandsService } from "../services/trace-processing-commands.service.ts";
-import { createDeferredOriginHandler } from "./deferred-origin.subscriber.ts";
+import {
+  createDeferredOriginHandler,
+  WRITE_COMPACT_ORIGIN_JOBS,
+} from "./deferred-origin.subscriber.ts";
 import {
   createProjectMetadataHandler,
   type ProjectMetadataSubscriberDeps,
 } from "./project-metadata.subscriber.ts";
-import type { TraceSpanCostEnrichment, TraceSpanTokenEstimation } from "./record-span.commands.ts";
+import type {
+  TraceSpanCostEnrichment,
+  TraceSpanSpool,
+  TraceSpanTokenEstimation,
+} from "./record-span.commands.ts";
 import { EventingRecordSpanAdapter } from "./record-span.commands.ts";
 import { createSpanStorageBroadcastHandler } from "./span-storage-broadcast.subscriber.ts";
 import { SpanStorageStore } from "./span-storage.store.ts";
@@ -65,6 +73,11 @@ export interface TraceProcessingPipelineInput {
   >;
   canonicalisation: TraceCanonicalisationService;
   commands: TraceProcessingCommandsService;
+  /**
+   * The ADR-022 spool the ingestion door writes an over-threshold command to. Required: a
+   * record-span command built without it refuses every spooled span, and the group blocks.
+   */
+  spool: Pick<TraceBlobStoreService, "getSpool" | "deleteSpool">;
   findSummary: (input: {
     projectId: string;
     traceId: string;
@@ -77,6 +90,8 @@ export interface TraceProcessingPipelineInput {
   milestones: ProjectMetadataSubscriberDeps["milestones"];
   /** Mints the own-only proof the summary and analytics fold stores read back through. */
   authorizeFoldRead: FoldReadAuthorizer;
+  /** Test-only: overrides `WRITE_COMPACT_ORIGIN_JOBS`; production never passes it. */
+  writeCompactOriginJobs?: boolean;
 }
 
 /** trace_processing per role: producers send; consumers fold and react as main's worker did. */
@@ -138,12 +153,21 @@ export class TraceProcessingRuntimeAdapter {
         },
         costEnrichment: this.#costEnrichment(),
         tokenEstimation: this.#tokenEstimation(),
+        spool: this.#spool(),
       }),
     })
       .build()
       .withRetention({
         resolve: (tenantId) => peers.dataRetention.getResolvedForProject({ projectId: tenantId }),
       });
+  }
+
+  #spool(): TraceSpanSpool {
+    const { spool } = this.input;
+    return {
+      read: async (identity) => (await spool.getSpool(identity)).toString("utf8"),
+      delete: (identity) => spool.deleteSpool(identity),
+    };
   }
 
   #tokenEstimation(): TraceSpanTokenEstimation {
@@ -186,6 +210,7 @@ export class TraceProcessingRuntimeAdapter {
       }),
       spanStorageBroadcast: createSpanStorageBroadcastHandler({ broadcast: this.input.broadcast }),
       broadcastDisabled: false,
+      writeCompactOriginJobs: this.input.writeCompactOriginJobs ?? WRITE_COMPACT_ORIGIN_JOBS,
     };
   }
 }

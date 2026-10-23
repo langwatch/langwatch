@@ -29,6 +29,7 @@ import {
   traceSummaryRow,
   WINDOW,
 } from "./error-series.fixture.ts";
+import { ownProjectReaderOver } from "./support/clickhouse-query-client.support.ts";
 
 const SEEDED_TABLES = ["trace_summaries", "stored_spans", "evaluation_runs"] as const;
 
@@ -41,12 +42,10 @@ describe("per-series filters and percentage mode", () => {
   ): Promise<Record<string, number | string>[]> => {
     resetParamCounter();
     const { sql, params } = buildTimeseriesQuery(input);
-    const result = await ch.query({
-      query: sql,
-      query_params: params,
-      format: "JSONEachRow",
-    });
-    const rows = await result.json<Record<string, number | string>>();
+    const result = await ownProjectReaderOver({ client: ch, projectId: TENANT_ID }).query<
+      Record<string, number | string>
+    >({ query: sql, query_params: params, format: "JSONEachRow" });
+    const rows = await result.json();
     return rows.filter((row) => row.period === "current");
   };
 

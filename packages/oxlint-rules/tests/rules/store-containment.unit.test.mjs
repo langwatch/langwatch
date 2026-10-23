@@ -196,3 +196,69 @@ describe("given a named exception", () => {
     ).toEqual([{ line: 1, messageId: "storeClientValue", store: "Redis" }]);
   });
 });
+
+// ADR-181: `relay` opts into the feature layout; `eventing` is a framework that has not.
+const framework = createFixtureWorkspace({
+  files: {
+    "packages/relay/package.json": JSON.stringify({
+      name: "@langwatch/relay",
+      exports: { ".": { default: "./src/index.ts" } },
+      langwatch: { group: "framework", layout: "features" },
+    }),
+    "packages/eventing/package.json": JSON.stringify({
+      name: "@langwatch/eventing",
+      langwatch: { group: "framework" },
+    }),
+  },
+});
+
+afterAll(() => framework.cleanup());
+
+function frameworkReport(filename, code) {
+  return runRule(storeContainmentRule, { code, cwd: framework.cwd, filename }).map(
+    ({ data, line, messageId }) => ({ line, messageId, store: data.store }),
+  );
+}
+
+const REDIS_VALUE = 'import Redis from "ioredis";';
+
+describe("given an opted-in framework package", () => {
+  describe("when a concern's service value-imports the Redis client", () => {
+    /** @scenario "A framework store client sits only in its tier folders and app" */
+    it("reports storeClientValue", () => {
+      expect(
+        frameworkReport("packages/relay/src/features/claim/services/claim.service.ts", REDIS_VALUE),
+      ).toEqual([{ line: 1, messageId: "storeClientValue", store: "Redis" }]);
+    });
+  });
+
+  describe("when its vocabulary names Prisma, even as a type", () => {
+    /** @scenario "A framework store client sits only in its tier folders and app" */
+    it("reports storeNamed", () => {
+      const code = 'import type { PrismaClient } from "@prisma/client";';
+      expect(frameworkReport("packages/relay/src/vocabulary/relay.ts", code)).toEqual([
+        { line: 1, messageId: "storeNamed", store: "Prisma" },
+      ]);
+    });
+  });
+
+  describe("when a tier folder or app/ names the client", () => {
+    /** @scenario "A framework store client sits only in its tier folders and app" */
+    it("reports nothing", () => {
+      for (const path of [
+        "features/claim/repositories/redis/redis.claim.repository.ts",
+        "features/claim/channels/redis/redis.lane.channel.ts",
+        "app/relay.app.ts",
+      ]) {
+        expect(frameworkReport(`packages/relay/src/${path}`, REDIS_VALUE)).toEqual([]);
+      }
+    });
+  });
+});
+
+describe("given a framework package that has not opted in", () => {
+  /** @scenario "A framework package that has not opted in is left alone by the layered rules" */
+  it("reports nothing for a client in a service", () => {
+    expect(frameworkReport("packages/eventing/src/services/claim.ts", REDIS_VALUE)).toEqual([]);
+  });
+});

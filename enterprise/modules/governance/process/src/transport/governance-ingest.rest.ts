@@ -1,5 +1,9 @@
 import { publicRoute } from "@langwatch/api/access";
-import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
+import {
+  callerAddressContext,
+  defineRestRouter,
+  MANAGEMENT_API_VERSION,
+} from "@langwatch/api/rest";
 import {
   GovernanceRestApi,
   governanceIngestHeadersSchema,
@@ -30,55 +34,63 @@ export const governanceIngestRest = defineRestRouter(GovernanceRestApi)
   .withAddressing("literal", { v1Twin: true })
 
   .post("/api/ingest/otel/:sourceId", "ingestSourceOtlpTraces")
+  .keepsRecords()
   .withoutAudit("ingestion")
   .withParams(governanceIngestSourceParamsSchema)
   .withRawBody("bytes", { refuses: OTLP_REFUSED_MEDIA_TYPES })
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
   .withAccess(INGEST_DOOR)
   .withHeaders(governanceIngestHeadersSchema)
+  .withMiddlewareContext(callerAddressContext)
   .responds(ingestAnswers)
   .withDocs({ hide: true })
-  .handle(({ app, input, raw }, headers) =>
-    app.ingestOtlpTraces({ sourceId: input.sourceId, raw, headers }),
+  .handle(({ app, input, raw }, headers, callerAddress) =>
+    app.ingestOtlpTraces({ sourceId: input.sourceId, raw, headers, callerAddress }),
   )
 
   .post("/api/ingest/webhook/:sourceId", "ingestSourceWebhook")
+  .keepsRecords()
   .withoutAudit("ingestion")
   .withParams(governanceIngestSourceParamsSchema)
   .withRawBody("text")
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
   .withAccess(INGEST_DOOR)
   .withHeaders(governanceIngestHeadersSchema)
+  .withMiddlewareContext(callerAddressContext)
   .responds(ingestAnswers)
   .withDocs({ hide: true })
-  .handle(({ app, input, raw }, headers) =>
-    app.ingestWebhook({ sourceId: input.sourceId, raw, headers }),
+  .handle(({ app, input, raw }, headers, callerAddress) =>
+    app.ingestWebhook({ sourceId: input.sourceId, raw, headers, callerAddress }),
   )
 
   .post("/api/ingest/otel/:sourceId/v1/logs", "ingestSourceOtlpLogs")
+  .keepsRecords()
   .withoutAudit("ingestion")
   .withParams(governanceIngestSourceParamsSchema)
   .withRawBody("bytes", { refuses: OTLP_REFUSED_MEDIA_TYPES })
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
   .withAccess(INGEST_DOOR)
   .withHeaders(governanceIngestHeadersSchema)
+  .withMiddlewareContext(callerAddressContext)
   .responds(ingestAnswers)
   .withDocs({ hide: true })
-  .handle(({ app, input, raw }, headers) =>
-    app.ingestOtlpLogs({ sourceId: input.sourceId, raw, headers }),
+  .handle(({ app, input, raw }, headers, callerAddress) =>
+    app.ingestOtlpLogs({ sourceId: input.sourceId, raw, headers, callerAddress }),
   )
 
   .post("/api/ingest/otel/:sourceId/v1/metrics", "ingestSourceOtlpMetrics")
+  .keepsRecords()
   .withoutAudit("ingestion")
   .withParams(governanceIngestSourceParamsSchema)
   .withRawBody("bytes", { refuses: OTLP_REFUSED_MEDIA_TYPES })
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
   .withAccess(INGEST_DOOR)
   .withHeaders(governanceIngestHeadersSchema)
+  .withMiddlewareContext(callerAddressContext)
   .responds(ingestAnswers)
   .withDocs({ hide: true })
-  .handle(({ app, input, raw }, headers) =>
-    app.ingestOtlpMetrics({ sourceId: input.sourceId, raw, headers }),
+  .handle(({ app, input, raw }, headers, callerAddress) =>
+    app.ingestOtlpMetrics({ sourceId: input.sourceId, raw, headers, callerAddress }),
   )
 
   .build();

@@ -60,40 +60,38 @@ describe("Dashboards v1 on the server", () => {
     /** @scenario "AC18 Every Project board is visible to every member of the project" */
     it("lists and opens every board for every member", async () => {
       const app = appWith();
-      const mine = await app.create({
+      const mine = await app.createBoard({
         projectId: PROJECT,
         name: "Mine",
         createdById: CREATOR.userId,
       });
-      const theirs = await app.create({
+      const theirs = await app.createBoard({
         projectId: PROJECT,
         name: "Theirs",
         createdById: TEAMMATE.userId,
       });
 
       const listedFor = async (viewer: { userId: string }) =>
-        (await app.getAll({ projectId: PROJECT, graphCountScope: "builder", viewer })).map(
-          (board) => board.id,
-        );
+        (await app.findBoards({ projectId: PROJECT, viewer })).map((board) => board.id);
 
       expect(await listedFor(CREATOR)).toEqual([mine.id, theirs.id]);
       expect(await listedFor(OUTSIDER)).toEqual([mine.id, theirs.id]);
       await expect(
-        app.getById({ projectId: PROJECT, dashboardId: theirs.id, viewer: OUTSIDER }),
+        app.getBoard({ projectId: PROJECT, dashboardId: theirs.id, viewer: OUTSIDER }),
       ).resolves.toMatchObject({ id: theirs.id });
     });
 
     /** @scenario "AC26 Any member with the edit permission can edit any board they can see" */
     it("lets any member rename, describe and delete a board another member created", async () => {
       const app = appWith();
-      const board = await app.create({
+      const board = await app.createBoard({
         projectId: PROJECT,
         name: "Mine",
         createdById: CREATOR.userId,
       });
 
       await expect(
-        app.updateDashboardDetails({
+        app.updateBoard({
           projectId: PROJECT,
           dashboardId: board.id,
           viewer: TEAMMATE,
@@ -102,7 +100,7 @@ describe("Dashboards v1 on the server", () => {
         }),
       ).resolves.toMatchObject({ name: "Ours", description: "Shared numbers" });
       await expect(
-        app.delete({ projectId: PROJECT, dashboardId: board.id, viewer: OUTSIDER }),
+        app.deleteBoard({ projectId: PROJECT, dashboardId: board.id, viewer: OUTSIDER }),
       ).resolves.toMatchObject({ id: board.id });
     });
   });
@@ -118,11 +116,13 @@ describe("Dashboards v1 on the server", () => {
     async function boardWithBlocks() {
       const repositories = MemoryDashboardRepositories.create();
       const app = appWith({ repositories });
-      const board = await app.create({
+      const board = await app.createBoard({
         projectId: PROJECT,
-        name: "Reports",
+        name: "Usage",
         createdById: CREATOR.userId,
       });
+      // A saved chart is placed on a Reports board, made there at the scope Project.
+      const reports = await app.create({ projectId: PROJECT, name: "Reports" });
       const placed = await app.createDashboardWidget({
         ...WIDGET,
         dashboardId: board.id,
@@ -138,7 +138,7 @@ describe("Dashboards v1 on the server", () => {
       await app.placeSavedWorkbenchChart({
         projectId: PROJECT,
         chartId: "chart-placed",
-        dashboardId: board.id,
+        dashboardId: reports.id,
         viewer: CREATOR,
       });
       return { app, repositories, board, placed, unplaced };
@@ -186,22 +186,21 @@ describe("Dashboards v1 on the server", () => {
     /** @scenario "AC24 Boards created before this change keep working" */
     it("stays listed, openable and deletable for any member", async () => {
       const repositories = MemoryDashboardRepositories.create();
-      const legacy = await repositories.dashboards.createDashboard({
+      const legacy = await repositories.boards.createBoard({
         id: "legacy-board",
         projectId: PROJECT,
         name: "Reports",
-        order: 0,
       });
       const app = appWith({ repositories });
 
+      await expect(app.findBoards({ projectId: PROJECT, viewer: OUTSIDER })).resolves.toMatchObject(
+        [{ id: legacy.id, description: null, createdById: null }],
+      );
       await expect(
-        app.getAll({ projectId: PROJECT, graphCountScope: "builder", viewer: OUTSIDER }),
-      ).resolves.toMatchObject([{ id: legacy.id }]);
-      await expect(
-        app.getById({ projectId: PROJECT, dashboardId: legacy.id, viewer: OUTSIDER }),
+        app.getBoard({ projectId: PROJECT, dashboardId: legacy.id, viewer: OUTSIDER }),
       ).resolves.toMatchObject({ id: legacy.id });
       await expect(
-        app.delete({ projectId: PROJECT, dashboardId: legacy.id, viewer: OUTSIDER }),
+        app.deleteBoard({ projectId: PROJECT, dashboardId: legacy.id, viewer: OUTSIDER }),
       ).resolves.toMatchObject({ id: legacy.id });
     });
   });
@@ -210,13 +209,13 @@ describe("Dashboards v1 on the server", () => {
     /** @scenario "AC14 Rename and describe" */
     it("saves a new name and description, and lists the new name", async () => {
       const app = appWith();
-      const board = await app.create({
+      const board = await app.createBoard({
         projectId: PROJECT,
         name: "Mine",
         createdById: CREATOR.userId,
       });
 
-      await app.updateDashboardDetails({
+      await app.updateBoard({
         projectId: PROJECT,
         dashboardId: board.id,
         viewer: CREATOR,
@@ -224,9 +223,7 @@ describe("Dashboards v1 on the server", () => {
         description: "p95 by model",
       });
 
-      await expect(
-        app.getAll({ projectId: PROJECT, graphCountScope: "builder", viewer: CREATOR }),
-      ).resolves.toMatchObject([
+      await expect(app.findBoards({ projectId: PROJECT, viewer: CREATOR })).resolves.toMatchObject([
         { id: board.id, name: "Latency watch", description: "p95 by model" },
       ]);
     });
@@ -237,7 +234,7 @@ describe("Dashboards v1 on the server", () => {
     it("answers every Dashboards-area procedure with dashboards_not_enabled", async () => {
       const repositories = MemoryDashboardRepositories.create();
       const seeded = appWith({ repositories });
-      const board = await seeded.create({
+      const board = await seeded.createBoard({
         projectId: PROJECT,
         name: "Reports",
         createdById: CREATOR.userId,
@@ -246,11 +243,21 @@ describe("Dashboards v1 on the server", () => {
       const ref = { projectId: PROJECT, dashboardId: board.id, viewer: CREATOR };
 
       const codes = await Promise.all([
-        codeOf(app.updateDashboardDetails({ ...ref, name: "Off" })),
+        codeOf(app.createBoard({ projectId: PROJECT, name: "New", createdById: CREATOR.userId })),
+        codeOf(app.updateBoard({ ...ref, name: "Off" })),
+        codeOf(app.deleteBoard(ref)),
         codeOf(app.getSourcePresence({ projectId: PROJECT, viewer: CREATOR })),
       ]);
 
-      expect(codes).toEqual(Array(codes.length).fill("dashboards_not_enabled"));
+      expect({
+        codes,
+        kept: (await seeded.getBoard(ref)).name,
+        boards: (await seeded.findBoards({ projectId: PROJECT, viewer: CREATOR })).length,
+      }).toEqual({
+        codes: Array(codes.length).fill("dashboards_not_enabled"),
+        kept: "Reports",
+        boards: 1,
+      });
     });
 
     it("leaves the procedures legacy analytics reads untouched", async () => {
@@ -258,7 +265,7 @@ describe("Dashboards v1 on the server", () => {
 
       await expect(
         app.getOrCreateFirst({ projectId: PROJECT, viewer: CREATOR }),
-      ).resolves.toMatchObject([{ name: "Reports", createdById: CREATOR.userId }]);
+      ).resolves.toMatchObject([{ name: "Reports", createdById: null, scope: "PROJECT" }]);
     });
   });
 

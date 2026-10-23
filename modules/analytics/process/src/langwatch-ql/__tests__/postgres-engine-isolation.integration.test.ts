@@ -553,7 +553,8 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
       ).toBeGreaterThan(0);
       for (const scan of scans) {
         expect(
-          scan.includes(`= '${harness.tenantA.tenantId}'`),
+          scan.includes(`>= '${harness.tenantA.tenantId}'`) &&
+            scan.includes(`<= '${harness.tenantA.tenantId}'`),
           `the LangWatchQL view's tenant predicate did not reach PostgreSQL ("${scan}")`,
         ).toBe(true);
       }
@@ -663,14 +664,51 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
     }, 120_000);
   });
 
+  describe("when a group project's session carries every member's key hash", () => {
+    /** @scenario "A group project reads every member through a PostgreSQL-resident view" */
+    it("reads every member's rows and sends PostgreSQL a range spanning them", async () => {
+      const control = await recordSeedControl({
+        harness,
+        table: PG_MAPPED_TABLE,
+        tenantColumn: PG_MAPPED_TENANT_COLUMN,
+      });
+      const group = await harness.restrictedClient({
+        keyHash: `${harness.tenantA.keyHash},${harness.tenantB.keyHash}`,
+      });
+      const before = await postgres.readLog();
+
+      const rows = await selectRows<{ TenantId: string }>(
+        group,
+        `SELECT ${PG_MAPPED_TENANT_COLUMN} FROM ${database}.${PG_MAPPED_VIEW}`,
+      );
+
+      const tenants = (tenantId: string) => rows.filter((row) => row.TenantId === tenantId).length;
+      expect(tenants(harness.tenantA.tenantId)).toBe(control.tenantA);
+      expect(tenants(harness.tenantB.tenantId)).toBe(control.tenantB);
+      expect(rows).toHaveLength(control.tenantA + control.tenantB);
+
+      const [low, high] = [harness.tenantA.tenantId, harness.tenantB.tenantId].toSorted();
+      const scans = statementsLoggedSince(before, await postgres.readLog()).filter((statement) =>
+        statement.includes(postgres.approvedView),
+      );
+      expect(scans.length).toBeGreaterThan(0);
+      for (const scan of scans) {
+        expect(
+          scan.includes(`>= '${low}'`) && scan.includes(`<= '${high}'`),
+          `the group's tenant range did not reach PostgreSQL ("${scan}")`,
+        ).toBe(true);
+      }
+    });
+  });
+
   describe("when the key map holds a duplicate row for the caller's key", () => {
     /**
      * The bug this pins: the key map is `ORDER BY KeyHash` with no uniqueness
      * enforced, so a retried provisioning step or a re-issued key can leave two
      * rows the key map's own self-policy admits for the same hash. The LangWatchQL
      * view's tenant predicate (`postgresTenantPredicate` in `../views.ts`) is a
-     * scalar subquery over exactly that self-policed read — before its
-     * `LIMIT 1`, two admitted rows made the subquery return two rows and
+     * min/max range over exactly that self-policed read — when it was one
+     * bare scalar, two admitted rows made the subquery return two rows and
      * ClickHouse rejected the whole read with
      * `Code: 125. INCORRECT_RESULT_OF_SCALAR_SUBQUERY`, taking out every
      * PostgreSQL-resident dataset for the affected key at once.
@@ -842,6 +880,72 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
         }
       } finally {
         await deletePrivateSeed();
+      }
+    }, 60_000);
+  });
+
+  describe("when a project has an Only me board and a Project board", () => {
+    /** The generic seed's board is the Project one; only the Only me board is seeded here. */
+    const projectBoardId = () => `${harness.tenantA.tenantId}-DashboardsV2-1`;
+    const onlyMeBoardId = () => `${harness.tenantA.tenantId}-only-me-board`;
+    const onlyMeWidgetId = () => `${harness.tenantA.tenantId}-only-me-widget`;
+    const projectWidgetId = () => `${harness.tenantA.tenantId}-project-board-widget`;
+
+    const boardSeedStatements = (): string[] => {
+      const tenantId = harness.tenantA.tenantId;
+      return [
+        `INSERT INTO "DashboardsV2" (id, "projectId", name, scope) VALUES (` +
+          `'${onlyMeBoardId()}', '${tenantId}', 'Only me board', 'PRIVATE')`,
+        `INSERT INTO "DashboardWidget" (id, "projectId", "dashboardId", name, definition) VALUES ` +
+          `('${onlyMeWidgetId()}', '${tenantId}', '${onlyMeBoardId()}', 'Only me widget', '{}'::jsonb), ` +
+          `('${projectWidgetId()}', '${tenantId}', '${projectBoardId()}', 'Project widget', '{}'::jsonb)`,
+      ];
+    };
+
+    const deleteBoardSeed = async (): Promise<void> => {
+      await postgres.asAdmin(
+        `DELETE FROM "DashboardWidget" WHERE id IN ('${onlyMeWidgetId()}', '${projectWidgetId()}')`,
+      );
+      await postgres.asAdmin(`DELETE FROM "DashboardsV2" WHERE id = '${onlyMeBoardId()}'`);
+    };
+
+    /** @scenario "Per-user visibility is enforced at the approved view" */
+    it("hides the Only me board and its widgets, and shows the Project board and its widgets", async () => {
+      for (const sql of boardSeedStatements()) {
+        const result = await postgres.asAdmin(sql);
+        expect(result.exitCode, `seeding failed: ${sql}\n${result.stderr}`).toBe(0);
+      }
+
+      try {
+        const boardIds = (
+          await selectRows<{ DashboardId: string }>(
+            tenantA,
+            `SELECT DashboardId FROM ${database}.dashboards_v2`,
+          )
+        ).map((row) => row.DashboardId);
+        expect(boardIds, "dashboards_v2: the Only me board reached the caller").not.toContain(
+          onlyMeBoardId(),
+        );
+        expect(boardIds, "dashboards_v2: the Project board never reached the caller").toContain(
+          projectBoardId(),
+        );
+
+        const widgetIds = (
+          await selectRows<{ DashboardWidgetId: string }>(
+            tenantA,
+            `SELECT DashboardWidgetId FROM ${database}.dashboard_widgets`,
+          )
+        ).map((row) => row.DashboardWidgetId);
+        expect(
+          widgetIds,
+          "dashboard_widgets: a widget on the Only me board reached the caller",
+        ).not.toContain(onlyMeWidgetId());
+        expect(
+          widgetIds,
+          "dashboard_widgets: a widget on the Project board never reached the caller",
+        ).toContain(projectWidgetId());
+      } finally {
+        await deleteBoardSeed();
       }
     }, 60_000);
   });

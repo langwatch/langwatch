@@ -148,6 +148,54 @@ describe("buildModelsJson", () => {
     });
   });
 
+  describe("when an Anthropic Messages model pi's catalog does not list", () => {
+    const env = { ANTHROPIC_BASE_URL: "http://127.0.0.1:41234", ANTHROPIC_API_KEY: "k" };
+    const claude = (id: string, compat?: Record<string, unknown>): Record<string, unknown> => {
+      const provider = buildModelsJson({
+        model: {
+          id,
+          api: "anthropic-messages",
+          baseUrlEnv: "ANTHROPIC_BASE_URL",
+          apiKeyEnv: "ANTHROPIC_API_KEY",
+          reasoning: true,
+          ...(compat ? { compat } : {}),
+        },
+        env,
+      }).providers[PROVIDER_ID] as { models: Record<string, unknown>[] };
+      return provider.models[0] as Record<string, unknown>;
+    };
+
+    /** @scenario A Claude newer than pi's catalog still gets the adaptive thinking shape */
+    it("asks for adaptive thinking on Claude 4.6 and later", () => {
+      for (const id of [
+        "anthropic/claude-opus-5-5",
+        "anthropic/claude-sonnet-5-5",
+        "anthropic/claude-haiku-5-5",
+        "anthropic/claude-sonnet-4-6-20260101",
+        "anthropic/claude-opus-6",
+      ]) {
+        expect(claude(id).compat, id).toEqual({ forceAdaptiveThinking: true });
+      }
+    });
+
+    /** @scenario A Claude newer than pi's catalog still gets the adaptive thinking shape */
+    it("keeps the manager's own compat keys, which win over the default", () => {
+      expect(
+        claude("anthropic/claude-opus-5-5", {
+          supportsLongCacheRetention: true,
+          forceAdaptiveThinking: false,
+        }).compat,
+      ).toEqual({ forceAdaptiveThinking: false, supportsLongCacheRetention: true });
+    });
+
+    /** @scenario A Claude newer than pi's catalog still gets the adaptive thinking shape */
+    it("leaves an older Claude on the manager's config alone", () => {
+      for (const id of ["anthropic/claude-opus-4-20250514", "anthropic/claude-3-7-sonnet-latest"]) {
+        expect(claude(id).compat, id).toBeUndefined();
+      }
+    });
+  });
+
   describe("when the config carries routing or credential keys", () => {
     // The model config passes unknown keys through on purpose, so a new compat
     // flag needs no wrapper change. Routing and credential keys must not ride

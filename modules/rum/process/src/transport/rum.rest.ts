@@ -4,7 +4,11 @@
  * @see modules/rum/specs/browser-telemetry-ingest.feature
  */
 import { publicRoute } from "@langwatch/api/access";
-import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
+import {
+  callerAddressContext,
+  defineRestRouter,
+  MANAGEMENT_API_VERSION,
+} from "@langwatch/api/rest";
 import {
   RUM_MAX_BODY_BYTES,
   RUM_SESSION_HEADER,
@@ -22,6 +26,7 @@ export const rumRest = defineRestRouter(RumApi)
   .withAddressing("literal", { v1Twin: false })
 
   .post(RUM_TRACES_PATH, "ingestBrowserTraces")
+  .keepsRecords()
   .withoutAudit("ingestion")
   .withRawBody("text")
   .withBodyLimit({
@@ -36,17 +41,18 @@ export const rumRest = defineRestRouter(RumApi)
     }),
   )
   .withHeaders(rumReportHeadersSchema)
+  .withMiddlewareContext(callerAddressContext)
   .withResponse("protocol", { produces: "application/json", because: ACCEPTED })
   .withDocs({
     tags: ["Browser telemetry"],
     summary: "Report the platform's own browser traces",
     description: `The LangWatch app's browser tracing exports here. ${ACCEPTED}`,
   })
-  .handle(async ({ app, raw, response }, headers) => {
+  .handle(async ({ app, raw, response }, headers, callerAddress) => {
     await app.ingestBrowserTraces({
       body: raw,
       session: headers[RUM_SESSION_HEADER],
-      forwardedFor: headers["x-forwarded-for"],
+      callerAddress,
     });
     return response.write({ status: 202, mediaType: "application/json", body: null });
   })

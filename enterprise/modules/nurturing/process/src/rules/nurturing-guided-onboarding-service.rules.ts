@@ -13,7 +13,9 @@ import {
   type GuidedPath,
   type OnboardingVariant,
 } from "@langwatch/onboarding-contract";
-import { nowInstant } from "@langwatch/time";
+import { type Instant, nowInstant, Temporal } from "@langwatch/time";
+
+import { unixSecondsOf } from "./nurturing-customer-io-timestamp.rules.ts";
 
 /**
  * One campaign trigger per path. Marketing runs one campaign off each of
@@ -169,7 +171,7 @@ export function fireGuidedOnboardingProgress({
           userId,
           traits: {
             guided_onboarding_completed_paths: completedPaths,
-            guided_onboarding_completed_at: nowInstant().toString({ fractionalSecondDigits: 3 }),
+            guided_onboarding_completed_at: unixSecondsOf(nowInstant().epochMilliseconds),
           },
         },
         {
@@ -276,6 +278,43 @@ export function fireGuidedOnboardingPostHog({
         onboarding_paths: paths,
         onboarding_primary_path: paths[0],
       },
+    },
+  };
+}
+
+/**
+ * The experiment's exposure, for either variant: the event the funnel starts from on both
+ * sides, carrying the experiment property and the onboarding_variant person property.
+ */
+export function fireOnboardingVariantAssignedPostHog({
+  userId,
+  organizationId,
+  variant,
+  occurredAt,
+}: {
+  userId: string;
+  organizationId: string;
+  variant: OnboardingVariant;
+  occurredAt: number;
+}): {
+  userId: string;
+  event: string;
+  properties: Record<string, unknown>;
+  uuid: string;
+  timestamp: Instant;
+} {
+  return {
+    userId,
+    event: "onboarding_variant_assigned",
+    // One uuid and timestamp per organization, so a replay after the delivery
+    // claim expires is still one event.
+    uuid: postHogUuidFor(`onboarding-variant-assigned:${organizationId}`),
+    timestamp: Temporal.Instant.fromEpochMilliseconds(occurredAt),
+    properties: {
+      variant,
+      ...onboardingExperimentProperties(variant),
+      organization_id: organizationId,
+      $set: { onboarding_variant: variant },
     },
   };
 }

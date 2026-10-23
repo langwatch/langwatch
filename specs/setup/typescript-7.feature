@@ -56,10 +56,19 @@ Feature: TypeScript 7 is the compiler
     # Its references reach build projects the root solution builds too; two
     # compilers over one build info each mark the other's output stale.
 
+  # ADR-181: the workspace `tsc` launcher runs tsrs, the Rust port of the compiler.
+  @unit
+  Scenario: The workspace compiler is the Rust port, with the Go binary one switch away
+    Given the workspace's `tsc` command
+    When it reports its version
+    Then it names tsrs
+    But with LANGWATCH_TSC set to "tsgo" it is the Go binary TypeScript 7 ships
+    And on a platform tsrs supports, a missing tsrs binary stops the run instead of falling back
+
   @unit
   Scenario: The superseded preview compiler is gone
     Given TypeScript 7 is released
-    Then no workspace package declares `@typescript/native-preview`; the root keeps it for tslsp-cli (round 41)
+    Then no workspace package declares `@typescript/native-preview`; the root keeps it as the language server tsrs falls back to (round 41)
 
   # Gap: main's tsAst helper (parseSourceText) was deleted in 0affb6cbab; no helper parses source text that has no file.
   @unit @unimplemented

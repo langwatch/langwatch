@@ -5,8 +5,9 @@ import { defineRule } from "../define-rule.mjs";
 // file that looks like a service. Rules functions in a rules/ module are the
 // house shape for pure behaviour.
 
+/** A module's process source, or an opted-in framework package's source (ADR-181). */
 function isStrictProcessSource(file) {
-  return file.role === "process" && Boolean(file.strictSource);
+  return (file.role === "process" || file.role === "framework") && Boolean(file.strictSource);
 }
 
 function memberName(member) {

@@ -35,6 +35,7 @@
   },
   "dependencies": {
     "@langwatch/authorization": "workspace:*",
+    "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/group-queue": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
@@ -45,7 +46,6 @@
     "ioredis": "catalog:",
     "langwatch": "workspace:*",
     "nanoid": "catalog:",
-    "prom-client": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

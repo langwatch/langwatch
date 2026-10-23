@@ -699,7 +699,7 @@ After creation, verify the saved resource:
 
 ```bash
 langwatch monitor list --format json
-langwatch monitor get <monitor-id> --format json
+langwatch monitor get <idOrSlugOrName> --format json
 ```
 
 The task is complete only when the created monitor appears with the intended evaluator, execution mode, level, sample rate, and enabled state.
@@ -3258,7 +3258,7 @@ The events are the raw material: every model call with its input, output, cache-
 Write a small local script (python3 or jq) over the events. Per session, compute:
 
 1. **Peak context**: the largest (input + cache-read) of any model call, and its share of the model's context window.
-2. **Cache rebuilds**: model calls whose cache-creation tokens are the bulk of their input, counted only once the session already holds cached context. The first cache-creating call of a session builds the cache rather than rebuilding it, and it pays for the context once, so it is a setup cost and not a rebuild. Count a write from the first call that follows a call with cache-read tokens, or that follows an explicit cache miss. Each rebuild re-paid for context that was already paid for, at the provider's cache-write rate. That rate is specific to the provider and the model: some price a write above fresh input, some price it the same, and some charge for cache storage by time instead. Take it from the price card of the model in question, never from a rule of thumb.
+2. **Cache rebuilds**: model calls that wrote 1,000 tokens or more to the cache, and at least half as many as the call before them held in it (that call's cache read plus its cache write), whatever the call itself read from the cache. This is the rule the LangWatch session detail counts as a cache miss. A call whose previous call held nothing in the cache is never counted, so the first cache-creating call of a session builds the cache rather than rebuilding it: it pays for the context once, as a setup cost. Each rebuild re-paid for context that was already paid for, at the provider's cache-write rate. That rate is specific to the provider and the model: some price a write above fresh input, some price it the same, and some charge for cache storage by time instead. Take it from the price card of the model in question, never from a rule of thumb.
 3. **Compaction count and where they landed**: a compaction late in a session marks the point where the carried context stopped fitting.
 4. **Cost per model call over session lifetime**: split each session into thirds by call order and compare the average cost per call between the first and last third.
 5. **Waiting time around rebuilds**: rebuilt context is also re-uploaded and re-processed, so rebuild-heavy sessions are slower per turn.
@@ -3544,6 +3544,8 @@ GROUP BY TenantId ORDER BY cost_usd DESC
 ```
 
 If more than one project comes back, ask whether the report covers the user's own sessions or the whole team. For one project, add `AND TenantId = '<id>'` to every query below; the user's own id is `personal_project.id` in `langwatch whoami`; if that field is missing, ask the user which project id to use.
+
+If the report window has no `model_call` rows, run `SELECT count() AS events, max(TimeUnixMs) AS newest FROM langwatch.coding_session_events WHERE EventKind = 'model_call'` inline (not a `sql` fence) for the newest event in any window, adding `AND TenantId = '<id>'` when the report covers one project. `events = 0` means no Claude Code model call is stored for the report's scope (one project, or the whole team), so there is no cost data; otherwise report the age (`the newest Claude Code event is from <time>, <age> ago`). Name what to check in the Claude Code telemetry setup: `CLAUDE_CODE_ENABLE_TELEMETRY=1`, `OTEL_EXPORTER_OTLP_ENDPOINT` pointing at LangWatch, and the project API key in `OTEL_EXPORTER_OTLP_HEADERS` (`Authorization=Bearer <key>`). Report that gap instead of the cost checks.
 
 `langwatch.coding_sessions` holds one row per session, with `Title`, `PeakContextTokens`, `Compactions`, `Models`, `SubAgentTypes`, `CostUsd`, `StartedAt` and `UserId`. Use it to name example sessions.
 
@@ -4371,7 +4373,7 @@ After creation, verify the saved resource:
 
 ```bash
 langwatch monitor list --format json
-langwatch monitor get <monitor-id> --format json
+langwatch monitor get <idOrSlugOrName> --format json
 ```
 
 The task is complete only when the created monitor appears with the intended evaluator, execution mode, level, sample rate, and enabled state.
@@ -6264,7 +6266,7 @@ Production quality signals live in monitors (online evaluation) and their evalua
 
 ```bash
 langwatch monitor list -o json           # which monitors exist, are they enabled/firing?
-langwatch monitor get <id> -o json       # one monitor's config and recent state
+langwatch monitor get <idOrSlugOrName> -o json     # one monitor's config and recent state
 langwatch evaluator list -o json         # the evaluators the monitors run
 ```
 
@@ -6404,7 +6406,7 @@ For each failing row, note the input, the expected output (from the dataset), an
 
 ```bash
 langwatch evaluator list -o json
-langwatch evaluator get <idOrSlug> -o json
+langwatch evaluator get <idOrSlugOrName> -o json
 ```
 
 Before blaming the agent, rule out the scorer:
@@ -7418,7 +7420,7 @@ With no `--grid-row`, the platform allocates the next free row, so it never land
 langwatch chart list -f json
 langwatch chart get <chart-id> -f json    # SQL, parameters, spec, placement
 langwatch chart update <chart-id> --sql-file query.sql
-langwatch chart delete <chart-id>
+langwatch chart delete <chart-id>   # destructive: confirm on a choices card first
 ```
 
 ## Failure modes worth knowing
@@ -7607,12 +7609,13 @@ langwatch dashboard-widget list -f json
 langwatch dashboard-widget get <id> -f json      # code, queries, platformUrl
 langwatch dashboard-widget update <id> --code-file widget.tsx --queries-file queries.json
 langwatch dashboard-widget delete <id>
+langwatch dashboard-widget boards -f json                              # the dashboards a widget can go on
 langwatch dashboard-widget pin <id-or-name> --dashboard <id-or-name>   # add to a dashboard
 ```
 
-`pin` reassigns the widget to that dashboard, at the dashboard's next free row — edit it from the widget's menu on that board. See `langwatch dashboard list` for ids.
+`pin` reassigns the widget to that dashboard, at the dashboard's next free row — edit it from the widget's menu on that board. See `langwatch dashboard-widget boards` for ids. `langwatch dashboard list` lists the Analytics Reports dashboards, which hold no widgets, so `pin` does not find them.
 
-**Which dashboard:** place on the dashboard in the user's context (the board they are on, or one they named). If no dashboard is in context, ask which board with the `question` tool, one option per board with its id in `ref`. Never pick one from `langwatch dashboard list` on your own.
+**Which dashboard:** place on the dashboard in the user's context (the board they are on, or one they named). If no dashboard is in context, ask which board with the `question` tool, one option per board from `langwatch dashboard-widget boards` with its id in `ref`. Never choose a board for the user.
 
 `update` accepts `--name` on its own, or a full definition (`--code`/`--code-file` together with `--queries-file`) — passing one definition flag without the other is refused locally rather than saving half a widget. A call with nothing to change is refused too.
 

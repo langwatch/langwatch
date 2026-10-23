@@ -1,3 +1,4 @@
+import type { Authorization } from "@langwatch/authorization";
 import {
   type CodingAgentRecentSessionsInput,
   type CodingAgentSession,
@@ -154,6 +155,30 @@ export class CodingAgentSessionReadService {
     });
 
     return this.withMetricTotals(input.projectId, rows, input);
+  }
+
+  /**
+   * `listRecent` through a proof's fence (ADR-177): an aggregate's page spans its
+   * members, so the metric fill runs per tenant the rows came back under.
+   */
+  async listRecentFenced(input: {
+    authorization: Authorization;
+    fromMs: number;
+    toMs: number;
+    limit: number;
+  }): Promise<CodingAgentSession[]> {
+    const rows = await this.dependencies.sessions.findManyRecentFenced(input);
+    const byTenant = new Map<string, CodingAgentSession[]>();
+    for (const row of rows) {
+      byTenant.set(row.tenantId, [...(byTenant.get(row.tenantId) ?? []), row]);
+    }
+    const filled = await Promise.all(
+      [...byTenant].map(([tenantId, tenantRows]) =>
+        this.withMetricTotals(tenantId, tenantRows, input),
+      ),
+    );
+
+    return filled.flat().toSorted((a, b) => b.startedAtMs - a.startedAtMs);
   }
 
   /** The usage report's figures (ADR-156, section 10). */

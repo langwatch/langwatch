@@ -49,6 +49,7 @@ import { IdentityApi, type IdentityApi as IdentityApiContract } from "@langwatch
 import { InsightApi } from "@langwatch/insight-contract";
 import { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import { LangyApi } from "@langwatch/langy-contract";
+import { ReactEmailMailRenderer } from "@langwatch/mail";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";
 import { NotificationService as NotificationApi } from "@langwatch/notification-contract";
@@ -65,6 +66,7 @@ import {
   type ExplicitCheckInput,
   type ProjectCheckupReport,
   OpsCapabilityUnavailableError,
+  type UpgradeDiagnosticsAutoSendAnswer,
   type UsageReportAnswer,
   opsBrowserConfig,
   opsConfig,
@@ -239,6 +241,7 @@ import {
   type SignUpHealth,
   type OpsDoorAnswer,
   type OpsUpgradeIdInput,
+  type OpsUpgradeSendDiagnosticsInput,
   type OpsUpgradeListRunsInput,
   type OpsUpgradeListStepsInput,
   type OpsUpgradeListTenantsInput,
@@ -248,6 +251,9 @@ import {
   type OpsUpgradeRunPage,
   type OpsUpgradeStatus,
   type OpsUpgradeStepDetail,
+  type OpsUpgradeDiagnosticsAvailability,
+  type OpsUpgradeDiagnosticsReceipt,
+  type UpgradeDiagnosticsBundle,
   type OpsUpgradeStepPage,
   type OpsUpgradeTenantPage,
   type OpsUpgradeTargetSummary,
@@ -282,6 +288,7 @@ import { UserApi, type UserApi as UserApiContract } from "@langwatch/user-contra
 import { WorkflowApi } from "@langwatch/workflow-contract";
 
 import { UpgradeAlertsService } from "#features/upgrades/services/upgrade-alerts.service";
+import { UpgradeDiagnosticsService } from "#features/upgrades/services/upgrade-diagnostics.service";
 import { OpsExplainClickHouseRepository } from "#repositories/clickhouse/clickhouse.ops-explain.repository";
 import type { OpsExplainClients } from "#repositories/ops-explain.repository";
 import type { OpsRepositories } from "#repositories/ops.repositories";
@@ -734,6 +741,8 @@ type OpsRuntimeDependencies = Readonly<{
   upgrades: OpsUpgradeService;
   /** The check `ops_upgrade_alerts` runs hourly; absent where a composition built none. */
   upgradeAlerts: UpgradeAlertsService | undefined;
+  /** A failed step's redacted bundle, and sending it over Connect; absent where none was built. */
+  upgradeDiagnostics: UpgradeDiagnosticsService | undefined;
   operatorSeed: PlatformOperatorSeedSettings | undefined;
   findOpsApiKey(): string | null;
   findProductAnalyticsTargets(): ProductAnalyticsTarget[];
@@ -873,6 +882,7 @@ export class OpsModule implements OpsApi {
         redis: repositories.redisHealth,
         upgradeLedger: repositories.upgradeLedger,
         cloudLatestRelease: repositories.cloudLatestRelease,
+        cloudNotices: repositories.cloudNotices,
       },
       channels: setup.channels,
       // Read only when a report is taken, by which time `app` below exists.
@@ -900,6 +910,17 @@ export class OpsModule implements OpsApi {
       logger,
     });
 
+    const isCloud = config.isSaas || cloudOps;
+    const upgradeDiagnostics = UpgradeDiagnosticsService.create({
+      ledger: repositories.upgradeLedger,
+      licensing: dependencies.licensing,
+      deployment: {
+        imageRelease: releaseVersionOf(config),
+        chartVersion: config.usageStats.chartVersion ?? null,
+        installMethod: config.usageStats.installMethod ?? "self-hosted",
+      },
+      automaticDisabled: config.upgradeDiagnosticsAutoSendDisabled,
+    });
     const platformOperators = PlatformOperatorsService.create({
       authz: dependencies.authz,
       users: dependencies.users,
@@ -925,8 +946,12 @@ export class OpsModule implements OpsApi {
         ledger: repositories.upgradeLedger,
         operators: platformOperators,
         mail: dependencies.notifications,
+        renderer: ReactEmailMailRenderer.create(),
         upgradesUrl: `${(config.publicBaseUrl ?? "").replace(/\/$/, "")}/ops/upgrades`,
+        audience: isCloud ? "langwatch-cloud" : "self-hosted",
+        ...(isCloud ? {} : { diagnostics: upgradeDiagnostics }),
       }),
+      upgradeDiagnostics,
     });
     return app;
   }
@@ -945,6 +970,7 @@ export class OpsModule implements OpsApi {
     signUpHealth?: SignUpHealthService;
     platformOperators?: PlatformOperatorsService;
     upgradeAlerts?: UpgradeAlertsService;
+    upgradeDiagnostics?: UpgradeDiagnosticsService;
   }): OpsModule {
     const { infrastructure: members, dependencies, repositories } = setup;
 
@@ -998,6 +1024,7 @@ export class OpsModule implements OpsApi {
       signUpHealth: setup.signUpHealth,
       platformOperators: setup.platformOperators,
       upgradeAlerts: setup.upgradeAlerts,
+      upgradeDiagnostics: setup.upgradeDiagnostics,
       operatorSeed: members.operatorSeed,
       findOpsApiKey: () => members.findOpsApiKey(),
       findProductAnalyticsTargets: () => members.findProductAnalyticsTargets(),
@@ -1866,13 +1893,13 @@ export class OpsModule implements OpsApi {
   /** The intake door's whole answer, in the bodies released CLI and MCP builds read. */
   async receiveBugReport(input: {
     report: SubmitBugReport;
-    forwardedFor: string | null;
+    callerAddress: string | null;
     linkedProjectId: string | null;
   }): Promise<OpsDoorAnswer> {
     try {
       const { id } = await this.submitBugReport({
         report: input.report,
-        callerKey: toCallerKey(input.forwardedFor),
+        callerKey: toCallerKey(input.callerAddress),
         linkedProjectId: input.linkedProjectId,
       });
 
@@ -1981,6 +2008,33 @@ export class OpsModule implements OpsApi {
     return { deployment: "self-hosted", ...report };
   }
 
+  async getUpgradeDiagnosticsAutoSend({
+    organizationId: _installWide,
+    operator,
+  }: {
+    organizationId: string;
+    operator: OpsOperator | null;
+  }): Promise<UpgradeDiagnosticsAutoSendAnswer> {
+    if (this.#checkup.isSaas) return { deployment: "saas" };
+    await this.admitOperator(operator, "ops:manage");
+    return { deployment: "self-hosted", ...(await this.#upgradeDiagnostics.getAutoSend()) };
+  }
+
+  async setUpgradeDiagnosticsAutoSend({
+    organizationId: _installWide,
+    operator,
+    enabled,
+  }: {
+    organizationId: string;
+    operator: OpsOperator | null;
+    enabled: boolean;
+  }): Promise<UpgradeDiagnosticsAutoSendAnswer> {
+    if (this.#checkup.isSaas) return { deployment: "saas" };
+    await this.admitOperator(operator, "ops:manage");
+    const autoSend = await this.#upgradeDiagnostics.setAutoSend({ enabled });
+    return { deployment: "self-hosted", ...autoSend };
+  }
+
   /** A project key has no person behind it, so it reads its organization's verdicts only. */
   getUpgradeStatus(): Promise<OpsUpgradeStatus> {
     return this.#dependencies.upgrades.getStatus();
@@ -2016,6 +2070,20 @@ export class OpsModule implements OpsApi {
 
   retryUpgradeStep(input: OpsUpgradeIdInput): Promise<OpsUpgradeStepDetail> {
     return this.#dependencies.upgrades.retryStep(input);
+  }
+
+  getUpgradeStepDiagnostics(input: OpsUpgradeIdInput): Promise<UpgradeDiagnosticsBundle> {
+    return this.#upgradeDiagnostics.getBundle(input);
+  }
+
+  getUpgradeDiagnosticsAvailability(): Promise<OpsUpgradeDiagnosticsAvailability> {
+    return this.#upgradeDiagnostics.getAvailability();
+  }
+
+  sendUpgradeStepDiagnostics(
+    input: OpsUpgradeSendDiagnosticsInput,
+  ): Promise<OpsUpgradeDiagnosticsReceipt> {
+    return this.#upgradeDiagnostics.sendReviewed({ bundle: input.bundle });
   }
 
   async getProjectCheckup({ projectId }: { projectId: string }): Promise<ProjectCheckupReport> {
@@ -2160,6 +2228,12 @@ export class OpsModule implements OpsApi {
   ): Promise<OpsQueueReapedStrandedGroups> {
     const audited = input.requestedBy !== GROUP_QUEUE_REAPER_PIPELINE_NAME;
     return this.#dependencies.groupQueueReaper.reap({ ...input, audited });
+  }
+
+  get #upgradeDiagnostics(): UpgradeDiagnosticsService {
+    const { upgradeDiagnostics } = this.#dependencies;
+    if (!upgradeDiagnostics) throw new OpsCapabilityUnavailableError("upgrade diagnostics");
+    return upgradeDiagnostics;
   }
 
   get #signUpHealth(): SignUpHealthService {

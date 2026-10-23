@@ -37,4 +37,5 @@ export {
   subscriptionActivatedNotice,
   subscriptionCancelledNotice,
   subscriptionProspectiveNotice,
+  upgradeDiagnosticsNotice,
 } from "./templates/index.ts";

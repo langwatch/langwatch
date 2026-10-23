@@ -97,7 +97,7 @@ authorize(args: { principal: AuthzPrincipalRef; permission: Permission; scope: E
 
 #### `authorizeInternal`
 
-The own-only proof platform code reads its own project with (ADR-177); evaluates nothing.
+The own-only proof platform code reads its own project with (ADR-177); evaluates nothing. A project that no longer exists throws `ProjectNotFoundError`.
 
 ```typescript
 authorizeInternal(args: { actor: Extract<Actor, { type: "internal" | "system" }>; projectId: string; permission: AuthzPermission; purpose: AuthorizationPurpose; }): Promise<Authorization>;
@@ -636,7 +636,7 @@ type Response = z.infer<typeof grantSchema>; // ../contract/src/authz-grants-res
 
 Get a grant
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-grant.rest.ts:80`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-grant.rest.ts:81`.
 
 Answers at `/api/grants/:grantId`, `/api/v1/grants/:grantId`; also, undocumented, `/api/grants/2026-08-07/:grantId`, `/api/v1/grants/2026-08-07/:grantId`, `/api/grants/latest/:grantId`, `/api/v1/grants/latest/:grantId`.
 
@@ -652,7 +652,7 @@ type Response = z.infer<typeof grantSchema>; // ../contract/src/authz-grants-res
 
 Change a grant's role
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-grant.rest.ts:96`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-grant.rest.ts:97`.
 
 Answers at `/api/grants/:grantId`, `/api/v1/grants/:grantId`; also, undocumented, `/api/grants/2026-08-07/:grantId`, `/api/v1/grants/2026-08-07/:grantId`, `/api/grants/latest/:grantId`, `/api/v1/grants/latest/:grantId`.
 
@@ -669,7 +669,7 @@ type Response = z.infer<typeof grantSchema>; // ../contract/src/authz-grants-res
 
 Revoke a grant
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-grant.rest.ts:119`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-grant.rest.ts:121`.
 
 Answers at `/api/grants/:grantId`, `/api/v1/grants/:grantId`; also, undocumented, `/api/grants/2026-08-07/:grantId`, `/api/v1/grants/2026-08-07/:grantId`, `/api/grants/latest/:grantId`, `/api/v1/grants/latest/:grantId`.
 
@@ -742,7 +742,7 @@ type Response = z.infer<typeof roleBindingRestSchema>; // ../contract/src/authz-
 
 Change a binding's role (and custom role). The principal and scope are the binding's identity and do not change; create a new binding instead.
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-role-binding.rest.ts:147`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-role-binding.rest.ts:148`.
 
 Answers at `/api/role-bindings/:id`, `/api/v1/role-bindings/:id`; also, undocumented, `/api/role-bindings/2026-08-07/:id`, `/api/v1/role-bindings/2026-08-07/:id`, `/api/role-bindings/latest/:id`, `/api/v1/role-bindings/latest/:id`.
 
@@ -763,7 +763,7 @@ type Response = z.infer<typeof roleBindingRestSchema>; // ../contract/src/authz-
 
 Delete a role binding. An id that does not exist in the caller's organization answers 404 role_binding_not_found.
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-role-binding.rest.ts:172`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-role-binding.rest.ts:174`.
 
 Answers at `/api/role-bindings/:id`, `/api/v1/role-bindings/:id`; also, undocumented, `/api/role-bindings/2026-08-07/:id`, `/api/v1/role-bindings/2026-08-07/:id`, `/api/role-bindings/latest/:id`, `/api/v1/role-bindings/latest/:id`.
 

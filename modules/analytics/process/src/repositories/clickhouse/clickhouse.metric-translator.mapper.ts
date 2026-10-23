@@ -298,6 +298,30 @@ function translateArrayAggregation({
   }
 }
 
+/**
+ * A thread, user or customer id keyed by its member project. A group project reads several
+ * members, and two of them can hold the same id (ADR-177), so a count or a per-entity pipeline
+ * keyed on the bare id merged them. Stays `''` when the id is, so the empty-id filters still hold.
+ */
+export function memberScopedId({
+  tenantColumn,
+  idColumn,
+}: {
+  tenantColumn: string;
+  idColumn: string;
+}): string {
+  return `if(${idColumn} = '', '', concat(${tenantColumn}, '/', ${idColumn}))`;
+}
+
+/** {@link memberScopedId} over a `trace_summaries` Attributes read. */
+export function memberScopedTraceAttribute(attributeKey: string): string {
+  const ts = tableAliases.trace_summaries;
+  return memberScopedId({
+    tenantColumn: `${ts}.TenantId`,
+    idColumn: `${ts}.Attributes['${attributeKey}']`,
+  });
+}
+
 /** Reduce a caller-supplied alias part to characters legal in an identifier. */
 function sanitizeAliasPart(value: string): string {
   return value.replace(/[^a-zA-Z0-9]/g, "_");
@@ -457,9 +481,10 @@ function translateMetadataMetric({
 
     case "metadata.user_id":
       // For cardinality, filter out empty/null user_ids to match ES terms aggregation behavior
+      // and key each id by its member, so a group project counts each member's own
       if (aggregation === "cardinality") {
         return {
-          selectExpression: `uniqIf(${ts}.Attributes['langwatch.user_id'], ${ts}.Attributes['langwatch.user_id'] != '') AS ${alias}`,
+          selectExpression: `uniqIf(${memberScopedTraceAttribute("langwatch.user_id")}, ${memberScopedTraceAttribute("langwatch.user_id")} != '') AS ${alias}`,
           alias,
           requiredJoins,
           params: {},
@@ -478,9 +503,10 @@ function translateMetadataMetric({
 
     case "metadata.thread_id":
       // For cardinality, filter out empty/null thread_ids to match ES terms aggregation behavior
+      // and key each id by its member, so a group project counts each member's own
       if (aggregation === "cardinality") {
         return {
-          selectExpression: `uniqIf(${ts}.Attributes['gen_ai.conversation.id'], ${ts}.Attributes['gen_ai.conversation.id'] != '') AS ${alias}`,
+          selectExpression: `uniqIf(${memberScopedTraceAttribute("gen_ai.conversation.id")}, ${memberScopedTraceAttribute("gen_ai.conversation.id")} != '') AS ${alias}`,
           alias,
           requiredJoins,
           params: {},
@@ -603,17 +629,6 @@ function translatePerformanceMetric({
         params: {},
       };
 
-    case "performance.total_tokens":
-      // Sum of prompt + completion tokens (the "new content" delta, excludes cache)
-      return {
-        selectExpression: perfAgg(
-          `(coalesce(${ts}.TotalPromptTokenCount, 0) + coalesce(${ts}.TotalCompletionTokenCount, 0))`,
-        ),
-        alias,
-        requiredJoins,
-        params: {},
-      };
-
     // Cache + reasoning sums are parked on reserved attribute keys by the fold
     // (they never reach a dedicated column), so read them from the Attributes
     // map at query time — no migration, works on every historical trace. The
@@ -650,6 +665,7 @@ function translatePerformanceMetric({
 
     // Total tokens the model actually processed = input + output + cache read +
     // cache write. Reasoning is a subset of completion, so it is NOT added again.
+    case "performance.total_tokens":
     case "performance.total_processed_tokens":
       return {
         selectExpression: perfAgg(
@@ -958,7 +974,7 @@ function translateThreadsMetric({
         params: {},
         requiresSubquery: true,
         subquery: {
-          innerSelect: `${ts}.Attributes['gen_ai.conversation.id'] AS thread_id, least((max(${ts}.OccurredAt) - min(${ts}.OccurredAt)) * 1000, ${MAX_THREAD_SESSION_DURATION_MS}) AS thread_duration`,
+          innerSelect: `${memberScopedTraceAttribute("gen_ai.conversation.id")} AS thread_id, least((max(${ts}.OccurredAt) - min(${ts}.OccurredAt)) * 1000, ${MAX_THREAD_SESSION_DURATION_MS}) AS thread_duration`,
           innerGroupBy: "thread_id",
           outerAggregation: `avg(thread_duration) AS ${alias}`,
         },
@@ -1002,13 +1018,13 @@ export function translatePipelineAggregation({
       pipelineColumn = `${ts}.TraceId`;
       break;
     case "user_id":
-      pipelineColumn = `${ts}.Attributes['langwatch.user_id']`;
+      pipelineColumn = memberScopedTraceAttribute("langwatch.user_id");
       break;
     case "thread_id":
-      pipelineColumn = `${ts}.Attributes['gen_ai.conversation.id']`;
+      pipelineColumn = memberScopedTraceAttribute("gen_ai.conversation.id");
       break;
     case "customer_id":
-      pipelineColumn = `${ts}.Attributes['langwatch.customer_id']`;
+      pipelineColumn = memberScopedTraceAttribute("langwatch.customer_id");
       break;
     default:
       pipelineColumn = `${ts}.TraceId`;
@@ -1023,7 +1039,7 @@ export function translatePipelineAggregation({
   // 2. Group by user_id, compute avg thread duration per user
   // 3. Compute avg across users
   if (metric === "threads.average_duration_per_thread" && innerMetric.requiresSubquery) {
-    const threadIdCol = `${ts}.Attributes['gen_ai.conversation.id']`;
+    const threadIdCol = memberScopedTraceAttribute("gen_ai.conversation.id");
     // pipelineAggregation is typed as PipelineAggregationTypes (sum/avg/min/max)
     // which matches CH function names directly
     const outerAgg = pipelineAggregation;

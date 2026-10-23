@@ -97,6 +97,10 @@ export class MemoryTraceEvaluationRunsRepository extends TraceEvaluationRunsRead
           startedAt: run.startedAt,
           completedAt: run.completedAt,
         },
+        attempts: run.attempts ?? 0,
+        lastAttemptAt: run.lastAttemptAt ?? null,
+        lastAttemptError: run.lastAttemptError ?? null,
+        nextAttemptAt: run.nextAttemptAt ?? null,
       });
     }
     return output;
