@@ -400,6 +400,13 @@ Feature: The insights inbox
       Then it holds no Insights entry
 
     @integration
+    Scenario: Insights shows nothing while release_dashboards is off
+      Given the release_insights flag is on and the release_dashboards flag is off
+      When a member looks at the top bar
+      Then it holds no insights bell, because the Insights page is closed
+      And with both flags on the bell is there
+
+    @integration
     Scenario: The side menu shows no Insights entry while the flag is off
       Given the release_insights flag is off, or a member without analytics:view
       When they look at the Dashboards side menu

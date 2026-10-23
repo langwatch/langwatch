@@ -59,8 +59,9 @@ a new field with a default is the default, not an upcast.
   finding's widget, the finding's query and the card's window, all as typed
   data. The query is Langy's own text and is not checked when it is filed: the
   LangWatchQL door checks it when a reader replays it.
-- No asking module hands Langy a structured subject for an ordinary answer yet
-  (`LangyAnswerActionProps.subject`), so an answer with no card is saved from
-  its text and carries no pointer and no window.
+- (Removed 2026-10-23, https://github.com/langwatch/langwatch/issues/8998, with
+  "Save as insight".) No asking module hands Langy a structured subject for an
+  ordinary answer yet (`LangyAnswerActionProps.subject`), so an answer with no
+  card is saved from its text and carries no pointer and no window.
 - An old image that folds a new filed event drops the three fields, because it
   does not know them. Replaying the insight projection restores them.
