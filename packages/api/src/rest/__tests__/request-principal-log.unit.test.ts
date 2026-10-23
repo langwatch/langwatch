@@ -47,11 +47,12 @@ const declaration = defineRestRouter(Api)
   .handle(({ app }) => app.read())
   .build();
 
-function hostCalledBy(actor: Actor | null) {
+function hostCalledBy(actor: Actor | null, key?: RestCaller["key"]) {
   const caller: RestCaller = {
     actor,
     scope: null,
     internal: { type: "internalSecret", secretName: "TEST_DOOR_SECRET" },
+    ...(key ? { key } : {}),
   };
   const door: RestIdentity = { authenticate: () => caller, identify: () => caller };
   const closed = BearerIdentity.create({ name: "unconfigured", token: void 0 });
@@ -96,6 +97,25 @@ describe("the request access record", () => {
       expect(response.status).toBe(200);
       expect(records).toHaveLength(1);
       expect(records[0]).toMatchObject({ "client.address": "198.51.100.7", "user.id": "user_123" });
+      expect(JSON.stringify(records[0])).not.toContain(SECRET);
+    });
+  });
+
+  describe("when a module-bound door names the key it resolved", () => {
+    /** @scenario "The request log names the API key and its kind, never the key" */
+    it("carries the key id and kind, and nothing of the credential", async () => {
+      const host = hostCalledBy(
+        { type: "api_key", id: "key_otlp" },
+        { kind: "ingestion_key", apiKeyId: "key_otlp", ownerUserId: null },
+      );
+
+      const response = await host.app.request(arrivingFrom("198.51.100.7"));
+
+      expect(response.status).toBe(200);
+      expect(records[0]).toMatchObject({
+        "api_key.id": "key_otlp",
+        "api_key.type": "ingestion_key",
+      });
       expect(JSON.stringify(records[0])).not.toContain(SECRET);
     });
   });

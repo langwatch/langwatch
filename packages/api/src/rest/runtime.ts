@@ -923,7 +923,7 @@ function authenticateMiddleware({
             key:
               caller && isKeyDoor(credential)
                 ? recordedKeyOfDoor({ door: credential, request: context.req.raw })
-                : null,
+                : (caller?.key ?? null),
           }),
       });
     }
