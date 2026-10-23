@@ -54,6 +54,7 @@ function key(overrides: Record<string, unknown>) {
 const { state, calls } = vi.hoisted(() => ({
   state: {
     keys: [] as Record<string, unknown>[],
+    listFailed: false,
     refusal: undefined as unknown,
   },
   calls: {
@@ -94,9 +95,12 @@ vi.mock("../../../behavior/api-key-api.ts", () => ({
     useUtils: () => ({ signingKeys: { list: { invalidate: () => Promise.resolve() } } }),
     signingKeys: {
       list: {
-        useQuery: (input: unknown) => {
+        useQuery: (input: unknown, options?: { enabled?: boolean }) => {
+          if (options?.enabled === false) return { data: undefined, isLoading: false };
           calls.listInputs.push(input);
-          return { data: state.keys, isLoading: false };
+          return state.listFailed
+            ? { data: undefined, isLoading: false, isError: true }
+            : { data: state.keys, isLoading: false, isError: false };
         },
       },
       create: mutation("create"),
@@ -118,13 +122,16 @@ beforeAll(async () => {
 
 beforeEach(() => {
   state.keys = [];
+  state.listFailed = false;
   state.refusal = undefined;
   for (const list of Object.values(calls)) list.length = 0;
 });
 
 afterEach(cleanup);
 
-function renderPanel(host = new FakeApiKeyHost()) {
+const MANAGER = new Set(["braids:manage"]);
+
+function renderPanel(host = new FakeApiKeyHost({ grants: MANAGER })) {
   return renderWithApiKeyHost(<Panel projectId="proj-1" />, host);
 }
 
@@ -168,7 +175,7 @@ describe("given the Braids page mounts the signing keys panel by its token", () 
     /** @scenario Creating a signing key shows its secret once */
     it("shows the secret once with TypeScript, Python and Go setup, then drops it", async () => {
       const user = userEvent.setup();
-      const host = new FakeApiKeyHost();
+      const host = new FakeApiKeyHost({ grants: MANAGER });
       renderPanel(host);
 
       await user.click(screen.getByTestId("signing-key-new"));
@@ -225,7 +232,7 @@ describe("given the Braids page mounts the signing keys panel by its token", () 
   describe("when an admin revokes a key", () => {
     it("confirms that it stops at once, then revokes it", async () => {
       const user = userEvent.setup();
-      const host = new FakeApiKeyHost();
+      const host = new FakeApiKeyHost({ grants: MANAGER });
       state.keys = [key({})];
       renderPanel(host);
 
@@ -239,10 +246,34 @@ describe("given the Braids page mounts the signing keys panel by its token", () 
     });
   });
 
+  describe("when the viewer may not braid out of the project", () => {
+    /** @scenario Someone who may not manage signing keys is told who does */
+    it("says who manages the keys, reads none and offers no way to create one", () => {
+      renderPanel(new FakeApiKeyHost({ grants: new Set(["project:view"]) }));
+
+      expect(screen.getByTestId("signing-keys-not-managed")).toHaveTextContent(
+        "Signing keys are managed by whoever may braid out of this project",
+      );
+      expect(screen.getByTestId("signing-key-new")).toBeDisabled();
+      expect(screen.queryByTestId("signing-keys-empty")).not.toBeInTheDocument();
+      expect(calls.listInputs).toEqual([]);
+    });
+  });
+
+  describe("when the keys can't be read", () => {
+    it("says so rather than showing an empty list", () => {
+      state.listFailed = true;
+      renderPanel();
+
+      expect(screen.getByTestId("signing-keys-error")).toBeInTheDocument();
+      expect(screen.queryByTestId("signing-keys-empty")).not.toBeInTheDocument();
+    });
+  });
+
   describe("when the organisation is below Enterprise", () => {
     it("shows the Enterprise upsell rather than a failure", async () => {
       const user = userEvent.setup();
-      const host = new FakeApiKeyHost();
+      const host = new FakeApiKeyHost({ grants: MANAGER });
       state.refusal = ENTERPRISE_REFUSAL;
       renderPanel(host);
 
@@ -256,7 +287,7 @@ describe("given the Braids page mounts the signing keys panel by its token", () 
 
     it("reports any other refusal through the host", async () => {
       const user = userEvent.setup();
-      const host = new FakeApiKeyHost();
+      const host = new FakeApiKeyHost({ grants: MANAGER });
       state.refusal = { data: { error: { code: "forbidden", httpStatus: 403 } } };
       renderPanel(host);
 

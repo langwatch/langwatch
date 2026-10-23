@@ -1,22 +1,32 @@
 /**
- * A project's braid signing keys, lent to the Braids page by `SigningKeysPanelToken`: each key's
- * status and signed spans over 24 hours; create, rotate and revoke, each confirmed. A secret
- * lives only in panel state. Spec: modules/api-key/specs/signing-keys.feature
+ * A project's braid signing keys, lent to the Braids page by `SigningKeysPanelToken`: status and
+ * signed spans over 24 hours; create, rotate and revoke for whoever may braid out of the project.
+ * A secret lives only in panel state. Spec: modules/api-key/specs/signing-keys.feature
  */
 import type { SigningKeysPanelProps } from "@langwatch/api-key-client";
 import type { SigningKey } from "@langwatch/api-key-contract";
 import type { WireOf } from "@langwatch/api/web";
+import { AccessState } from "@langwatch/design-system/access-state";
 import type { SnippetCopy } from "@langwatch/design-system/code-preview";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { EmptyValue } from "@langwatch/design-system/empty-value";
-import { FeatureIllustration } from "@langwatch/design-system/feature-illustration";
-import { FeatureMark } from "@langwatch/design-system/feature-mark";
 import { FormattedDate } from "@langwatch/design-system/formatted-date";
 import { MoreVerticalIcon } from "@langwatch/design-system/icons";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
-import { Badge, Button, HStack, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
+import {
+  Alert,
+  Badge,
+  Box,
+  Button,
+  Heading,
+  HStack,
+  Spacer,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Key, Plus } from "lucide-react";
 import { useState } from "react";
 
@@ -30,6 +40,8 @@ type SigningKeyRow = WireOf<SigningKey>;
 type PendingAction = Readonly<{ kind: "rotate" | "revoke"; key: SigningKeyRow }>;
 
 const COLUMNS = 6;
+/** The door asks this for every keys route but the reader's signing summary. */
+const MANAGE_PERMISSION = "braids:manage";
 /** A mutation answer that may carry a secret is dropped from the client's cache at once. */
 const NO_CACHE = { gcTime: 0 } as const;
 
@@ -123,25 +135,84 @@ function SigningKeyTableRow({
   );
 }
 
-function EnterpriseUpsell() {
+function SigningKeysHeading({ canManage, onCreate }: { canManage: boolean; onCreate: () => void }) {
   return (
-    <VStack gap={3} align="start" data-testid="signing-keys-upsell">
-      <FeatureIllustration feature="braids" name="enterprise" />
-      <HStack gap={2}>
-        <FeatureMark feature="braids" variant="mono" size={16} />
-        <Text fontWeight="semibold">Signing keys come with the Enterprise plan</Text>
-      </HStack>
-      <Text color="fg.muted">
-        Upgrade to sign the tags on your calls, so projects that braid into this one can trust them.
-      </Text>
-    </VStack>
+    <HStack width="full" align="start" gap={4}>
+      <Box>
+        <Heading size="sm" as="h3">
+          Signing keys
+        </Heading>
+        <Text color="fg.muted" fontSize="sm">
+          Sign the tags on this project&apos;s calls so projects that braid into it can trust them.
+        </Text>
+      </Box>
+      <Spacer />
+      <Tooltip
+        content="Whoever may braid out of this project manages its signing keys."
+        disabled={canManage}
+      >
+        <Button
+          size="sm"
+          colorPalette="orange"
+          onClick={onCreate}
+          disabled={!canManage}
+          data-testid="signing-key-new"
+        >
+          <Plus size={14} aria-hidden />
+          New signing key
+        </Button>
+      </Tooltip>
+    </HStack>
+  );
+}
+
+function SigningKeysTable({
+  rows,
+  isLoading,
+  onAction,
+}: {
+  rows: readonly SigningKeyRow[];
+  isLoading: boolean;
+  onAction: (action: PendingAction) => void;
+}) {
+  if (!isLoading && rows.length === 0) {
+    return (
+      <NoDataInfoBlock
+        size="inline"
+        title="No signing keys"
+        description="Create one if this project calls other projects and wants to prove it."
+        icon={<Key size={24} />}
+        testId="signing-keys-empty"
+      />
+    );
+  }
+  return (
+    <ListTable scroll="x" scrollLabel="Signing keys">
+      <ListTable.Header>
+        <ListTable.Row>
+          <ListTable.ColumnHeader>Name</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Status</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Created</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Last used</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Signed spans, 24 hours</ListTable.ColumnHeader>
+          <ListTable.ActionHeader />
+        </ListTable.Row>
+      </ListTable.Header>
+      <ListTable.Body>
+        {isLoading && <ListTable.LoadingRows rows={2} columns={COLUMNS} />}
+        {rows.map((signingKey) => (
+          <SigningKeyTableRow key={signingKey.id} signingKey={signingKey} onAction={onAction} />
+        ))}
+      </ListTable.Body>
+    </ListTable>
   );
 }
 
 export function SigningKeysPanel({ projectId }: SigningKeysPanelProps) {
   const host = useApiKeyHost();
   const utils = apiKeyApi.useUtils();
-  const keys = apiKeyApi.signingKeys.list.useQuery({ projectId });
+  const canManage = host.hasPermission(MANAGE_PERMISSION);
+  const keys = apiKeyApi.signingKeys.list.useQuery({ projectId }, { enabled: canManage });
   const create = apiKeyApi.signingKeys.create.useMutation(NO_CACHE);
   const rotate = apiKeyApi.signingKeys.rotate.useMutation(NO_CACHE);
   const revoke = apiKeyApi.signingKeys.revoke.useMutation();
@@ -206,53 +277,43 @@ export function SigningKeysPanel({ projectId }: SigningKeysPanelProps) {
     });
   };
 
-  const rows = keys.data ?? [];
+  let body = (
+    <SigningKeysTable rows={keys.data ?? []} isLoading={keys.isLoading} onAction={setPending} />
+  );
+  if (!canManage) {
+    body = (
+      <AccessState
+        kind="permission"
+        compact
+        title="Signing keys are managed by whoever may braid out of this project"
+        description="Ask an admin of this project, or of your organisation, to create or rotate a key."
+        data-testid="signing-keys-not-managed"
+      />
+    );
+  } else if (keys.isError) {
+    body = (
+      <Alert.Root status="error" data-testid="signing-keys-error">
+        <Alert.Indicator />
+        <Alert.Content>
+          <Alert.Title>Couldn&apos;t load this project&apos;s signing keys</Alert.Title>
+        </Alert.Content>
+      </Alert.Root>
+    );
+  }
+
   return (
     <VStack gap={4} align="stretch" data-testid="signing-keys-panel">
-      <HStack gap={3}>
-        <Text color="fg.muted">
-          Sign the tags on this project&apos;s calls so projects that braid into it can trust them.
-        </Text>
-        <Spacer />
-        <Button size="sm" onClick={() => setCreating(true)} data-testid="signing-key-new">
-          <Plus size={14} />
-          New signing key
-        </Button>
-      </HStack>
-
-      {needsEnterprise && <EnterpriseUpsell />}
-
-      {!keys.isLoading && rows.length === 0 ? (
-        <NoDataInfoBlock
-          title="No signing keys"
-          description="Create one if this project calls other projects and wants to prove it."
-          icon={<Key size={24} />}
-          testId="signing-keys-empty"
+      <SigningKeysHeading canManage={canManage} onCreate={() => setCreating(true)} />
+      {needsEnterprise && (
+        <AccessState
+          kind="upgrade"
+          compact
+          title="Signing keys come with the Enterprise plan"
+          description="Upgrade to sign the tags on your calls, so projects that braid into this one can trust them."
+          data-testid="signing-keys-upsell"
         />
-      ) : (
-        <ListTable scroll="x" scrollLabel="Signing keys">
-          <ListTable.Header>
-            <ListTable.Row>
-              <ListTable.ColumnHeader>Name</ListTable.ColumnHeader>
-              <ListTable.ColumnHeader>Status</ListTable.ColumnHeader>
-              <ListTable.ColumnHeader>Created</ListTable.ColumnHeader>
-              <ListTable.ColumnHeader>Last used</ListTable.ColumnHeader>
-              <ListTable.ColumnHeader>Signed spans, 24 hours</ListTable.ColumnHeader>
-              <ListTable.ActionHeader />
-            </ListTable.Row>
-          </ListTable.Header>
-          <ListTable.Body>
-            {keys.isLoading && <ListTable.LoadingRows rows={2} columns={COLUMNS} />}
-            {rows.map((signingKey) => (
-              <SigningKeyTableRow
-                key={signingKey.id}
-                signingKey={signingKey}
-                onAction={setPending}
-              />
-            ))}
-          </ListTable.Body>
-        </ListTable>
       )}
+      {body}
 
       <CreateSigningKeyDialog
         key={createRound}

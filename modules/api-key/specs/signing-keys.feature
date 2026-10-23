@@ -86,6 +86,13 @@ Feature: Signing keys
       When sam asks to create a signing key for "orchestrator"
       Then it is refused as a permission denial
 
+    @integration
+    Scenario: Someone who may not manage signing keys is told who does
+      Given sam may open the Braids page of "orchestrator" but may not braid out of it
+      When sam opens its signing keys
+      Then sam is told that whoever may braid out of "orchestrator" manages them
+      And creating a key is off, and no key of "orchestrator" is read for sam
+
     @unit
     Scenario: Creating, rotating and revoking a signing key is in the audit log
       When ana creates, rotates and then revokes a signing key
@@ -105,7 +112,7 @@ Feature: Signing keys
     Scenario: A braid's author sees whether the reader signs without managing its keys
       Given tom may read the traces of "orchestrator" but may not manage its signing keys
       When tom asks whether "orchestrator" signs its calls
-      Then he is told the name of its key used last and when, and never a key id or secret
+      Then tom is told the name of its key used last and when, and never a key id or secret
       And someone who may not read the traces of "orchestrator" is refused
 
     @unit
