@@ -34,6 +34,15 @@ Feature: An SSO connection reaches the endpoints its issuer's discovery document
     And the issuer's address is still judged public before the request is sent
 
   @unit
+  Scenario: An issuer origin an operator vouched for is reached directly, not through the proxy
+    Given the deployment has an outbound proxy configured
+    And SSO_TRUSTED_IDP_ORIGINS names an issuer origin inside the network
+    And NO_PROXY does not name it
+    When an administrator saves a connection with that issuer
+    Then the discovery document is read directly from the vouched origin
+    And a redirect out of that origin is judged again and travels through the proxy
+
+  @unit
   Scenario: NO_PROXY does not lift the public-address check on discovery
     Given NO_PROXY names an issuer's host
     And that host resolves to a private address the operator has not trusted

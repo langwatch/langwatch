@@ -65048,8 +65048,9 @@ public first, and checks every redirect again.
 
 `NO_PROXY` only chooses a
 direct connection: it does not lift that check. An identity provider inside
-your network needs its origin in `SSO_TRUSTED_IDP_ORIGINS`, and its host in
-`NO_PROXY` so it is reached directly rather than through the proxy.
+your network needs its origin in `SSO_TRUSTED_IDP_ORIGINS`. LangWatch then
+reaches that origin directly, never through the proxy, so it needs no `NO_PROXY`
+entry.
 
 Register the client with the authorization code flow and the `openid`,
 `email` and `profile` scopes. GitHub sign-in is OAuth without OpenID Connect,
