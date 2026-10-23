@@ -90,6 +90,13 @@ export class TestUserApi implements UserApi {
   hasPassword: UserApi["hasPassword"] = (input) =>
     this.overrides.hasPassword?.(input) ?? this.unimplemented("hasPassword");
 
+  findPasswordHolders: UserApi["findPasswordHolders"] = (input) =>
+    this.overrides.findPasswordHolders?.(input) ?? this.unimplemented("findPasswordHolders");
+
+  markPasswordResetRequired: UserApi["markPasswordResetRequired"] = (input) =>
+    this.overrides.markPasswordResetRequired?.(input) ??
+    this.unimplemented("markPasswordResetRequired");
+
   setFirstPassword: UserApi["setFirstPassword"] = (input) =>
     this.overrides.setFirstPassword?.(input) ?? this.unimplemented("setFirstPassword");
 
