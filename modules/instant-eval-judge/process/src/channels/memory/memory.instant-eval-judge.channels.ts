@@ -21,6 +21,7 @@ export class MemoryInstantEvalJudgeChannels {
 
 /** No provider is reached in the memory tier, so every LLM leg is unavailable. */
 const unavailableLlmJudge: InstantEvalLlmJudgeChannel = {
+  isConfigured: () => false,
   judge: async (): Promise<InstantEvalLlmJudgeAnswer> => ({
     outcome: "skipped",
     reason: "classifier_provider_unavailable",

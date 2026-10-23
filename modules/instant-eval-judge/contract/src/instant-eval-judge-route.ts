@@ -71,7 +71,7 @@ export type InstantEvalJudgeRouteSlot = z.infer<typeof routeSlotSchema>;
 const backendSchema = z
   .object({
     kind: z.enum(INSTANT_EVAL_JUDGE_BACKEND_KINDS),
-    /** The provider's model id; a Decisions backend must name one, there is no default. */
+    /** The provider's model id; a Decisions or LLM backend must name one, there is no default. */
     model: z.string().min(1).optional(),
     enabled: z.boolean().default(true),
     timeoutMs: z.number().int().positive().default(30_000),
@@ -134,9 +134,7 @@ type RouteTableShape = z.output<typeof instantEvalJudgeRouteTableSchemaDefinitio
 
 /** What makes a table unroutable; the config refuses to boot on any of them. */
 function routeTableIssues(table: RouteTableShape): string[] {
-  const issues: string[] = [];
-  const last = table.buckets[table.buckets.length - 1];
-  if (last && last.maxTokens !== null) issues.push("the last bucket must be open (maxTokens null)");
+  const issues: string[] = bucketIssues(table.buckets);
   const slotKeys = [...table.buckets.map((b) => b.name), INSTANT_EVAL_JUDGE_ARITHMETIC_SLOT];
   for (const job of INSTANT_EVAL_JUDGE_JOBS) {
     for (const key of slotKeys) {
@@ -154,6 +152,34 @@ function routeTableIssues(table: RouteTableShape): string[] {
   return issues;
 }
 
+/** Unique names, bounds strictly ascending, and only the last bucket open. */
+function bucketIssues(buckets: RouteTableShape["buckets"]): string[] {
+  const issues: string[] = [];
+  const names = buckets.map((bucket) => bucket.name);
+  if (new Set(names).size !== names.length) issues.push("bucket names must be unique");
+  let previous = 0;
+  buckets.forEach((bucket, at) => {
+    const isLast = at === buckets.length - 1;
+    if (bucket.maxTokens === null) {
+      if (!isLast) issues.push(`bucket ${bucket.name}: only the last bucket may be open`);
+      return;
+    }
+    if (isLast) issues.push("the last bucket must be open (maxTokens null)");
+    if (bucket.maxTokens <= previous) {
+      issues.push(`bucket ${bucket.name}: maxTokens must be above the bucket before it`);
+    }
+    previous = bucket.maxTokens;
+  });
+  return issues;
+}
+
+/** The kinds that cannot answer without a model id in the table: there is no default. */
+const KINDS_NEEDING_A_MODEL: readonly InstantEvalJudgeBackendKind[] = [
+  "decisions",
+  "anthropic_messages",
+  "openai_responses",
+];
+
 function backendIssues({
   table,
   name,
@@ -164,11 +190,12 @@ function backendIssues({
   backend: InstantEvalJudgeBackend;
 }): string[] {
   const issues: string[] = [];
-  if (backend.kind === "decisions" && !backend.model) {
+  if (KINDS_NEEDING_A_MODEL.includes(backend.kind) && !backend.model) {
     issues.push(`backend ${name}: a ${backend.kind} backend must name its model`);
   }
   for (const fallback of backend.fallbacks) {
     if (!table.backends[fallback]) issues.push(`backend ${name}: unknown fallback ${fallback}`);
+    if (fallback === name) issues.push(`backend ${name}: lists itself as a fallback`);
   }
   return issues;
 }

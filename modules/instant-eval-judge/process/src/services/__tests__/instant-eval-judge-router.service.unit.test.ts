@@ -305,6 +305,25 @@ describe("InstantEvalJudgeRouterService", () => {
     });
   });
 
+  /** @scenario "A route table that cannot bill or call a backend refuses to boot" */
+  it("never asks the primary again as the escalation's fallback", async () => {
+    const { classify, hostedDecisions } = harness({
+      table: syntheticRouteTable({
+        backends: { "llm-b": { kind: "openai_responses", model: "m", fallbacks: ["decision-a"] } },
+      }),
+      decisions: () => judged(0.4),
+      llm: () => ({
+        outcome: "skipped",
+        reason: "classifier_failed",
+        inputTokens: 0,
+        outputTokens: 0,
+      }),
+    });
+    const judgement = await classify(SHORT);
+    expect(hostedDecisions.requests).toHaveLength(1);
+    expect(judgement.verdicts).toEqual([{ questionId: "q", probability: 0.4 }]);
+  });
+
   describe("given a text-view plan", () => {
     /** @scenario "A text view the caller did not render judges the full text, flagged" */
     it("judges the full text and names the missing view", async () => {

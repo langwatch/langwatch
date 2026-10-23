@@ -34,6 +34,15 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     Then the configuration is refused, naming the backend, since the code holds no default model
 
   @unit
+  Scenario: A route table that cannot bill or call a backend refuses to boot
+    Given a configured route table
+    When a backend a slot or an enabled fallback can reach has no price, key or channel
+    Then the deployment refuses to boot, naming each such backend
+    And bucket bounds must rise with unique names and only the last bucket open
+    And no backend may list itself as a fallback
+    And an escalation's fallbacks never ask the primary again
+
+  @unit
   Scenario: A slot is picked by job, length bucket and arithmetic flag
     Given a route table with length buckets and an arithmetic slot
     When a call is routed

@@ -101,6 +101,64 @@ describe("judge route table", () => {
       expect(JSON.stringify(parsed.error?.issues)).toContain("backend hosted");
     });
 
+    /** @scenario "A decision-model backend names its model in the table" */
+    it("refuses an LLM backend with no model", () => {
+      const parsed = instantEvalJudgeRouteTableSchema.safeParse(
+        tableWith({ backends: { jev: { kind: "jev" }, llm: { kind: "openai_responses" } } }),
+      );
+      expect(JSON.stringify(parsed.error?.issues)).toContain("backend llm");
+    });
+
+    /** @scenario "The route table refuses a slot without an instant entry" */
+    it.each([
+      [
+        "unsorted bounds",
+        [
+          { name: "a", maxTokens: 500 },
+          { name: "b", maxTokens: 100 },
+          { name: "c", maxTokens: null },
+        ],
+        "bucket b: maxTokens must be above",
+      ],
+      [
+        "a repeated name",
+        [
+          { name: "a", maxTokens: 100 },
+          { name: "a", maxTokens: null },
+        ],
+        "bucket names must be unique",
+      ],
+      [
+        "an open bucket before the last",
+        [
+          { name: "a", maxTokens: null },
+          { name: "b", maxTokens: null },
+        ],
+        "bucket a: only the last bucket may be open",
+      ],
+    ])("refuses buckets with %s", (_label, buckets, message) => {
+      const routes = Object.fromEntries(
+        INSTANT_EVAL_JUDGE_JOBS.map((job) => [
+          job,
+          Object.fromEntries(
+            [...buckets.map((bucket) => bucket.name), "arithmetic"].map((key) => [
+              key,
+              slot({ primary: "jev" }),
+            ]),
+          ),
+        ]),
+      );
+      const parsed = instantEvalJudgeRouteTableSchema.safeParse(tableWith({ buckets, routes }));
+      expect(JSON.stringify(parsed.error?.issues)).toContain(message);
+    });
+
+    it("refuses a backend that lists itself as a fallback", () => {
+      const parsed = instantEvalJudgeRouteTableSchema.safeParse(
+        tableWith({ backends: { jev: { kind: "jev", fallbacks: ["jev"] } } }),
+      );
+      expect(JSON.stringify(parsed.error?.issues)).toContain("backend jev: lists itself");
+    });
+
     it("refuses an instant entry on a switched-off backend", () => {
       const table = tableWith({
         backends: {
