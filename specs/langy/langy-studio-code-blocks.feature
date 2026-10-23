@@ -119,6 +119,7 @@ Feature: Langy writes and edits Studio code blocks from the code editor
       Given Langy is available on the code block
       When the code editor opens over Studio's node drawer
       Then Langy's panel is held above the drawer
+      And Langy's launcher steps aside, since the editor's Ask Langy opens the panel
       And closing the editor releases it
 
     @integration
