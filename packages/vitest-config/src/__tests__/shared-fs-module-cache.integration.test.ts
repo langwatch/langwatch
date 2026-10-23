@@ -92,7 +92,8 @@ describe("the shared fs module cache", () => {
   const runVitest = async (
     root: string,
     expectedWhere: string,
-    cache = cacheDir,
+    cache: string | null = cacheDir,
+    extraEnv: Record<string, string> = {},
   ): Promise<CheckoutRun> => {
     const report = join(root, "report.json");
     const child = await run(
@@ -102,8 +103,9 @@ describe("the shared fs module cache", () => {
         cwd: join(root, "pkg"),
         env: {
           ...process.env,
-          VITEST_FS_MODULE_CACHE_DIR: cache,
+          VITEST_FS_MODULE_CACHE_DIR: cache ?? "",
           VITEST_FS_MODULE_CACHE_ROOT: "",
+          ...extraEnv,
           // a child of a run that already holds a machine slot
           LANGWATCH_VITEST_SLOT: "held-by-parent",
           DEBUG: "vitest:cache:fs",
@@ -274,7 +276,22 @@ describe("the shared fs module cache", () => {
       const own = readdirSync(lockCache).filter((name) => name !== "cafef00d");
       expect(own).toHaveLength(1);
       expect(readdirSync(join(lockCache, "cafef00d"))).toEqual(["module"]);
+      // the shape the pruning pattern in the patch recognises, or the directory is never pruned
+      expect(own[0]).toMatch(/^[0-9a-f_]{8}$/);
       expect(readdirSync(join(lockCache, own[0] as string)).length).toBeGreaterThan(1);
+    }, 60_000);
+
+    /** @scenario "Without VITEST_FS_MODULE_CACHE_DIR the cache lives under XDG_CACHE_HOME" */
+    it("writes under XDG_CACHE_HOME when no cache directory is set", async () => {
+      const xdg = join(base, "xdg-cache-home");
+      const xdgRoot = checkout("xdg", { "shared/helper.ts": HELPER });
+
+      await runVitest(xdgRoot, "file", null, { XDG_CACHE_HOME: xdg });
+
+      const defaultRoot = join(xdg, "vitest", "fs-module-cache");
+      const lockfileDirs = readdirSync(defaultRoot).filter((name) => /^[0-9a-f_]{8}$/.test(name));
+      expect(lockfileDirs).toHaveLength(1);
+      expect(readdirSync(join(defaultRoot, lockfileDirs[0] as string)).length).toBeGreaterThan(1);
     }, 60_000);
 
     /** @scenario "A checkout's old node_modules cache is removed" */
@@ -340,16 +357,18 @@ describe("the shared fs module cache", () => {
     /** @scenario "A module whose source names the first checkout's path is not reused by the second" */
     it("keeps a module that names the checkout's root out of the other checkout's reads", async () => {
       const cache = fresh("pinned-cache");
-      const firstRoot = fresh("pinned-first");
-      const helper = `${HELPER}// built at ${firstRoot}\n`;
-      const first = checkout("pinned-first", { "shared/helper.ts": helper });
-      const second = checkout("pinned-second", { "shared/helper.ts": helper });
+      const pinnedFirstRoot = fresh("pinned-first");
+      const helper = `${HELPER}// built at ${pinnedFirstRoot}\n`;
+      const pinnedFirst = checkout("pinned-first", { "shared/helper.ts": helper });
+      const pinnedSecond = checkout("pinned-second", { "shared/helper.ts": helper });
 
-      await runVitest(first, "file", cache);
-      const secondRun = await runVitest(second, "file", cache);
+      await runVitest(pinnedFirst, "file", cache);
+      const secondRun = await runVitest(pinnedSecond, "file", cache);
 
-      expect(secondRun.cacheLog).toContain(`[write] ${helperLine(second)} is cached in ${cache}`);
-      expect(secondRun.cacheLog).not.toContain(`[read] ${helperLine(second)}`);
+      expect(secondRun.cacheLog).toContain(
+        `[write] ${helperLine(pinnedSecond)} is cached in ${cache}`,
+      );
+      expect(secondRun.cacheLog).not.toContain(`[read] ${helperLine(pinnedSecond)}`);
       expect(secondRun.results["imports the helper this checkout has"]?.status).toBe("passed");
     }, 120_000);
 

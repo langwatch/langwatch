@@ -64,6 +64,13 @@ Feature: Vitest's transform cache is shared across checkouts
     And the other lockfile's directory is unchanged
 
   @integration
+  Scenario: Without VITEST_FS_MODULE_CACHE_DIR the cache lives under XDG_CACHE_HOME
+    Given XDG_CACHE_HOME points at an empty directory
+    And VITEST_FS_MODULE_CACHE_DIR is not set
+    When a checkout runs its tests
+    Then its modules are written under vitest/fs-module-cache in that directory
+
+  @integration
   Scenario: A checkout's old node_modules cache is removed
     Given a checkout with a node_modules/.vitest-cache directory
     When it runs its tests with the shared cache
