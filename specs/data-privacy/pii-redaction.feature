@@ -729,3 +729,25 @@ Feature: Redacting personal data from traces
     When a trace is ingested whose input carries version numbers and counts but
       no run of digits long enough to be a phone number
     Then the stored input is unchanged
+
+  # A number written the national way, with a trunk 0 or local digit groups and
+  # no country code, is not a valid US number, so the default reading misses
+  # it. The floor reads it again in the common regions (Europe, Australia,
+  # India, Brazil). Only a mobile, or a landline written with its area code
+  # and digit groups, counts; a bare run without a leading 0 never does.
+  #
+  # Bindings: packages/redaction/src/__tests__/essentialPii.nationalPhones.unit.test.ts
+
+  @unit
+  Scenario: A phone number written without its country code is redacted
+    When a trace is ingested whose input contains mobile numbers written the
+      national way in the United Kingdom, the Netherlands, Germany, France,
+      Belgium, Spain, Italy, Portugal, Ireland, Austria, Switzerland,
+      Australia, India and Brazil
+    Then every one of them is redacted
+
+  @unit
+  Scenario: A barcode, date, timestamp or order number is not read as a national phone number
+    When a trace is ingested whose input carries barcodes, dates, timestamps,
+      invoice numbers, order numbers and decimals
+    Then the stored input is unchanged

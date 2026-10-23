@@ -1,4 +1,6 @@
+import type { CountryCode } from "libphonenumber-js";
 import { findPhoneNumbersInText } from "libphonenumber-js";
+import { findPhoneNumbersInText as findPhoneNumbersInTextStrict } from "libphonenumber-js/max";
 
 import { isBitcoinAddress } from "./bitcoinAddress.ts";
 import { isIdentifierShapedValue, MAX_IDENTIFIER_LENGTH } from "./identifierHoldout.ts";
@@ -500,6 +502,192 @@ function collectRecognizerSpans({
  */
 const ENOUGH_DIGITS_FOR_A_NUMBER = /\d(?:[^0-9A-Za-z]{0,4}\d){5}/;
 
+/**
+ * Regions tried for national-format numbers, which the US pass misreads. Europe first, then
+ * the large English and Portuguese markets; order only decides which region claims a span.
+ * `trunkZero`: the region writes every national number with a leading `0`.
+ */
+interface NationalRegion {
+  region: CountryCode;
+  trunkZero: boolean;
+}
+
+const NATIONAL_FORMAT_REGIONS: readonly NationalRegion[] = [
+  { region: "GB", trunkZero: true },
+  { region: "NL", trunkZero: true },
+  { region: "DE", trunkZero: true },
+  { region: "FR", trunkZero: true },
+  { region: "BE", trunkZero: true },
+  { region: "IE", trunkZero: true },
+  { region: "AT", trunkZero: true },
+  { region: "CH", trunkZero: true },
+  { region: "AU", trunkZero: true },
+  { region: "ES", trunkZero: false },
+  { region: "PT", trunkZero: false },
+  { region: "IT", trunkZero: false },
+  { region: "IN", trunkZero: false },
+  { region: "BR", trunkZero: false },
+];
+
+const TRUNK_ZERO_REGIONS = NATIONAL_FORMAT_REGIONS.filter(({ trunkZero }) => trunkZero);
+const NO_TRUNK_REGIONS = NATIONAL_FORMAT_REGIONS.filter(({ trunkZero }) => !trunkZero);
+
+/** A digit run with phone separators, at most 26 characters, not glued to a word, `+` or `#`. */
+const NATIONAL_CANDIDATE = /(?<![\w+#])\(?\d[\d ()./-]{5,24}\d/g;
+const TRUNK_ZERO_GROUP = /(?:^|[^\d.,])0[1-9]/;
+const LEADS_WITH_TRUNK_ZERO = /^\(?0[1-9]/;
+const LEADS_WITH_AREA_CODE = /^(?:\(?0[1-9]|\(\d{1,5}\))/;
+const SPACED_GROUPS = /\d[ ()/-]+\d/;
+const DOT = /\./g;
+const CONTAINS_DATE = /\d{1,2}([./-])\d{1,2}\1\d{4}|\d{4}([./-])\d{1,2}\2\d{1,2}/;
+const NATIONAL_DIGIT_FLOOR = 7;
+/** The shortest mobile in the regions without a trunk zero (nine digits, ES and PT). */
+const SHORTEST_NO_TRUNK_MOBILE = 9;
+const LONGEST_UNGROUPED_NUMBER = 12;
+const MOBILE_TYPES: ReadonlySet<string> = new Set(["MOBILE", "FIXED_LINE_OR_MOBILE"]);
+
+/** Digit groups split by spaces, dashes, slashes or brackets, or by two dots or more. */
+function isGrouped(raw: string): boolean {
+  return SPACED_GROUPS.test(raw) || (raw.match(DOT)?.length ?? 0) >= 2;
+}
+
+/** Whether a raw match can be a national-format number at all, whatever its type. */
+function isNationalShape(raw: string): boolean {
+  if (raw.includes("+") || raw.startsWith("00")) return false;
+  if (CONTAINS_DATE.test(raw)) return false;
+  return isGrouped(raw) || !hasDigitCount(raw, LONGEST_UNGROUPED_NUMBER + 1);
+}
+
+/**
+ * Whether a number parsed in `trunkZero`'s region is written the way that region writes
+ * phones: a trunk-zero region needs its leading `0`; elsewhere a mobile needs digit groups
+ * or an area code in front, and a landline needs both, so bare id-shaped runs stay out.
+ */
+function isNationalFormatPhone({
+  raw,
+  type,
+  trunkZero,
+}: {
+  raw: string;
+  type: string | undefined;
+  trunkZero: boolean;
+}): boolean {
+  if (!isNationalShape(raw)) return false;
+  if (trunkZero && !LEADS_WITH_TRUNK_ZERO.test(raw)) return false;
+  const leadsWithAreaCode = LEADS_WITH_AREA_CODE.test(raw);
+  if (type !== undefined && MOBILE_TYPES.has(type)) return leadsWithAreaCode || isGrouped(raw);
+  return type === "FIXED_LINE" && leadsWithAreaCode && isGrouped(raw);
+}
+
+/** Counts digits in `candidate`, stopping as soon as it reaches `floor`. */
+function hasDigitCount(candidate: string, floor: number): boolean {
+  let digits = 0;
+  for (let i = 0; i < candidate.length && digits < floor; i++) {
+    const code = candidate.charCodeAt(i);
+    if (code >= 48 && code <= 57) digits++;
+  }
+  return digits >= floor;
+}
+
+/**
+ * The regions worth parsing one window in. A number a trunk-zero region accepts starts with
+ * `0`, and one the others accept is grouped or bracketed, so a window holding neither shape
+ * gets no regions and never reaches the parser.
+ */
+function regionsForCandidate(candidate: string): readonly NationalRegion[] {
+  if (CONTAINS_DATE.test(candidate)) return [];
+  const trunkGroup = TRUNK_ZERO_GROUP.test(candidate);
+  const groupedOrBracketed =
+    (candidate.includes("(") || isGrouped(candidate)) &&
+    hasDigitCount(candidate, SHORTEST_NO_TRUNK_MOBILE);
+  if (trunkGroup && groupedOrBracketed) return NATIONAL_FORMAT_REGIONS;
+  if (trunkGroup) return TRUNK_ZERO_REGIONS;
+  if (groupedOrBracketed) return NO_TRUNK_REGIONS;
+  return [];
+}
+
+/**
+ * The national-format numbers one candidate window holds, as spans of `text`. Regions are
+ * tried in order until one claims the whole window, so a number costs a few parses at most.
+ */
+function nationalSpansInCandidate({
+  text,
+  candidate,
+  offset,
+}: {
+  text: string;
+  candidate: string;
+  offset: number;
+}): Span[] {
+  const spans: Span[] = [];
+  for (const { region, trunkZero } of regionsForCandidate(candidate)) {
+    for (const phone of findPhoneNumbersInTextStrict(candidate, { defaultCountry: region })) {
+      const raw = candidate.slice(phone.startsAt, phone.endsAt);
+      if (!isNationalFormatPhone({ raw, type: phone.number.getType(), trunkZero })) continue;
+      const span: Span = {
+        start: offset + phone.startsAt,
+        end: offset + phone.endsAt,
+        entity: "PHONE_NUMBER",
+      };
+      if (!insideIdentifierToken(text, span)) spans.push(span);
+    }
+    if (spans.some((span) => span.start === offset && span.end === offset + candidate.length)) {
+      break;
+    }
+  }
+  return spans;
+}
+
+/**
+ * National-format pass over the digit windows the US pass left alone (`found` holds its
+ * spans, in order), each parsed only in the regions {@link regionsForCandidate} keeps.
+ */
+function collectNationalFormatPhoneSpans({
+  text,
+  excepted,
+  found,
+  spans,
+}: {
+  text: string;
+  excepted: (span: Span) => boolean;
+  found: readonly Span[];
+  spans: Span[];
+}): void {
+  let next = 0;
+  for (const match of text.matchAll(NATIONAL_CANDIDATE)) {
+    const candidate = match[0];
+    const offset = match.index ?? 0;
+    while (next < found.length && found[next]!.end <= offset) next++;
+    if (next < found.length && found[next]!.start < offset + candidate.length) continue;
+    if (!hasDigitCount(candidate, NATIONAL_DIGIT_FLOOR)) continue;
+    for (const span of nationalSpansInCandidate({ text, candidate, offset })) {
+      if (!excepted(span)) spans.push(span);
+    }
+  }
+}
+
+/** International numbers (`+31 ...`, `011 ...`) and US numbers written without a country code. */
+function collectInternationalOrUsPhoneSpans({
+  text,
+  excepted,
+  spans,
+}: {
+  text: string;
+  excepted: (span: Span) => boolean;
+  spans: Span[];
+}): void {
+  for (const phone of findPhoneNumbersInText(text, { defaultCountry: "US" })) {
+    const span: Span = {
+      start: phone.startsAt,
+      end: phone.endsAt,
+      entity: "PHONE_NUMBER",
+    };
+    if (insideIdentifierToken(text, span)) continue;
+    if (excepted(span)) continue;
+    spans.push(span);
+  }
+}
+
 function collectPhoneSpans({
   text,
   allowed,
@@ -516,18 +704,8 @@ function collectPhoneSpans({
   if (!ENOUGH_DIGITS_FOR_A_NUMBER.test(text)) return [];
   const spans: Span[] = [];
   try {
-    for (const phone of findPhoneNumbersInText(text, {
-      defaultCountry: "US",
-    })) {
-      const span: Span = {
-        start: phone.startsAt,
-        end: phone.endsAt,
-        entity: "PHONE_NUMBER",
-      };
-      if (insideIdentifierToken(text, span)) continue;
-      if (excepted(span)) continue;
-      spans.push(span);
-    }
+    collectInternationalOrUsPhoneSpans({ text, excepted, spans });
+    collectNationalFormatPhoneSpans({ text, excepted, found: [...spans], spans });
   } catch {
     // Defensive: never let phone parsing break ingestion. Whatever the
     // detector produced before it gave up is still a real answer.
