@@ -238,29 +238,21 @@ export class ApiKeyTokenResolutionService {
     projectId?: string | null;
   }): Promise<ResolvedApiKeyCredential | null> {
     const parsed = apiKeyTokenResolutionInputSchema.parse(input);
-    const tokenType = getTokenType(parsed.token);
-
-    if (tokenType === "legacyProjectKey") {
-      return this.authenticateLegacyProjectKey(parsed.token);
-    }
-
-    if (tokenType === "apiKey") {
+    if (getTokenType(parsed.token) === "apiKey") {
       const resolved = await this.findCurrentApiKeyResolution(
         parsed.token,
         parsed.projectId ?? null,
       );
-      if (resolved) {
-        return resolved;
-      }
-
-      if (parsed.token.startsWith(API_KEY_PREFIX)) {
-        return this.authenticateLegacyProjectKey(parsed.token);
-      }
-
-      return null;
+      if (resolved) return resolved;
+      if (!parsed.token.startsWith(API_KEY_PREFIX)) return null;
     }
 
-    return this.authenticateLegacyProjectKey(parsed.token);
+    // A legacy key that authenticates stamps its project's last legacy use
+    // (spec: modules/api-key/specs/request-credential-type.feature).
+    const legacy = await this.findLegacyProjectKeyResolution(parsed.token);
+    if (legacy?.type === "legacyProjectKey") this.legacyUses.markUsed({ id: legacy.project.id });
+
+    return legacy;
   }
 
   async resolveOrganizationToken(input: { token: string }): Promise<OrganizationApiKeyResolution> {
@@ -307,21 +299,6 @@ export class ApiKeyTokenResolutionService {
     const parent = await this.repository.findLivenessById({ id: parentApiKeyId });
     if (!parent || parent.revokedAt) return false;
     return !(parent.expiresAt && Temporal.Instant.compare(parent.expiresAt, this.now()) < 0);
-  }
-
-  /**
-   * A legacy key that authenticates a request stamps its project's last legacy use
-   * (spec: modules/api-key/specs/request-credential-type.feature).
-   */
-  private async authenticateLegacyProjectKey(
-    token: string,
-  ): Promise<ResolvedApiKeyCredential | null> {
-    const resolved = await this.findLegacyProjectKeyResolution(token);
-    if (resolved?.type === "legacyProjectKey") {
-      this.legacyUses.markUsed({ id: resolved.project.id });
-    }
-
-    return resolved;
   }
 
   private async findLegacyProjectKeyResolution(
