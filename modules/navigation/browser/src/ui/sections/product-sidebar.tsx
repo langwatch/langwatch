@@ -4,7 +4,7 @@ import { RawKbd as Kbd } from "@langwatch/design-system/kbd";
 import { Badge, Box, VStack } from "@langwatch/design-system/primitives";
 import { ScrollEdgeFade, useScrollEdges } from "@langwatch/design-system/scroll-fade";
 import { FrontendFlags } from "@langwatch/feature-flag-contract";
-import { projectNavigation } from "@langwatch/project-contract";
+import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { ArrowLeft, ArrowUpRight, Search } from "lucide-react";
 import { useRef, useState } from "react";
 
@@ -335,15 +335,15 @@ function DashboardsSidebarBody({ showExpanded }: { showExpanded: boolean }) {
 
 /**
  * The one Insights entry, at the top of the Dashboards menu: the inbox is where a day starts.
- * Hidden until `release_insights` answers on, and on a project kind with no home (an
- * aggregate files no insight); the unread pill is the one insight lends.
+ * Hidden until `release_insights` answers on, and on an aggregate project, which files no
+ * insight; the unread pill is the one insight lends.
  * @see modules/insight/specs/insight-inbox.feature
  */
 function InsightsMenuLink({ pattern, showExpanded }: { pattern: string; showExpanded: boolean }) {
   const host = useNavigationHost();
   const { enabled, isLoading } = host.featureFlag(FrontendFlags.release_insights);
   if (isLoading || !enabled || !host.hasPermission("analytics:view")) return null;
-  if (!projectNavigation(host.project()?.kind).home) return null;
+  if (isAggregateProjectKind(host.project()?.kind)) return null;
   const destination = projectScopedDestination({
     path: projectNavItems.insights.path,
     label: projectNavItems.insights.title,
