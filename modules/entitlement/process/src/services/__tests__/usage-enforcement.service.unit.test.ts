@@ -547,9 +547,9 @@ describe("given limit checks that read the counting store", () => {
       };
       const service = serviceOver({ counter, clock: { ms: 0 } });
 
-      await expect(
-        service.checkLimitForOrganization({ organizationId: "org-1" }),
-      ).rejects.toThrow();
+      await expect(service.checkLimitForOrganization({ organizationId: "org-1" })).rejects.toThrow(
+        "memory limit exceeded",
+      );
       await expect(
         service.getCurrentMonthCountForDisplay({ organizationId: "org-1" }),
       ).resolves.toBe(10);
