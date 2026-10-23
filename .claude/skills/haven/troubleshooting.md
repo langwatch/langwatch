@@ -154,18 +154,19 @@ Only once the server is settled does the browser console mean anything. Do not r
 the ui lane to chase a "broken mount": a re-optimize you caused minutes earlier looks the
 same.
 
-## Gotcha 7: secrets resolve through the shell, `.env`, then 1Password
+## Gotcha 7: secrets resolve through the shell, `.env`, then 1Password via haven
 
 haven's own injected variables (hostnames, ports, database URLs; see
 `tools/thuishaven/app/overlayenv.go`) go straight into each child's OS environment;
-nothing writes them to a file. With `LANGWATCH_OP_ACCOUNT` set in the workspace `.env`
-(a personal choice, never set by haven), haven reads the 1Password item `Private/LangWatch`
-once per `up` and injects every field the shell and `.env` leave unset into every lane,
-with the account blanked so no lane asks again (`tools/thuishaven/app/onepassword.go`).
-A key you just added in 1Password needs `haven down && haven up`. A
-`haven: 1Password skipped (<reason>)` line means `op` is missing, locked or signed out:
-unlock the app and restart. A `.env holds credentials (...)` warning at `up` means a
-credential crept back: `haven secrets move` (dry run), then `--apply`.
+nothing writes them to a file. haven is the only 1Password reader: with
+`LANGWATCH_OP_ACCOUNT` set in the workspace `.env` (a personal choice, never set by haven)
+it reads the item `Private/LangWatch` in memory each time it starts or restarts a process
+and puts the fields the shell and `.env` leave unset into that process's env; the keeper
+plan holds no value (`tools/thuishaven/app/onepassword.go`). The Node secrets chain is
+env then `.env`; it has no 1Password adapter. A key you just added in 1Password needs a
+restart of the lane. A `haven: 1Password skipped (<reason>)` line means `op` is missing,
+locked or signed out: unlock the app and restart. A `.env holds credentials (...)` warning
+at `up` means a credential crept back: `haven secrets move` (dry run), then `--apply`.
 
 `haven env` decides what to mask in two layers (`tools/thuishaven/domain/secretkeys.go`):
 every `Secret.load("ID", …)` handle it finds by scanning `packages`, `modules`,

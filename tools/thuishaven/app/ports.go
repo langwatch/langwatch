@@ -200,6 +200,12 @@ type Child struct {
 	MaxRSSBytes int64
 	// OnReap hears each such kill, with its reason, so it lands in the reap record.
 	OnReap func(reason string) `json:"-"`
+	// SecretsFrom names the checkout whose 1Password item this lane reads at each
+	// start; every lane haven plans names one.
+	SecretsFrom string `json:",omitempty"`
+	// EnvAtStart is read at each start and restart, before Env so Env wins a clash.
+	// Never in the plan file: the values it answers stay in memory (ADR-132).
+	EnvAtStart func() []string `json:"-"`
 }
 
 // ProcessSample is one live process as the tsgo governor's sampler sees it.

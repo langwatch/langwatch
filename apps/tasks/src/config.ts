@@ -17,8 +17,6 @@ export const tasksConfig = Config.define((c) => ({
   isSaaS: c.env("IS_SAAS", environmentOneOrTrueSchema),
   skipLwqlProvision: c.env("SKIP_LWQL_PROVISION", environmentOneOrTrueSchema),
   nodeEnvironment: c.env("NODE_ENV", nodeEnvironmentSchema),
-  /** Routing, not a secret: which 1Password account the secrets chain asks. */
-  onePasswordAccount: c.env("LANGWATCH_OP_ACCOUNT", z.string().optional()),
   /** Comma-separated plugin task modules a module task's catalogue also loads. */
   taskModules: c.env("LANGWATCH_TASK_MODULES", z.string().optional()),
 }));

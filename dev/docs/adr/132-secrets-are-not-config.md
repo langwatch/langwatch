@@ -200,32 +200,35 @@ enumeration:
 The stores declare `CLICKHOUSE_URL__` as a family and parse it once at boot into
 the `clickhouse` member (ARCHITECTURE.md §6, §7).
 
-### Amendment (2026-10-23): the root `.env` holds config only; haven reads 1Password for what it starts
+### Amendment (2026-10-23): haven is the only 1Password reader; values stay in memory
 
 Goal (Alex): every credential a developer needs comes from 1Password through `op`; `.env`
-holds config. Addressing is unchanged (ARCHITECTURE.md §6: `LANGWATCH_OP_ACCOUNT`, vault
-`Private`, item `LangWatch`, field = env key). Behavioural contract:
+holds config. Behavioural contract:
 [haven resolves development secrets from 1Password](../../../specs/setup/haven-one-password.feature).
+This replaces the "1Password is opt-in" section above and the Node adapter it describes.
 
-- **One read per run, for every language.** haven reads the item with one `op item get`
-  and treats its fields as the layer after the shell and `.env`. Provider detection (paymentsim,
-  mailsim, storagesim and the other stand-ins) sees them, so a key kept only in 1Password counts
-  as configured. Every process haven starts (Node, Go, Python) gets the fields the shell and
-  `.env` leave unset, before the stack's own addresses so those win a clash, and a blank
-  `LANGWATCH_OP_ACCOUNT`, so no process asks 1Password again. A failed read prints one line
-  and changes nothing. Reading the whole item is allowed here because the item is fixed: haven
-  still lists no vault. The Node chain is unchanged and still answers outside haven.
-- **Outside haven,** `haven secrets exec -- <command>` runs any command with the same fields;
+- **One path.** The Node 1Password adapter is removed (`withOnePassword`, its probe and
+  reads, `OnePasswordUnavailableError`, `OnePasswordInProductionError`). The Node chain is
+  env, then `.env`, then the refusal. A pod therefore holds no vault code at all.
+- **haven reads, in memory.** `LANGWATCH_OP_ACCOUNT` (in `.env` or the shell) names the account;
+  the item is `Private/LangWatch`, one field per env key. haven reads it with one
+  `op item get`, cached in its own process memory only, and treats the fields as the layer after
+  the shell and `.env`. Provider detection (paymentsim, mailsim and the other stand-ins) sees
+  them, and `haven env` masks every value that came from the item.
+- **Handed in as env at start.** Each process haven starts (Node, Go, Python, and the one-shot
+  jobs) gets the fields the shell and `.env` leave unset, read at the moment it starts or
+  restarts and placed before its planned env so that env wins a clash. The keeper plan records
+  only which checkout a lane reads from, never a value: **no 1Password value is written to any
+  file haven keeps** (Alex, 2026-10-23). A failed read prints one line and changes nothing.
+- **Outside haven,** `haven secrets exec -- <command>` runs any command the same way;
   `pnpm dev` re-runs itself through it when the account is set and haven is installed, and the
   two `ensure-*.sh` writers skip a key the environment already holds.
 - **The move is `haven secrets move`.** It replaces the unbuilt `SecretMigrationService` and
   the `haven secrets push` note above: a dry run naming keys, then `--apply` creates or edits
   the item through a JSON template on stdin, reads it back, and only then deletes the moved
-  lines and sets `LANGWATCH_OP_ACCOUNT`. Lines are deleted, not rewritten to `op://` references.
-  A credential line is a secret-class key with a value, except a connection string with no password.
+  lines and sets `LANGWATCH_OP_ACCOUNT`. A credential line is a secret-class key with a value,
+  except a connection string with no password.
 - **Guard.** `haven up` warns, naming keys only, whenever `.env` holds a credential line.
-- `haven env` masks every value that came from the item, whatever its name. The values live in
-  haven's memory and in the keeper plan (0600, removed on down) beside the rest of the lane env.
 
 ## Alternatives considered
 

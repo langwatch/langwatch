@@ -2609,16 +2609,6 @@ const presentations = {
     title: "This can't be run while impersonating",
     describe: () => "Stop impersonating and sign in as yourself to run it.",
   },
-  one_password_in_production: {
-    title: "The service isn't configured correctly",
-    describe: () =>
-      "A development-only secrets source was enabled on a production deployment. An operator needs to remove it before the service can start.",
-  },
-  one_password_unavailable: {
-    title: "Secrets are unavailable",
-    describe: () =>
-      "The development secrets source could not be read. Sign in to it and try again.",
-  },
   ops_confirmation_required: {
     title: "Confirm before running this",
     describe: () => "This action can't be undone, so it has to be confirmed first.",

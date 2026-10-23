@@ -173,10 +173,18 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir s
 		out = append(out, langy)
 	}
 	if st.Layout.IsMonolith() || isBuiltUI || !isAppOn {
-		return out
+		return readItemAtStart(out, repoDir)
 	}
 	// --hmr: Vite runs as its own ui lane beside the backend (ADR-168, 2026-10-10).
-	return append(out, p.backendChild())
+	return readItemAtStart(append(out, p.backendChild()), repoDir)
+}
+
+// readItemAtStart tells every lane to read the 1Password item in memory when it starts.
+func readItemAtStart(children []Child, repoDir string) []Child {
+	for i := range children {
+		children[i].SecretsFrom = repoDir
+	}
+	return children
 }
 
 // childPlan is what every child of one stack is planned from: the stack, the
@@ -193,8 +201,7 @@ type childPlan struct {
 func (o *Orchestrator) newChildPlan(st domain.Stack, opts PlanOptions, repoDir string) *childPlan {
 	p := &childPlan{o: o, st: st, opts: opts, repoDir: repoDir}
 	p.logDir, _ = domain.StackLogPaths(st.WorktreeDir, st.Slug)
-	// The item's fields come first, so the stack's own addresses win a clash.
-	p.base = append(append(onePasswordEnv(repoDir), st.OverlayEnv()...), o.credentialEnv(st.Slug, repoDir)...)
+	p.base = append(st.OverlayEnv(), o.credentialEnv(st.Slug, repoDir)...)
 	// Bun and Node use their own bundled CA roots, NOT the macOS system store, so
 	// the app process and the langy worker (Bun) subprocess otherwise
 	// reject the portless HTTPS certs on every gateway/control-plane call ("self

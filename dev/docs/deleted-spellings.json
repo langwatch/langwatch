@@ -1026,6 +1026,14 @@
       "section": "§8, §15",
       "ruled": "2026-10-10",
       "note": "`facts` is ordinary English for domain and event facts elsewhere, which no pattern can tell apart."
+    },
+    {
+      "spelling": "withOnePassword",
+      "kind": "identifier",
+      "pattern": "\\bwithOnePassword\\b",
+      "replacement": "`secrets.withEnv().withFile()`; haven reads 1Password in memory and hands values in as env (`haven secrets exec` outside haven)",
+      "section": "§6, §15",
+      "ruled": "2026-10-23"
     }
   ]
 }

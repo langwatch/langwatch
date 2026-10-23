@@ -1,7 +1,7 @@
 /**
- * A declared secret: ONE id every adapter interprets for itself — the env
- * adapter reads the variable of that name, 1Password that key in the vault's
- * dictionary. A family's id is a prefix instead. Declaring fetches nothing (§6).
+ * A declared secret: ONE id, the variable of that name in the environment or
+ * `.env` (locally haven hands 1Password values in as env). A family's id is a
+ * prefix instead. Declaring fetches nothing (§6).
  */
 export interface SecretSchema<Value> {
   parse(value: string): Value;
@@ -43,7 +43,7 @@ function load<const Options extends LoadOptions & { optional?: boolean } = LoadO
 
 /**
  * Every name under one prefix, name to value (ADR-132 amendment): env and `.env` scan by
- * prefix, 1Password answers none. Optional by nature: an empty family is an ordinary answer.
+ * prefix. Optional by nature: an empty family is an ordinary answer.
  */
 function family(prefix: string): SecretFamilyHandle {
   return new SecretFamilyHandle(prefix);

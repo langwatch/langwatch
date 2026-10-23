@@ -15,16 +15,15 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
-// haven reads the 1Password item once and hands its fields to every process
-// it starts, so a Go, Python or Node lane needs no credential in .env
-// (ADR-132 amendment 2026-10-23). Values live in memory and in the 0600 keeper
-// plan beside the rest of the lane environment, never in the checkout.
+// haven is the only reader of 1Password (ADR-132 amendment 2026-10-23). It reads
+// the item in memory for provider detection, for masking, and into the env of
+// each process at the moment it starts. No value is written to a file haven keeps.
 
 // onePasswordTimeout bounds one op call; an unlock prompt counts against it.
 const onePasswordTimeout = 30 * time.Second
 
-// onePasswordTTL is how long one read answers, so a long-lived keeper or
-// daemon picks up a rotated key on its next replan without asking op per lane.
+// onePasswordTTL is how long one in-memory read answers, so a long-lived keeper
+// picks up a rotated key at a later restart without asking op per lane.
 const onePasswordTTL = 5 * time.Minute
 
 // accountPattern is what an account shorthand, sign-in address or id looks like.
@@ -131,26 +130,40 @@ func localDevEnv(repoDir string) map[string]string {
 	return resolved
 }
 
-// onePasswordEnv is what every lane is started with from the item: each field
-// the shell and .env leave unset, then a blank account, so no Node lane asks
-// 1Password again for what haven already read. Nothing when the read failed.
-func onePasswordEnv(repoDir string) []string {
+// onePasswordChildEnv is what a process gets from the item when it starts:
+// each field the shell and .env leave unset. Nothing when the read failed.
+func onePasswordChildEnv(repoDir string) []string {
 	local := localDevEnv(repoDir)
 	fields, err := onePasswordFields(local[domain.OnePasswordAccountKey])
-	if err != nil || fields == nil {
+	if err != nil {
 		return nil
 	}
-	return append(domain.OnePasswordEnv(fields, local), domain.OnePasswordAccountKey+"=")
+	return domain.OnePasswordEnv(fields, local)
 }
 
-// SecretsExecMarker tells a script `haven secrets exec` already ran it with the item's fields.
+// withItemEnv puts the item's fields before env for a one-shot run, read now
+// and handed to that run only; env wins a clash.
+func withItemEnv(repoDir string, env []string) []string {
+	return append(onePasswordChildEnv(repoDir), env...)
+}
+
+// withSecretsAtStart gives a lane that names a checkout its start-time read of
+// the item. It is set after the plan file is read, so no value is ever in it.
+func withSecretsAtStart(c Child) Child {
+	if dir := c.SecretsFrom; dir != "" {
+		c.EnvAtStart = func() []string { return onePasswordChildEnv(dir) }
+	}
+	return c
+}
+
+// SecretsExecMarker tells a script `haven secrets exec` already ran it.
 const SecretsExecMarker = "HAVEN_SECRETS_EXEC"
 
 // SecretsExecEnv is the environment `haven secrets exec` runs a command in:
-// this process's own, with the item's fields the shell and .env leave unset
-// and the marker, each key once (a later duplicate is not what getenv reads).
+// this process's own plus the item's fields the shell and .env leave unset and
+// the marker, each key once (a later duplicate is not what getenv reads).
 func SecretsExecEnv(worktreeDir string) []string {
-	added := append(onePasswordEnv(worktreeDir), SecretsExecMarker+"=1")
+	added := append(onePasswordChildEnv(worktreeDir), SecretsExecMarker+"=1")
 	replaced := map[string]bool{}
 	for _, kv := range added {
 		key, _, _ := strings.Cut(kv, "=")

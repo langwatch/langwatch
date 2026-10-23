@@ -139,7 +139,7 @@ func TestTheShellAndDotenvWinOverTheItem(t *testing.T) {
 	if got := resolvedDevEnv(repo)["OPENAI_API_KEY"]; got != "fromdotenv" {
 		t.Errorf("OPENAI_API_KEY resolved to %q, want the .env value", got)
 	}
-	env := onePasswordEnv(repo)
+	env := onePasswordChildEnv(repo)
 	if slices.Contains(env, "OPENAI_API_KEY=fromitem") {
 		t.Error("the item's OPENAI_API_KEY was injected over the .env value")
 	}
@@ -156,7 +156,7 @@ func TestTheItemIsReadOnce(t *testing.T) {
 
 	for range 3 {
 		_ = resolvedDevEnv(repo)
-		_ = onePasswordEnv(repo)
+		_ = onePasswordChildEnv(repo)
 	}
 	calls := op.calls(t)
 	if len(calls) != 1 {
@@ -176,8 +176,8 @@ func TestALockedOrMissingOpLeavesTheStackAsItWas(t *testing.T) {
 	if _, err := onePasswordFields("acme"); err == nil || !strings.Contains(err.Error(), "not signed in") {
 		t.Errorf("a locked vault answered %v, want op's reason", err)
 	}
-	if env := onePasswordEnv(repo); env != nil {
-		t.Errorf("a locked vault injected %d entries, want none (the account kept for the Node chain)", len(env))
+	if env := onePasswordChildEnv(repo); env != nil {
+		t.Errorf("a locked vault injected %d entries, want none", len(env))
 	}
 
 	forgetOnePassword()
@@ -187,8 +187,8 @@ func TestALockedOrMissingOpLeavesTheStackAsItWas(t *testing.T) {
 	}
 }
 
-// @scenario "Every process haven starts gets the item's values"
-func TestEveryLaneGetsTheItemsValues(t *testing.T) {
+// @scenario "Every process haven starts reads the item when it starts"
+func TestEveryLaneReadsTheItemWhenItStarts(t *testing.T) {
 	op := stubOnePassword(t)
 	op.holds(t, map[string]string{"OPENAI_API_KEY": "fromitem"})
 	t.Setenv("OPENAI_API_KEY", "")
@@ -197,20 +197,53 @@ func TestEveryLaneGetsTheItemsValues(t *testing.T) {
 	sel.Langevals = true
 
 	children := langevalsPlan(t, sel, repo)
-	st := domain.Stack{Slug: "test", Services: []domain.Service{{Name: domain.LangevalsService, Port: 45562}}}
-	firstOverlay := st.OverlayEnv()[0]
-	for _, name := range []string{"langevals", GoLane} {
+	for _, name := range []string{APILane, "langevals", GoLane} {
 		lane, ok := findChild(children, name)
 		if !ok {
 			t.Fatalf("no %s lane planned", name)
 		}
-		item := slices.Index(lane.Env, "OPENAI_API_KEY=fromitem")
-		if item < 0 || !slices.Contains(lane.Env, domain.OnePasswordAccountKey+"=") {
-			t.Errorf("the %s lane lacks the item's field or the blank account", name)
+		if lane.SecretsFrom != repo || slices.Contains(lane.Env, "OPENAI_API_KEY=fromitem") {
+			t.Errorf("the %s lane does not read the item at start, or carries its value in the plan", name)
 		}
-		if overlay := slices.Index(lane.Env, firstOverlay); overlay >= 0 && overlay < item {
-			t.Errorf("the %s lane puts the item's fields after the stack's addresses", name)
+		if !slices.Contains(withSecretsAtStart(lane).EnvAtStart(), "OPENAI_API_KEY=fromitem") {
+			t.Errorf("the %s lane's start does not get the item's field", name)
 		}
+	}
+	once := withItemEnv(repo, []string{"OPENAI_API_KEY=mine"})
+	if slices.Index(once, "OPENAI_API_KEY=fromitem") > slices.Index(once, "OPENAI_API_KEY=mine") {
+		t.Error("a one-shot run's own env does not win over the item")
+	}
+}
+
+// @scenario "No 1Password value is written to disk"
+func TestThePlanFileHoldsNoItemValue(t *testing.T) {
+	op := stubOnePassword(t)
+	op.holds(t, map[string]string{"OPENAI_API_KEY": "fromitem-must-not-persist"})
+	t.Setenv("OPENAI_API_KEY", "")
+	repo := checkoutWithDotenv(t, "LANGWATCH_OP_ACCOUNT=acme\n")
+	sel := domain.DefaultSelection()
+	sel.Langevals = true
+
+	children := langevalsPlan(t, sel, repo)
+	for i := range children {
+		children[i] = withSecretsAtStart(children[i])
+		if children[i].EnvAtStart != nil {
+			_ = children[i].EnvAtStart() // a lane started before the plan is written
+		}
+	}
+	path := filepath.Join(t.TempDir(), "run", "test", "plan.json")
+	if err := writeKeeperPlan(path, KeeperPlan{Children: children, Env: os.Environ()}); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(raw), "fromitem-must-not-persist") {
+		t.Fatal("the keeper plan holds a 1Password value")
+	}
+	if !strings.Contains(string(raw), `"SecretsFrom"`) {
+		t.Error("the keeper plan does not say which lanes read the item at start")
 	}
 }
 
@@ -338,7 +371,7 @@ func TestSecretsExecEnvCarriesEachKeyOnce(t *testing.T) {
 		key, _, _ := strings.Cut(kv, "=")
 		seen[key]++
 	}
-	if seen[domain.OnePasswordAccountKey] != 1 || seen["OPENAI_API_KEY"] != 1 {
+	if seen[domain.OnePasswordAccountKey] != 1 || seen["OPENAI_API_KEY"] != 1 { // the account passes through
 		t.Errorf("keys repeat: account %d, OPENAI_API_KEY %d", seen[domain.OnePasswordAccountKey], seen["OPENAI_API_KEY"])
 	}
 	if !slices.Contains(env, "OPENAI_API_KEY=fromitem") || !slices.Contains(env, SecretsExecMarker+"=1") {

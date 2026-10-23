@@ -578,8 +578,6 @@ export const APP_ERROR_CODES = [
   "not_found",
   "notification_delivery_error",
   "offboard_incomplete",
-  "one_password_in_production",
-  "one_password_unavailable",
   "ops_confirmation_required",
   "ops_feature_flag_unknown",
   "ops_impersonated_operator_refused",

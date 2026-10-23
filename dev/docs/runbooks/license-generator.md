@@ -15,9 +15,9 @@ root `.env`.
    (`DEFAULT_LICENSE_PUBLIC_KEY`).
 2. **The private key lives only in secrets.** `LANGWATCH_LICENSE_PRIVATE_KEY`
    (`licensingSecrets.licensePrivateKey`) resolves through the ADR-132 chain:
-   the environment, the root `.env`, then 1Password when
-   `LANGWATCH_OP_ACCOUNT` names an account
-   (`op://Private/LangWatch/LANGWATCH_LICENSE_PRIVATE_KEY`).
+   the environment, then the root `.env`. Under haven (or `haven secrets exec`)
+   the environment includes the 1Password item `Private/LangWatch` when
+   `LANGWATCH_OP_ACCOUNT` names an account.
 3. **The storage seed signs a fresh licence**
    (`apps/tasks/src/storage-seed/seed-license.ts`, `chooseSeedLicense`), in
    this order:
@@ -55,7 +55,7 @@ seed both import, so the seed signs exactly what the verifier checks.
 
    The private key may live in 1Password instead: the `LangWatch` item of your
    `Private` vault, field `LANGWATCH_LICENSE_PRIVATE_KEY`, with
-   `LANGWATCH_OP_ACCOUNT` set.
+   `LANGWATCH_OP_ACCOUNT` set; haven hands it to the seed in memory.
 
 3. `haven down` and `haven up` (a restart does not reload the environment),
    or `haven db seed` on a running stack. The seed logs which licence it

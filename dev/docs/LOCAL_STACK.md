@@ -29,9 +29,9 @@ every process it starts, and `eval "$(haven env)"` puts the same set in your
 shell.
 
 Credential-carrying variables are classified once in `packages/secrets`
-(ADR-132). Each app resolves them through an ordered chain (env, `.env`, then
-1Password when `LANGWATCH_OP_ACCOUNT` is set, then a refusal by name) before
-its Zod parse. Never read `.env` to find a value and never print one:
+(ADR-132). Each app resolves them through an ordered chain (env, then `.env`,
+then a refusal by name) before its Zod parse; values kept in 1Password arrive as
+env, handed in by haven. Never read `.env` to find a value and never print one:
 `haven env` masks every classified key (`--reveal` for the shell form).
 
 ### Credentials haven makes up
@@ -84,14 +84,16 @@ To add a credential later, add the field in the 1Password app (never on a
 command line) and restart the stack. `haven up` warns, naming the key and never
 the value, whenever a credential is back in `.env`.
 
-How each process gets the values:
+How each process gets the values. haven is the only 1Password reader: it reads
+the item in its own memory and hands the fields the shell and `.env` leave unset
+to a process as env when it starts it. No value is ever written to a file.
 
-| Started by                  | Who reads 1Password                                                                                                                                                                                                  |
-| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `haven up`                  | haven reads the item once (`op item get`) and hands every field the shell and `.env` leave unset to every process it starts: Node, Go and Python alike. The account is blank in those processes, so none asks again. |
-| `pnpm dev`                  | the same, through `haven secrets exec` when haven is installed; otherwise each Node app's own secrets chain, and the Go services see only `.env`                                                                     |
-| any other script or command | `haven secrets exec -- <command>`                                                                                                                                                                                    |
-| your shell                  | `eval "$(haven env --reveal)"` includes the item's fields                                                                                                                                                            |
+| Started by                  | How it gets the item's fields                                                               |
+| --------------------------- | ------------------------------------------------------------------------------------------- |
+| `haven up`                  | every process haven starts or restarts (Node, Go, Python, the seed and other one-shot jobs) |
+| `pnpm dev`                  | `dev-stack.sh` re-runs itself through `haven secrets exec` when the account is set          |
+| any other script or command | `haven secrets exec -- <command>`                                                           |
+| no haven installed          | none: a credential has to be in `.env` or the shell                                         |
 
 haven counts a key the item holds as configured, so a Stripe or mail key kept
 in 1Password is used and the stand-in is not injected. `haven env` masks every
@@ -99,10 +101,9 @@ value that came from the item, whatever its name.
 
 1Password is best effort: when `op` is missing, locked, signed out or times
 out, haven prints one `haven: 1Password skipped` line with the reason and the
-stack comes up as it would without it. A Node process outside haven probes
-once with `op whoami`, reads each missing handle, and on failure logs one
-`[secrets] 1Password skipped` warning. Unlock 1Password and restart to pick the
-values up. Production refuses the account by name.
+processes start as they would without it. Unlock 1Password and restart to pick
+the values up. Production never reads 1Password; it gets its environment from
+Kubernetes.
 
 ## haven (thuishaven)
 

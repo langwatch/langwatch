@@ -55,7 +55,7 @@ func diffLanes(running, planned []Child) LaneChange {
 func sameLane(a, b *Child) bool {
 	return a.Name == b.Name && a.Dir == b.Dir && a.Shell == b.Shell && slices.Equal(a.Env, b.Env) &&
 		a.ReadyProbeURL == b.ReadyProbeURL && a.LogPath == b.LogPath && a.SplitLog == b.SplitLog &&
-		a.MaxRSSBytes == b.MaxRSSBytes
+		a.MaxRSSBytes == b.MaxRSSBytes && a.SecretsFrom == b.SecretsFrom
 }
 
 // liveLanes is a keeper's running lanes by name.
@@ -70,7 +70,7 @@ func (l *liveLanes) start(c *Child) {
 	laneCtx, cancel := context.WithCancel(l.ctx)
 	lane := &liveLane{child: *c, cancel: cancel, done: make(chan struct{})}
 	l.lanes[c.Name] = lane
-	run := lane.child
+	run := withSecretsAtStart(lane.child)
 	if l.onReap != nil {
 		run.OnReap = func(reason string) { l.onReap(c.Name, reason) }
 	}

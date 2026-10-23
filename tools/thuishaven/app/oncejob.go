@@ -33,7 +33,7 @@ type onceJob struct {
 // still ran, and failing the up over an unwritable log line would be absurd.
 func (o *Orchestrator) runOnceJob(ctx context.Context, job onceJob) error {
 	started := o.sys.Now()
-	err := o.sup.RunOnce(ctx, job.Name, job.Dir, job.Shell, job.Env)
+	err := o.sup.RunOnce(ctx, job.Name, job.Dir, job.Shell, withItemEnv(job.WorktreeDir, job.Env))
 	o.journalOnceJob(job.WorktreeDir, job.Slug, domain.OnceJobRun{
 		Name:       job.Name,
 		At:         started,

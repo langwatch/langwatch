@@ -1,10 +1,11 @@
 Feature: haven resolves development secrets from 1Password
   As a developer keeping every credential in 1Password
-  I want haven to read the LangWatch item once and hand its values to every process it starts
-  So that the root .env holds only config and no service needs a credential line in it
+  I want haven to read the LangWatch item in memory and hand its fields to every process it starts
+  So that the root .env holds only config and no 1Password value is ever written to disk
 
   # ADR-132 amendment 2026-10-23; ARCHITECTURE.md §6. Order is unchanged: the
   # shell, then .env, then the item Private/LangWatch when LANGWATCH_OP_ACCOUNT is set.
+  # haven is the only 1Password reader; values stay in process memory (Alex, 2026-10-23).
 
   @unit
   Scenario: A key only 1Password holds counts as configured
@@ -31,15 +32,19 @@ Feature: haven resolves development secrets from 1Password
     Given LANGWATCH_OP_ACCOUNT is set and op fails or is not on the path
     When haven resolves the development environment
     Then one warning names the reason and no value comes from 1Password
-    And the children keep LANGWATCH_OP_ACCOUNT so the Node chain may try itself
 
   @unit
-  Scenario: Every process haven starts gets the item's values
-    Given haven read the item
-    When haven plans the stack's processes
-    Then each process's environment carries the item's fields the shell and .env leave unset
-    And LANGWATCH_OP_ACCOUNT is blank there, so no process asks 1Password a second time
-    And the stack's own addresses win over a field of the same name
+  Scenario: Every process haven starts reads the item when it starts
+    Given LANGWATCH_OP_ACCOUNT is set and the item holds a field the shell and .env leave unset
+    When the keeper starts or restarts any lane, Node, Go or Python, or runs a one-shot job
+    Then that one process's environment gets the field, read in memory at that moment
+    And the process's own planned env wins over a field of the same name
+
+  @unit
+  Scenario: No 1Password value is written to disk
+    Given a Go lane has already read the item at its start
+    When haven writes the keeper plan
+    Then the plan names which lanes read the item and holds none of its values
 
   @unit
   Scenario: The move is a dry run until it is applied

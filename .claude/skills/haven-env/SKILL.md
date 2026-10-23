@@ -48,12 +48,13 @@ haven help env                    # every knob and where it resolves from
 
 - `.env` holds config only. Credentials live in the 1Password item `Private/LangWatch`, one field per
   env key, with `LANGWATCH_OP_ACCOUNT="<shorthand>"` in `.env` (`dev/docs/LOCAL_STACK.md`).
-- Precedence: shell, then `.env`, then the item. haven reads the item once per `up` and injects its
-  fields into every lane (Node, Go, Python); a key there counts as configured for the stand-ins.
+- Precedence: shell, then `.env`, then the item. haven is the only 1Password reader: it reads the item
+  in memory when it starts or restarts a process and puts the fields into that process's env (never a
+  file); a key there counts as configured for the stand-ins.
 - `haven secrets move` (dry run, key names only), then `haven secrets move --apply --account <shorthand>`
   moves the credential lines out of `.env`. `haven up` warns, naming keys, when one comes back.
 - `haven secrets exec -- <command>` runs any command with the item's fields; `pnpm dev` uses it itself.
-- `haven env` masks every value from the item; `--reveal` includes them for `eval`.
+- `haven env` masks every value from the item that it prints (the passthrough model keys).
 - Logins and tokens are printed by `haven db seed` (`haven-seed`).
 
 ## Machine limits

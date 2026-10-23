@@ -48,7 +48,8 @@ REPO_ROOT="$(cd "$REPO_ROOT/.." && pwd)"
 export NODE_ENV="${NODE_ENV:-development}"
 
 # Credentials kept in 1Password (LANGWATCH_OP_ACCOUNT set): haven reads the item
-# once and runs this script again with its fields, so the Go lanes get them too.
+# in memory and runs this script again with its fields as env, so every lane,
+# Node and Go alike, sees them. haven is the only 1Password reader (ADR-132).
 . "$HERE/lib/env-file-keys.sh"
 if [ -z "${HAVEN_SECRETS_EXEC:-}" ] && command -v haven >/dev/null 2>&1 &&
   { [ -n "${LANGWATCH_OP_ACCOUNT:-}" ] || env_file_key_read LANGWATCH_OP_ACCOUNT "$REPO_ROOT/.env" >/dev/null; }; then

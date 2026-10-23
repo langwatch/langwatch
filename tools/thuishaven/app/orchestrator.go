@@ -1267,7 +1267,7 @@ func (o *Orchestrator) runIngestScript(ctx context.Context, p UpParams, retryCmd
 	if err != nil {
 		return err
 	}
-	return o.sup.RunOnce(ctx, script, p.WorktreeDir, "pnpm run "+script, env)
+	return o.sup.RunOnce(ctx, script, p.WorktreeDir, "pnpm run "+script, withItemEnv(p.WorktreeDir, env))
 }
 
 // liveSeedEnv returns the running stack's complete environment overlay plus a
