@@ -87,6 +87,15 @@ describe("given a mobile number written without its country code", () => {
     });
   });
 
+  describe("when it follows an international number in the same run of digits", () => {
+    /** @scenario "A phone number written without its country code is redacted" */
+    it("redacts both", () => {
+      expect(redact("Tel: +31 20 123 4567 / 06 12345678")).toBe(
+        "Tel: [PHONE_NUMBER] / [PHONE_NUMBER]",
+      );
+    });
+  });
+
   describe("when it is a landline written with its area code", () => {
     /** @scenario "A phone number written without its country code is redacted" */
     it("redacts it", () => {

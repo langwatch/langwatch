@@ -639,8 +639,52 @@ function nationalSpansInCandidate({
 }
 
 /**
- * National-format pass over the digit windows the US pass left alone (`found` holds its
- * spans, in order), each parsed only in the regions {@link regionsForCandidate} keeps.
+ * The parts of the window [start, end) that no span in `found` covers, scanning `found`
+ * from `from` (spans in order). A window the US pass claimed in part keeps its remainder.
+ */
+function uncoveredParts({
+  start,
+  end,
+  found,
+  from,
+}: {
+  start: number;
+  end: number;
+  found: readonly Span[];
+  from: number;
+}): { start: number; end: number }[] {
+  const parts: { start: number; end: number }[] = [];
+  let cursor = start;
+  for (let i = from; i < found.length && found[i]!.start < end; i++) {
+    if (found[i]!.start > cursor) parts.push({ start: cursor, end: found[i]!.start });
+    cursor = Math.max(cursor, found[i]!.end);
+  }
+  if (cursor < end) parts.push({ start: cursor, end });
+  return parts;
+}
+
+/** One uncovered part of a candidate window, parsed when it holds enough digits. */
+function collectNationalSpansInPart({
+  text,
+  part,
+  excepted,
+  spans,
+}: {
+  text: string;
+  part: { start: number; end: number };
+  excepted: (span: Span) => boolean;
+  spans: Span[];
+}): void {
+  const candidate = text.slice(part.start, part.end);
+  if (!hasDigitCount(candidate, NATIONAL_DIGIT_FLOOR)) return;
+  for (const span of nationalSpansInCandidate({ text, candidate, offset: part.start })) {
+    if (!excepted(span)) spans.push(span);
+  }
+}
+
+/**
+ * National-format pass over the digit windows, minus what the US pass already found
+ * (`found`, in order), each part parsed only in the regions {@link regionsForCandidate} keeps.
  */
 function collectNationalFormatPhoneSpans({
   text,
@@ -655,13 +699,11 @@ function collectNationalFormatPhoneSpans({
 }): void {
   let next = 0;
   for (const match of text.matchAll(NATIONAL_CANDIDATE)) {
-    const candidate = match[0];
-    const offset = match.index ?? 0;
-    while (next < found.length && found[next]!.end <= offset) next++;
-    if (next < found.length && found[next]!.start < offset + candidate.length) continue;
-    if (!hasDigitCount(candidate, NATIONAL_DIGIT_FLOOR)) continue;
-    for (const span of nationalSpansInCandidate({ text, candidate, offset })) {
-      if (!excepted(span)) spans.push(span);
+    const start = match.index ?? 0;
+    const end = start + match[0].length;
+    while (next < found.length && found[next]!.end <= start) next++;
+    for (const part of uncoveredParts({ start, end, found, from: next })) {
+      collectNationalSpansInPart({ text, part, excepted, spans });
     }
   }
 }
