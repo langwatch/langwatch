@@ -4,7 +4,11 @@ import {
   CODEX_RECOVERED_CONTENT_SPAN_NAME,
   collectRecoveredCodexTurn,
 } from "./coding-agent-transcript-codex.ts";
-import { extractOutputText, extractOutputMessagesText } from "./coding-agent-transcript-content.ts";
+import {
+  extractAnsweredPromptText,
+  extractOutputText,
+  extractOutputMessagesText,
+} from "./coding-agent-transcript-content.ts";
 import {
   type CodexToolLogContent,
   createSpanEntryAccumulator,
@@ -12,7 +16,7 @@ import {
   fillToolCallGaps,
   type SpanEntryAccumulator,
 } from "./coding-agent-transcript-state.ts";
-import { pickModel, pickNumber } from "./coding-agent-transcript-value.ts";
+import { parseMaybeJson, pickModel, pickNumber } from "./coding-agent-transcript-value.ts";
 import { parseMcpToolName, deriveToolName } from "./telemetry/coding-agent-normalization.ts";
 import { pickString } from "./telemetry/coding-agent-span.ts";
 import { isModelCallSpan } from "./telemetry/index.ts";
@@ -59,6 +63,16 @@ function collectModelCallSpan(span: SpanDetail, accumulator: SpanEntryAccumulato
   accumulator.entries.push(call);
 
   emitSystemPrompt(span, accumulator);
+
+  const promptText = extractAnsweredPromptText(span.input);
+  if (promptText !== null) {
+    accumulator.spanPrompts.push({
+      kind: "user_prompt",
+      atMs: span.startTimeMs,
+      text: promptText,
+      chars: promptText.length,
+    });
+  }
 
   const replyText =
     extractOutputText(span.output) ??
@@ -107,7 +121,8 @@ function collectToolSpan(
     atMs: span.startTimeMs,
     name: toolName,
     mcpServer: parseMcpToolName(toolName)?.server ?? null,
-    input: span.input ?? logContent?.input ?? null,
+    // Parsed, as the log's arguments are, so the line can name what the call ran on.
+    input: (span.input != null ? parseMaybeJson(span.input) : null) ?? logContent?.input ?? null,
     output: span.output ?? logContent?.output ?? null,
     durationMs: computeSpanDurationMs(span),
     failed,

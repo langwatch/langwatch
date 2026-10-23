@@ -87,6 +87,11 @@ export class McpCallerAuthService {
     return extractBearerToken(req.headers.authorization);
   }
 
+  /** What the credential census counts a bearer as: an access token, else a project key. */
+  credentialTypeOf(token: string): "cli_token" | "legacy_project_key" {
+    return token.startsWith(ACCESS_TOKEN_PREFIX) ? "cli_token" : "legacy_project_key";
+  }
+
   /** The rate-limit bucket: the address the rest of the deployment limits on. */
   clientIpOf(req: IncomingMessage): string {
     return this.#collaborators.address.clientIp(req);
