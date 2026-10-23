@@ -97,8 +97,8 @@ catalog:
   '@types/ws': ^8.18.1
   '@typescript/native-preview': 7.0.0-dev.20260506.1
   '@vitejs/plugin-react': ^6.1.1
-  '@vitest/browser': ^5.0.1
-  '@vitest/browser-playwright': ^5.0.1
+  '@vitest/browser': ^5.0.5
+  '@vitest/browser-playwright': ^5.0.5
   '@xyflow/react': ^12.11.1
   ai: ^6.0.217
   ajv: ^8.20.0
@@ -182,7 +182,7 @@ catalog:
   vega: 6.3.1
   vega-lite: 6.4.3
   vite: ^8.3.3
-  vitest: ^5.0.1
+  vitest: ^5.0.5
   vitest-browser-react: ^2.3.0
   web-push: ^3.6.7
   ws: ^8.21.0
@@ -380,5 +380,5 @@ patchedDependencies:
   '@better-auth/sso@1.7.1': patches/@better-auth__sso@1.7.1.patch
   '@better-auth/core@1.7.1': patches/@better-auth__core@1.7.1.patch
   typescript@7.0.2: patches/typescript@7.0.2.patch
-  vitest@5.0.1: patches/vitest@5.0.1.patch
+  vitest@5.0.5: patches/vitest@5.0.5.patch
   oxlint@1.85.0: patches/oxlint@1.85.0.patch
