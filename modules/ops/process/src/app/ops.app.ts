@@ -882,6 +882,7 @@ export class OpsModule implements OpsApi {
         redis: repositories.redisHealth,
         upgradeLedger: repositories.upgradeLedger,
         cloudLatestRelease: repositories.cloudLatestRelease,
+        cloudNotices: repositories.cloudNotices,
       },
       channels: setup.channels,
       // Read only when a report is taken, by which time `app` below exists.

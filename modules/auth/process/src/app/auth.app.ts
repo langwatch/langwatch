@@ -14,6 +14,7 @@ import {
   AuthUnavailableError,
   FrontDoorRateLimitedError,
   NoAddressToConfirmError,
+  type AppPage,
   type AuthApi as AuthApiContract,
   type AuthServerConfig,
   type BrowserSessionInventoryEntry,
@@ -136,6 +137,7 @@ import { resolveDialableIdentityProviderOrigins } from "../rules/trusted-origins
 import { AccountLifecycleService } from "../services/account-lifecycle.service.ts";
 import { AddressConfirmationService } from "../services/address-confirmation.service.ts";
 import type { CliAccessProject } from "../services/api-rest-credentials.service.ts";
+import { AppPageOpenedService } from "../services/app-page-opened.service.ts";
 import { AuthDoorService } from "../services/auth-door.service.ts";
 import {
   AuthLifecycleNoticeService,
@@ -195,7 +197,8 @@ type AuthAppPeers = Readonly<{
   featureFlags: FeatureFlagApi;
   identity: Pick<IdentityApi, "routeSignIn" | "sendOwnAddressConfirmation" | "resolveEmail">;
   /** The sign-up policy, and the invitation an invite link lands on (organization's). */
-  organizations: SignUpPolicy & Pick<OrganizationApi, "getInviteLanding" | "requestFreshInvite">;
+  organizations: SignUpPolicy &
+    Pick<OrganizationApi, "getInviteLanding" | "requestFreshInvite" | "countMembershipsForUser">;
   /** The account writes auth's lifecycle doors run before ending credentials. */
   users: Pick<
     UserApi,
@@ -308,6 +311,7 @@ export class AuthModule implements AuthApiContract {
   readonly #twoStep: TwoStepVerificationService;
   /** Where a session and a domain auto-join are recorded as auth's events. */
   readonly #lifecycle: AuthLifecycleNoticeService;
+  readonly #appPageOpened: AppPageOpenedService;
   /** The account writes that end credentials: deactivation and an address change. */
   readonly #accounts: AccountLifecycleService;
   readonly #ownPasswords: OwnPasswordService;
@@ -440,6 +444,11 @@ export class AuthModule implements AuthApiContract {
     this.#lifecycle = AuthLifecycleNoticeService.create({
       reportError: (error) =>
         logger.error({ error }, "a sign-in milestone was not recorded for nurturing"),
+    });
+    this.#appPageOpened = AppPageOpenedService.create({
+      organizations: dependencies.organizations,
+      lifecycle: this.#lifecycle,
+      reportError: (error) => logger.error({ error }, "a page open was not recorded for nurturing"),
     });
     this.#accounts = AccountLifecycleService.create({
       users: dependencies.users,
@@ -592,6 +601,8 @@ export class AuthModule implements AuthApiContract {
           checkSignUp,
           getInviteLanding: (input) => dependencies.organizations.getInviteLanding(input),
           requestFreshInvite: (input) => dependencies.organizations.requestFreshInvite(input),
+          countMembershipsForUser: (input) =>
+            dependencies.organizations.countMembershipsForUser(input),
         },
         users: dependencies.users,
       },
@@ -1011,6 +1022,15 @@ export class AuthModule implements AuthApiContract {
     currentSessionId?: string | undefined;
   }): Promise<{ ended: number }> {
     return this.#sessions.endBrowserSession(input);
+  }
+
+  recordPageOpened(input: {
+    userId: string;
+    browserSessionId: string | null;
+    page: AppPage;
+    impersonatorId?: string | undefined;
+  }): Promise<void> {
+    return this.#appPageOpened.record(input);
   }
 
   endBrowserSessionsForIdentifier(input: {

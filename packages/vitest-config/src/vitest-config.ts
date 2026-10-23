@@ -4,6 +4,7 @@ import react from "@vitejs/plugin-react";
 import { defineConfig, type ViteUserConfig } from "vitest/config";
 
 import { isolateInVmContexts } from "./isolate-in-vm-contexts.ts";
+import { moduleLoadingCacheExecArgv } from "./module-loading-cache.ts";
 import { splitIsolationByMocking } from "./split-isolation-by-mocking.ts";
 
 // Absolute so it resolves the same regardless of the consuming package's cwd.
@@ -88,6 +89,7 @@ export function moduleVitestTestOptions(
   const resolvedIsolate = isolate === undefined ? false : isolate !== false;
   const fast = fastMode();
   const resolvedCss = css ?? !fast;
+  const cacheExecArgv = fast ? moduleLoadingCacheExecArgv() : [];
   const resolvedSetupFiles = [
     LOGGER_SETUP,
     ...(kind === "unit" ? [CONSOLE_GUARD_SETUP] : []),
@@ -107,6 +109,9 @@ export function moduleVitestTestOptions(
     // transform share of the run entirely.
     // https://vitest.dev/config/#fsmodulecache (top-level since vitest 4.0.11)
     fsModuleCache: fast,
+    // Answers Node's resolution and reads of installed packages in each worker from one
+    // file each, kept per worktree. See ./module-loading-cache.ts.
+    ...(cacheExecArgv.length > 0 ? { execArgv: cacheExecArgv } : {}),
     // https://vitest.dev/config/#fileparallelism
     fileParallelism: true,
     // Skips CSS parse/transform on import. No package under this builder
