@@ -895,6 +895,20 @@ describe("simulationRunStateFoldProjection", () => {
       expect(state.DurationMs).toBeNull();
     });
 
+    it("leaves DurationMs null for a run that finished without starting", () => {
+      // Only a run with a hooks record measures from its queued time (ADR-180).
+      const state = foldEvents([
+        createRunQueuedEvent({}, { occurredAt: 1000 }),
+        createRunFinishedEvent(
+          { results: { verdict: "failure", metCriteria: [], unmetCriteria: [] } },
+          { occurredAt: 3500 },
+        ),
+      ]);
+
+      expect(state.StartedAt).toBeNull();
+      expect(state.DurationMs).toBeNull();
+    });
+
     it("leaves DurationMs null when the finish event precedes the start", () => {
       // Events can arrive out of order. Subtracting these two timestamps would
       // report a negative duration, so the derivation declines instead.

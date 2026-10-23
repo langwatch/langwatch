@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-10 (CLI) · extended 2026-07-14 (app)
 
-**Status:** Accepted (CLI, §Decision · app, §Extension · VS Code, §Extension #2)
+**Status:** Accepted (CLI, §Decision · app, §Extension · VS Code, §Extension #2 · sessions and pull requests, §Extension #3)
 
 > `langwatch copilot` is a first-class wrapped tool with both paths — gateway via BYOK env vars and direct OTLP via native OTel — defaulting to ingestion (sourceType `copilot_cli`), extracted by `copilot.ts`. The standalone Copilot app is captured on the same `copilot.ts` extractor by injecting the same direct-OTLP env at app launch (sourceType `copilot_app`), delivered by a user login agent.
 
@@ -41,7 +41,7 @@ Forcing function: governance program expansion — Copilot is the biggest gap in
 
 9. **Version gate: warn below 1.0.41, mode-independent.** `copilot --version` before spawn (same pre-spawn step as Decision 8); older versions get a one-line upgrade warning and run anyway. Matches the graceful-degradation posture used for codex/gemini version quirks. Rejects a hard minimum (stricter than any existing tool, and copilot auto-updates).
 
-10. **Hooks and events.jsonl are out of scope for v1.** Copilot's OTel carries both tokens and content — unlike codex, whose contentless OTel forced the rollout-tailing harvester. Hook payloads add no token/content data; the transcript format is unversioned. Revisit only if the dogfood spike (Open questions) finds captureContent gaps.
+10. **Hooks and events.jsonl are out of scope for v1.** Copilot's OTel carries both tokens and content — unlike codex, whose contentless OTel forced the rollout-tailing harvester. Hook payloads add no token/content data; the transcript format is unversioned. Revisit only if the dogfood spike (Open questions) finds captureContent gaps. **[Amended, see v8 and §Extension #3:** hooks are now in scope for one job only, repository and branch context for sessions and pull requests. Tokens and content still come from OTel only, and events.jsonl stays out.**]**
 
 ## Constants
 
@@ -114,7 +114,7 @@ specs/ai-governance/cli-wrappers/*.feature          — scenarios for the new to
 - **Per-tool admin provider-type knob** — policy plumbing for a knob nobody will touch.
 - **Copilot-config env persistence** — unverified surface, overridable by managed settings.
 - **Hard version minimum / hard managed-settings fail** — stricter than every existing tool for no data-integrity gain.
-- **v1 events.jsonl harvest / hooks install** — redundant with content-carrying OTel; unversioned format; no tokens in hook payloads.
+- **v1 events.jsonl harvest / hooks install** — redundant with content-carrying OTel; unversioned format; no tokens in hook payloads. (The hooks install is reopened for repository context only, see v8.)
 
 ## Consequences
 
@@ -275,7 +275,82 @@ sourceType `copilot_vscode`, minted as a key distinct from `copilot_cli` / `copi
 - ~~Integrated-terminal exposure~~ — **RESOLVED** (see Revisions): the `code` setup now writes a narrow `terminal.integrated.env.<os>` clear (each telemetry key set to `null`) so integrated terminals never inherit the token; the extension host keeps it (read at launch). Logout removes the clear via the telemetry-targets scan.
 - Turn/usage accounting: one Chat turn emits several sub-agent traces (`panel/editAgent` + `progressMessages` + `title`); analytics must not count internal sub-agent spans as user turns or double-count tokens against the `panel/*` root — needs a filter or a root-span marker before VS Code usage is surfaced.
 
+## Extension: Copilot sessions and pull requests
+
+Makes a Copilot CLI or VS Code session a coding-agent session row, as Claude Code and Codex are, and links it to the pull request it fed. Status: Accepted. Tracked by #8589; decided from the real captures in #8803 (CLI 1.0.79 and 1.0.100, Copilot Chat 0.67). The Copilot app is out of scope: it has not been captured.
+
+### S1. Spans are declared by their GenAI operation, not by name
+
+Copilot follows the OTel GenAI span naming `{operation} {target}` (`chat gpt-6-luna`, `execute_tool rg`, `invoke_agent GitHub Copilot Chat`), so exact names cannot be listed. The definition declares the operation behind each role instead:
+
+```ts
+genAiOperations: { session: "invoke_agent", modelCall: "chat", toolRun: "execute_tool" }
+```
+
+- **Admission:** a span is admitted when the first word of its name is a declared operation **and** the agent detected from its scope is the agent that declared it. A Gemini or OpenCode `chat` span stays out.
+- **Fold:** the projection reads the role and applies the generic fold for it. There is no `copilot` branch in the projection.
+- **One model-call predicate** serves stamping, the fold and the trace browser, read from the declarations.
+
+### S2. Every number comes from the model call
+
+- **Model call (`chat`):** tokens, model and AI units, once per call. CLI 1.0.100 puts `github.copilot.nano_aiu` on every `chat` span; VS Code puts `copilot_chat.copilot_usage_nano_aiu` there.
+- **Session root (`invoke_agent`):** start, end and duration only. Its tokens are the rollup of its calls (v7), so they are never counted.
+- **Tool run (`execute_tool`):** one run per span, named by `gen_ai.tool.name`.
+
+### S3. The session key is `gen_ai.conversation.id`
+
+All three operations carry it on both surfaces (#8803 Q1), and it is already in the shared key order. A Copilot span without it, such as the VS Code title call, is not folded: it never falls back to its trace id, which would mint a row per call.
+
+### S4. Repository and branch come from hooks only
+
+- **Why:** CLI 1.0.100 stopped sending the `github.copilot.git.*` span attributes that 1.0.79 sent, and VS Code sends them as a full remote URL. A span route would need two parsers and would break on the next release.
+- **How:** LangWatch owns one file, `~/.copilot/hooks/langwatch.json` (`$COPILOT_HOME/hooks/` when set). Copilot loads every `*.json` in that folder, so the user's own hook files are never edited. The CLI and VS Code both document it as their user-level hook folder; in the #8803 capture VS Code ran each event once per loaded file, the user-level one included.
+- **Events:** `sessionStart` and `agentStop`, the same pair as Claude Code's `SessionStart` and `Stop`, so a repository switch updates the row under the same rule.
+- **Payload:** `langwatch ingest hook copilot` reads the CLI's `sessionId` or VS Code's `session_id`, and `cwd`. The hook session id equals the span conversation id (#8803 Q4).
+- **Server:** no change. The record is the existing `langwatch.session_context` log with `coding_agent.name = "copilot"`, so the existing log fold sets repository and branch, and pull-request mapping follows.
+- **Key:** the personal ingest key is found by the surface's source type (`copilot_cli` or `copilot_vscode`), not by the agent id. The CLI marks its hooks with `COPILOT_CLI`.
+
+### S5. One per-agent table in the LangWatch CLI
+
+Copilot is added as one row of a single per-agent table (tool slug, server agent id, key source types, session-id source, hook target), replacing the per-command lists. Claude Code, Codex and OpenCode keep identical hook files, records and key lookups.
+
+### S6. Surface and boundaries
+
+- The row keeps agent `copilot` and shows its surface (CLI or VS Code), taken from the source type stamped at the receiver.
+- The `copilot_vscode` receiver policy keeps the `copilot-chat` scope, and the canonicaliser marks its `invoke_agent` like the CLI's. Other scopes from VS Code children are still dropped.
+- Copilot Studio (`copilot_studio.*`) never becomes a coding-agent session.
+
+### S7. Pull-request cost
+
+Per-model tokens come from the S2 model-call fold. AI units are shown as their own count and never enter a dollar total. A model with no price shows its tokens and an unknown cost, never zero.
+
+### Rejected alternatives
+
+- **Span git attributes for repository context:** dropped in CLI 1.0.100; two formats across surfaces.
+- **Prefix lists of span names:** a second matching rule beside the semconv operation, which every GenAI agent already sends.
+- **Merging our entries into the user's hook files:** Copilot loads a whole folder, so an owned file needs no merge or removal logic.
+- **Trace-id fallback for keyless Copilot spans:** one row per call.
+
+### Invariants
+
+| Invariant                                                | Spec                                                                                                           |
+| -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Claude Code and Codex rows, hooks and keys are unchanged | `specs/coding-agent/copilot-sessions.feature`, `specs/ai-governance/cli-wrappers/session-context-hook.feature` |
+| Only the declaring agent's spans are admitted            | `specs/coding-agent/copilot-sessions.feature`                                                                  |
+| Tokens and AI units are counted once, from model calls   | `specs/coding-agent/copilot-sessions.feature`                                                                  |
+| No Copilot span mints a trace-id row                     | `specs/coding-agent/copilot-sessions.feature`                                                                  |
+| AI units never enter dollar totals                       | `specs/coding-agent/copilot-sessions.feature`                                                                  |
+| The user's own hook files are never edited               | `specs/ai-governance/cli-wrappers/session-context-hook.feature`                                                |
+| VS Code keeps `copilot-chat`, drops other scopes         | `specs/ai-governance/ingestion-sources/copilot-vscode-otlp.feature`                                            |
+
+### Open questions
+
+- Whether every VS Code release runs `~/.copilot/hooks` with default settings. The docs say yes (`chat.useHooks` is on by default); one report on VS Code 1.135 says no. The implementer checks on a clean profile before the user docs claim it.
+- A repository may carry its own `.github/hooks` file, so a session can run the same event twice. The hook's existing per-session fingerprint store already drops the repeat.
+
 ## Changelog
+
+- **v8 (2026-10-20, sessions and pull requests from the #8803 captures):** §10 amended: hooks are in scope for repository and branch context only; tokens and content stay OTel-only. Added §Extension #3 (S1 to S7). Facts from the captures: CLI 1.0.100 dropped the `github.copilot.git.*` span attributes; `gen_ai.conversation.id` is on `chat`, `execute_tool` and `invoke_agent`; the hook session id equals it on both surfaces; AI units sit on every `chat` span; `~/.copilot/hooks` is the user-level hook folder of both the CLI and VS Code. The Copilot app is out of scope until it is captured.
 
 - **v7 (2026-08-05, live-wire ruthless review — corrections from a real 1.0.79 capture):** (1) **Token double-count fixed:** copilot's root `invoke_agent` span carries `gen_ai.usage.*` that is the exact rollup of its `chat` children (single turn: chat=15560/153 AND invoke_agent=15560/153, confirmed against copilot's own footer), so every trace folded 2× tokens/cost/cache. The extractor now stamps `langwatch.reserved.skip_token_accumulation` on usage-bearing `invoke_agent` spans — same shape as codex's `handle_responses` marker — with an extractor→fold regression test asserting the trace total. (2) **Scope corrected:** the real wire scope is `github.copilot`, not the v4-recorded `@github/copilot` (kept as a legacy alias in `COPILOT_SCOPES`). (3) **Reasoning tokens:** copilot spells `gen_ai.usage.reasoning.output_tokens`; now mapped to the canonical `gen_ai.usage.reasoning_tokens`. (4) **Seat-bypass wording completed:** the interactive prompt's gateway answer — the route that actually moves spend — now names the shift; the explicit/pinned notices are policy-gated so a run the org downgrades to ingestion isn't falsely warned. (5) **Key-refresh parity:** the per-run scoped-function re-sync now covers every `SHELL_FUNCTION_TOOLS` member (copilot was excluded — bare `copilot` would 401 forever after a key re-mint, the #6202 class).
 - **v6 (2026-07-31, superseded-by-#6343 alignment):** main's #6343 made the wrapper **ingestion-first for every tool** and removed the ingestion-mint-failure fallback onto the gateway (an expired session now recovers inline and retries the same path; other mint failures stop the run; a prompt abort cancels the run). This universalizes Decision 3's billing-safety goal, so the copilot-specific mechanics it introduced are gone: `silentDefaultMode`'s copilot carve-out (all three flips) and the seat-bypass suffix on the mint-failure fallback message. Decision 3's surviving copilot-specific contract is the **wording**: every remaining route that puts copilot on the gateway — org policy or an explicit choice — names the Copilot-seat bypass (`copilotSeatBypassSuffix`, applied at the policy-downgrade notice in `wrapper-mode.ts` and the single-allowed-path branch in `wrapper-path-choice.ts`). `specs/ai-governance/cli-wrappers/copilot-path-defaults.feature` reframed accordingly.

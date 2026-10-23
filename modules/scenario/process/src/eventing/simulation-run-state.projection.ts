@@ -20,6 +20,7 @@ import {
   SimulationRunCutAtLimitRecordedEventSchema,
   SimulationRunDeletedEventSchema,
   SimulationRunEvaluatedEventSchema,
+  SimulationRunHooksRecordedEventSchema,
   SimulationRunFinishedEventSchema,
   SimulationRunMetadataRefreshedEventSchema,
   SimulationRunMetricsComputedEventSchema,
@@ -36,6 +37,7 @@ import {
   type SimulationRunCutAtLimitRecordedEvent,
   type SimulationRunDeletedEvent,
   type SimulationRunEvaluatedEvent,
+  type SimulationRunHooksRecordedEvent,
   type SimulationRunFinishedEvent,
   type SimulationRunMetadataRefreshedEvent,
   type SimulationRunMetricsComputedEvent,
@@ -305,6 +307,7 @@ const simulationRunEvents = [
   SimulationRunAgentInstanceRecordedEventSchema,
   SimulationRunCutAtLimitRecordedEventSchema,
   SimulationRunMetadataRefreshedEventSchema,
+  SimulationRunHooksRecordedEventSchema,
   SimulationRunDeletedEventSchema,
 ] as const;
 
@@ -712,6 +715,11 @@ export class SimulationRunStateFoldProjection
       attachmentCount: event.data.evaluators?.attachments.length ?? 0,
     });
 
+    const derivedDurationMs =
+      state.StartedAt !== null && event.occurredAt >= state.StartedAt
+        ? event.occurredAt - state.StartedAt
+        : null;
+
     return {
       ...state,
       ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
@@ -727,14 +735,8 @@ export class SimulationRunStateFoldProjection
       // event. An evaluated event that folded before this one (business time
       // can land it first) already wrote its results, which stay.
       Evaluations: results?.evaluations ?? state.Evaluations,
-      // Derived because the SDK ingest path never carries it — every real run
-      // derives DurationMs; only a synthetic event supplies one. The fold
-      // already holds both ends, so a supplied value still wins when present.
-      DurationMs:
-        event.data.durationMs ??
-        (state.StartedAt !== null && event.occurredAt >= state.StartedAt
-          ? event.occurredAt - state.StartedAt
-          : null),
+      // The SDK ingest path never carries it; a supplied value still wins.
+      DurationMs: event.data.durationMs ?? derivedDurationMs,
       FinishedAt: event.occurredAt,
     };
   }
@@ -853,6 +855,28 @@ export class SimulationRunStateFoldProjection
         metadata: state.Metadata,
         refresh: event.data.metadata,
       }),
+    };
+  }
+
+  /** The hook results land in `langwatch.hooks`; status, verdict and finish time stay. */
+  handleSimulationRunHooksRecorded(
+    event: SimulationRunHooksRecordedEvent,
+    state: SimulationRunStateData,
+  ): SimulationRunStateData {
+    // A failed setup never starts the scenario, so a run with hooks is measured from its queued
+    // time; any other run that never started keeps no duration.
+    const { DurationMs, StartedAt, QueuedAt, FinishedAt } = state;
+    const measuresFromQueue =
+      DurationMs === null &&
+      StartedAt === null &&
+      QueuedAt !== null &&
+      FinishedAt !== null &&
+      FinishedAt >= QueuedAt;
+    return {
+      ...state,
+      ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
+      Metadata: mergeLangwatchNamespace(state.Metadata, { hooks: event.data.hooks }),
+      DurationMs: measuresFromQueue ? FinishedAt - QueuedAt : DurationMs,
     };
   }
 

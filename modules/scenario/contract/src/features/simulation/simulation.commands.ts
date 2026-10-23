@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { scenarioCriterionResultSchema } from "../../scenario-criterion-result.ts";
 import { scenarioEvaluationResultSchema } from "../../schemas/event-schemas.ts";
+import { scenarioRunHooksSchema } from "../execution/scenario-hooks.ts";
 import { runEvaluatorsSchema } from "../run/scenario-run-evaluators.ts";
 import {
   simulationQueuedTargetSchema,
@@ -139,6 +140,18 @@ export interface SimulationRecordAgentInstanceSchema extends Named<
 export const simulationRecordAgentInstanceSchema: SimulationRecordAgentInstanceSchema =
   simulationRecordAgentInstanceSchemaDefinition;
 export type SimulationRecordAgentInstance = z.infer<typeof simulationRecordAgentInstanceSchema>;
+
+/** The setup and teardown results of a run, reported by the child (ADR-180). */
+const simulationRecordHooksSchemaDefinition = z.object({
+  ...simulationRunIdentitySchema.shape,
+  hooks: scenarioRunHooksSchema,
+});
+export interface SimulationRecordHooksSchema extends Named<
+  typeof simulationRecordHooksSchemaDefinition
+> {}
+export const simulationRecordHooksSchema: SimulationRecordHooksSchema =
+  simulationRecordHooksSchemaDefinition;
+export type SimulationRecordHooks = z.infer<typeof simulationRecordHooksSchema>;
 
 /** A voice run LangWatch ended at the maximum call duration, reported by the child. */
 export const simulationRecordCutAtLimitSchema = simulationRunIdentitySchema;

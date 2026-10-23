@@ -239,6 +239,10 @@ model User {
   /// answered. The browser's own permission is not stored here.
   /// Spec: specs/langy/langy-notifications.feature
   notificationPreferences       Json                     @default("{}")
+  /// When an operator marked this person's password as no longer trusted. A
+  /// password sign-in opens no session while it is set; any write of a new
+  /// password hash clears it. Spec: modules/auth/specs/forced-password-reset.feature
+  passwordResetRequiredAt       DateTime?
   Annotation                    Annotation[]
   shareLinks                    ShareLink[]
   Workflow                      Workflow[]
@@ -4818,12 +4822,17 @@ model NurturingProject {
 /// Nurturing's read model per organization: its admin and its milestone counts.
 /// `seeded` marks an organization learned from the project backfill: its first_* already happened.
 model NurturingOrganization {
-  organizationId     String   @id
-  adminUserId        String?
-  seeded             Boolean  @default(false)
-  evaluationCount    Int      @default(0)
-  simulationRunCount Int      @default(0)
-  updatedAt          DateTime @updatedAt
+  organizationId       String    @id
+  adminUserId          String?
+  seeded               Boolean   @default(false)
+  evaluationCount      Int       @default(0)
+  simulationRunCount   Int       @default(0)
+  // Each coding signal is written by one conditional update (null-only, not-has, lt-day).
+  codingFirstSessionAt DateTime?
+  codingAgentTypes     String[]  @default([])
+  codingActiveDays     Int       @default(0)
+  codingLastActiveDay  String? // UTC `YYYY-MM-DD`; sorts lexically
+  updatedAt            DateTime  @updatedAt
 }
 
 model BillingMeterCheckpoint {
@@ -7110,6 +7119,9 @@ model InstanceIdentity {
   /// Hostname, which names the customer's own network and so has a switch of
   /// its own rather than travelling with its category.
   hostnameOptOut                         Boolean   @default(false)
+  /// Sending a failed upgrade step's diagnostics to LangWatch on its own,
+  /// switched off by the operator (upgrade-diagnostics-via-connect, decision 4).
+  upgradeDiagnosticsOptOut               Boolean   @default(false)
 }
 
 /// One self-hosted install, as its daily usage report describes it (ADR-139,
@@ -7183,6 +7195,32 @@ model SelfHostedInstance {
   @@index([lastSeenAt])
   @@index([organizationId])
   @@index([issuedLicenseId])
+}
+
+/// One upgrade diagnostics bundle a self-hosted install sent over Connect, on
+/// LangWatch Cloud. The bytes live in object storage under
+/// `upgrade-diagnostics/` and expire at 30 days by a lifecycle rule; this row
+/// points at them and feeds Cloud admin and the Slack signal. Plain column
+/// refs, no relation, as the usage report rows.
+model SelfHostedInstanceDiagnostic {
+  id               String    @id
+  /// The `SelfHostedInstance.instanceId` the licence caller presented.
+  instanceId       String
+  stepId           String
+  stepDescription  String?
+  release          String?
+  attempt          Int
+  /// `operator` or `automatic`.
+  trigger          String
+  byteLength       Int
+  objectKey        String
+  receivedAt       DateTime  @default(now())
+  /// When the lifecycle rule removes the bundle; the row is listed until then.
+  expiresAt        DateTime
+  /// Set on the report that posted this step and release's one Slack message.
+  slackAnnouncedAt DateTime?
+
+  @@index([instanceId, receivedAt])
 }
 
 /// One usage report, exactly as it arrived. Kept so a number on an install's

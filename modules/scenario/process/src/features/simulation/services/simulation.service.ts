@@ -5,6 +5,7 @@ import {
   simulationRecordAgentInstanceSchema,
   simulationRecordCutAtLimitSchema,
   simulationRefreshMetadataSchema,
+  simulationRecordHooksSchema,
   simulationFinishRunSchema,
   recordEvaluationsCommandDataSchema,
   simulationMessageSnapshotSchema,
@@ -26,6 +27,7 @@ import type {
   SimulationRecordAgentInstance,
   SimulationRecordCutAtLimit,
   SimulationRefreshMetadata,
+  SimulationRecordHooks,
   SimulationExportFilterInput,
   SimulationExportRunsInput,
   SimulationExternalSetCountInput,
@@ -206,5 +208,9 @@ export class SimulationService extends SimulationServiceContract {
 
   refreshMetadata(input: SimulationRefreshMetadata): Promise<void> {
     return this.execution.refreshMetadata(simulationRefreshMetadataSchema.parse(input));
+  }
+
+  recordHooks(input: SimulationRecordHooks): Promise<void> {
+    return this.execution.recordHooks(simulationRecordHooksSchema.parse(input));
   }
 }

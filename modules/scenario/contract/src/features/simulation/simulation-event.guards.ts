@@ -6,6 +6,7 @@ import type {
   SimulationMessageSnapshotEvent,
   SimulationProcessingEvent,
   SimulationRunAgentInstanceRecordedEvent,
+  SimulationRunHooksRecordedEvent,
   SimulationRunCancelRequestedEvent,
   SimulationRunCutAtLimitRecordedEvent,
   SimulationRunDeletedEvent,
@@ -83,6 +84,12 @@ export function isSimulationRunMetadataRefreshedEvent(
   event: SimulationProcessingEvent,
 ): event is SimulationRunMetadataRefreshedEvent {
   return event.type === SIMULATION_RUN_EVENT_TYPES.METADATA_REFRESHED;
+}
+
+export function isSimulationRunHooksRecordedEvent(
+  event: SimulationProcessingEvent,
+): event is SimulationRunHooksRecordedEvent {
+  return event.type === SIMULATION_RUN_EVENT_TYPES.HOOKS_RECORDED;
 }
 
 export function isSimulationRunCancelRequestedEvent(

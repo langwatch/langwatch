@@ -4,7 +4,7 @@ import {
   limitReachedEventDataSchema,
   USAGE_LIMIT_REACHED_EVENT_TYPE,
 } from "@langwatch/entitlement-contract";
-import type { PeerSubscriberDefinition } from "@langwatch/eventing";
+import type { PeerEventSubscriberDefinition } from "@langwatch/eventing";
 
 export const BILLING_PLAN_LIMIT_REACHED_SUBSCRIBER_NAME = "usageLimitReached";
 
@@ -13,7 +13,7 @@ export function planLimitReachedSubscriber({
   alerts,
 }: {
   alerts: { notifyPlanLimitReached(input: PlanLimitNotifierInput): Promise<void> };
-}): PeerSubscriberDefinition<typeof limitReachedEventDataSchema> {
+}): PeerEventSubscriberDefinition<typeof limitReachedEventDataSchema> {
   return {
     eventType: USAGE_LIMIT_REACHED_EVENT_TYPE,
     data: limitReachedEventDataSchema,

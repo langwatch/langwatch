@@ -1,11 +1,23 @@
-import type {
-  EvaluationProcessingEvent,
-  ExecuteEvaluationCommandData,
+import {
+  EVALUATION_ATTEMPT_FAILED_EVENT_TYPE,
+  EVALUATION_ATTEMPT_FAILED_EVENT_VERSION_LATEST,
+  evaluationAttemptFailedEventDataSchema,
+  type EvaluationAttemptFailedEvent,
+  type EvaluationProcessingEvent,
+  type ExecuteEvaluationCommandData,
+  deriveVerdictPassed,
+  deriveVerdictScore,
 } from "@langwatch/evaluation-contract";
-import { deriveVerdictPassed, deriveVerdictScore } from "@langwatch/evaluation-contract";
+import { createTenantId, EventUtils } from "@langwatch/eventing";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
 
+import {
+  evaluationRetryDelayMs,
+  isWithinEvaluationRetryWindow,
+} from "../../../rules/evaluation-retry-window.rules.ts";
+import type { EvaluationCommandDispatcherService } from "../../../services/evaluation-command-dispatcher.service.ts";
 import {
   type EvaluationReportedEventService,
   type EvaluationReportedResult,
@@ -15,6 +27,14 @@ import type { EvaluationExecutionReceiptService } from "./evaluation-execution-r
 
 const logger = createLogger("langwatch:evaluation-processing:execute-evaluation");
 
+/** The next attempt of an evaluation whose evaluator service was not up. */
+type PlannedRetry = { attempt: number; delayMs: number; nextAttemptAt: number };
+
+/** An evaluator service that is not up (retryable `evaluator_execution_error`). */
+function isEvaluatorNotUp(error: HandledError): boolean {
+  return error.code === "evaluator_execution_error" && error.retryable;
+}
+
 function isCustomerFixable(error: unknown): error is HandledError {
   return HandledError.isHandled(error) && error.fault === "customer" && !error.retryable;
 }
@@ -23,6 +43,8 @@ export class EvaluationExecutionOutcomeService {
   static create(input: {
     executionReceipt: Pick<EvaluationExecutionReceiptService, "execute">;
     reportedEvents: EvaluationReportedEventService;
+    retries: Pick<EvaluationCommandDispatcherService, "retryEvaluation">;
+    retryWindowMs: number;
   }): EvaluationExecutionOutcomeService {
     return new EvaluationExecutionOutcomeService(input);
   }
@@ -31,6 +53,8 @@ export class EvaluationExecutionOutcomeService {
     private readonly deps: {
       executionReceipt: Pick<EvaluationExecutionReceiptService, "execute">;
       reportedEvents: EvaluationReportedEventService;
+      retries: Pick<EvaluationCommandDispatcherService, "retryEvaluation">;
+      retryWindowMs: number;
     },
   ) {}
 
@@ -102,12 +126,14 @@ export class EvaluationExecutionOutcomeService {
     return this.deps.reportedEvents.emit(data, reported);
   }
 
-  private handleFailure(
+  private async handleFailure(
     data: ExecuteEvaluationCommandData,
     error: unknown,
   ): Promise<EvaluationProcessingEvent[]> {
     if (HandledError.isHandled(error) && error.retryable) {
-      throw error;
+      if (!isEvaluatorNotUp(error)) throw error;
+      const retry = this.planRetry({ data, error });
+      if (retry) return this.retryLater({ data, error, retry });
     }
 
     if (isCustomerFixable(error)) {
@@ -147,5 +173,74 @@ export class EvaluationExecutionOutcomeService {
       error: message,
       errorDetails: error instanceof Error ? (error.stack ?? null) : null,
     });
+  }
+
+  /** The next attempt, unless it would start after the retry window, measured from the first. */
+  private planRetry({
+    data,
+    error,
+  }: {
+    data: ExecuteEvaluationCommandData;
+    error: HandledError;
+  }): PlannedRetry | undefined {
+    const attempt = data.attempt ?? 1;
+    const asked = error.meta.retryAfterMs;
+    const retryAfterMs = typeof asked === "number" && asked > 0 ? asked : undefined;
+    const delayMs = evaluationRetryDelayMs({ attempt, retryAfterMs });
+    const nextAttemptAt = nowInstant().epochMilliseconds + delayMs;
+    const inWindow = isWithinEvaluationRetryWindow({
+      occurredAt: data.occurredAt,
+      now: nextAttemptAt,
+      windowMs: this.deps.retryWindowMs,
+    });
+    return inWindow ? { attempt, delayMs, nextAttemptAt } : undefined;
+  }
+
+  /** Sends the next attempt, delayed, and records this one as failed; no result yet. */
+  private async retryLater({
+    data,
+    error,
+    retry,
+  }: {
+    data: ExecuteEvaluationCommandData;
+    error: HandledError;
+    retry: PlannedRetry;
+  }): Promise<EvaluationProcessingEvent[]> {
+    logger.warn(
+      {
+        tenantId: data.tenantId,
+        evaluationId: data.evaluationId,
+        evaluatorId: data.evaluatorId,
+        attempt: retry.attempt,
+        nextAttemptAt: retry.nextAttemptAt,
+        error: error.message,
+      },
+      "Evaluator service not up; the evaluation is retried",
+    );
+    await this.deps.retries.retryEvaluation({
+      data: { ...data, attempt: retry.attempt + 1 },
+      delayMs: retry.delayMs,
+    });
+
+    const event = EventUtils.createEvent<EvaluationAttemptFailedEvent>({
+      aggregateType: "evaluation",
+      aggregateId: data.evaluationId,
+      tenantId: createTenantId(data.tenantId),
+      type: EVALUATION_ATTEMPT_FAILED_EVENT_TYPE,
+      version: EVALUATION_ATTEMPT_FAILED_EVENT_VERSION_LATEST,
+      data: evaluationAttemptFailedEventDataSchema.parse({
+        evaluationId: data.evaluationId,
+        evaluatorId: data.evaluatorId,
+        evaluatorType: data.evaluatorType,
+        evaluatorName: data.evaluatorName,
+        traceId: data.traceId,
+        isGuardrail: data.isGuardrail,
+        attempt: retry.attempt,
+        error: error.message,
+        nextAttemptAt: retry.nextAttemptAt,
+      }),
+      idempotencyKey: `${data.tenantId}:${data.evaluationId}:attempt_failed:${retry.attempt}`,
+    });
+    return [event];
   }
 }

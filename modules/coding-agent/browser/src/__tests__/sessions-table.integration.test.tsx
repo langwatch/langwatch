@@ -75,6 +75,8 @@ function pinSessions(data: unknown) {
 /** One session row, filled in around whatever a case pins. */
 function sessionRow(over: Record<string, unknown> = {}) {
   return {
+    tenantId: "proj-personal",
+    projectName: "Personal",
     sessionId: "session-1",
     title: "Link sessions to pull requests",
     agent: "claude_code",
@@ -147,6 +149,14 @@ let host: FakeCodingAgentActivityHost;
 function renderTable() {
   host = fakeCodingAgentActivityHost();
   return render(tableElement(), { wrapper: codingAgentHostWrapper(host) });
+}
+
+/** The same table mounted on a group project, which lists its member projects' sessions. */
+function renderGroupTable() {
+  host = fakeCodingAgentActivityHost();
+  return render(<SessionsTable projectId="proj-group" projectSlug="acme-group" />, {
+    wrapper: codingAgentHostWrapper(host),
+  });
 }
 
 /** Every address the table wrote, in order. */
@@ -702,5 +712,110 @@ describe("the personal Sessions table", () => {
       expect(headingFor("Context")).toHaveAttribute("aria-sort", "descending");
       expect(host.recording.navigations).toEqual([]);
     });
+  });
+});
+
+describe("the group project's Sessions table", () => {
+  describe("given two member projects that recorded the same session id", () => {
+    beforeEach(() => {
+      pinSessions([
+        sessionRow({
+          tenantId: "member-a",
+          projectName: "Alice's workspace",
+          sessionId: "shared",
+          title: "Session from member A",
+          lastEventOccurredAtMs: LONG_AGO + DAY_MS,
+        }),
+        sessionRow({
+          tenantId: "member-b",
+          projectName: "Bob's workspace",
+          sessionId: "shared",
+          title: "Session from member B",
+        }),
+      ]);
+    });
+
+    const rowTitled = (title: string): HTMLTableRowElement => {
+      const row = screen.getByText(title).closest("tr");
+      if (row === null) throw new Error(`no row is titled ${title}`);
+      return row;
+    };
+
+    /**
+     * @see specs/governance/aggregate-project.feature
+     * @scenario "The group project's Sessions page names the member project on each row"
+     */
+    it("draws both sessions as their own rows, each naming its member project", () => {
+      renderGroupTable();
+
+      expect(listedTitles()).toEqual(["Session from member A", "Session from member B"]);
+      expect(
+        screen.getAllByTestId("coding-agent-session-project").map((cell) => cell.textContent),
+      ).toEqual(["Alice's workspace", "Bob's workspace"]);
+    });
+
+    /**
+     * @see specs/governance/aggregate-project.feature
+     * @scenario "Opening a member project's session replays that member's conversation"
+     */
+    it("reads member B's conversation for member B's row and leaves member A's row idle", async () => {
+      let resolveTurns: (value: unknown) => void = () => undefined;
+      utils.traces.conversationContext.fetch.mockReturnValue(
+        new Promise((resolve) => {
+          resolveTurns = resolve;
+        }),
+      );
+      const user = userEvent.setup();
+      renderGroupTable();
+
+      await user.click(screen.getByText("Session from member B"));
+
+      expect(utils.traces.conversationContext.fetch).toHaveBeenCalledWith({
+        projectId: "proj-group",
+        conversationId: "shared",
+        tenantId: "member-b",
+      });
+      expect(rowTitled("Session from member B")).toHaveAttribute("aria-busy", "true");
+      expect(rowTitled("Session from member A")).toHaveAttribute("aria-busy", "false");
+
+      resolveTurns({ conversationId: "shared", total: 1, turns: [turn()] });
+      await waitFor(() =>
+        expect(writtenQueries()).toEqual([
+          {
+            "drawer.open": "traceV2Details",
+            "drawer.traceId": "trace-last",
+            "drawer.t": String(LONG_AGO + 5_000),
+            "drawer.mode": "terminal",
+            "drawer.projectId": "proj-group",
+            "drawer.tenantId": "member-b",
+          },
+        ]),
+      );
+    });
+
+    it("pays for member B's lookup on hover under member B", async () => {
+      const user = userEvent.setup();
+      renderGroupTable();
+
+      await user.hover(screen.getByText("Session from member B"));
+
+      expect(utils.traces.conversationContext.prefetch).toHaveBeenCalledWith({
+        projectId: "proj-group",
+        conversationId: "shared",
+        tenantId: "member-b",
+      });
+    });
+  });
+
+  /**
+   * @see specs/governance/aggregate-project.feature
+   * @scenario "The group project's Sessions page names the member project on each row"
+   */
+  it("names no project when every row came from one", () => {
+    pinSessions([sessionRow(), sessionRow({ sessionId: "session-2", title: "Second session" })]);
+
+    renderTable();
+
+    expect(screen.queryAllByTestId("coding-agent-session-project")).toEqual([]);
   });
 });

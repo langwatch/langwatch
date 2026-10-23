@@ -34,7 +34,8 @@ import { TraceAnalyticsRollupMapProjection } from "../../../../eventing/trace-ro
 import { TraceSummaryFoldProjection } from "../../../../eventing/trace-summary.projection.ts";
 import { RedisTraceSpanDedupRepository } from "../../../../repositories/redis/redis.trace-span-dedup.repository.ts";
 import { TraceCanonicalisationService } from "../../../derivation/services/trace-canonicalisation.service.ts";
-import { TraceIngressCommand, TraceIngestionService } from "../trace-ingestion.service.ts";
+import { TraceIngestionService } from "../trace-ingestion.service.ts";
+import { type RecordSpanOutcome, TraceIngressCommand } from "../trace-span-collection.service.ts";
 
 const redisUrl = process.env.LANGWATCH_TEST_REDIS_URL;
 const TENANT_ID = "claude-otel-test-project";
@@ -61,6 +62,11 @@ class RecordingIngressCommand extends TraceIngressCommand {
       data,
     });
     this.events.push(...events);
+  }
+
+  async recordSpans(data: readonly RecordSpanCommandData[]): Promise<RecordSpanOutcome[]> {
+    for (const each of data) await this.recordSpan(each);
+    return data.map(() => ({ status: "recorded" }));
   }
 }
 
