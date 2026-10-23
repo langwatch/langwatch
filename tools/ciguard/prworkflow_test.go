@@ -84,7 +84,7 @@ func TestPRFiltersHoldEveryPathACheckConsults(t *testing.T) {
 	root := prTree(t, keep)
 	filters, err := PRFilters(root)
 	require.NoError(t, err)
-	require.Contains(t, filters, "docs:\n  - 'docs/**'\n  - 'ingest/docs/**'\n  - '.github/workflows/pr.yml'\n  - '.github/pr-filters.yml'\n")
+	require.Contains(t, filters, "docs:\n  - \"docs/**\"\n  - \"ingest/docs/**\"\n  - \".github/workflows/pr.yml\"\n  - \".github/pr-filters.yml\"\n")
 
 	stale := filepath.Join(root, ciscan.WorkflowDir, "docs-ci.yml")
 	content, err := os.ReadFile(stale)

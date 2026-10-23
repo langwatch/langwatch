@@ -179,7 +179,7 @@ func PRFilters(repoRoot string) (string, error) {
 		}
 		fmt.Fprintf(&out, "%s:\n", call.Key)
 		for _, path := range paths {
-			fmt.Fprintf(&out, "  - '%s'\n", strings.ReplaceAll(path, "'", "''"))
+			fmt.Fprintf(&out, "  - %q\n", path) // double quotes, as oxfmt writes them
 		}
 	}
 

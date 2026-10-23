@@ -136,7 +136,20 @@ jobs:
   # The one verdict. Until the ruleset requires `ci-complete`, it also posts
   # the names main still requires, each from the call that used to report it.
   ci-complete:
-    needs: [changes, app, e2e, nlp, langevals, mcp, sdk-go, sdk-javascript, docs, codeql, clickhouse-serverless]
+    needs:
+      [
+        changes,
+        app,
+        e2e,
+        nlp,
+        langevals,
+        mcp,
+        sdk-go,
+        sdk-javascript,
+        docs,
+        codeql,
+        clickhouse-serverless,
+      ]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
