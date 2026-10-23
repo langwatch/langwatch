@@ -127,7 +127,8 @@ accepts the token only when all of these are true:
 
 - An asymmetric key of the user's issuer signed it (RS, PS, ES or EdDSA).
 - Its `iss` equals the issuer's `url`, and its `aud` contains the audience.
-- Its `exp` is in the future, with 30 seconds of clock leeway.
+- Its `exp` is in the future. There is no leeway: the token stops working at
+  that second. Its `nbf` gets 30 seconds of clock leeway.
 - Its `username_claim` equals the user's `subject`.
 - Every `required_claims` entry matches.
 
@@ -251,6 +252,67 @@ users:
 
 Each user names its subject explicitly. A new person gets access only when you
 add their user, and removing the user ends their access at the next sync.
+
+## Dynamic-only mode
+
+Dynamic-only mode removes every long-lived password from ClickHouse. People and
+workloads log in with short-lived OIDC tokens only. A password leaked from a
+Secret, Terraform state, a backup or a laptop is then of no use, because there
+is none, and a leaked token expires within minutes.
+
+Turn it on with `mode: dynamic-only` at the top of the access file. Under Helm,
+set `clickhouse.access.dynamicOnly.enabled: true` instead:
+
+```yaml
+clickhouse:
+  auth:
+    clusterSecretEnabled: true        # required with more than one replica
+  access:
+    enabled: true
+    dynamicOnly:
+      enabled: true
+    config:
+      issuers:
+        - name: cluster
+          url: https://oidc.eks.eu-west-1.amazonaws.com/id/EXAMPLE
+      users:
+        - name: grafana
+          tier: read
+          databases: [langwatch]
+          login:
+            token: { issuer: cluster, subject: "system:serviceaccount:monitoring:grafana" }
+```
+
+In this mode the server:
+
+- refuses to start with `CLICKHOUSE_PASSWORD`, a rolling user, or any other
+  file-defined user with a password, and names each one;
+- locks `default`: no address may log in as it;
+- refuses `CREATE USER ... IDENTIFIED BY`, and logs any SQL user that still has
+  a password;
+- generates a `local_admin` password at every start, valid only from inside the
+  pod, for initialisation scripts and in-pod tools.
+
+Give each workload a token that lives for minutes. A projected ServiceAccount
+token with `expirationSeconds: 600` works; the kubelet renews the file before
+it expires. **Read the token file for each connection or request**, and never
+reuse a token after it expires.
+
+<Warning>
+Every login depends on the access sidecar in this mode. The chart takes a pod
+out of its Service until the sidecar has fetched every issuer's keys, and
+Kubernetes restarts a sidecar that stops answering. An issuer that is down when
+a pod starts keeps that pod unready.
+</Warning>
+
+What it does not protect against: an attacker inside the ClickHouse pod; anyone
+who can mint tokens for a mapped subject (the issuer's key, or creating
+ServiceAccount tokens or pods in Kubernetes); and the cluster secret, which
+replicas share and which still works for anyone who reaches port 9000. Rotate
+the cluster secret by changing it and restarting every replica together.
+
+LangWatch itself connects with a password today. Run dynamic-only mode for
+separate tools, or wait for the app to support token logins.
 
 ## Enabling access
 
