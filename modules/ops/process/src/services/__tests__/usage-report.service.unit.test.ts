@@ -50,6 +50,7 @@ class InstallStandIn implements UsageReportInstall {
         createdAt: "2026-08-01T00:00:00.000Z",
         optionalMetricsOptOut: false,
         hostnameOptOut: false,
+        upgradeDiagnosticsOptOut: false,
       };
     }
     return this.identity.instanceId;
@@ -327,10 +328,25 @@ describe("the usage report preview", () => {
 
       const preview = await service().setSwitches({ optionalMetricsOptOut: true });
 
-      expect(preview.switches).toEqual({ optional: false, hostname: true });
+      expect(preview.switches).toEqual({
+        optional: false,
+        hostname: true,
+      });
       expect(preview.payload.user_email_domains).toBeUndefined();
       expect(preview.payload.totalTraces).toBeUndefined();
       expect(preview.payload.ops_health).toBeUndefined();
+    });
+  });
+
+  describe("when the identity row has opted out of upgrade diagnostics", () => {
+    it("leaves that switch out of the report's switches, which name only what the report sends", async () => {
+      await install.getInstanceId();
+      if (install.identity)
+        install.identity = { ...install.identity, upgradeDiagnosticsOptOut: true };
+
+      const preview = await service().preview();
+
+      expect(preview.switches).toEqual({ optional: true, hostname: true });
     });
   });
 

@@ -12,6 +12,7 @@ import type {
   CreateUserInput,
   CreatedUser,
   CredentialAccountInput,
+  PasswordHolder,
   RemoveUserAvatarInput,
   RotateUserPasswordInput,
   SetOwnAvatarInput,
@@ -95,6 +96,11 @@ export interface UserApi {
   registerCredentialAccount(input: CredentialAccountInput): Promise<CreatedUser>;
   hasPassword(input: UserIdInput): Promise<boolean>;
   setFirstPassword(input: SetFirstUserPasswordInput): Promise<SetFirstUserPasswordResult>;
+  /** Holders of a credential password, oldest id first; `emails` narrows to those addresses,
+   *  matched in any case. Read by auth's require-password-reset task. */
+  findPasswordHolders(input: { emails: readonly string[] | null }): Promise<PasswordHolder[]>;
+  /** Marks these users' passwords as requiring a reset now; a mark already set keeps its time. */
+  markPasswordResetRequired(input: { userIds: readonly string[] }): Promise<{ marked: number }>;
   /** Whether to offer this person a passkey or two-step verification now, on this session. */
   getPasskeyOffer(
     input: UserIdInput & { sessionId: string | null },

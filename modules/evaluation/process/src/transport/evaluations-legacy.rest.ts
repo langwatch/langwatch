@@ -182,6 +182,7 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
   })
 
   .post("/api/evaluations/:evaluator/evaluate", "postApiEvaluationsByEvaluatorEvaluate")
+  .keepsRecords()
   .withoutAudit("run, not a change")
   .withSharedPath(EXPERIMENT_NAMESPACE)
   .withParams(evaluatorParamsSchema)
@@ -216,6 +217,7 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
     "/api/evaluations/:evaluator/:subpath/evaluate",
     "postApiEvaluationsByEvaluatorBySubpathEvaluate",
   )
+  .keepsRecords()
   .withoutAudit("run, not a change")
   .withSharedPath(EXPERIMENT_NAMESPACE)
   .withParams(namespacedEvaluatorParamsSchema)
@@ -247,6 +249,7 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
   )
 
   .post("/api/guardrails/:evaluator/evaluate", "postApiGuardrailsByEvaluatorEvaluate")
+  .keepsRecords()
   .withoutAudit("run, not a change")
   .withParams(evaluatorParamsSchema)
   .withInput(z.looseObject({}), { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })

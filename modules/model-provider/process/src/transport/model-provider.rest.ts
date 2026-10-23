@@ -47,6 +47,7 @@ export const modelProviderRest = defineRestRouter(ModelProviderApi)
 
   // Write scope, mirroring the tRPC modelProvider update.
   .put("/:provider", "putApiModelProvidersByProvider")
+  .keepsRecords()
   .withParams(modelProviderRestParamsSchema)
   .withInput(updateModelProviderInputSchema)
   .withPermission("project:update")

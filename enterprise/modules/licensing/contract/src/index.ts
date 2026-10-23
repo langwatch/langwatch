@@ -32,3 +32,5 @@ export * from "./license-registry.errors.ts";
 export * from "./license-sync.ts";
 export * from "./self-hosted-instance.ts";
 export * from "./licensing-customer.events.ts";
+export * from "./upgrade-diagnostics.ts";
+export * from "./upgrade-diagnostics.errors.ts";

@@ -10,10 +10,10 @@ import { applyOverlayToSpanDetail } from "../../../model/traces/edit-overlay/app
 
 /** Every span's detail exactly as captured, before any correction. */
 export function useSpansFullCanonical(enabled: boolean) {
-  const { isReady, hintReady, queryArgs } = useTraceQueryArgs();
+  const { isReady, queryArgs } = useTraceQueryArgs();
 
   return api.traces.spansFull.useQuery(queryArgs, {
-    enabled: enabled && isReady && hintReady,
+    enabled: enabled && isReady,
     // Hold the span tree in cache for 30 min after the last observer
     // unmounts. Lets users flip between recently-viewed traces in the
     // conversation strip with no loading flash.

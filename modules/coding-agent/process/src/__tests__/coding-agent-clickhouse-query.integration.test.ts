@@ -60,7 +60,10 @@ describe("Coding Agent ClickHouse query contract", () => {
     });
 
     expect(endpoint.requests).toHaveLength(1);
-    expect(endpoint.requests[0]?.body).toContain("TimeUnixMs BETWEEN");
+    expect(endpoint.requests[0]?.body).toContain(
+      "AND TimeUnixMs >= fromUnixTimestamp64Milli({idBound_fromMs:Int64}) " +
+        "AND TimeUnixMs <= fromUnixTimestamp64Milli({idBound_toMs:Int64})",
+    );
     expect(endpoint.requests[0]?.body).toContain("EventKind IN");
     expect(endpoint.requests[0]?.body).toContain("(TimeUnixMs, RecordId) >");
     expect(endpoint.requests[0]?.body).toContain(
@@ -68,8 +71,8 @@ describe("Coding Agent ClickHouse query contract", () => {
     );
     expect(endpoint.requests[0]?.body).toContain("LIMIT 1 BY TimeUnixMs, RecordId");
     expect(endpoint.requests[0]?.body).toContain("LIMIT {limit:UInt32}");
-    expect(endpoint.requests[0]?.url).toContain("param_fromMs=100");
-    expect(endpoint.requests[0]?.url).toContain("param_toMs=200");
+    expect(endpoint.requests[0]?.url).toContain("param_idBound_fromMs=100");
+    expect(endpoint.requests[0]?.url).toContain("param_idBound_toMs=200");
     expect(endpoint.requests[0]?.url).toContain("param_cursorTimeMs=150");
   });
 

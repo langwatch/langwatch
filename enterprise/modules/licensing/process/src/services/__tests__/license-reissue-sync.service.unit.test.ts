@@ -112,6 +112,10 @@ class RegistryHost extends ConnectLicenseChannel {
     throw new Error("a sync never redeems an activation code");
   }
 
+  async sendUpgradeDiagnostics(): Promise<never> {
+    throw new Error("a sync never sends upgrade diagnostics");
+  }
+
   async syncLicense({
     credential,
     version,
