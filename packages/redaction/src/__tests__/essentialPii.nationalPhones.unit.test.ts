@@ -141,3 +141,50 @@ describe("given numeric text that is no phone number", () => {
     });
   });
 });
+
+describe("given a digit group with no leading zero and no area code", () => {
+  describe("when a phone word comes just before it", () => {
+    /** @scenario "A phone number written without its country code is redacted" */
+    it.each([
+      ["Spanish", "móvil: 612 345 678"],
+      ["Portuguese", "telemóvel 912 345 678"],
+      ["Italian", "cellulare 347 123 4567"],
+      ["Indian", "WhatsApp 98765 43210"],
+      ["Spanish, after M:", "M: 612 345 678"],
+    ])("redacts the %s mobile", (_label, input) => {
+      expect(redact(input)).toMatch(/\[PHONE_NUMBER\]$/);
+    });
+  });
+
+  describe("when no phone word comes before it", () => {
+    /** @scenario "A digit group without a leading zero and no phone word nearby is left alone" */
+    it.each([
+      ["a company register number", "registered under n° B 612 045 678 - share capital"],
+      ["a part reference", "Ref: Part 612-0345-078 - PO123456"],
+      ["a numbered list item", "channel 2 Engine 12. 345 67 89 for the cross"],
+      ["an amount", "total 612 345 678 EUR"],
+    ])("leaves %s alone", (_label, input) => {
+      expect(redact(input)).toBe(input);
+    });
+  });
+});
+
+describe("given a number that is part of a longer value", () => {
+  describe("when it is a grouped IBAN, a VAT number, a code, a log line or a table cell", () => {
+    /** @scenario "A grouped IBAN, a VAT number, a product code or a table cell is not read as a phone number" */
+    it.each([
+      ["a grouped IBAN", "New IBAN: NL91 ABNA 0417 1643 00 please"],
+      ["a grouped IBAN without the bank code", "account BE68 0539 0075 4703 today"],
+      ["a dotted Belgian VAT number", '{"vat":"0123.456.789"}'],
+      ["a prefixed VAT number", '{"vat_number":"BE 0123456789"}'],
+      ["a procurement code with a check digit", '{"cpv_codes":"45000000-7"}'],
+      ["a Brazilian postal code", "Av. Paulista 1000, Sao Paulo/SP, 01310-100, Brasil"],
+      ["a log line after a timestamp", "2026-09-30 12:34:05 0612 345678.12 system"],
+      ["a table row after a date", "2026-09-30   1234.5   0612 345678.9"],
+      ["a masked account number", "account 1234 5678 90XX on file"],
+      ["a path segment", "see docs/012/3456789 for details"],
+    ])("leaves %s alone", (_label, input) => {
+      expect(redact(input)).toBe(input);
+    });
+  });
+});
