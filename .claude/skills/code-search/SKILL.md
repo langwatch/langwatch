@@ -1,6 +1,6 @@
 ---
 name: code-search
-description: "Pick the right tool to find code in this repository: ripgrep when you know the word, sgrep (search by meaning) when an index is ready, ripgrep while an index builds, gopls and tslsp for exact references. Use when someone says 'find where', 'search the code', 'which file handles', 'grep for', 'sgrep', 'semantic search', 'search by meaning', 'index the repo', 'is the index ready', 'code search', or before sweeping an unfamiliar area of the tree."
+description: "Pick the right tool to find code in this repository: ripgrep when you know the word, sgrep (search by meaning) when an index is ready, ripgrep while an index builds, gopls and `rush ts` for exact references. Use when someone says 'find where', 'search the code', 'which file handles', 'grep for', 'sgrep', 'semantic search', 'search by meaning', 'index the repo', 'is the index ready', 'code search', or before sweeping an unfamiliar area of the tree."
 user-invocable: true
 argument-hint: '[status <dir> | query <dir> "<question>" | index <dir>]'
 ---
@@ -43,7 +43,7 @@ need every caller of a Go symbol, exactly? ──▶ gopls references file.go:li
 - **While an index builds, use `rg`.** Don't wait for it.
 - **Exact references:** `gopls references` for Go. `rush ts references --file F --line N --symbol S`
   for TypeScript, and `rush ts rename` / `rename-file` for renames and moves. Always give the file
-  and line; `find_symbol` loads every project and is slow here.
+  and line: a lookup by name alone loads every project and is slow here.
 - sgrep skips tests, generated and vendored files itself; pass `-t` to include tests.
 - `rg` skips the generated files listed in the root `.rgignore` (lockfiles, snapshots, generated
   clients and READMEs). Searching for something that only lives there, such as a handled-error

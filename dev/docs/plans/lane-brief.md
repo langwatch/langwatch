@@ -34,7 +34,7 @@ Rows live in `packages/architecture-enforcer/src/feature-shape-baseline.json` as
 A `git show` exemplar is read as one outline plus one handler, never whole
 (`LANE.md` section 1); a framework signature (`withModule`,
 `defineRestRouter`, `defineRestMiddleware`, `runtime.mount`) comes from
-`rush ts hover`, never from a read of `packages/api` or
+`rush ts hover --file F --line N --symbol X`, never from a read of `packages/api` or
 `packages/runtime-composition` source.
 
 The wire is pinned to origin/main: procedure and route names, paths, inputs,
