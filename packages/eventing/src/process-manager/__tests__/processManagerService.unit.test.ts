@@ -409,7 +409,7 @@ describe("ProcessManagerService", () => {
             tenantId: "tenant_1",
             sourceEventId: `evt_competing_${committed}`,
             expectedRevision: result.revision,
-            state: result.state,
+            state: { ...(result.state as PilotState), titleSource: "user" },
             nextWakeAt: null,
             messages: [],
             now: T0 + committed,
@@ -442,6 +442,7 @@ describe("ProcessManagerService", () => {
       const instance = await store.findByRef<PilotState>({ ref: pilotRef });
       expect(instance?.revision).toBe(3);
       expect(instance?.state.lastActivityAt).toBe(T0 + 10);
+      expect(instance?.state.titleSource).toBe("user");
       expect(await store.hasConsumedSource({ ref: pilotRef, sourceEventId: "evt_tool" })).toBe(
         true,
       );
@@ -489,24 +490,49 @@ describe("ProcessManagerService", () => {
         payload: { turnId: "turn_1" },
       });
       const originalFindByRef = store.findByRef.bind(store);
-      let raced = false;
+      const originalHasConsumed = store.hasConsumedSource.bind(store);
+      let reads = 0;
+      let inboxChecks = 0;
       store.findByRef = async <State = unknown>(params: { ref: ProcessRef }) => {
         const result = await originalFindByRef<State>(params);
-        if (!raced && result) {
-          raced = true;
-          // A redelivery of the same event commits first.
-          await new ProcessManagerService({ definition: pilotDefinition, store }).handleEvent({
-            envelope,
-            now: T0 + 10,
+        if (reads++ === 0 && result) {
+          // A wake-like commit lands first, so the first attempt loses the race.
+          await store.commit({
+            ref: pilotRef,
+            tenantId: "tenant_1",
+            sourceEventId: null,
+            expectedRevision: result.revision,
+            state: result.state,
+            nextWakeAt: null,
+            messages: [],
+            now: T0 + 1,
           });
         }
         return result;
+      };
+      store.hasConsumedSource = async (params) => {
+        if (inboxChecks++ === 1) {
+          // A redelivery of the same event commits between the two attempts.
+          const current = await originalFindByRef<PilotState>({ ref: pilotRef });
+          await store.commit({
+            ref: pilotRef,
+            tenantId: "tenant_1",
+            sourceEventId: envelope.eventId,
+            expectedRevision: current?.revision ?? 0,
+            state: current?.state ?? pilotDefinition.initialState,
+            nextWakeAt: null,
+            messages: [],
+            now: T0 + 2,
+          });
+        }
+        return originalHasConsumed(params);
       };
 
       const result = await service.handleEvent({ envelope, now: T0 + 10 });
 
       expect(result.outcome).toBe("duplicateEvent");
-      expect((await store.findByRef({ ref: pilotRef }))?.revision).toBe(2);
+      expect(reads).toBe(1);
+      expect((await store.findByRef({ ref: pilotRef }))?.revision).toBe(3);
     });
   });
 
@@ -519,7 +545,7 @@ describe("ProcessManagerService", () => {
             store,
             eventRevisionRetries: -1,
           }),
-      ).toThrow("eventRevisionRetries must be a non-negative safe integer");
+      ).toThrow(RangeError);
     });
   });
 
