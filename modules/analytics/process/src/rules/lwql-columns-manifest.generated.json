@@ -1347,6 +1347,26 @@
           "comment": ""
         },
         {
+          "name": "Attempts",
+          "type": "UInt16",
+          "comment": ""
+        },
+        {
+          "name": "LastAttemptAt",
+          "type": "Nullable(DateTime64(3))",
+          "comment": ""
+        },
+        {
+          "name": "LastAttemptError",
+          "type": "Nullable(String)",
+          "comment": ""
+        },
+        {
+          "name": "NextAttemptAt",
+          "type": "Nullable(DateTime64(3))",
+          "comment": ""
+        },
+        {
           "name": "LastProcessedEventId",
           "type": "String",
           "comment": ""
@@ -2402,6 +2422,93 @@
         {
           "name": "LastObservedAt",
           "type": "DateTime",
+          "comment": ""
+        },
+        {
+          "name": "_retention_days",
+          "type": "UInt16",
+          "comment": ""
+        }
+      ]
+    },
+    {
+      "name": "governance_cost_rollup_charges",
+      "engine": "ReplacingMergeTree",
+      "sortingKey": "TenantId, Day, EventId",
+      "columns": [
+        {
+          "name": "TenantId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "Day",
+          "type": "Date",
+          "comment": ""
+        },
+        {
+          "name": "EventId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "CostSource",
+          "type": "LowCardinality(String)",
+          "comment": ""
+        },
+        {
+          "name": "IngestionSourceId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "Provider",
+          "type": "LowCardinality(String)",
+          "comment": ""
+        },
+        {
+          "name": "Model",
+          "type": "LowCardinality(String)",
+          "comment": ""
+        },
+        {
+          "name": "AgentId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "CurrencyCode",
+          "type": "LowCardinality(String)",
+          "comment": ""
+        },
+        {
+          "name": "RawActorId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "RestatementKey",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "IsRetraction",
+          "type": "UInt8",
+          "comment": ""
+        },
+        {
+          "name": "ObservedAtMs",
+          "type": "Int64",
+          "comment": ""
+        },
+        {
+          "name": "AmountNanoMinor",
+          "type": "Int64",
+          "comment": ""
+        },
+        {
+          "name": "EventOccurredAt",
+          "type": "UInt64",
           "comment": ""
         },
         {
@@ -5471,6 +5578,38 @@
         {
           "name": "EarliestSpanStartMs",
           "type": "UInt64",
+          "comment": ""
+        }
+      ]
+    },
+    {
+      "name": "usage_trace_meter",
+      "engine": "ReplacingMergeTree",
+      "sortingKey": "OrganizationId, Month, TenantId, TraceId",
+      "columns": [
+        {
+          "name": "OrganizationId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "TenantId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "Month",
+          "type": "Date",
+          "comment": ""
+        },
+        {
+          "name": "TraceId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "UpdatedAt",
+          "type": "DateTime64(3)",
           "comment": ""
         }
       ]

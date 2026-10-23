@@ -87,6 +87,7 @@ export const experimentDspyStepsRest = defineRestRouter(ExperimentApi)
   .withVersion(MANAGEMENT_API_VERSION)
 
   .post("/log_steps", "postApiDspyLogSteps")
+  .keepsRecords()
   .withInput(dSPyLogStepsBodySchema, { as: "steps" })
   .withPermission("experiments:manage")
   .withoutAudit("ingestion")

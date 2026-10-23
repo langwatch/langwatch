@@ -85,6 +85,7 @@ export type PulledUsageTotals = {
 };
 
 export interface GatewayBudgetSpendRepository {
+  /** The id index (once ready) answers whether the request is already in the ledger. */
   insertDebit(rows: BudgetDebitRow[]): Promise<void>;
   insertPulledUsageRows(rows: PulledUsageRow[]): Promise<void>;
   readPulledUsageTotals(input: {

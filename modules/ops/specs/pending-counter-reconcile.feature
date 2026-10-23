@@ -2,7 +2,7 @@ Feature: GroupQueue pending counter ground-truth reconcile
   As an operator monitoring the GroupQueue dashboard
   I want the pending counter to self-heal to the live ground truth
   So that the "pending jobs" tile reflects reality even after worker deaths,
-  TTL reaps, or DLQ moves that cannot decrement the counter atomically
+  TTL reaps, or writers from an older release that did not adjust it
 
   Background:
     Given a GroupQueue whose pending counter is tracked separately from the jobs
@@ -196,3 +196,12 @@ Feature: GroupQueue pending counter ground-truth reconcile
     When it goes to publish
     Then neither the counter nor the drift is written
 
+  # Moving a group to the dead-letter queue and replaying it adjust the counter
+  # in the same step as the jobs, so the tile is right before any reconcile runs.
+  @integration
+  Scenario: Operator dead-letter moves and replays keep the pending counter without a reconcile
+    Given a blocked group whose staged job the pending counter counts
+    When an operator moves it to the dead-letter queue, singly or in bulk
+    Then the pending counter drops by the jobs moved
+    When the operator replays or redrives it, even more than once
+    Then the pending counter equals the jobs back on the live group

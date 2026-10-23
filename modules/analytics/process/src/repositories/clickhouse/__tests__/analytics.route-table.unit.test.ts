@@ -11,6 +11,31 @@ describe("Analytics timeseries route table", () => {
     ).toBe("evaluation_analytics_rollup");
   });
 
+  describe("given a read whose proof spans an aggregate's members", () => {
+    /** @scenario "The aggregate counts a member's evaluations by when their trace occurred" */
+    it("sends an evaluation series to the legacy builder, which windows the trace", () => {
+      for (const groupBy of [undefined, "evaluations.evaluation_passed"]) {
+        expect(
+          pickAnalyticsTable(
+            {
+              series: [{ metric: "evaluations.evaluation_runs", aggregation: "cardinality" }],
+              groupBy,
+            },
+            { readsMembers: true },
+          ),
+        ).toBe("evaluation_runs");
+      }
+    });
+
+    it("routes a trace series as before, its tables already timed by the trace", () => {
+      const series = [{ metric: "performance.total_cost", aggregation: "sum" as const }];
+
+      expect(pickAnalyticsTable({ series }, { readsMembers: true })).toBe(
+        pickAnalyticsTable({ series }),
+      );
+    });
+  });
+
   it("uses slim for supported trace dimensions", () => {
     expect(
       pickAnalyticsTable({

@@ -2,11 +2,14 @@ import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import type { AgentCallSignal } from "./connected-agent.connection.ts";
+import { MAX_CALL_TIMEOUT_MS } from "./connected-agent.constants.ts";
 import {
+  CALL_KINDS,
   callRunSchema,
   messageSchema,
   outputSchema,
   paramsSchema,
+  stateSchema,
 } from "./connected-agent.protocol.ts";
 
 const relayCallBodySchemaDefinition = z.object({
@@ -35,6 +38,22 @@ const relayCallBodySchemaDefinition = z.object({
     .optional()
     .describe("The W3C trace context the agent adopts, so its spans join this turn's trace."),
   run: callRunSchema.optional().describe("The simulation run this turn belongs to, if any."),
+  kind: z
+    .enum(CALL_KINDS)
+    .optional()
+    .describe("A turn, or a scenario run's setup or teardown hook. Defaults to a turn."),
+  state: stateSchema.describe(
+    "The scenario run's test data: what setup returned, or a turn's latest update.",
+  ),
+  timeoutMs: z
+    .number()
+    .int()
+    .positive()
+    .max(MAX_CALL_TIMEOUT_MS)
+    .optional()
+    .describe(
+      "A setup or teardown hook's budget in milliseconds. A turn runs under the agent's own timeout.",
+    ),
 });
 export interface RelayCallBodySchema extends Named<typeof relayCallBodySchemaDefinition> {}
 export const relayCallBodySchema: RelayCallBodySchema = relayCallBodySchemaDefinition;
@@ -47,6 +66,9 @@ const relayCallResponseSchemaDefinition = z.object({
     .unknown()
     .optional()
     .describe("The agent's per-conversation memory, to send on the next turn."),
+  state: stateSchema.describe(
+    "Setup's state, a turn's state update, or the object teardown returned.",
+  ),
   instance: z.object({
     hostname: z.string(),
     label: z.string().nullable(),

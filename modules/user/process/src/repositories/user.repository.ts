@@ -71,6 +71,13 @@ export type StoredProfileChange = UpdateUserProfileInput &
   Partial<Pick<UpdateUserEmailInput, "email">> &
   Partial<Pick<UserProfile, "emailVerified">>;
 
+/** A user holding a credential password, and whether it is already marked for a reset. */
+export type PasswordHolderRow = Readonly<{
+  id: string;
+  email: string | null;
+  passwordResetRequiredAt: Instant | null;
+}>;
+
 export interface UserRepository {
   findProfiles(userIds: string[]): Promise<UserFullProfile[]>;
   findById(id: string): Promise<UserProfile | null>;
@@ -82,6 +89,12 @@ export interface UserRepository {
   createCredentialUser(input: CreateCredentialUserRow): Promise<CreatedCredentialUser>;
   createPasskeyUser(input: CreatePasskeyUserRow): Promise<CreatedUser>;
   hasPassword(id: string): Promise<boolean>;
+  /** Users holding a credential password, oldest id first; `emails` narrows to those addresses,
+   *  matched case-insensitively. */
+  findPasswordHolders(input: { emails: readonly string[] | null }): Promise<PasswordHolderRow[]>;
+  /** Marks these passwords as requiring a reset; a mark already set keeps its time. Answers how
+   *  many were newly marked. */
+  markPasswordResetRequired(input: { ids: readonly string[]; at: Instant }): Promise<number>;
   setFirstPassword(input: SetFirstUserPasswordRow): Promise<SetFirstUserPasswordResult>;
   /**
    * Confirms an unfinished account and drops every account row and passkey it holds, as ONE

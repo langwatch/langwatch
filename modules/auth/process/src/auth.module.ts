@@ -10,6 +10,7 @@ import { authEventing } from "./eventing/auth.pipeline.ts";
 import { authRepositories } from "./repositories/auth-repositories.registry.ts";
 import { ApiDoorService } from "./services/api-door.service.ts";
 import { ClearStalePendingSsoSetupTask } from "./tasks/clear-stale-pending-sso-setup.task.ts";
+import { RequirePasswordResetTask } from "./tasks/require-password-reset.task.ts";
 import { authCliDeviceFlowRest } from "./transport/auth-cli-device-flow.rest.ts";
 import { authRest } from "./transport/auth.rest.ts";
 import { authRequestHeadersContext, authTrpcTransport } from "./transport/auth.trpc.ts";
@@ -28,11 +29,12 @@ export const authProcessModule: PublishedProcessModule<"auth", AuthApi, AuthServ
     .withTransports(authTrpcTransport, signInSecurityTrpcTransport, authCliDeviceFlowRest, authRest)
     .withEventing(authEventing)
     .withEventing(authLifecycleEventing)
-    .withTasks(({ repositories, dependencies }) => [
+    .withTasks(({ app, repositories, dependencies }) => [
       ClearStalePendingSsoSetupTask.create({
         candidates: repositories.pendingSsoSetup,
         organizations: dependencies.organizations,
       }),
+      RequirePasswordResetTask.create({ users: dependencies.users, sessions: app }),
     ])
     .provideMiddlewareBindings(({ app, dependencies }) => [
       bindTrpcMiddlewareContext(

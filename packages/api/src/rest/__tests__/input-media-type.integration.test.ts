@@ -38,6 +38,7 @@ function notesRouter() {
 
 const notes = notesRouter()
   .post("/", "recordNote")
+  .keepsRecords()
   .withInput(note, { mediaType: JSON_TYPE })
   .withPermission("organization:manage")
   .withOutput(note)
@@ -45,6 +46,7 @@ const notes = notesRouter()
   .handle(async ({ app, input }) => app.record({ text: input.text }))
 
   .post("/legacy", "recordLegacyNote")
+  .keepsRecords()
   .withInput(note, { mediaType: JSON_TYPE, mismatch: "malformed_request" })
   .withPermission("organization:manage")
   .withOutput(note)

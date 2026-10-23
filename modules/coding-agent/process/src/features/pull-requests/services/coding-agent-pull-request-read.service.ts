@@ -83,6 +83,7 @@ export class CodingAgentPullRequestReadService {
       sessionEvents: CodingAgentSessionEventRepository;
       sessionReads: CodingAgentSessionReadService;
       github: GithubApi;
+      projects: Pick<ProjectApi, "listNamesByIds">;
       clock: CodingAgentClock;
       assignments: CodingAgentPullRequestAssignmentService;
       shares: CodingAgentPullRequestShareService;
@@ -104,12 +105,17 @@ export class CodingAgentPullRequestReadService {
       toMs,
       limit: SESSIONS_LIST_LIMIT,
     });
-    const pullRequests = await this.dependencies.sessionListPullRequests.findForProject({
-      projectId: input.projectId,
-      sessions: rows,
-    });
+    const [pullRequests, projectNames] = await Promise.all([
+      this.dependencies.sessionListPullRequests.findForProject({
+        projectId: input.projectId,
+        sessions: rows,
+      }),
+      this.projectNamesOf(rows),
+    ]);
 
     return rows.map((row) => ({
+      tenantId: row.tenantId,
+      projectName: projectNames.get(row.tenantId) ?? row.tenantId,
       sessionId: row.sessionId,
       title: row.title === "" ? null : row.title,
       agent: row.agent,
@@ -137,6 +143,14 @@ export class CodingAgentPullRequestReadService {
       models: row.models,
       pullRequests: pullRequests.get(sessionListKey(row)) ?? [],
     }));
+  }
+
+  /** One name lookup per page, over the distinct member projects its rows came from. */
+  private async projectNamesOf(rows: { tenantId: string }[]): Promise<Map<string, string>> {
+    const projectIds = [...new Set(rows.map((row) => row.tenantId))];
+    if (projectIds.length === 0) return new Map();
+    const identities = await this.dependencies.projects.listNamesByIds({ projectIds });
+    return new Map(identities.map((identity) => [identity.id, identity.name]));
   }
 
   async getPullRequestUsage(

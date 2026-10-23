@@ -17,7 +17,10 @@ import {
   type CodingAgentSessionState,
 } from "../../eventing/coding-agent-session.projection.ts";
 import { toCodingAgentSessionRow } from "../../rules/coding-agent-session-row-mapper.rules.ts";
-import { EventingCodingAgentSessionStoreService } from "../coding-agent-session-store.service.ts";
+import {
+  EventingCodingAgentSessionStoreService,
+  type StoredSession,
+} from "../coding-agent-session-store.service.ts";
 
 const tenantId = createTenantId("tenant-1");
 
@@ -104,7 +107,7 @@ const context = (over: Partial<ProjectionStoreContext> = {}): ProjectionStoreCon
 
 function storeWith(
   persistence: FakePersistence,
-  hooks: { onSessionsStored?: (tenantIds: string[]) => Promise<void> } = {},
+  hooks: { onSessionsStored?: (sessions: StoredSession[]) => Promise<void> } = {},
 ): EventingCodingAgentSessionStoreService {
   return EventingCodingAgentSessionStoreService.create({
     persistence,
@@ -228,33 +231,55 @@ describe("EventingCodingAgentSessionStoreService durable dedup", () => {
   });
 
   describe("given the store carries the sessions-stored hook", () => {
+    const stored = (over: Partial<StoredSession> = {}): StoredSession => ({
+      tenantId: String(tenantId),
+      sessionId: "session-1",
+      agent: "claude_code",
+      occurredAt: 1_000,
+      firstStoredAt: 1_000,
+      auxiliary: false,
+      ...over,
+    });
+
     describe("when a fold step commits", () => {
-      it("reports the committed tenant after the durable write", async () => {
+      it("reports the committed session after the durable write", async () => {
         const persistence = new FakePersistence();
-        const seen: string[][] = [];
+        const seen: StoredSession[][] = [];
         const store = storeWith(persistence, {
-          onSessionsStored: async (tenantIds) => {
+          onSessionsStored: async (sessions) => {
             // The row must be durable before the project is stamped.
             expect(persistence.upsertCalls).toHaveLength(1);
-            seen.push(tenantIds);
+            seen.push(sessions);
           },
         });
 
-        await store.store(makeState(), context());
+        await store.store(makeState({ agent: "claude_code" }), context());
         await Promise.resolve();
 
-        expect(seen).toEqual([[String(tenantId)]]);
+        expect(seen).toEqual([[stored()]]);
+      });
+
+      /** @scenario "A helper-thread session is reported as auxiliary" */
+      it("marks an auxiliary session as such", async () => {
+        const persistence = new FakePersistence();
+        const seen: StoredSession[][] = [];
+        const store = storeWith(persistence, {
+          onSessionsStored: async (sessions) => void seen.push(sessions),
+        });
+
+        await store.store(makeState({ auxiliary: true }), context());
+        await Promise.resolve();
+
+        expect(seen[0]?.[0]?.auxiliary).toBe(true);
       });
     });
 
     describe("when a batch commits several sessions of one project", () => {
-      it("reports the tenant once, not once per session", async () => {
+      it("reports each committed session with its own id", async () => {
         const persistence = new FakePersistence();
-        const seen: string[][] = [];
+        const seen: StoredSession[][] = [];
         const store = storeWith(persistence, {
-          onSessionsStored: async (tenantIds) => {
-            seen.push(tenantIds);
-          },
+          onSessionsStored: async (sessions) => void seen.push(sessions),
         });
 
         await store.storeBatch([
@@ -263,13 +288,12 @@ describe("EventingCodingAgentSessionStoreService durable dedup", () => {
         ]);
         await Promise.resolve();
 
-        expect(seen).toEqual([[String(tenantId)]]);
+        expect(seen[0]?.map((session) => session.sessionId)).toEqual(["session-1", "session-2"]);
       });
     });
 
     describe("when the hook rejects anyway", () => {
-      // The touch helper never rejects by contract; this pins that a
-      // misbehaving hook still cannot fail the committed fold write.
+      /** @scenario "A failing session-stored recorder never fails the stored row" */
       it("does not fail the store call", async () => {
         const persistence = new FakePersistence();
         const store = storeWith(persistence, {
@@ -277,6 +301,17 @@ describe("EventingCodingAgentSessionStoreService durable dedup", () => {
         });
 
         await expect(store.store(makeState(), context())).resolves.toBeUndefined();
+      });
+
+      it("does not fail the batch call", async () => {
+        const persistence = new FakePersistence();
+        const store = storeWith(persistence, {
+          onSessionsStored: () => Promise.reject(new Error("boom")),
+        });
+
+        await expect(
+          store.storeBatch([{ state: makeState(), context: context() }]),
+        ).resolves.toBeUndefined();
       });
     });
   });

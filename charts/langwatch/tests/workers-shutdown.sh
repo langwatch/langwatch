@@ -245,6 +245,12 @@ test_app_pre_stop_sleep() {
   expect_render_refused "preStop too long for the grace" \
     "--set app.preStopSleepSeconds=10" \
     "too short for a 10s preStop sleep"
+  local bad
+  for bad in "--set-string app.preStopSleepSeconds=5.5" "--set-string app.preStopSleepSeconds=abc" \
+    "--set app.preStopSleepSeconds=-1" "--set-string app.preStopSleepSeconds=99999999999999999999"; do
+    expect_render_refused "preStop ${bad#*=}" "$bad" \
+      "app.preStopSleepSeconds must be a whole number of seconds"
+  done
   block=$(render_component "app" "$BASE --set app.preStopSleepSeconds=0")
   case "$block" in
     *preStop*) fail "app preStop off" "preStopSleepSeconds=0 still rendered a preStop" ;;
