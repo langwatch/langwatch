@@ -105,6 +105,13 @@ Feature: Braided spans in the reader's traces
       When sam, an admin of "orchestrator" with no role on "specialists", opens a braided span
       Then the span's input is hidden
 
+    @unit
+    Scenario: A braided span's cost shows only to a viewer who may see costs on its owner
+      Given sam may see costs on "orchestrator" but not on "specialists"
+      When sam opens the span tree of a trace holding spans from both
+      Then the "orchestrator" spans show their cost
+      And the "specialists" spans show none
+
   Rule: The trace view says where each span came from
 
     @integration

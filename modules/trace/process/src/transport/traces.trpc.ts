@@ -33,7 +33,11 @@ import {
   mapTraceSummaryToHeader,
   redactV2Content,
 } from "../rules/trace-read-mappers.rules.ts";
-import { gateHeaderCost, gateTreeCost, resourceInfoOf } from "../rules/trace-view-gates.rules.ts";
+import {
+  gateHeaderCost,
+  gateTreeCostByOwner,
+  resourceInfoOf,
+} from "../rules/trace-view-gates.rules.ts";
 
 const evaluationsSchema = evaluationSchema.array();
 
@@ -708,11 +712,17 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
         authorization,
       });
 
-      return app.readSpanTreePage({
-        ...input,
-        authorization,
-        canSeeCosts: protections.canSeeCosts === true,
+      // Priced in full here, then each span's cost is gated by its owner (ADR-183 §5).
+      const page = await app.readSpanTreePage({ ...input, authorization, canSeeCosts: true });
+      const owners = await app.resolveBraidOwnerProtections({
+        viewerUserId: actor.id,
+        ownerProjectIds: page.nodes.map((node) => node.ownerProjectId),
       });
+
+      return {
+        ...page,
+        nodes: gateTreeCostByOwner({ nodes: page.nodes, reader: protections, owners }),
+      };
     })
 
     .procedure("spanTreeDelta")
@@ -729,11 +739,13 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
         authorization,
       });
 
-      return app.readSpanTreeDelta({
-        ...input,
-        authorization,
-        canSeeCosts: protections.canSeeCosts === true,
+      const nodes = await app.readSpanTreeDelta({ ...input, authorization, canSeeCosts: true });
+      const owners = await app.resolveBraidOwnerProtections({
+        viewerUserId: actor.id,
+        ownerProjectIds: nodes.map((node) => node.ownerProjectId),
       });
+
+      return gateTreeCostByOwner({ nodes, reader: protections, owners });
     })
 
     /**
@@ -761,7 +773,16 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
         reads: "spans",
       });
 
-      return gateTreeCost({ nodes: rows.map(mapLegacySpanSummaryToTreeNode), protections });
+      const owners = await app.resolveBraidOwnerProtections({
+        viewerUserId: actor.id,
+        ownerProjectIds: rows.map((row) => row.ownerProjectId),
+      });
+
+      return gateTreeCostByOwner({
+        nodes: rows.map(mapLegacySpanSummaryToTreeNode),
+        reader: protections,
+        owners,
+      });
     })
 
     .procedure("spanLangwatchSignals")

@@ -8,6 +8,7 @@ import type {
   TraceResourceInfoDto,
 } from "@langwatch/trace-contract";
 
+import { protectByOwner } from "./braided-span-owner.rules.ts";
 import { createAttributeRedactor } from "./trace-attribute-redaction.rules.ts";
 
 /**
@@ -37,6 +38,24 @@ export function gateTreeCost({
 }): SpanTreeNode[] {
   if (protections.canSeeCosts === true) return nodes;
   return nodes.map((node) => (node.cost == null ? node : { ...node, cost: null }));
+}
+
+/** Each span's spend gated by its owner's cost:view, the reader's by theirs (ADR-183 §5). */
+export function gateTreeCostByOwner({
+  nodes,
+  reader,
+  owners,
+}: {
+  nodes: SpanTreeNode[];
+  reader: Protections;
+  owners: ReadonlyMap<string, Protections>;
+}): SpanTreeNode[] {
+  return protectByOwner({
+    items: nodes,
+    reader,
+    owners,
+    protect: (group, protections) => gateTreeCost({ nodes: group, protections }),
+  });
 }
 
 /**
