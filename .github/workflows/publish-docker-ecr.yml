@@ -601,6 +601,54 @@ jobs:
           aws ecr get-login-password --region "${AWS_REGION}" \
             | docker login --username AWS --password-stdin "${REGISTRY}"
 
+      # Boot the image the way Lambda does before it gets a tag: as a uid that
+      # is not the image's own, with a read-only root and only /tmp writable.
+      # An image that is valid everywhere else can fail every start on Lambda
+      # (one that started in a home directory only its own user could enter
+      # shipped and broke every studio workflow it reached), and the push
+      # below would publish it under this commit's tag. The build is loaded
+      # into the runner's Docker; the push step then reuses its cache.
+      #
+      # nlp-lambda only: it serves /healthz behind the Lambda Web Adapter. The
+      # evaluator images start the Python runtime interface client, which
+      # needs the Lambda Runtime API and has no health check to call.
+      - name: Build ${{ matrix.image }} for the boot check
+        if: matrix.image == 'langwatch-nlp-lambda'
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: false
+          load: true
+          platforms: linux/arm64
+          provenance: false
+          sbom: false
+          cache-from: type=gha,scope=ecr-${{ matrix.image }}-arm64
+          build-args: |
+            VERSION=${{ needs.meta.outputs.version || needs.meta.outputs.image_tag }}
+            EVALUATOR=${{ matrix.evaluator }}
+          tags: lambda-boot-check:${{ github.run_id }}
+
+      - name: Set up Go for the boot check
+        if: matrix.image == 'langwatch-nlp-lambda'
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
+
+      # The env is what the app sets on every per-project function, with
+      # stand-in values: the check is that the process starts, not that it
+      # reaches anything.
+      - name: Boot ${{ matrix.image }} as Lambda's user
+        if: matrix.image == 'langwatch-nlp-lambda'
+        run: |
+          go run ./cmd/lambdaboot -image "lambda-boot-check:${{ github.run_id }}" \
+            -e LANGWATCH_ENDPOINT=http://127.0.0.1:9 \
+            -e STUDIO_RUNTIME=async \
+            -e AWS_LWA_INVOKE_MODE=RESPONSE_STREAM \
+            -e CACHE_BUCKET=lambda-boot-check \
+            -e NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS=600
+
       # `provenance: false` keeps the push a plain manifest; with it on, buildx
       # pushes an index carrying an attestation, which Lambda refuses.
       - name: Build and push ${{ matrix.image }}

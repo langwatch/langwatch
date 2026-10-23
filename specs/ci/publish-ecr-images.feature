@@ -6,8 +6,9 @@ Feature: Publish every deployable image to the artifacts registry
   # These scenarios describe .github/workflows/publish-docker-ecr.yml. How a
   # Lambda image gets its tag is .github/scripts/publish-lambda-tag.sh, bound
   # by .github/scripts/__tests__/publish-lambda-tag.test.sh. The path filters
-  # are bound by .github/scripts/__tests__/publish-ecr-filters.test.sh, and where a Lambda
-  # image starts by tools/ciguard/lambdaworkdir_test.go. The rest is the
+  # are bound by .github/scripts/__tests__/publish-ecr-filters.test.sh, where a Lambda
+  # image starts by tools/ciguard/lambdaworkdir_test.go, and the boot check a
+  # Lambda image passes before it is pushed by tools/lambdaboot. The rest is the
   # workflow's own build steps, which no test suite can run: those scenarios
   # are @unimplemented and are proved by the first run on main.
 
@@ -87,3 +88,35 @@ Feature: Publish every deployable image to the artifacts registry
     Given a Lambda image whose base sets a home directory only its own user may enter
     When the image's Dockerfile is checked
     Then its runtime stage sets a working directory outside every home directory
+
+  # The Dockerfile check above reads one known cause. The boot check runs the
+  # built image the way Lambda does, as a user that is not the image's own,
+  # with a read-only root and only /tmp writable, so any cause that stops it
+  # starting fails the run before the image gets a tag.
+  @unit
+  Scenario: A Lambda image that serves its health check as a foreign user is pushed
+    Given a built Lambda image that starts as a user other than its own
+    When the publish run boots it before pushing
+    Then its health check answers within the bound
+    And the image is pushed under the commit tag
+
+  @unit
+  Scenario: A Lambda image that cannot start as a foreign user is never pushed
+    Given a built Lambda image whose working directory only its own user may enter
+    When the publish run boots it before pushing
+    Then the run fails and names the image
+    And the image gets no tag
+
+  @unit
+  Scenario: A Lambda image whose process exits during the boot check fails at once
+    Given a built Lambda image whose process exits soon after it starts
+    When the publish run boots it before pushing
+    Then the run fails without waiting out the bound
+    And the failure shows the container's own output
+
+  @unit
+  Scenario: A Lambda image that never answers its health check fails within the bound
+    Given a built Lambda image that keeps running but never answers its health check
+    When the publish run boots it before pushing
+    Then the run fails once the bound has passed
+    And the failure shows the container's own output
