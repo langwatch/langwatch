@@ -408,6 +408,23 @@ describe("the shared fs module cache", () => {
       expect(secondRun.results["imports the helper this checkout has"]?.status).toBe("passed");
     }, 120_000);
 
+    /** @scenario "Checkouts under a path that needs URL-encoding keep their own entries" */
+    it("transforms and passes in each checkout whose root needs URL-encoding", async () => {
+      const cache = fresh("encoded-cache");
+      const encodedFirst = checkout("with space/first", { "shared/helper.ts": HELPER });
+      const encodedSecond = checkout("with space/second", { "shared/helper.ts": HELPER });
+
+      const firstRun = await runVitest(encodedFirst, "file", cache);
+      const secondRun = await runVitest(encodedSecond, "file", cache);
+
+      expect(firstRun.results["imports the helper this checkout has"]?.status).toBe("passed");
+      expect(secondRun.results["imports the helper this checkout has"]?.status).toBe("passed");
+      expect(secondRun.cacheLog).toContain(
+        `[write] ${helperLine(encodedSecond)} is cached in ${cache}`,
+      );
+      expect(secondRun.cacheLog).not.toContain(`[read] ${helperLine(encodedSecond)}`);
+    }, 120_000);
+
     /** @scenario "A module whose source contains the cache's root token is never cached" */
     it("never caches a module whose source contains the root token", async () => {
       const cache = fresh("token-cache");

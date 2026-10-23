@@ -106,6 +106,13 @@ Feature: Vitest's transform cache is shared across checkouts
     Then that module is transformed again and the test imports it
 
   @integration
+  Scenario: Checkouts under a path that needs URL-encoding keep their own entries
+    Given two checkouts whose root contains a character that needs URL-encoding
+    When each runs the same suite against the same cache
+    Then the root stays in each module's key, so each checkout transforms its own modules
+    And each checkout's tests pass
+
+  @integration
   Scenario: A module whose source contains the cache's root token is never cached
     Given a module whose source contains the cache's root token
     When two checkouts run their tests
