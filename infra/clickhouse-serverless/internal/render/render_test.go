@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/config"
 	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/render"
@@ -149,6 +150,7 @@ func replicatedInput() *config.Input {
 	return input
 }
 
+// @scenario "The cluster secret is applied only when asked for"
 func TestRenderAll_KeeperWrittenForReplicated(t *testing.T) {
 	dir := t.TempDir()
 	input := replicatedInput()
@@ -188,13 +190,18 @@ func TestRenderAll_KeeperWrittenForReplicated(t *testing.T) {
 
 // Without the opt-in the secret renders as before (an ignored from_file
 // attribute), so a rolling upgrade never mixes secret and no-secret pods.
+// @scenario "The cluster secret is applied only when asked for"
 func TestRenderAll_ClusterSecretOffKeepsEarlierShape(t *testing.T) {
 	dir := t.TempDir()
 	input := replicatedInput()
 	computed := config.ComputeFromResources(input.CPU, input.RAMBytes, input)
 
-	if err := render.RenderAll(testLogger(), input, computed, dir); err != nil {
+	core, logs := observer.New(zap.WarnLevel)
+	if err := render.RenderAll(zap.New(core), input, computed, dir); err != nil {
 		t.Fatalf("RenderAll: %v", err)
+	}
+	if logs.FilterMessageSnippet("CLICKHOUSE_CLUSTER_SECRET_ENABLED").Len() != 1 {
+		t.Errorf("want one warning naming CLICKHOUSE_CLUSTER_SECRET_ENABLED, got %v", logs.All())
 	}
 	data, err := os.ReadFile(filepath.Join(dir, "config.d/keeper.yaml"))
 	if err != nil {

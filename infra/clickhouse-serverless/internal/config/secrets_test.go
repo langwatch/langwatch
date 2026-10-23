@@ -70,6 +70,7 @@ func TestLoad_RefusesEmptyOrMissingSecretFiles(t *testing.T) {
 
 // Without the opt-in the cluster secret file is not read, so an empty or
 // missing one fails nothing, as before.
+// @scenario "The cluster secret is applied only when asked for"
 func TestLoad_ClusterSecretFileIgnoredWithoutOptIn(t *testing.T) {
 	for name, path := range map[string]string{
 		"empty":   writeSecret(t, "empty", ""),
@@ -89,6 +90,7 @@ func TestLoad_ClusterSecretFileIgnoredWithoutOptIn(t *testing.T) {
 	}
 }
 
+// @scenario "The cluster secret opt-in needs a secret file"
 func TestValidate_ClusterSecretOptInNeedsFile(t *testing.T) {
 	i := validInput()
 	i.ClusterSecretEnabled = true
