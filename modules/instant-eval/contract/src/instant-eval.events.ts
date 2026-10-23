@@ -10,7 +10,9 @@ import { z } from "zod";
 import {
   INSTANT_EVAL_EVENT_TYPES,
   INSTANT_EVAL_EVENT_VERSIONS,
+  INSTANT_EVAL_FINISHED_EVENT_VERSIONS,
   INSTANT_EVAL_OUTCOMES,
+  INSTANT_EVAL_PAGE_JUDGED_EVENT_VERSIONS,
 } from "./instant-eval-event.constants.ts";
 
 /** Portable event envelope owned by Instant Evals; Eventing consumes it structurally. */
@@ -109,6 +111,12 @@ const instantEvalPageJudgedEventDataSchemaDefinition = z.object({
   skipped: z.number().int().nonnegative(),
   inputTokens: z.number().int().nonnegative(),
   requests: z.number().int().nonnegative(),
+  /** What this page's routed calls cost us, summed; zero when the run is not routed. */
+  costNanoUsd: z.number().int().nonnegative().default(0),
+  /** Questions this page escalated past an unsure or failed decision model. */
+  escalated: z.number().int().nonnegative().default(0),
+  /** Verdicts each routed backend supplied on this page, by backend name. */
+  answeredBy: z.record(z.string(), z.number().int().nonnegative()).default({}),
   /** The last trace id of this page, where the next one starts. Null ends the run. */
   cursor: z.string().nullable(),
   cursorSpanId: z.string().nullable().default(null),
@@ -124,7 +132,7 @@ export type InstantEvalPageJudgedEventData = z.infer<typeof instantEvalPageJudge
 const instantEvalPageJudgedEventSchemaDefinition = z.object({
   ...instantEvalEventSchema.shape,
   type: z.literal(INSTANT_EVAL_EVENT_TYPES.PAGE_JUDGED),
-  version: z.literal(INSTANT_EVAL_EVENT_VERSIONS.PAGE_JUDGED),
+  version: z.enum(INSTANT_EVAL_PAGE_JUDGED_EVENT_VERSIONS),
   data: instantEvalPageJudgedEventDataSchema,
 });
 export interface InstantEvalPageJudgedEventSchema extends Named<
@@ -169,6 +177,8 @@ const instantEvalFinishedEventDataSchemaDefinition = z.object({
   /** What the run judged in total, summed from its pages. */
   inputTokens: z.number().int().nonnegative(),
   requests: z.number().int().nonnegative(),
+  /** What the run's routed calls cost us, summed from its pages; zero when it was not routed. */
+  costNanoUsd: z.number().int().nonnegative().default(0),
   /** What the judge charged us, and what the customer is charged. */
   costUsd: z.number().nonnegative(),
   priceUsd: z.number().nonnegative(),
@@ -183,7 +193,7 @@ export type InstantEvalFinishedEventData = z.infer<typeof instantEvalFinishedEve
 const instantEvalFinishedEventSchemaDefinition = z.object({
   ...instantEvalEventSchema.shape,
   type: z.literal(INSTANT_EVAL_EVENT_TYPES.FINISHED),
-  version: z.literal(INSTANT_EVAL_EVENT_VERSIONS.FINISHED),
+  version: z.enum(INSTANT_EVAL_FINISHED_EVENT_VERSIONS),
   data: instantEvalFinishedEventDataSchema,
 });
 export interface InstantEvalFinishedEventSchema extends Named<

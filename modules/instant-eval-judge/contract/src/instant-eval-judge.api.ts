@@ -8,6 +8,8 @@
 import { moduleApi } from "@langwatch/module";
 import { z } from "zod";
 
+import type { InstantEvalJudgeRoute, InstantEvalJudgeRouting } from "./instant-eval-judge-route.ts";
+
 /**
  * The judge call and the cloud classifier behind it (ADR-174 decisions 10, 13). It calls no
  * peer: what it checks before each call comes from its own copies of its peers' facts.
@@ -97,6 +99,8 @@ export interface InstantEvalClassification {
   readonly signal?: AbortSignal;
   /** Present when the project runs on its own decision model instead of LangWatch's. */
   readonly decisionModel?: InstantEvalOwnDecisionModel;
+  /** Present when the call is routed; absent, the hosted classifier answers alone, as before. */
+  readonly route?: InstantEvalJudgeRoute;
 }
 
 /** The model a judge's settings name to be answered by Instant Evals (ADR-174 decision 11). */
@@ -117,6 +121,8 @@ export interface InstantEvalJudgeSpendRecord {
   readonly requestId: string;
   /** Input tokens the classifier billed for. Zero records nothing. */
   readonly inputTokens: number;
+  /** The summed cost of routed calls; when above zero it is priced instead of the tokens. */
+  readonly costNanoUsd?: number;
   /** Classifications made, one per judged text. */
   readonly requests: number;
   /** The run the spend belongs to, when it belongs to one. */
@@ -251,6 +257,10 @@ export interface InstantEvalJudgement {
    * opposite fixes, and elapsed time alone cannot tell them apart.
    */
   readonly limiterWaitMs?: number;
+  /** What every call of a routed judgement cost us, summed; absent when the call was not routed. */
+  readonly costNanoUsd?: number;
+  /** How a routed judgement was answered; absent when the call was not routed. */
+  readonly routing?: InstantEvalJudgeRouting;
 }
 
 /** What the classifier charges, and what the customer is charged. */

@@ -3,6 +3,7 @@
  * tokens are priced. @see modules/instant-eval-judge/specs/instant-eval-judge-pricing.feature
  */
 
+import type { InstantEvalJudgeRoutePricing } from "./instant-eval-judge-route.ts";
 import type { InstantEvalPricing } from "./instant-eval-judge.api.ts";
 
 /** The shipped rate, measured September 2026. The markup applies to every plan. */
@@ -66,3 +67,40 @@ export function instantEvalPriceUsd({
  * owns the check (ADR-174 decisions 12, 13); runs and judged queries read the same figure.
  */
 export const INSTANT_EVAL_FREE_BUDGET_USD = 1;
+
+/** The public prices: the hosted classifier's published rate only. */
+export const INSTANT_EVAL_JUDGE_DEFAULT_ROUTE_PRICING: InstantEvalJudgeRoutePricing = {
+  version: "default",
+  markup: INSTANT_EVAL_PRICING.markup,
+  backends: {
+    jev: {
+      usdPerMillionInputTokens: INSTANT_EVAL_PRICING.usdPerMillionInputTokens,
+      usdPerMillionOutputTokens: 0,
+    },
+  },
+};
+
+/** The model the ledger names for a routed judgement: one product, whichever backend answered. */
+export const INSTANT_EVAL_JUDGE_ROUTED_SPEND_MODEL = "langwatch-judge";
+
+/** The rate identity a routed judgement's priced fact carries. */
+export function instantEvalJudgeRouteRateVersion(pricing: InstantEvalJudgeRoutePricing): string {
+  return `instant_eval_judge_router@${pricing.version}x${pricing.markup}`;
+}
+
+/**
+ * What a judgement, page or run cost us: the summed routed cost when the calls were routed,
+ * else its input tokens at the published rate, as before. A run routes every call or none.
+ */
+export function instantEvalSpentCostUsd({
+  inputTokens,
+  costNanoUsd,
+  pricing = INSTANT_EVAL_PRICING,
+}: {
+  inputTokens: number;
+  costNanoUsd?: number | undefined;
+  pricing?: InstantEvalPricing;
+}): number {
+  if (costNanoUsd !== undefined && costNanoUsd > 0) return costNanoUsd / NANO_USD_PER_USD;
+  return instantEvalCostUsd({ inputTokens, pricing });
+}
