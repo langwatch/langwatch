@@ -617,7 +617,7 @@
     "test:browser": "playwright install --with-deps chromium && vitest run --config vitest.browser.config.ts"
   },
   "dependencies": {
-    "@chakra-ui/charts": "^3.36.0",
+    "@chakra-ui/charts": "^3.37.0",
     "@langwatch/time": "workspace:*",
     "@paper-design/shaders": "catalog:",
     "@paper-design/shaders-react": "catalog:",
