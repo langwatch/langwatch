@@ -57,8 +57,8 @@ function input(overrides: Partial<AllPagesInput> = {}): AllPagesInput {
   };
 }
 
-/** @scenario "Report Lighthouse and on-page SEO for every page on the pull request" */
 describe("the every-page report", () => {
+  /** @scenario "Report Lighthouse and on-page SEO for every page on the pull request" */
   it("carries the sticky marker, a headline with budget pass counts, and the commit", () => {
     const runs = input().runs.map((r) =>
       r.path === "/guide/b" && r.formFactor === "mobile"
