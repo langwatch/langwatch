@@ -8,6 +8,7 @@ import {
 } from "@langwatch/authorization";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, REQUEST_CAUSE_FIELD, validationMeta } from "@langwatch/observability";
+import { noteRequestCredential } from "@langwatch/observability/credential-census";
 import type { Context, ErrorHandler, Hono as HonoApp, MiddlewareHandler } from "hono";
 import { Hono } from "hono";
 import { uniqueSymbol, validator as openApiValidator } from "hono-openapi";
@@ -74,6 +75,7 @@ import {
   type RestConfirmationGate,
   type RestConfirmationReceipt,
 } from "./confirmation.ts";
+import { doorCredentialOf } from "./credential-census.ts";
 import {
   admittedOwnerlessProjectKeyFor,
   OWNERLESS_PROJECT_KEY_PROOF_CODE_PATH,
@@ -147,6 +149,7 @@ import {
   ENDPOINT_ROUTE,
   isDeclined,
   REQUEST_FAMILY,
+  ROUTE_TEMPLATE,
   withRetryAfter,
 } from "./response.ts";
 
@@ -331,6 +334,7 @@ function mountFamilyRoutes<Api>({
           ports,
           options,
           contexts,
+          template: basePath === "" ? mount.path : mergePath(basePath, mount.path),
           ...mount.context,
         }),
         policy: registryPolicy({ route, options, credential }),
@@ -773,6 +777,7 @@ function routeStack<Api>({
   ports,
   options,
   contexts,
+  template,
   version,
   status,
   paramSource = "route",
@@ -783,6 +788,8 @@ function routeStack<Api>({
   ports: RestRuntimeMembers;
   options: RestMountOptions<Api>;
   contexts: ReadonlyMap<string, MiddlewareContextBinding>;
+  /** The full path template this mount answers, which the credential census counts by. */
+  template: string;
   version: string;
   status: VersionStatus;
   paramSource?: "route" | "context";
@@ -828,7 +835,7 @@ function routeStack<Api>({
   return [
     ...legacyErrorScopes(route),
     ...(refusal ? [protocolRefusalScope({ route, refusal })] : []),
-    versionContext({ route, family, version, status }),
+    versionContext({ route, family, template, version, status }),
     ...(documents
       ? [
           documentRoute({
@@ -914,6 +921,9 @@ function authenticateMiddleware({
         });
       }
 
+      if (caller) {
+        noteRequestCredential(doorCredentialOf({ credential, caller, request: context.req.raw }));
+      }
       callers.set(context, caller);
       recordRequestPrincipal({
         context,
@@ -1084,11 +1094,13 @@ function deprecationLog<Api>({
 function versionContext({
   route,
   family,
+  template,
   version,
   status,
 }: {
   route: RestTransportRoute<unknown>;
   family: string;
+  template: string;
   version: string;
   status: VersionStatus;
 }): MiddlewareHandler {
@@ -1097,6 +1109,7 @@ function versionContext({
 
   return async (context, next) => {
     context.set(ENDPOINT_ROUTE, identity);
+    context.set(ROUTE_TEMPLATE, template);
     context.set(REQUEST_FAMILY, family);
 
     try {
@@ -2863,6 +2876,7 @@ function dateFallback<Api>({
       ports,
       options,
       contexts,
+      template: mergePath(basePath, route.path || "/"),
       version: declaration.version,
       status: "stable",
       paramSource: "context",
