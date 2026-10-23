@@ -34,11 +34,11 @@ func StatCLI(ctx context.Context, containerID, p string) (Entry, error) {
 	if err := cmd.Start(); err != nil {
 		return Entry{}, err
 	}
-	defer func() {
-		_ = cmd.Process.Kill()
-		_ = cmd.Wait()
-	}()
 	hdr, err := tar.NewReader(out).Next()
+	// Wait before reading stderr: until it returns, exec may still be
+	// copying into the buffer.
+	_ = cmd.Process.Kill()
+	_ = cmd.Wait()
 	if err != nil {
 		return Entry{}, fmt.Errorf("docker cp %s: %w: %s", p, err, strings.TrimSpace(stderr.String()))
 	}

@@ -270,7 +270,6 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // The Lambda image boot check publish-docker-ecr runs before a push: the
   // specs/ci/publish-ecr-images.feature boot scenarios bind only here.
   "tools/lambdaboot",
-  "cmd/lambdaboot",
   // The mono-binary's own dispatch, including the combined Go development
   // process (`service combined`). Which services it hosts, what telemetry
   // identity each keeps and which address variable each binds are asserted
