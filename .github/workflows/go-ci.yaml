@@ -25,6 +25,7 @@ on:
       - '*/go.sum'
       - '.golangci.yml'
       - '.github/workflows/**'
+      - '.github/pr-filters.yml'
   # Evaluate against the queued merge commit too, so the generated-code drift
   # check can gate the queue rather than only the PR head.
   merge_group:
