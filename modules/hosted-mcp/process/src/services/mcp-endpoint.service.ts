@@ -12,6 +12,11 @@ import {
 } from "@langwatch/hosted-mcp-contract";
 import { initConfig, tryGetConfig } from "@langwatch/mcp-server/config";
 import { classifyClient, endpointClassOf } from "@langwatch/observability";
+import {
+  censusClientOf,
+  recordCredentialCensus,
+  type CensusCredentialType,
+} from "@langwatch/observability/credential-census";
 import { nowInstant } from "@langwatch/time";
 
 import type { McpOAuthClientRepository } from "../repositories/mcp-oauth-client.repository.ts";
@@ -151,7 +156,15 @@ export class McpEndpointService implements McpHandler {
 
     const answer = await this.#answerRequest({ request, pathname, method });
     const accessLog = { ...accessLogOf({ request, pathname, method }), ...identifiers };
-    return { answer, accessLog };
+    const onClosed = (status: number) =>
+      this.#countCredential({
+        request,
+        pathname,
+        method,
+        projectId: identifiers.projectId,
+        status,
+      });
+    return { answer, accessLog, onClosed };
   };
 
   answerFailure = (input: { error: unknown; url: string }): McpDoorAnswer =>
@@ -252,6 +265,39 @@ export class McpEndpointService implements McpHandler {
       return this.#oauth.answerProtectedResourceMetadata(path.resourceSuffix);
     }
     return this.#oauth.answerAuthorizationServerMetadata();
+  }
+
+  /** One authenticated MCP request into the credential census, as client hosted-mcp. */
+  #countCredential(input: {
+    request: McpRequest;
+    pathname: string;
+    method: string;
+    projectId: string | undefined;
+    status: number;
+  }): void {
+    try {
+      const { request, projectId } = input;
+      const bearer = this.#auth.extractBearer(request);
+      const credentialType: CensusCredentialType | undefined = bearer
+        ? this.#auth.credentialTypeOf(bearer)
+        : undefined;
+      if (!credentialType || !projectId) return;
+      recordCredentialCensus({
+        ...censusClientOf((name) => {
+          const value = request.headers[name];
+          return typeof value === "string" ? value : value?.[0];
+        }),
+        client: "hosted-mcp",
+        credentialType,
+        projectId,
+        method: input.method,
+        route: isMcpRoute(input.pathname) ? input.pathname : "<other>",
+        family: "hosted-mcp",
+        status: input.status,
+      });
+    } catch {
+      // The census only observes.
+    }
   }
 
   /** Bounds the memory of abandoned sessions and stale probes. */

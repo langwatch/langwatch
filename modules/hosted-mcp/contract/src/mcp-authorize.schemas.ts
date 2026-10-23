@@ -111,8 +111,12 @@ export interface McpSessionRunner {
  */
 export type McpDoorAccessLog = Readonly<Record<string, unknown>>;
 
-/** An answer and the access log fields of the request it answers. */
-export type McpDoorReply = Readonly<{ answer: McpDoorAnswer; accessLog: McpDoorAccessLog }>;
+/** An answer, the access log fields of the request it answers, and what to run once it closes. */
+export type McpDoorReply = Readonly<{
+  answer: McpDoorAnswer;
+  accessLog: McpDoorAccessLog;
+  onClosed: (status: number) => void;
+}>;
 
 /** What the endpoint answers, as data: the door writes it. Headers are set before the head. */
 export type McpDoorAnswer =

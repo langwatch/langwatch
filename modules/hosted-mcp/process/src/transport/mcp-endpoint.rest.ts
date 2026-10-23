@@ -61,8 +61,8 @@ export function answerMcpExchange(input: {
     readBody: () => readBody(request),
   };
 
-  void endpoint.answer(exchange).then(({ answer, accessLog }) => {
-    logOnClose({ accessLog, response, startedAt, closedAt });
+  void endpoint.answer(exchange).then(({ answer, accessLog, onClosed }) => {
+    logOnClose({ accessLog, onClosed, response, startedAt, closedAt });
     return writeAnswer({ answer, runner, request, response }).catch((error: unknown) => {
       const failure = endpoint.answerFailure({ error, url: exchange.url });
       // A stream failing after its head was written has nothing left to answer.
@@ -101,12 +101,14 @@ async function writeAnswer(input: {
 /** The endpoint's access log fields, with the status and duration, once the response is done. */
 function logOnClose(input: {
   accessLog: McpDoorAccessLog;
+  onClosed: (status: number) => void;
   response: ServerResponse;
   startedAt: number;
   closedAt: Promise<number>;
 }): void {
-  const { accessLog, response, startedAt, closedAt } = input;
+  const { accessLog, onClosed, response, startedAt, closedAt } = input;
   void closedAt.then((closedAtMs) => {
+    onClosed(response.statusCode);
     try {
       const durationMs = closedAtMs - startedAt;
       logger.info({ ...accessLog, status: response.statusCode, durationMs }, "MCP request");

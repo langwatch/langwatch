@@ -60,6 +60,7 @@ describe("the hosted MCP door", () => {
       decide({
         answer: { kind: "empty", status: 204, headers: {} },
         accessLog: { method: "POST", path: "/mcp" },
+        onClosed: () => undefined,
       });
 
       await vi.waitFor(() => {
