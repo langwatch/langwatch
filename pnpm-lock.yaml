@@ -764,9 +764,6 @@ importers:
 
   .:
     devDependencies:
-      '@0xdeafcafe/tslsp-cli':
-        specifier: 0.6.0
-        version: 0.6.0
       '@nx/js':
         specifier: 23.2.1
         version: 23.2.1(@babel/traverse@7.29.8(supports-color@10.2.2))(nx@23.2.1)(supports-color@10.2.2)
@@ -18740,11 +18737,6 @@ importers:
 
 packages:
 
-  '@0xdeafcafe/tslsp-cli@0.6.0':
-    resolution: {integrity: sha512-3ed4cRuuptRkmpey3waZOd5Hl2Vl60NJlZCMr2g6QdxtIEGtopndcuwLiwaiJ9DgpTgqR4HKPKusZizLGfdp+A==}
-    engines: {node: '>=22'}
-    hasBin: true
-
   '@adobe/css-tools@4.5.0':
     resolution: {integrity: sha512-6OzddxPio9UiWTCemp4N8cYLV2ZN1ncRnV1cVGtve7dhPOtRkleRyx32GQCYSwDYgaHU3USMm84tNsvKzRCa1Q==}
 
@@ -29632,10 +29624,6 @@ packages:
     resolution: {integrity: sha512-bXE4cR/kVZhKZX/RjPEflHaKVhUVl85noU3v6b8apfQEc1x4A+zBxjZ4lN8LqGd6WZ3dl98pY4o717VFmoPp+A==}
 
 snapshots:
-
-  '@0xdeafcafe/tslsp-cli@0.6.0':
-    dependencies:
-      '@typescript/native-preview': 7.0.0-dev.20260506.1
 
   '@adobe/css-tools@4.5.0': {}
 
