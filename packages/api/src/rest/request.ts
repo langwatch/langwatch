@@ -850,14 +850,7 @@ function logRequestOutcome({
     },
   };
 
-  // A caller's fault is counted by reason and logged once per window; its repeats go to debug.
-  const clientFault = sampleClientFaultLog({ error: requestError, family, statusCode });
-  if (clientFault) {
-    if (clientFault.level === "debug") record.level = "debug";
-    if (clientFault.suppressedRequests > 0) {
-      record.extra = { ...record.extra, suppressedRequests: clientFault.suppressedRequests };
-    }
-  }
+  sampleClientFault({ record, family });
 
   // A status the route DECLARED is an answer, not a fault.
   if (!requestError && c.get(DECLARED_ANSWER) === true) {
@@ -873,6 +866,25 @@ function logRequestOutcome({
   }
 
   logHttpRequest(logger, record);
+}
+
+/** A caller's fault is counted by reason and logged once per window; its repeats go to debug. */
+function sampleClientFault({
+  record,
+  family,
+}: {
+  record: RequestLogData;
+  family: string | undefined;
+}): void {
+  const clientFault = sampleClientFaultLog({
+    error: record.error,
+    family,
+    statusCode: record.statusCode,
+  });
+  if (clientFault?.isRepeat) record.level = "debug";
+  if (clientFault && clientFault.suppressedRequests > 0) {
+    record.extra = { ...record.extra, suppressedRequests: clientFault.suppressedRequests };
+  }
 }
 
 /** Counts the request into the credential census and tags its span; never fails the request. */

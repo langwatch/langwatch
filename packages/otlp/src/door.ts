@@ -3,8 +3,6 @@
  * hand: the refusal they render, the receiver policy they tag with, and the two
  * diagnostics they log. See specs/otlp/endpoint-path-canonicalisation.feature.
  */
-import { createHash } from "node:crypto";
-
 import { HandledError } from "@langwatch/handled-error";
 import type { Named } from "@langwatch/module";
 import { createWarnThrottle, type Logger } from "@langwatch/observability";
@@ -111,12 +109,12 @@ export function isIngestDoorRefusal(error: unknown): error is HandledError {
   return HandledError.isHandled(error) && DOOR_REFUSAL_CODES.has(error.code);
 }
 
-/** One door-refusal line per caller bucket per window; the counter below holds the full volume. */
+/** One door-refusal line per caller per window; the counter below holds the full volume. */
 const REFUSAL_LOG_WINDOW_MS = 60_000;
-/** Callers share a bounded number of buckets, so the throttle's state cannot grow without limit. */
-const REFUSAL_LOG_BUCKETS = 64;
+/** Callers the throttle remembers; the longest quiet one is forgotten first. */
+const REFUSAL_LOG_MAX_CALLERS = 1_000;
 
-const refusalLog = createWarnThrottle(REFUSAL_LOG_WINDOW_MS);
+const refusalLog = createWarnThrottle(REFUSAL_LOG_WINDOW_MS, { maxKeys: REFUSAL_LOG_MAX_CALLERS });
 
 /** Every refused ingest request, by signal, reason code and status: no tenant, key or token. */
 const ingestDoorRefusalsTotal = counter({
@@ -168,7 +166,7 @@ export function resetIngestDoorRefusalLog(): void {
 
 /**
  * Records a credential refusal at an ingestion door. The counter takes every refusal; the warn
- * line is sampled per caller bucket, since an exporter retries a refused batch many times a
+ * line is sampled per caller, since an exporter retries a refused batch many times a
  * second. A suppressed refusal is still written, at debug.
  */
 export function recordIngestDoorRefusal({
@@ -185,7 +183,7 @@ export function recordIngestDoorRefusal({
     {
       hasEmptyAuthToken: boolean;
       userAgent?: string | null;
-      forwardedFor?: string | null;
+      clientAddress?: string | null;
     } & Record<string, unknown>
   >;
   now?: number;
@@ -193,10 +191,9 @@ export function recordIngestDoorRefusal({
   const refusalStatus = ingestDoorRefusalStatus(error);
   ingestDoorRefusalsTotal.inc({ signal, code: error.code, status: refusalStatus });
 
-  const caller = `${diagnostics.userAgent ?? ""}|${diagnostics.forwardedFor ?? ""}`;
-  const bucket = createHash("sha256").update(caller).digest().readUInt16BE(0) % REFUSAL_LOG_BUCKETS;
+  const caller = `${diagnostics.clientAddress ?? ""}|${diagnostics.userAgent ?? ""}`;
   const suppressed = refusalLog.claim({
-    key: `${signal}|${error.code}|${diagnostics.hasEmptyAuthToken}|${bucket}`,
+    key: `${signal}|${error.code}|${diagnostics.hasEmptyAuthToken}|${caller}`,
     now,
   });
   const message = diagnostics.hasEmptyAuthToken

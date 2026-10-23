@@ -31,7 +31,7 @@ const diagnostics = {
   method: "POST",
   userAgent: "exporter/1",
   traceparent: null,
-  forwardedFor: "203.0.113.9",
+  clientAddress: "203.0.113.9",
   hasEmptyAuthToken: false,
 };
 
@@ -72,6 +72,25 @@ describe("recordIngestDoorRefusal", () => {
           status: 401,
         }),
       ).toBe(4);
+    });
+  });
+
+  describe("when two callers share a user agent", () => {
+    /** @scenario A refused ingest export warns once a minute per caller */
+    it("warns for each caller address on its own", () => {
+      const logger = { warn: vi.fn(), debug: vi.fn() };
+      for (const clientAddress of ["203.0.113.9", "198.51.100.4"]) {
+        recordIngestDoorRefusal({
+          logger,
+          signal: "traces",
+          error: refusal(),
+          diagnostics: { ...diagnostics, clientAddress },
+          now: 0,
+        });
+      }
+
+      expect(logger.warn).toHaveBeenCalledTimes(2);
+      expect(logger.debug).not.toHaveBeenCalled();
     });
   });
 });

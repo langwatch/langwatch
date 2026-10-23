@@ -28,7 +28,7 @@ function clientFaultCodeOf(error: unknown, answeredStatus?: number): string | un
   if (answeredStatus !== undefined && answeredStatus >= 500) return undefined;
   if (HandledError.isHandled(error)) return error.fault === "customer" ? error.code : undefined;
   const status = getStatusCodeFromError(error);
-  if (!error || status >= 500) return undefined;
+  if (status >= 500) return undefined;
   return status >= 400 && status < 500 ? `http_${status}` : undefined;
 }
 
@@ -45,7 +45,7 @@ export function recordRequestSpanFailure({
   error: unknown;
   answeredStatus?: number;
 }): void {
-  span.recordException(error as Error);
+  span.recordException(error instanceof Error ? error : failureMessage(error) || String(error));
 
   const code = clientFaultCodeOf(error, answeredStatus);
   if (code !== undefined) {
@@ -65,9 +65,9 @@ function failureMessage(error: unknown): string {
 }
 
 /**
- * Counts a client-fault request and decides how loudly its log line speaks: the first of a
- * reason in a window warns (carrying how many repeats were held back); the repeats go to debug.
- * Undefined means the error is not a client fault and the caller logs as it always did.
+ * Counts a client-fault request and says whether its log line is a repeat: the first of a reason
+ * in a window keeps its level and carries how many repeats were held back; the repeats go to
+ * debug. Undefined means the error is not a client fault and the caller logs as it always did.
  */
 export function sampleClientFaultLog({
   error,
@@ -79,7 +79,7 @@ export function sampleClientFaultLog({
   family: string | undefined;
   statusCode: number;
   now?: number;
-}): { level: "warn" | "debug"; suppressedRequests: number } | undefined {
+}): { isRepeat: boolean; suppressedRequests: number } | undefined {
   const code = clientFaultCodeOf(error, statusCode);
   if (code === undefined) return undefined;
 
@@ -87,8 +87,8 @@ export function sampleClientFaultLog({
 
   const suppressed = clientFaultLog.claim({ key: `${family ?? ""}|${code}|${statusCode}`, now });
   return suppressed === undefined
-    ? { level: "debug", suppressedRequests: 0 }
-    : { level: "warn", suppressedRequests: suppressed };
+    ? { isRepeat: true, suppressedRequests: 0 }
+    : { isRepeat: false, suppressedRequests: suppressed };
 }
 
 /** Clears the sampled-log state; tests only. */
