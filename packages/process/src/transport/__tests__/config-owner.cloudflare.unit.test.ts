@@ -44,13 +44,23 @@ describe("TRUSTED_PROXY_ADDRESSES", () => {
     });
   });
 
+  describe("when an entry is an IPv4-mapped IPv6 range", () => {
+    it("reads it, since the mapped block is an IPv4 range", () => {
+      expect(parsed("::ffff:10.0.0.0/104")).toEqual(["::ffff:10.0.0.0/104"]);
+    });
+  });
+
   describe("when an entry is a hostname or a malformed range", () => {
     /** @scenario "An unreadable trusted proxy entry refuses to boot" */
-    it.each(["ingress.internal", "10.0.0.0/33", "10.0.0.0/8/1", "2400:cb00::/129", "10.0.0.0/x"])(
-      "refuses the configuration (%s)",
-      (entry) => {
-        expect(() => parsed(`10.0.0.0/8,${entry}`)).toThrow(entry);
-      },
-    );
+    it.each([
+      "ingress.internal",
+      "10.0.0.0/33",
+      "10.0.0.0/8/1",
+      "2400:cb00::/129",
+      "10.0.0.0/x",
+      "::ffff:10.0.0.0/64",
+    ])("refuses the configuration (%s)", (entry) => {
+      expect(() => parsed(`10.0.0.0/8,${entry}`)).toThrow(entry);
+    });
   });
 });

@@ -191,6 +191,21 @@ describe("ClientAddress with an IPv6 trusted range", () => {
   });
 });
 
+describe("ClientAddress with an IPv4-mapped IPv6 trusted range", () => {
+  it("trusts an IPv4 peer inside the mapped range and only that peer", () => {
+    const from = (socketAddress: string) =>
+      resolve({
+        addresses: ["::ffff:10.0.0.0/104"],
+        socketAddress,
+        headers: { "x-forwarded-for": "198.51.100.7" },
+      });
+
+    expect(from("10.0.3.17")).toBe("198.51.100.7");
+    expect(from("::ffff:10.0.3.17")).toBe("198.51.100.7");
+    expect(from("11.0.0.1")).toBe("11.0.0.1");
+  });
+});
+
 describe("ClientAddress over a raw Node request", () => {
   /** @scenario "A raw door ahead of the router reads the resolved address" */
   it("stamps the resolved address on the incoming message", () => {

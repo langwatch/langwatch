@@ -83,5 +83,14 @@ function isAddressOrRange(entry: string): boolean {
   if (prefix === void 0) return true;
 
   const bits = Number(prefix);
-  return /^\d+$/.test(prefix) && bits <= (family === 6 ? 128 : 32);
+  if (!/^\d+$/.test(prefix) || bits > (family === 6 ? 128 : 32)) return false;
+  // An IPv4-mapped range is read as its IPv4 range, so it cannot be wider than the mapped block.
+  return !isIPv4Mapped(network) || bits >= MAPPED_PREFIX_BITS;
+}
+
+/** `::ffff:` and the 32 bits of an IPv4 address: the IPv4 range's prefix plus 96. */
+const MAPPED_PREFIX_BITS = 96;
+
+function isIPv4Mapped(network: string): boolean {
+  return /^::ffff:/i.test(network) && isIP(network.slice("::ffff:".length)) === 4;
 }

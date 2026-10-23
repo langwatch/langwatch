@@ -149,7 +149,10 @@ function trustedSet(entries: readonly string[]): BlockList | undefined {
       continue;
     }
 
-    const bits = Number(prefix);
+    // An IPv4-mapped range (`::ffff:10.0.0.0/104`) is unmapped with its address, so its prefix
+    // drops the 96 bits of the mapping too.
+    const mapped = family === "ipv4" && isIP(network.trim()) === 6;
+    const bits = Number(prefix) - (mapped ? 96 : 0);
     const widest = family === "ipv6" ? 128 : 32;
     if (!Number.isInteger(bits) || bits < 0 || bits > widest) continue;
 
