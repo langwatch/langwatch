@@ -2,11 +2,12 @@
 // bound to specs/tooling/test-changed.feature.
 
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { describe, it } from "node:test";
+import { fileURLToPath } from "node:url";
 
 import { buildImportGraph, reachedFrom, scanSpecifiers } from "../import-graph.mjs";
 import {
@@ -18,6 +19,7 @@ import {
   formatFileList,
   planJson,
   planRuns,
+  readArgs,
   readPackages,
   runCommands,
 } from "../test-changed.mjs";
@@ -209,18 +211,65 @@ void describe("test:changed", () => {
     assert.equal(defaultBase({ cwd: root }), "HEAD");
   });
 
+  /** @scenario "With no files named, the change is what differs from the merge base" */
+  void it("takes the merge base with origin/main, not origin/main's later commits", () => {
+    const root = fixtureRepo();
+    const git = (args) => execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
+    commitStaged({ root, message: "base" });
+    const base = git(["rev-parse", "HEAD"]);
+    git(["branch", "-q", "upstream"]);
+    write({ root, file: "packages/time/src/clock.ts", content: "export const clock = () => 2;\n" });
+    git(["add", "-A"]);
+    commitStaged({ root, message: "branch edit" });
+    git(["checkout", "-q", "upstream"]);
+    write({ root, file: "packages/time/src/shape.ts", content: "export type Shape = {};\n" });
+    git(["add", "-A"]);
+    commitStaged({ root, message: "main moved on" });
+    git(["update-ref", "refs/remotes/origin/main", "HEAD"]);
+    git(["checkout", "-q", "-"]);
+    write({ root, file: "packages/time/src/new.ts", content: "export const n = 1;\n" });
+
+    assert.equal(defaultBase({ cwd: root }), base);
+    assert.deepEqual(changedSince({ base: defaultBase({ cwd: root }), cwd: root }), [
+      "packages/time/src/clock.ts",
+      "packages/time/src/new.ts",
+    ]);
+  });
+
   /** @scenario "An argument that is not a file or a known option is refused" */
-  void it("refuses unknown options and files that exist nowhere, and allows deleted files", () => {
+  void it("refuses unknown options and a --base with no ref, and keeps the named files", () => {
+    const read = readArgs({ args: ["--list", "--base", "main", "./a/b.ts", "--bogus", "-l"] });
+
+    assert.equal(read.base, "main");
+    assert.deepEqual([...read.options], ["--list"]);
+    assert.deepEqual(read.named, ["a/b.ts"]);
+    assert.deepEqual(read.problems, ["unknown option --bogus", "unknown option -l"]);
+    assert.deepEqual(readArgs({ args: ["--base", "--json"] }).problems, ["--base needs a ref"]);
+    assert.deepEqual(readArgs({ args: ["--base=main"] }).problems, ["unknown option --base=main"]);
+  });
+
+  /** @scenario "An argument that is not a file or a known option is refused" */
+  void it("refuses paths that exist nowhere and directories, and allows deleted files", () => {
     const root = fixtureRepo();
     commitStaged({ root, message: "base" });
     const known = (file) => file === "packages/time/src/clock.ts";
+    const check = (named) => checkNamed({ named, known, cwd: root });
 
-    assert.deepEqual(checkNamed({ named: ["packages/time/src/clock.ts"], known, cwd: root }), []);
-    assert.deepEqual(checkNamed({ named: ["modules/auth/notes.md"], known, cwd: root }), []);
-    assert.equal(checkNamed({ named: ["--base=origin/main", "-l"], known, cwd: root }).length, 2);
-    assert.equal(checkNamed({ named: ["src/clock.ts"], known, cwd: root }).length, 1);
+    assert.deepEqual(check(["packages/time/src/clock.ts"]), []);
+    assert.deepEqual(check(["modules/auth/notes.md"]), []);
+    assert.match(check(["src/clock.ts"]).join(), /src\/clock\.ts is not a file in this repository/);
+    assert.match(check(["packages/time/src"]).join(), /packages\/time\/src is a directory/);
     execFileSync("git", ["rm", "-q", "packages/time/src/shape.ts"], { cwd: root });
-    assert.deepEqual(checkNamed({ named: ["packages/time/src/shape.ts"], known, cwd: root }), []);
+    assert.deepEqual(check(["packages/time/src/shape.ts"]), []);
+  });
+
+  /** @scenario "An argument that is not a file or a known option is refused" */
+  void it("exits 2 naming an unknown option, before any test runs", () => {
+    const script = fileURLToPath(new URL("../test-changed.mjs", import.meta.url));
+    const run = spawnSync(process.execPath, [script, "--bogus"], { encoding: "utf8" });
+
+    assert.equal(run.status, 2);
+    assert.match(run.stderr, /test:changed: unknown option --bogus/);
   });
 
   /** @scenario "Every way a file names another is followed" */

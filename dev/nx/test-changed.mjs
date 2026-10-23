@@ -4,7 +4,7 @@
 // script. No files means the diff from the merge base with origin/main,
 // untracked files included. ADR-186, specs/tooling/test-changed.feature.
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, join, matchesGlob, posix } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -41,23 +41,41 @@ export function defaultBase({ cwd = root } = {}) {
   return base ?? "HEAD";
 }
 
+const OPTIONS = new Set(["--list", "--json", "--reads"]);
+
+/** Splits the arguments into options and named files; an unknown option is a problem. */
+export function readArgs({ args }) {
+  const read = { base: void 0, options: new Set(), named: [], problems: [] };
+  for (let at = 0; at < args.length; at++) {
+    const arg = args[at];
+    if (arg === "--base") {
+      read.base = args[++at];
+      if (read.base === undefined || read.base.startsWith("-"))
+        read.problems.push("--base needs a ref");
+    } else if (OPTIONS.has(arg)) read.options.add(arg);
+    else if (arg.startsWith("-")) read.problems.push(`unknown option ${arg}`);
+    else read.named.push(posix.normalize(arg).replace(/^\.\//, ""));
+  }
+
+  return read;
+}
+
 /**
- * Names what is wrong with the named arguments. An option-like argument is
- * unknown; a file in the graph, on disk or tracked in HEAD (a deleted file)
- * is real, anything else is a typo or a package-relative path.
+ * Names each named path that is not a file: a file in the graph, on disk or
+ * tracked in HEAD (a deleted file) is real; a directory, a typo or a
+ * package-relative path is not.
  */
 export function checkNamed({ named, known, cwd = root }) {
   const problems = [];
   for (const arg of named) {
-    if (arg.startsWith("-")) {
-      problems.push(`unknown option ${arg}`);
+    const path = join(cwd, arg);
+    if (existsSync(path) && statSync(path).isDirectory()) {
+      problems.push(`${arg} is a directory; name the files in it`);
       continue;
     }
     const tracked = git({ args: ["ls-tree", "HEAD", "--", arg], cwd, allowFailure: true });
-    const inHead = tracked.length > 0;
-    const inGraph = known(arg);
-    const onDisk = existsSync(join(cwd, arg));
-    if (!inGraph && !onDisk && !inHead)
+    const inHead = tracked.some((line) => line.includes(" blob "));
+    if (!known(arg) && !existsSync(path) && !inHead)
       problems.push(`${arg} is not a file in this repository (paths are from the repository root)`);
   }
 
@@ -259,24 +277,16 @@ export async function runCommands({ commands, start }) {
 }
 
 async function main() {
-  const args = process.argv.slice(2);
-  const baseFlag = args.indexOf("--base");
-  const base = baseFlag === -1 ? void 0 : args[baseFlag + 1];
-  const flags = new Set(["--list", "--json", "--reads", "--base", base]);
-  const named = args.filter((arg) => !flags.has(arg));
-  const baseMissing = baseFlag !== -1 && (base === undefined || base.startsWith("-"));
-  const normalized = named.map((file) => posix.normalize(file).replace(/^\.\//, ""));
-  const graph = buildImportGraph({ root, cacheFile: CACHE_FILE });
-  const problems = [
-    ...(baseMissing ? ["--base needs a ref"] : []),
-    ...checkNamed({ named: normalized, known: (file) => graph.index.has(file) }),
-  ];
-  if (problems.length > 0) {
+  const { base, options, named, problems: argProblems } = readArgs({ args: process.argv.slice(2) });
+  const refuse = (problems) => {
+    if (problems.length === 0) return;
     process.stderr.write(`test:changed: ${problems.join("\ntest:changed: ")}\n`);
     process.exit(2);
-  }
-  const changed =
-    normalized.length > 0 ? normalized : changedSince({ base: base ?? defaultBase() });
+  };
+  refuse(argProblems);
+  const graph = buildImportGraph({ root, cacheFile: CACHE_FILE });
+  refuse(checkNamed({ named, known: (file) => graph.index.has(file) }));
+  const changed = named.length > 0 ? named : changedSince({ base: base ?? defaultBase() });
   if (changed.length === 0) {
     process.stderr.write("test:changed: nothing changed.\n");
     process.exit(0);
@@ -289,14 +299,14 @@ async function main() {
   const walkStarted = performance.now();
   const reached = reachedFrom({ graph, changed });
   const walkMs = performance.now() - walkStarted;
-  const plan = planRuns({ graph, packages, changed, reached, withReads: args.includes("--reads") });
+  const plan = planRuns({ graph, packages, changed, reached, withReads: options.has("--reads") });
 
-  if (args.includes("--json")) {
+  if (options.has("--json")) {
     process.stdout.write(planJson({ plan, changed, graphMs: graph.stats.ms, walkMs }));
     process.exit(0);
   }
   process.stderr.write(formatPlan({ plan, changed, graphStats: graph.stats, walkMs }));
-  if (args.includes("--list")) {
+  if (options.has("--list")) {
     process.stdout.write(formatFileList(plan));
     process.exit(0);
   }
