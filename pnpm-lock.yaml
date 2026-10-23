@@ -331,7 +331,7 @@ catalogs:
       version: 16.3.2
     '@testing-library/user-event':
       specifier: ^14.6.1
-      version: 14.6.1
+      version: 14.6.8
     '@trpc/client':
       specifier: 11.18.0
       version: 11.18.0
@@ -420,8 +420,8 @@ catalogs:
       specifier: ^15.0.0
       version: 15.0.0
     concurrently:
-      specifier: ^9.1.2
-      version: 9.2.4
+      specifier: ^10.0.6
+      version: 10.0.6
     croner:
       specifier: ^10.0.1
       version: 10.0.1
@@ -787,7 +787,7 @@ importers:
         version: 7.0.0-dev.20260506.1
       concurrently:
         specifier: 'catalog:'
-        version: 9.2.4
+        version: 10.0.6
       knip:
         specifier: 'catalog:'
         version: 6.35.1
@@ -1195,7 +1195,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@testing-library/user-event':
         specifier: 'catalog:'
-        version: 14.6.1(@testing-library/dom@10.4.1)
+        version: 14.6.8(@testing-library/dom@10.4.1)
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.18
@@ -1370,7 +1370,7 @@ importers:
         version: 15.0.0
       concurrently:
         specifier: 'catalog:'
-        version: 9.2.4
+        version: 10.0.6
       execa:
         specifier: ^9.6.0
         version: 9.6.1
@@ -1444,7 +1444,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@testing-library/user-event':
         specifier: 'catalog:'
-        version: 14.6.1(@testing-library/dom@10.4.1)
+        version: 14.6.8(@testing-library/dom@10.4.1)
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.18
@@ -2055,7 +2055,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@testing-library/user-event':
         specifier: 'catalog:'
-        version: 14.6.1(@testing-library/dom@10.4.1)
+        version: 14.6.8(@testing-library/dom@10.4.1)
       '@types/bcrypt':
         specifier: 'catalog:'
         version: 6.0.0
@@ -3152,7 +3152,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@testing-library/user-event':
         specifier: 'catalog:'
-        version: 14.6.1(@testing-library/dom@10.4.1)
+        version: 14.6.8(@testing-library/dom@10.4.1)
       '@types/numeral':
         specifier: 'catalog:'
         version: 2.0.5
@@ -3471,7 +3471,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@testing-library/user-event':
         specifier: 'catalog:'
-        version: 14.6.1(@testing-library/dom@10.4.1)
+        version: 14.6.8(@testing-library/dom@10.4.1)
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.18
@@ -4072,7 +4072,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@testing-library/user-event':
         specifier: 'catalog:'
-        version: 14.6.1(@testing-library/dom@10.4.1)
+        version: 14.6.8(@testing-library/dom@10.4.1)
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.18
@@ -4304,7 +4304,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@testing-library/user-event':
         specifier: 'catalog:'
-        version: 14.6.1(@testing-library/dom@10.4.1)
+        version: 14.6.8(@testing-library/dom@10.4.1)
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.18
@@ -4627,7 +4627,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@testing-library/user-event':
         specifier: 'catalog:'
-        version: 14.6.1(@testing-library/dom@10.4.1)
+        version: 14.6.8(@testing-library/dom@10.4.1)
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.18
@@ -4952,7 +4952,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@testing-library/user-event':
         specifier: 'catalog:'
-        version: 14.6.1(@testing-library/dom@10.4.1)
+        version: 14.6.8(@testing-library/dom@10.4.1)
       '@types/lodash-es':
         specifier: 'catalog:'
         version: 4.17.12
@@ -5290,7 +5290,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@testing-library/user-event':
         specifier: 'catalog:'
-        version: 14.6.1(@testing-library/dom@10.4.1)
+        version: 14.6.8(@testing-library/dom@10.4.1)
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.18
@@ -5519,7 +5519,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@testing-library/user-event':
         specifier: 'catalog:'
-        version: 14.6.1(@testing-library/dom@10.4.1)
+        version: 14.6.8(@testing-library/dom@10.4.1)
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.18
@@ -5870,7 +5870,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@testing-library/user-event':
         specifier: 'catalog:'
-        version: 14.6.1(@testing-library/dom@10.4.1)
+        version: 14.6.8(@testing-library/dom@10.4.1)
       '@trpc/client':
         specifier: 'catalog:'
         version: 11.18.0(@trpc/server@11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
@@ -6128,7 +6128,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@testing-library/user-event':
         specifier: 'catalog:'
-        version: 14.6.1(@testing-library/dom@10.4.1)
+        version: 14.6.8(@testing-library/dom@10.4.1)
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.18
@@ -6377,7 +6377,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@testing-library/user-event':
         specifier: 'catalog:'
-        version: 14.6.1(@testing-library/dom@10.4.1)
+        version: 14.6.8(@testing-library/dom@10.4.1)
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.18
@@ -6656,7 +6656,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@testing-library/user-event':
         specifier: 'catalog:'
-        version: 14.6.1(@testing-library/dom@10.4.1)
+        version: 14.6.8(@testing-library/dom@10.4.1)
       '@types/numeral':
         specifier: 'catalog:'
         version: 2.0.5
@@ -6995,7 +6995,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@testing-library/user-event':
         specifier: 'catalog:'
-        version: 14.6.1(@testing-library/dom@10.4.1)
+        version: 14.6.8(@testing-library/dom@10.4.1)
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.18
@@ -7172,7 +7172,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@testing-library/user-event':
         specifier: 'catalog:'
-        version: 14.6.1(@testing-library/dom@10.4.1)
+        version: 14.6.8(@testing-library/dom@10.4.1)
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.18
@@ -7430,7 +7430,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@testing-library/user-event':
         specifier: 'catalog:'
-        version: 14.6.1(@testing-library/dom@10.4.1)
+        version: 14.6.8(@testing-library/dom@10.4.1)
       '@types/node':
         specifier: ^26.0.1
         version: 26.2.0
@@ -8080,7 +8080,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@testing-library/user-event':
         specifier: 'catalog:'
-        version: 14.6.1(@testing-library/dom@10.4.1)
+        version: 14.6.8(@testing-library/dom@10.4.1)
       '@types/lodash-es':
         specifier: 'catalog:'
         version: 4.17.12
@@ -8429,7 +8429,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@testing-library/user-event':
         specifier: 'catalog:'
-        version: 14.6.1(@testing-library/dom@10.4.1)
+        version: 14.6.8(@testing-library/dom@10.4.1)
       '@types/lodash-es':
         specifier: 'catalog:'
         version: 4.17.12
@@ -8739,7 +8739,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@testing-library/user-event':
         specifier: 'catalog:'
-        version: 14.6.1(@testing-library/dom@10.4.1)
+        version: 14.6.8(@testing-library/dom@10.4.1)
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.18
@@ -8998,7 +8998,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@testing-library/user-event':
         specifier: 'catalog:'
-        version: 14.6.1(@testing-library/dom@10.4.1)
+        version: 14.6.8(@testing-library/dom@10.4.1)
       '@types/papaparse':
         specifier: 'catalog:'
         version: 5.5.2
@@ -9244,7 +9244,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@testing-library/user-event':
         specifier: 'catalog:'
-        version: 14.6.1(@testing-library/dom@10.4.1)
+        version: 14.6.8(@testing-library/dom@10.4.1)
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.18
@@ -9721,7 +9721,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@testing-library/user-event':
         specifier: 'catalog:'
-        version: 14.6.1(@testing-library/dom@10.4.1)
+        version: 14.6.8(@testing-library/dom@10.4.1)
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.18
@@ -10133,7 +10133,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@testing-library/user-event':
         specifier: 'catalog:'
-        version: 14.6.1(@testing-library/dom@10.4.1)
+        version: 14.6.8(@testing-library/dom@10.4.1)
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.18
@@ -10305,7 +10305,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@testing-library/user-event':
         specifier: 'catalog:'
-        version: 14.6.1(@testing-library/dom@10.4.1)
+        version: 14.6.8(@testing-library/dom@10.4.1)
       '@trpc/client':
         specifier: 'catalog:'
         version: 11.18.0(@trpc/server@11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
@@ -10856,7 +10856,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@testing-library/user-event':
         specifier: 'catalog:'
-        version: 14.6.1(@testing-library/dom@10.4.1)
+        version: 14.6.8(@testing-library/dom@10.4.1)
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.18
@@ -11118,7 +11118,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@testing-library/user-event':
         specifier: 'catalog:'
-        version: 14.6.1(@testing-library/dom@10.4.1)
+        version: 14.6.8(@testing-library/dom@10.4.1)
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.18
@@ -11371,7 +11371,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@testing-library/user-event':
         specifier: 'catalog:'
-        version: 14.6.1(@testing-library/dom@10.4.1)
+        version: 14.6.8(@testing-library/dom@10.4.1)
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.18
@@ -11467,7 +11467,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@testing-library/user-event':
         specifier: 'catalog:'
-        version: 14.6.1(@testing-library/dom@10.4.1)
+        version: 14.6.8(@testing-library/dom@10.4.1)
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.18
@@ -11713,7 +11713,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@testing-library/user-event':
         specifier: 'catalog:'
-        version: 14.6.1(@testing-library/dom@10.4.1)
+        version: 14.6.8(@testing-library/dom@10.4.1)
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.18
@@ -11993,7 +11993,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@testing-library/user-event':
         specifier: 'catalog:'
-        version: 14.6.1(@testing-library/dom@10.4.1)
+        version: 14.6.8(@testing-library/dom@10.4.1)
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.18
@@ -12393,7 +12393,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@testing-library/user-event':
         specifier: 'catalog:'
-        version: 14.6.1(@testing-library/dom@10.4.1)
+        version: 14.6.8(@testing-library/dom@10.4.1)
       '@types/lodash-es':
         specifier: 'catalog:'
         version: 4.17.12
@@ -12987,7 +12987,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@testing-library/user-event':
         specifier: 'catalog:'
-        version: 14.6.1(@testing-library/dom@10.4.1)
+        version: 14.6.8(@testing-library/dom@10.4.1)
       '@types/lodash-es':
         specifier: 'catalog:'
         version: 4.17.12
@@ -13321,7 +13321,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@testing-library/user-event':
         specifier: 'catalog:'
-        version: 14.6.1(@testing-library/dom@10.4.1)
+        version: 14.6.8(@testing-library/dom@10.4.1)
       '@types/lodash-es':
         specifier: 'catalog:'
         version: 4.17.12
@@ -13916,7 +13916,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@testing-library/user-event':
         specifier: 'catalog:'
-        version: 14.6.1(@testing-library/dom@10.4.1)
+        version: 14.6.8(@testing-library/dom@10.4.1)
       '@trpc/client':
         specifier: 'catalog:'
         version: 11.18.0(@trpc/server@11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
@@ -14265,7 +14265,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@testing-library/user-event':
         specifier: 'catalog:'
-        version: 14.6.1(@testing-library/dom@10.4.1)
+        version: 14.6.8(@testing-library/dom@10.4.1)
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.18
@@ -14406,7 +14406,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@testing-library/user-event':
         specifier: 'catalog:'
-        version: 14.6.1(@testing-library/dom@10.4.1)
+        version: 14.6.8(@testing-library/dom@10.4.1)
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.18
@@ -14574,7 +14574,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@testing-library/user-event':
         specifier: 'catalog:'
-        version: 14.6.1(@testing-library/dom@10.4.1)
+        version: 14.6.8(@testing-library/dom@10.4.1)
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.18
@@ -14882,7 +14882,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@testing-library/user-event':
         specifier: 'catalog:'
-        version: 14.6.1(@testing-library/dom@10.4.1)
+        version: 14.6.8(@testing-library/dom@10.4.1)
       typescript:
         specifier: 'catalog:'
         version: 7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)
@@ -15068,7 +15068,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@testing-library/user-event':
         specifier: 'catalog:'
-        version: 14.6.1(@testing-library/dom@10.4.1)
+        version: 14.6.8(@testing-library/dom@10.4.1)
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.18
@@ -15443,7 +15443,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@testing-library/user-event':
         specifier: 'catalog:'
-        version: 14.6.1(@testing-library/dom@10.4.1)
+        version: 14.6.8(@testing-library/dom@10.4.1)
       '@trpc/client':
         specifier: 'catalog:'
         version: 11.18.0(@trpc/server@11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
@@ -15894,7 +15894,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@testing-library/user-event':
         specifier: 'catalog:'
-        version: 14.6.1(@testing-library/dom@10.4.1)
+        version: 14.6.8(@testing-library/dom@10.4.1)
       '@types/node':
         specifier: ^26.0.1
         version: 26.2.0
@@ -16413,7 +16413,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@testing-library/user-event':
         specifier: 'catalog:'
-        version: 14.6.1(@testing-library/dom@10.4.1)
+        version: 14.6.8(@testing-library/dom@10.4.1)
       '@types/lodash-es':
         specifier: 'catalog:'
         version: 4.17.12
@@ -16850,7 +16850,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@testing-library/user-event':
         specifier: 'catalog:'
-        version: 14.6.1(@testing-library/dom@10.4.1)
+        version: 14.6.8(@testing-library/dom@10.4.1)
       '@types/node':
         specifier: ^26.0.1
         version: 26.2.0
@@ -16971,7 +16971,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@testing-library/user-event':
         specifier: 'catalog:'
-        version: 14.6.1(@testing-library/dom@10.4.1)
+        version: 14.6.8(@testing-library/dom@10.4.1)
       '@types/qs':
         specifier: 'catalog:'
         version: 6.15.1
@@ -17195,7 +17195,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@testing-library/user-event':
         specifier: 'catalog:'
-        version: 14.6.1(@testing-library/dom@10.4.1)
+        version: 14.6.8(@testing-library/dom@10.4.1)
       '@types/lodash-es':
         specifier: 'catalog:'
         version: 4.17.12
@@ -17246,7 +17246,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@testing-library/user-event':
         specifier: 'catalog:'
-        version: 14.6.1(@testing-library/dom@10.4.1)
+        version: 14.6.8(@testing-library/dom@10.4.1)
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.18
@@ -17332,7 +17332,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@testing-library/user-event':
         specifier: 'catalog:'
-        version: 14.6.1(@testing-library/dom@10.4.1)
+        version: 14.6.8(@testing-library/dom@10.4.1)
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.18
@@ -23143,12 +23143,6 @@ packages:
       '@types/react-dom':
         optional: true
 
-  '@testing-library/user-event@14.6.1':
-    resolution: {integrity: sha512-vq7fv0rnt+QTXgPxr5Hjc210p6YKq2kmdziLgnsZGgLJ9e6VAShx1pACLuRjd/AS/sr7phAR58OIIpf0LlmQNw==}
-    engines: {node: '>=12', npm: '>=6'}
-    peerDependencies:
-      '@testing-library/dom': '>=7.21.4'
-
   '@testing-library/user-event@14.6.8':
     resolution: {integrity: sha512-vgSSqnANMnkcYR/vUNDbwS7aM3OErRLNUG8vCVVlj4oc6cKffUrccX7UAS5AmJQQNZTSibi9z5GvvRZ0aYgUCQ==}
     engines: {node: '>=12', npm: '>=6'}
@@ -24913,9 +24907,9 @@ packages:
     resolution: {integrity: sha512-MWufYdFw53ccGjCA+Ol7XJYpAlW6/prSMzuPOTRnJGcGzuhLn4Scrz7qf6o8bROZ514ltazcIFJZevcfbo0x7A==}
     engines: {'0': node >= 6.0}
 
-  concurrently@9.2.4:
-    resolution: {integrity: sha512-TZ0CEhyzvFjgtAvHTusDMgj7wNdihCh7LLLrzdUOXIhdlnL2JBBGA9eJxR24rtqgmdjh3OA3hrN1rCHj6HM8qA==}
-    engines: {node: '>=18'}
+  concurrently@10.0.6:
+    resolution: {integrity: sha512-qgICXXFp2/3nAebRLmxcINKEXM1mLK3ij/y31P02VTs/KIkddIeC05n73DxOXsXMB9LFSqNU1/na3lDlOhcbIw==}
+    engines: {node: '>=22'}
     hasBin: true
 
   confbox@0.1.8:
@@ -26450,7 +26444,7 @@ packages:
       '@langchain/xai': '*'
       axios: '>=1.20.0 <2'
       cheerio: '*'
-      handlebars: '>=4.7.10 <5'
+      handlebars: ^4.7.8
       peggy: ^3.0.2
       typeorm: '*'
     peerDependenciesMeta:
@@ -28665,10 +28659,6 @@ packages:
   supports-color@7.2.0:
     resolution: {integrity: sha512-qpCAvRl9stuOHveKsn7HncJRvv501qIacKzQlO/+Lwxc9+0q2wLyv4Dfvt80/DPn2pqOBsJdDiogXGR9+OvwRw==}
     engines: {node: '>=8'}
-
-  supports-color@8.1.1:
-    resolution: {integrity: sha512-MpUEN2OodtUzxvKQl72cUF7RQ5EiHsGvSsVG0ia9c5RbWGL2CI4C7EpPS8UTBIplnlzZiNuV56w+FuNxy3ty2Q==}
-    engines: {node: '>=10'}
 
   supports-preserve-symlinks-flag@1.0.0:
     resolution: {integrity: sha512-ot0WnXS9fgdkgIcePe6RHNk1WA8+muPa6cSjeR3V8K27q9BB1rTE3R1p7Hv0z1ZyAc8s6Vvv8DIyWf681MAt0w==}
@@ -34295,10 +34285,6 @@ snapshots:
       '@types/react': 19.2.18
       '@types/react-dom': 19.2.4(@types/react@19.2.18)
 
-  '@testing-library/user-event@14.6.1(@testing-library/dom@10.4.1)':
-    dependencies:
-      '@testing-library/dom': 10.4.1
-
   '@testing-library/user-event@14.6.8(@testing-library/dom@10.4.1)':
     dependencies:
       '@testing-library/dom': 10.4.1
@@ -36497,14 +36483,14 @@ snapshots:
       readable-stream: 3.6.2
       typedarray: 0.0.6
 
-  concurrently@9.2.4:
+  concurrently@10.0.6:
     dependencies:
-      chalk: 4.1.2
+      chalk: 5.6.2
       rxjs: 7.8.2
       shell-quote: 1.12.0
-      supports-color: 8.1.1
+      supports-color: 10.2.2
       tree-kill: 1.2.2
-      yargs: 17.7.2
+      yargs: 18.0.0
 
   confbox@0.1.8: {}
 
@@ -41047,10 +41033,6 @@ snapshots:
   supports-color@10.2.2: {}
 
   supports-color@7.2.0:
-    dependencies:
-      has-flag: 4.0.0
-
-  supports-color@8.1.1:
     dependencies:
       has-flag: 4.0.0
 
