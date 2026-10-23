@@ -57,6 +57,20 @@ Feature: Vitest workers load installed packages from a cache
     Then Node's own error reaches the worker
 
   @unit
+  Scenario: A file that changes while Node reads it is not kept
+    Given an installed file that is rewritten while Node reads it
+    When a worker loads it
+    Then the worker gets what Node read
+    And nothing about it is cached
+
+  @unit
+  Scenario: A source larger than the cap is not kept
+    Given an installed file larger than 8 MB
+    When a worker loads it twice
+    Then Node answers both loads
+    And nothing about it is cached
+
+  @unit
   Scenario: A cached source is not served to a caller expecting another format
     Given an earlier worker loaded a file from node_modules as CommonJS
     When a later worker loads it expecting an ES module
@@ -88,11 +102,27 @@ Feature: Vitest workers load installed packages from a cache
     When any worker saves
     Then the old file is removed and the recent one stays
 
+  # Two saves that overlap can drop the earlier writer's additions: that costs a
+  # lookup or a read next run, never a wrong answer (ADR-183, "Writing").
   @unit
-  Scenario: Workers that save at once keep each other's entries
-    Given two workers that each added different entries
-    When both save their cache
+  Scenario: A save keeps what other workers saved before it
+    Given a worker that opened the cache file and added entries
+    And another worker that saved its own entries since
+    When the first worker saves
     Then the file on disk holds both workers' entries
+
+  @unit
+  Scenario: Entries no recent save touched are dropped
+    Given an entry that no worker added or read in the last 200 saves
+    And an entry a saving worker read
+    When a worker saves
+    Then the untouched entry is gone and the one that was read stays
+
+  @unit
+  Scenario: The cache file stays under its byte cap
+    Given entries that together pass the cap of 96 MB per file
+    When a worker saves
+    Then the entries touched longest ago are dropped until the file fits
 
   @unit
   Scenario: A damaged cache file reads as empty

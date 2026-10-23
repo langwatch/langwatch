@@ -45,7 +45,7 @@ describe("CacheFile", () => {
     );
   });
 
-  /** @scenario "Workers that save at once keep each other's entries" */
+  /** @scenario "A save keeps what other workers saved before it" */
   it("merges what another worker saved since this one opened the file", () => {
     const dir = cacheDir();
     const first = new CacheFile({ dir, name: "resolutions", salt: "s" });
@@ -60,5 +60,49 @@ describe("CacheFile", () => {
     expect(reopened.get("a")?.toString()).toBe("1");
     expect(reopened.get("b")?.toString()).toBe("2");
     expect(reopened.size).toBe(2);
+  });
+
+  /** @scenario "Entries no recent save touched are dropped" */
+  it("drops an entry no save touched in the last keepForSaves, and keeps one a worker read", () => {
+    const dir = cacheDir();
+    const options = { dir, name: "sources", salt: "s", keepForSaves: 2 };
+    const first = new CacheFile(options);
+    first.set("stale", Buffer.from("old"));
+    first.set("read", Buffer.from("hot"));
+    first.save();
+
+    for (const key of ["k2", "k3", "k4"]) {
+      const worker = new CacheFile(options);
+      expect(worker.get("read")?.toString()).toBe("hot");
+      worker.set(key, Buffer.from(key));
+      worker.save();
+    }
+    const reopened = new CacheFile(options);
+
+    expect(reopened.get("stale")).toBeUndefined();
+    expect(reopened.get("read")?.toString()).toBe("hot");
+    expect(["k2", "k3", "k4"].map((key) => reopened.get(key)?.toString())).toEqual([
+      "k2",
+      "k3",
+      "k4",
+    ]);
+  });
+
+  /** @scenario "The cache file stays under its byte cap" */
+  it("drops the least recently touched entries once the file would pass maxBytes", () => {
+    const dir = cacheDir();
+    const options = { dir, name: "sources", salt: "s", maxBytes: 1_500 };
+    const first = new CacheFile(options);
+    first.set("older", Buffer.alloc(1_000, 1));
+    first.save();
+
+    const second = new CacheFile(options);
+    second.set("newer", Buffer.alloc(1_000, 2));
+    second.save();
+    const reopened = new CacheFile(options);
+
+    expect(reopened.get("older")).toBeUndefined();
+    expect(reopened.get("newer")).toEqual(Buffer.alloc(1_000, 2));
+    expect(statSync(reopened.path).size).toBeLessThan(1_500);
   });
 });

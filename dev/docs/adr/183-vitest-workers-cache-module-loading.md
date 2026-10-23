@@ -40,8 +40,15 @@ hash table looked up where it lies in the buffer, with no parse step, read once 
   left to Node.
 
 **Writing.** A worker that added entries merges them, when it exits, with whatever is on disk and swaps
-the result in by rename. Workers that exit together can lose each other's additions until the next run,
-never correctness. A file that is cut short or damaged reads as empty.
+the result in by rename. The guarantee is that a save keeps what was on disk when it read the file. Two
+saves that overlap can drop the earlier writer's additions: the next run looks those up again, never
+gets a wrong answer. Locking would cost every exiting worker a wait for that. A file that is cut short
+or damaged reads as empty.
+
+**Bounding.** Each entry carries the number of the last save that added it or saw a worker read it.
+A save drops entries no save touched in the last 200, then, if the file would still pass 96 MB, the
+entries touched longest ago until it fits. So a cache does not grow without end between installs, and
+the cost is a re-read of a file a later run needs again.
 
 **Worktrees.** The files live in each worktree's own `node_modules`, and every key is an absolute URL in
 that worktree, so nothing is shared between worktrees.
@@ -80,7 +87,8 @@ System time on the trace UI halved (8.7 s to 4.7 s). The saving follows how many
 a suite with isolation off loads `node_modules` once per worker and gains little.
 
 The cache costs about 50 MB per worktree (7.7 MB of resolutions and 43.5 MB of sources after these
-three suites). A worker reads both whole when it starts, from the page cache in practice.
+three suites), and at most 96 MB per file. A worker reads both whole when it starts, from the page
+cache in practice.
 
 ## References
 

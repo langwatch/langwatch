@@ -188,5 +188,36 @@ describe("createModuleLoadingHooks", () => {
 
       expect(nextLoad).toHaveBeenCalledTimes(2);
     });
+
+    /** @scenario "A file that changes while Node reads it is not kept" */
+    it("keeps nothing when the file is rewritten between the stat and the end of the read", () => {
+      const { packageFile, packageUrl } = workspace();
+      const { load, sources } = hooksOver();
+      const nextLoad = vi.fn((url: string): LoadFnOutput => {
+        const source = readFileSync(new URL(url), "utf8");
+        writeFileSync(packageFile, "module.exports = 'rewritten';\n");
+        utimesSync(packageFile, new Date(), new Date(Date.now() + 5_000));
+        return { format: "commonjs", source };
+      });
+
+      const result = load(packageUrl, loadContext, nextLoad);
+
+      expect(result.source).toBe("module.exports = 1;\n");
+      expect(sources.size).toBe(0);
+    });
+
+    /** @scenario "A source larger than the cap is not kept" */
+    it("keeps nothing for a source over 8 MB, and asks Node again next time", () => {
+      const { packageUrl } = workspace();
+      const { load, sources } = hooksOver();
+      const huge = "x".repeat(8 * 1024 * 1024 + 1);
+      const nextLoad = vi.fn((): LoadFnOutput => ({ format: "commonjs", source: huge }));
+
+      load(packageUrl, loadContext, nextLoad);
+      load(packageUrl, loadContext, nextLoad);
+
+      expect(sources.size).toBe(0);
+      expect(nextLoad).toHaveBeenCalledTimes(2);
+    });
   });
 });
