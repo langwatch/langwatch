@@ -9,7 +9,7 @@ import type { InstantEvalJudgeRoutePricing } from "@langwatch/instant-eval-judge
 const NANO_USD_PER_MILLION_TOKENS_PER_USD = 1_000;
 
 /** The call's cost, or `unpriced` when the backend has no configured price. */
-export type InstantEvalJudgeCallCost =
+type InstantEvalJudgeCallCost =
   | Readonly<{ outcome: "priced"; costNanoUsd: number }>
   | Readonly<{ outcome: "unpriced" }>;
 

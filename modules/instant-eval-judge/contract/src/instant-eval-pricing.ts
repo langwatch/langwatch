@@ -104,3 +104,17 @@ export function instantEvalSpentCostUsd({
   if (costNanoUsd !== undefined && costNanoUsd > 0) return costNanoUsd / NANO_USD_PER_USD;
   return instantEvalCostUsd({ inputTokens, pricing });
 }
+
+/** What the customer is charged for a judgement, page or run: its spent cost at the markup. */
+export function instantEvalSpentPriceUsd({
+  inputTokens,
+  costNanoUsd,
+  pricing = INSTANT_EVAL_PRICING,
+}: {
+  inputTokens: number;
+  costNanoUsd?: number | undefined;
+  pricing?: InstantEvalPricing;
+}): number {
+  const costUsd = instantEvalSpentCostUsd({ inputTokens, costNanoUsd, pricing });
+  return instantEvalPriceUsd({ costUsd, pricing });
+}

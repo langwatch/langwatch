@@ -10,10 +10,10 @@ import {
   syntheticRouteTable,
   yesNo,
 } from "../../__tests__/support/instant-eval-judge-route.test-fakes.ts";
-import { isArithmeticQuestion } from "../instant-eval-judge-arithmetic.rules.ts";
 import { instantEvalJudgeCallCostOf } from "../instant-eval-judge-route-cost.rules.ts";
 import {
   instantEvalJudgeRoutePlanOf,
+  isArithmeticQuestion,
   instantEvalVerdictConfidence,
   isUnsureVerdict,
 } from "../instant-eval-judge-route.rules.ts";
