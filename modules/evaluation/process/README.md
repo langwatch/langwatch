@@ -407,6 +407,7 @@ Declared at `src/eventing/evaluation-processing-definition.pipeline.ts:150`. Eve
 | secret | `openAi`                           | `OPENAI_API_KEY`                           | `src/app/evaluation.app.ts:277`           |
 | secret | `azureContentSafety`               | `AZURE_CONTENT_SAFETY_KEY`                 | `src/app/evaluation.app.ts:278`           |
 | secret | `nlpgoInternal`                    | `NLPGO_INTERNAL_SECRET`                    | `src/app/evaluation.app.ts:279`           |
+| secret | `nlpInternal`                      | `LANGWATCH_NLP_INTERNAL_SECRET`            | `src/app/evaluation.app.ts:280`           |
 | config | `langevalsEndpoint`                | `LANGEVALS_ENDPOINT`                       | `../contract/src/evaluation.config.ts:67` |
 | config | `stagingThresholdBytes`            | `LANGEVALS_STAGING_THRESHOLD_BYTES`        | `../contract/src/evaluation.config.ts:68` |
 | config | `stagingTtlSeconds`                | `LANGEVALS_STAGING_TTL_SECONDS`            | `../contract/src/evaluation.config.ts:69` |

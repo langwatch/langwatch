@@ -146,5 +146,7 @@ export type EvaluationWebConfig = z.infer<typeof evaluationWebConfigSchema>;
 
 export const evaluationBrowserConfig = defineBrowserConfig({
   schema: evaluationWebConfigSchema,
-  project: (config: EvaluationServerConfig) => ({ langevals: Boolean(config.langevalsEndpoint) }),
+  project: (config: EvaluationServerConfig) => ({
+    langevals: Boolean(config.langevalsEndpoint || config.evaluatorRuntime.endpoint),
+  }),
 });

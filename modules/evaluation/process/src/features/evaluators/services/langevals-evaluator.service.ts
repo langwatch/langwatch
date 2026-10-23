@@ -16,6 +16,7 @@ import {
 import { HandledError } from "@langwatch/handled-error";
 import { EvaluatorConfigError } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
+import { nlpInternalSecretHeaders } from "@langwatch/process/nlp-internal-secret";
 import { z } from "zod";
 
 import {
@@ -177,12 +178,16 @@ async function refusedCall({
   });
 }
 
-/** Where the Go evaluator runtime answers, which evaluators it answers, and its bearer. */
+/**
+ * Where the Go evaluator runtime answers, which evaluators it answers, its bearer, and the
+ * engine hop's shared secret that nlpgo asks on every /go route.
+ */
 export type EvaluatorRuntimeRouting = Readonly<{
   endpoint: string | undefined;
   engine: EvaluatorRuntimeEngine;
   engineOverrides: Readonly<Record<string, EvaluatorRuntimeEngine>>;
   internalSecret: string | undefined;
+  nlpInternalSecret: string | undefined;
 }>;
 
 /**
@@ -274,6 +279,7 @@ export class LangevalsEvaluatorService {
       url: `${this.config.evaluatorRuntime?.endpoint}/${params.evaluatorType}/evaluate`,
       headers: {
         Authorization: `Bearer ${this.config.evaluatorRuntime?.internalSecret ?? ""}`,
+        ...nlpInternalSecretHeaders({ secret: this.config.evaluatorRuntime?.nlpInternalSecret }),
         "X-LangWatch-Project-Id": params.projectId,
         ...(params.idempotencyKey ? { "Idempotency-Key": params.idempotencyKey } : {}),
       },

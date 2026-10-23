@@ -1,7 +1,7 @@
 // playground_proxy.go owns the inbound shape for /go/proxy/v1/*: read
 // the OpenAI-shape body + x-litellm-* headers, route to the right
 // dispatcher request type, stream the response back. This file is the
-// HTTP-layer counterpart to pkg/litellmparams/headers.go (which owns the
+// HTTP-layer counterpart to services/nlpgo/litellmparams/headers.go (which owns the
 // header → domain.Credential mapping).
 package httpapi
 

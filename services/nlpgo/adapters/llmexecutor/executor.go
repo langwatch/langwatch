@@ -1,5 +1,5 @@
 // Package llmexecutor implements services/nlpgo/app.LLMClient by combining
-// the litellm-shape translator (pkg/litellmparams) with a
+// the litellm-shape translator (services/nlpgo/litellmparams) with a
 // pluggable app.GatewayClient.
 //
 // The LLM block in Sarah's engine talks to this executor. The executor:

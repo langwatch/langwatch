@@ -43,6 +43,7 @@ function serviceRouting({
         engine: "python",
         engineOverrides,
         internalSecret: "s3cret",
+        nlpInternalSecret: "nlp-s3cret",
       },
     },
     langevals: channel,
@@ -58,7 +59,7 @@ beforeEach(() => {
 describe("LangevalsEvaluatorService routing to the Go evaluator runtime", () => {
   describe("given langevals/exact_match is switched to the Go runtime", () => {
     /** @scenario "An evaluator switched to the Go runtime is answered by it" */
-    it("is answered by Go, with the bearer and the project, and never calls Python", async () => {
+    it("is answered by Go, with the bearer, nlpgo's secret and the project, never Python", async () => {
       const { channel, service } = serviceRouting({
         engineOverrides: { "langevals/exact_match": "go" },
       });
@@ -72,6 +73,7 @@ describe("LangevalsEvaluatorService routing to the Go evaluator runtime", () => 
       ]);
       expect(channel.posts[0]?.headers).toMatchObject({
         Authorization: "Bearer s3cret",
+        "X-LangWatch-NLP-Secret": "nlp-s3cret",
         "X-LangWatch-Project-Id": "project_acme",
       });
       expect(channel.posts[0]?.headers).not.toHaveProperty("X-LangWatch-Trace-Token");
