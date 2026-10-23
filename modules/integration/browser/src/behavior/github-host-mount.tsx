@@ -11,8 +11,10 @@ import {
   type UiRoute,
   type UiSession,
 } from "@langwatch/browser-host/capabilities";
+import { useUiFlags } from "@langwatch/browser-host/feature-flag";
 import { useLentOperations } from "@langwatch/browser-host/lent";
 import { uiLeaveTo, uiOpenExternal } from "@langwatch/browser-host/navigation";
+import { FrontendFlags } from "@langwatch/feature-flag-contract";
 import { type LangyAsk, LangyAskToken } from "@langwatch/langy-client";
 import { useMemo, type ReactNode } from "react";
 
@@ -24,6 +26,8 @@ import {
   type GithubRouteReading,
 } from "../model/github-host.ts";
 
+const LANGY_CREATE_PERMISSION = "langy:create";
+
 class HostServiceGithubHost extends GithubHostApi {
   constructor(
     private readonly deps: {
@@ -32,6 +36,7 @@ class HostServiceGithubHost extends GithubHostApi {
       feedback: UiFeedback;
       session: UiSession;
       langy: (() => Promise<LangyAsk>) | undefined;
+      langyReleased: boolean;
     },
   ) {
     super();
@@ -69,12 +74,17 @@ class HostServiceGithubHost extends GithubHostApi {
     this.deps.feedback.failed(failure);
   }
 
+  /** Langy installed, rolled out to this install, and the person may ask it. */
   canAskLangy(): boolean {
-    return this.deps.langy !== void 0;
+    return (
+      this.deps.langy !== void 0 &&
+      this.deps.langyReleased &&
+      this.deps.session.hasPermission(LANGY_CREATE_PERMISSION)
+    );
   }
 
   askLangy(question: string): void {
-    if (!this.deps.langy) return;
+    if (!this.deps.langy || !this.canAskLangy()) return;
     void this.deps
       .langy()
       .then((langy) => langy.ask({ question }))
@@ -93,6 +103,7 @@ export default function GithubHostMount({ children }: { children?: ReactNode }) 
   const { feedback, route, session } = useUiHostServices();
   const { organizationId } = useUiScope().activeScope();
   const langy = useLentOperations(LangyAskToken);
+  const langyReleased = useUiFlags().flag(FrontendFlags.release_langy_enabled) === true;
   const host = useMemo(
     () =>
       new HostServiceGithubHost({
@@ -101,8 +112,9 @@ export default function GithubHostMount({ children }: { children?: ReactNode }) 
         feedback,
         session,
         langy,
+        langyReleased,
       }),
-    [organizationId, route, feedback, session, langy],
+    [organizationId, route, feedback, session, langy, langyReleased],
   );
   return <GithubHostProvider value={host}>{children}</GithubHostProvider>;
 }

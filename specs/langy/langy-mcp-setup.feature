@@ -87,8 +87,16 @@ Feature: Langy helps a person connect the LangWatch MCP server to their AI clien
       And the steps show "claude mcp add --transport http langwatch <address>" with a copy button
 
     @integration
+    Scenario: A call without a client lets me pick it
+      Given Langy called mcp_setup without naming a client
+      When the MCP setup card renders
+      Then no client is picked
+      And the card asks me to pick my client before it shows steps
+
+    @integration
     Scenario: The API key method links to the API keys page and shows the header
       When I pick Cursor and then "API key" on the card
       Then the card shows the header "Authorization: Bearer YOUR_API_KEY"
       And a link to Settings, API Keys
+      And it tells me to restrict the key to only what my AI client needs
       And the Cursor steps for a key

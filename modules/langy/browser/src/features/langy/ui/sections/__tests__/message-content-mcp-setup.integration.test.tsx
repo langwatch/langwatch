@@ -125,6 +125,18 @@ describe("given an assistant message carrying an mcp_setup call", () => {
     });
   });
 
+  describe("when Langy named no client", () => {
+    /** @scenario "A call without a client lets me pick it" */
+    it("presses no client and asks the person to pick one before showing steps", () => {
+      renderMessage(messageWith({}));
+
+      const card = screen.getByTestId("langy-mcp-setup-card");
+      expect(within(card).queryAllByRole("button", { pressed: true })).toEqual([]);
+      expect(screen.queryByTestId("langy-mcp-setup-steps")).toBeNull();
+      expect(screen.getByTestId("langy-mcp-setup-pick-client")).toBeInTheDocument();
+    });
+  });
+
   describe("when the person picks another client and the API key method", () => {
     /** @scenario "The API key method links to the API keys page and shows the header" */
     it("shows that client's key steps, the header and the API keys link", async () => {

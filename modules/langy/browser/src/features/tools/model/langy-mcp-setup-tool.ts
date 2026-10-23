@@ -183,7 +183,7 @@ function apiKeySteps({
   appBaseUrl: string;
 }): McpSetupStep[] {
   const createKey: McpSetupStep = {
-    text: "Create a personal API key.",
+    text: "Create a personal API key. Its Permissions start at All: choose Restricted and grant only what your AI client needs, such as Read on the projects you want it to see.",
     link: { label: "Settings, API Keys", href: LANGWATCH_API_KEYS_PATH },
   };
   const bearer = `Bearer ${MCP_API_KEY_PLACEHOLDER}`;

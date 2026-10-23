@@ -42,10 +42,11 @@ export const LANGY_MCP_API_KEY_WHY =
 
 export function LangyMcpSetupCard({ call }: { call: LangyMcpSetupCall }) {
   const { appBaseUrl } = useUiDeployment();
-  const [client, setClient] = useState<McpSetupClient>(call.client ?? "claude");
+  // A call with no client lets the person pick: nothing is pressed until they do.
+  const [client, setClient] = useState<McpSetupClient | null>(call.client);
   const [method, setMethod] = useState<McpSetupMethod>(call.method);
   const url = mcpServerUrl(appBaseUrl);
-  const steps = mcpSetupSteps({ client, method, appBaseUrl });
+  const steps = client ? mcpSetupSteps({ client, method, appBaseUrl }) : null;
 
   return (
     <Box data-testid="langy-mcp-setup-card" maxWidth="560px">
@@ -110,7 +111,13 @@ export function LangyMcpSetupCard({ call }: { call: LangyMcpSetupCall }) {
             />
             <MethodWhy method={method} />
           </Field>
-          <Steps steps={steps} />
+          {steps ? (
+            <Steps steps={steps} />
+          ) : (
+            <Text textStyle="xs" color="fg.muted" data-testid="langy-mcp-setup-pick-client">
+              Pick your client to see its steps.
+            </Text>
+          )}
         </VStack>
       </LangyCard>
     </Box>

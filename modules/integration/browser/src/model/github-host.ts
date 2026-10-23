@@ -58,7 +58,7 @@ export abstract class GithubHostApi {
 
   abstract failed(failure: GithubFailureNotice): void;
 
-  /** Whether Langy is installed to be asked; the page offers it only then. */
+  /** Whether this person may ask Langy here (installed, rolled out, langy:create). */
   abstract canAskLangy(): boolean;
 
   /** Opens Langy and sends it this question. */

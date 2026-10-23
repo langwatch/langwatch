@@ -82,6 +82,7 @@ describe("mcpSetupSteps", () => {
       const steps = mcpSetupSteps({ client: "cursor", method: "api-key", appBaseUrl: BASE });
 
       expect(steps[0]?.link?.href).toBe(LANGWATCH_API_KEYS_PATH);
+      expect(steps[0]?.text).toMatch(/choose Restricted/);
       expect(stepsText(steps)).toContain('"Authorization": "Bearer YOUR_API_KEY"');
     });
 

@@ -33,3 +33,16 @@ Feature: The Integrations page points people to the LangWatch MCP
     Given Langy is not installed in this deployment
     Then the banner shows the docs link
     And it offers no "Ask Langy" button
+
+  @integration
+  Scenario: Only someone who may ask Langy is offered it
+    Given Langy is installed
+    But Langy is not rolled out to this install, or I lack langy:create
+    Then the banner offers no "Ask Langy" button
+
+  @integration
+  Scenario: The ask reaches Langy, and a Langy that cannot open is reported
+    Given Langy is installed, rolled out, and I hold langy:create
+    When the banner asks Langy a question
+    Then Langy's lent operations load and are asked that question
+    And when they fail to load, I am told "Langy could not open"
