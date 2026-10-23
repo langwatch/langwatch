@@ -117,9 +117,11 @@ export class ReadBudget {
           observed: decision.used,
         });
 
-        return enforced
-          ? new ReadRateLimitedError({ dimension: window.dimension, retryAfterSeconds })
-          : undefined;
+        // Log-only keeps counting the remaining windows, so the day's
+        // allowance stays true while the minute's is past.
+        if (enforced) {
+          return new ReadRateLimitedError({ dimension: window.dimension, retryAfterSeconds });
+        }
       }
       return undefined;
     });

@@ -209,6 +209,16 @@ describe("ReadBudget", () => {
     });
   });
 
+  describe("when a key starts exports past the minute's allowance while enforcement is off", () => {
+    it("still counts each one against the day's allowance", async () => {
+      const counter = memoryCounter();
+      const { budget } = budgetWith({ enforced: false, counter });
+      for (let call = 0; call < 3; call += 1) await budget.admit(readBy(KEY_A, "export"));
+
+      expect(counter.used.get("read-budget:api_key:key-a:exports-day")).toBe(3);
+    });
+  });
+
   describe("given a platform operator acting as a customer", () => {
     /** @scenario "A read made while impersonating counts against the operator" */
     it("counts against the operator and leaves an audit line", async () => {
