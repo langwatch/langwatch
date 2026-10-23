@@ -58,7 +58,7 @@ The CronJob alerts avoided self-telemetry because a backup that stops running re
 
 A backup failure never ends the sidecar process: configuration errors are logged and reported, panics in a run are recovered, the metrics listener retries. The chart's sidecar has a liveness probe and no readiness probe. A crash-looping sidecar container would make the whole pod unready.
 
-The sidecar logs in with `BACKUP_USER` and a password file (`BACKUP_PASSWORD_FILE`), never a password in its environment, and never assumes the `default` user. The login sits behind `chclient.Credentials`, re-read on every request, so the dynamic-users mode the access sidecar is gaining (a per-boot bootstrap password) is one more implementation. One-shot commands also accept `CLICKHOUSE_PASSWORD`, which the CronJobs pass today.
+The sidecar logs in with `BACKUP_USER` and a password file (`BACKUP_PASSWORD_FILE`), never a password in its environment, and never assumes the `default` user. The login sits behind `chclient.Credentials`, re-read on every request. When the access sidecar runs dynamic-only (ADR-184), there is no outside password: on a loopback host with a per-boot password in `CLICKHOUSE_ACCESS_BOOTSTRAP_DIR`, the sidecar and one-shot commands log in as that local admin instead. One-shot commands also accept `CLICKHOUSE_PASSWORD`, which the CronJobs pass today.
 
 ### 8. Retention stays with the object store
 
@@ -66,7 +66,7 @@ The earlier public script pruned with `DROP BACKUP`, which ClickHouse does not h
 
 ### 9. Chart modes
 
-`backup.mode` is `cronjob` (the default, manifests unchanged), `sidecar` (no backup CronJobs; the restore template stays) or `cronjob-observe` (CronJobs back up; the sidecar runs with `BACKUP_SIDECAR=observe`, deciding and reporting but never sending a `BACKUP`). Observe mode is how a deployment runs both side by side without double backups, and checks the sidecar's metrics and alerts against real backups before switching.
+`backup.mode` is `cronjob` (the default, manifests unchanged), `sidecar` (no backup CronJobs; the restore template stays) or `cronjob-observe` (CronJobs back up; the sidecar runs with `BACKUP_SIDECAR=observe`, deciding and reporting but never sending a `BACKUP`). Observe mode is how a deployment runs both side by side without double backups, and checks the sidecar's metrics and alerts against real backups before switching. Under dynamic-only access only `sidecar` renders: a CronJob pod has no password to log in with, so the chart refuses the other modes and drops the restore template, and a restore runs with `kubectl exec` into the sidecar container.
 
 ## Rationale / Trade-offs
 
