@@ -77,6 +77,13 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     And a fallback whose kind may not read the view judges the full trace, flagged
 
   @unit
+  Scenario: The tools view is used only when it is shorter than the full trace
+    Given a question category the table maps to the tools view, on a backend allowed to read it
+    When the rendered tools view has at least as many tokens as the full trace
+    Then the plan judges the full trace and the routing names the view as not shorter
+    And the mapping from category to view is configuration only, with the full trace as default
+
+  @unit
   Scenario: The length bucket is measured on the chosen view
     Given a long trace whose conversation text is short
     When a text-view call is routed

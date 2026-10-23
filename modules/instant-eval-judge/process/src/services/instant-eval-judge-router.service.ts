@@ -152,9 +152,10 @@ class RouteRun {
     this.projectId = input.projectId;
     this.signal = input.signal;
     this.logger = input.logger;
-    const { inputView, isViewMissing, refusedView } = input.plan;
+    const { inputView, isViewMissing, refusedView, longerView } = input.plan;
     if (isViewMissing) this.flags.push(`${inputView}_view_missing`);
     if (refusedView) this.flags.push(`${refusedView}_view_refused`);
+    if (longerView) this.flags.push(`${longerView}_view_not_shorter`);
   }
 
   /** A caller's stop after paid legs carries their spend, so the stopped batch still bills it. */
