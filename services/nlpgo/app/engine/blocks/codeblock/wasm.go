@@ -91,21 +91,10 @@ func newWasmRuntime(ctx context.Context, opts Options, sources runnerPair) (*was
 	if memoryMiB <= 0 {
 		memoryMiB = defaultWasmMemoryMiB
 	}
-	// Debug info off: with it, wazero symbolizes every trap against the
-	// guest's DWARF, which held a timed-out run seconds past its deadline.
-	config := wazero.NewRuntimeConfig().
-		WithDebugInfoEnabled(false).
-		WithCloseOnContextDone(true).
-		WithMemoryLimitPages(uint32(memoryMiB << 20 / wasmPageBytes))
-	cache := sharedCompilationCache
-	if opts.WasmCompilationCacheDir != "" {
-		dirCache, err := wazero.NewCompilationCacheWithDir(opts.WasmCompilationCacheDir)
-		if err != nil {
-			return nil, fmt.Errorf("codeblock: wasm compilation cache: %w", err)
-		}
-		cache = dirCache
+	config, err := wasmRuntimeConfig(opts, memoryMiB)
+	if err != nil {
+		return nil, err
 	}
-	config = config.WithCompilationCache(cache)
 	// A run's footprint: its linear memory, its /work, its queued bridge replies
 	// and its result, which the engine copies and then decodes.
 	runWeight := int64(memoryMiB) + defaultWorkLimits.bytes>>20 + maxQueuedReplyBytes>>20 + 2*maxResultBytes>>20
@@ -128,21 +117,45 @@ func newWasmRuntime(ctx context.Context, opts Options, sources runnerPair) (*was
 		_ = w.runtime.Close(ctx)
 		return nil, fmt.Errorf("codeblock: wasi: %w", err)
 	}
-	var err error
-	if opts.Runtime == RuntimeWasm {
-		w.python, err = w.pythonGuest(ctx, sources)
-	}
-	if err == nil && opts.QuickJSWasm != "" {
-		w.js, err = w.javascriptGuest(ctx)
-	}
-	if err == nil && opts.QuickJSWasm != "" && opts.TypeScriptWasm != "" {
-		w.tsstrip, err = w.compile(ctx, opts.TypeScriptWasm)
-	}
-	if err != nil {
+	if err := w.loadGuests(ctx, sources); err != nil {
 		_ = w.runtime.Close(ctx)
 		return nil, err
 	}
 	return w, nil
+}
+
+// wasmRuntimeConfig caps each guest at memoryMiB and shares compiled modules.
+// Debug info off: with it, wazero symbolizes every trap against the guest's
+// DWARF, which held a timed-out run seconds past its deadline.
+func wasmRuntimeConfig(opts Options, memoryMiB int) (wazero.RuntimeConfig, error) {
+	config := wazero.NewRuntimeConfig().
+		WithDebugInfoEnabled(false).
+		WithCloseOnContextDone(true).
+		WithMemoryLimitPages(uint32(memoryMiB << 20 / wasmPageBytes))
+	cache := sharedCompilationCache
+	if opts.WasmCompilationCacheDir != "" {
+		dirCache, err := wazero.NewCompilationCacheWithDir(opts.WasmCompilationCacheDir)
+		if err != nil {
+			return nil, fmt.Errorf("codeblock: wasm compilation cache: %w", err)
+		}
+		cache = dirCache
+	}
+	return config.WithCompilationCache(cache), nil
+}
+
+// loadGuests compiles the guests w.opts asks for.
+func (w *wasmRuntime) loadGuests(ctx context.Context, sources runnerPair) error {
+	var err error
+	if w.opts.Runtime == RuntimeWasm {
+		w.python, err = w.pythonGuest(ctx, sources)
+	}
+	if err == nil && w.opts.QuickJSWasm != "" {
+		w.js, err = w.javascriptGuest(ctx)
+	}
+	if err == nil && w.opts.QuickJSWasm != "" && w.opts.TypeScriptWasm != "" {
+		w.tsstrip, err = w.compile(ctx, w.opts.TypeScriptWasm)
+	}
+	return err
 }
 
 func (w *wasmRuntime) compile(ctx context.Context, path string) (wazero.CompiledModule, error) {

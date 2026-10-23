@@ -562,47 +562,12 @@ func (e *Executor) executeWasm(runCtx context.Context, guest *wasmGuest, req Req
 	started := time.Now()
 	admission, err := e.wasm.admit(runCtx)
 	if err != nil {
-		return collectResult(runResult{}, runOutcome{
-			timedOut: errors.Is(runCtx.Err(), context.DeadlineExceeded),
-			elapsed:  time.Since(started),
-			err:      err,
-		}), nil
+		return cancelledRun(runCtx, started, err), nil
 	}
 	defer admission.release()
-	// Erasing, sizing and encoding take time: past the deadline, the run timed out.
-	expired := func() *Result {
-		if runCtx.Err() == nil {
-			return nil
-		}
-		return collectResult(runResult{}, runOutcome{
-			timedOut: errors.Is(runCtx.Err(), context.DeadlineExceeded),
-			elapsed:  time.Since(started),
-			err:      runCtx.Err(),
-		})
-	}
-	stripped, failure := e.wasm.erasedTypes(runCtx, &req)
-	if res := expired(); res != nil {
-		return res, nil
-	}
-	if failure != nil {
-		return &Result{Error: failure, DurationMS: time.Since(started).Milliseconds()}, nil
-	}
-	fits := requestFits(req, maxWasmPayloadBytes)
-	if res := expired(); res != nil {
-		return res, nil
-	}
-	if !fits {
-		return requestTooLarge(), nil
-	}
-	payload, err := marshalRequest(req)
-	if err != nil {
-		return nil, err
-	}
-	if res := expired(); res != nil {
-		return res, nil
-	}
-	if len(payload) > maxWasmPayloadBytes {
-		return requestTooLarge(), nil
+	stripped, payload, early, err := e.wasmPayload(runCtx, &req, started)
+	if err != nil || early != nil {
+		return early, err
 	}
 	admission.fit(e.wasm.runWeight, len(payload))
 	run := e.wasm.run(runCtx, guest, wasmRunRequest{
@@ -619,6 +584,83 @@ func (e *Executor) executeWasm(runCtx context.Context, guest *wasmGuest, req Req
 		outcome.err = fmt.Errorf("the interpreter exited with status %d", run.exitCode)
 	}
 	return stripped.remapResult(collectResult(run.result, outcome)), nil
+}
+
+// wasmPayload erases req's types and encodes it. Erasing, sizing and encoding
+// take time: past the deadline at any step, the run timed out. A non-nil
+// Result ends the run before it starts.
+func (e *Executor) wasmPayload(runCtx context.Context, req *Request, started time.Time) (*strippedCode, []byte, *Result, error) {
+	expired := func() *Result {
+		if runCtx.Err() == nil {
+			return nil
+		}
+		return cancelledRun(runCtx, started, runCtx.Err())
+	}
+	stripped, failure := e.wasm.erasedTypes(runCtx, req)
+	if res := expired(); res != nil {
+		return nil, nil, res, nil
+	}
+	if failure != nil {
+		return nil, nil, &Result{Error: failure, DurationMS: time.Since(started).Milliseconds()}, nil
+	}
+	fits := requestFits(*req, maxWasmPayloadBytes)
+	if res := expired(); res != nil {
+		return nil, nil, res, nil
+	}
+	if !fits {
+		return nil, nil, requestTooLarge(), nil
+	}
+	payload, err := marshalRequest(*req)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if res := expired(); res != nil {
+		return nil, nil, res, nil
+	}
+	if len(payload) > maxWasmPayloadBytes {
+		return nil, nil, requestTooLarge(), nil
+	}
+	return stripped, payload, nil, nil
+}
+
+// cancelledRun is the result of a run stopped by err before it started.
+func cancelledRun(runCtx context.Context, started time.Time, err error) *Result {
+	return collectResult(runResult{}, runOutcome{
+		timedOut: errors.Is(runCtx.Err(), context.DeadlineExceeded),
+		elapsed:  time.Since(started),
+		err:      err,
+	})
+}
+
+// parsedResult reads the runner's own result file, or nil when there is none
+// or it does not parse.
+func parsedResult(data []byte, timedOut bool) *Result {
+	if len(data) == 0 {
+		return nil
+	}
+	var parsed struct {
+		Outputs    map[string]any `json:"outputs"`
+		Stdout     string         `json:"stdout"`
+		Stderr     string         `json:"stderr"`
+		DurationMS int64          `json:"duration_ms"`
+		Error      *Error         `json:"error"`
+	}
+	if err := json.Unmarshal(data, &parsed); err != nil {
+		return nil
+	}
+	disownReservedType(parsed.Error)
+	res := &Result{
+		Outputs:    parsed.Outputs,
+		Stdout:     parsed.Stdout,
+		Stderr:     parsed.Stderr,
+		DurationMS: parsed.DurationMS,
+		Error:      parsed.Error,
+		TimedOut:   timedOut,
+	}
+	if timedOut && res.Error == nil {
+		res.Error = &Error{Type: TimeoutType, Message: "code_block_timeout"}
+	}
+	return res
 }
 
 func requestTooLarge() *Result {
@@ -654,29 +696,8 @@ func collectResult(result runResult, outcome runOutcome) *Result {
 				"the code block's result has more than %d values or %d levels of nesting", maxResultValues, maxResultDepth)},
 		}
 	}
-	if data := result.data; len(data) > 0 {
-		var parsed struct {
-			Outputs    map[string]any `json:"outputs"`
-			Stdout     string         `json:"stdout"`
-			Stderr     string         `json:"stderr"`
-			DurationMS int64          `json:"duration_ms"`
-			Error      *Error         `json:"error"`
-		}
-		if err := json.Unmarshal(data, &parsed); err == nil {
-			disownReservedType(parsed.Error)
-			res := &Result{
-				Outputs:    parsed.Outputs,
-				Stdout:     parsed.Stdout,
-				Stderr:     parsed.Stderr,
-				DurationMS: parsed.DurationMS,
-				Error:      parsed.Error,
-				TimedOut:   timedOut,
-			}
-			if timedOut && res.Error == nil {
-				res.Error = &Error{Type: TimeoutType, Message: "code_block_timeout"}
-			}
-			return res
-		}
+	if res := parsedResult(result.data, timedOut); res != nil {
+		return res
 	}
 
 	// No result file (most likely: timeout killed the process before
