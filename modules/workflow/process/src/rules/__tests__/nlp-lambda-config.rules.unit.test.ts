@@ -16,8 +16,7 @@ import {
 
 const FIELDS: StudioLambdaFleetFields = {
   region: "eu-central-1",
-  accessKeyId: "key",
-  secretAccessKey: "secret",
+  credentials: { kind: "static", accessKeyId: "key", secretAccessKey: "secret" },
   roleArn: "arn:aws:iam::123:role/nlp",
   imageUri: "123.dkr.ecr.eu-central-1.amazonaws.com/nlp:v9",
   cacheBucket: "langwatch-nlp-cache",

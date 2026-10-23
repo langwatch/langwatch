@@ -23,33 +23,107 @@ const COUNTER_FIELDS = [
   "cacheCreationTokens",
 ] as const;
 
+type Counter = (typeof COUNTER_FIELDS)[number];
+
+/** What a bucket's record holds of each counter and of the cost. */
+export type BucketAmounts = Pick<StampedUsage, Counter | "costUsd">;
+
+/** Each bucket's summed record, the cost never negative (see `costOf`). */
+export function bucketAmountsOf({
+  ledger,
+  keyOf,
+}: {
+  ledger: readonly StampedUsage[];
+  keyOf: (usage: StampedUsage) => string;
+}): Map<string, BucketAmounts> {
+  const amounts = new Map<string, BucketAmounts>();
+  for (const usage of ledger) {
+    const key = keyOf(usage);
+    const current = amounts.get(key);
+    amounts.set(key, {
+      inputTokens: (current?.inputTokens ?? 0) + usage.inputTokens,
+      outputTokens: (current?.outputTokens ?? 0) + usage.outputTokens,
+      cacheReadTokens: (current?.cacheReadTokens ?? 0) + usage.cacheReadTokens,
+      cacheCreationTokens: (current?.cacheCreationTokens ?? 0) + usage.cacheCreationTokens,
+      costUsd: (current?.costUsd ?? 0) + costOf(usage),
+    });
+  }
+
+  return amounts;
+}
+
+/**
+ * What one amount splits by: the record's own figure for it where the record holds any, else
+ * the bucket weights. Work recorded at two rates thus keeps what each bucket recorded.
+ */
+function ratioFor({
+  field,
+  amounts,
+  buckets,
+  totalWeight,
+}: {
+  field: Counter | "costUsd";
+  amounts: ReadonlyMap<string, BucketAmounts>;
+  buckets: ReadonlyMap<string, number>;
+  totalWeight: number;
+}): { weightOf: (key: string) => number; total: number } {
+  const total = [...amounts.values()].reduce((sum, amount) => sum + amount[field], 0);
+  if (total > 0) {
+    return { weightOf: (key) => amounts.get(key)?.[field] ?? 0, total };
+  }
+
+  return { weightOf: (key) => buckets.get(key) ?? 0, total: totalWeight };
+}
+
+/** This pull request's share of the session's cost, never rounded: it is a currency amount. */
+export function allocateCost({
+  costUsd,
+  buckets,
+  amounts,
+  totalWeight,
+  ownKeys,
+}: {
+  costUsd: number;
+  buckets: ReadonlyMap<string, number>;
+  amounts: ReadonlyMap<string, BucketAmounts>;
+  totalWeight: number;
+  ownKeys: readonly string[];
+}): number {
+  const ratio = ratioFor({ field: "costUsd", amounts, buckets, totalWeight });
+  const owned = ownKeys.reduce((total, key) => total + ratio.weightOf(key), 0);
+  return (costUsd * owned) / ratio.total;
+}
+
 /**
  * This pull request's whole-token share of each of the session's counters.
  */
 export function allocateCounters({
   session,
   buckets,
+  amounts,
   totalWeight,
   ownKeys,
 }: {
   session: CodingAgentSessionBranchRecord;
   buckets: ReadonlyMap<string, number>;
+  amounts: ReadonlyMap<string, BucketAmounts>;
   totalWeight: number;
   ownKeys: readonly string[];
-}): Pick<CodingAgentSessionBranchRecord, (typeof COUNTER_FIELDS)[number]> {
+}): Pick<CodingAgentSessionBranchRecord, Counter> {
   // Sorted so the allocation never depends on the order rows arrived in.
   const keys = [...buckets.keys()].toSorted();
   const owned = new Set(ownKeys);
-  const allocated = {} as Record<(typeof COUNTER_FIELDS)[number], number>;
+  const allocated = {} as Record<Counter, number>;
 
   for (const field of COUNTER_FIELDS) {
     const amount = Math.max(0, Math.floor(session[field]));
+    const ratio = ratioFor({ field, amounts, buckets, totalWeight });
     const floors = new Map<string, number>();
     const remainders: { key: string; remainder: number }[] = [];
     let handedOut = 0;
 
     for (const key of keys) {
-      const exact = (amount * buckets.get(key)!) / totalWeight;
+      const exact = (amount * ratio.weightOf(key)) / ratio.total;
       const whole = Math.floor(exact);
       floors.set(key, whole);
       handedOut += whole;

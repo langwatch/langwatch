@@ -6,6 +6,7 @@
 import { ProjectInvalidCredentialsError, ProjectMissingCredentialsError } from "@langwatch/api";
 import type { ApiKeyApi, ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
 import { ApiKeyPermissionDeniedError } from "@langwatch/api-key-contract";
+import type { RestKeyCredential } from "@langwatch/api/rest";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { HandledError } from "@langwatch/handled-error";
 import { createLogger, createWarnThrottle, type Logger } from "@langwatch/observability";
@@ -77,7 +78,11 @@ export class TraceIngestCredentialService {
   async resolveForCollector(input: { request: Request }): Promise<CollectorCredential> {
     const resolution = await this.#authenticate(input.request);
 
-    return { project: projectOf(resolution.resolved), markUsed: resolution.markUsed };
+    return {
+      project: projectOf(resolution.resolved),
+      markUsed: resolution.markUsed,
+      key: collectorKeyOf(resolution.resolved),
+    };
   }
 
   /** The receiver's credential, plus the identity it stamps provenance from. */
@@ -175,6 +180,27 @@ export class TraceIngestCredentialService {
     }
     return new ApiKeyPermissionDeniedError(INGEST_PERMISSION);
   }
+}
+
+/** The key a collector bearer is, as the access record names it: id and kind, never the token. */
+function collectorKeyOf(resolved: ResolvedApiKeyCredential): RestKeyCredential {
+  if (resolved.type === "legacyProjectKey") {
+    return { kind: "legacy_project_key", apiKeyId: null, ownerUserId: null };
+  }
+  return {
+    kind: collectorKeyKindOf(resolved),
+    apiKeyId: resolved.apiKeyId,
+    ownerUserId: resolved.userId,
+  };
+}
+
+function collectorKeyKindOf(
+  resolved: Exclude<ResolvedApiKeyCredential, { type: "legacyProjectKey" }>,
+): RestKeyCredential["kind"] {
+  if (resolved.isLangySessionKey) return "langy_session_key";
+  // A source type is what makes a key an ingestion key; a template is optional on one.
+  if (resolved.ingestSourceType) return "ingestion_key";
+  return "api_key";
 }
 
 /** The three ids both doors record a batch against. */

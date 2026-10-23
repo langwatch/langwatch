@@ -21,8 +21,7 @@ const ARN = "arn:aws:lambda:eu-central-1:123:function:langwatch_nlp-project-1";
 
 const CONFIG: StudioLambdaConfig = {
   region: "eu-central-1",
-  accessKeyId: "key",
-  secretAccessKey: "secret",
+  credentials: { kind: "static", accessKeyId: "key", secretAccessKey: "secret" },
   roleArn: "arn:aws:iam::123:role/nlp",
   imageUri: "registry/nlp:v9",
   cacheBucket: "langwatch-nlp-cache",

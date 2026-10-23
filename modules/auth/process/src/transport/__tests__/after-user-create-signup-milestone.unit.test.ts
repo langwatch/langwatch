@@ -136,6 +136,7 @@ function composedAnnouncements() {
     },
     recordSessionStarted: { send: async () => undefined },
     recordSsoAutoAdded: { send: async () => undefined },
+    recordAppPageOpened: { send: async () => undefined },
   });
   const { logger } = createTestLogger();
   const signups = SignupAnnouncementService.create({
