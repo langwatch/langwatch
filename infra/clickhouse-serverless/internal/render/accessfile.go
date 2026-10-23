@@ -19,6 +19,9 @@ func renderAccessUsers(log *zap.Logger, input *config.Input, usersD string) erro
 	if err != nil {
 		return err
 	}
+	if f.DynamicOnly() != input.DynamicOnly {
+		return fmt.Errorf("%s: mode changed while the server was starting; start it again", input.AccessFile)
+	}
 	in, err := access.Gather(f)
 	if err != nil {
 		return fmt.Errorf("%s: %w", input.AccessFile, err)

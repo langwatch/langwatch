@@ -9,7 +9,14 @@ ch-config generate /etc/clickhouse-server
 # access_management). Its initdb step and CLICKHOUSE_DB still log in as
 # default, so they get the password ch-config used, and only they do.
 export CLICKHOUSE_SKIP_USER_SETUP=1
-if [ -n "${CLICKHOUSE_PASSWORD_FILE:-}" ]; then
+# Dynamic-only mode (ADR-184): default has no password, so initdb logs in as
+# the local admin with the password ch-config generated for this start.
+bootstrap_password="${CLICKHOUSE_ACCESS_BOOTSTRAP_DIR:-/run/clickhouse-access}/password"
+initdb_user=""
+if [ -s "$bootstrap_password" ]; then
+    initdb_user=local_admin
+    CLICKHOUSE_PASSWORD="$(<"$bootstrap_password")"
+elif [ -n "${CLICKHOUSE_PASSWORD_FILE:-}" ]; then
     CLICKHOUSE_PASSWORD="$(<"$CLICKHOUSE_PASSWORD_FILE")"
     CLICKHOUSE_PASSWORD="${CLICKHOUSE_PASSWORD#"${CLICKHOUSE_PASSWORD%%[![:space:]]*}"}"
     CLICKHOUSE_PASSWORD="${CLICKHOUSE_PASSWORD%"${CLICKHOUSE_PASSWORD##*[![:space:]]}"}"
@@ -24,6 +31,9 @@ if [ $# -eq 0 ] || [[ "$1" == --* ]]; then
 fi
 if [ -n "$initdb_inputs" ]; then
     export CLICKHOUSE_PASSWORD
+    if [ -n "$initdb_user" ]; then
+        export CLICKHOUSE_USER="$initdb_user"
+    fi
 else
     unset CLICKHOUSE_PASSWORD
 fi

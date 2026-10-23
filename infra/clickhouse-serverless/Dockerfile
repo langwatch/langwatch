@@ -32,6 +32,7 @@ RUN install -d -o clickhouse -g clickhouse -m 755 \
         /etc/clickhouse-server/config.d \
         /etc/clickhouse-server/users.d \
         /scripts \
+    && install -d -o clickhouse -g clickhouse -m 750 /run/clickhouse-access \
     && chown clickhouse:clickhouse /scripts/*.sh
 
 # Group 101 too: secret mounts may be readable by the clickhouse group only (0440).

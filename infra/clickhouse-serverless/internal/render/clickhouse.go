@@ -1,6 +1,7 @@
 package render
 
 import (
+	"crypto/rand"
 	"crypto/sha256"
 	"fmt"
 	"path/filepath"
@@ -9,8 +10,27 @@ import (
 	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/config"
 )
 
-// renderDefaultPassword writes default-password.yaml with the SHA256-hashed password.
+// renderDefaultPassword writes default-password.yaml with the SHA256-hashed
+// password. In dynamic-only mode default is locked instead: the hash of 32
+// random bytes nobody keeps, and an empty network list, so no address may
+// log in as default whatever it presents.
 func renderDefaultPassword(input *config.Input, usersD string) error {
+	if input.DynamicOnly {
+		secret := make([]byte, 32)
+		if _, err := rand.Read(secret); err != nil {
+			return err
+		}
+		h := sha256.Sum256(secret)
+		return writeYAML(filepath.Join(usersD, "default-password.yaml"), map[string]any{
+			"users": map[string]any{
+				"default": map[string]any{
+					"password":            map[string]string{"@remove": "1"},
+					"password_sha256_hex": fmt.Sprintf("%x", h),
+					"networks":            map[string]string{"@replace": "replace"},
+				},
+			},
+		})
+	}
 	h := sha256.Sum256([]byte(input.Password))
 	return writeYAML(filepath.Join(usersD, "default-password.yaml"), map[string]any{
 		"users": map[string]any{

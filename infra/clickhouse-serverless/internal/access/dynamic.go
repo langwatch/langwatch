@@ -11,7 +11,9 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
+	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
 
 	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/bootstrap"
@@ -76,6 +78,7 @@ func (n configNode) credentialKeys() []string {
 	var keys []string
 	for _, c := range n.children {
 		switch {
+		case c.removed:
 		case staticCredentialKeys[c.name]:
 			keys = append(keys, c.name)
 		case c.name == "auth_methods":
@@ -197,4 +200,53 @@ func PasswordLogins(ctx context.Context, q Querier) ([]string, error) {
 		found = append(found, fmt.Sprintf("user %s (%s) logs in with %s", cols[0], cols[1], cols[2]))
 	}
 	return found, nil
+}
+
+// AuditInterval is how often the sidecar asks for password logins.
+const AuditInterval = time.Minute
+
+// Auditor logs password logins on a dynamic-only server, at error level, each
+// time the set changes. It reports and never drops a user: that is the
+// operator's call, and an admin may have made it on purpose.
+type Auditor struct {
+	Q   Querier
+	Log *zap.Logger
+
+	last string
+}
+
+// Check runs one audit.
+func (a *Auditor) Check(ctx context.Context) {
+	found, err := PasswordLogins(ctx, a.Q)
+	if err != nil {
+		a.Log.Warn("password login audit failed", zap.Error(err))
+		return
+	}
+	key := strings.Join(found, "\n")
+	if key == a.last {
+		return
+	}
+	a.last = key
+	if len(found) == 0 {
+		a.Log.Info("password login audit: only the local admin has a password")
+		return
+	}
+	a.Log.Error("dynamic-only server still has password logins; move them to token logins or drop them",
+		zap.Strings("users", found))
+}
+
+// Run audits every interval while enabled reports true, until ctx ends.
+func (a *Auditor) Run(ctx context.Context, interval time.Duration, enabled func() bool) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		if enabled() {
+			a.Check(ctx)
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+	}
 }
