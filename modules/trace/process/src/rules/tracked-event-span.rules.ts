@@ -1,6 +1,10 @@
 import { createHash } from "node:crypto";
 
-import { type OtlpKeyValue, type OtlpSpan } from "@langwatch/otlp/trace-request";
+import {
+  epochMsToOtlpNanos,
+  type OtlpKeyValue,
+  type OtlpSpan,
+} from "@langwatch/otlp/trace-request";
 import {
   TRACK_EVENT_SPAN_NAME,
   type TrackEventRESTParamsValidator,
@@ -10,8 +14,6 @@ import { ESpanKind } from "@opentelemetry/otlp-transformer-next/build/esm/trace/
 /** How many hex characters an OTLP span id carries. */
 const SPAN_ID_LENGTH = 16;
 
-/** Nanoseconds in a millisecond, the unit the wire carries timestamps in. */
-const NANOSECONDS_PER_MILLISECOND = 1_000_000;
 
 /** The span id derives from trace and event IDs, making retries idempotent. */
 /** The span id a given event on a given trace always has. */
@@ -61,7 +63,7 @@ export function buildTrackedEventSpan(
     occurredAtMs: number;
   }>,
 ): OtlpSpan {
-  const timestampNano = String(input.occurredAtMs * NANOSECONDS_PER_MILLISECOND);
+  const timestampNano = epochMsToOtlpNanos(input.occurredAtMs);
   const attributes = buildAttributes({
     body: input.body,
     eventId: input.eventId,
