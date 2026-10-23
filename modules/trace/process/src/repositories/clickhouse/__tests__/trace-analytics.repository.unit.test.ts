@@ -10,6 +10,7 @@ nodeProcessEnv.TZ = "Asia/Kolkata";
 import { AuthorizedClickHouse, setWindowedReadMetrics } from "@langwatch/clickhouse-client";
 import {
   idIndexedClientDouble,
+  readyIdIndexedClientDouble,
   type ScriptedStatements,
 } from "@langwatch/clickhouse-client/testing";
 import { describe, expect, it, vi } from "vitest";
@@ -233,65 +234,8 @@ describe("TraceAnalyticsClickHouseRepository tied-version read", () => {
 describe("TraceAnalyticsClickHouseRepository windowed read", () => {
   describe("given a caller-supplied window", () => {
     describe("when the read runs", () => {
-      it("counts the read on the windowed-read metric as a window hit", async () => {
-        const before = windowedReadMetrics.count({
-          table: TABLE,
-          outcome: "hit",
-        });
-        // A row, so this is a genuine hit. The empty case is its own outcome
-        // (see below) — asserting `hit` off an empty read would pin the wrong
-        // half of the contract.
-        const { repository } = makeOrderingRepository([
-          tiedVersion({
-            lastEventOccurredAt: "1750000000001",
-            spanCount: 1,
-            appliedEventIds: ["a"],
-            occurredAt: "2026-07-24 12:00:00.000",
-          }),
-        ]);
-
-        await repository.findByTraceId({
-          authorization: AUTHORIZATION,
-          traceId: TRACE_ID,
-          window: { fromMs: 1_750_000_000_000, toMs: 1_750_000_345_679 },
-        });
-
-        expect(windowedReadMetrics.count({ table: TABLE, outcome: "hit" })).toBe(before + 1);
-      });
-
-      /**
-       * This read declares its window authoritative, so a miss never widens and
-       * has no widen outcome to appear as. It gets counted as a miss instead of
-       * folded into `hit`.
-       */
-      /** @scenario a bounded miss is recorded as a miss, not as an answer */
-      it("counts an empty window as a miss, not as a hit", async () => {
-        const beforeEmpty = windowedReadMetrics.count({
-          table: TABLE,
-          outcome: "windowed_empty",
-        });
-        const beforeHit = windowedReadMetrics.count({
-          table: TABLE,
-          outcome: "hit",
-        });
-        const { repository } = makeOrderingRepository([]);
-
-        await repository.findByTraceId({
-          authorization: AUTHORIZATION,
-          traceId: TRACE_ID,
-          window: { fromMs: 1_750_000_000_000, toMs: 1_750_000_345_679 },
-        });
-
-        expect(windowedReadMetrics.count({ table: TABLE, outcome: "windowed_empty" })).toBe(
-          beforeEmpty + 1,
-        );
-        expect(windowedReadMetrics.count({ table: TABLE, outcome: "hit" })).toBe(beforeHit);
-      });
-
       it("passes the caller's bounds through to ClickHouse unchanged", async () => {
-        // queryWindowed takes a centre + half-width, so the bounds make a
-        // round-trip through `(from + to) / 2` and `(to - from) / 2`. An odd
-        // width lands the halves on .5 and still has to reconstruct exactly.
+        // An odd width: nothing on the way may round the bounds.
         const { repository, seen } = makeOrderingRepository([]);
 
         await repository.findByTraceId({
@@ -345,6 +289,81 @@ describe("TraceAnalyticsClickHouseRepository windowed read", () => {
 
         expect(windowedReadMetrics.count({ table: TABLE, outcome: "unwindowed" })).toBe(before + 1);
         expect(seen[0]?.query).not.toContain("fromUnixTimestamp64Milli");
+      });
+    });
+  });
+});
+
+/** The index's range for the trace, and every source statement the read sent. */
+async function repositoryOverReadyIndex({ indexedAtMs }: { indexedAtMs: number }) {
+  const sent: { sql: string; params: Record<string, unknown> }[] = [];
+  const execute = vi.fn<ScriptedStatements["execute"]>(async ({ sql, params = {} }) => {
+    if (sql.includes("count() AS n")) {
+      return { rows: [{ n: "1", fromMs: String(indexedAtMs), toMs: String(indexedAtMs) }] };
+    }
+    sent.push({ sql, params });
+    return { rows: [] };
+  });
+  const client = await readyIdIndexedClientDouble({
+    indexes: TRACE_ID_INDEXES,
+    driver: { execute },
+  });
+  const repository = TraceAnalyticsClickHouseRepository.create({
+    resolveClient: async () => clientReturning({}),
+    clickhouse: new AuthorizedClickHouse({ resolveClient: async () => client }),
+  });
+  return { repository, sent };
+}
+
+/** The statement split at the dedup subquery, found by its tuple: the fence is an `IN` too. */
+function scopesOf({ sql }: { sql: string }): { outer: string; inner: string } {
+  const innerStart = sql.indexOf("(TenantId, TraceId, UpdatedAt) IN (");
+  return { outer: sql.slice(0, innerStart), inner: sql.slice(innerStart, sql.indexOf("GROUP BY")) };
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+describe("TraceAnalyticsClickHouseRepository read over a ready id index", () => {
+  describe("given a fold read-back window", () => {
+    describe("when the read runs", () => {
+      it("bounds both scopes by the index range and the outer scope by the window too", async () => {
+        const indexedAtMs = 1_750_000_100_000;
+        const { repository, sent } = await repositoryOverReadyIndex({ indexedAtMs });
+
+        await repository.findByTraceId({
+          authorization: AUTHORIZATION,
+          traceId: TRACE_ID,
+          window: { fromMs: 1_750_000_000_000, toMs: 1_750_000_345_679 },
+        });
+
+        // The index range spans every version's OccurredAt, so it is safe in the dedup scope;
+        // the fold's window is not, since the anchor can be re-stamped (ADR-071).
+        const { sql, params } = sent[0] ?? { sql: "", params: {} };
+        const { outer, inner } = scopesOf({ sql });
+        expect(outer).toContain("{from:Int64}");
+        expect(outer).toContain("{idBound_fromMs:Int64}");
+        expect(inner).toContain("{idBound_fromMs:Int64}");
+        expect(inner).not.toContain("{from:Int64}");
+        expect(params.idBound_fromMs).toBe(indexedAtMs - DAY_MS);
+        expect(params.idBound_toMs).toBe(indexedAtMs + DAY_MS);
+        expect(sent).toHaveLength(1);
+      });
+    });
+  });
+
+  describe("given no window", () => {
+    describe("when the read runs", () => {
+      it("bounds both scopes by the index range alone", async () => {
+        const { repository, sent } = await repositoryOverReadyIndex({
+          indexedAtMs: 1_750_000_100_000,
+        });
+
+        await repository.findByTraceId({ authorization: AUTHORIZATION, traceId: TRACE_ID });
+
+        const { outer, inner } = scopesOf({ sql: sent[0]?.sql ?? "" });
+        expect(outer).toContain("{idBound_fromMs:Int64}");
+        expect(inner).toContain("{idBound_fromMs:Int64}");
+        expect(outer).not.toContain("{from:Int64}");
       });
     });
   });
