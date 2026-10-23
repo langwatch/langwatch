@@ -26,34 +26,45 @@ type CardProps = {
   children?: ReactNode;
 };
 
+/** Full cards put a glyph in a tinted tile, a logo on a light chip; logo-only cards stay bare. */
+function CardIcon({ icon, compact }: { icon: string; compact: boolean }) {
+  if (compact) return <Icon icon={icon} size={20} />;
+  const logo = /^(\/|https?:)/.test(icon) || ["github", "python", "typescript"].includes(icon);
+  return (
+    <span className="docs-card-icon" data-logo={logo} aria-hidden="true">
+      <Icon icon={icon} size={logo ? 20 : 18} />
+    </span>
+  );
+}
+
 /** MDX supplies content and destinations; the shared card owns its surface and interaction. */
 export function Card({ title, description, icon, href, arrow, children }: CardProps) {
   const compact = Boolean(icon && !description && !Children.toArray(children).length);
   const linked = Boolean(href && title && !containsLink({ node: children }));
   const Direction = href && /^https?:/.test(href) ? ArrowUpRight : ArrowRight;
+  const body = description || children;
   return (
     <Box className="docs-card" data-compact={compact} display="grid" minWidth="0">
       <SurfaceCard
         variant="panel-fill"
-        padding={compact ? "sm" : "lg"}
+        padding={compact ? "sm" : "md"}
         titleLevel={3}
         title={
           title && href && !linked ? <Link href={sitePath({ path: href })}>{title}</Link> : title
         }
-        description={description}
         badge={
           href && arrow !== false && arrow !== "false" ? (
-            <Direction size={16} aria-hidden="true" />
+            <Direction className="docs-card-arrow" size={16} aria-hidden="true" />
           ) : (
             void 0
           )
         }
-        icon={icon ? <Icon icon={icon} size={20} /> : void 0}
+        icon={icon ? <CardIcon icon={icon} compact={compact} /> : void 0}
         opener={linked && href ? <a href={sitePath({ path: href })} aria-label={title} /> : void 0}
       >
-        {children ? (
+        {body ? (
           <Box className="docs-card-body" minWidth="0">
-            {children}
+            {description ? <p>{description}</p> : children}
           </Box>
         ) : null}
       </SurfaceCard>
@@ -76,7 +87,6 @@ export function CardGroup({
         className="docs-card-grid"
         display="grid"
         alignItems="stretch"
-        gridAutoRows="1fr"
         gap="3"
         css={{
           gridTemplateColumns: "minmax(0, 1fr)",

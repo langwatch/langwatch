@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { mkdtemp, readFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -26,7 +27,9 @@ void it("audits every representative page within budget", async () => {
   const forwarded =
     typeof values["report-dir"] === "string" ? args : [...args, "--report-dir", reportDir];
   const result = spawnSync(process.execPath, [runner, ...forwarded], { stdio: "inherit" });
-  const report = JSON.parse(await readFile(path.join(reportDir, "audit-report.json"), "utf8"));
+  const reportFile = path.join(reportDir, "audit-report.json");
+  assert.ok(existsSync(reportFile), `the audit stopped (exit ${result.status}); see its output`);
+  const report = JSON.parse(await readFile(reportFile, "utf8"));
   const budgets = JSON.parse(
     await readFile(new URL("../src/site/audit/budgets.json", import.meta.url), "utf8"),
   );

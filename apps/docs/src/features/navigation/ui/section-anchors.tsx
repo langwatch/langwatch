@@ -24,7 +24,8 @@ const SECTION_ICONS = {
   "API Reference": Braces,
   "Get Support": LifeBuoy,
 };
-import { pagePath } from "../../../lib/site-path.ts";
+import { publicSlug, sitePath } from "../../../lib/site-path.ts";
+import { localHref } from "../model/inline.ts";
 import { firstSlug } from "../model/nav.ts";
 import type { Section } from "../model/nav.ts";
 import { sections, support } from "./site-nav.ts";
@@ -35,8 +36,19 @@ function SectionGlyph({ title }: { title: string }) {
   return <Glyph size={18} strokeWidth={1.8} aria-hidden="true" />;
 }
 
-function AnchorLink({ href, title, selected }: { href: string; title: string; selected: boolean }) {
-  const external = /^https?:/.test(href);
+function AnchorLink({
+  href: authored,
+  title,
+  selected,
+}: {
+  href: string;
+  title: string;
+  selected: boolean;
+}) {
+  // docs.json may spell a page of this site as an absolute URL; it still opens in place.
+  const local = localHref({ href: authored });
+  const external = /^https?:/.test(local);
+  const href = external ? local : sitePath({ path: local });
   return (
     <Link
       href={href}
@@ -56,7 +68,13 @@ function AnchorLink({ href, title, selected }: { href: string; title: string; se
       bg={selected ? "docs.raised" : "transparent"}
       marginBottom="0.5"
       boxShadow={selected ? "0 1px 3px var(--chakra-colors-docs-shadow)" : void 0}
-      _hover={{ bg: selected ? "docs.raised" : "bg.hover", textDecoration: "none" }}
+      _hover={{
+        bg: selected ? "docs.raised" : "bg.hover",
+        boxShadow: selected
+          ? "0 1px 3px var(--chakra-colors-docs-shadow), inset 0 0 0 1px var(--chakra-colors-border)"
+          : void 0,
+        textDecoration: "none",
+      }}
     >
       <Box
         display="inline-flex"
@@ -86,7 +104,7 @@ export function SectionAnchors({ active }: { active: Section | undefined }) {
           {sections.map((section) => (
             <Box as="li" key={section.title} listStyleType="none">
               <AnchorLink
-                href={pagePath({ slug: firstSlug({ items: section.children }) })}
+                href={`/${publicSlug({ slug: firstSlug({ items: section.children }) })}`}
                 title={section.title}
                 selected={section === active}
               />

@@ -6,10 +6,12 @@ import {
 } from "@langwatch/design-system/app-shell";
 import { Box, Button, Text } from "@langwatch/design-system/primitives";
 import { ArrowUpRight, FileText, Hash, Zap } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import type { LucideIcon, LucideProps } from "lucide-react";
+import { forwardRef, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
 
-import { pagePath } from "../../../lib/site-path.ts";
+import { isColourLogo } from "../../../lib/logos.ts";
+import { pagePath, sitePath } from "../../../lib/site-path.ts";
 import { searchIndex, type SearchIndex } from "../model/search-engine.ts";
 import { QUICK_ACTIONS, runQuickAction } from "./search-actions.ts";
 import { currentBuild, loadSearchIndex } from "./search-index-store.ts";
@@ -46,19 +48,34 @@ function commandRows({ index, query }: { index: SearchIndex | null; query: strin
     group: entry.section,
     method: entry.method,
     heading: Boolean(heading),
+    icon: entry.icon,
+    glyph: index?.glyphs.get(entry.icon) ?? "",
   }));
   const actions = QUICK_ACTIONS.filter(
     (action) =>
       !query || `${action.title} ${action.description}`.toLowerCase().includes(query.toLowerCase()),
-  ).map((action) => ({ ...action, group: "Quick actions", method: "", heading: false }));
+  ).map((action) => ({
+    ...action,
+    group: "Quick actions",
+    method: "",
+    heading: false,
+    icon: "",
+    glyph: "",
+  }));
   return [...pages, ...actions].toSorted((left, right) => {
     const leftGroup = left.group === "Quick actions" ? "" : left.group;
     const rightGroup = right.group === "Quick actions" ? "" : right.group;
     return leftGroup.localeCompare(rightGroup);
   });
 }
-export function SearchContent({ close }: { close: () => void }) {
-  const [query, setQuery] = useState("");
+export function SearchContent({
+  close,
+  initialQuery = "",
+}: {
+  close: () => void;
+  initialQuery?: string;
+}) {
+  const [query, setQuery] = useState(initialQuery);
   const [selected, setSelected] = useState(0);
   const [notice, setNotice] = useState("");
   const input = useRef<HTMLInputElement>(null);
@@ -145,9 +162,34 @@ export function SearchContent({ close }: { close: () => void }) {
   );
 }
 
+const PAGE_GLYPHS = new Map<string, LucideIcon>();
+
+/** A page's own icon in the row's icon slot: a logo, dark marks on a light chip, or a glyph. */
+function pageGlyph({ icon, glyph }: { icon: string; glyph: string }) {
+  const logo = icon[0] === "/";
+  if (!logo && !glyph) return FileText;
+  const drawn =
+    PAGE_GLYPHS.get(icon) ??
+    forwardRef<SVGSVGElement, Omit<LucideProps, "ref">>(() =>
+      logo ? (
+        <span className="docs-command-logo" data-chip={isColourLogo({ icon }) ? void 0 : ""}>
+          <img src={sitePath({ path: icon })} alt="" />
+        </span>
+      ) : (
+        <svg
+          className="docs-command-glyph"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+          dangerouslySetInnerHTML={{ __html: glyph }}
+        />
+      ),
+    );
+  PAGE_GLYPHS.set(icon, drawn);
+  return drawn;
+}
 function rowIcon({ row }: { row: ReturnType<typeof commandRows>[number] }) {
   if (row.heading) return Hash;
-  return row.group === "Quick actions" ? ArrowUpRight : FileText;
+  return row.group === "Quick actions" ? ArrowUpRight : pageGlyph(row);
 }
 function SearchRows({
   rows,

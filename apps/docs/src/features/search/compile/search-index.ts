@@ -1,8 +1,11 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { z } from "zod/mini";
 
+import { ICONS, LOGO_ASSETS } from "../../../lib/icon-registry.ts";
 import type { Heading } from "../../content/compile/rehype-content.ts";
 import { pageMarkdown } from "../../discovery/compile/markdown-export.ts";
-import { trailOf, type Section } from "../../navigation/model/nav.ts";
+import { trailOf, type NavItem, type Section } from "../../navigation/model/nav.ts";
 import {
   searchEntrySchema,
   type PublishedSearchEntry,
@@ -19,8 +22,11 @@ import {
 
 /** The slice of the navigation an index entry reads. */
 type SearchNav = {
-  anchors: Pick<Section, "title" | "children">[];
-  pages: Record<string, { title: string; description: string; openapi?: string }>;
+  anchors: (Pick<Section, "title" | "children"> & { icon?: string })[];
+  pages: Record<
+    string,
+    { title: string; description: string; openapi?: string; icon?: string; logo?: string }
+  >;
 };
 
 export function searchTrail({ nav, slug }: { nav: SearchNav; slug: string }) {
@@ -29,6 +35,31 @@ export function searchTrail({ nav, slug }: { nav: SearchNav; slug: string }) {
     if (trail) return { section: anchor.title, trail: [anchor.title, ...trail].join(" › ") };
   }
   return { section: "", trail: "" };
+}
+
+/** The icons of the groups holding the page, outermost first; null when they do not hold it. */
+function groupIcons({ items, slug }: { items: NavItem[]; slug: string }): string[] | null {
+  for (const item of items) {
+    if (item.type === "page" && item.slug === slug) return [];
+    if (item.type === "group") {
+      const inner = groupIcons({ items: item.children, slug });
+      if (inner) return [item.icon ?? "", ...inner];
+    }
+  }
+  return null;
+}
+
+/** The page's own icon, else its innermost group's with one, else its section's. */
+export function pageIcon({ nav, slug }: { nav: SearchNav; slug: string }) {
+  const meta = nav.pages[slug];
+  let icon = meta?.icon || meta?.logo || "";
+  for (const anchor of icon ? [] : nav.anchors) {
+    const groups = groupIcons({ items: anchor.children, slug });
+    if (!groups) continue;
+    icon = groups.findLast(Boolean) || anchor.icon || "";
+    break;
+  }
+  return LOGO_ASSETS[icon] ?? icon;
 }
 
 export function bodyText({ html }: { html: string }) {
@@ -46,6 +77,11 @@ export function bodyText({ html }: { html: string }) {
 
 function methodOf({ openapi }: { openapi?: string }) {
   return openapi ? { method: openapi.split(/\s+/)[0].toUpperCase() } : {};
+}
+
+function iconOf({ nav, slug }: { nav: SearchNav; slug: string }) {
+  const icon = pageIcon({ nav, slug });
+  return icon ? { icon } : {};
 }
 
 /** One page's entry from its rendered HTML: article text plus heading anchors. */
@@ -66,6 +102,7 @@ export function searchEntry({
     ...methodOf({ openapi: meta.openapi }),
     title: meta.title,
     description: meta.description,
+    ...iconOf({ nav, slug }),
     ...searchTrail({ nav, slug }),
     body: bodyText({ html }),
     headings: headings.map(({ id, text }) => ({ id, text })),
@@ -79,6 +116,7 @@ export function sourceSearchIndex({ docsRoot, nav }: { docsRoot: string; nav: Se
     ...methodOf({ openapi: meta.openapi }),
     title: meta.title,
     description: meta.description,
+    ...iconOf({ nav, slug }),
     ...searchTrail({ nav, slug }),
     body: bodyText({
       html: `<article>${pageMarkdown({ docsRoot, slug })}</article>`,
@@ -123,9 +161,25 @@ export function publishSearchIndex({ entries }: { entries: unknown[] }) {
   const terms: [word: string, gaps: string][][] = parsed.map(() => []);
   for (const [word, pages] of wordPages({ entries: parsed }))
     terms[pages[0]].push([word, gapsOf({ pages })]);
+  const drawn = new Set<string>();
   return JSON.stringify(
-    parsed.map((entry, position) => publishedEntry({ entry, terms: terms[position] })),
+    parsed.map((entry, position) => {
+      const published = publishedEntry({ entry, terms: terms[position] });
+      if (drawn.has(entry.icon)) return published;
+      drawn.add(entry.icon);
+      const glyph = glyphOf({ icon: entry.icon });
+      return glyph ? { ...published, glyph } : published;
+    }),
   );
+}
+
+/** The SVG body of a bundled icon, for the browser to draw without bundling the icon set. */
+function glyphOf({ icon }: { icon: string }) {
+  const Glyph = ICONS[icon];
+  if (!Glyph) return "";
+  return renderToStaticMarkup(createElement(Glyph))
+    .replace(/^<svg[^>]*>|<\/svg>$/g, "")
+    .replace(/><\/\w+>/g, "/>");
 }
 
 function publishedEntry({
@@ -146,6 +200,7 @@ function publishedEntry({
     description: entry.description,
     ...(section === undefined ? {} : { section }),
     ...(entry.trail ? { trail: entry.trail } : {}),
+    ...(entry.icon ? { icon: entry.icon } : {}),
     ...(entry.headings.length ? { headings: entry.headings.map(publishedHeading) } : {}),
     ...(sorted.length ? { terms: sorted.map(([word]) => word).join(" ") } : {}),
     ...(gaps.some(Boolean) ? { pages: gaps.join(" ") } : {}),

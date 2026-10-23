@@ -239,3 +239,29 @@ await it("renders responsive product imagery and a solid footer across themes an
     },
   });
 });
+
+/** @scenario "Choose a page action from a compact menu" */
+await it("shows each page action on an icon chip with the copy shortcut", async () => {
+  await withPreviewBrowser({
+    outDir,
+    run: async ({ browser, base }) => {
+      const context = await browser.newContext();
+      try {
+        const page = await context.newPage();
+        await page.goto(base + "integration/quick-start");
+        await page.getByRole("button", { name: "More page actions" }).click();
+        const menu = page.getByRole("menu", { name: "Page actions" });
+        await menu.waitFor();
+        const items = menu.getByRole("menuitem");
+        const count = await items.count();
+        assert.ok(count > 2);
+        assert.equal(await menu.locator("[role=menuitem] > .docs-menu-icon").count(), count);
+        const shortcut = menu.locator(".docs-menu-shortcut");
+        assert.equal(await shortcut.textContent(), "Alt+Shift+C");
+        assert.ok(await shortcut.isVisible());
+      } finally {
+        await context.close();
+      }
+    },
+  });
+});

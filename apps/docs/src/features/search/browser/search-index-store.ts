@@ -10,7 +10,7 @@ export function currentBuild() {
 
 /**
  * Fetches and decodes the index once per build; a failed load is forgotten so retry
- * refetches. `?v=<build>` is the one query the service worker caches, so search works offline.
+ * refetches. `?v=<build>` gives each build its own URL, so HTTP caches never serve an old index.
  */
 export function loadSearchIndex({ build }: { build: string }): Promise<SearchIndex> {
   if (loaded?.build === build) return loaded.index;

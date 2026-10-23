@@ -21,7 +21,7 @@ Feature: Generate and run the documentation site
     Given the machine has several cores and enough free memory
     When the build renders every page
     Then it renders on at most four independent workers, fewer when memory is short
-    And the stylesheet, search index, page files and offline cache version match a single-worker build
+    And the stylesheet, search index, page files and build version match a single-worker build
 
   @unimplemented
   Scenario: Reject invalid documentation

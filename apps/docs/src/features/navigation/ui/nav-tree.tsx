@@ -1,9 +1,10 @@
 import { Box, chakra, Text } from "@langwatch/design-system/primitives";
 import nav from "virtual:docs-nav";
 
+import { isColourLogo } from "../../../lib/logos.ts";
 import { pagePath, sitePath } from "../../../lib/site-path.ts";
 import { Icon } from "../../content/ui/icon.tsx";
-import { endpointCount, groupTarget, methodOf, startsOpen } from "../model/nav.ts";
+import { endpointCount, groupTarget, methodOf, soleChild, startsOpen } from "../model/nav.ts";
 import type { NavItem } from "../model/nav.ts";
 
 type Group = Extract<NavItem, { type: "group" }>;
@@ -45,7 +46,7 @@ function NavMethod({ method }: { method: string }) {
   );
 }
 
-/** Brand logos sit on a light chip so dark marks stay legible on the dark sidebar. */
+/** Dark brand marks sit on a light chip so they stay legible on the dark sidebar. */
 function NavGlyph({ icon }: { icon: string }) {
   if (!icon.startsWith("/")) {
     return (
@@ -54,6 +55,7 @@ function NavGlyph({ icon }: { icon: string }) {
       </Box>
     );
   }
+  const colour = isColourLogo({ icon });
   return (
     <Box
       as="span"
@@ -65,8 +67,8 @@ function NavGlyph({ icon }: { icon: string }) {
       width="20px"
       height="20px"
       borderRadius="5px"
-      bg={{ base: "white", _dark: "#eeece8" }}
-      boxShadow="inset 0 0 0 1px rgba(32, 30, 27, 0.1)"
+      bg={colour ? void 0 : { base: "white", _dark: "#eeece8" }}
+      boxShadow={colour ? void 0 : "inset 0 0 0 1px rgba(32, 30, 27, 0.1)"}
     >
       <img
         src={sitePath({ path: icon })}
@@ -81,21 +83,28 @@ function NavGlyph({ icon }: { icon: string }) {
   );
 }
 
+/** `group` is set when a one-page group shows as its page: the row takes the group's name. */
 function PageRow({
   item,
   current,
   nested,
+  group,
+  depth = 1,
 }: {
   item: Extract<NavItem, { type: "page" }>;
   current: string;
   nested: boolean;
+  group?: Group;
+  depth?: number;
 }) {
   const active = item.slug === current;
   const meta = nav.pages[item.slug];
   const method = methodOf({ meta });
-  const glyph = meta?.icon || meta?.logo;
+  const glyph = group?.icon || meta?.icon || meta?.logo;
+  const title = group?.title ?? item.title;
+  const heading = Boolean(group) && depth === 0;
   return (
-    <li>
+    <li style={heading ? { marginTop: "16px" } : undefined}>
       <chakra.a
         href={pagePath({ slug: item.slug })}
         aria-current={active ? "page" : undefined}
@@ -110,10 +119,10 @@ function PageRow({
         fontSize="14px"
         lineHeight="20px"
         textDecoration="none"
-        color={active ? "accent.fg" : "nav.fg"}
-        fontWeight={active ? "600" : "400"}
-        bg={active ? "accent.subtle" : undefined}
-        _hover={{ bg: active ? "accent.subtle" : "bg.hover", textDecoration: "none" }}
+        color={heading ? "fg" : "nav.fg"}
+        fontWeight={heading ? "600" : "400"}
+        _hover={{ bg: "bg.hover", textDecoration: "none" }}
+        _currentPage={{ color: "accent.fg", fontWeight: "600", bg: "accent.subtle" }}
         _before={
           nested && active
             ? {
@@ -131,8 +140,8 @@ function PageRow({
       >
         {method ? <NavMethod method={method} /> : null}
         {!method && glyph ? <NavGlyph icon={glyph} /> : null}
-        <span className="docs-nav-label" title={item.title}>
-          {item.title}
+        <span className="docs-nav-label" title={title}>
+          {title}
         </span>
       </chakra.a>
     </li>
@@ -253,13 +262,24 @@ function NavList({
 }) {
   return (
     <ul>
-      {items.map((item) =>
-        item.type === "page" ? (
-          <PageRow key={item.slug} item={item} current={current} nested={depth > 0} />
+      {items.map((item) => {
+        if (item.type === "page") {
+          return <PageRow key={item.slug} item={item} current={current} nested={depth > 0} />;
+        }
+        const only = soleChild({ group: item });
+        return only ? (
+          <PageRow
+            key={item.title}
+            item={only}
+            group={item}
+            current={current}
+            nested={depth > 0}
+            depth={depth}
+          />
         ) : (
           <GroupRow key={item.title} item={item} current={current} depth={depth} trail={trail} />
-        ),
-      )}
+        );
+      })}
     </ul>
   );
 }

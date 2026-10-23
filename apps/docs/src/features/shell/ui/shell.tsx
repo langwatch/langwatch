@@ -33,6 +33,8 @@ type ShellProps = {
   /** A frontmatter tag such as "Deprecated", shown beside the breadcrumb. */
   tag?: string;
   endpoint?: { summary: ReactNode; playground: ReactNode; reference: ReactNode };
+  /** A page that is its own scene (the 404): children fill the main column, this the rail. */
+  aside?: ReactNode;
 };
 
 function LeftRail({ children }: { children: ReactNode }) {
@@ -71,6 +73,7 @@ export function DocsShell({
   wide = false,
   updated = "",
   tag = "",
+  aside,
 }: ShellProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const section = sectionOf({ slug });
@@ -104,8 +107,10 @@ export function DocsShell({
       position="relative"
       isolation="isolate"
       css={{
-        "--docs-header-h": HEADER_HEIGHT.base,
-        "@media (min-width: 64rem)": { "--docs-header-h": HEADER_HEIGHT.lg },
+        "--docs-header-h": `calc(${HEADER_HEIGHT.base} + var(--docs-banners-h))`,
+        "@media (min-width: 64rem)": {
+          "--docs-header-h": `calc(${HEADER_HEIGHT.lg} + var(--docs-banners-h))`,
+        },
         overflowX: "clip",
       }}
     >
@@ -117,19 +122,32 @@ export function DocsShell({
           Skip to page list
         </a>
       ) : null}
-      <SiteAnnouncement announcement={site.announcement} />
-      <SiteBanner />
-      <Header kind={kind} onMenu={() => setMenuOpen(true)} />
+      <Box className="docs-top" position="sticky" top="0" zIndex="sticky">
+        <SiteAnnouncement announcement={site.announcement} />
+        <SiteBanner />
+        <Header kind={kind} onMenu={() => setMenuOpen(true)} />
+      </Box>
       <Box
         className="docs-layout"
         data-kind={kind}
         data-has-toc={showRail ? "true" : "false"}
         data-wide={wide || !showRail ? "true" : "false"}
+        data-scene={aside ? "true" : void 0}
       >
         <LeftRail>
           <SideNav active={section} slug={slug} treeId="page-tree" />
         </LeftRail>
-        {endpoint ? (
+        {aside ? (
+          <>
+            <Box id="content" as="main" tabIndex={-1} className="docs-scene-main">
+              {children}
+            </Box>
+            <Box as="aside" className="docs-scene-aside">
+              {aside}
+            </Box>
+          </>
+        ) : null}
+        {!aside && endpoint ? (
           <>
             <Box
               id="content"
@@ -175,7 +193,8 @@ export function DocsShell({
               </Box>
             </Box>
           </>
-        ) : (
+        ) : null}
+        {!aside && !endpoint ? (
           <Box
             id="content"
             as="main"
@@ -188,7 +207,7 @@ export function DocsShell({
             paddingBottom="12"
           >
             {header}
-            {kind === "guide" ? <Box marginTop="4">{contents}</Box> : null}
+            {kind === "guide" ? contents : null}
             <TypeRegion
               mode={typeMode}
               as="article"
@@ -199,7 +218,7 @@ export function DocsShell({
             </TypeRegion>
             {footer}
           </Box>
-        )}
+        ) : null}
         {showRail ? (
           <Box gridArea="toc" paddingTop="0" display={{ base: "none", xl: "block" }}>
             <Box className="docs-toc-container" data-docs-rail="" paddingTop="10" paddingBottom="6">

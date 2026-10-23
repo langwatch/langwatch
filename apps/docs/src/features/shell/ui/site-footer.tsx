@@ -65,14 +65,7 @@ export function SiteFooter() {
         </Box>
         {FOOTER_GROUPS.map((group) => (
           <Box key={group.title}>
-            <Text
-              fontSize="12px"
-              letterSpacing="0.06em"
-              textTransform="uppercase"
-              fontWeight="600"
-              color="docs.lede"
-              marginBottom="3"
-            >
+            <Text fontFamily="mono" fontSize="12px" color="docs.lede" marginBottom="3">
               {group.title}
             </Text>
             <Flex

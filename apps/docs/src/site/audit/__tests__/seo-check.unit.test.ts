@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { applyKnownIssues, checkSeo, knownIssuesOf } from "../seo-check.ts";
+import { applyKnownIssues, builtBasePath, checkSeo, knownIssuesOf } from "../seo-check.ts";
 
 const DOCS = "https://langwatch.ai/docs";
 const seo = { title: { min: 10, max: 70 }, description: { min: 20, max: 160 } };
@@ -27,10 +27,15 @@ function page({
     ogTitle: `<meta property="og:title" content="${slug}">`,
     ogDescription: `<meta property="og:description" content="${description}">`,
     ogImage: `<meta property="og:image" content="${DOCS}/images/card.webp">`,
+    viewport: '<meta name="viewport" content="width=device-width, initial-scale=1">',
+    twitterCard: '<meta name="twitter:card" content="summary_large_image">',
+    twitterTitle: `<meta name="twitter:title" content="${slug}">`,
+    twitterDescription: `<meta name="twitter:description" content="${description}">`,
+    twitterImage: `<meta name="twitter:image" content="${DOCS}/images/card.webp">`,
     jsonLd: `<script type="application/ld+json">{"@type":"WebPage"}</script>`,
     ...head,
   };
-  return `<!doctype html><html><head>${Object.values(tags).filter(Boolean).join("")}</head><body>${body}</body></html>`;
+  return `<!doctype html><html lang="en"><head>${Object.values(tags).filter(Boolean).join("")}</head><body>${body}</body></html>`;
 }
 
 let outDir: string;
@@ -150,6 +155,29 @@ describe("checkSeo", () => {
       ]);
     });
 
+    /** @scenario "Every published page carries complete search and social metadata" */
+    it("reports a page missing its language, viewport or social card", () => {
+      const bare = page({
+        slug: "bare",
+        head: {
+          viewport: null,
+          twitterCard: null,
+          twitterDescription: null,
+          twitterImage: '<meta name="twitter:image" content="/card.webp">',
+        },
+      }).replace(' lang="en"', "");
+      site({ pages: { bare } });
+      expect(checkSeo({ outDir, basePath: "/docs", seo }).issues).toEqual(
+        [
+          ["missing-twitter-card", "no twitter:card"],
+          ["missing-twitter-card", "no twitter:description"],
+          ["missing-document-basics", "no html lang"],
+          ["missing-document-basics", "no viewport"],
+          ["open-graph-image", "twitter:image /card.webp"],
+        ].map(([code, detail]) => ({ page: `${DOCS}/bare`, code, detail })),
+      );
+    });
+
     it("reports an empty Markdown export", () => {
       site({ pages: { guide: page({ slug: "guide" }) } });
       write({ file: "guide.md", contents: "  \n" });
@@ -176,6 +204,16 @@ describe("checkSeo", () => {
       });
       expect(checkSeo({ outDir, basePath: "/docs", seo }).issues).toEqual([]);
     });
+  });
+});
+
+describe("builtBasePath", () => {
+  /** @scenario "Refuse to audit a build made for another mount" */
+  it("reads the mount a build was made for from its home page", () => {
+    write({ file: "index.html", contents: '<head><link rel="icon" href="/docs/favicon.svg" />' });
+    expect(builtBasePath({ outDir })).toBe("/docs");
+    write({ file: "index.html", contents: '<head><link rel="icon" href="/favicon.svg" />' });
+    expect(builtBasePath({ outDir })).toBe("");
   });
 });
 

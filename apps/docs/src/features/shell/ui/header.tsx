@@ -70,7 +70,8 @@ export function Header({ kind, onMenu }: { kind: PageKind; onMenu: () => void })
             alignItems="center"
             minHeight="44px"
             css={{ "& > svg": { width: { base: "96px", lg: "128px" }, height: "auto" } }}
-            _hover={{ textDecoration: "none" }}
+            transition="opacity 160ms ease-out"
+            _hover={{ textDecoration: "none", opacity: 0.75 }}
           >
             <FullLogo width={128} height={31.38} />
           </Link>
@@ -153,9 +154,7 @@ export function Header({ kind, onMenu }: { kind: PageKind; onMenu: () => void })
           >
             Open app <ArrowUpRight size={15} aria-hidden="true" />
           </Link>
-          <Box data-docs-menu-root="theme">
-            <ThemeMenu />
-          </Box>
+          <ThemeMenu />
         </Flex>
       </Box>
     </Box>

@@ -22,10 +22,10 @@ export function SiteAnnouncement({ announcement }: { announcement: Announcement 
           aria-label="Hide notice"
           title="Hide this notice"
           data-docs-dismiss=""
+          className="docs-banner-dismiss"
           variant="ghost"
           color="fg.muted"
-          minWidth="36px"
-          height="36px"
+          size="2xs"
         >
           <X size={14} />
         </IconButton>

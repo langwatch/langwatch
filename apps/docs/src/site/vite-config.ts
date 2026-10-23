@@ -91,8 +91,12 @@ export function createViteConfig({
       outDir,
       emptyOutDir: true,
       manifest: true,
+      /* Islands load as plain module scripts and every target browser reads modulepreload. */
+      modulePreload: { polyfill: false },
       rollupOptions: {
         treeshake: CLIENT_TREESHAKE,
+        /* Inlines the base path into each chunk, so a /docs bootstrap imports no config chunk. */
+        optimization: { inlineConst: { mode: "all", pass: 2 } },
         input: {
           index: path.join(appRoot, "index.html"),
           ...Object.fromEntries(

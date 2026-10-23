@@ -1,6 +1,6 @@
 import type lighthouse from "lighthouse";
 
-import { CATEGORIES, type AuditRun, type Category } from "./budgets.ts";
+import { AGENTIC_CATEGORY, CATEGORIES, type AuditRun, type Category } from "./budgets.ts";
 
 type Result = NonNullable<Awaited<ReturnType<typeof lighthouse>>>["lhr"];
 type Audit = Result["audits"][string];
@@ -16,6 +16,17 @@ function savings({ audit }: { audit: Audit }) {
     savingsMs: (metric.LCP ?? 0) + (metric.FCP ?? 0) + (metric.TBT ?? 0),
     savingsBytes: details?.overallSavingsBytes ?? 0,
   };
+}
+
+/* Lighthouse's own pass rule for this checklist: binary checks pass at 1, numeric ones at 0.9. */
+function agenticChecks({ lhr }: { lhr: Result }): AuditRun["agentic"] {
+  const category = lhr.categories[AGENTIC_CATEGORY];
+  if (!category) return null;
+  const applicable = category.auditRefs
+    .map((ref) => lhr.audits[ref.id])
+    .filter((audit) => audit && audit.scoreDisplayMode !== "notApplicable" && audit.score !== null);
+  const failed = applicable.filter((audit) => (audit.score ?? 0) < 0.9).map((audit) => audit.id);
+  return { passed: applicable.length - failed.length, applicable: applicable.length, failed };
 }
 
 /** The parts of a Lighthouse result the budgets and the summary read. */
@@ -68,6 +79,7 @@ export function summariseResult({
     },
     transferBytes: numeric({ audits, id: "total-byte-weight" }),
     requests: requests?.items?.length ?? null,
+    agentic: agenticChecks({ lhr }),
     failingAudits,
     opportunities,
     durationMs,

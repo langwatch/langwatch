@@ -38,13 +38,13 @@ async function assertStrip({ page, base, width, mode }) {
   await strip.locator("a").click();
   await page.waitForURL((url) => url.pathname + url.hash === href);
   await page.getByRole("heading", { name: `Release ${version}` }).waitFor();
-  assert.ok(await page.getByRole("heading", { name: "Versioning" }).count());
+  assert.ok(await page.locator('#content a[href="/self-hosting/releases"]').count());
   return strip.getAttribute("data-docs-banner");
 }
 
 async function dismissRelease({ page, base, release }) {
   const strip = page.getByRole("complementary", { name: "Latest release" });
-  await page.getByRole("button", { name: "Dismiss announcement" }).click();
+  await strip.getByRole("button", { name: "Dismiss announcement" }).click();
   await strip.waitFor({ state: "detached" });
   await page.goto(base + "api-reference/introduction");
   assert.equal(await strip.count(), 0);
@@ -92,7 +92,7 @@ await it("keeps releases readable without scripts and can dismiss when storage i
       const deniedContext = await browser.newContext();
       try {
         const staticPage = await staticContext.newPage();
-        await staticPage.goto(base + "self-hosting/releases");
+        await staticPage.goto(base + "changelog");
         const strip = staticPage.getByRole("complementary", { name: "Latest release" });
         const version = await strip.locator(".docs-release-version").textContent();
         const heading = staticPage.getByRole("heading", { name: `Release ${version}` });
@@ -108,8 +108,8 @@ await it("keeps releases readable without scripts and can dismiss when storage i
         });
         const page = await deniedContext.newPage();
         await page.goto(base + "support");
-        await page.getByRole("button", { name: "Dismiss announcement" }).click();
         const announcement = page.getByRole("complementary", { name: "Latest release" });
+        await announcement.getByRole("button", { name: "Dismiss announcement" }).click();
         await announcement.waitFor({ state: "detached" });
         assert.equal(await announcement.count(), 0, "dismissal works when storage is denied");
       } finally {

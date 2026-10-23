@@ -150,23 +150,6 @@
   font-size: 13px;
   line-height: 22px;
 }
-.docs-offline {
-  max-width: 42rem;
-  margin: 15vh auto;
-  padding: 24px;
-  color: var(--chakra-colors-fg);
-}
-.docs-offline h1 {
-  font-size: 32px;
-  font-weight: 650;
-  margin-bottom: 24px;
-}
-.docs-offline p {
-  margin-block: 24px;
-}
-.docs-offline a {
-  text-decoration: underline;
-}
 body:has(dialog[open]) {
   overflow: hidden;
 }
@@ -181,4 +164,40 @@ body:has(dialog[open]) {
 .docs-island-dialog :is(button, input):focus-visible {
   outline: 2px solid var(--chakra-colors-border-emphasized);
   outline-offset: 2px;
+}
+
+/* Dialogs ease in and out; the phone menu slides from the edge like a drawer. */
+@media (prefers-reduced-motion: no-preference) {
+  .docs-island-dialog,
+  .docs-island-dialog::backdrop {
+    transition:
+      opacity 200ms ease,
+      transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1),
+      overlay 260ms allow-discrete,
+      display 260ms allow-discrete;
+  }
+  .docs-island-dialog:not([open]) {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  .docs-island-dialog:not([open])::backdrop {
+    opacity: 0;
+  }
+  .docs-mobile-dialog:not([open]) {
+    opacity: 1;
+    transform: translateX(-100%);
+  }
+  @starting-style {
+    .docs-island-dialog[open] {
+      opacity: 0;
+      transform: scale(0.98);
+    }
+    .docs-island-dialog[open]::backdrop {
+      opacity: 0;
+    }
+    .docs-mobile-dialog[open] {
+      opacity: 1;
+      transform: translateX(-100%);
+    }
+  }
 }

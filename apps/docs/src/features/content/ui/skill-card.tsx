@@ -1,41 +1,75 @@
-import { Box, Flex, Text } from "@langwatch/design-system/primitives";
-import { Sparkles, Terminal, ChevronDown } from "lucide-react";
+import { Box, Flex, Text, VisuallyHidden } from "@langwatch/design-system/primitives";
+import { Check, ChevronRight, Copy } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { CopyAction } from "../../code/ui/code-parts.tsx";
+import { PROMPT_ATTRIBUTE } from "../../code/ui/copy-source.ts";
 import { PROMPT_BODY_ATTRIBUTE } from "./prompt-attributes.ts";
 
-function Command({ label, value }: { label: string; value: string }) {
-  if (!value) return null;
+function CopyIcons() {
   return (
-    <Box minWidth="0">
-      <Text margin="0" marginBottom="1" fontSize="12px" color="docs.body">
-        {label}
-      </Text>
-      <Flex
-        alignItems="center"
-        gap="2"
-        bg="bg.subtle"
-        borderWidth="1px"
-        borderColor="border"
-        borderRadius="lg"
-        paddingStart="3"
-        minHeight="40px"
-      >
-        <Terminal size={14} aria-hidden="true" />
-        <Box
-          as="code"
-          flex="1"
-          minWidth="0"
-          fontFamily="mono"
-          fontSize="13px"
-          overflowWrap="anywhere"
-        >
-          {value}
+    <>
+      <Copy className="docs-skill-copy-idle" size={14} aria-hidden="true" />
+      <Check className="docs-skill-copy-done" size={14} aria-hidden="true" />
+    </>
+  );
+}
+
+/** Narrow screens wrap a long command between path segments, never inside a hyphenated name. */
+function wrappable({ value }: { value: string }): ReactNode[] {
+  return value.split(/(?<=[/ ])/).map((segment, index) => (
+    <span key={index} className="docs-skill-segment">
+      {segment}
+      <wbr />
+    </span>
+  ));
+}
+
+/** The install command is the block's main action: the whole line copies it. */
+function InstallCommand({ install }: { install: string }) {
+  return (
+    <Flex className="docs-skill-command-cell" minWidth="0" flex="1">
+      <button type="button" className="docs-skill-command" data-docs-copy={install}>
+        <span className="docs-skill-glyph" aria-hidden="true" />
+        {/* Named by its content: a label would not match the command as it wraps. */}
+        <VisuallyHidden>Copy </VisuallyHidden>
+        <Box as="code" flex="1" minWidth="0" textAlign="start">
+          {wrappable({ value: install })}
         </Box>
-        <CopyAction code={value} label={`Copy ${label.toLowerCase()}`} source="button" />
-      </Flex>
-    </Box>
+        <CopyIcons />
+      </button>
+      <VisuallyHidden as="output" aria-live="polite" />
+    </Flex>
+  );
+}
+
+function PromptCopy({ prompt }: { prompt: string }) {
+  return (
+    <Flex className="docs-skill-prompt-cell" flexShrink="0">
+      <button
+        type="button"
+        className="docs-skill-secondary"
+        disabled
+        data-docs-copy=""
+        {...{ [PROMPT_ATTRIBUTE]: prompt }}
+        aria-label="Copy full prompt"
+      >
+        <CopyIcons />
+        <span className="docs-skill-label">
+          <span className="docs-skill-label-idle">Copy full prompt</span>
+          <span className="docs-skill-label-done">Copied</span>
+        </span>
+      </button>
+      <VisuallyHidden as="output" aria-live="polite" />
+    </Flex>
+  );
+}
+
+function caption({ command }: { command: string }): ReactNode {
+  if (!command) return "Paste the prompt into any coding agent.";
+  return (
+    <>
+      Install once, then run <code>{command}</code> in your coding agent.
+    </>
   );
 }
 
@@ -53,60 +87,35 @@ export function SkillCard({
   children?: ReactNode;
 }) {
   return (
-    <Box
-      className="docs-skill-card"
-      borderWidth="1px"
-      borderColor="border"
-      borderRadius="xl"
-      padding="4"
-      bg="bg.surface"
-      marginY="4"
-    >
-      <Text
-        as="h3"
-        margin="0"
-        marginBottom="3"
-        fontSize="16px"
-        lineHeight="24px"
-        fontWeight="600"
-        color="fg"
-        display="flex"
-        alignItems="center"
-        gap="2"
-      >
-        <Sparkles size={18} aria-hidden="true" /> {title}
-      </Text>
-      <Box
-        display="grid"
-        gridTemplateColumns={{ base: "minmax(0, 1fr)", md: "minmax(0, 2fr) minmax(0, 1fr)" }}
-        gap="3"
-      >
-        <Command label="Install via CLI" value={install} />
-        <Command label="Skill command" value={command} />
+    <Box className="docs-skill-card" data-install={install ? "true" : "false"}>
+      <Box className="docs-skill-head">
+        <Text as="h3" className="docs-skill-title">
+          {title}
+        </Text>
+        <Text className="docs-skill-caption">{caption({ command })}</Text>
+        {install || prompt ? (
+          <Flex className="docs-skill-actions">
+            {install ? <InstallCommand install={install} /> : null}
+            {prompt ? <PromptCopy prompt={prompt} /> : null}
+          </Flex>
+        ) : null}
       </Box>
       {prompt ? (
-        <Box marginTop="4" borderTopWidth="1px" borderColor="border" paddingTop="3">
-          <Flex alignItems="center" justifyContent="space-between" fontSize="13px">
-            <span>Or paste the prompt into your agent</span>
-            <Flex alignItems="center">
-              <CopyAction code={prompt} label="Copy full prompt" showLabel source="prompt" />
-            </Flex>
-          </Flex>
-          <details className="docs-skill-prompt">
-            <summary>
-              View prompt <ChevronDown size={16} aria-hidden="true" />
-            </summary>
-            <Box
-              {...{ [PROMPT_BODY_ATTRIBUTE]: "" }}
-              className="docs-skill-body docs-prose"
-              fontSize="14px"
-              lineHeight="24px"
-              overflowWrap="anywhere"
-            >
-              {children}
-            </Box>
-          </details>
-        </Box>
+        <details className="docs-skill-prompt">
+          <summary>
+            <ChevronRight size={14} aria-hidden="true" />
+            <span>View prompt</span>
+          </summary>
+          <Box
+            {...{ [PROMPT_BODY_ATTRIBUTE]: "" }}
+            className="docs-skill-body docs-prose"
+            fontSize="14px"
+            lineHeight="24px"
+            overflowWrap="anywhere"
+          >
+            {children}
+          </Box>
+        </details>
       ) : null}
     </Box>
   );

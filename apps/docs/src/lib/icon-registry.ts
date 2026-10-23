@@ -190,3 +190,5 @@ export const ICONS: Record<string, LucideIcon> = {
   dharmachakra: Ship,
 };
 export const GenericIcon = FileText;
+/** Flat marks for logos whose shared SVG uses global gradient ids that vanish when hidden. */
+export const LOGO_ASSETS: Record<string, string> = { python: "/images/logos/python.svg" };

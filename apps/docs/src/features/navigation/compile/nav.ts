@@ -208,12 +208,16 @@ function buildPage({
   return { type: "page", slug: item, title: pages[item].sidebarTitle };
 }
 
-/** Overview cards pair a page link with its brand logo; the first card for a page wins. */
+/**
+ * Overview cards pair a page link with its brand logo. A page keeps a logo only when every card
+ * linking to it shows that same icon, so a card naming another product cannot brand the page.
+ */
 function collectLogos({ source, logos }: { source: string; logos: Map<string, string> }) {
   for (const [, attributes] of source.matchAll(CARD)) {
     const icon = /\bicon="([^"]+)"/.exec(attributes)?.[1] ?? "";
     const slug = /\bhref="\/([^"#?]+)/.exec(attributes)?.[1];
-    if (slug && icon.startsWith(LOGO_DIRECTORY) && !logos.has(slug)) logos.set(slug, icon);
+    if (!slug) continue;
+    logos.set(slug, logos.has(slug) && logos.get(slug) !== icon ? "" : icon);
   }
 }
 
@@ -315,7 +319,8 @@ export function buildNav({ docsRoot }: { docsRoot: string }): Nav {
   });
   const dates = config.metadata?.timestamp ? pageDates({ docsRoot }) : new Map<string, string>();
   for (const [slug, meta] of Object.entries(pages)) {
-    meta.logo = logos.get(slug) ?? "";
+    const logo = logos.get(slug) ?? "";
+    meta.logo = logo.startsWith(LOGO_DIRECTORY) ? logo : "";
     meta.updated = dates.get(slug) ?? "";
   }
   const anchors = built.map((anchor) => ({

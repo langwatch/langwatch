@@ -4,6 +4,7 @@ import { Children, isValidElement, useState } from "react";
 import type { ReactNode } from "react";
 
 import { usePreference, writePreference } from "../../../lib/storage.ts";
+import { tabFamilies } from "../../code/model/language-family.ts";
 import { CodeBar, CodeFrame } from "../../code/ui/code-block.tsx";
 import { CodeBody, CopyAction, sourceFromProps } from "../../code/ui/code-parts.tsx";
 import type { CodeSource } from "../../code/ui/code-parts.tsx";
@@ -42,6 +43,9 @@ export function CodeGroup({ children }: { children?: ReactNode }) {
     if (!languageVariants || !item.source) return item.label;
     return languageName({ lang: item.source.lang });
   };
+  const families = tabFamilies({
+    tabs: items.map((item) => [choiceOf(item), ...(item.source ? [item.source.lang] : [])]),
+  });
   const stored = usePreference({ key: group });
   const [local, setLocal] = useState<string | null>(null);
   const labels = items.map((item) => item.label);
@@ -95,11 +99,12 @@ export function CodeGroup({ children }: { children?: ReactNode }) {
               boxShadow: "none",
             }}
           >
-            {items.map((item) => (
+            {items.map((item, index) => (
               <Tabs.Trigger
                 key={item.label}
                 value={item.label}
                 data-docs-language={choiceOf(item)}
+                data-docs-family={families[index] ?? void 0}
                 css={{ ...readingTabTrigger, minHeight: "44px" }}
               >
                 {choiceOf(item)}

@@ -6,7 +6,7 @@ export const releaseSchema = z.object({
   label: z.string(),
   summary: z.string().min(1),
   body: z.string(),
-  href: z.string().startsWith("/self-hosting/releases#"),
+  href: z.string().startsWith("/changelog#"),
   compare: z.url().startsWith("https://github.com/langwatch/langwatch/compare/"),
 });
 

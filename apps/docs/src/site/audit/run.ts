@@ -23,7 +23,7 @@ import {
   type PageBudget,
 } from "./budgets.ts";
 import { summaryMarkdown } from "./report.ts";
-import { applyKnownIssues, checkSeo, knownIssuesOf } from "./seo-check.ts";
+import { applyKnownIssues, builtBasePath, checkSeo, knownIssuesOf } from "./seo-check.ts";
 
 const RUNNER = fileURLToPath(new URL("./lighthouse-run.ts", import.meta.url));
 const list = z.string().transform((value) =>
@@ -135,6 +135,7 @@ function runLighthouse({
         },
         transferBytes: null,
         requests: null,
+        agentic: null,
         failingAudits: [],
         opportunities: [],
         durationMs: 0,
@@ -282,6 +283,16 @@ async function lighthouseRuns({
   );
 }
 
+/** Stops before any check when the build was made for another mount: every URL would be wrong. */
+function assertBuiltFor({ outDir, basePath }: { outDir: string; basePath: string }) {
+  const built = builtBasePath({ outDir });
+  if (built === null || built === basePath) return;
+  throw new Error(
+    `${outDir} was built for base path "${built || "/"}", not "${basePath || "/"}": ` +
+      `build it with --base-path ${basePath || "/"} (CI audits a /docs build), or pass --base-path ${built || "/"}`,
+  );
+}
+
 async function main() {
   const started = nowInstant().epochMilliseconds;
   const options = readOptions();
@@ -290,6 +301,7 @@ async function main() {
   const basePath = options["base-path"].replace(/\/$/, "");
   const reportDir = path.resolve(options["report-dir"] ?? outDir);
   const budgets = readBudgets();
+  assertBuiltFor({ outDir, basePath });
 
   const seoResult = options["skip-static"]
     ? { pages: 0, issues: [], exports: [] }

@@ -89,6 +89,8 @@
 /ai-gateway/rate-limits
 /ai-gateway/rbac
 /ai-gateway/sdks
+/ai-gateway/sdks/go
+/ai-gateway/sdks/http
 /ai-gateway/sdks/python
 /ai-gateway/sdks/typescript
 /ai-gateway/security
@@ -561,6 +563,7 @@
 /api-reference/workflows/run-a-workflow
 /api-reference/workflows/run-a-workflow-version-legacy-path
 /api-reference/workflows/update-workflows
+/changelog
 /coding-agents
 /coding-agents/claude-code
 /coding-agents/claude-code-usage

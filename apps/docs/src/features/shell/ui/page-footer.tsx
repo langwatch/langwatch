@@ -46,15 +46,15 @@ function NeighbourCard({
       paddingX="5"
       paddingY="4"
       borderWidth="1px"
-      borderColor="accent.muted"
+      borderColor="border"
       borderRadius="xl"
-      bg="accent.subtle"
+      bg="docs.paper"
       color="fg"
       textDecoration="none"
       boxShadow="0 1px 2px {colors.docs.shadow}"
       _hover={{
         textDecoration: "none",
-        borderColor: "accent.fg",
+        borderColor: "border.emphasized",
         boxShadow: "0 6px 18px -8px {colors.docs.shadowStrong}",
         "& .docs-page-footer-arrow": {
           color: "accent.fg",
@@ -63,7 +63,7 @@ function NeighbourCard({
       }}
       css={motion}
     >
-      <Box className="docs-page-footer-arrow" flexShrink="0" color="accent.fg" display="flex">
+      <Box className="docs-page-footer-arrow" flexShrink="0" color="fg.muted" display="flex">
         <Arrow size={18} aria-hidden="true" />
       </Box>
       <Flex
@@ -117,15 +117,19 @@ function FeedbackAction({
       minHeight="9"
       paddingX="3.5"
       borderWidth="1px"
-      borderColor="border"
+      borderColor="border.emphasized"
       borderRadius="lg"
-      bg="accent.subtle"
-      color="accent.fg"
+      bg="docs.paper"
+      color="fg"
       fontSize="13px"
       fontWeight="500"
       whiteSpace="nowrap"
       textDecoration="none"
-      _hover={{ textDecoration: "none", color: "fg", borderColor: "border.emphasized" }}
+      _hover={{
+        textDecoration: "none",
+        borderColor: "fg.muted",
+        "& svg": { color: "accent.fg" },
+      }}
       css={motion}
     >
       {icon}

@@ -4,6 +4,7 @@ import { Children, isValidElement, useState } from "react";
 import type { ReactNode } from "react";
 
 import { usePreference, writePreference } from "../../../lib/storage.ts";
+import { tabFamilies } from "../../code/model/language-family.ts";
 import { preferenceGroupFor } from "../../code/ui/languages.ts";
 
 /** Docs reading treatment: neutral labels, a 2px accent underline, 44px triggers. */
@@ -81,6 +82,7 @@ export function Tabs({ children }: { children?: ReactNode }) {
   );
   const labels = tabs.map((tab) => tab.label);
   const group = preferenceGroupFor({ labels });
+  const families = tabFamilies({ tabs: labels.map((label) => [label]) });
   const stored = usePreference({ key: group });
   const [local, setLocal] = useState<string | null>(null);
   const wanted = group ? stored : local;
@@ -105,8 +107,13 @@ export function Tabs({ children }: { children?: ReactNode }) {
         css={{ ...readingTabList, ...FRAMED_LIST }}
         aria-description="Scroll horizontally for more tabs. Use arrow keys to change the selected tab."
       >
-        {tabs.map((tab) => (
-          <ChakraTabs.Trigger key={tab.label} value={tab.label} css={readingTabTrigger}>
+        {tabs.map((tab, index) => (
+          <ChakraTabs.Trigger
+            key={tab.label}
+            value={tab.label}
+            data-docs-family={families[index] ?? void 0}
+            css={readingTabTrigger}
+          >
             {tab.label}
           </ChakraTabs.Trigger>
         ))}

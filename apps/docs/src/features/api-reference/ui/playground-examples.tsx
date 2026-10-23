@@ -2,6 +2,7 @@ import { Box, Flex, Tabs, Text } from "@langwatch/design-system/primitives";
 import { FileCode } from "lucide-react";
 
 import { usePreference, writePreference } from "../../../lib/storage.ts";
+import { languageFamily } from "../../code/model/language-family.ts";
 import { CodeBar } from "../../code/ui/code-block.tsx";
 import { CodeBody, CopyAction } from "../../code/ui/code-parts.tsx";
 import type { CodeSource } from "../../code/ui/code-parts.tsx";
@@ -57,7 +58,12 @@ export function RequestExamples({ examples }: { examples: Record<string, CodeSou
             }}
           >
             {EXAMPLE_LANGUAGES.map((entry) => (
-              <Tabs.Trigger key={entry.id} value={entry.label} css={readingTabTrigger}>
+              <Tabs.Trigger
+                key={entry.id}
+                value={entry.label}
+                data-docs-family={languageFamily({ label: entry.label }) ?? void 0}
+                css={readingTabTrigger}
+              >
                 {entry.label}
               </Tabs.Trigger>
             ))}

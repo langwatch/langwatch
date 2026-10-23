@@ -19,8 +19,13 @@ export function runtimePlugin(): Plugin {
     enforce: "pre",
     resolveId(source, importer) {
       const { consumer, command } = this.environment.config;
-      if (SHARED_RUNTIME.has(source))
-        return consumer === "server" ? { id: source, external: true } : require.resolve(source);
+      if (SHARED_RUNTIME.has(source)) {
+        if (consumer === "server") return { id: source, external: true };
+        /* Dev resolves through Vite so the CommonJS runtime is served pre-bundled. */
+        return command === "build"
+          ? require.resolve(source)
+          : this.resolve(source, fileURLToPath(import.meta.url), { skipSelf: true });
+      }
       const prerender = consumer === "server" && command === "build";
       if (prerender && importer && path.resolve(path.dirname(importer), source) === HIGHLIGHT)
         return { id: HIGHLIGHT, external: "absolute" };

@@ -1,5 +1,5 @@
 /* The Haven docs mount against a real `--base-path /docs` build: an app front over a mock app
-   (SSE, websocket, its own root service worker) and a docs-only mount. Read-only; no stack.
+   (SSE, websocket) and a docs-only mount. Read-only; no stack.
    node scripts/mount.smoke.test.mjs --haven-binary <haven> [--out-dir <build>]
    [--base-path /docs] */
 import assert from "node:assert/strict";
@@ -29,14 +29,7 @@ if (!existsSync(path.join(outDir, "index.html")))
   throw new Error(`No build in ${outDir}; build with --base-path ${base} first.`);
 
 /* The mock app: what the front must hand through untouched. */
-const APP_PAGE = `<!doctype html><title>App</title><h1>App home</h1><script>
-navigator.serviceWorker.register("/sw.js", { scope: "/" });</script>`;
-const APP_WORKER = `self.addEventListener("install", () => self.skipWaiting());
-self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
-self.addEventListener("fetch", (event) => {
-  if (new URL(event.request.url).pathname === "/app-worker-probe")
-    event.respondWith(new Response("app-worker"));
-});`;
+const APP_PAGE = `<!doctype html><title>App</title><h1>App home</h1>`;
 
 function startApp() {
   const seen = [];
@@ -45,8 +38,6 @@ function startApp() {
     const { pathname } = new URL(request.url, "http://app");
     if (pathname === "/")
       return response.writeHead(200, { "content-type": "text/html" }).end(APP_PAGE);
-    if (pathname === "/sw.js")
-      return response.writeHead(200, { "content-type": "text/javascript" }).end(APP_WORKER);
     if (pathname === "/api/stream") {
       response.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
       response.write("data: first\n\n");
@@ -151,19 +142,6 @@ async function upgradeAndEcho({ origin }) {
   }
 }
 
-/** Registered worker scopes once the docs worker is active (it registers after load). */
-function docsWorkerScopes({ page }) {
-  return page.evaluate(async (mount) => {
-    const active = async () =>
-      (await navigator.serviceWorker.getRegistrations()).some(
-        (registration) => registration.scope.endsWith(`${mount}/`) && registration.active,
-      );
-    for (let attempt = 0; attempt < 50 && !(await active()); attempt++)
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    return (await navigator.serviceWorker.getRegistrations()).map((r) => r.scope);
-  }, base);
-}
-
 let app, front, alone, browser;
 before(async () => {
   app = await startApp();
@@ -249,15 +227,6 @@ void describe("the app front", () => {
     assert.match(location, /from=smoke/);
   });
 
-  void it("serves a service worker scoped to the mount whose precache stays under it", async () => {
-    const worker = await get(`${front.origin}${base}/sw.js`);
-    assert.equal(worker.status, 200);
-    const source = await worker.text();
-    const precache = JSON.parse(source.match(/const PRECACHE = (\[[^\]]*\]);/)?.[1] ?? "[]");
-    assert.ok(precache.length > 0, "the precache lists the reading assets");
-    for (const entry of precache) assert.ok(entry.startsWith(`${base}/`), entry);
-  });
-
   void it("hands every other path to the app unchanged", async () => {
     const post = await get(`${front.origin}/api/trpc/x?batch=1`, { method: "POST", body: "{}" });
     assert.equal(await post.text(), "app:POST:/api/trpc/x:{}");
@@ -310,36 +279,10 @@ void describe("in a browser on the app front", () => {
     assert.deepEqual(outside, [], "the docs never request a path outside the mount");
     assert.deepEqual(failures, []);
     assert.ok(fonts.length > 0, "the reading font loaded through the mount");
-    await context.close();
-  });
-
-  void it("keeps the docs worker and an old app worker apart", async () => {
-    const context = await browser.newContext();
-    const page = await context.newPage();
-    await page.goto(`${front.origin}/`);
-    await page.evaluate(() => navigator.serviceWorker.ready);
-    await page.reload();
-    assert.equal(
-      await page.evaluate(() => fetch("/app-worker-probe").then((r) => r.text())),
-      "app-worker",
+    const workers = await page.evaluate(
+      async () => (await navigator.serviceWorker.getRegistrations()).length,
     );
-
-    await page.goto(`${front.origin}${base}/introduction`, { waitUntil: "load" });
-    const scopes = await docsWorkerScopes({ page });
-    assert.ok(scopes.includes(`${front.origin}${base}/`), `docs worker scope in ${scopes}`);
-    await page.reload({ waitUntil: "load" });
-    const controller = await page.evaluate(() => navigator.serviceWorker.controller?.scriptURL);
-    assert.equal(
-      controller,
-      `${front.origin}${base}/sw.js`,
-      "the narrower docs scope controls docs pages",
-    );
-    const app = await page.evaluate(() => fetch("/api/health").then((r) => r.text()));
-    assert.equal(app, "app:GET:/api/health:", "the docs worker lets app requests through");
-
-    await page.goto(`${front.origin}/`);
-    const appController = await page.evaluate(() => navigator.serviceWorker.controller?.scriptURL);
-    assert.equal(appController, `${front.origin}/sw.js`, "app pages stay with the app's worker");
+    assert.equal(workers, 0, "the docs install no service worker");
     await context.close();
   });
 });
@@ -354,13 +297,12 @@ void describe("the docs alone", () => {
     assert.match(await api.text(), new RegExp(`served under ${base}/`));
   });
 
-  void it("serves pages, exports and the worker under the mount", async () => {
+  void it("serves pages and exports under the mount", async () => {
     for (const [address, type] of [
       [`${base}/`, /text\/html/],
       [`${base}/introduction`, /text\/html/],
       [`${base}/introduction.md`, /text\/markdown/],
       [`${base}/llms.txt`, /text\/plain/],
-      [`${base}/sw.js`, /javascript/],
     ]) {
       const response = await get(`${alone.origin}${address}`);
       assert.equal(response.status, 200, address);

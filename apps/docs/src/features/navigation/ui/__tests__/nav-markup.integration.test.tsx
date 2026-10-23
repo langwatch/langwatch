@@ -71,6 +71,32 @@ describe("when a page lists collapsible navigation groups", () => {
   });
 });
 
+describe("when a navigation group holds a single page", () => {
+  const html = render(
+    <NavTree
+      items={[
+        {
+          type: "group",
+          title: "Python",
+          icon: "python",
+          children: [{ type: "page", slug: "gateway/python", title: "Python SDK" }],
+        },
+      ]}
+      current="elsewhere"
+      section="Gateway"
+    />,
+  );
+
+  /** @scenario "Show a group of one page as that page's link" */
+  it("shows one link to the page under the group's name, with no toggle or panel", () => {
+    expect(html).toMatch(/<a href="[^"]*gateway\/python"/);
+    expect(html).toContain(">Python</span>");
+    expect(html).not.toContain("Python SDK");
+    expect(html).not.toContain("data-docs-group");
+    expect(html).not.toContain("data-docs-panel");
+  });
+});
+
 describe("when a page renders the mobile navigation drawer", () => {
   const html = render(<MobileNav open={false} onClose={() => {}} active={undefined} slug="x" />);
 

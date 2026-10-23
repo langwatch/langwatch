@@ -1,16 +1,15 @@
-import { Box, Button, Text } from "@langwatch/design-system/primitives";
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { createDesignSystem } from "@langwatch/design-system/system";
 import { MDXProvider } from "@mdx-js/react";
-import { Search } from "lucide-react";
 import nav from "virtual:docs-nav";
 
 import type { HighlightedExamples, Operation } from "../features/api-reference/model/operation.ts";
 import { EndpointStateProvider } from "../features/api-reference/ui/endpoint-state.tsx";
 import { Playground } from "../features/api-reference/ui/playground.tsx";
 import { EndpointReference, EndpointSummary } from "../features/api-reference/ui/reference.tsx";
-import { Card, CardGroup } from "../features/content/ui/cards.tsx";
 import { mdxComponents } from "../features/content/ui/mdx-components.ts";
+import { notFoundIndex } from "../features/navigation/model/not-found.ts";
+import { NotFoundPage, NotFoundRail } from "../features/navigation/ui/not-found-page.tsx";
 import { InlineContent } from "../features/shell/ui/inline-content.tsx";
 import { DocsShell } from "../features/shell/ui/shell.tsx";
 import { TypeRegion } from "../lib/type-mode.tsx";
@@ -18,6 +17,9 @@ import type { PageModule } from "./pages.ts";
 import { docsTheme } from "./theme-config.ts";
 
 import "./docs.css";
+
+/** The page list the 404 island matches a missing address against. */
+const notFoundPages = notFoundIndex({ sections: nav.anchors, pages: nav.pages });
 
 /** Every recipe, for the prerender; each browser island selects its own (`island-theme.ts`). */
 const docsSystem = createDesignSystem(docsTheme);
@@ -111,52 +113,16 @@ function NotFound() {
       slug="404"
       kind="guide"
       title={nav.site.notFound.title}
-      description={
-        nav.site.notFound.content.length
-          ? ""
-          : "This page may have moved. Search the docs or choose a starting point below."
-      }
+      description=""
       toc={[]}
+      aside={
+        <NotFoundRail
+          github={nav.site.github}
+          note={<InlineContent nodes={nav.site.notFound.content} />}
+        />
+      }
     >
-      <Box paddingBottom="12">
-        {nav.site.notFound.content.length ? (
-          <Text data-docs-not-found-copy="" marginTop="0" marginBottom="6" color="docs.lede">
-            <InlineContent nodes={nav.site.notFound.content} />
-          </Text>
-        ) : null}
-        <Button
-          data-docs-search=""
-          variant="outline"
-          colorPalette="gray"
-          height="44px"
-          onClick={() =>
-            window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true }))
-          }
-        >
-          <Search size={16} /> Search the docs
-        </Button>
-        <h2 className="docs-sr-only">Starting points</h2>
-        <CardGroup cols={3}>
-          <Card
-            title="Quick Start"
-            description="Send your first trace."
-            href="/integration/quick-start"
-            icon="rocket"
-          />
-          <Card
-            title="Skills Directory"
-            description="Set up with your coding assistant."
-            href="/skills/directory"
-            icon="terminal"
-          />
-          <Card
-            title="API Reference"
-            description="Explore endpoints and try a request."
-            href="/api-reference/introduction"
-            icon="code"
-          />
-        </CardGroup>
-      </Box>
+      <NotFoundPage title={nav.site.notFound.title} index={notFoundPages} />
     </DocsShell>
   );
 }

@@ -20,3 +20,18 @@ Feature: Search metadata matches the published documentation
     Given a page whose description is shorter than 50 characters
     When its head is generated
     Then the description is unchanged
+
+  @unit
+  Scenario: Describe a guide to search engines as a technical article
+    Given a guide with a known last commit date, and an organization that lists its X profile
+    When its head is generated
+    Then its structured data is a TechArticle with a headline, language, image, author and publisher
+    And its social type is article, with the commit date as its modified time
+    And the social card names the organization's X account
+    But the docs home stays a web page that is part of the documentation website
+
+  @integration
+  Scenario: Every published page carries complete search and social metadata
+    Given a build whose sitemap lists its navigable pages
+    When the static audit reads every listed page
+    Then a page without its language, viewport, social card, social title, social description or absolute social image is reported

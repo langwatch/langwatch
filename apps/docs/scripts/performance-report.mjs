@@ -36,16 +36,13 @@ async function measure({ directory }) {
     (sum, match) => sum + gzipSync(match[1]).length,
     0,
   );
-  const worker = gzipSync(await readFile(path.join(directory, "sw.js"))).length;
   const initial = entryFiles({ name: "index" });
   /* Islands every page loads at idle without a reader action. */
   const idle = ["tabs", "toc", "reading"].flatMap((name) => entryFiles({ name }));
   const index = await readFile(path.join(directory, "search-index.json"));
   return {
     initialGzip: inline + (await gzipFiles({ directory, files: initial })),
-    serviceWorkerGzip: worker,
-    withIdleControlsGzip:
-      inline + worker + (await gzipFiles({ directory, files: [...initial, ...idle] })),
+    withIdleControlsGzip: inline + (await gzipFiles({ directory, files: [...initial, ...idle] })),
     deferredReadingGzip: await gzipFiles({ directory, files: entryFiles({ name: "reading" }) }),
     simpleIslandsGzip: await gzipFiles({
       directory,

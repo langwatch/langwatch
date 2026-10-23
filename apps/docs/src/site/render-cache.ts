@@ -13,7 +13,7 @@ const publishedSearchEntry = z
   .json()
   .refine((value) => z.validate(searchEntrySchema, value), "not a search index entry");
 
-/** A rendered page before the shared stylesheet and offline version are known. */
+/** A rendered page before the shared stylesheet and build version are known. */
 export const renderedPageSchema = z.object({
   page: z.string(),
   rules: z.array(z.string()),

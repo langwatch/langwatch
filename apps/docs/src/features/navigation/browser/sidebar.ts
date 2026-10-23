@@ -5,13 +5,16 @@ type Selection = { x: number; y: number; height: number };
 type RailState = {
   section: string;
   scroll: number;
-  top: number;
+  /** The header was stuck, so the banners above it had scrolled away. */
+  pastBanners: boolean;
   open: Map<string, boolean>;
   selection: Selection | null;
 };
 
 const TREE = 'nav[aria-label="Page navigation"]';
 let saved: RailState | null = null;
+/** The rail link the reader clicked, and where it sat on screen, so the swap keeps it there. */
+let clicked: { href: string; top: number } | null = null;
 
 function rail() {
   return document.querySelector<HTMLElement>(".docs-left-rail");
@@ -39,15 +42,21 @@ function treeOffset({ root }: { root: HTMLElement }) {
   return tree.getBoundingClientRect().top - root.getBoundingClientRect().top + root.scrollTop;
 }
 
+const motion = () => matchMedia("(prefers-reduced-motion: no-preference)").matches;
+
 /** Scrolls the rail, never the document, so the current page's link is in view. */
-function revealCurrent({ root }: { root: HTMLElement }) {
+function revealCurrent({ root, smooth = false }: { root: HTMLElement; smooth?: boolean }) {
   const link = root.querySelector<HTMLElement>(`${TREE} [aria-current="page"]`);
   if (!link) return;
   const bounds = root.getBoundingClientRect();
   const visibleBottom = Math.min(bounds.bottom, innerHeight);
   const target = link.getBoundingClientRect();
   if (target.top >= bounds.top && target.bottom <= visibleBottom) return;
-  root.scrollTop += target.top - bounds.top - (visibleBottom - bounds.top - target.height) / 2;
+  root.scrollTo({
+    top:
+      root.scrollTop + target.top - bounds.top - (visibleBottom - bounds.top - target.height) / 2,
+    behavior: smooth && motion() ? "smooth" : "instant",
+  });
 }
 
 function selection() {
@@ -78,7 +87,7 @@ function markCurrent(previous: Selection | null = null) {
   marker.style.height = `${target.height}px`;
   const transform = `translate(${target.x}px, ${target.y}px)`;
   marker.style.transform = transform;
-  if (previous && matchMedia("(prefers-reduced-motion: no-preference)").matches) {
+  if (previous && motion()) {
     marker.animate(
       [
         {
@@ -87,7 +96,7 @@ function markCurrent(previous: Selection | null = null) {
         },
         { transform, height: `${target.height}px` },
       ],
-      { duration: 220, easing: "ease-in-out" },
+      { duration: 180, easing: "cubic-bezier(0.2, 0.7, 0.2, 1)" },
     );
   }
 }
@@ -99,7 +108,7 @@ function remember() {
     selection: selection(),
     section: sectionOf({ root }),
     scroll: root.scrollTop,
-    top: root.getBoundingClientRect().top,
+    pastBanners: (document.querySelector("header")?.getBoundingClientRect().top ?? 1) <= 0,
     open: new Map(
       groups(root).map((button) => [
         button.dataset.docsGroup ?? "",
@@ -125,11 +134,17 @@ function restore() {
       ? state.scroll
       : Math.min(state.scroll, treeOffset({ root }));
   root.scrollTop = scroll;
-  // Navigation scrolls the document next; before that frame paints, offset the rail's own
-  // scroll by however far its sticky box moved, so every link stays where the reader saw it.
+  const held = clicked;
+  clicked = null;
   requestAnimationFrame(() => {
-    root.scrollTop = scroll + root.getBoundingClientRect().top - state.top;
-    revealCurrent({ root });
+    // A new page opens at its top without bringing the banners back, so nothing shifts down.
+    const banners = document.querySelector("header")?.getBoundingClientRect().top ?? 0;
+    if (state.pastBanners && scrollY === 0 && !location.hash && banners > 0)
+      window.scrollTo({ top: banners, behavior: "instant" });
+    const link = root.querySelector<HTMLAnchorElement>(`${TREE} [aria-current="page"]`);
+    if (held && link?.href === held.href)
+      root.scrollTop += link.getBoundingClientRect().top - held.top;
+    revealCurrent({ root, smooth: true });
     markCurrent(sectionOf({ root }) === state.section ? state.selection : null);
   });
 }
@@ -141,9 +156,27 @@ export function installSidebar() {
   if (root) revealCurrent({ root });
   markCurrent();
   void document.fonts.ready.then(() => markCurrent());
+  // Groups open and close with an animation; the marker follows the rows as they move.
+  const follow = new ResizeObserver(() => markCurrent());
+  const watch = () => {
+    follow.disconnect();
+    const tree = rail()?.querySelector(TREE);
+    if (tree) follow.observe(tree);
+  };
+  watch();
+  document.addEventListener("docs:navigated", watch);
   document.addEventListener("click", (event) => {
-    if (event.target instanceof Element && event.target.closest("[data-docs-group]")) {
-      requestAnimationFrame(() => markCurrent());
+    if (!(event.target instanceof Element)) return;
+    const anchor = event.target.closest<HTMLAnchorElement>(`.docs-left-rail ${TREE} a`);
+    clicked = anchor ? { href: anchor.href, top: anchor.getBoundingClientRect().top } : null;
+    if (anchor && !event.defaultPrevented) return;
+    // The in-place navigation took the click: select the row now, before the page arrives.
+    if (anchor && anchor.getAttribute("aria-current") !== "page") {
+      const previous = selection();
+      rail()?.querySelector(`${TREE} [aria-current="page"]`)?.removeAttribute("aria-current");
+      anchor.setAttribute("aria-current", "page");
+      markCurrent(previous);
+      document.getElementById("content")?.setAttribute("data-docs-leaving", "");
     }
   });
 }

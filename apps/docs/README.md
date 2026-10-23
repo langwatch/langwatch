@@ -283,16 +283,8 @@ Navigation preserves the header and handles history, focus and announcements.
 A build change or a failed transition falls back to a normal document navigation.
 The dev server renders the same static page structure and reloads authored MDX.
 
-The production-only service worker precaches shell CSS/JS, the Latin reading font
-and an offline page. Other font faces are cached when requested.
-It revalidates public HTML/search, caps page caches at 40 entries, and expires the
-stale-while-revalidate window after 60 seconds. API requests, authentication
-headers, arbitrary query strings and private/no-store responses bypass caching.
-The public search index's build-version query is cacheable for offline search.
-The worker stays within its registration scope, including a `/docs/` mount. Updates
-activate on successful installation without forcing a reload; subsequent document
-navigation adopts the new version. Future hosting should retain old hashed assets
-for open tabs and let `sw.js` revalidate promptly.
+The site installs no service worker and has no offline mode. The search index is fetched
+as `search-index.json?v=<build>`, so HTTP caches never serve an old index.
 
 ```sh
 pnpm --filter @langwatch/docs-site size --out-dir "$TMPDIR/docs-performance"
@@ -301,12 +293,10 @@ pnpm --filter @langwatch/docs-site test:layout --out-dir "$TMPDIR/docs-performan
 ```
 
 `size` fails above 3 KB gzipped for initial reading and above 15 KB for the bootstrap, inline theme setup, idle
-controls and service worker combined. It separately reports the full search and
+controls combined. It separately reports the full search and
 playground interaction costs, including shared React/Zod. `test:performance`
-checks static reading, navigation, prefetch, worker replacement, offline fallback
-and credential isolation. `test:layout` checks 1280, 1440, 1670 and 390 pixel widths
-in light and dark. Run worker tests only against an isolated build: the update
-scenario temporarily changes that build’s `sw.js` and restores it afterwards.
+checks static reading, navigation, prefetch and credential isolation. `test:layout` checks 1280, 1440, 1670 and 390 pixel widths
+in light and dark.
 
 The page uses one document scroll on flat paper: tall rails flow naturally and the
 full-width footer follows the content. Only a rail that fits the viewport becomes

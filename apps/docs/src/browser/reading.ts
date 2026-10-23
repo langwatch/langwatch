@@ -1,5 +1,5 @@
 /* Deferred reading enhancements, kept out of the bootstrap budget: speculative prefetch, the
-   sidebar agent selection, and the media island on pages with GIF-replacement clips. */
+   sidebar agent selection and the media island on pages that hold clips. */
 import type { PrefetchRequest } from "./navigation.ts";
 import "../features/shell/browser/agent-choice.ts";
 
@@ -62,22 +62,24 @@ document.addEventListener("pointerout", (event) => hoverEnd({ event }), { passiv
 document.addEventListener("focusin", (event) => {
   if (event.target instanceof HTMLAnchorElement) prefetch({ anchor: event.target });
 });
-/** Loads the media island once a page holds a clip; pages without clips load nothing. */
-function enhanceClips() {
-  if (!document.querySelector("video[data-docs-clip]")) return;
-  if (document.querySelector('script[data-island="media"]')) return;
-  const source = document.querySelector<HTMLMetaElement>('meta[name="docs-island-media"]')?.content;
+/** Loads an island once a page holds what it enhances: clips. */
+function enhanceWith({ name, selector }: { name: string; selector: string }) {
+  if (!document.querySelector(selector)) return;
+  if (document.querySelector(`script[data-island="${name}"]`)) return;
+  const source = document.querySelector<HTMLMetaElement>(
+    `meta[name="docs-island-${name}"]`,
+  )?.content;
   if (!source) return;
   const script = document.createElement("script");
   script.type = "module";
   script.src = source;
-  script.dataset.island = "media";
+  script.dataset.island = name;
   document.head.append(script);
 }
 
 function enhance() {
   observeLinks();
-  enhanceClips();
+  enhanceWith({ name: "media", selector: "video[data-docs-clip]" });
 }
 
 document.addEventListener("docs:navigated", enhance);

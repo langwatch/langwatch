@@ -162,8 +162,18 @@ await it("makes API data, skill actions and selection movement readable", async 
             await page.evaluate(() => navigator.clipboard.readText()),
             await tracingPrompt({ outDir }),
           );
+          await card
+            .getByRole("button", { name: "Copy npx skills add langwatch/skills/tracing" })
+            .click();
+          await page.waitForFunction(async () =>
+            (await navigator.clipboard.readText()).startsWith("npx skills add"),
+          );
+          const [chevron, label] = await card
+            .locator("summary > *")
+            .evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect()));
+          assert.ok(label.left - chevron.right < 12, "The prompt chevron sits beside its label");
           await card.locator("summary").click();
-          assert.ok(await card.locator(".docs-code-region").first().isVisible());
+          await card.locator(".docs-code-region").first().waitFor();
           await card.locator("summary").click();
           await card.screenshot({ path: path.join(shots, `docs-skill-card-${theme}.png`) });
           await page.goto(base + "integration/cli");
@@ -200,7 +210,7 @@ await it("makes API data, skill actions and selection movement readable", async 
         const error = page.locator(".docs-response-schema").nth(index);
         await error.locator("summary").click();
         assert.equal(await error.getAttribute("open"), "");
-        assert.ok(await error.locator(".docs-field").first().isVisible());
+        await error.locator(".docs-field").first().waitFor();
       } finally {
         await page.close();
       }
@@ -225,7 +235,7 @@ await it("renders Markdown prompts and joins the setup tabs flush to the frame",
           await page.goto(base + "skills/directory");
           const card = page.locator(".docs-skill-card").first();
           await card.locator("summary").click();
-          assert.ok((await card.locator(".docs-skill-body h4").count()) > 0);
+          await card.locator(".docs-skill-body h4").first().waitFor();
           assert.ok((await card.locator(".docs-inline-code").count()) > 0);
           assert.ok(await card.locator(".docs-code-region").first().isVisible());
           assert.ok((await card.locator('.docs-code-region span[style*="--sl"]').count()) > 0);
@@ -272,6 +282,73 @@ await it("renders Markdown prompts and joins the setup tabs flush to the frame",
         } finally {
           await page.close();
         }
+      }
+    },
+  });
+});
+
+/** @scenario "Click, drag and spin the agent wheel" */
+await it("turns the agent wheel by click, drag, flick and wheel, landing on a real agent", async () => {
+  const agents = ["claude", "codex", "copilot", "gemini", "opencode"];
+  await withPreviewBrowser({
+    outDir,
+    run: async ({ browser, base }) => {
+      const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+      try {
+        await page.goto(base + "introduction", { waitUntil: "load" });
+        const pick = page.locator(".docs-left-rail .docs-agent-pick");
+        await page.waitForFunction(() => document.querySelector(".docs-agent-pick[data-reel]"));
+        const select = pick.getByLabel("Coding agent");
+        const settled = () =>
+          page.waitForFunction(() => !document.querySelector(".docs-agent-wheel[data-live]"));
+        const after = async ({ from, steps }) =>
+          assert.equal(await select.inputValue(), agents[(agents.indexOf(from) + steps + 5) % 5]);
+        assert.equal(await pick.evaluate((node) => getComputedStyle(node).touchAction), "none");
+        assert.equal(await pick.locator(".docs-agent-wheel").getAttribute("aria-hidden"), "true");
+        const wheel = await pick.locator(".docs-agent-wheel").boundingBox();
+        const x = wheel.x + 30;
+        const y = wheel.y + 10;
+        let from = await select.inputValue();
+        await page.mouse.click(x, y + 15);
+        await settled();
+        await after({ from, steps: 1 });
+        from = await select.inputValue();
+        await page.mouse.move(x, y);
+        await page.mouse.down();
+        for (let step = 1; step <= 30; step++) await page.mouse.move(x, y - step);
+        await page.waitForTimeout(200);
+        await page.mouse.up();
+        await settled();
+        await after({ from, steps: 2 });
+        await page.mouse.move(x, y + 10);
+        await page.mouse.down();
+        for (let step = 1; step <= 6; step++) {
+          await page.mouse.move(x, y + 10 - step * 12);
+          await page.waitForTimeout(8);
+        }
+        await page.mouse.up();
+        await page.waitForFunction(() => document.querySelector(".docs-agent-name[data-casino]"));
+        await settled();
+        assert.ok(agents.includes(await select.inputValue()));
+        assert.equal(await pick.locator(".docs-agent-name[data-casino]").count(), 0);
+        assert.equal(
+          await pick.locator('.docs-agent-name[data-distance="0"]').getAttribute("data-agent"),
+          await select.inputValue(),
+        );
+        from = await select.inputValue();
+        await page.mouse.move(x, y);
+        await page.mouse.wheel(0, 100);
+        await settled();
+        await after({ from, steps: 1 });
+        await page.emulateMedia({ reducedMotion: "reduce" });
+        from = await select.inputValue();
+        await page.mouse.move(x, y);
+        await page.mouse.down();
+        for (let step = 1; step <= 8; step++) await page.mouse.move(x, y - step * 12);
+        await page.mouse.up();
+        await after({ from, steps: 1 });
+      } finally {
+        await page.close();
       }
     },
   });

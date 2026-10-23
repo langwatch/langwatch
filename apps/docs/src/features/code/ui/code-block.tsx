@@ -95,7 +95,7 @@ function DocsMermaid(props: Record<string, unknown>) {
           }}
         />
       </Box>
-      <details>
+      <details className="docs-disclosure">
         <summary>View source</summary>
         <CodeFrame>
           <CodeBar>

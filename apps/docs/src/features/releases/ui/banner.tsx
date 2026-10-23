@@ -30,10 +30,10 @@ export function SiteBanner() {
       <IconButton
         aria-label="Dismiss announcement"
         title={`Dismiss release v${release.version}`}
+        className="docs-banner-dismiss"
         variant="ghost"
         color="fg.muted"
-        minWidth="36px"
-        height="36px"
+        size="2xs"
       >
         <X size={14} />
       </IconButton>

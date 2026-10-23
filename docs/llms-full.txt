@@ -16,7 +16,7 @@ keywords: langwatch, llm, ai, observability, evaluation, agent testing, prompt m
 
 ## Quick Start
 
-The fastest way to set up your agent with LangWatch and get started is by using LangWatch Skills via a coding assistant. If your agent is already set up, check out the skills to monitor performance and improve your agent.
+Already set up? The [LangWatch Skills](/skills/directory) also help you monitor and improve an agent that is running.
 
 <CardGroup cols={2}>
   <Card title="Get Started Using a Code Assistant" icon="terminal" href="/skills/directory">
@@ -26,6 +26,8 @@ The fastest way to set up your agent with LangWatch and get started is by using 
     See PM & Domain Expert Skills to collaborate with your team
   </Card>
 </CardGroup>
+
+<WhatsNew />
 
 ## What is LangWatch?
 
@@ -46,21 +48,16 @@ LangWatch has four areas, and you can use each one on its own.
 
 <CardGroup cols={2}>
   <Card title="LLM Ops" icon="chart-network" href="/observability/overview">
-    Everything you need to ship and improve an LLM application:
-
-    - [Observability](/observability/overview): every LLM call, tool call and user interaction as a trace.
-    - [Agent Testing](/agent-testing/overview): multi-turn conversations against your agent with a simulated user.
-    - [Evaluations](/evaluations/overview): experiments on datasets, and monitors on production traffic.
-    - [Prompt Management](/prompt-management/overview): versioned prompts your code loads at runtime.
+    Tracing, agent testing, evaluations and prompt management for the LLM apps you build.
   </Card>
   <Card title="Coding Agents" icon="terminal" href="/coding-agents/overview">
-    What Claude Code, Codex, Copilot, Gemini CLI and opencode do and cost, per session, per pull request and per team, with privacy controls for the people who use them.
+    What Claude Code, Codex and other coding agents do and cost, per session and per team.
   </Card>
   <Card title="LangWatch AI Gateway" icon="route" href="/ai-gateway/overview">
-    One OpenAI and Anthropic compatible endpoint for every LLM call in the company. Your provider keys, including Azure and Bedrock, stay in LangWatch. Each caller gets a virtual key with its own budget, and every request lands as a trace.
+    One OpenAI and Anthropic compatible endpoint, with virtual keys, budgets and a trace per call.
   </Card>
   <Card title="AI Governance" icon="shield-halved" href="/ai-governance/overview">
-    An inventory of every AI tool and source in the company, the people who use them, anomaly rules on their activity, and a personal home page for each developer.
+    An inventory of the AI tools in your company, who uses them, and alerts on unusual activity.
   </Card>
 </CardGroup>
 
@@ -309,8 +306,8 @@ Pick your language and start tracking:
 
 <CardGroup cols={2}>
   <Card title="Python SDK" icon="python" href="/integration/python/guide" horizontal arrow />
-  <Card title="TypeScript SDK" icon="code" href="/integration/typescript/guide" horizontal arrow />
-  <Card title="Go SDK" icon="golang" href="/integration/go/guide" horizontal arrow />
+  <Card title="TypeScript SDK" icon="typescript" href="/integration/typescript/guide" horizontal arrow />
+  <Card title="Go SDK" icon="/images/logos/golang.svg" href="/integration/go/guide" horizontal arrow />
   <Card title="View All Integrations" icon="plug" href="/integration/overview" horizontal arrow />
 </CardGroup>
 
@@ -8533,8 +8530,14 @@ The gateway translates between wire formats where the provider differs. For exam
   <Card title="Python SDK" icon="python" href="/ai-gateway/sdks/python">
     OpenAI and Anthropic Python SDKs, LangChain, LlamaIndex, trace propagation.
   </Card>
-  <Card title="TypeScript SDK" icon="js" href="/ai-gateway/sdks/typescript">
+  <Card title="TypeScript SDK" icon="typescript" href="/ai-gateway/sdks/typescript">
     OpenAI and Anthropic TypeScript SDKs, Vercel AI SDK, LangChain.js.
+  </Card>
+  <Card title="Go SDK" icon="/images/logos/golang.svg" href="/ai-gateway/sdks/go">
+    OpenAI and Anthropic Go SDKs, trace propagation.
+  </Card>
+  <Card title="HTTP and other clients" icon="globe" href="/ai-gateway/sdks/http">
+    curl, or any client that takes an OpenAI base URL and API key.
   </Card>
 </CardGroup>
 
@@ -10159,6 +10162,332 @@ Default roles are code-defined in `modules/authz/contract/src/roles.ts`, declare
 ## SCIM + SSO
 
 Default role matrix assignments flow through SCIM: when an IdP pushes a user with role `MEMBER`, they pick up the gateway permissions in the MEMBER column above. Custom roles must be assigned via the LangWatch UI (SCIM doesn't carry custom-role identifiers); the SCIM integration only maps to ADMIN, MEMBER, VIEWER.
+
+---
+
+# FILE: ./ai-gateway/sdks/go.mdx
+
+---
+title: Go
+description: Call the LangWatch AI Gateway from Go with the OpenAI SDK or the Anthropic SDK, and link the gateway span to your own trace.
+sidebarTitle: Go SDK
+---
+
+## What changes in your code
+
+Two settings change: the base URL points at the gateway, and the API key is a virtual key. The request body, streaming, tools and every other SDK feature stay the same. Name the model as `provider/model` on the OpenAI-shaped and Anthropic-shaped routes; see [Model naming](/ai-gateway/model-naming).
+
+| SDK       | Base URL                           | Where the key goes                                 |
+| --------- | ---------------------------------- | -------------------------------------------------- |
+| OpenAI    | `https://gateway.langwatch.ai/v1/` | `option.WithAPIKey`, sent as `Authorization: Bearer` |
+| Anthropic | `https://gateway.langwatch.ai/`    | `option.WithAPIKey`, sent as `X-Api-Key`           |
+
+Keep the trailing slash on the base URL: the Go SDKs append the route to it.
+
+## Install
+
+```bash
+go get github.com/openai/openai-go/v3
+# add the SDK you use: github.com/anthropics/anthropic-sdk-go
+# and go.opentelemetry.io/otel, to link the gateway span to your trace
+```
+
+The virtual key (`vk-lw-...`) is not your LangWatch API key. `LANGWATCH_API_KEY` is only needed by the LangWatch SDK, to trace your own code.
+
+## OpenAI SDK
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+
+	"github.com/openai/openai-go/v3"
+	"github.com/openai/openai-go/v3/option"
+)
+
+func main() {
+	client := openai.NewClient(
+		option.WithBaseURL("https://gateway.langwatch.ai/v1/"),
+		option.WithAPIKey(os.Getenv("LANGWATCH_VIRTUAL_KEY")),
+	)
+
+	response, err := client.Chat.Completions.New(context.Background(), openai.ChatCompletionNewParams{
+		Model: openai.ChatModel("openai/gpt-5-mini"),
+		Messages: []openai.ChatCompletionMessageParamUnion{
+			openai.UserMessage("Say hi in one word"),
+		},
+	})
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(response.Choices[0].Message.Content)
+}
+```
+
+The same client serves the Responses API and embeddings. With an Anthropic or Gemini model name the gateway translates the chat request to the provider's format.
+
+## Anthropic SDK
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+
+	"github.com/anthropics/anthropic-sdk-go"
+	"github.com/anthropics/anthropic-sdk-go/option"
+)
+
+func main() {
+	client := anthropic.NewClient(
+		option.WithBaseURL("https://gateway.langwatch.ai/"),
+		option.WithAPIKey(os.Getenv("LANGWATCH_VIRTUAL_KEY")),
+	)
+
+	message, err := client.Messages.New(context.Background(), anthropic.MessageNewParams{
+		Model:     anthropic.Model("anthropic/claude-haiku-4-5"),
+		MaxTokens: 64,
+		Messages: []anthropic.MessageParam{
+			anthropic.NewUserMessage(anthropic.NewTextBlock("Say hi in one word")),
+		},
+	})
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(message.Content[0].Text)
+}
+```
+
+## Check it worked
+
+Run the OpenAI SDK sample. It prints the model's answer. Then open the project the virtual key traces to in LangWatch: the gateway's `gen_ai.<request type>` span appears in the traces list within a few seconds, as its own trace, with the model, the tokens and the cost.
+
+## Link the gateway span to your trace
+
+The gateway records one `gen_ai.<request type>` span per request in the trace project of the virtual key. Send a W3C `traceparent` header and the gateway nests that span under your span. Without it, each request is its own trace.
+
+Any OpenTelemetry-instrumented application has the current context. Inject it into the request headers, per request, inside the span you want the gateway span under:
+
+```go
+import (
+	"context"
+	"net/http"
+
+	"github.com/openai/openai-go/v3"
+	"github.com/openai/openai-go/v3/option"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
+)
+
+func traceOptions(ctx context.Context) []option.RequestOption {
+	carrier := propagation.HeaderCarrier(http.Header{})
+	otel.GetTextMapPropagator().Inject(ctx, carrier) // traceparent: 00-<trace id>-<span id>-01
+	opts := []option.RequestOption{}
+	for key, values := range carrier {
+		opts = append(opts, option.WithHeader(key, values[0]))
+	}
+	return opts
+}
+
+func ask(ctx context.Context, client openai.Client) (*openai.ChatCompletion, error) {
+	return client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
+		Model: openai.ChatModel("openai/gpt-5-mini"),
+		Messages: []openai.ChatCompletionMessageParamUnion{
+			openai.UserMessage("Say hi in one word"),
+		},
+	}, traceOptions(ctx)...)
+}
+```
+
+`otel.GetTextMapPropagator()` returns a no-op until you register a propagator, for example `otel.SetTextMapPropagator(propagation.TraceContext{})`. The [LangWatch Go SDK](/integration/go/guide) is built on OpenTelemetry, so the same code works inside a `langwatch` span. Do not also add the LangWatch OpenAI middleware to clients that call the gateway: the gateway already records the span with the model, the tokens and the cost.
+
+## Headers you can send
+
+| Header                    | Purpose                                                                                                   |
+| ------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `traceparent`             | Nests the gateway span in your trace.                                                                     |
+| `X-LangWatch-End-User-Id` | The end user of your product, for per-end-user budgets and spend. The OpenAI `user` body field works too. |
+| `X-LangWatch-Metadata`    | A JSON object, at most 4096 bytes, copied onto the spend event.                                           |
+
+Pass them per request with `option.WithHeader("X-LangWatch-End-User-Id", "cust_8841")` as an extra argument to the call. The gateway removes them before it forwards the request to the provider. See [Billing and spend events](/ai-gateway/billing-events#attribution-what-the-request-carries).
+
+## Read the response headers
+
+```go
+var httpResponse *http.Response
+
+response, err := client.Chat.Completions.New(ctx, params, option.WithResponseInto(&httpResponse))
+if err != nil {
+	return err
+}
+fmt.Println(httpResponse.Header.Get("X-LangWatch-Gateway-Request-Id")) // quote this to support
+fmt.Println(httpResponse.Header.Get("X-LangWatch-Budget-Warning"))     // "project:84" when a budget is at 80 percent or more
+fmt.Println(httpResponse.Header.Get("Traceparent"))                    // the gateway span in your project
+_ = response
+```
+
+## Manage keys and budgets from Go
+
+The LangWatch Go SDK has no helpers for virtual keys, budgets or spend events. Call the management routes over REST with a LangWatch API key. See [Virtual keys](/ai-gateway/virtual-keys#manage-keys-over-rest) and [Billing and spend events](/ai-gateway/billing-events#read-events-over-rest).
+
+## Self-hosted gateway
+
+Replace the host with your gateway's URL. Everything else is the same.
+
+```go
+client := openai.NewClient(
+	option.WithBaseURL("https://gateway.acme.internal/v1/"),
+	option.WithAPIKey(os.Getenv("LANGWATCH_VIRTUAL_KEY")),
+)
+```
+
+## Troubleshooting
+
+| Symptom                              | Cause                                                                                                                                                                |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `401` on every request               | The key is wrong, revoked, or sent in a header the gateway does not read. The gateway reads `Authorization: Bearer`, `X-Api-Key`, `X-Goog-Api-Key` and `Xi-Api-Key`. |
+| `400 model_not_allowed`              | The key restricts its models under **Provider access**, or its routing policy does.                                                                                  |
+| Two spans per call in Trace Explorer | The client also carries the LangWatch OpenAI middleware. Remove it for gateway calls.                                                                                |
+| The gateway span is its own trace    | No `traceparent` on the request, no propagator registered, or the headers were computed outside the active span.                                                     |
+
+See [Errors](/ai-gateway/api/errors) for every error code.
+
+---
+
+# FILE: ./ai-gateway/sdks/http.mdx
+
+---
+title: Any OpenAI-compatible client
+description: Call the LangWatch AI Gateway with curl or any client that lets you set an OpenAI base URL and API key, and link the gateway span to your own trace.
+sidebarTitle: HTTP and other clients
+---
+
+## What changes in your client
+
+Any client that lets you set an OpenAI base URL and an API key works with the gateway. Set the base URL to `https://gateway.langwatch.ai/v1` and send the virtual key as `Authorization: Bearer`. The request body, streaming and tools stay the same. Name the model as `provider/model`; see [Model naming](/ai-gateway/model-naming).
+
+| Route                        | Shape     | Where the key goes                       |
+| ---------------------------- | --------- | ---------------------------------------- |
+| `POST /v1/chat/completions`  | OpenAI    | `Authorization: Bearer vk-lw-...`        |
+| `POST /v1/messages`          | Anthropic | `X-Api-Key: vk-lw-...`                   |
+
+The virtual key (`vk-lw-...`) is not your LangWatch API key. For the SDKs, see [TypeScript](/ai-gateway/sdks/typescript), [Python](/ai-gateway/sdks/python) and [Go](/ai-gateway/sdks/go).
+
+## Chat completions
+
+```bash
+curl https://gateway.langwatch.ai/v1/chat/completions \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "openai/gpt-5-mini",
+    "messages": [{"role": "user", "content": "Say hi in one word"}]
+  }'
+```
+
+Add `"stream": true` to stream the answer as server-sent events. Use `curl -N` so curl does not buffer the frames:
+
+```bash
+curl -N https://gateway.langwatch.ai/v1/chat/completions \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "openai/gpt-5-mini",
+    "messages": [{"role": "user", "content": "Count to 5"}],
+    "stream": true
+  }'
+```
+
+The response is `text/event-stream`, one `data:` frame per chunk, ending with `data: [DONE]`. See [Streaming](/ai-gateway/streaming).
+
+## Messages (Anthropic shape)
+
+```bash
+curl https://gateway.langwatch.ai/v1/messages \
+  -H "X-Api-Key: $LANGWATCH_VIRTUAL_KEY" \
+  -H "anthropic-version: 2023-06-01" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "anthropic/claude-haiku-4-5",
+    "max_tokens": 64,
+    "messages": [{"role": "user", "content": "Say hi in one word"}]
+  }'
+```
+
+`Authorization: Bearer` works in place of `X-Api-Key`. The gateway reads `Authorization: Bearer`, `X-Api-Key`, `X-Goog-Api-Key` and `Xi-Api-Key`; see [Virtual keys](/ai-gateway/virtual-keys#the-key-format-and-how-to-send-it).
+
+## Check it worked
+
+Run the chat completions request. It returns a JSON body with the model's answer. Then open the project the virtual key traces to in LangWatch: the gateway's `gen_ai.<request type>` span appears in the traces list within a few seconds, as its own trace, with the model, the tokens and the cost.
+
+## Link the gateway span to your trace
+
+The gateway records one `gen_ai.<request type>` span per request in the trace project of the virtual key. Send a W3C `traceparent` header and the gateway nests that span under your span. Without it, each request is its own trace.
+
+```bash
+curl https://gateway.langwatch.ai/v1/chat/completions \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "traceparent: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "openai/gpt-5-mini",
+    "messages": [{"role": "user", "content": "Say hi in one word"}]
+  }'
+```
+
+The format is `00-<trace id>-<span id>-<flags>`, with a 32-character trace id and a 16-character span id in hexadecimal. In an instrumented application, inject the current context rather than writing the value by hand; see the OpenTelemetry samples in [TypeScript](/ai-gateway/sdks/typescript#link-the-gateway-span-to-your-trace), [Python](/ai-gateway/sdks/python#link-the-gateway-span-to-your-trace) and [Go](/ai-gateway/sdks/go#link-the-gateway-span-to-your-trace).
+
+## Headers you can send
+
+| Header                    | Purpose                                                                                                   |
+| ------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `traceparent`             | Nests the gateway span in your trace.                                                                     |
+| `X-LangWatch-End-User-Id` | The end user of your product, for per-end-user budgets and spend. The OpenAI `user` body field works too. |
+| `X-LangWatch-Metadata`    | A JSON object, at most 4096 bytes, copied onto the spend event.                                           |
+
+The gateway removes them before it forwards the request to the provider. See [Billing and spend events](/ai-gateway/billing-events#attribution-what-the-request-carries).
+
+## Read the response headers
+
+Add `-i` to print the response headers before the body:
+
+```bash
+curl -i https://gateway.langwatch.ai/v1/chat/completions \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model": "openai/gpt-5-mini", "messages": [{"role": "user", "content": "Hi"}]}'
+```
+
+| Header                           | Value                                                                                |
+| -------------------------------- | ------------------------------------------------------------------------------------ |
+| `X-LangWatch-Gateway-Request-Id` | The request id. Quote it to support.                                                 |
+| `X-LangWatch-Budget-Warning`     | Present when a budget is at 80 percent or more, for example `project:84`.            |
+| `Traceparent`                    | The gateway span in your project.                                                    |
+
+The full list is on [Chat Completions](/ai-gateway/api/chat-completions#response-headers).
+
+## Self-hosted gateway
+
+Replace the host with your gateway's URL, for example `https://gateway.acme.internal/v1`. Everything else is the same.
+
+## In the browser
+
+The gateway sends no CORS headers on `/v1` unless the operator allows origins, and a virtual key in browser code is visible to every visitor. Call the gateway from your server.
+
+## Troubleshooting
+
+| Symptom                           | Cause                                                                                                                                                                |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `401` on every request            | The key is wrong, revoked, or sent in a header the gateway does not read. The gateway reads `Authorization: Bearer`, `X-Api-Key`, `X-Goog-Api-Key` and `Xi-Api-Key`. |
+| `400 model_not_allowed`           | The key restricts its models under **Provider access**, or its routing policy does.                                                                                  |
+| The gateway span is its own trace | No `traceparent` on the request.                                                                                                                                     |
+
+See [Errors](/ai-gateway/api/errors) for every error code.
 
 ---
 
@@ -19039,19 +19368,25 @@ Check out the [quickstart](/coding-agents/quickstart) for next steps.
 ## Set up your agent
 
 <CardGroup cols={3}>
-  <Card
-    title="Claude Code"
-    icon="/images/logos/claude-code.svg"
-    href="/coding-agents/claude-code"
-  />
-  <Card title="Codex" icon="/images/logos/codex.svg" href="/coding-agents/openai-codex" />
+  <Card title="Claude Code" icon="/images/logos/claude-code.svg" href="/coding-agents/claude-code">
+    One command, or `CLAUDE_CODE_ENABLE_TELEMETRY` and the OpenTelemetry variables by hand.
+  </Card>
+  <Card title="Codex" icon="/images/logos/codex.svg" href="/coding-agents/openai-codex">
+    Sessions, cost and traces from the OpenAI Codex CLI.
+  </Card>
   <Card
     title="GitHub Copilot"
     icon="/images/logos/github-copilot.svg"
     href="/coding-agents/github-copilot-cli"
-  />
-  <Card title="Gemini CLI" icon="/images/logos/gemini.svg" href="/coding-agents/gemini-cli" />
-  <Card title="OpenCode" icon="/images/logos/opencode.svg" href="/coding-agents/opencode" />
+  >
+    Usage and cost from the Copilot CLI and Copilot Chat.
+  </Card>
+  <Card title="Gemini CLI" icon="/images/logos/gemini.svg" href="/coding-agents/gemini-cli">
+    Sessions, cost and traces from the Gemini CLI.
+  </Card>
+  <Card title="OpenCode" icon="/images/logos/opencode.svg" href="/coding-agents/opencode">
+    Sessions, cost and traces from opencode.
+  </Card>
   <Card title="Cursor and Aider" icon="/images/logos/cursor.svg" href="/ai-gateway/quickstart">
     Through the LangWatch AI Gateway: point their OpenAI base URL at
     `https://gateway.langwatch.ai/v1` with a virtual key.
@@ -19999,11 +20334,11 @@ LangWatch provides SDKs for several programming languages.
   Complete Python SDK with automatic instrumentation for popular frameworks
 </Card>
 
-<Card title="TypeScript SDK" icon="square-js" href="/integration/typescript/guide" arrow>
+<Card title="TypeScript SDK" icon="typescript" href="/integration/typescript/guide" arrow>
   Full-featured TypeScript/JavaScript SDK with type safety
 </Card>
 
-<Card title="Go SDK" icon="golang" href="/integration/go/guide" arrow>
+<Card title="Go SDK" icon="/images/logos/golang.svg" href="/integration/go/guide" arrow>
   High-performance Go SDK for server-side applications
 </Card>
 
@@ -48819,7 +49154,7 @@ competitor_check = langwatch.evaluation.evaluate(
   <Card
     title="TypeScript SDK Reference"
     description="Full API documentation for the TypeScript SDK."
-    icon="square-js"
+    icon="typescript"
     href="/integration/typescript/reference"
   />
 </CardGroup>
@@ -70155,6 +70490,8 @@ Enterprise capabilities include:
 title: Releases and support
 description: "How LangWatch is versioned, which releases get fixes, and why you can upgrade to the latest release from any version."
 ---
+
+What changed in each release is in the [changelog](/changelog). This page covers how releases are versioned and supported, and what to prepare before an upgrade.
 
 ## Preparing for 3.21
 

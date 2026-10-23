@@ -106,7 +106,7 @@ await it("groups documentation in the command surface and supports keyboard navi
 });
 
 /** @scenario "Use clear contextual menus" */
-await it("shows descriptive page actions and the selected theme in design-system menus", async () => {
+await it("shows descriptive page actions and switches the theme from one button", async () => {
   await withPreviewBrowser({
     outDir,
     run: async ({ browser, base }) => {
@@ -123,7 +123,7 @@ await it("shows descriptive page actions and the selected theme in design-system
           const menu = page.getByRole("menu", { name: "Page actions" });
           await menu.waitFor();
           assert.ok((await menu.boundingBox()).width >= 280);
-          await menu.getByRole("menuitem", { name: /^Copy page Copy this/ }).click();
+          await menu.getByRole("menuitem", { name: /^Copy page\s*As Markdown/ }).click();
           await menu.getByText("Copied page", { exact: true }).waitFor();
           assert.equal(
             await page.evaluate(() => navigator.clipboard.readText()),
@@ -131,20 +131,18 @@ await it("shows descriptive page actions and the selected theme in design-system
           );
           await shot({ page, name: `page-menu-${mode}` });
           await page.keyboard.press("Escape");
-          await page.getByRole("button", { name: "Colour theme" }).click();
-          const theme = page.getByRole("menu", { name: "Colour theme" });
-          await theme.waitFor();
-          assert.equal(
-            await theme.locator(`[data-theme=${mode}]`).getAttribute("aria-checked"),
-            "true",
-          );
-          await shot({ page, name: `theme-menu-${mode}` });
-          await theme.locator("[data-theme=system]").click();
-          await page.getByRole("button", { name: "Colour theme" }).click();
-          assert.equal(
-            await theme.locator("[data-theme=system]").getAttribute("aria-checked"),
-            "true",
-          );
+          const html = page.locator("html");
+          const other = mode === "dark" ? "light" : "dark";
+          assert.equal(await html.getAttribute("class"), mode);
+          const toggle = page.getByRole("button", { name: "Switch colour theme" });
+          await toggle.click();
+          await page.waitForFunction((next) => document.documentElement.className === next, other);
+          assert.equal(await page.evaluate(() => localStorage.getItem("theme")), other);
+          await shot({ page, name: `theme-toggle-${other}` });
+          await toggle.click();
+          await page.waitForFunction((back) => document.documentElement.className === back, mode);
+          await page.reload();
+          assert.equal(await html.getAttribute("class"), mode);
         } finally {
           await context.close();
         }

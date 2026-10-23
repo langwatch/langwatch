@@ -20,7 +20,7 @@ CSS or images.
 - Responsive WebP imagery, intrinsic dimensions, and short video replacements
   for the three referenced prompt GIFs. Keep playback optional and respect motion
   preferences.
-- Scoped, bounded offline caches and deliberate prefetch with save-data guards.
+- Deliberate prefetch with save-data guards. No service worker or offline mode.
   Native Haven hosting supports `/docs` without capturing other app requests.
 - Content-addressed Brotli/gzip variants for the complete search index. Native
   hosting negotiates those variants and preserves video Range requests.

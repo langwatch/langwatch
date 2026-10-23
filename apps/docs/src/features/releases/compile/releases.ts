@@ -5,7 +5,11 @@ import { Temporal } from "@langwatch/time";
 
 import { releaseSchema, type Release } from "../model/release.ts";
 
-export const RELEASES_SLUG = "self-hosting/releases";
+export const RELEASES_SLUG = "changelog";
+const PUBLISHED = 5;
+const WHATS_NEW = 3;
+const WHATS_NEW_TAG = /^<WhatsNew\s*\/>\s*$/m;
+const NOTES_TAG = /^<ReleaseNotes\s*\/>\s*$/m;
 const cache = new Map<string, { modified: number; entries: Release[] }>();
 
 /** The repository CHANGELOG.md beside the docs root. */
@@ -25,7 +29,16 @@ function summaryOf({ body }: { body: string }) {
     .replace(/^[a-z]/, (letter) => letter.toUpperCase());
 }
 
-/** The two newest well-formed releases; malformed entries are skipped. */
+/* "([#12](…)) ([abc1234](…/commit/…))": the pull request already leads to the commit. */
+const COMMIT_BESIDE_PULL_REQUEST =
+  /(\(\[#\d+\]\([^)\s]+\)\)) \(\[[0-9a-f]{7,40}\]\([^)\s]+\/commit\/[0-9a-f]+\)\)/g;
+
+/** A release's notes without the commit links that repeat a linked pull request. */
+function compactNotes({ body }: { body: string }) {
+  return body.replace(COMMIT_BESIDE_PULL_REQUEST, "$1");
+}
+
+/** The newest well-formed releases; malformed entries are skipped. */
 export function parseReleases({ source }: { source: string }): Release[] {
   const headings = [
     ...source.matchAll(/^## \[([^\]]+)\]\(([^)]+)\) \((\d{4}-\d{2}-\d{2})\)\s*$/gm),
@@ -33,9 +46,11 @@ export function parseReleases({ source }: { source: string }): Release[] {
   return headings
     .flatMap((heading, index) => {
       const [, version, compare, date] = heading;
-      const body = source
-        .slice((heading.index ?? 0) + heading[0].length, headings[index + 1]?.index)
-        .trim();
+      const body = compactNotes({
+        body: source
+          .slice((heading.index ?? 0) + heading[0].length, headings[index + 1]?.index)
+          .trim(),
+      });
       const result = releaseSchema.safeParse({
         version,
         compare,
@@ -57,7 +72,23 @@ export function parseReleases({ source }: { source: string }): Release[] {
         },
       ];
     })
-    .slice(0, 2);
+    .slice(0, PUBLISHED);
+}
+
+const escapeMdx = ({ text }: { text: string }) =>
+  text.replace(/[{}<>]/g, (character) => `&#${character.charCodeAt(0)};`);
+
+/** A page's `<WhatsNew />` tag as a short list of the newest releases. */
+function whatsNew({ entries }: { entries: Release[] }) {
+  if (!entries.length) return "";
+  const items = entries
+    .slice(0, WHATS_NEW)
+    .map(
+      ({ version, label, summary, href }) =>
+        `- [v${version}](${href}) ${label}: ${escapeMdx({ text: summary })}`,
+    )
+    .join("\n");
+  return `## What’s new\n\n<div className="docs-whats-new">\n\n${items}\n\n</div>\n\n[Read the changelog](/${RELEASES_SLUG})\n`;
 }
 
 export function readReleases({ docsRoot }: { docsRoot: string }) {
@@ -71,7 +102,7 @@ export function readReleases({ docsRoot }: { docsRoot: string }) {
   return entries;
 }
 
-/** Injects the newest releases above the authored releases page; other pages pass through. */
+/** Fills the changelog's `<ReleaseNotes />` tag (else its top) and any `<WhatsNew />` tag. */
 export function withReleaseNotes({
   source,
   slug,
@@ -81,15 +112,19 @@ export function withReleaseNotes({
   slug: string;
   docsRoot: string;
 }) {
-  if (slug !== RELEASES_SLUG) return source;
+  if (slug !== RELEASES_SLUG) {
+    if (!WHATS_NEW_TAG.test(source)) return source;
+    return source.replace(WHATS_NEW_TAG, () => whatsNew({ entries: readReleases({ docsRoot }) }));
+  }
   const entries = readReleases({ docsRoot });
-  if (!entries.length) return source;
+  if (!entries.length) return source.replace(NOTES_TAG, "");
   const notes = entries
     .map(
       ({ version, label, body, compare }) =>
-        `## Release v${version}\n\nReleased ${label}. [Compare changes](${compare}).\n\n${body.replace(/[{}<>]/g, (character) => `&#${character.charCodeAt(0)};`)}\n`,
+        `## Release v${version}\n\nReleased ${label}. [Compare changes](${compare}).\n\n${escapeMdx({ text: body })}\n`,
     )
     .join("\n");
+  if (NOTES_TAG.test(source)) return source.replace(NOTES_TAG, () => notes);
   const frontmatter = source.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n/)?.[0] ?? "";
   return `${frontmatter}\n${notes}\n${source.slice(frontmatter.length)}`;
 }

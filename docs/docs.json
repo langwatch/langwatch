@@ -40,8 +40,8 @@
   "errors": {
     "404": {
       "redirect": false,
-      "title": "That page has moved or been retired",
-      "description": "Search above for what you were looking for, or start from the [introduction](/introduction). If a link on our own site sent you here, [tell us](/support) so we can fix it."
+      "title": "Page not found",
+      "description": "Most moved pages redirect on their own. If one of our own links sent you here, report it and we will fix it."
     }
   },
   "markdown": {
@@ -93,7 +93,8 @@
                 ]
               },
               "integration/cli",
-              "integration/mcp"
+              "integration/mcp",
+              "changelog"
             ]
           },
           {
@@ -375,7 +376,7 @@
               },
               {
                 "group": "TypeScript",
-                "icon": "square-js",
+                "icon": "typescript",
                 "pages": [
                   "integration/typescript/guide",
                   "integration/typescript/reference",
@@ -389,7 +390,7 @@
               },
               {
                 "group": "Go",
-                "icon": "golang",
+                "icon": "/images/logos/golang.svg",
                 "pages": [
                   "integration/go/guide",
                   "integration/go/reference"
@@ -653,9 +654,23 @@
               },
               {
                 "group": "TypeScript",
-                "icon": "square-js",
+                "icon": "typescript",
                 "pages": [
                   "ai-gateway/sdks/typescript"
+                ]
+              },
+              {
+                "group": "Go SDK",
+                "icon": "/images/logos/golang.svg",
+                "pages": [
+                  "ai-gateway/sdks/go"
+                ]
+              },
+              {
+                "group": "HTTP and other clients",
+                "icon": "globe",
+                "pages": [
+                  "ai-gateway/sdks/http"
                 ]
               }
             ]

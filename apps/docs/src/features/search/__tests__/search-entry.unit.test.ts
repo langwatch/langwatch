@@ -60,6 +60,7 @@ describe("when a reader searches the loaded index", () => {
       title: "A",
       section: "",
       description: "",
+      icon: "",
       trail: "",
       body: "",
       headings: [],

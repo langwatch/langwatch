@@ -84,6 +84,14 @@ Feature: Generate documentation data from authored sources
     And the entry contains its title, description, nested navigation trail and heading anchors
 
   @unit
+  Scenario: Give each search result its page's icon
+    Given pages with their own icon, pages whose group has one and pages with only a section icon
+    When the search index is published
+    Then each entry names the page's own icon, else its innermost group's, else its section's
+    And a bundled icon's drawing is written once, on the first entry naming it
+    And a page with no icon at any level names none, and its result shows the generic page icon
+
+  @unit
   Scenario: Detect broken local links and fragments
     Given a build contains pages, redirects and links
     When its links are checked

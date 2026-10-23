@@ -21,7 +21,8 @@ function closeSearch() {
   root.render(null);
   if (opener?.isConnected) opener.focus({ preventScroll: true });
 }
-function openSearch() {
+/** Opens the bar, prefilled with `query` (a trigger's `data-docs-search-query`) when given. */
+function openSearch({ query = "" }: { query?: string } = {}) {
   if (open) return;
   open = true;
   opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -30,14 +31,22 @@ function openSearch() {
       <SearchSurface onClose={closeSearch}>
         <DialogTitle className="docs-sr-only">Search the LangWatch docs</DialogTitle>
         <SearchFallback>
-          <SearchContent close={closeSearch} />
+          <SearchContent close={closeSearch} initialQuery={query} />
         </SearchFallback>
       </SearchSurface>
     </SystemProvider>,
   );
 }
 document.addEventListener("click", (event) => {
-  if (event.target instanceof Element && event.target.closest("[data-docs-search]")) openSearch();
+  const trigger =
+    event.target instanceof Element
+      ? event.target.closest<HTMLElement>("[data-docs-search]")
+      : null;
+  if (trigger) openSearch({ query: trigger.dataset.docsSearchQuery });
 });
-document.addEventListener("docs:search", openSearch);
+document.addEventListener("keydown", (event) => {
+  if ((event.metaKey || event.ctrlKey) && /^k$/i.test(event.key)) openSearch();
+});
+/* A shortcut pressed while this island was still loading opens it now. */
+if ((window as { docsSearchKey?: number }).docsSearchKey) openSearch();
 document.addEventListener("docs:leaving", closeSearch);

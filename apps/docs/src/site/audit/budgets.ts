@@ -4,6 +4,8 @@ import { z } from "zod";
 
 export const CATEGORIES = ["performance", "accessibility", "best-practices", "seo"] as const;
 export const FORM_FACTORS = ["mobile", "desktop"] as const;
+/** Lighthouse's experimental checks for AI agents: reported beside the scores, never gated. */
+export const AGENTIC_CATEGORY = "agentic-browsing";
 
 const category = z.enum(CATEGORIES);
 const formFactor = z.enum(FORM_FACTORS);
@@ -82,6 +84,11 @@ export const auditRunSchema = z.object({
   }),
   transferBytes: z.number().nullable(),
   requests: z.number().nullable(),
+  /** Agentic browsing checks that apply to the page, and the ids of those that failed. */
+  agentic: z
+    .object({ passed: z.number(), applicable: z.number(), failed: z.array(z.string()) })
+    .nullable()
+    .default(null),
   failingAudits: z.array(failingAudit),
   opportunities: z.array(
     z.object({

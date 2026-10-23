@@ -15,7 +15,7 @@ import { withTemporaryDirectory } from "./temporary-directory.ts";
 import { createViteConfig } from "./vite-config.ts";
 
 /* Client build, then an SSR bundle of prerender.ts that renders every page into the client
-   output and writes the service worker. The bundle lives in this build's own temporary
+   output and versions them by content. The bundle lives in this build's own temporary
    directory; a node_modules link there lets its external imports (react, shiki) resolve. */
 const { outDir, basePath, renderWorkers, renderCache } = readBuildOptions();
 const run = promisify(execFile);

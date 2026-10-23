@@ -15,6 +15,52 @@ function escapeCell(text: string) {
   return text.replaceAll("|", "\\|").replaceAll("\n", " ");
 }
 
+/** One row per page and device, then the agentic checks that failed anywhere. */
+function runTable({ runs }: { runs: AuditRun[] }) {
+  const header = [
+    "Page",
+    "Device",
+    ...CATEGORIES.map((category) => LABELS[category]),
+    "FCP",
+    "LCP",
+    "TBT",
+    "CLS",
+    "Speed Index",
+    "Transfer",
+    "Requests",
+    "Agents",
+  ];
+  const rows = runs.map((run) => [
+    `\`${run.path}\``,
+    run.formFactor,
+    ...CATEGORIES.map((category) => formatScore(run.scores[category])),
+    milliseconds(run.metrics.firstContentfulPaint),
+    milliseconds(run.metrics.largestContentfulPaint),
+    milliseconds(run.metrics.totalBlockingTime),
+    run.metrics.cumulativeLayoutShift === null
+      ? "n/a"
+      : run.metrics.cumulativeLayoutShift.toFixed(3),
+    milliseconds(run.metrics.speedIndex),
+    kilobytes(run.transferBytes),
+    run.requests === null ? "n/a" : String(run.requests),
+    run.agentic ? `${run.agentic.passed}/${run.agentic.applicable}` : "n/a",
+  ]);
+  const agentic = [
+    ...new Set(runs.flatMap((run) => (run.agentic?.failed ?? []).map((id) => `\`${id}\``))),
+  ];
+  const table = [
+    `| ${header.join(" | ")} |`,
+    `| ${header.map(() => "---").join(" | ")} |`,
+    ...rows.map((row) => `| ${row.join(" | ")} |`),
+  ];
+  if (agentic.length === 0) return table;
+  return [
+    ...table,
+    "",
+    `Agents is Lighthouse's experimental agentic browsing checklist, reported and never gated; failing: ${agentic.join(", ")}.`,
+  ];
+}
+
 /** The audit as Markdown: one row per page and device, then every failure and note. */
 export function summaryMarkdown({
   runs,
@@ -32,44 +78,12 @@ export function summaryMarkdown({
   /** New agent readiness gaps; their section follows this summary. */
   agentFailures?: number;
 }) {
-  const header = [
-    "Page",
-    "Device",
-    ...CATEGORIES.map((category) => LABELS[category]),
-    "FCP",
-    "LCP",
-    "TBT",
-    "CLS",
-    "Speed Index",
-    "Transfer",
-    "Requests",
-  ];
-  const rows = runs.map((run) => [
-    `\`${run.path}\``,
-    run.formFactor,
-    ...CATEGORIES.map((category) => formatScore(run.scores[category])),
-    milliseconds(run.metrics.firstContentfulPaint),
-    milliseconds(run.metrics.largestContentfulPaint),
-    milliseconds(run.metrics.totalBlockingTime),
-    run.metrics.cumulativeLayoutShift === null
-      ? "n/a"
-      : run.metrics.cumulativeLayoutShift.toFixed(3),
-    milliseconds(run.metrics.speedIndex),
-    kilobytes(run.transferBytes),
-    run.requests === null ? "n/a" : String(run.requests),
-  ]);
   const lines = [
     `## Docs audit: ${failures.length + seo.failures.length + agentFailures === 0 ? "passed" : "failed"}`,
     "",
     `Lighthouse on ${runs.length} page runs in ${Math.round(wallClockMs / 1000)} s; static checks on ${seo.pages} pages (${seo.known} known gaps tolerated).`,
   ];
-  if (rows.length > 0)
-    lines.push(
-      "",
-      `| ${header.join(" | ")} |`,
-      `| ${header.map(() => "---").join(" | ")} |`,
-      ...rows.map((row) => `| ${row.join(" | ")} |`),
-    );
+  if (runs.length > 0) lines.push("", ...runTable({ runs }));
   if (failures.length > 0) {
     lines.push("", "### Budget failures", "");
     for (const finding of failures)

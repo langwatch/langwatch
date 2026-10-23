@@ -33,8 +33,11 @@ function CopyPageMenu({
             variant="outline"
             colorPalette="gray"
             size="sm"
-            height={{ base: "44px", xl: "34px" }}
-            minHeight={{ base: "44px", xl: "34px" }}
+            height="32px"
+            minHeight="32px"
+            paddingX="2.5"
+            gap="1.5"
+            fontSize="13px"
             data-docs-page-copy={slug}
             aria-keyshortcuts="Alt+Shift+C"
             title="Copy page as Markdown (Alt+Shift+C)"
@@ -50,9 +53,9 @@ function CopyPageMenu({
             }
           >
             {state === "copied" ? (
-              <Check size={16} aria-hidden="true" />
+              <Check size={14} aria-hidden="true" />
             ) : (
-              <Copy size={16} aria-hidden="true" />
+              <Copy size={14} aria-hidden="true" />
             )}
             {state === "copied" ? "Copied" : "Copy page"}
           </Button>
@@ -75,21 +78,30 @@ function CopyPageMenu({
   );
 }
 
+/** A quiet mono path, as an engineer reads a file location: section, then group. */
 function Breadcrumb({ trail }: { trail: string[] }) {
+  const parts = trail.filter((part, index) => part && part !== trail[index - 1]);
   return (
     <Text
       as="nav"
       aria-label="Breadcrumb"
+      className="docs-path"
       fontFamily="mono"
       fontSize="12px"
       lineHeight="20px"
-      letterSpacing="0.08em"
-      textTransform="uppercase"
-      color="accent.fg"
-      fontWeight="500"
+      color="docs.lede"
       margin="0"
     >
-      {trail.at(-1)}
+      {parts.map((part, index) => (
+        <Box as="span" key={part} color={index === parts.length - 1 ? "fg" : void 0}>
+          {index > 0 ? (
+            <Box as="span" className="docs-path-sep" aria-hidden="true">
+              /
+            </Box>
+          ) : null}
+          {part}
+        </Box>
+      ))}
     </Text>
   );
 }
@@ -99,6 +111,7 @@ export function PageHeader({
   title,
   description,
   breadcrumb,
+  kind,
   tag = "",
   actions = [],
 }: {

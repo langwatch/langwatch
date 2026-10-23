@@ -25,7 +25,7 @@ export async function assertAgentSetup({ page, base, prompt }) {
   }
   await setup.locator("summary").filter({ hasText: "View full prompt" }).click();
   const fullPrompt = setup.getByLabel("Full setup prompt");
-  assert.ok(await fullPrompt.isVisible());
+  await fullPrompt.waitFor();
   assert.equal(await fullPrompt.textContent(), prompt);
   await setup.locator("summary").filter({ hasText: "View full prompt" }).click();
   await setup.getByRole("button", { name: "Copy setup prompt" }).click();
@@ -99,7 +99,7 @@ export async function assertStaticDiagrams({ browser, base }) {
     assert.ok((await page.locator(".docs-mermaid .docs-dark-only svg").count()) > 0);
     const diagram = page.getByRole("figure", { name: /Diagram/ }).first();
     await diagram.locator("summary").click();
-    assert.ok(await diagram.locator("pre").isVisible());
+    await diagram.locator("pre").waitFor({ state: "visible" });
     assert.match(await diagram.locator("pre").textContent(), /graph|flowchart|sequenceDiagram/);
   } finally {
     await context.close();

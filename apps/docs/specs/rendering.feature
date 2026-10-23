@@ -28,6 +28,45 @@ Feature: Read and navigate the generated documentation
     Then the server returns a 404 page in the documentation shell
     And the reader can open search or follow a starting-point link
 
+  @unit
+  Scenario: Suggest the closest pages for a missing address
+    Given no redirect matches a missing address such as "/integration/pyhton/langchain"
+    When the reader opens it
+    Then the 404 page lists the closest pages, best first and navigation order on ties
+    And a misspelt word still matches its page
+    And an address with no recognisable word lists no suggestions
+
+  @unit
+  Scenario: Mark a missing address with the section it sits in
+    Given a missing address under a section's path, such as "/api-reference/retired-endpoint"
+    When the reader opens it
+    Then the 404 page is marked with that section, even when no page title matches
+    And an address under no section's path takes the section of its closest page
+    And an address with neither carries no section
+
+  @unit
+  Scenario: Act out a miss in the way of its section
+    Given a missing address under API reference, SDK and integration, CLI, skills, coding agent, AI gateway, self-hosting or changelog pages
+    Then the 404 page is a Langy Code terminal session that fails to fetch the address
+    Given a missing address under a product guide, such as evaluations, agent testing, prompts, datasets, Langy or governance
+    Then the 404 page is a trace of the page request whose page_exists evaluation fails
+    Given any other missing address, or one with no section
+    Then the 404 page shows a castle whose one turret is the LangWatch mark
+    And each scene offers the three closest pages as numbered links
+
+  @unit
+  Scenario: Search from the 404 page with the missing address's words
+    When the reader types in the scene's input or presses "/"
+    Then the search bar opens, filled with the words of the missing address
+
+  @e2e
+  Scenario: Show the scene and closest pages for a missing address
+    Given the built site served with a 404 status for unknown addresses
+    When a reader opens a missing API reference address and a missing product guide address
+    Then each page is marked noindex, shows the terminal or the trace, and links to its closest pages
+    And pressing 1 opens the first of them
+    And the page has one h1, the rail of ways out, and no sideways scroll at 390 pixels
+
   @e2e
   Scenario: Inspect an API request before sending
     Given a reader opens Try it on an authenticated endpoint

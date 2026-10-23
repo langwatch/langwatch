@@ -19,23 +19,22 @@ export function SearchSurface({ onClose, children }: { onClose: () => void; chil
     >
       <Portal>
         <RawDialog.Backdrop
-          backdropFilter="blur(12px) saturate(1.05)"
-          background="transparent"
+          backdropFilter="blur(2px)"
+          background={{ base: "docs.primaryText/30", _dark: "black/60" }}
           data-lw-transparent-backdrop="true"
         />
         <RawDialog.Positioner>
           <RawDialog.Content
-            background="bg.overlay"
+            background="docs.raised"
             width={{ base: "calc(100vw - 24px)", md: "680px" }}
             maxWidth="680px"
             marginTop={{ base: "8vh", md: "12vh" }}
             padding={0}
             overflow="hidden"
             borderWidth="1px"
-            borderColor="border.subtle"
+            borderColor={{ base: "border", _dark: "border.emphasized/50" }}
             borderRadius={{ base: "18px", md: "20px" }}
-            boxShadow="0 2px 8px rgba(20, 20, 23, 0.08), 0 24px 70px -20px rgba(20, 20, 23, 0.35)"
-            backdropFilter="blur(20px) saturate(1.15)"
+            boxShadow="0 2px 8px {colors.docs.shadow}, 0 28px 80px -16px {colors.docs.shadowStrong}"
             style={{
               opacity: 1,
               transition: reduceMotion

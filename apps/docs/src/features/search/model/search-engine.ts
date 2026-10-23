@@ -10,6 +10,7 @@ export type IndexedEntry = {
   section: string;
   description: string;
   trail: string;
+  icon: string;
   headings: Heading[];
   match: {
     title: string;
@@ -25,6 +26,8 @@ export type SearchIndex = {
   entries: IndexedEntry[];
   vocabulary: string[];
   postings: number[][];
+  /** Each named icon's SVG body, as published on the first page naming it. */
+  glyphs: Map<string, string>;
   /** Pages whose article has a word containing a term, filled as terms are first searched. */
   pagesWith: Map<string, Set<number>>;
 };
@@ -66,6 +69,7 @@ function indexedEntry({ value }: { value: unknown }): IndexedEntry {
     section:
       record.section === undefined ? impliedSection({ trail }) : text({ value: record.section }),
     trail,
+    icon: text({ value: record.icon, optional: true }),
     headings: headings.map((heading) => headingOf({ value: heading })),
   };
   const title = entry.title.toLowerCase();
@@ -115,9 +119,18 @@ function readTerms({
 /** The published search-index.json, checked and decoded; anything malformed throws. */
 export function decodeSearchIndex({ data }: { data: unknown }): SearchIndex {
   if (!Array.isArray(data)) throw new MalformedIndexError();
-  const index: SearchIndex = { entries: [], vocabulary: [], postings: [], pagesWith: new Map() };
+  const index: SearchIndex = {
+    entries: [],
+    vocabulary: [],
+    postings: [],
+    glyphs: new Map(),
+    pagesWith: new Map(),
+  };
   data.forEach((value: unknown, position) => {
-    index.entries.push(indexedEntry({ value }));
+    const entry = indexedEntry({ value });
+    index.entries.push(entry);
+    const glyph = text({ value: (value as { glyph?: unknown }).glyph, optional: true });
+    if (glyph) index.glyphs.set(entry.icon, glyph);
     readTerms({ value: value as { terms?: unknown }, position, count: data.length, index });
   });
   return index;

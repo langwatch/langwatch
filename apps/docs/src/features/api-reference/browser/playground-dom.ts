@@ -1,3 +1,4 @@
+import { slide } from "../../../lib/slide.ts";
 import { generateExample, paramKey } from "../model/codegen.ts";
 import type { RequestState } from "../model/codegen.ts";
 import { EXAMPLE_LANGUAGES } from "../model/operation.ts";
@@ -61,7 +62,7 @@ export function showErrors({ errors }: { errors: Record<string, string> }) {
 
 export function setFormOpen({ open }: { open: boolean }) {
   const form = document.querySelector<HTMLElement>("[data-docs-form]");
-  if (form) form.hidden = !open;
+  if (form) slide({ panel: form, open });
   document.getElementById("try-it-button")?.setAttribute("aria-expanded", String(open));
   if (open) {
     form?.scrollIntoView({ block: "nearest" });

@@ -42,6 +42,7 @@ function run(overrides: Partial<AuditRun> = {}): AuditRun {
     },
     transferBytes: 90_000,
     requests: 10,
+    agentic: null,
     failingAudits: [],
     opportunities: [],
     durationMs: 5000,
@@ -142,16 +143,45 @@ describe("evaluateBudgets", () => {
   });
 
   describe("when the committed budgets are read", () => {
-    it("parses them and names every page once", () => {
+    /** @scenario "Audit representative pages in a real browser" */
+    it("parses them, names every page once and holds the quality categories at 100", () => {
       const committed = readBudgets();
       const ids = committed.pages.map((page) => page.id);
       expect(new Set(ids).size).toBe(ids.length);
-      expect(committed.categories.mobile.seo).toBe(1);
+      for (const device of ["mobile", "desktop"] as const)
+        expect(committed.categories[device]).toMatchObject({
+          accessibility: 1,
+          "best-practices": 1,
+          seo: 1,
+        });
+      expect(ids).toEqual(expect.arrayContaining(["home", "guide", "api-operation", "changelog"]));
     });
   });
 });
 
 describe("summaryMarkdown", () => {
+  describe("when Lighthouse ran its agentic browsing checklist", () => {
+    /** @scenario "Report Lighthouse's agentic browsing checks without gating on them" */
+    it("shows each page's pass count and names the failing checks, without failing the audit", () => {
+      const agentic = { passed: 5, applicable: 6, failed: ["llms-txt"] };
+      const scores = { performance: 1, accessibility: 1, "best-practices": 1, seo: 1 };
+      const runs = [run({ agentic }), run({ formFactor: "desktop", scores, agentic })];
+      expect(evaluateBudgets({ runs, budgets }).failures).toEqual([]);
+      const markdown = summaryMarkdown({
+        runs,
+        failures: [],
+        notes: [],
+        seo: { pages: 1, failures: [], fixed: [], known: 0 },
+        wallClockMs: 1000,
+      });
+      expect(markdown).toContain("## Docs audit: passed");
+      expect(markdown).toContain("| 88 KB | 10 | 5/6 |");
+      expect(markdown).toContain(
+        "agentic browsing checklist, reported and never gated; failing: `llms-txt`.",
+      );
+    });
+  });
+
   describe("when the audit has runs and failures", () => {
     /** @scenario "Summarise the audit for the pull request" */
     it("tabulates each page and device and lists every failure", () => {
@@ -176,12 +206,13 @@ describe("summaryMarkdown", () => {
       });
       expect(markdown).toContain("## Docs audit: failed");
       expect(markdown).toContain(
-        "| `/` | mobile | 90 | 100 | 100 | 100 | 1000 ms | 1500 ms | 0 ms | 0.010 | 1000 ms | 88 KB | 10 |",
+        "| `/` | mobile | 90 | 100 | 100 | 100 | 1000 ms | 1500 ms | 0 ms | 0.010 | 1000 ms | 88 KB | 10 | n/a |",
       );
       expect(markdown).toContain(
-        "| `/` | desktop | 90 | 100 | 100 | 100 | 1000 ms | 1500 ms | 0 ms | 0.010 | 1000 ms | n/a | 10 |",
+        "| `/` | desktop | 90 | 100 | 100 | 100 | 1000 ms | 1500 ms | 0 ms | 0.010 | 1000 ms | n/a | 10 | n/a |",
       );
       expect(markdown).toContain("- `home` desktop: requests-over-budget, 30 requests > 20");
+      expect(markdown).not.toContain("agentic browsing checklist");
       expect(markdown).toContain("- `/a`: h1-count, 2 <h1> elements");
     });
   });

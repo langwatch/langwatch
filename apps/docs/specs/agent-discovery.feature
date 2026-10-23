@@ -30,3 +30,18 @@ Feature: Agents discover the documentation and its skills
   Scenario: Every page head links the agent discovery files
     When a page head is generated
     Then it links llms.txt, llms-full.txt, the agent card and the skills index by absolute address
+
+  @unit
+  Scenario: An agent that asks for Markdown gets the page's Markdown
+    Given a published page with its Markdown twin
+    When a request for the page's address prefers text/markdown at least as much as text/html
+    Then the preview answers with the Markdown twin as text/markdown
+    And every page response names its twin in a Link header and varies by Accept
+    But a browser asking for HTML still gets the page
+
+  @unit
+  Scenario: Serve files with the caching a production host gives them
+    When the preview serves a build
+    Then content-hashed assets may be cached for a year without asking again
+    And fonts and media for a day, revalidated in the background for a week
+    And pages, the search index and agent files are revalidated every time

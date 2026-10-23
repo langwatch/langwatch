@@ -1,21 +1,21 @@
 {
-  "$comment": "Docs audit budgets (specs/audit.feature). Scores are 0..1; bytes are transferred bytes, with room for the Latin-ext font a page may fetch late. A page override below a default names the baseline it was measured at, so a later round can raise it. knownFailures and seo.known only shrink: a new failure fails the run. Performance floors are calibrated on GitHub's ubuntu-latest runners (median of 3), which score 5 to 10 points below a laptop; raise them from the CI table after each performance round. agentReadiness.known shrinks the same way (specs/agent-readiness.feature); pageTokens counts characters / 4.",
+  "$comment": "Docs audit budgets (specs/audit.feature), run against a /docs build. Scores are 0..1; bytes are transferred bytes, with room for the Latin-ext font a page may fetch late. Accessibility, best practices and SEO hold at 100; performance floors leave room for GitHub's ubuntu-latest runners (median of 3), which score 5 to 10 points below a laptop. A page override below a default names why, so a later round can raise it. knownFailures and seo.known only shrink: a new failure fails the run. agentReadiness.known shrinks the same way (specs/agent-readiness.feature); pageTokens counts characters / 4.",
   "categories": {
     "mobile": {
-      "performance": 0.85,
-      "accessibility": 0.95,
-      "best-practices": 0.95,
+      "performance": 0.9,
+      "accessibility": 1,
+      "best-practices": 1,
       "seo": 1
     },
     "desktop": {
-      "performance": 0.92,
-      "accessibility": 0.95,
-      "best-practices": 0.95,
+      "performance": 0.95,
+      "accessibility": 1,
+      "best-practices": 1,
       "seo": 1
     }
   },
   "maxCumulativeLayoutShift": 0.02,
-  "maxTransferBytes": 760000,
+  "maxTransferBytes": 450000,
   "maxRequests": 25,
   "gatedAuditCategories": ["accessibility", "best-practices", "seo"],
   "pages": [
@@ -23,13 +23,7 @@
       "id": "home",
       "path": "/",
       "why": "The docs home and most common landing page.",
-      "categories": {
-        "mobile": {
-          "performance": 0.8
-        }
-      },
-      "maxCumulativeLayoutShift": 0.04,
-      "maxTransferBytes": 560000,
+      "categories": {},
       "knownFailures": {}
     },
     {
@@ -37,8 +31,6 @@
       "path": "/integration/quick-start",
       "why": "A guide with code blocks and tabs.",
       "categories": {},
-      "maxCumulativeLayoutShift": 0.08,
-      "maxTransferBytes": 760000,
       "knownFailures": {}
     },
     {
@@ -62,8 +54,21 @@
       "path": "/ai-governance/ingestion-sources",
       "why": "A section index page, published at the section address.",
       "categories": {},
-      "maxCumulativeLayoutShift": 0.16,
       "maxTransferBytes": 350000,
+      "knownFailures": {}
+    },
+    {
+      "id": "changelog",
+      "path": "/changelog",
+      "why": "The changelog: the newest releases injected at build time, a long page of short entries.",
+      "categories": {},
+      "knownFailures": {}
+    },
+    {
+      "id": "skills",
+      "path": "/skills/directory",
+      "why": "A skills page with prompt cards whose bodies load as fragments.",
+      "categories": {},
       "knownFailures": {}
     },
     {
@@ -75,11 +80,9 @@
           "seo": 0.5
         },
         "desktop": {
-          "seo": 0.5,
-          "accessibility": 0.94
+          "seo": 0.5
         }
       },
-      "maxTransferBytes": 660000,
       "knownFailures": {
         "is-crawlable": "Deliberate: the not-found page is noindex.",
         "meta-description": "The not-found page has no description; it is never indexed."
@@ -218,6 +221,7 @@
         "integration/go/guide"
       ],
       "exclude": [
+        "ai-gateway/sdks/http",
         "dspy-visualization/custom-optimizer",
         "dspy-visualization/rag-visualization",
         "integration/custom-models",
@@ -258,7 +262,6 @@
         "/integration/python/reference",
         "/integration/typescript/reference",
         "/self-hosting/configuration/environment-variables",
-        "/self-hosting/releases",
         "/self-hosting/upgrade"
       ]
     }

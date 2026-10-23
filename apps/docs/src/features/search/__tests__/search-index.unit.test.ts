@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { publishSearchIndex, searchEntry, searchTrail } from "../compile/search-index.ts";
+import { pageIcon, publishSearchIndex, searchEntry, searchTrail } from "../compile/search-index.ts";
+import { decodeSearchIndex } from "../model/search-engine.ts";
 
 describe("when a rendered page includes shell text and nested navigation", () => {
   /** @scenario "Index API reference content" */
@@ -126,5 +127,77 @@ describe("when the build publishes the rendered entries", () => {
     }));
     const articleBytes = entries.reduce((sum, entry) => sum + entry.body.length, 0);
     expect(publishSearchIndex({ entries }).length).toBeLessThan(articleBytes / 10);
+  });
+});
+
+describe("when pages carry icons at different levels", () => {
+  const page = (title: string, icon?: string) => ({
+    title,
+    description: "",
+    ...(icon ? { icon } : {}),
+  });
+  const nav = {
+    pages: {
+      own: page("Own", "rocket"),
+      grouped: page("Grouped"),
+      sectioned: page("Sectioned"),
+      bare: page("Bare"),
+    },
+    anchors: [
+      {
+        title: "Guides",
+        icon: "book",
+        children: [
+          { type: "page", slug: "sectioned", title: "Sectioned" },
+          {
+            type: "group",
+            title: "Outer",
+            icon: "/images/logos/golang.svg",
+            children: [
+              {
+                type: "group",
+                title: "Inner",
+                children: [
+                  { type: "page", slug: "own", title: "Own" },
+                  { type: "page", slug: "grouped", title: "Grouped" },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      { title: "Other", children: [{ type: "page", slug: "bare", title: "Bare" }] },
+    ],
+  } satisfies Parameters<typeof searchEntry>[0]["nav"];
+  const entry = (slug: string) =>
+    searchEntry({ nav, slug, html: "<article></article>", headings: [] });
+
+  /** @scenario "Give each search result its page's icon" */
+  it("names the page's own icon, else its innermost group's with one, else its section's", () => {
+    expect(pageIcon({ nav, slug: "own" })).toBe("rocket");
+    expect(pageIcon({ nav, slug: "grouped" })).toBe("/images/logos/golang.svg");
+    expect(pageIcon({ nav, slug: "sectioned" })).toBe("book");
+    expect(entry("bare")).not.toHaveProperty("icon");
+  });
+
+  /** @scenario "Give each search result its page's icon" */
+  it("writes a bundled icon's drawing once, and the browser reads it for every page naming it", () => {
+    const published = JSON.parse(
+      publishSearchIndex({
+        entries: ["own", "sectioned", "grouped", "bare"].map(entry).concat(entry("own")),
+      }),
+    );
+    expect(published.map((value: { icon?: string }) => value.icon)).toEqual([
+      "rocket",
+      "book",
+      "/images/logos/golang.svg",
+      undefined,
+      "rocket",
+    ]);
+    expect(published.filter((value: { glyph?: string }) => value.glyph)).toHaveLength(2);
+    expect(published[0].glyph).toMatch(/^<path d="[^"]+"\/>/);
+    const index = decodeSearchIndex({ data: published });
+    expect(index.glyphs.get(index.entries[4].icon)).toBe(published[0].glyph);
+    expect(index.entries[3].icon).toBe("");
   });
 });

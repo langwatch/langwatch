@@ -7,6 +7,8 @@ export const searchEntrySchema = z.object({
   title: z.string(),
   section: z.string(),
   description: z.string(),
+  /** An icon name or image path: the page's own, else its group's, else its section's. */
+  icon: z._default(z.string(), ""),
   trail: z._default(z.string(), ""),
   body: z._default(z.string(), ""),
   headings: z.array(z.object({ id: z.string(), text: z.string() })),

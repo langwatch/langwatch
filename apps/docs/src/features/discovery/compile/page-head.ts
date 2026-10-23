@@ -154,6 +154,56 @@ function organizationData({ organization }: { organization: Organization }) {
   };
 }
 
+/** The organization's X account, from the profile it lists, as "@handle". */
+function twitterHandle({ organization }: { organization: Organization | null }) {
+  const profile = organization?.sameAs.find((link) =>
+    /^https:\/\/(x|twitter)\.com\/[A-Za-z0-9_]+\/?$/.test(link),
+  );
+  return profile ? `@${profile.replace(/\/$/, "").split("/").at(-1)}` : null;
+}
+
+/** The page's own structured data: a technical article, or the docs home as a web page. */
+function pageData({
+  url,
+  title,
+  description,
+  modified,
+  image,
+  article,
+  settings,
+}: {
+  url: string;
+  title: string;
+  description: string;
+  modified: string | undefined;
+  image: string;
+  article: boolean;
+  settings: HeadSettings;
+}) {
+  const publisher = settings.organization
+    ? organizationData({ organization: settings.organization })
+    : null;
+  return {
+    "@context": "https://schema.org",
+    "@type": article ? "TechArticle" : "WebPage",
+    "@id": url,
+    url,
+    name: title,
+    ...(article ? { headline: title, mainEntityOfPage: url } : {}),
+    ...(description ? { description } : {}),
+    inLanguage: "en",
+    image,
+    ...(modified ? { dateModified: modified } : {}),
+    ...(article && publisher ? { author: publisher, publisher } : {}),
+    isPartOf: {
+      "@type": "WebSite",
+      name: "LangWatch documentation",
+      url: docsUrl({ path: "/introduction" }),
+      ...(publisher ? { publisher } : {}),
+    },
+  };
+}
+
 export function pageHead({
   slug,
   title,
@@ -174,6 +224,8 @@ export function pageHead({
   const description = trimDescription({ text: authored || settings.description });
   const modified = settings.dates.get(slug);
   const image = docsUrl({ path: "/images/coding-agents/optimized/session-detail-1560.webp" });
+  const article = slug !== "introduction";
+  const handle = twitterHandle({ organization: settings.organization });
   const tags = [
     `<title>${escapeAttribute(documentTitle({ title }))}</title>`,
     `<link rel="canonical" href="${escapeAttribute(url)}">`,
@@ -184,13 +236,17 @@ export function pageHead({
       (path) =>
         `<link rel="preload" href="${sitePath({ path })}" as="font" type="font/woff2" crossorigin>`,
     ),
-    '<meta property="og:type" content="website">',
+    `<meta property="og:type" content="${article ? "article" : "website"}">`,
+    ...(article && modified
+      ? [`<meta property="article:modified_time" content="${escapeAttribute(modified)}">`]
+      : []),
     '<meta property="og:site_name" content="LangWatch documentation">',
     `<meta property="og:title" content="${escapeAttribute(documentTitle({ title }))}">`,
     `<meta property="og:url" content="${escapeAttribute(url)}">`,
     `<meta property="og:image" content="${image}">`,
     '<meta property="og:image:alt" content="A coding-agent session in LangWatch">',
     '<meta name="twitter:card" content="summary_large_image">',
+    ...(handle ? [`<meta name="twitter:site" content="${escapeAttribute(handle)}">`] : []),
     `<meta name="twitter:title" content="${escapeAttribute(documentTitle({ title }))}">`,
     `<meta name="twitter:image" content="${image}">`,
   ];
@@ -203,23 +259,7 @@ export function pageHead({
       tags.push(`<meta ${attribute} content="${escapeAttribute(description)}">`);
     }
   }
-  const data = {
-    "@context": "https://schema.org",
-    "@type": "WebPage",
-    "@id": url,
-    url,
-    name: title,
-    ...(description ? { description } : {}),
-    ...(modified ? { dateModified: modified } : {}),
-    isPartOf: {
-      "@type": "WebSite",
-      name: "LangWatch documentation",
-      url: docsUrl({ path: "/introduction" }),
-      ...(settings.organization
-        ? { publisher: organizationData({ organization: settings.organization }) }
-        : {}),
-    },
-  };
+  const data = pageData({ url, title, description, modified, image, article, settings });
   tags.push(jsonLd({ data }));
   if (production && settings.tagManager)
     tags.push(`<meta name="docs-gtm" content="${escapeAttribute(settings.tagManager)}">`);

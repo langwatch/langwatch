@@ -21,6 +21,8 @@ title: Integrations
 />
 <Card title="Guide" icon="book" href="/frameworks/plain" />
 <Card title="Screenshot" icon="/images/screens/plain.png" href="/frameworks/plain" />
+<Card title="Cursor" icon="/images/logos/cursor.svg" href="/providers/python" />
+<Card title="Quickstart" icon="rocket" href="/providers/python" />
 `;
 
 function integrationFixture({ root }: { root: string }) {
@@ -101,6 +103,17 @@ describe("when integration groups carry roots, expansion and overview card logos
       expect(frameworks.icon).toBeUndefined();
       expect(openai.icon).toBe("/images/logos/openai.svg");
       expect(python.icon).toBe("python");
+    } finally {
+      fixture.dispose();
+    }
+  });
+
+  /** @scenario "Brand a page only with the logo every card linking to it shows" */
+  it("gives no logo to a page whose linking cards disagree on its icon", () => {
+    const fixture = integrationFixture({ root: "overview" });
+    try {
+      const nav = buildNav({ docsRoot: fixture.docsRoot });
+      expect(nav.pages["providers/python"].logo).toBe("");
     } finally {
       fixture.dispose();
     }

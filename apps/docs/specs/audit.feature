@@ -45,7 +45,23 @@ Feature: Audit the built documentation for search, agents and page quality
   @e2e
   Scenario: Audit representative pages in a real browser
     Given a production build served under /docs with compressed responses, as a CDN serves it
-    When the audit runs Lighthouse on the home page, a guide with code and tabs, a long page with diagrams and images, an API operation, a section index and the not-found page
-    Then each runs on mobile and desktop, a few at a time
+    When the audit runs Lighthouse on the home page, a guide with code and tabs, a long page with diagrams and images, an API operation, a section index, the changelog, a skills page and the not-found page
+    Then each runs on mobile, emulated with a slow network and CPU, and on desktop, a few at a time
+    And accessibility, best practices and search score 100 on every page but the not-found page's search score
     And Markdown exports are served as text/markdown
     And the run fails when any budget or static check fails
+
+  @unit
+  Scenario: Refuse to audit a build made for another mount
+    Given a build made for the site root
+    When the audit is asked to read it under /docs
+    Then it stops before any check and names the base path the build was made for
+    And it says how to build for the mount it was asked to read
+
+  @unit
+  Scenario: Report Lighthouse's agentic browsing checks without gating on them
+    Given Lighthouse ran its experimental agentic browsing checklist on a page
+    When the summary is written
+    Then each page and device shows how many of the checks that apply passed
+    And the failing checks are named once
+    But they never fail the audit, because the checklist is still changing

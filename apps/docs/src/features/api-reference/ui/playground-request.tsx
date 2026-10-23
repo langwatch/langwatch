@@ -153,6 +153,7 @@ function AuthField({
   return (
     <chakra.details
       open
+      className="docs-disclosure"
       css={{
         "& > summary": {
           cursor: "pointer",
@@ -361,6 +362,7 @@ function ParameterFields({
       ) : null}
       {deprecated.length > 0 ? (
         <chakra.details
+          className="docs-disclosure"
           css={{
             "& > summary": {
               cursor: "pointer",

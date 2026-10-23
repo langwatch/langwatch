@@ -4,13 +4,12 @@ import { createRoot } from "react-dom/client";
 import { docsMenuSystem } from "../../../app/island-theme.ts";
 import { contextualOptions } from "../../navigation/model/nav.ts";
 import { PageMenu } from "../ui/page-menu.tsx";
-import { ThemeMenu } from "../ui/theme-menu.tsx";
 
 const roots = new Map<HTMLElement, ReturnType<typeof createRoot>>();
 document.addEventListener("click", (event) => {
   const trigger =
     event.target instanceof Element
-      ? event.target.closest("[data-docs-page-menu], [data-docs-theme]")
+      ? event.target.closest("[data-docs-page-menu]")
       : null;
   const container = trigger?.closest<HTMLElement>("[data-docs-menu-root]");
   if (!container || roots.has(container)) return;
@@ -19,15 +18,11 @@ document.addEventListener("click", (event) => {
   container.dataset.mounted = "true";
   root.render(
     <SystemProvider system={docsMenuSystem}>
-      {container.dataset.docsMenuRoot === "theme" ? (
-        <ThemeMenu initialOpen />
-      ) : (
-        <PageMenu
-          slug={container.dataset.slug ?? "introduction"}
-          actions={contextualOptions({ options: (container.dataset.actions ?? "").split(" ") })}
-          initialOpen
-        />
-      )}
+      <PageMenu
+        slug={container.dataset.slug ?? "introduction"}
+        actions={contextualOptions({ options: (container.dataset.actions ?? "").split(" ") })}
+        initialOpen
+      />
     </SystemProvider>,
   );
 });

@@ -9,7 +9,7 @@ import lighthouse, { desktopConfig } from "lighthouse";
 import { chromium } from "playwright";
 import { z } from "zod";
 
-import { CATEGORIES, FORM_FACTORS } from "./budgets.ts";
+import { AGENTIC_CATEGORY, CATEGORIES, FORM_FACTORS } from "./budgets.ts";
 import { summariseResult } from "./lighthouse-summary.ts";
 
 /* One Lighthouse run per process: Lighthouse keeps per-process state (logging, marks), so the
@@ -56,7 +56,12 @@ async function main() {
     const port = await devtoolsPort({ userDataDir });
     const result = await lighthouse(
       args.url,
-      { port, output: "json", logLevel: "error", onlyCategories: [...CATEGORIES] },
+      {
+        port,
+        output: "json",
+        logLevel: "error",
+        onlyCategories: [...CATEGORIES, AGENTIC_CATEGORY],
+      },
       args["form-factor"] === "desktop" ? desktopConfig : undefined,
     );
     if (!result) throw new Error(`Lighthouse returned no result for ${args.url}`);

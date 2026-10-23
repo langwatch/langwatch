@@ -1,6 +1,14 @@
 import { Box, Button, Link, Text } from "@langwatch/design-system/primitives";
 import { Play } from "lucide-react";
-import { Children, isValidElement, useEffect, useRef, useState } from "react";
+import {
+  Children,
+  createContext,
+  isValidElement,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import type { ComponentProps } from "react";
 
 import { sitePath } from "../../../lib/site-path.ts";
@@ -28,9 +36,20 @@ function themeClass({ className }: { className?: string }): string {
   return "";
 }
 
+/** True inside a Frame, whose own window already holds the media. */
+export const InFrame = createContext(false);
+
+/** Screenshots get the window bar, SVG diagrams only the frame, external badges stay inline. */
+export function shotKind({ src }: { src?: string }): "bare" | "diagram" | "shot" {
+  if (!src || /^https?:/.test(src)) return "bare";
+  return /\.svg($|[?#])/.test(src) ? "diagram" : "shot";
+}
+
 /** Broken images retain their authored alternative text. */
 export function DocsImage({ className, alt, src, srcSet, width, ...rest }: ComponentProps<"img">) {
   const [failed, setFailed] = useState(false);
+  const kind = useContext(InFrame) ? "bare" : shotKind({ src });
+  const percent = typeof width === "string" && width.endsWith("%") ? width : undefined;
   if (failed) {
     return (
       <Link
@@ -43,9 +62,11 @@ export function DocsImage({ className, alt, src, srcSet, width, ...rest }: Compo
       </Link>
     );
   }
-  return (
+  const image = (
     <img
-      className={`docs-img ${themeClass({ className })} ${className ?? ""}`.trim()}
+      className={`docs-img ${kind === "bare" ? themeClass({ className }) : ""} ${className ?? ""}`
+        .replace(/\s+/g, " ")
+        .trim()}
       src={mediaPath({ path: src })}
       srcSet={mediaSrcSet({ srcSet })}
       alt={alt ?? ""}
@@ -54,12 +75,22 @@ export function DocsImage({ className, alt, src, srcSet, width, ...rest }: Compo
       style={{
         maxWidth: "100%",
         height: "auto",
-        width: typeof width === "string" && width.endsWith("%") ? width : undefined,
+        width: percent && kind === "bare" ? percent : undefined,
       }}
-      width={typeof width === "string" && width.endsWith("%") ? undefined : width}
+      width={percent ? undefined : width}
       onError={() => setFailed(true)}
       {...rest}
     />
+  );
+  if (kind === "bare") return image;
+  return (
+    <span
+      className={`docs-shot ${themeClass({ className })}`.trim()}
+      data-shot={kind}
+      style={percent ? { width: percent } : undefined}
+    >
+      {image}
+    </span>
   );
 }
 

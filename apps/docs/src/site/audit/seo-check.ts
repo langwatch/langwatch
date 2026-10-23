@@ -46,6 +46,12 @@ export function readHead({ html }: { html: string }) {
     ogTitle: meta("property", "og:title"),
     ogDescription: meta("property", "og:description"),
     ogImage: meta("property", "og:image"),
+    twitterCard: meta("name", "twitter:card"),
+    twitterTitle: meta("name", "twitter:title"),
+    twitterDescription: meta("name", "twitter:description"),
+    twitterImage: meta("name", "twitter:image"),
+    viewport: meta("name", "viewport"),
+    lang: /<html\b[^>]*\blang="([^"]+)"/i.exec(html)?.[1],
     canonical: links.find((attributes) => attributes.rel === "canonical")?.href,
     markdown: links.find(
       (attributes) => attributes.rel === "alternate" && attributes.type === "text/markdown",
@@ -74,6 +80,13 @@ function lengthIssue({ name, value, range }: { name: string; value?: string; ran
       detail: `${value.length} characters, budget ${range.min} to ${range.max}: "${value}"`,
     };
   return null;
+}
+
+/** The base path a build was made for, read from the favicon link its home page carries. */
+export function builtBasePath({ outDir }: { outDir: string }) {
+  const html = readFileSync(path.join(outDir, "index.html"), "utf8");
+  const icon = /<link\b[^>]*rel="icon"[^>]*href="([^"]*)\/favicon\.svg"/i.exec(html);
+  return icon ? icon[1] : null;
 }
 
 /** Every sitemap `<loc>`, the build's list of navigable pages. */
@@ -118,13 +131,21 @@ function canonicalIssue({ head, url }: { head: PageHead; url: string }): PageIss
 function socialIssues({ head }: { head: PageHead }): PageIssue[] {
   const issues: PageIssue[] = [];
   const named = [
-    ["og:title", head.ogTitle],
-    ["og:description", head.ogDescription],
+    ["missing-open-graph", "og:title", head.ogTitle],
+    ["missing-open-graph", "og:description", head.ogDescription],
+    ["missing-twitter-card", "twitter:card", head.twitterCard],
+    ["missing-twitter-card", "twitter:title", head.twitterTitle],
+    ["missing-twitter-card", "twitter:description", head.twitterDescription],
+    ["missing-document-basics", "html lang", head.lang],
+    ["missing-document-basics", "viewport", head.viewport],
   ] as const;
-  for (const [name, value] of named)
-    if (!value) issues.push({ code: "missing-open-graph", detail: `no ${name}` });
-  if (!isAbsoluteHttps(head.ogImage))
-    issues.push({ code: "open-graph-image", detail: `og:image ${head.ogImage ?? "missing"}` });
+  for (const [code, name, value] of named) if (!value) issues.push({ code, detail: `no ${name}` });
+  for (const [name, value] of [
+    ["og:image", head.ogImage],
+    ["twitter:image", head.twitterImage],
+  ] as const)
+    if (!isAbsoluteHttps(value))
+      issues.push({ code: "open-graph-image", detail: `${name} ${value ?? "missing"}` });
   return issues;
 }
 

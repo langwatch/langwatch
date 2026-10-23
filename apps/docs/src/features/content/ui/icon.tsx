@@ -1,15 +1,16 @@
-import { GitHubIcon, Python, TypeScript } from "@langwatch/design-system/icons";
+import { GitHubIcon, TypeScript } from "@langwatch/design-system/icons";
 import { Box, Image } from "@langwatch/design-system/primitives";
 
-import { GenericIcon, ICONS } from "../../../lib/icon-registry.tsx";
+import { GenericIcon, ICONS, LOGO_ASSETS } from "../../../lib/icon-registry.ts";
 import { sitePath } from "../../../lib/site-path.ts";
 
-const BRAND_ICONS = { github: GitHubIcon, python: Python, typescript: TypeScript };
+const BRAND_ICONS = { github: GitHubIcon, typescript: TypeScript };
 
 type IconProps = { icon?: string; size?: number | string };
 
 /** Resolves a Font Awesome name to a bundled glyph, or an asset path to its local image. */
-export function Icon({ icon, size = 20 }: IconProps) {
+export function Icon({ icon: name, size = 20 }: IconProps) {
+  const icon = (name && LOGO_ASSETS[name]) || name;
   const pixels = typeof size === "number" ? size : Number.parseInt(size, 10) || 20;
   if (icon && /^(\/|https?:)/.test(icon)) {
     return (

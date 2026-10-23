@@ -178,8 +178,7 @@ await it("shows one diagram variant, explicit matrix values and clear navigation
             path: path.join(screenshots, `docs-overview-diagram-${mode}.png`),
           });
           const other = mode === "light" ? "Dark" : "Light";
-          await page.getByRole("button", { name: "Colour theme" }).click();
-          await page.getByRole("menuitemradio", { name: other, exact: true }).click();
+          await page.getByRole("button", { name: "Switch colour theme" }).click();
           await page.waitForFunction(
             (theme) => document.documentElement.classList.contains("dark") === (theme === "Dark"),
             other,
@@ -187,10 +186,7 @@ await it("shows one diagram variant, explicit matrix values and clear navigation
           await (other === "Dark" ? dark : light).waitFor({ state: "visible" });
           assert.equal(await dark.isVisible(), other === "Dark");
           assert.equal(await light.isVisible(), other === "Light");
-          await page.getByRole("button", { name: "Colour theme" }).click();
-          await page
-            .getByRole("menuitemradio", { name: mode === "dark" ? "Dark" : "Light", exact: true })
-            .click();
+          await page.getByRole("button", { name: "Switch colour theme" }).click();
           await page.waitForFunction(
             (theme) => document.documentElement.classList.contains("dark") === (theme === "dark"),
             mode,
@@ -204,8 +200,9 @@ await it("shows one diagram variant, explicit matrix values and clear navigation
           const support = page
             .getByRole("navigation", { name: "Support", exact: true })
             .getByRole("link");
-          assert.match(await support.getAttribute("aria-label"), /external site/);
-          assert.ok((await support.locator("svg").count()) >= 2);
+          assert.match(await support.getAttribute("href"), /^\/support(#|$)/);
+          assert.doesNotMatch((await support.getAttribute("aria-label")) ?? "", /external site/);
+          assert.ok((await support.locator("svg").count()) >= 1);
           await page.goto(base + "self-hosting/data-and-telemetry");
           assert.equal(await page.locator("table tr > :nth-child(5)").count(), 0);
           assert.ok(
@@ -313,14 +310,13 @@ await it("draws the contents path through subsection indents without animation u
         await page.setViewportSize({ width: 1440, height: 600 });
         await page.goto(base + "self-hosting/overview");
         const rail = page.locator(".docs-toc-container");
-        await rail.locator("a").last().scrollIntoViewIfNeeded();
-        assert.equal(await rail.evaluate((node) => node.scrollTop), 0);
         await page.evaluate(() => window.scrollTo(0, 500));
-        await rail.locator("a").last().hover();
-        const scrollYBefore = await page.evaluate(() => scrollY);
-        assert.ok(scrollYBefore > 0);
-        await page.mouse.wheel(0, -600);
-        await page.waitForFunction((previous) => scrollY < previous, scrollYBefore);
+        const pinned = await rail.evaluate((node) => ({
+          position: getComputedStyle(node).position,
+          bottom: node.getBoundingClientRect().bottom,
+        }));
+        assert.equal(pinned.position, "sticky");
+        assert.ok(pinned.bottom <= 600 + 1);
         await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
         const ends = await page.evaluate(() => ({
           rail: document.querySelector(".docs-toc-container").getBoundingClientRect().bottom,

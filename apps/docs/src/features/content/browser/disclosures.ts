@@ -1,3 +1,5 @@
+import { slide } from "../../../lib/slide.ts";
+
 function tooltipButton({ target }: { target: EventTarget | null }) {
   return target instanceof Element ? target.closest<HTMLElement>("[data-docs-tooltip]") : null;
 }
@@ -10,12 +12,12 @@ function toggleAccordion({ button }: { button: HTMLElement }) {
   if (!panel) return;
   const open = button.getAttribute("aria-expanded") !== "true";
   button.setAttribute("aria-expanded", String(open));
-  panel.hidden = !open;
-  panel.style.height = open ? "auto" : "";
   const item = button.closest('[data-part="item"]');
   item?.querySelectorAll<HTMLElement>("[data-state]").forEach((node) => {
     if (node.closest('[data-part="item"]') === item) node.dataset.state = open ? "open" : "closed";
   });
+  panel.style.height = open ? "auto" : "";
+  slide({ panel, open });
 }
 export function installDisclosures() {
   document.addEventListener("click", (event) => {

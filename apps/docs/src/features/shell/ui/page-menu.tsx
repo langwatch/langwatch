@@ -27,15 +27,17 @@ function MenuLabel({
   icon,
   title,
   description,
+  shortcut,
 }: {
   icon: ReactNode;
   title: string;
   description: string;
+  shortcut?: string;
 }) {
   return (
     <>
       <span className="docs-menu-icon">{icon}</span>
-      <Box minWidth="0">
+      <Box minWidth="0" flex="1">
         <Text as="span" display="block" fontWeight="500" whiteSpace="nowrap">
           {title}
         </Text>
@@ -43,6 +45,7 @@ function MenuLabel({
           {description}
         </Text>
       </Box>
+      {shortcut ? <kbd className="docs-menu-shortcut">{shortcut}</kbd> : null}
     </>
   );
 }
@@ -106,7 +109,8 @@ export function PageMenu({
         <MenuLabel
           icon={copied === "page" ? <Check size={16} /> : <Copy size={16} />}
           title={copied === "page" ? "Copied page" : "Copy page"}
-          description="Copy this page as Markdown for LLMs · Alt+Shift+C"
+          description="As Markdown, for LLMs"
+          shortcut="Alt+Shift+C"
         />
       </Menu.Item>
     ),
@@ -187,13 +191,15 @@ export function PageMenu({
           variant="outline"
           colorPalette="gray"
           size="sm"
-          height={{ base: "44px", xl: "34px" }}
-          minHeight={{ base: "44px", xl: "34px" }}
+          height="32px"
+          minHeight="32px"
+          minWidth="32px"
+          width="32px"
           aria-label="More page actions"
           borderStartRadius={actions.includes("copy") ? "0" : undefined}
           marginInlineStart={actions.includes("copy") ? "-1px" : undefined}
         >
-          <ChevronDown size={16} />
+          <ChevronDown size={14} />
         </IconButton>
       </Menu.Trigger>
       <Menu.Content

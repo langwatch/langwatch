@@ -107,10 +107,9 @@ export function TocDisclosure({ entries, always }: { entries: TocEntry[]; always
       as="details"
       data-docs-toc=""
       ref={ref}
+      className="docs-toc-disclosure"
+      marginTop="4"
       marginBottom="6"
-      borderWidth="1px"
-      borderColor="border"
-      borderRadius="lg"
       display={always ? "block" : { base: "block", xl: "none" }}
       css={{
         "& > summary::-webkit-details-marker": { display: "none" },
@@ -121,16 +120,17 @@ export function TocDisclosure({ entries, always }: { entries: TocEntry[]; always
         as="summary"
         display="flex"
         alignItems="center"
-        justifyContent="space-between"
+        gap="2"
         minHeight="44px"
-        paddingX="4"
         cursor="pointer"
         fontSize="14px"
         fontWeight="500"
         listStyle="none"
       >
-        On this page
+        <span>On this page</span>
+        <span className="docs-toc-current" aria-hidden="true" />
         <ChevronDown size={16} className="docs-toc-chevron" aria-hidden="true" />
+        <span className="docs-toc-bar" aria-hidden="true" />
       </Box>
       <Box paddingX="2" paddingBottom="2">
         <TocLinks

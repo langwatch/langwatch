@@ -18,34 +18,6 @@ Feature: Static documentation with progressive interaction
     Then its static HTML is fetched without navigating
     And following the link reuses that response
 
-  @e2e
-  Scenario: Update an offline cache safely
-    Given a reader has installed the current documentation worker
-    When a new build is deployed
-    Then its versioned cache activates for the next navigation
-    And previous cache versions are removed
-    And a cached page works offline
-    And uncached pages show the offline fallback
-    And API requests and credentials are never cached
-
-  @unit
-  Scenario: Keep a network response when the offline cache cannot store it
-    Given the documentation worker controls a page under its scope
-    When storing a fetched page or asset fails because storage is full
-    Then the reader still receives the network response
-    And requests outside the worker's base path are left to the browser
-    And runtime pages and assets stay within their entry limits
-    And the Latin-ext reading font is cached only after a page requests it
-
-  @e2e
-  Scenario: Reopen search offline
-    Given a reader opened search while online
-    When the search index for the current build was fetched as search-index.json?v=<build>
-    And <build> is the version of the active documentation worker
-    Then the worker serves that index from its cache when the reader reopens search offline
-    But any other query string, another build's index or extra parameters beside v bypass the worker
-    And at most one search index is ever cached
-
   @integration
   Scenario: Explain a search that fails to render
     Given the search dialog is open
@@ -59,6 +31,7 @@ Feature: Static documentation with progressive interaction
     When the reader closes and reopens search
     Then the index is not fetched or parsed again
     And after a failed load, Retry fetches it again
+    And a build whose search index changed has a new build version, so no reader keeps an old index
 
   @unit
   Scenario: Find titles, headings, body-only words, API paths and properties, and near misses
@@ -80,6 +53,25 @@ Feature: Static documentation with progressive interaction
     When the page is compiled
     Then the image declares its intrinsic width and height
     But an authored width keeps its value and percentage widths are left alone
+
+  @unit
+  Scenario: Serve authored screenshots as modern images
+    Given a guide shows a local PNG or JPEG image
+    When the site is built
+    Then the page offers AVIF and WebP encodings of it in a picture, with the original as the fallback
+    And the image keeps its intrinsic width and height
+    And no encoding wider than twice the article column or larger than the original is published
+    And unchanged images are reused from the build cache instead of being encoded again
+    But SVG, GIF, external and already responsive images are left as authored
+
+  @unit
+  Scenario: Preload the first image a reader sees
+    Given a page's first article image sits above the fold
+    When the page is prerendered
+    Then that image loads eagerly at high priority and the page head preloads its AVIF encoding
+    And a light and dark pair preloads each variant for its colour scheme without fetching the hidden one
+    And every other article image loads lazily and decodes asynchronously
+    But an image below the fold, in a closed disclosure or in a hidden tab is never preloaded
 
   @unit
   Scenario: Serve authored media from the docs mount
@@ -138,8 +130,9 @@ Feature: Static documentation with progressive interaction
     Given an API introduction is open at a desktop or phone width
     Then the document scrolls without an inner content panel
     And the page sits flat on paper directly beneath the header
-    And tall desktop rails flow with the document without an inner scrollbar
-    And short rails may stick beneath the header
+    And the desktop page list sticks beneath the header and scrolls on its own
+    And following a page list link keeps that link in view
+    And a short contents rail may stick beneath the header
     And the full-width footer follows the page and never clips navigation
     And unrelated navigation groups start collapsed
     And the active page remains in an expanded branch
@@ -171,10 +164,10 @@ Feature: Static documentation with progressive interaction
 
   @e2e
   Scenario: Use clear contextual menus
-    When a reader opens the page or theme menu
+    When a reader opens the page menu or presses the theme button
     Then page actions have readable titles and descriptions
     And copying a page confirms success
-    And the theme menu marks the current choice
+    And the theme button switches between light and dark and the page remembers the choice
 
   @e2e
   Scenario: Start with a coding agent
@@ -200,6 +193,19 @@ Feature: Static documentation with progressive interaction
     When a page lists collapsible navigation groups
     Then each group toggle carries a styled chevron instead of its own inline icon
     And the chevron turns when the group opens
+
+  @integration
+  Scenario: Show a group of one page as that page's link
+    Given a navigation group holds exactly one page and no other root
+    When the page tree renders
+    Then the group shows as one link to that page, with the group's name and icon
+    And it has no chevron and no nested panel
+
+  @unit
+  Scenario: Brand a page only with the logo every card linking to it shows
+    Given overview cards link to a page
+    When one card shows a brand logo and another card linking there shows a different icon
+    Then the page and its group get no logo in the page tree
 
   @e2e
   Scenario: Keep text in place while the web fonts load

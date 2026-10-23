@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { it } from "node:test";
 import { parseArgs } from "node:util";
@@ -31,7 +30,7 @@ await it("renders styled content and code without JavaScript", async () => {
           const examples = page.locator(".docs-examples");
           if ((await examples.count()) && (await examples.getAttribute("open")) === null)
             await examples.locator("summary").click();
-          assert.ok(await page.locator(".docs-code-region").first().isVisible());
+          await page.locator(".docs-code-region").first().waitFor({ state: "visible" });
         }
       } finally {
         await context.close();
@@ -293,136 +292,6 @@ await it("serves silent clips with posters that play only while visible and allo
   });
 });
 
-/** Search index URLs held in any worker cache; only listed keys have finished writing. */
-function cachedIndexUrls({ page }) {
-  return page.evaluate(async () => {
-    const names = await caches.keys();
-    const keys = await Promise.all(names.map(async (name) => (await caches.open(name)).keys()));
-    return keys
-      .flat()
-      .map((key) => key.url)
-      .filter((url) => url.includes("search-index"));
-  });
-}
-
-/* A cache match can answer while a large write is still committing, so poll the key list. */
-async function waitForCachedIndex({ page, index }) {
-  for (;;) {
-    const urls = await cachedIndexUrls({ page });
-    if (urls.some((url) => url.endsWith(index))) return;
-    await page.waitForTimeout(100);
-  }
-}
-
-/** @scenario "Reopen search offline" */
-await it("serves this build's search index from the worker cache when offline", async () => {
-  await withPreviewBrowser({
-    outDir,
-    run: async ({ browser, base }) => {
-      const context = await browser.newContext();
-      const page = await context.newPage();
-      try {
-        await page.goto(base + "introduction");
-        await page.evaluate(() => navigator.serviceWorker.ready);
-        await page.reload();
-        const build = await page.evaluate(
-          () => document.querySelector('meta[name="docs-build"]')?.content ?? "",
-        );
-        const index = `/search-index.json?v=${encodeURIComponent(build)}`;
-        await page.evaluate(async (url) => void (await (await fetch(url)).arrayBuffer()), index);
-        await waitForCachedIndex({ page, index });
-        await page.evaluate(async () => {
-          for (const url of ["/search-index.json?v=another-build", "/search-index.json?q=private"])
-            await (await fetch(url)).arrayBuffer();
-        });
-        await page.waitForTimeout(1000);
-        await context.setOffline(true);
-        const offline = await page.evaluate(async (url) => {
-          const response = await fetch(url);
-          return { ok: response.ok, entries: (await response.json()).length };
-        }, index);
-        assert.ok(offline.ok && offline.entries > 0, "search reopens offline");
-        assert.deepEqual(
-          (await cachedIndexUrls({ page })).map((url) => new URL(url).search),
-          [`?v=${encodeURIComponent(build)}`],
-          "only this build's index is cached",
-        );
-      } finally {
-        await context.close();
-      }
-    },
-  });
-});
-
-/** @scenario "Update an offline cache safely" */
-await it("activates a new cache version and provides offline pages without caching API requests", async () => {
-  const workerPath = path.join(outDir, "sw.js");
-  const original = await readFile(workerPath, "utf8");
-  try {
-    await withPreviewBrowser({
-      outDir,
-      run: async ({ browser, base }) => {
-        const context = await browser.newContext();
-        const page = await context.newPage();
-        try {
-          await page.goto(base + "introduction");
-          await page.evaluate(() => navigator.serviceWorker.ready);
-          await page.reload();
-          await page.evaluate(async () => {
-            await fetch("/integration/quick-start", { headers: { Accept: "text/html" } });
-          });
-          await page.waitForFunction(async () =>
-            Boolean(await caches.match("/integration/quick-start")),
-          );
-          await context.setOffline(true);
-          await page.goto(base + "integration/quick-start");
-          assert.match(await page.title(), /Quick Start/i);
-          await page.goto(base + "never-cached-offline-page");
-          assert.equal(await page.locator("h1").textContent(), "You are offline");
-          await context.setOffline(false);
-          await page.goto(base + "introduction");
-          const oldKeys = await page.evaluate(() => caches.keys());
-          await writeFile(
-            workerPath,
-            original.replace(/const VERSION = "[^"]+";/, 'const VERSION = "update-test";'),
-          );
-          await page.evaluate(async () => {
-            const registration = await navigator.serviceWorker.getRegistration();
-            await registration.update();
-          });
-          await page.waitForFunction(async () =>
-            (await caches.keys()).includes("lw-docs-static-update-test"),
-          );
-          await page.waitForFunction(
-            async (keys) => !(await caches.keys()).some((key) => keys.includes(key)),
-            oldKeys,
-          );
-          await page.reload();
-          await page.evaluate(async () => {
-            await fetch("/api/credential-test", { headers: { "X-Auth-Token": "test-only" } });
-            await fetch("/search-index.json", { headers: { "X-Auth-Token": "test-only" } });
-            await fetch("/search-index.json", { headers: { Authorization: "Bearer test-only" } });
-          });
-          const paths = await page.evaluate(async () => {
-            const keys = await caches.keys();
-            const requests = await Promise.all(
-              keys.map(async (key) => (await caches.open(key)).keys()),
-            );
-            return requests.flat().map((request) => request.url);
-          });
-          assert.ok(
-            paths.every((url) => !url.includes("/api/") && !url.endsWith("/search-index.json")),
-          );
-        } finally {
-          await context.close();
-        }
-      },
-    });
-  } finally {
-    await writeFile(workerPath, original);
-  }
-});
-
 /** @scenario "Send a request from a lazy playground" */
 await it("loads the playground on demand and sends an isolated request", async () => {
   await withPreviewBrowser({
@@ -546,8 +415,7 @@ await it("styles a page, dark mode, search and navigation from inlined styles", 
           "grid",
         );
         const light = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-        await page.getByRole("button", { name: "Colour theme" }).first().click();
-        await page.getByRole("menuitemradio", { name: "Dark" }).click();
+        await page.getByRole("button", { name: "Switch colour theme" }).first().click();
         await page.waitForFunction(
           (before) =>
             document.documentElement.classList.contains("dark") &&

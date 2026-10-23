@@ -31,7 +31,7 @@ export async function assertBuild({ outDir }: { outDir: string }) {
       ),
     ),
   ];
-  const expectedHtml = ["404.html", "offline.html"];
+  const expectedHtml = ["404.html"];
   for (const slug of slugs) {
     await access(path.join(outDir, `${slug}.md`));
     expectedHtml.push(...pageTargets({ slug }));

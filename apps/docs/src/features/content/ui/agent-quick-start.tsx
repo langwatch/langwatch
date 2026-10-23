@@ -1,4 +1,3 @@
-import { Card } from "@langwatch/design-system/card";
 import { Box, Button, Flex, Link, Text } from "@langwatch/design-system/primitives";
 import { ArrowRight, Check, ChevronDown, Copy, FileText, Terminal } from "lucide-react";
 import { useState } from "react";
@@ -15,7 +14,7 @@ const AGENTS = [
 
 function PromptPreview({ prompt, action }: { prompt: string; action: ReactNode }) {
   return (
-    <Card variant="nested" tone="neutral" padding="none">
+    <Box bg="docs.raised" borderWidth="1px" borderColor="border" borderRadius="lg" overflow="hidden">
       <Flex padding="4" gap="3" alignItems="center" justifyContent="space-between" wrap="wrap">
         <Flex gap="2" alignItems="center" color="fg" fontSize="14px" fontWeight="600">
           <FileText size={16} aria-hidden="true" /> Setup prompt
@@ -48,7 +47,8 @@ function PromptPreview({ prompt, action }: { prompt: string; action: ReactNode }
           paddingX="4"
           minHeight="44px"
           fontSize="13px"
-          color="fg"
+          color="fg.muted"
+          _hover={{ color: "fg" }}
           listStyleType="none"
         >
           View full prompt <ChevronDown size={16} aria-hidden="true" />
@@ -72,7 +72,7 @@ function PromptPreview({ prompt, action }: { prompt: string; action: ReactNode }
           {prompt}
         </Box>
       </Box>
-    </Card>
+    </Box>
   );
 }
 
@@ -81,7 +81,7 @@ export function AgentQuickStart({ prompt }: { prompt: string }) {
   const { state, copy, ready } = useCopy();
   return (
     <Box className="docs-agent-start" marginY="6">
-      <Card variant="nested" tone="neutral" padding="none">
+      <Box borderWidth="1px" borderColor="border" borderRadius="xl" bg="docs.paper">
         <Box padding={{ base: "5", md: "7" }}>
           <Flex gap="3" alignItems="center" marginBottom="4" color="fg">
             <Terminal size={22} strokeWidth={1.7} aria-hidden="true" />
@@ -106,10 +106,11 @@ export function AgentQuickStart({ prompt }: { prompt: string }) {
                 disabled={!ready}
                 aria-pressed={agent === name}
                 onClick={() => setAgent(name)}
-                bg={agent === name ? "docs.raised" : "transparent"}
-                color="fg"
-                borderColor={agent === name ? "fg" : "border"}
-                _hover={{ bg: "bg.hover" }}
+                bg="transparent"
+                color="fg.muted"
+                borderColor="border"
+                _hover={{ bg: "bg.hover", color: "fg" }}
+                _pressed={{ color: "fg", borderColor: "accent.fg", bg: "accent.subtle" }}
               >
                 <img
                   src={sitePath({ path: `/images/logos/${logo}.svg` })}
@@ -129,9 +130,10 @@ export function AgentQuickStart({ prompt }: { prompt: string }) {
               <Button
                 size="sm"
                 minHeight="40px"
-                bg="docs.action"
-                color="docs.actionText"
-                _hover={{ bg: "docs.action", opacity: 0.9 }}
+                bg="docs.primary"
+                color="docs.primaryText"
+                fontWeight="600"
+                _hover={{ bg: "docs.primary", opacity: 0.9 }}
                 disabled={!ready}
                 data-docs-prompt=""
                 onClick={() => copy({ text: prompt })}
@@ -170,14 +172,24 @@ export function AgentQuickStart({ prompt }: { prompt: string }) {
           wrap="wrap"
           fontSize="14px"
         >
-          <Link href={pagePath({ slug: "integration/quick-start" })} color="fg" gap="2">
+          <Link
+            href={pagePath({ slug: "integration/quick-start" })}
+            color="fg.muted"
+            _hover={{ color: "fg" }}
+            gap="2"
+          >
             Set up manually <ArrowRight size={14} />
           </Link>
-          <Link href={pagePath({ slug: "skills/directory" })} color="fg" gap="2">
+          <Link
+            href={pagePath({ slug: "skills/directory" })}
+            color="fg.muted"
+            _hover={{ color: "fg" }}
+            gap="2"
+          >
             Explore all skills <ArrowRight size={14} />
           </Link>
         </Flex>
-      </Card>
+      </Box>
     </Box>
   );
 }

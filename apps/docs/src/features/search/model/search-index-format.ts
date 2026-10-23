@@ -16,6 +16,10 @@ export type PublishedIndexEntry = {
   description: string;
   section?: string;
   trail?: string;
+  /** An icon name or image path. */
+  icon?: string;
+  /** The SVG body of the named icon, on the first entry naming it. */
+  glyph?: string;
   headings?: PublishedHeading[];
   terms?: string;
   pages?: string;

@@ -44,6 +44,8 @@ import {
   STATIC_FILES,
   extractStyles,
 } from "./document.ts";
+import { writeVersionedPages } from "./build-version.ts";
+import { optimisePageImages } from "./image-variants.ts";
 import { writeOutputFiles } from "./output-files.ts";
 import { renderCache, renderedPageSchema, type RenderedPage } from "./render-cache.ts";
 import {
@@ -53,7 +55,6 @@ import {
   type PrerenderPlan,
 } from "./render-keys.ts";
 import { renderWorkerCount, runOnWorkers, type WorkerOutcome } from "./render-workers.ts";
-import { writeServiceWorker } from "./service-worker.ts";
 
 /* Runs as the SSR bundle (see build.ts) after the client build. The main thread reads one
    build context, renders pages on worker threads of this same bundle (or reuses them from the
@@ -352,6 +353,14 @@ async function generate() {
   });
   for (const [name, contents] of styled.files) files.set(name, contents);
   for (const [target, page] of styled.pages) pages.set(target, page);
+  const images = await optimisePageImages({
+    pages,
+    docsRoot,
+    basePath,
+    cacheDir: plan.cacheDir ? path.join(path.dirname(plan.cacheDir), "images") : null,
+  });
+  for (const [target, page] of images.pages) pages.set(target, page);
+  for (const [name, contents] of images.files) files.set(name, contents);
   redirectPages({ dist, redirects, pages });
   files.set("skipped.json", JSON.stringify(skipped, null, 2));
   await writeOutputFiles({ root: dist, files });
@@ -364,7 +373,7 @@ async function generate() {
   reportSkipped({ skipped });
   if (skipped.length > 0)
     throw new Error(`Documentation rendering failed for ${skipped.length} pages`);
-  await writeServiceWorker({ outDir: dist, basePath, pages });
+  await writeVersionedPages({ outDir: dist, pages });
 }
 
 if (isMainThread) await generate();

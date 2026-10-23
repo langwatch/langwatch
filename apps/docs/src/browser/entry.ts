@@ -1,4 +1,3 @@
-import { docsBasePath, isProduction } from "../config.ts";
 import { startNavigation } from "./navigation.ts";
 
 import "./islands.css";
@@ -29,7 +28,15 @@ function prepareControls() {
 }
 
 export function loadIsland({ name, trigger }: { name: string; trigger?: HTMLElement }) {
-  if (document.querySelector(`script[data-island="${name}"]`)) return;
+  const replay = () => {
+    if (trigger?.isConnected) trigger.click();
+  };
+  const loading = document.querySelector<HTMLScriptElement>(`script[data-island="${name}"]`);
+  /* An island still loading (an idle one, say) replays the click that came first. */
+  if (loading) {
+    if (loading.dataset.loaded === undefined) loading.addEventListener("load", replay);
+    return;
+  }
   const source = document.querySelector<HTMLMetaElement>(
     `meta[name="docs-island-${name}"]`,
   )?.content;
@@ -39,7 +46,8 @@ export function loadIsland({ name, trigger }: { name: string; trigger?: HTMLElem
   script.src = source;
   script.dataset.island = name;
   script.addEventListener("load", () => {
-    if (trigger?.isConnected) trigger.click();
+    script.dataset.loaded = "";
+    replay();
   });
   script.addEventListener("error", () => script.remove());
   document.head.append(script);
@@ -56,13 +64,13 @@ document.addEventListener("click", (event) => {
     ["#try-it-button", "playground"],
     ["[data-docs-copy], [data-docs-page-copy], [data-docs-prompt]", "copy"],
     ["[role=tab]", "tabs"],
-    ["[data-docs-theme], [data-docs-page-menu]", "context-menus"],
+    ["[data-docs-page-menu]", "context-menus"],
     ["[data-docs-mobile], [data-docs-mobile-close]", "menus"],
     ["[data-docs-video]", "media"],
     ["[data-scope=accordion] button, [data-docs-tooltip]", "disclosures"],
     [".docs-skill-prompt", "skill-prompts"],
     [
-      '[data-docs-agent], [aria-label="Dismiss announcement"], [data-docs-dismiss], nav[aria-label="Page navigation"] button[aria-expanded]',
+      '[data-docs-theme], [data-docs-agent], [aria-label="Dismiss announcement"], [data-docs-dismiss], nav[aria-label="Page navigation"] button[aria-expanded]',
       "controls",
     ],
   ];
@@ -73,23 +81,12 @@ document.addEventListener("click", (event) => {
     break;
   }
 });
-document.addEventListener("keydown", (event) => {
-  if (event.key.toLowerCase() === "k" && (event.metaKey || event.ctrlKey)) {
-    event.preventDefault();
-    loadIsland({
-      name: "search",
-      trigger: document.querySelector<HTMLElement>("[data-docs-search]") ?? void 0,
-    });
-    document.dispatchEvent(new Event("docs:search"));
-  }
-});
-if ("serviceWorker" in navigator && isProduction) {
-  window.addEventListener("load", () => {
-    void navigator.serviceWorker
-      .register(`${docsBasePath}/sw.js`, { scope: `${docsBasePath}/`, updateViaCache: "none" })
-      .catch(() => {});
-  });
-}
+/* The page's inline key listener marks a search shortcut, even one pressed before this ran. */
+const searchRequested = () => {
+  if ((window as { docsSearchKey?: number }).docsSearchKey) loadIsland({ name: "search" });
+};
+searchRequested();
+addEventListener("keydown", searchRequested);
 
 const enhanceReading = () => {
   loadIsland({ name: "toc" });

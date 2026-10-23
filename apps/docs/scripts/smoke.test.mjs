@@ -163,16 +163,47 @@ await it("offers working search on an unknown route", async () => {
     run: async ({ page, base }) => {
       const response = await page.goto(`${base}nonexistent-docs-smoke-route`);
       assert.equal(response.status(), 404);
-      await page
-        .getByRole("main")
-        .getByRole("button", { name: "Search the docs", exact: true })
-        .click();
+      await page.locator("[data-docs-not-found][data-ready]").waitFor({ state: "attached" });
+      await page.locator("[data-nf-search]").click();
       await page.getByRole("searchbox").fill("traces");
       const result = page.locator("#docs-search-results a").first();
       await result.waitFor();
       await result.click();
       await page.waitForURL((url) => !url.pathname.includes("nonexistent-docs-smoke-route"));
       assert.ok((await page.locator("h1").textContent()).trim().length > 0);
+    },
+  });
+});
+
+/** @scenario "Show the scene and closest pages for a missing address" */
+await it("acts out a missing address in its section's scene and links its closest pages", async () => {
+  await withReader({
+    outDir,
+    run: async ({ page, base }) => {
+      for (const [address, scene, first] of [
+        ["api-reference/traces/serch", "engineering", "/api-reference/traces/search"],
+        ["evaluations/llm-as-judge", "product", "/evaluations/experiments/ui/llm-as-a-judge"],
+      ]) {
+        const response = await page.goto(`${base}${address}`);
+        assert.equal(response.status(), 404, address);
+        const root = page.locator("[data-docs-not-found][data-ready]");
+        await root.waitFor({ state: "attached" });
+        assert.equal(await root.getAttribute("data-scene"), scene, address);
+        assert.equal(await page.locator('meta[name="robots"]').getAttribute("content"), "noindex");
+        assert.equal(await page.locator("h1").count(), 1, address);
+        const scenery = scene === "engineering" ? ".docs-nf-term" : ".docs-nf-trace";
+        assert.equal(await page.locator(scenery).count(), 1, address);
+        const pick = new URL(await page.locator('[data-nf-pick="1"]').getAttribute("href"), base);
+        assert.equal(pick.pathname, first, address);
+        assert.ok(await page.locator("[data-nf-rail-matches] a").count(), address);
+        assert.equal(
+          await page.evaluate(() => document.documentElement.scrollWidth > innerWidth),
+          false,
+          address,
+        );
+        await page.keyboard.press("1");
+        await page.waitForURL((url) => url.pathname === first);
+      }
     },
   });
 });

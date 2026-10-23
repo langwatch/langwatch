@@ -123,6 +123,13 @@ export function groupTarget({ group }: { group: Group }): string {
   return group.root ?? firstSlug({ items: group.children });
 }
 
+/** A group of one page with no other root shows as that page's link under the group's name. */
+export function soleChild({ group }: { group: Group }): Extract<NavItem, { type: "page" }> | null {
+  const [only, ...rest] = group.children;
+  if (rest.length || only?.type !== "page") return null;
+  return !group.root || group.root === only.slug ? only : null;
+}
+
 /** Authored-open groups, the current branch, single pages and small endpoint lists start open. */
 export function startsOpen({
   group,
