@@ -3,11 +3,13 @@ import type { PlanInfo, PricingModel } from "@langwatch/entitlement-contract";
  * @vitest-environment node
  * Spec: specs/licensing/usage-enforcement-plan-resolution.feature.
  */
+import { HandledError } from "@langwatch/handled-error";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { BillableEventsMeterRepository } from "../../repositories/billable-events-meter.repository.ts";
 import { MemoryTraceCountRepository } from "../../repositories/memory/memory.trace-count.repository.ts";
+import { RecentCountFailureError } from "../count-read-coalescer.service.ts";
 import { UsageCountingService } from "../usage-counting.service.ts";
 import {
   type EntitlementUsagePeers,
@@ -40,6 +42,12 @@ class TestOrganizations implements UsageOrganization {
   }
   getPricingModel(): Promise<{ pricingModel: null }> {
     return Promise.resolve({ pricingModel: null });
+  }
+}
+
+class TooManyQueriesInFlight extends HandledError {
+  constructor() {
+    super("clickhouse_overloaded", "Too many queries in flight", { httpStatus: 503 });
   }
 }
 
@@ -521,9 +529,9 @@ describe("given limit checks that read the counting store", () => {
         outOfMemory,
       );
       clock.ms += 29_000;
-      await expect(service.checkLimitForOrganization({ organizationId: "org-1" })).rejects.toBe(
-        outOfMemory,
-      );
+      const reused = service.checkLimitForOrganization({ organizationId: "org-1" });
+      await expect(reused).rejects.toBeInstanceOf(RecentCountFailureError);
+      await expect(reused).rejects.toThrow("memory limit exceeded");
       expect(reads).toBe(1);
 
       clock.ms += 1_000;
@@ -553,6 +561,51 @@ describe("given limit checks that read the counting store", () => {
       await expect(
         service.getCurrentMonthCountForDisplay({ organizationId: "org-1" }),
       ).resolves.toBe(10);
+    });
+  });
+
+  describe("when a limit check left a failed count behind and the licence status reads it", () => {
+    /** @scenario A failed enforcement count does not fail the licence usage read */
+    it("reads the store instead of answering the failure", async () => {
+      let reads = 0;
+      const counter: UsageVolumeCounter = {
+        getCountByProjects: async () => {
+          reads++;
+          if (reads === 1) throw new Error("memory limit exceeded");
+          return [{ projectId: "project-1", count: 10 }];
+        },
+      };
+      const service = serviceOver({ counter, clock: { ms: 0 } });
+
+      await expect(service.checkLimitForOrganization({ organizationId: "org-1" })).rejects.toThrow(
+        "memory limit exceeded",
+      );
+      await expect(service.getCurrentMonthCount({ organizationId: "org-1" })).resolves.toBe(10);
+      expect(reads).toBe(2);
+    });
+  });
+
+  describe("when the store refused the count as busy", () => {
+    /** @scenario A busy or unreachable store is asked again on the next check */
+    it("reads the store again on the next check", async () => {
+      const busy = new TooManyQueriesInFlight();
+      let reads = 0;
+      const counter: UsageVolumeCounter = {
+        getCountByProjects: async () => {
+          reads++;
+          if (reads === 1) throw busy;
+          return [{ projectId: "project-1", count: 10 }];
+        },
+      };
+      const service = serviceOver({ counter, clock: { ms: 0 } });
+
+      await expect(service.checkLimitForOrganization({ organizationId: "org-1" })).rejects.toBe(
+        busy,
+      );
+      await expect(service.checkLimitForOrganization({ organizationId: "org-1" })).resolves.toEqual(
+        { exceeded: false },
+      );
+      expect(reads).toBe(2);
     });
   });
 });
