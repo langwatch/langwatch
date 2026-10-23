@@ -56,9 +56,10 @@ initiating user instead of logging in as `default` with no password. A pod
 with the secret and one without cannot run distributed queries against each
 other, so turn it on in one of two ways:
 
-- restart every replica at once (Helm: `auth.clusterSecretEnabled=true`, then
-  delete the pods together, or `kubectl rollout restart` with
-  `podManagementPolicy: Parallel`), or
+- restart every replica at once: set it (Helm: `auth.clusterSecretEnabled=true`),
+  let the rollout start, then delete the remaining old pods together
+  (`kubectl delete pod -l app.kubernetes.io/name=<release fullname>`, which spares
+  the Keeper pods), or
 - roll as usual and accept that cross-replica queries fail until the last pod
   has restarted. Replicated inserts and part fetches are unaffected.
 
