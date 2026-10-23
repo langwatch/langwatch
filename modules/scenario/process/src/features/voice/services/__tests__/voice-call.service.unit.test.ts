@@ -688,7 +688,7 @@ describe("finishVoiceSession", () => {
           releaseCreate = resolve;
         });
         const createVoiceAgent = vi.fn(() => createGate);
-        const writeCallRun = vi.fn<VoiceSessionPorts["writeCallRun"]>(
+        const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(
           async () => {},
         );
         const ports = fakePorts({
