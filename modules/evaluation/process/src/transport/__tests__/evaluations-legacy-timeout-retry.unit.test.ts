@@ -1,19 +1,6 @@
 /**
- * Regression: the legacy evaluations REST route decided whether to retry an
- * errored evaluation by calling `result.details.toLowerCase()`. `details` is
- * typed as a required string, but an evaluator can return `status: "error"`
- * with no `details` at runtime. The unguarded read threw
- * `TypeError: Cannot read properties of undefined (reading 'toLowerCase')`,
- * which the dispatch's catch swallowed as a generic INTERNAL_ERROR, losing the
- * real evaluator error (langwatch/tasks#8507; seen on prod across several
- * projects between 2026-09-30 and 2026-10-07).
- *
- * `timedOut` is the retry predicate. These pin:
- *  - an errored result with a missing `details` is not a timeout and does NOT
- *    throw (AC#1/#2), so the original error result falls through and is
- *    returned to the caller.
- *  - `details` containing "timed out" is still detected (AC#2), so a genuine
- *    timeout is retried as before.
+ * Regression for langwatch#8507: an error result with no `details` must not throw
+ * in `timedOut`, so the real evaluator error reaches the caller.
  */
 import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
 import { describe, expect, it } from "vitest";
