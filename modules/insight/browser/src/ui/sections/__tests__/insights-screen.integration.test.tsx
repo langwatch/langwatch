@@ -38,18 +38,45 @@ function project({ entries }: { entries: ReturnType<typeof insightEntry>[] }) {
 describe("given a project with no insights", () => {
   describe("when a member opens Insights", () => {
     /** @scenario "A project with no insights shows how to get the first one" */
-    it("says Langy writes the brief here, for them alone, and offers an action that opens Langy", async () => {
+    it("says Langy writes the brief here from a board's daily run, for them alone, and opens Dashboards", async () => {
       const { host } = renderWithInsightHost({
         element: <InsightsScreen />,
         answer: project({ entries: [] }).answer,
       });
 
       expect(await screen.findByText("Langy writes your brief here")).toBeInTheDocument();
+      expect(screen.getByText(/Daily insights/)).toBeInTheDocument();
       expect(screen.getByText(/It is yours alone; copy one to share it\./)).toBeInTheDocument();
 
-      await userEvent.click(screen.getByRole("button", { name: "Open Langy" }));
+      await userEvent.click(screen.getByRole("button", { name: "Open Dashboards" }));
 
-      expect(host.langyAsks).toEqual([{ draft: "" }]);
+      expect(host.navigations).toEqual(["/acme/dashboards"]);
+      expect(host.langyAsks).toEqual([]);
+    });
+  });
+});
+
+describe("given insights of every verdict, filed at different times", () => {
+  describe("when a member opens Insights", () => {
+    /** @scenario "The inbox is one list, newest first, whatever the verdict" */
+    it("lists them in one list, newest first, with no grouping or filter by verdict", async () => {
+      renderWithInsightHost({
+        element: <InsightsScreen />,
+        answer: project({
+          entries: [
+            insightEntry({ id: "old", title: "Oldest", tone: "good", filedAt: NOW - 3 * HOUR_MS }),
+            insightEntry({ id: "new", title: "Newest", tone: "watch", filedAt: NOW }),
+            insightEntry({ id: "mid", title: "Middle", tone: "bad", filedAt: NOW - HOUR_MS }),
+          ],
+        }).answer,
+      });
+
+      await screen.findByRole("article", { name: "Newest" });
+      expect(screen.getAllByRole("article").map((row) => row.getAttribute("aria-label"))).toEqual(
+        ["Newest", "Middle", "Oldest"],
+      );
+      expect(screen.queryByRole("tablist")).toBeNull();
+      expect(screen.queryByRole("button", { name: /Warning|Worth a look|Good news/ })).toBeNull();
     });
   });
 });

@@ -3,9 +3,11 @@
 import { RawKbd as Kbd } from "@langwatch/design-system/kbd";
 import { Badge, Box, VStack } from "@langwatch/design-system/primitives";
 import { ScrollEdgeFade, useScrollEdges } from "@langwatch/design-system/scroll-fade";
+import { FrontendFlags } from "@langwatch/feature-flag-contract";
 import { ArrowLeft, ArrowUpRight, Search } from "lucide-react";
 import { useRef, useState } from "react";
 
+import { InsightsNavCount } from "../../behavior/lent-insights.tsx";
 import { SavedDashboards, StarredDashboards } from "../../behavior/lent-saved-dashboards.tsx";
 import { useAdminMenu } from "../../behavior/use-admin-menu.ts";
 import { useLlmOpsProjectSlug } from "../../behavior/use-llm-ops-project-slug.ts";
@@ -24,7 +26,12 @@ import {
   OPERATIONS_CONSOLE,
   type ProductId,
 } from "../../model/products.ts";
-import { dashboardsAreaAt, toProjectRoutePattern } from "../../model/project-nav-items.ts";
+import {
+  dashboardsAreaAt,
+  projectNavItems,
+  toProjectRoutePattern,
+} from "../../model/project-nav-items.ts";
+import { projectScopedDestination } from "../../model/project-scoped-nav.ts";
 import { QUIET_SIDEBAR_CHIP } from "../../model/quiet-chip-style.ts";
 import { resolveSettingsBackTarget } from "../../model/resolve-settings-back-target.ts";
 import {
@@ -308,8 +315,8 @@ function SectionItemsNav({
 }
 
 /**
- * The Dashboards sidebar body: only the saved-dashboards list analytics lends,
- * with the board the address opens marked (dashboards-v1.feature).
+ * The Dashboards sidebar body: the Insights entry, then the saved-dashboards list analytics
+ * lends, with the board the address opens marked (dashboards-v1.feature).
  */
 function DashboardsSidebarBody({ showExpanded }: { showExpanded: boolean }) {
   const host = useNavigationHost();
@@ -317,8 +324,39 @@ function DashboardsSidebarBody({ showExpanded }: { showExpanded: boolean }) {
     pathname: host.pathname(),
     projectSlug: host.project()?.slug,
   });
-  if (!showExpanded) return null;
-  return <SavedDashboards openPath={dashboardsAreaAt(pattern)?.openPath} />;
+  return (
+    <>
+      <InsightsMenuLink pattern={pattern} showExpanded={showExpanded} />
+      {showExpanded && <SavedDashboards openPath={dashboardsAreaAt(pattern)?.openPath} />}
+    </>
+  );
+}
+
+/**
+ * The one Insights entry, at the top of the Dashboards menu: the inbox is where a day starts.
+ * Hidden until `release_insights` answers on; the unread pill is the one insight lends.
+ * @see modules/insight/specs/insight-inbox.feature
+ */
+function InsightsMenuLink({ pattern, showExpanded }: { pattern: string; showExpanded: boolean }) {
+  const host = useNavigationHost();
+  const { enabled, isLoading } = host.featureFlag(FrontendFlags.release_insights);
+  if (isLoading || !enabled || !host.hasPermission("analytics:view")) return null;
+  const destination = projectScopedDestination({
+    path: projectNavItems.insights.path,
+    label: projectNavItems.insights.title,
+    project: host.project(),
+  });
+  return (
+    <SideMenuLink
+      icon={featureIcons.insights.icon}
+      label={projectNavItems.insights.title}
+      href={destination.href}
+      unavailableReason={destination.unavailableReason}
+      isActive={isPathUnder({ pathname: pattern, base: projectNavItems.insights.path })}
+      showLabel={showExpanded}
+      rightElement={<InsightsNavCount />}
+    />
+  );
 }
 
 /**

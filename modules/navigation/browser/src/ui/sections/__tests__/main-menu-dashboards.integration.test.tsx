@@ -1,6 +1,7 @@
 /**
  * @vitest-environment jsdom
  * @see modules/dashboard/specs/dashboards-v1.feature
+ * @see modules/insight/specs/insight-inbox.feature
  */
 
 import {
@@ -10,6 +11,7 @@ import {
 } from "@langwatch/analytics-client";
 import { uiDeclarations, type UiDeclarations } from "@langwatch/browser-host/declarations";
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { InsightsNavCountToken } from "@langwatch/insight-contract";
 import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -49,6 +51,11 @@ function LentStarred() {
   return <div data-testid="starred-dashboards">Starred dashboards</div>;
 }
 
+/** Stands in for insight's lent unread pill. */
+function LentInsightsCount() {
+  return <span data-testid="insights-nav-count">3</span>;
+}
+
 const analyticsLends = uiDeclarations([
   {
     name: "analytics",
@@ -60,16 +67,25 @@ const analyticsLends = uiDeclarations([
       ],
     },
   },
+  {
+    name: "insight",
+    installation: {
+      capabilities: {},
+      lends: [{ token: InsightsNavCountToken, load: async () => ({ default: LentInsightsCount }) }],
+    },
+  },
 ]);
 
 function renderSidebar({
   surface,
   pathname,
   permissions = ["analytics:view"],
+  insightsOn = false,
 }: {
   surface: "llm-ops" | "dashboards" | "gateway" | "settings";
   pathname: string;
   permissions?: string[];
+  insightsOn?: boolean;
 }) {
   declarations.current = analyticsLends;
   return renderWithDesignSystem(
@@ -78,7 +94,10 @@ function renderSidebar({
         project: PROJECT,
         pathname,
         permissions,
-        flags: { release_dashboards: { enabled: true, isLoading: false } },
+        flags: {
+          release_dashboards: { enabled: true, isLoading: false },
+          release_insights: { enabled: insightsOn, isLoading: false },
+        },
         commandBar: { shortcut: "⌘K", open: vi.fn(), trigger: null },
       }}
     >
@@ -124,6 +143,65 @@ describe("the Dashboards product sidebar", () => {
       renderSidebar({ surface: "dashboards", pathname: "/demo/dashboards" });
 
       expect(await screen.findByTestId("saved-dashboards")).toHaveTextContent("open:none");
+    });
+  });
+});
+
+describe("the Insights entry", () => {
+  describe("given release_insights is on and the member holds analytics:view", () => {
+    /** @scenario "The Dashboards side menu holds the one Insights entry with its unread count" */
+    it("sits in the Dashboards sidebar above the saved-dashboards list, with the lent count", async () => {
+      renderSidebar({ surface: "dashboards", pathname: "/demo/dashboards", insightsOn: true });
+
+      const entry = await screen.findByRole("link", { name: "Insights" });
+      expect(screen.getAllByRole("link", { name: /Insights/ })).toHaveLength(1);
+      expect(entry).toHaveAttribute("href", "/demo/insights");
+      expect(await screen.findByTestId("insights-nav-count")).toHaveTextContent("3");
+      const list = await screen.findByTestId("saved-dashboards");
+      expect(entry.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    /** @scenario "The Dashboards side menu holds the one Insights entry with its unread count" */
+    it("is marked current on the Insights page", async () => {
+      renderSidebar({ surface: "dashboards", pathname: "/demo/insights", insightsOn: true });
+
+      expect(await screen.findByRole("link", { name: "Insights" })).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
+    });
+
+    /** @scenario "The LLM Ops side menu holds no Insights entry" */
+    it("is not in the LLM Ops sidebar", async () => {
+      renderSidebar({ surface: "llm-ops", pathname: "/demo", insightsOn: true });
+
+      await screen.findByRole("link", { name: "Analytics" });
+      expect(screen.queryByRole("link", { name: /Insights/ })).toBeNull();
+    });
+  });
+
+  describe("given release_insights is off", () => {
+    /** @scenario "The side menu shows no Insights entry while the flag is off" */
+    it("draws no Insights entry in the Dashboards sidebar", async () => {
+      renderSidebar({ surface: "dashboards", pathname: "/demo/dashboards" });
+
+      await screen.findByTestId("saved-dashboards");
+      expect(screen.queryByRole("link", { name: /Insights/ })).toBeNull();
+    });
+  });
+
+  describe("given a member without analytics:view", () => {
+    /** @scenario "The side menu shows no Insights entry while the flag is off" */
+    it("draws no Insights entry", async () => {
+      renderSidebar({
+        surface: "dashboards",
+        pathname: "/demo/dashboards",
+        insightsOn: true,
+        permissions: [],
+      });
+
+      await screen.findByRole("button", { name: "Quick Search" });
+      expect(screen.queryByRole("link", { name: /Insights/ })).toBeNull();
     });
   });
 });
