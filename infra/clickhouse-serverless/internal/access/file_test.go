@@ -70,6 +70,8 @@ func TestParse_RefusesInvalidFiles(t *testing.T) {
 		{"system database", user("{name: a, tier: read, databases: [system], login: {rolling: {dir: /x}}}"), `database "system" cannot be granted`},
 		{"injected database", user("{name: a, tier: read, databases: ['d.* TO x; --'], login: {rolling: {dir: /x}}}"), "must match"},
 		{"reserved name", user("{name: default, tier: admin, login: {rolling: {dir: /x}}}"), "name is reserved"},
+		{"local admin name", user("{name: local_admin, tier: admin, login: {rolling: {dir: /x}}}"), "name is reserved"},
+		{"unknown mode", "mode: tokens\n", `unknown mode "tokens"`},
 		{"tier-prefixed name", user("{name: tier_read, tier: read, databases: [d], login: {rolling: {dir: /x}}}"), "name is reserved"},
 		{"dotted name", user("{name: a.b, tier: inspect, login: {rolling: {dir: /x}}}"), "name must match"},
 		{"duplicate user", user("{name: a, tier: inspect, login: {rolling: {dir: /x}}}") + "  - {name: a, tier: inspect, login: {rolling: {dir: /y}}}\n", "duplicate user name"},
@@ -93,6 +95,61 @@ func TestParse_RefusesInvalidFiles(t *testing.T) {
 			}
 		})
 	}
+}
+
+// @scenario "Dynamic-only mode refuses every long-lived password in access.yaml"
+func TestParse_DynamicOnly(t *testing.T) {
+	const tokens = `issuers:
+  - {name: cluster, url: 'https://oidc.example.com'}
+  - {name: ci, url: 'https://token.actions.githubusercontent.com', allow_admin: true}
+users:
+  - {name: app, tier: write, databases: [langwatch], login: {token: {issuer: cluster, subject: 'system:serviceaccount:langwatch:app'}}}
+  - {name: grafana, tier: read, databases: [langwatch], login: {token: {issuer: cluster}}}
+  - {name: deployer, tier: admin, login: {token: {issuer: ci}}}
+`
+	t.Run("token users only is valid", func(t *testing.T) {
+		f, err := Parse([]byte("mode: dynamic-only\n" + tokens))
+		if err != nil {
+			t.Fatalf("Parse: %v", err)
+		}
+		if !f.DynamicOnly() {
+			t.Error("DynamicOnly() = false")
+		}
+	})
+
+	t.Run("absent, the mode is standard", func(t *testing.T) {
+		f, err := Parse([]byte(tokens))
+		if err != nil || f.DynamicOnly() {
+			t.Errorf("Parse = %v, DynamicOnly = %v; want standard mode", err, f != nil && f.DynamicOnly())
+		}
+	})
+
+	// Each violation is reported on its own, naming the user.
+	for _, tc := range []struct{ name, user, want string }{
+		{"a rolling user", "{name: metabase, tier: read, databases: [d], login: {rolling: {dir: /secrets/metabase}}}",
+			`users[3] "metabase": login.rolling is a long-lived password, refused in dynamic-only mode`},
+		{"a rolling admin", "{name: ops, tier: admin, login: {rolling: {dir: /secrets/ops}}}",
+			`users[3] "ops": login.rolling is a long-lived password`},
+		{"the local admin's name", "{name: local_admin, tier: admin, login: {token: {issuer: ci}}}",
+			`users[3] "local_admin": name is reserved`},
+		{"default", "{name: default, tier: admin, login: {token: {issuer: ci}}}",
+			`users[3] "default": name is reserved`},
+		{"an admin token from an issuer without allow_admin", "{name: root, tier: admin, login: {token: {issuer: cluster}}}",
+			"needs allow_admin"},
+	} {
+		t.Run("refuses "+tc.name, func(t *testing.T) {
+			_, err := Parse([]byte("mode: dynamic-only\n" + tokens + "  - " + tc.user + "\n"))
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Errorf("Parse error = %v, want it to mention %q", err, tc.want)
+			}
+		})
+	}
+
+	t.Run("the same rolling user is fine in standard mode", func(t *testing.T) {
+		if _, err := Parse([]byte(tokens + "  - {name: metabase, tier: read, databases: [d], login: {rolling: {dir: /secrets/metabase}}}\n")); err != nil {
+			t.Errorf("Parse: %v", err)
+		}
+	})
 }
 
 func TestParse_AllowsLoopbackHTTPIssuer(t *testing.T) {

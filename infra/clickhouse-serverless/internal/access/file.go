@@ -15,11 +15,15 @@ import (
 	"strings"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/bootstrap"
 )
 
 // File is access.yaml: the issuers token users trust and the users the image
 // renders. Load decodes it strictly and validates it.
 type File struct {
+	// Mode ModeDynamicOnly refuses every long-lived password (ADR-184).
+	Mode    Mode     `yaml:"mode"`
 	Issuers []Issuer `yaml:"issuers"`
 	Users   []User   `yaml:"users"`
 
@@ -67,6 +71,20 @@ type TokenLogin struct {
 	Issuer  string `yaml:"issuer"`
 	Subject string `yaml:"subject"`
 }
+
+// Mode is how the server lets users log in.
+type Mode string
+
+const (
+	// ModeStandard (the default) allows rolling passwords and operator users.
+	ModeStandard Mode = ""
+	// ModeDynamicOnly allows token logins only: no rolling users, default
+	// locked, and a per-boot local admin as the only password (ADR-184).
+	ModeDynamicOnly Mode = "dynamic-only"
+)
+
+// DynamicOnly reports whether f turns on dynamic-only mode.
+func (f *File) DynamicOnly() bool { return f.Mode == ModeDynamicOnly }
 
 const (
 	DefaultAudience      = "clickhouse"
@@ -167,6 +185,12 @@ func (f *File) validate() []string {
 		errs = append(errs, where+": "+fmt.Sprintf(format, args...))
 	}
 
+	switch f.Mode {
+	case ModeStandard, ModeDynamicOnly:
+	default:
+		add("mode", "unknown mode %q (want dynamic-only, or leave it out)", f.Mode)
+	}
+
 	seenIssuers := map[string]bool{}
 	for i, is := range f.Issuers {
 		where := fmt.Sprintf("issuers[%d] %q", i, is.Name)
@@ -200,7 +224,7 @@ func (f *File) validate() []string {
 		switch {
 		case !userNameRE.MatchString(u.Name):
 			add(where, "name must match %s", userNameRE)
-		case u.Name == "default" || strings.HasPrefix(u.Name, "tier_"):
+		case u.Name == "default" || u.Name == bootstrap.User || strings.HasPrefix(u.Name, "tier_"):
 			add(where, "name is reserved")
 		}
 		if seenUsers[u.Name] {
@@ -238,6 +262,8 @@ func (f *File) validate() []string {
 		switch l := u.Login; {
 		case (l.Rolling == nil) == (l.Token == nil):
 			add(where, "login needs exactly one of rolling or token")
+		case l.Rolling != nil && f.DynamicOnly():
+			add(where, "login.rolling is a long-lived password, refused in dynamic-only mode; give the user a token login")
 		case l.Rolling != nil:
 			if !filepath.IsAbs(l.Rolling.Dir) {
 				add(where, "login.rolling.dir must be an absolute path")
