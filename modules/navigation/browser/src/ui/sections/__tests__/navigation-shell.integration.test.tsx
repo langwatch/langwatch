@@ -334,7 +334,7 @@ describe("an address naming a product whose release flag is off", () => {
     };
 
     /** @scenario "AC1b A Dashboards address with the flag off is a 404 with no Dashboards sidebar" */
-    it.each(["/demo/dashboards", "/demo/dashboards/agent-flight-deck"])(
+    it.each(["/demo/dashboards", "/demo/dashboards/agent-flight-deck", "/demo/insights"])(
       "draws the not-found page at %s with no product sidebar around it",
       (pathname) => {
         renderShell({
