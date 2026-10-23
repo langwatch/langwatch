@@ -683,6 +683,13 @@ Feature: Authorization grants
     And it keeps the compiled condition
     And a braid no person made, or a shared read no braid made, names no creator
 
+  @integration
+  Scenario: A braid's row keeps the braid it replaces through a later write
+    Given a braid's row is written naming the braid it replaces
+    When it is read back
+    Then it names that braid
+    And a later write of the same row naming another braid replaces it
+
   @unit
   Scenario: A braid is never honoured before the release that ships its fence
     Given a reader project holding braids with and without a condition beside a trace read
