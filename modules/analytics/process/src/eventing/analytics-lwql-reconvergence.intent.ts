@@ -145,7 +145,7 @@ async function convergeStore({
     return true;
   } catch (error) {
     const at = now();
-    const run = await readUnconfirmedRun({ error, unconfirmedSince, at });
+    const run = await readUnconfirmedRun({ store, error, unconfirmedSince, at });
     if (run.open && at - run.since < LWQL_UNCONFIRMED_ALERT_AFTER_MS) {
       logger.warn(
         { ...failureCodeFields(store, error), ...driftFields(only), unconfirmedSince: run.since },
@@ -186,18 +186,22 @@ type LwqlUnconfirmedRun =
   | { readonly open: true; readonly since: number };
 
 /**
- * Extends the shared run when this failure is an unconfirmed collection; otherwise ends it.
+ * Extends the shared run when this ClickHouse failure is an unconfirmed collection; otherwise
+ * ends it. The run is ClickHouse's alone, so a PostgreSQL failure leaves it as it is.
  * An unreadable run reads as closed, so the check alerts rather than stays silent.
  */
 async function readUnconfirmedRun({
+  store,
   error,
   unconfirmedSince,
   at,
 }: {
+  store: LwqlStore;
   error: unknown;
   unconfirmedSince: LwqlUnconfirmedSinceRepository;
   at: number;
 }): Promise<LwqlUnconfirmedRun> {
+  if (store !== "clickHouse") return { open: false };
   if (!isCollectionUnconfirmed(error)) {
     await endUnconfirmedRun(unconfirmedSince);
     return { open: false };
@@ -240,6 +244,22 @@ async function fillKeyMapOrThrow(
   }
 }
 
+/**
+ * Whether this check's converge left the key map in place where it was missing. A converge that
+ * failed on another object may still have created it, so the catalog is read again.
+ */
+async function isKeyMapRebuilt({
+  findDrift,
+  clickHouseConverged,
+}: {
+  findDrift: LwqlReconvergenceRunDeps["findDrift"];
+  clickHouseConverged: boolean;
+}): Promise<boolean> {
+  if (clickHouseConverged) return true;
+  const after = await findDrift().catch((): undefined => undefined);
+  return after !== undefined && !after.isKeyMapMissing;
+}
+
 /** The SQL-mode owner probe: re-provisions once neither store owns the access model. */
 async function probeAccessModel({
   probe,
@@ -255,7 +275,7 @@ const FIRST_DELIVERY = { attempt: 1 };
 
 /**
  * One check: read which app-owned objects are absent, converge PostgreSQL then ClickHouse where
- * either does, fill the key map when asked or once a converge repaired it, then the SQL-mode
+ * either does, fill the key map when asked or once a converge rebuilt it, then the SQL-mode
  * owner probe. Any worker may run any check; the closure only rates the failure log's level.
  */
 export function runLwqlReconvergence(
@@ -287,9 +307,12 @@ export function runLwqlReconvergence(
     // Unread is not converged: an unreadable catalog leaves the last alert as it was.
     if (drift !== undefined) await converge("postgres", drift);
     const clickHouseConverged = drift === undefined || (await converge("clickHouse", drift));
-    const keyMapRepaired = drift?.isKeyMapMissing === true;
+    const isKeyMapMissing = drift?.isKeyMapMissing === true;
     try {
-      if ((fillKeyMap || keyMapRepaired) && (!keyMapRepaired || clickHouseConverged)) {
+      const keyMapRepaired =
+        isKeyMapMissing &&
+        (await isKeyMapRebuilt({ findDrift: deps.findDrift, clickHouseConverged }));
+      if ((fillKeyMap && !isKeyMapMissing) || keyMapRepaired) {
         await fillKeyMapOrThrow(deps.fillKeyMap);
       }
     } finally {

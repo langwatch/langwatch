@@ -132,16 +132,32 @@ function unconfirmed(): Error {
   });
 }
 
-/** `workers` fresh workers sharing one clock, taking the slots' checks in turn. */
-function fleet({ workers }: { workers: number }) {
+/** PostgreSQL refusing a converge as a role without CREATEROLE does. */
+function postgresRefusal(): Error {
+  return Object.assign(new Error("permission denied"), { code: "P2010", meta: { code: "42501" } });
+}
+
+/**
+ * `workers` fresh workers sharing one clock, taking the slots' checks in turn; with
+ * `postgresRefuses`, every check also finds a PostgreSQL gap whose converge is refused.
+ */
+function fleet({
+  workers,
+  postgresRefuses = false,
+}: {
+  workers: number;
+  postgresRefuses?: boolean;
+}) {
   const world = { now: FIRST_SLOT, converged: false };
   const unconfirmedSince = MemoryLwqlUnconfirmedSinceRepository.create();
+  const postgres = postgresRefuses ? [{ view: "lwql_agents", absent: true }] : [];
   const checks = Array.from({ length: workers }, () =>
     runLwqlReconvergence({
       probe: () => Promise.resolve("config_store"),
       converge: () => Promise.resolve(),
-      findDrift: async () => (world.converged ? healthy : staleEngineTable),
-      convergeAppOwned: () => Promise.reject(unconfirmed()),
+      findDrift: async () => (world.converged ? healthy : { ...staleEngineTable, postgres }),
+      convergeAppOwned: (half) =>
+        Promise.reject(half.clickHouse.length === 0 ? postgresRefusal() : unconfirmed()),
       fillKeyMap: () => Promise.resolve(),
       unconfirmedSince,
       now: () => world.now,
@@ -431,6 +447,17 @@ describe("given a check over the app-owned objects", () => {
       expect(await alertsOfNextCheck()).toEqual([ALERT]);
     });
 
+    /** @scenario "A collection that stays unconfirmed alerts 15 minutes after the first failed check" */
+    it("alerts 15 minutes after the first failed check while PostgreSQL fails every check too", async () => {
+      const { alertsOfNextCheck } = fleet({ workers: 1, postgresRefuses: true });
+      const quiet = LWQL_UNCONFIRMED_ALERT_AFTER_MS / LWQL_RECONVERGENCE_INTERVAL_MS;
+
+      for (let slot = 0; slot < quiet; slot++) {
+        expect(await alertsOfNextCheck()).not.toContain(ALERT);
+      }
+      expect(await alertsOfNextCheck()).toContain(ALERT);
+    });
+
     describe("when Redis does not answer, as its offline queue does while it is down", () => {
       /** @scenario "A collection that stays unconfirmed alerts 15 minutes after the first failed check" */
       it("gives up on reading the clock after the timeout and alerts at once", async () => {
@@ -538,6 +565,26 @@ describe("given a check over the app-owned objects", () => {
       expect(fillKeyMap).toHaveBeenCalledTimes(1);
       await check({ fillKeyMap: true });
       expect(fillKeyMap).toHaveBeenCalledTimes(2);
+    });
+
+    /** @scenario "The reconvergence check fills the key-map rows a project lacks" */
+    it("fills in the same check when its converge rebuilt the key map but another object failed", async () => {
+      const missing = new Set(["api_key_tenants", "agents_pg"]);
+      const { check, fillKeyMap } = workerOver(clickHouseWorld({ missing: [] }), {
+        findDrift: async () => ({
+          clickHouse: [...missing],
+          postgres: [],
+          isKeyMapMissing: missing.has("api_key_tenants"),
+        }),
+        convergeAppOwned: async () => {
+          missing.delete("api_key_tenants");
+          throw new Error("Code: 614. DB::Exception: connection failed");
+        },
+      });
+
+      await check(wakeOnce);
+
+      expect(fillKeyMap).toHaveBeenCalledTimes(1);
     });
 
     /** @scenario "The reconvergence check fills the key-map rows a project lacks" */

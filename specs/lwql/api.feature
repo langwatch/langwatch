@@ -1163,6 +1163,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Then the check leaves that engine table in place, logs at warn which read failed with no secret, and fails the converge
     And it still creates an absent engine table, unstamped
     And a deploy's converge replaces the engine tables unstamped, so a later check rebuilds them
+    And a sql-mode deploy stamps them unprobed only once its own batch rewrote the collection, and reads first where that rewrite was skipped
     And the next check reads again
 
   # A replica that has not loaded the new collection would build its copy of a replaced table on
@@ -1185,6 +1186,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Then each logs a warning until a check runs 15 minutes or more after the first, which logs the ClickHouse alert at error with its error_signature
     And while it holds the alert repeats hourly, like any other failed converge
     And a check that converges the tables starts the clock again
+    And a PostgreSQL failure in the same checks leaves the clock running
 
   @integration
   Scenario: A rotated reader password reaches the engine tables without a ClickHouse restart

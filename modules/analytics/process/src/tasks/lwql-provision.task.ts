@@ -27,6 +27,7 @@ import type { LwqlProvisioningDatabase } from "../repositories/langwatch-ql-post
 import type {
   LangWatchQLProvisioningRepository,
   ProvisioningFailureLevel,
+  SkippedProvisioningStatement,
 } from "../repositories/langwatch-ql-provisioning.repository.ts";
 import { PrismaLangWatchQLPostgresRepository } from "../repositories/prisma/prisma.langwatch-ql-postgres.repository.ts";
 import { collectionUnconfirmedError } from "../rules/langwatch-ql-collection-probe.rules.ts";
@@ -34,6 +35,7 @@ import {
   clickHouseErrorCodeFields,
   clickHouseErrorSummary,
   postgresErrorCodeFields,
+  statementKind,
 } from "../rules/langwatch-ql-config-store.rules.ts";
 import type { LangWatchQLNames } from "../services/langwatch-ql-access-model.service.ts";
 import { LangWatchQLSqlModeClusterGuardService } from "../services/langwatch-ql-sql-mode-cluster-guard.service.ts";
@@ -327,6 +329,19 @@ async function gateEngineTables({
   };
 }
 
+function isNamedCollectionKind(kind: string): boolean {
+  return kind.endsWith("NAMED COLLECTION");
+}
+
+/** The position just past a batch's last named-collection statement; 0 when it has none. */
+function afterNamedCollection(statements: readonly string[]): number {
+  return statements.reduce(
+    (split, statement, index) =>
+      isNamedCollectionKind(statementKind(statement)) ? index + 1 : split,
+    0,
+  );
+}
+
 /** Inventory, app-function probe, SQL-mode guard, then the statements; the key map is a step's. */
 async function convergeClickHouse({
   repository,
@@ -352,35 +367,45 @@ async function convergeClickHouse({
   if (mode === "sql") {
     await clusterGuard.assertSafe({ query: (sql) => repository.queryRows(sql), source });
   }
-  // A sql-mode deploy creates the collection in its own batch, so it stamps unprobed. A check
-  // probes in either mode: it never recreates the collection, and an unstamped table would loop.
-  const gate: LwqlEngineTableGate =
-    mode === "sql" && only === undefined
-      ? { collectionLoaded: false, only }
-      : await gateEngineTables({
-          repository,
-          request,
-          names,
-          only,
-          cluster: source.CLICKHOUSE_CLUSTER || undefined,
-        });
-  const result = await repository.runStatements({
-    configStoreEntities,
-    failureLevel,
-    statements: selfProvisioning.clickHouseStatements({
+  const render = ({ collectionLoaded, only: drifted }: LwqlEngineTableGate) =>
+    selfProvisioning.clickHouseStatements({
       names,
       restrictedPassword: request.connection.password,
       sourceDatabase,
       postgres: { endpoint: request.endpoint, readerPassword: request.postgresReaderPassword },
       includeAppFunctions,
       mode,
-      collectionLoaded: gate.collectionLoaded,
-      ...(gate.only === undefined ? {} : { only: gate.only }),
-    }),
-  });
-  if (result.skipped.length > 0) {
+      collectionLoaded,
+      ...(drifted === undefined ? {} : { only: drifted }),
+    });
+  const run = async (statements: readonly string[]) =>
+    (await repository.runStatements({ configStoreEntities, failureLevel, statements })).skipped;
+  const gateByProbe = () =>
+    gateEngineTables({
+      repository,
+      request,
+      names,
+      only,
+      cluster: source.CLICKHOUSE_CLUSTER || undefined,
+    });
+  let gate: LwqlEngineTableGate;
+  let skipped: SkippedProvisioningStatement[];
+  if (mode === "sql" && only === undefined) {
+    // A sql-mode deploy rewrites the collection before its engine tables: they stamp unprobed only
+    // once that ran. A check probes in either mode: it never rewrites the collection.
+    const unprobed: LwqlEngineTableGate = { collectionLoaded: true, only };
+    const statements = render(unprobed);
+    const split = afterNamedCollection(statements);
+    const head = await run(statements.slice(0, split));
+    gate = head.some((s) => isNamedCollectionKind(s.kind)) ? await gateByProbe() : unprobed;
+    skipped = [...head, ...(await run(render(gate).slice(split)))];
+  } else {
+    gate = await gateByProbe();
+    skipped = await run(render(gate));
+  }
+  if (skipped.length > 0) {
     logger.warn(
-      { skippedCount: result.skipped.length },
+      { skippedCount: skipped.length },
       "lwql provisioning yielded to config-store-owned entities and provisioned the rest",
     );
   }

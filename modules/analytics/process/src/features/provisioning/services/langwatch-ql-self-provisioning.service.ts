@@ -256,7 +256,7 @@ export class LangWatchQLSelfProvisioningService {
     mode?: LwqlAccessModelMode;
     /** The reconvergence check's drift: only these app-owned objects, never the access entities. */
     only?: readonly string[];
-    /** A probe showed ClickHouse holds the app's collection values: engine tables are stamped. */
+    /** The task found ClickHouse holds the app's collection values: engine tables are stamped. */
     collectionLoaded?: boolean;
   }): string[] {
     if (names.database !== sourceDatabase) {
@@ -265,9 +265,7 @@ export class LangWatchQLSelfProvisioningService {
       );
     }
     const collection = this.namedCollection({ names });
-    // A sql-mode deploy creates the collection itself, synchronously, before its engine tables.
-    const stamped = collectionLoaded || (only === undefined && mode === "sql");
-    const credentialFingerprint = stamped
+    const credentialFingerprint = collectionLoaded
       ? this.credentialFingerprint({ names, postgres })
       : undefined;
     if (only !== undefined) {

@@ -498,6 +498,44 @@ describe("convergeLwqlAccessModel", () => {
       for (const statement of replaced) expect(statement).not.toContain("COMMENT");
     });
 
+    describe("when a sql-mode deploy converges", () => {
+      const deploy = async (clickHouse: ReturnType<typeof clickHouseThat>) => {
+        await convergeLwqlAccessModel({
+          database: postgresThat({ refuses: false }).database,
+          plan: clickHouse.plan,
+          failOnError: true,
+        });
+        return clickHouse.ran.filter((s) => s.includes("ENGINE = PostgreSQL"));
+      };
+
+      /** @scenario "An engine table carries a fingerprint of the named collection's values, never the password" */
+      it("stamps the engine tables unprobed once its own batch rewrote the collection", async () => {
+        const clickHouse = clickHouseThat({ present: engineTables, mode: "sql" });
+
+        const replaced = await deploy(clickHouse);
+
+        expect(replaced.length).toBe(engineTables.length);
+        for (const statement of replaced) expect(statement).toContain(fingerprint);
+        expect(clickHouse.probed).toEqual([]);
+      });
+
+      /** @scenario "No engine table is rebuilt until ClickHouse holds the app's collection values" */
+      it("probes when the collection statements were skipped, and leaves the tables unstamped when a read fails", async () => {
+        const clickHouse = clickHouseThat({
+          present: engineTables,
+          mode: "sql",
+          failing: /^(DROP|CREATE) NAMED COLLECTION/,
+          failingProbe: "collection",
+        });
+
+        const replaced = await deploy(clickHouse);
+
+        expect(clickHouse.probed).toHaveLength(1);
+        expect(replaced.length).toBe(engineTables.length);
+        for (const statement of replaced) expect(statement).not.toContain("COMMENT");
+      });
+    });
+
     /** @scenario "The reconvergence check rebuilds an engine table built on other credentials" */
     it("probes on a sql-mode check too, so the next check finds its rebuilt table converged", async () => {
       const clickHouse = clickHouseThat({ present: [stale], mode: "sql" });

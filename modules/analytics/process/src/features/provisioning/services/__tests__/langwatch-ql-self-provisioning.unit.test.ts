@@ -382,14 +382,15 @@ describe("given whether ClickHouse holds the app's collection values", () => {
     });
 
     /** @scenario "An engine table carries a fingerprint of the named collection's values, never the password" */
-    it("stamps a sql-mode deploy, whose own batch creates the collection first", () => {
+    it("orders a sql-mode deploy's collection first and leaves stamping to the task", () => {
       const statements = statementsWithCollection({ collectionLoaded: false, mode: "sql" });
       const collectionAt = statements.findIndex((s) => s.startsWith("CREATE NAMED COLLECTION"));
       const engineTableAt = statements.findIndex((s) => s.includes("ENGINE = PostgreSQL"));
 
       expect(collectionAt).toBeGreaterThanOrEqual(0);
       expect(engineTableAt).toBeGreaterThan(collectionAt);
-      for (const statement of engineTablesOf(statements)) expect(statement).toContain(fingerprint);
+      for (const statement of engineTablesOf(statements))
+        expect(statement).not.toContain("COMMENT");
     });
   });
 });
