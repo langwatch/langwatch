@@ -23,7 +23,12 @@ import {
   type InstantEvalRateLimiter,
 } from "../channels/instant-eval-classifier.channel.ts";
 import type { InstantEvalDecisionModelChannel } from "../channels/instant-eval-decision-model.channel.ts";
+import { hostedDecisionsApiKey } from "../channels/instant-eval-hosted-decisions.channel.ts";
 import type { InstantEvalJudgeChannels } from "../channels/instant-eval-judge.channels.ts";
+import {
+  llmJudgeAnthropicApiKey,
+  llmJudgeOpenAiApiKey,
+} from "../channels/instant-eval-llm-judge.channel.ts";
 import {
   buildInstantEvalJudgeFactsPipeline,
   type InstantEvalJudgeFactsPipeline,
@@ -59,8 +64,13 @@ export class InstantEvalJudgeModule implements InstantEvalJudgeApi {
   static readonly contract = InstantEvalJudgeApi;
   static readonly dependencies = {};
   static readonly config = instantEvalJudgeConfig;
-  /** LangWatch's classifier key, read only where LangWatch runs the install. */
-  static readonly secrets = { classifierApiKey } as const;
+  /** LangWatch's classifier and router keys, read only where LangWatch runs the install. */
+  static readonly secrets = {
+    classifierApiKey,
+    hostedDecisionsApiKey,
+    llmJudgeAnthropicApiKey,
+    llmJudgeOpenAiApiKey,
+  } as const;
 
   readonly #facts: InstantEvalJudgeFactsService;
   readonly #classifier: InstantEvalClassifierChannel | undefined;

@@ -49,7 +49,7 @@ export class HttpInstantEvalDecisionModelChannel implements InstantEvalDecisionM
   }
 
   async classify(
-    { text, questions, decisionModel }: InstantEvalDecisionModelRequest,
+    { text, questions, decisionModel, isBilledToLangWatch }: InstantEvalDecisionModelRequest,
     signal?: AbortSignal,
   ): Promise<InstantEvalJudgement> {
     const limits = INSTANT_EVAL_CLASSIFIER_LIMITS;
@@ -80,10 +80,9 @@ export class HttpInstantEvalDecisionModelChannel implements InstantEvalDecisionM
             reason: "classifier_provider_unavailable",
             model: decisionModel.model,
           });
-        // The provider bills the organization, so nothing here is billed by LangWatch (ADR-182).
         return {
           verdicts: readClassifierVerdicts({ questions, response }),
-          inputTokens: 0,
+          inputTokens: billedInputTokensOf({ isBilledToLangWatch, response }),
           isTextTruncated: prepared.isTruncated,
         };
       }
@@ -158,6 +157,17 @@ export class HttpInstantEvalDecisionModelChannel implements InstantEvalDecisionM
     logger.warn({ model, reason, status }, "Own decision model call did not answer");
     return instantEvalSkipped(reason);
   }
+}
+
+/** An own model bills the organization, so LangWatch bills nothing for it (ADR-182). */
+function billedInputTokensOf({
+  isBilledToLangWatch,
+  response,
+}: {
+  isBilledToLangWatch: boolean | undefined;
+  response: { usage?: { input_tokens?: number } | undefined };
+}): number {
+  return isBilledToLangWatch ? (response.usage?.input_tokens ?? 0) : 0;
 }
 
 function waitMs({ attempt, retryAfter }: { attempt: number; retryAfter: string | null }): number {
