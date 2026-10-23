@@ -126,6 +126,34 @@ If the CronJob is genuinely gone, either the release was deployed with
 retired should be removed from `backup.monitoring.targets` in the same change
 that removes the CronJob, not left to alert.
 
+## Sidecar mode
+
+With `backup.mode=sidecar` or `cronjob-observe` the rules read the sidecar's own
+metrics (`clickhouse_backup_*`, scraped from `/metrics` on port 8125; enable
+`backup.sidecar.podMonitor`). In `cronjob-observe` both sets render. The design
+is [ADR-191](../adr/191-clickhouse-serverless-backups-run-in-the-ch-config-sidecar.md).
+
+| Alert                             | Severity | Means                                                                  |
+| --------------------------------- | -------- | ---------------------------------------------------------------------- |
+| `ClickHouseBackupStale`           | critical | No completed backup of a mode inside its window, or none ever          |
+| `ClickHouseBackupFailing`         | warning  | The runner's last attempt of a mode failed                             |
+| `ClickHouseBackupNoRunner`        | critical | No sidecar reports itself as runner, or no sidecar is scraped at all   |
+| `ClickHouseBackupMultipleRunners` | warning  | Two sidecars both elected themselves; the in-flight check still guards |
+| `ClickHouseBackupConfigError`     | critical | A sidecar's backup env is invalid, so it schedules nothing             |
+
+To see what a sidecar thinks, read its status and logs:
+
+```bash
+kubectl exec <pod> -c backup -- curl -s http://127.0.0.1:8125/status
+kubectl logs <pod> -c backup
+```
+
+Use `-c access` when ClickHouse access is enabled. `/status` names the runner,
+the last success, attempt and failure per mode, and the reason for the last
+decision. A config error names the variable in the log. `NoRunner` with every
+sidecar up usually means the replicas cannot reach each other over the cluster;
+the preferred ordinal (`backup.sidecar.runnerOrdinal`) still runs when it is up.
+
 ## Tuning
 
 `staleAfterHours` should be at least two scheduling intervals. One interval

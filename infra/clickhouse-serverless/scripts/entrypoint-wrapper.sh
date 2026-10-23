@@ -9,6 +9,7 @@ ch-config generate /etc/clickhouse-server
 # access_management). Its initdb step and CLICKHOUSE_DB still log in as
 # default, so they get the password ch-config used, and only they do.
 export CLICKHOUSE_SKIP_USER_SETUP=1
+default_password_file="${CLICKHOUSE_PASSWORD_FILE:-}"
 # Dynamic-only mode (ADR-190): default has no password, so initdb logs in as
 # the local admin with the password ch-config generated for this start.
 bootstrap_password="${CLICKHOUSE_ACCESS_BOOTSTRAP_DIR:-/run/clickhouse-access}/password"
@@ -40,9 +41,27 @@ fi
 
 # With an access file and no sidecar container of its own (the chart runs one
 # and sets CLICKHOUSE_ACCESS_SIDECAR=external), run it here, restarted if it
-# exits: token logins and password rotation depend on it (ADR-190).
+# exits: token logins and password rotation depend on it (ADR-190). Scheduled
+# backups (BACKUP_SIDECAR=run|observe) run in the same process (ADR-191).
+embedded_access=""
 if [ -n "${CLICKHOUSE_ACCESS_FILE:-}" ] && [ "${CLICKHOUSE_ACCESS_SIDECAR:-embedded}" = "embedded" ]; then
-    (unset CLICKHOUSE_PASSWORD; while true; do ch-config sidecar /etc/clickhouse-server || true; sleep 2; done) &
+    embedded_access=1
+fi
+embedded_backups=""
+case "${BACKUP_SIDECAR:-off}" in off | "") ;; *) embedded_backups=1 ;; esac
+if [ -n "$embedded_access" ] || [ -n "$embedded_backups" ]; then
+    (
+        unset CLICKHOUSE_PASSWORD
+        # initdb's local_admin login is not the backup user.
+        [ -z "$initdb_user" ] || unset CLICKHOUSE_USER
+        [ -n "$embedded_access" ] || unset CLICKHOUSE_ACCESS_FILE
+        # Backups log in from a file only: the local admin's when dynamic-only,
+        # else BACKUP_PASSWORD_FILE or the server's own password file.
+        if [ -n "$embedded_backups" ]; then
+            export BACKUP_PASSWORD_FILE="${BACKUP_PASSWORD_FILE:-$default_password_file}"
+        fi
+        while true; do ch-config sidecar /etc/clickhouse-server || true; sleep 2; done
+    ) &
 fi
 
 exec /entrypoint.sh "$@" --config-file=/etc/clickhouse-server/config.xml

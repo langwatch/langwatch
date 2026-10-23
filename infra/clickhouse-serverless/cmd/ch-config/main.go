@@ -8,12 +8,14 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"sync"
 	"syscall"
 	"time"
 
 	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/access"
+	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/backup"
 	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/bootstrap"
 	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/config"
 	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/render"
@@ -22,6 +24,8 @@ import (
 const usage = `Usage:
   ch-config generate <output-dir>   render config.d and users.d from env
   ch-config sidecar <output-dir>    keep the access users current (CLICKHOUSE_ACCESS_FILE)
+                                    and run scheduled backups (BACKUP_SIDECAR)
+  ch-config backup <run|restore|list> [flags]   one-shot backup commands
 `
 
 func main() {
@@ -29,7 +33,6 @@ func main() {
 		fmt.Fprint(os.Stderr, usage)
 		os.Exit(1)
 	}
-	outputDir := os.Args[2]
 
 	log, err := zap.NewProduction()
 	if err != nil {
@@ -40,9 +43,13 @@ func main() {
 
 	switch os.Args[1] {
 	case "generate":
-		generate(log, outputDir)
+		generate(log, os.Args[2])
 	case "sidecar":
-		sidecar(log, outputDir)
+		sidecar(log, os.Args[2])
+	case "backup":
+		code := backupCommand(log, os.Args[2:], os.Stdout)
+		_ = log.Sync()
+		os.Exit(code)
 	default:
 		fmt.Fprint(os.Stderr, usage)
 		os.Exit(1)
@@ -72,13 +79,37 @@ func generate(log *zap.Logger, outputDir string) {
 	}
 }
 
-// sidecar needs only the access file and the users.d it shares with the
-// server: it never sees the default password or the server's sizing.
+// sidecar runs whichever of its jobs is configured: the access users
+// (CLICKHOUSE_ACCESS_FILE) and scheduled backups (BACKUP_SIDECAR). Backups
+// never end the process, which shares the pod with ClickHouse.
 func sidecar(log *zap.Logger, outputDir string) {
 	accessFile := os.Getenv("CLICKHOUSE_ACCESS_FILE")
-	if accessFile == "" {
-		log.Fatal("CLICKHOUSE_ACCESS_FILE is required in sidecar mode")
+	backupCfg, backupErr := backup.LoadConfig(os.Getenv)
+	backups := backupCfg.Sidecar != backup.SidecarOff
+	if accessFile == "" && !backups {
+		log.Fatal("sidecar mode needs CLICKHOUSE_ACCESS_FILE or BACKUP_SIDECAR=run|observe")
 	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	defer stop()
+
+	var wg sync.WaitGroup
+	if backups {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			backup.RunSidecar(ctx, backupCfg, backupErr, log)
+		}()
+	}
+	if accessFile != "" {
+		runAccess(ctx, log, accessFile, outputDir)
+	}
+	wg.Wait()
+}
+
+// runAccess needs only the access file and the users.d it shares with the
+// server: it never sees the default password or the server's sizing.
+func runAccess(ctx context.Context, log *zap.Logger, accessFile, outputDir string) {
 	listen := os.Getenv("CLICKHOUSE_ACCESS_LISTEN")
 	if listen == "" {
 		listen = "127.0.0.1:8124"
@@ -86,9 +117,6 @@ func sidecar(log *zap.Logger, outputDir string) {
 	if err := access.ValidateListen(listen); err != nil {
 		log.Fatal("invalid listen address", zap.Error(err))
 	}
-
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
-	defer stop()
 
 	verifier := &access.Verifier{Now: time.Now, Log: log}
 	syncer := &access.Syncer{

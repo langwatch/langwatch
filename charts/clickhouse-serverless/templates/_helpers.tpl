@@ -99,8 +99,8 @@ app.kubernetes.io/component: keeper
     {{- if and (gt (int .Values.replicas) 1) (not .Values.auth.clusterSecretEnabled) }}
       {{- fail "access.dynamicOnly.enabled with replicas > 1 needs auth.clusterSecretEnabled: replicas would otherwise log in to each other as default, which is locked" }}
     {{- end }}
-    {{- if .Values.backup.enabled }}
-      {{- fail "access.dynamicOnly.enabled cannot run the backup CronJobs: they log in as default with the static password, which this mode removes" }}
+    {{- if and .Values.backup.enabled (ne (include "clickhouse-serverless.backupMode" .) "sidecar") }}
+      {{- fail "access.dynamicOnly.enabled cannot run the backup CronJobs: they log in as default with the static password, which this mode removes. Set backup.mode=sidecar: the sidecar logs in as the per-boot local admin" }}
     {{- end }}
     {{- if .Values.access.passwordSecrets }}
       {{- fail "access.dynamicOnly.enabled refuses access.passwordSecrets: rolling passwords are long-lived, use token logins" }}
@@ -216,3 +216,22 @@ app.kubernetes.io/component: keeper
 {{- default "clusterSecret" .Values.auth.secretKeys.clusterSecretKey -}}
 {{- end -}}
 
+
+{{/* Backup mode (ADR-191): "cronjob", "sidecar" or "cronjob-observe". */}}
+{{- define "clickhouse-serverless.backupMode" -}}
+{{- $mode := .Values.backup.mode | default "cronjob" -}}
+{{- if not (has $mode (list "cronjob" "sidecar" "cronjob-observe")) -}}
+{{- fail (printf "backup.mode must be cronjob, sidecar or cronjob-observe, got %q" $mode) -}}
+{{- end -}}
+{{- $mode -}}
+{{- end -}}
+
+{{/* "true" when backup CronJobs render. */}}
+{{- define "clickhouse-serverless.backupCronJobs" -}}
+{{- if and .Values.backup.enabled (ne (include "clickhouse-serverless.backupMode" .) "sidecar") }}true{{ end -}}
+{{- end -}}
+
+{{/* "true" when the ch-config sidecar runs backups (or observes them). */}}
+{{- define "clickhouse-serverless.backupSidecar" -}}
+{{- if and .Values.backup.enabled (ne (include "clickhouse-serverless.backupMode" .) "cronjob") }}true{{ end -}}
+{{- end -}}

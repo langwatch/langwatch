@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # E2E test: exercises the shipped /scripts/backup-data.sh and /scripts/restore-data.sh
-# via docker exec, exactly as the Helm CronJobs would run them.
-# Uses RustFS as S3-compatible storage.
+# via docker exec, exactly as the Helm CronJobs would run them, then the backup
+# sidecar (ADR-191): a full that survives a sidecar restart, an incremental chained
+# on it, and a restore. Uses RustFS as S3-compatible storage.
 # Usage: ./tests/e2e-backup-test.sh [image:tag]
 set -euo pipefail
 
@@ -126,9 +127,22 @@ run_restore() {
 }
 
 echo ""
-echo "=== Phase 1: Create data and full backup ==="
+echo "=== Phase 0: An incremental with no full ever writes nothing and exits 0 ==="
 
 query "CREATE DATABASE IF NOT EXISTS e2e"
+if run_backup incremental; then
+    echo "  PASS: incremental with no full exited 0"
+    pass=$((pass + 1))
+else
+    echo "  FAIL: incremental with no full should stand down with exit 0"
+    fail=$((fail + 1))
+fi
+check "no incremental written without a full" \
+    "SELECT count() FROM system.backups WHERE id LIKE 'e2e_incremental_%'" "0"
+
+echo ""
+echo "=== Phase 1: Create data and full backup ==="
+
 query "CREATE TABLE e2e.events (
     ts DateTime,
     msg String,
@@ -194,6 +208,25 @@ check "incremental restored rows" "SELECT count() FROM e2e.events" "5"
 check "incremental restored checksum" "SELECT sum(value) FROM e2e.events" "1500"
 
 echo ""
+echo "=== Phase 3b: A second incremental chains on the first ==="
+
+query "INSERT INTO e2e.events VALUES ('2025-01-01 00:00:05', 'event_f', 600)"
+sleep 1 # backup names have one-second resolution
+run_backup incremental
+INCR2_BACKUP_NAME=$(query "SELECT id FROM system.backups WHERE id LIKE 'e2e_incremental_%' AND status = 'BACKUP_CREATED' ORDER BY start_time DESC LIMIT 1" | tr -d '[:space:]')
+if [ "$INCR2_BACKUP_NAME" = "$INCR_BACKUP_NAME" ]; then
+    echo "  FAIL: no second incremental was written"
+    fail=$((fail + 1))
+fi
+query "SYSTEM FLUSH LOGS"
+check "second incremental is based on the first" \
+    "SELECT countIf(query LIKE '%base_backup = Disk(\\'backups\\', \\'${INCR_BACKUP_NAME}\\')%') > 0 FROM system.query_log WHERE query LIKE 'BACKUP DATABASE%${INCR2_BACKUP_NAME}%' SETTINGS log_queries = 0" "1"
+query "DROP TABLE e2e.events SYNC"
+run_restore "$INCR2_BACKUP_NAME"
+check "chained restore rows" "SELECT count() FROM e2e.events" "6"
+check "chained restore checksum" "SELECT sum(value) FROM e2e.events" "2100"
+
+echo ""
 echo "=== Phase 4: Verify CONFIRM_RESTORE guard ==="
 
 # Drop the target table so a real restore would succeed if the guard were broken.
@@ -215,6 +248,88 @@ else
     echo "  PASS: restore-data.sh correctly rejected CONFIRM_RESTORE=no"
     pass=$((pass + 1))
 fi
+
+echo ""
+echo "=== Phase 5: The sidecar survives a restart mid-backup, then chains and restores ==="
+
+SERVER_STARTED=$(query "SELECT toUnixTimestamp(now()) - uptime()" | tr -d '[:space:]')
+query "CREATE DATABASE IF NOT EXISTS e2e_side"
+query "CREATE TABLE e2e_side.blob (n UInt64, payload String) ENGINE = MergeTree ORDER BY n"
+# ~40 MB of incompressible data at 2 MiB/s keeps the full in flight for ~20s.
+query "INSERT INTO e2e_side.blob SELECT number, randomString(1000) FROM numbers(40000)"
+docker exec "$CH" sh -c 'printf test123 > /tmp/backup-password'
+
+start_sidecar() {
+    docker exec -d \
+        -e BACKUP_SIDECAR=run \
+        -e BACKUP_USER=default \
+        -e BACKUP_PASSWORD_FILE=/tmp/backup-password \
+        -e BACKUP_DATABASE=e2e_side \
+        -e BACKUP_FULL_SCHEDULE='0 0 1 1 *' \
+        -e BACKUP_INCREMENTAL_SCHEDULE='* * * * *' \
+        -e BACKUP_MAX_BANDWIDTH=2097152 \
+        -e BACKUP_METRICS_LISTEN=127.0.0.1:8125 \
+        "$CH" sh -c 'echo $$ > /tmp/sidecar.pid; exec ch-config sidecar /etc/clickhouse-server'
+}
+stop_sidecar() { docker exec "$CH" sh -c 'kill "$(cat /tmp/sidecar.pid)"' || true; }
+wait_for() { # <description> <query> <expected> <seconds>
+    local i
+    for i in $(seq 1 "$4"); do
+        [ "$(query "$2" | tr -d '[:space:]')" = "$3" ] && return 0
+        sleep 1
+    done
+    echo "  FAIL: timed out waiting for $1"
+    fail=$((fail + 1))
+}
+
+# No full has ever been taken of e2e_side, so the yearly full is owed at once.
+start_sidecar
+wait_for "the sidecar to start a full" \
+    "SELECT count() FROM system.backups WHERE id LIKE 'e2e_side_full_%' AND status = 'CREATING_BACKUP'" "1" 30
+stop_sidecar
+sleep 3
+check "the full carries on with the sidecar gone" \
+    "SELECT status FROM system.backups WHERE id LIKE 'e2e_side_full_%'" "CREATING_BACKUP"
+
+start_sidecar
+wait_for "the adopted full to complete" \
+    "SELECT status FROM system.backups WHERE id LIKE 'e2e_side_full_%' ORDER BY start_time DESC LIMIT 1" "BACKUP_CREATED" 180
+check "the restarted sidecar adopted the full, not started a second" \
+    "SELECT count() FROM system.backups WHERE id LIKE 'e2e_side_full_%'" "1"
+sleep 2
+METRICS=$(docker exec "$CH" curl -sf http://127.0.0.1:8125/metrics || true)
+for want in 'clickhouse_backup_runner 1' 'clickhouse_backup_last_success_timestamp_seconds{mode="full"}' 'clickhouse_backup_failures_total{mode="full"} 0'; do
+    if grep -qF "$want" <<<"$METRICS"; then
+        echo "  PASS: metrics carry $want"; pass=$((pass + 1))
+    else
+        echo "  FAIL: metrics lack $want"; fail=$((fail + 1))
+    fi
+done
+if docker exec "$CH" curl -sf http://127.0.0.1:8125/status | grep -q '"last_outcome": "succeeded"'; then
+    echo "  PASS: status reports the adopted full"; pass=$((pass + 1))
+else
+    echo "  FAIL: status does not report the adopted full"; fail=$((fail + 1))
+fi
+
+query "INSERT INTO e2e_side.blob SELECT number + 40000, randomString(10) FROM numbers(100)"
+# The minute tick may already have chained an incremental on the full, before
+# this insert. Only one that started in a later second can hold these rows.
+INSERTED_AT=$(query "SELECT toUnixTimestamp(now())" | tr -d '[:space:]')
+AFTER_INSERT="id LIKE 'e2e_side_incremental_%' AND status = 'BACKUP_CREATED' AND toUnixTimestamp(start_time) > ${INSERTED_AT}"
+wait_for "an incremental chained after the insert" \
+    "SELECT count() > 0 FROM system.backups WHERE ${AFTER_INSERT}" "1" 150
+stop_sidecar
+SIDE_INC=$(query "SELECT id FROM system.backups WHERE ${AFTER_INSERT} ORDER BY start_time DESC LIMIT 1" | tr -d '[:space:]')
+query "DROP TABLE e2e_side.blob SYNC"
+docker exec \
+    -e CLICKHOUSE_USER=default \
+    -e CLICKHOUSE_PASSWORD=test123 \
+    -e BACKUP_DATABASE=e2e_side \
+    "$CH" ch-config backup restore --name "$SIDE_INC" --confirm
+check "sidecar chain restore rows" "SELECT count() FROM e2e_side.blob" "40100"
+# Same start time, to the second: uptime alone is under a minute on a fast run.
+check "the server never restarted" \
+    "SELECT abs(toUnixTimestamp(now()) - uptime() - ${SERVER_STARTED}) <= 1" "1"
 
 echo ""
 echo "=== Results: $pass passed, $fail failed ==="

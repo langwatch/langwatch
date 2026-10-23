@@ -33,8 +33,44 @@ cold:
 # Backups: native ClickHouse BACKUP/RESTORE to S3 (requires objectStorage)
 backup:
   enabled: false
+  # Who takes the backups (ADR-191):
+  #   cronjob          CronJobs below, as before (the default)
+  #   sidecar          the ch-config sidecar in every ClickHouse pod, on one
+  #                    elected runner; no backup CronJobs render
+  #   cronjob-observe  CronJobs back up; the sidecar only decides and exports
+  #                    metrics, so its alerts can be checked before switching
+  mode: cronjob
   database: "langwatch"
   user: "default" # ClickHouse user for backup/restore operations
+  # Sidecar mode: the Secret key holding backup.user's password, mounted as a
+  # file. Empty uses the chart's credentials Secret (the default password).
+  passwordSecret:
+    name: ""
+    key: ""
+  # Sidecar mode: how long the backups prefix is kept (the object store's
+  # lifecycle rule), which bounds how old a base may be.
+  retentionDays: 7
+  # Sidecar mode: max_backup_bandwidth in bytes per second (0 = unlimited).
+  maxBandwidth: 0
+  sidecar:
+    # Pod ordinal that runs backups while it answers; else the next one that does.
+    runnerOrdinal: 0
+    # /metrics, /status and /healthz, on the pod IP.
+    metricsPort: 8125
+    # Used when access is off; with access on the shared container takes
+    # access.sidecar.resources.
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        cpu: 200m
+        memory: 128Mi
+    # A prometheus-operator PodMonitor for the sidecar's /metrics.
+    podMonitor:
+      enabled: false
+      interval: 60s
+      labels: {}
   # Resource requests + limits for the backup/restore Job containers.
   # Both are required by clusters that enforce a "limits and requests must
   # be set" policy (Gatekeeper/Kyverno) — a Job without them is denied.
@@ -115,6 +151,17 @@ backup:
       - name: incremental
         cronjob: backup-incremental
         staleAfterHours: 3 # schedule is hourly
+
+    # Sidecar and cronjob-observe modes: rules on the sidecar's own metrics,
+    # one stale alert per mode. Needs the sidecar's /metrics scraped (see
+    # backup.sidecar.podMonitor). `targets` above applies while CronJobs render.
+    sidecar:
+      staleAfterHours:
+        full: 26
+        incremental: 3
+      # PromQL label matchers for the sidecar's series; empty matches this
+      # release's pods: namespace="<ns>", pod=~"<fullname>-[0-9]+".
+      selector: ""
 
 # Authentication
 auth:
