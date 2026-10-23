@@ -69,7 +69,7 @@ catalog:
   '@tanstack/query-async-storage-persister': 5.101.4
   '@tanstack/react-query': 5.101.4
   '@tanstack/react-query-persist-client': 5.101.4
-  '@tanstack/react-table': ^8.21.3
+  '@tanstack/react-table': ^9.2.6
   '@tanstack/react-virtual': ^3.14.5
   '@testcontainers/clickhouse': ^12.1.0
   '@testcontainers/redis': ^12.0.4
