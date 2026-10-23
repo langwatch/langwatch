@@ -21,7 +21,7 @@ Feature: A settlement refused by the automation's own saved configuration
     And the dispatch completes instead of retrying
     And one warning is logged and no error is reported
 
-  @unit
+  @regression @unit
   Scenario: An automation that keeps firing with an invalid saved configuration warns once per window
     Given the automation sends an email to stored recipients that no longer validate
     When several matches settle inside one hour

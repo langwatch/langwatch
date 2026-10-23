@@ -73,7 +73,6 @@ export class AutomationSettlementDispatchService extends AutomationSettlementExe
     } catch (error) {
       this.rethrowIfRetryable({
         error,
-        triggerId: payload.triggerId,
         context: {
           projectId: context.projectId,
           triggerId: payload.triggerId,
@@ -95,7 +94,6 @@ export class AutomationSettlementDispatchService extends AutomationSettlementExe
     } catch (error) {
       this.rethrowIfRetryable({
         error,
-        triggerId: payload.triggerId,
         context: {
           projectId: context.projectId,
           triggerId: payload.triggerId,
@@ -127,22 +125,26 @@ export class AutomationSettlementDispatchService extends AutomationSettlementExe
    */
   private rethrowIfRetryable({
     error,
-    triggerId,
     context,
   }: {
     error: unknown;
-    triggerId: string;
-    context: Record<string, unknown>;
+    context: Record<string, unknown> & { triggerId: string };
   }): void {
     const retryable = !refusesRetry(error);
     if (!retryable && isCustomerConfigurationRefusal(error)) {
-      const suppressed = this.refusalLog.claim({
-        key: `${triggerId}:${error.code}`,
+      const suppressedRefusals = this.refusalLog.claim({
+        key: `${context.triggerId}:${error.code}`,
         now: this.composition.clock.now().epochMilliseconds,
       });
-      if (suppressed === undefined) return;
+      if (suppressedRefusals === undefined) return;
       logger.warn(
-        { ...context, code: error.code, fault: error.fault, error: error.message, suppressed },
+        {
+          ...context,
+          code: error.code,
+          fault: error.fault,
+          error: error.message,
+          suppressedRefusals,
+        },
         "Settlement dispatch refused by the automation's saved configuration; not retrying",
       );
       return;

@@ -245,11 +245,11 @@ export class TriggerSettlementPersistenceService {
   private recordTraceFailure(page: PersistPage, traceId: string, error: unknown): void {
     const retryable = !refusesRetry(error);
     if (!retryable && isCustomerConfigurationRefusal(error)) {
-      const suppressed = this.refusalLog.claim({
+      const suppressedRefusals = this.refusalLog.claim({
         key: `${page.triggerId}:${error.code}`,
         now: this.composition.clock.now().epochMilliseconds,
       });
-      if (suppressed === undefined) return;
+      if (suppressedRefusals === undefined) return;
       logger.warn(
         {
           projectId: page.projectId,
@@ -258,7 +258,7 @@ export class TriggerSettlementPersistenceService {
           code: error.code,
           fault: error.fault,
           error: error.message,
-          suppressed,
+          suppressedRefusals,
         },
         "Persist dispatch refused by the automation's saved configuration; not retrying",
       );
