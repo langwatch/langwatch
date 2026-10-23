@@ -79,6 +79,21 @@ describe("the shared grant shape", () => {
     });
   });
 
+  describe("when a grant that is not a braid names a grant it replaces", () => {
+    it("refuses the grant a braid replaces on any other source's grant", () => {
+      const trace = { type: "trace", from: "2026-10-01T00:00:00.000Z" };
+      const sources = GRANT_EVENT_SOURCES.filter((source) => source !== "braid");
+
+      for (const source of sources) {
+        expect(attach({ source, condition: trace, replacesGrantId: "grant_0" }).success).toBe(
+          false,
+        );
+        expect(attach({ source, condition: trace }).success).toBe(true);
+      }
+      expect(attach({ replacesGrantId: "grant_0" }).success).toBe(true);
+    });
+  });
+
   describe("when a braid is anything but the shared span read", () => {
     it("refuses a braid on the reader's own project or with a role other than project-reader", () => {
       expect(attach({ scope: { type: "PROJECT", id: "proj_orchestrator" } }).success).toBe(false);
