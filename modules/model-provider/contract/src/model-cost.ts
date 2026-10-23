@@ -192,13 +192,17 @@ export const findMatchingModelCost = (
   const matches = matchesFor(costs);
   // `null` remembers a miss, so an unknown model is not rescanned on every span.
   let match = matches.get(model);
-  if (match === undefined) {
+  if (match !== undefined) {
+    // Re-insert on a hit, so the least recently used name is the one a full list drops.
+    matches.delete(model);
+    matches.set(model, match);
+  } else {
     match =
       findCandidateModelCost({ candidate: model, costs }) ??
       findSubtypeStrippedModelCost({ model, costs }) ??
       findBedrockModelCost({ model, costs }) ??
       null;
-    // Drop the oldest name only, so a burst of new names never flushes the common ones.
+    // Drop the least recently used name only, so a burst of new names never flushes busy ones.
     const oldest =
       matches.size >= MATCHES_PER_COST_LIST_MAX_ENTRIES ? matches.keys().next() : undefined;
     if (oldest && !oldest.done) matches.delete(oldest.value);

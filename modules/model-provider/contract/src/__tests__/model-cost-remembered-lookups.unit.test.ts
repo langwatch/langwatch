@@ -141,6 +141,39 @@ describe("findMatchingModelCost remembering its answers", () => {
     });
   });
 
+  describe("when a burst of new names fills one list's memory", () => {
+    const countingRules = (): { costs: ModelCostRate[]; reads: () => number } => {
+      let reads = 0;
+      const rule = (model: string, pattern: string): ModelCostRate => ({
+        model,
+        get regex() {
+          reads += 1;
+          return pattern;
+        },
+      });
+      return { costs: [rule("busy", "^busy"), rule("other", "^name-")], reads: () => reads };
+    };
+
+    /** @scenario "A cost list past its memory limit still answers like a full scan" */
+    it("keeps a name still in use and drops one not looked up since", () => {
+      const { costs, reads } = countingRules();
+      findMatchingModelCost("busy-model", costs);
+      findMatchingModelCost("name-idle", costs);
+      for (let index = 0; index < 5_000; index++) {
+        findMatchingModelCost(`name-${index}`, costs);
+        if (index % 500 === 0) findMatchingModelCost("busy-model", costs);
+      }
+
+      const beforeBusy = reads();
+      expect(findMatchingModelCost("busy-model", costs)[0]?.model).toBe("busy");
+      expect(reads()).toBe(beforeBusy);
+
+      const beforeIdle = reads();
+      expect(findMatchingModelCost("name-idle", costs)[0]?.model).toBe("other");
+      expect(reads()).toBeGreaterThan(beforeIdle);
+    });
+  });
+
   describe("when the same model name is looked up again in one list", () => {
     const countingList = (): { costs: ModelCostRate[]; reads: () => number } => {
       let reads = 0;
