@@ -1,5 +1,7 @@
 /** Spec: specs/observability/request-log-client-and-principal.feature */
 import type { OtlpIngestCredential } from "@langwatch/otlp/door";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { otlpMetricsDoor } from "../otlp-metrics.rest.ts";
@@ -20,15 +22,16 @@ function identifiedWith(identity: Partial<OtlpIngestCredential["identity"]>) {
       ...identity,
     },
   };
-  const traces = { otlpCredential: async () => credential } as unknown as Parameters<
-    typeof otlpMetricsDoor.open
-  >[0];
+  const door = otlpMetricsDoor.open(
+    createApiFixture<TraceApi>({ otlpCredential: async () => credential }),
+  );
+  if (!door.identify) throw new Error("the OTLP door identifies its own caller");
   const request = new Request("http://localhost/api/otel/v1/metrics", {
     method: "POST",
     headers: { authorization: "Bearer sk-lw-test" },
   });
 
-  return otlpMetricsDoor.open(traces).identify({ request });
+  return door.identify({ request });
 }
 
 describe("the OTLP metrics door", () => {
