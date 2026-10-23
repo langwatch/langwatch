@@ -73,12 +73,28 @@ const customRules: ModelCostRate[] = [
   { model: "invalid", regex: "([", inputCostPerToken: 4 },
 ];
 
+/** A cost list counting its pattern reads, so a test can tell memory from a scan. */
+const countingList = (
+  patterns: readonly (readonly [string, string])[],
+): { costs: ModelCostRate[]; reads: () => number } => {
+  let reads = 0;
+  const costs = patterns.map(([model, pattern]): ModelCostRate => ({
+    model,
+    get regex() {
+      reads += 1;
+      return pattern;
+    },
+  }));
+  return { costs, reads: () => reads };
+};
+
 describe("findMatchingModelCost remembering its answers", () => {
   describe("when looking up every model name against the full catalogue", () => {
     /** @scenario "A remembered lookup picks the same rate as a full scan" */
     it("picks the same rate as a full scan, on the first and on a repeated lookup", () => {
-      const names = modelNames();
-      expect(names.length).toBeGreaterThan(1_000);
+      // Fewer names than one list remembers, so the repeat round is answered from memory.
+      const names = modelNames().slice(0, 1_500);
+      expect(names.length).toBe(1_500);
       for (const round of ["first", "repeat"]) {
         for (const name of names) {
           expect(findMatchingModelCost(name, catalogue), `${round}: ${name}`).toEqual(
@@ -142,21 +158,12 @@ describe("findMatchingModelCost remembering its answers", () => {
   });
 
   describe("when a burst of new names fills one list's memory", () => {
-    const countingRules = (): { costs: ModelCostRate[]; reads: () => number } => {
-      let reads = 0;
-      const rule = (model: string, pattern: string): ModelCostRate => ({
-        model,
-        get regex() {
-          reads += 1;
-          return pattern;
-        },
-      });
-      return { costs: [rule("busy", "^busy"), rule("other", "^name-")], reads: () => reads };
-    };
-
-    /** @scenario "A cost list past its memory limit still answers like a full scan" */
+    /** @scenario "A full list forgets the name used longest ago" */
     it("keeps a name still in use and drops one not looked up since", () => {
-      const { costs, reads } = countingRules();
+      const { costs, reads } = countingList([
+        ["busy", "^busy"],
+        ["other", "^name-"],
+      ]);
       findMatchingModelCost("busy-model", costs);
       findMatchingModelCost("name-idle", costs);
       for (let index = 0; index < 5_000; index++) {
@@ -174,22 +181,26 @@ describe("findMatchingModelCost remembering its answers", () => {
     });
   });
 
-  describe("when the same model name is looked up again in one list", () => {
-    const countingList = (): { costs: ModelCostRate[]; reads: () => number } => {
-      let reads = 0;
-      const rule = (model: string, pattern: string): ModelCostRate => ({
-        model,
-        get regex() {
-          reads += 1;
-          return pattern;
-        },
-      });
-      return { costs: [rule("a", "^alpha"), rule("b", "^beta")], reads: () => reads };
-    };
+  describe("when a model name is longer than a list remembers", () => {
+    /** @scenario "A very long model name is matched but never remembered" */
+    it("answers like a full scan and scans again on the next lookup", () => {
+      const { costs, reads } = countingList([["long", "^long-"]]);
+      const name = `long-${"x".repeat(1_000)}`;
+      expect(findMatchingModelCost(name, costs)[0]?.model).toBe("long");
+      const readsAfterFirst = reads();
 
+      expect(findMatchingModelCost(name, costs)[0]?.model).toBe("long");
+      expect(reads()).toBeGreaterThan(readsAfterFirst);
+    });
+  });
+
+  describe("when the same model name is looked up again in one list", () => {
     /** @scenario "A repeated lookup does not scan the patterns again" */
     it("does not evaluate the patterns again for a hit", () => {
-      const { costs, reads } = countingList();
+      const { costs, reads } = countingList([
+        ["a", "^alpha"],
+        ["b", "^beta"],
+      ]);
       findMatchingModelCost("beta-1", costs);
       const readsAfterFirst = reads();
 
@@ -202,7 +213,10 @@ describe("findMatchingModelCost remembering its answers", () => {
 
     /** @scenario "A repeated lookup does not scan the patterns again" */
     it("does not evaluate the patterns again for a miss", () => {
-      const { costs, reads } = countingList();
+      const { costs, reads } = countingList([
+        ["a", "^alpha"],
+        ["b", "^beta"],
+      ]);
       findMatchingModelCost("gamma-1", costs);
       const readsAfterFirst = reads();
 

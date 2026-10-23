@@ -25,3 +25,15 @@ Feature: Model price lookups are remembered per cost list
     Given a model name already looked up in a cost list, as a hit or as a miss
     When it is looked up again in the same list
     Then no pricing pattern is evaluated again
+
+  Scenario: A full list forgets the name used longest ago
+    Given a cost list that remembers as many names as it can
+    And one name looked up again and again, another not since it was first remembered
+    When a burst of new names is looked up
+    Then the name still in use is answered from memory
+    And the name not used since is scanned again
+
+  Scenario: A very long model name is matched but never remembered
+    Given a span model name longer than a cost list remembers
+    When it is looked up twice
+    Then each lookup scans the patterns and picks the same rate
