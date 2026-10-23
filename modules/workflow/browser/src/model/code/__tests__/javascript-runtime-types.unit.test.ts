@@ -22,8 +22,8 @@ const RUNTIME_URI = "file:///langwatch/code-block-runtime-0.d.ts";
 /** Monaco's worker reads a lib by its file name or by the bare `lib` option entry. */
 const libText = (name: string) => libFileMap[name] ?? libFileMap[`lib.${name}.d.ts`];
 
-/** Runs Monaco's own TypeScript over one code block, hosted the way its JS worker hosts it. */
-function diagnosticsFor({ code }: { code: string }): string[] {
+/** Monaco's own TypeScript over one code block, hosted the way its JS worker hosts it. */
+function serviceFor({ code }: { code: string }) {
   const files = new Map([
     [CODE_URI, code],
     [RUNTIME_URI, buildJavaScriptRuntimeDts(contract)],
@@ -43,6 +43,11 @@ function diagnosticsFor({ code }: { code: string }): string[] {
     fileExists: (name) => read(name) !== undefined,
     readFile: read,
   });
+  return service;
+}
+
+function diagnosticsFor({ code }: { code: string }): string[] {
+  const service = serviceFor({ code });
   return [
     ...service.getSyntacticDiagnostics(CODE_URI),
     ...service.getSemanticDiagnostics(CODE_URI),
@@ -53,12 +58,18 @@ describe("buildJavaScriptRuntimeDts", () => {
   describe("given secrets, inputs and outputs", () => {
     const dts = buildJavaScriptRuntimeDts(contract);
 
+    /**
+     * @scenario "Secrets are declared as documented read-only strings"
+     */
     it("declares each secret as a documented readonly string", () => {
       expect(dts).toContain("readonly API_KEY: string;");
       expect(dts).toContain('readonly "weird-name": string;');
       expect(dts).toContain("Project secret, managed in Settings → Secrets.");
     });
 
+    /**
+     * @scenario "Inputs and Outputs are typed from the node's fields"
+     */
     it("types Inputs and Outputs from the node's fields", () => {
       expect(dts).toContain(
         "interface Inputs {\n  question: string;\n  count: number;\n  flags: boolean[];\n}",
@@ -66,12 +77,28 @@ describe("buildJavaScriptRuntimeDts", () => {
       expect(dts).toContain("interface Outputs {\n  answer: string;\n}");
     });
 
+    /**
+     * @scenario "Secret values never reach the editor"
+     */
+    it("never carries a secret's value into the declarations", () => {
+      const withValues = { ...contract, secretValues: { API_KEY: "sk-live-0123456789" } };
+      const text = buildJavaScriptRuntimeDts(withValues);
+      expect(text).toContain("readonly API_KEY: string;");
+      expect(text).not.toContain("sk-live-0123456789");
+    });
+
+    /**
+     * @scenario "The declarations hold no DOM globals"
+     */
     it("declares no DOM globals", () => {
       expect(dts).not.toMatch(/\b(document|window|XMLHttpRequest|localStorage)\b/);
     });
   });
 
   describe("given no secrets", () => {
+    /**
+     * @scenario "The secrets namespace completes when the project has no secrets"
+     */
     it("still declares the secrets namespace so it completes", () => {
       const dts = buildJavaScriptRuntimeDts({ secretNames: [], inputs: [], outputs: [] });
       expect(dts).toContain("declare const secrets: {\n};");
@@ -79,6 +106,9 @@ describe("buildJavaScriptRuntimeDts", () => {
   });
 
   describe("given each studio field type", () => {
+    /**
+     * @scenario "Studio field types map to TypeScript"
+     */
     it("maps studio field types to TypeScript", () => {
       expect(tsTypeFor({ type: "float" })).toBe("number");
       expect(tsTypeFor({ type: "dict" })).toBe("Record<string, unknown>");
@@ -88,6 +118,9 @@ describe("buildJavaScriptRuntimeDts", () => {
 });
 
 describe("a JavaScript code block checked against the runtime", () => {
+  /**
+   * @scenario "Runtime globals type-check"
+   */
   it("accepts code that uses the runtime's globals", () => {
     const code = `/**
  * @param {Inputs} inputs
@@ -104,6 +137,9 @@ export default async function ({ question, count }) {
     expect(diagnosticsFor({ code })).toEqual([]);
   });
 
+  /**
+   * @scenario "The JavaScript template type-checks against the runtime"
+   */
   it("type-checks the default template", () => {
     const template = MODULES.code.parameters?.find((p) => p.identifier === "code")?.value as string;
     const diagnostics = diagnosticsFor({
@@ -112,6 +148,32 @@ export default async function ({ question, count }) {
     expect(diagnostics).toEqual([]);
   });
 
+  /**
+   * @scenario "Secret names are offered for completion"
+   */
+  it("completes secret names and offers no DOM global", () => {
+    const secretCode = "export default function () { return secrets.; }";
+    const secretAt = secretCode.indexOf("secrets.") + "secrets.".length;
+    const secretNames = serviceFor({ code: secretCode })
+      .getCompletionsAtPosition(CODE_URI, secretAt, {})
+      ?.entries.map((e) => e.name);
+    expect(secretNames).toEqual(expect.arrayContaining(["API_KEY"]));
+
+    const globalCode = "export default function () { d }";
+    const globalAt = globalCode.indexOf("d }") + 1;
+    const globals = serviceFor({ code: globalCode })
+      .getCompletionsAtPosition(CODE_URI, globalAt, {})
+      ?.entries.map((e) => e.name);
+    expect(globals).toEqual(expect.arrayContaining(["fetch", "console", "secrets", "params"]));
+    expect(globals).not.toContain("document");
+    expect(globals).not.toContain("window");
+  });
+
+  /**
+   * @scenario "DOM globals are flagged"
+   * @scenario "An unknown secret is flagged"
+   * @scenario "A wrong output type is flagged"
+   */
   it("flags DOM globals, unknown secrets and wrong output types", () => {
     const code = `/** @returns {Outputs} */
 export default function () {

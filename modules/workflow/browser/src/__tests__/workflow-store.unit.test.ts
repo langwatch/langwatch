@@ -583,6 +583,28 @@ describe("workflowStoreCore", () => {
     });
   });
 
+  describe("given a code node without a language", () => {
+    /**
+     * @scenario "A node without a language still gets Python signature sync"
+     */
+    it("rewrites the Python signature and adds no destructured parameter", () => {
+      const params = [
+        {
+          identifier: "code",
+          type: "code" as const,
+          value: `class Code:\n    def __call__(self, input: str):\n        return {"output": input}\n`,
+        },
+      ];
+      const result = updateInputFields(params, [
+        { identifier: "input", type: "str" },
+        { identifier: "context", type: "str" },
+      ]);
+      const code = result[0]?.value as string;
+      expect(code).toContain("def __call__(self, input: str = None, context: str = None):");
+      expect(code).not.toContain("({ input");
+    });
+  });
+
   describe("given a JavaScript code node", () => {
     const jsParams = () => [
       { identifier: "language", type: "str" as const, value: "javascript" },
@@ -596,6 +618,9 @@ describe("workflowStoreCore", () => {
       params.find((p) => p.identifier === "code")?.value as string;
 
     describe("when an input is added", () => {
+      /**
+       * @scenario "Adding an input to a JavaScript node never writes Python"
+       */
       it("adds it to the destructured parameter, not a Python signature", () => {
         const result = updateInputFields(jsParams(), [
           { identifier: "input", type: "str" },
@@ -607,6 +632,9 @@ describe("workflowStoreCore", () => {
     });
 
     describe("when an output is renamed", () => {
+      /**
+       * @scenario "Renaming an output rewrites the returned key"
+       */
       it("renames the returned key", () => {
         const result = updateOutputFields(
           jsParams(),
@@ -617,7 +645,29 @@ describe("workflowStoreCore", () => {
       });
     });
 
+    describe("when an output with a quoted key is renamed", () => {
+      /**
+       * @scenario "A quoted returned key keeps its quotes when renamed"
+       */
+      it("keeps the quotes", () => {
+        const params = jsParams().map((p) =>
+          p.identifier === "code"
+            ? { ...p, value: `export default function () {\n  return { "output": 1 };\n}\n` }
+            : p,
+        );
+        const result = updateOutputFields(
+          params,
+          [{ identifier: "output", type: "str" }],
+          [{ identifier: "answer", type: "str" }],
+        );
+        expect(codeOf(result)).toContain('return { "answer": 1 };');
+      });
+    });
+
     describe("when the node is renamed", () => {
+      /**
+       * @scenario "Renaming a JavaScript node leaves the code untouched"
+       */
       it("leaves the code untouched", () => {
         const params = jsParams();
         expect(updateCodeClassName(params, "code", "code_2")).toBe(params);

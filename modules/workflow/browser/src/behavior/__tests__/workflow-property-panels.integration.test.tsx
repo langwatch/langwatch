@@ -106,6 +106,9 @@ describe("Workflow property panels", () => {
     });
   });
 
+  /**
+   * @scenario "A JavaScript node opens in the JavaScript editor"
+   */
   it("opens a JavaScript code node in the JavaScript editor", () => {
     const node: Node<Component> = {
       id: "code",
@@ -124,6 +127,9 @@ describe("Workflow property panels", () => {
     expect(screen.getByTestId("code-editor").dataset.language).toBe("javascript");
   });
 
+  /**
+   * @scenario "A node without a language opens in the Python editor with no migration"
+   */
   it("opens a code node without a language in the Python editor", () => {
     const node: Node<Component> = {
       id: "code",

@@ -78,6 +78,9 @@ describe("rewriteJavaScriptSignature", () => {
 
   describe("given a default export that destructures its inputs", () => {
     describe("when an input is added", () => {
+      /**
+       * @scenario "Adding an input rewrites the JavaScript destructured parameter"
+       */
       it("adds it to the destructured parameter", () => {
         const next = rewriteJavaScriptSignature({
           code: template,
@@ -88,6 +91,9 @@ describe("rewriteJavaScriptSignature", () => {
     });
 
     describe("when an input is renamed", () => {
+      /**
+       * @scenario "Renaming an input rewrites the JavaScript destructured parameter"
+       */
       it("replaces the old name with the new one", () => {
         const next = rewriteJavaScriptSignature({
           code: template,
@@ -98,6 +104,9 @@ describe("rewriteJavaScriptSignature", () => {
     });
 
     describe("when entries carry defaults or a rest element", () => {
+      /**
+       * @scenario "Defaults and a rest element survive an input sync"
+       */
       it("keeps the surviving entries' text and the rest element last", () => {
         const next = rewriteJavaScriptSignature({
           code: `export default function ({ input = [1, 2], gone, ...rest }) {}`,
@@ -109,6 +118,9 @@ describe("rewriteJavaScriptSignature", () => {
   });
 
   describe("given an execute export", () => {
+    /**
+     * @scenario "A named execute export is rewritten"
+     */
     it("rewrites its destructured parameter", () => {
       const next = rewriteJavaScriptSignature({
         code: `export async function execute({ a }) {}`,
@@ -119,6 +131,9 @@ describe("rewriteJavaScriptSignature", () => {
   });
 
   describe("given an entrypoint that takes the inputs object whole", () => {
+    /**
+     * @scenario "An entrypoint taking the inputs object whole is left alone"
+     */
     it("leaves the code unchanged", () => {
       const code = `export default function (inputs) {\n  return { output: inputs.input };\n}`;
       expect(rewriteJavaScriptSignature({ code, inputs: [{ identifier: "context" }] })).toBe(code);

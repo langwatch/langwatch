@@ -53,6 +53,9 @@ const position = (line: string) => ({ lineNumber: 1, column: line.length + 1 });
 
 describe("Python providers and run parameters", () => {
   describe("given a fresh line", () => {
+    /**
+     * @scenario "Python completion offers params"
+     */
     it("offers the params handle", async () => {
       const { monaco, providers } = fakeMonaco();
       registerCompletion(monaco, contractRef);
@@ -68,6 +71,9 @@ describe("Python providers and run parameters", () => {
   });
 
   describe("when hovering params.NAME", () => {
+    /**
+     * @scenario "Python hover explains a run parameter"
+     */
     it("explains the run parameter", async () => {
       const { monaco, providers } = fakeMonaco();
       registerHover(monaco, contractRef);

@@ -65,6 +65,9 @@ describe("Optimization Studio Registry", () => {
 
     const codeValue = () => code.parameters?.find((p) => p.identifier === "code")?.value as string;
 
+    /**
+     * @scenario "A new code node is JavaScript"
+     */
     it("defaults a new code node to JavaScript", () => {
       const language = code.parameters?.find((p) => p.identifier === "language");
 
@@ -72,16 +75,25 @@ describe("Optimization Studio Registry", () => {
       expect(codeLanguageOf({ parameters: code.parameters })).toBe("javascript");
     });
 
+    /**
+     * @scenario "The JavaScript template destructures the input and returns the output"
+     */
     it("ships a default export that destructures the input and returns the output", () => {
       expect(codeValue()).toContain("export default async function ({ input })");
       expect(codeValue()).toContain('return { output: "Hello world!" };');
     });
 
+    /**
+     * @scenario "The JavaScript template is typed through JSDoc"
+     */
     it("types the entrypoint with the editor's Inputs and Outputs through JSDoc", () => {
       expect(codeValue()).toContain("@param {Inputs} inputs");
       expect(codeValue()).toContain("@returns {Promise<Outputs>}");
     });
 
+    /**
+     * @scenario "The JavaScript template contains no Python"
+     */
     it("ships no Python in the JavaScript template", () => {
       expect(codeValue()).not.toMatch(/^class\s+\w+/m);
       expect(codeValue()).not.toContain("def __call__");

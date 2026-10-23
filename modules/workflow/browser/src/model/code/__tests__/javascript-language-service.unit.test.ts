@@ -47,6 +47,9 @@ const contract = {
 
 describe("registerJavaScriptLanguageService", () => {
   describe("when a JavaScript editor opens", () => {
+    /**
+     * @scenario "JavaScript is checked as ES2023 without DOM"
+     */
     it("checks JavaScript as ES2023 without DOM, with diagnostics on", () => {
       const fake = fakeMonaco();
       registerJavaScriptLanguageService({ monaco: fake.monaco, contract });
@@ -62,6 +65,9 @@ describe("registerJavaScriptLanguageService", () => {
       });
     });
 
+    /**
+     * @scenario "The runtime library is added under one uri per editor"
+     */
     it("adds one ambient lib with the node's globals", () => {
       const fake = fakeMonaco();
       registerJavaScriptLanguageService({ monaco: fake.monaco, contract });
@@ -72,6 +78,9 @@ describe("registerJavaScriptLanguageService", () => {
   });
 
   describe("when the node's contract changes", () => {
+    /**
+     * @scenario "A changed contract replaces the library"
+     */
     it("replaces the lib under the same uri", () => {
       const fake = fakeMonaco();
       const handle = registerJavaScriptLanguageService({ monaco: fake.monaco, contract });
@@ -85,7 +94,31 @@ describe("registerJavaScriptLanguageService", () => {
     });
   });
 
+  describe("when two editors are open", () => {
+    /**
+     * @scenario "Two open editors do not share a library"
+     */
+    it("gives each its own library, so closing one leaves the other's", () => {
+      const fake = fakeMonaco();
+      const first = registerJavaScriptLanguageService({ monaco: fake.monaco, contract });
+      registerJavaScriptLanguageService({
+        monaco: fake.monaco,
+        contract: { ...contract, secretNames: ["SECOND"] },
+      });
+      const [firstUri, secondUri] = [...fake.libs.keys()];
+      expect(firstUri).not.toBe(secondUri);
+
+      first.dispose();
+
+      expect(fake.libs.has(firstUri!)).toBe(false);
+      expect(fake.libs.get(secondUri!)).toContain("readonly SECOND: string;");
+    });
+  });
+
   describe("when the editor closes", () => {
+    /**
+     * @scenario "Closing the editor removes the library and restores the page's options"
+     */
     it("removes the lib and restores the page's previous options", () => {
       const fake = fakeMonaco();
       const handle = registerJavaScriptLanguageService({ monaco: fake.monaco, contract });

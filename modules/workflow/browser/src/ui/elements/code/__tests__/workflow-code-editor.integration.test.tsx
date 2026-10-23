@@ -69,6 +69,9 @@ describe("WorkflowCodeEditorModal", () => {
   afterEach(() => vi.clearAllMocks());
 
   describe("given a JavaScript code node", () => {
+    /**
+     * @scenario "The JavaScript editor registers the JavaScript service and no Python providers"
+     */
     it("edits code.mjs with the JavaScript service, not the Python providers", async () => {
       openEditor({ language: "javascript" });
 
@@ -84,6 +87,9 @@ describe("WorkflowCodeEditorModal", () => {
   });
 
   describe("given a code node without a language", () => {
+    /**
+     * @scenario "The Python editor registers the Python providers and no JavaScript service"
+     */
     it("edits Code.py in Python mode with the Python providers", async () => {
       openEditor({});
 
