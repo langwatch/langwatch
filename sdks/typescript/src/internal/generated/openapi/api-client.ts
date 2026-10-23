@@ -8686,6 +8686,7 @@ export interface operations {
                         [key: string]: string | number | boolean;
                     };
                     row_indices?: number[];
+                    concurrency?: number;
                 };
             };
         };

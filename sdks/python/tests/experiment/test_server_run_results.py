@@ -245,6 +245,18 @@ class TestExperimentRunWithParameters:
         assert run_post["json"] == {"parameters": {"model": "gpt-5-mini"}}
 
 
+class TestExperimentRunWithConcurrency:
+    """when running with a concurrency"""
+
+    def test_concurrency_is_sent_in_body(self):
+        _script_full_run()
+        with patch.object(platform_run, "create_client", _FakeClient):
+            experiment_run("rag-eval", concurrency=1, poll_interval=0)
+
+        run_post = next(p for p in _FakeClient.captured_posts if "/run" in p["url"])
+        assert run_post["json"] == {"concurrency": 1}
+
+
 class TestExperimentRunWithNoBody:
     """when running with no inline data, dataset, or parameters"""
 

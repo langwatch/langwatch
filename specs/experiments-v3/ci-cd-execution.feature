@@ -109,6 +109,37 @@ Feature: CI/CD Execution of Platform Evaluations
     Then I receive 404 Not Found
 
   # ==========================================================================
+  # Per-run concurrency
+  # ==========================================================================
+
+  Scenario: A run call that names a concurrency runs that many rows at once
+    When I POST to /api/experiments/my-evaluation/run with body:
+      """json
+      { "concurrency": 1 }
+      """
+    Then the run executes one cell at a time
+    And the experiment's saved run options are unchanged
+
+  Scenario: A run call that names no concurrency uses the deployment's default
+    Given the deployment runs ten cells at once by default
+    When I POST to /api/experiments/my-evaluation/run
+    Then the run executes up to ten cells at once
+
+  Scenario Outline: A run call with a concurrency outside 1 to 24 is refused
+    When I POST to /api/experiments/my-evaluation/run with body:
+      """json
+      { "concurrency": <concurrency> }
+      """
+    Then I receive 400 Bad Request with code "experiment_evaluation_input_invalid"
+    And no run is started
+
+    Examples:
+      | concurrency |
+      | 0           |
+      | 25          |
+      | 1.5         |
+
+  # ==========================================================================
   # SSE Streaming Mode
   # ==========================================================================
 

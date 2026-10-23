@@ -169,6 +169,21 @@ describe("ExperimentsFacade.runWithResults", () => {
     });
   });
 
+  describe("given a concurrency is provided", () => {
+    describe("when the run starts", () => {
+      it("posts the concurrency in the start body", async () => {
+        mockFetch
+          .mockResolvedValueOnce(jsonResponse(startResponse))
+          .mockResolvedValueOnce(jsonResponse(completedStatus))
+          .mockResolvedValueOnce(jsonResponse(resultsResponse));
+
+        await makeFacade().runWithResults("my-experiment", { concurrency: 1, pollInterval: 0 });
+
+        expect(await requestAt(0).clone().json()).toEqual({ concurrency: 1 });
+      });
+    });
+  });
+
   describe("given no overrides are provided", () => {
     describe("when the run completes", () => {
       it("posts a body-less start request", async () => {
@@ -312,5 +327,41 @@ describe("ExperimentsFacade.run error compatibility", () => {
     );
 
     await expect(makeFacade().run("my-experiment")).rejects.toThrow(ExperimentsApiError);
+  });
+});
+
+describe("ExperimentsFacade.run concurrency", () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    vi.spyOn(console, "log").mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe("given a concurrency is provided", () => {
+    it("posts the concurrency in the start body", async () => {
+      mockFetch
+        .mockResolvedValueOnce(jsonResponse(startResponse))
+        .mockResolvedValueOnce(jsonResponse(completedStatus));
+
+      await makeFacade().run("my-experiment", { concurrency: 1, pollInterval: 0 });
+
+      expect(await requestAt(0).clone().json()).toEqual({ concurrency: 1 });
+    });
+  });
+
+  describe("given no concurrency is provided", () => {
+    it("posts a body-less start request", async () => {
+      mockFetch
+        .mockResolvedValueOnce(jsonResponse(startResponse))
+        .mockResolvedValueOnce(jsonResponse(completedStatus));
+
+      await makeFacade().run("my-experiment", { pollInterval: 0 });
+
+      expect(await requestAt(0).clone().text()).toBe("");
+    });
   });
 });
