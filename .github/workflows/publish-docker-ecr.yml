@@ -728,9 +728,15 @@ jobs:
               return 1
             fi
             aws configure set default.s3.max_concurrent_requests 64
+            # Copy the source objects' properties, Content-Type included. A copy
+            # inside S3 has no local file name for the CLI to guess a MIME type
+            # from, so --metadata-directive REPLACE stored every file as
+            # binary/octet-stream, and browsers refuse to run a module script
+            # served that way: git-3e84e6bc showed "Could not load". The source
+            # already carries the immutable Cache-Control from its own upload.
             aws s3 sync "s3://${BUCKET}/${previous}/assets" "s3://${BUCKET}/${IMAGE_TAG}/assets" \
               --size-only --no-progress --exclude "*.map" \
-              --cache-control "public, max-age=31536000, immutable" --metadata-directive REPLACE
+              --copy-props metadata-directive
             aws s3api put-object --bucket "${BUCKET}" --key "${IMAGE_TAG}/.complete" \
               --cache-control "no-cache" --content-length 0 >/dev/null
             echo "Copied CDN assets ${previous} -> ${IMAGE_TAG}" >> "$GITHUB_STEP_SUMMARY"
