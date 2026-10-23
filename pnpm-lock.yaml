@@ -17478,8 +17478,8 @@ importers:
         specifier: workspace:*
         version: link:../time
       '@slack/types':
-        specifier: ^2.21.1
-        version: 2.21.1
+        specifier: ^3.2.0
+        version: 3.2.0
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -22877,6 +22877,10 @@ packages:
   '@slack/types@2.21.1':
     resolution: {integrity: sha512-I8vmSjNYWsaxuWPx6dz4yeh0h7vRBWbgAMK14LEmblbZ404BtrPbXs6jDPx4cYgGf8msDGF4A9opLZBu21FViQ==}
     engines: {node: '>= 12.13.0', npm: '>= 6.12.0'}
+
+  '@slack/types@3.2.0':
+    resolution: {integrity: sha512-IN4gdtlzQt8UJoj+1v+qAHeR4TxHO0KMlIs841SFfDQAcFFnsrWaGsEAE4goxVt8O/JOAFaGGdrFTzhNBop/Fg==}
+    engines: {node: '>= 20', npm: '>=9.6.4'}
 
   '@slack/webhook@7.1.0':
     resolution: {integrity: sha512-cVXjP1n5s9gF7EW0zi58gYhf9JQ+FDu9t0Tq4ufdJxSO6QkT4wBMjSWYGAz61Xi6eHaZlnyGu7RuzwpGERLYbw==}
@@ -31191,7 +31195,7 @@ snapshots:
 
   '@better-auth/utils@0.5.0':
     dependencies:
-      '@noble/hashes': 2.2.0
+      '@noble/hashes': 2.4.0
 
   '@better-fetch/fetch@1.3.1': {}
 
@@ -34017,6 +34021,8 @@ snapshots:
   '@sindresorhus/merge-streams@4.0.0': {}
 
   '@slack/types@2.21.1': {}
+
+  '@slack/types@3.2.0': {}
 
   '@slack/webhook@7.1.0(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)':
     dependencies:
