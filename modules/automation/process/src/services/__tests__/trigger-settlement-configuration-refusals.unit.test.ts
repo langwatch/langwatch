@@ -97,6 +97,29 @@ describe("settlement refusals caused by the automation's saved configuration", (
     });
   });
 
+  describe("given two email automations with recipients that no longer validate", () => {
+    describe("when each settles a match", () => {
+      /** @scenario "Each automation with an invalid saved configuration warns on its own" */
+      it("warns once for each automation", async () => {
+        const first = settlementTrigger("SEND_EMAIL", { actionParams: { members: [] } });
+        const fixture = createSettlementFixture(first);
+
+        await fixture.service.notifyDigest(digest, settlementContext("digest:1"));
+        fixture.automation.activeTrigger = { ...first, id: "trigger-2" };
+        await fixture.service.notifyDigest(
+          { ...digest, triggerId: "trigger-2" },
+          settlementContext("digest:2"),
+        );
+        await fixture.service.notifyDigest(digest, settlementContext("digest:3"));
+
+        expect(refusalWarnings().map(([fields]) => fields.triggerId)).toEqual([
+          "trigger-1",
+          "trigger-2",
+        ]);
+      });
+    });
+  });
+
   describe("given a webhook automation whose stored settings no longer parse", () => {
     describe("when the match settles", () => {
       /** @scenario "A webhook automation whose saved settings no longer parse is refused as the customer's to fix" */
@@ -160,6 +183,41 @@ describe("settlement refusals caused by the automation's saved configuration", (
           ],
         ]);
         expect(loggerError).not.toHaveBeenCalled();
+        expect(fixture.observability.captures).toEqual([]);
+      });
+    });
+  });
+
+  describe("given a persist action refused for every trace in the page", () => {
+    describe("when the persist page settles", () => {
+      /** @scenario "A persist page of refused traces warns once per window" */
+      it("warns once for the automation", async () => {
+        const fixture = createSettlementFixture(
+          settlementTrigger("ADD_TO_DATASET", {
+            actionParams: {
+              datasetId: "dataset-1",
+              datasetMapping: { mapping: {}, expansions: [] },
+            },
+          }),
+        );
+        for (const traceId of ["trace-1", "trace-2"]) {
+          fixture.writer.errors.set(
+            traceId,
+            new AutomationDatasetUnavailableError({
+              datasetId: "dataset-1",
+              reason: "it is gone or archived",
+            }),
+          );
+        }
+
+        await expect(
+          fixture.service.persistMatch(
+            { triggerId: "trigger-1", traceIds: ["trace-1", "trace-2"] },
+            settlementContext("persist:page-1"),
+          ),
+        ).resolves.toBeUndefined();
+
+        expect(refusalWarnings()).toHaveLength(1);
         expect(fixture.observability.captures).toEqual([]);
       });
     });
