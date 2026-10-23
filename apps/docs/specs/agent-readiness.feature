@@ -52,6 +52,15 @@ Feature: Audit how well the documentation serves coding agents
     And a "langwatch." inside a string or a comment is not an SDK call
 
   @unit
+  Scenario: A code sample parses in its own language
+    Given a page with JSON, YAML and Python code blocks
+    When the agent readiness audit reads them
+    Then a JSON block that is not valid JSON is reported
+    And a YAML block that does not parse is reported
+    And a Python block whose opener is followed by an unindented line is reported
+    But templates, comments and ellipses mark a block as illustrative and are not parsed
+
+  @unit
   Scenario: Components export as readable Markdown
     Given a page whose Markdown export still holds component tags or MDX statements outside code blocks
     When the agent readiness audit reads it

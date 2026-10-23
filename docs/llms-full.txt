@@ -511,10 +511,8 @@ LANGWATCH_PROJECT_ID="your-project-id"
 import langwatch
 
 # LANGWATCH_PROJECT_ID comes from the environment
-
 langwatch.setup(api_key="sk-lw-...")
-
-````
+```
 
 ### TypeScript
 
@@ -523,7 +521,7 @@ import { LangWatch } from 'langwatch';
 
 // LANGWATCH_PROJECT_ID comes from the environment
 const langwatch = new LangWatch({ apiKey: 'sk-lw-...' });
-````
+```
 
 ## Permission categories
 
@@ -7956,7 +7954,7 @@ Several guardrails on the same direction run in parallel. One fail verdict block
 
 ## What a blocked caller gets
 
-```json
+```http
 HTTP/1.1 403 Forbidden
 Content-Type: application/json
 
@@ -8776,7 +8774,7 @@ A pattern that does not compile fails the request closed with `500 internal_erro
 
 ## What a refused caller gets
 
-```json
+```http
 HTTP/1.1 403 Forbidden
 
 {
@@ -11805,13 +11803,12 @@ from openai import OpenAI
 client = OpenAI(base_url="https://gateway.langwatch.ai/v1", api_key="vk-lw-...")
 
 for chunk in client.chat.completions.create(
-model="openai/gpt-5-mini",
-messages=[{"role": "user", "content": "count to 5"}],
-stream=True,
+    model="openai/gpt-5-mini",
+    messages=[{"role": "user", "content": "count to 5"}],
+    stream=True,
 ):
-print(chunk.choices[0].delta.content or "", end="")
-
-````
+    print(chunk.choices[0].delta.content or "", end="")
+```
 
   ### Anthropic
 
@@ -11827,7 +11824,7 @@ with client.messages.stream(
 ) as stream:
     for text in stream.text_stream:
         print(text, end="")
-````
+```
 
 
 
@@ -15344,7 +15341,7 @@ Governance MCP tools register inside LangWatch's existing MCP server (served on 
 - **Project API key as Bearer** (`Authorization: Bearer <projectApiKey>`), the plain read tools work immediately. Sufficient to call `governance_*_list` and `governance_*_get`. Admin reads (`governance_*_admin_list`, which expose `ottlRules`) and every write tool require a user-bound session and reject a project-key-only caller.
 - **OAuth (PKCE) flow** at `/mcp/authorize` → `/oauth/token`, required for write tools and admin reads. The OAuth flow captures the user's id at authorize time, threads it through the session token cache, and surfaces it to governance tools as `ctx.callerUserId`. Without it, a write tool returns an `AUTH_REQUIRED:` error pointing the client at the OAuth flow.
 
-```jsonc
+```jsoncc
 // MCP client config, points at the LangWatch instance's MCP endpoint
 // (SaaS shown; self-hosted uses your deployment's host).
 {
@@ -15379,7 +15376,7 @@ Governance tools enforce two distinct gates at the tool layer (`enterprise/modul
 
 **`AUTH_REQUIRED:`**, write tools (e.g. `governance_ingestion_templates_create`, `governance_ingestion_keys_mint`) called from a project-apiKey-only session without OAuth. Read tools are NOT subject to this gate; they work with project-apiKey-only sessions.
 
-```jsonc
+```jsoncc
 {
   "isError": true,
   "content": [
@@ -15393,7 +15390,7 @@ Governance tools enforce two distinct gates at the tool layer (`enterprise/modul
 
 **`FORBIDDEN:`**, the caller has a session but their organization role doesn't include the required permission (the same organization-permission decision the tRPC and REST surfaces make, `AuthzService.hasPermission` in `modules/authz/contract/src/authz.service.ts`).
 
-```jsonc
+```jsoncc
 {
   "isError": true,
   "content": [
@@ -25064,16 +25061,18 @@ import langwatch
 import os
 
 # Assume we have already setup LangWatch
-
 # langwatch.setup()
 
 @langwatch.trace(
-name="UserIntentProcessing",
-input={"user_query": "Book a flight to London"}, # Output can be set later via update() if determined by function logic
+    name="UserIntentProcessing",
+    input={"user_query": "Book a flight to London"},
+    # Output can be set later via update() if determined by function logic
 )
-def process_user_intent(raw_query_data: dict): # raw_query_data might be large or contain sensitive info # The 'input' parameter above provides a clean version.
-intent = "book_flight"
-entities = {"destination": "London"}
+def process_user_intent(raw_query_data: dict):
+    # raw_query_data might be large or contain sensitive info
+    # The 'input' parameter above provides a clean version.
+    intent = "book_flight"
+    entities = {"destination": "London"}
 
     # Explicitly set the output for the root span of the trace
     current_trace = langwatch.get_current_trace()
@@ -25083,8 +25082,7 @@ entities = {"destination": "London"}
     return {"status": "success", "intent": intent} # Actual function return
 
 process_user_intent({"query": "Book a flight to London", "user_id": "123"})
-
-````
+```
 
 ```python Span with explicit input/output
 import langwatch
@@ -25114,7 +25112,7 @@ def handle_chat():
     print("Chat finished.")
 
 handle_chat()
-````
+```
 
 </CodeGroup>
 
@@ -26766,30 +26764,29 @@ For automatic instrumentation without manual span creation, you can use the [Ope
   import { OpenAIInstrumentation } from "@arizeai/openinference-instrumentation-openai";
   import { setupObservability } from "langwatch/observability/node";
 
-// Setup observability with the instrumentation
-setupObservability({
-instrumentations: [new OpenAIInstrumentation()],
-});
-
-````
+  // Setup observability with the instrumentation
+  setupObservability({
+    instrumentations: [new OpenAIInstrumentation()],
+  });
+  ```
 </Step>
 
 <Step title="Use Azure OpenAI normally">
-```typescript
-import { AzureOpenAI } from "openai";
+  ```typescript
+  import { AzureOpenAI } from "openai";
 
-const openai = new AzureOpenAI({
-  apiKey: process.env.AZURE_OPENAI_API_KEY,
-  apiVersion: "2024-02-01",
-  endpoint: process.env.AZURE_OPENAI_ENDPOINT,
-});
+  const openai = new AzureOpenAI({
+    apiKey: process.env.AZURE_OPENAI_API_KEY,
+    apiVersion: "2024-02-01",
+    endpoint: process.env.AZURE_OPENAI_ENDPOINT,
+  });
 
-// This call will be automatically instrumented
-const completion = await openai.chat.completions.create({
-  model: "gpt-5-mini",
-  messages: [{ role: "user", content: "Hello!" }],
-});
-````
+  // This call will be automatically instrumented
+  const completion = await openai.chat.completions.create({
+    model: "gpt-5-mini",
+    messages: [{ role: "user", content: "Hello!" }],
+  });
+  ```
 
 </Step>
 </Steps>
@@ -27950,28 +27947,27 @@ setupObservability();
 const tracer = getLangWatchTracer("input-output-example");
 
 await tracer.withActiveSpan("UserIntentProcessing", async (span) => {
-// Set explicit input for the span
-span.setInput("json", {
-user_query: "Book a flight to London"
+  // Set explicit input for the span
+  span.setInput("json", {
+    user_query: "Book a flight to London"
+  });
+
+  // raw_query_data might be large or contain sensitive info
+  // The setInput() call above provides a clean version
+  const rawQueryData = { query: "Book a flight to London", user_id: "123" };
+
+  const intent = "book_flight";
+  const entities = { destination: "London" };
+
+  // Explicitly set the output for the span
+  span.setOutput("json", {
+    intent,
+    entities
+  });
+
+  return { status: "success", intent }; // Actual function return
 });
-
-// raw_query_data might be large or contain sensitive info
-// The setInput() call above provides a clean version
-const rawQueryData = { query: "Book a flight to London", user_id: "123" };
-
-const intent = "book_flight";
-const entities = { destination: "London" };
-
-// Explicitly set the output for the span
-span.setOutput("json", {
-intent,
-entities
-});
-
-return { status: "success", intent }; // Actual function return
-});
-
-````
+```
 
 ```typescript Span with explicit input/output
 import { setupObservability } from "langwatch/observability/node";
@@ -28003,7 +27999,7 @@ await tracer.withActiveSpan("ChatbotInteraction", async (span) => {
 
   console.log("Chat finished.");
 });
-````
+```
 
 </CodeGroup>
 
@@ -28859,20 +28855,19 @@ import { setupObservability } from "langwatch/observability/node";
 import { LangWatchTraceExporter } from "langwatch";
 
 setupObservability({
-// We are specifying a custom trace exporter, so we need to disable default
-// integration to prevent double exporting
-langwatch: "disabled",
-traceExporter: new LangWatchTraceExporter(),
+  // We are specifying a custom trace exporter, so we need to disable default
+  // integration to prevent double exporting
+  langwatch: "disabled",
+  traceExporter: new LangWatchTraceExporter(),
 });
-
-````
+```
 
 ```typescript Creating an exporter
 import { LangWatchTraceExporter } from "langwatch";
 
 // Default: excludes HTTP request spans
 const exporter = new LangWatchTraceExporter();
-````
+```
 
 </CodeGroup>
 
@@ -29668,46 +29663,45 @@ const handle = setupObservability({
   import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
   import { JaegerExporter } from "@opentelemetry/exporter-jaeger";
 
-const sdk = new NodeSDK({
-serviceName: "my-service",
-spanProcessors: [
-new BatchSpanProcessor(new JaegerExporter())
-],
-instrumentations: [new HttpInstrumentation()],
-sampler: new TraceIdRatioBasedSampler(0.1),
-spanLimits: { attributeCountLimit: 128 }
-});
+  const sdk = new NodeSDK({
+    serviceName: "my-service",
+    spanProcessors: [
+      new BatchSpanProcessor(new JaegerExporter())
+    ],
+    instrumentations: [new HttpInstrumentation()],
+    sampler: new TraceIdRatioBasedSampler(0.1),
+    spanLimits: { attributeCountLimit: 128 }
+  });
 
-sdk.start();
-
-````
+  sdk.start();
+  ```
 </Step>
 
 <Step title="After: Using LangWatch with Same Configuration">
-```typescript
-import { setupObservability } from "langwatch/observability/node";
-import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { JaegerExporter } from "@opentelemetry/exporter-jaeger";
+  ```typescript
+  import { setupObservability } from "langwatch/observability/node";
+  import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
+  import { JaegerExporter } from "@opentelemetry/exporter-jaeger";
 
-const handle = setupObservability({
-  langwatch: {
-    apiKey: process.env.LANGWATCH_API_KEY
-  },
-  serviceName: "my-service",
-  spanProcessors: [
-    new BatchSpanProcessor(new JaegerExporter())
-  ],
-  instrumentations: [new HttpInstrumentation()],
-  sampler: new TraceIdRatioBasedSampler(0.1),
-  spanLimits: { attributeCountLimit: 128 }
-});
+  const handle = setupObservability({
+    langwatch: {
+      apiKey: process.env.LANGWATCH_API_KEY
+    },
+    serviceName: "my-service",
+    spanProcessors: [
+      new BatchSpanProcessor(new JaegerExporter())
+    ],
+    instrumentations: [new HttpInstrumentation()],
+    sampler: new TraceIdRatioBasedSampler(0.1),
+    spanLimits: { attributeCountLimit: 128 }
+  });
 
-// Graceful shutdown
-process.on('SIGTERM', async () => {
-  await handle.shutdown();
-  process.exit(0);
-});
-````
+  // Graceful shutdown
+  process.on('SIGTERM', async () => {
+    await handle.shutdown();
+    process.exit(0);
+  });
+  ```
 
 </Step>
 </Steps>
@@ -38139,13 +38133,12 @@ import langwatch
 langwatch.setup()
 
 result = langwatch.test_suites.run(
-"suite_abc123",
-targets=[{"type": "http", "referenceId": "agent_abc123"}],
-parameters={"plan": "enterprise", "region": "eu-central"},
+    "suite_abc123",
+    targets=[{"type": "http", "referenceId": "agent_abc123"}],
+    parameters={"plan": "enterprise", "region": "eu-central"},
 )
 print(result["batchRunId"])
-
-````
+```
 
   ### TypeScript
 
@@ -38159,7 +38152,7 @@ const result = await langwatch.testSuites.run("suite_abc123", {
   parameters: { plan: "enterprise", region: "eu-central" },
 });
 console.log(result.batchRunId);
-````
+```
 
 
 
@@ -39758,10 +39751,8 @@ The SDKs, the CLI and the MCP server list, create, read, update and delete datas
 import langwatch
 
 # Initialize the SDK (or set LANGWATCH_API_KEY environment variable)
-
 langwatch.setup()
-
-````
+```
 
   ### TypeScript
 
@@ -39769,7 +39760,7 @@ langwatch.setup()
 import { LangWatch } from "langwatch";
 
 const langwatch = new LangWatch();
-````
+```
 
 
 
@@ -39794,15 +39785,13 @@ import langwatch
 result = langwatch.dataset.list_datasets()
 
 for ds in result.data:
-print(f"{ds.name} ({ds.slug}) - {len(ds.columnTypes)} columns")
+    print(f"{ds.name} ({ds.slug}) - {len(ds.columnTypes)} columns")
 
 print(f"Page {result.pagination.page} of {result.pagination.totalPages}")
 
 # List with explicit pagination
-
 result = langwatch.dataset.list_datasets(page=2, limit=10)
-
-````
+```
 
   ### TypeScript
 
@@ -39822,7 +39811,7 @@ console.log(`Page ${result.pagination.page} of ${result.pagination.totalPages}`)
 
 // List with explicit pagination
 const page2 = await langwatch.datasets.list({ page: 2, limit: 10 });
-````
+```
 
 
 
@@ -39848,10 +39837,8 @@ info = langwatch.dataset.create_dataset(
 print(f"Created: {info.name} (slug: {info.slug})")
 
 # Create with just a name (columns can be added later)
-
 info = langwatch.dataset.create_dataset("Simple Dataset")
-
-````
+```
 
   ### TypeScript
 
@@ -39872,7 +39859,7 @@ console.log(`Created: ${info.name} (slug: ${info.slug})`);
 
 // Create with just a name
 const simple = await langwatch.datasets.create({ name: "Simple Dataset" });
-````
+```
 
 
 
@@ -39891,16 +39878,13 @@ import langwatch
 dataset = langwatch.dataset.get_dataset("your-dataset-slug")
 
 # Access entries
-
 for entry in dataset.entries:
-print(entry.id, entry.entry)
+    print(entry.id, entry.entry)
 
 # Convert to pandas DataFrame for easy manipulation
-
 df = dataset.to_pandas()
 print(df.head())
-
-````
+```
 
   ### TypeScript
 
@@ -39916,7 +39900,7 @@ const dataset = await langwatch.datasets.get("your-dataset-slug");
 for (const entry of dataset.entries) {
   console.log(entry.entry);
 }
-````
+```
 
 
 
@@ -39936,13 +39920,11 @@ updated = langwatch.dataset.update_dataset("my-dataset", name="New Name")
 print(f"New slug: {updated.slug}")
 
 # Update column types
-
 updated = langwatch.dataset.update_dataset(
-"my-dataset",
-columns=[{"name": "question", "type": "string"}, {"name": "answer", "type": "string"}],
+    "my-dataset",
+    columns=[{"name": "question", "type": "string"}, {"name": "answer", "type": "string"}],
 )
-
-````
+```
 
   ### TypeScript
 
@@ -39964,7 +39946,7 @@ const withCols = await langwatch.datasets.update("my-dataset", {
     { name: "answer", type: "string" },
   ],
 });
-````
+```
 
 
 
@@ -39994,15 +39976,13 @@ import langwatch
 result = langwatch.dataset.list_records("my-dataset")
 
 for record in result.data:
-print(record.id, record.entry)
+    print(record.id, record.entry)
 
 print(f"Total: {result.pagination.total}")
 
 # List with explicit pagination
-
 result = langwatch.dataset.list_records("my-dataset", page=2, limit=20)
-
-````
+```
 
   ### TypeScript
 
@@ -40025,7 +40005,7 @@ const page2 = await langwatch.datasets.listRecords("my-dataset", {
   page: 2,
   limit: 20,
 });
-````
+```
 
 
 
@@ -40121,10 +40101,10 @@ Batch-delete records by their IDs.
 
   ### TypeScript
 
-    ```typescript
-    const result = await langwatch.datasets.deleteRecords("my-dataset", ["rec-1", "rec-2"]);
-    console.log(`Deleted ${result.deletedCount} records`);
-    ```
+```typescript
+const result = await langwatch.datasets.deleteRecords("my-dataset", ["rec-1", "rec-2"]);
+console.log(`Deleted ${result.deletedCount} records`);
+```
 
 
 
@@ -40143,14 +40123,11 @@ result = langwatch.dataset.upload("my-dataset", file_path="data.csv")
 print(f"Created {result.recordsCreated} records")
 
 # Replace all records (delete existing, then upload)
-
 result = langwatch.dataset.upload("my-dataset", file_path="data.csv", if_exists="replace")
 
 # Error if dataset already exists (create-only)
-
 result = langwatch.dataset.upload("my-dataset", file_path="data.csv", if_exists="error")
-
-````
+```
 
 The `if_exists` parameter controls how conflicts are handled:
 
@@ -40178,7 +40155,7 @@ await langwatch.datasets.upload("my-dataset", file, { ifExists: "replace" });
 
 // Error if dataset already exists (create-only)
 await langwatch.datasets.upload("my-dataset", file, { ifExists: "error" });
-````
+```
 
 The `ifExists` parameter controls how conflicts are handled:
 
@@ -40204,20 +40181,18 @@ import langwatch
 langwatch.setup()
 
 # Fetch dataset
-
 df = langwatch.dataset.get_dataset("your-dataset-slug").to_pandas()
 
 # Initialize evaluation
-
 evaluation = langwatch.experiment.init("my-evaluation")
 
-for index, row in evaluation.loop(df.iterrows()): # Run your LLM/agent
-output = my_llm(row["input"])
+for index, row in evaluation.loop(df.iterrows()):
+    # Run your LLM/agent
+    output = my_llm(row["input"])
 
     # Log evaluation metrics
     evaluation.log("response_quality", index=index, score=0.9)
-
-````
+```
 
   ### TypeScript
 
@@ -40243,7 +40218,7 @@ await evaluation.run(
   },
   { concurrency: 4 }
 );
-````
+```
 
 
 
@@ -40282,8 +40257,8 @@ const dataset = await langwatch.datasets.get<MyDatasetEntry>("my-dataset");
 
 // Now entry.entry is typed as MyDatasetEntry
 for (const entry of dataset.entries) {
-  console.log(entry.entry.input); // Typed as string
-  console.log(entry.entry.expected_output); // Typed as string
+  console.log(entry.entry.input);  // Typed as string
+  console.log(entry.entry.expected_output);  // Typed as string
 }
 ```
 
@@ -45049,7 +45024,7 @@ import langwatch
 
 @langwatch.span()
 def my_llm_step(user_input: str):
-output = my_llm(user_input)
+    output = my_llm(user_input)
 
     # Use any evaluator from the list above
     result = langwatch.evaluation.evaluate(
@@ -45063,8 +45038,7 @@ output = my_llm(user_input)
     )
 
     return output
-
-````
+```
 
 ```typescript TypeScript
 import { LangWatch } from "langwatch";
@@ -45086,7 +45060,7 @@ async function myLLMStep(userInput: string): Promise<string> {
 
   return output;
 }
-````
+```
 
 </CodeGroup>
 
@@ -45758,8 +45732,7 @@ import langwatch
 
 result = langwatch.experiment.run("your-experiment-slug")
 result.print_summary()
-
-````
+```
 
   ### TypeScript
 
@@ -45769,7 +45742,7 @@ import { LangWatch } from "langwatch";
 const langwatch = new LangWatch();
 const result = await langwatch.experiments.run("your-experiment-slug");
 result.printSummary();
-````
+```
 
 
 
@@ -45907,17 +45880,15 @@ Define your entire experiment in code. This gives you full control and version c
 import langwatch
 
 # Load your dataset
-
 dataset = langwatch.dataset.get_dataset("my-dataset").to_pandas()
 
 # Initialize experiment
-
 experiment = langwatch.experiment.init("ci-quality-check")
 
 # Run through each test case
-
-for idx, row in experiment.loop(dataset.iterrows()): # Call your LLM/agent
-response = my_llm(row["input"])
+for idx, row in experiment.loop(dataset.iterrows()):
+    # Call your LLM/agent
+    response = my_llm(row["input"])
 
     # Run evaluators
     experiment.evaluate(
@@ -45932,10 +45903,8 @@ response = my_llm(row["input"])
     )
 
 # Print summary and exit with code 1 on failure
-
 experiment.print_summary()
-
-````
+```
 
   ### TypeScript
 
@@ -45972,7 +45941,7 @@ await experiment.run(
 
 // Print summary and exit with code 1 on failure
 experiment.printSummary();
-````
+```
 
 
 
@@ -46097,15 +46066,34 @@ The `print_summary()` method:
 
   ### Platform Experiment
 
-    ```yaml evaluate: stage: test image: python:3.11 script: - pip install langwatch - python -c "
-    import langwatch result = langwatch.experiment.run('my-experiment') result.print_summary() "
-    variables: LANGWATCH_API_KEY: $LANGWATCH_API_KEY ```
+```yaml
+evaluate:
+  stage: test
+  image: python:3.11
+  script:
+    - pip install langwatch
+    - python -c "
+      import langwatch
+      result = langwatch.experiment.run('my-experiment')
+      result.print_summary()
+      "
+  variables:
+    LANGWATCH_API_KEY: $LANGWATCH_API_KEY
+```
 
   ### via SDK
 
-    ```yaml evaluate: stage: test image: python:3.11 script: - pip install langwatch openai - python
-    scripts/run_evaluation.py variables: LANGWATCH_API_KEY: $LANGWATCH_API_KEY OPENAI_API_KEY:
-    $OPENAI_API_KEY ```
+```yaml
+evaluate:
+  stage: test
+  image: python:3.11
+  script:
+    - pip install langwatch openai
+    - python scripts/run_evaluation.py
+  variables:
+    LANGWATCH_API_KEY: $LANGWATCH_API_KEY
+    OPENAI_API_KEY: $OPENAI_API_KEY
+```
 
 
 
@@ -46118,19 +46106,21 @@ The `print_summary()` method:
 version: 2.1
 
 jobs:
-evaluate:
-docker: - image: python:3.11
-steps: - checkout - run:
-name: Run experiment
-command: |
-pip install langwatch
-python -c "
-import langwatch
-result = langwatch.experiment.run('my-experiment')
-result.print_summary()
-"
-
-````
+  evaluate:
+    docker:
+      - image: python:3.11
+    steps:
+      - checkout
+      - run:
+          name: Run experiment
+          command: |
+            pip install langwatch
+            python -c "
+            import langwatch
+            result = langwatch.experiment.run('my-experiment')
+            result.print_summary()
+            "
+```
 
   ### via SDK
 
@@ -46149,7 +46139,7 @@ jobs:
       - run:
           name: Run experiment
           command: python scripts/run_evaluation.py
-````
+```
 
 
 
@@ -46169,19 +46159,18 @@ from langwatch.evaluation import (
 )
 
 try:
-result = langwatch.experiment.run("my-experiment", timeout=300)
-result.print_summary()
+    result = langwatch.experiment.run("my-experiment", timeout=300)
+    result.print_summary()
 except EvaluationNotFoundError:
-print("Experiment not found - check the slug")
-exit(1)
+    print("Experiment not found - check the slug")
+    exit(1)
 except EvaluationTimeoutError as e:
-print(f"Timeout: only {e.progress}/{e.total} completed")
-exit(1)
+    print(f"Timeout: only {e.progress}/{e.total} completed")
+    exit(1)
 except EvaluationRunFailedError as e:
-print(f"Run failed: {e.error_message}")
-exit(1)
-
-````
+    print(f"Run failed: {e.error_message}")
+    exit(1)
+```
 
   ### TypeScript
 
@@ -46205,7 +46194,7 @@ try {
   }
   process.exit(1);
 }
-````
+```
 
 
 
@@ -46777,8 +46766,7 @@ yourself: [create an experiment](/api-reference/experiments/create-an-experiment
 import langwatch
 
 langwatch.login()
-
-````
+```
 
 Be sure to log in or create an account using the displayed link, then provide your API key when prompted.
 
@@ -46787,7 +46775,7 @@ Be sure to log in or create an account using the displayed link, then provide yo
 ```bash
 export LANGWATCH_API_KEY=your_api_key
 export LANGWATCH_PROJECT_ID=your_project_id  # Required for service API keys
-````
+```
 
 <Note>
   `LANGWATCH_PROJECT_ID` is required when using a **service API key** (e.g. for CI/CD or multi-project setups). Project API keys obtained via `langwatch.login()` or from the project settings page already have the project context built in.
@@ -46805,22 +46793,19 @@ import langwatch
 import pandas as pd
 
 # Load your dataset
-
 df = pd.read_csv("my_dataset.csv")
 
 # Initialize a new experiment
-
 evaluation = langwatch.experiment.init("my-experiment")
 
 # Wrap your loop with evaluation.loop(), and iterate as usual
-
-for idx, row in evaluation.loop(df.iterrows()): # Run your model or pipeline
-response = my_agent(row["question"])
+for idx, row in evaluation.loop(df.iterrows()):
+    # Run your model or pipeline
+    response = my_agent(row["question"])
 
     # Log a metric for this sample
     evaluation.log("sample_metric", index=idx, score=0.95)
-
-````
+```
 
   ### TypeScript
 
@@ -46847,7 +46832,7 @@ await evaluation.run(dataset, async ({ item, index }) => {
   // Log a metric for this sample
   evaluation.log("sample_metric", { index, score: 0.95 });
 });
-````
+```
 
 
 
@@ -46867,15 +46852,15 @@ The evaluation is started by creating an evaluation session with a descriptive n
 
   ### Python
 
-    ```python
-    evaluation = langwatch.experiment.init("rag-pipeline-openai-vs-claude")
-    ```
+```python
+evaluation = langwatch.experiment.init("rag-pipeline-openai-vs-claude")
+```
 
   ### TypeScript
 
-    ```typescript
-    const evaluation = await langwatch.experiments.init("rag-pipeline-openai-vs-claude");
-    ```
+```typescript
+const evaluation = await langwatch.experiments.init("rag-pipeline-openai-vs-claude");
+```
 
 
 
@@ -46919,15 +46904,12 @@ Track any metric you want with `evaluation.log()`:
 evaluation.log("relevance", index=index, score=0.85)
 
 # Boolean pass/fail
-
 evaluation.log("contains_citation", index=index, passed=True)
 
 # Include additional data for debugging
-
 evaluation.log("coherence", index=index, score=0.9,
-data={"output": result["text"], "tokens": result["token_count"]})
-
-````
+               data={"output": result["text"], "tokens": result["token_count"]})
+```
 
   ### TypeScript
 
@@ -46944,7 +46926,7 @@ evaluation.log("coherence", {
   score: 0.9,
   data: { output: result.text, tokens: result.tokenCount }
 });
-````
+```
 
 
 
@@ -47058,15 +47040,12 @@ with evaluation.target("gpt5", {"model": "gpt-5", "temp": 0.7}):
     evaluation.log("accuracy", index=0, score=0.95)  # target auto-inferred
 
 # Or using explicit target parameter (without target() context)
-
 evaluation.log("latency", index=0, target="gpt5", metadata={"model": "gpt-5", "temp": 0.7})
 
 # Subsequent calls can omit metadata - it's already registered
-
 evaluation.log("accuracy", index=0, target="gpt5", score=0.95)
 evaluation.log("latency", index=1, target="gpt5", score=150)
-
-````
+```
 
   ### TypeScript
 
@@ -47080,7 +47059,7 @@ await evaluation.withTarget("gpt5", { model: "gpt-5", temp: 0.7 }, async () => {
 // Or using explicit target parameter
 evaluation.log("latency", { index: 0, target: "gpt5", metadata: { model: "gpt-5", temp: 0.7 } });
 evaluation.log("accuracy", { index: 0, target: "gpt5", score: 0.95 }); // metadata already registered
-````
+```
 
 
 
@@ -47293,16 +47272,15 @@ import langwatch
 evaluation = langwatch.experiment.init("model-comparison")
 
 for index, row in evaluation.loop(df.iterrows()):
-with evaluation.target("gpt-5-mini", {"model": "openai/gpt-5-mini"}):
-evaluation.log_response(ask_gpt(row["question"]))
+    with evaluation.target("gpt-5-mini", {"model": "openai/gpt-5-mini"}):
+        evaluation.log_response(ask_gpt(row["question"]))
 
     with evaluation.target("claude-sonnet-5", {"model": "anthropic/claude-sonnet-5"}):
         evaluation.log_response(ask_claude(row["question"]))
 
     verdict = evaluation.compare(index, input=row["question"])
     print(verdict.winner, verdict.reasoning)
-
-````
+```
 
 The candidates are whatever `log_response()` recorded inside each `target()` block.
 
@@ -47328,7 +47306,7 @@ await evaluation.run(dataset, async ({ item }) => {
   const verdict = await evaluation.compare({ input: item.question });
   console.log(verdict.winner, verdict.reasoning);
 });
-````
+```
 
 The candidates are whatever each `withTarget()` callback returned.
 
@@ -47413,12 +47391,11 @@ briefly which candidate wins on those criteria, then pick its slot label.
 """
 
 verdict = evaluation.compare(
-index,
-input=row["question"],
-prompt=SUPPORT_RUBRIC,
+    index,
+    input=row["question"],
+    prompt=SUPPORT_RUBRIC,
 )
-
-````
+```
 
   ### TypeScript
 
@@ -47439,7 +47416,7 @@ const verdict = await evaluation.compare({
   input: item.question,
   prompt: supportRubric,
 });
-````
+```
 
 
 
@@ -47515,9 +47492,9 @@ df = langwatch.dataset.get_dataset("your-dataset-id").to_pandas()
 evaluation = langwatch.experiment.init("support-reply-comparison")
 
 for index, row in evaluation.loop(df.iterrows(), threads=4):
-def task(index, row):
-with evaluation.target("gpt-5-mini", {"model": "openai/gpt-5-mini"}):
-evaluation.log_response(ask_gpt(row["question"]))
+    def task(index, row):
+        with evaluation.target("gpt-5-mini", {"model": "openai/gpt-5-mini"}):
+            evaluation.log_response(ask_gpt(row["question"]))
 
         with evaluation.target("claude-sonnet-5", {"model": "anthropic/claude-sonnet-5"}):
             evaluation.log_response(ask_claude(row["question"]))
@@ -47536,8 +47513,7 @@ evaluation.log_response(ask_gpt(row["question"]))
     evaluation.submit(task, index, row)
 
 evaluation.print_summary()
-
-````
+```
 
   ### TypeScript
 
@@ -47572,7 +47548,7 @@ await evaluation.run(dataset, async ({ item, index }) => {
 }, { concurrency: 4 });
 
 evaluation.printSummary();
-````
+```
 
 
 
@@ -47645,20 +47621,18 @@ await evaluation.run(
 import langwatch
 
 # Load dataset from LangWatch
-
 df = langwatch.dataset.get_dataset("your-dataset-id").to_pandas()
 
 # Initialize evaluation
-
 evaluation = langwatch.experiment.init("rag-pipeline-evaluation-v2")
 
 # Run evaluation with parallelization
-
 for index, row in evaluation.loop(df.iterrows(), threads=8):
-def task(index, row): # Compare two RAG configurations
-with evaluation.target("rag-v1", {"model": "gpt-5", "retriever": "dense"}):
-response, contexts = execute_rag_pipeline(row["question"], version="v1")
-evaluation.log_response(response.text) # Store the output
+    def task(index, row):
+        # Compare two RAG configurations
+        with evaluation.target("rag-v1", {"model": "gpt-5", "retriever": "dense"}):
+            response, contexts = execute_rag_pipeline(row["question"], version="v1")
+            evaluation.log_response(response.text)  # Store the output
 
             # Use LangWatch evaluators - target auto-inferred
             evaluation.evaluate(
@@ -47685,8 +47659,7 @@ evaluation.log_response(response.text) # Store the output
             evaluation.log("response_quality", index=index, score=response.quality)
 
     evaluation.submit(task, index, row)
-
-````
+```
 
   ### TypeScript
 
@@ -47730,7 +47703,7 @@ await evaluation.run(dataset, async ({ item, index }) => {
     }),
   ]);
 }, { concurrency: 8 });
-````
+```
 
 
 
@@ -47753,10 +47726,9 @@ def agent(question):
     return {"text": completion.text, "context": context}
 
 for index, row in evaluation.loop(df.iterrows()):
-result = agent(row["question"])
-evaluation.log("accuracy", index=index, score=0.9)
-
-````
+    result = agent(row["question"])
+    evaluation.log("accuracy", index=index, score=0.9)
+```
 
 <Info>
   Learn more in our [Python Integration Guide](/integration/python/guide).
@@ -47782,7 +47754,7 @@ await evaluation.run(dataset, async ({ item, index }) => {
   const result = await agent(item.question);
   evaluation.log("accuracy", { index, score: 0.9 });
 });
-````
+```
 
 <Info>
   Learn more in our [TypeScript Integration Guide](/integration/typescript/guide).
@@ -48402,13 +48374,14 @@ The key difference between guardrails and regular evaluations is the `as_guardra
 import langwatch
 
 @langwatch.trace()
-def my_llm_app(user_input): # Run guardrail check
-guardrail = langwatch.evaluation.evaluate(
-"azure/jailbreak",
-name="Jailbreak Detection",
-as_guardrail=True,
-data={"input": user_input},
-)
+def my_llm_app(user_input):
+    # Run guardrail check
+    guardrail = langwatch.evaluation.evaluate(
+        "azure/jailbreak",
+        name="Jailbreak Detection",
+        as_guardrail=True,
+        data={"input": user_input},
+    )
 
     # Check result and handle failure
     if not guardrail.passed:
@@ -48417,8 +48390,7 @@ data={"input": user_input},
     # Continue with normal processing
     response = call_llm(user_input)
     return response
-
-````
+```
 
   ### TypeScript
 
@@ -48444,7 +48416,7 @@ async function myLLMApp(userInput: string): Promise<string> {
   const response = await callLLM(userInput);
   return response;
 }
-````
+```
 
 
 
@@ -48581,21 +48553,21 @@ For async applications, use `async_evaluate`:
 import langwatch
 
 @langwatch.trace()
-async def async_chatbot(user_input): # Async guardrail check
-guardrail = await langwatch.evaluation.async_evaluate(
-"azure/jailbreak",
-name="Jailbreak Detection",
-as_guardrail=True,
-data={"input": user_input},
-)
+async def async_chatbot(user_input):
+    # Async guardrail check
+    guardrail = await langwatch.evaluation.async_evaluate(
+        "azure/jailbreak",
+        name="Jailbreak Detection",
+        as_guardrail=True,
+        data={"input": user_input},
+    )
 
     if not guardrail.passed:
         return "I can't help with that request."
 
     response = await async_call_llm(user_input)
     return response
-
-````
+```
 
   ### TypeScript
 
@@ -48610,7 +48582,7 @@ const guardrail = await langwatch.evaluations.evaluate("azure/jailbreak", {
   asGuardrail: true,
   data: { input: userInput },
 });
-````
+```
 
 
 
@@ -48627,28 +48599,29 @@ import asyncio
 import langwatch
 
 @langwatch.trace()
-async def chatbot_with_parallel_guards(user_input): # Run multiple guardrails in parallel
-jailbreak, moderation, off_topic = await asyncio.gather(
-langwatch.evaluation.async_evaluate(
-"azure/jailbreak",
-name="Jailbreak Detection",
-as_guardrail=True,
-data={"input": user_input},
-),
-langwatch.evaluation.async_evaluate(
-"openai/moderation",
-name="Content Moderation",
-as_guardrail=True,
-data={"input": user_input},
-),
-langwatch.evaluation.async_evaluate(
-"langevals/off_topic",
-name="Off Topic Check",
-as_guardrail=True,
-data={"input": user_input},
-settings={"allowed_topics": ["customer support", "product questions"]},
-),
-)
+async def chatbot_with_parallel_guards(user_input):
+    # Run multiple guardrails in parallel
+    jailbreak, moderation, off_topic = await asyncio.gather(
+        langwatch.evaluation.async_evaluate(
+            "azure/jailbreak",
+            name="Jailbreak Detection",
+            as_guardrail=True,
+            data={"input": user_input},
+        ),
+        langwatch.evaluation.async_evaluate(
+            "openai/moderation",
+            name="Content Moderation",
+            as_guardrail=True,
+            data={"input": user_input},
+        ),
+        langwatch.evaluation.async_evaluate(
+            "langevals/off_topic",
+            name="Off Topic Check",
+            as_guardrail=True,
+            data={"input": user_input},
+            settings={"allowed_topics": ["customer support", "product questions"]},
+        ),
+    )
 
     # Check all results
     if not jailbreak.passed:
@@ -48659,8 +48632,7 @@ settings={"allowed_topics": ["customer support", "product questions"]},
         return "I can only help with customer support questions."
 
     return await async_call_llm(user_input)
-
-````
+```
 
   ### TypeScript
 
@@ -48703,7 +48675,7 @@ async function chatbotWithParallelGuards(userInput: string): Promise<string> {
 
   return await callLLM(userInput);
 }
-````
+```
 
 
 
@@ -48920,13 +48892,14 @@ Click **Set up Guardrail** on the [Online Evaluations](https://app.langwatch.ai/
 import langwatch
 
 @langwatch.trace()
-def my_chatbot(user_input): # Input guardrail - check for jailbreak attempts
-jailbreak_check = langwatch.evaluation.evaluate(
-"azure/jailbreak",
-name="Jailbreak Detection",
-as_guardrail=True,
-data={"input": user_input},
-)
+def my_chatbot(user_input):
+    # Input guardrail - check for jailbreak attempts
+    jailbreak_check = langwatch.evaluation.evaluate(
+        "azure/jailbreak",
+        name="Jailbreak Detection",
+        as_guardrail=True,
+        data={"input": user_input},
+    )
 
     if not jailbreak_check.passed:
         return "I'm sorry, I can't help with that request."
@@ -48946,8 +48919,7 @@ data={"input": user_input},
         return "I apologize, but I cannot share that information."
 
     return response
-
-````
+```
 
   ### TypeScript
 
@@ -48984,7 +48956,7 @@ async function myChatbot(userInput: string): Promise<string> {
 
   return response;
 }
-````
+```
 
 
 
@@ -49157,8 +49129,7 @@ def my_llm_app(user_input):
     )
 
     return response
-
-````
+```
 
   ### TypeScript
 
@@ -49179,7 +49150,7 @@ await tracer.withActiveSpan("my_llm_app", async (span) => {
 
   return response;
 });
-````
+```
 
 
 
@@ -49412,10 +49383,9 @@ import langwatch
 evaluation = langwatch.experiment.init("my-first-experiment")
 
 for idx, row in evaluation.loop(dataset.iterrows()):
-response = my_llm(row["input"])
-evaluation.log("quality", index=idx, score=0.95)
-
-````
+    response = my_llm(row["input"])
+    evaluation.log("quality", index=idx, score=0.95)
+```
 
   ### TypeScript
 
@@ -49429,7 +49399,7 @@ await evaluation.run(dataset, async ({ item, index }) => {
   const response = await myLLM(item.input);
   evaluation.log("quality", { index, score: 0.95 });
 });
-````
+```
 
 
 
@@ -51809,7 +51779,7 @@ from rich import print
 print(synthetic_queries[0])
 ```
 
-```json
+```python
 {
     'query': 'Searching for a sleeveless top with lace detailing at the neckline for casual outings and dinner
 dates.',
@@ -52625,7 +52595,7 @@ Custom events allow you to track any user interactions with your LLM application
 
 ### Request Body
 
-```javascript
+```jsonc
 {
   "trace_id": "id of the message the event occurred",
   "event_type": "your_custom_event_type",
@@ -52706,7 +52676,7 @@ Selected text events allow you to track when a user selects text generated by yo
 
 ### Request Body
 
-```javascript
+```jsonc
 {
   "trace_id": "id of the message the user selected",
   "event_type": "selected_text",
@@ -52768,7 +52738,7 @@ To use the thumbs_up_down event it's important that you have used an explicit `t
 
 ### Request Body
 
-```javascript
+```jsonc
 {
   "trace_id": "id of the message the user gave the feedback on",
   "event_type": "thumbs_up_down",
@@ -52828,7 +52798,7 @@ Since the user can close the window, to track this behavior, you need to send tw
 
 ### Request Body
 
-```javascript
+```jsonc
 {
   "trace_id": "id of the message the user gave the feedback on",
   "event_type": "waited_to_finish",
@@ -70420,7 +70390,7 @@ ingress:
   # Defaults to ["/api/internal"]. Add prefixes your install keeps in-cluster.
   blockedPaths:
     - /api/internal
-    - /api/cron # only if you do NOT drive cron from an external scheduler
+    - /api/cron   # only if you do NOT drive cron from an external scheduler
 ```
 
 Before you change it:
@@ -73594,24 +73564,21 @@ If you're using the LLM Category evaluator to check different aspects of your ou
 import langwatch
 
 # Check 1: Is the answer complete?
-
 langwatch.evaluation.evaluate(
-"langevals/llm_category",
-name="Answer Completeness Check", # Unique name for this check
-data={"input": user_input, "output": response},
-settings={"categories": [{"name": "complete"}, {"name": "incomplete"}]}
+    "langevals/llm_category",
+    name="Answer Completeness Check",  # Unique name for this check
+    data={"input": user_input, "output": response},
+    settings={"categories": [{"name": "complete"}, {"name": "incomplete"}]}
 )
 
 # Check 2: Is the tone appropriate?
-
 langwatch.evaluation.evaluate(
-"langevals/llm_category",
-name="Tone Appropriateness Check", # Different name for this check
-data={"input": user_input, "output": response},
-settings={"categories": [{"name": "professional"}, {"name": "casual"}, {"name": "inappropriate"}]}
+    "langevals/llm_category",
+    name="Tone Appropriateness Check",  # Different name for this check
+    data={"input": user_input, "output": response},
+    settings={"categories": [{"name": "professional"}, {"name": "casual"}, {"name": "inappropriate"}]}
 )
-
-````
+```
 
 ```typescript TypeScript
 import { LangWatch } from "langwatch";
@@ -73631,7 +73598,7 @@ await langwatch.evaluations.evaluate("langevals/llm_category", {
     data: { input: userInput, output: response },
     settings: { categories: [{ name: "professional" }, { name: "casual" }, { name: "inappropriate" }] }
 });
-````
+```
 
 </CodeGroup>
 

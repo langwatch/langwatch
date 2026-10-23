@@ -1,3 +1,5 @@
+import { unparseable } from "./code-syntax.ts";
+
 /** A gap on one page; `weight` orders the worst offenders (tokens, or how many blocks). */
 export type AgentIssue = { page: string; code: string; detail: string; weight?: number };
 type PageIssue = Omit<AgentIssue, "page">;
@@ -167,6 +169,7 @@ function codeIssues({ codes }: { codes: CodeBlock[] }): PageIssue[] {
   const placeholders = codes.filter(
     (code) => (SHELL.has(code.lang) || code.lang in LANGUAGE_OF) && placeholderOnly({ code }),
   ).length;
+  const broken = codes.filter((code) => unparseable(code)).length;
   const unimported = codes.filter((code) => {
     const language = LANGUAGE_OF[code.lang];
     if (!language || filled({ code }).length < MIN_SAMPLE_LINES) return false;
@@ -179,6 +182,7 @@ function codeIssues({ codes }: { codes: CodeBlock[] }): PageIssue[] {
     ...counted({ code: "code-shell-prompt", count: prompts, what: 'shell blocks with "$ "' }),
     ...counted({ code: "code-placeholder-only", count: placeholders, what: "placeholder blocks" }),
     ...counted({ code: "code-missing-import", count: unimported, what: "SDK samples, no import" }),
+    ...counted({ code: "code-unparseable", count: broken, what: "blocks that do not parse" }),
   ];
 }
 

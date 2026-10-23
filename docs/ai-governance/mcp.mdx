@@ -70,7 +70,7 @@ Governance MCP tools register inside LangWatch's existing MCP server (served on 
 - **Project API key as Bearer** (`Authorization: Bearer <projectApiKey>`), the plain read tools work immediately. Sufficient to call `governance_*_list` and `governance_*_get`. Admin reads (`governance_*_admin_list`, which expose `ottlRules`) and every write tool require a user-bound session and reject a project-key-only caller.
 - **OAuth (PKCE) flow** at `/mcp/authorize` → `/oauth/token`, required for write tools and admin reads. The OAuth flow captures the user's id at authorize time, threads it through the session token cache, and surfaces it to governance tools as `ctx.callerUserId`. Without it, a write tool returns an `AUTH_REQUIRED:` error pointing the client at the OAuth flow.
 
-```jsonc
+```jsoncc
 // MCP client config, points at the LangWatch instance's MCP endpoint
 // (SaaS shown; self-hosted uses your deployment's host).
 {
@@ -105,7 +105,7 @@ Governance tools enforce two distinct gates at the tool layer (`enterprise/modul
 
 **`AUTH_REQUIRED:`**, write tools (e.g. `governance_ingestion_templates_create`, `governance_ingestion_keys_mint`) called from a project-apiKey-only session without OAuth. Read tools are NOT subject to this gate; they work with project-apiKey-only sessions.
 
-```jsonc
+```jsoncc
 {
   "isError": true,
   "content": [
@@ -119,7 +119,7 @@ Governance tools enforce two distinct gates at the tool layer (`enterprise/modul
 
 **`FORBIDDEN:`**, the caller has a session but their organization role doesn't include the required permission (the same organization-permission decision the tRPC and REST surfaces make, `AuthzService.hasPermission` in `modules/authz/contract/src/authz.service.ts`).
 
-```jsonc
+```jsoncc
 {
   "isError": true,
   "content": [

@@ -28,7 +28,13 @@ export const AGENT_CHECKS = [
   {
     id: "code",
     label: "Code pastes as is",
-    codes: ["code-untagged", "code-shell-prompt", "code-placeholder-only", "code-missing-import"],
+    codes: [
+      "code-untagged",
+      "code-shell-prompt",
+      "code-placeholder-only",
+      "code-missing-import",
+      "code-unparseable",
+    ],
   },
   {
     id: "fidelity",

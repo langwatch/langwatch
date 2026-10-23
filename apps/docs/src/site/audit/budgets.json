@@ -245,6 +245,7 @@
         "/prompt-management/features/essential/tags",
         "/prompt-management/features/essential/version-control"
       ],
+      "code-unparseable": ["/prompt-management/cli", "/self-hosting/security"],
       "tokens-over-budget": [
         "/agent-testing/connect-your-agent",
         "/api-reference/agents/create-agents",
