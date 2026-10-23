@@ -1,6 +1,7 @@
 import { AuthApi } from "@langwatch/auth-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
+import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import {
   HostedMcpApi,
   type HostedMcpApiContract,
@@ -45,6 +46,8 @@ type HostedMcpDependenciesMap = Readonly<{
   sessions: typeof AuthApi;
   /** Installs governance's tools on each session (Alex, 2026-09-27). */
   governance: typeof GovernanceRestApi;
+  /** Which projects' legacy keys keep full access (`legacy_project_key_full_access`). */
+  featureFlags: typeof FeatureFlagApi;
 }>;
 
 type HostedMcpSetup = FeatureSetup<
@@ -61,6 +64,7 @@ export class HostedMcpModule implements HostedMcpApiContract, McpAuthorizeApi {
     authorization: AuthzApi,
     sessions: AuthApi,
     governance: GovernanceRestApi,
+    featureFlags: FeatureFlagApi,
   };
   static readonly config = hostedMcpConfig;
 
@@ -109,7 +113,10 @@ export class HostedMcpModule implements HostedMcpApiContract, McpAuthorizeApi {
     return new HostedMcpModule(
       {
         repositories,
-        projects: ProjectMcpProjectLookupService.create({ projects: dependencies.projects }),
+        projects: ProjectMcpProjectLookupService.create({
+          projects: dependencies.projects,
+          featureFlags: dependencies.featureFlags,
+        }),
         grants: AuthzMcpSessionGrantService.create({ authorization: dependencies.authorization }),
         cliSessions: dependencies.sessions,
         address: ResolvedMcpClientAddressService.create(),

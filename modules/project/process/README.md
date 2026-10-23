@@ -184,6 +184,14 @@ The live project a legacy `apiKey` column names, or nothing.
 findIdByLegacyApiKey(input: Readonly<{ token: string }>): Promise<string | null>;
 ```
 
+#### `markLegacyApiKeyUsed`
+
+Stamps when the project's legacy `apiKey` last authenticated a request.
+
+```typescript
+markLegacyApiKeyUsed(input: Readonly<{ projectId: string }>): Promise<void>;
+```
+
 #### `findTraceSharingConfig`
 
 Whether the organisation and the project both still allow trace sharing. Nothing when the project is not there to read the two switches from.

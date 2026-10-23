@@ -176,6 +176,10 @@ func (s Stack) OverlayEnv() []string {
 	if s.LocalAPIKey != "" {
 		env = append(env, "HAVEN_SEED_LANGWATCH_API_KEY="+s.LocalAPIKey)
 	}
+	// The seeded key is a legacy project key, which off this flag may only ingest
+	// (modules/auth/specs/legacy-project-key-scope.feature); local scripts and
+	// agents call prompts, datasets and evaluations with it.
+	env = append(env, "LEGACY_PROJECT_KEY_FULL_ACCESS=1")
 	// Google DLP off by default locally: no local workflow wants trace text leaving
 	// for Google, and the app skips loading @google-cloud/dlp (grpc + generated
 	// protos) entirely when this is set. False emits nothing, leaving .env to decide
