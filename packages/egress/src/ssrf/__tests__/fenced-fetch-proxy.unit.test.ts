@@ -167,6 +167,23 @@ describe("the pinned fetch with an outbound proxy", () => {
     });
   });
 
+  describe("given a proxy setting that is not a URL", () => {
+    /** @scenario "A malformed proxy setting fails as a connection error" */
+    it("fails as a connection error naming the destination", async () => {
+      const validated = admitted({
+        hostname: "idp.example.test",
+        port: originPort,
+        path: "/",
+        resolvedIp: UNREACHABLE_IP,
+      });
+
+      await expect(
+        fetchValidatedDestination(validated, { proxy: { httpsProxy: "proxy.corp:3128" } }, tls),
+      ).rejects.toThrow(new RegExp(`Connection failed to idp.example.test:${originPort}`));
+      expect(tunnelled).toEqual([]);
+    });
+  });
+
   describe("given a redirect to a destination the policy refuses", () => {
     /** @scenario "A redirect is judged again before it travels through the proxy" */
     it("refuses the next hop without asking the proxy for it", async () => {
