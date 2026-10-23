@@ -573,8 +573,8 @@ catalogs:
       specifier: ^10.1.0
       version: 10.1.0
     react-resizable-panels:
-      specifier: ^2.1.9
-      version: 2.1.9
+      specifier: ^4.14.2
+      version: 4.14.2
     react-router:
       specifier: ^8.0.1
       version: 8.3.0
@@ -15409,7 +15409,7 @@ importers:
         version: 10.1.0(@types/react@19.2.18)(react@19.2.8)(supports-color@10.2.2)
       react-resizable-panels:
         specifier: 'catalog:'
-        version: 2.1.9(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+        version: 4.14.2(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       react-router:
         specifier: 'catalog:'
         version: 8.3.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -16376,7 +16376,7 @@ importers:
         version: 10.1.0(@types/react@19.2.18)(react@19.2.8)(supports-color@10.2.2)
       react-resizable-panels:
         specifier: 'catalog:'
-        version: 2.1.9(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+        version: 4.14.2(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       react-spinners:
         specifier: ^0.17.0
         version: 0.17.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -28029,8 +28029,8 @@ packages:
       redux:
         optional: true
 
-  react-resizable-panels@2.1.9:
-    resolution: {integrity: sha512-z77+X08YDIrgAes4jl8xhnUu1LNIRp4+E7cv4xHmLOxxUPO/ML7PSrE813b90vj7xvQ1lcf7g2uA9GeMZonjhQ==}
+  react-resizable-panels@4.14.2:
+    resolution: {integrity: sha512-s35mfXhwpPEPnB+BKPCZJ9VZU0CHb1I9trm9tijEGBNv1Srl0HzIweENeXnsQvd0Xm9BeOBkEzDGVJOZM2mkEQ==}
     peerDependencies:
       react: ^19.2.7
       react-dom: ^19.2.7
@@ -40287,7 +40287,7 @@ snapshots:
       '@types/react': 19.2.18
       redux: 5.0.1
 
-  react-resizable-panels@2.1.9(react-dom@19.2.8(react@19.2.8))(react@19.2.8):
+  react-resizable-panels@4.14.2(react-dom@19.2.8(react@19.2.8))(react@19.2.8):
     dependencies:
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
