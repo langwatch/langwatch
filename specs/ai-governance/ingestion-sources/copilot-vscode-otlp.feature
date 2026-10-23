@@ -3,17 +3,18 @@ Feature: VS Code Copilot Chat OTLP spans canonicalize on the unified substrate
   OTel GenAI-semantic-convention spans as the CLI and app (invoke_agent /
   chat / execute_tool) under `service.name` "copilot-chat", and posts them
   live to /api/otel authorized by a personal ingest key of sourceType
-  "copilot_vscode". Receiver-side, the existing GenAI extractor already lifts
-  the standard attributes — model, token usage, operation, captured content —
-  with ZERO VS-Code-specific extractor code (empirically validated on VS Code
-  1.128.1 / Copilot Chat 0.56.0: a real Chat turn landed with model, tokens,
-  and content).
+  "copilot_vscode". Receiver-side, the existing GenAI extractor lifts the
+  standard attributes (model, token usage, operation, captured content), as
+  validated on VS Code 1.128.1 / Copilot Chat 0.56.0. The Copilot extractor
+  adds only two VS Code spellings: the `copilot-chat` instrumentation scope,
+  and the AI-unit count `copilot_chat.copilot_usage_nano_aiu`.
 
   Source separation: spans arrive under sourceType "copilot_vscode", stamped
   at the receiver edge, distinct from "copilot_cli" / "copilot_app". v1 is
-  tokens-only: VS Code reports AI-units as `copilot_usage_nano_aiu` under
-  obfuscated model codenames (e.g. `oswe-vscode-prime`), so dollar cost is out
-  of scope. Spans land on the unified substrate per ADR-018 (project-scoped).
+  tokens-only: VS Code reports AI-units as
+  `copilot_chat.copilot_usage_nano_aiu` under obfuscated model codenames
+  (e.g. `oswe-vscode-prime`), so dollar cost is out of scope. Spans land on
+  the unified substrate per ADR-018 (project-scoped).
 
   Pairs with:
     - specs/ai-governance/ingestion-sources/copilot-cli-otlp.feature
@@ -23,7 +24,7 @@ Feature: VS Code Copilot Chat OTLP spans canonicalize on the unified substrate
   Background:
     Given an organization "acme" with a personal ingest key of sourceType "copilot_vscode"
 
-  Rule: the standard GenAI attributes canonicalize without VS-Code-specific code
+  Rule: the standard GenAI attributes canonicalize through the shared Copilot extractor
 
     @unit
     Scenario: A copilot-chat span yields model and token usage on the canonical trace
@@ -52,12 +53,12 @@ Feature: VS Code Copilot Chat OTLP spans canonicalize on the unified substrate
       When the receiver applies key provenance
       Then the foreign scopes are dropped and only Copilot's own scopes are recorded
 
-    @unit @unimplemented @issue:8803
+    @unit
     Scenario: Copilot Chat's copilot-chat scope counts as Copilot's own on a copilot_vscode key
       Given a copilot_vscode ingest key receives spans under the copilot-chat scope
       When the receiver applies key provenance
       Then the spans are recorded
-      And a copilot_cli or copilot_app key still drops the copilot-chat scope
+      And a copilot_cli or copilot_app key applies no scope filter
 
     @integration @unimplemented @issue:8803
     Scenario: The source is stamped at the receiver, not taken from the payload
@@ -108,7 +109,7 @@ Feature: VS Code Copilot Chat OTLP spans canonicalize on the unified substrate
 
   Rule: v1 is tokens-only — no fabricated dollar cost
 
-    @unit @unimplemented @issue:8803
+    @unit
     Scenario: A VS Code turn is recorded without a fabricated dollar cost
       Given a copilot-chat span carrying copilot_usage_nano_aiu under an obfuscated model codename
       When the span is ingested with the copilot_vscode ingest key
