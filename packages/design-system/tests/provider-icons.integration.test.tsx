@@ -10,6 +10,7 @@ import {
   ProviderIconGlyph,
   type ProviderKey,
 } from "../src/components/scope/provider-icons.tsx";
+import { LOGO_LINES_PATH, LOGO_PLATE_PATH } from "../src/components/brand/logo-paths.ts";
 import { renderWithDesignSystem } from "../src/testing/index.tsx";
 
 afterEach(() => cleanup());
@@ -28,18 +29,15 @@ describe("provider icons", () => {
     it("names LangWatch as the provider", () => {
       expect(inferProvider("langwatch/instant-evals")).toBe("langwatch");
     });
-
-    it("draws the LangWatch mark", () => {
-      expect(artworkOf("langwatch")).not.toBe("");
-    });
   });
 
   describe("given the decision model providers", () => {
-    /** @scenario Each decision model shows its provider's brand mark */
-    it("draws a mark of each one's own rather than the Custom glyph", () => {
+    /** @scenario Each decision model provider draws its own brand mark */
+    it("draws the LangWatch logo and a mark of each one's own rather than the Custom glyph", () => {
       const providers = ["inception", "perplexity", "cloudflare", "langwatch"] as const;
       const drawings = [...providers, "custom" as const].map(artworkOf);
 
+      expect(artworkOf("langwatch")).toBe([LOGO_PLATE_PATH, LOGO_LINES_PATH].join("|"));
       expect(new Set(drawings).size).toBe(providers.length + 1);
     });
   });

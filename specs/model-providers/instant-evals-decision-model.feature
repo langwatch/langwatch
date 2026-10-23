@@ -183,7 +183,7 @@ Feature: Instant Evals decision model column in Default models
     Then I can pick only "LangWatch Instant Preview"
 
   @integration
-  Scenario: Each decision model shows its provider's brand mark
-    When I open the decision model picker
-    Then LangWatch Instant Preview shows the LangWatch mark
-    And the Inception, Perplexity and Cloudflare models each show their own brand mark
+  Scenario: Each decision model provider draws its own brand mark
+    When the icon for a decision model provider is drawn
+    Then the LangWatch hosted model draws the LangWatch logo
+    And Inception, Perplexity and Cloudflare each draw a mark of their own, not the generic one
