@@ -6,7 +6,9 @@
  */
 
 import {
+  estimateJudgedTextTokens,
   instantEvalCostUsd,
+  instantEvalQuestionTokens,
   instantEvalSkipped,
   NANO_USD_PER_USD,
   type InstantEvalBooleanQuestion,
@@ -23,6 +25,7 @@ import { nowInstant } from "@langwatch/time";
 
 import type {
   InstantEvalClassifierChannel,
+  InstantEvalPermit,
   InstantEvalRateLimiter,
 } from "../channels/instant-eval-classifier.channel.ts";
 import type { InstantEvalHostedDecisionsChannel } from "../channels/instant-eval-hosted-decisions.channel.ts";
@@ -301,23 +304,11 @@ class RouteRun {
     questions: readonly InstantEvalBooleanQuestion[];
     deadline: LegDeadline;
   }): Promise<Leg> {
-    const { classifier, hostedDecisions } = this.deps;
-    const text = this.plan.text;
-    const signal = deadline.signalWith(this.signal);
-    // The limiter waits on the caller's stop alone, with the leg's clock paused meanwhile.
-    const limiter = deadline.pausing({ limiter: this.deps.limiter, signal: this.signal });
-    const channelMissing = kind === "jev" ? !classifier : !hostedDecisions || !model;
-    if (channelMissing) {
+    const judgement = await this.callDecisionModel({ kind, model, questions, deadline });
+    if (!judgement) {
       this.flags.push(`${backend}_unavailable`);
       return { outcome: "failed", reason: "classifier_provider_unavailable" };
     }
-    const judgement =
-      kind === "jev"
-        ? await classifier!.classify(
-            { projectId: this.projectId, text, questions, limiter },
-            signal,
-          )
-        : await hostedDecisions!.classify({ text, questions, model: model! }, signal);
     this.paid({ backend, inputTokens: judgement.inputTokens, outputTokens: 0 });
     if (judgement.skippedReason) return { outcome: "failed", reason: judgement.skippedReason };
     const probabilities = new Map<string, number>();
@@ -333,6 +324,50 @@ class RouteRun {
       probabilities,
       isTextTruncated: judgement.isTextTruncated,
       limiterWaitMs: judgement.limiterWaitMs ?? 0,
+    };
+  }
+
+  /**
+   * The decision model's judgement, or undefined when this install holds no channel for it. Each
+   * send waits on the limiter (the hosted classifier's own bucket, a per-kind tenant share for
+   * Decisions) on the caller's stop alone, with the leg's clock paused meanwhile.
+   */
+  private async callDecisionModel({
+    kind,
+    model,
+    questions,
+    deadline,
+  }: {
+    kind: "jev" | "decisions";
+    model: string | undefined;
+    questions: readonly InstantEvalBooleanQuestion[];
+    deadline: LegDeadline;
+  }): Promise<InstantEvalJudgement | undefined> {
+    const { classifier, hostedDecisions } = this.deps;
+    const { text } = this.plan;
+    const signal = deadline.signalWith(this.signal);
+    const limiter = deadline.pausing({ limiter: this.deps.limiter, signal: this.signal });
+    if (kind === "jev") {
+      return classifier?.classify({ projectId: this.projectId, text, questions, limiter }, signal);
+    }
+    if (!hostedDecisions || !model) return undefined;
+    await limiter.acquire(this.permitOf({ pool: "decisions", text, questions }));
+    return hostedDecisions.classify({ text, questions, model }, signal);
+  }
+
+  /** One send's ask of the limiter: a tenant share per leg kind, under the shared global cap. */
+  private permitOf({
+    pool,
+    text,
+    questions,
+  }: {
+    pool: "decisions" | "llm";
+    text: string;
+    questions: readonly InstantEvalBooleanQuestion[];
+  }): InstantEvalPermit {
+    return {
+      tokens: estimateJudgedTextTokens({ text }) + instantEvalQuestionTokens(questions),
+      tenantId: `${this.projectId}:${pool}`,
     };
   }
 
@@ -352,20 +387,19 @@ class RouteRun {
   }): Promise<Leg> {
     // The table refuses an LLM backend with no model at boot; this keeps the type honest.
     if (!model) return { outcome: "failed", reason: "classifier_not_configured" };
+    const text = this.plan.fullText;
     const answers = await Promise.all(
-      questions.map((question) =>
-        this.deps.llmJudge.judge(
-          {
-            wire,
-            model,
-            job: this.plan.job,
-            question,
-            text: this.plan.fullText,
-            timeoutMs,
-          },
+      questions.map(async (question) => {
+        // Each question is a send of the full text, so each one draws on the limiter.
+        await this.deps.limiter.acquire(
+          this.permitOf({ pool: "llm", text, questions: [question] }),
+          this.signal,
+        );
+        return this.deps.llmJudge.judge(
+          { wire, model, job: this.plan.job, question, text, timeoutMs },
           ...(this.signal ? [this.signal] : []),
-        ),
-      ),
+        );
+      }),
     );
     const probabilities = new Map<string, number>();
     let reason: InstantEvalSkipReason = "classifier_provider_unavailable";

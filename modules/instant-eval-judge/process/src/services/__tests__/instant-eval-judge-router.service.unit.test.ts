@@ -324,6 +324,18 @@ describe("InstantEvalJudgeRouterService", () => {
     expect(judgement.verdicts).toEqual([{ questionId: "q", probability: 0.4 }]);
   });
 
+  /** @scenario "Decisions and LLM legs draw on the rate limiter too" */
+  it("paces Decisions and every LLM send through the limiter, each kind on its own share", async () => {
+    const { classify, limiter } = harness({ decisions: () => judged(0.5) });
+    await classify(SHORT, [Q, yesNo("q2", "did the user say thanks")]);
+    expect(limiter.permits.map((permit) => permit.tenantId)).toEqual([
+      "project-1:decisions",
+      "project-1:llm",
+      "project-1:llm",
+    ]);
+    expect(limiter.permits.every((permit) => permit.tokens > 0)).toBe(true);
+  });
+
   describe("given a text-view plan", () => {
     /** @scenario "A text view the caller did not render judges the full text, flagged" */
     it("judges the full text and names the missing view", async () => {

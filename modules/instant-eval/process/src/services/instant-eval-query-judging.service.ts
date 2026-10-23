@@ -98,6 +98,7 @@ export class InstantEvalQueryJudgingService {
     }
   }
 
+  /** A query is never routed in v1 (no route reaches the judge from here): classifier rate. */
   #priceOf(inputTokens: number): number {
     const { pricing } = this.options;
 
