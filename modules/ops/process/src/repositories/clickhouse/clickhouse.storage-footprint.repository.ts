@@ -91,7 +91,7 @@ export class ClickHouseStorageFootprintRepository extends StorageFootprintReposi
     if (!(await this.hasBackupLog({ cluster }))) return [];
     // A replica without the table refuses the cluster-wide read; the local log still answers.
     const rows = await this.readBackupRows({ cluster }).catch((error: unknown) => {
-      if (!clusterOf(cluster)) throw error;
+      if (!plainClusterName(cluster)) throw error;
       return this.readBackupRows({ cluster: undefined });
     });
     return rows.map((row) => ({
@@ -139,22 +139,23 @@ export class ClickHouseStorageFootprintRepository extends StorageFootprintReposi
   }
 }
 
-function clusterOf(cluster: string | undefined): string | undefined {
-  const name = cluster?.trim();
-  return name && isPlainClusterName(name) ? name : undefined;
+/** The trusted cluster name, or an empty string where none is named or it is not plain. */
+function plainClusterName(cluster: string | undefined): string {
+  const name = cluster?.trim() ?? "";
+  return isPlainClusterName(name) ? name : "";
 }
 
 function backupLogSource(cluster: string | undefined): string {
-  const name = clusterOf(cluster);
+  const name = plainClusterName(cluster);
   return name ? `clusterAllReplicas('${name}', system.backup_log)` : "system.backup_log";
 }
 
 function systemTablesSource(cluster: string | undefined): string {
-  const name = clusterOf(cluster);
+  const name = plainClusterName(cluster);
   return name ? `clusterAllReplicas('${name}', system.tables)` : "system.tables";
 }
 
 /** One unreachable replica must not blank the reading the others can still answer. */
 function clusterSettings(cluster: string | undefined): string {
-  return clusterOf(cluster) ? "SETTINGS skip_unavailable_shards = 1" : "";
+  return plainClusterName(cluster) ? "SETTINGS skip_unavailable_shards = 1" : "";
 }
