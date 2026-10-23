@@ -1,4 +1,4 @@
-# ADR-182: The platform blocks architecture drift, not a reviewer
+# ADR-192: The platform blocks architecture drift, not a reviewer
 
 **Date:** 2026-10-20
 
