@@ -3,7 +3,19 @@ Feature: The clickhouse-serverless image renders every server setting from env
   config.d and users.d. Each tunable setting has one env var with a default,
   so a deployment runs the public image by setting env and mounting extra
   files, never by patching the image. Every default keeps the behaviour of the
-  image before these settings existed; new behaviour is opt-in.
+  image before these settings existed; new behaviour is opt-in. The pins that
+  hold 25.10 behaviour on 26.8 are not tunables: they are fixed in the image
+  until a later image lifts them.
+
+  @unit
+  Scenario: The image holds 25.10 behaviour on ClickHouse 26.8
+    Given the image runs ClickHouse 26.8
+    When the renderer writes the server configuration
+    Then the on-disk format settings keep the formats 25.10 reads, so a rollback to the previous image still reads every part
+    And per-disk asynchronous metrics keep their 25.10 names
+    And the hard memory limit stays at the server memory cap
+    And the default profile sets compatibility to 25.10 and keeps insert deduplication as 25.10 had it
+    And a bare integer into DateTime64 still reads as epoch milliseconds
 
   @unit
   Scenario: Server and profile settings render their defaults
