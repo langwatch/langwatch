@@ -1,8 +1,8 @@
 import { defineRule } from "../define-rule.mjs";
 
 // A payload schema must not rewrite its input with `z.preprocess`: a changed shape is a new event
-// version read through an upcast. Name-based, so it leans to false negatives (ADR 182).
-// See dev/docs/adr/182-platform-blocks-architecture-drift.md.
+// version read through an upcast. Name-based, so it leans to false negatives (ADR 192).
+// See dev/docs/adr/192-platform-blocks-architecture-drift.md.
 
 const EVENT_FILE = /\.events\.[cm]?tsx?$/;
 const PAYLOAD_SCHEMA_NAME = /(?:Payload|EventData)Schema(?:Definition)?$/;

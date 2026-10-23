@@ -7,7 +7,7 @@ import { sourceFile } from "../../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
 
 /**
- * ADR-182: a module's contract or process production code may not value-import a package listed
+ * ADR-192: a module's contract or process production code may not value-import a package listed
  * only in devDependencies; the packed artifact installs none, so the boot crashes with
  * ERR_MODULE_NOT_FOUND. Browser code is bundled and out of scope. Main runs at zero.
  */

@@ -3,7 +3,7 @@ import { defineRule } from "../define-rule.mjs";
 // A service decides; it does not speak a wire protocol. Reported: imports of HTTP modules or raw
 // exchange types, Fetch `Response` built in a service, and writes on a response object. Response
 // detection is by name and annotation only, so it leans to false negatives.
-// See dev/docs/adr/182-platform-blocks-architecture-drift.md.
+// See dev/docs/adr/192-platform-blocks-architecture-drift.md.
 
 const HTTP_MODULE = /^(?:node:)?https?$|^(?:node:)?http2$/;
 const WIRE_TYPES = new Set(["IncomingMessage", "ServerResponse"]);

@@ -21,7 +21,7 @@
     "modules/auth/process/src/repositories/prisma/prisma.auth-directory.repository.ts|User": 2,
     "modules/auth/process/src/repositories/prisma/prisma.better-auth-hooks.repository.ts|Account": 5,
     "modules/auth/process/src/repositories/prisma/prisma.better-auth-hooks.repository.ts|Passkey": 1,
-    "modules/auth/process/src/repositories/prisma/prisma.better-auth-hooks.repository.ts|User": 4,
+    "modules/auth/process/src/repositories/prisma/prisma.better-auth-hooks.repository.ts|User": 5,
     "modules/auth/process/src/repositories/prisma/prisma.pending-sso-setup.repository.ts|User": 3,
     "modules/authz/process/src/repositories/eventing/eventing.authz-listing.repository.ts|ApiKey": 1,
     "modules/authz/process/src/repositories/eventing/eventing.authz-listing.repository.ts|Group": 1,

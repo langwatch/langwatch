@@ -10,7 +10,7 @@ import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
 import { GENERIC_ERROR_CODES } from "./error-code-single-owner.ts";
 
 /**
- * Rule 2 (ADR-182): a module reacting to another module's handled error asks the owner's class
+ * Rule 2 (ADR-192): a module reacting to another module's handled error asks the owner's class
  * (`WidgetMissingError.is(error)`). A literal spelling the peer's code keeps comparing the old
  * spelling the day the owner renames or splits it, and nothing fails. Main runs at zero.
  */

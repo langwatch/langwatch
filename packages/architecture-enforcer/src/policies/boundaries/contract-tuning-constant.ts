@@ -9,7 +9,7 @@ import {
 } from "./contract-export-use.ts";
 
 /**
- * Rule 12c (ADR-182): a timeout, retry count, interval or TTL is the owner's tuning; another module
+ * Rule 12c (ADR-192): a timeout, retry count, interval or TTL is the owner's tuning; another module
  * importing it freezes today's value. The owner hands over the result (a deadline, a policy, an
  * answer) through its Api; its own process and browser may import the number. Main runs at zero.
  */

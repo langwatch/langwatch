@@ -4,7 +4,7 @@ import { isBrowserCode, isFunction } from "../react-state.mjs";
 
 // A caught error's `.message` is not customer copy: the customer's words come from the
 // presentation registry, keyed by the error's code. Syntactic, biased to false negatives.
-// The full contract: dev/docs/adr/182-platform-blocks-architecture-drift.md
+// The full contract: dev/docs/adr/192-platform-blocks-architecture-drift.md
 
 const TOAST_RECEIVERS = new Set(["toast", "toaster"]);
 const TOAST_FUNCTIONS = new Set(["toast", "toaster", "showToast", "createToast"]);

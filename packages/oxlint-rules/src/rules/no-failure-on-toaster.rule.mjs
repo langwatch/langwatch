@@ -4,7 +4,7 @@ import { isErrorToastType, isToasterGovernedCode } from "../toaster-shapes.mjs";
 // A feature-web module must not raise a failure straight onto the Design System toaster: use the
 // host port (`showErrorToast`, `host.failed`). Once a file imports the toaster, every
 // `<toaster>.error(...)` and `type: "error"` counts, including a const holding "error".
-// See dev/docs/adr/182-platform-blocks-architecture-drift.md.
+// See dev/docs/adr/192-platform-blocks-architecture-drift.md.
 
 const TOASTER_MODULE = "@langwatch/design-system/toaster";
 const TRANSPARENT = new Set(["TSAsExpression", "TSSatisfiesExpression", "ParenthesizedExpression"]);

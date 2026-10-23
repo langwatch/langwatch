@@ -8,7 +8,7 @@ import {
 } from "./contract-export-use.ts";
 
 /**
- * Rule 12b (ADR-182): an `@ownerOnly` contract export is the owner's own vocabulary (a query
+ * Rule 12b (ADR-192): an `@ownerOnly` contract export is the owner's own vocabulary (a query
  * parameter name, a deep-link key), published only because its process and browser halves sit in
  * different packages. Another module importing it hard-codes the owner's address. Zero on main.
  */
