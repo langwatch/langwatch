@@ -163,13 +163,19 @@ export function recordIngestDoorRefusal({
   logger: Pick<Logger, "warn" | "debug">;
   signal: OtlpSignal;
   error: HandledError;
-  diagnostics: Readonly<{ hasEmptyAuthToken: boolean } & Record<string, unknown>>;
+  diagnostics: Readonly<
+    {
+      hasEmptyAuthToken: boolean;
+      userAgent?: string | null;
+      forwardedFor?: string | null;
+    } & Record<string, unknown>
+  >;
   now?: number;
 }): void {
   const refusalStatus = ingestDoorRefusalStatus(error);
   ingestDoorRefusalsTotal.inc({ signal, code: error.code, status: refusalStatus });
 
-  const caller = `${String(diagnostics.userAgent ?? "")}|${String(diagnostics.forwardedFor ?? "")}`;
+  const caller = `${diagnostics.userAgent ?? ""}|${diagnostics.forwardedFor ?? ""}`;
   const bucket = createHash("sha256").update(caller).digest().readUInt16BE(0) % REFUSAL_LOG_BUCKETS;
   const suppressed = refusalLog.claim({
     key: `${signal}|${error.code}|${diagnostics.hasEmptyAuthToken}|${bucket}`,
