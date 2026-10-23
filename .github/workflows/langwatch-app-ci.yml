@@ -1327,6 +1327,9 @@ jobs:
       - name: Test publish-docker-ecr.yml path filters
         run: bash .github/scripts/__tests__/publish-ecr-filters.test.sh
 
+      - name: Test nearest-ancestor-tag.sh
+        run: bash .github/scripts/__tests__/nearest-ancestor-tag.test.sh
+
       - name: Test detect-changes-source.sh
         run: bash .github/scripts/__tests__/detect-changes-source.test.sh
 
