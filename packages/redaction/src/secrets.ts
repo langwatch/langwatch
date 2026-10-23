@@ -264,6 +264,39 @@ const RECORD_ID_PREFIXES = new Set([
 ]);
 
 /**
+ * The platform's stored-object id (`deriveStoredObjectId`): a fixed-zero-time
+ * KSUID, so 29 base62 digits opening with ≥11 zeros. Matched in FULL, not by
+ * the `so_` prefix, so a key-shaped `so_…` value still hits the shape rule (#8077).
+ */
+const STORED_OBJECT_ID_RE = /^so_0{11}[0-9A-Za-z]{18}$/;
+
+/**
+ * A record id's own shape — `<prefix>_<id>`, the id a bounded base62 run —
+ * validated in FULL, never by the prefix alone, so a key-shaped value wearing
+ * a `project_` prefix is not mistaken for a reference (#8077).
+ */
+const RECORD_ID_RE = /^[A-Za-z][A-Za-z0-9]{1,11}[_-][0-9A-Za-z]{1,40}$/;
+
+/**
+ * Does the LAST path segment NAME a record the span points at (see
+ * `shaped_api_key`)? Either a `RECORD_ID_PREFIXES` reference whose id is a
+ * validated record-id shape and not itself key-shaped, or a stored-object id.
+ */
+function isRecordReferenceTail(segment: string): boolean {
+  const match = /^([A-Za-z][A-Za-z0-9]{1,11})[_-](.+)$/.exec(segment);
+  if (!match) return STORED_OBJECT_ID_RE.test(segment);
+  const [, prefix, id] = match;
+  if (
+    RECORD_ID_PREFIXES.has((prefix ?? "").toLowerCase()) &&
+    RECORD_ID_RE.test(segment) &&
+    !isKeyShapedBody(id ?? "")
+  ) {
+    return true;
+  }
+  return STORED_OBJECT_ID_RE.test(segment);
+}
+
+/**
  * Keys published on purpose. PostHog's `phc_` ships in bundles by design, so
  * blanking it protects nothing — the shape rule caught it anyway, the same
  * over-redaction as eating a record id.
@@ -543,7 +576,27 @@ const VALUE_RULES: ValueRule[] = [
       `${TOKEN_START}([A-Za-z][A-Za-z0-9]{1,11})[_-]([A-Za-z0-9_+/-]{${SHAPED_TOKEN_MIN_BODY},})${TOKEN_END}`,
       "g",
     ),
-    accept: (groups) => !isNonCredentialPrefix(groups[1] ?? "") && isKeyShapedBody(groups[2] ?? ""),
+    accept: (groups) => {
+      if (isNonCredentialPrefix(groups[1] ?? "")) return false;
+      const body = groups[2] ?? "";
+      // The body class crosses `/`, so a media path like
+      // `/api/files/<proj>/so_<id>` is swallowed whole and eating it 404s the
+      // reference (#8077). A span whose LAST segment IS a record reference
+      // (see `isRecordReferenceTail`) is exempt only when the path in FRONT is
+      // benign — key material ahead still redacts the span whole (safe way).
+      const lastSlash = body.lastIndexOf("/");
+      if (
+        lastSlash !== -1 &&
+        isRecordReferenceTail(body.slice(lastSlash + 1))
+      ) {
+        // A slash is valid inside these bodies, so a credential may arrive
+        // split across sub-floor segments whose joint head is a key. Check
+        // both the whole head and each segment.
+        const head = body.slice(0, lastSlash);
+        return isKeyShapedBody(head) || head.split("/").some(isKeyShapedBody);
+      }
+      return isKeyShapedBody(body);
+    },
     precondition: (text) => text.includes("_") || text.includes("-"),
   },
   {
