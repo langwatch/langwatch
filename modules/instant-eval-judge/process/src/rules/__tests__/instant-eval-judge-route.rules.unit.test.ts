@@ -166,7 +166,7 @@ describe("the route plan", () => {
     });
     const asked = instantEvalJudgeRoutePlanOf({
       route,
-      text: "full",
+      text: "the full trace, with the calls",
       questions: [UPSET],
       table: off,
     });
@@ -180,11 +180,43 @@ describe("the route plan", () => {
     });
     const allowed = instantEvalJudgeRoutePlanOf({
       route,
-      text: "full",
+      text: "the full trace, with the calls",
       questions: [UPSET],
       table: on,
     });
     expect(allowed).toMatchObject({ inputView: "tools", text: "calls" });
+  });
+
+  /** @scenario "The tools view is used only when it is shorter than the full trace" */
+  it("plans the full trace when the tools rendering is no shorter than it", () => {
+    const tools = syntheticRouteTable({
+      inputViews: {
+        default: "full",
+        byCategory: { tool_errors: "tools" },
+        allowedKinds: { text: ["decisions"], tools: ["decisions"] },
+      },
+    });
+    const planOf = (rendered: string) =>
+      instantEvalJudgeRoutePlanOf({
+        route: { job: "search", questionCategory: "tool_errors", views: { tools: rendered } },
+        text: "a".repeat(400),
+        questions: [UPSET],
+        table: tools,
+      });
+    expect(planOf("a".repeat(400))).toMatchObject({ inputView: "full", longerView: "tools" });
+    expect(planOf("a".repeat(100))).toMatchObject({ inputView: "tools", text: "a".repeat(100) });
+    expect(planOf("a".repeat(100)).longerView).toBeUndefined();
+  });
+
+  /** @scenario "The public default table sends every slot to the hosted classifier" */
+  it("maps no category to a partial view unless the table does, so every call judges the full trace", () => {
+    const p = instantEvalJudgeRoutePlanOf({
+      route: { job: "search", questionCategory: "sentiment", views: { text: "hi", tools: "t" } },
+      text: "full trace",
+      questions: [UPSET],
+      table: INSTANT_EVAL_JUDGE_DEFAULT_ROUTE_TABLE,
+    });
+    expect(p).toMatchObject({ inputView: "full", text: "full trace" });
   });
 
   /** @scenario "A text view the caller did not render judges the full text, flagged" */

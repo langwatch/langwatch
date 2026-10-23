@@ -38,6 +38,8 @@ export interface InstantEvalJudgeRoutePlan {
   readonly isViewMissing: boolean;
   /** The partial view asked for that the planned decision model may not judge, if any. */
   readonly refusedView?: InstantEvalJudgeInputView;
+  /** The tools view asked for but rendered no shorter than the full trace, so not used. */
+  readonly longerView?: InstantEvalJudgeInputView;
   readonly primary: string;
   readonly pairWith?: string;
   readonly escalateTo?: string;
@@ -59,17 +61,31 @@ export function instantEvalJudgeRoutePlanOf({
   table: InstantEvalJudgeRouteTable;
 }): InstantEvalJudgeRoutePlan {
   const asked = instantEvalJudgeInputViewOf({ route, table });
+  const fullPlan = () =>
+    planForView({
+      route: { ...route, tokens: undefined },
+      text,
+      questions,
+      table,
+      inputView: "full",
+    });
+  if (asked === "tools" && !isToolsViewShorter({ route, text })) {
+    return { ...fullPlan(), longerView: asked };
+  }
   const plan = planForView({ route, text, questions, table, inputView: asked });
   if (asked === "full" || isViewAllowed({ plan, table })) return plan;
   // A backend kind the table does not allow on the partial view gets the full one.
-  const full = planForView({
-    route: { ...route, tokens: undefined },
-    text,
-    questions,
-    table,
-    inputView: "full",
-  });
-  return { ...full, refusedView: asked };
+  return { ...fullPlan(), refusedView: asked };
+}
+
+/**
+ * The tools view earns its place only by being shorter: a trace that is mostly tool calls renders
+ * a tools view as long as the trace, which costs the same and drops the conversation around it.
+ */
+function isToolsViewShorter({ route, text }: { route: InstantEvalJudgeRoute; text: string }) {
+  const tools = route.views?.tools;
+  if (!tools?.trim()) return true;
+  return estimateJudgedTextTokens({ text: tools }) < estimateJudgedTextTokens({ text });
 }
 
 function isViewAllowed({
