@@ -58,7 +58,6 @@
     "@langwatch/task": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
-    "@opentelemetry/api": "catalog:",
     "@simplewebauthn/server": "^13.3.2",
     "@slack/webhook": "catalog:",
     "@trpc/server": "catalog:",
@@ -69,8 +68,6 @@
   },
   "devDependencies": {
     "@langwatch/test-harness": "workspace:*",
-    "@opentelemetry/sdk-trace-base": "catalog:",
-    "@opentelemetry/sdk-trace-node": "catalog:",
     "@types/bcrypt": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

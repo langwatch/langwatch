@@ -3,14 +3,10 @@
  * Who a browser request is at the API door, and what the refusals leave in the log.
  * @see specs/server/api-process-auth.feature
  */
-import { CREDENTIAL_TYPE_SPAN_ATTRIBUTE } from "@langwatch/api-key-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
 import type * as observabilityModule from "@langwatch/observability";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { context, propagation, trace } from "@opentelemetry/api";
-import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   BACKGROUND_READ_HEADER,
@@ -176,47 +172,5 @@ describe("given a verified session on a polling read", () => {
         expect.objectContaining({ background: false }),
       );
     });
-  });
-});
-
-describe("given a request whose session is live", () => {
-  const exporter = new InMemorySpanExporter();
-  const provider = new NodeTracerProvider({ spanProcessors: [new SimpleSpanProcessor(exporter)] });
-
-  beforeAll(() => {
-    provider.register();
-  });
-
-  afterAll(async () => {
-    await provider.shutdown();
-    trace.disable();
-    context.disable();
-    propagation.disable();
-  });
-
-  /** @scenario "A browser session is recorded as a session" */
-  it("tags the request's span with the session credential type", async () => {
-    const service = serviceOver({
-      verifyBrowserSession: verifiedSession,
-      resolveBrowserSession: async () =>
-        ({
-          kind: "signed_in",
-          session: { sessionId: "session-sam", user: { id: "user-sam" } },
-        }) as Awaited<ReturnType<AuthApi["resolveBrowserSession"]>>,
-    });
-
-    await trace.getTracer("test").startActiveSpan("request", async (span) => {
-      await service.verify(requestCarrying(`${COOKIE_NAME}=${COOKIE_VALUE}`));
-      span.end();
-    });
-
-    expect(exporter.getFinishedSpans()[0]?.attributes[CREDENTIAL_TYPE_SPAN_ATTRIBUTE]).toBe(
-      "session",
-    );
-    expect(loggerSpies.debug).toHaveBeenCalledWith(
-      { credentialType: "session" },
-      "request credential resolved",
-    );
-    expect(JSON.stringify(loggerSpies.debug.mock.calls)).not.toContain(COOKIE_VALUE);
   });
 });

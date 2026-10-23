@@ -5650,9 +5650,6 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
-      '@opentelemetry/api':
-        specifier: 'catalog:'
-        version: 1.9.1
       '@trpc/server':
         specifier: 'catalog:'
         version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
@@ -5681,12 +5678,6 @@ importers:
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness
-      '@opentelemetry/sdk-trace-base':
-        specifier: 'catalog:'
-        version: 2.10.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/sdk-trace-node':
-        specifier: 'catalog:'
-        version: 2.10.0(@opentelemetry/api@1.9.1)
       '@types/node':
         specifier: ^26.0.1
         version: 26.2.0
@@ -6030,9 +6021,6 @@ importers:
       '@langwatch/user-contract':
         specifier: workspace:*
         version: link:../../user/contract
-      '@opentelemetry/api':
-        specifier: 'catalog:'
-        version: 1.9.1
       '@simplewebauthn/server':
         specifier: ^13.3.2
         version: 13.3.2
@@ -6058,12 +6046,6 @@ importers:
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness
-      '@opentelemetry/sdk-trace-base':
-        specifier: 'catalog:'
-        version: 2.10.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/sdk-trace-node':
-        specifier: 'catalog:'
-        version: 2.10.0(@opentelemetry/api@1.9.1)
       '@types/bcrypt':
         specifier: 'catalog:'
         version: 6.0.0

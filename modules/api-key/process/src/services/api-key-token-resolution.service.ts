@@ -29,8 +29,8 @@ import {
 import type { ApiKeyRepository, StoredApiKey } from "../repositories/api-key.repository.ts";
 import { bindingsReachProject, findGrantedProjectIds } from "../rules/api-key-grant-reach.rules.ts";
 import { ApiKeyGrantsService } from "./api-key-grants.service.ts";
+import { ApiKeyLastUsedService } from "./api-key-last-used.service.ts";
 import type { ApiKeyDependencies } from "./api-key.service.ts";
-import { RequestCredentialRecorderService } from "./request-credential-recorder.service.ts";
 
 const logger = createLogger("langwatch:api-key:answers");
 
@@ -70,7 +70,8 @@ export class ApiKeyTokenResolutionService {
   }
 
   private readonly bindings: ApiKeyGrantsService;
-  private readonly credentials: RequestCredentialRecorderService;
+  /** Legacy key uses, keyed by project id: one stamp a minute per project in this process. */
+  private readonly legacyUses: ApiKeyLastUsedService;
   private readonly answerReads = new Map<string, Promise<HeldAnswer | null>>();
   private readonly legacyReads = new Map<string, Promise<ProjectIdentity | null>>();
 
@@ -80,8 +81,13 @@ export class ApiKeyTokenResolutionService {
     private readonly options: ApiKeyDependencies & { now?: () => Instant },
   ) {
     this.bindings = ApiKeyGrantsService.create({ authz: options.authz });
-    this.credentials = RequestCredentialRecorderService.create({
-      projects: options.projects,
+    this.legacyUses = ApiKeyLastUsedService.create({
+      repository: {
+        updateLastUsedAt: async ({ id }) => {
+          await options.projects.markLegacyApiKeyUsed({ projectId: id });
+        },
+      },
+      subject: "projectId",
       now: options.now,
     });
   }
@@ -303,13 +309,16 @@ export class ApiKeyTokenResolutionService {
     return !(parent.expiresAt && Temporal.Instant.compare(parent.expiresAt, this.now()) < 0);
   }
 
-  /** A legacy key that authenticates a request: recorded, and its project stamped. */
+  /**
+   * A legacy key that authenticates a request stamps its project's last legacy use
+   * (spec: modules/api-key/specs/request-credential-type.feature).
+   */
   private async authenticateLegacyProjectKey(
     token: string,
   ): Promise<ResolvedApiKeyCredential | null> {
     const resolved = await this.findLegacyProjectKeyResolution(token);
     if (resolved?.type === "legacyProjectKey") {
-      this.credentials.recordLegacyKeyUse(resolved.project.id);
+      this.legacyUses.markUsed({ id: resolved.project.id });
     }
 
     return resolved;

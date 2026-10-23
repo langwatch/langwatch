@@ -42,7 +42,6 @@
     "@langwatch/redis-client": "workspace:*",
     "@langwatch/secrets": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "@opentelemetry/api": "catalog:",
     "@trpc/server": "catalog:",
     "hono": "catalog:",
     "hono-openapi": "catalog:",
@@ -54,8 +53,6 @@
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/process-stores": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
-    "@opentelemetry/sdk-trace-base": "catalog:",
-    "@opentelemetry/sdk-trace-node": "catalog:",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
