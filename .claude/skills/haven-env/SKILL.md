@@ -46,7 +46,7 @@ haven help env                    # every knob and where it resolves from
 
 ## Credentials in 1Password
 
-- `.env` holds config only. Credentials live in the 1Password item `Private/LangWatch`, one field per
+- `.env` holds config only. Credentials live in the 1Password item `Private/LangWatch Dev`, one field per
   env key, with `LANGWATCH_OP_ACCOUNT="<shorthand>"` in `.env` (`dev/docs/LOCAL_STACK.md`).
 - Precedence: shell, then `.env`, then the item. haven is the only 1Password reader: it reads the item
   in memory when it starts or restarts a process and puts the fields into that process's env (never a

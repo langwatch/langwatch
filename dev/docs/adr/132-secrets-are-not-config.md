@@ -211,7 +211,7 @@ This replaces the "1Password is opt-in" section above and the Node adapter it de
   reads, `OnePasswordUnavailableError`, `OnePasswordInProductionError`). The Node chain is
   env, then `.env`, then the refusal. A pod therefore holds no vault code at all.
 - **haven reads, in memory.** `LANGWATCH_OP_ACCOUNT` (in `.env` or the shell) names the account;
-  the item is `Private/LangWatch`, one field per env key. haven reads it with one
+  the item is `Private/LangWatch Dev`, one field per env key. haven reads it with one
   `op item get`, cached in its own process memory only, and treats the fields as the layer after
   the shell and `.env`. Provider detection (paymentsim, mailsim and the other stand-ins) sees
   them, and `haven env` masks every value that came from the item.

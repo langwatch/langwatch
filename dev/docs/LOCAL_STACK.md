@@ -59,7 +59,7 @@ billing at it unless `.env`, the shell or the 1Password item sets `STRIPE_SECRET
 
 The root `.env` holds config only. Every credential a developer needs lives in
 1Password and arrives through the `op` CLI (ADR-132). Addressing is convention
-plus one key (ARCHITECTURE.md §6): vault `Private`, item `LangWatch`, one field
+plus one key (ARCHITECTURE.md §6): vault `Private`, item `LangWatch Dev`, one field
 per secret named exactly its env key (`STRIPE_SECRET_KEY`), and
 `LANGWATCH_OP_ACCOUNT` in `.env` names the account. There is no `op://`
 reference in `.env`: a value there is used literally, and it wins.
@@ -73,7 +73,7 @@ haven secrets move --apply --account <shorthand>   # fills the item, deletes tho
 haven down && haven up                             # a restart keeps the old env
 ```
 
-The move creates `LangWatch` in `Private` when it is missing and otherwise
+The move creates `LangWatch Dev` in `Private` when it is missing (not `LangWatch`: that title clashes with saved langwatch.ai logins) and otherwise
 edits it, keeping its other fields. Values go to `op` on stdin as an item
 template, never on a command line, in a log or on screen. The item is read back
 before `.env` changes; if any value is missing there, `.env` is left as it was.

@@ -1189,7 +1189,7 @@ the boot immediately, naming every missing key at once.
 **1Password is read only by haven, in memory, and handed to each process as env**
 (Alex, 2026-10-23; ADR-132 amendment, which removed the Node 1Password adapter):
 locally `.env` holds config only; `LANGWATCH_OP_ACCOUNT` names the account, the
-item is `Private/LangWatch` with one field per env key; haven reads it when it
+item is `Private/LangWatch Dev` with one field per env key; haven reads it when it
 starts or restarts a process and puts the fields the shell and `.env` leave unset
 into that process's env, never into a file. Outside haven,
 `haven secrets exec -- <command>` does the same; `haven secrets move` moves `.env`

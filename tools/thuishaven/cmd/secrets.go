@@ -14,7 +14,7 @@ import (
 func secretsCommand() commandSpec {
 	move := commandSpec{
 		name:    "move",
-		summary: "move every credential line of .env into 1Password (Private/LangWatch); a dry run naming keys unless --apply",
+		summary: "move every credential line of .env into 1Password (Private/LangWatch Dev); a dry run naming keys unless --apply",
 		flags: []flagSpec{
 			{long: "--apply", summary: "write the item, then delete the moved lines and set LANGWATCH_OP_ACCOUNT in .env"},
 			{long: "--account", takesValue: true, value: "<shorthand>", summary: "the 1Password account (default: LANGWATCH_OP_ACCOUNT)"},

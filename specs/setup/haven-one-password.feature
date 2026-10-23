@@ -4,7 +4,7 @@ Feature: haven resolves development secrets from 1Password
   So that the root .env holds only config and no 1Password value is ever written to disk
 
   # ADR-132 amendment 2026-10-23; ARCHITECTURE.md §6. Order is unchanged: the
-  # shell, then .env, then the item Private/LangWatch when LANGWATCH_OP_ACCOUNT is set.
+  # shell, then .env, then the item Private/LangWatch Dev when LANGWATCH_OP_ACCOUNT is set.
   # haven is the only 1Password reader; values stay in process memory (Alex, 2026-10-23).
 
   @unit
