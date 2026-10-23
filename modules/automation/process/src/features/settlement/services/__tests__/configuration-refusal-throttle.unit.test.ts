@@ -25,4 +25,21 @@ describe("ConfigurationRefusalThrottle", () => {
       expect(throttle.shouldLog({ triggerId: "t1", code: "a" })).toBe(false);
     });
   });
+
+  describe("given more live refusals than it tracks", () => {
+    it("evicts only the oldest, so the others stay suppressed", () => {
+      let at = 0;
+      const throttle = ConfigurationRefusalThrottle.create({ now: () => at });
+      for (let i = 0; i < 5_000; i++) {
+        at = i;
+        throttle.shouldLog({ triggerId: `t${i}`, code: "a" });
+      }
+
+      at = 5_000;
+      expect(throttle.shouldLog({ triggerId: "new", code: "a" })).toBe(true);
+      expect(throttle.shouldLog({ triggerId: "t1", code: "a" })).toBe(false);
+      expect(throttle.shouldLog({ triggerId: "t4999", code: "a" })).toBe(false);
+      expect(throttle.shouldLog({ triggerId: "t0", code: "a" })).toBe(true);
+    });
+  });
 });

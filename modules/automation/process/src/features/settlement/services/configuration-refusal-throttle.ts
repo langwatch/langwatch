@@ -35,7 +35,11 @@ export class ConfigurationRefusalThrottle {
       for (const [tracked, loggedAt] of this.lastLoggedAt) {
         if (at - loggedAt >= this.windowMs) this.lastLoggedAt.delete(tracked);
       }
-      if (this.lastLoggedAt.size >= MAX_TRACKED_REFUSALS) this.lastLoggedAt.clear();
+    }
+    this.lastLoggedAt.delete(key);
+    if (this.lastLoggedAt.size >= MAX_TRACKED_REFUSALS) {
+      const oldest = this.lastLoggedAt.keys().next().value;
+      if (oldest !== undefined) this.lastLoggedAt.delete(oldest);
     }
     this.lastLoggedAt.set(key, at);
 
