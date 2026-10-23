@@ -11,7 +11,7 @@
        the chart's keys carry guards (ENVIRONMENT gates a safety refusal in the
        manager) that a silent override would bypass. Set those through their
        own values instead. */ -}}
-{{- $owned := list "ENVIRONMENT" "PORT" "LANGY_MAX_WORKERS" "LANGY_WORKER_IDLE_MS" "LANGY_READINESS_TIMEOUT_MS" "LANGY_EGRESS_FQDN_FLOOR" "LANGY_EGRESS_REQUIRE_TLS" "LANGY_EGRESS_ENFORCE_FLOOR" "LANGY_EGRESS_SNI_CROSSCHECK" "LANGY_MIRROR_TRACE_ENDPOINT" -}}
+{{- $owned := splitList "," (include "langyagent.ownedEnvNames" .) -}}
 {{- range $key, $_ := .Values.extraConfig }}
 {{- if has $key $owned }}
 {{- fail (printf "langyagent.extraConfig.%s is set by the chart itself; use the chart value that controls it instead of extraConfig" $key) }}

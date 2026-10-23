@@ -49,6 +49,12 @@ Feature: The langyagent chart can take over an existing agent Deployment
     Then the render fails and names the value to use instead
 
   @regression
+  Scenario: Extra environment entries cannot replace a variable the chart sets
+    Given extraEnv sets ENVIRONMENT, which the chart writes to the ConfigMap
+    When the chart is rendered
+    Then the render fails and names the value to use instead
+
+  @regression
   Scenario: Service annotations and the rollout deadline are rendered when set
     Given service.annotations and progressDeadlineSeconds are set
     When the chart is rendered

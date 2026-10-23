@@ -144,6 +144,20 @@ test_extra_config_refuses_owned_key() {
   fi
 }
 
+# @scenario "Extra environment entries cannot replace a variable the chart sets"
+test_extra_env_refuses_owned_name() {
+  local out
+  # A container's env entries win over its envFrom, so this pair would turn
+  # worker isolation off in a production pod if it rendered.
+  if out="$(render --set-json 'extraEnv=[{"name":"ENVIRONMENT","value":"local"},{"name":"LANGY_UNSAFE_DEV_DISABLE_ISOLATION","value":"true"}]' 2>&1)"; then
+    fail "owned env name refused" "render succeeded"
+  elif grep -q 'extraEnv sets ENVIRONMENT, which the chart sets itself' <<<"$out"; then
+    pass "owned env name refused"
+  else
+    fail "owned env name refused" "failed for another reason: $(tr '\n' ' ' <<<"$out" | cut -c1-200)"
+  fi
+}
+
 # @scenario "Service annotations and the rollout deadline are rendered when set"
 test_annotations_and_deadline() {
   local out
@@ -171,6 +185,7 @@ test_pod_labels_keep_selector
 test_extra_env_appended
 test_extra_config_added
 test_extra_config_refuses_owned_key
+test_extra_env_refuses_owned_name
 test_annotations_and_deadline
 test_scratch_uncapped
 

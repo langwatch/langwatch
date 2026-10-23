@@ -47,3 +47,14 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- $selector := include "langyagent.selectorLabels" . | fromYaml }}
 {{- toYaml (merge $selector (deepCopy (.Values.podLabels | default dict))) }}
 {{- end }}
+
+{{- /* The environment variable names the chart writes itself, comma-joined: the
+       ConfigMap keys and the Secret-backed entries of the Deployment env.
+       extraConfig and extraEnv may not set any of them, because these carry
+       guards (ENVIRONMENT gates the manager's refusal to disable worker
+       isolation) that an operator-supplied value would bypass. A container's
+       env entries win over its envFrom, so extraEnv could otherwise replace a
+       ConfigMap key. */ -}}
+{{- define "langyagent.ownedEnvNames" -}}
+ENVIRONMENT,PORT,LANGY_MAX_WORKERS,LANGY_WORKER_IDLE_MS,LANGY_READINESS_TIMEOUT_MS,LANGY_EGRESS_FQDN_FLOOR,LANGY_EGRESS_REQUIRE_TLS,LANGY_EGRESS_ENFORCE_FLOOR,LANGY_EGRESS_SNI_CROSSCHECK,LANGY_MIRROR_TRACE_ENDPOINT,LANGY_INTERNAL_SECRET,LANGY_MIRROR_TRACE_KEY
+{{- end }}
