@@ -195,19 +195,25 @@ func (c container) waitHealthy(ctx context.Context) error {
 	}
 	url := "http://" + addr + c.opts.Path
 	for {
-		if status, err := c.rt.Probe(ctx, url); err == nil && status == http.StatusOK {
-			return nil
-		}
-		if ctx.Err() != nil {
-			return c.timedOut()
-		}
-		if err := c.stillRunning(ctx); err != nil {
+		if up, err := c.attempt(ctx, url); up || err != nil {
 			return err
 		}
 		if sleep(ctx, c.opts.Interval) != nil {
 			return c.timedOut()
 		}
 	}
+}
+
+// attempt probes once: up when the health check answered 200, an error when
+// the bound has passed or the process has exited.
+func (c container) attempt(ctx context.Context, url string) (bool, error) {
+	if status, err := c.rt.Probe(ctx, url); err == nil && status == http.StatusOK {
+		return true, nil
+	}
+	if ctx.Err() != nil {
+		return false, c.timedOut()
+	}
+	return false, c.stillRunning(ctx)
 }
 
 func (c container) timedOut() error {
