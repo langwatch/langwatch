@@ -19,7 +19,10 @@ export function actorReadCredential(actor: Actor | null): ReadCredential | null 
   return { id: actor.id, type: "session" };
 }
 
-/** A key door counts by the key; a browser by the session's person; other doors not at all. */
+/**
+ * A key door counts by the key; a browser by the session's person; a CLI token by its
+ * person, as an access token; other doors not at all.
+ */
 export function restReadCredential({
   door,
   actor,
@@ -32,6 +35,9 @@ export function restReadCredential({
   request: Request;
 }): ReadCredential | null {
   if (door === "browser") return actorReadCredential(actor);
+  if (door === "cli_token") {
+    return actor?.type === "user" ? { id: actor.id, type: "access_token" } : null;
+  }
   if (!isKeyDoor(door)) return null;
 
   const key = recordedKeyOfDoor({ door, request });
