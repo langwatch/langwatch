@@ -169,9 +169,10 @@ describe("rebuilding a fold's aggregate for a missed hand-off", () => {
       const counting = countingFold({ log });
       const wholeHistory = vi.fn(async () => log());
       counting.fold.eventLoader = wholeHistory;
-      counting.fold.eventLoaderUpToPaged = pagedReader({ log });
+      const paged = pagedReader({ log });
+      counting.fold.eventLoaderUpToPaged = paged;
       counting.fold.options = { ...counting.fold.options, refoldOnOutOfOrder: false };
-      return { ...counting, wholeHistory, paged: counting.fold.eventLoaderUpToPaged };
+      return { ...counting, wholeHistory, paged };
     }
 
     describe("when the aggregate's history spans many pages, with events after the missed one", () => {
