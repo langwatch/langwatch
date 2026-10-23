@@ -10,7 +10,9 @@ const { values } = parseArgs({
   options: { "out-dir": { type: "string" }, screenshots: { type: "string" } },
 });
 const outDir = path.resolve(values["out-dir"] ?? "dist");
-const screenshots = path.resolve(values.screenshots ?? process.env.TMPDIR);
+const screenshots = path.resolve(
+  values.screenshots ?? process.env.TMPDIR ?? "node_modules/.cache/docs-ui-shots",
+);
 await mkdir(screenshots, { recursive: true });
 
 /** @scenario "Open search only on explicit activation" */
@@ -192,6 +194,7 @@ await it("reveals the final setup tab horizontally while preserving vertical scr
   });
 });
 
+/** @scenario "Show product imagery and the footer cleanly in either theme at any width" */
 await it("renders responsive product imagery and a solid footer across themes and screen sizes", async () => {
   await withPreviewBrowser({
     outDir,

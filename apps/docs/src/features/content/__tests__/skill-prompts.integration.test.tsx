@@ -101,7 +101,9 @@ describe("when the build publishes a page with skill prompt bodies", () => {
   it("writes the full rendered body to a content-hashed fragment under the assets", () => {
     const pages = new Map([["skills/directory/index.html", skillPage({ body: BODY })]]);
     const files = publishBodies({ pages });
-    const [[name, fragment]] = [...files];
+    const [first] = [...files];
+    if (!first) throw new Error("No prompt fragment was published");
+    const [name, fragment] = first;
     expect(name).toMatch(/^assets\/skill-prompt-[0-9a-f]{16}\.html$/);
     expect(fragment).toContain("unique-third-block");
     expect(fragment).toContain("unique-nested-block");

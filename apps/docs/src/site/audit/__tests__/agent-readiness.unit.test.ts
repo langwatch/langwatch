@@ -144,7 +144,7 @@ describe("checkAgentReadiness", () => {
       expect(result.tokens.tokeniser).toBe("characters / 4");
       expect(result.tokens.llmsFull).toBeGreaterThan(0);
       expect(result.tokens.llmsTxt).toBeGreaterThan(0);
-      expect(result.tokens.largestPages[0].page).toBe("/b");
+      expect(result.tokens.largestPages[0]?.page).toBe("/b");
       expect(result.tokens.largestDirectoryEntries).toHaveLength(3);
       expect(result.issues).toContainEqual(
         expect.objectContaining({ page: "/b", code: "tokens-over-budget" }),

@@ -33,9 +33,9 @@ describe("when a release note links both its pull request and its commit", () =>
     const [entry] = parseReleases({
       source: `## [2.1.1](${compare}) (2026-10-02)\n### Bug Fixes\n* drawer closes ${pr} ${commit}\n* editor shows inputs ${lone}\n`,
     });
-    expect(entry.body).toContain(`* drawer closes ${pr}\n`);
-    expect(entry.body).not.toContain("945bf9c");
-    expect(entry.body).toContain(`* editor shows inputs ${lone}`);
+    expect(entry?.body).toContain(`* drawer closes ${pr}\n`);
+    expect(entry?.body).not.toContain("945bf9c");
+    expect(entry?.body).toContain(`* editor shows inputs ${lone}`);
   });
 });
 
@@ -51,7 +51,7 @@ describe("when the repository publishes release notes", () => {
       href: "/changelog#release-v211",
       compare,
     });
-    expect(entries[1].body).toContain("inspect requests with {details}");
+    expect(entries[1]?.body).toContain("inspect requests with {details}");
   });
 
   /** @scenario "Read published release notes" */

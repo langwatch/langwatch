@@ -22,6 +22,7 @@ export function checkSnippets({ docsRoot }: { docsRoot: string }) {
   for (const file of authoredFiles({ directory: docsRoot })) {
     for (const match of readFileSync(file, "utf8").matchAll(IMPORT)) {
       const specifier = match[1];
+      if (specifier === undefined) continue;
       checked += 1;
       const target = specifier.startsWith("/")
         ? path.join(docsRoot, specifier)

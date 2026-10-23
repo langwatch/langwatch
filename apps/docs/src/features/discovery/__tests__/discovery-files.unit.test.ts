@@ -20,7 +20,7 @@ describe("documentation discovery", () => {
     expect(files["sitemap.xml"]).toContain(
       "<loc>https://langwatch.ai/docs/coding-agents/overview</loc>",
     );
-    expect(files["sitemap.xml"].match(/<url>/g)).toHaveLength(2);
+    expect(files["sitemap.xml"]?.match(/<url>/g)).toHaveLength(2);
     expect(files["robots.txt"]).toContain("Sitemap: https://langwatch.ai/docs/sitemap.xml");
     expect(files["agents.txt"]).toContain("not automatically installed agent configuration");
     expect(files["humans.txt"]).toContain("LangWatch B.V.");
@@ -64,7 +64,7 @@ describe("documentation discovery", () => {
     expect(llms).toContain("- [Spans](https://langwatch.ai/docs/tracing/spans.md)");
     expect(llms).toContain("## More pages\n\n- [Orphan]");
     expect(llms).not.toContain("## Again");
-    expect(llms.match(/^- \[/gm)).toHaveLength(3);
+    expect(llms?.match(/^- \[/gm)).toHaveLength(3);
   });
 });
 
@@ -108,7 +108,7 @@ describe("when agents read the whole documentation", () => {
 
   /** @scenario "Robots.txt names each AI crawler" */
   it("allows each AI crawler the budgets list by name, keeping the catch-all and sitemap", () => {
-    const robots = discoveryFiles({ nav })["robots.txt"];
+    const robots = discoveryFiles({ nav })["robots.txt"] ?? "";
     expect(AI_CRAWLERS).toEqual(budgets.agentReadiness.crawlers);
     expect(robotsIssues({ robots, crawlers: AI_CRAWLERS })).toEqual([]);
     expect(robots.split("\n\n")[0]).toBe(

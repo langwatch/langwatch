@@ -195,9 +195,9 @@ describe("when pages carry icons at different levels", () => {
       "rocket",
     ]);
     expect(published.filter((value: { glyph?: string }) => value.glyph)).toHaveLength(2);
-    expect(published[0].glyph).toMatch(/^<path d="[^"]+"\/>/);
+    expect(published[0]?.glyph).toMatch(/^<path d="[^"]+"\/>/);
     const index = decodeSearchIndex({ data: published });
-    expect(index.glyphs.get(index.entries[4].icon)).toBe(published[0].glyph);
-    expect(index.entries[3].icon).toBe("");
+    expect(index.glyphs.get(index.entries[4]?.icon ?? "")).toBe(published[0]?.glyph);
+    expect(index.entries[3]?.icon).toBe("");
   });
 });

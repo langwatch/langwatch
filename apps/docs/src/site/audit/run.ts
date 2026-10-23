@@ -154,13 +154,10 @@ async function pool<T, R>({
   work: (item: T) => Promise<R>;
 }) {
   const results = Array.from<R>({ length: items.length });
-  let next = 0;
+  const queue = items.entries();
   await Promise.all(
     Array.from({ length: Math.min(limit, items.length) }, async () => {
-      while (next < items.length) {
-        const index = next++;
-        results[index] = await work(items[index]);
-      }
+      for (const [index, item] of queue) results[index] = await work(item);
     }),
   );
   return results;
@@ -171,7 +168,9 @@ function medianRun({ runs }: { runs: AuditRun[] }) {
   const sorted = runs.toSorted(
     (a, b) => (a.scores.performance ?? -1) - (b.scores.performance ?? -1),
   );
-  return sorted[Math.floor(sorted.length / 2)];
+  const median = sorted[Math.floor(sorted.length / 2)];
+  if (!median) throw new Error("No audit runs to take a median of");
+  return median;
 }
 
 async function checkExportTypes({ origin, exports }: { origin: string; exports: string[] }) {

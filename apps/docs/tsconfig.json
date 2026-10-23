@@ -8,7 +8,6 @@
     "lib": ["es2023", "dom", "dom.iterable"],
     "types": ["vite/client", "node"],
     "strict": true,
-    "noUncheckedIndexedAccess": false,
     "skipLibCheck": true,
     "noEmit": true,
     "allowImportingTsExtensions": true,

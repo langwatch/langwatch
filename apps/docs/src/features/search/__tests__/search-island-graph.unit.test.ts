@@ -14,7 +14,9 @@ function packagesOf({ entry }: { entry: string }) {
     if (seen.has(file)) return;
     seen.add(file);
     const source = readFileSync(file, "utf8");
-    for (const [, kind, specifier] of source.matchAll(/^import (type )?[^;]*?from "([^"]+)"/gms)) {
+    for (const [, kind, specifier = ""] of source.matchAll(
+      /^import (type )?[^;]*?from "([^"]+)"/gms,
+    )) {
       if (kind) continue;
       if (specifier.startsWith(".")) visit(path.resolve(path.dirname(file), specifier));
       else packages.add(specifier);

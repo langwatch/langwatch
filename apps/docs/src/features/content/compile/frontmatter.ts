@@ -32,7 +32,7 @@ export function readFrontmatter({ source }: { source: string }): PageFrontmatter
   const match = FRONTMATTER.exec(source);
   if (!match) return {};
   try {
-    return pageFrontmatterSchema.parse(parse(match[1]) ?? {});
+    return pageFrontmatterSchema.parse(parse(match[1] ?? "") ?? {});
   } catch {
     return {};
   }

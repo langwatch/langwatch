@@ -87,7 +87,6 @@ export function DocsShell({
       title={title}
       description={description}
       breadcrumb={breadcrumb}
-      kind={kind}
       tag={tag}
       actions={site.contextual}
     />

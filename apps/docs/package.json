@@ -25,6 +25,10 @@
     "test:news": "node scripts/news.smoke.test.mjs",
     "test:refinement": "node scripts/refinement.smoke.test.mjs",
     "test:mount": "node scripts/mount.smoke.test.mjs",
+    "test:agent-controls": "node scripts/agent-controls.smoke.test.mjs",
+    "test:code-preference": "node scripts/code-preference.smoke.test.mjs",
+    "shots": "node scripts/shots.mjs",
+    "contrast": "node scripts/contrast.mjs",
     "audit:site": "node src/site/audit/run.ts",
     "test:audit": "node scripts/audit.smoke.test.mjs"
   },

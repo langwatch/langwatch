@@ -50,14 +50,14 @@ function PageContent({ slug, page, operation, examples }: AppProps) {
           ? [{ depth: 2, text: "Authorisation", id: "authorisation" }]
           : []),
         ...[
-          ["path", "Path parameters"],
-          ["query", "Query parameters"],
-          ["header", "Headers"],
+          { location: "path", text: "Path parameters" },
+          { location: "query", text: "Query parameters" },
+          { location: "header", text: "Headers" },
         ]
-          .filter(([location]) =>
+          .filter(({ location }) =>
             operation.parameters.some((parameter) => parameter.in === location),
           )
-          .map(([, text]) => ({ depth: 2, text, id: text.toLowerCase().replaceAll(" ", "-") })),
+          .map(({ text }) => ({ depth: 2, text, id: text.toLowerCase().replaceAll(" ", "-") })),
         ...(operation.body ? [{ depth: 2, text: "Request body", id: "request-body" }] : []),
         { depth: 2, text: "Responses", id: "responses" },
         ...(page?.headings ?? []),

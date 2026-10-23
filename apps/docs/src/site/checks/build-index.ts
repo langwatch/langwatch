@@ -46,7 +46,7 @@ export function filesUnder({
 
 export function attributes({ html, attribute }: { html: string; attribute: string }) {
   const pattern = new RegExp(`\\s${attribute}=["']([^"']*)["']`, "gi");
-  return [...html.matchAll(pattern)].map((match) => match[1].replace(/&amp;/g, "&"));
+  return [...html.matchAll(pattern)].map((match) => (match[1] ?? "").replace(/&amp;/g, "&"));
 }
 
 const MEDIA_ATTRIBUTES = ["src", "poster", "data-src"];

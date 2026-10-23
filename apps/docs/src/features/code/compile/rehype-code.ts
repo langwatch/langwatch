@@ -8,14 +8,14 @@ export function parseFenceMeta({ meta }: { meta?: string | null }) {
   let title = "";
   const quoted = /title=(?:"([^"]*)"|'([^']*)')/.exec(rest);
   if (quoted) {
-    title = quoted[1] ?? quoted[2];
+    title = quoted[1] ?? quoted[2] ?? "";
     rest = rest.replace(quoted[0], " ");
   }
   const highlight: number[] = [];
   const braces = /\{([\d,\s-]+)\}/.exec(rest);
   if (braces) {
-    for (const part of braces[1].split(",")) {
-      const [from, to] = part.trim().split("-").map(Number);
+    for (const part of (braces[1] ?? "").split(",")) {
+      const [from = 0, to] = part.trim().split("-").map(Number);
       for (let line = from; line <= (to || from); line += 1) highlight.push(line);
     }
     rest = rest.replace(braces[0], " ");

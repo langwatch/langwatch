@@ -435,8 +435,8 @@ export function PlaygroundRequest({
   const send = async () => {
     const nextErrors = validateRequest({ operation, state, key, hasSession: session.selected });
     setErrors(nextErrors);
-    if (Object.keys(nextErrors).length > 0) {
-      const first = Object.keys(nextErrors)[0];
+    const [first] = Object.keys(nextErrors);
+    if (first !== undefined) {
       document.getElementById(errorFieldId({ first }))?.focus();
       return;
     }

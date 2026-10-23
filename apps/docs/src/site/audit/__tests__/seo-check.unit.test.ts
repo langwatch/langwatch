@@ -220,16 +220,15 @@ describe("builtBasePath", () => {
 describe("applyKnownIssues", () => {
   describe("when the known list holds today's issues", () => {
     it("fails only new issues and reports known ones that were fixed", () => {
-      const issues = [
-        { page: `${DOCS}/a`, code: "description-length", detail: "" },
-        { page: `${DOCS}/b`, code: "description-length", detail: "" },
-      ];
+      const first = { page: `${DOCS}/a`, code: "description-length", detail: "" };
+      const second = { page: `${DOCS}/b`, code: "description-length", detail: "" };
+      const issues = [first, second];
       const known = knownIssuesOf({
-        issues: [issues[0], { page: `${DOCS}/c`, code: "h1-count", detail: "" }],
+        issues: [first, { page: `${DOCS}/c`, code: "h1-count", detail: "" }],
       });
       expect(known).toEqual({ "description-length": ["/a"], "h1-count": ["/c"] });
       const result = applyKnownIssues({ issues, known });
-      expect(result.failures).toEqual([issues[1]]);
+      expect(result.failures).toEqual([second]);
       expect(result.fixed).toEqual([{ page: "/c", code: "h1-count", detail: "no longer occurs" }]);
       expect(result.known).toBe(1);
     });

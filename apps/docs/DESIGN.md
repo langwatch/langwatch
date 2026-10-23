@@ -36,10 +36,10 @@ not recreated in the browser. The API uses the existing request generator,
 validation and session-provider seam. No automatic request is sent on mount.
 Navigation disposes the API root, aborts pending work and clears credentials.
 
-React is retained for stateful islands because it is already installed and keeps
-the existing hooks/session lifecycle. Preact compatibility would add a dependency
-and a second compatibility surface for limited benefit: React is absent from the
-initial request. Whole-page hydration, Chakra in a lazy page bundle, runtime
+Stateful islands run on `preact/compat` in the browser build, about a tenth of
+react-dom's size, so a first click on search, a menu or the playground downloads
+little. No island hydrates server markup: each mounts into an empty node, so
+prerendering keeps real React and the HTML is unchanged. Whole-page hydration, Chakra in a lazy page bundle, runtime
 highlighting and a second client-side copy of MDX are rejected. Hydrating small
 static buttons with React would charge the renderer cost for no useful state, so
 those controls use browser event delegation instead. Module scripts give each
@@ -60,13 +60,8 @@ Native links and disclosure elements remain usable without JavaScript.
 The docs install no service worker and have no offline mode: they are served on a subdomain
 that must not hold one. Repeat reading relies on HTTP caching of hashed assets.
 
-The worker version hashes the rendered documents, including hashed CSS/JS
-references, together with the worker source and reading fonts. A successful install activates the new cache and removes previous
-versions. It neither forces a reload nor claims existing tabs. The next document
-navigation adopts the new version. Future hosting should retain old immutable assets so an open document can still
-load its lazy chunks, and revalidate mutable HTML, worker and search files promptly.
-Worker registration bypasses the browser HTTP cache. No Workbox dependency is needed.
-See [MDN lifecycle guidance](https://developer.mozilla.org/en-US/docs/Web/API/Service_Worker_API/Using_Service_Workers).
+Hosting should retain old immutable assets so an open document can still load its lazy
+chunks, and revalidate mutable HTML and search files promptly.
 
 ## Scroll layout
 

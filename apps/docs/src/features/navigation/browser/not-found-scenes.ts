@@ -101,9 +101,9 @@ function langyMark() {
     y2: "0",
   }))
     gradient.setAttribute(name, value);
-  for (const [offset, className] of [
-    ["0", "is-orange"],
-    ["1", "is-purple"],
+  for (const { offset, className } of [
+    { offset: "0", className: "is-orange" },
+    { offset: "1", className: "is-purple" },
   ]) {
     const stop = document.createElementNS(SVG, "stop");
     stop.setAttribute("offset", offset);

@@ -106,8 +106,9 @@ function readTerms({
   if (value.pages !== undefined && gaps.length !== words.length) throw new MalformedIndexError();
   words.forEach((word, at) => {
     const pages = [position];
-    for (const gap of gaps[at] ? gaps[at].split(",") : []) {
-      const next = pages[pages.length - 1] + Number.parseInt(gap, 36);
+    const run = gaps[at];
+    for (const gap of run ? run.split(",") : []) {
+      const next = (pages.at(-1) ?? position) + Number.parseInt(gap, 36);
       if (!(next > position && next < count)) throw new MalformedIndexError();
       pages.push(next);
     }
@@ -141,7 +142,7 @@ function pagesWith({ index, token }: { index: SearchIndex; token: string }) {
   if (pages) return pages;
   pages = new Set();
   for (const [position, word] of index.vocabulary.entries())
-    if (word.includes(token)) for (const page of index.postings[position]) pages.add(page);
+    if (word.includes(token)) for (const page of index.postings[position] ?? []) pages.add(page);
   index.pagesWith.set(token, pages);
   return pages;
 }
@@ -160,7 +161,7 @@ function articleHas({
   const token = trimTerm({ term });
   if (!token) return false;
   return (
-    index.entries[position].match.own.some((text) => text.includes(token)) ||
+    (index.entries[position]?.match.own.some((text) => text.includes(token)) ?? false) ||
     pagesWith({ index, token }).has(position)
   );
 }
@@ -191,6 +192,7 @@ function scoreTerm({
   term: string;
 }): { score: number; heading?: Heading } {
   const entry = index.entries[position];
+  if (!entry) return { score: 0 };
   const { match } = entry;
   if (match.title === term) return { score: 100 };
   if (match.title.startsWith(term)) return { score: 60 };
@@ -212,6 +214,8 @@ function scoreEntry({
   position: number;
   terms: string[];
 }): Result | null {
+  const entry = index.entries[position];
+  if (!entry) return null;
   let score = 0;
   let heading: Heading | undefined;
   for (const term of terms) {
@@ -220,7 +224,7 @@ function scoreEntry({
     score += hit.score;
     heading = heading ?? hit.heading;
   }
-  return { entry: index.entries[position], heading, score };
+  return { entry, heading, score };
 }
 
 export function searchIndex({ index, query }: { index: SearchIndex; query: string }): Result[] {

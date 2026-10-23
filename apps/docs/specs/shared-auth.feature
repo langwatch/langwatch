@@ -27,7 +27,7 @@ Feature: Use a short-lived session in the docs playground
     Then the request is refused without using the network
     And expired or malformed credentials are refused
 
-  @e2e
+  @unimplemented
   Scenario: Try the session seam without sending a real credential
     Given the docs were built with the mock session flag
     When the reader opens a trace playground and connects

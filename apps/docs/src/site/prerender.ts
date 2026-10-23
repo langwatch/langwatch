@@ -33,6 +33,7 @@ import type { Nav } from "../features/navigation/model/nav.ts";
 import { publishSearchIndex, searchEntry } from "../features/search/compile/search-index.ts";
 import { publicSlug, withBasePath } from "../lib/site-path.ts";
 import { docsRoot, readBuildOptions } from "../paths.ts";
+import { writeVersionedPages } from "./build-version.ts";
 import { compressedSearchIndex } from "./compressed-index.ts";
 import { inlinePageStyles } from "./css/page-styles.ts";
 import {
@@ -44,7 +45,6 @@ import {
   STATIC_FILES,
   extractStyles,
 } from "./document.ts";
-import { writeVersionedPages } from "./build-version.ts";
 import { optimisePageImages } from "./image-variants.ts";
 import { writeOutputFiles } from "./output-files.ts";
 import { renderCache, renderedPageSchema, type RenderedPage } from "./render-cache.ts";
@@ -218,6 +218,7 @@ async function renderAll({
   });
   for (const [index, slug] of pending.entries()) {
     const outcome = rendered[index];
+    if (outcome === undefined) throw new Error(`No render outcome for ${slug}`);
     outcomes.set(slug, outcome);
     const key = keyOf(slug);
     if (key && "result" in outcome) await cache.write({ key, page: outcome.result });

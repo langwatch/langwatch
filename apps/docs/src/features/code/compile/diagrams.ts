@@ -109,7 +109,7 @@ export function renderDiagram({ source }: { source: string }): Promise<Diagram> 
             flowchart: { htmlLabels: false, curve: "basis" },
           });
           const { svg } = await window.diagramRenderer.render(`diagram-${mode}-${hash}`, source);
-          const viewBox = /viewBox="([^"]+)"/.exec(svg)?.[1].split(/\s+/).map(Number);
+          const viewBox = /viewBox="([^"]+)"/.exec(svg)?.[1]?.split(/\s+/).map(Number);
           return viewBox ? svg.replace('width="100%"', `width="${viewBox[2]}"`) : svg;
         },
         { source: renderedSource, mode, hash, palette: diagramTheme[mode] },

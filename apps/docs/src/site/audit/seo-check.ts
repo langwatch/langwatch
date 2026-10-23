@@ -20,8 +20,8 @@ function decodeEntities(text: string) {
 function tagAttributes({ tag }: { tag: string }) {
   return Object.fromEntries(
     [...tag.matchAll(/([a-zA-Z:-]+)=(?:"([^"]*)"|'([^']*)')/g)].map((match) => [
-      match[1].toLowerCase(),
-      decodeEntities(match[2] ?? match[3]),
+      (match[1] ?? "").toLowerCase(),
+      decodeEntities(match[2] ?? match[3] ?? ""),
     ]),
   );
 }
@@ -58,7 +58,7 @@ export function readHead({ html }: { html: string }) {
     )?.href,
     jsonLd: [
       ...html.matchAll(/<script\b[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi),
-    ].map((match) => match[1]),
+    ].map((match) => match[1] ?? ""),
     headings: (body.match(/<h1[\s>]/gi) ?? []).length,
   };
 }
@@ -92,7 +92,9 @@ export function builtBasePath({ outDir }: { outDir: string }) {
 /** Every sitemap `<loc>`, the build's list of navigable pages. */
 export function sitemapPages({ outDir }: { outDir: string }) {
   const sitemap = readFileSync(path.join(outDir, "sitemap.xml"), "utf8");
-  return [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => decodeEntities(match[1]));
+  return [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) =>
+    decodeEntities(match[1] ?? ""),
+  );
 }
 
 /** The prerendered HTML file for a sitemap address, or null for an address off the site. */
@@ -230,8 +232,8 @@ function checkRobots({ outDir }: { outDir: string }): SeoIssue[] {
   for (const line of lines) {
     const [field, ...rest] = line.split(":");
     const value = rest.join(":").trim();
-    if (/^user-agent$/i.test(field)) everyone = value === "*";
-    else if (everyone && /^disallow$/i.test(field) && value === "/")
+    if (/^user-agent$/i.test(field ?? "")) everyone = value === "*";
+    else if (everyone && /^disallow$/i.test(field ?? "") && value === "/")
       issues.push({ page: "robots.txt", code: "robots-blocks-site", detail: line });
   }
   const sitemap = docsUrl({ path: "/sitemap.xml" });
@@ -308,7 +310,9 @@ export function checkSeo({
   const llmsFile = path.join(outDir, "llms.txt");
   const llms = new Set(
     existsSync(llmsFile)
-      ? [...readFileSync(llmsFile, "utf8").matchAll(/\]\((https?:\/\/[^)\s]+)\)/g)].map((m) => m[1])
+      ? [...readFileSync(llmsFile, "utf8").matchAll(/\]\((https?:\/\/[^)\s]+)\)/g)].flatMap((m) =>
+          m[1] === undefined ? [] : [m[1]],
+        )
       : [],
   );
   const pages = sitemapPages({ outDir });

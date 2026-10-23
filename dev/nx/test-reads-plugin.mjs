@@ -209,11 +209,7 @@ export const reads = {
   "@langwatch/analytics-contract": ["dev/scripts/build-charts-lib.mjs"],
   "@langwatch/clickhouse-migrations": ["packages/upgrade/releases/image/code-steps.json"],
   "@langwatch/seedgen-runner": ["tools/seedgen/**/*"],
-  "@langwatch/docs-site": [
-    "docs/api-reference/evaluators/overview.mdx",
-    "docs/concepts.mdx",
-    "docs/snippets/**/*",
-  ],
+  "@langwatch/docs-site": ["docs/**/*", "skills/_compiled/**/*"],
 };
 
 const members = memberPatterns(new URL("../..", import.meta.url).pathname);

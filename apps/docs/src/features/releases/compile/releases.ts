@@ -46,6 +46,7 @@ export function parseReleases({ source }: { source: string }): Release[] {
   return headings
     .flatMap((heading, index) => {
       const [, version, compare, date] = heading;
+      if (version === undefined || date === undefined) return [];
       const body = compactNotes({
         body: source
           .slice((heading.index ?? 0) + heading[0].length, headings[index + 1]?.index)

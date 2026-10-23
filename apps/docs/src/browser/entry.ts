@@ -60,21 +60,22 @@ document.addEventListener("docs:navigated", prepareControls);
 document.addEventListener("click", (event) => {
   if (!(event.target instanceof Element)) return;
   const controls = [
-    ["[data-docs-search]", "search"],
-    ["#try-it-button", "playground"],
-    ["[data-docs-copy], [data-docs-page-copy], [data-docs-prompt]", "copy"],
-    ["[role=tab]", "tabs"],
-    ["[data-docs-page-menu]", "context-menus"],
-    ["[data-docs-mobile], [data-docs-mobile-close]", "menus"],
-    ["[data-docs-video]", "media"],
-    ["[data-scope=accordion] button, [data-docs-tooltip]", "disclosures"],
-    [".docs-skill-prompt", "skill-prompts"],
-    [
-      '[data-docs-theme], [data-docs-agent], [aria-label="Dismiss announcement"], [data-docs-dismiss], nav[aria-label="Page navigation"] button[aria-expanded]',
-      "controls",
-    ],
+    { selector: "[data-docs-search]", name: "search" },
+    { selector: "#try-it-button", name: "playground" },
+    { selector: "[data-docs-copy], [data-docs-page-copy], [data-docs-prompt]", name: "copy" },
+    { selector: "[role=tab]", name: "tabs" },
+    { selector: "[data-docs-page-menu]", name: "context-menus" },
+    { selector: "[data-docs-mobile], [data-docs-mobile-close]", name: "menus" },
+    { selector: "[data-docs-video]", name: "media" },
+    { selector: "[data-scope=accordion] button, [data-docs-tooltip]", name: "disclosures" },
+    { selector: ".docs-skill-prompt", name: "skill-prompts" },
+    {
+      selector:
+        '[data-docs-theme], [data-docs-agent], [aria-label="Dismiss announcement"], [data-docs-dismiss], nav[aria-label="Page navigation"] button[aria-expanded]',
+      name: "controls",
+    },
   ];
-  for (const [selector, name] of controls) {
+  for (const { selector, name } of controls) {
     const trigger = event.target.closest<HTMLElement>(selector);
     if (!trigger) continue;
     loadIsland({ name, trigger });

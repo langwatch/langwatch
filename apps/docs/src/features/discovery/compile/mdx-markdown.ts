@@ -133,7 +133,7 @@ function expressionEnd({ text, at }: { text: string; at: number }) {
   let depth = 0;
   let string: string | null = null;
   for (let index = at; index < text.length; index += 1) {
-    const char = text[index];
+    const char = text[index] ?? "";
     if (string) string = char === string && text[index - 1] !== "\\" ? null : string;
     else if (QUOTES.has(char)) string = char;
     else depth += BRACE_DEPTH[char] ?? 0;
@@ -156,8 +156,8 @@ function expressionValue({ source }: { source: string }) {
 /** A converted component's tag at `at`, or null when it is anything else. */
 function tagAt({ text, at }: { text: string; at: number }): { token: Token; end: number } | null {
   const head = /^<(\/?)([A-Za-z][\w.]*)/.exec(text.slice(at, at + 64));
-  if (!head || !Object.hasOwn(CONVERTERS, head[2])) return null;
-  const [, closing, name] = head;
+  const [, closing, name] = head ?? [];
+  if (!head || name === undefined || !Object.hasOwn(CONVERTERS, name)) return null;
   const attributes: Attributes = {};
   for (let index = at + head[0].length; index < text.length;) {
     index += /^\s*/.exec(text.slice(index))?.[0].length ?? 0;
@@ -214,7 +214,7 @@ function specialAt({ text, at }: { text: string; at: number }) {
   if (literal)
     return {
       end: at + literal[0].length,
-      token: { kind: "text" as const, text: literal[2] },
+      token: { kind: "text" as const, text: literal[2] ?? "" },
       drop: false,
     };
   if (text[at] === "<") {
@@ -260,6 +260,12 @@ function unwrap({ parent, element }: { parent: Element; element: Element & { ope
 
 type OpenElement = Element & { open: string };
 
+function top({ stack }: { stack: OpenElement[] }) {
+  const element = stack.at(-1);
+  if (element === undefined) throw new Error("The element stack is empty");
+  return element;
+}
+
 /** Adds an element for an opening tag; one that is not self-closing takes what follows. */
 function openTag({
   stack,
@@ -276,7 +282,7 @@ function openTag({
     open: raw,
     children: [] as MdxNode[],
   };
-  stack[stack.length - 1].children.push(element);
+  top({ stack }).children.push(element);
   if (!token.selfClosing) stack.push(element);
 }
 
@@ -289,11 +295,11 @@ function closeTag({
   token: Extract<Token, { kind: "close" }>;
 }) {
   if (!stack.some((element, index) => index > 0 && element.name === token.name)) {
-    stack[stack.length - 1].children.push({ kind: "text", text: token.raw });
+    top({ stack }).children.push({ kind: "text", text: token.raw });
     return;
   }
   for (let open = stack.pop(); open && open.name !== token.name; open = stack.pop())
-    unwrap({ parent: stack[stack.length - 1], element: open });
+    unwrap({ parent: top({ stack }), element: open });
 }
 
 /** The source as a tree of converted components; unmatched tags stay text. */
@@ -307,11 +313,11 @@ function parseMdx({ source }: { source: string }): MdxNode[] {
   for (const token of tokens) {
     if (token.kind === "open") openTag({ stack, token });
     else if (token.kind === "close") closeTag({ stack, token });
-    else stack[stack.length - 1].children.push(token);
+    else top({ stack }).children.push(token);
   }
   while (stack.length > 1) {
     const open = stack.pop();
-    if (open) unwrap({ parent: stack[stack.length - 1], element: open });
+    if (open) unwrap({ parent: top({ stack }), element: open });
   }
   return root.children;
 }
@@ -362,6 +368,7 @@ function fieldRun({ nodes, from }: { nodes: MdxNode[]; from: number }) {
   let next = from;
   for (let index = from; index < nodes.length; index += 1) {
     const node = nodes[index];
+    if (node === undefined) continue;
     if (isElement(node) && FIELDS.has(node.name)) {
       fields.push(node);
       next = index + 1;
@@ -376,10 +383,11 @@ function renderNodes({ nodes, context }: { nodes: MdxNode[]; context: Context })
   let level = context.level;
   for (let index = 0; index < nodes.length; index += 1) {
     const node = nodes[index];
+    if (node === undefined) continue;
     if (!isElement(node)) {
       output += node.text;
       const headings = node.kind === "text" ? [...node.text.matchAll(/^ {0,3}(#{1,6})\s/gm)] : [];
-      level = headings.at(-1)?.[1].length ?? level;
+      level = headings.at(-1)?.[1]?.length ?? level;
       continue;
     }
     if (FIELDS.has(node.name)) {
@@ -392,10 +400,16 @@ function renderNodes({ nodes, context }: { nodes: MdxNode[]; context: Context })
       index = run.next - 1;
       continue;
     }
-    const block = CONVERTERS[node.name]({ element: node, context: { level } });
+    const block = convert({ element: node, context: { level } });
     output = place({ output, block, inline: INLINE.has(node.name) });
   }
   return output;
+}
+
+function convert({ element, context }: { element: Element; context: Context }) {
+  const converter = CONVERTERS[element.name];
+  if (!converter) throw new Error(`No converter for <${element.name}>`);
+  return converter({ element, context });
 }
 
 /** An element's content as standalone Markdown. */
@@ -430,7 +444,7 @@ function childBlocks({
     if (!isElement(child)) return child.text.trim() ? [dedent({ text: child.text }).trim()] : [];
     index += 1;
     const claimed = render?.(child, index);
-    return [claimed ?? CONVERTERS[child.name]({ element: child, context })].filter(Boolean);
+    return [claimed ?? convert({ element: child, context })].filter(Boolean);
   });
 }
 
@@ -476,7 +490,7 @@ function labelled({ label, body }: { label: string; body: string }) {
 
 /** A code block's tab label: its fence title, else its language's name. */
 function codeLabel({ code }: { code: string }) {
-  const info = /^\s*(?:`{3,}|~{3,})\s*(\S*)\s*(.*)$/.exec(code.split("\n")[0]);
+  const info = /^\s*(?:`{3,}|~{3,})\s*(\S*)\s*(.*)$/.exec(code.split("\n")[0] ?? "");
   const title = parseFenceMeta({ meta: info?.[2] ?? "" }).title;
   return title || languageName({ lang: info?.[1] ?? "" });
 }
@@ -662,7 +676,7 @@ function skillFromMarkup({ lines, context }: { lines: MarkedLine[]; context: Con
     .join("\n");
   const title = /lw-accordion-title"[^>]*>([^<]*)</.exec(markup)?.[1] ?? "Skill";
   const commands = [...markup.matchAll(/<code>([\s\S]*?)<\/code>/g)].map((match) =>
-    match[1].replace(/<[^>]+>/g, "").trim(),
+    (match[1] ?? "").replace(/<[^>]+>/g, "").trim(),
   );
   const code = lines.filter((line) => line.code);
   const close = code.findIndex((line) => line.closes);
@@ -682,13 +696,13 @@ function skillFromMarkup({ lines, context }: { lines: MarkedLine[]; context: Con
 /** A skill card opening on this line, or null. */
 function cardOpening({ line }: { line: MarkedLine }) {
   const opening = line.code ? null : SKILL_CARD.exec(line.text);
-  return opening ? { indent: opening[1], lines: [] as MarkedLine[] } : null;
+  return opening ? { indent: opening[1] ?? "", lines: [] as MarkedLine[] } : null;
 }
 
 /** The section level after a line: a prose heading's, else the one before. */
 function proseLevel({ line, level }: { line: MarkedLine; level: number }) {
   if (line.code) return level;
-  return /^(#{1,6})\s/.exec(line.text)?.[1].length ?? level;
+  return /^(#{1,6})\s/.exec(line.text)?.[1]?.length ?? level;
 }
 
 /** Swaps each generated skill card for its commands and prompt link; nothing else changes. */
@@ -734,7 +748,7 @@ const CONVERTERS: Record<string, Converter> = {
           const code = dedent({ text: child.text }).trimEnd();
           return [labelled({ label: codeLabel({ code }), body: code })];
         }
-        if (isElement(child)) return [CONVERTERS[child.name]({ element: child, context })];
+        if (isElement(child)) return [convert({ element: child, context })];
         return child.text.trim() ? [dedent({ text: child.text }).trim()] : [];
       })
       .filter(Boolean)

@@ -226,9 +226,9 @@ describe("when a guide imports snippets", () => {
 
   /** @scenario "Export complete guides with their snippets" */
   it("exports real guides with their snippet content and every code block intact", () => {
-    for (const [slug, snippet] of [
-      ["concepts", "agent-report-notice"],
-      ["api-reference/evaluators/overview", "evaluators-list"],
+    for (const { slug, snippet } of [
+      { slug: "concepts", snippet: "agent-report-notice" },
+      { slug: "api-reference/evaluators/overview", snippet: "evaluators-list" },
     ]) {
       const source = readFileSync(path.join(docsRoot, `${slug}.mdx`), "utf8");
       const markdown = pageMarkdown({ docsRoot, slug });
@@ -236,7 +236,7 @@ describe("when a guide imports snippets", () => {
       const snippetMarkdown = mdxToMarkdown({
         source: withoutFrontmatter({ source: snippetSource }),
       });
-      expect(markdown).toContain(snippetMarkdown.trim().split("\n")[0]);
+      expect(markdown).toContain(snippetMarkdown.trim().split("\n")[0] ?? "");
       expect(markdown).not.toContain(`/snippets/${snippet}.mdx`);
       for (const block of fencedBlocks({ source })) expect(markdown).toContain(block);
     }

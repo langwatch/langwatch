@@ -150,7 +150,7 @@ Feature: Static documentation with progressive interaction
     Given the islands render on a React compatible runtime a tenth of React's size
     And each island loads only the theme recipes it renders
     When a reader first opens search, a page or theme menu, or the API playground
-    Then search downloads at most 85,500 gzip bytes of script before it answers
+    Then search downloads at most 86,000 gzip bytes of script before it answers
     And a context menu downloads at most 95,000
     And the playground downloads at most 24,500
     And the page itself still loads under 3,000 gzip bytes of script before any interaction

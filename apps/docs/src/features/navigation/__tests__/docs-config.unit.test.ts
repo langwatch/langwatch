@@ -24,7 +24,7 @@ function authoredFrontmatterKeys() {
     const match = /^---\r?\n([\s\S]*?)\r?\n---/.exec(
       readFileSync(path.join(docsRoot, file), "utf8"),
     );
-    const data: unknown = match ? parse(match[1]) : null;
+    const data: unknown = match ? parse(match[1] ?? "") : null;
     if (data && typeof data === "object") for (const key of Object.keys(data)) keys.add(key);
   }
   return [...keys];

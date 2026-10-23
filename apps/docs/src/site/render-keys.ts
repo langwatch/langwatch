@@ -58,7 +58,7 @@ function externalSources({
     if (seen.has(file)) continue;
     const source = readFileSync(file, "utf8");
     seen.set(file, createHash("sha256").update(source).digest("hex"));
-    for (const [, specifier] of source.matchAll(SPECIFIER)) {
+    for (const [, specifier = ""] of source.matchAll(SPECIFIER)) {
       const name = packageName({ id: specifier });
       if (name) names.add(name);
       else if (specifier.startsWith(".")) pending.push(...resolveSource({ file, specifier }));

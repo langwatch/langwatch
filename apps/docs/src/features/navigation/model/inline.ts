@@ -62,7 +62,7 @@ function scanLink({ scan, source }: { scan: Scan; source: string }) {
   flushText({ scan });
   scan.nodes.push({
     type: "link",
-    href: localHref({ href: target[1] }),
+    href: localHref({ href: target[1] ?? "" }),
     children: parseInline({ source: source.slice(scan.index + 1, close) }),
   });
   scan.index = close + 1 + target[0].length;

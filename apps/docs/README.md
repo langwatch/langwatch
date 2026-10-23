@@ -119,9 +119,8 @@ There is no module installer or dependency injection pipeline.
 `src/site/` owns the static build, prerenderer, preview and Vite plugins;
 `vite.config.ts` delegates to the same configuration used by build commands.
 `src/site/document.ts` defines lazy browser entries and the document template seams.
-`src/browser/` holds the small navigation bootstrap. Worker source lives in
-`worker/`. Build paths and CLI options are in `src/paths.ts`; browser environment
-configuration stays in `src/config.ts`.
+`src/browser/` holds the small navigation bootstrap. Build paths and CLI options are in
+`src/paths.ts`; browser environment configuration stays in `src/config.ts`.
 
 The compiler and UI use strict TypeScript. Node 24 runs the typed build tools
 without a second loader. Dependency versions come from the workspace catalog.
@@ -218,7 +217,7 @@ take precedence. Pattern redirects need hosting rules; they remain in
 `redirects.json`. Preview tests HTTP redirects and query preservation separately.
 
 Keep old hashed assets long enough for cached documents to finish loading their
-lazy chunks. Revalidate mutable HTML, search and worker files; immutable hashed
+lazy chunks. Revalidate mutable HTML and search files; immutable hashed
 assets can use a long cache lifetime. These are hosting requirements, not cloud
 configuration emitted by the compiler. The existing Mintlify release workflow
 and DNS cutover remain separate decisions.
@@ -249,7 +248,6 @@ sign anyone into or out of their real LangWatch account.
 ```sh
 VITE_DOCS_SESSION_AUTH=mock pnpm --filter @langwatch/docs-site dev
 VITE_DOCS_SESSION_AUTH=mock pnpm --filter @langwatch/docs-site build --out-dir "$TMPDIR/docs-session-dist"
-pnpm --filter @langwatch/docs-site test:session --out-dir "$TMPDIR/docs-session-dist" --screenshots "$TMPDIR/docs-session-shots"
 ```
 
 For a haven review in this worktree:

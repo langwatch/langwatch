@@ -213,10 +213,9 @@ function rewriteImage({
 }
 
 /**
- * The page with each authored raster offered as AVIF and WebP before its original; the first
- * image above the fold loads eagerly at high priority and is preloaded from the head. A theme
- * pair preloads each variant for its colour scheme and stays lazy, so the hidden one is never
- * fetched. Every other image loads lazily.
+ * Each authored raster offered as AVIF and WebP before its original. The first image above the
+ * fold loads eagerly and is preloaded; a theme pair preloads each variant for its colour scheme
+ * and stays lazy, so the hidden one is never fetched. Every other image loads lazily.
  */
 export function rewritePageImages({
   html,

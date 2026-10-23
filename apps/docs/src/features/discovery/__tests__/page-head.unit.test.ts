@@ -39,7 +39,7 @@ const SETTINGS: HeadSettings = {
 
 function structuredData({ head }: { head: string }) {
   return [...head.matchAll(/<script[^>]+>([\s\S]+?)<\/script>/g)].map((match): unknown =>
-    JSON.parse(match[1]),
+    JSON.parse(match[1] ?? ""),
   );
 }
 
@@ -104,7 +104,7 @@ describe("static documentation metadata", () => {
     ]);
     const head = pageHead({ slug: "tracing/spans", title: "Spans", trail });
     const scripts = [...head.matchAll(/<script[^>]+>([\s\S]+?)<\/script>/g)].map((match) =>
-      JSON.parse(match[1]),
+      JSON.parse(match[1] ?? ""),
     );
     expect(scripts[1]).toMatchObject({
       "@type": "BreadcrumbList",

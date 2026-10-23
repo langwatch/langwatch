@@ -9,7 +9,7 @@ type ManifestEntry = { title?: string; skill?: string };
 /** The `description` of a SKILL.md frontmatter, unquoted; empty when it has none. */
 export function frontmatterDescription({ contents }: { contents: string }) {
   const block = /^---\r?\n([\s\S]*?)\r?\n---/.exec(contents)?.[1] ?? "";
-  const line = /^description:[ \t]*(.*)$/m.exec(block)?.[1].trim() ?? "";
+  const line = /^description:[ \t]*(.*)$/m.exec(block)?.[1]?.trim() ?? "";
   return line.replace(/^(["'])(.*)\1$/, "$2");
 }
 

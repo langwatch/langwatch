@@ -29,7 +29,7 @@ it("parses prose and fences without executing prompt MDX", () => {
   const card = tree.children?.[0];
   expect(card?.name).toBe("SkillCard");
   expect(card?.attributes?.find((attribute) => attribute.name === "prompt")?.value).toBe(prompt);
-  expect(card?.children?.[0].data?.hName).toBe("h4");
+  expect(card?.children?.[0]?.data?.hName).toBe("h4");
   expect(
     card?.children?.some((node) => node.type === "code" && node.value === 'print("hello")'),
   ).toBe(true);

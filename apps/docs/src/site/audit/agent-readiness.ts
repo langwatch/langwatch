@@ -108,7 +108,7 @@ function robotsGroups({ robots }: { robots: string }) {
   for (const raw of robots.split("\n")) {
     const line = raw.replace(/#.*/, "").trim();
     const [field, ...rest] = line.split(":");
-    if (/^user-agent$/i.test(field)) {
+    if (/^user-agent$/i.test(field ?? "")) {
       const agent = rest.join(":").trim().toLowerCase();
       agents = collecting ? [...agents, agent] : [agent];
       collecting = true;
@@ -224,7 +224,7 @@ function headRels({ html }: { html: string }) {
 
 /** Sitemap entries and how many carry a last-modified date. */
 export function sitemapFreshness({ sitemap }: { sitemap: string }) {
-  const entries = [...sitemap.matchAll(/<url>([\s\S]*?)<\/url>/g)].map((match) => match[1]);
+  const entries = [...sitemap.matchAll(/<url>([\s\S]*?)<\/url>/g)].map((match) => match[1] ?? "");
   return {
     total: entries.length,
     dated: entries.filter((entry) => entry.includes("<lastmod>")).length,
@@ -341,7 +341,7 @@ export function checkAgentReadiness({
       largestPages: largest({ items: pageTokens, size: (item) => item.tokens }),
       largestDirectoryEntries: largest({
         items: directoryLines.map((line) => ({
-          page: /\]\((\S+?)\)/.exec(line)?.[1].slice(DOCS_URL.length).replace(/\.md$/, "") ?? line,
+          page: /\]\((\S+?)\)/.exec(line)?.[1]?.slice(DOCS_URL.length).replace(/\.md$/, "") ?? line,
           tokens: approximateTokens({ text: line }),
         })),
         size: (item) => item.tokens,

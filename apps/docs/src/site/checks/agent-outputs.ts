@@ -44,7 +44,9 @@ export function checkAgentOutputs({ index }: { index: BuildIndex }) {
 
 /** The sitemap's locations, unescaped. */
 export function sitemapLocations({ xml }: { xml: string }) {
-  return [...xml.matchAll(/<loc>([^<]*)<\/loc>/g)].map((match) => match[1].replace(/&amp;/g, "&"));
+  return [...xml.matchAll(/<loc>([^<]*)<\/loc>/g)].map((match) =>
+    (match[1] ?? "").replace(/&amp;/g, "&"),
+  );
 }
 
 function addressShape({ loc }: { loc: string }) {

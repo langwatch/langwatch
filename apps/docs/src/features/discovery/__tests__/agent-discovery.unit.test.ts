@@ -23,7 +23,7 @@ describe("agent discovery files", () => {
 
     /** @scenario "The agent-skills index lists each skill once with a digest of its published file" */
     it("indexes each skill with the digest of its published bytes", () => {
-      const index = JSON.parse(files[".well-known/agent-skills/index.json"]);
+      const index = JSON.parse(files[".well-known/agent-skills/index.json"] ?? "");
       expect(index.$schema).toBe("https://schemas.agentskills.io/discovery/0.2.0/schema.json");
       expect(index.skills.map((skill: { name: string }) => skill.name)).toEqual([
         "find-traces",
@@ -34,7 +34,9 @@ describe("agent discovery files", () => {
         expect(path).toBe(`.well-known/agent-skills/${entry.name}/SKILL.md`);
         expect(entry.type).toBe("skill-md");
         expect(entry.digest).toBe(
-          `sha256:${createHash("sha256").update(files[path]).digest("hex")}`,
+          `sha256:${createHash("sha256")
+            .update(files[path] ?? "")
+            .digest("hex")}`,
         );
       }
       expect(files[".well-known/agent-skills/tracing/SKILL.md"]).toBe("# Tracing\n");
@@ -42,7 +44,7 @@ describe("agent discovery files", () => {
 
     /** @scenario "The agent card names LangWatch and lists its skills" */
     it("publishes a card with the summary and one entry per skill", () => {
-      const card = JSON.parse(files[".well-known/agent-card.json"]);
+      const card = JSON.parse(files[".well-known/agent-card.json"] ?? "");
       expect(card).toMatchObject({
         name: "LangWatch",
         url: "https://langwatch.ai/docs/",
@@ -68,7 +70,7 @@ describe("agent discovery files", () => {
 
     /** @scenario "Robots.txt declares the content signals" */
     it("puts the content signal right after the user agent", () => {
-      expect(files["robots.txt"].split("\n").slice(0, 2)).toEqual([
+      expect(files["robots.txt"]?.split("\n").slice(0, 2)).toEqual([
         "User-agent: *",
         "Content-Signal: ai-train=yes, search=yes, ai-input=yes",
       ]);

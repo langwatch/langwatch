@@ -76,12 +76,12 @@ export function agentReadinessMarkdown({
     `Freshness: ${freshness.dated} of ${freshness.total} sitemap pages carry a last-modified date. Dates come from git, so a shallow checkout dates fewer pages; the production build needs the full history.`,
   ];
   const worst = worstPages({ issues: result.issues, count: 5 });
-  const offenders = AGENT_CHECKS.filter((check) => worst[check.id].length > 0);
+  const offenders = AGENT_CHECKS.filter((check) => (worst[check.id]?.length ?? 0) > 0);
   if (offenders.length > 0) {
     lines.push("", "<details><summary>Worst pages per check</summary>", "");
     for (const check of offenders)
       lines.push(
-        `- **${check.label}**: ${worst[check.id].map((entry) => `\`${entry.page}\` (${escapeCell(entry.gaps.join("; "))})`).join(", ")}`,
+        `- **${check.label}**: ${(worst[check.id] ?? []).map((entry) => `\`${entry.page}\` (${escapeCell(entry.gaps.join("; "))})`).join(", ")}`,
       );
     lines.push("", "</details>");
   }

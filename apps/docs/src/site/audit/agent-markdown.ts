@@ -49,14 +49,16 @@ type BlockState = {
 };
 
 function flushProse({ state }: { state: BlockState }) {
-  if (state.prose.length > 0)
-    state.blocks.push({ kind: proseKind({ line: state.prose[0] }), lines: state.prose });
+  const [first] = state.prose;
+  if (first !== undefined)
+    state.blocks.push({ kind: proseKind({ line: first }), lines: state.prose });
   state.prose = [];
 }
 
 function closesFence({ match, marker }: { match: RegExpExecArray | null; marker: string }) {
-  if (!match || match[1][0] !== marker[0]) return false;
-  return match[1].length >= marker.length && match[2].trim() === "";
+  const [, fence = "", info = ""] = match ?? [];
+  if (!match || fence[0] !== marker[0]) return false;
+  return fence.length >= marker.length && info.trim() === "";
 }
 
 function readLine({ state, line }: { state: BlockState; line: string }) {
@@ -70,8 +72,8 @@ function readLine({ state, line }: { state: BlockState; line: string }) {
   }
   if (match) {
     flushProse({ state });
-    const lang = match[2].trim().split(/\s+/)[0].toLowerCase();
-    state.fence = { marker: match[1], code: { lang, lines: [] } };
+    const lang = (match[2] ?? "").trim().split(/\s+/)[0]?.toLowerCase() ?? "";
+    state.fence = { marker: match[1] ?? "", code: { lang, lines: [] } };
   } else if (line.trim() === "") flushProse({ state });
   else if (/^#{1,6}\s/.test(line)) {
     flushProse({ state });
@@ -95,7 +97,7 @@ const PREAMBLE =
 /** The description after the title, and the first paragraph before the first section heading. */
 export function openingOf({ blocks }: { blocks: Block[] }) {
   const title = blocks.findIndex(
-    (block) => block.kind === "heading" && block.lines[0].startsWith("# "),
+    (block) => block.kind === "heading" && block.lines[0]?.startsWith("# "),
   );
   const rest = blocks.slice(title + 1);
   const description = rest[0]?.kind === "paragraph" ? rest[0].lines.join(" ") : null;

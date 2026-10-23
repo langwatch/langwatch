@@ -22,9 +22,12 @@ function savings({ audit }: { audit: Audit }) {
 function agenticChecks({ lhr }: { lhr: Result }): AuditRun["agentic"] {
   const category = lhr.categories[AGENTIC_CATEGORY];
   if (!category) return null;
-  const applicable = category.auditRefs
-    .map((ref) => lhr.audits[ref.id])
-    .filter((audit) => audit && audit.scoreDisplayMode !== "notApplicable" && audit.score !== null);
+  const applicable = category.auditRefs.flatMap((ref) => {
+    const audit = lhr.audits[ref.id];
+    return audit && audit.scoreDisplayMode !== "notApplicable" && audit.score !== null
+      ? [audit]
+      : [];
+  });
   const failed = applicable.filter((audit) => (audit.score ?? 0) < 0.9).map((audit) => audit.id);
   return { passed: applicable.length - failed.length, applicable: applicable.length, failed };
 }
@@ -55,8 +58,10 @@ export function summariseResult({
     }),
   );
   const opportunities = (lhr.categories.performance?.auditRefs ?? [])
-    .map((ref) => audits[ref.id])
-    .filter((audit) => audit && audit.score !== null && audit.score < 1)
+    .flatMap((ref) => {
+      const audit = audits[ref.id];
+      return audit && audit.score !== null && audit.score < 1 ? [audit] : [];
+    })
     .map((audit) => ({ id: audit.id, title: audit.title, ...savings({ audit }) }))
     .filter((entry) => entry.savingsMs > 0 || entry.savingsBytes > 0)
     .toSorted((a, b) => b.savingsMs - a.savingsMs || b.savingsBytes - a.savingsBytes)

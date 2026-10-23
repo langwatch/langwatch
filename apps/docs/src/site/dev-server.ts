@@ -74,7 +74,7 @@ function serveSource({
     const body = pageMarkdown({ docsRoot, slug });
     return send({ response, type: "text/markdown; charset=utf-8", body });
   }
-  const [, top] = pathname.split("/");
+  const [, top = ""] = pathname.split("/");
   const allowed = STATIC_DIRS.includes(top) || STATIC_FILES.includes(top);
   const file = path.resolve(docsRoot, `.${pathname}`);
   if (!file.startsWith(docsRoot + path.sep)) return next();

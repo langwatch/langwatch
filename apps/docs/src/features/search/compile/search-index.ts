@@ -76,7 +76,7 @@ export function bodyText({ html }: { html: string }) {
 }
 
 function methodOf({ openapi }: { openapi?: string }) {
-  return openapi ? { method: openapi.split(/\s+/)[0].toUpperCase() } : {};
+  return openapi ? { method: (openapi.split(/\s+/)[0] ?? "").toUpperCase() } : {};
 }
 
 function iconOf({ nav, slug }: { nav: SearchNav; slug: string }) {
@@ -97,6 +97,7 @@ export function searchEntry({
   headings: Heading[];
 }): PublishedSearchEntry {
   const meta = nav.pages[slug];
+  if (!meta) throw new Error(`No navigation entry for ${slug}`);
   return {
     slug,
     ...methodOf({ openapi: meta.openapi }),
@@ -148,7 +149,7 @@ function wordPages({ entries }: { entries: SearchEntry[] }) {
 function gapsOf({ pages }: { pages: number[] }) {
   return pages
     .slice(1)
-    .map((page, at) => (page - pages[at]).toString(36))
+    .map((page, at) => (page - (pages[at] ?? 0)).toString(36))
     .join(",");
 }
 
@@ -160,11 +161,11 @@ export function publishSearchIndex({ entries }: { entries: unknown[] }) {
   const parsed = z.array(searchEntrySchema).parse(entries);
   const terms: [word: string, gaps: string][][] = parsed.map(() => []);
   for (const [word, pages] of wordPages({ entries: parsed }))
-    terms[pages[0]].push([word, gapsOf({ pages })]);
+    terms[pages[0] ?? 0]?.push([word, gapsOf({ pages })]);
   const drawn = new Set<string>();
   return JSON.stringify(
     parsed.map((entry, position) => {
-      const published = publishedEntry({ entry, terms: terms[position] });
+      const published = publishedEntry({ entry, terms: terms[position] ?? [] });
       if (drawn.has(entry.icon)) return published;
       drawn.add(entry.icon);
       const glyph = glyphOf({ icon: entry.icon });

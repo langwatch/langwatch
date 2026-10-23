@@ -73,20 +73,11 @@ describe("when a page is tagged", () => {
   /** @scenario "Mark deprecated pages" */
   it("shows the tag beside the breadcrumb", () => {
     const html = render(
-      <PageHeader
-        slug="old"
-        title="Old"
-        description=""
-        breadcrumb={["API"]}
-        kind="guide"
-        tag="Deprecated"
-      />,
+      <PageHeader slug="old" title="Old" description="" breadcrumb={["API"]} tag="Deprecated" />,
     );
     expect(html).toMatch(/data-docs-page-tag=""[^>]*>Deprecated</);
     expect(
-      render(
-        <PageHeader slug="new" title="New" description="" breadcrumb={["API"]} kind="guide" />,
-      ),
+      render(<PageHeader slug="new" title="New" description="" breadcrumb={["API"]} />),
     ).not.toContain("data-docs-page-tag");
   });
 });
@@ -100,25 +91,17 @@ describe("when docs.json lists contextual options", () => {
         title="Guide"
         description=""
         breadcrumb={[]}
-        kind="guide"
         actions={["copy", "view", "mcp"]}
       />,
     );
     expect(withCopy).toContain('data-actions="copy view mcp"');
     expect(withCopy).toContain("data-docs-page-copy");
     const viewOnly = render(
-      <PageHeader
-        slug="guide"
-        title="Guide"
-        description=""
-        breadcrumb={[]}
-        kind="guide"
-        actions={["view"]}
-      />,
+      <PageHeader slug="guide" title="Guide" description="" breadcrumb={[]} actions={["view"]} />,
     );
     expect(viewOnly).not.toContain("data-docs-page-copy");
     expect(
-      render(<PageHeader slug="guide" title="Guide" description="" breadcrumb={[]} kind="guide" />),
+      render(<PageHeader slug="guide" title="Guide" description="" breadcrumb={[]} />),
     ).not.toContain("data-docs-page-menu");
   });
 
@@ -147,7 +130,7 @@ describe("when docs.json lists contextual options", () => {
     });
     const vscode = editorInstallHref({ editor: "vscode" });
     expect(vscode.startsWith("vscode:mcp/install?")).toBe(true);
-    expect(JSON.parse(decodeURIComponent(vscode.split("?")[1]))).toEqual({
+    expect(JSON.parse(decodeURIComponent(vscode.split("?")[1] ?? ""))).toEqual({
       name: "langwatch",
       type: "http",
       url: "https://app.langwatch.ai/mcp",

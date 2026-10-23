@@ -13,7 +13,7 @@ function useActiveId({ entries }: { entries: TocEntry[] }) {
     if (elements.length === 0) return;
     const update = () => {
       const line = window.innerHeight * 0.25;
-      let current = elements[0].id;
+      let current = elements[0]?.id ?? "";
       for (const element of elements) {
         if (element.getBoundingClientRect().top - line <= 0) current = element.id;
       }

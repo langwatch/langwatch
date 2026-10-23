@@ -20,13 +20,9 @@ export async function writeOutputFiles({
   for (const folder of new Set(targets.map((target) => path.dirname(target))))
     await mkdir(folder, { recursive: true });
   const contents = [...files.values()];
-  let next = 0;
+  const queue = targets.entries();
   async function drain() {
-    while (next < targets.length) {
-      const index = next;
-      next += 1;
-      await writeFile(targets[index], contents[index]);
-    }
+    for (const [index, target] of queue) await writeFile(target, contents[index] ?? "");
   }
   await Promise.all(Array.from({ length: CONCURRENT_WRITES }, drain));
 }

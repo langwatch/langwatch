@@ -21,6 +21,7 @@ export function RequestExamples({ examples }: { examples: Record<string, CodeSou
   const selected =
     EXAMPLE_LANGUAGES.find((entry) => entry.label.toLowerCase() === stored?.toLowerCase()) ??
     EXAMPLE_LANGUAGES[0];
+  if (!selected) return null;
   const language = selected.id;
   const languageLabel = selected.label;
   return (
@@ -39,7 +40,7 @@ export function RequestExamples({ examples }: { examples: Record<string, CodeSou
           <Text as="span" data-docs-code-title="" flex="1" fontFamily="mono" fontSize="13px">
             {REQUEST_FILES[language]}
           </Text>
-          <CopyAction code={examples[language].code} />
+          <CopyAction code={examples[language]?.code ?? ""} />
         </CodeBar>
         <Flex
           alignItems="center"
@@ -69,21 +70,24 @@ export function RequestExamples({ examples }: { examples: Record<string, CodeSou
             ))}
           </Tabs.List>
         </Flex>
-        {EXAMPLE_LANGUAGES.map((entry) => (
-          <Tabs.Content
-            key={entry.id}
-            value={entry.label}
-            padding="0"
-            data-docs-panel=""
-            data-code-title={REQUEST_FILES[entry.id]}
-            bg="bg.nested"
-            minWidth="0"
-            maxWidth="100%"
-            overflow="hidden"
-          >
-            <CodeBody source={examples[entry.id]} />
-          </Tabs.Content>
-        ))}
+        {EXAMPLE_LANGUAGES.map((entry) => {
+          const source = examples[entry.id];
+          return (
+            <Tabs.Content
+              key={entry.id}
+              value={entry.label}
+              padding="0"
+              data-docs-panel=""
+              data-code-title={REQUEST_FILES[entry.id]}
+              bg="bg.nested"
+              minWidth="0"
+              maxWidth="100%"
+              overflow="hidden"
+            >
+              {source ? <CodeBody source={source} /> : null}
+            </Tabs.Content>
+          );
+        })}
       </Tabs.Root>
     </Panel>
   );
@@ -95,6 +99,7 @@ export function ResponseExample({ operation }: { operation: Operation }) {
   if (statuses.length === 0) return null;
   const response =
     operation.responses.find((entry) => entry.status === status) ?? operation.responses[0];
+  if (!response) return null;
   const { exampleCode } = responseExampleData({ response });
   return (
     <Panel showHeader={false} title="Documented response">

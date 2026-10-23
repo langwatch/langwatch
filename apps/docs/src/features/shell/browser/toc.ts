@@ -98,7 +98,7 @@ function updateProgress(rail: HTMLElement) {
       const middle = (previous.y + entry.y) / 2;
       commands.push(`C ${previous.x} ${middle} ${entry.x} ${middle} ${entry.x} ${entry.y}`);
     } else commands.push(`M ${entry.x} ${entry.y}`);
-    const active = links[index].getAttribute("aria-current") === "location";
+    const active = links[index]?.getAttribute("aria-current") === "location";
     if (active) activeStartShape = commands.join(" ");
     commands.push(`L ${entry.x} ${entry.y + entry.height}`);
     if (active) activeEndShape = commands.join(" ");

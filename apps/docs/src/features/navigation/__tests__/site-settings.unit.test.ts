@@ -104,7 +104,7 @@ describe("site settings from docs.json", () => {
       const fixture = settingsFixture({ config: {} });
       try {
         const { pages } = buildNav({ docsRoot: fixture.docsRoot });
-        expect([pages.guide.tag, pages.old.tag, pages.tagged.tag]).toEqual([
+        expect([pages.guide?.tag, pages.old?.tag, pages.tagged?.tag]).toEqual([
           "",
           "Deprecated",
           "Beta",

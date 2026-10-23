@@ -4,7 +4,6 @@ import { Check, Copy } from "lucide-react";
 import { useCopy } from "../../../lib/clipboard.ts";
 import { sitePath } from "../../../lib/site-path.ts";
 import type { ContextualOption } from "../../navigation/model/nav.ts";
-import type { PageKind } from "./header.tsx";
 import { PageMenu } from "./page-menu.tsx";
 
 async function readMarkdown({ slug }: { slug: string }): Promise<string> {
@@ -111,7 +110,6 @@ export function PageHeader({
   title,
   description,
   breadcrumb,
-  kind,
   tag = "",
   actions = [],
 }: {
@@ -119,7 +117,6 @@ export function PageHeader({
   title: string;
   description: string;
   breadcrumb: string[];
-  kind: PageKind;
   tag?: string;
   actions?: ContextualOption[];
 }) {

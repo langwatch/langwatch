@@ -106,7 +106,8 @@ function loadSpec({ docsRoot, file }: { docsRoot: string; file: string }): Spec 
 /** `openapi:` frontmatter is `<METHOD> <path>` or a bare path, optionally quoted. */
 export function parseOpenapiRef({ openapi }: { openapi: string }) {
   const match = /^(?:(\w+)\s+)?(\S+)$/.exec(openapi.trim().replace(/^["']|["']$/g, ""));
-  return match ? { method: match[1] ?? "", route: match[2] } : null;
+  const [, method = "", route] = match ?? [];
+  return route === undefined ? null : { method, route };
 }
 
 function lookupRef({ root, ref }: { root: Json; ref: string }) {
@@ -166,7 +167,7 @@ export function resolveOperation({
     const methods = document.paths[ref.route];
     const verb = ref.method ? ref.method.toLowerCase() : Object.keys(methods ?? {})[0];
     const raw = verb ? methods?.[verb] : undefined;
-    if (!verb || raw === undefined) continue;
+    if (!methods || !verb || raw === undefined) continue;
     const operation = operationShape.parse(deref({ root, node: raw, seen: [] }));
     const shared = parametersShape.parse(deref({ root, node: methods.parameters ?? [], seen: [] }));
     const { origin, basePath } = splitServer({
@@ -271,7 +272,9 @@ export function docsOpenapiPlugin({
           return `export default {${entries.join(",")}};`;
         }
         const slug = id.slice(PREFIX.length + 1);
-        const operation = resolveOperation({ docsRoot, openapi: openapiBySlug()[slug] });
+        const openapi = openapiBySlug()[slug];
+        if (openapi === undefined) throw new Error(`No OpenAPI reference for ${slug}`);
+        const operation = resolveOperation({ docsRoot, openapi });
         return `export default ${JSON.stringify(operation)};`;
       },
     },

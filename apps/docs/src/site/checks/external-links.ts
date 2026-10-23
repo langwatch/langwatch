@@ -20,7 +20,7 @@ export function externalLinks({ index }: { index: BuildIndex }) {
     const source = `/${path.relative(index.outDir, file).split(path.sep).join("/")}`;
     for (const href of facts.hrefs) {
       if (!/^https?:\/\//.test(href) || isDocsAddress({ href })) continue;
-      const url = href.split("#")[0];
+      const url = href.split("#")[0] ?? href;
       sources.set(url, (sources.get(url) ?? new Set()).add(source));
     }
   }
@@ -85,7 +85,7 @@ export async function checkExternalLinks({
   mkdirSync(path.dirname(cacheFile), { recursive: true });
   writeFileSync(cacheFile, JSON.stringify(cache));
   const failures: ExternalResult[] = [...links]
-    .map(([href, sources]) => ({ href, status: cache[href].status, sources: [...sources] }))
+    .map(([href, sources]) => ({ href, status: cache[href]?.status ?? 0, sources: [...sources] }))
     .filter((result) => result.status === 0 || result.status >= 400);
   return { checked: links.size, failures };
 }

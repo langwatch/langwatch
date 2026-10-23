@@ -22,6 +22,7 @@ export function exportSlug({ pathname }: { pathname: string }) {
 
 function directoryLine({ nav, slug }: { nav: DirectoryNav; slug: string }) {
   const page = nav.pages[slug];
+  if (!page) throw new Error(`No navigation entry for ${slug}`);
   return `- [${page.title}](${docsUrl({ path: `/${publicSlug({ slug })}.md` })})${page.description ? `: ${page.description}` : ""}`;
 }
 

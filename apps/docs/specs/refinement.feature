@@ -203,3 +203,11 @@ Feature: Actionable documentation and restrained reading surfaces
     And every control outside running text answers a tap anywhere in the 44 pixel square centred on it, unless a neighbouring control fills that spot
     And no visible text is smaller than 11 pixels, and article text is at least 16 pixels
     And the header's controls do not overlap one another
+
+  @e2e
+  Scenario: Show product imagery and the footer cleanly in either theme at any width
+    Given a reader on a 390 or 1440 pixel wide screen in the light or dark theme
+    When they open the coding agents overview and scroll to the end
+    Then its product image loads as a responsive WebP and the page never scrolls sideways
+    And the footer meets the bottom of the window in the page's own colour, with no overscroll bounce
+    And no script error is raised

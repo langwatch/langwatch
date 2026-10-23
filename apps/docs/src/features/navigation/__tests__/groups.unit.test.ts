@@ -71,11 +71,11 @@ describe("when integration groups carry roots, expansion and overview card logos
     const fixture = integrationFixture({ root: "overview#frameworks" });
     try {
       const nav = buildNav({ docsRoot: fixture.docsRoot });
-      const [frameworks] = nav.anchors[0].children as Group[];
+      const [frameworks] = (nav.anchors[0]?.children ?? []) as Group[];
       expect(frameworks).toMatchObject({ root: "overview#frameworks", expanded: true });
-      expect(nav.pages["frameworks/mastra"].logo).toBe("/images/logos/mastra.svg");
-      expect(nav.pages["providers/openai-python"].logo).toBe("/images/logos/openai.svg");
-      expect(nav.pages["frameworks/plain"].logo).toBe("");
+      expect(nav.pages["frameworks/mastra"]?.logo).toBe("/images/logos/mastra.svg");
+      expect(nav.pages["providers/openai-python"]?.logo).toBe("/images/logos/openai.svg");
+      expect(nav.pages["frameworks/plain"]?.logo).toBe("");
     } finally {
       fixture.dispose();
     }
@@ -85,8 +85,8 @@ describe("when integration groups carry roots, expansion and overview card logos
     const fixture = integrationFixture({ root: "overview" });
     try {
       const nav = buildNav({ docsRoot: fixture.docsRoot });
-      const [frameworks] = nav.anchors[0].children as Group[];
-      expect(frameworks.root).toBe("overview#frameworks");
+      const [frameworks] = (nav.anchors[0]?.children ?? []) as Group[];
+      expect(frameworks?.root).toBe("overview#frameworks");
     } finally {
       fixture.dispose();
     }
@@ -96,13 +96,13 @@ describe("when integration groups carry roots, expansion and overview card logos
     const fixture = integrationFixture({ root: "overview" });
     try {
       const nav = buildNav({ docsRoot: fixture.docsRoot });
-      const [frameworks] = nav.anchors[0].children as Group[];
-      const [openai, python] = frameworks.children.filter(
+      const [frameworks] = (nav.anchors[0]?.children ?? []) as Group[];
+      const [openai, python] = (frameworks?.children ?? []).filter(
         (child): child is Group => child.type === "group",
       );
-      expect(frameworks.icon).toBeUndefined();
-      expect(openai.icon).toBe("/images/logos/openai.svg");
-      expect(python.icon).toBe("python");
+      expect(frameworks?.icon).toBeUndefined();
+      expect(openai?.icon).toBe("/images/logos/openai.svg");
+      expect(python?.icon).toBe("python");
     } finally {
       fixture.dispose();
     }
@@ -113,7 +113,7 @@ describe("when integration groups carry roots, expansion and overview card logos
     const fixture = integrationFixture({ root: "overview" });
     try {
       const nav = buildNav({ docsRoot: fixture.docsRoot });
-      expect(nav.pages["providers/python"].logo).toBe("");
+      expect(nav.pages["providers/python"]?.logo).toBe("");
     } finally {
       fixture.dispose();
     }

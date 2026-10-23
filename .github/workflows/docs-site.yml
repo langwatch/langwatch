@@ -153,13 +153,23 @@ jobs:
             artifact: docs-site
             browser: true
           - check: performance
-            name: Test static reading, navigation and offline delivery
+            name: Test static reading and navigation
             script: test:performance
             artifact: docs-site
             browser: true
           - check: assets
             name: Test font swaps, preloads and drawn wheel names
             script: test:assets
+            artifact: docs-site
+            browser: true
+          - check: agent-controls
+            name: Test agent setup controls, skill actions and the agent wheel
+            script: test:agent-controls
+            artifact: docs-site
+            browser: true
+          - check: code-preference
+            name: Test code language choice, filenames and theme images
+            script: test:code-preference
             artifact: docs-site
             browser: true
           - check: links

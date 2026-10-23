@@ -10,7 +10,8 @@ const BUILD_META = /name="docs-build" content="[^"]*"/;
 
 /**
  * Versions every page by content, then writes each page once with that version. `pages` holds
- * HTML not yet written (output-relative path to markup); other HTML in `outDir` is versioned in place.
+ * HTML not yet written (output-relative path to markup); other HTML in `outDir` is versioned in
+ * place.
  */
 export async function writeVersionedPages({
   outDir,

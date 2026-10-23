@@ -54,7 +54,7 @@ export const PROMPT_FRAGMENT_FILE = /^assets\/skill-prompt-[0-9a-f]{16}\.html$/;
 /** The output-relative fragment files a built page names, given its base path. */
 export function namedFragments({ html, basePath }: { html: string; basePath: string }) {
   const pattern = new RegExp(`\\s${PROMPT_FRAGMENT_ATTRIBUTE}="([^"]*)"`, "g");
-  return [...html.matchAll(pattern)].map((match) => match[1].slice(basePath.length + 1));
+  return [...html.matchAll(pattern)].map((match) => (match[1] ?? "").slice(basePath.length + 1));
 }
 const PREVIEW_BYTES = 2_000;
 
@@ -63,7 +63,7 @@ function scanContent({ html, from }: { html: string; from: number }) {
   const children: { start: number; end: number }[] = [];
   let depth = 0;
   for (const tag of html.slice(from).matchAll(TAG_PATTERN)) {
-    const [markup, closing, name, selfClosing] = tag;
+    const [markup = "", closing, name = "", selfClosing] = tag;
     const at = from + tag.index;
     if (closing) {
       depth -= 1;

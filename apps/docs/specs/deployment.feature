@@ -42,5 +42,5 @@ Feature: Publish the documentation as a static site
     When a build is given "--base-path /docs"
     Then every site link, asset, font, script and search index address starts with "/docs/"
     And the page data, redirects.json and output directory layout stay unprefixed
-    And canonical, Open Graph, sitemap and llms.txt addresses still name https://docs.langwatch.ai at the root
+    And canonical, Open Graph, sitemap and llms.txt addresses still name https://langwatch.ai/docs
     But a base path that is not a clean "/segment" prefix stops the build

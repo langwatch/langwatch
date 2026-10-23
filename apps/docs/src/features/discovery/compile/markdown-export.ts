@@ -157,7 +157,7 @@ function closeFence({ source }: { source: string }) {
       .map((line) => line.text)
       .join("\n")
       .trimEnd();
-  return `${source}\n${FENCE.exec(lines[opener].text)?.[1] ?? "```"}`;
+  return `${source}\n${FENCE.exec(lines[opener]?.text ?? "")?.[1] ?? "```"}`;
 }
 
 /* An imported snippet's content in place of its own-line `<Name />`; an import used any
@@ -176,12 +176,13 @@ function inlineSnippets({
     source,
     line: (text) => {
       const match = SNIPPET_IMPORT.exec(text);
-      const file = match ? path.join(docsRoot, match[2]) : "";
-      if (match && depth < 3 && existsSync(file)) {
+      const [, name, relative] = match ?? [];
+      const file = relative === undefined ? "" : path.join(docsRoot, relative);
+      if (name !== undefined && depth < 3 && existsSync(file)) {
         const body = closeFence({
           source: withoutFrontmatter({ source: readFileSync(file, "utf8") }).trim(),
         });
-        snippets.set(match[1], inlineSnippets({ docsRoot, source: body, depth: depth + 1 }));
+        snippets.set(name, inlineSnippets({ docsRoot, source: body, depth: depth + 1 }));
       }
       return text;
     },

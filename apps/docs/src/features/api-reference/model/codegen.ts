@@ -1,5 +1,3 @@
-import { z } from "zod/mini";
-
 import type { ExampleLanguage, Operation, Schema } from "./operation.ts";
 
 export type RequestState = { values: Record<string, string>; body: string };
@@ -137,16 +135,15 @@ export function generateExample({
   return typescriptExample(request);
 }
 
-const exampleRequestSchema = z.object({
-  url: z.string(),
-  origin: z.string(),
-  method: z.string(),
-  auth: z.nullable(z.object({ name: z.string(), value: z.string() })),
-  allHeaders: z.array(z.tuple([z.string(), z.string()])),
-  body: z.unknown(),
-  needsBody: z.boolean(),
-});
-type ExampleRequest = z.infer<typeof exampleRequestSchema>;
+type ExampleRequest = {
+  url: string;
+  origin: string;
+  method: string;
+  auth: { name: string; value: string } | null;
+  allHeaders: [string, string][];
+  body: unknown;
+  needsBody: boolean;
+};
 
 function curlExample({ url, method, auth, allHeaders, body, needsBody }: ExampleRequest) {
   const parts = [`curl --request ${method} \\`, `  --url ${shellQuote(url)} \\`];
@@ -154,10 +151,10 @@ function curlExample({ url, method, auth, allHeaders, body, needsBody }: Example
     parts.push(`  --header "${auth.name}: ${auth.value.replace("$KEY", `$${KEY_ENV}`)}" \\`);
   for (const [name, value] of allHeaders)
     parts.push(`  --header ${shellQuote(`${name}: ${value}`)} \\`);
-  if (needsBody) parts.push("  --data @payload.json " + String.fromCharCode(92));
+  if (needsBody) parts.push(`  --data @payload.json \\`);
   if (body !== void 0) parts.push(`  --data ${shellQuote(JSON.stringify(body))} \\`);
   const last = parts.length - 1;
-  parts[last] = parts[last].replace(/ \\$/, "");
+  parts[last] = parts.at(-1)?.replace(/ \\$/, "") ?? "";
   return parts.join("\n");
 }
 

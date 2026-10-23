@@ -128,7 +128,7 @@ describe("checkPageMarkdown", () => {
         "integration-no-complete-sample",
         "integration-no-verify",
       ]);
-      expect(result.issues[0].detail).toBe("no install for python, typescript");
+      expect(result.issues[0]?.detail).toBe("no install for python, typescript");
     });
 
     /** @scenario "An integration page gives one complete path from install to a first trace" */

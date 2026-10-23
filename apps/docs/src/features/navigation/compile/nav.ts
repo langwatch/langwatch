@@ -140,7 +140,7 @@ export function humaniseOperationId({ operationId }: { operationId: string }) {
     .split(/[\s_-]+/)
     .map((word) => word.toLowerCase())
     .filter(Boolean);
-  const [first, ...rest] = words;
+  const [first = "", ...rest] = words;
   const subject = rest.filter((word) => word !== "api");
   if (subject.at(-1) === "id" && subject.length > 1 && subject.at(-2) !== "by")
     subject.splice(-1, 1, "by", "id");
@@ -194,9 +194,9 @@ function buildPage({
   const derived = meta.openapi
     ? operationTitle({ operation, fallback: titleCase({ text: item.split("/").pop() ?? item }) })
     : item;
-  pages[item] = {
+  const page = {
     title: meta.title ?? derived,
-    description: meta.description || (operation?.description ?? "").split("\n")[0],
+    description: meta.description || ((operation?.description ?? "").split("\n")[0] ?? ""),
     sidebarTitle: meta.sidebarTitle ?? meta.title ?? derived,
     openapi: meta.openapi ?? "",
     mode: meta.mode ?? "",
@@ -205,7 +205,8 @@ function buildPage({
     updated: "",
     tag: meta.tag ?? (meta.deprecated ? "Deprecated" : ""),
   };
-  return { type: "page", slug: item, title: pages[item].sidebarTitle };
+  pages[item] = page;
+  return { type: "page", slug: item, title: page.sidebarTitle };
 }
 
 /**
@@ -213,7 +214,7 @@ function buildPage({
  * linking to it shows that same icon, so a card naming another product cannot brand the page.
  */
 function collectLogos({ source, logos }: { source: string; logos: Map<string, string> }) {
-  for (const [, attributes] of source.matchAll(CARD)) {
+  for (const [, attributes = ""] of source.matchAll(CARD)) {
     const icon = /\bicon="([^"]+)"/.exec(attributes)?.[1] ?? "";
     const slug = /\bhref="\/([^"#?]+)/.exec(attributes)?.[1];
     if (!slug) continue;
@@ -266,7 +267,7 @@ function rootHref({ docsRoot, root, title }: { docsRoot: string; root: string; t
   const source = readFileSync(path.join(docsRoot, `${root}.mdx`), "utf8");
   const wanted = headingId({ text: title });
   const found = [...source.matchAll(/^#{2,6}\s+(.+)$/gm)].some(
-    ([, text]) => headingId({ text }) === wanted,
+    ([, text = ""]) => headingId({ text }) === wanted,
   );
   return found ? `${root}#${wanted}` : root;
 }
@@ -275,10 +276,10 @@ function sharedLogo({ items, pages }: { items: NavItem[]; pages: Record<string, 
   const logos = new Set<string>();
   for (const item of items) {
     if (item.type !== "page") continue;
-    const logo = pages[item.slug].logo;
+    const logo = pages[item.slug]?.logo;
     if (logo) logos.add(logo);
   }
-  return logos.size === 1 ? [...logos][0] : "";
+  return logos.size === 1 ? ([...logos][0] ?? "") : "";
 }
 
 /** Checks group roots; a group without an icon takes the one logo its own pages share. */

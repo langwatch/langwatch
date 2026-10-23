@@ -51,7 +51,7 @@ export async function assertBuild({ outDir }: { outDir: string }) {
     for (const match of (await readFile(path.join(outDir, file), "utf8")).matchAll(
       /\sdata-docs-prompt-fragment="[^"]*\/(assets\/skill-prompt-[0-9a-f]{16}\.html)"/g,
     ))
-      named.add(match[1]);
+      named.add(match[1] ?? "");
   assert.deepEqual(
     fragments.toSorted(),
     [...named].toSorted(),

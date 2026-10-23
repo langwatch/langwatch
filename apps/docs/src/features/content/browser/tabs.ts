@@ -171,8 +171,9 @@ function onTabKey(event: KeyboardEvent) {
   else if (event.key === "End") index = buttons.length - 1;
   else return;
   event.preventDefault();
-  buttons[index]?.focus({ preventScroll: true });
-  if (buttons[index]) selectTab({ button: buttons[index] });
+  const target = buttons[index];
+  target?.focus({ preventScroll: true });
+  if (target) selectTab({ button: target });
 }
 
 /** Number keys pick a tab in the group under the pointer, holding focus, or first on screen. */
