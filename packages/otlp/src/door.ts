@@ -110,9 +110,9 @@ const ingestDoorRefusalsTotal = counter({
 type FaultSpan = Pick<Span, "recordException" | "setAttributes" | "setStatus" | "end">;
 
 /**
- * Runs `body` in a span `open` starts and leaves open (a tracer's `startActiveSpan`), then closes
- * it: OK on success, UNSET with the exception and its code for a customer-fault refusal, ERROR
- * with its message for anything else. The error is rethrown either way.
+ * Runs `body` in a span `open` starts and leaves open (a tracer's `startActiveSpan`), then ends it.
+ * A resolved answer (a 400 for a bad body included) leaves the status UNSET, as does a thrown
+ * customer fault, which keeps its exception and code; anything else thrown is ERROR.
  */
 export function withClientFaultSpan<S extends FaultSpan, T>(
   open: (run: (span: S) => Promise<T>) => Promise<T>,
@@ -120,9 +120,7 @@ export function withClientFaultSpan<S extends FaultSpan, T>(
 ): Promise<T> {
   return open(async (span) => {
     try {
-      const value = await body(span);
-      span.setStatus({ code: SpanStatusCode.OK });
-      return value;
+      return await body(span);
     } catch (error) {
       recordFailure({ span, error });
       throw error;

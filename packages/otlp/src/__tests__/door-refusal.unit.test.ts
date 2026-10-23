@@ -115,9 +115,9 @@ describe("withClientFaultSpan", () => {
     expect(recorded().status).toEqual({ code: SpanStatusCode.ERROR, message: "boom" });
   });
 
-  it("returns the body's value with the span OK on success", async () => {
+  it("returns the body's value with the span ended and its status left unset", async () => {
     await expect(withClientFaultSpan(open, () => Promise.resolve(7))).resolves.toBe(7);
 
-    expect(recorded().status.code).toBe(SpanStatusCode.OK);
+    expect(recorded().status.code).toBe(SpanStatusCode.UNSET);
   });
 });
