@@ -103,6 +103,15 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     Then the primary verdict is kept and the routing names the failed escalation
 
   @unit
+  Scenario: A leg past its own timeout is a failed leg, not a stopped page
+    Given a decision-model leg that does not answer within its backend's timeout
+    When the call is judged
+    Then that leg fails as provider unavailable and its fallbacks are tried
+    And the legs already paid for stay in the judgement's cost
+    And only the caller's own stop is rethrown
+    And time spent waiting on the rate limiter does not count against the provider timeout
+
+  @unit
   Scenario: Nothing answered gives the last backend's skip reason
     Given every backend of the plan fails
     When the call is judged

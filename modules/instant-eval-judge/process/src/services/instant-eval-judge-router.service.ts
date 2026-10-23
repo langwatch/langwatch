@@ -17,6 +17,7 @@ import {
   type InstantEvalSkipReason,
 } from "@langwatch/instant-eval-judge-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
 
 import type {
   InstantEvalClassifierChannel,
@@ -224,7 +225,10 @@ class RouteRun {
     return last;
   }
 
-  /** One backend's answer; a stop by the caller is rethrown, any other failure is a leg failed. */
+  /**
+   * One backend's answer. Only the caller's stop is rethrown: the leg's own timeout is a leg that
+   * failed, so the paid legs before it stay billed and the page is not retried for it.
+   */
   private async askOne({
     backend,
     questions,
@@ -234,27 +238,31 @@ class RouteRun {
   }): Promise<Leg> {
     const config = this.deps.table.backends[backend];
     if (!config) return { outcome: "failed", reason: "classifier_provider_unavailable" };
-    const signal = legSignal({ signal: this.signal, timeoutMs: config.timeoutMs });
-    try {
-      if (config.kind === "jev" || config.kind === "decisions") {
-        return await this.askDecisionModel({
-          backend,
-          kind: config.kind,
-          model: config.model,
-          questions,
-          signal,
-        });
-      }
-      return await this.askLlm({
+    if (config.kind !== "jev" && config.kind !== "decisions") {
+      return this.askLlm({
         backend,
         wire: config.kind,
         model: config.model,
         questions,
         timeoutMs: config.timeoutMs,
       });
+    }
+    const deadline = LegDeadline.start(config.timeoutMs);
+    try {
+      return await this.askDecisionModel({
+        backend,
+        kind: config.kind,
+        model: config.model,
+        questions,
+        deadline,
+      });
     } catch (error) {
       if (this.signal?.aborted) throw error;
-      return { outcome: "failed", reason: "classifier_failed", error };
+      if (!isStop(error)) return { outcome: "failed", reason: "classifier_failed", error };
+      this.flags.push(`${backend}_timed_out`);
+      return { outcome: "failed", reason: "classifier_provider_unavailable" };
+    } finally {
+      deadline.stop();
     }
   }
 
@@ -263,16 +271,19 @@ class RouteRun {
     kind,
     model,
     questions,
-    signal,
+    deadline,
   }: {
     backend: string;
     kind: "jev" | "decisions";
     model: string | undefined;
     questions: readonly InstantEvalBooleanQuestion[];
-    signal: AbortSignal;
+    deadline: LegDeadline;
   }): Promise<Leg> {
-    const { classifier, hostedDecisions, limiter } = this.deps;
+    const { classifier, hostedDecisions } = this.deps;
     const text = this.plan.text;
+    const signal = deadline.signalWith(this.signal);
+    // The limiter waits on the caller's stop alone, with the leg's clock paused meanwhile.
+    const limiter = deadline.pausing({ limiter: this.deps.limiter, signal: this.signal });
     const channelMissing = kind === "jev" ? !classifier : !hostedDecisions || !model;
     if (channelMissing) {
       this.flags.push(`${backend}_unavailable`);
@@ -431,13 +442,79 @@ function isAnswered(leg: Leg): leg is Extract<Leg, { outcome: "answered" }> {
   return leg.outcome === "answered";
 }
 
-function legSignal({
-  signal,
-  timeoutMs,
-}: {
-  signal: AbortSignal | undefined;
-  timeoutMs: number;
-}): AbortSignal {
-  const timeout = AbortSignal.timeout(timeoutMs);
-  return signal ? AbortSignal.any([signal, timeout]) : timeout;
+/** A leg's own timeout or the stop it caused, as the channels and the limiter throw it. */
+function isStop(error: unknown): boolean {
+  return error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
+}
+
+/**
+ * A leg's provider timeout, apart from the caller's stop. Its clock runs only while the leg is
+ * with the provider: waiting on a rate limiter pauses it, so queueing never times a leg out.
+ */
+class LegDeadline {
+  private readonly controller = new AbortController();
+  private timer: ReturnType<typeof setTimeout> | undefined;
+  private startedAtMs = 0;
+  private isStopped = false;
+
+  private constructor(private remainingMs: number) {}
+
+  static start(timeoutMs: number): LegDeadline {
+    const deadline = new LegDeadline(timeoutMs);
+    deadline.resume();
+    return deadline;
+  }
+
+  /** What the channel is handed: the leg's timeout, and the caller's stop when there is one. */
+  signalWith(caller: AbortSignal | undefined): AbortSignal {
+    const own = this.controller.signal;
+    return caller ? AbortSignal.any([caller, own]) : own;
+  }
+
+  pausing({
+    limiter,
+    signal,
+  }: {
+    limiter: InstantEvalRateLimiter;
+    signal: AbortSignal | undefined;
+  }): InstantEvalRateLimiter {
+    return {
+      acquire: async (permit) => {
+        this.pause();
+        try {
+          await limiter.acquire(permit, signal);
+        } finally {
+          this.resume();
+        }
+      },
+    };
+  }
+
+  stop(): void {
+    this.isStopped = true;
+    this.clear();
+  }
+
+  private clear(): void {
+    clearTimeout(this.timer);
+    this.timer = undefined;
+  }
+
+  private pause(): void {
+    if (this.timer === undefined) return;
+    this.clear();
+    this.remainingMs -= nowInstant().epochMilliseconds - this.startedAtMs;
+  }
+
+  private resume(): void {
+    if (this.isStopped || this.controller.signal.aborted || this.timer !== undefined) return;
+    this.startedAtMs = nowInstant().epochMilliseconds;
+    this.timer = setTimeout(
+      () => {
+        this.timer = undefined;
+        this.controller.abort(new DOMException("The routed leg timed out", "TimeoutError"));
+      },
+      Math.max(0, this.remainingMs),
+    );
+  }
 }

@@ -10,6 +10,7 @@ import {
   type InstantEvalJudgement,
   type InstantEvalJudgeRoute,
   type InstantEvalJudgeRoutePricing,
+  type InstantEvalJudgeRouteTable,
   type InstantEvalQuestion,
 } from "@langwatch/instant-eval-judge-contract";
 import { describe, expect, it } from "vitest";
@@ -20,6 +21,7 @@ import {
   yesNo,
 } from "../../__tests__/support/instant-eval-judge-route.test-fakes.ts";
 import {
+  hangUntilAborted,
   ScriptedInstantEvalHostedDecisionsChannel,
   ScriptedInstantEvalLlmJudgeChannel,
 } from "../../__tests__/support/instant-eval-judge-router.test-fakes.ts";
@@ -51,39 +53,67 @@ const llmSays = (verdict: boolean): InstantEvalLlmJudgeAnswer => ({
   outputTokens: 100,
 });
 
-type Script = () => InstantEvalJudgement;
+type Script = (signal?: AbortSignal) => InstantEvalJudgement | Promise<InstantEvalJudgement>;
 
 function harness({
   decisions = () => judged(0.05),
   jev = () => judged(0.5),
   llm = () => llmSays(true),
   hasDecisions = true,
+  table = syntheticRouteTable(),
+  limiter = MemoryInstantEvalRateLimiter.create(),
 }: {
   decisions?: Script;
   jev?: Script;
   llm?: () => InstantEvalLlmJudgeAnswer;
   hasDecisions?: boolean;
+  table?: InstantEvalJudgeRouteTable;
+  limiter?: MemoryInstantEvalRateLimiter;
 } = {}) {
-  const hostedDecisions = ScriptedInstantEvalHostedDecisionsChannel.create({ answer: decisions });
+  const hostedDecisions = ScriptedInstantEvalHostedDecisionsChannel.create({
+    answer: (_request, signal) => decisions(signal),
+  });
   const llmJudge = ScriptedInstantEvalLlmJudgeChannel.create({ answer: llm });
   let jevCalls = 0;
+  // Paces each send through the limiter it is handed, as the HTTP classifier does.
   const classifier = MemoryInstantEvalClassifierChannel.create({
-    answer: async () => {
+    answer: async (request, signal) => {
       jevCalls += 1;
-      return jev();
+      await request.limiter.acquire({ tokens: 10, tenantId: request.projectId }, signal);
+      return jev(signal);
     },
   });
   const router = InstantEvalJudgeRouterService.create({
-    table: syntheticRouteTable(),
+    table,
     pricing: PRICING,
     classifier,
     hostedDecisions: hasDecisions ? hostedDecisions : undefined,
     llmJudge,
-    limiter: MemoryInstantEvalRateLimiter.create(),
+    limiter,
   });
-  const classify = (route: InstantEvalJudgeRoute, questions: InstantEvalQuestion[] = [Q]) =>
-    router.classify({ projectId: "project-1", text: "user: late again", questions, route });
-  return { classify, hostedDecisions, llmJudge, jevCalls: () => jevCalls };
+  const classify = (
+    route: InstantEvalJudgeRoute,
+    questions: InstantEvalQuestion[] = [Q],
+    signal?: AbortSignal,
+  ) =>
+    router.classify({
+      projectId: "project-1",
+      text: "user: late again",
+      questions,
+      route,
+      ...(signal ? { signal } : {}),
+    });
+  return { classify, hostedDecisions, llmJudge, limiter, jevCalls: () => jevCalls };
+}
+
+/** The made-up table with short provider timeouts, and no fallback unless one is given. */
+function timedTable(fallbacks: string[] = []): InstantEvalJudgeRouteTable {
+  return syntheticRouteTable({
+    backends: {
+      "decision-a": { kind: "decisions", model: "decision-model-a", timeoutMs: 40, fallbacks },
+      "decision-b": { kind: "jev", timeoutMs: 40 },
+    },
+  });
 }
 
 const SHORT: InstantEvalJudgeRoute = { job: "search", tokens: 500 };
@@ -210,6 +240,68 @@ describe("InstantEvalJudgeRouterService", () => {
       await expect(classify({ job: "search", tokens: 20_000, mode: "instant" })).rejects.toThrow(
         InstantEvalClassifierUnavailableError,
       );
+    });
+  });
+
+  describe("given a leg that runs past its own timeout", () => {
+    const LONG_INSTANT: InstantEvalJudgeRoute = { job: "search", tokens: 20_000, mode: "instant" };
+
+    /** @scenario "A leg past its own timeout is a failed leg, not a stopped page" */
+    it("skips as provider unavailable instead of throwing the leg's timeout", async () => {
+      const { classify } = harness({ table: timedTable(), decisions: hangUntilAborted });
+      const judgement = await classify(LONG_INSTANT);
+      expect(judgement.skippedReason).toBe("classifier_provider_unavailable");
+      expect(judgement.routing?.flags).toContain("decision-a_timed_out");
+    });
+
+    /** @scenario "A leg past its own timeout is a failed leg, not a stopped page" */
+    it("skips when both legs of a pair time out", async () => {
+      const { classify } = harness({
+        table: timedTable(),
+        decisions: hangUntilAborted,
+        jev: hangUntilAborted,
+      });
+      const judgement = await classify(PAIRED);
+      expect(judgement.skippedReason).toBe("classifier_provider_unavailable");
+    });
+
+    /** @scenario "A leg past its own timeout is a failed leg, not a stopped page" */
+    it("keeps the legs already paid for billed when the last one times out", async () => {
+      const { classify } = harness({
+        table: timedTable(["decision-b"]),
+        decisions: () => ({ ...instantEvalSkipped("classifier_rate_limited"), inputTokens: 1000 }),
+        jev: hangUntilAborted,
+      });
+      const judgement = await classify(LONG_INSTANT);
+      expect(judgement.skippedReason).toBe("classifier_provider_unavailable");
+      expect(judgement.costNanoUsd).toBe(100_000);
+      expect(judgement.inputTokens).toBe(1000);
+    });
+
+    /** @scenario "A leg past its own timeout is a failed leg, not a stopped page" */
+    it("rethrows the caller's own stop", async () => {
+      const stop = new AbortController();
+      const { classify } = harness({
+        decisions: (signal) => {
+          setTimeout(() => stop.abort(new DOMException("stopped", "AbortError")), 5);
+          return hangUntilAborted(signal);
+        },
+      });
+      await expect(classify(LONG_INSTANT, [Q], stop.signal)).rejects.toMatchObject({
+        name: "AbortError",
+      });
+    });
+
+    /** @scenario "A leg past its own timeout is a failed leg, not a stopped page" */
+    it("does not count the wait on the rate limiter against the provider timeout", async () => {
+      const { classify, limiter } = harness({
+        table: syntheticRouteTable({ backends: { "decision-b": { kind: "jev", timeoutMs: 40 } } }),
+        limiter: MemoryInstantEvalRateLimiter.create({ waitMs: 120 }),
+        jev: () => judged(0.2),
+      });
+      const judgement = await classify({ job: "scenario_judge", tokens: 20_000 });
+      expect(judgement.verdicts).toEqual([{ questionId: "q", probability: 0.2 }]);
+      expect(limiter.permits).toHaveLength(1);
     });
   });
 
