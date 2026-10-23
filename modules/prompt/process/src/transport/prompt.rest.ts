@@ -102,6 +102,7 @@ export const promptRest = defineRestRouter(PromptApi)
   // deployment, and it belongs with the grain that administers the prompt
   // rather than with the one that edits its text.
   .put("/api/prompts/:id{.+?}/tags/:tag", "putApiPromptsByIdTagsByTag")
+  .keepsRecords()
   .withAudit("prompts.assignTag")
   .withParams(idTagParamsSchema)
   .withInput(assignTagInputSchema)
@@ -157,6 +158,7 @@ export const promptRest = defineRestRouter(PromptApi)
   })
 
   .post("/api/prompts/tags", "postApiPromptsTags")
+  .keepsRecords()
   .withAudit("promptTags.create")
   .withInput(createTagInputSchema)
   .withPermission("prompts:manage")
@@ -180,6 +182,7 @@ export const promptRest = defineRestRouter(PromptApi)
   })
 
   .put("/api/prompts/tags/:tag", "putApiPromptsTagsByTag")
+  .keepsRecords()
   .withAudit("promptTags.rename")
   .withParams(tagParamsSchema)
   .withInput(renameTagInputSchema)
@@ -207,6 +210,12 @@ export const promptRest = defineRestRouter(PromptApi)
   .withAudit("promptTags.delete")
   .withParams(tagParamsSchema)
   .withPermission("prompts:manage")
+  .withConfirmation({
+    resource: "prompt tag",
+    action: "delete",
+    idParam: "tag",
+    name: async ({ id }) => id,
+  })
   .withOutput(z.void())
   .withMiddlewareContext(promptRestContext)
   .withDocs({
@@ -257,6 +266,7 @@ export const promptRest = defineRestRouter(PromptApi)
     "/api/prompts/:id{.+?}/versions/:versionId/restore",
     "postApiPromptsByIdVersionsByVersionIdRestore",
   )
+  .keepsRecords()
   .withAudit("prompts.restoreVersion")
   .withParams(idVersionParamsSchema)
   .withInput(restorePromptVersionBodySchema)
@@ -341,6 +351,7 @@ export const promptRest = defineRestRouter(PromptApi)
   // still implies it, so no existing caller changes, and a viewer holding only
   // `prompts:view` is declined exactly as before.
   .post("/api/prompts", "postApiPrompts")
+  .keepsRecords()
   .withAudit("prompts.create")
   .withInput(createPromptInputSchema)
   .withPermission("prompts:create")
@@ -368,6 +379,7 @@ export const promptRest = defineRestRouter(PromptApi)
   })
 
   .post("/api/prompts/:id{.+?}/sync", "postApiPromptsByIdSync")
+  .keepsRecords()
   .withAudit("prompts.syncFromSource")
   .withParams(idParamsSchema)
   .withInput(syncInputSchema)
@@ -397,6 +409,7 @@ export const promptRest = defineRestRouter(PromptApi)
   )
 
   .put("/api/prompts/:id{.+}", "putApiPromptsById")
+  .keepsRecords()
   .withAudit("prompts.update")
   .withParams(idParamsSchema)
   .withInput(updatePromptInputSchema)
@@ -436,6 +449,15 @@ export const promptRest = defineRestRouter(PromptApi)
   .withAudit("prompts.delete")
   .withParams(idParamsSchema)
   .withPermission("prompts:manage")
+  .withConfirmation({
+    resource: "prompt",
+    action: "delete",
+    idParam: "id",
+    name: async ({ app, projectId, id }) => {
+      const prompt = await app.findByIdOrHandle({ idOrHandle: id, projectId });
+      return prompt ? (prompt.handle ?? prompt.name) : undefined;
+    },
+  })
   .withOutput(successSchema)
   .withMiddlewareContext(promptRestContext)
   .withDocs({

@@ -36,6 +36,11 @@ export const opsConfig = Config.define((c) => ({
     /** The Helm chart release, which moves separately from the app. */
     chartVersion: c.env("LANGWATCH_CHART_VERSION", z.string().optional()),
   },
+  /** Set, the hourly check never sends a failed step's diagnostics by itself; Send still works. */
+  upgradeDiagnosticsAutoSendDisabled: c.env(
+    "DISABLE_UPGRADE_DIAGNOSTICS_AUTO_SEND",
+    environmentOneOrTrueSchema,
+  ),
   collectClickHouseBackupMetrics: c.env(
     "CLICKHOUSE_BACKUP_METRICS_ENABLED",
     z

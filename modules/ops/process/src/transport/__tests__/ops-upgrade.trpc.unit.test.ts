@@ -163,12 +163,13 @@ function boundAccess(): Record<string, string> {
 
 describe("the ops.upgrade reads", () => {
   /** @scenario "Every upgrade read asks the operator view grant at the door" */
-  it("declares each of the eight reads behind ops:view at the platform scope", () => {
+  it("declares each of the ten reads behind ops:view at the platform scope", () => {
     const reads = Object.fromEntries(
       Object.entries(boundAccess()).filter(
         ([name]) =>
           !MIGRATION_PROCEDURE_NAMES.includes(name) &&
           name !== "ops.upgrade.retryStep" &&
+          name !== "ops.upgrade.sendDiagnostics" &&
           name !== "ops.upgrade.attentionNotice",
       ),
     );
@@ -182,7 +183,13 @@ describe("the ops.upgrade reads", () => {
       "ops.upgrade.getRun": "permission-platform:ops:view",
       "ops.upgrade.listTargets": "permission-platform:ops:view",
       "ops.upgrade.listTenants": "permission-platform:ops:view",
+      "ops.upgrade.getDiagnostics": "permission-platform:ops:view",
+      "ops.upgrade.diagnosticsAvailability": "permission-platform:ops:view",
     });
+  });
+
+  it("declares sending diagnostics behind ops:manage at the platform scope", () => {
+    expect(boundAccess()["ops.upgrade.sendDiagnostics"]).toBe("permission-platform:ops:manage");
   });
 
   /** @scenario "Any signed-in member may ask whether the last upgrade needs attention" */
@@ -222,12 +229,17 @@ describe("the ops.upgrade reads", () => {
         latestRelease: null,
       });
       expect(await operator.listReleases()).toEqual(await reader.listReleases());
-      expect(await operator.listSteps({ release: "3.23.0" })).toEqual(
-        await reader.listSteps({ release: "3.23.0" }),
-      );
+      const { items, cursor } = await reader.listSteps({ release: "3.23.0" });
+      expect(await operator.listSteps({ release: "3.23.0" })).toEqual({
+        items: items.map(({ logTail: _logTail, ...step }) => step),
+        cursor,
+      });
       expect(await operator.getStep({ id: STEP.id })).toEqual(STEP_DETAIL);
       expect(await operator.listRuns({ limit: 20 })).toEqual(await reader.listRuns({ limit: 20 }));
-      expect(await operator.getRun({ id: RUN.id })).toEqual(RUN);
+      expect(await operator.getRun({ id: RUN.id })).toEqual({
+        ...RUN,
+        steps: RUN.steps.map(({ logTail: _logTail, ...step }) => step),
+      });
       expect(reader.listSteps).toHaveBeenCalledWith({ release: "3.23.0" });
       expect(reader.getRun).toHaveBeenCalledWith({ id: RUN.id });
     });

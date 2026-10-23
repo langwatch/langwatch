@@ -54,6 +54,8 @@ function mountDoor({ protections = PERMITTED }: { protections?: LangWatchQLProte
     database: DATABASE,
     views: [...LWQL_VIEW_CATALOG, GATED_DATASET],
     catalog: { ...LWQL_CATALOG, [GATED_DATASET.name]: LWQL_CATALOG.traces },
+    // A frozen clock, so hydration adds no wall time to the executor's elapsedMs.
+    stopwatch: () => 0,
   });
   const door = mountQueryDoor({ tenant: () => TENANT, service: () => service, protections });
 

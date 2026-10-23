@@ -14,13 +14,15 @@ function jsonByteLength(value: unknown): number {
 export function detectResultCapViolation({
   output,
   session,
+  state,
   caps,
 }: {
   output: unknown;
   session: unknown;
-  caps: { resultBytes: number; sessionBytes: number };
+  state?: unknown;
+  caps: { resultBytes: number; sessionBytes: number; stateBytes: number };
 }): {
-  what: "result" | "session";
+  what: "result" | "session" | "state";
   sizeBytes: number;
   limitBytes: number;
 } | null {
@@ -33,7 +35,12 @@ export function detectResultCapViolation({
     };
   }
 
-  const resultBytes = jsonByteLength(output) + sessionBytes;
+  const stateBytes = state === undefined ? 0 : jsonByteLength(state);
+  if (state !== undefined && stateBytes > caps.stateBytes) {
+    return { what: "state", sizeBytes: stateBytes, limitBytes: caps.stateBytes };
+  }
+
+  const resultBytes = jsonByteLength(output) + sessionBytes + stateBytes;
   if (resultBytes > caps.resultBytes) {
     return {
       what: "result",

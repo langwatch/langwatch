@@ -40,14 +40,14 @@ const EVERYTHING: ProjectNavigation = {
 
 /**
  * ADR-177 decision 8: an aggregate is read only, so its navigation is Traces
- * alone; every other kind keeps the whole menu.
+ * and Analytics over its members (v4.15); every other kind keeps the whole menu.
  */
 export function projectNavigation(kind: string | null | undefined): ProjectNavigation {
   if (!isAggregateProjectKind(kind)) return EVERYTHING;
   return {
     home: false,
     observe: true,
-    analytics: false,
+    analytics: true,
     onlineEvaluations: false,
     test: false,
     build: false,

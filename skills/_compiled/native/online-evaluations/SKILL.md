@@ -95,7 +95,7 @@ After creation, verify the saved resource:
 
 ```bash
 langwatch monitor list --format json
-langwatch monitor get <monitor-id> --format json
+langwatch monitor get <idOrSlugOrName> --format json
 ```
 
 The task is complete only when the created monitor appears with the intended evaluator, execution mode, level, sample rate, and enabled state.

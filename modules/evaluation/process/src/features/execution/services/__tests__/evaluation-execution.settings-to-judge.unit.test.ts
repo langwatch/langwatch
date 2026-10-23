@@ -44,7 +44,6 @@ function buildService(
   const traces = {
     readTracesWithSpans: vi.fn().mockResolvedValue([buildTrace()]),
     readThreadsTraces: vi.fn().mockResolvedValue([]),
-    readEvaluations: vi.fn().mockResolvedValue({}),
   };
   const spanDigest = {
     format: vi.fn().mockResolvedValue(""),
@@ -55,6 +54,12 @@ function buildService(
 
   const deps: EvaluationExecutionDeps = {
     traces,
+    runs: { findTraceEvaluations: async () => [] },
+    authz: {
+      authorizeInternal: async () => {
+        throw new Error("these cases read no earlier evaluations");
+      },
+    },
     spanDigest,
     modelEnvResolver,
     langevalsClient,
@@ -69,6 +74,7 @@ function buildService(
         throw new Error("no judge here is on Instant Evals");
       },
     },
+    decisionModels: { resolveDecisionModel: async () => ({ kind: "langwatch" }) },
     installEnvironment: {},
   };
 

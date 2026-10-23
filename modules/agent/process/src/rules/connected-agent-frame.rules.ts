@@ -3,7 +3,13 @@
  * fails the schema still names its call, so that call can fail at once.
  * @see specs/agents/connected-agents.feature
  */
-import { resultFrameSchema, type SdkFrame, sdkFrameSchema } from "@langwatch/agent-contract";
+import {
+  type CallKind,
+  type ResultFrame,
+  resultFrameSchema,
+  type SdkFrame,
+  sdkFrameSchema,
+} from "@langwatch/agent-contract";
 import type { z } from "zod";
 
 /** The start of the error a call fails with when its result fails the schema. */
@@ -32,6 +38,30 @@ export function readSdkFrame(raw: string): SdkFrameRead {
   const result = resultFrameSchema.safeParse(json);
   if (result.success) return { kind: "frame", frame: result.data };
   return { kind: "unreadable_result", callId, issue: describeIssue(result.error.issues) };
+}
+
+/** Whether a result holds what its call kind needs, and what it lacks when it does not. */
+export type ResultShape = { complete: true } | { complete: false; issue: string };
+
+/**
+ * Checks a result against the kind of call it answers. The frame does not carry the kind, so
+ * this runs once the call is matched (ADR-180).
+ */
+export function checkResultShape({
+  kind,
+  frame,
+}: {
+  kind: CallKind;
+  frame: Pick<ResultFrame, "output" | "error" | "state">;
+}): ResultShape {
+  if (frame.error !== undefined) return { complete: true };
+  if (kind === "turn" && frame.output === undefined) {
+    return { complete: false, issue: "a turn's result carries an output or an error" };
+  }
+  if (kind === "setup" && (frame.state === undefined || frame.state === null)) {
+    return { complete: false, issue: "a setup's result carries a state or an error" };
+  }
+  return { complete: true };
 }
 
 function namesResultCall(json: unknown): json is { type: "result"; callId: string } {

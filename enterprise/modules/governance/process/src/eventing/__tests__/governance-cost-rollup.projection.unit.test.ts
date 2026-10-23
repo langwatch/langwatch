@@ -2,7 +2,10 @@
 /** Port of main's governanceCostRollup fold tests. Specs: governance-cost-rollup.feature, governance-cost-restatement-markers.feature */
 import { describe, expect, it } from "vitest";
 
-import { governanceCostRollupTotals } from "../../features/cost/rules/governance-cost-rollup-cell.rules.ts";
+import {
+  type GovernanceCostRollupState,
+  governanceCostRollupTotals,
+} from "../../features/cost/rules/governance-cost-rollup-cell.rules.ts";
 import {
   DAY_START_MS,
   HOUR_MS,
@@ -249,6 +252,42 @@ describe("the last-observed anchor", () => {
       };
 
       expect(pick([...events].reverse())).toEqual(pick(events));
+    });
+  });
+});
+
+describe("a pulled item delivered twice", () => {
+  /** The cell's content; `createdAt`/`updatedAt` are when the fold ran, not what it holds. */
+  const cellOf = ({
+    createdAt: _startedAt,
+    updatedAt: _ranAt,
+    ...cell
+  }: GovernanceCostRollupState) => cell;
+
+  describe("when the same observation arrives again", () => {
+    /** @scenario "A pulled item delivered twice is counted once" */
+    it("leaves the cell as one delivery left it", () => {
+      const { fold } = rollupFold();
+      const first = observed({ restatementKey: "a", costNanoMinor: 100, observedAtMs: T1 });
+      const restated = observed({ restatementKey: "a", costNanoMinor: 150, observedAtMs: T2 });
+
+      const once = cellOf(fold([first, restated]));
+
+      expect(cellOf(fold([first, restated, restated]))).toEqual(once);
+      expect(cellOf(fold([first, restated, first]))).toEqual(once);
+    });
+  });
+
+  describe("when the same retraction arrives again", () => {
+    /** @scenario "A pulled item delivered twice is counted once" */
+    it("leaves the cell as one delivery left it", () => {
+      const { fold } = rollupFold();
+      const charge = observed({ restatementKey: "a", costNanoMinor: 100, observedAtMs: T1 });
+      const withdrawal = retracted({ restatementKey: "a", observedAtMs: T2 });
+
+      const once = cellOf(fold([charge, withdrawal]));
+
+      expect(cellOf(fold([charge, withdrawal, withdrawal]))).toEqual(once);
     });
   });
 });

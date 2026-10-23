@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Prints `<filter>=true|false` for every filter in FILTERS on a
-# pull_request_target run. BASE_SHA and HEAD_SHA are fetched as objects into
+# Prints `<filter>=true|false` for every filter in FILTERS on a pull_request
+# or pull_request_target run. BASE_SHA and HEAD_SHA are fetched as objects into
 # the base checkout and diffed by SHA; nothing from the head is checked out or
 # run. Any failure exits non-zero, and the action then forces every filter.
 # Spec: specs/ci/path-filters.feature ("The gate never under-reports").

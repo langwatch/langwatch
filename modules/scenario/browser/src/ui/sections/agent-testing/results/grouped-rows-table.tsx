@@ -54,6 +54,7 @@ const EXPANDED_RUN_LIMIT = 40;
 function verdictOf(outcome: ResultRow["outcome"]): { text: string; passRate: number | null } {
   if (outcome === "passed") return { text: "Passed", passRate: 100 };
   if (outcome === "failed") return { text: "Failed", passRate: 0 };
+  if (outcome === "not_scored") return { text: "Not scored", passRate: null };
   return { text: "Running", passRate: null };
 }
 

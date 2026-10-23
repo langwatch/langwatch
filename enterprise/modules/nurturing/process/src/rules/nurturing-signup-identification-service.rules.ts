@@ -7,6 +7,7 @@ import { toAttributionProperties } from "@langwatch/onboarding-contract";
 import { nowInstant } from "@langwatch/time";
 
 import type { PostHogEventInput } from "../channels/posthog.channel.ts";
+import { unixSecondsOf } from "./nurturing-customer-io-timestamp.rules.ts";
 
 type SignUpData = NurturingSignalOf<"signed_up">["signUpData"];
 
@@ -74,7 +75,7 @@ export function fireSignup({
     has_prompts: false,
     has_simulations: false,
     has_subscription: false,
-    createdAt: nowInstant().toString({ fractionalSecondDigits: 3 }),
+    createdAt: unixSecondsOf(nowInstant().epochMilliseconds),
   };
 
   return [

@@ -7,7 +7,6 @@ type FilterOptionsScope = {
 };
 
 export type ClickHouseFilterQueryParams = {
-  tenantId: string;
   query?: string;
   key?: string;
   subkey?: string;
@@ -15,6 +14,11 @@ export type ClickHouseFilterQueryParams = {
   endDate: number;
   /** Conditions over `trace_summaries ts` scoping results to a subset of traces, from Trace. */
   scope?: FilterOptionsScope;
+  /**
+   * The proof reads an aggregate's members, so an evaluation is offered only when its trace is
+   * inside the member's window, not when it ran (ADR-177 v4.15).
+   */
+  readsMembers?: boolean;
 };
 
 /**
