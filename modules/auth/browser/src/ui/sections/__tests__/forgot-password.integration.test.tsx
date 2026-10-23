@@ -2,6 +2,7 @@
  * @vitest-environment jsdom
  * Integration tests for /auth/forgot-password: the full tree renders under
  * Chakra; only the BetterAuth client and the public-env hook are mocked.
+ * @see modules/auth/specs/forced-password-reset.feature
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
@@ -51,6 +52,43 @@ describe("ForgotPassword page", () => {
 
   afterEach(() => {
     cleanup();
+  });
+
+  describe("when the sign-in sent the user here to replace their password", () => {
+    afterEach(() => {
+      window.history.replaceState(null, "", "/");
+    });
+
+    /** @scenario "The forgot-password screen says why a new password is needed" */
+    it("says a new password is needed, prefills the address and sends the link to it", async () => {
+      window.history.replaceState(
+        null,
+        "",
+        "/auth/forgot-password#email=sam%40acme.test&reset=required",
+      );
+      renderPage();
+
+      expect(await screen.findByText(/choose a new password/i)).toBeTruthy();
+      expect(screen.getByText(/need to set a new password before you can sign in/i)).toBeTruthy();
+      expect(window.location.hash).toBe("");
+      expect((screen.getByRole("textbox") as HTMLInputElement).value).toBe("sam@acme.test");
+
+      fireEvent.click(screen.getByRole("button", { name: /send reset link/i }));
+
+      await waitFor(() => {
+        expect(mockRequestPasswordReset).toHaveBeenCalledWith({
+          email: "sam@acme.test",
+          redirectTo: "/auth/reset-password",
+        });
+      });
+    });
+
+    it("keeps the ordinary wording when nothing asked for a new password", async () => {
+      renderPage();
+
+      expect(await screen.findByText(/forgot your password/i)).toBeTruthy();
+      expect(screen.queryByText(/choose a new password/i)).toBeNull();
+    });
   });
 
   describe("when the user submits their email in credential mode", () => {
@@ -145,6 +183,17 @@ describe("ForgotPassword page", () => {
       renderPage();
 
       expect(screen.getByText(/contact langwatch support/i)).toBeTruthy();
+    });
+
+    /** @scenario "A marked user on a deployment without email is told who can help" */
+    it("says why a new password is needed and who can help when the sign-in sent the user", () => {
+      window.history.replaceState(null, "", "/auth/forgot-password#reset=required");
+      renderPage();
+
+      expect(screen.getByText(/choose a new password/i)).toBeTruthy();
+      expect(screen.getByText(/need to set a new password before you can sign in/i)).toBeTruthy();
+      expect(screen.getByText(/contact your administrator/i)).toBeTruthy();
+      window.history.replaceState(null, "", "/");
     });
   });
 

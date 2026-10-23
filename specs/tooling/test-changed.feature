@@ -3,7 +3,7 @@ Feature: test:changed runs the tests a change reaches by imports
   `pnpm test:changed [files...]` keeps the repository's import graph in a cache
   file, finds every test file that imports a changed file directly or not, in
   any package, and runs each package's own Vitest with exactly those files
-  (ADR-182). With no files named, the change is what differs from the merge
+  (ADR-186). With no files named, the change is what differs from the merge
   base with origin/main, uncommitted and untracked files included.
 
   Scenario: An edit runs the test files that import it, in every package

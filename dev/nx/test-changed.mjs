@@ -2,7 +2,7 @@
 // `pnpm test:changed [files...] [--list|--json] [--reads] [--base REF]`: runs the Vitest
 // test files a change reaches by imports, each through its own package's `test`
 // script. No files means the diff from the merge base with origin/main,
-// untracked files included. ADR-182, specs/tooling/test-changed.feature.
+// untracked files included. ADR-186, specs/tooling/test-changed.feature.
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname, join, matchesGlob, posix } from "node:path";

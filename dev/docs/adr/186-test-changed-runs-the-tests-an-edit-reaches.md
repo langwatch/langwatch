@@ -1,4 +1,4 @@
-# ADR-182: `test:changed` runs the tests an edit reaches, from a kept import graph
+# ADR-186: `test:changed` runs the tests an edit reaches, from a kept import graph
 
 **Date:** 2026-10-21
 

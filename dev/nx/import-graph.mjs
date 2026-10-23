@@ -1,7 +1,7 @@
 // The repository's import graph, for choosing the tests an edit reaches
 // (`pnpm test:changed`). Imports resolve the way Vitest resolves them here and
 // type-only ones are dropped; each file's scan and resolution stay in a cache
-// file until the file or its surroundings change. ADR-182.
+// file until the file or its surroundings change. ADR-186.
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";

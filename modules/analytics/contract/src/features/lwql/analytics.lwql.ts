@@ -373,6 +373,17 @@ export type LangWatchQLProjectSetExecuteInput = Omit<LangWatchQLExecuteInput, "p
   Readonly<{ projects: readonly LangWatchQLCaller[] }>;
 
 /**
+ * A member project an aggregate reads through a shared grant, and the epoch milliseconds its
+ * grant opens at; 0 is its whole history (ADR-177 decision 3).
+ */
+export type LangWatchQLMemberWindow = Readonly<{ projectId: string; from: number }>;
+
+/** What an aggregate's run adds to a project-set run: its members' windows. */
+export type LangWatchQLMemberScope = Readonly<{
+  memberWindows?: readonly LangWatchQLMemberWindow[];
+}>;
+
+/**
  * What the extraction half of a judged plan is asked for: one page's traces,
  * read back through the statement with the judged columns holding their text.
  */
@@ -429,7 +440,7 @@ export abstract class LangWatchQLService {
     input: LangWatchQLExecuteInput & LangWatchQLEvalGate,
   ): Promise<LangWatchQLQueryResult>;
   abstract executeForProjects(
-    input: LangWatchQLProjectSetExecuteInput & LangWatchQLEvalGate,
+    input: LangWatchQLProjectSetExecuteInput & LangWatchQLEvalGate & LangWatchQLMemberScope,
   ): Promise<LangWatchQLQueryResult>;
   abstract executePass(
     input: LangWatchQLPassInput & LangWatchQLEvalGate,

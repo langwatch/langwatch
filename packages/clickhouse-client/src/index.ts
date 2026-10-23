@@ -298,7 +298,6 @@ export {
   fenceFor,
   HAND_WRITTEN_TENANT_PREDICATE,
   ownProjectIdOf,
-  PROOF_BEARING_PERMISSIONS,
   singleTenantOf,
   TenantReaderClientUnavailableError,
   TenantScopedReader,
