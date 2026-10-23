@@ -3,7 +3,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import type { TriggerSummary } from "@langwatch/automation-contract";
 import { DispatchError, pMapLimited } from "@langwatch/eventing";
 import { refusesRetry } from "@langwatch/group-queue";
-import { createLogger } from "@langwatch/observability";
+import { createLogger, createWarnThrottle } from "@langwatch/observability";
 
 import type { AutomationSettlementLedgerRepository } from "../../../repositories/automation-settlement-ledger.repository.ts";
 import type { AutomationSettlementTraceRepository } from "../../../repositories/automation-settlement-read.repository.ts";
@@ -13,10 +13,10 @@ import type { AutomationProjectDirectory } from "../../../services/automation.se
 import type { AutomationPersistActionService } from "../../runaway/services/persist-action.service.ts";
 import type { AutomationSettlementMatchConfirmation } from "./automation-settlement-match-confirmation.service.ts";
 import type { AutomationSettlementObservability } from "./automation-settlement-observability.service.ts";
-import { ConfigurationRefusalThrottle } from "./configuration-refusal-throttle.ts";
 
 const logger = createLogger("langwatch:automation:settlement-persistence");
 const CONFIRM_CONCURRENCY = 4;
+const REFUSAL_LOG_WINDOW_MS = 60 * 60 * 1000;
 const CLAIM_RETRY_DELAYS_MS = [200, 500];
 
 type PersistenceComposition = {
@@ -41,7 +41,7 @@ type PersistPage = {
 };
 
 export class TriggerSettlementPersistenceService {
-  private readonly refusalThrottle = ConfigurationRefusalThrottle.create();
+  private readonly refusalLog = createWarnThrottle(REFUSAL_LOG_WINDOW_MS);
 
   private constructor(private readonly composition: PersistenceComposition) {}
 
@@ -245,7 +245,11 @@ export class TriggerSettlementPersistenceService {
   private recordTraceFailure(page: PersistPage, traceId: string, error: unknown): void {
     const retryable = !refusesRetry(error);
     if (!retryable && isCustomerConfigurationRefusal(error)) {
-      if (!this.refusalThrottle.shouldLog({ triggerId: page.triggerId, code: error.code })) return;
+      const suppressed = this.refusalLog.claim({
+        key: `${page.triggerId}:${error.code}`,
+        now: this.composition.clock.now().epochMilliseconds,
+      });
+      if (suppressed === undefined) return;
       logger.warn(
         {
           projectId: page.projectId,
@@ -254,6 +258,7 @@ export class TriggerSettlementPersistenceService {
           code: error.code,
           fault: error.fault,
           error: error.message,
+          suppressed,
         },
         "Persist dispatch refused by the automation's saved configuration; not retrying",
       );

@@ -1,6 +1,6 @@
 import type { IntentContext } from "@langwatch/eventing";
 import { refusesRetry } from "@langwatch/group-queue";
-import { createLogger } from "@langwatch/observability";
+import { createLogger, createWarnThrottle } from "@langwatch/observability";
 
 import type { AutomationNotificationDelivery } from "../../../channels/automation-notification-delivery.channel.ts";
 import {
@@ -21,11 +21,11 @@ import type { AutomationPersistActionService } from "../../runaway/services/pers
 import type { SlackDestinationService } from "../../slack/services/slack-destination.service.ts";
 import type { AutomationSettlementMatchConfirmation } from "./automation-settlement-match-confirmation.service.ts";
 import type { AutomationSettlementObservability } from "./automation-settlement-observability.service.ts";
-import { ConfigurationRefusalThrottle } from "./configuration-refusal-throttle.ts";
 import { TriggerSettlementNotificationService } from "./trigger-settlement-notification.service.ts";
 import { TriggerSettlementPersistenceService } from "./trigger-settlement-persistence.service.ts";
 
 const logger = createLogger("langwatch:automation:settlement-dispatch");
+const REFUSAL_LOG_WINDOW_MS = 60 * 60 * 1000;
 
 type SettlementComposition = {
   automation: AutomationSettlementLedgerRepository;
@@ -50,7 +50,7 @@ type SettlementComposition = {
 export class AutomationSettlementDispatchService extends AutomationSettlementExecutor {
   private readonly notifications: TriggerSettlementNotificationService;
   private readonly persistence: TriggerSettlementPersistenceService;
-  private readonly refusalThrottle = ConfigurationRefusalThrottle.create();
+  private readonly refusalLog = createWarnThrottle(REFUSAL_LOG_WINDOW_MS);
 
   private constructor(private readonly composition: SettlementComposition) {
     super();
@@ -71,11 +71,15 @@ export class AutomationSettlementDispatchService extends AutomationSettlementExe
         messageKey: context.messageKey,
       });
     } catch (error) {
-      this.rethrowIfRetryable(error, {
-        projectId: context.projectId,
+      this.rethrowIfRetryable({
+        error,
         triggerId: payload.triggerId,
-        intent: TRIGGER_SETTLEMENT_INTENT_TYPES.NOTIFY_DIGEST,
-        attempt: context.attempt,
+        context: {
+          projectId: context.projectId,
+          triggerId: payload.triggerId,
+          intent: TRIGGER_SETTLEMENT_INTENT_TYPES.NOTIFY_DIGEST,
+          attempt: context.attempt,
+        },
       });
     }
   }
@@ -89,12 +93,16 @@ export class AutomationSettlementDispatchService extends AutomationSettlementExe
         traceIds,
       });
     } catch (error) {
-      this.rethrowIfRetryable(error, {
-        projectId: context.projectId,
+      this.rethrowIfRetryable({
+        error,
         triggerId: payload.triggerId,
-        traceCount: traceIds.length,
-        intent: TRIGGER_SETTLEMENT_INTENT_TYPES.PERSIST_MATCH,
-        attempt: context.attempt,
+        context: {
+          projectId: context.projectId,
+          triggerId: payload.triggerId,
+          traceCount: traceIds.length,
+          intent: TRIGGER_SETTLEMENT_INTENT_TYPES.PERSIST_MATCH,
+          attempt: context.attempt,
+        },
       });
     }
   }
@@ -114,16 +122,28 @@ export class AutomationSettlementDispatchService extends AutomationSettlementExe
 
   /**
    * One line per failure. A refusal the customer fixes in the automation is a
-   * warning, logged once per automation per window, and ends the dispatch; anything else is reported once through the
-   * process's error capture, and rethrown when another attempt could succeed.
+   * warning, logged once per automation per window, and ends the dispatch;
+   * anything else is reported once through the process's error capture, and
+   * rethrown when another attempt could succeed.
    */
-  private rethrowIfRetryable(error: unknown, context: Record<string, unknown>): void {
+  private rethrowIfRetryable({
+    error,
+    triggerId,
+    context,
+  }: {
+    error: unknown;
+    triggerId: string;
+    context: Record<string, unknown>;
+  }): void {
     const retryable = !refusesRetry(error);
     if (!retryable && isCustomerConfigurationRefusal(error)) {
-      const triggerId = String(context.triggerId);
-      if (!this.refusalThrottle.shouldLog({ triggerId, code: error.code })) return;
+      const suppressed = this.refusalLog.claim({
+        key: `${triggerId}:${error.code}`,
+        now: this.composition.clock.now().epochMilliseconds,
+      });
+      if (suppressed === undefined) return;
       logger.warn(
-        { ...context, code: error.code, fault: error.fault, error: error.message },
+        { ...context, code: error.code, fault: error.fault, error: error.message, suppressed },
         "Settlement dispatch refused by the automation's saved configuration; not retrying",
       );
       return;

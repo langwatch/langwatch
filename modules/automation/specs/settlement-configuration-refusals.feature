@@ -22,6 +22,13 @@ Feature: A settlement refused by the automation's own saved configuration
     And one warning is logged and no error is reported
 
   @unit
+  Scenario: An automation that keeps firing with an invalid saved configuration warns once per window
+    Given the automation sends an email to stored recipients that no longer validate
+    When several matches settle inside one hour
+    Then every dispatch completes instead of retrying
+    And one warning is logged for the automation and no error is reported
+
+  @unit
   Scenario: A webhook automation whose saved settings no longer parse is refused as the customer's to fix
     Given the automation calls a webhook whose stored settings no longer parse
     When the match settles

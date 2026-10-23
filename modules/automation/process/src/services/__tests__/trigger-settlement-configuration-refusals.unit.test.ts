@@ -11,7 +11,8 @@ import {
 const loggerWarn = vi.hoisted(() => vi.fn());
 const loggerError = vi.hoisted(() => vi.fn());
 
-vi.mock("@langwatch/observability", () => ({
+vi.mock("@langwatch/observability", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   createLogger: () => ({
     debug: vi.fn(),
     info: vi.fn(),
@@ -76,6 +77,7 @@ describe("settlement refusals caused by the automation's saved configuration", (
 
   describe("given an email automation that keeps firing with recipients that no longer validate", () => {
     describe("when several matches settle", () => {
+      /** @scenario "An automation that keeps firing with an invalid saved configuration warns once per window" */
       it("ends each dispatch without retrying and warns once for the automation", async () => {
         const fixture = createSettlementFixture(
           settlementTrigger("SEND_EMAIL", { actionParams: { members: [] } }),
