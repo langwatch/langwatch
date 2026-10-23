@@ -69,14 +69,18 @@ func StaticCloudKeys(repoRoot string) ([]string, error) {
 	return append(problems, stale...), nil
 }
 
-// staleFallbackVars refuses a StaticKeyFallbackVars entry whose workflow no
-// longer gates any stored-key step on it, so the list can only shrink: once a
-// fallback step is deleted, its entry has to go in the same change.
+// staleFallbackVars refuses a StaticKeyFallbackVars entry whose workflow is
+// gone or no longer gates any stored-key step on it, so the list can only
+// shrink: once a fallback step is deleted, its entry has to go in the same change.
 func staleFallbackVars(repoRoot string) ([]string, error) {
 	var problems []string
 	for _, gateVar := range sortedKeys(StaticKeyFallbackVars) {
 		rel := StaticKeyFallbackVars[gateVar]
 		if _, err := os.Stat(filepath.Join(repoRoot, rel)); os.IsNotExist(err) {
+			problems = append(problems, fmt.Sprintf(
+				"tools/ciguard/staticcloudkeys.go: StaticKeyFallbackVars lists %s for %s, which no longer exists; "+
+					"delete the entry so the fallback stays banned", gateVar, rel))
+
 			continue
 		}
 		workflow, err := ciscan.Load(repoRoot, rel)
@@ -383,9 +387,12 @@ func yamlFiles(repoRoot, dir string, recursive bool) ([]string, error) {
 			return nil
 		}
 		rel, err := filepath.Rel(repoRoot, path)
+		if err != nil {
+			return err
+		}
 		files = append(files, filepath.ToSlash(rel))
 
-		return err
+		return nil
 	})
 	if err != nil {
 		return nil, fmt.Errorf("walk %s: %w", dir, err)

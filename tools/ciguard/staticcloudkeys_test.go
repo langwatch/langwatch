@@ -55,10 +55,20 @@ jobs:
           aws-secret-access-key: ${{ secrets.EMBEDS_AWS_SECRET_ACCESS_KEY }}
 `
 
+// writeRepo writes files over a repository that already holds every listed
+// fallback workflow with its sanctioned fallback, so the stale-entry check
+// stays quiet unless a test overrides or removes one.
 func writeRepo(t *testing.T, files map[string]string) string {
 	t.Helper()
 	root := t.TempDir()
+	seeded := map[string]string{}
+	for gateVar, rel := range ciguard.StaticKeyFallbackVars {
+		seeded[rel] = strings.ReplaceAll(gatedFallbackWorkflow, "EMBEDS_AWS_ROLE_ARN", gateVar)
+	}
 	for rel, content := range files {
+		seeded[rel] = content
+	}
+	for rel, content := range seeded {
 		path := filepath.Join(root, rel)
 		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o750))
 		require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
@@ -305,6 +315,18 @@ func TestStaticCloudKeysRefusesAStaleFallbackEntry(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, problems, 1)
 	assert.Contains(t, problems[0], "StaticKeyFallbackVars lists EMBEDS_AWS_ROLE_ARN")
+}
+
+// @scenario "A listed fallback variable with no fallback step left fails CI"
+func TestStaticCloudKeysRefusesAnEntryWhoseWorkflowIsGone(t *testing.T) {
+	root := writeRepo(t, nil)
+	require.NoError(t, os.Remove(filepath.Join(root, embedsPath)))
+
+	problems, err := ciguard.StaticCloudKeys(root)
+
+	require.NoError(t, err)
+	require.Len(t, problems, 1)
+	assert.Contains(t, problems[0], "StaticKeyFallbackVars lists EMBEDS_AWS_ROLE_ARN for "+embedsPath+", which no longer exists")
 }
 
 func TestStaticCloudKeysPassesOnThisRepository(t *testing.T) {
