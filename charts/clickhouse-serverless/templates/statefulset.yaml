@@ -1,6 +1,7 @@
 {{- $replicas := .Values.replicas | int }}
 {{- $fullname := include "clickhouse-serverless.fullname" . }}
 {{- $dynamicOnly := include "clickhouse-serverless.dynamicOnly" . }}
+{{- $backupSidecar := include "clickhouse-serverless.backupSidecar" . }}
 {{- $secretsMounted := or (not $dynamicOnly) (gt $replicas 1) }}
 apiVersion: apps/v1
 kind: StatefulSet
@@ -301,10 +302,11 @@ spec:
             {{- tpl (toYaml .) $ | nindent 12 }}
             {{- end }}
 
-        {{- if .Values.access.enabled }}
+        {{- if or .Values.access.enabled $backupSidecar }}
         # Keeps users.d/access-users.yaml current and verifies token logins on
-        # loopback (ADR-190). Same image; it never sees the default password.
-        - name: access
+        # loopback (ADR-190), and/or runs scheduled backups (ADR-191). Same
+        # image; it never sees the default password unless backups need it.
+        - name: {{ if .Values.access.enabled }}access{{ else }}backup{{ end }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: ["ch-config", "sidecar", "/etc/clickhouse-server"]
@@ -316,14 +318,54 @@ spec:
             capabilities:
               drop: ["ALL"]
           env:
+            {{- if .Values.access.enabled }}
             - name: CLICKHOUSE_ACCESS_FILE
               value: /etc/clickhouse-access/config/access.yaml
             - name: CLICKHOUSE_ACCESS_LISTEN
               value: {{ .Values.env.CLICKHOUSE_ACCESS_LISTEN | default "127.0.0.1:8124" | quote }}
+            {{- end }}
             {{- if $dynamicOnly }}
+            # Also the backup runner's login: the per-boot local admin.
             - name: CLICKHOUSE_ACCESS_BOOTSTRAP_DIR
               value: /run/clickhouse-access
             {{- end }}
+            {{- if $backupSidecar }}
+            - name: BACKUP_SIDECAR
+              value: {{ if eq (include "clickhouse-serverless.backupMode" .) "sidecar" }}run{{ else }}observe{{ end }}
+            {{- if not $dynamicOnly }}
+            - name: BACKUP_USER
+              value: {{ .Values.backup.user | quote }}
+            - name: BACKUP_PASSWORD_FILE
+              value: /etc/clickhouse-backup/credentials/password
+            {{- end }}
+            - name: BACKUP_DATABASE
+              value: {{ .Values.backup.database | quote }}
+            - name: BACKUP_FULL_SCHEDULE
+              value: {{ .Values.backup.full.schedule | quote }}
+            - name: BACKUP_INCREMENTAL_SCHEDULE
+              value: {{ .Values.backup.incremental.schedule | quote }}
+            - name: BACKUP_RETENTION_DAYS
+              value: {{ .Values.backup.retentionDays | quote }}
+            - name: BACKUP_MAX_BANDWIDTH
+              value: {{ .Values.backup.maxBandwidth | int64 | quote }}
+            - name: BACKUP_RUNNER_ORDINAL
+              value: {{ .Values.backup.sidecar.runnerOrdinal | quote }}
+            - name: BACKUP_METRICS_LISTEN
+              value: {{ printf "0.0.0.0:%v" .Values.backup.sidecar.metricsPort | quote }}
+            {{- if gt $replicas 1 }}
+            # Every replica shares the backups disk, so a base may be a full
+            # another replica wrote; election probes the same cluster.
+            - name: BACKUP_CLUSTER
+              value: {{ .Values.clusterName | quote }}
+            {{- end }}
+            {{- end }}
+          {{- if $backupSidecar }}
+          ports:
+            - name: backup-metrics
+              containerPort: {{ .Values.backup.sidecar.metricsPort }}
+              protocol: TCP
+          {{- end }}
+          {{- if .Values.access.enabled }}
           # It listens on loopback only, which the kubelet cannot reach.
           livenessProbe:
             exec:
@@ -343,10 +385,29 @@ spec:
           {{- end }}
           resources:
             {{- toYaml .Values.access.sidecar.resources | nindent 12 }}
+          {{- else }}
+          # No readiness probe: a backup problem must never unready ClickHouse.
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: backup-metrics
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.backup.sidecar.resources | nindent 12 }}
+          {{- end }}
           volumeMounts:
+            {{- if .Values.access.enabled }}
             - name: users-d
               mountPath: /etc/clickhouse-server/users.d
             {{- include "clickhouse-serverless.accessMounts" . | nindent 12 }}
+            {{- end }}
+            {{- if and $backupSidecar (not $dynamicOnly) }}
+            - name: backup-credentials
+              mountPath: /etc/clickhouse-backup/credentials
+              readOnly: true
+            {{- end }}
         {{- end }}
 
       volumes:
@@ -379,6 +440,15 @@ spec:
               - key: {{ include "clickhouse-serverless.clusterSecretKey" . }}
                 path: cluster-secret
               {{- end }}
+        {{- end }}
+        {{- if and $backupSidecar (not $dynamicOnly) }}
+        - name: backup-credentials
+          secret:
+            secretName: {{ .Values.backup.passwordSecret.name | default (include "clickhouse-serverless.secretName" .) }}
+            defaultMode: 0440
+            items:
+              - key: {{ if .Values.backup.passwordSecret.name }}{{ .Values.backup.passwordSecret.key | default "password" }}{{ else }}{{ include "clickhouse-serverless.secretKey" . }}{{ end }}
+                path: password
         {{- end }}
         {{- if $dynamicOnly }}
         # tmpfs: the local admin's password never touches the node's disk.

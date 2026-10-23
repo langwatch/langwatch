@@ -1,11 +1,10 @@
 {{/*
 Prometheus alerting rules for the backup CronJobs.
 
-Everything here is derived from kube-state-metrics, so the rules see the
-CronJob and Job objects rather than anything the backup scripts report. That is
-deliberate: a backup that stops running produces no output to report on, and an
-alert built on the backup's own telemetry goes quiet at exactly the moment it
-matters.
+The CronJob rules are derived from kube-state-metrics, so they see the CronJob
+and Job objects rather than anything the backup scripts report: a backup that
+stops running produces no output to report on. The sidecar rules (ADR-185) read
+the runner's own metrics, so each also fires when those metrics go missing.
 */}}
 {{- define "clickhouse-serverless.backupAlertRules" -}}
 {{- $fullname := include "clickhouse-serverless.fullname" . -}}
@@ -14,6 +13,7 @@ matters.
 groups:
   - name: {{ $fullname }}-backups
     rules:
+    {{- if include "clickhouse-serverless.backupCronJobs" . }}
     {{- range $target := $mon.targets }}
     {{- if and $target.cronjob $target.cronjobName }}
     {{- fail (printf "backup.monitoring.targets[%s]: set either cronjob (suffix after the release fullname) or cronjobName (exact), not both" $target.name) }}
@@ -165,11 +165,143 @@ groups:
           runbook_url: {{ . | quote }}
           {{- end }}
     {{- end }}
+    {{- end }}
+    {{- if include "clickhouse-serverless.backupSidecar" . }}
+    {{- include "clickhouse-serverless.backupSidecarAlertRules" . }}
+    {{- end }}
+{{- end -}}
+
+{{/* Rules on the sidecar's own metrics. Every expression has a branch for
+     series that are missing, since a sidecar that is down reports nothing. */}}
+{{- define "clickhouse-serverless.backupSidecarAlertRules" -}}
+{{- $fullname := include "clickhouse-serverless.fullname" . -}}
+{{- $ns := .Release.Namespace -}}
+{{- $mon := .Values.backup.monitoring -}}
+{{- $sel := $mon.sidecar.selector | default (printf "namespace=%q, pod=~%q" $ns (printf "%s-[0-9]+" $fullname)) -}}
+{{- range $mode := list "full" "incremental" }}
+{{- $hours := index $mon.sidecar.staleAfterHours $mode | default 26 }}
+{{- $seconds := mulf $hours 3600 | int64 }}
+{{- $last := printf "max by (namespace) (clickhouse_backup_last_success_timestamp_seconds{%s, mode=%q})" $sel $mode }}
+
+      # The newest completed backup comes from system.backup_log, so it counts
+      # whoever wrote it. The second branch covers a backup that never once
+      # completed, gated on the sidecar's age so a fresh install is quiet.
+      - alert: ClickHouseBackupStale
+        expr: |-
+          (time() - {{ $last }} > {{ $seconds }})
+          or
+          (
+            (time() - min by (namespace) (clickhouse_backup_sidecar_start_timestamp_seconds{{ printf "{%s}" $sel }}) > {{ $seconds }})
+            unless {{ $last }}
+          )
+        for: {{ $mon.for | default "15m" | quote }}
+        labels:
+          severity: critical
+          backup: {{ $mode | quote }}
+          source: sidecar
+          {{- with $mon.additionalLabels }}
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
+        annotations:
+          summary: {{ printf "ClickHouse %s backup has no successful run in %vh" $mode $hours | quote }}
+          description: >-
+            The newest completed {{ $mode }} backup of {{ $fullname }} in namespace {{ $ns }}
+            ended {{ `{{ $value | humanizeDuration }}` }} ago, past its {{ $hours }}h window
+            (or, if none ever completed, the sidecar is that old). Read the runner's
+            `/status` on port {{ $.Values.backup.sidecar.metricsPort }} and its logs.
+          {{- with $mon.runbookUrl }}
+          runbook_url: {{ . | quote }}
+          {{- end }}
+
+      # The fast signal: the runner's latest run of this mode failed.
+      - alert: ClickHouseBackupFailing
+        expr: |-
+          max by (namespace) (clickhouse_backup_last_failure_timestamp_seconds{{ printf "{%s, mode=%q}" $sel $mode }}) > {{ $last }}
+          or
+          (max by (namespace) (clickhouse_backup_last_failure_timestamp_seconds{{ printf "{%s, mode=%q}" $sel $mode }}) unless {{ $last }})
+        for: {{ $mon.for | default "15m" | quote }}
+        labels:
+          severity: warning
+          backup: {{ $mode | quote }}
+          source: sidecar
+          {{- with $mon.additionalLabels }}
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
+        annotations:
+          summary: {{ printf "ClickHouse %s backup failed on the sidecar runner" $mode | quote }}
+          description: >-
+            The last {{ $mode }} run of {{ $fullname }} in namespace {{ $ns }} failed and
+            none has succeeded since. `last_error` in the runner's `/status` says why.
+          {{- with $mon.runbookUrl }}
+          runbook_url: {{ . | quote }}
+          {{- end }}
+{{- end }}
+
+      # Every rule above reads series that vanish with the sidecar or its
+      # scrape; this one makes their absence an alert.
+      - alert: ClickHouseBackupNoRunner
+        expr: |-
+          (max by (namespace) (clickhouse_backup_runner{{ printf "{%s}" $sel }}) < 1)
+          or
+          absent(clickhouse_backup_runner{{ printf "{%s}" $sel }})
+        for: {{ $mon.absentFor | default "30m" | quote }}
+        labels:
+          severity: critical
+          source: sidecar
+          {{- with $mon.additionalLabels }}
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
+        annotations:
+          summary: "No ClickHouse backup runner is reporting"
+          description: >-
+            No pod of {{ $fullname }} in namespace {{ $ns }} reports itself as the backup
+            runner, or the sidecar's metrics are not being scraped. Either way every
+            other backup alert has gone blind.
+          {{- with $mon.runbookUrl }}
+          runbook_url: {{ . | quote }}
+          {{- end }}
+
+      - alert: ClickHouseBackupMultipleRunners
+        expr: sum by (namespace) (clickhouse_backup_runner{{ printf "{%s}" $sel }}) > 1
+        for: {{ $mon.for | default "15m" | quote }}
+        labels:
+          severity: warning
+          source: sidecar
+          {{- with $mon.additionalLabels }}
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
+        annotations:
+          summary: "More than one ClickHouse backup runner"
+          description: >-
+            {{ `{{ $value }}` }} pods of {{ $fullname }} in namespace {{ $ns }} each see a
+            different set of replicas. The cluster-wide in-flight check keeps them from
+            writing the same backup twice; find the partition.
+          {{- with $mon.runbookUrl }}
+          runbook_url: {{ . | quote }}
+          {{- end }}
+
+      - alert: ClickHouseBackupConfigError
+        expr: max by (namespace) (clickhouse_backup_config_error{{ printf "{%s}" $sel }}) > 0
+        for: {{ $mon.for | default "15m" | quote }}
+        labels:
+          severity: critical
+          source: sidecar
+          {{- with $mon.additionalLabels }}
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
+        annotations:
+          summary: "ClickHouse backup sidecar configuration is invalid"
+          description: >-
+            The backup sidecar of {{ $fullname }} in namespace {{ $ns }} cannot run any
+            backup with its configuration; its log and `/status` name the setting.
+          {{- with $mon.runbookUrl }}
+          runbook_url: {{ . | quote }}
+          {{- end }}
 {{- end -}}
 
 {{- if and .Values.backup.enabled .Values.backup.monitoring.enabled }}
 {{- $fullname := include "clickhouse-serverless.fullname" . }}
-{{- if not .Values.backup.monitoring.targets }}
+{{- if and (include "clickhouse-serverless.backupCronJobs" .) (not .Values.backup.monitoring.targets) }}
 {{- fail "backup.monitoring.enabled is true but backup.monitoring.targets is empty: nothing would be watched" }}
 {{- end }}
 {{- if .Values.backup.monitoring.prometheusRule.enabled }}

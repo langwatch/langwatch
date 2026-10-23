@@ -1,0 +1,28 @@
+# Backups by the ch-config sidecar (ADR-185) on three replicas, with its
+# PodMonitor and alerts. tests/backup-sidecar.sh renders it.
+replicas: 3
+autogen:
+  enabled: true
+objectStorage:
+  bucket: "example-backups"
+  region: "eu-central-1"
+backup:
+  enabled: true
+  mode: sidecar
+  user: backup_runner
+  passwordSecret:
+    name: clickhouse-backup-login
+    key: pw
+  maxBandwidth: 104857600
+  full:
+    schedule: "0 5 */3 * *"
+  incremental:
+    schedule: "30 * * * *"
+  sidecar:
+    runnerOrdinal: 1
+    podMonitor:
+      enabled: true
+  monitoring:
+    enabled: true
+    additionalLabels:
+      route: page

@@ -1,5 +1,6 @@
 {{- if .Values.backup.enabled }}
 {{- $fullname := include "clickhouse-serverless.fullname" . }}
+{{- if include "clickhouse-serverless.backupCronJobs" . }}
 ---
 # Full backup — scripts are baked into the Docker image at /scripts/
 apiVersion: batch/v1
@@ -144,8 +145,9 @@ spec:
                   value: "incremental"
                 - name: BACKUP_DATABASE
                   value: {{ .Values.backup.database | quote }}
+{{- end }}
 ---
-# Restore template (suspended — manual trigger only)
+# Restore template, in every mode (suspended — manual trigger only)
 apiVersion: batch/v1
 kind: CronJob
 metadata:

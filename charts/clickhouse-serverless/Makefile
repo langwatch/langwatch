@@ -22,6 +22,7 @@ template: lint
 	@echo "--- backup alerting rules ---"
 	@helm template $(RELEASE) . -f tests/values-backup-alerts.yaml > /dev/null && echo "OK"
 	@bash tests/backup-alerts.sh
+	@bash tests/backup-sidecar.sh
 	@bash tests/access.sh
 
 ## Deploy to Kind and run functional tests (requires: kind, helm, kubectl)

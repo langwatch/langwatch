@@ -216,3 +216,22 @@ app.kubernetes.io/component: keeper
 {{- default "clusterSecret" .Values.auth.secretKeys.clusterSecretKey -}}
 {{- end -}}
 
+
+{{/* Backup mode (ADR-185): "cronjob", "sidecar" or "cronjob-observe". */}}
+{{- define "clickhouse-serverless.backupMode" -}}
+{{- $mode := .Values.backup.mode | default "cronjob" -}}
+{{- if not (has $mode (list "cronjob" "sidecar" "cronjob-observe")) -}}
+{{- fail (printf "backup.mode must be cronjob, sidecar or cronjob-observe, got %q" $mode) -}}
+{{- end -}}
+{{- $mode -}}
+{{- end -}}
+
+{{/* "true" when backup CronJobs render. */}}
+{{- define "clickhouse-serverless.backupCronJobs" -}}
+{{- if and .Values.backup.enabled (ne (include "clickhouse-serverless.backupMode" .) "sidecar") }}true{{ end -}}
+{{- end -}}
+
+{{/* "true" when the ch-config sidecar runs backups (or observes them). */}}
+{{- define "clickhouse-serverless.backupSidecar" -}}
+{{- if and .Values.backup.enabled (ne (include "clickhouse-serverless.backupMode" .) "cronjob") }}true{{ end -}}
+{{- end -}}
