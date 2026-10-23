@@ -88,6 +88,7 @@ jobs:
       - run: make e2e-cold
       - run: make e2e-cold-move
       - run: make e2e-backup
+      - run: make e2e-access
       - name: Show logs on failure
         if: failure()
         run: |

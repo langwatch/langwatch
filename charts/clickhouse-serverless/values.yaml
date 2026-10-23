@@ -232,6 +232,55 @@ extraVolumeMounts: []
 lwqlAccess:
   secretName: ""
 
+# Deprecated, no effect: documented earlier but never rendered. Use `access`.
+# Accepted so existing values files keep working; removed in the next major.
+users: ""
+
+# Users, tiers and logins from an access file (ADR-190). Off by default: the
+# server then has only its default user plus whatever extraVolumes mount.
+# On, a sidecar container keeps the users current and verifies OIDC token
+# logins on 127.0.0.1 inside the pod. See the README's "Access" section.
+access:
+  enabled: false
+  # The access file itself: issuers and users. Rolling users name a directory
+  # under /etc/clickhouse-access/secrets/<Secret name> (see passwordSecrets).
+  config: {}
+  # More files next to access.yaml, at /etc/clickhouse-access/config/<name>:
+  # an issuer's private CA for ca_file, say.
+  extraFiles: {}
+  # Or an existing ConfigMap with an `access.yaml` key (every key is mounted);
+  # `config` and `extraFiles` are then ignored.
+  existingConfigMap: ""
+  # Secrets mounted as password directories, each at
+  # /etc/clickhouse-access/secrets/<name>. Every key is one valid password;
+  # `<key>.valid_until` (RFC 3339) ends `<key>`. Add a key, move the client,
+  # remove the old key: the sidecar applies each change within ~10 seconds.
+  passwordSecrets: []
+  # Dynamic-only mode (ADR-190): no static password anywhere in ClickHouse.
+  # Every person and workload logs in with a short-lived OIDC token; default
+  # is locked; the only password is a local admin generated at every start
+  # into an in-memory volume, valid from inside the pod only. Needs
+  # access.enabled, token users only (no passwordSecrets), backup.enabled off,
+  # and auth.clusterSecretEnabled when replicas > 1. The chart adds
+  # `mode: dynamic-only` to access.config; with existingConfigMap, set it there.
+  # Clients mount a projected service-account token and re-read it for every
+  # connection, for example:
+  #   volumes:
+  #     - name: clickhouse-token
+  #       projected:
+  #         sources:
+  #           - serviceAccountToken: {audience: clickhouse, expirationSeconds: 600, path: token}
+  dynamicOnly:
+    enabled: false
+  sidecar:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        cpu: 200m
+        memory: 128Mi
+
 # Scheduling
 scheduling:
   nodeSelector: {}

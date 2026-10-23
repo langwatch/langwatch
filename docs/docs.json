@@ -1013,6 +1013,7 @@
               "self-hosting/configuration/environment-variables",
               "self-hosting/configuration/sizing-and-scaling",
               "self-hosting/configuration/backups",
+              "self-hosting/configuration/clickhouse-access",
               "self-hosting/configuration/object-storage-lifecycle",
               "self-hosting/configuration/sso",
               "self-hosting/configuration/email",

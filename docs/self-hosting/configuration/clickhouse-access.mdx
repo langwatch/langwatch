@@ -1,0 +1,377 @@
+---
+title: ClickHouse access
+description: "Give people and tools their own ClickHouse logins: access tiers, rolling passwords and OIDC token logins"
+---
+
+The LangWatch ClickHouse image (`langwatch/clickhouse-serverless`) can carry
+extra ClickHouse users next to the `default` user LangWatch itself uses. Use
+them for BI tools, reporting jobs, CI pipelines and engineers who query traces
+directly. Each user gets one **tier**, and logs in with either a **rolling
+password** or an **OIDC token**. The feature is off until you give the image an
+access file.
+
+<Note>
+Set your own password for the `default` user. In Docker Compose, put
+`CLICKHOUSE_PASSWORD` in `.env` (for example `openssl rand -hex 24`). Without it
+the compose file falls back to the published `langwatch`, which the server warns
+about at every boot; the next major release removes that fallback.
+</Note>
+
+## Tiers
+
+With an access file, the server defines four roles, each with a settings
+profile of the same name. Without one, none of them exists. To use the tiers
+for users you write yourself, set `CLICKHOUSE_ACCESS_TIERS=true`.
+
+| Tier           | Can                                                                                       | Limits                                    |
+| -------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------- |
+| `tier_inspect` | See database, table and column names. No rows.                                           | Read-only, capped execution time and memory |
+| `tier_read`    | Inspect, plus `SELECT` on the user's databases                                           | As inspect                                |
+| `tier_write`   | Read, plus `INSERT`, `ALTER UPDATE` and `ALTER DELETE` (and lightweight `DELETE`). No DDL. | Capped memory                             |
+| `tier_admin`   | Everything, including DDL and user management                                            | None                                      |
+
+`READ_TIER_MAX_EXECUTION_TIME` sets the execution-time cap of the inspect and
+read tiers, in seconds (default `300`). A read user cannot raise it. Only admin
+users can read `system.query_log` and the other system tables that hold query
+text.
+
+## The access file
+
+The access file lists issuers (for token logins) and users. The image checks it
+strictly at startup. An unknown key, tier or issuer, or a missing password
+directory, stops the container with an error that names the problem.
+
+```yaml access.yaml
+issuers:
+  - name: staff
+    url: https://idp.example.com      # exact `iss` of the tokens
+    audience: clickhouse              # default: clickhouse
+    username_claim: email             # default: sub
+    required_claims: { email_verified: true }
+users:
+  - name: metabase
+    tier: read
+    databases: [langwatch]
+    login:
+      rolling: { dir: /etc/clickhouse-access/secrets/metabase-passwords }
+  - name: alice
+    tier: read
+    databases: [langwatch]
+    networks: [10.0.0.0/8]            # default: any address
+    login:
+      token: { issuer: staff, subject: alice@example.com }
+```
+
+| Issuer key        | Meaning                                                                                       |
+| ----------------- | --------------------------------------------------------------------------------------------- |
+| `name`            | Name the users refer to                                                                       |
+| `url`             | The issuer, equal to the tokens' `iss`. Must be `https`.                                      |
+| `audience`        | A value the tokens' `aud` must contain. Default `clickhouse`.                                 |
+| `username_claim`  | The claim compared with each user's `subject`. Default `sub`.                                 |
+| `required_claims` | Claims that must have exactly these values                                                    |
+| `jwks_url`        | Fetch keys from here instead of through OIDC discovery                                        |
+| `ca_file`         | A CA bundle for an issuer with a private certificate                                          |
+| `allow_admin`     | Let this issuer's token users hold `tier_admin`. Off by default.                              |
+
+| User key    | Meaning                                                                            |
+| ----------- | ---------------------------------------------------------------------------------- |
+| `name`      | The ClickHouse user name. `default` and the `tier_*` names are reserved.           |
+| `tier`      | `inspect`, `read`, `write` or `admin`                                              |
+| `databases` | Databases a read or write user can use. `system` and `information_schema` are refused. |
+| `networks`  | Addresses or CIDR ranges the user may log in from                                  |
+| `login`     | Exactly one of `rolling` or `token`                                                |
+
+Do not also define an access user in your own `users.d` files.
+
+## Rolling passwords
+
+A `rolling` login points at a directory. Every regular, non-hidden file in it is
+a valid password of at least 16 characters, with at most 8 files per directory.
+Give each user its own directory. In Kubernetes, that is one Secret per user.
+
+To rotate a password without downtime:
+
+<Steps>
+  <Step title="Add the new password">
+    Add a key to the Secret (or a file to the directory) with the new password.
+    Both passwords now work.
+
+    ```bash
+    kubectl -n langwatch patch secret metabase-passwords --type merge \
+      -p "{\"stringData\":{\"2026-11\":\"$(openssl rand -hex 24)\"}}"
+    ```
+  </Step>
+  <Step title="Move the client">
+    Give the new password to the client and confirm that it connects.
+  </Step>
+  <Step title="Remove the old password">
+    Delete the old key. To end it at a fixed time instead, add a key
+    `<old-key>.valid_until` that holds an RFC 3339 instant, such as
+    `2026-11-30T00:00:00Z`.
+
+    ```bash
+    kubectl -n langwatch patch secret metabase-passwords --type json \
+      -p '[{"op":"remove","path":"/data/2026-10"}]'
+    ```
+  </Step>
+</Steps>
+
+Each change takes effect within about 10 seconds after the file reaches the pod,
+with no restart. Kubernetes can take up to a minute to update a mounted Secret.
+
+## Token logins
+
+A token user logs in with an OIDC JWT (an ID token or a workload token) as its
+password, over HTTP or the native protocol. A sidecar in the ClickHouse pod
+accepts the token only when all of these are true:
+
+- An asymmetric key of the user's issuer signed it (RS, PS, ES or EdDSA).
+- Its `iss` equals the issuer's `url`, and its `aud` contains the audience.
+- Its `exp` is in the future. There is no leeway: the token stops working at
+  that second. Its `nbf` gets 30 seconds of clock leeway.
+- Its `username_claim` equals the user's `subject`.
+- Every `required_claims` entry matches.
+
+Tokens can be up to 16 KiB. An expired token is refused, so a client must fetch
+a fresh token before each connection or when its token expires.
+
+```bash
+# HTTP
+curl -u "alice:$TOKEN" https://clickhouse.example.com:8123 -d 'SELECT 1'
+# Native
+clickhouse-client --host clickhouse.example.com --user alice --password "$TOKEN"
+```
+
+### Kubernetes workloads
+
+A pod can log in with a projected ServiceAccount token. Mount one with the
+audience `clickhouse` in the client pod:
+
+```yaml
+volumes:
+  - name: clickhouse-token
+    projected:
+      sources:
+        - serviceAccountToken:
+            audience: clickhouse
+            expirationSeconds: 3600
+            path: token
+```
+
+The client reads the token from the file at each connection. The kubelet renews
+the file before the token expires.
+
+On EKS, the cluster's OIDC issuer is public, so the issuer is only its URL:
+
+```yaml
+issuers:
+  - name: cluster
+    url: https://oidc.eks.eu-west-1.amazonaws.com/id/EXAMPLE
+users:
+  - name: report-job
+    tier: read
+    databases: [langwatch]
+    login:
+      token: { issuer: cluster, subject: "system:serviceaccount:reports:report-job" }
+```
+
+On other clusters the issuer is usually the API server, with a private
+certificate. Point `jwks_url` at the API server, and give the cluster CA as
+`ca_file` through `access.extraFiles`:
+
+```yaml
+clickhouse:
+  access:
+    extraFiles:
+      cluster-ca.crt: |
+        -----BEGIN CERTIFICATE-----
+        ...
+        -----END CERTIFICATE-----
+    config:
+      issuers:
+        - name: cluster
+          url: https://kubernetes.default.svc.cluster.local   # your cluster's --service-account-issuer
+          jwks_url: https://kubernetes.default.svc/openid/v1/jwks
+          ca_file: /etc/clickhouse-access/config/cluster-ca.crt
+```
+
+The sidecar fetches keys without credentials. If your cluster refuses that, bind
+the built-in `system:service-account-issuer-discovery` ClusterRole to the group
+`system:unauthenticated`.
+
+### GitHub Actions
+
+A workflow can log in with its OIDC token. Give the job `id-token: write`, and
+request a token with the audience `clickhouse`:
+
+```yaml
+permissions:
+  id-token: write
+steps:
+  - run: |
+      TOKEN=$(curl -sf -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+        "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=clickhouse" | jq -r .value)
+      clickhouse-client --host "$CH_HOST" --user ci-main --password "$TOKEN" --query 'SELECT 1'
+```
+
+```yaml
+issuers:
+  - name: github
+    url: https://token.actions.githubusercontent.com
+users:
+  - name: ci-main
+    tier: read
+    databases: [langwatch]
+    login:
+      token: { issuer: github, subject: "repo:your-org/your-repo:ref:refs/heads/main" }
+```
+
+The subject names one repository and one branch. A workflow on any other branch,
+or in a fork, cannot log in as this user.
+
+### People, through your identity provider
+
+Engineers can log in with an ID token from your company's identity provider.
+Use the OAuth client ID of the application that issues the tokens as the
+audience, match on a verified email, and give each person their own user:
+
+```yaml
+issuers:
+  - name: staff
+    url: https://idp.example.com
+    audience: 0oa1b2c3d4e5f6g7h8i9         # the OAuth client ID
+    username_claim: email
+    required_claims: { email_verified: true }
+users:
+  - name: alice
+    tier: read
+    databases: [langwatch]
+    login:
+      token: { issuer: staff, subject: alice@example.com }
+```
+
+Each user names its subject explicitly. A new person gets access only when you
+add their user, and removing the user ends their access at the next sync.
+
+## Dynamic-only mode
+
+Dynamic-only mode removes every long-lived password from ClickHouse. People and
+workloads log in with short-lived OIDC tokens only. A password leaked from a
+Secret, Terraform state, a backup or a laptop is then of no use, because there
+is none, and a leaked token expires within minutes.
+
+Turn it on with `mode: dynamic-only` at the top of the access file. Under Helm,
+set `clickhouse.access.dynamicOnly.enabled: true` instead:
+
+```yaml
+clickhouse:
+  auth:
+    clusterSecretEnabled: true        # required with more than one replica
+  access:
+    enabled: true
+    dynamicOnly:
+      enabled: true
+    config:
+      issuers:
+        - name: cluster
+          url: https://oidc.eks.eu-west-1.amazonaws.com/id/EXAMPLE
+      users:
+        - name: grafana
+          tier: read
+          databases: [langwatch]
+          login:
+            token: { issuer: cluster, subject: "system:serviceaccount:monitoring:grafana" }
+```
+
+In this mode the server:
+
+- refuses to start with `CLICKHOUSE_PASSWORD`, a rolling user, or any other
+  file-defined user with a password, and names each one;
+- locks `default`: no address may log in as it;
+- refuses `CREATE USER ... IDENTIFIED BY`, and logs any SQL user that still has
+  a password;
+- generates a `local_admin` password at every start, valid only from inside the
+  pod, for initialisation scripts and in-pod tools.
+
+ClickHouse treats every address of the server's own network interfaces as
+local, so "inside the pod" means its network namespace. Do not run a
+dynamic-only server with host networking: then every process on the host
+counts as local.
+
+Give each workload a token that lives for minutes. A projected ServiceAccount
+token with `expirationSeconds: 600` works; the kubelet renews the file before
+it expires. **Read the token file for each connection or request**, and never
+reuse a token after it expires.
+
+<Warning>
+Every login depends on the access sidecar in this mode. The chart takes a pod
+out of its Service until the sidecar has fetched every issuer's keys, and
+Kubernetes restarts a sidecar that stops answering. An issuer that is down when
+a pod starts keeps that pod unready.
+</Warning>
+
+What it does not protect against: an attacker inside the ClickHouse pod; anyone
+who can mint tokens for a mapped subject (the issuer's key, or creating
+ServiceAccount tokens or pods in Kubernetes); and the cluster secret, which
+replicas share and which still works for anyone who reaches port 9000. Rotate
+the cluster secret by changing it and restarting every replica together.
+
+LangWatch itself connects with a password today. Run dynamic-only mode for
+separate tools, or wait for the app to support token logins.
+
+## Enabling access
+
+### Helm
+
+Under the `langwatch` chart, set `clickhouse.access`. (On the standalone
+`clickhouse-serverless` chart, drop the `clickhouse.` prefix.)
+
+```yaml
+clickhouse:
+  access:
+    enabled: true
+    passwordSecrets: [metabase-passwords]   # each mounted at /etc/clickhouse-access/secrets/<name>
+    config:
+      issuers: []
+      users:
+        - name: metabase
+          tier: read
+          databases: [langwatch]
+          login:
+            rolling: { dir: /etc/clickhouse-access/secrets/metabase-passwords }
+```
+
+Create the password Secrets yourself. The chart creates no passwords. The chart
+runs the access sidecar as its own container in each ClickHouse pod. To keep the
+access file out of your values, put it in a ConfigMap under the key
+`access.yaml` and set `clickhouse.access.existingConfigMap`.
+
+### Docker
+
+Mount a directory holding the access file and the password directories, and set
+`CLICKHOUSE_ACCESS_FILE`:
+
+```bash
+docker run -d \
+  -e CLICKHOUSE_PASSWORD="$(openssl rand -hex 24)" \
+  -e CLICKHOUSE_ACCESS_FILE=/run/access/access.yaml \
+  -v "$PWD/access:/run/access:ro" \
+  langwatch/clickhouse-serverless
+```
+
+The image runs the sidecar inside the container in this case.
+
+## Limits
+
+- **Sidecar outages.** While the sidecar is down, token logins fail. A password
+  past its `valid_until` keeps working until the sidecar returns. Removing the
+  password file has the same delay. The chart restarts the sidecar when its
+  health check fails.
+- **Existing sessions.** Removing a password or a user stops new logins. It does
+  not end queries already running.
+- **Clients.** The image's `clickhouse-client` and any HTTP client accept a token
+  as the password. Some drivers limit the password length; check yours with a
+  real token.
+
+The design and the ClickHouse behaviour it relies on are in
+[ADR-190](https://github.com/langwatch/langwatch/blob/main/dev/docs/adr/190-clickhouse-serverless-access-tiers-rolling-passwords-and-token-logins.md).

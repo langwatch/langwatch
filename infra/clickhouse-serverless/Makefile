@@ -3,7 +3,7 @@ TAG       ?= test
 PLATFORM  ?= linux/$(shell go env GOARCH)
 HELM_DIR  ?= ../../charts/clickhouse-serverless
 
-.PHONY: test lint build e2e e2e-cold e2e-cold-move e2e-backup clean help
+.PHONY: test lint build e2e e2e-cold e2e-cold-move e2e-backup e2e-access clean help
 
 help: ## Show this help
 	@grep -E '^[a-z][a-z0-9_-]+:.*##' $(MAKEFILE_LIST) | awk -F ':.*##' '{printf "  %-14s %s\n", $$1, $$2}'
@@ -17,6 +17,8 @@ lint: ## Run go vet + helm lint + helm template
 	helm lint $(HELM_DIR) --set autogen.enabled=true
 	helm template test $(HELM_DIR) --set cpu=4,memory=8Gi,autogen.enabled=true > /dev/null
 	helm template test-ha $(HELM_DIR) --set cpu=4,memory=8Gi,replicas=3,autogen.enabled=true > /dev/null
+	helm template test-access $(HELM_DIR) -f $(HELM_DIR)/tests/values-access.yaml > /dev/null
+	helm template test-dynamic $(HELM_DIR) -f $(HELM_DIR)/tests/values-dynamic-only.yaml > /dev/null
 
 build: ## Build Docker image
 	docker build -t $(IMAGE):$(TAG) --platform=$(PLATFORM) .
@@ -33,6 +35,9 @@ e2e-cold-move: build ## E2E: verify data moves from hot to cold (S3) storage via
 e2e-backup: build ## E2E: native BACKUP/RESTORE cycle via S3 backups disk
 	@tests/e2e-backup-test.sh $(IMAGE):$(TAG)
 
+e2e-access: build ## E2E: tiers, rolling passwords, token logins and dynamic-only mode (Linux: host network)
+	CH_ACCESS_E2E_IMAGE=$(IMAGE):$(TAG) go test -count=1 -v ./tests/accesse2e/
+
 clean: ## Stop and remove test containers
-	@docker rm -f ch-e2e garage-e2e 2>/dev/null || true
+	@docker rm -f ch-e2e ch-e2e-access ch-e2e-dynamic garage-e2e 2>/dev/null || true
 	@docker network rm ch-test-net 2>/dev/null || true

@@ -18,7 +18,7 @@ import (
 const gb1 int64 = 1 << 30
 
 func testInput() *config.Input {
-	return &config.Input{
+	i := &config.Input{
 		CPU:                  4,
 		RAMBytes:             16 * gb1,
 		Replicated:           false,
@@ -60,6 +60,10 @@ func testInput() *config.Input {
 		MetricLogCollectMs:   10000,
 		TextLogLevel:         "warning",
 	}
+	i.ReadTierMaxExecutionTime = 300
+	i.AccessSidecar = "embedded"
+	i.AccessListen = "127.0.0.1:8124"
+	return i
 }
 
 func testLogger() *zap.Logger {

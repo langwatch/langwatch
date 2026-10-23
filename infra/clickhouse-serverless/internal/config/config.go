@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/access"
 )
 
 // Input holds all user-provided configuration, loaded from env vars via struct tags.
@@ -22,7 +24,7 @@ type Input struct {
 	DataNodePort int    `env:"CH_DATA_NODE_PORT" default:"9000"`
 
 	// Auth
-	Password          string `env:"CLICKHOUSE_PASSWORD" validate:"required"`
+	Password          string `env:"CLICKHOUSE_PASSWORD"`            // Validate refuses an empty one
 	ClusterSecretFile string `env:"CLICKHOUSE_CLUSTER_SECRET_FILE"` // path to mounted cluster secret
 
 	// Opt-in: render the real cluster secret (read from ClusterSecretFile by
@@ -36,6 +38,19 @@ type Input struct {
 	InterserverUser         string `env:"CLICKHOUSE_INTERSERVER_USER" default:"interserver"`
 	InterserverPasswordFile string `env:"CLICKHOUSE_INTERSERVER_PASSWORD_FILE"`
 	InterserverPassword     string
+
+	// Optional access.yaml (ADR-190): users, their tiers and logins. The
+	// sidecar answers token logins on AccessListen and re-renders the users.
+	AccessFile    string `env:"CLICKHOUSE_ACCESS_FILE"`
+	AccessListen  string `env:"CLICKHOUSE_ACCESS_LISTEN" default:"127.0.0.1:8124"`
+	AccessSidecar string `env:"CLICKHOUSE_ACCESS_SIDECAR" default:"embedded" validate:"oneof=embedded external"`
+	// Where dynamic-only mode writes the local admin's per-boot password; a
+	// tmpfs shared with the sidecar. DynamicOnly is read from the access file.
+	AccessBootstrapDir string `env:"CLICKHOUSE_ACCESS_BOOTSTRAP_DIR" default:"/run/clickhouse-access"`
+	DynamicOnly        bool
+	// The tier roles and profiles render with an access file, or with this
+	// for operator-written users that GRANT a tier. Off, no tier_* name exists.
+	AccessTiers bool `env:"CLICKHOUSE_ACCESS_TIERS"`
 
 	// nil means true: default gets access_management and named_collection_control.
 	DefaultUserAccessManagement *bool `env:"DEFAULT_USER_ACCESS_MANAGEMENT"`
@@ -91,6 +106,9 @@ type Input struct {
 	EnableProfileLog      bool   `env:"ENABLE_PROCESSORS_PROFILE_LOG"`
 	EnableBlobLog         bool   `env:"ENABLE_BLOB_STORAGE_LOG"`
 	EnablePrometheus      bool   `env:"ENABLE_PROMETHEUS_METRICS"`
+
+	// Execution-time cap of the inspect and read tiers' profiles (ADR-190).
+	ReadTierMaxExecutionTime int `env:"READ_TIER_MAX_EXECUTION_TIME" default:"300" validate:"gte=1"`
 
 	// Query limits (0 = unlimited)
 	MaxExecutionTime    int    `env:"MAX_EXECUTION_TIME"`
@@ -164,6 +182,15 @@ func Load() (*Input, error) {
 		i.Password = strings.TrimSpace(string(data))
 	}
 
+	// The mode decides which passwords are required and which refused.
+	if i.AccessFile != "" {
+		f, err := access.Load(i.AccessFile)
+		if err != nil {
+			return nil, fmt.Errorf("CLICKHOUSE_ACCESS_FILE: %w", err)
+		}
+		i.DynamicOnly = f.DynamicOnly()
+	}
+
 	for _, f := range []struct {
 		env, path string
 		read      bool
@@ -183,6 +210,11 @@ func Load() (*Input, error) {
 	}
 
 	return i, nil
+}
+
+// RendersTiers reports whether ch-config writes the tier roles and profiles.
+func (i *Input) RendersTiers() bool {
+	return i.AccessFile != "" || i.AccessTiers
 }
 
 // GrantsDefaultAccessManagement reports whether ch-config grants the default
