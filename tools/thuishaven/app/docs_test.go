@@ -177,6 +177,25 @@ func TestRunDocsSoloRemovesRouteBeforeStartupRecord(t *testing.T) {
 	}
 }
 
+func TestRunDocsSoloStopsWhenItCannotRecordTheRun(t *testing.T) {
+	o, sup, proxy := docsSoloOrchestrator(t, &fakeStore{}, &fakeSystem{})
+	p := UpParams{ExplicitSlug: "feat-x", WorktreeDir: t.TempDir()}
+	logDir, _ := domain.StackLogPaths(p.WorktreeDir, p.ExplicitSlug)
+	if err := os.MkdirAll(filepath.Dir(logDir), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(logDir, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	err := o.RunDocsSolo(t.Context(), p)
+	if err == nil || !strings.Contains(err.Error(), "docs log directory") {
+		t.Fatalf("RunDocsSolo = %v, want the failed docs-only record reported", err)
+	}
+	if len(sup.lanes) != 0 || len(proxy.removed) != len(proxy.registered) {
+		t.Fatalf("ran %v, registered %v removed %v; want nothing started and every route removed", sup.lanes, proxy.registered, proxy.removed)
+	}
+}
+
 func TestDocsOnlyReadsALiveRun(t *testing.T) {
 	o, _, _ := docsSoloOrchestrator(t, &fakeStore{}, &fakeSystem{alive: map[int]bool{7: true}})
 	p := UpParams{ExplicitSlug: "feat-x", WorktreeDir: t.TempDir()}

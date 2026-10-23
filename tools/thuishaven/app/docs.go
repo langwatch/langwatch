@@ -51,7 +51,11 @@ func (o *Orchestrator) RunDocsSolo(ctx context.Context, p UpParams) error {
 	port := ports[0]
 	logDir, _ := domain.StackLogPaths(p.WorktreeDir, slug)
 	docsURL, unroute := o.routeDocs(slug, port)
-	removeRecord := o.recordDocsOnly(DocsOnlyRun{PID: o.sys.Getpid(), URL: docsURL, LogDir: logDir})
+	removeRecord, err := o.recordDocsOnly(DocsOnlyRun{PID: o.sys.Getpid(), URL: docsURL, LogDir: logDir})
+	if err != nil {
+		unroute()
+		return err
+	}
 	// Keep the startup claim until route cleanup, so a new stack cannot lose its route.
 	defer removeRecord()
 	defer unroute()
@@ -108,14 +112,22 @@ func (o *Orchestrator) routeDocs(slug string, port int) (string, func()) {
 	}
 }
 
-// recordDocsOnly writes the docs-only record and returns its removal.
-func (o *Orchestrator) recordDocsOnly(run DocsOnlyRun) func() {
+// recordDocsOnly writes the docs-only record and returns its removal. Without
+// the record `haven down` and `haven status` cannot find the docs, so a failed
+// write stops the run instead of starting docs nothing else can see.
+func (o *Orchestrator) recordDocsOnly(run DocsOnlyRun) (func(), error) {
 	marker := filepath.Join(run.LogDir, docsOnlyFile)
 	data, err := json.Marshal(run)
-	if err != nil || os.MkdirAll(run.LogDir, 0o750) != nil || os.WriteFile(marker, data, 0o600) != nil {
-		return func() {}
+	if err != nil {
+		return nil, fmt.Errorf("encoding the docs-only record: %w", err)
 	}
-	return func() { _ = os.Remove(marker) }
+	if err := os.MkdirAll(run.LogDir, 0o750); err != nil {
+		return nil, fmt.Errorf("creating the docs log directory: %w", err)
+	}
+	if err := os.WriteFile(marker, data, 0o600); err != nil {
+		return nil, fmt.Errorf("writing the docs-only record: %w", err)
+	}
+	return func() { _ = os.Remove(marker) }, nil
 }
 
 // DocsOnly is this worktree's live `haven up --only docs`, if one runs.
