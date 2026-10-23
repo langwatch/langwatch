@@ -21,6 +21,13 @@ const RESPONSE_BODY_EVENT_NAME = "api_response_body";
 /** The utility call that generates it, apart from every conversational turn. */
 const TITLE_QUERY_SOURCE = "generate_session_title";
 
+/**
+ * Events nothing downstream reads. A hook's completion carries what the session folds
+ * (blocked, cancelled, duration) and the timeline declines both ends, so its start only
+ * cost writes, one for every hook a session runs.
+ */
+const UNREAD_EVENT_NAMES: readonly string[] = ["hook_execution_start"];
+
 const logger = createLogger("langwatch:coding-agent:log-facts");
 const flatAttributesSchema = z.record(z.string(), z.unknown());
 
@@ -51,6 +58,7 @@ export function liftLogContribution({
   // A cheap name/scope gate first; Cowork passes as claude_code and the resource parse relabels it.
   const facts = extractCodingAgentLogFacts({ scopeName: record.scopeName, attributes });
   if (facts === null) return IGNORED;
+  if (isUnreadEvent(facts["event.name"])) return IGNORED;
 
   const resourceAttributes = parseFlatAttributes(record.resourceAttributesFlatJson);
   stampServiceVersion({ facts, resourceAttributes });
@@ -65,6 +73,12 @@ export function liftLogContribution({
   });
   if (agent === null) return IGNORED;
   return keyContribution({ record, attributes, agent, facts });
+}
+
+/** Bare (`hook_execution_start`) or agent-namespaced (`claude_code.hook_execution_start`). */
+function isUnreadEvent(eventName: unknown): boolean {
+  if (typeof eventName !== "string") return false;
+  return UNREAD_EVENT_NAMES.some((name) => eventName === name || eventName.endsWith(`.${name}`));
 }
 
 function keyContribution({
