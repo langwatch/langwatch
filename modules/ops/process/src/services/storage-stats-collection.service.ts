@@ -10,13 +10,13 @@ import { toEpochMs } from "@langwatch/time";
 
 import {
   type BackupStatusRow,
-  isPlainClusterName,
   type StorageFootprintRepository,
 } from "../repositories/storage-footprint.repository.ts";
 import type {
   StorageStatsReading,
   StorageStatsReadingsRepository,
 } from "../repositories/storage-stats-readings.repository.ts";
+import { isPlainClusterName } from "../rules/cluster-name.rules.ts";
 
 /** The tables whose footprint the size and retention alerts are built on. */
 const MONITORED_TABLES = [

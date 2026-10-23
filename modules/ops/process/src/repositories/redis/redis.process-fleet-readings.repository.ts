@@ -8,6 +8,7 @@ import {
   processFleetReadingSchema,
 } from "../process-fleet-readings.repository.ts";
 
+const fleetReadingsSchema = z.array(processFleetReadingSchema);
 const HELD_FOR_SECONDS = 30 * 60;
 
 /** One JSON value that expires, so a fleet nobody measures any more stops reporting. */
@@ -35,7 +36,7 @@ export class RedisProcessFleetReadingsRepository extends ProcessFleetReadingsRep
     const raw = await this.redis.get(RedisProcessFleetReadingsRepository.key);
     if (raw === null) return [];
     try {
-      return z.array(processFleetReadingSchema).parse(JSON.parse(raw));
+      return fleetReadingsSchema.parse(JSON.parse(raw));
     } catch {
       return [];
     }

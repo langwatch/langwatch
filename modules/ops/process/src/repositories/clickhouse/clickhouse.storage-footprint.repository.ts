@@ -1,8 +1,8 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 
+import { isPlainClusterName } from "../../rules/cluster-name.rules.ts";
 import {
   type BackupStatusRow,
-  isPlainClusterName,
   StorageFootprintRepository,
 } from "../storage-footprint.repository.ts";
 import type { StorageStatsReading } from "../storage-stats-readings.repository.ts";

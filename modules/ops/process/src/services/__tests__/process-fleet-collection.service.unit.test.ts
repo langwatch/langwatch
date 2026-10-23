@@ -69,11 +69,10 @@ describe("given the scheduled fleet collection", () => {
         deadMessages: 0,
       },
     ]);
-    const failing = {
-      countByProcessName: async () => {
-        throw new Error("db down");
-      },
-    } as unknown as ProcessOpsRepository;
+    const failing = MemoryProcessOpsRepository.create({ store });
+    failing.countByProcessName = async () => {
+      throw new Error("db down");
+    };
     const { logger, lines } = createTestLogger();
 
     await ProcessFleetCollectionService.create({ fleet: failing, readings, logger }).collect();
