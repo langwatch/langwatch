@@ -81,6 +81,23 @@ describe("process-manager fleet gauges", () => {
     });
   });
 
+  describe("given a read is still in flight when the source is unbound", () => {
+    /** @scenario "Unbinding at shutdown silences the gauges" */
+    it("discards the late result instead of repopulating the cache", async () => {
+      let finish: (rows: never[]) => void = () => {};
+      const late = new Promise<never[]>((resolve) => {
+        finish = resolve;
+      });
+      bindProcessFleetMetricsSource(() => late);
+      const pending = metrics.collect();
+      unbindProcessFleetMetricsSource();
+      finish([]);
+      await pending;
+
+      expect(await collectOnce()).toEqual([]);
+    });
+  });
+
   describe("given a process name that disappears from the source", () => {
     it("observes nothing for it", async () => {
       bindProcessFleetMetricsSource(async () => []);
