@@ -90,7 +90,9 @@ jobs:
     needs: changes
     if: needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # A cold media cache encodes every image and video (about 8 minutes), then the
+    # 340 MB artifact uploads; warm runs finish well inside this.
+    timeout-minutes: 35
     strategy:
       fail-fast: false
       matrix:
