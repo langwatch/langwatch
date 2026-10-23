@@ -1599,7 +1599,7 @@ function readCallOf({
   if (!ports.readBudget) return null;
   const kind = readKindOf({ operation: route.operation, method: route.method });
   if (!kind) return null;
-  const credential = restReadCredential({ door, actor, scope, request });
+  const credential = restReadCredential({ door, actor, request });
   if (!credential) return null;
 
   return { credential, kind, route: `${family}.${route.operation}`, scope } as const;

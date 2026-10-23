@@ -304,6 +304,8 @@ export function readKindOf({
 }): ReadKind | null {
   if (/export|download/i.test(operation)) return "export";
   if (method.toUpperCase() === "GET") return "read";
-  if (/^(search|list|get|find|query|fetch)/i.test(operation)) return "read";
+  // A generated operation id names its method and address first: `postApiV1Query` queries.
+  const verb = operation.replace(/^postApi(V\d+)?/, "");
+  if (/^(search|list|get|find|query|fetch)/i.test(verb)) return "read";
   return null;
 }

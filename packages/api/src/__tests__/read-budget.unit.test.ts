@@ -13,6 +13,7 @@ import {
   ReadBudget,
   type ReadBudgetLimits,
   type ReadCredential,
+  readKindOf,
   rowsOf,
 } from "../read-budget.ts";
 
@@ -253,6 +254,21 @@ describe("rowsOf", () => {
       expect(rowsOf({ traces: [1, 2], columns: [1] })).toBe(2);
       expect(rowsOf({ id: "one" })).toBe(1);
       expect(rowsOf(undefined)).toBe(0);
+    });
+  });
+});
+
+describe("readKindOf", () => {
+  describe("when a generated operation id names a POST query", () => {
+    it("counts a LangWatchQL query as a read", () => {
+      expect(readKindOf({ operation: "postApiV1Query", method: "POST" })).toBe("read");
+    });
+  });
+
+  describe("when a POST writes", () => {
+    it("counts nothing", () => {
+      expect(readKindOf({ operation: "postApiV1Datasets", method: "POST" })).toBe(null);
+      expect(readKindOf({ operation: "createDataset", method: "POST" })).toBe(null);
     });
   });
 });

@@ -1,8 +1,9 @@
 /** Who a read counts against, from what the door resolved
  * (specs/security/read-rate-limits.feature). */
-import type { Actor, AuthzDeclaredScopeId } from "@langwatch/authorization";
+import type { Actor } from "@langwatch/authorization";
 
 import type { ReadCredential } from "./read-budget.ts";
+import { recordedKeyCredentialOf } from "./rest/credential.ts";
 import { isKeyDoor, recordedKeyOfDoor } from "./rest/key-credential.ts";
 
 /** An operator acting as somebody counts as the operator; a person in a browser by person. */
@@ -26,12 +27,10 @@ export function actorReadCredential(actor: Actor | null): ReadCredential | null 
 export function restReadCredential({
   door,
   actor,
-  scope,
   request,
 }: {
   door: string;
   actor: Actor | null;
-  scope: AuthzDeclaredScopeId | null;
   request: Request;
 }): ReadCredential | null {
   if (door === "browser") return actorReadCredential(actor);
@@ -46,7 +45,26 @@ export function restReadCredential({
     return key.ownerUserId ? { id: key.ownerUserId, type: "access_token" } : null;
   }
   if (key.kind === "legacy_project_key") {
-    return scope ? { id: scope.id, type: "legacy_project_key" } : null;
+    const projectId = legacyKeyProjectOf({ door, request });
+    return projectId ? { id: projectId, type: "legacy_project_key" } : null;
   }
   return key.apiKeyId ? { id: key.apiKeyId, type: key.kind } : null;
+}
+
+/**
+ * The project a legacy key is, from what its door recorded. Never the request's scope: the
+ * api_key door scopes a legacy key to its organization, and every project would share one budget.
+ */
+function legacyKeyProjectOf({
+  door,
+  request,
+}: {
+  door: "project" | "organization" | "api_key";
+  request: Request;
+}): string | null {
+  const recorded = recordedKeyCredentialOf({ door, request });
+  if (!recorded) return null;
+  if ("type" in recorded) return recorded.type === "legacyProjectKey" ? recorded.project.id : null;
+
+  return recorded.kind === "project" ? recorded.projectId : null;
 }
