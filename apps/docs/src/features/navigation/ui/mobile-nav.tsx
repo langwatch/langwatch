@@ -49,7 +49,7 @@ export function MobileNav({
       <Flex padding="4" gap="3" borderTopWidth="1px" borderColor="border" wrap="wrap">
         <Link href={sitePath({ path: site.llms })}>Docs for agents</Link>
         <Link href={site.signIn}>Open app</Link>
-        <GithubLink compact site={site} />
+        <GithubLink site={site} />
       </Flex>
     </dialog>
   );

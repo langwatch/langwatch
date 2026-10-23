@@ -6,13 +6,7 @@ import type { SiteMeta } from "../../navigation/model/nav.ts";
 
 const COUNT = new Intl.NumberFormat("en-GB");
 
-export function GithubLink({
-  compact,
-  site,
-}: {
-  compact: boolean;
-  site: Pick<SiteMeta, "github" | "stars">;
-}) {
+export function GithubLink({ site }: { site: Pick<SiteMeta, "github" | "stars"> }) {
   const stars = site.stars;
   return (
     <Link
@@ -28,9 +22,6 @@ export function GithubLink({
       _hover={{ color: "fg", textDecoration: "none" }}
     >
       <GitHubIcon size={16} />
-      <Text as="span" display={compact ? "none" : "inline"}>
-        langwatch/langwatch
-      </Text>
       {stars === null ? null : (
         <>
           <Star size={14} aria-hidden="true" />

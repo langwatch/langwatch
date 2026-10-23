@@ -134,7 +134,7 @@ export function Header({ kind }: { kind: PageKind }) {
             <Search size={20} aria-hidden="true" />
           </IconButton>
           <Box display={{ base: "none", xl: "block" }}>
-            <GithubLink compact site={site} />
+            <GithubLink site={site} />
           </Box>
           <Link
             href={site.signIn}
