@@ -92,6 +92,8 @@ jobs:
               - '.github/workflows/go-ci.yaml'
             ciguards:
               - '.github/workflows/**'
+              - '.github/pr-filters.yml'
+              - 'cmd/prfilters/**'
               - 'tools/ciguard/**'
               - 'pkg/ciscan/**'
       - name: Force the filter true on non-PR events

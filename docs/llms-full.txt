@@ -16843,12 +16843,12 @@ Open **Sessions** at [/me/sessions](https://app.langwatch.ai/me/sessions). One r
 
 Open a session and the **Usage** tab prices it. Read the **Cache health** block first: cache reads and cache writes decide a large share of a coding agent's bill.
 
-| Stat                | Why it costs you                                                                                                                                |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Peak context**    | The most tokens the session carried into one call. Every later call pays to keep that context alive.                                            |
-| **Cache misses**    | Calls that rebuilt the context instead of reading it. A cache write costs more per token than a read, so a miss pays twice for the same tokens. |
-| **Context reused**  | Tokens served from cache, billed at a fraction of fresh input.                                                                                  |
-| **Context rebuilt** | Tokens spent writing the cache again.                                                                                                           |
+| Stat                | Why it costs you                                                                                                                                                                                                                                                                                        |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Peak context**    | The most tokens the session carried into one call. Every later call pays to keep that context alive.                                                                                                                                                                                                    |
+| **Cache misses**    | Model calls that wrote 1,000 tokens or more to the cache, and at least half as many as the call before them held in it (that call's cache read plus its cache write). A session's first call is never a miss. A cache write costs more per token than a read, so a miss pays twice for the same tokens. |
+| **Context reused**  | Tokens served from cache, billed at a fraction of fresh input.                                                                                                                                                                                                                                          |
+| **Context rebuilt** | Tokens spent writing the cache again.                                                                                                                                                                                                                                                                   |
 
 <Frame caption="Session detail with the Cache health section. This session compacted twice, missed its cache three times, and re-sent 393k tokens on its biggest rebuild.">
   ![Claude Code session cost detail](/images/coding-agents/session-detail.png)
@@ -17832,7 +17832,7 @@ The events are the raw material: every model call with its input, output, cache-
 Write a small local script (python3 or jq) over the events. Per session, compute:
 
 1. **Peak context**: the largest (input + cache-read) of any model call, and its share of the model's context window.
-2. **Cache rebuilds**: model calls whose cache-creation tokens are the bulk of their input, counted only once the session already holds cached context. The first cache-creating call of a session builds the cache rather than rebuilding it, and it pays for the context once, so it is a setup cost and not a rebuild. Count a write from the first call that follows a call with cache-read tokens, or that follows an explicit cache miss. Each rebuild re-paid for context that was already paid for, at the provider's cache-write rate. That rate is specific to the provider and the model: some price a write above fresh input, some price it the same, and some charge for cache storage by time instead. Take it from the price card of the model in question, never from a rule of thumb.
+2. **Cache rebuilds**: model calls that wrote 1,000 tokens or more to the cache, and at least half as many as the call before them held in it (that call's cache read plus its cache write), whatever the call itself read from the cache. This is the rule the LangWatch session detail counts as a cache miss. A call whose previous call held nothing in the cache is never counted, so the first cache-creating call of a session builds the cache rather than rebuilding it: it pays for the context once, as a setup cost. Each rebuild re-paid for context that was already paid for, at the provider's cache-write rate. That rate is specific to the provider and the model: some price a write above fresh input, some price it the same, and some charge for cache storage by time instead. Take it from the price card of the model in question, never from a rule of thumb.
 3. **Compaction count and where they landed**: a compaction late in a session marks the point where the carried context stopped fitting.
 4. **Cost per model call over session lifetime**: split each session into thirds by call order and compare the average cost per call between the first and last third.
 5. **Waiting time around rebuilds**: rebuilt context is also re-uploaded and re-processed, so rebuild-heavy sessions are slower per turn.
@@ -18121,6 +18121,8 @@ Each one has two ways to set it up:
 - `langwatch copilot` or `langwatch code` starts the tool and sets up the connection on the first run. Use it on a machine you work on.
 - `langwatch instrument copilot` or `langwatch instrument code` writes the same setup and exits. Use it on a server, or when the telemetry must go to a team project.
 
+`langwatch instrument` always installs the hook file that links each session to its repository and pull request. The wrapper installs it only when you keep the plain command reporting, and a run that takes the gateway route writes no hook file. See [Link sessions to their pull requests](#link-sessions-to-their-pull-requests).
+
 ## Before you start
 
 - Install the GitHub Copilot command-line tool, Visual Studio Code, or both.
@@ -18175,6 +18177,8 @@ Each command writes a function of the same name in your shell start file, which 
 
 For `code`, LangWatch also removes the same settings from the Visual Studio Code integrated terminal configuration. The editor keeps the key, and the terminals inside it do not.
 
+Both commands also write the LangWatch hook file in your Copilot hooks folder, which reports the repository and branch of each session. See [Link sessions to their pull requests](#link-sessions-to-their-pull-requests).
+
 ### Choose where the telemetry goes
 
 Pass one scope flag, and one only:
@@ -18196,7 +18200,7 @@ The wrapper accepts the same flags: `langwatch copilot --project acme-app` pins 
 langwatch logout
 ```
 
-This deletes every connection the command-line tool wrote, for every tool.
+This deletes every connection the command-line tool wrote, for every tool, the Copilot hook file included.
 
 ## The GitHub Copilot app
 
@@ -18208,18 +18212,44 @@ langwatch copilot-app connect
 
 This mints an ingest key and installs a small agent that starts with your session, so every app session is captured without a wrapper. Add `--tokens-only` to collect the usage numbers and no content.
 
+<Note>
+  Not yet available: session rows and pull request cost for the GitHub Copilot app. Its turns
+  arrive as traces.
+</Note>
+
 ## What you get in LangWatch
 
 Open your personal page at `/me`, or open the project you pinned Copilot to.
 
-- **[Sessions](/coding-agents/sessions)**: one row per Copilot session, with the context it carried and how long it worked.
+- **[Sessions](/coding-agents/sessions)**: one row per Copilot conversation, from the command-line tool and from Copilot Chat in Visual Studio Code alike, with the models it used, its tokens, its token cost and the tools it ran.
+- **Repository and branch**: with the [hook file](#link-sessions-to-their-pull-requests) installed, each row shows the repository and branch the session worked on, and the pull requests that branch maps to.
+- **[Pull requests](/coding-agents/pull-requests)**: what each pull request cost across every session that drove it, with the tokens of each model.
 - **Traces**: one trace per turn, with the model, the tokens and the timing of each step.
-- **[Pull requests](/coding-agents/pull-requests)**: what each pull request cost across every session that drove it.
 - **Content**: the prompt of each turn and the response of the model.
 
-Copilot reports the number of premium requests a turn used, not an amount of money, so a Copilot trace carries a request count where a pay-per-token trace carries a cost.
+Microsoft Copilot Studio agents are a separate product and never appear as coding sessions. See [Copilot Studio](/ai-governance/ingestion-sources/copilot-studio) for those.
+
+### How Copilot cost is counted
+
+LangWatch prices each model call from its tokens at the model's list price, because Copilot reports no amount of money. That token cost is the dollar figure on sessions and pull requests, and it is not a figure from your Copilot bill.
+
+Copilot also reports AI units on each model call, its own usage count. On a pull request, AI units appear as their own count and never enter the dollar total. A model with no price shows its tokens and an unknown cost, not zero.
 
 Your agent can read all of this back. See [Explore your usage with your own agent](/coding-agents/explore-your-usage-with-your-own-agent).
+
+## Link sessions to their pull requests
+
+LangWatch reads the repository and branch of a Copilot session from a hook file, not from Copilot's telemetry. `langwatch instrument copilot` and `langwatch instrument code` write it to `~/.copilot/hooks/langwatch.json`, or to `$COPILOT_HOME/hooks/langwatch.json` when you set `COPILOT_HOME`. `langwatch ingest install copilot_cli` writes the same file.
+
+`langwatch copilot` and `langwatch code` write it on the run where you answer yes to keeping the plain command reporting, and later runs put it back if it is missing. A run that takes the gateway route asks no such question, so it writes no hook file.
+
+The file runs `langwatch ingest hook copilot` on two Copilot events: `sessionStart`, and `agentStop` at the end of every turn. The command reads the `origin` remote, the current branch and the worktree of the session's directory, and sends them to the same destination as the session's telemetry. With GitHub connected, LangWatch maps that branch to its pull requests. See [Repository and PR attribution](/coding-agents/repository-and-pr-attribution).
+
+LangWatch writes only `langwatch.json` and never opens your other hook files in that folder. A `langwatch.json` that LangWatch did not write is left as it is. `langwatch logout` deletes the file.
+
+Each entry in the file holds the same command for `bash` and for `powershell`, so the hook runs on macOS, Linux and Windows.
+
+The hook needs `langwatch` on your PATH. Copilot runs the command by name, so install the command-line tool with `npm install -g langwatch`, not through `npx` alone.
 
 ## Content and privacy
 
@@ -18260,6 +18290,15 @@ Set `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=false` in your own envir
   `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT` is `false` in your environment. Remove it, or
   set it to `true`, and start the tool again.
 </Accordion>
+
+  <Accordion title="Copilot sessions show no repository or pull request">
+    Check that `~/.copilot/hooks/langwatch.json` exists, or the same file under `$COPILOT_HOME/hooks/`. If it does not, run `langwatch instrument copilot` or `langwatch instrument code`. Then check that `langwatch --version` works in a new terminal, since the hook runs the command by name.
+
+    For Copilot Chat, check which harness the chat session runs on. A Copilot session loads the hook file from the folder above whatever the editor settings say. A Local session runs hook files only while the `chat.useHooks` setting is on. To see whether the hook ran, open the agent debug logs from the chat view.
+
+    A session that worked outside any git checkout, or on a branch with no pull request, has no pull request to show.
+
+  </Accordion>
 
   <Accordion title="The telemetry goes to the wrong workspace">
     Run `langwatch instrument copilot --project <id-or-slug>` to move it to a team project, or `langwatch instrument copilot --personal` to move it back to your own.
@@ -18368,6 +18407,10 @@ langwatch instrument claude --key ik-lw-...
 langwatch instrument codex --key ik-lw-...
 ```
 
+GitHub Copilot CLI is different: `langwatch instrument copilot` writes a shell function to your shell's startup file, which a non-interactive bash or zsh shell, such as a CI step or a service, does not load. On those machines, export the Copilot settings in the job or the image instead.
+
+`langwatch ingest install copilot_cli --env-only` prints those settings, but it needs a signed-in device, so run it on a machine where you are signed in and copy the lines, as [Bake it into an image](#bake-it-into-an-image) shows. With an ingest key alone, write the same lines by hand from [Manual OpenTelemetry setup](/coding-agents/github-copilot-cli#manual-opentelemetry-setup).
+
 The command reads the same value from the environment, which is how you keep the key out of shell history and provisioning scripts:
 
 ```bash
@@ -18408,7 +18451,9 @@ For CI jobs that use the LangWatch SDK or CLI itself rather than a coding agent,
 
 ## Bake it into an image
 
-`langwatch ingest install <tool> --env-only` prints the export lines without writing any config file, which is the form you want in a Dockerfile or a provisioning script. Supported tools: `claude_code`, `codex`, `gemini`, `opencode`. Add `--json` for machine-readable output.
+`langwatch ingest install <tool> --env-only` prints the export lines without writing any config file, which is the form you want in a Dockerfile or a provisioning script. Supported tools: `claude_code`, `codex`, `gemini`, `opencode`, `copilot_cli`. Add `--json` for machine-readable output. The command needs a signed-in device, unlike `--key`.
+
+`--env-only` also skips the hooks that report each session's repository and branch. For `copilot_cli`, that is the file `~/.copilot/hooks/langwatch.json`, and without it Copilot sessions reach no pull request. Run the command without `--env-only` to write it. See [GitHub Copilot](/coding-agents/github-copilot-cli#link-sessions-to-their-pull-requests).
 
 ## Roll out to a managed fleet
 
@@ -19721,7 +19766,7 @@ One row per session, over the last 90 days. Every column sorts; a third click on
 | Column                 | What it shows                                                                                                                            |
 | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | **Session**            | The session's title, lifted from the agent's own generated conversation title.                                                           |
-| **Agent**              | Which assistant ran it: Claude Code, Codex, Copilot, Gemini CLI, OpenCode.                                                               |
+| **Agent**              | Which assistant ran it: Claude Code, Codex, GitHub Copilot, Gemini CLI, OpenCode.                                                        |
 | **Last update**        | When the session last did anything.                                                                                                      |
 | **Context**            | Peak context: the most tokens the session carried into a single model call.                                                              |
 | **Compactions**        | How many times the agent compacted its conversation to fit the context window, and under it, how many times it rebuilt the prompt cache. |
@@ -19737,12 +19782,12 @@ Click a row to open the session. The **Usage** tab opens on the totals: cost, mo
 
 The **Cache health** section is where the money goes:
 
-| Stat                | What it tells you                                                                                                                                                              |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Peak context**    | The largest context the session carried, as a share of the model's window, banded against the current reliability guidance for long-context sessions.                          |
-| **Cache misses**    | Model calls that re-created most of the context instead of reading it from cache. A cache write costs more per token than a read, so each miss pays twice for the same tokens. |
-| **Context reused**  | Tokens served from the prompt cache across the session. These bill at a fraction of fresh input.                                                                               |
-| **Context rebuilt** | Tokens spent writing the cache again, summed across the session.                                                                                                               |
+| Stat                | What it tells you                                                                                                                                                                                                                                                                                          |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Peak context**    | The largest context the session carried, as a share of the model's window, banded against the current reliability guidance for long-context sessions.                                                                                                                                                      |
+| **Cache misses**    | Model calls that wrote 1,000 tokens or more to the cache, and at least half as many as the call before them held in it (that call's cache read plus its cache write). A session's first call is never a miss. A cache write costs more per token than a read, so each miss pays twice for the same tokens. |
+| **Context reused**  | Tokens served from the prompt cache across the session. These bill at a fraction of fresh input.                                                                                                                                                                                                           |
+| **Context rebuilt** | Tokens spent writing the cache again, summed across the session.                                                                                                                                                                                                                                           |
 
 The detail also shows the biggest single rebuild: how many tokens one model call re-sent instead of reusing from cache.
 
@@ -55777,7 +55822,7 @@ The events are the raw material: every model call with its input, output, cache-
 Write a small local script (python3 or jq) over the events. Per session, compute:
 
 1. **Peak context**: the largest (input + cache-read) of any model call, and its share of the model's context window.
-2. **Cache rebuilds**: model calls whose cache-creation tokens are the bulk of their input, counted only once the session already holds cached context. The first cache-creating call of a session builds the cache rather than rebuilding it, and it pays for the context once, so it is a setup cost and not a rebuild. Count a write from the first call that follows a call with cache-read tokens, or that follows an explicit cache miss. Each rebuild re-paid for context that was already paid for, at the provider's cache-write rate. That rate is specific to the provider and the model: some price a write above fresh input, some price it the same, and some charge for cache storage by time instead. Take it from the price card of the model in question, never from a rule of thumb.
+2. **Cache rebuilds**: model calls that wrote 1,000 tokens or more to the cache, and at least half as many as the call before them held in it (that call's cache read plus its cache write), whatever the call itself read from the cache. This is the rule the LangWatch session detail counts as a cache miss. A call whose previous call held nothing in the cache is never counted, so the first cache-creating call of a session builds the cache rather than rebuilding it: it pays for the context once, as a setup cost. Each rebuild re-paid for context that was already paid for, at the provider's cache-write rate. That rate is specific to the provider and the model: some price a write above fresh input, some price it the same, and some charge for cache storage by time instead. Take it from the price card of the model in question, never from a rule of thumb.
 3. **Compaction count and where they landed**: a compaction late in a session marks the point where the carried context stopped fitting.
 4. **Cost per model call over session lifetime**: split each session into thirds by call order and compare the average cost per call between the first and last third.
 5. **Waiting time around rebuilds**: rebuilt context is also re-uploaded and re-processed, so rebuild-heavy sessions are slower per turn.
@@ -64402,7 +64447,8 @@ The restriction applies to email and password sign-up, passkey sign-up, and firs
 | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
 | `BLOCK_LOCAL_HTTP_CALLS`  | `true` blocks user-configured outbound HTTP calls to private IPs, localhost and hostnames that resolve to private IPs. Cloud metadata addresses are always blocked                                                               | `false` |
 | `ALLOWED_PROXY_HOSTS`     | Comma-separated hostnames still allowed when `BLOCK_LOCAL_HTTP_CALLS=true`                                                                                                                                                       | -       |
-| `TRUSTED_PROXY_ADDRESSES` | Comma-separated addresses or IPv4 CIDR ranges of the proxies allowed to set `X-Forwarded-For`. Sign-in rate limits key on the client IP read from it. Unset, the header is read only from private, loopback and link-local peers | -       |
+| `TRUSTED_PROXY_ADDRESSES` | Comma-separated addresses or IPv4/IPv6 CIDR ranges of the proxies in front of the app. A forwarding header is read only from a socket peer inside this set, and the caller is the rightmost `X-Forwarded-For` hop outside it. Unset, no header is read and the socket peer is the caller. An entry that is not an address or range stops the app from starting. The Helm chart defaults to the private and loopback ranges | -       |
+| `TRUST_CLOUDFLARE_CLIENT_IP` | `true` reads the caller from `CF-Connecting-IP`, only from a peer inside `TRUSTED_PROXY_ADDRESSES` (set it to Cloudflare's published ranges). The header must hold a single valid IP; otherwise the caller comes from `X-Forwarded-For`. The app refuses to start with this on and no trusted proxy addresses | `false` |
 | `SSO_TRUSTED_IDP_ORIGINS` | Comma or whitespace separated origins of identity providers inside a private network. Without an entry here, sign-in refuses a provider whose address is not publicly routable                                                   | -       |
 
 ## Services

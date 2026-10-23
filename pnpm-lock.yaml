@@ -764,9 +764,6 @@ importers:
 
   .:
     devDependencies:
-      '@0xdeafcafe/tslsp-cli':
-        specifier: 0.6.0
-        version: 0.6.0
       '@nx/js':
         specifier: 23.2.1
         version: 23.2.1(@babel/traverse@7.29.8(supports-color@10.2.2))(nx@23.2.1)(supports-color@10.2.2)
@@ -16515,6 +16512,9 @@ importers:
       '@aws-sdk/client-lambda':
         specifier: 'catalog:'
         version: 3.1121.0
+      '@aws-sdk/credential-providers':
+        specifier: ^3.1080.0
+        version: 3.1108.0
       '@langwatch/agent-contract':
         specifier: workspace:*
         version: link:../../agent/contract
@@ -17867,6 +17867,9 @@ importers:
       '@aws-sdk/client-s3':
         specifier: 'catalog:'
         version: 3.1108.0
+      '@aws-sdk/credential-providers':
+        specifier: ^3.1080.0
+        version: 3.1108.0
       '@aws-sdk/s3-request-presigner':
         specifier: 'catalog:'
         version: 3.1108.0
@@ -18712,11 +18715,6 @@ importers:
         version: 5.0.1(patch_hash=2921221142707f0afee9faf1cba6c6fea7201f30a6ddf42aaf4c420be2067eb3)(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.4.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(vite@8.3.4(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
 
 packages:
-
-  '@0xdeafcafe/tslsp-cli@0.6.0':
-    resolution: {integrity: sha512-3ed4cRuuptRkmpey3waZOd5Hl2Vl60NJlZCMr2g6QdxtIEGtopndcuwLiwaiJ9DgpTgqR4HKPKusZizLGfdp+A==}
-    engines: {node: '>=22'}
-    hasBin: true
 
   '@adobe/css-tools@4.5.0':
     resolution: {integrity: sha512-6OzddxPio9UiWTCemp4N8cYLV2ZN1ncRnV1cVGtve7dhPOtRkleRyx32GQCYSwDYgaHU3USMm84tNsvKzRCa1Q==}
@@ -29605,10 +29603,6 @@ packages:
     resolution: {integrity: sha512-bXE4cR/kVZhKZX/RjPEflHaKVhUVl85noU3v6b8apfQEc1x4A+zBxjZ4lN8LqGd6WZ3dl98pY4o717VFmoPp+A==}
 
 snapshots:
-
-  '@0xdeafcafe/tslsp-cli@0.6.0':
-    dependencies:
-      '@typescript/native-preview': 7.0.0-dev.20260506.1
 
   '@adobe/css-tools@4.5.0': {}
 

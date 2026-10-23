@@ -1,10 +1,17 @@
 import {
   EVENTS_FOLD_TOOL_RUNS_AGENT_IDS,
+  genAiOperationRoleOf,
+  type GenAiOperationRole,
   LOGS_ONLY_AGENT_IDS,
+  SESSION_TITLE_FALLBACK_FACT_KEY,
   type SessionWorkingContext,
 } from "@langwatch/coding-agent-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
 
+import {
+  genAiModelCallFacts,
+  modelCallCostInput,
+} from "../rules/coding-agent-model-call-facts.rules.ts";
 import type { CodingAgentCostEstimator } from "../services/model-catalog-cost-estimator.service.ts";
 import {
   type CodingAgentSessionStateProjection,
@@ -24,23 +31,23 @@ const CLAUDE = {
 const CODEX = {
   // `HELPER_REQUEST` is a codex helper thread's request span: its one fact is the auxiliary mark.
   SPAN: { TURN: "session_task.turn", HELPER_REQUEST: "turn/start" },
-  ATTR: {
-    INPUT_TOKENS: "gen_ai.usage.input_tokens",
-    OUTPUT_TOKENS: "gen_ai.usage.output_tokens",
-    CACHE_READ_TOKENS: "gen_ai.usage.cache_read.input_tokens",
-    CACHE_CREATION_TOKENS: "gen_ai.usage.cache_creation.input_tokens",
-    RESPONSE_MODEL: "gen_ai.response.model",
-  },
 } as const;
+/** The GenAI semconv key a declared tool run names its tool by. */
+const GEN_AI_TOOL_NAME = "gen_ai.tool.name";
 /**
  * The spans whose tokens the fold counts as a model call, across every span-bearing agent. The
  * contribute service stamps exactly these with the session's declared working context, so the fold
  * can charge their tokens to it; every other span charges nothing anywhere and rides unstamped.
  */
-export const MODEL_CALL_SPAN_NAMES: ReadonlySet<string> = new Set([
+const MODEL_CALL_SPAN_NAMES: ReadonlySet<string> = new Set([
   CLAUDE.SPAN.LLM_REQUEST,
   CODEX.SPAN.TURN,
 ]);
+
+/** Whether the fold counts this span as a model call: a listed name, or a declared GenAI chat. */
+export function isFoldedModelCall({ name, agent }: { name: string; agent: string }): boolean {
+  return MODEL_CALL_SPAN_NAMES.has(name) || genAiOperationRoleOf({ agent, name }) === "modelCall";
+}
 
 interface SpanFactsView {
   name: string;
@@ -111,6 +118,12 @@ export class CodingAgentSessionSpanProjection {
     const durationMs = Math.max(0, span.endTimeUnixMs - span.startTimeUnixMs);
     const isLogsOnly = agent !== undefined && LOGS_ONLY_AGENT_IDS.has(agent);
 
+    const role =
+      agent !== undefined ? genAiOperationRoleOf({ agent, name: span.name }) : "undeclared";
+    if (role !== "undeclared") {
+      return this.applyGenAiOperation({ state, span, role, durationMs, context });
+    }
+
     if (span.name === CLAUDE.SPAN.LLM_REQUEST) {
       return this.applyClaudeLlmRequest({ state, attrs, durationMs, isLogsOnly, context });
     }
@@ -171,21 +184,40 @@ export class CodingAgentSessionSpanProjection {
     // Identity still rides the span; only the counted facts are the log's.
     if (isLogsOnly) return this.stateProjection.withIdentity(state, attrs);
     const before = this.stateProjection.withIdentity(state, attrs);
-    const folded = this.stateProjection.foldModelCall(before, attrs, durationMs);
+    const folded = this.stateProjection.foldModelCall({
+      state: before,
+      attrs,
+      fallbackDurationMs: durationMs,
+    });
     // Priced from the span's tokens with the same formula and the same
     // cache-write lifetime the trace pipeline applies to the identical span,
     // so the session and its traces state one figure. The cost the agent
     // reports about itself lands on agentReportedCostUsd instead.
+    return this.chargePricedCall({
+      before,
+      folded,
+      facts: this.claudeCallTokenFacts(attrs, this.traceCanonicalisation),
+      context,
+    });
+  }
+
+  /** One model call charged to its context at the cost computed from its tokens. */
+  private chargePricedCall({
+    before,
+    folded,
+    facts,
+    context,
+  }: {
+    before: CodingAgentSessionData;
+    folded: CodingAgentSessionData;
+    facts: Record<string, unknown>;
+    context: NonNullable<CodingAgentSessionSpanProjectionInput["context"]> | null;
+  }): CodingAgentSessionData {
     return this.stateProjection.chargeContextUsage({
       before,
       after: {
         ...folded,
-        costUsd:
-          folded.costUsd +
-          this.pricedFromTokens(
-            this.claudeCallTokenFacts(attrs, this.traceCanonicalisation),
-            this.modelProviders,
-          ),
+        costUsd: folded.costUsd + this.modelProviders.estimateCost(modelCallCostInput(facts)),
       },
       context,
     });
@@ -208,31 +240,63 @@ export class CodingAgentSessionSpanProjection {
     // declined foreign spans reusing this bare name, and one that still
     // arrives labeled as another agent contributes identity only.
     if (agent !== "codex" || isLogsOnly) return this.stateProjection.withIdentity(state, attrs);
-    const facts = this.codexTurnTokenFacts(attrs);
+    const facts = genAiModelCallFacts(attrs);
     // Fallback duration 0, not the span's: the turn's wall time includes the
     // tools that ran inside it, and zero reads honestly as "not measured".
     const before = this.stateProjection.withIdentity(state, attrs);
-    const folded = this.stateProjection.foldModelCall(before, facts, 0);
-    return this.stateProjection.chargeContextUsage({
-      before,
-      after: {
-        ...folded,
-        costUsd: folded.costUsd + this.pricedFromTokens(facts, this.modelProviders),
-      },
-      context,
+    const folded = this.stateProjection.foldModelCall({
+      state: before,
+      attrs: facts,
+      fallbackDurationMs: 0,
     });
+    return this.chargePricedCall({ before, folded, facts, context });
   }
 
-  private pricedFromTokens(
-    facts: Record<string, unknown>,
-    modelProviders: CodingAgentCostEstimator,
-  ): number {
-    return modelProviders.estimateCost({
+  /**
+   * One span of an agent that declares its GenAI operations: the root gives identity and start
+   * only, since its usage is the rollup of its model calls; each call and tool run counts once.
+   */
+  private applyGenAiOperation({
+    state,
+    span,
+    role,
+    durationMs,
+    context,
+  }: {
+    state: CodingAgentSessionData;
+    span: SpanFactsView;
+    role: GenAiOperationRole;
+    durationMs: number;
+    context: NonNullable<CodingAgentSessionSpanProjectionInput["context"]> | null;
+  }): CodingAgentSessionData {
+    const before = this.stateProjection.withIdentity(state, span.attrs);
+    if (role === "session") {
+      // The root's prompt names an unnamed session, as a Claude Code prompt event does.
+      return this.stateProjection.withTitle({
+        state: before,
+        value: this.stateProjection.coerceString(span.attrs[SESSION_TITLE_FALLBACK_FACT_KEY]),
+        source: "prompt",
+      });
+    }
+
+    if (role === "toolRun") {
+      return this.stateProjection.foldToolInvocation(before, {
+        attrs: { ...span.attrs, tool_name: span.attrs[GEN_AI_TOOL_NAME] },
+        failed: span.statusCode === SPAN_STATUS_ERROR,
+        toolMs: durationMs,
+        startedAtMs: span.startTimeUnixMs,
+      });
+    }
+
+    const facts = genAiModelCallFacts(span.attrs);
+    // A chat span wraps one request and no tools, so its wall time is the call's latency. Its AI
+    // units and per-model figures land on the per-call fact table, never on the session row.
+    const folded = this.stateProjection.foldModelCall({
+      state: before,
       attrs: facts,
-      model: this.stateProjection.coerceString(facts.model) ?? undefined,
-      promptTokens: this.stateProjection.number(facts.input_tokens),
-      completionTokens: this.stateProjection.number(facts.output_tokens),
+      fallbackDurationMs: durationMs,
     });
+    return this.chargePricedCall({ before, folded, facts, context });
   }
 
   private claudeCallTokenFacts(
@@ -253,19 +317,6 @@ export class CodingAgentSessionSpanProjection {
       ...(writesLongLived
         ? { "gen_ai.usage.cache_creation_1h.input_tokens": cacheWriteTokens }
         : {}),
-    };
-  }
-
-  private codexTurnTokenFacts(attrs: Record<string, unknown>): Record<string, unknown> {
-    return {
-      ...attrs,
-      input_tokens: this.stateProjection.number(attrs[CODEX.ATTR.INPUT_TOKENS]),
-      output_tokens: this.stateProjection.number(attrs[CODEX.ATTR.OUTPUT_TOKENS]),
-      cache_read_tokens: this.stateProjection.number(attrs[CODEX.ATTR.CACHE_READ_TOKENS]),
-      cache_creation_tokens: this.stateProjection.number(attrs[CODEX.ATTR.CACHE_CREATION_TOKENS]),
-      model:
-        this.stateProjection.coerceString(attrs["gen_ai.request.model"]) ??
-        this.stateProjection.coerceString(attrs[CODEX.ATTR.RESPONSE_MODEL]),
     };
   }
 }

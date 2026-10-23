@@ -75,8 +75,7 @@ function deploymentWithCeiling(seconds: string): StudioLambdaConfig {
   return buildStudioLambdaConfig({
     fields: {
       region: "eu-central-1",
-      accessKeyId: "key",
-      secretAccessKey: "secret",
+      credentials: { kind: "static", accessKeyId: "key", secretAccessKey: "secret" },
       roleArn: "arn:aws:iam::1:role/nlp",
       imageUri: IMAGE,
       cacheBucket: "langwatch-nlp-cache",
