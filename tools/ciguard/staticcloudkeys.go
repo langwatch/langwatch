@@ -12,12 +12,15 @@ import (
 	"github.com/langwatch/langwatch/pkg/ciscan"
 )
 
-// storedAWSKey matches a long-lived AWS key read from secrets, env or vars,
-// or passed as configure-aws-credentials' aws-access-key-id input. A shell
+// storedAWSKey matches a long-lived AWS key read from secrets, env or vars, by
+// property (`secrets.X`) or index (`secrets['X']`), or passed as
+// configure-aws-credentials' aws-access-key-id or aws-secret-access-key input,
+// in block or flow (`with: { aws-access-key-id: ... }`) style. A shell
 // `$AWS_ACCESS_KEY_ID` is a session the job already holds, so it is ignored.
 // Case-insensitive, because GitHub resolves context names case-insensitively.
 var storedAWSKey = regexp.MustCompile(
-	`(?i)\b(?:secrets|env|vars)\.[A-Z0-9_]*AWS_(?:ACCESS_KEY_ID|SECRET_ACCESS_KEY)\b|^\s*-?\s*aws-access-key-id\s*:`,
+	`(?i)\b(?:secrets|env|vars)\s*(?:\.\s*|\[\s*['"])[A-Z0-9_]*AWS_(?:ACCESS_KEY_ID|SECRET_ACCESS_KEY)\b` +
+		`|(?:^|[\s{,])['"]?aws-(?:access-key-id|secret-access-key)['"]?\s*:`,
 )
 
 // gateTerm matches one `&&` term of a fallback step's `if:` that holds only

@@ -109,6 +109,29 @@ func TestStaticCloudKeysIgnoresCase(t *testing.T) {
 	assert.Contains(t, problems[0], ".github/workflows/other.yml:18:")
 }
 
+// @scenario "A workflow that reads a stored AWS key fails CI"
+func TestStaticCloudKeysFindsKeysOutsideBlockStyle(t *testing.T) {
+	cases := map[string]string{
+		"flow mapping input": "      - uses: aws-actions/configure-aws-credentials@0000000000000000000000000000000000000000\n        with: { aws-region: eu-central-1, aws-access-key-id: \"${{ inputs.key }}\" }\n",
+		"quoted input key":   "      - uses: aws-actions/configure-aws-credentials@0000000000000000000000000000000000000000\n        with:\n          'aws-secret-access-key': ${{ inputs.secret }}\n",
+		"index into secrets": "      - env:\n          K: ${{ secrets['AWS_ACCESS_KEY_ID'] }}\n        run: aws s3 ls\n",
+		"index into vars":    "      - env:\n          K: ${{ vars[\"MATRIX_AWS_SECRET_ACCESS_KEY\"] }}\n        run: aws s3 ls\n",
+	}
+	for name, step := range cases {
+		t.Run(name, func(t *testing.T) {
+			workflow := strings.Replace(oidcOnlyWorkflow, "      - run: aws s3 ls \"$AWS_ACCESS_KEY_ID\"\n", step, 1)
+			require.NotEqual(t, oidcOnlyWorkflow, workflow)
+
+			problems, err := ciguard.StaticCloudKeys(writeRepo(t, map[string]string{".github/workflows/other.yml": workflow}))
+
+			require.NoError(t, err)
+			require.Len(t, problems, 1)
+			assert.Contains(t, problems[0], ".github/workflows/other.yml:")
+			assert.Contains(t, problems[0], ": stored AWS key:")
+		})
+	}
+}
+
 // @scenario "A composite action that reads a stored AWS key fails CI"
 func TestStaticCloudKeysScansCompositeActions(t *testing.T) {
 	action := "runs:\n  using: composite\n  steps:\n    - uses: aws-actions/configure-aws-credentials@0000000000000000000000000000000000000000\n      with:\n        aws-access-key-id: ${{ inputs.key }}\n"
