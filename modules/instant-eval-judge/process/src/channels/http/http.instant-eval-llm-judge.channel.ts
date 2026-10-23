@@ -53,6 +53,10 @@ export class HttpInstantEvalLlmJudgeChannel implements InstantEvalLlmJudgeChanne
     return new HttpInstantEvalLlmJudgeChannel(keys, dispatcher);
   }
 
+  isConfigured(wire: InstantEvalLlmJudgeWire): boolean {
+    return this.keys[wire] !== undefined;
+  }
+
   async judge(
     { wire, model, job, question, text, timeoutMs }: InstantEvalLlmJudgeRequest,
     signal?: AbortSignal,

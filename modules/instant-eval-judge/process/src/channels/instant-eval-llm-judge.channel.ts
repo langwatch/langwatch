@@ -23,8 +23,8 @@ export const llmJudgeOpenAiApiKey = Secret.load("INSTANT_EVAL_OPENAI_API_KEY", {
 
 export interface InstantEvalLlmJudgeRequest {
   readonly wire: InstantEvalLlmJudgeWire;
-  /** The provider's model id; absent, the wire's default. */
-  readonly model?: string;
+  /** The provider's model id, from the route table; there is no default. */
+  readonly model: string;
   readonly job: InstantEvalJudgeJob;
   readonly question: InstantEvalBooleanQuestion;
   readonly text: string;
@@ -42,6 +42,8 @@ export type InstantEvalLlmJudgeAnswer =
     }>;
 
 export interface InstantEvalLlmJudgeChannel {
+  /** Whether this install holds LangWatch's key for the wire. */
+  isConfigured(wire: InstantEvalLlmJudgeWire): boolean;
   judge(
     request: InstantEvalLlmJudgeRequest,
     signal?: AbortSignal,

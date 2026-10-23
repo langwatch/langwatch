@@ -1,4 +1,5 @@
 import {
+  INSTANT_EVAL_JUDGE_DEFAULT_ROUTE_PRICING,
   INSTANT_EVAL_JUDGE_DEFAULT_ROUTE_TABLE,
   INSTANT_EVAL_JUDGE_JOBS,
   INSTANT_EVAL_JUDGE_MODES,
@@ -10,6 +11,7 @@ import {
   syntheticRouteTable,
   yesNo,
 } from "../../__tests__/support/instant-eval-judge-route.test-fakes.ts";
+import { instantEvalJudgeRouteBootIssues } from "../instant-eval-judge-route-boot.rules.ts";
 import { instantEvalJudgeCallCostOf } from "../instant-eval-judge-route-cost.rules.ts";
 import {
   instantEvalJudgeRoutePlanOf,
@@ -258,5 +260,39 @@ describe("a routed call's cost", () => {
     expect(cost({ backend: "other", inputTokens: 1, outputTokens: 0 })).toEqual({
       outcome: "unpriced",
     });
+  });
+});
+
+describe("the boot check", () => {
+  const price = { usdPerMillionInputTokens: 1, usdPerMillionOutputTokens: 0 };
+
+  /** @scenario "A route table that cannot bill or call a backend refuses to boot" */
+  it("accepts the public table at the published rate without asking for keys", () => {
+    expect(
+      instantEvalJudgeRouteBootIssues({
+        table: INSTANT_EVAL_JUDGE_DEFAULT_ROUTE_TABLE,
+        pricing: INSTANT_EVAL_JUDGE_DEFAULT_ROUTE_PRICING,
+      }),
+    ).toEqual([]);
+  });
+
+  /** @scenario "A route table that cannot bill or call a backend refuses to boot" */
+  it("names every reachable backend with no price or no key, and skips switched-off ones", () => {
+    const off = syntheticRouteTable({
+      backends: { "llm-a": { kind: "anthropic_messages", model: "m", enabled: false } },
+    });
+    const issues = instantEvalJudgeRouteBootIssues({
+      table: off,
+      pricing: {
+        version: "t",
+        markup: 1.3,
+        backends: { "decision-a": price, "decision-b": price },
+      },
+      isHeld: (kind) => kind !== "openai_responses",
+    });
+    expect(issues).toEqual([
+      "backend llm-b: no price in the route pricing",
+      "backend llm-b: no openai_responses key or channel on this install",
+    ]);
   });
 });

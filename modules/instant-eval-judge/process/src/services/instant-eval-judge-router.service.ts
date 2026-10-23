@@ -44,7 +44,7 @@ type InstantEvalJudgeRouterServiceDeps = Readonly<{
   hostedDecisions: InstantEvalHostedDecisionsChannel | undefined;
   llmJudge: InstantEvalLlmJudgeChannel;
   limiter: InstantEvalRateLimiter;
-  logger?: Pick<Logger, "warn">;
+  logger?: Pick<Logger, "error">;
 }>;
 
 /** A routed classification: today's input with the route it carries. */
@@ -64,7 +64,7 @@ type Leg =
   | Readonly<{ outcome: "failed"; reason: InstantEvalSkipReason; error?: unknown }>;
 
 export class InstantEvalJudgeRouterService {
-  private readonly logger: Pick<Logger, "warn">;
+  private readonly logger: Pick<Logger, "error">;
 
   private constructor(private readonly deps: InstantEvalJudgeRouterServiceDeps) {
     this.logger = deps.logger ?? defaultLogger;
@@ -131,7 +131,7 @@ class RouteRun {
   private readonly plan: InstantEvalJudgeRoutePlan;
   private readonly projectId: string;
   private readonly signal: AbortSignal | undefined;
-  private readonly logger: Pick<Logger, "warn">;
+  private readonly logger: Pick<Logger, "error">;
   private readonly flags: string[] = [];
   private inputTokens = 0;
   private costNanoUsd = 0;
@@ -141,7 +141,7 @@ class RouteRun {
     plan: InstantEvalJudgeRoutePlan;
     projectId: string;
     signal: AbortSignal | undefined;
-    logger: Pick<Logger, "warn">;
+    logger: Pick<Logger, "error">;
   }) {
     this.deps = input.deps;
     this.plan = input.plan;
@@ -160,7 +160,7 @@ class RouteRun {
     if (first.outcome === "failed") {
       if (!escalateTo) return this.nothingAnswered(first);
       this.flags.push("primary_failed");
-      const second = await this.ask({ backend: escalateTo, questions });
+      const second = await this.ask({ backend: escalateTo, questions, skip: [primary] });
       if (second.outcome === "failed") return this.nothingAnswered(second);
       return this.result({ questions, legs: [second], escalated: second.probabilities.size });
     }
@@ -182,7 +182,12 @@ class RouteRun {
             isUnsureVerdict({ probability: first.probabilities.get(q.id), threshold }),
           );
     if (!escalateTo || unsure.length === 0) return this.result({ questions, legs: [first] });
-    const second = await this.ask({ backend: escalateTo, questions: unsure });
+    // The escalation's fallbacks never ask the primary again: it already answered or failed.
+    const second = await this.ask({
+      backend: escalateTo,
+      questions: unsure,
+      skip: [this.plan.primary],
+    });
     const escalated = second.outcome === "answered" ? second.probabilities.size : 0;
     if (escalated < unsure.length) this.flags.push("escalation_failed");
     if (second.outcome === "failed") return this.result({ questions, legs: [first] });
@@ -345,12 +350,14 @@ class RouteRun {
     questions: readonly InstantEvalBooleanQuestion[];
     timeoutMs: number;
   }): Promise<Leg> {
+    // The table refuses an LLM backend with no model at boot; this keeps the type honest.
+    if (!model) return { outcome: "failed", reason: "classifier_not_configured" };
     const answers = await Promise.all(
       questions.map((question) =>
         this.deps.llmJudge.judge(
           {
             wire,
-            ...(model ? { model } : {}),
+            model,
             job: this.plan.job,
             question,
             text: this.plan.fullText,
@@ -400,7 +407,11 @@ class RouteRun {
       return;
     }
     this.flags.push(`unpriced:${backend}`);
-    this.logger.warn({ backend }, "Instant Evals router called a backend with no configured price");
+    // Boot refuses a table with an unpriced reachable backend, so this is a bug, not a deploy slip.
+    this.logger.error(
+      { backend },
+      "Instant Evals router called a backend with no configured price",
+    );
   }
 
   /** Nothing answered: the platform's skip reason, or today's throw when a channel threw. */

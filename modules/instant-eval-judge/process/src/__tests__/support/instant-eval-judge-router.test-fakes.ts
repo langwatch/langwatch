@@ -61,6 +61,10 @@ export class ScriptedInstantEvalLlmJudgeChannel implements InstantEvalLlmJudgeCh
     return new ScriptedInstantEvalLlmJudgeChannel(answer);
   }
 
+  isConfigured(): boolean {
+    return true;
+  }
+
   async judge(request: InstantEvalLlmJudgeRequest): Promise<InstantEvalLlmJudgeAnswer> {
     this.requests.push(request);
     return this.answer(request);

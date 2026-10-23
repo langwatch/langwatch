@@ -5,6 +5,9 @@ import {
   type InstantEvalClassification,
   instantEvalJudgeConfig,
   type InstantEvalJudgeAnswer,
+  type InstantEvalJudgeBackendKind,
+  type InstantEvalJudgeRoutePricing,
+  type InstantEvalJudgeRouteTable,
   InstantEvalJudgeApi,
   type InstantEvalJudgeCall,
   type InstantEvalJudgeLedgerSpend,
@@ -40,6 +43,7 @@ import {
   type InstantEvalJudgeSpendPipeline,
 } from "../eventing/instant-eval-judge-spend.pipeline.ts";
 import type { InstantEvalJudgeRepositories } from "../repositories/instant-eval-judge.repositories.ts";
+import { instantEvalJudgeRouteBootIssues } from "../rules/instant-eval-judge-route-boot.rules.ts";
 import { InstantEvalJudgeFactsService } from "../services/instant-eval-judge-facts.service.ts";
 import { InstantEvalJudgeRouterService } from "../services/instant-eval-judge-router.service.ts";
 import { InstantEvalJudgeService } from "../services/instant-eval-judge.service.ts";
@@ -90,8 +94,10 @@ export class InstantEvalJudgeModule implements InstantEvalJudgeApi {
     this.#classifier = classifier;
     this.#limiter = InstantEvalJudgeModule.limiterOf(setup);
     const routePricing = setup.config.judgeRoutePricing ?? INSTANT_EVAL_JUDGE_DEFAULT_ROUTE_PRICING;
+    const routeTable = setup.config.judgeRoutes ?? INSTANT_EVAL_JUDGE_DEFAULT_ROUTE_TABLE;
+    InstantEvalJudgeModule.assertRoutable({ setup, table: routeTable, pricing: routePricing });
     this.#router = InstantEvalJudgeRouterService.create({
-      table: setup.config.judgeRoutes ?? INSTANT_EVAL_JUDGE_DEFAULT_ROUTE_TABLE,
+      table: routeTable,
       pricing: routePricing,
       classifier,
       hostedDecisions: setup.channels.hostedDecisions,
@@ -126,6 +132,36 @@ export class InstantEvalJudgeModule implements InstantEvalJudgeApi {
       );
     }
     return new InstantEvalJudgeModule(setup);
+  }
+
+  /**
+   * Refuses to boot on a route table it cannot bill or call: every backend a slot can reach needs
+   * a price and, for a configured table, this install's key and channel for its kind.
+   */
+  private static assertRoutable({
+    setup,
+    table,
+    pricing,
+  }: {
+    setup: InstantEvalJudgeSetup;
+    table: InstantEvalJudgeRouteTable;
+    pricing: InstantEvalJudgeRoutePricing;
+  }): void {
+    const { classifier, hostedDecisions, llmJudge } = setup.channels;
+    const isHeld = (kind: InstantEvalJudgeBackendKind): boolean => {
+      if (kind === "jev") return classifier !== undefined;
+      if (kind === "decisions") return hostedDecisions !== undefined;
+      return llmJudge.isConfigured(kind);
+    };
+    const issues = instantEvalJudgeRouteBootIssues({
+      table,
+      pricing,
+      ...(setup.config.judgeRoutes ? { isHeld } : {}),
+    });
+    if (issues.length === 0) return;
+    throw new Error(
+      `INSTANT_EVAL_JUDGE_ROUTES and INSTANT_EVAL_JUDGE_PRICING cannot route: ${issues.join("; ")}`,
+    );
   }
 
   private static limiterOf({
