@@ -1491,7 +1491,7 @@ type Input = z.infer<typeof traceScopeSchema>; // ../contract/src/features/edit-
 
 ### `traces`
 
-Contract `../contract/src/traces.trpc.ts:189`, router `src/transport/traces.trpc.ts:44`.
+Contract `../contract/src/traces.trpc.ts:189`, router `src/transport/traces.trpc.ts:48`.
 
 | Procedure                              | Kind         | Gate                                                                  | Input                           | Output                             |
 | -------------------------------------- | ------------ | --------------------------------------------------------------------- | ------------------------------- | ---------------------------------- |
