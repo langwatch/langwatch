@@ -8,9 +8,10 @@ profiles:
     # partitions whose key is outside the sorting key (26.3), and column statistics prune parts
     # (26.4). Settings the profile sets explicitly still win.
     compatibility: "25.10"
-    # Named as well: this app now sends instants as strings, but an older app still running
-    # in a rolling upgrade, or any other client, may send epoch milliseconds as bare JSON
-    # integers, which 26.8 reads as seconds (9999-12-31). Raising compatibility must not.
+    # Named as well: from 26.8 a bare JSON integer into DateTime64 reads as seconds and saturates
+    # at 9999-12-31. The app now sends instants, but an older app release during a rolling upgrade
+    # and clients outside the app may still send epoch milliseconds; raising compatibility must not
+    # silently change those.
     input_format_read_datetime_number_as_raw_value: 1
     # 26.2 turns insert deduplication on for async inserts and materialized views (#95970).
     deduplicate_insert: backward_compatible_choice

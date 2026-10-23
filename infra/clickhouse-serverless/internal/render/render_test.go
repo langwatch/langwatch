@@ -282,7 +282,7 @@ func TestRenderAll_LimitsContainsMergeTreeSettings(t *testing.T) {
 	}
 }
 
-// @scenario "ClickHouse 26.8 keeps the 25.10 behaviour and on-disk formats"
+// @scenario "The image holds 25.10 behaviour on ClickHouse 26.8"
 func TestRenderAll_UpgradePinsHold25_10Behaviour(t *testing.T) {
 	dir := t.TempDir()
 	input := testInput()
