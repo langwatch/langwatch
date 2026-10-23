@@ -14,6 +14,7 @@ describe("given a mux that serves requests", () => {
   });
   afterEach(() => provider.uninstall());
 
+  /** @scenario "A request is recorded under its mount prefix, method and status" */
   it("records duration by mount prefix, method and status, never the raw path", async () => {
     const mux = HttpMux.create()
       .route("/api", () => new Response("no", { status: 503 }))
@@ -36,6 +37,7 @@ describe("given a mux that serves requests", () => {
     );
   });
 
+  /** @scenario "A router that matched a template replaces the mount prefix" */
   it("prefers the template an inner router noted for the request", async () => {
     const mux = HttpMux.create().route("/api", (request) => {
       noteRouteTemplate(request, "/api/users/:id");
@@ -49,6 +51,7 @@ describe("given a mux that serves requests", () => {
     ).toHaveLength(1);
   });
 
+  /** @scenario "An unknown method collapses into one series" */
   it("collapses unknown methods into one series", async () => {
     const mux = HttpMux.create().route("/", () => new Response("ok"));
 
@@ -57,6 +60,7 @@ describe("given a mux that serves requests", () => {
     expect(provider.valuesOf(NAME, { http_request_method: "_OTHER" })).toHaveLength(1);
   });
 
+  /** @scenario "A route that throws is recorded as a server error" */
   it("records a 500 when a route throws", async () => {
     const mux = HttpMux.create().route("/api", () => {
       throw new Error("boom");

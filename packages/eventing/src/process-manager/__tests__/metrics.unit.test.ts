@@ -62,6 +62,7 @@ describe("process-manager fleet gauges", () => {
   });
 
   describe("given the source is unbound at shutdown", () => {
+    /** @scenario "Unbinding at shutdown silences the gauges" */
     it("reports nothing, including collection success", async () => {
       bindProcessFleetMetricsSource(async () => [
         {

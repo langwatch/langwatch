@@ -50,6 +50,7 @@ export interface HttpServerRequest {
   readonly durationSeconds: number;
 }
 
+/** Record one inbound request's duration against its bounded route label. */
 export function recordHttpServerRequest({
   method,
   route,

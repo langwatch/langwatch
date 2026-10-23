@@ -16,6 +16,7 @@ describe("given a router that notes the matched template", () => {
   );
   app.all("*", (context) => context.text("nope", 404));
 
+  /** @scenario "A router that matched a template replaces the mount prefix" */
   it("notes the template rather than the requested path", async () => {
     const request = new Request("http://localhost/api/traces/abc-123");
     await app.fetch(request);

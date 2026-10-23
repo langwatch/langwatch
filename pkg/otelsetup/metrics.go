@@ -31,6 +31,9 @@ func newMetricReader(ctx context.Context, endpointURL string, headers map[string
 	}
 	var readerOpts []sdkmetric.PeriodicReaderOption
 	for _, p := range producers {
+		if p == nil {
+			continue
+		}
 		readerOpts = append(readerOpts, sdkmetric.WithProducer(p))
 	}
 	return sdkmetric.NewPeriodicReader(exp, readerOpts...), nil

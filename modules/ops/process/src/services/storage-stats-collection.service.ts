@@ -8,9 +8,10 @@ import { HandledError, isTransientRefusal } from "@langwatch/handled-error";
 import type { Logger } from "@langwatch/observability";
 import { toEpochMs } from "@langwatch/time";
 
-import type {
-  BackupStatusRow,
-  StorageFootprintRepository,
+import {
+  type BackupStatusRow,
+  isPlainClusterName,
+  type StorageFootprintRepository,
 } from "../repositories/storage-footprint.repository.ts";
 import type {
   StorageStatsReading,
@@ -54,7 +55,14 @@ export class StorageStatsCollectionService {
   private backupsFailing = false;
   private backupLogAbsent = false;
 
-  private constructor(private readonly options: StorageStatsCollectionOptions) {}
+  private constructor(private readonly options: StorageStatsCollectionOptions) {
+    const name = options.clusterName?.trim();
+    if (name && !isPlainClusterName(name)) {
+      options.logger.warn(
+        "CLICKHOUSE_CLUSTER is not a plain identifier, so backup history is read from one node only",
+      );
+    }
+  }
 
   /** One pass over every configured endpoint; each `ops_storage_stats` wake runs one. */
   async collect(): Promise<void> {

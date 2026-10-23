@@ -1,5 +1,10 @@
 import type { StorageStatsReading } from "./storage-stats-readings.repository.ts";
 
+/** A cluster name is spliced as an identifier, so only a plain one is trusted. */
+export function isPlainClusterName(name: string): boolean {
+  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(name);
+}
+
 /** One status in a ClickHouse endpoint's backup log, with its last success where it has one. */
 export interface BackupStatusRow {
   status: string;

@@ -2,6 +2,7 @@ import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 
 import {
   type BackupStatusRow,
+  isPlainClusterName,
   StorageFootprintRepository,
 } from "../storage-footprint.repository.ts";
 import type { StorageStatsReading } from "../storage-stats-readings.repository.ts";
@@ -87,7 +88,7 @@ export class ClickHouseStorageFootprintRepository extends StorageFootprintReposi
   async findBackupStatuses({ cluster }: { cluster?: string | undefined } = {}): Promise<
     BackupStatusRow[]
   > {
-    if (!(await this.hasBackupLog())) return [];
+    if (!(await this.hasBackupLog({ cluster }))) return [];
     const result = await this.clickhouse.query<{
       status: string;
       cnt: string;
@@ -103,6 +104,7 @@ export class ClickHouseStorageFootprintRepository extends StorageFootprintReposi
           argMaxIf(total_size, end_time, status = 'BACKUP_CREATED') as last_success_size
         FROM ${backupLogSource(cluster)}
         GROUP BY status
+        ${clusterSettings(cluster)}
       `,
       // System.backup_log carries no tenant column: this is the instance's backup history.
       SKIP_TENANT_CHECK: true,
@@ -116,10 +118,11 @@ export class ClickHouseStorageFootprintRepository extends StorageFootprintReposi
   }
 
   /** Asked first: a server without the table would log an HTTP error for the query. */
-  private async hasBackupLog(): Promise<boolean> {
+  private async hasBackupLog({ cluster }: { cluster?: string | undefined }): Promise<boolean> {
     const result = await this.clickhouse.query<{ present: string }>({
       tenantId: "",
-      sql: "SELECT count() AS present FROM system.tables WHERE database = 'system' AND name = 'backup_log'",
+      sql: `SELECT count() AS present FROM ${systemTablesSource(cluster)}
+        WHERE database = 'system' AND name = 'backup_log' ${clusterSettings(cluster)}`,
       // System.tables carries no tenant column: this asks what the server has.
       SKIP_TENANT_CHECK: true,
     });
@@ -127,12 +130,22 @@ export class ClickHouseStorageFootprintRepository extends StorageFootprintReposi
   }
 }
 
-/** A cluster name is spliced as an identifier, so only a plain one is trusted. */
-const CLUSTER_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+function clusterOf(cluster: string | undefined): string | undefined {
+  const name = cluster?.trim();
+  return name && isPlainClusterName(name) ? name : undefined;
+}
 
 function backupLogSource(cluster: string | undefined): string {
-  const name = cluster?.trim();
-  return name && CLUSTER_NAME.test(name)
-    ? `clusterAllReplicas('${name}', system.backup_log)`
-    : "system.backup_log";
+  const name = clusterOf(cluster);
+  return name ? `clusterAllReplicas('${name}', system.backup_log)` : "system.backup_log";
+}
+
+function systemTablesSource(cluster: string | undefined): string {
+  const name = clusterOf(cluster);
+  return name ? `clusterAllReplicas('${name}', system.tables)` : "system.tables";
+}
+
+/** One unreachable replica must not blank the reading the others can still answer. */
+function clusterSettings(cluster: string | undefined): string {
+  return clusterOf(cluster) ? "SETTINGS skip_unavailable_shards = 1" : "";
 }
