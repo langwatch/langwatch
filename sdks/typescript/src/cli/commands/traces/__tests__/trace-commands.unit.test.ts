@@ -29,6 +29,23 @@ vi.mock("@/client-sdk/services/traces/traces-api.service", async (importOriginal
   };
 });
 
+const recordedCounts = vi.hoisted(() => [] as { count: number; message: string }[]);
+
+vi.mock("../../../telemetry/events", async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    createCommandEvents: () => ({
+      started: () => undefined,
+      count: (args: { count: number; message: string }) => recordedCounts.push(args),
+      progress: () => undefined,
+      completed: () => undefined,
+      failed: () => undefined,
+      flush: () => Promise.resolve(),
+    }),
+  };
+});
+
 vi.mock("../../../utils/apiKey", () => ({
   resolveCredentials: vi.fn(async () => ({
     apiKey: "test-key",
@@ -544,16 +561,33 @@ describe("exportTracesCommand()", () => {
     });
 
     /** @scenario export requests one page when the limit fits in a single page */
-    it("makes exactly one request at the page cap and trims it to the limit", async () => {
+    it("makes exactly one request asking for the limit", async () => {
       fetchMock.mockResolvedValueOnce(
-        pageResponse({ count: 500, from: 0, scrollId: "s1", totalHits: 500 }),
+        pageResponse({ count: 50, from: 0, scrollId: "s1", totalHits: 500 }),
       );
 
       await exportTracesCommand({ limit: "50" });
 
       expect(fetchMock).toHaveBeenCalledTimes(1);
-      expect(requestBodies()[0]!.pageSize).toBe(1000);
+      expect(requestBodies()[0]!.pageSize).toBe(50);
       expect(writtenOutput().trim().split("\n")).toHaveLength(50);
+    });
+
+    /** @scenario export reports the match count once, from the first page */
+    it("reports the match count once when the first page held only skipped rows", async () => {
+      recordedCounts.length = 0;
+      fetchMock
+        .mockResolvedValueOnce(
+          pageResponse({ count: 0, from: 0, scrollId: "s1", totalHits: 5000, skipped: 10 }),
+        )
+        .mockResolvedValueOnce(
+          pageResponse({ count: 1000, from: 0, scrollId: "s2", totalHits: 5000 }),
+        );
+
+      await exportTracesCommand({ limit: "1000" });
+
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(recordedCounts.map(({ count }) => count)).toEqual([5000]);
     });
 
     /** @scenario export keeps paging through a page the server answered short */

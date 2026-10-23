@@ -183,15 +183,13 @@ async function fetchExportPages({
   let matched = 0;
   let scrollId: string | undefined;
 
-  // Page until the requested limit is met or the result set is exhausted. The
-  // cursor alone says "there may be more": the server may answer a page shorter
-  // than asked (it clamps the size, or skips rows that failed to serialise), so
-  // only a missing cursor or an empty page ends the walk.
-  for (;;) {
-    // Every request asks for the same size: the server drops a cursor minted at another
-    // page size and starts over. The output is trimmed to the limit on write instead.
-    const pageSize = search.includeSpans ? SPANS_PAGE_CAP : SERVER_PAGE_CAP;
-
+  // One page of exactly the limit when it fits; past that, every page asks the cap (the
+  // server drops a cursor minted at another size) and the output is trimmed on write.
+  // A page may come back short (clamped, or rows skipped), so only a missing cursor or
+  // an empty page ends the walk.
+  const cap = search.includeSpans ? SPANS_PAGE_CAP : SERVER_PAGE_CAP;
+  const pageSize = Math.min(limit, cap);
+  for (let page = 0; ; page += 1) {
     const response = await requestSearchPage({ search, pageSize, scrollId });
 
     if (!response.ok) await failExport({ response, events, spinner });
@@ -203,7 +201,7 @@ async function fetchExportPages({
     traces.push(...pageTraces.slice(0, limit - traces.length));
     matched = data.pagination?.totalHits ?? traces.length;
 
-    if (traces.length === pageTraces.length) {
+    if (page === 0) {
       // First page: report the match count the moment it is known.
       events.count({
         count: matched,

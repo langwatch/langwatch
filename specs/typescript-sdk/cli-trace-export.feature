@@ -36,8 +36,13 @@ Feature: CLI trace export paging and span depth
   @unit
   Scenario: export requests one page when the limit fits in a single page
     When I run "langwatch trace export --limit 50"
-    Then the CLI makes exactly one search request at the page cap
-    And the exported output is trimmed to 50 traces
+    Then the CLI makes exactly one search request with pageSize 50
+
+  @unit
+  Scenario: export reports the match count once, from the first page
+    Given the first page holds only rows the server skipped and the second page holds traces
+    When I run "langwatch trace export --limit 1000"
+    Then the match count is reported once, from the first page
 
   @unit
   Scenario: export keeps paging through a page the server answered short
