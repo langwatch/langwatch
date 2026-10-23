@@ -491,12 +491,12 @@ describe("ProcessManagerService", () => {
       });
       const originalFindByRef = store.findByRef.bind(store);
       const originalHasConsumed = store.hasConsumedSource.bind(store);
-      let raced = false;
+      let hasInjectedRace = false;
       let inboxChecks = 0;
       store.findByRef = async <State = unknown>(params: { ref: ProcessRef }) => {
         const result = await originalFindByRef<State>(params);
-        if (!raced && result) {
-          raced = true;
+        if (!hasInjectedRace && result) {
+          hasInjectedRace = true;
           // A wake-like commit lands first, so the first attempt loses the race.
           await store.commit({
             ref: pilotRef,
