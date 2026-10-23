@@ -327,7 +327,7 @@ type TargetProofArguments<Composed extends boolean, Fields extends string> = Com
     : Readonly<{ authorizations: Readonly<Record<Fields, Authorization>> }>
   : unknown;
 
-/** A permission asked at a further project, named by an input field of its own (ADR-183 §2). */
+/** A permission asked at a further project, named by an input field of its own (ADR-185 §2). */
 export type TrpcFurtherPermission = Readonly<{
   permission: AuthzPermission;
   via: ScopeTierField;
@@ -652,7 +652,7 @@ export interface TrpcRouterImplementation<
 
 /**
  * A procedure asking one permission, which may ask one more at a further project its input names
- * by a field of its own (ADR-183 §2): both asked before the handler, one proof per target.
+ * by a field of its own (ADR-185 §2): both asked before the handler, one proof per target.
  */
 export interface TrpcComposableImplementation<
   Api,
@@ -837,7 +837,7 @@ function routerBuilder<Api, Contract extends BuiltTrpcContract, Implemented exte
           ),
       };
     };
-    /** A declared access, and each further permission asked after it (ADR-183 §2). */
+    /** A declared access, and each further permission asked after it (ADR-185 §2). */
     const composable = (
       access: AccessDeclaration,
       further: readonly TrpcFurtherPermission[],
@@ -1072,7 +1072,7 @@ function accessDeclarationOf({
 
 /**
  * A further permission composes only as one permission beside a first that asks one, at a field
- * of the input's own that no scope field and no earlier target already names (ADR-183 §2).
+ * of the input's own that no scope field and no earlier target already names (ADR-185 §2).
  */
 function furtherPermissionOf({
   contract,
@@ -1786,7 +1786,7 @@ async function admittedScope({
   };
 }
 
-/** A target after the first, with the scope its own input field named (ADR-183 §2). */
+/** A target after the first, with the scope its own input field named (ADR-185 §2). */
 type FurtherTarget = Readonly<{
   permission: AuthzPermission;
   field: string;

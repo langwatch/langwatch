@@ -68,7 +68,7 @@ export function aggregateProof({
   });
 }
 
-/** A reader's proof carrying braids (ADR-183): own on the reader, one `span` grant per braid. */
+/** A reader's proof carrying braids (ADR-185): own on the reader, one `span` grant per braid. */
 export function braidedProof({
   projectId,
   braids,

@@ -40,7 +40,7 @@ type PendingUsage = {
 };
 
 /**
- * Verifies a span's `langwatch.signature` (ADR-183 §4) without the secret leaving this module.
+ * Verifies a span's `langwatch.signature` (ADR-185 §4) without the secret leaving this module.
  * A key, or its absence, is held for `SIGNING_KEY_LOOKUP_CACHE_MS`; each verdict on a known key
  * is counted in memory and written every `SIGNING_KEY_USAGE_FLUSH_MS`, never once per span.
  */

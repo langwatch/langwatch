@@ -1,5 +1,5 @@
 /**
- * A braid with no condition (ADR-183 §3), against production schema: opening a trace the reader
+ * A braid with no condition (ADR-185 §3), against production schema: opening a trace the reader
  * holds reads every owner span under that trace id, whatever its name or attributes, and opening
  * a trace only the owner holds reads none. Spec: modules/authz/specs/braids.feature
  */

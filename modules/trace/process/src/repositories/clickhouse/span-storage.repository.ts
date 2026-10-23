@@ -305,7 +305,7 @@ function dedupInTuple(extraInnerWhere: string): string {
 }
 
 /**
- * One span id's latest versions under braids (ADR-183 §3), one per project holding it: the
+ * One span id's latest versions under braids (ADR-185 §3), one per project holding it: the
  * condition on the outer select, the election fenced by tenants and windows alone. The fence
  * alone names tenants, so the caller keeps the owner's row.
  */
@@ -827,7 +827,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     return this.deps.clickhouse.as(authorization, { reads: "traces" });
   }
 
-  /** The trace view's reader: braided owner spans under their conditions (ADR-183 §5). */
+  /** The trace view's reader: braided owner spans under their conditions (ADR-185 §5). */
   private spanReader(authorization: Authorization): TenantScopedReader {
     return this.deps.clickhouse.as(authorization, { reads: "spans" });
   }

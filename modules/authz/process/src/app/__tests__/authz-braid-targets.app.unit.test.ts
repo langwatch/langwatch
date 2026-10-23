@@ -1,6 +1,6 @@
 /**
  * AuthzApi.listBraidTargets through the composed app over memory twins: the braid dialog's
- * picker, decided for the viewer in one batch (ADR-183 §2).
+ * picker, decided for the viewer in one batch (ADR-185 §2).
  * @see modules/authz/specs/braids.feature
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";

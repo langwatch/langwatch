@@ -53,7 +53,7 @@ export const AUTHZ_GRANT_PIPELINE_NAME = "authz_grant" as const;
 interface EventingAuthzAdapterOptions {
   authzGrantsWriteStore: AuthzGrantProjectionRepository;
   authzAuditTrailStore: AuthzAuditTrailRepository;
-  /** Lets a revoked braid's audit entry name both projects and the condition (ADR-183 §2). */
+  /** Lets a revoked braid's audit entry name both projects and the condition (ADR-185 §2). */
   authzBraidReads?: Pick<AuthzLedgerReadRepository, "findBraids">;
   /** Absent on the consumer-only twin, which bumps no session version. */
   sessionVersions?: AuthzSessionVersionService;

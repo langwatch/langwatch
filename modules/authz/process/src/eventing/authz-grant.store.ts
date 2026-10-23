@@ -554,7 +554,7 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     return { grantId, wasAttached: true };
   }
 
-  /** ADR-183 §1: one braid's grant under a fresh id; the caller holds the reader's lock. */
+  /** ADR-185 §1: one braid's grant under a fresh id; the caller holds the reader's lock. */
   async attachBraidGrant({
     organizationId,
     readerProjectId,

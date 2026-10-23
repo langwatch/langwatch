@@ -1,5 +1,5 @@
 /**
- * Analytics shows only the project's own spans (ADR-183 §5), against production schema: a trace
+ * Analytics shows only the project's own spans (ADR-185 §5), against production schema: a trace
  * both projects hold, read through the analytics service the panels and Langy's `analytics query`
  * call. Spec: modules/trace/specs/braided-spans.feature; the other six surfaces: modules/trace.
  */

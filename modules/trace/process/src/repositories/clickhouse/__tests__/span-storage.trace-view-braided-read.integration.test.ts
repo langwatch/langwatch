@@ -1,5 +1,5 @@
 /**
- * Every trace-view read of a braided trace, against production schema (ADR-183 §3, §5): each
+ * Every trace-view read of a braided trace, against production schema (ADR-185 §3, §5): each
  * returns the reader's spans and the owner's matching spans, naming the owner on its own. A read
  * that does not ask for `spans` stays the reader's own. Spec: braided-spans.feature
  */

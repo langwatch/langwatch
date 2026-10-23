@@ -451,7 +451,7 @@ export class PlatformPermissionNotAssignableError extends HandledError {
   }
 }
 
-/** Why a braid's condition was refused on save (ADR-183 §3). */
+/** Why a braid's condition was refused on save (ADR-185 §3). */
 export const BRAID_CONDITION_REFUSAL_CODES = [
   "braid_condition_unsupported",
   "braid_condition_syntax",
@@ -496,7 +496,7 @@ export class BraidConditionRefusedError extends HandledError {
   }
 }
 
-/** A project never braids into itself (ADR-183 §1). */
+/** A project never braids into itself (ADR-185 §1). */
 export class BraidIntoItselfError extends HandledError {
   declare readonly code: "braid_into_itself";
 
@@ -594,7 +594,7 @@ export class BraidNotOnProjectError extends HandledError {
   }
 }
 
-/** A reader holds at most BRAID_MAX_DISTINCT_CONDITIONS distinct conditions (ADR-183 §3). */
+/** A reader holds at most BRAID_MAX_DISTINCT_CONDITIONS distinct conditions (ADR-185 §3). */
 export class BraidConditionLimitReachedError extends HandledError {
   declare readonly code: "braid_condition_limit_reached";
 
@@ -608,7 +608,7 @@ export class BraidConditionLimitReachedError extends HandledError {
   }
 }
 
-/** The change is durable but the epoch did not move; repeating it finishes (ADR-183 §8). */
+/** The change is durable but the epoch did not move; repeating it finishes (ADR-185 §8). */
 export class AuthzEpochBumpFailedError extends HandledError {
   declare readonly code: "authz_epoch_bump_failed";
 

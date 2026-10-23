@@ -1,5 +1,5 @@
 /**
- * The server half of `signingKeys.*` (ADR-183 §4 and §9). Whoever may braid out of a project
+ * The server half of `signingKeys.*` (ADR-185 §4 and §9). Whoever may braid out of a project
  * manages its keys: each key procedure asks `braids:manage` at the input's project. Writes need
  * Enterprise naming BRAIDS; the list stays open. `projectSigning` asks the braid door's read.
  */
@@ -15,7 +15,7 @@ export const signingKeyTrpcTransport: TrpcRouterDeclaration<ApiKeyApi, typeof si
     .withPermission("braids:manage")
     .handle(({ app, input }) => app.findSigningKeys({ projectId: input.projectId }))
 
-    // The braid dialog's switch: whoever braids into a project reads its traces (ADR-183 §2).
+    // The braid dialog's switch: whoever braids into a project reads its traces (ADR-185 §2).
     .procedure("projectSigning")
     .withPermission("traces:view")
     .handle(({ app, input }) => app.findProjectSigning({ projectId: input.projectId }))

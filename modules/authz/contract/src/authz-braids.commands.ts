@@ -7,7 +7,7 @@ import { authzPrincipalRefSchema } from "./authz.ts";
 /** Whose permissions bound a braid is the session's, so a procedure's input never names it. */
 const sessionShape = { actor: ledgerActorSchema, caller: authzPrincipalRefSchema };
 
-/** A braid's terms (ADR-183 §1): the condition text, which spans by time, and when access ends. */
+/** A braid's terms (ADR-185 §1): the condition text, which spans by time, and when access ends. */
 const braidTermsShape = {
   /** The OTTL-subset condition as written; absent or blank braids every owner span. */
   where: z.string().optional(),
@@ -73,7 +73,7 @@ export const authzListBraidsInputSchema: AuthzListBraidsInputSchema =
   authzListBraidsInputSchemaDefinition;
 export type AuthzListBraidsInput = z.infer<typeof authzListBraidsInputSchema>;
 
-/** ADR-183 §7: which permission to count a project's members holding, for the braid dialog. */
+/** ADR-185 §7: which permission to count a project's members holding, for the braid dialog. */
 const authzCountProjectMembersHoldingInputSchemaDefinition = z
   .object({ projectId: z.string().min(1), permission: authzPermissionSchema })
   .strict();
@@ -169,7 +169,7 @@ export interface AuthzBraidRemovedSchema extends Named<typeof authzBraidRemovedS
 export const authzBraidRemovedSchema: AuthzBraidRemovedSchema = authzBraidRemovedSchemaDefinition;
 export type AuthzBraidRemoved = z.infer<typeof authzBraidRemovedSchema>;
 
-/** ADR-183 §8: who read which reader's traces holding spans braided from which owners. */
+/** ADR-185 §8: who read which reader's traces holding spans braided from which owners. */
 const authzRecordBraidedSpansViewInputSchemaDefinition = z
   .object({
     actor: actorSchema,
@@ -189,7 +189,7 @@ export type AuthzRecordBraidedSpansViewInput = z.infer<
 
 const organizationShape = { organizationId: z.string().min(1) };
 
-/** ADR-183 §2: an organisation's authz settings; one that never changed them has every one off. */
+/** ADR-185 §2: an organisation's authz settings; one that never changed them has every one off. */
 const authzOrganizationPolicySchemaDefinition = z
   .object({
     ...organizationShape,

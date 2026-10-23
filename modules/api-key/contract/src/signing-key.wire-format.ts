@@ -1,5 +1,5 @@
 /**
- * Braid wire format v1, the portable half (ADR-183 §4): the attribute a signature travels as and
+ * Braid wire format v1, the portable half (ADR-185 §4): the attribute a signature travels as and
  * the message it signs. The SDK signer (sdks/typescript, braids/sign-baggage.ts) writes exactly
  * what this reads. No Node import and no DOM global: the trace module reuses it at span admission.
  */

@@ -33,7 +33,7 @@ function randomBase62({ length }: { length: number }): string {
 }
 
 /**
- * A project's braid signing keys (ADR-183 §4): issued, rotated with an overlap, revoked, listed
+ * A project's braid signing keys (ADR-185 §4): issued, rotated with an overlap, revoked, listed
  * with 24 hours of counts. The permission and plan are asked at the door; the project's
  * organisation names every read, so a key of another project reads as not found.
  */

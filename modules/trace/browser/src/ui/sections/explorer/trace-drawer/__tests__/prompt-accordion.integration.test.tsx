@@ -1,5 +1,5 @@
 /**
- * The span pane's Prompt section: a braided span's prompt is its owner's (ADR-183 §7).
+ * The span pane's Prompt section: a braided span's prompt is its owner's (ADR-185 §7).
  * Spec: modules/trace/specs/braided-spans.feature
  * @vitest-environment jsdom
  */

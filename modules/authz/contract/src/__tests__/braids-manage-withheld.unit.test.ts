@@ -1,5 +1,5 @@
 /**
- * ADR-183 §2: who holds braids:manage. A key never does; while an organisation keeps braids to
+ * ADR-185 §2: who holds braids:manage. A key never does; while an organisation keeps braids to
  * its admins, only an organisation-wide binding confers it.
  * @see modules/authz/specs/braids.feature
  */

@@ -1,5 +1,5 @@
 // Braids as the screens show them: rows from either side, the plan state, what the viewer may do.
-// Spec: modules/authz/specs/braids-screen.feature. Decisions: ADR-183.
+// Spec: modules/authz/specs/braids-screen.feature. Decisions: ADR-185.
 
 import { type AuthzBraid, BRAID_AUDIT_TARGET_KIND } from "@langwatch/authz-contract";
 import { format } from "@langwatch/time";
@@ -133,7 +133,7 @@ export function organizationBraidRows({
 
 /**
  * Enterprise: Braids works. Upsell: below Enterprise with nothing braided, the page sells.
- * Paused: below Enterprise with braids kept (ADR-183 §9), the braids show and are marked.
+ * Paused: below Enterprise with braids kept (ADR-185 §9), the braids show and are marked.
  */
 export type BraidsPlanState = "enterprise" | "upsell" | "paused";
 

@@ -1,6 +1,6 @@
 /**
  * The braid world: the composed authz app over memory twins, its grants pipeline running in
- * memory, and the real tRPC door asking the app's own decisions and a stated plan (ADR-183).
+ * memory, and the real tRPC door asking the app's own decisions and a stated plan (ADR-185).
  * @see modules/authz/specs/braids.feature
  */
 import { createTrpcRuntime } from "@langwatch/api/trpc";

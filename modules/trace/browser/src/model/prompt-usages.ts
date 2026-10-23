@@ -1,5 +1,5 @@
 // The prompts a trace ran, grouped from its spans' prompt references.
-// A prompt that ran in a span braided from another project is that project's (ADR-183 §5).
+// A prompt that ran in a span braided from another project is that project's (ADR-185 §5).
 
 import type { SpanDetail } from "@langwatch/trace-contract";
 

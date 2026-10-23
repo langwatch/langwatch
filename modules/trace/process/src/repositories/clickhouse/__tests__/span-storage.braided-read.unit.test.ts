@@ -1,5 +1,5 @@
 /**
- * The span panel reads one braided span (ADR-183 §3, §5): the owner named, the condition on the
+ * The span panel reads one braided span (ADR-185 §3, §5): the owner named, the condition on the
  * outer select beside the latest-version election, never inside it. A read without braids sends
  * the statement it sent before. Spec: modules/trace/specs/braided-spans.feature
  */

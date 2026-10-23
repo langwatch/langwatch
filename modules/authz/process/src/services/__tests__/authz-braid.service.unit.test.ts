@@ -1,5 +1,5 @@
 /**
- * ADR-183 §1-§2 and §8: braid writes over in-test twins of the ledger, its reads and the lock.
+ * ADR-185 §1-§2 and §8: braid writes over in-test twins of the ledger, its reads and the lock.
  * @see modules/authz/specs/braids.feature
  */
 import type { GrantCondition, LedgerActor } from "@langwatch/authorization";

@@ -38,7 +38,7 @@ Feature: A revoke ends a grant only inside its own organization
     When the caller revokes that binding
     Then the binding is revoked
 
-  # ADR-166 section 6, needed by ADR-183's removed braids. The revoke is durable
+  # ADR-166 section 6, needed by ADR-185's removed braids. The revoke is durable
   # before the epoch moves, and a failed move is reported, never swallowed.
   @unit
   Scenario: A revoke that cannot move the organization's epoch reports failure

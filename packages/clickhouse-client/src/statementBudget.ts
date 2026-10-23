@@ -1,6 +1,6 @@
 /**
  * The most statement text a reader sends: ClickHouse's default `max_query_size`, 256 KiB (ADR-177
- * v4.7, ADR-183 §3). Measured after the markers expand, so a proof whose braids would overflow
+ * v4.7, ADR-185 §3). Measured after the markers expand, so a proof whose braids would overflow
  * it is refused by name before anything is sent. Bound parameters travel apart and do not count.
  */
 import { StatementScopeError } from "./statementScopeError.ts";

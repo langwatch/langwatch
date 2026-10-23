@@ -1,5 +1,5 @@
 /**
- * Each view of a braided trace protects a span by its owner (ADR-183 §5): the reader's items
+ * Each view of a braided trace protects a span by its owner (ADR-185 §5): the reader's items
  * under the reader's protections, an owner's under the owner's, in the order read.
  * Spec: modules/trace/specs/braided-spans.feature
  */

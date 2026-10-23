@@ -1,5 +1,5 @@
 /**
- * Evaluations are not shared in either direction (ADR-183 §5): a span an owner records runs only
+ * Evaluations are not shared in either direction (ADR-185 §5): a span an owner records runs only
  * the owner's monitors, even when a braid shows it in a reader's trace.
  * Spec: modules/trace/specs/braided-spans.feature
  */

@@ -1,5 +1,5 @@
 /**
- * Outside the trace view a project shows only its own spans (ADR-183 §5), against production
+ * Outside the trace view a project shows only its own spans (ADR-185 §5), against production
  * schema: every surface below reads an orchestrator trace holding a braided span while each proof
  * it is handed carries the braid, and none returns the owner's span. Analytics: modules/analytics.
  */

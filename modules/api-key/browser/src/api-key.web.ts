@@ -37,7 +37,7 @@ export const apiKeyWeb = defineBrowserModule("api-key")
       load: () => import("./ui/sections/api-keys-screen.tsx"),
     },
   })
-  /** A project's braid signing keys, mounted by the Braids page (ADR-183 §4). */
+  /** A project's braid signing keys, mounted by the Braids page (ADR-185 §4). */
   .lends(SigningKeysPanelToken, {
     load: async () => ({
       default: (await import("./ui/sections/signing-keys-panel.tsx")).SigningKeysPanel,

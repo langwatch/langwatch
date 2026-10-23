@@ -1,6 +1,6 @@
 /**
  * @vitest-environment node
- * What the braid dialog's reads declare at the door (ADR-183 §2, §7). The runtime asks the
+ * What the braid dialog's reads declare at the door (ADR-185 §2, §7). The runtime asks the
  * declaration before the handler runs; this reads what each procedure declares.
  */
 import type { TrpcProcedureFactory } from "@langwatch/api/trpc";

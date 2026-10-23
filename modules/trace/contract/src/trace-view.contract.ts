@@ -67,7 +67,7 @@ const traceListItemSchemaDefinition = z.object({
 export interface TraceListItemSchema extends Named<typeof traceListItemSchemaDefinition> {}
 export const traceListItemSchema: TraceListItemSchema = traceListItemSchemaDefinition;
 
-/** A project that braided spans into the trace, in strand order (ADR-183 §5). */
+/** A project that braided spans into the trace, in strand order (ADR-185 §5). */
 const braidedOwnerSchemaDefinition = z.object({
   projectId: z.string(),
   name: z.string(),
@@ -172,7 +172,7 @@ export type LangwatchSignalBucket = z.infer<typeof langwatchSignalBucketSchema>;
 const spanLangwatchSignalsSchemaDefinition = z.object({
   spanId: z.string(),
   signals: z.array(langwatchSignalBucketSchema),
-  /** Set only on a span braided in from another project (ADR-183 §5); absent: the reader's own. */
+  /** Set only on a span braided in from another project (ADR-185 §5); absent: the reader's own. */
   ownerProjectId: z.string().nullish(),
 });
 export interface SpanLangwatchSignalsSchema extends Named<
@@ -226,7 +226,7 @@ export const truncatedAttributeSchema: TruncatedAttributeSchema =
 
 export type TruncatedAttribute = z.infer<typeof truncatedAttributeSchema>;
 
-/** Why a braided span shows in the reader's trace, and who it belongs to (ADR-183 §5). */
+/** Why a braided span shows in the reader's trace, and who it belongs to (ADR-185 §5). */
 const spanBraidSchemaDefinition = z.object({
   ownerProjectId: z.string(),
   ownerName: z.string(),
@@ -341,7 +341,7 @@ const spanResourceInfoSchema = z.object({
   parentSpanId: z.string().nullable(),
   resourceAttributes: z.record(z.string(), z.string()),
   scope: instrumentationScopeSchema,
-  /** Set only on a span braided in from another project (ADR-183 §5); absent: the reader's own. */
+  /** Set only on a span braided in from another project (ADR-185 §5); absent: the reader's own. */
   ownerProjectId: z.string().nullish(),
 });
 

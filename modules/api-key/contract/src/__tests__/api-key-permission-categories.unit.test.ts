@@ -65,7 +65,7 @@ describe("PERMISSION_CATEGORIES", () => {
     ).toEqual([]);
   });
 
-  /** ADR-183 §2: braiding is a person's decision, made in the screen. */
+  /** ADR-185 §2: braiding is a person's decision, made in the screen. */
   it("never offers braids:manage on a key, nor on a CLI login key's defaults", () => {
     expect(categorizablePermissions()).not.toContain("braids:manage");
     expect(defaultCliKeyPermissions()).not.toContain("braids:manage");

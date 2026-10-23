@@ -1,5 +1,5 @@
 /**
- * The trace header's braided totals against production schema (ADR-183 §5): read through the
+ * The trace header's braided totals against production schema (ADR-185 §5): read through the
  * reader's braided fence, so spans the condition hides are never counted.
  * Spec: modules/trace/specs/braided-spans.feature
  */

@@ -1,6 +1,6 @@
 """
-Signed calls for braids, wire format version 1 of ADR-183 section 4
-(dev/docs/adr/183-braids-show-matching-spans-in-another-projects-traces.md).
+Signed calls for braids, wire format version 1 of ADR-185 section 4
+(dev/docs/adr/185-braids-show-matching-spans-in-another-projects-traces.md).
 
 The calling side signs the baggage entries it names with ``sign_baggage``;
 the called side adds ``BraidBaggageSpanProcessor`` (or passes

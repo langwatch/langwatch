@@ -1,5 +1,5 @@
 /**
- * ADR-183 §2: an organisation can keep braids to its admins; no row means off, and a change is
+ * ADR-185 §2: an organisation can keep braids to its admins; no row means off, and a change is
  * audited and bumps the epoch.
  * @see modules/authz/specs/braids.feature
  */

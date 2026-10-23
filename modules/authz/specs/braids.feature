@@ -1,5 +1,5 @@
-# Decisions: dev/docs/adr/183-braids-show-matching-spans-in-another-projects-traces.md
-# (ADR-183), on ADR-166 (the proof) and ADR-177 (the shared grant and the fence).
+# Decisions: dev/docs/adr/185-braids-show-matching-spans-in-another-projects-traces.md
+# (ADR-185), on ADR-166 (the proof) and ADR-177 (the shared grant and the fence).
 #
 # Vocabulary, used exactly:
 #   braid      a shared grant from an owner project to a reader project, with a condition
@@ -8,7 +8,7 @@
 #   condition  the OTTL subset a braid's spans must match, compiled when the braid is saved
 #
 # Who may braid: braids:manage on the owner and traces:view on the reader. Project roles come
-# from teams, so a team admin holds braids:manage on every project in that team (ADR-183 §2).
+# from teams, so a team admin holds braids:manage on every project in that team (ADR-185 §2).
 #
 # A scenario still tagged @unimplemented is not bound whole yet; it names the level its binding
 # is expected at, and the note above it says which test is still missing.

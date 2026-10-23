@@ -41,7 +41,7 @@ export type ClickHouseClientResolver = (tenantId: string) => Promise<ClickHouseQ
 /**
  * What a reader may be asked for: the proof-bearing permission each needs, and the resources a
  * shared grant's window must apply to. Trace, analytics and cost reads take `trace` windows
- * (ADR-177 v4.9, v4.15); span reads also take a braid's `span` ones (ADR-183).
+ * (ADR-177 v4.9, v4.15); span reads also take a braid's `span` ones (ADR-185).
  */
 const READ_RESOURCES = {
   traces: { permission: "traces:view", conditions: ["trace"] },
@@ -208,7 +208,7 @@ function windowsOf({
 }
 
 /**
- * The conditions marker (ADR-183 §3): own projects outright, OR one bracketed clause per
+ * The conditions marker (ADR-185 §3): own projects outright, OR one bracketed clause per
  * distinct predicate holding its owners' windows AND the predicate, every key and literal bound.
  * The `OR` is the fence's, beneath its exact tenant set. With no braids it is the tenant marker.
  */
@@ -252,7 +252,7 @@ export function conditionsExpression({
 
 /**
  * A compiled condition rendered for a statement of a module's own, the braid preview's
- * (ADR-183 §7): the fence's conjunction, every key and literal bound under `prefix`, and
+ * (ADR-185 §7): the fence's conjunction, every key and literal bound under `prefix`, and
  * `Verified()` against `reader`. The prefix may not be the fence's own.
  */
 export function braidConditionExpression({
@@ -367,7 +367,7 @@ export function fenceFor({
   if (narrowed.own.length === 0 && narrowed.shared.length === 0) {
     throw new AccessNotGrantedError(permission);
   }
-  // Braids read into the own project's traces, so only narrowing to it keeps them (ADR-183 §5).
+  // Braids read into the own project's traces, so only narrowing to it keeps them (ADR-185 §5).
   return withBraids({ fence: narrowed, braided: narrowed.own.length > 0 ? braided : [], reader });
 }
 
@@ -614,7 +614,7 @@ export function expandStatement({
 
 /**
  * Fails closed: a fence carrying braids applies their conditions only through the conditions
- * marker, so a statement or fragment the fence reaches without one is refused (ADR-183 §3).
+ * marker, so a statement or fragment the fence reaches without one is refused (ADR-185 §3).
  */
 function refuseUnappliedBraids({
   fence,

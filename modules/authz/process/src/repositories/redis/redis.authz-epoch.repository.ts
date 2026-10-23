@@ -41,7 +41,7 @@ export class RedisAuthzEpochRepository extends AuthzEpochRepository {
     try {
       await this.redis.incr(`${EPOCH_KEY_PREFIX}${organizationId}`);
     } catch (error) {
-      // ADR-183 §8: the write before it is durable; reporting it lets the caller repeat it.
+      // ADR-185 §8: the write before it is durable; reporting it lets the caller repeat it.
       logger.warn({ error, organizationId }, "authz epoch bump failed");
       throw new AuthzEpochBumpFailedError({ organizationId });
     }

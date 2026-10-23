@@ -1,5 +1,5 @@
 /**
- * The crypto-free half of braid wire format v1 (ADR-183 section 4): names,
+ * The crypto-free half of braid wire format v1 (ADR-185 section 4): names,
  * the entry key rule and the typed error. Safe in a browser bundle.
  * @module braids/braid-wire-format
  */

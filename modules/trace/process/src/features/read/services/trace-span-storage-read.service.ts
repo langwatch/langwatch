@@ -50,9 +50,9 @@ interface SpanReadBlobResolutionDeps {
 
 /** Every read carries the sealed proof; the repository fences its statement by it (ADR-177). */
 type ByTraceId = { authorization: Authorization; traceId: string } & OccurredAtHint;
-/** `ownerProjectId` names a braided span's owner; absent, the reader's own (ADR-183 §5). */
+/** `ownerProjectId` names a braided span's owner; absent, the reader's own (ADR-185 §5). */
 type BySpanId = ByTraceId & { spanId: string; ownerProjectId?: string | undefined };
-/** A trace-view read: `reads: "spans"` lets the proof's braids show owners' spans (ADR-183 §5). */
+/** A trace-view read: `reads: "spans"` lets the proof's braids show owners' spans (ADR-185 §5). */
 type ByTraceView = ByTraceId & TraceViewRead;
 type Paginated = ByTraceView & { limit: number; offset: number };
 /** Full-span delta: keyed on span start (see `findSpansSince`). */
@@ -152,7 +152,7 @@ export class SpanStorageService {
     return applyVisibilityGate(mapNormalizedSpansToSpans(resolvedSpans), params.visibilityCutoffMs);
   }
 
-  /** A braided read's bodies, each resolved under the project that stored it (ADR-183 §5). */
+  /** A braided read's bodies, each resolved under the project that stored it (ADR-185 §5). */
   private async resolveBodiesByOwner({
     normalizedSpans,
     deps,

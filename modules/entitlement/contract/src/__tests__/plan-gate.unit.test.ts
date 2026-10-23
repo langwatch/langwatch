@@ -53,7 +53,7 @@ describe("the Enterprise plan gate", () => {
       });
     });
 
-    /** ADR-183 §9: every route that writes a braid refuses below Enterprise. */
+    /** ADR-185 §9: every route that writes a braid refuses below Enterprise. */
     it("names Braids as an Enterprise feature", () => {
       expect(Object.keys(ENTERPRISE_FEATURE_ERRORS)).toContain("BRAIDS");
       expect(new EnterprisePlanRequiredError("BRAIDS")).toMatchObject({

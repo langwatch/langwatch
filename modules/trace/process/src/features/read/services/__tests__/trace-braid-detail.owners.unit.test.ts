@@ -1,5 +1,5 @@
 /**
- * The owners the trace header names (ADR-183 §5). Spec: modules/trace/specs/braided-spans.feature
+ * The owners the trace header names (ADR-185 §5). Spec: modules/trace/specs/braided-spans.feature
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ProjectApi } from "@langwatch/project-contract";

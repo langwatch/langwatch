@@ -18,7 +18,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-// Pinned identically in the TypeScript and Python SDK tests (ADR-183 section 4).
+// Pinned identically in the TypeScript and Python SDK tests (ADR-185 section 4).
 const (
 	braidTestSigningKey = "lwsk_testkid_testsecret"
 	braidTestTraceID    = "0af7651916cd43dd8448eb211c80319c"

@@ -1,5 +1,5 @@
 /**
- * The span tree reads braided spans (ADR-183 §3, §5): the condition sits on the outer select,
+ * The span tree reads braided spans (ADR-185 §3, §5): the condition sits on the outer select,
  * beside the latest-version election, never inside it; each span names an owner that is not
  * the reader. Spec: modules/trace/specs/braided-spans.feature
  */

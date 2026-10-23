@@ -66,7 +66,7 @@ const validPayload = () => ({
 const INTENTIONALLY_NOT_SHARED: Record<string, string[]> = {
   // The project that owns the trace: a share viewer is told nothing about
   // the project (ADR-057), and an aggregate's member is no exception.
-  // A share link shows only the project's own spans (ADR-183), so no braid field.
+  // A share link shows only the project's own spans (ADR-185), so no braid field.
   header: ["braided", "projectId"],
   // The live delta poll's high-water mark. A share is a static snapshot —
   // `useSpanTree` disables the delta query in share mode — so this is internal

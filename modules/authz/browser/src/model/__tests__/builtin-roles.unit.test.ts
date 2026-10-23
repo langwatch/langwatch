@@ -168,7 +168,7 @@ describe("the built-in roles", () => {
   });
 });
 
-describe("who may braid (ADR-183 §2)", () => {
+describe("who may braid (ADR-185 §2)", () => {
   it("is the admin role, never member or viewer", () => {
     expect(builtinRoleGrants({ role: "admin", permission: "braids:manage" })).toBe(true);
     expect(builtinRoleGrants({ role: "member", permission: "braids:manage" })).toBe(false);

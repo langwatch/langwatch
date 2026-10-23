@@ -7,7 +7,7 @@ import { spanTreeQueryKey } from "./span-tree-paged-query.ts";
 
 /**
  * The braid owner of a span id in the tree the drawer already loaded, read from the cache
- * without fetching; undefined for the reader's own span (ADR-183 §5).
+ * without fetching; undefined for the reader's own span (ADR-185 §5).
  */
 export function useSelectedSpanOwner(spanId: string | null): string | undefined {
   const { queryArgs } = useTraceQueryArgs();

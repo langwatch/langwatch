@@ -1,6 +1,6 @@
 /**
  * A braided span is read alone and its offloaded body restored from where its owner stored it
- * (ADR-022, ADR-183 §5). Spec: modules/trace/specs/braided-spans.feature
+ * (ADR-022, ADR-185 §5). Spec: modules/trace/specs/braided-spans.feature
  */
 import { EVENTREF_ATTR_PREFIX } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";

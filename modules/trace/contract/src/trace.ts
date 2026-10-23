@@ -19,7 +19,7 @@ const spanTreeNodeSchemaDefinition = z.object({
   cacheReadTokens: z.number().nullish(),
   cacheCreationTokens: z.number().nullish(),
   updatedAtMs: z.number().nullish(),
-  /** Set only on a span braided in from another project (ADR-183 §5); absent: the reader's own. */
+  /** Set only on a span braided in from another project (ADR-185 §5); absent: the reader's own. */
   ownerProjectId: z.string().nullish(),
 });
 export interface SpanTreeNodeSchema extends Named<typeof spanTreeNodeSchemaDefinition> {}

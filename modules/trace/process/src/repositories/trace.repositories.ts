@@ -53,7 +53,7 @@ export interface TraceRepositories {
   /** The span tree's summary rows, read under the route's proof (ADR-177). */
   readonly spanTree: TraceProjectedReadRepository;
   readonly existence: TraceExistenceRepository;
-  /** The braid dialog's and Braids page's reads (ADR-183 §7); absent, they answer empty. */
+  /** The braid dialog's and Braids page's reads (ADR-185 §7); absent, they answer empty. */
   readonly braidReads?: TraceBraidReadsRepository;
   readonly derivationSpans: TraceDerivationSpanReaderRepository;
   readonly summary: TraceSummaryRepository;

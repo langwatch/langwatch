@@ -3,7 +3,7 @@ import type { Authorization, CompiledWhere } from "@langwatch/authorization";
 import type { BraidedSpanGroup } from "../rules/braided-trace-totals.rules.ts";
 import type { TraceSpanSummaryRecord } from "./trace-projected-read.repository.ts";
 
-/** A draft or saved braid's condition as one statement renders it (ADR-183 §7). */
+/** A draft or saved braid's condition as one statement renders it (ADR-185 §7). */
 export type BraidConditionRead = Readonly<{
   compiledWhere: CompiledWhere | undefined;
   readerProjectId: string;
@@ -45,7 +45,7 @@ export const NO_BRAID_TRACE_COUNTS: BraidOwnerTraceCounts = {
 export type TraceSpanTotalsGroup = Readonly<BraidedSpanGroup>;
 
 /**
- * The braid dialog's and the Braids page's reads (ADR-183 §7). Every statement reads one
+ * The braid dialog's and the Braids page's reads (ADR-185 §7). Every statement reads one
  * project with that project's own proof; a second project is only ever a bound parameter.
  */
 export abstract class TraceBraidReadsRepository {

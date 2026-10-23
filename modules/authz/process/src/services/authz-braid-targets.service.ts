@@ -4,7 +4,7 @@ import type { AuthzReadRepository } from "../repositories/authz-read.repository.
 import type { AuthzService } from "./authz.service.ts";
 
 /**
- * The braid dialog's picker (ADR-183 §2): nobody braids into a project whose traces they cannot
+ * The braid dialog's picker (ADR-185 §2): nobody braids into a project whose traces they cannot
  * read, so those are left out; the braid's own project and aggregates are listed but refused.
  */
 export class AuthzBraidTargetsService {

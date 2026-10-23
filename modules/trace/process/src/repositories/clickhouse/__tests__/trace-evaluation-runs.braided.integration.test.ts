@@ -1,5 +1,5 @@
 /**
- * Evaluations are not shared through a braid (ADR-183 §6), against production schema: the
+ * Evaluations are not shared through a braid (ADR-185 §6), against production schema: the
  * reader's evaluation reads of a trace holding braided spans return the reader's own runs, never
  * the owner's. Spec: modules/trace/specs/braided-spans.feature
  */

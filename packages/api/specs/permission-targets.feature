@@ -1,4 +1,4 @@
-# A route that asks a permission at more than one scope its input names (ADR-183 §2, §7, §9).
+# A route that asks a permission at more than one scope its input names (ADR-185 §2, §7, §9).
 # CLAUDE.md rule 6: the door asks every target before the handler runs; no handler checks one.
 Feature: A route asks a permission at each of several targets before its handler
   A braid joins two projects, so the routes that write or preview one ask a permission at each

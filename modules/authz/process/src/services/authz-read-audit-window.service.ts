@@ -1,4 +1,4 @@
-/** ADR-177 decision 9 and ADR-183 §8: one read audit per key per five minutes. */
+/** ADR-177 decision 9 and ADR-185 §8: one read audit per key per five minutes. */
 export const READ_AUDIT_WINDOW_MS = 5 * 60 * 1000;
 
 /** Bound on remembered keys; only caps memory, the window does the rest. */

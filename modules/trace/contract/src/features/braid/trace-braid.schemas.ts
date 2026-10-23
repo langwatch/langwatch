@@ -1,5 +1,5 @@
 /**
- * The braid dialog's and the Braids page's reads (ADR-183 §7): the preview counts, the
+ * The braid dialog's and the Braids page's reads (ADR-185 §7): the preview counts, the
  * owner's attribute keys, each braid's activity and one test trace as the reader sees it.
  */
 import type { Named } from "@langwatch/module";

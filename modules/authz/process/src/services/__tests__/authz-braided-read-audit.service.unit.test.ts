@@ -1,5 +1,5 @@
 /**
- * ADR-183 §8: a read showing braided spans is audited once per actor, reader and owner per
+ * ADR-185 §8: a read showing braided spans is audited once per actor, reader and owner per
  * window, naming the braids and never a span.
  * @see modules/authz/specs/braids.feature
  */

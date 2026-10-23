@@ -352,7 +352,7 @@ listOrganizationMembers(input: { organizationId: string }, by: ApiKeyManagementC
 
 #### `findSigningKeys`
 
-ADR-183 §4: a project's braid signing keys with their last 24 hours; never a secret.
+ADR-185 §4: a project's braid signing keys with their last 24 hours; never a secret.
 
 ```typescript
 findSigningKeys(input: FindSigningKeysInput): Promise<SigningKey[]>;

@@ -39,7 +39,7 @@ describe("a trace route and the proof", () => {
 
   describe("when a trace operation that reads span content mints its own proof", () => {
     const source = readFileSync(new URL("../../app/trace.app.ts", import.meta.url), "utf8");
-    /** The trace view's content reads (ADR-183 §5): each reads under the caller's proof. */
+    /** The trace view's content reads (ADR-185 §5): each reads under the caller's proof. */
     const contentReads = [
       "authorizationForTrace",
       "readTraceSummary",

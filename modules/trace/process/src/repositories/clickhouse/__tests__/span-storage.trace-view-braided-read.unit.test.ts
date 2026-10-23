@@ -1,5 +1,5 @@
 /**
- * The trace view's span reads under braids (ADR-183 §3, §5): the condition sits on the outer
+ * The trace view's span reads under braids (ADR-185 §3, §5): the condition sits on the outer
  * select beside a bare latest-version election, every value bound. Without braids, or for a read
  * that does not ask for `spans`, the statement is the one sent before. Spec: braided-spans.feature
  */

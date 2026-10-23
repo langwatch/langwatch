@@ -1,5 +1,5 @@
-# Decisions: dev/docs/adr/183-braids-show-matching-spans-in-another-projects-traces.md
-# (ADR-183) section 4. The keys themselves: modules/api-key/specs/signing-keys.feature.
+# Decisions: dev/docs/adr/185-braids-show-matching-spans-in-another-projects-traces.md
+# (ADR-185) section 4. The keys themselves: modules/api-key/specs/signing-keys.feature.
 #
 # How a signed call travels: the calling project's SDK signs the baggage entries it names
 # with one of its signing keys, over the trace id; the called project's SDK copies those

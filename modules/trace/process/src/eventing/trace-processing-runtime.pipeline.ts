@@ -50,7 +50,7 @@ import {
 } from "./tracked-event-sync.subscriber.ts";
 
 interface TraceProcessingPeers {
-  /** Checks a span's braid signature at admission (ADR-183 §4). */
+  /** Checks a span's braid signature at admission (ADR-185 §4). */
   apiKeys: Pick<ApiKeyApi, "verifyBraidSignature">;
   dataPrivacy: Pick<DataPrivacyApi, "redactSpan" | "dropSpanContent">;
   dataRetention: Pick<

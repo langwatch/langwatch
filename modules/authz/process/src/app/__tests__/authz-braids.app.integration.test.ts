@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  * Braids through the tRPC door over the composed authz app: its grants pipeline runs in memory,
- * so every write lands in the ledger, the projection and the audit trail (ADR-183).
+ * so every write lands in the ledger, the projection and the audit trail (ADR-185).
  * @see modules/authz/specs/braids.feature
  */
 import { BRAID_CONDITION_COMPILER_VERSION, usableAuthorization } from "@langwatch/authorization";

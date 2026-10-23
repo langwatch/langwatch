@@ -9,13 +9,13 @@ import type {
 } from "../repositories/authz-read.repository.ts";
 import type { AuthzService } from "./authz.service.ts";
 
-/** Members decided per count; an organisation past it gets a floor (ADR-183 §7). */
+/** Members decided per count; an organisation past it gets a floor (ADR-185 §7). */
 export const PROJECT_MEMBERS_DECIDED_LIMIT = 500;
 /** Members decided at once: each decision is one collect of that member's grants. */
 const DECISIONS_AT_ONCE = 10;
 
 /**
- * ADR-183 §7: how many people a project's spans reach, as the braid dialog names them. Each
+ * ADR-185 §7: how many people a project's spans reach, as the braid dialog names them. Each
  * active member of the project's organisation is decided at the project, one collect per member.
  */
 export class AuthzProjectMembersService {

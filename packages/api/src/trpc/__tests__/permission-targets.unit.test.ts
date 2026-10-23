@@ -1,7 +1,7 @@
 /**
  * A tRPC procedure asking a permission at a further project its input names: the door asks every
  * target before the handler, and mints a proof per proof-bearing target. Spec:
- * packages/api/specs/permission-targets.feature; ADR-183 §2.
+ * packages/api/specs/permission-targets.feature; ADR-185 §2.
  */
 import {
   type Authorization,

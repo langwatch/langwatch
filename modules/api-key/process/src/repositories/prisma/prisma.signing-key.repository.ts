@@ -49,7 +49,7 @@ function rowOf(row: StoredRow): SigningKeyRow {
   };
 }
 
-/** Signing keys over Postgres, the secret sealed by the process cipher (ADR-183 §4). */
+/** Signing keys over Postgres, the secret sealed by the process cipher (ADR-185 §4). */
 export class PrismaSigningKeyRepository implements SigningKeyRepository {
   static readonly tables = prismaTables("SigningKey");
 

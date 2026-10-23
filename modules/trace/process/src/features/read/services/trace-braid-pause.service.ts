@@ -8,7 +8,7 @@ import { TraceTtlCacheService } from "../../../services/trace-ttl-cache.service.
 type BraidPlans = Pick<EntitlementApi, "getActivePlan">;
 
 /**
- * Braids pause below Enterprise and are kept (ADR-183 §9): the trace module, which owns the
+ * Braids pause below Enterprise and are kept (ADR-185 §9): the trace module, which owns the
  * merged read, asks the plan before honouring them. The answer is cached per organisation for no
  * longer than the proof that asked lives; a process composed without plans honours none.
  */

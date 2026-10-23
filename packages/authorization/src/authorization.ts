@@ -42,7 +42,7 @@ const actorSchema = z.discriminatedUnion("type", [
 ]);
 
 /** The window a shared grant opens. `from` and `until` are epoch milliseconds; `until` null
- *  means open-ended. Only a `span` condition (a braid, ADR-183 §3) carries `compiledWhere`, and
+ *  means open-ended. Only a `span` condition (a braid, ADR-185 §3) carries `compiledWhere`, and
  *  one with a non-empty `where` must, so no condition reaches a fence it cannot apply. */
 export const authorizationConditionSchema = z
   .object({
@@ -175,7 +175,7 @@ export function isSealedAuthorization(value: unknown): value is Authorization {
   return typeof value === "object" && value !== null && sealed.has(value);
 }
 
-/** A braid (ADR-183 §1): a shared grant whose window opens span reads alone, never trace reads. */
+/** A braid (ADR-185 §1): a shared grant whose window opens span reads alone, never trace reads. */
 export function isSpanBraidGrant(grant: AuthorizationGrant): boolean {
   return grant.kind === "shared" && grant.condition?.type === "span";
 }
@@ -191,7 +191,7 @@ function isNarrowedToOwn(authorization: Authorization): boolean {
 
 /**
  * The same proof narrowed to one project its grants name, never widened: the own grant, that
- * project's, and the braids when it is the own one (ADR-183 §5). A project named by no grant or
+ * project's, and the braids when it is the own one (ADR-185 §5). A project named by no grant or
  * by braids alone is `null`, as a braid never opens an owner's trace. A forged proof is refused.
  */
 export function narrowAuthorization({
@@ -221,7 +221,7 @@ export function narrowAuthorization({
   });
 }
 
-/** The same proof without its braids, for a read that may not honour them (ADR-183 §5, §9).
+/** The same proof without its braids, for a read that may not honour them (ADR-185 §5, §9).
  *  A proof with none is returned as it is; a forged proof is refused. */
 export function withoutSpanBraids(authorization: Authorization): Authorization {
   if (!isSealedAuthorization(authorization)) {
@@ -284,7 +284,7 @@ export function ownProjectIdReadBy(authorization: Authorization): string {
 }
 
 /** A stable key for the projects and windows a proof reads in under `permission`; an aggregate
- *  and a member never share one. A braid's window carries its condition's digest (ADR-183 §3). */
+ *  and a member never share one. A braid's window carries its condition's digest (ADR-185 §3). */
 export function readScopeKeyOf(
   authorization: Authorization,
   permission: ProofBearingPermission = "traces:view",

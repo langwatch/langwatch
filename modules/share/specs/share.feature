@@ -203,7 +203,7 @@ Feature: Share a trace behind a secret, scoped, expiring link
       When the holder opens the link
       Then the payload carries no API key identifier
 
-    # A braid (ADR-183) shows another project's spans to that project's own
+    # A braid (ADR-185) shows another project's spans to that project's own
     # members; it never reaches past them to a link's holder.
     @integration @unimplemented
     Scenario: A shared link shows only the project's own spans, never braided ones

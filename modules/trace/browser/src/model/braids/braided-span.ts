@@ -11,7 +11,7 @@ export const BRAIDED_ACTION_DISABLED_REASON = "Not available on spans braided fr
 /**
  * One key per span in the tree. The reader's own spans keep their span id;
  * a braided span is keyed by its owner too, so two projects holding one
- * span id stay two spans (ADR-183 §5).
+ * span id stay two spans (ADR-185 §5).
  */
 export function spanNodeKey(span: Pick<SpanTreeNode, "spanId" | "ownerProjectId">): string {
   return span.ownerProjectId ? JSON.stringify([span.ownerProjectId, span.spanId]) : span.spanId;

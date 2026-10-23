@@ -38,7 +38,7 @@ export function tenantSet(): string {
 }
 
 /**
- * ADR-183 §3: the fence with each braid's condition applied, written on a span read's outer
+ * ADR-185 §3: the fence with each braid's condition applied, written on a span read's outer
  * select only. A latest-version subquery keeps `tenantScope`, which renders tenants and windows
  * alone, so a condition is applied after the latest version of each span is chosen.
  */

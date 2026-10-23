@@ -1,5 +1,5 @@
 /**
- * The braid dialog's and the Braids page's statements (ADR-183 §7). Each reads one project
+ * The braid dialog's and the Braids page's statements (ADR-185 §7). Each reads one project
  * under that project's own proof; a condition renders through `braidConditionExpression`, so
  * every key and literal is a bound parameter.
  */

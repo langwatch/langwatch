@@ -217,7 +217,7 @@ readConversationContextForViewer(input: { projectId: string; conversationId: str
 
 #### `previewBraid`
 
-ADR-183 §7: the reader's trace ids under its proof, then the owner's spans under its own.
+ADR-185 §7: the reader's trace ids under its proof, then the owner's spans under its own.
 
 ```typescript
 previewBraid(input: { ownerAuthorization: Authorization; readerAuthorization: Authorization; where?: string | undefined; fromMs: number; /** The braid being edited, which the draft replaces in the count; absent for a new braid. */ braidId?: string | undefined; }): Promise<BraidPreview>;
@@ -252,7 +252,7 @@ readBraidTestTrace(input: { ownerAuthorization: Authorization; readerAuthorizati
 One span's detail through the viewer's protections; refuses with `SpanNotFoundError`.
 
 ```typescript
-readSpanDetailForViewer(input: { projectId: string; authorization: Authorization; traceId: string; spanId: string; /** A braided span's owner (ADR-183 §5); absent, the reader's own span. */ ownerProjectId?: string | undefined; occurredAtMs?: number; viewerUserId: string; }): Promise<SpanDetail>;
+readSpanDetailForViewer(input: { projectId: string; authorization: Authorization; traceId: string; spanId: string; /** A braided span's owner (ADR-185 §5); absent, the reader's own span. */ ownerProjectId?: string | undefined; occurredAtMs?: number; viewerUserId: string; }): Promise<SpanDetail>;
 ```
 
 #### `readTraceFacetsForApiKey`
@@ -444,25 +444,25 @@ getLogsByTraceId(input: { tenantId: string; traceId: string; occurredAtMs?: numb
 #### `readSpanSummaries`
 
 ```typescript
-readSpanSummaries(input: { authorization: Authorization; traceId: string; occurredAtMs?: number; /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-183 §5). */ reads?: "spans" | "traces"; }): Promise<SpanSummaryRow[]>;
+readSpanSummaries(input: { authorization: Authorization; traceId: string; occurredAtMs?: number; /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-185 §5). */ reads?: "spans" | "traces"; }): Promise<SpanSummaryRow[]>;
 ```
 
 #### `readSpans`
 
 ```typescript
-readSpans(input: { authorization: Authorization; traceId: string; occurredAtMs?: number; visibilityCutoffMs?: number | null; limit?: number; /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-183 §5). */ reads?: "spans" | "traces"; }): Promise<(Span & { ownerProjectId?: string })[]>;
+readSpans(input: { authorization: Authorization; traceId: string; occurredAtMs?: number; visibilityCutoffMs?: number | null; limit?: number; /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-185 §5). */ reads?: "spans" | "traces"; }): Promise<(Span & { ownerProjectId?: string })[]>;
 ```
 
 #### `readSpansPage`
 
 ```typescript
-readSpansPage(input: { authorization: Authorization; traceId: string; limit: number; offset: number; occurredAtMs?: number; visibilityCutoffMs?: number | null; /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-183 §5). */ reads?: "spans" | "traces"; }): Promise<{ spans: (Span & { ownerProjectId?: string })[]; total: number }>;
+readSpansPage(input: { authorization: Authorization; traceId: string; limit: number; offset: number; occurredAtMs?: number; visibilityCutoffMs?: number | null; /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-185 §5). */ reads?: "spans" | "traces"; }): Promise<{ spans: (Span & { ownerProjectId?: string })[]; total: number }>;
 ```
 
 #### `readSpansSince`
 
 ```typescript
-readSpansSince(input: { authorization: Authorization; traceId: string; sinceStartTimeMs: number; occurredAtMs?: number; visibilityCutoffMs?: number | null; /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-183 §5). */ reads?: "spans" | "traces"; }): Promise<(Span & { ownerProjectId?: string })[]>;
+readSpansSince(input: { authorization: Authorization; traceId: string; sinceStartTimeMs: number; occurredAtMs?: number; visibilityCutoffMs?: number | null; /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-185 §5). */ reads?: "spans" | "traces"; }): Promise<(Span & { ownerProjectId?: string })[]>;
 ```
 
 #### `findSpan`
@@ -480,19 +480,19 @@ readSpanEvents(input: { authorization: Authorization; traceId: string; spanId: s
 #### `readLangwatchSignals`
 
 ```typescript
-readLangwatchSignals(input: { authorization: Authorization; traceId: string; occurredAtMs?: number; /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-183 §5). */ reads?: "spans" | "traces"; }): Promise< { spanId: string; signals: SpanLangwatchSignals["signals"]; ownerProjectId?: string }[] >;
+readLangwatchSignals(input: { authorization: Authorization; traceId: string; occurredAtMs?: number; /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-185 §5). */ reads?: "spans" | "traces"; }): Promise< { spanId: string; signals: SpanLangwatchSignals["signals"]; ownerProjectId?: string }[] >;
 ```
 
 #### `readSpanResources`
 
 ```typescript
-readSpanResources(input: { authorization: Authorization; traceId: string; occurredAtMs?: number; /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-183 §5). */ reads?: "spans" | "traces"; }): Promise<SpanResourceInfo[]>;
+readSpanResources(input: { authorization: Authorization; traceId: string; occurredAtMs?: number; /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-185 §5). */ reads?: "spans" | "traces"; }): Promise<SpanResourceInfo[]>;
 ```
 
 #### `readTraceEvents`
 
 ```typescript
-readTraceEvents(input: { authorization: Authorization; traceId: string; occurredAtMs?: number; /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-183 §5). */ reads?: "spans" | "traces"; }): Promise<DerivedTraceEvent[]>;
+readTraceEvents(input: { authorization: Authorization; traceId: string; occurredAtMs?: number; /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-185 §5). */ reads?: "spans" | "traces"; }): Promise<DerivedTraceEvent[]>;
 ```
 
 #### `readTraceEventRollups`
@@ -813,7 +813,7 @@ resolveBraidOwnerProtections(input: { viewerUserId: string; ownerProjectIds: rea
 
 #### `describeBraidedSpans`
 
-Each span's `braid`, null on the reader's own (ADR-183 §5).
+Each span's `braid`, null on the reader's own (ADR-185 §5).
 
 ```typescript
 describeBraidedSpans(input: { authorization: Authorization; viewerUserId: string; spans: readonly { ownerProjectId?: string | undefined; startedAtMs: number; params?: unknown; }[]; }): Promise<(SpanBraid | null)[]>;

@@ -1,6 +1,6 @@
 /**
  * Copies a braid's named baggage entries and their signature onto every span
- * on the called side (ADR-183 section 4).
+ * on the called side (ADR-185 section 4).
  * @module braids/braid-baggage-span-processor
  */
 

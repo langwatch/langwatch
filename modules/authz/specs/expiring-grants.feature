@@ -137,7 +137,7 @@ Feature: Expiring grants
     When a grant for a shared resource also states an end date of its own
     Then the fact is refused
 
-  # A braid (ADR-183) answers two questions with two fields: the grant's end
+  # A braid (ADR-185) answers two questions with two fields: the grant's end
   # date says when the reader stops seeing spans, and its condition's window
   # says which spans it sees. Neither stands in for the other.
   @unit @unimplemented

@@ -9,7 +9,7 @@ import {
   type VerifiedMark,
 } from "../../../rules/braided-span-owner.rules.ts";
 
-/** The peers a braided read asks about owners and audits through (ADR-183 §5, §8). */
+/** The peers a braided read asks about owners and audits through (ADR-185 §5, §8). */
 export interface TraceBraidDirectory {
   authz: Pick<AuthzApi, "hasPermission" | "listBraids" | "recordBraidedSpansView">;
   projects: Pick<ProjectApi, "findSummaryById">;
@@ -40,7 +40,7 @@ export class TraceBraidDetailService {
     ownerProjectId: string;
     viewerUserId: string;
     spanStartedAtMs: number;
-    /** The span's verified marks (ADR-183 §4). */
+    /** The span's verified marks (ADR-185 §4). */
     verifiedMarks?: readonly VerifiedMark[];
   }): Promise<SpanBraid> {
     const directory = this.#directory;

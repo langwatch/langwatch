@@ -61,7 +61,7 @@ export function seatCapsBinding({
 }
 
 /**
- * ADR-183 §2: a key never braids, at any tier, as no binding confers a platform permission; and
+ * ADR-185 §2: a key never braids, at any tier, as no binding confers a platform permission; and
  * while the organisation keeps braids to its admins, only an organisation-wide binding does.
  */
 function braidsWithheld({

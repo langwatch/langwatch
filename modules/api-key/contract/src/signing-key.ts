@@ -1,14 +1,14 @@
 /**
- * A project's braid signing keys (ADR-183 §4): the list item the keys screen reads, the answer
+ * A project's braid signing keys (ADR-185 §4): the list item the keys screen reads, the answer
  * that carries a secret once, and what verification answers the trace module. No schema here
  * holds a secret except `issuedSigningKeySchema`, which only create and rotate answer.
  */
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
-/** The old key keeps verifying this long after a rotation (ADR-183, Constants). */
+/** The old key keeps verifying this long after a rotation (ADR-185, Constants). */
 export const SIGNING_KEY_ROTATION_OVERLAP_MS = 7 * 24 * 60 * 60 * 1000;
-/** The longest a decrypted key, or its absence, is held in one process (ADR-183 §4, record §7). */
+/** The longest a decrypted key, or its absence, is held in one process (ADR-185 §4, record §7). */
 export const SIGNING_KEY_LOOKUP_CACHE_MS = 60_000;
 
 export const SIGNING_KEY_STATUSES = ["active", "verifying", "revoked"] as const;

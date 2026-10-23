@@ -273,7 +273,7 @@ export const PERMISSION_CATEGORIES: readonly PermissionCategory[] = [
   },
 ] as const;
 
-/** Never on a key in release 1: braiding is a person's decision in the screen (ADR-183 §2). */
+/** Never on a key in release 1: braiding is a person's decision in the screen (ADR-185 §2). */
 const RESOURCES_NEVER_ON_A_KEY: ReadonlySet<string> = new Set<AuthzResource>(["braids"]);
 
 /**

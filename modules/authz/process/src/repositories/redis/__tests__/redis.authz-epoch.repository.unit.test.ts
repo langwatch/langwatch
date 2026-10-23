@@ -42,7 +42,7 @@ describe("RedisAuthzEpochRepository", () => {
     const epoch = RedisAuthzEpochRepository.create({ redis });
 
     await expect(epoch.findEpoch({ organizationId: ORGANIZATION_ID })).resolves.toBeNull();
-    // ADR-183 §8: the write before a bump is durable; the caller is told so it repeats it.
+    // ADR-185 §8: the write before a bump is durable; the caller is told so it repeats it.
     await expect(epoch.bump({ organizationId: ORGANIZATION_ID })).rejects.toMatchObject({
       code: "authz_epoch_bump_failed",
     });

@@ -1,7 +1,7 @@
 /**
  * A REST route asking a permission at each of several route targets: the door asks every one
  * before the handler, and mints a proof per proof-bearing target. Spec:
- * packages/api/specs/permission-targets.feature; ADR-183 §2, §7.
+ * packages/api/specs/permission-targets.feature; ADR-185 §2, §7.
  */
 import {
   type Authorization,

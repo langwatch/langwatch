@@ -1,5 +1,5 @@
 /**
- * The API key module's half of signed-calls.feature (ADR-183 §4): the answer span admission marks
+ * The API key module's half of signed-calls.feature (ADR-185 §4): the answer span admission marks
  * from, and the failures the keys list counts. The trace module's half, a span marked only on a
  * `verified` answer, is record-span.signed-calls.unit.test.ts.
  */

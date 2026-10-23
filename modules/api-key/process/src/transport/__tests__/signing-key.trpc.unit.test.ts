@@ -22,7 +22,7 @@ type Context = { actor: { id: string } | null };
 
 const ORCHESTRATOR = "project_orchestrator";
 const OTHER_TEAMS_PROJECT = "project_elsewhere";
-/** The SDK's pinned test key (ADR-183 §4). */
+/** The SDK's pinned test key (ADR-185 §4). */
 const SECRET = "lwsk_testkid_testsecret";
 
 const listed: SigningKey = {

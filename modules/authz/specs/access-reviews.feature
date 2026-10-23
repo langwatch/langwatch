@@ -20,7 +20,7 @@
 #               it — not the rows bound at that scope.
 #   path        how a reach was arrived at: directly, through a group, through
 #               a key whose owner sets its ceiling, through a share link, or
-#               through a braid (ADR-183) into a project the person can read.
+#               through a braid (ADR-185) into a project the person can read.
 #   change      one access fact that was attached, re-roled, revoked, or a role
 #               that was defined, edited or deleted.
 #

@@ -274,7 +274,7 @@ export function declaredProducerFields(call) {
     link = link.callee.object;
   }
   if (routeCredential ?? routerSessionOf(link)) fields.add("session");
-  // A route asking at several projects is handed each one's proof by field (ADR-183 §2).
+  // A route asking at several projects is handed each one's proof by field (ADR-185 §2).
   if (permissions > 1) fields.add("authorizations");
 
   return fields;

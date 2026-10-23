@@ -745,7 +745,7 @@ export interface TraceAppDependencies {
   annotationCommands?: TraceAnnotationCommands;
   traces: Readonly<{
     existence: TraceExistenceRepository;
-    /** The braid dialog's and Braids page's reads (ADR-183 §7); absent, they answer empty. */
+    /** The braid dialog's and Braids page's reads (ADR-185 §7); absent, they answer empty. */
     braidReads?: TraceBraidReadsRepository | undefined;
     /** The legacy trace read the `traces.*` and `spans.*` surfaces call. */
     read: TraceLegacyRead;
@@ -788,7 +788,7 @@ export interface TraceAppDependencies {
    * carry the registry's enterprise ceiling.
    */
   requestBounds: Pick<EntitlementApi, "requestBound">;
-  /** The plan the merged read asks before honouring braids; absent, braids pause (ADR-183 §9). */
+  /** The plan the merged read asks before honouring braids; absent, braids pause (ADR-185 §9). */
   braidPlans?: Pick<EntitlementApi, "getActivePlan">;
   /** Owner names, the viewer's standing on an owner and the read audit; absent, braids say less. */
   braidDirectory?: TraceBraidDirectory;
@@ -1496,7 +1496,7 @@ export class TraceModule implements TraceApi, CollectorApp {
       dependencies.protections && dependencies.shareReadLimiter && authorizeRead
         ? TraceSharedReadService.create({
             reads: this,
-            // A share link shows only the project's own spans (ADR-183 §5).
+            // A share link shows only the project's own spans (ADR-185 §5).
             authorize: async (params) =>
               withoutSpanBraids(
                 await authorizeRead({ ...params, codePath: "api/routers/sharedTrace" }),
@@ -1910,7 +1910,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     authorization: Authorization;
     braidIds: readonly string[];
   }): Promise<BraidActivity> {
-    // A paused braid counts nothing on the reader's page (ADR-183 §9).
+    // A paused braid counts nothing on the reader's page (ADR-185 §9).
     const authorization = await this.#braidPause.honoured({ authorization: input.authorization });
     return this.#braidPreview.activity({ ...input, authorization });
   }
@@ -1937,7 +1937,7 @@ export class TraceModule implements TraceApi, CollectorApp {
   }): Promise<SpanDetail> {
     const selected = selectedSpanOwnerOf(input);
     const braidOwner = selected.kind === "braid" ? selected.ownerProjectId : undefined;
-    // A braided span: its owner's policy, the viewer's standing on the owner (ADR-183 §5).
+    // A braided span: its owner's policy, the viewer's standing on the owner (ADR-185 §5).
     const protections = await this.resolveViewerProtections({
       projectId: braidOwner ?? input.projectId,
       userId: input.viewerUserId,
@@ -3301,7 +3301,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     input: SpanTreeInput & { authorization: Authorization },
   ): Promise<SpanTreePage> {
     const page = await this.#getTree().getSpanTreePage(input);
-    // Opening a trace that shows owner spans is audited per owner (ADR-183 §8).
+    // Opening a trace that shows owner spans is audited per owner (ADR-185 §8).
     await this.#braidDetail.recordView({
       authorization: input.authorization,
       ownerProjectIds: page.nodes.map((node) => node.ownerProjectId),

@@ -1,5 +1,5 @@
 /**
- * The braid reads' statements (ADR-183 §7): one proof per statement, the other project only
+ * The braid reads' statements (ADR-185 §7): one proof per statement, the other project only
  * ever a bound parameter, and every key and literal of a condition bound, never in the text.
  * Spec: modules/trace/specs/braided-spans.feature
  */

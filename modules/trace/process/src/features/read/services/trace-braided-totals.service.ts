@@ -8,7 +8,7 @@ import {
   braidedOwnerTotalsOf,
 } from "../../../rules/braided-trace-totals.rules.ts";
 
-/** The trace header's braided totals, read through the reader's own braided proof (ADR-183 §5). */
+/** The trace header's braided totals, read through the reader's own braided proof (ADR-185 §5). */
 export class TraceBraidedTotalsService {
   static create({
     reads,

@@ -26,7 +26,7 @@ import type { QueryDriver, QueryRequest } from "../query.ts";
 import { STATEMENT_BYTE_BUDGET } from "../statementBudget.ts";
 import { StatementScopeError } from "../statementScopeError.ts";
 /**
- * ADR-183 §3: a span read applies each braid's compiled condition through the conditions marker
+ * ADR-185 §3: a span read applies each braid's compiled condition through the conditions marker
  * on its outer select, owner-bound and fully parameter-bound, and refuses a statement that would
  * read a braid owner's spans without it. Spec: modules/trace/specs/braided-spans.feature
  */

@@ -949,11 +949,11 @@ side keeps its existing guards until ADR-166's `prisma.as` lands.
     trace, so it reads only members shared for their whole history. An
     evaluation that names no trace keeps its own time.
     Spec: `specs/governance/aggregate-project.feature`, section D.
-- v4.16 (2026-10-21, ADR-183 builds on this one; no decision here changed).
+- v4.16 (2026-10-21, ADR-185 builds on this one; no decision here changed).
   Braids reuse the shared grant, the proof and the fence for project-to-project
   reads between plain projects. Decision 4's refusal of a non-empty `where`
   stands for every `trace` condition, so the reconciler's grants are
-  unchanged; ADR-183 adds a second legal placement, `project-reader` with a
+  unchanged; ADR-185 adds a second legal placement, `project-reader` with a
   `span` condition and source `braid`, whose `where` is compiled on save.
   v4.9's rule that a window opens only its own resource is what keeps a braid
   from widening any trace or analytics read. Decisions 5 and 9 stay the

@@ -62,7 +62,7 @@ export interface TraceSpanContentDrop {
 }
 
 /**
- * ADR-183 §4: the verified marks a signed span earns; never rejects, empty when unverified.
+ * ADR-185 §4: the verified marks a signed span earns; never rejects, empty when unverified.
  * Reads the span before its first await, so later steps may change the span meanwhile.
  */
 export interface TraceSpanSignatureVerification {
@@ -117,7 +117,7 @@ export type RecordSpanCommandOptions = {
   tokenEstimation: TraceSpanTokenEstimation;
   contentDrop: TraceSpanContentDrop;
   spool?: TraceSpanSpool;
-  /** Absent, no span is marked verified: the safe direction (ADR-183 §4, no forged mark). */
+  /** Absent, no span is marked verified: the safe direction (ADR-185 §4, no forged mark). */
   signatures?: TraceSpanSignatureVerification;
 };
 
@@ -133,7 +133,7 @@ export class EventingRecordSpanAdapter implements CommandHandler<
   );
 
   private static readonly RESERVED_ATTRIBUTE_PREFIX = "langwatch.reserved.";
-  /** Never holds the verified prefix: only verification at ingest writes a mark (ADR-183 §4). */
+  /** Never holds the verified prefix: only verification at ingest writes a mark (ADR-185 §4). */
   static readonly RESERVED_ATTRIBUTE_PASSTHROUGH: ReadonlySet<string> = new Set([
     "langwatch.reserved.causality_depth",
     "langwatch.reserved.skip_token_accumulation",

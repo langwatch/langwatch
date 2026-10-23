@@ -113,7 +113,7 @@ export const Resources = {
   // ADR-122). Organization-tier only: a connection decides how EVERYONE in
   // the organization signs in.
   SSO: "sso",
-  // Who may share matching spans into another project's traces (ADR-183 §2).
+  // Who may share matching spans into another project's traces (ADR-185 §2).
   BRAIDS: "braids",
 } as const;
 

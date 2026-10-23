@@ -32,7 +32,7 @@ import {
 } from "../repositories/trace-braid-reads.repository.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-/** ADR-183 §7: the preview counts the reader's last 7 days of traces. */
+/** ADR-185 §7: the preview counts the reader's last 7 days of traces. */
 export const BRAID_PREVIEW_WINDOW_MS = 7 * DAY_MS;
 /** The most reader traces one preview counts; past it the answer says `capped`. */
 export const BRAID_PREVIEW_TRACE_CAP = 10_000;
@@ -109,7 +109,7 @@ function nodeOf(node: SpanTreeNode): SpanTreeNode {
 }
 
 /**
- * The braid dialog's and the Braids page's reads (ADR-183 §7). Every read takes one proof per
+ * The braid dialog's and the Braids page's reads (ADR-185 §7). Every read takes one proof per
  * project it reads: the reader's trace ids under the reader's, the owner's spans under the owner's.
  */
 export class TraceBraidPreviewService {

@@ -143,12 +143,12 @@ type BraidReads = Pick<AuthzLedgerReadRepository, "findBraids">;
 
 interface EventingAuthzAuditAdapterOptions {
   store: AuthzAuditTrailRepository;
-  /** ADR-183 §2: a revoked braid's projects and condition, read from authz's own projection. */
+  /** ADR-185 §2: a revoked braid's projects and condition, read from authz's own projection. */
   braids?: BraidReads;
 }
 
 /**
- * ADR-183 §8: a braid's entry is filed under the braid and its owner, so its audit link finds it.
+ * ADR-185 §8: a braid's entry is filed under the braid and its owner, so its audit link finds it.
  * An attach says it is a braid's by its own source; a revoke names only the grant, so the braid
  * is read back from authz's projection, which also gives the entry both projects and the condition.
  */

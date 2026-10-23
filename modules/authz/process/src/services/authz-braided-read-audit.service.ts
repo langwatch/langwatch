@@ -16,7 +16,7 @@ export const BRAIDED_SPANS_VIEWED_ACTION = "braided_spans.viewed";
 const logger = createLogger("langwatch:authz:braided-read-audit");
 
 /**
- * ADR-183 §8: a read showing braided spans writes one audit row per actor, reader and owner per
+ * ADR-185 §8: a read showing braided spans writes one audit row per actor, reader and owner per
  * window. The row id carries the window it falls in, so other processes write the same row.
  */
 export class AuthzBraidedReadAuditService {

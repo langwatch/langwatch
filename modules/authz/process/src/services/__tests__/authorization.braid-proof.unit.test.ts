@@ -1,5 +1,5 @@
 /**
- * ADR-183 §1, §3 and §8: what a braid puts in the proof a reader's trace read carries, minted
+ * ADR-185 §1, §3 and §8: what a braid puts in the proof a reader's trace read carries, minted
  * over the ledger's memory twin. The fence reads only the projects a proof names.
  * @see modules/authz/specs/braids.feature
  */

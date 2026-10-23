@@ -60,7 +60,7 @@ def setup(
         debug: Whether to enable debug logging for the LangWatch client.
         skip_open_telemetry_setup: Whether to skip setting up the OpenTelemetry tracer provider. If this is skipped, instrumentors will be added to the global tracer provider. Reads LANGWATCH_SKIP_OTEL_SETUP when not given.
         prompts_path: The base path for local prompt files. If not set, defaults to the current working directory.
-        braid_copy_entries: Optional. Baggage entries copied, with ``langwatch.signature``, onto every span started on the tracer provider (ADR-183 braids).
+        braid_copy_entries: Optional. Baggage entries copied, with ``langwatch.signature``, onto every span started on the tracer provider (ADR-185 braids).
     Returns:
         The LangWatch client.
     """

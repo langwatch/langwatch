@@ -1,5 +1,5 @@
 // The braid dialog's draft: the condition and its signed-calls switch, the window, the picker.
-// Spec: modules/authz/specs/braids-screen.feature, "The dialog builds a braid". Decisions: ADR-183.
+// Spec: modules/authz/specs/braids-screen.feature, "The dialog builds a braid". Decisions: ADR-185.
 
 import {
   type AuthzBraid,
@@ -109,7 +109,7 @@ export function verifiedKeyIn(where: string): string | undefined {
 
 /**
  * The signed entry key the switch adds: the first attribute the condition compares, since
- * that is the tag the reader signs, else the reader's name as a key (ADR-183 §4).
+ * that is the tag the reader signs, else the reader's name as a key (ADR-185 §4).
  */
 export function signedEntryKey({ where, readerName }: { where: string; readerName: string }) {
   const compared = /(?<!\.)attributes\["([A-Za-z0-9._-]{1,128})"\]/.exec(where);

@@ -1,5 +1,5 @@
 /**
- * The span panel on a braided span (ADR-183 §5, §8): redacted under its owner's policy and the
+ * The span panel on a braided span (ADR-185 §5, §8): redacted under its owner's policy and the
  * viewer's standing on the owner, saying who owns it, and audited.
  * Spec: modules/trace/specs/braided-spans.feature
  */

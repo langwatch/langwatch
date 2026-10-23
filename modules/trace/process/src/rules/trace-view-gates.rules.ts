@@ -40,7 +40,7 @@ export function gateTreeCost({
   return nodes.map((node) => (node.cost == null ? node : { ...node, cost: null }));
 }
 
-/** Each span's spend gated by its owner's cost:view, the reader's by theirs (ADR-183 §5). */
+/** Each span's spend gated by its owner's cost:view, the reader's by theirs (ADR-185 §5). */
 export function gateTreeCostByOwner({
   nodes,
   reader,
@@ -75,7 +75,7 @@ export function gateSessionCost<T extends { totalCost: number }>({
 
 /**
  * The resource pane: the trace's resources from the reader's root span (a braided span is never
- * the root), and every span's, each gated by its owner's protections (ADR-183 §5).
+ * the root), and every span's, each gated by its owner's protections (ADR-185 §5).
  */
 export function resourceInfoOf({
   rows,
@@ -111,7 +111,7 @@ export function resourceInfoOf({
 
 /**
  * Redact resource attributes with the viewer's restricted-attribute rules; a braided span's with
- * its owner's (ADR-183 §5), and every attribute of an owner whose protections were not resolved.
+ * its owner's (ADR-185 §5), and every attribute of an owner whose protections were not resolved.
  */
 export function gateResources({
   resources,

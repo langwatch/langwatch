@@ -135,7 +135,7 @@ describe("given the access level of one resource", () => {
   });
 
   describe("when a resource has only full access", () => {
-    /** ADR-183 §2: braiding is one permission, `braids:manage`. */
+    /** ADR-185 §2: braiding is one permission, `braids:manage`. */
     it("offers full access to braids and no read level", () => {
       expect(offeredActions("braids")).toEqual(["manage"]);
       expect(offersReadLevel("braids")).toBe(false);

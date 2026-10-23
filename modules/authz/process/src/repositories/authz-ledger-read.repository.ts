@@ -6,7 +6,7 @@ import type { AuthzReadRepository } from "./authz-read.repository.ts";
 import type { GrantRowShape } from "./prisma/prisma.authz-grant.mapper.ts";
 import type { AuthzGrantFilter } from "./prisma/prisma.authz-ledger.mapper.ts";
 
-/** One braid's grant (ADR-183 §1); `condition` is null when its stored window no longer parses. */
+/** One braid's grant (ADR-185 §1); `condition` is null when its stored window no longer parses. */
 export type LedgerBraidRow = Readonly<{
   grantId: string;
   ownerProjectId: string;

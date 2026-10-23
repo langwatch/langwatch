@@ -70,7 +70,7 @@ export class TraceSummaryService {
     return this.braidsIntoHeldTrace({ authorization, traceId: input.traceId });
   }
 
-  /** Braids read only into a trace the reader holds (ADR-183 §5): an owner-only trace drops
+  /** Braids read only into a trace the reader holds (ADR-185 §5): an owner-only trace drops
    *  them, so opening one from the reader reads none of the owner's spans. */
   private async braidsIntoHeldTrace({
     authorization,

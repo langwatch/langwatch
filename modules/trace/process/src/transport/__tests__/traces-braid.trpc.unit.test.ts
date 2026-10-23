@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  * @see modules/trace/specs/braided-spans.feature
- * The braid dialog's reads through the real tRPC runtime (ADR-183 §7): read access asked at both
+ * The braid dialog's reads through the real tRPC runtime (ADR-185 §7): read access asked at both
  * projects and the Enterprise plan at the door, each project's proof handed to the app by field.
  */
 import { createTrpcRuntime } from "@langwatch/api/trpc";

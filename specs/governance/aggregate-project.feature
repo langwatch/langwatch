@@ -38,7 +38,7 @@ Feature: An aggregate project reads its member projects
     When a project-reader grant carries a condition with a non-empty where clause
     Then the grant is refused
     # The slot is kept for the OTTL compiler. Nothing is compiled in v1.
-    # ADR-183 (Braids) compiles a where on a span condition only; a trace
+    # ADR-185 (Braids) compiles a where on a span condition only; a trace
     # condition, which every aggregate grant carries, keeps refusing one.
 
   @unit
@@ -531,7 +531,7 @@ Feature: An aggregate project reads its member projects
     # half it is. The proof is narrowed to one of its own tenants; a tenant
     # outside the proof is refused rather than read.
 
-  # Shares do not chain (ADR-183): the aggregate's proof carries its own
+  # Shares do not chain (ADR-185): the aggregate's proof carries its own
   # grants only, never the braids its members receive.
   @integration @unimplemented
   Scenario: A member trace shows none of the spans braided into that member
@@ -691,7 +691,7 @@ Feature: An aggregate project reads its member projects
     # Twenty call sites in the trace router today pass the project id by
     # hand. After this block none do, and the gate keeps it so. A route left
     # behind the baseline is listed by name with its owner and reason.
-    # ADR-183 extends the gate below the route: modules/trace/specs/braided-spans.feature,
+    # ADR-185 extends the gate below the route: modules/trace/specs/braided-spans.feature,
     # "A trace content read cannot swap the route's proof for an own-only one".
 
   @integration

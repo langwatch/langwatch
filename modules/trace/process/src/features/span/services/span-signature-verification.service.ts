@@ -24,7 +24,7 @@ type SpanSignature =
   | { kind: "unsigned" };
 
 /**
- * Verification at ingest (ADR-183 §4): only the API key module answering `verified` writes
+ * Verification at ingest (ADR-185 §4): only the API key module answering `verified` writes
  * `langwatch.reserved.verified.<k>` = the signing project, per signed entry. Any other answer,
  * an error or a timeout leaves the span unverified and never refuses it.
  */

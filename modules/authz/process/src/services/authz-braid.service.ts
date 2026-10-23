@@ -41,7 +41,7 @@ import type {
 import type { ScopeLineageRepository } from "../repositories/authz-read.repository.ts";
 import type { AuthzGrantWriterPermissions } from "./authz-grant-writer.service.ts";
 
-/** What a braid confers on the owner: a span window opens span reads alone (ADR-183 §1, v4.9). */
+/** What a braid confers on the owner: a span window opens span reads alone (ADR-185 §1, v4.9). */
 const BRAID_CONFERRED_PERMISSIONS = ["traces:view"] as const;
 export const BRAID_REMOVED_REASON = "braid_removed";
 export const BRAID_CHANGED_REASON = "braid_changed";
@@ -50,7 +50,7 @@ const NO_CONDITION_DIGEST = "none";
 type BraidTerms = { condition: GrantCondition; expiresAtMs: number | undefined; key: string };
 
 /**
- * ADR-183 §1-§2: a braid is a shared span grant from the owner project to the reader project.
+ * ADR-185 §1-§2: a braid is a shared span grant from the owner project to the reader project.
  * The door asked the permissions; this service checks what needs the loaded rows: the projects,
  * the caller's ceiling on the owner, the condition, and the reader's live braids under its lock.
  */
@@ -83,7 +83,7 @@ export class AuthzBraidService {
     };
   }
 
-  /** Every live braid in the organisation, for its admins (ADR-183 §2). */
+  /** Every live braid in the organisation, for its admins (ADR-185 §2). */
   async listOrganizationBraids({
     organizationId,
   }: AuthzOrganizationInput): Promise<AuthzOrganizationBraids> {
@@ -237,7 +237,7 @@ export class AuthzBraidService {
     };
   }
 
-  /** Two distinct plain projects of one organisation (ADR-183 §1); answers that organisation. */
+  /** Two distinct plain projects of one organisation (ADR-185 §1); answers that organisation. */
   private async organizationOfPair({
     ownerProjectId,
     readerProjectId,

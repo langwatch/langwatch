@@ -1,4 +1,4 @@
-/** The braid preview's predicate rendering (ADR-183 §3, §7): every key and literal a parameter. */
+/** The braid preview's predicate rendering (ADR-185 §3, §7): every key and literal a parameter. */
 import type { CompiledWhere } from "@langwatch/authorization";
 import { describe, expect, it } from "vitest";
 

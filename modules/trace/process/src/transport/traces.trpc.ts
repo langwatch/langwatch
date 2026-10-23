@@ -41,7 +41,7 @@ import {
 
 const evaluationsSchema = evaluationSchema.array();
 
-/** ADR-183 §9: the braid dialog's reads are Enterprise, named at the owner. */
+/** ADR-185 §9: the braid dialog's reads are Enterprise, named at the owner. */
 const braids = { feature: "BRAIDS" } as const;
 
 export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesTrpc> =
@@ -712,7 +712,7 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
         authorization,
       });
 
-      // Priced in full here, then each span's cost is gated by its owner (ADR-183 §5).
+      // Priced in full here, then each span's cost is gated by its owner (ADR-185 §5).
       const page = await app.readSpanTreePage({ ...input, authorization, canSeeCosts: true });
       const owners = await app.resolveBraidOwnerProtections({
         viewerUserId: actor.id,

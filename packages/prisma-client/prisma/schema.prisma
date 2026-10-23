@@ -4526,7 +4526,7 @@ model AuthzEngineSwitch {
   updatedAt      DateTime @default(now()) @updatedAt
 }
 
-/// ADR-183: an organisation's braid setting. Owned by authz; read into the organisation's snapshot.
+/// ADR-185: an organisation's braid setting. Owned by authz; read into the organisation's snapshot.
 model AuthzOrganizationPolicy {
   organizationId               String   @id
   braidsOrganizationAdminsOnly Boolean  @default(false)
@@ -4625,7 +4625,7 @@ model Grant {
   // like every other fact column; the proof minted at the door copies it.
   condition Json?
 
-  // ADR-183 §2: on a braid change's attach, the braid it replaces. Null on every other grant and
+  // ADR-185 §2: on a braid change's attach, the braid it replaces. Null on every other grant and
   // on braids attached before the column; the fold writes it from the attach event, so a replay
   // rebuilds it.
   replacesGrantId String?
@@ -4815,7 +4815,7 @@ model ApiKey {
   @@index([ingestionTemplateId])
 }
 
-/// ADR-183: a project's key for signing the tags on its calls. Owned by the API key module.
+/// ADR-185: a project's key for signing the tags on its calls. Owned by the API key module.
 model SigningKey {
   id               String    @id
   organizationId   String
@@ -4854,12 +4854,17 @@ model NurturingProject {
 /// Nurturing's read model per organization: its admin and its milestone counts.
 /// `seeded` marks an organization learned from the project backfill: its first_* already happened.
 model NurturingOrganization {
-  organizationId     String   @id
-  adminUserId        String?
-  seeded             Boolean  @default(false)
-  evaluationCount    Int      @default(0)
-  simulationRunCount Int      @default(0)
-  updatedAt          DateTime @updatedAt
+  organizationId       String    @id
+  adminUserId          String?
+  seeded               Boolean   @default(false)
+  evaluationCount      Int       @default(0)
+  simulationRunCount   Int       @default(0)
+  // Each coding signal is written by one conditional update (null-only, not-has, lt-day).
+  codingFirstSessionAt DateTime?
+  codingAgentTypes     String[]  @default([])
+  codingActiveDays     Int       @default(0)
+  codingLastActiveDay  String? // UTC `YYYY-MM-DD`; sorts lexically
+  updatedAt            DateTime  @updatedAt
 }
 
 model BillingMeterCheckpoint {
@@ -7248,6 +7253,29 @@ model SelfHostedInstanceDiagnostic {
   slackAnnouncedAt DateTime?
 
   @@index([instanceId, receivedAt])
+}
+
+/// A notice LangWatch staff send every self-hosted install in Cloud's reply to its daily usage
+/// report (enterprise/modules/licensing/specs/self-hosted-notices.feature). Cloud only, and no
+/// tenant: every install receives every published notice that has not expired.
+model SelfHostedNotice {
+  id          String    @id
+  /// `info`, `warning` or `security`.
+  severity    String
+  title       String
+  body        String
+  /// An https link to read more; null where the notice names none.
+  url         String?
+  /// The release that fixes what the notice is about; an install on it or newer hides it.
+  fixedIn     String?
+  /// `draft`, `published` or `withdrawn`. Only a published notice that has not expired is sent.
+  status      String
+  expiresAt   DateTime?
+  publishedAt DateTime?
+  /// The staff member who published it, by user id.
+  publishedBy String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 }
 
 /// One usage report, exactly as it arrived. Kept so a number on an install's

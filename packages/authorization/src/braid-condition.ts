@@ -1,5 +1,5 @@
 /**
- * ADR-183 §3: a braid's condition as its compiler stores it beside the OTTL text, and the bounds
+ * ADR-185 §3: a braid's condition as its compiler stores it beside the OTTL text, and the bounds
  * the compiler and the store client's fence both read. The tree holds conjunctions of string
  * comparisons only, so the fence renders it as one bracketed conjunction of bound parameters.
  */

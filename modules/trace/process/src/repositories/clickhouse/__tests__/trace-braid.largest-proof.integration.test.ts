@@ -1,5 +1,5 @@
 /**
- * The largest legal braided proof (ADR-183 §3), against production schema: the most distinct
+ * The largest legal braided proof (ADR-185 §3), against production schema: the most distinct
  * conditions a reader may hold, each at its most comparisons and characters, read by every
  * statement that opens a trace and applied by ClickHouse. Spec: modules/authz/specs/braids.feature
  */

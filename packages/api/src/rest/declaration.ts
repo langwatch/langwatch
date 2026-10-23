@@ -542,7 +542,7 @@ export type RestPermissionPlatform = PlatformPermissionTarget;
  */
 export type RestPermissionReach = Readonly<{ at: "grants" | "organization" }>;
 
-/** A permission asked at a further route target, after the route's first (ADR-183 §2). */
+/** A permission asked at a further route target, after the route's first (ADR-185 §2). */
 export type RestFurtherPermission = Readonly<{
   permission: AuthzPermission;
   target: Extract<RestPermissionTarget, { at: "route" }>;
@@ -778,7 +778,7 @@ type RouteShape = Readonly<{
   permission: boolean;
   /** Whether that permission mints the proof the handler is handed (ADR-166). */
   proof: boolean;
-  /** Whether a further permission is asked at a route target of its own (ADR-183 §2). */
+  /** Whether a further permission is asked at a route target of its own (ADR-185 §2). */
   composed: boolean;
   /** The fields of the route targets whose permission mints a proof. */
   proofTargets: string;
@@ -1175,7 +1175,7 @@ class RouteBuilder<in out Api, in out S extends RouteShape> {
 
   /**
    * A proof-bearing permission: the door mints the proof and the handler is handed it. A second
-   * call at another route target composes (ADR-183 §2): both asked, one proof per target.
+   * call at another route target composes (ADR-185 §2): both asked, one proof per target.
    */
   withPermission<const Target extends RestPermissionTarget | undefined = undefined>(
     permission: ProofBearingPermission,

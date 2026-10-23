@@ -123,9 +123,9 @@ function callerOf(actor: Actor): AuthzPrincipalRef {
 /** Assigning a custom role is the Enterprise capability, refused on every plan below it. */
 const customRoles = { feature: "RBAC", when: assignsCustomGrantRole };
 
-/** ADR-183 §9: every braid write is Enterprise; the list stays open so paused braids show. */
+/** ADR-185 §9: every braid write is Enterprise; the list stays open so paused braids show. */
 const braids = { feature: "BRAIDS" };
-/** ADR-183 §2: nobody braids into a project whose traces they cannot read. */
+/** ADR-185 §2: nobody braids into a project whose traces they cannot read. */
 const AT_READER = { via: "projectId", field: "readerProjectId" } as const;
 
 /**
@@ -185,7 +185,7 @@ export const authzTrpcTransport: TrpcRouterDeclaration<AuthzApi, typeof authzTrp
       app.applyMemberBindings({ ...input, caller: callerOf(actor), actor: toLedgerActor(actor) }),
     )
 
-    /** Members of either project list the braids touching it (ADR-183 §2). */
+    /** Members of either project list the braids touching it (ADR-185 §2). */
     .procedure("listBraids")
     .withPermission("project:view", { via: "projectId" })
     .handle(async ({ app, input }) => app.listBraids(input))
@@ -214,7 +214,7 @@ export const authzTrpcTransport: TrpcRouterDeclaration<AuthzApi, typeof authzTrp
       app.removeBraid({ ...input, caller: callerOf(actor), actor: toLedgerActor(actor) }),
     )
 
-    /** Any member reads whether project admins may braid (ADR-183 §2). */
+    /** Any member reads whether project admins may braid (ADR-185 §2). */
     .procedure("getBraidsPolicy")
     .withPermission("organization:view")
     .handle(async ({ app, input }) => app.getOrganizationPolicy(input))
@@ -232,14 +232,14 @@ export const authzTrpcTransport: TrpcRouterDeclaration<AuthzApi, typeof authzTrp
     .withPermission("organization:manage")
     .handle(async ({ app, input }) => app.listOrganizationBraids(input))
 
-    /** ADR-183 §7: the braid dialog's "<n> people in <reader> will see these spans". */
+    /** ADR-185 §7: the braid dialog's "<n> people in <reader> will see these spans". */
     .procedure("countProjectTraceViewers")
     .withPermission("traces:view", { via: "projectId" })
     .handle(async ({ app, input }) =>
       app.countProjectMembersHolding({ ...input, permission: "traces:view" }),
     )
 
-    /** ADR-183 §2: the braid dialog's picker, decided for the viewer in one batch. */
+    /** ADR-185 §2: the braid dialog's picker, decided for the viewer in one batch. */
     .procedure("listBraidTargets")
     .withPermission("braids:manage", { via: "projectId" })
     .handle(async ({ app, input, actor }) =>

@@ -71,7 +71,7 @@ export class AuthzGrantProjection implements MapProjectionDefinition<
     const { data } = event;
     // One column, two tiers: a resource grant states its end inside its terms, a binding on itself.
     const expiresAtMs = data.resource?.expiresAtMs ?? data.expiresAtMs;
-    // A braid's row names the person who made it, as both projects' lists show (ADR-183 §2).
+    // A braid's row names the person who made it, as both projects' lists show (ADR-185 §2).
     const braidCreator =
       data.source === GRANT_SOURCE_BRAID && data.actor.type === "user" ? data.actor.id : null;
     return {

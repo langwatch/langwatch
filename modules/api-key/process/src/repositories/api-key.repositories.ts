@@ -18,7 +18,7 @@ export interface ApiKeyRepositories {
   readonly sandboxKeys: SharedCredentialStore;
   /** Each run's key, minted once across every server and shared sealed until it expires. */
   readonly runKeys: SharedCredentialStore;
-  /** Braid signing keys, the secret sealed at rest on the live tier (ADR-183 §4). */
+  /** Braid signing keys, the secret sealed at rest on the live tier (ADR-185 §4). */
   readonly signingKeys: SigningKeyRepository;
   /** Each signing key's passed and failed signatures per hour, shared by every pod. */
   readonly signingKeyUsage: SigningKeyUsageRepository;

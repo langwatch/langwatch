@@ -588,7 +588,7 @@ export const tracesTrpc = defineTrpcContract("traces")
       projectId: z.string(),
       traceId: z.string(),
       spanId: z.string(),
-      /** A braided span's owner (ADR-183 §5); absent, the reader's own span. */
+      /** A braided span's owner (ADR-185 §5); absent, the reader's own span. */
       ownerProjectId: z.string().optional(),
       ...spanReadHintShape,
     }),
@@ -625,7 +625,7 @@ export const tracesTrpc = defineTrpcContract("traces")
   .withOutput(tracesTraceEventsSchema)
 
   /**
-   * ADR-183 §7: the braid dialog's counts with the pair's live braids and the draft, and with the
+   * ADR-185 §7: the braid dialog's counts with the pair's live braids and the draft, and with the
    * live ones alone, the owner's spans read under the owner's proof, and one example trace.
    */
   .query("braidPreview")

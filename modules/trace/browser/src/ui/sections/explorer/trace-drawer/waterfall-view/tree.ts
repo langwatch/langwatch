@@ -46,7 +46,7 @@ export function buildTree(spans: SpanTreeNode[]): WaterfallTreeNode[] {
 /**
  * The tree key of a span's parent, or null when it sits at the top. A braided
  * span looks among its owner's spans first, then the reader's own; one not
- * found sits at the top, as an orphan does (ADR-183 §5).
+ * found sits at the top, as an orphan does (ADR-185 §5).
  */
 function parentNodeKey({ span, keys }: { span: SpanTreeNode; keys: Set<string> }): string | null {
   const parentSpanId = span.parentSpanId;

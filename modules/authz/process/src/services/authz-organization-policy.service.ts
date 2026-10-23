@@ -12,7 +12,7 @@ import type { AuthzOrganizationPolicyRepository } from "../repositories/authz-or
 export const BRAIDS_POLICY_CHANGED_ACTION = "authz.organization_policy.braids_changed";
 
 /**
- * ADR-183 §2: an organisation can keep braids to its admins. A change is stored, audited, then
+ * ADR-185 §2: an organisation can keep braids to its admins. A change is stored, audited, then
  * bumps the epoch so cached snapshots stop conferring braids:manage within the bound.
  */
 export class AuthzOrganizationPolicyService {

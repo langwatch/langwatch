@@ -3795,6 +3795,9 @@ importers:
       '@langwatch/auth-contract':
         specifier: workspace:*
         version: link:../../../../modules/auth/contract
+      '@langwatch/coding-agent-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/coding-agent/contract
       '@langwatch/enterprise-billing-contract':
         specifier: workspace:*
         version: link:../../billing/contract

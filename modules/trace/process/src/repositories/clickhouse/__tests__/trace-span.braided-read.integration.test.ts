@@ -1,5 +1,5 @@
 /**
- * The span tree under a braid, against production schema (ADR-183 §3, §5): the owner's matching
+ * The span tree under a braid, against production schema (ADR-185 §3, §5): the owner's matching
  * spans join the reader's trace, matched on each span's latest version and inside the braid's
  * window. Spec: modules/trace/specs/braided-spans.feature
  */

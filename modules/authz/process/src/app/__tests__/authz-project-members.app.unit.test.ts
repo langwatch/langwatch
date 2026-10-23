@@ -1,6 +1,6 @@
 /**
  * AuthzApi.countProjectMembersHolding through the composed app over memory twins: the braid
- * dialog's "<n> people in <reader> will see these spans" (ADR-183 §7).
+ * dialog's "<n> people in <reader> will see these spans" (ADR-185 §7).
  * @see modules/authz/specs/braids.feature
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";

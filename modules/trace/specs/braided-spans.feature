@@ -1,5 +1,5 @@
-# Decisions: dev/docs/adr/183-braids-show-matching-spans-in-another-projects-traces.md
-# (ADR-183) sections 5 to 7. The braid itself: modules/authz/specs/braids.feature.
+# Decisions: dev/docs/adr/185-braids-show-matching-spans-in-another-projects-traces.md
+# (ADR-185) sections 5 to 7. The braid itself: modules/authz/specs/braids.feature.
 # Design: dev/docs/plans/braids/braids-prototype.html, steps 5 and 6.
 #
 # Vocabulary, used exactly:

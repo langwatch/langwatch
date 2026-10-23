@@ -1,5 +1,5 @@
 /**
- * A project's braid signing keys (ADR-183 §4). Every read names the organisation, and every
+ * A project's braid signing keys (ADR-185 §4). Every read names the organisation, and every
  * read but `findCredentials` leaves the sealed secret in the store: only verification opens it.
  */
 import type { Instant } from "@langwatch/time";

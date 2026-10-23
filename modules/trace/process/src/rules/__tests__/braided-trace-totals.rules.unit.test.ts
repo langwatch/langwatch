@@ -1,5 +1,5 @@
 /**
- * The trace header's braided totals (ADR-183 §5). Spec: modules/trace/specs/braided-spans.feature
+ * The trace header's braided totals (ADR-185 §5). Spec: modules/trace/specs/braided-spans.feature
  */
 import { describe, expect, it } from "vitest";
 

@@ -1,5 +1,5 @@
 /**
- * The braid dialog's behaviour over its reads (ADR-183 §7): refusals, the trace cap, which proof
+ * The braid dialog's behaviour over its reads (ADR-185 §7): refusals, the trace cap, which proof
  * each read takes, the pair's live braids beside the draft, and each braid's 24-hour window.
  * Spec: modules/trace/specs/braided-spans.feature, modules/authz/specs/braids-screen.feature
  */

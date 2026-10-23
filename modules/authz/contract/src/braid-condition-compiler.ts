@@ -1,5 +1,5 @@
 /**
- * ADR-183 §3: compiles a braid's condition, an OTTL subset, once on save into the tree the
+ * ADR-185 §3: compiles a braid's condition, an OTTL subset, once on save into the tree the
  * fence renders, or refuses it by name with the construct, its offset in the text and a fix.
  * Pure and portable: the save path and the browser's condition editor run the same function.
  */
@@ -22,7 +22,7 @@ import {
   type BraidConditionRefusalCode,
 } from "./authz.errors.ts";
 
-/** A key `Verified("k")` may name: the signed entry keys of ADR-183 §4's wire format. */
+/** A key `Verified("k")` may name: the signed entry keys of ADR-185 §4's wire format. */
 export const BRAID_VERIFIED_KEY_PATTERN = /^[A-Za-z0-9._-]{1,128}$/;
 
 /** Accepted: the compiled tree, or none for an empty condition, which braids every owner span. */

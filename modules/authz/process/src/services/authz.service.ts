@@ -100,7 +100,7 @@ type CheckArgs = {
 
 export type AuthzServiceOptions = {
   repository: AuthzReadRepository;
-  /** The organisation's settings read into each snapshot (ADR-183 §2); omitted = all off. */
+  /** The organisation's settings read into each snapshot (ADR-185 §2); omitted = all off. */
   policies?: Pick<AuthzOrganizationPolicyRepository, "getPolicy">;
   listing: AuthzListingRepository;
   bindings: AuthzManagedGrantRepository;

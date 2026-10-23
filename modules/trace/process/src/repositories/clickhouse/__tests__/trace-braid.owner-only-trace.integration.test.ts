@@ -1,5 +1,5 @@
 /**
- * Braids read only into traces the reader already has (ADR-183 §5, invariant "Only into the
+ * Braids read only into traces the reader already has (ADR-185 §5, invariant "Only into the
  * reader's own traces"), against production schema: an owner-only trace is neither listed,
  * searched nor opened from the reader. Spec: modules/trace/specs/braided-spans.feature
  */

@@ -7,14 +7,14 @@ import {
 } from "@langwatch/authorization";
 import { compileBraidCondition } from "@langwatch/authz-contract";
 
-/** Whether a proof reads any owner's spans through a braid (ADR-183 §5). */
+/** Whether a proof reads any owner's spans through a braid (ADR-185 §5). */
 export function readsBraidedSpans(authorization: Authorization): boolean {
   return authorization.grants.some(isSpanBraidGrant);
 }
 
 /**
  * Protects each braid owner's items under that owner's protections and the reader's under the
- * reader's, keeping their order (ADR-183 §5). An owner with no protections resolved hides all.
+ * reader's, keeping their order (ADR-185 §5). An owner with no protections resolved hides all.
  */
 export function protectByOwner<T extends { ownerProjectId?: string | null | undefined }, R, P>({
   items,
@@ -47,7 +47,7 @@ export function protectByOwner<T extends { ownerProjectId?: string | null | unde
   return protectedItems;
 }
 
-/** Whether a trace-view read shows owners' spans: it reads `spans` under a braid (ADR-183 §5). */
+/** Whether a trace-view read shows owners' spans: it reads `spans` under a braid (ADR-185 §5). */
 export function readsOwnersSpans({
   authorization,
   reads,
@@ -58,7 +58,7 @@ export function readsOwnersSpans({
   return reads === "spans" && readsBraidedSpans(authorization);
 }
 
-/** The owner a span row names, set only when it is not the reader's own (ADR-183 §5). */
+/** The owner a span row names, set only when it is not the reader's own (ADR-185 §5). */
 export function braidedOwnerOf({
   authorization,
   tenantId,
@@ -121,7 +121,7 @@ const stringLeavesAt = ({ value, path }: { value: unknown; path: string }): stri
   );
 };
 
-/** One verified mark (ADR-183 §4): the signed entry key and the project it names. */
+/** One verified mark (ADR-185 §4): the signed entry key and the project it names. */
 export interface VerifiedMark {
   key: string;
   projectId: string;
@@ -159,7 +159,7 @@ function verifiedKeysIn(where: string | null): string[] {
 /**
  * The conditions a braided span shows under; empty when a braid in its window shows every span.
  * A condition is joined by `and` only, so one naming `Verified("k")` shows a span only when the
- * span's mark under k names the reader (ADR-183 §4); the others are left out.
+ * span's mark under k names the reader (ADR-185 §4); the others are left out.
  */
 export function braidConditionsShownFor({
   braids,

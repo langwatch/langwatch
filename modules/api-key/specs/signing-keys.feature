@@ -1,5 +1,5 @@
-# Decisions: dev/docs/adr/183-braids-show-matching-spans-in-another-projects-traces.md
-# (ADR-183) section 4. How a signature is checked at ingest:
+# Decisions: dev/docs/adr/185-braids-show-matching-spans-in-another-projects-traces.md
+# (ADR-185) section 4. How a signature is checked at ingest:
 # modules/trace/specs/signed-calls.feature. Design: dev/docs/plans/braids/braids-prototype.html,
 # step 2.
 #

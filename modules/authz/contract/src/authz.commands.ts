@@ -81,7 +81,7 @@ const attachGrantEntrySchemaDefinition = z
     membershipBootstrap: z.boolean().optional(),
     /** The writer asked to skip an identical live grant; the fold honours it too. */
     onDuplicate: z.literal("skip").optional(),
-    /** A braid change (ADR-183 §2): the grant this one replaces, revoked after it attaches. */
+    /** A braid change (ADR-185 §2): the grant this one replaces, revoked after it attaches. */
     replacesGrantId: z.string().min(1).optional(),
   })
   .strict()

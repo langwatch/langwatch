@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  * @see modules/trace/specs/braided-spans.feature
- * The drawer's views of a braided trace through the real tRPC runtime (ADR-183 §5): each reads
+ * The drawer's views of a braided trace through the real tRPC runtime (ADR-185 §5): each reads
  * `spans`, and each braided item is protected by its owner's protections, the reader's by theirs.
  */
 import { createTrpcRuntime } from "@langwatch/api/trpc";

@@ -13,7 +13,7 @@ type PolicyRow = {
   updatedAt: Date;
 };
 
-/** ADR-183 Schema: `AuthzOrganizationPolicy`, keyed by the organisation; no row means off. */
+/** ADR-185 Schema: `AuthzOrganizationPolicy`, keyed by the organisation; no row means off. */
 export class PrismaAuthzOrganizationPolicyRepository extends AuthzOrganizationPolicyRepository {
   static readonly tables = prismaTables("AuthzOrganizationPolicy");
 

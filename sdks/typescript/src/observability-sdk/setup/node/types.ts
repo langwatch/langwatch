@@ -91,7 +91,7 @@ export interface SetupObservabilityOptions {
   spanProcessors?: SpanProcessor[];
 
   /**
-   * Called side of a braid's signed calls (ADR-183): copies these baggage
+   * Called side of a braid's signed calls (ADR-185): copies these baggage
    * entries, and `langwatch.signature`, onto every span this service starts.
    */
   braids?: BraidOptions;

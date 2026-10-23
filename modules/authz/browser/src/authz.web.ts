@@ -1,7 +1,7 @@
 /**
  * What a browser installs when it installs authz: the Roles & access settings
  * page, whose Access tab /settings/role-bindings now redirects to, and the
- * project and organisation Braids pages (ADR-183).
+ * project and organisation Braids pages (ADR-185).
  */
 
 import { authzWebConfigSchema } from "@langwatch/authz-contract";

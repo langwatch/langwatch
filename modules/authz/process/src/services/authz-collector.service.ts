@@ -28,7 +28,7 @@ type AuthzCollectorOptions = {
   lineage?: Pick<ScopeLineageRepository, "findProjectLineage" | "findTeamOrganization">;
   /** Injected so binding and share-link liveness are testable at their exact boundary. */
   now?: () => Instant;
-  /** The organisation's settings (ADR-183 §2); omitted = every setting off. */
+  /** The organisation's settings (ADR-185 §2); omitted = every setting off. */
   policies?: Pick<AuthzOrganizationPolicyRepository, "getPolicy">;
 };
 

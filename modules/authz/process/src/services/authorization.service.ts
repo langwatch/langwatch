@@ -30,7 +30,7 @@ import type { AuthzService } from "./authz.service.ts";
  *  how stale a route's view of access may be. */
 export const AUTHORIZATION_MAX_AGE_MS = 5 * 60 * 1000;
 
-/** ADR-183 §8: a proof carrying a braid lives at most this, so a removal shows within it. */
+/** ADR-185 §8: a proof carrying a braid lives at most this, so a removal shows within it. */
 export const BRAID_REVOCATION_BOUND_MS = 30_000;
 
 /** How long a project's organisation is remembered for internal mints: it

@@ -1,5 +1,5 @@
 /**
- * The braid dialog's and Braids page's reads against production schema (ADR-183 §7): each
+ * The braid dialog's and Braids page's reads against production schema (ADR-185 §7): each
  * statement reads one project under its own proof. Spec: modules/trace/specs/braided-spans.feature,
  * modules/authz/specs/braids-screen.feature
  */

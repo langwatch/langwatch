@@ -1,4 +1,4 @@
-# Signed calls for braids, wire format version 1 (ADR-183 section 4).
+# Signed calls for braids, wire format version 1 (ADR-185 section 4).
 # The pinned signature is asserted identically in
 # sdks/typescript/src/observability-sdk/braids/__tests__/braids.unit.test.ts
 # and sdks/go/braids_test.go. See sdks/typescript/specs/telemetry/braid-signing.feature

@@ -14,7 +14,7 @@ import {
 } from "../index";
 
 /**
- * ADR-183 §3: the compiled condition a braid stores, its bounds, and the digest every fence
+ * ADR-185 §3: the compiled condition a braid stores, its bounds, and the digest every fence
  * cache key carries. The OTTL compiler is authz's; this is only the tree it writes.
  */
 

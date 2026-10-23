@@ -1,5 +1,5 @@
 /**
- * Every `signingKeys.*` procedure, declared once (ADR-183 §4). Only `create` and `rotate`
+ * Every `signingKeys.*` procedure, declared once (ADR-185 §4). Only `create` and `rotate`
  * answer a secret, once; `list` never does.
  */
 import { defineTrpcContract } from "@langwatch/module";

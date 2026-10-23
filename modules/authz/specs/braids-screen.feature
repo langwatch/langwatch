@@ -1,5 +1,5 @@
-# Decisions: dev/docs/adr/183-braids-show-matching-spans-in-another-projects-traces.md
-# (ADR-183). Design: dev/docs/plans/braids/braids-prototype.html, steps 1 to 4, 7 and 9.
+# Decisions: dev/docs/adr/185-braids-show-matching-spans-in-another-projects-traces.md
+# (ADR-185). Design: dev/docs/plans/braids/braids-prototype.html, steps 1 to 4, 7 and 9.
 # The braid's rules live in braids.feature; this file is what the screen offers and says.
 #
 # Bound by rendered integration tests.

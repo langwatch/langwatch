@@ -14,7 +14,7 @@ import { MetricPill } from "./metric-pill.tsx";
 
 /**
  * The header's duration, spans, cost and tokens over the whole trace, braided
- * spans included, each saying how much is this project's (ADR-183 §5). Replaces
+ * spans included, each saying how much is this project's (ADR-185 §5). Replaces
  * the project's own pills in place; the trace list keeps its own totals.
  */
 export function withBraidedTotals({

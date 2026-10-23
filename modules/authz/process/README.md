@@ -381,7 +381,7 @@ revokeSharedProjectGrants(args: Commands.AuthzRevokeSharedProjectGrantsInput): P
 
 #### `listBraids`
 
-ADR-183: the live braids out of a project and into it; a downgraded organisation lists too.
+ADR-185: the live braids out of a project and into it; a downgraded organisation lists too.
 
 ```typescript
 listBraids(args: Braids.AuthzListBraidsInput): Promise<Braids.AuthzProjectBraids>;
@@ -413,7 +413,7 @@ removeBraid(args: Braids.AuthzRemoveBraidInput): Promise<Braids.AuthzBraidRemove
 
 #### `recordBraidedSpansView`
 
-ADR-183 §8: one `braided_spans.viewed` audit row per actor, reader and owner per five minutes, naming the braids and never a span. Never fails the read that calls it.
+ADR-185 §8: one `braided_spans.viewed` audit row per actor, reader and owner per five minutes, naming the braids and never a span. Never fails the read that calls it.
 
 ```typescript
 recordBraidedSpansView(args: Braids.AuthzRecordBraidedSpansViewInput): Promise<void>;
@@ -445,7 +445,7 @@ listOrganizationBraids(args: Braids.AuthzOrganizationInput): Promise<Braids.Auth
 
 #### `countProjectMembersHolding`
 
-ADR-183 §7: the organisation's active members holding `permission` at the project.
+ADR-185 §7: the organisation's active members holding `permission` at the project.
 
 ```typescript
 countProjectMembersHolding(args: Braids.AuthzCountProjectMembersHoldingInput): Promise<Braids.AuthzProjectMembersHolding>;

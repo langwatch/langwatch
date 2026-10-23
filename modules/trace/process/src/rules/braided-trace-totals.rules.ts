@@ -59,7 +59,7 @@ type OwnTotals = Pick<
   "timestamp" | "durationMs" | "spanCount" | "totalCost" | "inputTokens" | "outputTokens"
 >;
 
-/** The header's whole-trace totals: its own plus the braided spans the reader sees (ADR-183 §5). */
+/** The header's whole-trace totals: its own plus the braided spans the reader sees (ADR-185 §5). */
 export function braidedTraceSummaryOf({
   header,
   owners,

@@ -1,5 +1,5 @@
 /**
- * Verification at ingest (ADR-183 §4): span admission marks a signed entry verified only on the
+ * Verification at ingest (ADR-185 §4): span admission marks a signed entry verified only on the
  * API key module's `verified` answer. Spec: modules/trace/specs/signed-calls.feature
  */
 import { createHmac } from "node:crypto";
