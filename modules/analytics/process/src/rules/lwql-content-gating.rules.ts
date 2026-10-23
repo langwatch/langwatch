@@ -80,3 +80,11 @@ export function contentKeyExclusionSql(keyParameter = "k"): string {
 export function contentFilteredMapSql(qualifiedColumn: string): string {
   return `mapFilter((k, v) -> ${contentKeyExclusionSql("k")}, ${qualifiedColumn})`;
 }
+
+/**
+ * A string map as `Map(String, String)`, whatever its key's storage type. `mapFilter` returns a
+ * LowCardinality key unchanged from 26.x on and drops it before, so a view casts to stay one type.
+ */
+export function plainStringMapSql(mapSql: string): string {
+  return `CAST(${mapSql} AS Map(String, String))`;
+}

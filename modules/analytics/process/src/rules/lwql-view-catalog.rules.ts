@@ -23,7 +23,7 @@ import {
   LWQL_CLICKHOUSE_EVENT_TABLES,
   LWQL_TRACES_CATALOGUE,
 } from "./lwql-catalogue.rules.ts";
-import { contentFilteredMapSql } from "./lwql-content-gating.rules.ts";
+import { contentFilteredMapSql, plainStringMapSql } from "./lwql-content-gating.rules.ts";
 import {
   catalogueColumnGates,
   type UngatedViewDefinition,
@@ -368,21 +368,21 @@ const SPANS: UngatedViewDefinition = {
     },
     {
       name: "SpanAttributes",
-      // Not the source's `Map(LowCardinality(String), String)`: `mapFilter`
-      // returns a plain-keyed map, and the catalog publishes what the view
-      // returns rather than what the table stores.
+      // Not the source's `Map(LowCardinality(String), String)`: the view casts to
+      // one type every server version returns (plainStringMapSql).
       type: "Map(String, String)",
       description:
         "Span attributes, with every captured-content key removed. Content is reachable only through CapturedInput and CapturedOutput.",
       sourceColumns: ["SpanAttributes"],
-      expression: (source) => contentFilteredMapSql(source("SpanAttributes")),
+      expression: (source) => plainStringMapSql(contentFilteredMapSql(source("SpanAttributes"))),
     },
     {
       name: "ResourceAttributes",
       type: "Map(String, String)",
       description: "Resource attributes, with every captured-content key removed.",
       sourceColumns: ["ResourceAttributes"],
-      expression: (source) => contentFilteredMapSql(source("ResourceAttributes")),
+      expression: (source) =>
+        plainStringMapSql(contentFilteredMapSql(source("ResourceAttributes"))),
     },
     {
       name: "CapturedInput",
