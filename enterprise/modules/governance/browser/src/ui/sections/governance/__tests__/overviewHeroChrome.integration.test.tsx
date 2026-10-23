@@ -120,10 +120,11 @@ function paintOf(root: Element): string[] {
 
 const ACCENT = /orange|accent|brand|primary|purple/;
 
+/** A narrow page body reads `calc(900px + 2 * <inset>)`: its measure is the px term inside it. */
 const nearestMeasurePx = (element: Element): number | undefined => {
   for (let node: Element | null = element; node; node = node.parentElement) {
-    const measure = getComputedStyle(node).maxWidth;
-    if (measure.endsWith("px")) return Number.parseFloat(measure);
+    const measure = /^(?:calc\()?(\d+(?:\.\d+)?)px/.exec(getComputedStyle(node).maxWidth);
+    if (measure?.[1]) return Number.parseFloat(measure[1]);
   }
   return undefined;
 };

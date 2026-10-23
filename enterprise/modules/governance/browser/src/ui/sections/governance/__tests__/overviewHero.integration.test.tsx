@@ -222,6 +222,44 @@ describe("given the overview renders", () => {
     expect(order & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  /** @scenario "The overview is one centred column" */
+  it("lays the overview in the narrow page body and empties lists with the design system's line", () => {
+    window.sessionStorage.setItem(SAMPLE_CHOICE_KEY, "false");
+    renderOverview();
+
+    const body = screen.getByTestId("governance-overview-body");
+    expect(body).toHaveAttribute("data-width", "narrow");
+    expect(getComputedStyle(body).getPropertyValue("margin-inline")).toBe("auto");
+    // The column inside the body sets no measure of its own.
+    const column = body.firstElementChild as HTMLElement;
+    expect(getComputedStyle(column).maxWidth).not.toContain("900px");
+    const emptyLines = [
+      "Nothing to report yet. Insights appear here once sources are pulling.",
+      "Your recent screens will show up here.",
+    ].map((text) => screen.getByText(text).closest("[data-size='line']"));
+    expect(emptyLines.every(Boolean)).toBe(true);
+    // This reader may not add a source, so neither line offers a step it would refuse.
+    expect(screen.queryByRole("link", { name: /Connect a source/ })).toBeNull();
+    expect(within(emptyLines[1] as HTMLElement).queryByRole("link")).toBeNull();
+  });
+
+  /** @scenario "The overview is one centred column" */
+  it("offers connecting a source on the empty Insights line only to whoever may add one", () => {
+    window.sessionStorage.setItem(SAMPLE_CHOICE_KEY, "false");
+    renderOverview({ permissions: [...VIEWER, "ingestionSources:view"] });
+    expect(screen.queryByRole("link", { name: /Connect a source/ })).toBeNull();
+    cleanup();
+
+    renderOverview({ permissions: MANAGER });
+    const insightsLine = screen
+      .getByText("Nothing to report yet. Insights appear here once sources are pulling.")
+      .closest("[data-size='line']") as HTMLElement;
+    expect(within(insightsLine).getByRole("link", { name: /Connect a source/ })).toHaveAttribute(
+      "href",
+      "/governance/inventory?tab=sources",
+    );
+  });
+
   /** @scenario "The overview renders no error alert and issues no spend read" */
   it("shows no alert and reads only the source list when the plan lacks the activity monitor", () => {
     renderOverview({ plan: { isEnterprise: false, isLoading: false } });

@@ -6,6 +6,7 @@ import { SecurityError } from "@langwatch/eventing";
 import { nowInstant, Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
+import { analyticsProof } from "../../__tests__/analytics-proof.fixture.ts";
 import { MemoryAnalyticsRepositories } from "../memory.analytics.repositories.ts";
 
 const OCCURRED_AT_MS = 1_750_000_000_000;
@@ -188,7 +189,7 @@ describe("the analytics memory tier", () => {
     await expect(
       analytics.runTimeseries({
         table: analytics.tableFor(input),
-        tenantId: "project-1",
+        authorization: analyticsProof({ projectId: "project-1" }),
         input,
         startDate: nowInstant(),
         endDate: nowInstant(),

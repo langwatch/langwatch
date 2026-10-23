@@ -6,10 +6,7 @@ import { GuidedOnboardingOffer } from "@langwatch/onboarding-client";
 import { api } from "../../../behavior/governance-api.ts";
 import { useGovernanceScope } from "../../../behavior/governance-session.ts";
 import { GovernanceHeroGround } from "../../../features/overview/ui/sections/governance-hero-ground.tsx";
-import {
-  GovernanceHero,
-  HOME_MEASURE,
-} from "../../../features/overview/ui/sections/governance-hero.tsx";
+import { GovernanceHero } from "../../../features/overview/ui/sections/governance-hero.tsx";
 import { GovernanceHomeSections } from "../../../features/overview/ui/sections/governance-home-sections.tsx";
 import { QuarantineFillAlert } from "../../../features/overview/ui/sections/quarantine-fill-panel.tsx";
 import { useGovernanceHost } from "../../../model/governance-host.ts";
@@ -61,16 +58,10 @@ function GovernanceOverviewPage() {
         <Spacer />
         <SampleDataToggle active={sample.active} onToggle={sample.toggle} size="sm" />
       </PageLayout.Header>
-      <PageLayout.Container>
+      {/* One centred column, as before the #7536 port; the page body owns the measure. */}
+      <PageLayout.Container width="narrow" data-testid="governance-overview-body">
         {/* zIndex 1 is load-bearing: the stacking context the hero's zIndex -1 light sits in. */}
-        <VStack
-          align="stretch"
-          gap={8}
-          width="full"
-          maxW={HOME_MEASURE}
-          position="relative"
-          zIndex={1}
-        >
+        <VStack align="stretch" gap={8} width="full" position="relative" zIndex={1}>
           <VStack align="stretch" gap={6}>
             {orgId && !sample.active && <QuarantineFillAlert organizationId={orgId} />}
 
@@ -83,7 +74,11 @@ function GovernanceOverviewPage() {
             <GuidedOnboardingOffer space="governance" spaceInUse={sourcesInUse} />
           </VStack>
 
-          <GovernanceHomeSections canSetUpInsights={canSetUpInsights} sample={sample.active} />
+          <GovernanceHomeSections
+            canSetUpInsights={canSetUpInsights}
+            canManageSources={canManageSources}
+            sample={sample.active}
+          />
         </VStack>
       </PageLayout.Container>
     </GovernanceLayout>

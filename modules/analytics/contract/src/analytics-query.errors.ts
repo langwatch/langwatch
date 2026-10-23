@@ -109,3 +109,21 @@ export function isSeriesPercentageUnsupported(error: unknown): boolean {
     error.code === "analytics_series_percentage_unsupported"
   );
 }
+
+/**
+ * A series read with no viewer (a scheduled report, a graph alert) on an aggregate project
+ * (ADR-177 v4.15). With no viewer there is no route proof to carry the members, so the read
+ * would count the aggregate's own empty tenant and report zero; it is refused instead.
+ */
+export class AggregateUnattendedReadError extends HandledError {
+  declare readonly code: "analytics_aggregate_unattended_read";
+
+  constructor() {
+    super(
+      "analytics_aggregate_unattended_read",
+      "Scheduled reports and alerts do not read across member projects yet.",
+      { httpStatus: 422, fault: "customer" },
+    );
+    this.name = "AggregateUnattendedReadError";
+  }
+}

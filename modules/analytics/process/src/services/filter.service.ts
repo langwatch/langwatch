@@ -1,4 +1,5 @@
 import type { FilterField } from "@langwatch/analytics-contract";
+import { type Authorization, projectIdsReadBy } from "@langwatch/authorization";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { getLangWatchTracer } from "langwatch";
@@ -18,6 +19,7 @@ type GetFilterOptionsInput = {
   startDate: number;
   endDate: number;
   scope?: FindFilterOptionsInput["scope"];
+  authorization: Authorization;
 };
 
 /**
@@ -67,13 +69,15 @@ export class FilterService {
         try {
           const filterOptions = await this.repository.findOptions({
             field: input.field,
-            tenantId: input.projectId,
+            authorization: input.authorization,
             query: input.query,
             key: input.key,
             subkey: input.subkey,
             startDate: input.startDate,
             endDate: input.endDate,
             ...(input.scope ? { scope: input.scope } : {}),
+            // A proof spanning members holds each evaluation to its trace's window.
+            readsMembers: projectIdsReadBy(input.authorization, "analytics:view").length > 1,
           });
 
           span.setAttribute("clickhouse.result_count", filterOptions.length);

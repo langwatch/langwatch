@@ -417,6 +417,95 @@ export class LangWatchQLRateLimitedError extends HandledError {
 }
 
 /**
+ * An aggregate's run needs every member's LangWatchQL key, and these members have none that can
+ * be read, so nothing runs: reading the rest would show a total that silently leaves them out.
+ */
+export class LangWatchQLMemberKeyMissingError extends HandledError {
+  declare readonly code: "lwql_member_key_missing";
+
+  constructor(input: { projectIds: readonly string[]; projectNames?: readonly string[] }) {
+    super("lwql_member_key_missing", "A member project of this aggregate cannot be queried.", {
+      httpStatus: 503,
+      fault: "platform",
+      meta: { projectIds: [...input.projectIds], projectNames: [...(input.projectNames ?? [])] },
+    });
+    this.name = "LangWatchQLMemberKeyMissingError";
+  }
+}
+
+/**
+ * These members are shared up to an end date, and no view can keep a read to before it, so
+ * nothing runs: reading the rest would show a total that silently leaves them out.
+ */
+export class LangWatchQLMemberGrantClosedError extends HandledError {
+  declare readonly code: "lwql_member_grant_closed";
+
+  constructor(input: { projectIds: readonly string[]; projectNames?: readonly string[] }) {
+    super(
+      "lwql_member_grant_closed",
+      "A member project of this aggregate is shared up to a date.",
+      {
+        httpStatus: 422,
+        fault: "customer",
+        meta: { projectIds: [...input.projectIds], projectNames: [...(input.projectNames ?? [])] },
+      },
+    );
+    this.name = "LangWatchQLMemberGrantClosedError";
+  }
+}
+
+/**
+ * An aggregate reads more members than one LangWatchQL statement may name, refused before any
+ * read rather than answered for a part of them.
+ */
+export class LangWatchQLTooManyMembersError extends HandledError {
+  declare readonly code: "lwql_too_many_members";
+
+  constructor(input: { memberCount: number; maxMembers: number }) {
+    super("lwql_too_many_members", "This aggregate has too many members to query at once.", {
+      httpStatus: 422,
+      fault: "customer",
+      meta: { memberCount: input.memberCount, maxMembers: input.maxMembers },
+    });
+    this.name = "LangWatchQLTooManyMembersError";
+  }
+}
+
+/**
+ * A view the read keeps to a window is read as a subquery, and ClickHouse takes no `FINAL` or
+ * `SAMPLE` on one. The views already keep one row per key, so `FINAL` adds nothing there.
+ */
+export class LangWatchQLTableModifierError extends HandledError {
+  declare readonly code: "lwql_table_modifier_unsupported";
+
+  constructor(input: { modifiers: readonly string[] }) {
+    super("lwql_table_modifier_unsupported", "FINAL and SAMPLE cannot be used on this read.", {
+      httpStatus: 400,
+      fault: "customer",
+      meta: { modifiers: [...input.modifiers] },
+    });
+    this.name = "LangWatchQLTableModifierError";
+  }
+}
+
+/**
+ * A `WITH` name spelt like a view the read keeps to a window. The rewrite finds views by name, so
+ * a name declared in one subquery could hide the view another part of the statement reads.
+ */
+export class LangWatchQLShadowedViewError extends HandledError {
+  declare readonly code: "lwql_view_shadowed";
+
+  constructor(input: { names: readonly string[] }) {
+    super("lwql_view_shadowed", "A WITH name cannot repeat a view's name on this read.", {
+      httpStatus: 400,
+      fault: "customer",
+      meta: { names: [...input.names] },
+    });
+    this.name = "LangWatchQLShadowedViewError";
+  }
+}
+
+/**
  * The shared LangWatchQL identity is already running as many statements as it
  * may (ClickHouse TOO_MANY_SIMULTANEOUS_QUERIES). Nothing is wrong with the
  * query: the same request succeeds moments later, so it is retryable.

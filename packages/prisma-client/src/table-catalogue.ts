@@ -270,6 +270,7 @@ export const prismaModelFieldCatalogue = {
     "passkeyNudgeDismissedAt",
     "joinOfferDismissedDomains",
     "notificationPreferences",
+    "passwordResetRequiredAt",
     "Annotation",
     "shareLinks",
     "Workflow",
@@ -2238,6 +2239,10 @@ export const prismaModelFieldCatalogue = {
     "seeded",
     "evaluationCount",
     "simulationRunCount",
+    "codingFirstSessionAt",
+    "codingAgentTypes",
+    "codingActiveDays",
+    "codingLastActiveDay",
     "updatedAt"
   ],
   "BillingMeterCheckpoint": [

@@ -2132,7 +2132,7 @@ each owner's events, which carry ids and the non-personal, point-in-time facts; 
 personal data: where a signal needs some it carries the id (and a revision), and nurturing reads the value from
 `UserApi` at delivery and never stores it. Only the email and name leave, to Customer.io, once at sign-up; each
 identify sends only the traits that signal changes, once per source event.
-With no owner-to-nurturing edges, its `nurturing -> user` read closes no construction or package-import cycle, and the ratchet baseline
+With no owner-to-nurturing edges, its `nurturing -> user` and `nurturing -> organization` reads close no construction or package-import cycle, and the ratchet baseline
 carries no exception for it (Alex, 2026-09-29).
 
 The framework's public types carry typed parameters or `unknown`, never `any`: an event, command or

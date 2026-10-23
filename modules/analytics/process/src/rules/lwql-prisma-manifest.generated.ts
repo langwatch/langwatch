@@ -75,6 +75,7 @@ export interface LwqlPrismaRows {
     readonly passkeyNudgeDismissedAt: "DateTime?";
     readonly joinOfferDismissedDomains: "String[]";
     readonly notificationPreferences: "Json";
+    readonly passwordResetRequiredAt: "DateTime?";
   };
   readonly VerificationToken: {
     readonly id: "String";
@@ -1774,6 +1775,10 @@ export interface LwqlPrismaRows {
     readonly seeded: "Boolean";
     readonly evaluationCount: "Int";
     readonly simulationRunCount: "Int";
+    readonly codingFirstSessionAt: "DateTime?";
+    readonly codingAgentTypes: "String[]";
+    readonly codingActiveDays: "Int";
+    readonly codingLastActiveDay: "String?";
     readonly updatedAt: "DateTime";
   };
   readonly BillingMeterCheckpoint: {

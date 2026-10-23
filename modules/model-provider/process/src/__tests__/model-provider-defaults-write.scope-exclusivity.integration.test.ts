@@ -60,6 +60,7 @@ describe.skipIf(!DB_URL)(
 
     function writerFor(admins: Set<string>) {
       return ModelProviderDefaultsWriteService.create({
+        decisionModels: { assertMayStore: () => Promise.resolve() },
         defaults,
         catalog,
         writeAuthorization: ModelProviderWriteAuthorizationService.create(
@@ -254,6 +255,7 @@ describe.skipIf(!DB_URL)(
           return { permitted: true, organizationRole: null };
         });
         const checkedWriter = ModelProviderDefaultsWriteService.create({
+          decisionModels: { assertMayStore: () => Promise.resolve() },
           defaults,
           catalog,
           writeAuthorization: ModelProviderWriteAuthorizationService.create(
