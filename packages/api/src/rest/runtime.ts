@@ -2115,6 +2115,8 @@ async function answerWith<Api>({
   } else if (!route.rawResponse) {
     return respond({ context, route, result });
   } else if (!isDeclined(result)) {
+    if (result instanceof Response) recordForwardedFailure(context, result);
+
     return respondRaw({ context, route, result });
   }
 

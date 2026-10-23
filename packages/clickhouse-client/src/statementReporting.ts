@@ -90,19 +90,30 @@ const NOOP_METRICS: StatementMetrics = {
 /** How long a cold-scan warning for one query shape stays quiet after it is logged. */
 const COLD_SCAN_WARN_INTERVAL_MS = 60 * 60 * 1000;
 
-/** Replaces each quoted literal with `?`, in one pass (a backtracking regex is quadratic). */
-function withoutStringLiterals(query: string): string {
+/**
+ * Replaces each quoted literal with `?` and drops `--` and block comments, in one linear pass (a
+ * backtracking regex is quadratic), so an apostrophe in a comment never swallows the SQL after it.
+ */
+function withoutLiteralsOrComments(query: string): string {
   let out = "";
-  let inside = false;
-  for (let i = 0; i < query.length; i++) {
+  let i = 0;
+  while (i < query.length) {
     const ch = query[i];
-    if (!inside) {
-      if (ch === "'") {
-        inside = true;
-        out += "?";
-      } else out += ch;
-    } else if (ch === "\\") i++;
-    else if (ch === "'") inside = false;
+    const pair = query.slice(i, i + 2);
+    if (ch === "'") {
+      i++;
+      while (i < query.length && query[i] !== "'") i += query[i] === "\\" ? 2 : 1;
+      i++;
+      out += "?";
+    } else if (pair === "--") {
+      while (i < query.length && query[i] !== "\n") i++;
+    } else if (pair === "/*") {
+      const end = query.indexOf("*/", i + 2);
+      i = end === -1 ? query.length : end + 2;
+    } else {
+      out += ch;
+      i++;
+    }
   }
 
   return out;
@@ -113,7 +124,7 @@ function withoutStringLiterals(query: string): string {
  * tenant, time window or limit is one key. The warning is about the statement's form.
  */
 function queryShapeOf(rawQuery: string): string {
-  const shape = withoutStringLiterals(rawQuery)
+  const shape = withoutLiteralsOrComments(rawQuery)
     .replace(/\b\d+(?:\.\d+)?\b/g, "?")
     .replace(/\s+/g, " ")
     .trim();
@@ -162,7 +173,10 @@ export class StatementReporter {
 
   /** Null while the shape is quiet; otherwise how many warnings it held back since the last. */
   private claimColdScanWarning(rawQuery: string): { suppressedSincePrevious: number } | null {
-    const suppressed = this.coldScanThrottle.claim({ key: queryShapeOf(rawQuery), now: this.now() });
+    const suppressed = this.coldScanThrottle.claim({
+      key: queryShapeOf(rawQuery),
+      now: this.now(),
+    });
 
     return suppressed === undefined ? null : { suppressedSincePrevious: suppressed };
   }

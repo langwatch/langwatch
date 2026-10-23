@@ -135,3 +135,10 @@ Feature: The trace ingestion doors are served
     Then both exports are accepted
     And the span is recorded once
 
+
+  @unit
+  Scenario: A body the collector refused is logged as the sender's warning
+    Given the collector refused a body the SDK sent
+    When the refusal is reported
+    Then it is logged at warn, never error
+    And the record names the trace when the refusal knows it
