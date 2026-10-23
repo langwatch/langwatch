@@ -246,7 +246,6 @@ describe("given a member filed an insight with a query and a window", () => {
         archived: [],
         unseen: [],
         count: 0,
-        tone: "good",
       });
       // The owner still reads the evidence the other member was never handed.
       await expect(as({ userId: OWNER }).getAll({ projectId: PROJECT })).resolves.toEqual([
