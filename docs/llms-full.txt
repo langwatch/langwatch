@@ -25599,7 +25599,7 @@ def run_langchain_rag(user_input: str):
         ),
     )
 
-    output = response.get("output", "No output found.")=
+    output = response.get("output", "No output found.")
     return output
 
 if __name__ == "__main__":
@@ -25727,7 +25727,7 @@ async def handle_user_query_manual(query: str):
             # Set input, metadata and output via update
             llm_span.update(
                 input=llm_input,
-                output=llm_output
+                output=llm_output,
                 llm_metadata=llm_metadata,
             )
 
@@ -39957,9 +39957,17 @@ Archive a dataset by slug or ID.
 
 
   ### Python
-```python langwatch.dataset.delete_dataset("my-dataset") ```
+
+```python
+langwatch.dataset.delete_dataset("my-dataset")
+```
+
   ### TypeScript
-```typescript await langwatch.datasets.delete("my-dataset"); ```
+
+```typescript
+await langwatch.datasets.delete("my-dataset");
+```
+
 
 
 ## List Records
@@ -46752,9 +46760,19 @@ yourself: [create an experiment](/api-reference/experiments/create-an-experiment
 
 
   ### Python
-```bash pip install langwatch ```
+
+```bash
+pip install langwatch
+```
+
   ### TypeScript
-```bash npm install langwatch # or pnpm add langwatch ```
+
+```bash
+npm install langwatch
+# or
+pnpm add langwatch
+```
+
 
 
 ### 2. Set your API Key
@@ -51779,7 +51797,7 @@ from rich import print
 print(synthetic_queries[0])
 ```
 
-```python
+```text
 {
     'query': 'Searching for a sleeveless top with lace detailing at the neckline for casual outings and dinner
 dates.',
@@ -70485,7 +70503,9 @@ runAsUser: 1000
 fsGroup: 1000
 seccompProfile:
   type: RuntimeDefault
+```
 
+```yaml
 # Container-level (global.containerSecurityContext)
 runAsNonRoot: true
 allowPrivilegeEscalation: false

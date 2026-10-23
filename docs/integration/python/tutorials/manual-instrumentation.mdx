@@ -62,7 +62,7 @@ async def handle_user_query_manual(query: str):
             # Set input, metadata and output via update
             llm_span.update(
                 input=llm_input,
-                output=llm_output
+                output=llm_output,
                 llm_metadata=llm_metadata,
             )
 

@@ -17,14 +17,13 @@ Initializes the LangWatch observability system for Node.js environments, enablin
 import { setupObservability } from "langwatch/observability/node";
 
 setupObservability({
-langwatch: {
-apiKey: process.env.LANGWATCH_API_KEY,
-endpoint: process.env.LANGWATCH_ENDPOINT_URL
-},
-serviceName: "my-service"
+  langwatch: {
+    apiKey: process.env.LANGWATCH_API_KEY,
+    endpoint: process.env.LANGWATCH_ENDPOINT_URL
+  },
+  serviceName: "my-service"
 });
-
-````
+```
 
 ```typescript Advanced Setup
 import { setupObservability } from "langwatch/observability/node";
@@ -47,7 +46,7 @@ setupObservability({
     logLevel: "debug"
   }
 });
-````
+```
 
 ```typescript Custom Configuration
 import { setupObservability } from "langwatch/observability/node";

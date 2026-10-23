@@ -22,8 +22,18 @@ yourself: [create an experiment](/api-reference/experiments/create-an-experiment
 ### 1. Install the SDK
 
 <Tabs>
-  <Tab title="Python">```bash pip install langwatch ```</Tab>
-  <Tab title="TypeScript">```bash npm install langwatch # or pnpm add langwatch ```</Tab>
+  <Tab title="Python">
+```bash
+pip install langwatch
+```
+  </Tab>
+  <Tab title="TypeScript">
+```bash
+npm install langwatch
+# or
+pnpm add langwatch
+```
+  </Tab>
 </Tabs>
 
 ### 2. Set your API Key
@@ -34,8 +44,7 @@ yourself: [create an experiment](/api-reference/experiments/create-an-experiment
 import langwatch
 
 langwatch.login()
-
-````
+```
 
 Be sure to log in or create an account using the displayed link, then provide your API key when prompted.
   </Tab>
@@ -43,7 +52,7 @@ Be sure to log in or create an account using the displayed link, then provide yo
 ```bash
 export LANGWATCH_API_KEY=your_api_key
 export LANGWATCH_PROJECT_ID=your_project_id  # Required for service API keys
-````
+```
 
 <Note>
   `LANGWATCH_PROJECT_ID` is required when using a **service API key** (e.g. for CI/CD or multi-project setups). Project API keys obtained via `langwatch.login()` or from the project settings page already have the project context built in.
@@ -60,22 +69,19 @@ import langwatch
 import pandas as pd
 
 # Load your dataset
-
 df = pd.read_csv("my_dataset.csv")
 
 # Initialize a new experiment
-
 evaluation = langwatch.experiment.init("my-experiment")
 
 # Wrap your loop with evaluation.loop(), and iterate as usual
-
-for idx, row in evaluation.loop(df.iterrows()): # Run your model or pipeline
-response = my_agent(row["question"])
+for idx, row in evaluation.loop(df.iterrows()):
+    # Run your model or pipeline
+    response = my_agent(row["question"])
 
     # Log a metric for this sample
     evaluation.log("sample_metric", index=idx, score=0.95)
-
-````
+```
   </Tab>
   <Tab title="TypeScript">
 ```typescript
@@ -101,7 +107,7 @@ await evaluation.run(dataset, async ({ item, index }) => {
   // Log a metric for this sample
   evaluation.log("sample_metric", { index, score: 0.95 });
 });
-````
+```
 
   </Tab>
 </Tabs>
@@ -120,14 +126,14 @@ The evaluation is started by creating an evaluation session with a descriptive n
 
 <Tabs>
   <Tab title="Python">
-    ```python
-    evaluation = langwatch.experiment.init("rag-pipeline-openai-vs-claude")
-    ```
+```python
+evaluation = langwatch.experiment.init("rag-pipeline-openai-vs-claude")
+```
   </Tab>
   <Tab title="TypeScript">
-    ```typescript
-    const evaluation = await langwatch.experiments.init("rag-pipeline-openai-vs-claude");
-    ```
+```typescript
+const evaluation = await langwatch.experiments.init("rag-pipeline-openai-vs-claude");
+```
   </Tab>
 </Tabs>
 
@@ -168,15 +174,12 @@ Track any metric you want with `evaluation.log()`:
 evaluation.log("relevance", index=index, score=0.85)
 
 # Boolean pass/fail
-
 evaluation.log("contains_citation", index=index, passed=True)
 
 # Include additional data for debugging
-
 evaluation.log("coherence", index=index, score=0.9,
-data={"output": result["text"], "tokens": result["token_count"]})
-
-````
+               data={"output": result["text"], "tokens": result["token_count"]})
+```
   </Tab>
   <Tab title="TypeScript">
 ```typescript
@@ -192,7 +195,7 @@ evaluation.log("coherence", {
   score: 0.9,
   data: { output: result.text, tokens: result.tokenCount }
 });
-````
+```
 
   </Tab>
 </Tabs>
@@ -303,15 +306,12 @@ with evaluation.target("gpt5", {"model": "gpt-5", "temp": 0.7}):
     evaluation.log("accuracy", index=0, score=0.95)  # target auto-inferred
 
 # Or using explicit target parameter (without target() context)
-
 evaluation.log("latency", index=0, target="gpt5", metadata={"model": "gpt-5", "temp": 0.7})
 
 # Subsequent calls can omit metadata - it's already registered
-
 evaluation.log("accuracy", index=0, target="gpt5", score=0.95)
 evaluation.log("latency", index=1, target="gpt5", score=150)
-
-````
+```
   </Tab>
   <Tab title="TypeScript">
 ```typescript
@@ -324,7 +324,7 @@ await evaluation.withTarget("gpt5", { model: "gpt-5", temp: 0.7 }, async () => {
 // Or using explicit target parameter
 evaluation.log("latency", { index: 0, target: "gpt5", metadata: { model: "gpt-5", temp: 0.7 } });
 evaluation.log("accuracy", { index: 0, target: "gpt5", score: 0.95 }); // metadata already registered
-````
+```
 
   </Tab>
 </Tabs>
@@ -530,16 +530,15 @@ import langwatch
 evaluation = langwatch.experiment.init("model-comparison")
 
 for index, row in evaluation.loop(df.iterrows()):
-with evaluation.target("gpt-5-mini", {"model": "openai/gpt-5-mini"}):
-evaluation.log_response(ask_gpt(row["question"]))
+    with evaluation.target("gpt-5-mini", {"model": "openai/gpt-5-mini"}):
+        evaluation.log_response(ask_gpt(row["question"]))
 
     with evaluation.target("claude-sonnet-5", {"model": "anthropic/claude-sonnet-5"}):
         evaluation.log_response(ask_claude(row["question"]))
 
     verdict = evaluation.compare(index, input=row["question"])
     print(verdict.winner, verdict.reasoning)
-
-````
+```
 
 The candidates are whatever `log_response()` recorded inside each `target()` block.
   </Tab>
@@ -564,7 +563,7 @@ await evaluation.run(dataset, async ({ item }) => {
   const verdict = await evaluation.compare({ input: item.question });
   console.log(verdict.winner, verdict.reasoning);
 });
-````
+```
 
 The candidates are whatever each `withTarget()` callback returned.
 
@@ -646,12 +645,11 @@ briefly which candidate wins on those criteria, then pick its slot label.
 """
 
 verdict = evaluation.compare(
-index,
-input=row["question"],
-prompt=SUPPORT_RUBRIC,
+    index,
+    input=row["question"],
+    prompt=SUPPORT_RUBRIC,
 )
-
-````
+```
   </Tab>
   <Tab title="TypeScript">
 ```typescript
@@ -671,7 +669,7 @@ const verdict = await evaluation.compare({
   input: item.question,
   prompt: supportRubric,
 });
-````
+```
 
   </Tab>
 </Tabs>
@@ -746,9 +744,9 @@ df = langwatch.dataset.get_dataset("your-dataset-id").to_pandas()
 evaluation = langwatch.experiment.init("support-reply-comparison")
 
 for index, row in evaluation.loop(df.iterrows(), threads=4):
-def task(index, row):
-with evaluation.target("gpt-5-mini", {"model": "openai/gpt-5-mini"}):
-evaluation.log_response(ask_gpt(row["question"]))
+    def task(index, row):
+        with evaluation.target("gpt-5-mini", {"model": "openai/gpt-5-mini"}):
+            evaluation.log_response(ask_gpt(row["question"]))
 
         with evaluation.target("claude-sonnet-5", {"model": "anthropic/claude-sonnet-5"}):
             evaluation.log_response(ask_claude(row["question"]))
@@ -767,8 +765,7 @@ evaluation.log_response(ask_gpt(row["question"]))
     evaluation.submit(task, index, row)
 
 evaluation.print_summary()
-
-````
+```
   </Tab>
   <Tab title="TypeScript">
 ```typescript
@@ -802,7 +799,7 @@ await evaluation.run(dataset, async ({ item, index }) => {
 }, { concurrency: 4 });
 
 evaluation.printSummary();
-````
+```
 
   </Tab>
 </Tabs>
@@ -872,20 +869,18 @@ await evaluation.run(
 import langwatch
 
 # Load dataset from LangWatch
-
 df = langwatch.dataset.get_dataset("your-dataset-id").to_pandas()
 
 # Initialize evaluation
-
 evaluation = langwatch.experiment.init("rag-pipeline-evaluation-v2")
 
 # Run evaluation with parallelization
-
 for index, row in evaluation.loop(df.iterrows(), threads=8):
-def task(index, row): # Compare two RAG configurations
-with evaluation.target("rag-v1", {"model": "gpt-5", "retriever": "dense"}):
-response, contexts = execute_rag_pipeline(row["question"], version="v1")
-evaluation.log_response(response.text) # Store the output
+    def task(index, row):
+        # Compare two RAG configurations
+        with evaluation.target("rag-v1", {"model": "gpt-5", "retriever": "dense"}):
+            response, contexts = execute_rag_pipeline(row["question"], version="v1")
+            evaluation.log_response(response.text)  # Store the output
 
             # Use LangWatch evaluators - target auto-inferred
             evaluation.evaluate(
@@ -912,8 +907,7 @@ evaluation.log_response(response.text) # Store the output
             evaluation.log("response_quality", index=index, score=response.quality)
 
     evaluation.submit(task, index, row)
-
-````
+```
   </Tab>
   <Tab title="TypeScript">
 ```typescript
@@ -956,7 +950,7 @@ await evaluation.run(dataset, async ({ item, index }) => {
     }),
   ]);
 }, { concurrency: 8 });
-````
+```
 
   </Tab>
 </Tabs>
@@ -978,10 +972,9 @@ def agent(question):
     return {"text": completion.text, "context": context}
 
 for index, row in evaluation.loop(df.iterrows()):
-result = agent(row["question"])
-evaluation.log("accuracy", index=index, score=0.9)
-
-````
+    result = agent(row["question"])
+    evaluation.log("accuracy", index=index, score=0.9)
+```
 
 <Info>
   Learn more in our [Python Integration Guide](/integration/python/guide).
@@ -1006,7 +999,7 @@ await evaluation.run(dataset, async ({ item, index }) => {
   const result = await agent(item.question);
   evaluation.log("accuracy", { index, score: 0.9 });
 });
-````
+```
 
 <Info>
   Learn more in our [TypeScript Integration Guide](/integration/typescript/guide).

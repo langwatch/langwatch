@@ -53,8 +53,7 @@ import langwatch
 
 result = langwatch.experiment.run("your-experiment-slug")
 result.print_summary()
-
-````
+```
   </Tab>
   <Tab title="TypeScript">
 ```typescript
@@ -63,7 +62,7 @@ import { LangWatch } from "langwatch";
 const langwatch = new LangWatch();
 const result = await langwatch.experiments.run("your-experiment-slug");
 result.printSummary();
-````
+```
 
   </Tab>
 </Tabs>
@@ -196,17 +195,15 @@ Define your entire experiment in code. This gives you full control and version c
 import langwatch
 
 # Load your dataset
-
 dataset = langwatch.dataset.get_dataset("my-dataset").to_pandas()
 
 # Initialize experiment
-
 experiment = langwatch.experiment.init("ci-quality-check")
 
 # Run through each test case
-
-for idx, row in experiment.loop(dataset.iterrows()): # Call your LLM/agent
-response = my_llm(row["input"])
+for idx, row in experiment.loop(dataset.iterrows()):
+    # Call your LLM/agent
+    response = my_llm(row["input"])
 
     # Run evaluators
     experiment.evaluate(
@@ -221,10 +218,8 @@ response = my_llm(row["input"])
     )
 
 # Print summary and exit with code 1 on failure
-
 experiment.print_summary()
-
-````
+```
   </Tab>
   <Tab title="TypeScript">
 ```typescript
@@ -260,7 +255,7 @@ await experiment.run(
 
 // Print summary and exit with code 1 on failure
 experiment.printSummary();
-````
+```
 
   </Tab>
 </Tabs>
@@ -384,14 +379,33 @@ The `print_summary()` method:
 
 <Tabs>
   <Tab title="Platform Experiment">
-    ```yaml evaluate: stage: test image: python:3.11 script: - pip install langwatch - python -c "
-    import langwatch result = langwatch.experiment.run('my-experiment') result.print_summary() "
-    variables: LANGWATCH_API_KEY: $LANGWATCH_API_KEY ```
+```yaml
+evaluate:
+  stage: test
+  image: python:3.11
+  script:
+    - pip install langwatch
+    - python -c "
+      import langwatch
+      result = langwatch.experiment.run('my-experiment')
+      result.print_summary()
+      "
+  variables:
+    LANGWATCH_API_KEY: $LANGWATCH_API_KEY
+```
   </Tab>
   <Tab title="via SDK">
-    ```yaml evaluate: stage: test image: python:3.11 script: - pip install langwatch openai - python
-    scripts/run_evaluation.py variables: LANGWATCH_API_KEY: $LANGWATCH_API_KEY OPENAI_API_KEY:
-    $OPENAI_API_KEY ```
+```yaml
+evaluate:
+  stage: test
+  image: python:3.11
+  script:
+    - pip install langwatch openai
+    - python scripts/run_evaluation.py
+  variables:
+    LANGWATCH_API_KEY: $LANGWATCH_API_KEY
+    OPENAI_API_KEY: $OPENAI_API_KEY
+```
   </Tab>
 </Tabs>
 
@@ -403,19 +417,21 @@ The `print_summary()` method:
 version: 2.1
 
 jobs:
-evaluate:
-docker: - image: python:3.11
-steps: - checkout - run:
-name: Run experiment
-command: |
-pip install langwatch
-python -c "
-import langwatch
-result = langwatch.experiment.run('my-experiment')
-result.print_summary()
-"
-
-````
+  evaluate:
+    docker:
+      - image: python:3.11
+    steps:
+      - checkout
+      - run:
+          name: Run experiment
+          command: |
+            pip install langwatch
+            python -c "
+            import langwatch
+            result = langwatch.experiment.run('my-experiment')
+            result.print_summary()
+            "
+```
   </Tab>
   <Tab title="via SDK">
 ```yaml
@@ -433,7 +449,7 @@ jobs:
       - run:
           name: Run experiment
           command: python scripts/run_evaluation.py
-````
+```
 
   </Tab>
 </Tabs>
@@ -452,19 +468,18 @@ from langwatch.evaluation import (
 )
 
 try:
-result = langwatch.experiment.run("my-experiment", timeout=300)
-result.print_summary()
+    result = langwatch.experiment.run("my-experiment", timeout=300)
+    result.print_summary()
 except EvaluationNotFoundError:
-print("Experiment not found - check the slug")
-exit(1)
+    print("Experiment not found - check the slug")
+    exit(1)
 except EvaluationTimeoutError as e:
-print(f"Timeout: only {e.progress}/{e.total} completed")
-exit(1)
+    print(f"Timeout: only {e.progress}/{e.total} completed")
+    exit(1)
 except EvaluationRunFailedError as e:
-print(f"Run failed: {e.error_message}")
-exit(1)
-
-````
+    print(f"Run failed: {e.error_message}")
+    exit(1)
+```
   </Tab>
   <Tab title="TypeScript">
 ```typescript
@@ -487,7 +502,7 @@ try {
   }
   process.exit(1);
 }
-````
+```
 
   </Tab>
 </Tabs>

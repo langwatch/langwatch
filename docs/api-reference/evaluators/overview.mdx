@@ -84,24 +84,21 @@ If you're using the LLM Category evaluator to check different aspects of your ou
 import langwatch
 
 # Check 1: Is the answer complete?
-
 langwatch.evaluation.evaluate(
-"langevals/llm_category",
-name="Answer Completeness Check", # Unique name for this check
-data={"input": user_input, "output": response},
-settings={"categories": [{"name": "complete"}, {"name": "incomplete"}]}
+    "langevals/llm_category",
+    name="Answer Completeness Check",  # Unique name for this check
+    data={"input": user_input, "output": response},
+    settings={"categories": [{"name": "complete"}, {"name": "incomplete"}]}
 )
 
 # Check 2: Is the tone appropriate?
-
 langwatch.evaluation.evaluate(
-"langevals/llm_category",
-name="Tone Appropriateness Check", # Different name for this check
-data={"input": user_input, "output": response},
-settings={"categories": [{"name": "professional"}, {"name": "casual"}, {"name": "inappropriate"}]}
+    "langevals/llm_category",
+    name="Tone Appropriateness Check",  # Different name for this check
+    data={"input": user_input, "output": response},
+    settings={"categories": [{"name": "professional"}, {"name": "casual"}, {"name": "inappropriate"}]}
 )
-
-````
+```
 
 ```typescript TypeScript
 import { LangWatch } from "langwatch";
@@ -121,7 +118,7 @@ await langwatch.evaluations.evaluate("langevals/llm_category", {
     data: { input: userInput, output: response },
     settings: { categories: [{ name: "professional" }, { name: "casual" }, { name: "inappropriate" }] }
 });
-````
+```
 
 </CodeGroup>
 

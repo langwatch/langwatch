@@ -14,17 +14,15 @@ The SDKs, the CLI and the MCP server list, create, read, update and delete datas
 import langwatch
 
 # Initialize the SDK (or set LANGWATCH_API_KEY environment variable)
-
 langwatch.setup()
-
-````
+```
   </Tab>
   <Tab title="TypeScript">
 ```typescript
 import { LangWatch } from "langwatch";
 
 const langwatch = new LangWatch();
-````
+```
 
   </Tab>
 </Tabs>
@@ -48,15 +46,13 @@ import langwatch
 result = langwatch.dataset.list_datasets()
 
 for ds in result.data:
-print(f"{ds.name} ({ds.slug}) - {len(ds.columnTypes)} columns")
+    print(f"{ds.name} ({ds.slug}) - {len(ds.columnTypes)} columns")
 
 print(f"Page {result.pagination.page} of {result.pagination.totalPages}")
 
 # List with explicit pagination
-
 result = langwatch.dataset.list_datasets(page=2, limit=10)
-
-````
+```
   </Tab>
   <Tab title="TypeScript">
 ```typescript
@@ -75,7 +71,7 @@ console.log(`Page ${result.pagination.page} of ${result.pagination.totalPages}`)
 
 // List with explicit pagination
 const page2 = await langwatch.datasets.list({ page: 2, limit: 10 });
-````
+```
 
   </Tab>
 </Tabs>
@@ -100,10 +96,8 @@ info = langwatch.dataset.create_dataset(
 print(f"Created: {info.name} (slug: {info.slug})")
 
 # Create with just a name (columns can be added later)
-
 info = langwatch.dataset.create_dataset("Simple Dataset")
-
-````
+```
   </Tab>
   <Tab title="TypeScript">
 ```typescript
@@ -123,7 +117,7 @@ console.log(`Created: ${info.name} (slug: ${info.slug})`);
 
 // Create with just a name
 const simple = await langwatch.datasets.create({ name: "Simple Dataset" });
-````
+```
 
   </Tab>
 </Tabs>
@@ -141,16 +135,13 @@ import langwatch
 dataset = langwatch.dataset.get_dataset("your-dataset-slug")
 
 # Access entries
-
 for entry in dataset.entries:
-print(entry.id, entry.entry)
+    print(entry.id, entry.entry)
 
 # Convert to pandas DataFrame for easy manipulation
-
 df = dataset.to_pandas()
 print(df.head())
-
-````
+```
   </Tab>
   <Tab title="TypeScript">
 ```typescript
@@ -165,7 +156,7 @@ const dataset = await langwatch.datasets.get("your-dataset-slug");
 for (const entry of dataset.entries) {
   console.log(entry.entry);
 }
-````
+```
 
   </Tab>
 </Tabs>
@@ -184,13 +175,11 @@ updated = langwatch.dataset.update_dataset("my-dataset", name="New Name")
 print(f"New slug: {updated.slug}")
 
 # Update column types
-
 updated = langwatch.dataset.update_dataset(
-"my-dataset",
-columns=[{"name": "question", "type": "string"}, {"name": "answer", "type": "string"}],
+    "my-dataset",
+    columns=[{"name": "question", "type": "string"}, {"name": "answer", "type": "string"}],
 )
-
-````
+```
   </Tab>
   <Tab title="TypeScript">
 ```typescript
@@ -211,7 +200,7 @@ const withCols = await langwatch.datasets.update("my-dataset", {
     { name: "answer", type: "string" },
   ],
 });
-````
+```
 
   </Tab>
 </Tabs>
@@ -221,8 +210,16 @@ const withCols = await langwatch.datasets.update("my-dataset", {
 Archive a dataset by slug or ID.
 
 <Tabs>
-  <Tab title="Python">```python langwatch.dataset.delete_dataset("my-dataset") ```</Tab>
-  <Tab title="TypeScript">```typescript await langwatch.datasets.delete("my-dataset"); ```</Tab>
+  <Tab title="Python">
+```python
+langwatch.dataset.delete_dataset("my-dataset")
+```
+  </Tab>
+  <Tab title="TypeScript">
+```typescript
+await langwatch.datasets.delete("my-dataset");
+```
+  </Tab>
 </Tabs>
 
 ## List Records
@@ -238,15 +235,13 @@ import langwatch
 result = langwatch.dataset.list_records("my-dataset")
 
 for record in result.data:
-print(record.id, record.entry)
+    print(record.id, record.entry)
 
 print(f"Total: {result.pagination.total}")
 
 # List with explicit pagination
-
 result = langwatch.dataset.list_records("my-dataset", page=2, limit=20)
-
-````
+```
   </Tab>
   <Tab title="TypeScript">
 ```typescript
@@ -268,7 +263,7 @@ const page2 = await langwatch.datasets.listRecords("my-dataset", {
   page: 2,
   limit: 20,
 });
-````
+```
 
   </Tab>
 </Tabs>
@@ -358,10 +353,10 @@ Batch-delete records by their IDs.
     ```
   </Tab>
   <Tab title="TypeScript">
-    ```typescript
-    const result = await langwatch.datasets.deleteRecords("my-dataset", ["rec-1", "rec-2"]);
-    console.log(`Deleted ${result.deletedCount} records`);
-    ```
+```typescript
+const result = await langwatch.datasets.deleteRecords("my-dataset", ["rec-1", "rec-2"]);
+console.log(`Deleted ${result.deletedCount} records`);
+```
   </Tab>
 </Tabs>
 
@@ -379,14 +374,11 @@ result = langwatch.dataset.upload("my-dataset", file_path="data.csv")
 print(f"Created {result.recordsCreated} records")
 
 # Replace all records (delete existing, then upload)
-
 result = langwatch.dataset.upload("my-dataset", file_path="data.csv", if_exists="replace")
 
 # Error if dataset already exists (create-only)
-
 result = langwatch.dataset.upload("my-dataset", file_path="data.csv", if_exists="error")
-
-````
+```
 
 The `if_exists` parameter controls how conflicts are handled:
 
@@ -413,7 +405,7 @@ await langwatch.datasets.upload("my-dataset", file, { ifExists: "replace" });
 
 // Error if dataset already exists (create-only)
 await langwatch.datasets.upload("my-dataset", file, { ifExists: "error" });
-````
+```
 
 The `ifExists` parameter controls how conflicts are handled:
 
@@ -438,20 +430,18 @@ import langwatch
 langwatch.setup()
 
 # Fetch dataset
-
 df = langwatch.dataset.get_dataset("your-dataset-slug").to_pandas()
 
 # Initialize evaluation
-
 evaluation = langwatch.experiment.init("my-evaluation")
 
-for index, row in evaluation.loop(df.iterrows()): # Run your LLM/agent
-output = my_llm(row["input"])
+for index, row in evaluation.loop(df.iterrows()):
+    # Run your LLM/agent
+    output = my_llm(row["input"])
 
     # Log evaluation metrics
     evaluation.log("response_quality", index=index, score=0.9)
-
-````
+```
   </Tab>
   <Tab title="TypeScript">
 ```typescript
@@ -476,7 +466,7 @@ await evaluation.run(
   },
   { concurrency: 4 }
 );
-````
+```
 
   </Tab>
 </Tabs>
@@ -515,8 +505,8 @@ const dataset = await langwatch.datasets.get<MyDatasetEntry>("my-dataset");
 
 // Now entry.entry is typed as MyDatasetEntry
 for (const entry of dataset.entries) {
-  console.log(entry.entry.input); // Typed as string
-  console.log(entry.entry.expected_output); // Typed as string
+  console.log(entry.entry.input);  // Typed as string
+  console.log(entry.entry.expected_output);  // Typed as string
 }
 ```
 

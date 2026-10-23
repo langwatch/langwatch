@@ -88,28 +88,24 @@ import langwatch
 from litellm import completion
 
 # Get the latest prompt by handle
-
 prompt = langwatch.prompts.get("my-summarizer")
 
 # Compile prompt with variables
-
 compiled_prompt = prompt.compile(
-user_input="Summarize this article for me...",
-context="Article content here"
+    user_input="Summarize this article for me...",
+    context="Article content here"
 )
 
 # Use with LiteLLM (supports all major providers)
-
 response = completion(
-model=prompt.model,
-messages=compiled_prompt.messages,
-temperature=prompt.temperature,
-max_tokens=prompt.max_tokens
+    model=prompt.model,
+    messages=compiled_prompt.messages,
+    temperature=prompt.temperature,
+    max_tokens=prompt.max_tokens
 )
 
 print(response.choices[0].message.content)
-
-````
+```
 
 </Tab>
 
@@ -141,7 +137,7 @@ const result = await generateText({
 });
 
 console.log(result.text);
-````
+```
 
 </Tab>
 </Tabs>
@@ -547,7 +543,7 @@ Since prompts are just YAML files, you refer to them directly from other tools o
 
 Reference prompts in a `.cursor/rules/*.mdc` file:
 
-```yaml
+```markdown
 ---
 description:
 globs:

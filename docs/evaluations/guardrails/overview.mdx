@@ -79,20 +79,21 @@ Click **Set up Guardrail** on the [Online Evaluations](https://app.langwatch.ai/
 import langwatch
 
 @langwatch.trace()
-def my_chatbot(user_input): # Input guardrail - check for jailbreak attempts
-jailbreak_check = langwatch.evaluation.evaluate(
-"azure/jailbreak",
-name="Jailbreak Detection",
-as_guardrail=True,
-data={"input": user_input},
-)
-
+def my_chatbot(user_input):
+    # Input guardrail - check for jailbreak attempts
+    jailbreak_check = langwatch.evaluation.evaluate(
+        "azure/jailbreak",
+        name="Jailbreak Detection",
+        as_guardrail=True,
+        data={"input": user_input},
+    )
+    
     if not jailbreak_check.passed:
         return "I'm sorry, I can't help with that request."
-
+    
     # Generate response
     response = call_llm(user_input)
-
+    
     # Output guardrail - check for PII
     pii_check = langwatch.evaluation.evaluate(
         "presidio/pii_detection",
@@ -100,13 +101,12 @@ data={"input": user_input},
         as_guardrail=True,
         data={"output": response},
     )
-
+    
     if not pii_check.passed:
         return "I apologize, but I cannot share that information."
-
+    
     return response
-
-````
+```
   </Tab>
   <Tab title="TypeScript">
 ```typescript
@@ -121,28 +121,28 @@ async function myChatbot(userInput: string): Promise<string> {
     asGuardrail: true,
     data: { input: userInput },
   });
-
+  
   if (!jailbreakCheck.passed) {
     return "I'm sorry, I can't help with that request.";
   }
-
+  
   // Generate response
   const response = await callLLM(userInput);
-
+  
   // Output guardrail - check for PII
   const piiCheck = await langwatch.evaluations.evaluate("presidio/pii_detection", {
     name: "PII Check",
     asGuardrail: true,
     data: { output: response },
   });
-
+  
   if (!piiCheck.passed) {
     return "I apologize, but I cannot share that information.";
   }
-
+  
   return response;
 }
-````
+```
 
   </Tab>
 </Tabs>

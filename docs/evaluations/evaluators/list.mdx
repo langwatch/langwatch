@@ -35,7 +35,7 @@ import langwatch
 
 @langwatch.span()
 def my_llm_step(user_input: str):
-output = my_llm(user_input)
+    output = my_llm(user_input)
 
     # Use any evaluator from the list above
     result = langwatch.evaluation.evaluate(
@@ -49,8 +49,7 @@ output = my_llm(user_input)
     )
 
     return output
-
-````
+```
 
 ```typescript TypeScript
 import { LangWatch } from "langwatch";
@@ -72,7 +71,7 @@ async function myLLMStep(userInput: string): Promise<string> {
 
   return output;
 }
-````
+```
 
 </CodeGroup>
 

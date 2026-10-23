@@ -17,11 +17,10 @@ import langwatch
 import os
 
 client = langwatch.setup(
-api_key=os.getenv("LANGWATCH_API_KEY"),
-endpoint_url=os.getenv("LANGWATCH_ENDPOINT_URL") # Optional, defaults to LangWatch Cloud
+    api_key=os.getenv("LANGWATCH_API_KEY"),
+    endpoint_url=os.getenv("LANGWATCH_ENDPOINT_URL") # Optional, defaults to LangWatch Cloud
 )
-
-````
+```
 
 ```python Advanced Setup
 import langwatch
@@ -51,7 +50,7 @@ client = langwatch.setup(
     base_attributes=custom_attributes,
     debug=True
 )
-````
+```
 
 </CodeGroup>
 
@@ -113,12 +112,13 @@ import langwatch
 langwatch.setup()
 
 @langwatch.trace(name="MyRequestHandler", metadata={"user_id": "123"})
-def handle_request(query: str): # ... your logic ... # langwatch.get_current_span().update(output=response)
-return f"Processed: {query}"
+def handle_request(query: str):
+    # ... your logic ...
+    # langwatch.get_current_span().update(output=response)
+    return f"Processed: {query}"
 
 handle_request("Hello LangWatch!")
-
-````
+```
 
 ```python Context Manager Usage
 import langwatch
@@ -135,7 +135,7 @@ def process_data(data: str):
         return result
 
 process_data("Sample Data")
-````
+```
 
 </CodeGroup>
 
@@ -286,21 +286,21 @@ with langwatch.trace(name="Initial Trace") as current_trace:
 <ParamField path="add_evaluation" type="Callable">
   Adds an `Evaluation` object directly to the trace (or a specified span within it).
 
-```python
-from langwatch.domain import Evaluation, EvaluationTimestamps
+  ```python
+  from langwatch.domain import Evaluation, EvaluationTimestamps
 
-with langwatch.trace(name="MyEvaluatedProcess") as current_trace:
-    # ... operation ...
-    eval_result = Evaluation(
-        name="Accuracy Check",
-        status="processed",
-        passed=True,
-        score=0.95,
-        details="All checks passed.",
-        timestamps=EvaluationTimestamps(started_at=..., finished_at=...)
-    )
-    current_trace.add_evaluation(**eval_result) # Pass fields as keyword arguments
-```
+  with langwatch.trace(name="MyEvaluatedProcess") as current_trace:
+      # ... operation ...
+      eval_result = Evaluation(
+          name="Accuracy Check",
+          status="processed",
+          passed=True,
+          score=0.95,
+          details="All checks passed.",
+          timestamps=EvaluationTimestamps(started_at=..., finished_at=...)
+      )
+      current_trace.add_evaluation(**eval_result) # Pass fields as keyword arguments
+  ```
 
 (Refer to `Evaluation` type in Core Data Types and `langwatch.evaluations` module for more details on parameters.)
 
@@ -408,20 +408,21 @@ langwatch.setup()
 
 @langwatch.trace(name="MainProcess")
 def main_process():
-do_first_step("data for step 1")
-do_second_step("data for step 2")
+    do_first_step("data for step 1")
+    do_second_step("data for step 2")
 
 @langwatch.span(name="StepOne", type="tool")
-def do_first_step(data: str): # langwatch.get_current_span().set_attributes({"custom_info": "info1"})
-return f"Step 1 processed: {data}"
+def do_first_step(data: str):
+    # langwatch.get_current_span().set_attributes({"custom_info": "info1"})
+    return f"Step 1 processed: {data}"
 
 @langwatch.span() # Name will be 'do_second_step', type will be 'span'
-def do_second_step(data: str): # langwatch.get_current_span().update(metrics={"items_processed": 10})
-return f"Step 2 processed: {data}"
+def do_second_step(data: str):
+    # langwatch.get_current_span().update(metrics={"items_processed": 10})
+    return f"Step 2 processed: {data}"
 
 main_process()
-
-````
+```
 
 ```python Context Manager Usage
 import langwatch
@@ -443,7 +444,7 @@ def complex_op():
     return summary
 
 complex_op()
-````
+```
 
 </CodeGroup>
 
@@ -600,20 +601,20 @@ with langwatch.span(name="MySpan", type="tool") as current_span:
 <ParamField path="add_evaluation" type="Callable">
   Adds an `Evaluation` object directly to this span.
 
-```python
-from langwatch.domain import Evaluation
+  ```python
+  from langwatch.domain import Evaluation
 
-with langwatch.span(name="SubOperation") as current_span:
-    # ... operation ...
-    eval_data = {
-        "name": "Correctness Check",
-        "status": "processed",
-        "passed": False,
-        "score": 0.2,
-        "label": "Incorrect"
-    } # Example, more fields available
-    current_span.add_evaluation(**eval_data)
-```
+  with langwatch.span(name="SubOperation") as current_span:
+      # ... operation ...
+      eval_data = {
+          "name": "Correctness Check",
+          "status": "processed",
+          "passed": False,
+          "score": 0.2,
+          "label": "Incorrect"
+      } # Example, more fields available
+      current_span.add_evaluation(**eval_data)
+  ```
 
 (Refer to `Evaluation` type in Core Data Types and `langwatch.evaluations` module for more details on parameters.)
 
@@ -1277,20 +1278,20 @@ Represents a prompt configuration that can be used with OpenAI's API. Handles fo
 <ParamField path="compile" type="Callable">
   Compiles the prompt template with provided variables using lenient compilation.
 
-```python
-compiled = prompt.compile(variables={"name": "Alice"})
-# or
-compiled = prompt.compile(name="Alice")
-```
+  ```python
+  compiled = prompt.compile(variables={"name": "Alice"})
+  # or
+  compiled = prompt.compile(name="Alice")
+  ```
 
 </ParamField>
 
 <ParamField path="compile_strict" type="Callable">
   Compiles with strict validation, throwing error if required variables are missing.
 
-```python
-compiled = prompt.compile_strict(variables={"name": "Alice", "topic": "weather"})
-```
+  ```python
+  compiled = prompt.compile_strict(variables={"name": "Alice", "topic": "weather"})
+  ```
 
 </ParamField>
 

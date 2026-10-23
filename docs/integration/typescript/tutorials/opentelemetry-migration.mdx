@@ -90,46 +90,45 @@ const handle = setupObservability({
   import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
   import { JaegerExporter } from "@opentelemetry/exporter-jaeger";
 
-const sdk = new NodeSDK({
-serviceName: "my-service",
-spanProcessors: [
-new BatchSpanProcessor(new JaegerExporter())
-],
-instrumentations: [new HttpInstrumentation()],
-sampler: new TraceIdRatioBasedSampler(0.1),
-spanLimits: { attributeCountLimit: 128 }
-});
+  const sdk = new NodeSDK({
+    serviceName: "my-service",
+    spanProcessors: [
+      new BatchSpanProcessor(new JaegerExporter())
+    ],
+    instrumentations: [new HttpInstrumentation()],
+    sampler: new TraceIdRatioBasedSampler(0.1),
+    spanLimits: { attributeCountLimit: 128 }
+  });
 
-sdk.start();
-
-````
+  sdk.start();
+  ```
 </Step>
 
 <Step title="After: Using LangWatch with Same Configuration">
-```typescript
-import { setupObservability } from "langwatch/observability/node";
-import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { JaegerExporter } from "@opentelemetry/exporter-jaeger";
+  ```typescript
+  import { setupObservability } from "langwatch/observability/node";
+  import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
+  import { JaegerExporter } from "@opentelemetry/exporter-jaeger";
 
-const handle = setupObservability({
-  langwatch: {
-    apiKey: process.env.LANGWATCH_API_KEY
-  },
-  serviceName: "my-service",
-  spanProcessors: [
-    new BatchSpanProcessor(new JaegerExporter())
-  ],
-  instrumentations: [new HttpInstrumentation()],
-  sampler: new TraceIdRatioBasedSampler(0.1),
-  spanLimits: { attributeCountLimit: 128 }
-});
+  const handle = setupObservability({
+    langwatch: {
+      apiKey: process.env.LANGWATCH_API_KEY
+    },
+    serviceName: "my-service",
+    spanProcessors: [
+      new BatchSpanProcessor(new JaegerExporter())
+    ],
+    instrumentations: [new HttpInstrumentation()],
+    sampler: new TraceIdRatioBasedSampler(0.1),
+    spanLimits: { attributeCountLimit: 128 }
+  });
 
-// Graceful shutdown
-process.on('SIGTERM', async () => {
-  await handle.shutdown();
-  process.exit(0);
-});
-````
+  // Graceful shutdown
+  process.on('SIGTERM', async () => {
+    await handle.shutdown();
+    process.exit(0);
+  });
+  ```
 
 </Step>
 </Steps>
