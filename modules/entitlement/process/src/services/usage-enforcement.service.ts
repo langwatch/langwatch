@@ -403,12 +403,10 @@ export class UsageService {
       this.#failedCounts.delete(cacheKey);
       return value;
     } catch (error) {
-      if (reuseFailure) {
-        this.#failedCounts.set(cacheKey, {
-          error,
-          retryAt: this.now() + FAILED_COUNT_RETRY_AFTER_MS,
-        });
-      }
+      this.#failedCounts.set(cacheKey, {
+        error,
+        retryAt: this.now() + FAILED_COUNT_RETRY_AFTER_MS,
+      });
       throw error;
     } finally {
       this.#countsInFlight.delete(cacheKey);
