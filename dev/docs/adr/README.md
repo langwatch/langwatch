@@ -102,6 +102,7 @@ Reusable framework decisions live with their packages:
 | [183](./183-vitest-workers-cache-module-loading.md)                    | Vitest workers cache how they load installed packages                                                                      | Proposed                  |
 | [184](./184-isolated-jsdom-files-share-a-worker.md)                    | Isolated jsdom test files share a worker instead of starting a process each                                                | Proposed                  |
 | [185](./185-braids-show-matching-spans-in-another-projects-traces.md)  | Braids show one project's matching spans in another project's traces                                                       | Proposed                  |
+| [186](./186-test-changed-runs-the-tests-an-edit-reaches.md)            | `test:changed` runs the tests an edit reaches, from a kept import graph                                                    | Proposed                  |
 
 Package-local decisions are indexed beside their owners. The framework
 records are the [Eventing ADR index](../../../packages/eventing/adrs/README.md)
