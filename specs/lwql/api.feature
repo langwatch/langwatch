@@ -428,6 +428,14 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     And the caller receives zero rows, because the row policy decides the answer
 
   @integration
+  Scenario: A group project reads every member through a PostgreSQL-resident view
+    Given a PG-resident table is mapped into ClickHouse through the server-side named collection
+    And the restricted identity carries the key hashes of tenant-a and tenant-b
+    When it reads the LangWatchQL view over the mapped table
+    Then it receives every row of tenant-a and every row of tenant-b
+    And the statement PostgreSQL received bounds the read to the range spanning both tenants
+
+  @integration
   Scenario: A duplicate key-map row does not break a PostgreSQL-resident read
     Given the key map holds two rows carrying the caller's key hash
     And the restricted identity carries tenant-a's valid key-hash context

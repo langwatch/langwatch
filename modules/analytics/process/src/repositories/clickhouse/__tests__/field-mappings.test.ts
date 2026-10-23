@@ -173,7 +173,7 @@ describe("field-mappings", () => {
     it("builds correct JOIN for stored_spans with column pruning", () => {
       const join = buildJoinClause({ table: "stored_spans" });
       expect(join).toContain("FROM stored_spans");
-      expect(join).toContain("TenantId = {tenantId:String}");
+      expect(join).toContain("{{tenantSet}}");
       expect(join).toContain("ts.TenantId = ss.TenantId");
       expect(join).toContain("ts.TraceId = ss.TraceId");
       // Should not use SELECT *
@@ -194,7 +194,7 @@ describe("field-mappings", () => {
       // the WHERE ends right after the tenant filter.
       expect(join).not.toContain("StartTime >=");
       expect(join).not.toContain("StartTime <");
-      expect(join).toContain("WHERE TenantId = {tenantId:String}) ss");
+      expect(join).toContain("WHERE {{tenantSet}}) ss");
     });
 
     it("injects the span time filter into the stored_spans JOIN when provided", () => {
@@ -205,7 +205,7 @@ describe("field-mappings", () => {
         spanTimeFilter: filter,
       });
       // The bound lands inside the subquery WHERE, before the closing paren/alias.
-      expect(join).toContain(`TenantId = {tenantId:String} ${filter})`);
+      expect(join).toContain(`{{tenantSet}} ${filter})`);
     });
 
     it("ignores the span time filter for evaluation_runs", () => {

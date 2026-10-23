@@ -148,3 +148,10 @@ Feature: Removing something with Langy needs a confirmation click
     And a DELETE route cannot say it keeps every record
     And an update that can switch a record off asks for the click when its body would do so
     And every route that says it asks for none is one a Langy key cannot reach
+
+  @regression @unit
+  Scenario: A Langy key's delete card names the key owner's own Only me records
+    Given a dashboard record on a board only the key's owner can see
+    When Langy deletes or removes that record
+    Then the card names the record, as the delete reads it for the key's owner
+    And for a key that names nobody, or names another member, the record reads as not found
