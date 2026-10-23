@@ -19,11 +19,12 @@ import {
 import { langWatchQLPassSql } from "../../rules/langwatch-ql-pass-sql.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
 import { LangWatchQLCapabilityService } from "../langwatch-ql-capability.service.ts";
+import { LangWatchQLCatalogShapesService } from "../langwatch-ql-catalog-shapes.service.ts";
 import { LangWatchQLService } from "../langwatch-ql.service.ts";
 import { EVERY_CATALOGUE_PERMISSION } from "./lwql-catalogue-access.fixture.ts";
 
 const PROJECT = { id: "project-1", lwqlKey: "key-1" };
-const POSTGRES_VIEW = LWQL_VIEW_CATALOG.find((view) => view.postgres !== undefined);
+const [POSTGRES_VIEW] = LangWatchQLCatalogShapesService.create().postgresViews(LWQL_VIEW_CATALOG);
 if (!POSTGRES_VIEW) throw new Error("the catalogue has no PostgreSQL-resident view");
 const STATEMENT =
   "SELECT TraceId, eval(TraceName, 'Is the name a greeting?') AS named FROM analytics.traces";

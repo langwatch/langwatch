@@ -10,7 +10,10 @@ import {
 } from "@langwatch/analytics-contract";
 import { describe, expect, it } from "vitest";
 
-import type { LangWatchQLViewDefinition } from "../../services/langwatch-ql-catalog-shapes.service.ts";
+import {
+  LangWatchQLCatalogShapesService,
+  type LangWatchQLViewDefinition,
+} from "../../services/langwatch-ql-catalog-shapes.service.ts";
 import { hydratableProjects, scopeLangWatchQL } from "../langwatch-ql-query-scope.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../lwql-view-catalog.rules.ts";
 
@@ -28,7 +31,7 @@ const UNTENANTED: LangWatchQLViewDefinition = {
   columns: traces.columns.filter((column) => column.name !== "TenantId"),
 };
 const VIEWS = [...LWQL_VIEW_CATALOG, UNDATED, UNTENANTED];
-const POSTGRES_VIEW = LWQL_VIEW_CATALOG.find((view) => view.postgres !== undefined);
+const [POSTGRES_VIEW] = LangWatchQLCatalogShapesService.create().postgresViews(LWQL_VIEW_CATALOG);
 if (!POSTGRES_VIEW) throw new Error("the catalogue has no PostgreSQL-resident view");
 
 const B_FROM = `(TenantId = 'project_b' AND OccurredAt >= fromUnixTimestamp64Milli(toInt64(${SHARED_FROM})))`;
@@ -277,6 +280,19 @@ describe("scopeLangWatchQL with member windows", () => {
     it("refuses FINAL on a PostgreSQL-resident view, which the store rejects", () => {
       const refusal = captureRefusal(() =>
         scope({ sql: `SELECT count() FROM ${POSTGRES_VIEW.name} FINAL`, memberWindows: [WHOLE_A] }),
+      );
+
+      expect(refusal).toBeInstanceOf(LangWatchQLTableModifierError);
+    });
+  });
+
+  describe("given an excluded origin and a PostgreSQL-resident view it does not narrow", () => {
+    it("refuses FINAL on that view, though the view is not rewritten", () => {
+      const refusal = captureRefusal(() =>
+        scope({
+          sql: `SELECT count() FROM ${POSTGRES_VIEW.name} FINAL`,
+          excludeOrigins: ["langy"],
+        }),
       );
 
       expect(refusal).toBeInstanceOf(LangWatchQLTableModifierError);

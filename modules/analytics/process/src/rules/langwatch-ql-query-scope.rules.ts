@@ -153,8 +153,9 @@ function findViewReferences({
 }
 
 /**
- * Refuses `FINAL` or `SAMPLE` on a view about to be read as a subquery, which ClickHouse rejects
- * with a bare error. The parser gives neither a position, so neither can be moved inside.
+ * Refuses `FINAL` or `SAMPLE` on the given references: a view about to be read as a subquery, or
+ * a PostgreSQL-resident view. The parser gives neither modifier a position, so neither can be moved
+ * inside a subquery.
  * @throws {LangWatchQLTableModifierError} naming the modifiers written.
  */
 function assertNoTableModifiers({
@@ -164,14 +165,14 @@ function assertNoTableModifiers({
   statements: readonly SqlAstNode[];
   references: readonly ViewReference[];
 }): void {
-  const rewritten = new Set(references.map((reference) => reference.start));
+  const refused = new Set(references.map((reference) => reference.start));
   const modifiers = new Set<string>();
   for (const expression of collectNodes(statements, "TableExpression", [])) {
     const table = expression.database_and_table_name as
       | { location?: { start?: { offset?: unknown } } }
       | undefined;
     const start = table?.location?.start?.offset;
-    if (typeof start !== "number" || !rewritten.has(start)) continue;
+    if (typeof start !== "number" || !refused.has(start)) continue;
     if (expression.final === true) modifiers.add("FINAL");
     if (expression.sample_size !== undefined) modifiers.add("SAMPLE");
   }
