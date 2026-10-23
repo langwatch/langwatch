@@ -152,6 +152,30 @@ describe("judge route table", () => {
       expect(JSON.stringify(parsed.error?.issues)).toContain(message);
     });
 
+    /** @scenario "A pair names decision models only" */
+    it("refuses an LLM backend as a pair member or a pair member's fallback", () => {
+      const backends = {
+        jev: { kind: "jev", fallbacks: ["llm-a"] },
+        "llm-a": { kind: "anthropic_messages", model: "llm-model-a" },
+      };
+      const routes = (entry: Record<string, unknown>) =>
+        Object.fromEntries(
+          INSTANT_EVAL_JUDGE_JOBS.map((job) => [
+            job,
+            { all: slot(entry), arithmetic: slot(entry) },
+          ]),
+        );
+      for (const entry of [
+        { primary: "jev", pairWith: "llm-a" },
+        { primary: "jev", pairWith: "jev" },
+      ]) {
+        const parsed = instantEvalJudgeRouteTableSchema.safeParse(
+          tableWith({ backends, routes: routes(entry) }),
+        );
+        expect(JSON.stringify(parsed.error?.issues)).toContain("may not be an LLM backend");
+      }
+    });
+
     it("refuses a backend that lists itself as a fallback", () => {
       const parsed = instantEvalJudgeRouteTableSchema.safeParse(
         tableWith({ backends: { jev: { kind: "jev", fallbacks: ["jev"] } } }),
@@ -176,7 +200,6 @@ describe("judge route table", () => {
         INSTANT_EVAL_JUDGE_ROUTES: JSON.stringify(tableWith()),
         INSTANT_EVAL_JUDGE_PRICING: JSON.stringify({
           version: "v1",
-          markup: 1.3,
           backends: { jev: { usdPerMillionInputTokens: 1 } },
         }),
       });

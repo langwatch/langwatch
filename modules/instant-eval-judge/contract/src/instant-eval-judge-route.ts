@@ -212,22 +212,63 @@ function slotIssues({
   const issues: string[] = [];
   for (const mode of INSTANT_EVAL_JUDGE_MODES) {
     const entry = slot[mode];
-    if (!entry) continue;
-    for (const backend of instantEvalJudgeEntryBackends(entry)) {
-      if (!table.backends[backend]) issues.push(`${where} / ${mode}: unknown backend ${backend}`);
-    }
-    if (entry.escalateTo && entry.threshold === undefined) {
-      issues.push(`${where} / ${mode}: escalateTo needs a threshold`);
-    }
-    if (entry.escalateTo && entry.pairWith) {
-      issues.push(`${where} / ${mode}: an entry escalates or pairs, not both`);
-    }
+    if (entry) issues.push(...entryIssues({ table, entry, where: `${where} / ${mode}` }));
   }
   const instantOff = instantEvalJudgeEntryBackends(slot.instant).some(
     (backend) => table.backends[backend]?.enabled === false,
   );
   if (instantOff) issues.push(`${where}: the instant entry must name enabled backends only`);
   return issues;
+}
+
+function entryIssues({
+  table,
+  entry,
+  where,
+}: {
+  table: RouteTableShape;
+  entry: InstantEvalJudgeRouteEntry;
+  where: string;
+}): string[] {
+  const issues: string[] = [];
+  for (const backend of instantEvalJudgeEntryBackends(entry)) {
+    if (!table.backends[backend]) issues.push(`${where}: unknown backend ${backend}`);
+  }
+  if (entry.escalateTo && entry.threshold === undefined) {
+    issues.push(`${where}: escalateTo needs a threshold`);
+  }
+  if (entry.escalateTo && entry.pairWith) {
+    issues.push(`${where}: an entry escalates or pairs, not both`);
+  }
+  const pairsAnLlm =
+    entry.pairWith !== undefined && pairMembersOf({ table, entry }).some(isLlmBackendOf(table));
+  if (pairsAnLlm) {
+    issues.push(`${where}: a pair or its fallbacks may not be an LLM backend`);
+  }
+  return issues;
+}
+
+/** A pair's two backends and their fallbacks, any of which may answer for a pair leg. */
+function pairMembersOf({
+  table,
+  entry,
+}: {
+  table: RouteTableShape;
+  entry: InstantEvalJudgeRouteEntry;
+}): string[] {
+  const legs = [entry.primary, entry.pairWith ?? entry.primary];
+  return [...legs, ...legs.flatMap((name) => table.backends[name]?.fallbacks ?? [])];
+}
+
+/**
+ * An LLM answers yes or no, a probability of one or zero, so it would always win a pair's
+ * confidence pick; pairs are for decision models, and an LLM only escalates.
+ */
+function isLlmBackendOf(table: RouteTableShape) {
+  return (name: string): boolean => {
+    const kind = table.backends[name]?.kind;
+    return kind === "anthropic_messages" || kind === "openai_responses";
+  };
 }
 
 /** Every backend an entry may call, in the order it may call them. */
@@ -276,7 +317,7 @@ export type InstantEvalJudgeBackendPrice = z.infer<typeof backendPriceSchema>;
 const instantEvalJudgeRoutePricingSchemaDefinition = z.object({
   /** Stamped on the priced fact, so a replay is told from a re-rating. */
   version: z.string().min(1),
-  markup: z.number().positive(),
+  /** No markup here: every Instant Eval price takes the one published markup. */
   backends: z.record(z.string(), backendPriceSchema),
 });
 export interface InstantEvalJudgeRoutePricingSchema extends Named<

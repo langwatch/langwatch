@@ -193,6 +193,12 @@ describe("the route plan", () => {
     expect(p).toMatchObject({ text: "full trace", isViewMissing: true });
   });
 
+  /** @scenario "A text view the caller did not render judges the full text, flagged" */
+  it("treats an empty rendering as no view at all", () => {
+    const p = plan({ job: "search", inputView: "text", views: { text: " \n" } }, UPSET, "trace");
+    expect(p).toMatchObject({ inputView: "text", text: "trace", isViewMissing: true });
+  });
+
   /** @scenario "The public default table sends every slot to the hosted classifier" */
   it("plans the hosted classifier alone in every slot of the shipped table", () => {
     for (const job of INSTANT_EVAL_JUDGE_JOBS) {
@@ -224,7 +230,6 @@ describe("the arithmetic rule", () => {
 describe("a routed call's cost", () => {
   const pricing = {
     version: "test",
-    markup: 1.3,
     backends: {
       llm: {
         usdPerMillionInputTokens: 1,
@@ -285,7 +290,6 @@ describe("the boot check", () => {
       table: off,
       pricing: {
         version: "t",
-        markup: 1.3,
         backends: { "decision-a": price, "decision-b": price },
       },
       isHeld: (kind) => kind !== "openai_responses",

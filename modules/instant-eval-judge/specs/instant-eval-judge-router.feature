@@ -43,6 +43,12 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     And an escalation's fallbacks never ask the primary again
 
   @unit
+  Scenario: A pair names decision models only
+    Given a route table pairing an LLM backend, or a pair member whose fallback is an LLM
+    When the deployment boots
+    Then the configuration is refused, since an LLM's yes or no would always win the pair
+
+  @unit
   Scenario: A slot is picked by job, length bucket and arithmetic flag
     Given a route table with length buckets and an arithmetic slot
     When a call is routed
@@ -68,6 +74,7 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     When a question maps to a partial view but its slot plans a model not allowed to read it
     Then the plan judges the full trace instead and the routing names the refused view
     And an escalation always judges the full trace, since an outcome may turn on a tool result
+    And a fallback whose kind may not read the view judges the full trace, flagged
 
   @unit
   Scenario: The length bucket is measured on the chosen view
@@ -77,7 +84,7 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
 
   @unit
   Scenario: A text view the caller did not render judges the full text, flagged
-    Given a plan for the text view and a call that carries no conversation rendering
+    Given a plan for the text view and a call whose conversation rendering is absent or empty
     When it is judged
     Then the full text is judged and the routing names the missing view
 
@@ -126,6 +133,13 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     When it is judged
     Then the Decisions send and each LLM send wait on the rate limiter first
     And each leg kind draws on its own per-project share under the deployment's global cap
+
+  @unit
+  Scenario: A caller's stop keeps the legs already paid billed
+    Given a routed call whose first leg answered and was paid
+    When the caller stops it while a later leg is in flight
+    Then the stop still reaches the caller as a stop
+    And it carries what the paid legs spent, which the stopped batch bills
 
   @unit
   Scenario: Nothing answered gives the last backend's skip reason

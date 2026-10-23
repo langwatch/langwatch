@@ -23,7 +23,6 @@ const ALL_KEYS = {
 const price = { usdPerMillionInputTokens: 1, usdPerMillionOutputTokens: 0 };
 const FULL_PRICING: InstantEvalJudgeRoutePricing = {
   version: "test",
-  markup: 1.3,
   backends: { "decision-a": price, "decision-b": price, "llm-a": price, "llm-b": price },
 };
 

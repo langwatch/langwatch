@@ -71,7 +71,6 @@ export const INSTANT_EVAL_FREE_BUDGET_USD = 1;
 /** The public prices: the hosted classifier's published rate only. */
 export const INSTANT_EVAL_JUDGE_DEFAULT_ROUTE_PRICING: InstantEvalJudgeRoutePricing = {
   version: "default",
-  markup: INSTANT_EVAL_PRICING.markup,
   backends: {
     jev: {
       usdPerMillionInputTokens: INSTANT_EVAL_PRICING.usdPerMillionInputTokens,
@@ -83,9 +82,15 @@ export const INSTANT_EVAL_JUDGE_DEFAULT_ROUTE_PRICING: InstantEvalJudgeRoutePric
 /** The model the ledger names for a routed judgement: one product, whichever backend answered. */
 export const INSTANT_EVAL_JUDGE_ROUTED_SPEND_MODEL = "langwatch-judge";
 
-/** The rate identity a routed judgement's priced fact carries. */
-export function instantEvalJudgeRouteRateVersion(pricing: InstantEvalJudgeRoutePricing): string {
-  return `instant_eval_judge_router@${pricing.version}x${pricing.markup}`;
+/** The rate identity a routed judgement's priced fact carries: the route prices and the markup. */
+export function instantEvalJudgeRouteRateVersion({
+  routePricing,
+  pricing = INSTANT_EVAL_PRICING,
+}: {
+  routePricing: InstantEvalJudgeRoutePricing;
+  pricing?: InstantEvalPricing;
+}): string {
+  return `instant_eval_judge_router@${routePricing.version}x${pricing.markup}`;
 }
 
 /**
