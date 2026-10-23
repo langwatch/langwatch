@@ -18,6 +18,7 @@ import { MemoryUsageReportChannel } from "../../channels/memory/memory.usage-rep
 import { OpsCheckupService } from "../../features/checkup/services/ops-checkup.service.ts";
 import { UpgradeDiagnosticsService } from "../../features/upgrades/services/upgrade-diagnostics.service.ts";
 import { MemoryCloudLatestReleaseRepository } from "../../repositories/memory/memory.cloud-latest-release.repository.ts";
+import { MemoryCloudNoticeRepository } from "../../repositories/memory/memory.cloud-notice.repository.ts";
 import {
   MemoryClickHouseHealthRepository,
   MemoryPostgresHealthRepository,
@@ -88,6 +89,7 @@ function checkupService(): OpsCheckupService {
       clickhouseOpsUrl: undefined,
       usageStats: { disabled: false, installMethod: undefined, chartVersion: undefined },
       collectClickHouseBackupMetrics: true,
+      noticesDisabled: false,
       upgradeDiagnosticsAutoSendDisabled: false,
       productAnalytics: { key: undefined, host: undefined },
       grafana: { baseUrl: undefined, tempoDatasourceUid: undefined, lokiDatasourceUid: undefined },
@@ -148,6 +150,7 @@ function checkupService(): OpsCheckupService {
       cloudLatestRelease: MemoryCloudLatestReleaseRepository.create({
         store: MemoryOpsStore.create(),
       }),
+      cloudNotices: MemoryCloudNoticeRepository.create({ store: MemoryOpsStore.create() }),
     },
     channels: {
       usageReport: MemoryUsageReportChannel.create(),

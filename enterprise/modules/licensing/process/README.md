@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The portable signed-license capability supplied to process peers.
 
-Peers call these through the token, declared at `../contract/src/licensing.api.ts:71`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/licensing.api.ts:77`; nothing else in this package is public.
 
 #### `resolve`
 
@@ -490,6 +490,46 @@ A five-minute link to one report's bundle; an unknown id throws its code.
 getUpgradeDiagnosticsDownload(input: { id: string }): Promise<UpgradeDiagnosticsDownload>;
 ```
 
+#### `findSelfHostedNotices`
+
+Notices LangWatch staff send self-hosted installs (self-hosted-notices.feature): written and published in Cloud admin, sent in the usage report reply while published and not expired. An unknown id throws `not_found`.
+
+```typescript
+findSelfHostedNotices(): Promise<SelfHostedNoticeView[]>;
+```
+
+#### `createSelfHostedNotice`
+
+```typescript
+createSelfHostedNotice(input: CreateSelfHostedNoticeInput): Promise<SelfHostedNoticeView>;
+```
+
+#### `updateSelfHostedNotice`
+
+```typescript
+updateSelfHostedNotice(input: UpdateSelfHostedNoticeInput): Promise<SelfHostedNoticeView>;
+```
+
+#### `publishSelfHostedNotice`
+
+```typescript
+publishSelfHostedNotice(input: { id: string; operatorId: string }): Promise<SelfHostedNoticeView>;
+```
+
+#### `withdrawSelfHostedNotice`
+
+```typescript
+withdrawSelfHostedNotice(input: { id: string }): Promise<SelfHostedNoticeView>;
+```
+
+#### `findPublishedSelfHostedNotices`
+
+What an install is sent now: published and not expired, the newest published first.
+
+```typescript
+findPublishedSelfHostedNotices(): Promise<SelfHostedNotice[]>;
+```
+
 ## REST transport
 
 ### `connectHostRest`
@@ -720,9 +760,9 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                             | Environment variable                 | Declared at                              |
 | ------ | -------------------------------- | ------------------------------------ | ---------------------------------------- |
-| secret | `instanceLicenseKey`             | `LANGWATCH_LICENSE_KEY`              | `src/app/licensing.app.ts:174`           |
-| secret | `licensePrivateKey`              | `LANGWATCH_LICENSE_PRIVATE_KEY`      | `src/app/licensing.app.ts:175`           |
-| secret | `upgradeDiagnosticsSlackWebhook` | `SLACK_CHANNEL_UPGRADE_DIAGNOSTICS`  | `src/app/licensing.app.ts:176`           |
+| secret | `instanceLicenseKey`             | `LANGWATCH_LICENSE_KEY`              | `src/app/licensing.app.ts:178`           |
+| secret | `licensePrivateKey`              | `LANGWATCH_LICENSE_PRIVATE_KEY`      | `src/app/licensing.app.ts:179`           |
+| secret | `upgradeDiagnosticsSlackWebhook` | `SLACK_CHANNEL_UPGRADE_DIAGNOSTICS`  | `src/app/licensing.app.ts:180`           |
 | config | `publicKey`                      | `LANGWATCH_LICENSE_PUBLIC_KEY`       | `../contract/src/licensing.config.ts:46` |
 | config | `connectDisabled`                | `LANGWATCH_CONNECT_DISABLED`         | `../contract/src/licensing.config.ts:54` |
 | config | `connectGatewayEndpoint`         | `LANGWATCH_CONNECT_GATEWAY_ENDPOINT` | `../contract/src/licensing.config.ts:61` |

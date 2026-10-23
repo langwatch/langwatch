@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 LangWatch Cloud's own surface. Every operation refuses on any other deployment.
 
-Peers call these through the token, declared at `../contract/src/saas.api.ts:58`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/saas.api.ts:67`; nothing else in this package is public.
 
 #### `receiveUsageReport`
 
@@ -40,16 +40,9 @@ Public: anonymous product telemetry: a self-hosted install presents no credentia
 Answers at `/api/track_usage`.
 
 ```typescript
-type Body = z.infer<typeof usageReportRequestSchema>; // ../contract/src/saas.api.ts:12
-type Headers = z.infer<typeof senderAddressHeadersSchema>; // ../contract/src/saas.api.ts:28
-// Response: usageReportReceiptSchema, ../contract/src/saas.api.ts:47
-interface Response {
-  message: "Event captured";
-  latest_release?: {
-    release: string;
-    commit: string | null;
-  };
-}
+type Body = z.infer<typeof usageReportRequestSchema>; // ../contract/src/saas.api.ts:16
+type Headers = z.infer<typeof senderAddressHeadersSchema>; // ../contract/src/saas.api.ts:32
+type Response = z.infer<typeof usageReportReceiptSchema>; // ../contract/src/saas.api.ts:56
 ```
 
 #### `POST /api/connect/v1/stats` · `receiveConnectUsageReport`
@@ -59,9 +52,9 @@ Public: anonymous product telemetry: a self-hosted install presents no credentia
 Answers at `/api/connect/v1/stats`.
 
 ```typescript
-type Body = z.infer<typeof usageReportRequestSchema>; // ../contract/src/saas.api.ts:12
-type Headers = z.infer<typeof senderAddressHeadersSchema>; // ../contract/src/saas.api.ts:28
-type Response = z.infer<typeof usageReportReceiptSchema>; // ../contract/src/saas.api.ts:47
+type Body = z.infer<typeof usageReportRequestSchema>; // ../contract/src/saas.api.ts:16
+type Headers = z.infer<typeof senderAddressHeadersSchema>; // ../contract/src/saas.api.ts:32
+type Response = z.infer<typeof usageReportReceiptSchema>; // ../contract/src/saas.api.ts:56
 ```
 
 ## tRPC transport
