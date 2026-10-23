@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   groupStepsByRelease,
   heldOrganizationCount,
+  migratedSplit,
   orderReleasesNewestFirst,
   releaseGroupName,
   remainingCount,
@@ -173,6 +174,26 @@ describe("heldOrganizationCount()", () => {
           },
         ]),
       ).toBe(1);
+    });
+  });
+});
+
+describe("migratedSplit()", () => {
+  describe("when some of a step's migrated users wait on a person", () => {
+    /** @scenario "Users waiting on a person are counted, not listed as needing attention" */
+    it("counts them apart from the held ones", () => {
+      expect(migratedSplit({ migrated: 5, waitingOnPerson: 3 })).toEqual({
+        held: 2,
+        waitingOnPerson: 3,
+      });
+    });
+
+    /** @scenario "Users waiting on a person are counted, not listed as needing attention" */
+    it("never takes the held count below zero when the two reads disagree", () => {
+      expect(migratedSplit({ migrated: 2, waitingOnPerson: 3 })).toEqual({
+        held: 0,
+        waitingOnPerson: 2,
+      });
     });
   });
 });

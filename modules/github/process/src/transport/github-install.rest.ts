@@ -121,6 +121,7 @@ export const githubInstallRest = defineRestRouter(GithubInstallApi)
   )
 
   .post("/api/github/webhook", "receiveGithubWebhook")
+  .keepsRecords()
   .withoutAudit("GitHub webhook")
   // The body IS the evidence: the HMAC is computed over the exact bytes GitHub
   // sent, spacing included, so nothing parses it first.
@@ -148,6 +149,7 @@ export const githubInstallRest = defineRestRouter(GithubInstallApi)
   )
 
   .post("/api/github-langy/webhook", "receiveGithubWebhookOnLegacyPath")
+  .keepsRecords()
   .withoutAudit("GitHub webhook")
   .withRawBody("text", { mediaType: "application/json" })
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })

@@ -109,6 +109,7 @@ describe("a route that requires several permissions together", () => {
       .withVersion(VERSION)
       .withCredential("project")
       .post("/trigger", "trigger")
+      .keepsRecords()
       .withInput(z.object({ name: z.string() }))
       .withPermission(["workflows:create", "evaluations:view"])
       .withOutput(z.object({ ran: z.boolean() }))
@@ -173,6 +174,7 @@ describe("a route that requires several permissions together", () => {
       .withVersion(VERSION)
       .withCredential("organization")
       .post("/:projectId/trigger", "trigger")
+      .keepsRecords()
       .withParams(z.object({ projectId: z.string() }))
       .withPermission(["evaluations:view", "workflows:create"], {
         at: "route",
@@ -263,6 +265,7 @@ describe("a route that chooses its permission from its parsed input", () => {
       .withVersion(VERSION)
       .withCredential("project")
       .post("/", "trigger")
+      .keepsRecords()
       .withInput(dispatchInput)
       .withPermission(BY_KIND)
       .withOutput(z.object({ ran: z.boolean() }))
@@ -344,6 +347,7 @@ describe("a route that chooses its permission from its parsed input", () => {
         .withNamespace("e3-dispatch")
         .withVersion(VERSION)
         .post("/", "trigger")
+        .keepsRecords()
         .withInput(dispatchInput)
         .withOutput(z.object({ ran: z.boolean() }));
     const handled = () => ({ ran: true });
@@ -388,6 +392,7 @@ describe("a route that chooses its permission from its parsed input", () => {
       .withVersion(VERSION)
       .withCredential("browser")
       .post("/", "trigger")
+      .keepsRecords()
       .withInput(dispatchInput)
       .withPermission(BY_KIND)
       .withOutput(z.object({ ran: z.boolean() }))
@@ -485,6 +490,7 @@ describe("a route that declares an array body", () => {
         .withNamespace("steps")
         .withVersion(VERSION)
         .post("/:runId", "trigger")
+        .keepsRecords()
         .withParams(z.object({ runId: z.string() }));
 
     expect(() => route().withInput(steps, {} as never)).toThrow(/names no field to hand it under/);

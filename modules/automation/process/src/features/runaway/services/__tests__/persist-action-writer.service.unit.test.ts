@@ -156,16 +156,24 @@ describe("PersistActionWriterService.addToDataset", () => {
     it("treats a dataset that is gone, before or during the write, as terminal", async () => {
       const gone = writerOver({ findBySlugOrId: async () => null });
       const goneRefusal = await refusalOf(gone.writer.addToDataset(write));
-      expect(gone.warnings()).toEqual([expect.objectContaining({ datasetId: "dataset-1" })]);
+      const datasetGone = new DatasetNotFoundError();
       const raced = writerOver({
         findBySlugOrId: async () => datasetWith(["question"]),
         batchCreateRecords: async () => {
-          throw new DatasetNotFoundError();
+          throw datasetGone;
         },
       });
+      const racedRefusal = await refusalOf(raced.writer.addToDataset(write));
 
-      expect(refusesRetry(goneRefusal)).toBe(true);
-      expect(refusesRetry(await refusalOf(raced.writer.addToDataset(write)))).toBe(true);
+      for (const refusal of [goneRefusal, racedRefusal]) {
+        expect(refusal).toEqual(
+          expect.objectContaining({ code: "automation_dataset_unavailable", fault: "customer" }),
+        );
+        expect(refusesRetry(refusal)).toBe(true);
+      }
+      expect(racedRefusal).toEqual(expect.objectContaining({ reasons: [datasetGone] }));
+      // The settlement logs the refusal once; the writer adds no line of its own.
+      expect(gone.warnings()).toEqual([]);
     });
 
     it("leaves a failure the dataset did not name retryable", async () => {

@@ -40,6 +40,29 @@ export class GroupQueueConfigurationError extends GroupQueueError {
   }
 }
 
+/**
+ * A send refused because this queue's drain has finished. During shutdown it is
+ * expected (a job whose drain overran its budget is still running), and the caller
+ * keeps the work for re-drive, so callers may log it below error level.
+ */
+export class QueueStagingClosedError extends GroupQueueError {
+  constructor({
+    queueName,
+    operation,
+  }: {
+    queueName: string;
+    operation: "send" | "sendBatch" | "sendEach";
+  }) {
+    super({ queueName, operation, message: "Cannot send to queue after its drain has finished" });
+    this.name = "QueueStagingClosedError";
+  }
+}
+
+/** By name, not class, so a second copy of this package still recognises it. */
+export function isQueueStagingClosed(error: unknown): boolean {
+  return error instanceof Error && error.name === "QueueStagingClosedError";
+}
+
 export class NonRetryableGroupQueueError extends Error {
   readonly retryable = false;
 

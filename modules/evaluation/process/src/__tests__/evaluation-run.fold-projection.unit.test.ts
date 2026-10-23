@@ -1,10 +1,12 @@
 import type {
+  EvaluationAttemptFailedEvent,
   EvaluationRunData,
   EvaluationCompletedEvent,
   EvaluationReportedEvent,
   EvaluationStartedEvent,
 } from "@langwatch/evaluation-contract";
 import {
+  evaluationAttemptFailedEventSchema,
   evaluationCompletedEventSchema,
   evaluationReportedEventSchema,
   evaluationStartedEventSchema,
@@ -117,6 +119,40 @@ function createReportedEvent(
       ...data,
     },
     ...eventOverrides,
+  });
+}
+
+function createAttemptFailedEvent({
+  id,
+  attempt,
+  occurredAt,
+  nextAttemptAt,
+}: {
+  id: string;
+  attempt: number;
+  occurredAt: number;
+  nextAttemptAt: number;
+}): EvaluationAttemptFailedEvent {
+  return evaluationAttemptFailedEventSchema.parse({
+    id,
+    aggregateId: "eval-1",
+    aggregateType: "evaluation",
+    tenantId: "tenant-1",
+    createdAt: occurredAt,
+    occurredAt,
+    type: "lw.evaluation.attempt_failed",
+    version: "2026-10-19",
+    data: {
+      evaluationId: "eval-1",
+      evaluatorId: "evaluator-1",
+      evaluatorType: "custom",
+      evaluatorName: "toxicity",
+      traceId: "trace-1",
+      isGuardrail: false,
+      attempt,
+      error: "Evaluator cannot be reached",
+      nextAttemptAt,
+    },
   });
 }
 
@@ -379,6 +415,85 @@ describe("evaluationRun foldProjection", () => {
 
         expect(eventLoader).not.toHaveBeenCalled();
         expect(state.status).toBe("in_progress");
+      });
+    });
+  });
+
+  describe("given the evaluator service was not up for two attempts", () => {
+    const projection = EvaluationRunFoldProjection.create({ store: createStubStore() });
+    const afterFirst = projection.apply(
+      createInitState(),
+      createAttemptFailedEvent({
+        id: "evt-a1",
+        attempt: 1,
+        occurredAt: 1_700_000_010_000,
+        nextAttemptAt: 1_700_000_015_000,
+      }),
+    );
+    const afterSecond = projection.apply(
+      afterFirst,
+      createAttemptFailedEvent({
+        id: "evt-a2",
+        attempt: 2,
+        occurredAt: 1_700_000_015_000,
+        nextAttemptAt: 1_700_000_025_000,
+      }),
+    );
+
+    describe("when the second attempt has been folded", () => {
+      /** @scenario "A retrying evaluation shows as in progress" */
+      it("shows the run in progress with its last attempt and next try", () => {
+        expect(afterSecond).toMatchObject({
+          evaluationId: "eval-1",
+          traceId: "trace-1",
+          status: "in_progress",
+          attempts: 2,
+          lastAttemptAt: 1_700_000_015_000,
+          lastAttemptError: "Evaluator cannot be reached",
+          nextAttemptAt: 1_700_000_025_000,
+          startedAt: 1_700_000_010_000,
+        });
+      });
+    });
+
+    describe("when the run is then reported as an error", () => {
+      /** @scenario "A run that ends after failed attempts keeps how many attempts failed" */
+      it("keeps its attempts and last attempt, with no next try", () => {
+        const ended = projection.apply(
+          afterSecond,
+          createReportedEvent({
+            data: { status: "error", error: "Evaluator cannot be reached", score: null },
+          }),
+        );
+
+        expect(ended).toMatchObject({
+          status: "error",
+          attempts: 2,
+          lastAttemptAt: 1_700_000_015_000,
+          lastAttemptError: "Evaluator cannot be reached",
+          nextAttemptAt: null,
+        });
+      });
+
+      /** @scenario "A run that ends after failed attempts keeps how many attempts failed" */
+      it("is not reopened by an attempt event folded after it", () => {
+        const ended = projection.apply(afterSecond, createReportedEvent());
+        const late = projection.apply(
+          ended,
+          createAttemptFailedEvent({
+            id: "evt-a3",
+            attempt: 3,
+            occurredAt: 1_700_000_030_000,
+            nextAttemptAt: 1_700_000_050_000,
+          }),
+        );
+
+        expect(late).toMatchObject({
+          status: ended.status,
+          attempts: 2,
+          lastAttemptAt: 1_700_000_015_000,
+          nextAttemptAt: null,
+        });
       });
     });
   });

@@ -1,6 +1,7 @@
 /**
  * The ADR-034 read tripwire is the feature-flag peer's answer, asked of the project: where
  * it is on the legacy table is read beside the routed one, and the routed result still wins.
+ * A series read with no proof on an aggregate is refused before any read (ADR-177 v4.15).
  * @vitest-environment node
  */
 import type {
@@ -10,17 +11,20 @@ import type {
   AnalyticsTimeseriesResult,
   AnalyticsTopDocumentsResult,
 } from "@langwatch/analytics-contract";
-import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi, FeatureFlagTarget } from "@langwatch/feature-flag-contract";
 import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
+import type { Project, ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
+import {
+  analyticsProof,
+  analyticsTestAuthz,
+} from "../../repositories/__tests__/analytics-proof.fixture.ts";
 import {
   AnalyticsRepository,
   type AnalyticsTimeseriesQuery,
@@ -67,7 +71,7 @@ class TableRecordingRepository extends AnalyticsRepository {
   }
 }
 
-async function harness(tripwireOn: boolean) {
+async function harness(tripwireOn: boolean, { kind = "application" }: { kind?: string } = {}) {
   const flagReads: { key: string; target: FeatureFlagTarget }[] = [];
   const repository = new TableRecordingRepository();
   const app = await AnalyticsModule.create({
@@ -79,9 +83,11 @@ async function harness(tripwireOn: boolean) {
           return Promise.resolve(key === TRIPWIRE_FLAG && tripwireOn);
         },
       }),
-      authz: createApiFixture<AuthzApi>(),
+      authz: analyticsTestAuthz(),
       dataPrivacy: createApiFixture<DataPrivacyApi>(),
-      projects: createApiFixture<ProjectApi>(),
+      projects: createApiFixture<ProjectApi>({
+        findById: (id) => Promise.resolve({ id, kind } as Project),
+      }),
       plans: createApiFixture<EntitlementApi>(),
       traces: createApiFixture<TraceApi>(),
       retention: createApiFixture<DataRetentionApi>({
@@ -100,6 +106,7 @@ async function harness(tripwireOn: boolean) {
         accessModelMode: void 0,
         sqlSingleNode: void 0,
         clickhouseCluster: void 0,
+        aggregateMaxMembers: void 0,
       },
       tenantAnalyticsConcurrency: 4,
       publicBaseUrl: "https://app.langwatch.test",
@@ -139,6 +146,23 @@ describe("AnalyticsModule.getTimeseries read tripwire", () => {
     });
   });
 
+  describe("given the tripwire flag is on for an aggregate read under a member's grant", () => {
+    /** @scenario "An aggregate's series is not compared with the legacy tables" */
+    it("reads only the routed table, since the legacy tables read the aggregate alone", async () => {
+      const { app, repository } = await harness(true);
+
+      const result = await app.getTimeseries(timeseriesInput, {
+        authorization: analyticsProof({
+          projectId: PROJECT_ID,
+          shared: [{ projectId: "project-member", from: Date.UTC(2025, 11, 1) }],
+        }),
+      });
+
+      expect(repository.tablesRead).toEqual(["trace_analytics_rollup"]);
+      expect(result).toEqual(routedResult);
+    });
+  });
+
   describe("given the tripwire flag is off for the project", () => {
     /** @scenario "A project with the read tripwire off is read only from the routed table" */
     it("reads only the routed table", async () => {
@@ -148,6 +172,28 @@ describe("AnalyticsModule.getTimeseries read tripwire", () => {
 
       expect(repository.tablesRead).toEqual(["trace_analytics_rollup"]);
       expect(result).toEqual(routedResult);
+    });
+  });
+
+  describe("given an aggregate read with no proof, as a scheduled report or a graph alert reads", () => {
+    /** @scenario "A scheduled report or a graph alert on an aggregate is refused by name" */
+    it("refuses because the project is an aggregate and reads no series", async () => {
+      const { app, repository } = await harness(false, { kind: "aggregate" });
+
+      await expect(app.getTimeseries(timeseriesInput)).rejects.toMatchObject({
+        code: "analytics_aggregate_unattended_read",
+      });
+      expect(repository.tablesRead).toEqual([]);
+    });
+
+    it("still reads an aggregate's series under a route's proof", async () => {
+      const { app, repository } = await harness(false, { kind: "aggregate" });
+
+      await app.getTimeseries(timeseriesInput, {
+        authorization: analyticsProof({ projectId: PROJECT_ID }),
+      });
+
+      expect(repository.tablesRead).toEqual(["trace_analytics_rollup"]);
     });
   });
 });

@@ -208,6 +208,10 @@ export class TestModelProviderService implements ModelProviderApi {
     throw new Error("Not used by Coding Agent tests.");
   }
 
+  resolveDecisionModel(): Promise<never> {
+    throw new Error("Not used by Coding Agent tests.");
+  }
+
   findAlternateModel(): Promise<never> {
     throw new Error("Not used by Coding Agent tests.");
   }

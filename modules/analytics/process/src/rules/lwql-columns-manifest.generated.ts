@@ -276,6 +276,10 @@ export interface LwqlClickHouseRows {
     readonly StartedAt: "Nullable(DateTime64(3))";
     readonly CompletedAt: "Nullable(DateTime64(3))";
     readonly CostId: "Nullable(String)";
+    readonly Attempts: "UInt16";
+    readonly LastAttemptAt: "Nullable(DateTime64(3))";
+    readonly LastAttemptError: "Nullable(String)";
+    readonly NextAttemptAt: "Nullable(DateTime64(3))";
     readonly LastProcessedEventId: "String";
     readonly LastEventOccurredAt: "DateTime64(3)";
     readonly _retention_days: "UInt16";
@@ -493,6 +497,24 @@ export interface LwqlClickHouseRows {
     readonly EventTimestamp: "UInt64";
     readonly RevisedAt: "Nullable(DateTime)";
     readonly LastObservedAt: "DateTime";
+    readonly _retention_days: "UInt16";
+  };
+  readonly governance_cost_rollup_charges: {
+    readonly TenantId: "String";
+    readonly Day: "Date";
+    readonly EventId: "String";
+    readonly CostSource: "LowCardinality(String)";
+    readonly IngestionSourceId: "String";
+    readonly Provider: "LowCardinality(String)";
+    readonly Model: "LowCardinality(String)";
+    readonly AgentId: "String";
+    readonly CurrencyCode: "LowCardinality(String)";
+    readonly RawActorId: "String";
+    readonly RestatementKey: "String";
+    readonly IsRetraction: "UInt8";
+    readonly ObservedAtMs: "Int64";
+    readonly AmountNanoMinor: "Int64";
+    readonly EventOccurredAt: "UInt64";
     readonly _retention_days: "UInt16";
   };
   readonly governance_cost_rollup_restatement_index: {
@@ -1123,5 +1145,12 @@ export interface LwqlClickHouseRows {
     readonly _retention_days: "UInt16";
     readonly _size_bytes: "UInt32";
     readonly EarliestSpanStartMs: "UInt64";
+  };
+  readonly usage_trace_meter: {
+    readonly OrganizationId: "String";
+    readonly TenantId: "String";
+    readonly Month: "Date";
+    readonly TraceId: "String";
+    readonly UpdatedAt: "DateTime64(3)";
   };
 }

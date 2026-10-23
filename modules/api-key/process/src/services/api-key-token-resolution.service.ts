@@ -262,6 +262,7 @@ export class ApiKeyTokenResolutionService {
             apiKeyId: apiKey.id,
             userId: apiKey.userId,
             organizationId: apiKey.organizationId,
+            ...(apiKey.name === LANGY_SESSION_API_KEY_NAME ? { isLangySessionKey: true } : {}),
           },
         });
       }

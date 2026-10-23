@@ -46,6 +46,7 @@ export class SystemMigrationLegacyMirrorService {
       hasUnsettledTenant: (args) => state.hasUnsettledTenant(args),
       findStatusCounts: (args) => state.findStatusCounts(args),
       findRecordsByStatus: (args) => state.findRecordsByStatus(args),
+      countHeld: (args) => state.countHeld(args),
       upsertRecord: async (record) => {
         await state.upsertRecord(record);
         await this.mirrorRecord(record);

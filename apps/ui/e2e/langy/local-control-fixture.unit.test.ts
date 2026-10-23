@@ -7,8 +7,11 @@ import * as path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { type LangyToolEvent, toolEventOf } from "./langy-agent";
 import {
   answerOfTurn,
+  deleteOrderFailure,
+  isDeleteCommand,
   demoReposToPrune,
   judgeMessages,
   listeningPids,
@@ -133,9 +136,24 @@ describe("questionAnswerNote", () => {
         questions: [{ question: "Which branch?", options: [{ label: "main" }] }],
         answered: [{ question: "Which branch?", selected: ["main"] }],
         turnId: "langyturn_1",
+        toolEventsBeforeAnswer: 0,
       });
 
       expect(note).toBe('[developer answered in the panel: "Which branch?" -> main]');
+    });
+  });
+
+  describe("when the developer answers in typed words", () => {
+    it("carries the question and the typed answer", () => {
+      const note = questionAnswerNote({
+        waitId: "wait_3",
+        questions: [{ question: "Delete it?" }],
+        answered: [{ question: "Delete it?", selected: [], other: "No, keep it." }],
+        turnId: "langyturn_1",
+        toolEventsBeforeAnswer: 0,
+      });
+
+      expect(note).toBe('[developer answered in the panel: "Delete it?" -> No, keep it.]');
     });
   });
 });
@@ -415,6 +433,23 @@ describe("pendingWaitDispatches", () => {
     });
   });
 
+  describe("when the platform raised the card after the turn ended", () => {
+    it("finds a question with no tool call, so it is answered between turns", () => {
+      const dispatches = pendingWaitDispatches({
+        waits: [
+          wait({
+            waitId: "wait_server",
+            kind: "question",
+            questions: [{ question: 'Delete evaluator "X"?' }],
+          }),
+        ],
+        answered: new Set<string>(),
+      });
+      expect(dispatches.map((dispatch) => dispatch.kind)).toEqual(["question"]);
+      expect(dispatches[0]?.entry.toolCallId).toBeUndefined();
+    });
+  });
+
   describe("when a card needs nothing", () => {
     it("leaves an answered card alone, so one answer is sent once", () => {
       expect(
@@ -460,5 +495,229 @@ describe("pendingWaitDispatches", () => {
         "wait_3",
       ]);
     });
+  });
+});
+
+describe("deleteOrderFailure", () => {
+  const REQUEST = "langyturn_request";
+  const YES = "langyturn_yes";
+  const frame = (turnId: string, command: string): LangyToolEvent => ({
+    turnId,
+    phase: "start",
+    id: command,
+    name: "bash",
+    command,
+    input: { command },
+  });
+  const check = (over: Partial<Parameters<typeof deleteOrderFailure>[0]> = {}) =>
+    deleteOrderFailure({
+      toolEvents: [],
+      questions: [],
+      turnIds: [REQUEST, YES],
+      unreadTurns: [],
+      deleted: true,
+      ...over,
+    });
+
+  describe("when a lookup names the item with delete in its name", () => {
+    it("is not taken as the delete (r13)", () => {
+      expect(
+        check({
+          toolEvents: [
+            frame(REQUEST, "langwatch evaluator get e2e-delete-me-x"),
+            frame(REQUEST, "langwatch evaluator delete evaluator_1"),
+          ],
+          questions: [{ toolEventsBeforeAnswer: 1 }],
+        }),
+      ).toBeNull();
+    });
+
+    it("still fails a real delete before the answer", () => {
+      expect(
+        check({
+          toolEvents: [
+            frame(REQUEST, "langwatch evaluator get e2e-delete-me-x"),
+            frame(REQUEST, "langwatch evaluator delete evaluator_1"),
+          ],
+          questions: [{ toolEventsBeforeAnswer: 2 }],
+        }),
+      ).toMatch(/tool frame 1\).*answered after the delete/);
+    });
+  });
+
+  describe("when the request turn deletes with no card", () => {
+    it("fails, naming the request turn", () => {
+      expect(
+        check({ toolEvents: [frame(REQUEST, "langwatch evaluator delete e2e-delete-me")] }),
+      ).toMatch(/delete ran in the request turn/);
+    });
+  });
+
+  describe("when a confirmation card was answered", () => {
+    it("fails when the delete came before the answer", () => {
+      expect(
+        check({
+          toolEvents: [frame(REQUEST, "langwatch evaluator delete x"), frame(REQUEST, "ls")],
+          questions: [{ toolEventsBeforeAnswer: 2 }],
+        }),
+      ).toMatch(/answered after the delete/);
+    });
+
+    it("passes when the delete came after the answer, in the same turn", () => {
+      expect(
+        check({
+          toolEvents: [
+            frame(REQUEST, "langwatch evaluator list"),
+            frame(REQUEST, "langwatch evaluator delete x"),
+          ],
+          questions: [{ toolEventsBeforeAnswer: 1 }],
+        }),
+      ).toBeNull();
+    });
+  });
+
+  describe("when the delete runs in the turn after the user's yes", () => {
+    it("passes", () => {
+      expect(
+        check({ toolEvents: [frame(YES, "langwatch evaluator delete evaluator_1")] }),
+      ).toBeNull();
+    });
+  });
+
+  describe("when the platform refused the delete for want of a click", () => {
+    const REFUSAL = '{"code":"langy_confirmation_required","status":409}';
+    let calls = 0;
+    const refusal = (turnId: string, command: string, output: string): LangyToolEvent[] => {
+      const id = `call_${calls++}`;
+      return [
+        { ...frame(turnId, command), id },
+        { ...frame(turnId, command), id, phase: "end", output },
+      ];
+    };
+
+    it("does not take the refused attempt for a delete, so the card may be answered after it", () => {
+      expect(
+        check({
+          toolEvents: [
+            ...refusal(REQUEST, "langwatch evaluator delete x", REFUSAL),
+            ...refusal(YES, "langwatch evaluator delete x", "deleted"),
+          ],
+          questions: [{ toolEventsBeforeAnswer: 2 }],
+        }),
+      ).toBeNull();
+    });
+
+    it("fails a delete that succeeded before the card was answered", () => {
+      expect(
+        check({
+          toolEvents: [
+            ...refusal(REQUEST, "langwatch evaluator delete x", REFUSAL),
+            ...refusal(REQUEST, "langwatch evaluator delete x", "deleted"),
+          ],
+          questions: [{ toolEventsBeforeAnswer: 4 }],
+        }),
+      ).toMatch(/tool frame 2\).*answered after the delete/);
+    });
+
+    it("does not take a delete the CLI failed (not found) for a delete either", () => {
+      const NOT_FOUND = '{"ok":false,"error":{"code":"evaluator_not_found"}}';
+      expect(
+        check({
+          toolEvents: [
+            ...refusal(REQUEST, "langwatch evaluator delete my-slug", NOT_FOUND),
+            ...refusal(REQUEST, "langwatch evaluator delete evaluator_1", REFUSAL),
+            ...refusal(YES, "langwatch evaluator delete evaluator_1", "deleted"),
+          ],
+          questions: [{ toolEventsBeforeAnswer: 4 }],
+        }),
+      ).toBeNull();
+    });
+
+    it("fails closed when only refusals were recorded yet the target is gone", () => {
+      expect(
+        check({ toolEvents: refusal(REQUEST, "langwatch evaluator delete x", REFUSAL) }),
+      ).toMatch(/none of the 2 recorded tool frames is a delete/);
+    });
+
+    it("passes when only refusals were recorded and the target is still there", () => {
+      expect(
+        check({
+          toolEvents: refusal(REQUEST, "langwatch evaluator delete x", REFUSAL),
+          deleted: false,
+        }),
+      ).toBeNull();
+    });
+  });
+
+  describe("when the target is gone but no delete frame was recorded", () => {
+    it("fails closed rather than reading the missing frame as a pass", () => {
+      expect(check({ toolEvents: [frame(YES, "langwatch evaluator list")] })).toMatch(
+        /none of the 1 recorded tool frames is a delete/,
+      );
+    });
+  });
+
+  describe("when the watcher could not read a turn", () => {
+    it("fails closed even though the frames it did read look right", () => {
+      expect(
+        check({
+          toolEvents: [frame(YES, "langwatch evaluator delete evaluator_1")],
+          unreadTurns: [REQUEST],
+        }),
+      ).toMatch(/could not read turn\(s\) langyturn_request/);
+    });
+  });
+
+  describe("when nothing was deleted and no delete ran", () => {
+    it("has no order to check", () => {
+      expect(check({ deleted: false })).toBeNull();
+    });
+  });
+});
+
+describe("isDeleteCommand", () => {
+  it.each([
+    ["langwatch evaluator delete evaluator_1", true],
+    ["langwatch monitor delete mon_1", true],
+    ["langwatch --json evaluator delete x", true],
+    ["langwatch evaluator delete x --yes", true],
+    ["langwatch evaluator archive x", true],
+    ["ls && langwatch evaluator delete x", true],
+    ["langwatch evaluator remove x", true],
+    ["/home/x/.bin/langwatch-cli/langwatch evaluator delete x", true],
+    ["./langwatch monitor archive y", true],
+    ['bash -lc "langwatch evaluator delete x"', true],
+    ["sh -c 'cd /tmp && langwatch monitor delete y'", true],
+    ["(langwatch evaluator delete x)", true],
+    ["echo $(langwatch monitor remove y)", true],
+    ["echo `langwatch evaluator delete x`", true],
+    ["cd /tmp; (langwatch evaluator delete x)", true],
+    ["langwatch evaluator list\nlangwatch evaluator delete x", true],
+    ["cd /tmp&&langwatch evaluator delete x", true],
+    ["ls;langwatch monitor delete y", true],
+    ["a&langwatch evaluator delete x", true],
+    ["x|langwatch evaluator delete z", true],
+    ['langwatch evaluator get "a;b"', false],
+    ["langwatch evaluator list\nlangwatch evaluator get x", false],
+    // The CLI rejects a global flag before the resource ("unknown option
+    // '--format'"), so this form never deletes and is not treated as one.
+    ["langwatch --format json evaluator delete x", false],
+    ["langwatch evaluator get e2e-delete-me-x", false],
+    ['bash -lc "langwatch evaluator list"', false],
+    ['langwatch evaluator create "delete me"', false],
+    ["langwatch evaluator list", false],
+    ["rm delete", false],
+  ])("%s -> %s", (command, expected) => {
+    expect(isDeleteCommand(command)).toBe(expected);
+  });
+});
+
+describe("toolEventOf", () => {
+  it("keeps what an end frame printed, so a refused delete can be told from a done one", () => {
+    const event = toolEventOf({
+      entry: { type: "tool", phase: "end", id: "t1", output: "langy_confirmation_required" },
+      turnId: "turn_1",
+    });
+    expect(event?.output).toBe("langy_confirmation_required");
   });
 });

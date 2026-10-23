@@ -32,6 +32,7 @@ import {
 import {
   type PaginatedProjects,
   type ProjectApi,
+  type ProjectIdentity,
   projectWithTeamSchema,
   type ProjectWithTeam,
 } from "@langwatch/project-contract";
@@ -41,7 +42,10 @@ import type { CodingAgentBillingPolicy } from "../../services/coding-agent-cost-
 import type { CodingAgentClock } from "../../services/coding-agent-clock.service.ts";
 import { CODING_AGENT_ID_INDEXES } from "../../repositories/clickhouse/clickhouse.coding-agent-id-indexes.database.ts";
 import { CodingAgentSessionEventRepository } from "../../repositories/coding-agent-session-event.repository.ts";
-import { CodingAgentSessionRepository } from "../../repositories/coding-agent-session.repository.ts";
+import {
+  CodingAgentSessionRepository,
+  type OtherSessionKind,
+} from "../../repositories/coding-agent-session.repository.ts";
 import { CodingAgentTraceSessionRepository } from "../../repositories/coding-agent-trace-session.repository.ts";
 import {
   SessionMetricSeriesRepository,
@@ -402,6 +406,17 @@ export class TestSessions extends CodingAgentSessionRepository {
     appliedEventIds: string[];
   } | null> {
     return this.applied;
+  }
+
+  async findOtherSessionKind(input: {
+    tenantId: string;
+    excludeSessionIds: string[];
+  }): Promise<OtherSessionKind> {
+    const others = this.rows.filter(
+      (row) => row.tenantId === input.tenantId && !input.excludeSessionIds.includes(row.sessionId),
+    );
+    if (others.some((row) => !row.auxiliary)) return "main";
+    return others.length > 0 ? "helpers_only" : "none";
   }
 
   async findManyRecent(input: {
@@ -776,7 +791,10 @@ export class TestGithubService implements GithubApi {
   }
 }
 
-function projectRow(id: string): PaginatedProjects["data"][number] {
+export function projectRow(
+  id: string,
+  overrides: Partial<PaginatedProjects["data"][number]> = {},
+): PaginatedProjects["data"][number] {
   const at = new Date(0);
   return {
     id,
@@ -807,11 +825,28 @@ function projectRow(id: string): PaginatedProjects["data"][number] {
     langyEgressAllowlist: null,
     lastCodingAgentSessionAt: null,
     lastCodingAgentPullRequestAt: null,
+    ...overrides,
+  };
+}
+
+function projectIdentity({ id, name }: { id: string; name: string }): ProjectIdentity {
+  return {
+    id,
+    name,
+    slug: id,
+    teamId: "team-1",
+    organizationId: "organization-1",
+    isPersonal: false,
+    ownerUserId: null,
+    kind: "application",
   };
 }
 
 export interface TestProjectState {
   projects: { id: string }[];
+  /** The names `listNamesByIds` answers with; an id left out has no live project. */
+  readonly projectNames: Map<string, string>;
+  readonly nameLookups: { projectIds: string[] }[];
   readonly sessionActivity: { projectId: string; at: Instant }[];
   teamProject: ProjectWithTeam | null;
 }
@@ -833,12 +868,23 @@ export function createTestProjects(overrides: Partial<ProjectApi> = {}): TestPro
           projects.sessionActivity.push(input);
           return Promise.resolve();
         },
+        listNamesByIds: (input) => {
+          projects.nameLookups.push(input);
+          return Promise.resolve(
+            input.projectIds.flatMap((id) => {
+              const name = projects.projectNames.get(id);
+              return name === undefined ? [] : [projectIdentity({ id, name })];
+            }),
+          );
+        },
         ...overrides,
       },
       "ProjectApi",
     ),
     {
       projects: [],
+      projectNames: new Map(),
+      nameLookups: [],
       sessionActivity: [],
       teamProject: projectWithTeamSchema.parse({
   id: "project-1",

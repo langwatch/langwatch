@@ -72,6 +72,12 @@ lane makes that rare, and lifecycle-triggered reconciliation covers it, as for p
 - Nothing replays a subscriber from the start of the log. A receiver added later starts from the
   next event; one that needs history is filled by a background step (`migration-data-step`).
 
+## Amendment 2026-10-21: one row folded from many aggregates
+
+A receiver row folded from several aggregates (the `NurturingOrganization` coding fields, fed by many
+projects) guards each field monotonically (null-only, not-has, later-day) instead of one
+`lastAppliedEventId`. One id per row would drop valid late facts from the other projects.
+
 ## References
 
 - Record: `dev/docs/ARCHITECTURE.md` §9 (peer subscribers, durable receivers), §10 (cursor reads).
