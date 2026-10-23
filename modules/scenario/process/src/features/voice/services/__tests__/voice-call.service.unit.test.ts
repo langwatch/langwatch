@@ -728,7 +728,7 @@ describe("finishVoiceSession", () => {
       /** @scenario "A Call it myself finish at or over the call limit is marked as cut" */
       it("writes the record with the cutoff marker on, from the span alone", async () => {
         const runner = fakeRunner();
-        const writeCallRun = vi.fn<VoiceSessionPorts["writeCallRun"]>(
+        const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(
           async () => {},
         );
         const ports = fakePorts({ runner, over: { writeCallRun } });
