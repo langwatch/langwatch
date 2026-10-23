@@ -72,9 +72,11 @@ describe("given insights of every verdict, filed at different times", () => {
       });
 
       await screen.findByRole("article", { name: "Newest" });
-      expect(screen.getAllByRole("article").map((row) => row.getAttribute("aria-label"))).toEqual(
-        ["Newest", "Middle", "Oldest"],
-      );
+      expect(screen.getAllByRole("article").map((row) => row.getAttribute("aria-label"))).toEqual([
+        "Newest",
+        "Middle",
+        "Oldest",
+      ]);
       expect(screen.queryByRole("tablist")).toBeNull();
       expect(screen.queryByRole("button", { name: /Warning|Worth a look|Good news/ })).toBeNull();
     });
