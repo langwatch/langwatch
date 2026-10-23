@@ -4,6 +4,8 @@ import { OpenTelemetry } from "@ai-sdk/otel"; // +
 import { openai } from "@ai-sdk/openai";
 
 setupObservability({ serviceName: "<project_name>" }); // +
+// AI SDK 7. On AI SDK 6, skip @ai-sdk/otel and registerTelemetry, and pass
+// experimental_telemetry: { isEnabled: true } to each call below instead.
 registerTelemetry(new OpenTelemetry()); // +
 
 async function main(message: string): Promise<string> {

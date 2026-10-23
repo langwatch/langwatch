@@ -177,6 +177,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
     });
 
     describe("when the span carries gen_ai.client.operation.time_to_first_chunk", () => {
+      /** @scenario "AI SDK 7's time to first chunk becomes the time to first token" */
       it("canonicalises the AI SDK 7 key to gen_ai.server.time_to_first_token", () => {
         const result = canonicalisation.canonicalizeSpanAttributes({
           spanAttributes: {
@@ -194,6 +195,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
     });
 
     describe("when both time-to-first-chunk keys carry valid values", () => {
+      /** @scenario "AI SDK 7's time to first chunk becomes the time to first token" */
       it("prefers gen_ai.response.time_to_first_chunk over the client key", () => {
         const result = canonicalisation.canonicalizeSpanAttributes({
           spanAttributes: {
@@ -213,6 +215,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
     });
 
     describe("when gen_ai.response.time_to_first_chunk is negative and the client key is valid", () => {
+      /** @scenario "AI SDK 7's time to first chunk becomes the time to first token" */
       it("falls back to gen_ai.client.operation.time_to_first_chunk", () => {
         const result = canonicalisation.canonicalizeSpanAttributes({
           spanAttributes: {
