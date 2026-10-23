@@ -12,6 +12,7 @@ import {
   Bug,
   Building2,
   Coins,
+  Combine,
   CreditCard,
   EyeOff,
   Server,
@@ -250,7 +251,7 @@ function accessGroup({
       // Every braid in the organisation and who may braid; the project page is under Project.
       ...(!isLiteMember && hasPermission("organization:manage")
         ? enterpriseEntry({
-            item: { label: "Braids", href: "/settings/organization-braids", icon: Waypoints },
+            item: { label: "Braids", href: "/settings/organization-braids", icon: Combine },
             enterprisePlan,
           })
         : []),
