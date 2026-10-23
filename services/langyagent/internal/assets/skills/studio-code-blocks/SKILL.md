@@ -20,7 +20,7 @@ A Studio code block runs a small function inside the workflow engine. The user e
    langwatch ui call studio.code.read --payload '{}'
    ```
 
-   The answer holds the `language` (`python`, `javascript` or `typescript`), the `code` as the editor holds it with the user's unsaved edits, the declared `inputs` and `outputs` with their types, the project's `secretNames`, the node's `lastError` and `hasUnsavedChanges`. Write against this answer, not against the buffer quoted in the question, which may be cut short.
+   The answer holds a `readToken`, the `language` (`python`, `javascript` or `typescript`), the `code` as the editor holds it with the user's unsaved edits, the declared `inputs` and `outputs` with their types, the project's `secretNames`, the node's `lastError` and `hasUnsavedChanges`. Write against this answer, not against the buffer quoted in the question, which may be cut short.
 
 2. Propose the whole new code, with a summary of one or two sentences:
 
@@ -28,7 +28,7 @@ A Studio code block runs a small function inside the workflow engine. The user e
    langwatch ui call studio.code.propose --payload-file proposal.json
    ```
 
-   `proposal.json` is `{"code": "<the whole file>", "summary": "<what changed and why>"}` and nothing else. Always use `--payload-file` for code: quotes in code break the shell's quoting. The code is capped at 32 KB; a read whose answer would not fit says `codeTooLarge` and holds no code, and then you say so rather than propose.
+   `proposal.json` is `{"code": "<the whole file>", "summary": "<what changed and why>", "readToken": "<from the read>"}` and nothing else. A refusal with `studio_code_target_changed` means the user moved to another code block or language since your read: read again and write against that. Always use `--payload-file` for code: quotes in code break the shell's quoting. The code is capped at 32 KB; a read whose answer would not fit says `codeTooLarge` and holds no code, and then you say so rather than propose.
 
 3. The answer is `{"status": "awaiting_review"}`. The user now sees a diff with Accept and Reject. Tell them what you changed in a sentence or two and that they can review it, accept it, and save when they are happy. Do not claim the change is applied or saved.
 

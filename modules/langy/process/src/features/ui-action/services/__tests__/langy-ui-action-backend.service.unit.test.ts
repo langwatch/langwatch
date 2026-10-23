@@ -104,7 +104,7 @@ describe("LangyUiActionBackendService", () => {
           ...CALLER,
           kind: "studio.code.propose",
           definition: definition({ requiredPermission: "workflows:manage" }),
-          payload: { code: "x = 1", summary: "Sets x" },
+          payload: { code: "x = 1", summary: "Sets x", readToken: "read-1" },
           experimentSlug: "my-exp",
         }),
       ).rejects.toMatchObject({ code: "langy_ui_no_browser" });

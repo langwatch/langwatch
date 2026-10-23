@@ -34,6 +34,7 @@
     "@langwatch/experiment-contract": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/ksuid": "workspace:*",
     "@langwatch/langy-client": "workspace:*",
     "@langwatch/langy-contract": "workspace:*",
     "@langwatch/model-provider-client": "workspace:*",

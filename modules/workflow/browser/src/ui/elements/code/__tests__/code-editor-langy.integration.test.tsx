@@ -195,9 +195,21 @@ function handler(kind: string) {
   return found;
 }
 
-async function propose(code = PROPOSED_CODE) {
+/** The read token Langy got back from reading the open code block. */
+async function read(): Promise<string> {
+  const answer = (await handler("studio.code.read").run({} as never)) as { readToken: string };
+  return answer.readToken;
+}
+
+/** Proposes as Langy does: against a fresh read unless handed an older one. */
+async function propose(code = PROPOSED_CODE, readToken?: string) {
+  const token = readToken ?? (await read());
   await act(async () => {
-    await handler("studio.code.propose").run({ code, summary: "Upper-cases the answer" } as never);
+    await handler("studio.code.propose").run({
+      code,
+      summary: "Upper-cases the answer",
+      readToken: token,
+    } as never);
   });
 }
 
@@ -283,6 +295,7 @@ describe("the Studio code editor with Langy", () => {
       const answer = await handler("studio.code.read").run({} as never);
 
       expect(answer).toEqual({
+        readToken: expect.any(String),
         nodeId: "code_1",
         nodeName: "Shout",
         language: "python",
@@ -388,6 +401,24 @@ describe("the Studio code editor with Langy", () => {
       expect(screen.queryByRole("button", { name: "Accept" })).toBeNull();
       expect((await screen.findByTestId<HTMLTextAreaElement>("monaco")).value).toBe(SAVED_CODE);
       expect(setCode).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A proposal is refused once the editor moved to another code block" */
+    it("refuses code written for the code block the editor has left", async () => {
+      const { rerender } = openEditor();
+      await screen.findByTestId("monaco");
+      const readOfFirst = await read();
+
+      rerender(true, "code_2");
+      await screen.findByTestId("monaco");
+
+      await expect(propose(PROPOSED_CODE, readOfFirst)).rejects.toMatchObject({
+        code: "studio_code_target_changed",
+      });
+      await expect(propose(PROPOSED_CODE, "made-up")).rejects.toMatchObject({
+        code: "studio_code_target_changed",
+      });
+      expect(screen.queryByTestId("monaco-diff")).toBeNull();
     });
 
     /** @scenario "A second proposal is refused while one awaits review" */

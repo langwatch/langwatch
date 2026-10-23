@@ -33,6 +33,10 @@ function snapshotWith(overrides: Partial<CodeBlockSnapshot> = {}): CodeBlockSnap
   };
 }
 
+/** A read as the editor answers it, named by a token. */
+const readAnswer = (snapshot: CodeBlockSnapshot) =>
+  codeBlockReadAnswer({ ...snapshot, readToken: "read-1" });
+
 describe("codeBlockSecretNames", () => {
   describe("given secrets list rows that carry more than a name", () => {
     /** @scenario "The ask and the read carry secret names, never secret values" */
@@ -44,7 +48,7 @@ describe("codeBlockSecretNames", () => {
       const snapshot = snapshotWith({ secretNames });
 
       const ask = JSON.stringify(codeBlockAskRequest({ instruction: "Use the key", snapshot }));
-      const read = JSON.stringify(codeBlockReadAnswer(snapshot));
+      const read = JSON.stringify(readAnswer(snapshot));
 
       expect(secretNames).toEqual(["OPENAI_KEY"]);
       for (const handed of [ask, read]) {
@@ -94,10 +98,10 @@ describe("codeBlockAskRequest", () => {
 
 describe("codeBlockReadAnswer", () => {
   it("says whether the buffer differs from the saved code", () => {
-    expect(codeBlockReadAnswer(snapshotWith()).hasUnsavedChanges).toBe(true);
-    expect(
-      codeBlockReadAnswer(snapshotWith({ code: "same", savedCode: "same" })).hasUnsavedChanges,
-    ).toBe(false);
+    expect(readAnswer(snapshotWith()).hasUnsavedChanges).toBe(true);
+    expect(readAnswer(snapshotWith({ code: "same", savedCode: "same" })).hasUnsavedChanges).toBe(
+      false,
+    );
   });
 });
 
@@ -105,11 +109,11 @@ describe("codeBlockReadAnswer for a large buffer", () => {
   /** @scenario "A code block too large to hand over is read without its code" */
   it("hands over code at the proposal cap and withholds a buffer too large to return", () => {
     const atCap = "a".repeat(STUDIO_CODE_MAX_BYTES);
-    const fits = codeBlockReadAnswer(snapshotWith({ code: atCap }));
+    const fits = readAnswer(snapshotWith({ code: atCap }));
     expect(fits.codeTooLarge).toBe(false);
     expect(fits.code).toBe(atCap);
 
-    const tooLarge = codeBlockReadAnswer(snapshotWith({ code: "é".repeat(40 * 1024) }));
+    const tooLarge = readAnswer(snapshotWith({ code: "é".repeat(40 * 1024) }));
     expect(tooLarge.codeTooLarge).toBe(true);
     expect(tooLarge.code).toBe("");
     expect(tooLarge.hasUnsavedChanges).toBe(true);

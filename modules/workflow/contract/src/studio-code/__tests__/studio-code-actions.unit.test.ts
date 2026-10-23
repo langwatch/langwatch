@@ -28,6 +28,7 @@ describe("given the studio code action manifest", () => {
       const parsed = studioCodeProposePayloadSchema.safeParse({
         code: "a".repeat(STUDIO_CODE_MAX_BYTES),
         summary: "Fills the cap",
+        readToken: "read-1",
       });
 
       expect(parsed.success).toBe(true);
@@ -40,6 +41,7 @@ describe("given the studio code action manifest", () => {
       const parsed = studioCodeProposePayloadSchema.safeParse({
         code: "a".repeat(STUDIO_CODE_MAX_BYTES + 1),
         summary: "Too big",
+        readToken: "read-1",
       });
 
       expect(parsed.success).toBe(false);
@@ -49,6 +51,7 @@ describe("given the studio code action manifest", () => {
       const parsed = studioCodeProposePayloadSchema.safeParse({
         code: "é".repeat(STUDIO_CODE_MAX_BYTES / 2 + 1),
         summary: "Under the cap in characters, over it in bytes",
+        readToken: "read-1",
       });
 
       expect(parsed.success).toBe(false);
@@ -67,6 +70,7 @@ describe("given the studio code action manifest", () => {
       const parsed = studioCodeProposePayloadSchema.safeParse({
         code: "export default async function () { return {}; }",
         summary: "Adds a field",
+        readToken: "read-1",
         ...extra,
       });
 
@@ -74,7 +78,11 @@ describe("given the studio code action manifest", () => {
     });
 
     it("refuses a proposal with no summary", () => {
-      const parsed = studioCodeProposePayloadSchema.safeParse({ code: "x = 1", summary: "  " });
+      const parsed = studioCodeProposePayloadSchema.safeParse({
+        code: "x = 1",
+        summary: "  ",
+        readToken: "read-1",
+      });
 
       expect(parsed.success).toBe(false);
     });

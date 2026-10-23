@@ -18,6 +18,9 @@ export const STUDIO_CODE_MAX_BYTES = 32 * 1024;
  */
 export const STUDIO_CODE_READ_MAX_BYTES = 60 * 1024;
 
+/** The longest read token a proposal may carry back. */
+export const STUDIO_CODE_MAX_READ_TOKEN_LENGTH = 64;
+
 /** The longest summary a proposal may carry. */
 export const STUDIO_CODE_MAX_SUMMARY_LENGTH = 500;
 
@@ -33,6 +36,8 @@ export const studioCodeReadPayloadSchema: StudioCodeReadPayloadSchema =
   studioCodeReadPayloadSchemaDefinition;
 
 const studioCodeReadResultSchemaDefinition = z.object({
+  /** Names this read; a proposal hands it back, and is refused once the editor moved on. */
+  readToken: z.string(),
   nodeId: z.string(),
   nodeName: z.string(),
   language: z.enum(["python", "javascript", "typescript"]),
@@ -59,6 +64,8 @@ const studioCodeProposePayloadSchemaDefinition = z
       message: `The proposed code is over ${STUDIO_CODE_MAX_BYTES} bytes.`,
     }),
     summary: z.string().trim().min(1).max(STUDIO_CODE_MAX_SUMMARY_LENGTH),
+    /** The `readToken` of the read the code was written against. */
+    readToken: z.string().min(1).max(STUDIO_CODE_MAX_READ_TOKEN_LENGTH),
   })
   .strict();
 export interface StudioCodeProposePayloadSchema extends Named<

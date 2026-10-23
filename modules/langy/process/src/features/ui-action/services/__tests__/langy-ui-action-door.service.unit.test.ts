@@ -97,7 +97,7 @@ describe("given the CLI's UI-action door", () => {
           dispatch({
             conversationId: "c",
             kind: "studio.code.propose",
-            payload: { code: "x = 1", summary: "Sets x" },
+            payload: { code: "x = 1", summary: "Sets x", readToken: "read-1" },
           }),
         ),
       ).rejects.toMatchObject({ code: "api_key_permission_denied" });

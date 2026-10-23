@@ -55,7 +55,7 @@ export type CodeBlockSnapshot = {
 /** What the editor needs from Langy: the ask, and the proposal waiting for the reader. */
 export type CodeEditorAssistant = {
   ask(instruction: string): void;
-  proposal: StudioCodeProposal | null;
+  proposal: Pick<StudioCodeProposal, "code" | "summary"> | null;
   /** The reader accepted or rejected the proposal; either way it is gone. */
   settle(): void;
   /** The buffer as it changes, so a read sees the reader's unsaved edits. */
@@ -98,8 +98,11 @@ function fieldsText(fields: readonly CodeField[]): string {
 }
 
 /** The code block as `studio.code.read` answers it. */
-export function codeBlockReadAnswer(snapshot: CodeBlockSnapshot): StudioCodeReadResult {
+export function codeBlockReadAnswer(
+  snapshot: CodeBlockSnapshot & { readToken: string },
+): StudioCodeReadResult {
   const answer = {
+    readToken: snapshot.readToken,
     nodeId: snapshot.subject.nodeId,
     nodeName: snapshot.subject.nodeName,
     language: snapshot.language,

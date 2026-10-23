@@ -115,6 +115,14 @@ Feature: Langy writes and edits Studio code blocks from the code editor
       And the reader can read and type into Langy without closing the editor
 
     @integration
+    Scenario: A proposal is refused once the editor moved to another code block
+      Given Langy read code block A, and its answer named that read
+      When the user opens code block B before Langy proposes
+      And Langy proposes against its read of A
+      Then the proposal is refused with "studio_code_target_changed"
+      And nothing is shown for review on B
+
+    @integration
     Scenario: Langy rides above Studio's node drawer while the code editor is open
       Given Langy is available on the code block
       When the code editor opens over Studio's node drawer

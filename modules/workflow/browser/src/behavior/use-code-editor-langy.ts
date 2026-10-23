@@ -8,6 +8,7 @@ import { useUiFlags } from "@langwatch/browser-host/feature-flag";
 import { readSlice } from "@langwatch/browser-host/global-store";
 import { useLentOperations } from "@langwatch/browser-host/lent";
 import { FrontendFlags } from "@langwatch/feature-flag-contract";
+import { generate } from "@langwatch/ksuid";
 import { LangyAskToken } from "@langwatch/langy-client";
 import {
   LANGY_ABSENT_REGISTRATIONS,
@@ -42,7 +43,11 @@ const useLangyRegistrations = readSlice<LangyRegistrationsState>({
   absent: LANGY_ABSENT_REGISTRATIONS,
 });
 
-type PendingProposal = StudioCodeProposal & { nodeId: string; language: CodeLanguage };
+type ProposalTarget = { nodeId: string; language: CodeLanguage };
+type PendingProposal = Pick<StudioCodeProposal, "code" | "summary"> & ProposalTarget;
+
+/** Reads a proposal may still answer; older ones are forgotten. */
+const REMEMBERED_READS = 16;
 
 /** A refusal the page reports back to the agent by its `code`. */
 class StudioCodeActionError extends Error {
@@ -101,6 +106,7 @@ export function useCodeEditorAssistant({
   });
 
   const buffer = useRef(savedCode);
+  const reads = useRef(new Map<string, ProposalTarget>());
   const latest = useRef<EditorState>({
     subject,
     language,
@@ -121,7 +127,7 @@ export function useCodeEditorAssistant({
 
   useEffect(() => {
     if (!enabled) return undefined;
-    registerActions(studioCodeHandlers({ latest, buffer, pending, setProposal }));
+    registerActions(studioCodeHandlers({ latest, buffer, reads, pending, setProposal }));
     return () => clearActions();
   }, [enabled, registerActions, clearActions]);
 
@@ -176,20 +182,39 @@ function proposalFor({
   proposal: PendingProposal | null;
   nodeId: string;
   language: CodeLanguage;
-}): StudioCodeProposal | null {
+}): Pick<StudioCodeProposal, "code" | "summary"> | null {
   if (!proposal || proposal.nodeId !== nodeId || proposal.language !== language) return null;
   return { code: proposal.code, summary: proposal.summary };
+}
+
+/** Names a read for the proposal that answers it, keeping only the latest few. */
+function remember({
+  reads,
+  target,
+}: {
+  reads: Map<string, ProposalTarget>;
+  target: ProposalTarget;
+}): string {
+  const readToken = generate("workflow").toString();
+  reads.set(readToken, target);
+  for (const oldest of reads.keys()) {
+    if (reads.size <= REMEMBERED_READS) break;
+    reads.delete(oldest);
+  }
+  return readToken;
 }
 
 /** The read and propose handlers, over the editor's latest state rather than a render's. */
 function studioCodeHandlers({
   latest,
   buffer,
+  reads,
   pending,
   setProposal,
 }: {
   latest: RefObject<EditorState>;
   buffer: RefObject<string>;
+  reads: RefObject<Map<string, ProposalTarget>>;
   pending: RefObject<PendingProposal | null>;
   setProposal: (proposal: PendingProposal) => void;
 }): LangyUiActionHandlers {
@@ -200,7 +225,11 @@ function studioCodeHandlers({
         const { subject, ...rest } = latest.current;
         if (!subject)
           throw new StudioCodeActionError("studio_code_editor_closed", "No code block.");
-        return codeBlockReadAnswer({ ...rest, subject, code: buffer.current });
+        const readToken = remember({
+          reads: reads.current,
+          target: { nodeId: subject.nodeId, language: rest.language },
+        });
+        return codeBlockReadAnswer({ ...rest, subject, code: buffer.current, readToken });
       },
     },
     "studio.code.propose": {
@@ -215,6 +244,13 @@ function studioCodeHandlers({
         }
         if (!subject)
           throw new StudioCodeActionError("studio_code_editor_closed", "No code block.");
+        const read = reads.current.get(payload.readToken);
+        if (read?.nodeId !== subject.nodeId || read.language !== language) {
+          throw new StudioCodeActionError(
+            "studio_code_target_changed",
+            "The open code block is not the one this code was written for; read it again.",
+          );
+        }
         if (pending.current) {
           throw new StudioCodeActionError(
             "studio_code_proposal_pending",
