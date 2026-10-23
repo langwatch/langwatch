@@ -5929,6 +5929,11 @@
       "A customer in a euro country is created in euros",
       "An existing customer's currency is never rewritten"
     ],
+    "specs/ci/nightly-suite.feature": [
+      "The nightly's jobs run side by side and one failing does not stop another",
+      "A run from a branch leaves the dashboard issue alone",
+      "A representative cell runs on a hosted runner and keeps its evidence"
+    ],
     "specs/ci/no-docker-integration-tests.feature": [
       "Native services replace testcontainers",
       "Test databases are isolated from dev data",
@@ -6889,7 +6894,6 @@
       "The scope capability resolves without the session's grants",
       "The legacy scope hook offers no permission answer"
     ],
-    "specs/governance/aggregate-project.feature": ["Analytics aggregate across members"],
     "specs/home/onboarding-progress-backend.feature": [
       "Returns all steps with completion status",
       "Step createProject is always complete",
