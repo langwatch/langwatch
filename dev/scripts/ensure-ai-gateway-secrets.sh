@@ -30,6 +30,9 @@ ENV_FILE="$(cd "$(dirname "$0")/../.." && pwd)/.env"
 # script generating secrets into a file that doesn't exist.
 [ -f "$ENV_FILE" ] || exit 0
 
+# Credentials kept in 1Password (haven secrets move) are never generated here.
+[ -n "$(env_file_key_value "$ENV_FILE" LANGWATCH_OP_ACCOUNT || true)" ] && exit 0
+
 REQUIRED_SECRETS=(
   LW_GATEWAY_INTERNAL_SECRET
   LW_GATEWAY_JWT_SECRET
