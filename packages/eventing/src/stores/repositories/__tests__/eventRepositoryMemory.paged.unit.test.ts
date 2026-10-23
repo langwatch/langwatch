@@ -111,3 +111,56 @@ describe("EventRepositoryMemory.getEventRecordsUpToPaged", () => {
     });
   });
 });
+
+describe("EventRepositoryMemory.getEventRecordsPaged", () => {
+  describe("given a history with a timestamp tie", () => {
+    /** @scenario An order-insensitive fold that missed an event is rebuilt from its log a page at a time */
+    it("walks the whole history across pages in (timestamp, eventId) order, with no bound", async () => {
+      const repo = EventRepositoryMemory.createForTesting();
+      await repo.insertEventRecords([
+        record({ eventId: "e3b", ts: 3000 }),
+        record({ eventId: "e1", ts: 1000 }),
+        record({ eventId: "e3a", ts: 3000 }),
+        record({ eventId: "e5", ts: 5000 }),
+      ]);
+      const all: string[] = [];
+      let after: { timestamp: number; eventId: string } | undefined;
+
+      for (;;) {
+        const page = await repo.getEventRecordsPaged({
+          tenantId: "tenant",
+          aggregateType: "trace",
+          aggregateId: "agg",
+          after,
+          limit: 2,
+        });
+        if (page.length === 0) break;
+        all.push(...page.map((r) => r.EventId));
+        const last = page[page.length - 1]!;
+        after = { timestamp: last.EventTimestamp, eventId: last.EventId };
+        if (page.length < 2) break;
+      }
+
+      expect(all).toEqual(["e1", "e3a", "e3b", "e5"]);
+    });
+  });
+});
+
+describe("EventRepositoryMemory.getEventRecordsPaged", () => {
+  describe("given a limit that is not a positive integer", () => {
+    it.each([0, -1, 1.5])("refuses limit %s instead of reading an empty page", async (limit) => {
+      const repo = EventRepositoryMemory.createForTesting();
+      await repo.insertEventRecords([record({ eventId: "e1", ts: 1000 })]);
+
+      await expect(
+        repo.getEventRecordsPaged({
+          tenantId: "tenant",
+          aggregateType: "trace",
+          aggregateId: "agg",
+          after: undefined,
+          limit,
+        }),
+      ).rejects.toBeInstanceOf(RangeError);
+    });
+  });
+});

@@ -60,6 +60,7 @@ const lastCall = () =>
   queryMock.mock.calls.at(-1)![0] as {
     query: string;
     query_params: Record<string, unknown>;
+    clickhouse_settings?: Record<string, number>;
   };
 
 describe("re-fold reads prune partitions — unpaged, time-local aggregate", () => {
@@ -123,6 +124,58 @@ describe("re-fold reads prune partitions — paged, time-local aggregate", () =>
     await store.getEventsUpToPaged?.(pagedRequest);
 
     expect(lastCall().query).toContain("EventOccurredAt = 0 OR");
+  });
+
+  /** @scenario A page of an aggregate's history reads payloads only for its own rows */
+  it("reads each page's payloads lazily, for that page's rows only", async () => {
+    await store.getEventsUpToPaged?.(pagedRequest);
+
+    expect(lastCall().clickhouse_settings).toEqual({
+      query_plan_max_limit_for_lazy_materialization: 100,
+    });
+  });
+});
+
+describe("rebuild reads prune partitions: paged whole history", () => {
+  describe("given a time-local aggregate", () => {
+    /** @scenario A page of an aggregate's history reads payloads only for its own rows */
+    it("bounds every page on the triggering event, with no upper bound", async () => {
+      await store.getEventsPaged?.({
+        aggregateId: "trace-1",
+        context: { tenantId },
+        aggregateType: TIME_LOCAL,
+        anchorOccurredAtMs: OCCURRED_AT,
+        after: { timestamp: 500, eventId: "event-0" },
+        limit: 100,
+      });
+
+      expect(lastCall().query).toContain("EventOccurredAt = 0 OR EventOccurredAt >=");
+      expect(lastCall().query_params.occurredAtFromMs).toBe(OCCURRED_AT - REHYDRATION_WINDOW_MS);
+      expect(lastCall().query).not.toContain("upToTimestamp");
+      expect(lastCall().query).toContain("LIMIT {limit:UInt32}");
+      expect(lastCall().query_params.afterEventId).toBe("event-0");
+      // Payloads are read lazily for the page's own rows, not for every row the page scans.
+      expect(lastCall().clickhouse_settings).toEqual({
+        query_plan_max_limit_for_lazy_materialization: 100,
+      });
+    });
+  });
+
+  describe("given a long-lived aggregate type", () => {
+    /** @scenario A page of an aggregate's history reads payloads only for its own rows */
+    it("leaves the scan unbounded but still pages it", async () => {
+      await store.getEventsPaged?.({
+        aggregateId: "global-1",
+        context: { tenantId },
+        aggregateType: "global" as AggregateType,
+        anchorOccurredAtMs: OCCURRED_AT,
+        after: undefined,
+        limit: 100,
+      });
+
+      expect(lastCall().query).not.toContain("EventOccurredAt >=");
+      expect(lastCall().query_params.limit).toBe(100);
+    });
   });
 });
 

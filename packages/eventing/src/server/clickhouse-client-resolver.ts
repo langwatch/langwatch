@@ -11,6 +11,8 @@ export interface EventingClickHouseClient {
     SKIP_COLD_SCAN_CHECK?: true | undefined;
     /** The tenant set a `TenantId IN {...:Array(String)}` read binds, resolving tenant included. */
     tenantIds?: readonly string[] | undefined;
+    /** Per-query ClickHouse settings, as an insert carries them. */
+    clickhouse_settings?: Record<string, number> | undefined;
   }) => Promise<EventingClickHouseQueryResult>;
   insert(request: {
     table: string;
