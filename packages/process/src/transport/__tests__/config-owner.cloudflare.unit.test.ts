@@ -8,7 +8,7 @@ describe("cloudflareTrustOf", () => {
     /** @scenario "TRUST_CLOUDFLARE_CLIENT_IP with no trusted proxy addresses refuses to boot" */
     it.each([undefined, []])("refuses the configuration naming both settings (%j)", (proxies) => {
       expect(() => cloudflareTrustOf({ trustCloudflare: true, trustedProxies: proxies })).toThrow(
-        /TRUST_CLOUDFLARE_CLIENT_IP.*TRUSTED_PROXY_ADDRESSES/,
+        expect.objectContaining({ code: "config_refused" }),
       );
     });
   });

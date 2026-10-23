@@ -105,8 +105,13 @@ export class ClientAddress {
     const hops = (request.header(FORWARDED_FOR_HEADER) ?? "").split(",");
 
     for (let index = hops.length - 1; index >= 0; index--) {
-      const address = parseAddress(hops[index] ?? "");
-      if (address === null) continue;
+      const hop = (hops[index] ?? "").trim();
+      if (hop === "") continue;
+
+      // A hop no parser reads (ip:port, say) may be the one a proxy wrote: stop, so an earlier
+      // hop the client wrote itself is never believed in its place.
+      const address = parseAddress(hop);
+      if (address === null) return void 0;
 
       if (!this.isTrustedHop(address)) return address;
     }

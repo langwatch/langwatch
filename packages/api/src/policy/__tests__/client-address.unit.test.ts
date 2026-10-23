@@ -66,6 +66,16 @@ describe("ClientAddress behind a trusted proxy", () => {
     expect(from("203.0.113.9")).toBe("203.0.113.9");
   });
 
+  it("falls back to the peer when the nearest hop is one no parser reads", () => {
+    expect(
+      resolve({
+        addresses: ["10.0.0.0/8"],
+        socketAddress: "10.0.0.1",
+        headers: { "x-forwarded-for": "203.0.113.66, 198.51.100.7:51234" },
+      }),
+    ).toBe("10.0.0.1");
+  });
+
   /** @scenario "Vendor headers other than the forwarded chain are never read" */
   it("reads no vendor header besides the forwarded chain", () => {
     expect(
