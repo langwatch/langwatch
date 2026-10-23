@@ -1200,6 +1200,11 @@ sits out that boot, so optional handles stay unset and a required one fails
 with the ordinary missing-key refusal. After a good probe the preflight reads
 every single handle env and `.env` leave unanswered in parallel (capped, each
 read timed out), and a field absent from the item is an ordinary miss.
+**Locally `.env` holds config only, and haven reads the item once for every process
+it starts** (Alex, 2026-10-23; ADR-132 amendment): its fields are the layer after
+the shell and `.env`, they reach Node, Go and Python lanes alike with the account
+blanked so no lane asks again, and `haven secrets move` / `haven secrets exec` are
+the move and the outside-haven path.
 **Global concerns declare the
 same way at their framework owner** — logging and telemetry are
 everyone-sends-to-one-place concerns, so `@langwatch/process` and

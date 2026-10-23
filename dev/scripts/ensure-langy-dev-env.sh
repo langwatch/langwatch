@@ -57,7 +57,7 @@ note() {
   written=$((written + 1))
 }
 
-if env_file_key_is_empty_or_missing "$ENV_FILE" LANGY_INTERNAL_SECRET; then
+if [ -z "${LANGY_INTERNAL_SECRET:-}" ] && env_file_key_is_empty_or_missing "$ENV_FILE" LANGY_INTERNAL_SECRET; then
   if ! command -v openssl >/dev/null 2>&1; then
     echo "ERROR: openssl not found — cannot generate LANGY_INTERNAL_SECRET." >&2
     echo "       Install openssl, or set it manually in $ENV_FILE." >&2

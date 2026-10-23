@@ -154,23 +154,25 @@ Only once the server is settled does the browser console mean anything. Do not r
 the ui lane to chase a "broken mount": a re-optimize you caused minutes earlier looks the
 same.
 
-## Gotcha 7: secrets resolve through `.env`, not through haven's overlay
+## Gotcha 7: secrets resolve through the shell, `.env`, then 1Password
 
 haven's own injected variables (hostnames, ports, database URLs; see
 `tools/thuishaven/app/overlayenv.go`) go straight into each child's OS environment;
-nothing writes them to a file. A `Secret.load(id)` handle (`packages/secrets`,
-`dev/docs/ARCHITECTURE.md` §6) resolves through the process's secrets chain, and its env
-step already sees whatever haven injected. What is NOT haven's: `LANGWATCH_OP_ACCOUNT`
-(which 1Password account the chain asks) is a personal choice. Set it in the workspace
-`.env`, never by haven; `pnpm dev`'s own `node --env-file=../../.env` loads that file
-before `main.ts` runs.
+nothing writes them to a file. With `LANGWATCH_OP_ACCOUNT` set in the workspace `.env`
+(a personal choice, never set by haven), haven reads the 1Password item `Private/LangWatch`
+once per `up` and injects every field the shell and `.env` leave unset into every lane,
+with the account blanked so no lane asks again (`tools/thuishaven/app/onepassword.go`).
+A key you just added in 1Password needs `haven down && haven up`. A
+`haven: 1Password skipped (<reason>)` line means `op` is missing, locked or signed out:
+unlock the app and restart. A `.env holds credentials (...)` warning at `up` means a
+credential crept back: `haven secrets move` (dry run), then `--apply`.
 
 `haven env` decides what to mask in two layers (`tools/thuishaven/domain/secretkeys.go`):
 every `Secret.load("ID", …)` handle it finds by scanning `packages`, `modules`,
 `enterprise` and `apps`, then a name-shape fallback (`NameLooksSecret`). A multi-line
 `Secret.load` call is missed by the first layer and caught only by the second, so a
-secret with an innocent name could print. If `haven env` ever shows a credential, stop
-and report which key.
+secret with an innocent name could print. Every value that came from the item is masked whatever its name. If `haven env` ever
+shows a credential, stop and report which key.
 
 ## Gotcha 8: "LangWatch is starting" and 502s that come and go
 

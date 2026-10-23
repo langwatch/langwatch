@@ -11,16 +11,15 @@ import (
 )
 
 // resolvedDevEnv is the environment the app process will actually see in this
-// worktree: the operator's .env, overridden by whatever the shell that ran
-// `haven up` already exports — the same precedence a dotenv loader gives a
-// real env var. It exists to answer one question honestly (did the developer
-// already configure an email provider?) without haven reading or writing
-// anything to disk itself.
+// worktree: the shell over .env (localDevEnv), then the 1Password item's
+// fields neither sets, in the secrets chain's order. It answers questions such
+// as "did the developer configure an email provider?" without writing anything.
 func resolvedDevEnv(repoDir string) map[string]string {
-	resolved := domain.LoadDotenv(repoDir)
-	for _, kv := range os.Environ() {
-		if key, val, ok := strings.Cut(kv, "="); ok && val != "" {
-			resolved[key] = val
+	resolved := localDevEnv(repoDir)
+	fields, _ := onePasswordFields(resolved[domain.OnePasswordAccountKey])
+	for key, value := range fields {
+		if resolved[key] == "" {
+			resolved[key] = value
 		}
 	}
 	return resolved
@@ -194,7 +193,8 @@ type childPlan struct {
 func (o *Orchestrator) newChildPlan(st domain.Stack, opts PlanOptions, repoDir string) *childPlan {
 	p := &childPlan{o: o, st: st, opts: opts, repoDir: repoDir}
 	p.logDir, _ = domain.StackLogPaths(st.WorktreeDir, st.Slug)
-	p.base = append(st.OverlayEnv(), o.credentialEnv(st.Slug, repoDir)...)
+	// The item's fields come first, so the stack's own addresses win a clash.
+	p.base = append(append(onePasswordEnv(repoDir), st.OverlayEnv()...), o.credentialEnv(st.Slug, repoDir)...)
 	// Bun and Node use their own bundled CA roots, NOT the macOS system store, so
 	// the app process and the langy worker (Bun) subprocess otherwise
 	// reject the portless HTTPS certs on every gateway/control-plane call ("self

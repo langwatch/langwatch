@@ -47,6 +47,14 @@ REPO_ROOT="$(cd "$REPO_ROOT/.." && pwd)"
 
 export NODE_ENV="${NODE_ENV:-development}"
 
+# Credentials kept in 1Password (LANGWATCH_OP_ACCOUNT set): haven reads the item
+# once and runs this script again with its fields, so the Go lanes get them too.
+. "$HERE/lib/env-file-keys.sh"
+if [ -z "${HAVEN_SECRETS_EXEC:-}" ] && command -v haven >/dev/null 2>&1 &&
+  { [ -n "${LANGWATCH_OP_ACCOUNT:-}" ] || env_file_key_read LANGWATCH_OP_ACCOUNT "$REPO_ROOT/.env" >/dev/null; }; then
+  exec haven secrets exec -- bash "$0" "$@"
+fi
+
 # A fresh clone ships the three AI Gateway secrets empty, and the environment
 # validator requires 32 characters of each — without them every lane crashloops
 # on boot with a validation error and no hint (issue #3902). Idempotent: it only

@@ -51,41 +51,58 @@ headless shell per stack with a signed-in context per lane, for agent testers: s
 `haven` skill.
 
 Stripe is paymentsim on every local and CI stack: `haven up` runs it and points
-billing at it unless `.env` or the shell sets `STRIPE_SECRET_KEY`,
+billing at it unless `.env`, the shell or the 1Password item sets `STRIPE_SECRET_KEY`,
 `STRIPE_WEBHOOK_SECRET` or `STRIPE_API_BASE`, in which case your keys are used.
-`haven up` prints which (`Stripe: paymentsim` or `Stripe: your key from .env`).
+`haven up` prints which (`Stripe: paymentsim` or `Stripe: your test key from .env or 1Password`).
 
-### Keeping a credential in 1Password
+### Keeping your credentials in 1Password
 
-Addressing is convention plus one key (ARCHITECTURE.md §6): vault `Private`,
-item `LangWatch`, one field per secret named exactly its `Secret.load` id
-(`STRIPE_SECRET_KEY`), read with `op read` through the desktop app's CLI
-integration. There is no `op://` reference in `.env`: a value there is used
-literally.
+The root `.env` holds config only. Every credential a developer needs lives in
+1Password and arrives through the `op` CLI (ADR-132). Addressing is convention
+plus one key (ARCHITECTURE.md §6): vault `Private`, item `LangWatch`, one field
+per secret named exactly its env key (`STRIPE_SECRET_KEY`), and
+`LANGWATCH_OP_ACCOUNT` in `.env` names the account. There is no `op://`
+reference in `.env`: a value there is used literally, and it wins.
 
-1. `op account list`; the URL's subdomain is your account shorthand.
-2. Add the field (empty), then paste the value in the 1Password app, never on a
-   command line. `op item edit` if `LangWatch` already exists in `Private`:
-   ```bash
-   op item create --account <shorthand> --vault Private --category "Secure Note" \
-     --title LangWatch 'STRIPE_SECRET_KEY[password]=' 'STRIPE_WEBHOOK_SECRET[password]='
-   ```
-3. In `.env`: delete the moved lines (env and `.env` answer first, so a line
-   left behind wins) and set `LANGWATCH_OP_ACCOUNT="<shorthand>"`.
-4. `haven down && haven up` (a restart keeps the old env), then
-   `haven env --agent | grep -E 'STRIPE|LANGWATCH_OP'` shows only the account.
+Move once, with the 1Password desktop app unlocked and its CLI integration on:
 
-Under haven, a Stripe pair kept only in 1Password is not used: haven sees no
-Stripe key in env or `.env`, injects paymentsim's pair, and env answers first.
-Keep your own Stripe test keys in `.env` to use them.
+```bash
+op account list                                    # the URL's subdomain is your account shorthand
+haven secrets move                                 # dry run: names the credential keys, writes nothing
+haven secrets move --apply --account <shorthand>   # fills the item, deletes those lines, sets LANGWATCH_OP_ACCOUNT
+haven down && haven up                             # a restart keeps the old env
+```
 
-With the account set, each boot probes once with `op whoami`, then reads every
-handle missing from env and `.env` in parallel. 1Password is best effort: when
-`op` is missing, locked, signed out or times out, the boot logs one
-`[secrets] 1Password skipped` warning with the reason and carries on without
-it, so optional secrets stay unset and a missing required one fails by name.
-Unlock 1Password and restart to pick the values up. Production refuses the
-account by name.
+The move creates `LangWatch` in `Private` when it is missing and otherwise
+edits it, keeping its other fields. Values go to `op` on stdin as an item
+template, never on a command line, in a log or on screen. The item is read back
+before `.env` changes; if any value is missing there, `.env` is left as it was.
+A connection string with no password in it (a local `DATABASE_URL`) is config
+and stays.
+
+To add a credential later, add the field in the 1Password app (never on a
+command line) and restart the stack. `haven up` warns, naming the key and never
+the value, whenever a credential is back in `.env`.
+
+How each process gets the values:
+
+| Started by                  | Who reads 1Password                                                                                                                                                                                                  |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `haven up`                  | haven reads the item once (`op item get`) and hands every field the shell and `.env` leave unset to every process it starts: Node, Go and Python alike. The account is blank in those processes, so none asks again. |
+| `pnpm dev`                  | the same, through `haven secrets exec` when haven is installed; otherwise each Node app's own secrets chain, and the Go services see only `.env`                                                                     |
+| any other script or command | `haven secrets exec -- <command>`                                                                                                                                                                                    |
+| your shell                  | `eval "$(haven env --reveal)"` includes the item's fields                                                                                                                                                            |
+
+haven counts a key the item holds as configured, so a Stripe or mail key kept
+in 1Password is used and the stand-in is not injected. `haven env` masks every
+value that came from the item, whatever its name.
+
+1Password is best effort: when `op` is missing, locked, signed out or times
+out, haven prints one `haven: 1Password skipped` line with the reason and the
+stack comes up as it would without it. A Node process outside haven probes
+once with `op whoami`, reads each missing handle, and on failure logs one
+`[secrets] 1Password skipped` warning. Unlock 1Password and restart to pick the
+values up. Production refuses the account by name.
 
 ## haven (thuishaven)
 

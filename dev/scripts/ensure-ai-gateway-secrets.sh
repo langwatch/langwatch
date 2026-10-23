@@ -49,7 +49,8 @@ generate_one() {
 
 generated=0
 for key in "${REQUIRED_SECRETS[@]}"; do
-  if env_file_key_is_empty_or_missing "$ENV_FILE" "$key"; then
+  # A value the environment already holds (haven secrets exec, from 1Password) stays there.
+  if [ -z "${!key:-}" ] && env_file_key_is_empty_or_missing "$ENV_FILE" "$key"; then
     # Assigned first, not passed inline: `exit` inside a command substitution
     # ends only the subshell, so an inline call would write an empty secret
     # when openssl is missing instead of stopping.

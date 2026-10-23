@@ -538,6 +538,9 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 	if err := domain.RefuseLiveStripe(resolvedDevEnv(p.WorktreeDir)); err != nil {
 		return err
 	}
+	if warning := dotenvCredentialWarning(p.WorktreeDir); warning != "" {
+		fmt.Printf("  warning: %s\n", warning)
+	}
 	if err := o.ensurePortlessProxy(); err != nil {
 		return err
 	}
