@@ -86,7 +86,7 @@ The middleware captures input and output content **by default**. Pass `otelopena
 
 Run the program with `go run .`. The deferred `tp.Shutdown(ctx)` flushes the spans when `main` returns. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds, with the Groq call as an LLM span carrying its input, output and token counts.
 
-If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the program runs in.
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the program runs in.
 
 ## Related
 

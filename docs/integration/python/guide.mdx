@@ -159,7 +159,7 @@ For detailed guidance on manually creating traces and spans using context manage
 
 Call a function decorated with `@langwatch.trace()`, for example `handle_message()` above. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds. Open it to see the root span and any spans nested under it, such as the autotracked OpenAI call.
 
-If nothing appears, check that `LANGWATCH_API_KEY` (and `LANGWATCH_PROJECT_ID` for a key from Settings → API Keys) is set in the environment your code runs in. The SDK flushes pending spans when the process exits.
+If no trace appears, check that `LANGWATCH_API_KEY` (and `LANGWATCH_PROJECT_ID` for a key from Settings → API Keys) is set in the environment your code runs in. The SDK flushes pending spans when the process exits.
 
 ## Full Setup
 

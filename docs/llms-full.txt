@@ -20802,7 +20802,7 @@ The `AgnoInstrumentor` automatically captures all Agno agent activity. All trace
 
 Run the example. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds. Open it to see the Agno agent run and the model calls it made.
 
-If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
 
 ## Related
 
@@ -20880,7 +20880,7 @@ The `AnthropicInstrumentor` automatically captures all Anthropic API calls globa
 
 Run the example. Then open your project in LangWatch: a new trace named "Anthropic Call with Community Instrumentor" appears in the traces list within a few seconds. Open it to see the Anthropic call nested inside it, with its input and output.
 
-If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
 
 ## Related
 
@@ -21233,7 +21233,7 @@ Remember to replace placeholder values for AWS credentials and adapt the model I
 
 Run the example. Then open your project in LangWatch: a new trace named "Bedrock - Example Usage" appears in the traces list within a few seconds. Open it to see the Bedrock calls nested inside it.
 
-If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
 
 ---
 
@@ -21333,7 +21333,7 @@ if __name__ == "__main__":
 
 Run the example. Then open your project in LangWatch: a new trace named "Azure AI Inference Chat" appears in the traces list within a few seconds. Open it to see the `complete` call recorded by `AIInferenceInstrumentor` nested inside it.
 
-If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
 
 ## How it Works
 
@@ -21607,7 +21607,7 @@ if __name__ == "__main__":
 
 Run the example. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds. Open it to see the crew's agents, tasks and model calls nested inside the trace named in the decorator, for example "CrewAI Execution with OpenInference".
 
-If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
 
 ---
 
@@ -21686,7 +21686,7 @@ The `@langwatch.trace()` decorator creates a parent trace, and `autotrack_dspy()
 
 Run the example. Then open your project in LangWatch: a new trace named "DSPy RAG Execution" appears in the traces list within a few seconds. Open it to see the DSPy module calls nested inside it.
 
-If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
 
 ## Related
 
@@ -21966,7 +21966,7 @@ The `HaystackInstrumentor` automatically captures Haystack pipeline operations, 
 
 Run the example. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds. Open it to see the Haystack pipeline, its components and the model calls as spans.
 
-If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
 
 ## Related
 
@@ -22289,7 +22289,7 @@ The `@langwatch.trace()` decorator creates a parent trace, and `get_langchain_ca
 
 Run the example. Then open your project in LangWatch: a new trace named "Langchain - Weather Agent" appears in the traces list within a few seconds. Open it to see the LangChain chain, tool and LLM steps nested inside it.
 
-If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
 
 ## Related
 
@@ -22441,7 +22441,7 @@ A callback attached only to the model call inside one node produces LLM spans al
 
 Run the example. Then open your project in LangWatch: a new trace named "LangGraph - Calculator Agent" appears in the traces list within a few seconds. Open it to see the graph's nodes, tool calls and LLM calls nested inside it.
 
-If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
 
 ## Related
 
@@ -22525,7 +22525,7 @@ The `@langwatch.trace()` decorator creates a parent trace, and `autotrack_litell
 
 Run the example. Then open your project in LangWatch: a new trace named "LiteLLM Autotrack Example" appears in the traces list within a few seconds. Open it to see the LiteLLM completion call nested inside it, with its input and output.
 
-If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
 
 ## Related
 
@@ -22785,7 +22785,7 @@ The `OpenAIAgentsInstrumentor` automatically captures agent activities, LLM call
 
 Run the example. Then open your project in LangWatch: a new trace named "OpenAI Agent Run with OpenInference" appears in the traces list within a few seconds. Open it to see the agent run, its LLM calls and tool calls nested inside it.
 
-If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
 
 ## Related
 
@@ -22976,7 +22976,7 @@ if __name__ == "__main__":
 
 Run the example. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds. Open it to see the Azure OpenAI call nested inside the trace named in the decorator, for example "Azure OpenAI Chat Completion".
 
-If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
 
 <Note>
 ### Which Approach to Choose?
@@ -23061,7 +23061,7 @@ The `@langwatch.trace()` decorator creates a parent trace, and `autotrack_openai
 
 Run the example. Then open your project in LangWatch: a new trace named "OpenAI Chat Completion" appears in the traces list within a few seconds. Open it to see the OpenAI chat completion nested inside it, with its input and output.
 
-If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
 
 ## Related
 
@@ -23173,7 +23173,7 @@ You can browse these repositories to find instrumentors for other libraries you 
 
 Run the example. Then open your project in LangWatch: a new trace named "Task with Instrumented Logging" appears in the traces list within a few seconds. Open it to see the spans your instrumentor created nested inside it.
 
-If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
 
 ### Key Considerations:
 
@@ -23454,7 +23454,7 @@ LangWatch automatically captures all PydanticAI agent runs and model interaction
 
 Run the example. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds. Open it to see the PydanticAI agent run and its model calls.
 
-If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
 
 ## Related
 
@@ -23971,7 +23971,7 @@ LangWatch automatically captures all agent interactions, model calls, and tool e
 
 Run the example. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds. Open it to see the agent run, its model calls and its tool executions.
 
-If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
 
 ## Related
 
@@ -24117,7 +24117,7 @@ if __name__ == "__main__":
 
 Run the example. Then open your project in LangWatch: a new trace named "Vertex AI Call with OpenInference" appears in the traces list within a few seconds. Open it to see the Vertex AI call nested inside it.
 
-If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
 
 <Note>
 ### Which Approach to Choose?
@@ -26837,7 +26837,7 @@ results of your custom evaluator on the current trace or span by using the `.add
 
 Run the example. The SDK flushes pending spans when the process exits. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds. Open it to see the `llm-call` span with the Azure OpenAI request.
 
-If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the process runs in.
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the process runs in.
 
 ## Related Documentation
 
@@ -26928,7 +26928,7 @@ The `LangWatchCallbackHandler` captures Langchain events and converts them into 
 
 Run the example. The SDK flushes pending spans when the process exits. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds. Open it to see the LangChain steps and the LLM call.
 
-If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the process runs in.
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the process runs in.
 
 ## Related
 
@@ -27030,7 +27030,7 @@ The `LangWatchCallbackHandler` captures LangGraph node executions and workflow p
 
 Run the example. The SDK flushes pending spans when the process exits. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds. Open it to see the graph's nodes and LLM calls.
 
-If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the process runs in.
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the process runs in.
 
 ## Related
 
@@ -27123,7 +27123,7 @@ Mastra automatically sends traces to LangWatch through the OpenTelemetry exporte
 
 Run the example. The SDK flushes pending spans when the process exits. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds. Open it to see the Mastra agent run and its model calls.
 
-If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the process runs in.
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the process runs in.
 
 ## Related
 
@@ -27269,7 +27269,7 @@ results of your custom evaluator on the current trace or span by using the `.add
 
 Run the example. The SDK flushes pending spans when the process exits. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds. Open it to see the `main` span with the OpenAI call nested inside it.
 
-If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the process runs in.
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the process runs in.
 
 ## Related
 
@@ -27420,7 +27420,7 @@ for the attribute names.
 
 Run the example. The SDK flushes pending spans when the process exits. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds. Open it to see the `generateText` call and its model request as spans.
 
-If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the process runs in.
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the process runs in.
 
 ## Related
 
@@ -31046,7 +31046,7 @@ The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in m
 
 Run the program with `go run .`. The deferred `tp.Shutdown(ctx)` flushes the spans when `main` returns. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds, with the Bedrock call as an LLM span carrying its input, output and token counts.
 
-If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the program runs in.
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the program runs in.
 
 ## Related
 
@@ -31147,7 +31147,7 @@ The middleware captures input and output content **by default** (`langwatch.Data
 
 Run the program with `go run .`. The deferred `tp.Shutdown(ctx)` flushes the spans when `main` returns. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds, with the Anthropic call as an LLM span carrying its input, output and token counts.
 
-If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the program runs in.
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the program runs in.
 
 ## Related
 
@@ -31259,7 +31259,7 @@ The middleware captures input and output content **by default** (`langwatch.Data
 
 Run the program with `go run .`. The deferred `tp.Shutdown(ctx)` flushes the spans when `main` returns. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds, with the Azure OpenAI call as an LLM span carrying its input, output and token counts.
 
-If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the program runs in.
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the program runs in.
 
 ## Related
 
@@ -31344,7 +31344,7 @@ LangWatch captures whatever `gen_ai.*` attributes Genkit records; there is no ex
 
 Run one of your flows. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds, with the spans Genkit recorded for the flow and its model calls.
 
-If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the program runs in.
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the program runs in.
 
 ## Related
 
@@ -31440,7 +31440,7 @@ For the **Vertex AI** backend set `Backend: genai.BackendVertexAI`. If you build
 
 Run the program with `go run .`. The deferred `tp.Shutdown(ctx)` flushes the spans when `main` returns. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds, with the Gemini call as an LLM span carrying its input, output and token counts.
 
-If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the program runs in.
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the program runs in.
 
 ## Related
 
@@ -31540,7 +31540,7 @@ The middleware captures input and output content **by default**. Pass `otelopena
 
 Run the program with `go run .`. The deferred `tp.Shutdown(ctx)` flushes the spans when `main` returns. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds, with the Grok call as an LLM span carrying its input, output and token counts.
 
-If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the program runs in.
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the program runs in.
 
 ## Related
 
@@ -31640,7 +31640,7 @@ The middleware captures input and output content **by default**. Pass `otelopena
 
 Run the program with `go run .`. The deferred `tp.Shutdown(ctx)` flushes the spans when `main` returns. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds, with the Groq call as an LLM span carrying its input, output and token counts.
 
-If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the program runs in.
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the program runs in.
 
 ## Related
 
@@ -31740,7 +31740,7 @@ If you'd rather build the `*http.Client` yourself, use `ollama.NewTransport()` (
 
 Run the program with `go run .`. The deferred `tp.Shutdown(ctx)` flushes the spans when `main` returns. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds, with the Ollama call as an LLM span carrying its input and output.
 
-If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the program runs in.
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the program runs in.
 
 ## Related
 
@@ -31840,7 +31840,7 @@ The middleware captures input and output content **by default** (`langwatch.Data
 
 Run the program with `go run .`. The deferred `tp.Shutdown(ctx)` flushes the spans when `main` returns. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds, with the OpenAI call as an LLM span carrying its input, output and token counts.
 
-If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the program runs in.
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the program runs in.
 
 ## Related
 
@@ -31954,7 +31954,7 @@ Using OpenRouter is a great way to experiment with different models without chan
 
 Run the program with `go run .`. The deferred `tp.Shutdown(ctx)` flushes the spans when `main` returns. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds, with the OpenRouter call as an LLM span carrying its input, output and token counts.
 
-If nothing appears, check that `LANGWATCH_API_KEY` is set in the environment the program runs in.
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the program runs in.
 
 ---
 
@@ -32564,7 +32564,7 @@ This is a name-based blocklist. The dedicated provider approach is more reliable
 
 Run a function decorated with `@langwatch.trace()` (Python) or wrapped in a LangWatch tracer span (TypeScript). Then open your project in LangWatch: the trace appears in the traces list within a few seconds, and the other tool does not receive it. Application spans recorded on the global provider stay in the other tool and do not appear in LangWatch.
 
-If nothing appears in LangWatch, check that `LANGWATCH_API_KEY` is set, or that the key passed to the setup call is right.
+If no trace appears in LangWatch, check that `LANGWATCH_API_KEY` is set, or that the key passed to the setup call is right.
 
 ---
 
@@ -32722,7 +32722,7 @@ response.raise_for_status()
 
 A successful request returns a `2xx` status. Then open your project in LangWatch: the trace `trace-123` appears in the traces list within a few seconds, with one LLM span holding the input and output you sent. Use a new `trace_id` for each trace you send.
 
-If the request is refused or nothing appears, check that `LANGWATCH_API_KEY` holds a valid project API key.
+If the request is refused or no trace appears, check that `LANGWATCH_API_KEY` holds a valid project API key.
 
 ---
 
@@ -51236,7 +51236,13 @@ Remember:
 - **Precision**: The ratio of correct tool calls to total tool calls
 - **Recall**: The ratio of correct tool calls to total possible tool calls
 
-In RAG, precision was less important since we relied on the model's ability to filter out relevant documents. In tool calling, precision is very important. For example, let's say the model calls the following tools: get calendar events, create reminder, and send email about the event. If all we really cared about is that the model tells us what time an event is, we don't care about the reminder nor the email. As oppposed to RAG, the model won't filter these tools out for us (technically you could chain it with another LLM to do this for you, but this is not a standard practice). It will call them, leading to increased latency and cost. Recall is, just like standard RAG, important. If we're not calling the right tools, we might miss out on potential tools that the user needs.
+In RAG, precision was less important since we relied on the model's ability to filter out relevant documents. In tool calling, precision is very important.
+
+For example, let's say the model calls the following tools: get calendar events, create reminder, and send email about the event. If all we really cared about is that the model tells us what time an event is, we don't care about the reminder nor the email.
+
+Unlike RAG, the model won't filter these tools out for us (technically you could chain it with another LLM to do this for you, but this is not a standard practice). It will call them, leading to increased latency and cost.
+
+Recall is, just like standard RAG, important. If we're not calling the right tools, we might miss out on potential tools that the user needs.
 
 ## Defining Tools
 
