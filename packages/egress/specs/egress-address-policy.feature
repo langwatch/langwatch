@@ -65,6 +65,12 @@ Feature: Egress address policy and the pinned fetch
     When the receiver redirects to a destination the policy refuses
     Then the next hop is refused without being sent to the proxy
 
+  @unit
+  Scenario: A malformed proxy setting fails as a connection error
+    Given the outbound proxy setting is not a URL
+    When a destination the policy admitted is fetched
+    Then the fetch fails with a connection error naming the destination
+
   # Every caller opts in by passing its proxy setting (ADR-187). These have not yet.
   @integration @unimplemented
   Scenario Outline: A caller that fetches a user-supplied address passes the outbound proxy

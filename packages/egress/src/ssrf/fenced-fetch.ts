@@ -253,9 +253,11 @@ export async function fetchValidatedDestination(
   }
 
   const requestUrl = `${validated.protocol}//${validated.hostname}:${validated.port}${validated.path}`;
-  const dispatcher = createDispatcher({ validated, init, tls });
+  let dispatcher: Dispatcher | undefined;
 
   try {
+    // Inside the try: a malformed proxy URL fails here and is normalised below.
+    dispatcher = createDispatcher({ validated, init, tls });
     const response = await undiciFetch(requestUrl, {
       method: init?.method,
       // Entries, not the `Headers` instance: two copies of the undici types
@@ -290,7 +292,7 @@ export async function fetchValidatedDestination(
     void dispatcher.close().catch(() => undefined);
     return response;
   } catch (err) {
-    void dispatcher.destroy().catch(() => undefined);
+    void dispatcher?.destroy().catch(() => undefined);
     // Our own refusal, not the network's. Everything below rewrites an error
     // into "Connection failed to host:port: …", the right shape for a socket
     // problem and the wrong one for a decision this module made.
