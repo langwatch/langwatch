@@ -231,7 +231,9 @@ var envHelpText = `Environment variables.
     LANGWATCH_HAVEN_PUBLIC_URL=https://host[:port]   Origin browsers use when the stack
                                  sits behind a tunnel; BASE_HOST and NEXTAUTH_URL carry
                                  it so sign-in works from there.
-    HAVEN_REDIS_FORMULA=redis    brew formula to start if none is running.
+    HAVEN_REDIS_FORMULA=valkey   brew formula to start if none is running. Unset:
+                                 the one brew already started, else an installed
+                                 valkey, else an installed redis, else valkey.
     HAVEN_REDIS_PORT=6379        Port to expect/start Redis on.
     HAVEN_REDIS_MAXMEMORY_MB=512 maxmemory ceiling applied to the managed Redis
                                  (writes fail loudly at the cap instead of the

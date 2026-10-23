@@ -1,5 +1,8 @@
-import type { StoredCall, StoredResult } from "@langwatch/agent-contract";
+import { agentHooksSchema, type StoredCall, type StoredResult } from "@langwatch/agent-contract";
 import { z } from "zod";
+
+/** The scenario hooks each agent of one instance declared, by agent id (ADR-180). */
+export const instanceHooksSchema = z.record(z.string(), agentHooksSchema);
 
 /** What every pod knows about one connected instance. */
 export const instanceMetaSchema = z.object({
@@ -18,6 +21,8 @@ export const instanceMetaSchema = z.object({
   podId: z.string(),
   connectedAt: z.number(),
   maxConcurrency: z.number(),
+  /** Per instance, so an older SDK's instance of the same agent never takes a hook call. */
+  hooks: instanceHooksSchema.optional(),
 });
 export type InstanceMeta = z.infer<typeof instanceMetaSchema>;
 

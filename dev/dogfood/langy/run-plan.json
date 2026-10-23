@@ -1,0 +1,6 @@
+{
+  "name": "Langy dashboards (hooks dogfood)",
+  "description": "Issue 8573 rows D1, D2, A1, D3, X1, D5, plus B1, T1, W1, C1, against the connected agent langy (dev/dogfood/langy). Data from the setup hook, removed by teardown.",
+  "agent": "langy",
+  "repeatCount": 1
+}

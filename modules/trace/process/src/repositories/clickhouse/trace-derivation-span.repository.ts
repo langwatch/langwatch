@@ -1,9 +1,5 @@
 import type { Authorization } from "@langwatch/authorization";
-import {
-  DEFAULT_PARTITION_WINDOW_MS,
-  ownProjectIdOf,
-  queryWindowed,
-} from "@langwatch/clickhouse-client";
+import { type IdBoundOptions, ownProjectIdOf } from "@langwatch/clickhouse-client";
 import { EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { DerivedTraceEvent, NormalizedSpan } from "@langwatch/trace-contract";
@@ -73,6 +69,14 @@ const DERIVATION_FETCH_SETTINGS = {
   max_execution_time: "30",
 } as const;
 
+/**
+ * A caller's time is read first; otherwise the id index bounds the read once ready, and before
+ * that, or for a trace it has never seen, the read is unbounded as before the index.
+ */
+function idBoundOf({ occurredAtMs }: { occurredAtMs?: number | undefined }): IdBoundOptions {
+  return { occurredAtHint: occurredAtMs ?? null, fallback: "unbounded", onMiss: "unbounded" };
+}
+
 // Every stored span of one trace for scenario role derivation; uses argMax with
 // UpdatedAt (not LIMIT 1 BY which materializes columns for whole granules)
 export class TraceDerivationSpanClickHouseRepository {
@@ -96,14 +100,7 @@ export class TraceDerivationSpanClickHouseRepository {
     );
 
     try {
-      return await queryWindowed<NormalizedSpan[]>({
-        table: TABLE_NAME,
-        hintMs: input.occurredAtMs ?? null,
-        windowMs: DEFAULT_PARTITION_WINDOW_MS,
-        fallback: "unbounded",
-        isEmpty: (rows) => rows.length === 0,
-        run: (window) => this.fetchTraceSpanRows(input, window),
-      });
+      return await this.fetchTraceSpanRows(input);
     } catch (error) {
       logger.warn(
         {
@@ -136,14 +133,7 @@ export class TraceDerivationSpanClickHouseRepository {
     );
 
     try {
-      return await queryWindowed<DerivedTraceEvent[]>({
-        table: TABLE_NAME,
-        hintMs: input.occurredAtMs ?? null,
-        windowMs: DEFAULT_PARTITION_WINDOW_MS,
-        fallback: "unbounded",
-        isEmpty: (rows) => rows.length === 0,
-        run: (window) => this.fetchTraceEventRows(input, window),
-      });
+      return await this.fetchTraceEventRows(input);
     } catch (error) {
       logger.warn(
         {
@@ -157,14 +147,11 @@ export class TraceDerivationSpanClickHouseRepository {
     }
   }
 
-  private async fetchTraceEventRows(
-    input: { tenantId: string; traceId: string },
-    window: { fromMs: number; toMs: number } | null,
-  ): Promise<DerivedTraceEvent[]> {
-    const partition =
-      window === null
-        ? ""
-        : "AND StartTime BETWEEN fromUnixTimestamp64Milli({fromMs:Int64}) AND fromUnixTimestamp64Milli({toMs:Int64})";
+  private async fetchTraceEventRows(input: {
+    tenantId: string;
+    traceId: string;
+    occurredAtMs?: number | undefined;
+  }): Promise<DerivedTraceEvent[]> {
     const client = await this.options.resolveClient(input.tenantId);
     const result = await client.query({
       query: `
@@ -182,7 +169,7 @@ export class TraceDerivationSpanClickHouseRepository {
           FROM ${TABLE_NAME}
           WHERE TenantId = {tenantId:String}
             AND TraceId = {traceId:String}
-            ${partition}
+            {{idBound:stored_spans.TraceId:traceId}}
           GROUP BY SpanId
         )
         ARRAY JOIN
@@ -196,10 +183,10 @@ export class TraceDerivationSpanClickHouseRepository {
         tenantId: input.tenantId,
         traceId: input.traceId,
         limit: DERIVATION_EVENT_LIMIT,
-        ...(window === null ? {} : { fromMs: window.fromMs, toMs: window.toMs }),
       },
       clickhouse_settings: DERIVATION_FETCH_SETTINGS,
       format: "JSONEachRow",
+      idBound: idBoundOf(input),
     });
 
     return traceEventRowsSchema.parse(await result.json()).map((row) => ({
@@ -210,14 +197,12 @@ export class TraceDerivationSpanClickHouseRepository {
     }));
   }
 
-  private async fetchTraceSpanRows(
-    input: { tenantId: string; traceId: string; limit?: number },
-    window: { fromMs: number; toMs: number } | null,
-  ): Promise<NormalizedSpan[]> {
-    const partition =
-      window === null
-        ? ""
-        : "AND t.StartTime BETWEEN fromUnixTimestamp64Milli({fromMs:Int64}) AND fromUnixTimestamp64Milli({toMs:Int64})";
+  private async fetchTraceSpanRows(input: {
+    tenantId: string;
+    traceId: string;
+    limit?: number;
+    occurredAtMs?: number | undefined;
+  }): Promise<NormalizedSpan[]> {
     const client = await this.options.resolveClient(input.tenantId);
     const result = await client.query({
       query: `
@@ -247,7 +232,7 @@ export class TraceDerivationSpanClickHouseRepository {
           FROM ${TABLE_NAME} AS t
           WHERE t.TenantId = {tenantId:String}
             AND t.TraceId = {traceId:String}
-            ${partition}
+            {{idBound:stored_spans.TraceId:traceId:t}}
           GROUP BY SpanId
         )
         ORDER BY StartTimeMs ASC
@@ -257,10 +242,10 @@ export class TraceDerivationSpanClickHouseRepository {
         tenantId: input.tenantId,
         traceId: input.traceId,
         limit: input.limit ?? DERIVATION_SPAN_LIMIT,
-        ...(window === null ? {} : { fromMs: window.fromMs, toMs: window.toMs }),
       },
       clickhouse_settings: DERIVATION_FETCH_SETTINGS,
       format: "JSONEachRow",
+      idBound: idBoundOf(input),
     });
 
     return fullSpanRowsSchema.parse(await result.json()).map((row) => mapChRowToNormalized(row));

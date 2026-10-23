@@ -12,7 +12,7 @@ import {
   defineEventingModule,
   definePipeline,
   type EventingSetup,
-  type PeerSubscriberDefinition,
+  type PeerEventSubscriberDefinition,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 import {
@@ -41,7 +41,7 @@ export const SSO_SIGN_IN_PROVIDER_RECORDED = "ssoSignInProviderRecorded";
  */
 export function configuredLicenseOnSignUp(
   app: Pick<LicensingModule, "activateConfiguredLicense">,
-): PeerSubscriberDefinition<typeof organizationSignedUpEventDataSchema> {
+): PeerEventSubscriberDefinition<typeof organizationSignedUpEventDataSchema> {
   return {
     eventType: ORGANIZATION_SIGNED_UP_EVENT_TYPE,
     data: organizationSignedUpEventDataSchema,
@@ -54,7 +54,7 @@ export function configuredLicenseOnSignUp(
 /** sso's sign-in provider fact, applied under the row's event id guard (ADR-179). */
 export function ssoSignInProviderRecorded(
   app: Pick<LicensingModule, "applySignInProvider">,
-): PeerSubscriberDefinition<typeof ssoSignInProviderRecordedEventDataSchema> {
+): PeerEventSubscriberDefinition<typeof ssoSignInProviderRecordedEventDataSchema> {
   return {
     eventType: SSO_SIGN_IN_PROVIDER_RECORDED_EVENT_TYPE,
     data: ssoSignInProviderRecordedEventDataSchema,

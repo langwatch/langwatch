@@ -7,6 +7,7 @@ import { AnalyticsModule } from "./app/analytics.app.ts";
 import { analyticsChannels } from "./channels/analytics-channels.registry.ts";
 import { lwqlReconvergenceEventing } from "./eventing/analytics-lwql-reconvergence.pipeline.ts";
 import { analyticsRepositories } from "./repositories/analytics-repositories.registry.ts";
+import { ANALYTICS_ID_INDEXES } from "./repositories/clickhouse/clickhouse.analytics-id-indexes.database.ts";
 import { AnalyticsComparisonWindowService } from "./services/analytics-comparison-window.service.ts";
 import { analyticsLegacyRest } from "./transport/analytics-legacy.rest.ts";
 import { analyticsLwqlTrpcTransport } from "./transport/analytics-lwql.trpc.ts";
@@ -44,7 +45,12 @@ export const analyticsProcessModule: PublishedProcessModule<
       // Level-triggered: a rerun reads the map again and inserts only what is still missing.
       run: ({ dryRun }) => app.fillLwqlProjectKeys({ dryRun }),
     }),
-  ]);
+  ])
+  .withIdIndexes(ANALYTICS_ID_INDEXES, {
+    after: ["evaluation:fill-second-id-indexes"],
+    description:
+      "Fills the evaluation analytics id index from rows older than its view, then turns the lookup on per ClickHouse target.",
+  });
 
 /** Where the window immediately before a requested period begins. */
 export function createAnalyticsComparisonWindow(): AnalyticsComparisonWindowService {

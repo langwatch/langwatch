@@ -7,5 +7,10 @@ import { repoScans } from "./vitest.repo.config.ts";
 export default defineModuleVitestConfig({
   kind: "node",
   isolate: true,
+  // Storybook's components module patches HTMLElement.prototype.focus the first
+  // time it loads, so a story test that runs after another in the same registry
+  // fails with "Cannot assign to read only property 'focus'". Every test that
+  // reaches the Storybook preview runs isolated.
+  alsoIsolate: [".storybook/**"],
   exclude: ["**/node_modules/**", "**/dist/**", ...repoScans],
 });

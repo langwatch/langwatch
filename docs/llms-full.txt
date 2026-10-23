@@ -10601,7 +10601,7 @@ A gateway whose `ENVIRONMENT` is set to anything other than `local` refuses to s
 | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | `BLOCK_LOCAL_HTTP_CALLS`         | Refuses a customer-configured provider endpoint that resolves to a private or link-local address                              |
 | `REQUIRE_HTTPS_CUSTOM_ENDPOINTS` | Refuses a customer-configured provider endpoint that is plain HTTP                                                            |
-| `ALLOWED_PROXY_HOSTS`            | Exact hostnames that may use a private address while the guard is on. Cloud metadata and link-local destinations stay refused |
+| `ALLOWED_PROXY_HOSTS`            | Exact hostnames that pass the endpoint check on a private address while the guard is on. Chat dispatch still refuses private addresses until the guard is off. Cloud metadata and link-local destinations stay refused |
 
 ## Calling the gateway from a browser
 
@@ -10697,7 +10697,8 @@ These apply to the base URLs customers configure on their own provider credentia
 | -------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | `BLOCK_LOCAL_HTTP_CALLS`         | `false` | Refuse a provider endpoint that resolves to a private, loopback or otherwise non-public address                                     |
 | `REQUIRE_HTTPS_CUSTOM_ENDPOINTS` | `false` | Refuse a provider endpoint with an `http://` scheme                                                                                 |
-| `ALLOWED_PROXY_HOSTS`            | empty   | Comma-separated hostnames, matched case-insensitively, allowed to resolve to a private address while `BLOCK_LOCAL_HTTP_CALLS` is on |
+| `ALLOWED_PROXY_HOSTS`            | empty   | Comma-separated hostnames, matched case-insensitively, allowed past the endpoint check on a private address while `BLOCK_LOCAL_HTTP_CALLS` is on. Chat dispatch still refuses private addresses until the block is off |
+| `SSL_CERT_DIR`                   | unset   | Colon-separated directories of PEM CA certificates trusted beside the public roots, for provider endpoints on a private CA            |
 
 ## Browser access
 
@@ -11019,9 +11020,25 @@ TLS in front of the gateway is one boundary. The other is the provider endpoints
 | -------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------- |
 | `security.requireHTTPSCustomEndpoints` | `REQUIRE_HTTPS_CUSTOM_ENDPOINTS` | Refuse a provider base URL with an `http://` scheme                                         |
 | `security.blockLocalHTTPCalls`         | `BLOCK_LOCAL_HTTP_CALLS`         | Refuse a provider base URL that resolves to a private, loopback or other non-public address |
-| `security.allowedProxyHosts`           | `ALLOWED_PROXY_HOSTS`            | Hostnames that may resolve to a private address while the block is on                       |
+| `security.allowedProxyHosts`           | `ALLOWED_PROXY_HOSTS`            | Hostnames that pass the endpoint check on a private address while the block is on. Chat dispatch still refuses them |
 
 Both switches default to `false`, so a self-hosted install can route to a model server on the cluster network. Cloud metadata addresses, `0.0.0.0`, `::` and link-local ranges are refused with every setting. Setting `ENVIRONMENT` to anything other than `local` requires both switches to be `true`.
+
+### Provider endpoints on a private CA
+
+When a provider endpoint serves TLS from your own certificate authority, put the CA certificates (PEM) in a ConfigMap and name it in `gateway.security.extraCACertsConfigMap`:
+
+```bash
+kubectl -n langwatch create configmap internal-ca --from-file=internal-ca.pem
+```
+
+```yaml
+gateway:
+  security:
+    extraCACertsConfigMap: internal-ca
+```
+
+The chart mounts it at `/etc/langwatch/ca` and sets `SSL_CERT_DIR` to that path. The gateway then trusts those certificates beside the public roots for every outbound call. Outside the chart, mount a directory of PEM files and set `SSL_CERT_DIR` yourself.
 
 ## Common failures
 
@@ -11031,7 +11048,8 @@ Both switches default to `false`, so a self-hosted install can route to a model 
 | Streamed responses arrive all at once | Buffering is on at the proxy | With `ingress.className: nginx` the chart adds `proxy-buffering: "off"` to the gateway Ingress; on another controller, set the equivalent in `ingress.gateway.annotations` |
 | A long stream stops at 60 seconds | The load balancer idle timeout is shorter than the stream | Raise the controller's idle or read timeout |
 | CLI users get `http://localhost:5563` as the gateway URL | The control plane has no `LW_GATEWAY_PUBLIC_URL` | Set `ingress.gateway.host`, or `gateway.publicUrl` |
-| A provider credential with a private base URL fails to dispatch | `BLOCK_LOCAL_HTTP_CALLS` is on | Add the hostname to `ALLOWED_PROXY_HOSTS` |
+| A provider credential with a private base URL fails to dispatch | `BLOCK_LOCAL_HTTP_CALLS` is on | Set `BLOCK_LOCAL_HTTP_CALLS` to `false`. `ALLOWED_PROXY_HOSTS` gets the host past the endpoint check, but chat dispatch refuses private addresses while the block is on |
+| A provider call fails with `x509: certificate signed by unknown authority` | The endpoint's certificate comes from a private CA | Set `gateway.security.extraCACertsConfigMap` (see [Provider endpoints on a private CA](#provider-endpoints-on-a-private-ca)) |
 
 More symptoms are on [Troubleshooting](/ai-gateway/troubleshooting).
 
@@ -11253,6 +11271,7 @@ gateway:
     blockLocalHTTPCalls: false
     requireHTTPSCustomEndpoints: false
     allowedProxyHosts: []
+    extraCACertsConfigMap: "" # ConfigMap of PEM CA certificates to trust
     corsAllowedOrigins: [] # browser origins allowed to call /v1
 
   # OTLP/HTTP endpoint for the gateway's own spans. Empty disables export.
@@ -11324,6 +11343,7 @@ The chart passes these environment variables to the container. Every other key i
 | `BLOCK_LOCAL_HTTP_CALLS`                               | `security.blockLocalHTTPCalls`                                       | Refuse provider endpoints on private addresses |
 | `REQUIRE_HTTPS_CUSTOM_ENDPOINTS`                       | `security.requireHTTPSCustomEndpoints`                               | Refuse `http://` provider endpoints            |
 | `ALLOWED_PROXY_HOSTS`                                  | `security.allowedProxyHosts`, comma-joined                           | Private hostnames exempt from the block        |
+| `SSL_CERT_DIR`                                         | set to `/etc/langwatch/ca` when `security.extraCACertsConfigMap` is set | Extra CA certificates to trust              |
 | `LW_GATEWAY_CORS_ALLOWED_ORIGINS`                      | `security.corsAllowedOrigins`, comma-joined                          | Browser origins allowed to call `/v1`          |
 | `LW_GATEWAY_INTERNAL_SECRET`                           | Secret `secrets.existingSecretName`, key `secrets.internalSecretKey` | HMAC secret for control plane calls            |
 | `LW_GATEWAY_JWT_SECRET`                                | Secret `secrets.existingSecretName`, key `secrets.jwtSecretKey`      | JWT verification secret                        |
@@ -21285,8 +21305,7 @@ You can pass an instance of the CrewAI instrumentor to the `instrumentors` list 
 ```python openinference_setup.py
 import langwatch
 from crewai import Agent, Task, Crew
-import os
-from openinference.instrumentation.crewai import CrewAIInstrumentor # Assuming this is the correct import
+from openinference.instrumentation.crewai import CrewAIInstrumentor
 
 # Ensure LANGWATCH_API_KEY is set in your environment, or set it in `setup`
 langwatch.setup(
@@ -21305,14 +21324,22 @@ writer = Agent(
   backstory='A wordsmith who can make complex AI topics accessible and engaging.'
 )
 
-task1 = Task(description='Investigate the latest advancements in LLM prompting techniques.', agent=researcher)
-task2 = Task(description='Write a blog post summarizing the findings.', agent=writer)
+task1 = Task(
+  description='Investigate the latest advancements in LLM prompting techniques.',
+  expected_output='A bullet list of the key advancements.',
+  agent=researcher
+)
+task2 = Task(
+  description='Write a blog post summarizing the findings.',
+  expected_output='A short blog post in markdown.',
+  agent=writer
+)
 
 # Create and run the crew
 crew = Crew(
   agents=[researcher, writer],
   tasks=[task1, task2],
-  verbose=2
+  verbose=True
 )
 
 @langwatch.trace(name="CrewAI Execution with OpenInference")
@@ -21330,8 +21357,7 @@ if __name__ == "__main__":
 ```python openllmetry_setup.py
 import langwatch
 from crewai import Agent, Task, Crew
-import os
-from opentelemetry_instrumentation_crewai import CrewAIInstrumentor # Assuming this is the correct import
+from opentelemetry.instrumentation.crewai import CrewAIInstrumentor
 
 # Ensure LANGWATCH_API_KEY is set in your environment, or set it in `setup`
 langwatch.setup(
@@ -21350,14 +21376,22 @@ writer = Agent(
   backstory='A wordsmith who can make complex AI topics accessible and engaging.'
 )
 
-task1 = Task(description='Investigate the latest advancements in LLM prompting techniques.', agent=researcher)
-task2 = Task(description='Write a blog post summarizing the findings.', agent=writer)
+task1 = Task(
+  description='Investigate the latest advancements in LLM prompting techniques.',
+  expected_output='A bullet list of the key advancements.',
+  agent=researcher
+)
+task2 = Task(
+  description='Write a blog post summarizing the findings.',
+  expected_output='A short blog post in markdown.',
+  agent=writer
+)
 
 # Create and run the crew
 crew = Crew(
   agents=[researcher, writer],
   tasks=[task1, task2],
-  verbose=2
+  verbose=True
 )
 
 @langwatch.trace(name="CrewAI Execution with OpenLLMetry")
@@ -21375,10 +21409,10 @@ if __name__ == "__main__":
 </CodeGroup>
 
 <Note>
-  Ensure you have the respective community instrumentation library installed: - For OpenLLMetry:
-  `pip install opentelemetry-instrumentation-crewai` - For OpenInference: `pip install
-  openinference-instrumentation-crewai` Consult the specific library's documentation for the exact
-  package name and instrumentor class if the above assumptions are incorrect.
+  Install the instrumentation library for the instrumentor you use:
+
+  - OpenLLMetry: `pip install opentelemetry-instrumentation-crewai`
+  - OpenInference: `pip install openinference-instrumentation-crewai`
 </Note>
 
 ### 2. Direct Instrumentation
@@ -21390,8 +21424,7 @@ If you have an existing OpenTelemetry `TracerProvider` configured in your applic
 ```python openinference_direct.py
 import langwatch
 from crewai import Agent, Task, Crew
-import os
-from openinference.instrumentation.crewai import CrewAIInstrumentor # Assuming this is the correct import
+from openinference.instrumentation.crewai import CrewAIInstrumentor
 # from opentelemetry.sdk.trace import TracerProvider # If managing your own provider
 # from opentelemetry.sdk.trace.export import SimpleSpanProcessor, ConsoleSpanExporter # If managing your own provider
 
@@ -21405,7 +21438,11 @@ planner = Agent(
   goal='Plan an engaging tech conference',
   backstory='An experienced planner with a passion for technology events.'
 )
-task_planner = Task(description='Outline the agenda for a 3-day AI conference.', agent=planner)
+task_planner = Task(
+  description='Outline the agenda for a 3-day AI conference.',
+  expected_output='A day-by-day agenda.',
+  agent=planner
+)
 conference_crew = Crew(agents=[planner], tasks=[task_planner])
 
 @langwatch.trace(name="CrewAI Direct Instrumentation with OpenInference")
@@ -21423,8 +21460,7 @@ if __name__ == "__main__":
 ```python openllmetry_direct.py
 import langwatch
 from crewai import Agent, Task, Crew
-import os
-from opentelemetry_instrumentation_crewai import CrewAIInstrumentor # Assuming this is the correct import
+from opentelemetry.instrumentation.crewai import CrewAIInstrumentor
 # from opentelemetry.sdk.trace import TracerProvider # If managing your own provider
 # from opentelemetry.sdk.trace.export import SimpleSpanProcessor, ConsoleSpanExporter # If managing your own provider
 
@@ -21438,7 +21474,11 @@ planner = Agent(
   goal='Plan an engaging tech conference',
   backstory='An experienced planner with a passion for technology events.'
 )
-task_planner = Task(description='Outline the agenda for a 3-day AI conference.', agent=planner)
+task_planner = Task(
+  description='Outline the agenda for a 3-day AI conference.',
+  expected_output='A day-by-day agenda.',
+  agent=planner
+)
 conference_crew = Crew(agents=[planner], tasks=[task_planner])
 
 @langwatch.trace(name="CrewAI Direct Instrumentation with OpenLLMetry")
@@ -23523,11 +23563,11 @@ LangWatch captures traces generated by SmolAgents through its built-in OpenTelem
 2.  **Install SmolAgents and OpenInference instrumentor**:
 
     ```bash
-    pip install smolagents openinference-instrumentation-smolagents
+    pip install "smolagents[litellm]" openinference-instrumentation-smolagents
     ```
 
 3.  **Set up your LLM provider**:
-    You'll need to configure your preferred LLM provider (OpenAI, Anthropic, etc.) with the appropriate API keys.
+    The samples below use `LiteLLMModel` with OpenAI, so set `OPENAI_API_KEY` in your environment. LiteLLM also supports Anthropic and other providers through the `model_id`, for example `anthropic/claude-sonnet-4-5`.
 
 ## Instrumentation with OpenInference
 
@@ -23539,23 +23579,23 @@ Here's the simplest way to instrument your application:
 
 ```python
 import langwatch
-from smolagents import Agent
+from smolagents import CodeAgent, LiteLLMModel
 from openinference.instrumentation.smolagents import SmolagentsInstrumentor
-import os
 
 # Initialize LangWatch with the SmolAgents instrumentor
 langwatch.setup(
     instrumentors=[SmolagentsInstrumentor()]
 )
 
-# Set up environment variables
-os.environ["OPENAI_API_KEY"] = "your-openai-api-key"
+# LiteLLMModel reads OPENAI_API_KEY from the environment
+model = LiteLLMModel(model_id="openai/gpt-5")
 
 # Create your agent
-agent = Agent(
+agent = CodeAgent(
+    tools=[],
+    model=model,
     name="hello_agent",
-    model="gpt-5",
-    instruction="You are a helpful assistant. Always be friendly and concise.",
+    instructions="You are a helpful assistant. Always be friendly and concise.",
 )
 
 # Use the agent as usual, traces are sent to LangWatch automatically
@@ -23579,15 +23619,19 @@ If you want to add additional context or metadata to your traces, you can option
 
 ```python
 import langwatch
-from smolagents import Agent
+from smolagents import CodeAgent, LiteLLMModel
 from openinference.instrumentation.smolagents import SmolagentsInstrumentor
-import os
 
 langwatch.setup(
     instrumentors=[SmolagentsInstrumentor()]
 )
 
-# ... agent setup code ...
+agent = CodeAgent(
+    tools=[],
+    model=LiteLLMModel(model_id="openai/gpt-5"),
+    name="hello_agent",
+    instructions="You are a helpful assistant. Always be friendly and concise.",
+)
 
 @langwatch.trace(name="SmolAgents Run")
 def run_agent_interaction(user_message: str):
@@ -23640,7 +23684,7 @@ You can use this integration together with the LangWatch Python SDK to add addit
 
 ```python
 import langwatch
-from smolagents import Agent
+from smolagents import CodeAgent, LiteLLMModel
 from openinference.instrumentation.smolagents import SmolagentsInstrumentor
 
 langwatch.setup(
@@ -23650,10 +23694,11 @@ langwatch.setup(
 @langwatch.trace(name="Custom SmolAgents Agent")
 def my_custom_agent(input_message: str):
     # Your SmolAgents code here
-    agent = Agent(
+    agent = CodeAgent(
+        tools=[],
+        model=LiteLLMModel(model_id="openai/gpt-5"),
         name="custom_agent",
-        model="gpt-5",
-        instruction="Your custom instructions",
+        instructions="Your custom instructions",
     )
 
     # Update the current trace with additional metadata
@@ -35415,6 +35460,7 @@ The platform sends the same fields on every call. They describe the turn, and th
 | `new_messages` | `newMessages` | The messages added since the previous turn |
 | `thread_id` | `threadId` | The platform's conversation id, the same on every turn of one run |
 | `session` | `session` | What the function returned as `session` on the previous turn, empty on the first |
+| `state` | `state` | The scenario's state: what the [setup hook](/agent-testing/setup-and-teardown-hooks) returned, as the latest turn updated it, empty without one |
 | `trace_id` | `traceId` | The id of the turn's trace |
 
 In Python the SDK reads the signature once, at decoration, and passes exactly the names the function declares. A function that declares `messages` and `thread_id` receives those two. A function that declares `**kwargs` receives all of them. A first parameter annotated `langwatch.AgentCall` receives one object with every field and the parameter values:
@@ -35425,7 +35471,7 @@ async def support_agent(call: langwatch.AgentCall) -> str:
     return await run_my_agent(call.messages, tenant=call.parameters["tenant"])
 ```
 
-In TypeScript the handler receives one object, `{ messages, newMessages, threadId, session, params, traceId }`.
+In TypeScript the handler receives one object, `{ messages, newMessages, threadId, session, state, params, traceId }`.
 
 The function returns a string, one message, a list of messages, or a reply with a session value: `langwatch.AgentReply(output, session=...)` in Python, `{ output, session }` in TypeScript.
 
@@ -35595,6 +35641,10 @@ To keep the state in your own process instead, use an in-memory map. Key it by `
 With `sticky`, a conversation whose instance goes away fails with `agent_instance_lost` instead of restarting somewhere else. A session value is limited to 64 kilobytes.
 
 An agent that reads the whole `messages` list on every turn needs neither of these.
+
+## Test data for each run
+
+If a scenario needs data that exists before the conversation starts, such as a customer with an order to refund, declare a setup hook that creates it and a teardown hook that deletes it. Both run in this same process, and the agent receives what setup returned as `state` on every turn. See [Setup and teardown hooks](/agent-testing/setup-and-teardown-hooks).
 
 ## Environments and personal agents
 
@@ -35770,6 +35820,9 @@ The run settings also record which instance served each run, so a result from a 
   </Card>
   <Card title="Run parameters" icon="sliders" href="/agent-testing/run-parameters">
     Declare values a run supplies, and offer them in the run dialog
+  </Card>
+  <Card title="Setup and teardown hooks" icon="database" href="/agent-testing/setup-and-teardown-hooks">
+    Create test data before the first turn and delete it after the last
   </Card>
   <Card title="Other ways to connect" icon="plug" href="/agent-testing/other-ways-to-connect">
     HTTP agents, the local tunnel, and code agents
@@ -37037,6 +37090,8 @@ The **Result** column of the table shows `Passed`, `Failed`, `Running` or `Evalu
 <img className="block" src="/images/agent-testing/run-drawer-unreachable.png" alt="The conversation drawer of a run whose target could not be reached, with the error" />
 </Frame>
 
+A run whose setup hook failed shows **Not scored**: no turn ran, and the run does not count towards the pass rate. The drawer shows the setup error. See [Setup and teardown hooks](/agent-testing/setup-and-teardown-hooks#what-happens-when-a-hook-fails).
+
 A criterion the judge could not decide is inconclusive. A criterion about an internal action goes inconclusive when the agent's traces did not arrive; see [Linking your traces](/agent-testing/linking-your-traces#when-traces-do-not-arrive).
 
 Also check: [Run plans](/agent-testing/run-plans), [Compare agents](/agent-testing/compare-agents), [Run from CI](/agent-testing/run-from-ci) for the batch API behind the same runs.
@@ -37695,6 +37750,9 @@ The platform runs these checks before it schedules any jobs. A rejected run sche
 ## Next steps
 
 <CardGroup cols={2}>
+  <Card title="Setup and teardown hooks" icon="database" href="/agent-testing/setup-and-teardown-hooks">
+    Create the test data a parameter picks before the first turn, and delete it after the last
+  </Card>
   <Card title="Authenticated agents" icon="key" href="/agent-testing/authenticated-agents">
     Reference project secrets from an HTTP target or a code agent
   </Card>
@@ -38242,7 +38300,170 @@ Through the [LangWatch MCP integration](/integration/mcp), a coding assistant su
 | Max turns without a value           | 10               |
 | Versions kept                       | All              |
 
-Also check: [Test suites](/agent-testing/test-suites), [Run plans](/agent-testing/run-plans), [Run parameters](/agent-testing/run-parameters).
+Also check: [Test suites](/agent-testing/test-suites), [Run plans](/agent-testing/run-plans), [Run parameters](/agent-testing/run-parameters), [Setup and teardown hooks](/agent-testing/setup-and-teardown-hooks).
+
+---
+
+# FILE: ./agent-testing/setup-and-teardown-hooks.mdx
+
+---
+title: Setup and Teardown Hooks
+sidebarTitle: Setup and teardown hooks
+keywords: langwatch, agent simulations, scenario hooks, setup, teardown, fixtures, test data, connected agent, connectAgent, connect_agent, run parameters, cleanup
+description: Create the test data a scenario needs before its first turn and remove it after its last, with setup and teardown hooks on a connected agent.
+---
+
+## What are setup and teardown hooks
+
+Setup and teardown hooks are two optional functions you declare on a connected agent, which LangWatch calls around each scenario run. **Setup** runs before the first turn and returns the state the run starts with, such as the id of a test customer with a loyalty tier. **Teardown** runs after the last turn and gets that state, so it can delete what setup made.
+
+Both hooks run in your own process, the one that already answers the agent's turns, so they can use your database, your secrets and your internal APIs the same way the agent does. LangWatch calls them over the connection the SDK already holds open.
+
+A run goes in this order: setup, then the turns, then teardown.
+
+<Note>
+  Hooks work on agents you connect with `connectAgent` (TypeScript) or `@langwatch.connect_agent` (Python), and only on scenario runs. HTTP agents, code agents, experiments, the Test button and `langwatch agent run` never call them.
+</Note>
+
+## Declare the hooks
+
+Declare the hooks on the agent that `connectAgent` or `@langwatch.connect_agent` returns. See [Connect your agent](/agent-testing/connect-your-agent) for the connect function itself.
+
+<CodeGroup>
+
+```typescript TypeScript
+import { connectAgent } from "langwatch/agent";
+
+const shopAssistant = connectAgent(
+  {
+    name: "shop-assistant",
+    parameters: {
+      loyalty_tier: { default: "none" },
+    },
+  },
+  async ({ messages, state }) => {
+    // `state` is what setup returned
+    return await runShopAssistant({ messages, customerId: state?.customerId });
+  },
+);
+
+shopAssistant.scenario.setup(async (run, params) => {
+  const customer = await createTestCustomer({
+    tier: params.loyalty_tier,
+    label: run.scenarioRunId,
+  });
+  return { customerId: customer.id };
+});
+
+shopAssistant.scenario.teardown(async (run, state, params) => {
+  // Setup may have failed before it made the customer
+  if (!state?.customerId) return;
+  await deleteTestCustomer(state.customerId as string);
+  return { deletedCustomer: state.customerId };
+});
+```
+
+```python Python
+import langwatch
+
+
+@langwatch.connect_agent(name="shop-assistant")
+async def shop_assistant(messages: list[dict], state: dict | None = None) -> str:
+    # `state` is what setup returned
+    return await run_shop_assistant(messages, customer_id=(state or {}).get("customerId"))
+
+
+@shop_assistant.scenario.setup
+async def setup(run: langwatch.agent.ScenarioRun, loyalty_tier: str = "none") -> dict:
+    customer = await create_test_customer(tier=loyalty_tier, label=run.scenario_run_id)
+    return {"customerId": customer.id}
+
+
+@shop_assistant.scenario.teardown
+async def teardown(run: langwatch.agent.ScenarioRun, state: dict | None, loyalty_tier: str = "none") -> dict | None:
+    # Setup may have failed before it made the customer
+    customer_id = (state or {}).get("customerId")
+    if not customer_id:
+        return None
+    await delete_test_customer(customer_id)
+    return {"deletedCustomer": customer_id}
+```
+
+</CodeGroup>
+
+The hook arguments:
+
+| Argument | What it is |
+|---|---|
+| `run` | The run the hook is called for: `scenarioRunId`, `scenarioName` and `batchRunId` in TypeScript, `scenario_run_id`, `scenario_name` and `batch_run_id` in Python. |
+| `state` | A JSON object. Setup returns it, every turn receives the latest version, and teardown receives it last. |
+| `params` | The [run parameters](/agent-testing/run-parameters) of the run, with the same values the agent and the scenario read. In Python, declare the parameters a hook uses as keyword arguments with defaults, as `loyalty_tier` above. |
+
+A turn can update the state by returning `{ output, state }` in TypeScript or `langwatch.AgentReply(output, state=...)` in Python. LangWatch keeps the newest state, and a turn that returns none leaves it unchanged. A setup that returns no value starts the run with an empty state.
+
+Teardown's return value is optional. If it returns an object, the run shows it under **Returned by teardown**.
+
+In Python, a hook's keyword arguments join the agent's run parameters. If the agent and a hook declare the same name with a different type or default, the SDK logs a `parameters_invalid` warning and does not register the agent. In TypeScript, the hooks receive the parameters you declare in `connectAgent`.
+
+<Note>
+  In the Python SDK, `state` is a reserved turn field. Do not name a run parameter `state`: the argument receives the scenario state, and the name is not registered as a parameter.
+</Note>
+
+## What do the simulated user and the judge see
+
+The simulated user and the judge get the current state on every turn, as a system message that starts with `Current test state:`, so they can check the agent's answers against the real test data. That message is part of their prompts, which means the state costs tokens and is sent to your model provider.
+
+## What happens when a hook fails
+
+| Situation | What happens |
+|---|---|
+| Setup succeeds | The turns run with the state setup returned. |
+| Setup fails, times out, or the agent is offline | No turn runs. The run ends in `ERROR` with no verdict, shows as **Not scored**, and does not count towards the pass rate. LangWatch still calls teardown; if the agent is still offline, teardown shows as not run. |
+| The turns pass or fail | Teardown runs either way. |
+| Teardown fails, times out, or does not run | The score does not change. The run shows the error, the state teardown was given, and "Test data may be left behind." |
+| Live instances of the agent exist, but none declared the hook | The call fails with `hook_not_declared`, and the agent function does not run. |
+| A state, or teardown's returned object, is over 64 kilobytes | The call fails with `agent_payload_too_large`. The cap applies to a turn's state update too. |
+
+Each hook has a 60 second timeout. The agent's per-turn timeout does not apply to hooks, and you cannot change the hook timeout per scenario.
+
+A failed setup is not scored because a fault in your test data is not the agent failing, so it should not lower the pass rate. Teardown never changes the score, because the score is about the agent's conversation.
+
+## Where to see what a hook did
+
+Open the run in **Agent Testing** or in **Simulations**. For each hook, the run shows its status (`ok`, `failed`, `timed_out`, `skipped` or `not_run`), duration, state or returned object, and error, with a **Trace** button for the hook's own trace. The run keeps the first 1,000 characters of an error, and keeps no copy of a state over 64 kilobytes.
+
+### Rerun and keep the test data
+
+To inspect the data a run made, open the run in **Simulations** and choose **Rerun and keep data**. The rerun skips teardown, and the run shows "Teardown skipped". The action appears only for a run that recorded a teardown.
+
+"Teardown not run" means LangWatch called teardown but no instance of the agent was online to take the call, so teardown did not happen even though no one asked to skip it.
+
+### Limits
+
+- Not yet available: teardown for a run whose scenario process is killed. Name your test data with the run id, so you can find what is left behind.
+- Not yet available: teardown for a run you cancel during its turns.
+
+## Best practices
+
+**Create test data in setup and remove it in teardown.** Data made anywhere else, such as inside a turn, is not in the state, so teardown cannot know about it.
+
+**Return references, not data.** Put ids and URLs in the state, never whole records or secrets. The state goes into every call, into the prompts of the simulated user and the judge, and into the run record, and it is capped at 64 kilobytes.
+
+**Name all test data with the run id.** Use `run.scenarioRunId` (`run.scenario_run_id` in Python) in a name or a tag, as the setup above does with `label`. Runs of a suite can overlap, so a unique name keeps one run's data apart from another's, and lets you find leftovers by name if a teardown is missed.
+
+**Make teardown safe to run twice and safe on partial state.** Teardown runs after a failed setup too, so the state it gets can be missing or incomplete. Check that each id exists before you delete it, treat "already gone" as success, and remove everything you can.
+
+**Return what teardown did.** Return what you deleted and what you left behind, so the run shows whether anyone needs to clean up by hand. If setup made something you have no way to delete, say so in the returned object.
+
+**Keep hooks fast.** A hook that runs past 60 seconds counts as failed. Seed slow data once, ahead of time, and have setup pick from it instead of building it on every run.
+
+**Throw in setup when the data cannot be made.** The run is then marked **Not scored** and stays out of the pass rate. If setup catches the error and returns an empty state instead, the agent is graded against data that does not exist.
+
+**Keep secrets out of the state and the returned object.** Read credentials from your own process's environment, because the state and the returned object are stored on the run and sent to the model provider.
+
+**Use run parameters to pick the test data.** For example, one scenario can cover several loyalty tiers when setup reads the `loyalty_tier` parameter and the scenario text reads the same value as `{{ params.loyalty_tier }}`. See [Run parameters](/agent-testing/run-parameters).
+
+Also check: [Connect your agent](/agent-testing/connect-your-agent), [Run parameters](/agent-testing/run-parameters), [Scenarios](/agent-testing/scenarios), [Results](/agent-testing/results), [TypeScript agent SDK reference](/integration/typescript/agent-reference), [Python agent SDK reference](/integration/python/agent-reference).
 
 ---
 
@@ -53000,7 +53221,7 @@ After creation, verify the saved resource:
 
 ```bash
 langwatch monitor list --format json
-langwatch monitor get <monitor-id> --format json
+langwatch monitor get <idOrSlugOrName> --format json
 ```
 
 The task is complete only when the created monitor appears with the intended evaluator, execution mode, level, sample rate, and enabled state.
@@ -56674,7 +56895,7 @@ After creation, verify the saved resource:
 
 ```bash
 langwatch monitor list --format json
-langwatch monitor get <monitor-id> --format json
+langwatch monitor get <idOrSlugOrName> --format json
 ```
 
 The task is complete only when the created monitor appears with the intended evaluator, execution mode, level, sample rate, and enabled state.
@@ -58567,7 +58788,7 @@ Production quality signals live in monitors (online evaluation) and their evalua
 
 ```bash
 langwatch monitor list -o json           # which monitors exist, are they enabled/firing?
-langwatch monitor get <id> -o json       # one monitor's config and recent state
+langwatch monitor get <idOrSlugOrName> -o json     # one monitor's config and recent state
 langwatch evaluator list -o json         # the evaluators the monitors run
 ```
 
@@ -58707,7 +58928,7 @@ For each failing row, note the input, the expected output (from the dataset), an
 
 ```bash
 langwatch evaluator list -o json
-langwatch evaluator get <idOrSlug> -o json
+langwatch evaluator get <idOrSlugOrName> -o json
 ```
 
 Before blaming the agent, rule out the scorer:
@@ -59721,7 +59942,7 @@ With no `--grid-row`, the platform allocates the next free row, so it never land
 langwatch chart list -f json
 langwatch chart get <chart-id> -f json    # SQL, parameters, spec, placement
 langwatch chart update <chart-id> --sql-file query.sql
-langwatch chart delete <chart-id>
+langwatch chart delete <chart-id>   # destructive: confirm on a choices card first
 ```
 
 ## Failure modes worth knowing
@@ -63812,6 +64033,7 @@ The restriction applies to email and password sign-up, passkey sign-up, and firs
 | `LANGWATCH_NLP_SERVICE`         | URL of the NLP service. Required                                                                                                                                                                                                                | - (Docker Compose: `http://langwatch_nlp:5561`, Helm: `http://<release>-langwatch-nlp:5561`) |
 | `LANGWATCH_NLP_INTERNAL_SECRET` | Shared credential for the app to NLP service hop. The app sends it on every NLP request and the NLP service refuses requests that do not carry it, so set the same value on both. Unset on the NLP service, it accepts unauthenticated requests | -                                                                                            |
 | `LANGEVALS_ENDPOINT`            | URL of the LangEvals service                                                                                                                                                                                                                    | - (Docker Compose: `http://langevals:5562`, Helm: `http://<release>-langevals:5562`)         |
+| `LANGWATCH_EVALUATOR_RETRY_WINDOW_MINUTES` | How long an evaluation keeps retrying while LangEvals is unreachable or starting before it is recorded as an error, in minutes (at most 120) | `120` |
 
 `LANGWATCH_NLP_INTERNAL_SECRET` is optional, and how you provide it depends on the deployment:
 
@@ -64170,6 +64392,7 @@ Create one rule per row. Each rule matches the prefix and expires objects after 
 | `group-queue/` | Group-queue S3 tier | No | Expire after 7 days |
 | `evaluation-inputs/r<days>/` | Evaluation inputs | No | One rule per retention class: `r90` after 90 days, `r180` after 180, `r365` after 365, `r730` after 730 |
 | `evaluation-inputs/r-indefinite/` | Evaluation inputs | No | None. Kept for ever |
+| `upgrade-diagnostics/` | Received upgrade diagnostics, on LangWatch Cloud only. A self-hosted install never writes under this prefix | No | Expire after 30 days |
 
 Prefixes are matched from the start of the key, so each one is the first segment of the object key. Existing prefixes are unchanged: if you already hold rules for the three older ones, they keep working.
 
@@ -64496,9 +64719,9 @@ For production with single-node ClickHouse.
 - Langy: 1 replica, 500m/2 CPU, 1Gi/4Gi memory
 - ClickHouse: 4 CPU, 8Gi memory, 100Gi storage
 - PostgreSQL: 250m/1 CPU, 512Mi/1Gi memory, 20Gi storage
-- Redis: 250m/500m CPU, 256Mi/512Mi memory, 5Gi storage
+- Redis: 500m/1 CPU, 1Gi/3Gi memory, 5Gi storage
 - Prometheus: 200m/500m CPU, 512Mi/2Gi memory, 30d retention, 20Gi storage
-- Total: ~8.9 CPU, ~23 Gi RAM requests
+- Total: ~9.1 CPU, ~23.8 Gi RAM requests
 
 ```bash
 helm install langwatch langwatch/langwatch \
@@ -64519,9 +64742,9 @@ For production with replicated ClickHouse.
 - ClickHouse: 3 nodes, 4 CPU, 16Gi memory, 300Gi storage each
 - ClickHouse Keeper: 3 nodes, 250m/1 CPU, 512Mi/1Gi memory
 - PostgreSQL: 250m/1 CPU, 512Mi/1Gi memory, 50Gi storage
-- Redis: 250m/500m CPU, 256Mi/512Mi memory, 10Gi storage
+- Redis: 500m/1 CPU, 1Gi/3Gi memory, 10Gi storage
 - Prometheus: 200m/500m CPU, 512Mi/2Gi memory, 60d retention, 50Gi storage
-- Total: ~22.9 CPU, ~84.8 Gi RAM requests
+- Total: ~23.1 CPU, ~85.6 Gi RAM requests
 
 ```bash
 helm install langwatch langwatch/langwatch \
@@ -64534,17 +64757,73 @@ helm install langwatch langwatch/langwatch \
 
 Both production overlays turn off the local-filesystem volume for stored objects, because more than one replica cannot share it. Set `app.dataplane.enabled: true` with an S3 or Azure Blob bucket, or stored objects (audio, images and documents) land on the pods' ephemeral disk and are lost on restart. Both commands also need the Secrets from [Provide the Secrets](/self-hosting/deployment/kubernetes-helm#1-provide-the-secrets), or `--set autogen.enabled=true` for a test install.
 
+## Throughput by size
+
+How much trace data each profile can take. Each profile accepts spans faster than it processes them: a burst above the processing rate waits in a queue and is worked through once traffic drops.
+
+| Profile | Accepts (spans per second) | Processes (spans per second) | Spans per day | Spans per month | ClickHouse disk per day | Redis memory limit |
+| --- | --- | --- | --- | --- | --- | --- |
+| `size-minimal.yaml` | ~250 | ~50 | ~4M | ~130M | ~4 GB | 128Mi |
+| `size-dev.yaml` | ~600 | ~200 | ~17M | ~520M | ~17 GB | 512Mi |
+| `size-prod.yaml` | ~2,500 | ~700 | ~60M | ~1.8B | ~60 GB | 3Gi |
+| `size-ha.yaml` | ~2,500 | ~800 | ~70M | ~2.1B | ~70 GB | 3Gi |
+
+- These rates are for traffic from many projects. One project on its own processes about 60 spans per second under the default per-project limit: if most of your traffic comes from one project, [raise the limit](#per-project-limit).
+- Per day, per month and disk follow the processing rate, which is what the install keeps up with all day.
+- Treat these as ceilings and plan to run at about 70% of them. Long prompts and completions lower them.
+- Per day and per month assume the same rate around the clock. Size for your busiest hour.
+- Disk is an estimate at about 1 KB per span. `size-prod.yaml` gives ClickHouse 100Gi, which fills in under two days at full rate: give it more storage or turn on [cold storage](#clickhouse-cold-storage-s3).
+- `size-dev.yaml` ships Redis at 256Mi. Raise `redis.master.resources.limits.memory` to 512Mi to reach its rate.
+- `size-minimal.yaml` is held back by ClickHouse memory. Setting `clickhouse.memory` to 2Gi roughly doubles its processing rate.
+
+### Changing `size-prod.yaml`
+
+What `size-prod.yaml` processes with one setting changed:
+
+| Change | Processes (spans per second) |
+| --- | --- |
+| None | ~700 |
+| `workers.replicaCount: 4` | ~800: Redis CPU is then the limit |
+| `clickhouse.cpu: 2`, `clickhouse.memory: 4Gi` | ~200 |
+| Valkey instead of Redis | ~700, with about 10% less CPU on the queue |
+| All traffic from one project | ~60 for that project, under the default per-project limit |
+
+Each worker replica processes about 350 spans per second on about one core, however high its CPU limit, so to process more, add replicas rather than CPU. More replicas raise the rate until Redis reaches 1 CPU, at about 800 spans per second. Every 100 spans per second needs about:
+
+| Component | CPU |
+| --- | --- |
+| LangWatch Workers | 0.3 core |
+| LangWatch App | 0.15 core |
+| ClickHouse | 0.16 core |
+| Redis | 0.12 core, up to 1 core in total |
+| PostgreSQL | 0.03 core |
+
+Redis needs about 2.5 MiB of memory limit for each span per second; the table rounds up to leave room for bursts. It uses up to half of its limit and keeps the rest free for snapshots.
+
+The queue for bursts lives in Redis too. Each waiting span takes about 8 KB, so a minute at 500 spans per second above the processing rate needs about 240 MiB more.
+
+To accept more, add app replicas (each core takes about 700 spans per second) and give Redis up to 1 CPU.
+
+### Per-project limit
+
+Each project gets a fair share of the workers, so one busy project can't slow down the others.
+
+To give a single project more, raise `LANGWATCH_DISPATCH_TENANT_CAP` in `workers.extraEnvs`: the number of traces one project can have in progress at once (default `50`). At the default, one project on its own processes about 60 spans per second. Setting it to `0` turns the limit off and lets one project take every worker.
+
 ## Scaling Guidelines
 
 ### What to scale first
 
-| Bottleneck                             | Component to Scale | How                                               |
-| -------------------------------------- | ------------------ | ------------------------------------------------- |
-| Trace ingestion is slow, queue backlog | LangWatch Workers  | Increase `workers.replicaCount`                   |
-| UI is slow, many concurrent users      | LangWatch App      | Increase `app.replicaCount`                       |
-| ClickHouse queries are slow            | ClickHouse         | Increase `clickhouse.cpu` and `clickhouse.memory` |
-| Evaluations are slow                   | LangEvals          | Increase `langevals.replicaCount`                 |
-| Topic clustering is slow               | LangEvals          | Increase `langevals.replicaCount`                 |
+| Bottleneck                                          | Component to Scale | How                                                                  |
+| --------------------------------------------------- | ------------------ | -------------------------------------------------------------------- |
+| Redis refuses writes (`OOM command not allowed`) or restarts with `OOMKilled` | Redis | Raise `redis.master.resources.limits.memory` (about 2.5 MiB per span/s, see [Throughput by Size](#throughput-by-size)) |
+| Redis CPU near its limit                            | Redis              | Raise `redis.master.resources.limits.cpu`, up to 1                   |
+| Trace ingestion is slow, each worker near one core | LangWatch Workers | Increase `workers.replicaCount` (about 350 spans per second each) |
+| One project falls behind while others keep up       | LangWatch Workers  | Raise `LANGWATCH_DISPATCH_TENANT_CAP` in `workers.extraEnvs` (default `50`) |
+| UI is slow, many concurrent users                   | LangWatch App      | Increase `app.replicaCount`                                          |
+| ClickHouse queries are slow, trace summaries lag    | ClickHouse         | Increase `clickhouse.cpu` and `clickhouse.memory`                    |
+| Evaluations are slow                                | LangEvals          | Increase `langevals.replicaCount`                                    |
+| Topic clustering is slow                            | LangEvals          | Increase `langevals.replicaCount`                                    |
 
 ### Horizontal Pod Autoscaler (HPA)
 
@@ -64594,6 +64873,16 @@ spec:
 
 - Minimal storage: job queue, cache and sessions
 - 1-5 GB is sufficient
+
+## Redis or Valkey
+
+The chart runs Redis by default. To run Valkey instead, add `-f examples/overlays/redis-valkey.yaml`. Both take the same load. Valkey uses about 10% less CPU, which helps only when Redis CPU is the limit.
+
+<Warning>
+  Choose Valkey when you first install. Valkey can't read the data Redis has saved, so switching an existing install means starting Redis empty: let the workers finish their queued jobs first, and expect everyone to sign in again.
+</Warning>
+
+For an external server, use Redis 7.0 or later, or Valkey 7.2 or later.
 
 ## Cloud Instance Recommendations
 
@@ -65064,7 +65353,7 @@ For a month with hosted usage, LangWatch emails a statement to your billing cont
 title: "Data and telemetry: every outbound connection of a self-hosted install"
 description: "Every connection a self-hosted install can open to LangWatch and to third parties, what each one carries, and the switch that stops it"
 sidebarTitle: Data and telemetry
-keywords: telemetry, usage report, usage statistics, self-hosted, privacy, opt out, DISABLE_USAGE_STATS, license sync, checkup, egress, outbound connections, firewall, managed models, instant evals, air-gapped, LANGWATCH_CONNECT_DISABLED
+keywords: telemetry, usage report, upgrade diagnostics, usage statistics, self-hosted, privacy, opt out, DISABLE_USAGE_STATS, license sync, checkup, egress, outbound connections, firewall, managed models, instant evals, air-gapped, LANGWATCH_CONNECT_DISABLED
 ---
 
 A self-hosted install sends LangWatch one usage report a day, and a licensed install with hosted services also syncs its license once a day. Both carry counts and metadata. Neither carries a trace, a prompt, a dataset row, an evaluation input or output, a project name, a user name, an email address, an IP address or a key.
@@ -65092,6 +65381,7 @@ The chart ships a NetworkPolicy for the Langy agent only, and the AI Gateway's N
 | `app.langwatch.ai/api/track_usage` | Workers | Daily at 12:00 UTC, when no license on the install names a hosted service | The usage report: counts, timestamps, the release, optional email domains and hostname. No content | `DISABLE_USAGE_STATS=true` |
 | `connect.langwatch.ai/v1/stats` | Workers | The same report, sent here instead once a license names a hosted service | The same report | `DISABLE_USAGE_STATS=true` |
 | `connect.langwatch.ai/v1/license/sync` | Workers daily; App on demand from the License page | For organizations whose license names a hosted service | The license token, the instance id, the release, and the member and lite member counts | `LANGWATCH_CONNECT_DISABLED=true` |
+| `connect.langwatch.ai/v1/upgrade-diagnostics` | Workers, on the hourly upgrade check after a step fails; App when an admin presses **Send to LangWatch** | The install has a license and an upgrade step failed. The hourly check sends when the [upgrade diagnostics](#upgrade-diagnostics) switch is on; an admin can send from the step either way | One failed step's [diagnostics](#upgrade-diagnostics), with secrets masked. Its error, report and log lines are what the step wrote, and can quote what it was processing | Automatic sends only: switch **Upgrade diagnostics** off on **Settings, Checkup**, or `DISABLE_UPGRADE_DIAGNOSTICS_AUTO_SEND=true`. Both automatic and admin sends: `LANGWATCH_CONNECT_DISABLED=true` |
 | `connect.langwatch.ai/v1/license/activate` | App | An admin redeems an activation code on the License page | The activation code and the instance id | Paste a license instead, or `LANGWATCH_CONNECT_DISABLED=true` |
 | `gateway.langwatch.ai/v1/instant-evals/classify` | App, Workers | The license names [Instant Evals](#instant-evals), no admin switched it off, and Instant Evals run or a sentence typed in trace search is routed | Content: the text being judged and the questions | Switch it off on **Settings, Connect**, or `LANGWATCH_CONNECT_DISABLED=true` |
 | `gateway.langwatch.ai/v1` | AI Gateway | The license names [managed models](#managed-models), no admin switched it off, and a virtual-key request names a `langwatch/` model | Content: the full model request and response | Switch it off on **Settings, Connect**, or `LANGWATCH_CONNECT_DISABLED=true` |
@@ -65203,15 +65493,30 @@ langwatch doctor --format json
 
 The CLI needs a project API key of the install, either from `langwatch login` or in `LANGWATCH_API_KEY`, with `LANGWATCH_ENDPOINT` pointing at your install.
 
-## The three switches
+## Upgrade diagnostics
+
+When a background upgrade step fails, it is almost always a problem on our side. The step's page in **Ops, Upgrades** can copy or download the step's diagnostics, and, on an install with a license, send them to the LangWatch team.
+
+A bundle holds one step: its id, kind, mode, release, status and attempt count, its last error, its checkpoint report, each target's error, the last lines it logged, the release, chart version and install method, and the instance id.
+
+Every string has passwords in URLs and secret-named values masked, and every value the install holds as a store URL removed. Values a validation error quotes are dropped, every string is cut at 4 KB, and the bundle stays under 64 KB.
+
+The bundle reads only the step's ledger records, the deployment facts above and the instance id, not traces, table rows, user records or environment variables. Its error, report and log lines are what the step itself wrote, after the masking above, so they can still name something such as a project id. **Send to LangWatch** shows the exact bundle before it is sent, and sends that bundle.
+
+On an install with a license, the hourly upgrade check sends the bundle of each newly failed step by itself, once per failure, and the alert email says so. Switch **Upgrade diagnostics** off on **Settings, Checkup**, or set `DISABLE_UPGRADE_DIAGNOSTICS_AUTO_SEND=true`, and a bundle is sent only when an admin presses **Send to LangWatch**. Without a license, or with `LANGWATCH_CONNECT_DISABLED=true`, the install sends no bundle, and the step's page offers the download to email to support@langwatch.ai.
+
+LangWatch keeps a received bundle for 30 days, in the EU (Frankfurt), and then deletes it.
+
+## The switches
 
 | Switch | Where | What it stops |
 |---|---|---|
 | `DISABLE_USAGE_STATS=true` | Environment, or `app.telemetry.usage.enabled: false` in the chart | The usage report as a whole. No report leaves the install |
 | Usage counts and onboarding dates | **Settings, Checkup** | The optional category: usage counts, onboarding dates, email domains, model provider names. The report keeps the release, the counts of organizations and projects, and the sign-in method |
 | Hostname | **Settings, Checkup** | The `hostname` field alone. It names your own network, so it has a switch of its own |
+| Upgrade diagnostics | **Settings, Checkup**, or `DISABLE_UPGRADE_DIAGNOSTICS_AUTO_SEND=true` | The automatic sending of a failed upgrade step's [diagnostics](#upgrade-diagnostics). It is not part of the usage report, and an admin can still send them from the step |
 
-`LANGWATCH_CONNECT_DISABLED=true` is a fourth switch, for an audit that has to prove absence rather than derive it from the license. With it set the install opens no connection to LangWatch for any reason, see [To LangWatch](#to-langwatch).
+`LANGWATCH_CONNECT_DISABLED=true` is one more switch, for an audit that has to prove absence rather than derive it from the license. With it set the install opens no connection to LangWatch for any reason, see [To LangWatch](#to-langwatch).
 
 The switches on the Checkup page are stored in the install's own database, so they hold across restarts, upgrades and every browser. Organization management rights are needed to change them; every member can read the report.
 
@@ -65280,7 +65585,7 @@ spec:
   source:
     repoURL: https://langwatch.github.io/langwatch
     chart: langwatch
-    targetRevision: 3.20.1 # x-release-please-version
+    targetRevision: 3.21.0 # x-release-please-version
     helm:
       releaseName: langwatch
       values: |
@@ -65335,7 +65640,7 @@ spec:
   sources:
     - repoURL: https://langwatch.github.io/langwatch
       chart: langwatch
-      targetRevision: 3.20.1 # x-release-please-version
+      targetRevision: 3.21.0 # x-release-please-version
       helm:
         releaseName: langwatch
         valueFiles:
@@ -65639,7 +65944,7 @@ The main application image. Used for both LangWatch App and LangWatch Workers. H
 |                |                                                                                                     |
 | -------------- | --------------------------------------------------------------------------------------------------- |
 | **Port**       | 5560                                                                                                |
-| **Base**       | `node:24-alpine`                                                                                    |
+| **Base**       | `node:24.22.1-alpine`                                                                               |
 | **Entrypoint** | `pnpm start`                                                                                        |
 | **Workers**    | In Kubernetes, Workers run as a separate Deployment using the same image with `pnpm start:workers`. |
 
@@ -65739,7 +66044,7 @@ For air-gapped or private environments, mirror the images to your own registry:
 ```bash
 # The release you are mirroring. Every tag below follows it, so set it once.
 # Pick the version from https://github.com/langwatch/langwatch/releases
-VERSION=3.20.1 # x-release-please-version
+VERSION=3.21.0 # x-release-please-version
 REGISTRY=registry.example.com
 
 for image in langwatch langwatch_nlp langevals; do
@@ -65755,13 +66060,13 @@ Then configure the Helm chart, giving every tag the version you mirrored:
 images:
   app:
     repository: registry.example.com/langwatch/langwatch
-    tag: "3.20.1" # x-release-please-version
+    tag: "3.21.0" # x-release-please-version
   langwatch_nlp:
     repository: registry.example.com/langwatch/langwatch_nlp
-    tag: "3.20.1" # x-release-please-version
+    tag: "3.21.0" # x-release-please-version
   langevals:
     repository: registry.example.com/langwatch/langevals
-    tag: "3.20.1" # x-release-please-version
+    tag: "3.21.0" # x-release-please-version
 ```
 
 Mirror and override the bundled services the same way: `gateway.image.repository`, `langyagent.image.repository`, `clickhouse.image.repository`, `postgresql.image.repository`, `redis.image.repository`, `prometheus.server.image.repository`, `cronjobs.image.repository` and `app.storedObjects.localFilesystem.serializeUpgradesImage` (the image the stored-objects upgrade hooks run).
@@ -65904,7 +66209,7 @@ This configures smaller resource limits, single replicas, and disables evaluator
 
 For production, you should:
 
-1. Use external managed databases (PostgreSQL, Redis)
+1. Use external managed databases (PostgreSQL, and Redis 7.0 or later or Valkey 7.2 or later)
 2. Provide Kubernetes Secrets from your secret manager
 3. Expose via Ingress with TLS
 4. Disable auto-generation
@@ -66214,6 +66519,7 @@ The chart ships with composable overlay files in `examples/overlays/`. Combine t
 | ---------------------------- | -------------------------------------------- |
 | `postgres-external.yaml`     | External PostgreSQL (RDS, Cloud SQL)         |
 | `redis-external.yaml`        | External Redis (ElastiCache, Memorystore)    |
+| `redis-valkey.yaml`          | Valkey 9.1 as the chart-managed Redis, fresh installs |
 | `clickhouse-external.yaml`   | External ClickHouse instance                 |
 | `clickhouse-replicated.yaml` | 3-node replicated ClickHouse                 |
 | `cold-storage-s3.yaml`       | S3 cold storage + backups                    |
@@ -69762,7 +70068,7 @@ Roughly 1 KB per span (compressed). See [Sizing & Scaling](/self-hosting/configu
 
 ### Can I use an existing PostgreSQL, Redis?
 
-Yes. Use the external database overlays:
+Yes. Redis must be 7.0 or later (or Valkey 7.2 or later); LangWatch refuses to start when the server reports an older version (a server that does not report its version starts with a warning). Use the external database overlays:
 
 ```bash
 helm install langwatch langwatch/langwatch \
@@ -70548,7 +70854,7 @@ helm search repo langwatch/langwatch --versions
 # x-release-please-start-version
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
-  --version 3.20.1 \
+  --version 3.21.0 \
   -f values-production.yaml
 # x-release-please-end
 ```

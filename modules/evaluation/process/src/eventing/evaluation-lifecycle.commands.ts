@@ -18,7 +18,10 @@ import {
   recordEvaluationRanCommandDataSchema,
 } from "./evaluation-lifecycle.events.ts";
 
-/** Records that a person ran an evaluation by hand; the same send twice is one event. */
+/**
+ * Records that a person ran an evaluation by hand; the same send twice is one event. Keyed by the
+ * run (its person and instant), never the project, so one project's runs never queue in a line.
+ */
 export class RecordEvaluationRanCommand implements CommandHandler<
   Command<RecordEvaluationRanCommandData>,
   EvaluationRanEvent
@@ -34,7 +37,7 @@ export class RecordEvaluationRanCommand implements CommandHandler<
     return [
       EventUtils.createEvent<EvaluationRanEvent>({
         aggregateType: EVALUATION_LIFECYCLE_AGGREGATE_TYPE,
-        aggregateId: data.projectId,
+        aggregateId: RecordEvaluationRanCommand.getAggregateId(data),
         tenantId: createTenantId(command.tenantId),
         type: EVALUATION_RAN_EVENT_TYPE,
         version: EVALUATION_LIFECYCLE_EVENT_VERSION,
@@ -47,11 +50,15 @@ export class RecordEvaluationRanCommand implements CommandHandler<
   }
 
   static getAggregateId(payload: RecordEvaluationRanCommandData): string {
-    return payload.projectId;
+    return `${payload.userId}:${payload.occurredAt}`;
   }
 }
 
-/** Records that an evaluation settled; one event per evaluation, however often it is sent. */
+/**
+ * Records that an evaluation settled; one event per evaluation, however often it is sent. Keyed
+ * by the evaluation, never its project: a project key queued every settled evaluation behind the
+ * one before it, so one busy project held its whole backlog in a single group.
+ */
 export class RecordEvaluationLifecycleCompletedCommand implements CommandHandler<
   Command<RecordEvaluationLifecycleCompletedCommandData>,
   EvaluationLifecycleCompletedEvent
@@ -69,7 +76,7 @@ export class RecordEvaluationLifecycleCompletedCommand implements CommandHandler
     return [
       EventUtils.createEvent<EvaluationLifecycleCompletedEvent>({
         aggregateType: EVALUATION_LIFECYCLE_AGGREGATE_TYPE,
-        aggregateId: data.projectId,
+        aggregateId: RecordEvaluationLifecycleCompletedCommand.getAggregateId(data),
         tenantId: createTenantId(command.tenantId),
         type: EVALUATION_LIFECYCLE_COMPLETED_EVENT_TYPE,
         version: EVALUATION_LIFECYCLE_EVENT_VERSION,
@@ -82,6 +89,6 @@ export class RecordEvaluationLifecycleCompletedCommand implements CommandHandler
   }
 
   static getAggregateId(payload: RecordEvaluationLifecycleCompletedCommandData): string {
-    return payload.projectId;
+    return payload.evaluationId;
   }
 }
