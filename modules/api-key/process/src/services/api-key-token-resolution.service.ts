@@ -1,7 +1,6 @@
 import { createHash } from "node:crypto";
 
 import {
-  apiKeyCredentialTypeOf,
   apiKeyTokenResolutionInputSchema,
   apiKeyVerificationSchema,
   getTokenType,
@@ -12,11 +11,13 @@ import {
   type OrganizationApiKeyResolution,
   type ResolvedApiKeyCredential,
   API_KEY_PREFIX,
+  CLI_LOGIN_KEY_NAME_PREFIX,
   LANGY_SESSION_API_KEY_NAME,
   WORKFLOW_RUN_API_KEY_NAME,
 } from "@langwatch/api-key-contract";
 import type * as apiKeyContractModule from "@langwatch/api-key-contract";
 import { createLogger } from "@langwatch/observability";
+import { noteRequestCredential } from "@langwatch/observability/credential-census";
 import { projectIdentitySchema, type ProjectIdentity } from "@langwatch/project-contract";
 import { Temporal, fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
 import { z } from "zod";
@@ -260,8 +261,9 @@ export class ApiKeyTokenResolutionService {
     if (getTokenType(parsed.token) === "apiKey") {
       const apiKey = await this.findVerifiedToken({ token: parsed.token });
       if (apiKey) {
-        this.credentials.record({
-          credentialType: apiKeyCredentialTypeOf(apiKey),
+        noteRequestCredential({
+          credentialType: keyCredentialTypeOf(apiKey),
+          apiKeyId: apiKey.id,
           organizationId: apiKey.organizationId,
         });
         return organizationApiKeyResolutionSchema.parse({
@@ -305,8 +307,14 @@ export class ApiKeyTokenResolutionService {
     token: string,
   ): Promise<ResolvedApiKeyCredential | null> {
     const project = await this.findLegacyProject(token);
+    if (!project) return null;
+    noteRequestCredential({
+      credentialType: "legacy_project_key",
+      projectId: project.id,
+      organizationId: project.organizationId,
+    });
 
-    return project ? resolvedApiKeyTokenSchema.parse({ type: "legacyProjectKey", project }) : null;
+    return resolvedApiKeyTokenSchema.parse({ type: "legacyProjectKey", project });
   }
 
   private async findCurrentApiKeyResolution(
@@ -339,9 +347,9 @@ export class ApiKeyTokenResolutionService {
     if (projectId && !bindingsReachProject(apiKey.grants, project)) {
       return null;
     }
-
-    this.credentials.record({
-      credentialType: apiKeyCredentialTypeOf(apiKey),
+    noteRequestCredential({
+      credentialType: keyCredentialTypeOf(apiKey),
+      apiKeyId: apiKey.id,
       projectId: project.id,
       organizationId: apiKey.organizationId,
     });
@@ -441,6 +449,11 @@ export class ApiKeyTokenResolutionService {
   private nowMs(): number {
     return this.now().epochMilliseconds;
   }
+}
+
+/** A key a CLI login minted is a CLI token to the credential census; any other is an API key. */
+function keyCredentialTypeOf(key: { name: string }): "cli_token" | "api_key" {
+  return key.name.startsWith(CLI_LOGIN_KEY_NAME_PREFIX) ? "cli_token" : "api_key";
 }
 
 /** Concurrent reads of one token in this process share one promise, dropped once it settles. */
