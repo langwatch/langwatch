@@ -72,6 +72,14 @@ Feature: Legacy project keys are ingestion-only, enforced per project
       And no outside-scope line is logged
 
     @unit
+    Scenario: The request's span records the use and its decision
+      Given a legacy project key request beyond ingestion
+      When it is allowed or refused outside the key's scopes, or granted by a scope flag
+      Then the span carries the project, route, permission and the route's scope flags
+      And it carries whether the request was enforced, or the flag that granted it
+      And a route that asks no permission is recorded with permission "none"
+
+    @unit
     Scenario: Ingestion and full access write no line
       Given a legacy project key
       When the door asks it "traces:create", or asks anything with its project on the full-access flag
