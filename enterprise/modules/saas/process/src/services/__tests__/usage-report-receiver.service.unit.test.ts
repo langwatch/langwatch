@@ -33,7 +33,9 @@ function setup({
   },
   release = {},
   failFacts = false,
+  findPublishedSelfHostedNotices = () => Promise.resolve([]),
 }: {
+  findPublishedSelfHostedNotices?: LicensingApi["findPublishedSelfHostedNotices"];
   failFacts?: boolean;
   isSaas?: boolean;
   release?: Partial<Parameters<typeof UsageReportReceiverService.create>[0]["release"]>;
@@ -45,7 +47,10 @@ function setup({
   const receiver = UsageReportReceiverService.create({
     cloud: LangWatchCloudService.create({ isSaas }),
     rateLimits,
-    registry: createApiFixture<LicensingApi>({ recordUsageReport }),
+    registry: createApiFixture<LicensingApi>({
+      recordUsageReport,
+      findPublishedSelfHostedNotices,
+    }),
     logger,
     release: {
       latestRelease: void 0,
@@ -176,6 +181,52 @@ describe("UsageReportReceiverService", () => {
       const { receiver } = setup();
 
       await expect(receiver.receive(report())).resolves.toEqual({ message: "Event captured" });
+    });
+  });
+
+  describe("given one published notice with severity security fixed in 3.4.2", () => {
+    const notice = {
+      id: "shnotice_1",
+      severity: "security" as const,
+      title: "Upgrade to 3.4.2",
+      body: "A vulnerability in trace sharing is fixed in 3.4.2.",
+      url: "https://langwatch.ai/security/2026-10",
+      fixed_in: "3.4.2",
+      published_at: "2026-10-21T10:00:00.000Z",
+    };
+
+    describe("when Cloud answers a usage report", () => {
+      /** @scenario "The usage report reply carries published notices beside the latest release" */
+      it("names the latest release and lists the notice in the install's wire", async () => {
+        const { receiver } = setup({
+          release: { latestRelease: "3.4.2", latestReleaseCommit: "0a1b2c3d" },
+          findPublishedSelfHostedNotices: () => Promise.resolve([notice]),
+        });
+
+        await expect(receiver.receive(report())).resolves.toEqual({
+          message: "Event captured",
+          latest_release: { release: "3.4.2", commit: "0a1b2c3d" },
+          notices: [notice],
+        });
+      });
+    });
+  });
+
+  describe("given reading the notices fails", () => {
+    describe("when Cloud answers a usage report", () => {
+      /** @scenario "A notice that cannot be read does not refuse the report" */
+      it("accepts the report, names the latest release with no notices, and logs the failure", async () => {
+        const { receiver, lines } = setup({
+          release: { latestRelease: "3.4.2" },
+          findPublishedSelfHostedNotices: () => Promise.reject(new Error("database down")),
+        });
+
+        await expect(receiver.receive(report())).resolves.toEqual({
+          message: "Event captured",
+          latest_release: { release: "3.4.2", commit: null },
+        });
+        expect(lines.findLine("error", "carries no notices")).toBeDefined();
+      });
     });
   });
 

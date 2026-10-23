@@ -28,6 +28,19 @@ function carriesReadBackColumns(row: CodingAgentSessionRow): boolean {
   );
 }
 
+/** What a committed fold step tells the sessions-stored hook, one entry per session. */
+export interface StoredSession {
+  tenantId: string;
+  sessionId: string;
+  /** The product id (`claude_code`, `codex`); null until a span or log names it. */
+  agent: string | null;
+  /** The session's own last event time, epoch ms. */
+  occurredAt: number;
+  /** When the session was first folded (set at fold init, kept on read-back), epoch ms. */
+  firstStoredAt: number;
+  auxiliary: boolean;
+}
+
 /** Store adapter; no agent gate (dispatchers gate upstream), read-back decoding per ADR-066. */
 export class EventingCodingAgentSessionStoreService implements FoldProjectionStore<CodingAgentSessionState> {
   private constructor(
@@ -35,18 +48,18 @@ export class EventingCodingAgentSessionStoreService implements FoldProjectionSto
     private readonly hooks: {
       defaultRetentionDays: () => number;
       /**
-       * Called after a commit with the distinct tenants whose sessions were
-       * stored — the seam `createCodingAgentSessionSeenTouch` rides. Fire-and-forget:
-       * the callback owns its own errors, never blocking the committed row.
+       * Called after a commit with the sessions stored: the seam the activity stamp
+       * and the session-stored fact ride. Fire-and-forget: the callback owns its own
+       * errors, never blocking the committed row.
        */
-      onSessionsStored?: (tenantIds: string[]) => Promise<void>;
+      onSessionsStored?: (sessions: StoredSession[]) => Promise<void>;
     },
   ) {}
 
   static create(input: {
     persistence: CodingAgentProjectionPersistence;
     defaultRetentionDays: () => number;
-    onSessionsStored?: (tenantIds: string[]) => Promise<void>;
+    onSessionsStored?: (sessions: StoredSession[]) => Promise<void>;
   }): EventingCodingAgentSessionStoreService {
     return new EventingCodingAgentSessionStoreService(input.persistence, {
       defaultRetentionDays: input.defaultRetentionDays,
@@ -58,7 +71,7 @@ export class EventingCodingAgentSessionStoreService implements FoldProjectionSto
     if (!hasPersistableSignal(state)) return;
     const entry = this.toRow(state, context);
     await this.persistence.storeSession(entry);
-    this.reportSessionsStored([String(context.tenantId)]);
+    this.reportSessionsStored([toStoredSession(state, context)]);
   }
 
   async storeBatch(
@@ -71,18 +84,15 @@ export class EventingCodingAgentSessionStoreService implements FoldProjectionSto
     const rows = persistable.map(({ state, context }) => this.toRow(state, context));
     if (rows.length === 0) return;
 
-    const tenantIds = [...new Set(persistable.map(({ context }) => String(context.tenantId)))];
     await this.persistence.storeSessionBatch(rows);
-    this.reportSessionsStored(tenantIds);
+    this.reportSessionsStored(
+      persistable.map(({ state, context }) => toStoredSession(state, context)),
+    );
   }
 
-  /**
-   * Fire-and-forget by contract: the callback swallows its own failures, and
-   * a hook that rejects anyway must surface as nothing worse than a dropped
-   * stamp, never an unhandled rejection in the worker.
-   */
-  private reportSessionsStored(tenantIds: string[]): void {
-    void this.hooks.onSessionsStored?.(tenantIds).catch(() => undefined);
+  /** Fire-and-forget: a rejecting hook costs a dropped stamp, never an unhandled rejection. */
+  private reportSessionsStored(sessions: StoredSession[]): void {
+    void this.hooks.onSessionsStored?.(sessions).catch(() => undefined);
   }
 
   private toRow(
@@ -149,6 +159,20 @@ export class EventingCodingAgentSessionStoreService implements FoldProjectionSto
 
     return state === null ? { kind: "empty" } : { kind: "folded", state };
   }
+}
+
+function toStoredSession(
+  state: CodingAgentSessionState,
+  context: ProjectionStoreContext,
+): StoredSession {
+  return {
+    tenantId: String(context.tenantId),
+    sessionId: String(context.aggregateId),
+    agent: state.agent,
+    occurredAt: state.LastEventOccurredAt,
+    firstStoredAt: state.createdAt,
+    auxiliary: state.auxiliary,
+  };
 }
 
 /** Session worth a row once it signals: prompt, call, tokens, cost, name, or repo. */

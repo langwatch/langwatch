@@ -138,8 +138,19 @@ jobs:
               # repo-wide cost decision, not part of this change; tracked
               # separately.
               - '.github/workflows/langwatch-app-ci.yml'
+              # Read by .github/scripts/nightly-workflows.test.ts in ci-scripts-test.
+              - '.github/workflows/nightly.yml'
+              - '.github/workflows/codebase-health.yml'
+              - '.github/workflows/migration-compat.yml'
+              - '.github/workflows/npx-server-smoke.yml'
+              - '.github/workflows/gateway-matrix.yaml'
+              # Read by .github/scripts/release-please-timer.test.ts.
+              - '.github/workflows/release-please-sdks.yml'
               - '.github/.release-please-manifest.json'
               - '.github/scripts/**'
+              # ci-scripts-test reads this workflow's path filters and its
+              # re-tag step, so an edit to the workflow alone must reach it.
+              - '.github/workflows/publish-docker-ecr.yml'
               # Composite actions are covered by ci-scripts-test through the
               # scripts they call, so an edit that only touches an action.yml
               # has to reach the gate too.
@@ -1318,6 +1329,15 @@ jobs:
       - name: Test check-added-images.sh
         run: bash .github/scripts/__tests__/check-added-images.test.sh
 
+      - name: Test publish-lambda-tag.sh
+        run: bash .github/scripts/__tests__/publish-lambda-tag.test.sh
+
+      - name: Test publish-docker-ecr.yml path filters
+        run: bash .github/scripts/__tests__/publish-ecr-filters.test.sh
+
+      - name: Test nearest-ancestor-tag.sh
+        run: bash .github/scripts/__tests__/nearest-ancestor-tag.test.sh
+
       - name: Test detect-changes-source.sh
         run: bash .github/scripts/__tests__/detect-changes-source.test.sh
 
@@ -1346,6 +1366,18 @@ jobs:
 
       - name: Test the PR impact map categories
         run: node --test --experimental-strip-types .github/scripts/pr-impact-map-categories.test.ts
+
+      # The nightly suite's reports and its workflow promises (specs/ci/nightly-suite.feature).
+      - name: Test the nightly suite's scripts
+        run: >-
+          node --test --experimental-strip-types
+          .github/scripts/nightly-hygiene.test.ts
+          .github/scripts/nightly-flaky.test.ts
+          .github/scripts/nightly-dashboard.test.ts
+          .github/scripts/nightly-workflows.test.ts
+
+      - name: Test when release pull requests refresh
+        run: node --test --experimental-strip-types .github/scripts/release-please-timer.test.ts
 
   ci-self-test:
     needs: changes
