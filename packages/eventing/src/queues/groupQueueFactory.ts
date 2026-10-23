@@ -10,6 +10,7 @@ import {
   type GroupQueueDependencies,
   type RunningGroupQueueConsumer,
 } from "@langwatch/group-queue";
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
 
 import { incrementEsJobsProjectGone } from "../metrics.ts";
@@ -17,7 +18,6 @@ import {
   classifyClickHouseError,
   ErrorCategory,
   isProjectGone,
-  isQueryMemoryLimitExceeded,
   UndeclaredQueuedEventTypeError,
   UnroutableQueuedJobError,
 } from "../services/errorHandling.ts";
@@ -107,6 +107,41 @@ export async function completeWhenProjectGone({
       "Job's project no longer exists; completing it as a no-op",
     );
   }
+}
+
+const MAX_QUERY_MEMORY_CAUSE_DEPTH = 8;
+
+/** ClickHouse's per-query memory limit, in both its older and newer wording. */
+const QUERY_MEMORY_LIMIT_FRAGMENTS = [
+  "Query memory limit exceeded",
+  "Memory limit (for query) exceeded",
+] as const;
+
+/**
+ * Whether one statement outgrew its own memory limit, read through causes and handled
+ * reasons. The server-wide `(total)` limit and the client's own shedding are load, not size.
+ */
+function isQueryMemoryLimitExceeded(error: unknown): boolean {
+  return queryMemoryLimitAt({ error, depth: 0 });
+}
+
+function queryMemoryLimitAt({ error, depth }: { error: unknown; depth: number }): boolean {
+  if (depth > MAX_QUERY_MEMORY_CAUSE_DEPTH || error === null || typeof error !== "object")
+    return false;
+  const message = Reflect.get(error, "message");
+  if (
+    typeof message === "string" &&
+    QUERY_MEMORY_LIMIT_FRAGMENTS.some((fragment) => message.includes(fragment))
+  ) {
+    return true;
+  }
+  const reasons: unknown = HandledError.isHandled(error) ? error.reasons : undefined;
+  if (Array.isArray(reasons)) {
+    for (const reason of reasons) {
+      if (queryMemoryLimitAt({ error: reason, depth: depth + 1 })) return true;
+    }
+  }
+  return queryMemoryLimitAt({ error: Reflect.get(error, "cause"), depth: depth + 1 });
 }
 
 /** The first error in a cause chain that ClickHouse's own classification calls transient. */
