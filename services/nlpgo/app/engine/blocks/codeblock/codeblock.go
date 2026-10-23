@@ -284,7 +284,7 @@ func removeRunDir(dir string) {
 
 // Request is what the engine hands to the executor per node invocation.
 type Request struct {
-	// Language is LanguagePython (also when empty) or LanguageJavaScript.
+	// Language is LanguagePython (also when empty), LanguageJavaScript or LanguageTypeScript.
 	Language        string
 	Code            string
 	Inputs          map[string]any
@@ -401,6 +401,9 @@ func withSandboxCredential(env []string, apiKey, endpoint string) []string {
 
 // Execute runs the request. Wall-clock timeout kills the subprocess.
 func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
+	if req.Language == LanguageTypeScript {
+		return e.executeTypeScript(ctx, req)
+	}
 	// The operator's ceiling wins. A per-request value only ever shortens the
 	// budget: a workflow author must not be able to escape
 	// NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS by writing a bigger number into

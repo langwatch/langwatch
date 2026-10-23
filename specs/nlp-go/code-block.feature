@@ -474,6 +474,36 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       When it is asked to run a JavaScript code node
       Then it returns an error saying JavaScript is not available
 
+  Rule: TypeScript code blocks run as JavaScript with their types erased
+    # A code node whose `language` is "typescript" has its types erased by
+    # esbuild in the engine, then runs on QuickJS like JavaScript. Types are
+    # never checked at run time; the Studio editor checks them as you write.
+
+    @unit
+    Scenario: a TypeScript code block runs with its types erased
+      Given a TypeScript code node using interfaces, type aliases, an enum and casts
+      When the executor runs the request with inputs
+      Then the returned object becomes the node's outputs
+
+    @unit
+    Scenario: a TypeScript code block with a type error still runs
+      Given a TypeScript code node that assigns a number to a string
+      When the executor runs the request
+      Then it runs and returns its outputs
+
+    @unit
+    Scenario: a TypeScript code block that does not parse reports the line
+      Given a TypeScript code node with a syntax error on line 2
+      When the executor runs the request
+      Then the error type is "SyntaxError"
+      And the traceback names code-block.ts at line 2
+
+    @unit
+    Scenario: a TypeScript code block that throws points at the line it was written on
+      Given a TypeScript code node whose throw is on line 7, below lines erasing drops
+      When the executor runs the request
+      Then the traceback names code-block.ts at line 7, not the erased JavaScript
+
   Rule: The wasm runtime runs each execution in its own WebAssembly instance
 
     # NLPGO_ENGINE_CODE_BLOCK_RUNTIME=wasm runs user code in a WASI CPython

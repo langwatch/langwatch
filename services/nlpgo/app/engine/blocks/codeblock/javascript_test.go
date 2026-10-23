@@ -244,3 +244,66 @@ func TestJavaScript_RefusedWithoutQuickJS(t *testing.T) {
 	})
 	require.ErrorContains(t, err, "not available")
 }
+
+func runTS(t *testing.T, e *codeblock.Executor, req codeblock.Request) *codeblock.Result {
+	t.Helper()
+	req.Language = codeblock.LanguageTypeScript
+	res, err := e.Execute(context.Background(), req)
+	require.NoError(t, err)
+	return res
+}
+
+// @scenario "a TypeScript code block runs with its types erased"
+func TestTypeScript_RunsWithTypesErased(t *testing.T) {
+	e := newJSExec(t, codeblock.Options{})
+	res := runTS(t, e, codeblock.Request{
+		Code: `interface Inputs { question: string }
+type Outputs = { output: string; count: number }
+enum Mode { Loud = "LOUD" }
+
+export default async function ({ question }: Inputs): Promise<Outputs> {
+  const words = question.split(" ") as string[];
+  return { output: ` + "`${Mode.Loud}:${question.toUpperCase()}`" + `, count: words.length };
+}
+`,
+		Inputs:          map[string]any{"question": "hi there"},
+		DeclaredOutputs: []string{"output", "count"},
+	})
+	require.Nil(t, res.Error, "expected no error, got %+v (stderr %q)", res.Error, res.Stderr)
+	assert.Equal(t, "LOUD:HI THERE", res.Outputs["output"])
+	assert.InDelta(t, 2, res.Outputs["count"], 0)
+}
+
+// @scenario "a TypeScript code block with a type error still runs"
+func TestTypeScript_TypeErrorsDoNotStopTheRun(t *testing.T) {
+	e := newJSExec(t, codeblock.Options{})
+	res := runTS(t, e, codeblock.Request{
+		Code:            "export default function (): { output: string } {\n  const n: string = 42 as any as number;\n  return { output: n as unknown as string };\n}\n",
+		DeclaredOutputs: []string{"output"},
+	})
+	require.Nil(t, res.Error, "expected no error, got %+v", res.Error)
+	assert.InDelta(t, 42, res.Outputs["output"], 0)
+}
+
+// @scenario "a TypeScript code block that does not parse reports the line"
+func TestTypeScript_SyntaxErrorReportsItsLine(t *testing.T) {
+	e := newJSExec(t, codeblock.Options{})
+	res := runTS(t, e, codeblock.Request{
+		Code: "export default function () {\n  const x: = 1;\n  return { x };\n}\n",
+	})
+	require.NotNil(t, res.Error)
+	assert.Equal(t, "SyntaxError", res.Error.Type)
+	assert.Contains(t, res.Error.Traceback, "code-block.ts:2:")
+}
+
+// @scenario "a TypeScript code block that throws points at the line it was written on"
+func TestTypeScript_ThrownErrorPointsAtTheTypeScriptLine(t *testing.T) {
+	e := newJSExec(t, codeblock.Options{})
+	res := runTS(t, e, codeblock.Request{
+		Code: "// a comment esbuild drops\n\ninterface Big { size: number }\n\n\nexport default function (): Big {\n  throw new RangeError('too big')\n}\n",
+	})
+	require.NotNil(t, res.Error)
+	assert.Equal(t, "RangeError", res.Error.Type)
+	assert.Contains(t, res.Error.Traceback, "code-block.ts:7")
+	assert.NotContains(t, res.Error.Traceback, "code-block.mjs")
+}
