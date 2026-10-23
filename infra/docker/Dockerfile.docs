@@ -1,0 +1,62 @@
+# syntax=docker/dockerfile:1.7
+# The documentation site as a plain filesystem image: the static build under
+# /site, served from /docs. Not meant to run; the SaaS deployment copies /site
+# to S3 behind CloudFront. Sitemap dates need the full git history in .git.
+
+# ── Workspace manifests ─────────────────────────────────────────────
+# Every member's package.json and nothing else, so the install layer below
+# stays cached across source-only commits (same trick as the app's Dockerfile).
+FROM node:24.22.1-bookworm-slim AS manifests
+WORKDIR /src
+COPY apps ./apps
+COPY packages ./packages
+COPY modules ./modules
+COPY enterprise ./enterprise
+COPY mcp/typescript ./mcp/typescript
+COPY plugins ./plugins
+COPY sdks/typescript ./sdks/typescript
+COPY services/langyworker ./services/langyworker
+COPY tools ./tools
+COPY skills ./skills
+COPY dev/tests/agentic-e2e ./dev/tests/agentic-e2e
+COPY dev/tests/e2e-stack ./dev/tests/e2e-stack
+COPY dev/scripts ./dev/scripts
+RUN find . ! -type d ! -name package.json -delete && find . -depth -type d -empty -delete
+
+# ── Build ───────────────────────────────────────────────────────────
+# Debian, not Alpine: the build renders Mermaid diagrams in Playwright's
+# headless Chromium, which has no musl build. git reads each page's commit date.
+FROM node:24.22.1-bookworm-slim AS build
+RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && git config --global --add safe.directory '*'
+RUN npm install -g pnpm@12.6.0 && npm cache clean --force
+ENV pnpm_config_store_dir=/root/.local/share/pnpm/store
+WORKDIR /src
+COPY pnpm-workspace.yaml pnpm-lock.yaml package.json .npmrc ./
+COPY patches ./patches
+COPY vendor ./vendor
+COPY --from=manifests /src/ ./
+RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
+    CI=true pnpm install --frozen-lockfile --filter "@langwatch/docs-site..."
+RUN pnpm --filter @langwatch/docs-site exec playwright install --with-deps --only-shell chromium \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY tsconfig.base.json tsconfig.shared.json tsconfig.emit.json CHANGELOG.md .gitattributes ./
+COPY packages ./packages
+COPY skills ./skills
+COPY docs ./docs
+COPY apps/docs ./apps/docs
+# The history is mounted, never copied: no layer carries it. A shallow or
+# missing history builds a sitemap without dates, so the check refuses that.
+RUN --mount=type=bind,source=.git,target=/src/.git \
+    --mount=type=cache,id=docs-site-render,target=/src/apps/docs/node_modules/.cache/docs-site \
+    pnpm --filter @langwatch/docs-site build --base-path /docs --out-dir /out \
+    && test -f /out/index.html && test -f /out/404.html \
+    && grep -q '<lastmod>' /out/sitemap.xml
+
+# ── The image: the site and nothing else ────────────────────────────
+FROM scratch
+COPY --from=build /out /site
+# Never started: `docker create` refuses an image with no command, so name one.
+CMD ["/site"]
