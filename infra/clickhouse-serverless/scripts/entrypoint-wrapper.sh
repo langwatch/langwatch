@@ -32,7 +32,7 @@ fi
 # and sets CLICKHOUSE_ACCESS_SIDECAR=external), run it here, restarted if it
 # exits: token logins and password rotation depend on it (ADR-184).
 if [ -n "${CLICKHOUSE_ACCESS_FILE:-}" ] && [ "${CLICKHOUSE_ACCESS_SIDECAR:-embedded}" = "embedded" ]; then
-    (while true; do ch-config sidecar /etc/clickhouse-server || true; sleep 2; done) &
+    (unset CLICKHOUSE_PASSWORD; while true; do ch-config sidecar /etc/clickhouse-server || true; sleep 2; done) &
 fi
 
 exec /entrypoint.sh "$@" --config-file=/etc/clickhouse-server/config.xml
