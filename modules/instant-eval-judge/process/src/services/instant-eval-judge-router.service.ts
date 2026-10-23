@@ -6,7 +6,9 @@
  */
 
 import {
+  instantEvalCostUsd,
   instantEvalSkipped,
+  NANO_USD_PER_USD,
   type InstantEvalBooleanQuestion,
   type InstantEvalClassification,
   type InstantEvalJudgeRoute,
@@ -72,7 +74,10 @@ export class InstantEvalJudgeRouterService {
     return new InstantEvalJudgeRouterService(deps);
   }
 
-  /** Only yes-or-no questions are routed; any other question takes today's classifier call. */
+  /**
+   * Only yes-or-no questions are routed; any other question takes today's classifier call, priced
+   * as a routed one so a run whose calls all carry a route never bills some tokens at zero.
+   */
   async classify(input: RoutedClassification): Promise<InstantEvalJudgement> {
     const { projectId, text, questions, signal, route } = input;
     const booleans = questions.filter(isBooleanQuestion);
@@ -97,10 +102,22 @@ export class InstantEvalJudgeRouterService {
   }: Omit<RoutedClassification, "route">): Promise<InstantEvalJudgement> {
     const { classifier, limiter } = this.deps;
     if (!classifier) return instantEvalSkipped("classifier_not_configured");
-    return classifier.classify(
+    const judgement = await classifier.classify(
       { projectId, text, questions, limiter },
       ...(signal ? [signal] : []),
     );
+    return { ...judgement, costNanoUsd: this.classifierCostNanoUsd(judgement.inputTokens) };
+  }
+
+  /** The hosted classifier's cost: its backend's routed price, else the published rate. */
+  private classifierCostNanoUsd(inputTokens: number): number {
+    const { table, pricing } = this.deps;
+    for (const [backend, config] of Object.entries(table.backends)) {
+      if (config.kind !== "jev") continue;
+      const cost = instantEvalJudgeCallCostOf({ backend, inputTokens, outputTokens: 0, pricing });
+      if (cost.outcome === "priced") return cost.costNanoUsd;
+    }
+    return Math.round(instantEvalCostUsd({ inputTokens }) * NANO_USD_PER_USD);
   }
 }
 

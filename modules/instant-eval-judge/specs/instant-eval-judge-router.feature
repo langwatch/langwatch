@@ -131,6 +131,14 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     Then the priced fact carries that cost times the markup, under the router's model and rate
 
   @unit
+  Scenario: Every judgement a routed call returns carries its cost
+    Given a call that carries a route but asks a question the router does not route
+    When the hosted classifier answers it
+    Then the judgement carries the classifier's cost at its routed price
+    And a run whose calls all carry a route never prices some of its tokens at zero
+    And the caller resolves the route once per run, so a run routes every call or none
+
+  @unit
   Scenario: A page event without a routed cost still reads and prices from tokens
     Given a page_judged event written before the router
     When it is read

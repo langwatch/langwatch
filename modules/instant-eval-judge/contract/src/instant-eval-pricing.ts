@@ -33,7 +33,7 @@ export function instantEvalRateVersion(pricing: InstantEvalPricing = INSTANT_EVA
 const TOKENS_PER_MILLION = 1_000_000;
 
 /** The ledger keeps integer nano-USD, so amounts round to nine decimals. */
-const NANO_USD_PER_USD = 1_000_000_000;
+export const NANO_USD_PER_USD = 1_000_000_000;
 
 function toNanoUsdPrecision(usd: number): number {
   return Math.round(usd * NANO_USD_PER_USD) / NANO_USD_PER_USD;
