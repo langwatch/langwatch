@@ -28,6 +28,36 @@ import type {
 
 const logger = createLogger("langwatch:scenarios:processor");
 
+/**
+ * Run one best-effort recorder: a throwing recorder is logged with the run
+ * and project ids and swallowed, so a side-channel write can never fail a
+ * job that already ran to the end (#8029).
+ */
+export async function recordBestEffort({
+  what,
+  jobData,
+  record,
+  jobLogger = logger,
+}: {
+  what: string;
+  jobData: Pick<ExecutionJobData, "projectId" | "scenarioRunId">;
+  record: () => Promise<unknown>;
+  jobLogger?: Logger;
+}): Promise<void> {
+  try {
+    await record();
+  } catch (err) {
+    jobLogger.warn(
+      {
+        err,
+        scenarioRunId: jobData.scenarioRunId,
+        projectId: jobData.projectId,
+      },
+      `Could not record ${what}`,
+    );
+  }
+}
+
 export class ScenarioProcessorService implements ScenarioExecutionRunner {
   static create(options: {
     execution: ScenarioExecutionService;
@@ -432,29 +462,26 @@ export class ScenarioProcessorService implements ScenarioExecutionRunner {
     const jobLogger = input.jobLogger ?? logger;
     const agentInstance = input.result.agentInstance;
     if (agentInstance) {
-      try {
-        await this.options.execution.recordAgentInstance({
-          projectId,
-          scenarioRunId,
-          agentInstance,
-        });
-      } catch (error) {
-        jobLogger.warn(
-          { err: error, scenarioRunId },
-          "Could not record the agent instance that served the run",
-        );
-      }
+      await recordBestEffort({
+        what: "the agent instance that served the run",
+        jobData: input.jobData,
+        jobLogger,
+        record: () =>
+          this.options.execution.recordAgentInstance({
+            projectId,
+            scenarioRunId,
+            agentInstance,
+          }),
+      });
     }
 
     if (input.result.isCutAtLimit) {
-      try {
-        await this.options.execution.recordCutAtLimit({ projectId, scenarioRunId });
-      } catch (error) {
-        jobLogger.warn(
-          { err: error, scenarioRunId },
-          "Could not record that the run was cut at the call limit",
-        );
-      }
+      await recordBestEffort({
+        what: "that the run was cut at the call limit",
+        jobData: input.jobData,
+        jobLogger,
+        record: () => this.options.execution.recordCutAtLimit({ projectId, scenarioRunId }),
+      });
     }
   }
 
