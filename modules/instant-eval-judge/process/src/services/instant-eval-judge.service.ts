@@ -10,6 +10,7 @@ import {
   type InstantEvalJudgeAnswer,
   type InstantEvalJudgeCall,
   type InstantEvalJudgeRefusalCode,
+  type InstantEvalJudgeRoutePricing,
   type InstantEvalJudgeSpendPricedEventData,
   type InstantEvalJudgeSpendRecord,
   type InstantEvalPricing,
@@ -28,6 +29,7 @@ import {
   instantEvalJudgeSpendPricedOf,
   instantEvalJudgeSpendRequestId,
 } from "../rules/instant-eval-judge-spend.rules.ts";
+import type { InstantEvalJudgeRouterService } from "./instant-eval-judge-router.service.ts";
 
 const defaultLogger: Logger = createLogger("langwatch:instant-eval-judge:judge");
 
@@ -47,6 +49,10 @@ type InstantEvalJudgeServiceDeps = Readonly<{
   decisionModels: InstantEvalDecisionModelChannel;
   /** Paces every classify send over the module's own rate buckets. */
   limiter: InstantEvalRateLimiter;
+  /** Answers a call that carries a route; absent, a route is ignored and the classifier answers. */
+  router?: InstantEvalJudgeRouterService;
+  /** The router's prices; a routed spend is priced from its cost at this markup. */
+  routePricing?: InstantEvalJudgeRoutePricing;
   /** LangWatch cloud, the only install a judge call is answered on. */
   isCloud: boolean;
   /** Appends the priced fact; the judge's spend row and gateway's ledger row follow from it. */
@@ -76,6 +82,7 @@ export class InstantEvalJudgeService {
     requestKey,
     signal,
     decisionModel,
+    route,
   }: InstantEvalJudgeCall): Promise<InstantEvalJudgeAnswer> {
     if (decisionModel) {
       const judgement = await this.deps.decisionModels.classify(
@@ -109,10 +116,20 @@ export class InstantEvalJudgeService {
       return refused({ code: "instant_eval_free_budget_exhausted", message });
     }
 
-    const judgement = await classifier.classify(
-      { projectId, text, questions, limiter: this.deps.limiter },
-      ...(signal ? [signal] : []),
-    );
+    const { router } = this.deps;
+    const judgement =
+      route && router
+        ? await router.classify({
+            projectId,
+            text,
+            questions,
+            route,
+            ...(signal ? { signal } : {}),
+          })
+        : await classifier.classify(
+            { projectId, text, questions, limiter: this.deps.limiter },
+            ...(signal ? [signal] : []),
+          );
     // A skip billed nothing, so it records nothing.
     if (judgement.inputTokens <= 0) return { outcome: "judged", judgement, priceUsd: 0 };
 
@@ -126,6 +143,7 @@ export class InstantEvalJudgeService {
       inputTokens: judgement.inputTokens,
       occurredAt: this.deps.now().epochMilliseconds,
       ...this.pricing(),
+      routed: this.routedOf(judgement.costNanoUsd),
     });
     await this.record({ fact });
     return { outcome: "judged", judgement, priceUsd };
@@ -141,6 +159,7 @@ export class InstantEvalJudgeService {
     projectId,
     requestId,
     inputTokens,
+    costNanoUsd,
     requests,
     runId,
     occurredAt,
@@ -155,8 +174,16 @@ export class InstantEvalJudgeService {
       requests,
       runId,
       ...this.pricing(),
+      routed: this.routedOf(costNanoUsd),
     });
     await this.deps.recordSpendPriced(fact);
+  }
+
+  /** A routed cost prices the spend; none, or zero, prices the tokens as before. */
+  private routedOf(costNanoUsd: number | undefined) {
+    const pricing = this.deps.routePricing;
+    if (!pricing || costNanoUsd === undefined || costNanoUsd <= 0) return undefined;
+    return { costNanoUsd, pricing };
   }
 
   private pricing(): { pricing?: InstantEvalPricing } {

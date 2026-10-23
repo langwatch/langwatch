@@ -41,10 +41,18 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
 
   @unit
   Scenario: The input view follows the question category from config
-    Given a route table mapping the sentiment category to the text view
+    Given a route table mapping the sentiment category, a wording question, to the text view
     When a sentiment call with no view of its own is routed
     Then the plan judges the conversation text only
     And a call naming its own view keeps it
+
+  @unit
+  Scenario: The text view is judged only by a decision model allowed to read it
+    Given a route table that lets only the Decisions API judge the conversation text
+    And lets no backend judge the tools view until it is measured
+    When a question maps to a partial view but its slot plans a model not allowed to read it
+    Then the plan judges the full trace instead and the routing names the refused view
+    And an escalation always judges the full trace, since an outcome may turn on a tool result
 
   @unit
   Scenario: The length bucket is measured on the chosen view

@@ -5,11 +5,14 @@
  */
 
 import {
+  INSTANT_EVAL_JUDGE_ROUTED_SPEND_MODEL,
   INSTANT_EVAL_PRICING,
   INSTANT_EVAL_SPEND_MODEL,
   instantEvalCostUsd,
+  instantEvalJudgeRouteRateVersion,
   instantEvalPriceUsd,
   instantEvalRateVersion,
+  type InstantEvalJudgeRoutePricing,
   type InstantEvalJudgeSpendPricedEventData,
   type InstantEvalPricing,
 } from "@langwatch/instant-eval-judge-contract";
@@ -43,6 +46,7 @@ export function instantEvalJudgeSpendPricedOf({
   requests,
   runId,
   pricing = INSTANT_EVAL_PRICING,
+  routed,
 }: {
   organizationId: string;
   projectId: string;
@@ -53,9 +57,16 @@ export function instantEvalJudgeSpendPricedOf({
   requests?: number | undefined;
   runId?: string | undefined;
   pricing?: InstantEvalPricing;
+  /** A routed spend: its summed cost, priced at the router's markup under the router's model. */
+  routed?: Readonly<{ costNanoUsd: number; pricing: InstantEvalJudgeRoutePricing }> | undefined;
 }): Readonly<{ priceUsd: number; fact: InstantEvalJudgeSpendPricedEventData }> {
-  const costUsd = instantEvalCostUsd({ inputTokens, pricing });
-  const priceUsd = instantEvalPriceUsd({ costUsd, pricing });
+  const costUsd = routed
+    ? routed.costNanoUsd / NANO_USD_PER_USD
+    : instantEvalCostUsd({ inputTokens, pricing });
+  const priceUsd = instantEvalPriceUsd({
+    costUsd,
+    pricing: routed ? { ...pricing, markup: routed.pricing.markup } : pricing,
+  });
   return {
     priceUsd,
     fact: {
@@ -64,8 +75,10 @@ export function instantEvalJudgeSpendPricedOf({
       organizationId,
       projectId,
       requestId,
-      model: INSTANT_EVAL_SPEND_MODEL,
-      rateVersion: instantEvalRateVersion(pricing),
+      model: routed ? INSTANT_EVAL_JUDGE_ROUTED_SPEND_MODEL : INSTANT_EVAL_SPEND_MODEL,
+      rateVersion: routed
+        ? instantEvalJudgeRouteRateVersion(routed.pricing)
+        : instantEvalRateVersion(pricing),
       inputTokens,
       priceNanoUsd: Math.round(priceUsd * NANO_USD_PER_USD),
       costNanoUsd: Math.round(costUsd * NANO_USD_PER_USD),

@@ -14,6 +14,11 @@ import { describe, expect, it, vi } from "vitest";
 
 import { MemoryInstantEvalClassifierChannel } from "../../__tests__/support/instant-eval-classifier.test-fakes.ts";
 import { ScriptedInstantEvalDecisionModelChannel } from "../../__tests__/support/instant-eval-decision-model.test-fakes.ts";
+import { syntheticRouteTable } from "../../__tests__/support/instant-eval-judge-route.test-fakes.ts";
+import {
+  ScriptedInstantEvalHostedDecisionsChannel,
+  ScriptedInstantEvalLlmJudgeChannel,
+} from "../../__tests__/support/instant-eval-judge-router.test-fakes.ts";
 import { MemoryInstantEvalRateLimiter } from "../../__tests__/support/instant-eval-rate-limiter.test-fakes.ts";
 import type { InstantEvalClassifyRequest } from "../../channels/instant-eval-classifier.channel.ts";
 import { MemoryInstantEvalDecisionModelChannel } from "../../channels/memory/memory.instant-eval-decision-model.channel.ts";
@@ -22,6 +27,7 @@ import {
   MemoryInstantEvalJudgeRepositories,
 } from "../../repositories/memory/memory.instant-eval-judge.repositories.ts";
 import { instantEvalJudgeSpendPricedOf } from "../../rules/instant-eval-judge-spend.rules.ts";
+import { InstantEvalJudgeRouterService } from "../instant-eval-judge-router.service.ts";
 import { InstantEvalJudgeService } from "../instant-eval-judge.service.ts";
 
 const PROJECT_ID = "project-1";
@@ -56,6 +62,7 @@ function harness({
   isProjectKnown = true,
   usageBilled,
   spentNanoUsd = 0n,
+  isRouted = false,
 }: {
   isCloud?: boolean;
   hasClassifier?: boolean;
@@ -64,6 +71,8 @@ function harness({
   /** Absent leaves the organization never folded, which reads as not billed. */
   usageBilled?: boolean;
   spentNanoUsd?: bigint;
+  /** Gives the service a router over a synthetic table whose LLM leg answers yes. */
+  isRouted?: boolean;
 } = {}) {
   const repositories = {
     ...MemoryInstantEvalJudgeRepositories.create(),
@@ -84,11 +93,34 @@ function harness({
       isTextTruncated: false,
     }),
   });
+  const limiter = MemoryInstantEvalRateLimiter.create();
+  const routePricing = {
+    version: "test",
+    markup: 2,
+    backends: { decisions: { usdPerMillionInputTokens: 1, usdPerMillionOutputTokens: 0 } },
+  };
+  const router = InstantEvalJudgeRouterService.create({
+    table: syntheticRouteTable(),
+    pricing: routePricing,
+    classifier,
+    hostedDecisions: ScriptedInstantEvalHostedDecisionsChannel.create({
+      answer: () => ({
+        verdicts: [{ questionId: QUESTION.id, probability: 0.05 }],
+        inputTokens: 1_000_000,
+        isTextTruncated: false,
+      }),
+    }),
+    llmJudge: ScriptedInstantEvalLlmJudgeChannel.create({
+      answer: () => ({ outcome: "answered", verdict: true, inputTokens: 1, outputTokens: 1 }),
+    }),
+    limiter,
+  });
   const service = InstantEvalJudgeService.create({
     decisionModels,
     repositories,
     classifier: hasClassifier ? classifier : undefined,
-    limiter: MemoryInstantEvalRateLimiter.create(),
+    ...(isRouted ? { router, routePricing } : {}),
+    limiter,
     isCloud,
     // The spend pipeline's subscriber, stood in: one row per request, never rewritten.
     recordSpendPriced: async (fact) => {
@@ -487,6 +519,64 @@ describe("given a judge call on an own decision model", () => {
       expect(decisionModels.requests[0]?.decisionModel).toEqual(decisionModel);
       expect(classifier.classify).not.toHaveBeenCalled();
       expect(recorded).toEqual([]);
+    });
+  });
+});
+
+describe("given a judge call that carries a route", () => {
+  /** @scenario "A routed judgement is priced from the summed cost of every call" */
+  it("prices the summed cost at the router's markup, under the router's model and rate", async () => {
+    const { service, classifier, recorded, seed } = harness({ isRouted: true });
+    await seed();
+
+    const answer = await service.judge({ ...call, route: { job: "llm_judge", tokens: 100 } });
+
+    // One million Decisions tokens at $1 per million, at a markup of two.
+    expect(answer).toMatchObject({ outcome: "judged", priceUsd: 2 });
+    expect(classifier.classify).not.toHaveBeenCalled();
+    expect(recorded).toHaveLength(1);
+    expect(recorded[0]).toMatchObject({
+      model: "langwatch-judge",
+      rateVersion: "instant_eval_judge_router@testx2",
+      costNanoUsd: 1_000_000_000,
+      priceNanoUsd: 2_000_000_000,
+      inputTokens: 1_000_000,
+    });
+  });
+
+  /** @scenario "A call with no route keeps today's single classifier call" */
+  it("keeps today's single classifier call and token price when no route is sent", async () => {
+    const { service, classifier, recorded, seed } = harness({ isRouted: true });
+    await seed();
+
+    const answer = await service.judge(call);
+
+    expect(classifier.classify).toHaveBeenCalledTimes(1);
+    expect(answer).toMatchObject({ outcome: "judged" });
+    const { judgement } = answer as Extract<typeof answer, { outcome: "judged" }>;
+    expect(judgement.routing).toBeUndefined();
+    expect(judgement.costNanoUsd).toBeUndefined();
+    expect(recorded[0]).toMatchObject({ model: "jev", inputTokens: 500 });
+  });
+
+  /** @scenario "A routed judgement is priced from the summed cost of every call" */
+  it("records a run's routed spend from its summed cost", async () => {
+    const { service, recorded } = harness({ isRouted: true });
+
+    await service.recordSpend({
+      organizationId: ORGANIZATION_ID,
+      projectId: PROJECT_ID,
+      requestId: "run-1",
+      inputTokens: 10,
+      costNanoUsd: 500,
+      requests: 1,
+      occurredAt: NOW,
+    });
+
+    expect(recorded[0]).toMatchObject({
+      costNanoUsd: 500,
+      priceNanoUsd: 1_000,
+      model: "langwatch-judge",
     });
   });
 });
