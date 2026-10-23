@@ -120,9 +120,10 @@ func envKeys(env []string) []string {
 	return keys
 }
 
-// dotenvUnderShell is every .env assignment the shell leaves unset, in a stable order.
+// dotenvUnderShell is every .env assignment the shell leaves unset, in a stable order,
+// each value read as Node's --env-file reads it (escapes, multi-line quotes, last wins).
 func dotenvUnderShell(repoDir string) []string {
-	dotenv := domain.LoadDotenv(repoDir)
+	dotenv := dotenvAsNodeReadsIt(repoDir)
 	keys := make([]string, 0, len(dotenv))
 	for key := range dotenv {
 		if os.Getenv(key) == "" {
@@ -135,6 +136,24 @@ func dotenvUnderShell(repoDir string) []string {
 		env = append(env, key+"="+dotenv[key])
 	}
 	return env
+}
+
+// dotenvAsNodeReadsIt is .env's last assignment per key; a file the Node-faithful
+// parser refuses (an unterminated quote) falls back to the line reader.
+func dotenvAsNodeReadsIt(repoDir string) map[string]string {
+	raw, err := os.ReadFile(dotenvPath(repoDir))
+	if err != nil {
+		return map[string]string{}
+	}
+	entries, err := domain.ParseDotenvEntries(string(raw))
+	if err != nil {
+		return domain.LoadDotenv(repoDir)
+	}
+	dotenv := make(map[string]string, len(entries))
+	for _, entry := range entries {
+		dotenv[entry.Key] = entry.Value
+	}
+	return dotenv
 }
 
 // dotenvCredentialWarning is the line `haven up` prints when .env holds a

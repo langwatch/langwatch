@@ -87,3 +87,19 @@ func TestSecretsExecKeepsTheShellThenDotenvThenTheItem(t *testing.T) {
 		}
 	}
 }
+
+func TestSecretsExecReadsDotenvValuesAsNodeDoes(t *testing.T) {
+	stubOnePassword(t)
+	t.Setenv("ESCAPED_TOKEN", "")
+	t.Setenv("PEM_KEY", "")
+	t.Setenv("TWICE_TOKEN", "")
+	repo := checkoutWithDotenv(t, "ESCAPED_TOKEN=\"a\\nb\"\nPEM_KEY=\"line one\nline two\"\nTWICE_TOKEN=first\nTWICE_TOKEN=last\n")
+
+	env := SecretsExecEnv(repo)
+
+	for _, want := range []string{"ESCAPED_TOKEN=a\nb", "PEM_KEY=line one\nline two", "TWICE_TOKEN=last"} {
+		if !slices.Contains(env, want) {
+			t.Errorf("the exec env lacks %q", want)
+		}
+	}
+}

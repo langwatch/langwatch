@@ -180,13 +180,16 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir s
 }
 
 // readItemAtStart tells every lane to read the 1Password item in memory when it
-// starts; a fork PR's stack reads nothing.
+// starts; a fork PR's stack reads nothing, and neither does the ui lane, which
+// only builds the browser bundle and so runs third-party plugin code.
 func readItemAtStart(children []Child, st domain.Stack, repoDir string) []Child {
 	if st.UntrustedCheckout {
 		return children
 	}
 	for i := range children {
-		children[i].SecretsFrom = repoDir
+		if children[i].Name != UILane {
+			children[i].SecretsFrom = repoDir
+		}
 	}
 	return children
 }
@@ -595,6 +598,8 @@ const (
 	// AppLane is the built-UI stack's one Node lane: api and worker serving apps/ui/dist/client (still and --watch).
 	// Same name as a monolith checkout's one lane, for the same reason.
 	AppLane = domain.MonolithAppLane
+	// UILane builds or serves the browser bundle: Vite under --hmr, `haven ui-watch` otherwise.
+	UILane = "ui"
 	// GoLane is the process hosting the Go data-plane services, and the
 	// simulators too unless LANGWATCH_DEV_ONE_PROCESS=0.
 	GoLane = "go"

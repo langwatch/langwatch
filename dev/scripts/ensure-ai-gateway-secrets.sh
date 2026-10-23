@@ -30,9 +30,9 @@ ENV_FILE="$(cd "$(dirname "$0")/../.." && pwd)/.env"
 # script generating secrets into a file that doesn't exist.
 [ -f "$ENV_FILE" ] || exit 0
 
-# Credentials kept in 1Password (haven secrets move) are never generated here.
-[ -n "${LANGWATCH_OP_ACCOUNT:-}" ] && exit 0
-[ -n "$(env_file_key_value "$ENV_FILE" LANGWATCH_OP_ACCOUNT || true)" ] && exit 0
+# Credentials kept in 1Password (haven secrets move) are never generated here: a
+# fresh value in .env would disagree with the item's. A missing one is named instead.
+op_account="${LANGWATCH_OP_ACCOUNT:-$(env_file_key_value "$ENV_FILE" LANGWATCH_OP_ACCOUNT || true)}"
 
 REQUIRED_SECRETS=(
   LW_GATEWAY_INTERNAL_SECRET
@@ -55,6 +55,10 @@ generated=0
 for key in "${REQUIRED_SECRETS[@]}"; do
   # A value the environment already holds (haven secrets exec, from 1Password) stays there.
   if [ -z "${!key:-}" ] && env_file_key_is_empty_or_missing "$ENV_FILE" "$key"; then
+    if [ -n "$op_account" ]; then
+      printf '  ! %s is unset: add it to the 1Password item "LangWatch haven secrets" (openssl rand -hex 32)\n' "$key" >&2
+      continue
+    fi
     # Assigned first, not passed inline: `exit` inside a command substitution
     # ends only the subshell, so an inline call would write an empty secret
     # when openssl is missing instead of stopping.

@@ -233,3 +233,14 @@ func TestAnUntrustedCheckoutGetsNothingFromTheItem(t *testing.T) {
 		}
 	}
 }
+
+func TestTheUILaneNeverReadsTheItem(t *testing.T) {
+	children := readItemAtStart([]Child{{Name: APILane}, {Name: UILane}}, domain.Stack{}, "/repo")
+
+	if api, _ := findChild(children, APILane); api.SecretsFrom != "/repo" {
+		t.Error("the api lane does not read the item")
+	}
+	if ui, _ := findChild(children, UILane); ui.SecretsFrom != "" {
+		t.Error("the ui lane, which runs third-party build plugins, reads the item")
+	}
+}

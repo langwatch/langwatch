@@ -7,9 +7,9 @@ import (
 	"sort"
 )
 
-// 1Password addressing is the same convention the Node secrets chain uses
-// (ARCHITECTURE.md §6): one account named by LANGWATCH_OP_ACCOUNT, the vault
-// Private, the item LangWatch, one field per secret named by its env key.
+// 1Password addressing, read by haven only: the account LANGWATCH_OP_ACCOUNT names,
+// the vault Private, the item "LangWatch haven secrets", one field per env key. Not
+// plain "LangWatch": op matches titles case-insensitively, and saved logins share it.
 const (
 	OnePasswordAccountKey = "LANGWATCH_OP_ACCOUNT"
 	OnePasswordVault      = "Private"

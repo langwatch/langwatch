@@ -222,8 +222,9 @@ This replaces the "1Password is opt-in" section above and the Node adapter it de
   only which checkout a lane reads from, never a value: **no 1Password value is written to any
   file haven keeps** (Alex, 2026-10-23). A failed read prints one line and changes nothing.
 - **Untrusted code gets nothing.** A fork PR's stack (`haven pr`) and a throwaway play sandbox
-  read nothing from the item; neither do dependency installs, codegen and builds, which run
-  third-party scripts.
+  read nothing from the item; neither do dependency installs, codegen and the ui lane, which run
+  third-party scripts. The app lane's one start-up UI build runs in the lane that then serves,
+  so it holds the fields; a later rebuild (`haven ui-watch`, `haven reload ui`) reads nothing.
 - **Outside haven,** `haven secrets exec -- <command>` runs any command the same way;
   `pnpm dev` re-runs itself through it when the account is set and haven is installed, and the
   two `ensure-*.sh` writers skip a key the environment already holds. A `haven up` run under
