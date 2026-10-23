@@ -106,3 +106,9 @@ Feature: The gateway registers its own spend pipeline
     Given a budget debit that occurred at a known instant
     When the budget ledger writes the debit to ClickHouse
     Then the row sends OccurredAt as that instant in ISO form
+
+  @unit @regression
+  Scenario: A pulled-usage ledger row carries OccurredAt as an instant, not epoch milliseconds
+    Given provider usage pulled for a bucket that occurred at a known instant
+    When the budget ledger writes the pulled-usage row to ClickHouse
+    Then the row sends OccurredAt as that instant in ISO form

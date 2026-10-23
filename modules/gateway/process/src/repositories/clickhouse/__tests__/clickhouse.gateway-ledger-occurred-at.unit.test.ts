@@ -63,6 +63,32 @@ describe("ledger writes send OccurredAt as a quoted instant", () => {
     });
   });
 
+  describe("when the budget ledger records pulled provider usage", () => {
+    /** @scenario "A pulled-usage ledger row carries OccurredAt as an instant, not epoch milliseconds" */
+    it("sends OccurredAt as an ISO string, not epoch milliseconds", async () => {
+      const { client, sentOccurredAt } = recordingClient();
+      const repository = GatewayBudgetClickHouseRepository.create(client as never);
+
+      await repository.insertPulledUsageRows([
+        {
+          tenantId: "project-a",
+          scopeId: "project-a",
+          restatementKey: "provider-a:2026-10-20",
+          amountNanoUsd: 1_000,
+          tokensInput: 1,
+          tokensOutput: 1,
+          tokensCacheRead: 0,
+          tokensCacheWrite: 0,
+          model: "gpt-5-mini",
+          occurredAt: Temporal.Instant.fromEpochMilliseconds(OCCURRED_AT_MS),
+          observedAt: Temporal.Instant.fromEpochMilliseconds(OCCURRED_AT_MS + 60_000),
+        },
+      ]);
+
+      expect(sentOccurredAt()).toEqual([OCCURRED_AT_ISO]);
+    });
+  });
+
   describe("when the spend fold writes a request", () => {
     /** @scenario "A spend ledger row carries OccurredAt as an instant, not epoch milliseconds" */
     it("sends OccurredAt as an ISO string, not epoch milliseconds", async () => {

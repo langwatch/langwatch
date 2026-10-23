@@ -22,10 +22,9 @@ export async function partsAfterPartitionPruning({
 }
 
 /**
- * The pruned part count of each `ReadFromMergeTree` in an EXPLAIN, from its Partition stage.
- * Reads both plan layouts: the indented one before 26.7 and the `pretty` tree from it
- * (`explain_query_plan_default`), whose lines carry box-drawing prefixes. A stage is named one
- * level under `Indexes:`, so a bare key name deeper down is not mistaken for one.
+ * Pruned part count of each `ReadFromMergeTree` in an EXPLAIN, from its Partition stage. Reads the
+ * indented layout before 26.7 and the box-drawn `pretty` tree from it. A stage sits one level under
+ * `Indexes:`, so a bare key name deeper down is not taken for one.
  */
 export function partsInExplain(lines: readonly string[]): number {
   let total = 0;
