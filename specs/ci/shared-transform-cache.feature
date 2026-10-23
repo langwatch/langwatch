@@ -76,3 +76,23 @@ Feature: Vitest's transform cache is shared across checkouts
     When it runs its tests
     Then modules are cached at that path
     And the node_modules/.vitest-cache directory is untouched
+
+  @integration
+  Scenario: A second checkout with a different tsconfig does not reuse the first's entry
+    Given the first checkout has run its tests with one tsconfig
+    When a second checkout whose tsconfig differs runs the same tests
+    Then its modules are transformed again
+    And a third checkout with the first checkout's tsconfig reads from the cache
+
+  @integration
+  Scenario: A module whose source names the first checkout's path is not reused by the second
+    Given a module whose source contains the first checkout's absolute path
+    And the first checkout has run its tests
+    When the second checkout has the same module and runs its tests
+    Then that module is transformed again and the test imports it
+
+  @integration
+  Scenario: A module whose source contains the cache's root token is never cached
+    Given a module whose source contains the cache's root token
+    When two checkouts run their tests
+    Then neither run writes that module to the shared cache or reads it from there

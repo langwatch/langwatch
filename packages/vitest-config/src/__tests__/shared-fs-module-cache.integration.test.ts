@@ -305,4 +305,75 @@ describe("the shared fs module cache", () => {
       expect(readdirSync(ownCache).length).toBeGreaterThan(0);
     }, 60_000);
   });
+
+  describe("when a module's cache key depends on more than its source", () => {
+    const fresh = (name: string) => join(base, name);
+    const probeLine = (root: string) => join(root, "pkg/src/probe.test.ts");
+    const helperLine = (root: string) => join(root, "shared/helper.ts");
+
+    /** @scenario "A second checkout with a different tsconfig does not reuse the first's entry" */
+    it("transforms again when the nearest tsconfig differs", async () => {
+      const cache = fresh("tsconfig-cache");
+      const tsconfig = (target: string) => JSON.stringify({ compilerOptions: { target } });
+      const a = checkout("tsconfig-a", {
+        "shared/helper.ts": HELPER,
+        "pkg/tsconfig.json": tsconfig("es2022"),
+      });
+      const b = checkout("tsconfig-b", {
+        "shared/helper.ts": HELPER,
+        "pkg/tsconfig.json": tsconfig("es2020"),
+      });
+      const same = checkout("tsconfig-same", {
+        "shared/helper.ts": HELPER,
+        "pkg/tsconfig.json": tsconfig("es2022"),
+      });
+
+      await runVitest(a, "file", cache);
+      const different = await runVitest(b, "file", cache);
+      const identical = await runVitest(same, "file", cache);
+
+      expect(different.cacheLog).toContain(`[write] ${probeLine(b)} is cached in ${cache}`);
+      expect(different.cacheLog).not.toContain(`[read] ${probeLine(b)}`);
+      expect(identical.cacheLog).toContain(`[read] ${probeLine(same)}`);
+    }, 120_000);
+
+    /** @scenario "A module whose source names the first checkout's path is not reused by the second" */
+    it("keeps a module that names the checkout's root out of the other checkout's reads", async () => {
+      const cache = fresh("pinned-cache");
+      const firstRoot = fresh("pinned-first");
+      const helper = `${HELPER}// built at ${firstRoot}\n`;
+      const first = checkout("pinned-first", { "shared/helper.ts": helper });
+      const second = checkout("pinned-second", { "shared/helper.ts": helper });
+
+      await runVitest(first, "file", cache);
+      const secondRun = await runVitest(second, "file", cache);
+
+      expect(secondRun.cacheLog).toContain(`[write] ${helperLine(second)} is cached in ${cache}`);
+      expect(secondRun.cacheLog).not.toContain(`[read] ${helperLine(second)}`);
+      expect(secondRun.results["imports the helper this checkout has"]?.status).toBe("passed");
+    }, 120_000);
+
+    /** @scenario "A module whose source contains the cache's root token is never cached" */
+    it("never caches a module whose source contains the root token", async () => {
+      const cache = fresh("token-cache");
+      // built in two parts: a literal token in this file would be rewritten by the cache the test itself runs under
+      const token = ["@@vitest-fs-module", "cache-root@@"].join("-");
+      const helper = HELPER.replace('"file"', `"${token}"`);
+      const first = checkout("token-first", { "shared/helper.ts": helper });
+      const second = checkout("token-second", { "shared/helper.ts": helper });
+
+      const firstRun = await runVitest(first, token, cache);
+      const secondRun = await runVitest(second, token, cache);
+
+      for (const [root, log] of [
+        [first, firstRun.cacheLog],
+        [second, secondRun.cacheLog],
+      ] as const) {
+        // the forks pool's own temporary copy is logged as a write too, so only
+        // a write into the shared cache counts
+        expect(log).not.toContain(`[write] ${helperLine(root)} is cached in ${cache}`);
+        expect(log).not.toContain(`[read] ${helperLine(root)}`);
+      }
+    }, 120_000);
+  });
 });

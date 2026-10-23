@@ -123,7 +123,7 @@ index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..208b264d9da4d38ec90f32a97fa16754
  const parallelFsCacheRead = /* @__PURE__ */ new Map();
  class FileSystemModuleCache {
  	vitest;
-@@ -7119,8 +7161,12 @@ class FileSystemModuleCache {
+@@ -7119,8 +7161,13 @@ class FileSystemModuleCache {
  	* - lockfile changes are reflected for the whole workspace, not just for a single project
  	*/
  	rootCache;
@@ -134,11 +134,12 @@ index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..208b264d9da4d38ec90f32a97fa16754
 +	// the absolute root, when the key must keep it: a path the token can't stand in for
 +	pinnedRoot;
 +	lockfileDirName;
++	tsconfigByDir = /* @__PURE__ */ new Map();
 +	version = "1.0.0-beta.7+langwatch-shared.1";
  	fsCacheRoots = /* @__PURE__ */ new WeakMap();
  	fsEnvironmentHashMap = /* @__PURE__ */ new WeakMap();
  	fsCacheKeyGenerators = /* @__PURE__ */ new Set();
-@@ -7130,8 +7176,54 @@ class FileSystemModuleCache {
+@@ -7130,8 +7177,88 @@ class FileSystemModuleCache {
  	fsCacheKeys = /* @__PURE__ */ new WeakMap();
  	constructor(vitest) {
  		this.vitest = vitest;
@@ -162,6 +163,40 @@ index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..208b264d9da4d38ec90f32a97fa16754
 +	}
 +	fromPortable(text) {
 +		return text.includes(FS_CACHE_ROOT_TOKEN) ? text.replaceAll(FS_CACHE_ROOT_TOKEN, this.workspaceRoot) : text;
++	}
++	// The tsconfig.json files that apply to a module: the nearest one up its directory
++	// tree and the files it extends. Vite's esbuild reads them to transform TypeScript,
++	// so an edit to compilerOptions or paths must change the key.
++	tsconfigContents(id) {
++		const file = cleanUrl(id);
++		if (!file.startsWith(`${this.workspaceRoot}/`)) return "";
++		const start = dirname(file);
++		const known = this.tsconfigByDir.get(start);
++		if (known !== undefined) return known;
++		let contents = "";
++		for (let dir = start; dir.startsWith(this.workspaceRoot); dir = dirname(dir)) {
++			const candidate = join(dir, "tsconfig.json");
++			if (existsSync(candidate)) {
++				contents = this.readTsconfigChain(candidate, /* @__PURE__ */ new Set());
++				break;
++			}
++		}
++		this.tsconfigByDir.set(start, contents);
++		return contents;
++	}
++	readTsconfigChain(file, seen) {
++		if (seen.has(file)) return "";
++		seen.add(file);
++		const text = tryReadFileSync(file);
++		let chain = this.toPortable(`${file}\n${text}\n`);
++		const extended = /"extends"\s*:\s*("[^"]*"|\[[^\]]*\])/.exec(text);
++		for (const [, spec] of extended ? extended[1].matchAll(/"([^"]+)"/g) : []) {
++			const name = spec.endsWith(".json") ? spec : `${spec}.json`;
++			try {
++				chain += this.readTsconfigChain(spec.startsWith(".") ? resolve$1(dirname(file), name) : createRequire(file).resolve(name), seen);
++			} catch {}
++		}
++		return chain;
 +	}
 +	// The inline source map is base64, out of reach of `toPortable`: its `file`
 +	// becomes a bare name (the reader sets it again) and a `sources` entry under
@@ -195,7 +230,7 @@ index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..208b264d9da4d38ec90f32a97fa16754
  	}
  	defineCacheKeyGenerator(callback) {
  		this.fsCacheKeyGenerators.add(callback);
-@@ -7159,7 +7251,8 @@ class FileSystemModuleCache {
+@@ -7159,7 +7286,8 @@ class FileSystemModuleCache {
  		if (log) this.vitest.logger.log(`[cache] cleared fs module cache at ${uniquePaths.join(", ")}`);
  	}
  	readCachedFileConcurrently(cachedFilePath) {
@@ -205,7 +240,7 @@ index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..208b264d9da4d38ec90f32a97fa16754
  			const matchIndex = code.lastIndexOf(cacheComment);
  			if (matchIndex === -1) {
  				debugFs?.(`${y.red("[empty]")} ${cachedFilePath} exists, but doesn't have a ${cacheComment} comment, transforming by vite instead`);
-@@ -7169,6 +7262,9 @@ class FileSystemModuleCache {
+@@ -7169,6 +7297,9 @@ class FileSystemModuleCache {
  				code,
  				meta: this.fromBase64(code.slice(matchIndex + cacheCommentLength))
  			};
@@ -215,7 +250,7 @@ index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..208b264d9da4d38ec90f32a97fa16754
  		}).finally(() => {
  			parallelFsCacheRead.delete(cachedFilePath);
  		}));
-@@ -7196,7 +7292,7 @@ class FileSystemModuleCache {
+@@ -7196,7 +7327,7 @@ class FileSystemModuleCache {
  			staticMocks: meta.staticMocks
  		};
  	}
@@ -224,7 +259,7 @@ index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..208b264d9da4d38ec90f32a97fa16754
  		if ("code" in fetchResult) {
  			const result = {
  				file: fetchResult.file,
-@@ -7210,15 +7306,16 @@ class FileSystemModuleCache {
+@@ -7210,15 +7341,16 @@ class FileSystemModuleCache {
  				staticMocks: transformResult?.__vitestStaticMocks
  			};
  			debugFs?.(`${y.yellow("[write]")} ${fetchResult.id} is cached in ${cachedFilePath}`);
@@ -245,7 +280,7 @@ index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..208b264d9da4d38ec90f32a97fa16754
  		return parse(json);
  	}
  	invalidateCachePath(environment, id) {
-@@ -7243,6 +7340,12 @@ class FileSystemModuleCache {
+@@ -7243,6 +7375,12 @@ class FileSystemModuleCache {
  			debugMemory?.(`${y.yellow("[write]")} ${id} was bailed out because it has "import.meta.glob"`);
  			return null;
  		}
@@ -258,7 +293,7 @@ index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..208b264d9da4d38ec90f32a97fa16754
  		let hashString = "";
  		for (const generator of this.fsCacheKeyGenerators) {
  			const result = generator({
-@@ -7279,20 +7382,29 @@ class FileSystemModuleCache {
+@@ -7279,20 +7417,29 @@ class FileSystemModuleCache {
  				configFileDependencies: config.configFileDependencies.map((file) => tryReadFileSync(file)),
  				environment: environment.name,
  				// this affects Vitest CSS plugin
@@ -283,7 +318,7 @@ index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..208b264d9da4d38ec90f32a97fa16754
 +		// a module that names this checkout's root itself keeps it in the key: only
 +		// this checkout can use its result
 +		const pinnedRoot = fileContent.includes(this.workspaceRoot) ? this.workspaceRoot : this.pinnedRoot;
-+		hashString += this.toPortable(id) + fileContent + environmentHash + coverageAffectsCache + pinnedRoot;
++		hashString += this.toPortable(id) + fileContent + environmentHash + coverageAffectsCache + pinnedRoot + this.tsconfigContents(id);
  		const cacheKey = hash("sha1", hashString, "hex");
  		let cacheRoot = this.fsCacheRoots.get(vitestConfig);
  		if (cacheRoot == null) {
@@ -292,7 +327,7 @@ index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..208b264d9da4d38ec90f32a97fa16754
  			this.fsCacheRoots.set(vitestConfig, cacheRoot);
  			if (!existsSync(cacheRoot)) mkdirSync(cacheRoot, { recursive: true });
  		}
-@@ -7309,49 +7421,54 @@ class FileSystemModuleCache {
+@@ -7309,49 +7456,54 @@ class FileSystemModuleCache {
  		}
  		environmentKeys.set(id, cache);
  	}
