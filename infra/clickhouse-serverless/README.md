@@ -20,7 +20,7 @@ CPU and RAM are auto-detected from cgroups. Override with `CH_CPU` and `CH_RAM` 
 | `CH_CPU`                          | auto-detect  | CPU cores                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `CH_RAM`                          | auto-detect  | Memory (`4Gi`, `16G`, or bytes)                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | `COLD_STORAGE_ENABLED`            | `false`      | Enable hot→cold tiering to S3                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| `BACKUP_ENABLED`                  | `false`      | Enable S3 disk for native `BACKUP`/`RESTORE` SQL                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `BACKUP_ENABLED`                  | `false`      | Enable S3 disk for native `BACKUP`/`RESTORE` SQL; see [Backups](#backups)                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `S3_ENDPOINT`                     | —            | S3-compatible endpoint (e.g. `https://s3.us-east-1.amazonaws.com/bucket/`)                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `S3_ACCESS_KEY` / `S3_SECRET_KEY` | —            | Static credentials (or use `USE_ENVIRONMENT_CREDENTIALS=true` for IRSA)                                                                                                                                                                                                                                                                                                                                                                                                    |
 | `CH_REPLICATED`                   | `false`      | Enable Keeper-coordinated ReplicatedMergeTree replication (requires keeper + data node env vars). Keeper replicates table data only — the LangWatchQL access model (users, profiles, row policies) is never stored in Keeper: on chart-managed ClickHouse it is delivered to every pod as rendered `users.d`/`config.d` files, and on bring-your-own ClickHouse the app provisions it via SQL; see [ADR-159](../../dev/docs/adr/159-the-app-owns-the-lwql-access-model.md) |
@@ -236,6 +236,45 @@ The remaining shared secret is the cluster secret (and the interserver HTTP
 password, when set). Rotate it by replacing the file on every replica and
 restarting them together (see [Cluster secret](#cluster-secret)).
 
+## Backups
+
+With `BACKUP_ENABLED=true` the image renders a `backups` disk (`s3_plain`, under `clickhouse-backup/` on the object store). One Go implementation takes native `BACKUP`s to it, full and incremental, from three places: `ch-config backup run` once, `ch-config sidecar` on a schedule, and `/scripts/backup-data.sh` and `/scripts/restore-data.sh`, which now exec `ch-config backup` with the same env as before. Design and limits: [ADR-185](../../dev/docs/adr/185-clickhouse-serverless-backups-run-in-the-ch-config-sidecar.md).
+
+```bash
+ch-config backup run --mode full                      # or BACKUP_MODE
+ch-config backup list                                 # names, newest first
+ch-config backup restore --name <name> --confirm      # or BACKUP_NAME, CONFIRM_RESTORE=yes
+```
+
+A run exits 0 only when it wrote a backup, or when an incremental stands down: for a full in flight, or because no full exists yet. Each incremental chains on the newest backup since the newest full still inside retention. Restore needs an exact name; `latest` is refused.
+
+| Variable                      | Default                    | Meaning                                                                                      |
+| ----------------------------- | -------------------------- | -------------------------------------------------------------------------------------------- |
+| `CLICKHOUSE_HOST`             | `localhost`                | Server to back up                                                                            |
+| `CLICKHOUSE_HTTP_PORT`        | `8123`                     | Its HTTP port                                                                                |
+| `BACKUP_USER`                 | `CLICKHOUSE_USER`          | Login; required unless the dynamic-only local admin is present (the shims default `default`) |
+| `BACKUP_PASSWORD_FILE`        | `CLICKHOUSE_PASSWORD_FILE` | Password file. One-shot commands also take `CLICKHOUSE_PASSWORD`; the sidecar never does     |
+| `BACKUP_DATABASE`             | `langwatch`                | Database to back up and restore                                                              |
+| `BACKUP_RETENTION_DAYS`       | `7`                        | The lifecycle rule on the backups prefix; a base is at most this less a day old (12h floor)  |
+| `STALE_BACKUP_HOURS`          | `3`                        | In-flight entries older than this are orphans                                                |
+| `BACKUP_CLUSTER`              | unset                      | Look up bases and in-flight backups on every replica of this cluster                         |
+| `BACKUP_MAX_BANDWIDTH`        | `0`                        | `max_backup_bandwidth`, bytes per second (0: unlimited)                                      |
+| `BACKUP_SIDECAR`              | `off`                      | `run`: the sidecar schedules backups. `observe`: it decides and reports, never backs up      |
+| `BACKUP_FULL_SCHEDULE`        | `0 */12 * * *`             | Cron, UTC                                                                                    |
+| `BACKUP_INCREMENTAL_SCHEDULE` | `0 * * * *`                | Cron, UTC                                                                                    |
+| `BACKUP_RUNNER_ORDINAL`       | `0`                        | Replica that runs backups while it answers; else the next that does                          |
+| `BACKUP_METRICS_LISTEN`       | `127.0.0.1:8125`           | `/metrics`, `/status`, `/healthz`                                                            |
+
+Example cadence, a full every third day at 05:00 UTC and an hourly incremental at :30:
+
+```bash
+BACKUP_SIDECAR=run BACKUP_FULL_SCHEDULE='0 5 */3 * *' BACKUP_INCREMENTAL_SCHEDULE='30 * * * *'
+```
+
+The sidecar runs in the ClickHouse pod (embedded in the container when there is no sidecar container). A firing is owed until a backup of its mode completes after it, whoever wrote it: a restart across a firing catches up, and a backup a CronJob finished counts. A restarted sidecar adopts a backup still in flight. Backup failures never end the process. Retention is the object store's lifecycle rule; nothing here deletes backups.
+
+To run it beside existing CronJobs without double backups, set `BACKUP_SIDECAR=observe`: it logs what it would do, exports the same metrics and counts the CronJobs' backups as successes. In dynamic-only mode the sidecar and one-shot commands inside the pod log in as the per-boot local admin; restore there with `kubectl exec <pod> -c access -- ch-config backup restore --name <name> --confirm`.
+
 ## What Gets Computed
 
 From 3 inputs (CPU, RAM, replicated), the Go binary derives ~40 parameters:
@@ -276,7 +315,7 @@ make test            # Go unit tests
 make e2e             # Basic: settings verification
 make e2e-cold        # Cold storage config check
 make e2e-cold-move   # Data moves from hot to cold S3 disk
-make e2e-backup      # Full backup → restore → incremental → restore
+make e2e-backup      # Scripts: full, chained incrementals, restores; sidecar restart mid-backup
 make e2e-access      # Tiers, rolling passwords and token logins (Linux, host network)
 ```
 
@@ -284,7 +323,7 @@ make e2e-access      # Tiers, rolling passwords and token logins (Linux, host ne
 
 ```text
 tini → entrypoint-wrapper.sh → ch-config generate → official entrypoint
-                             └→ ch-config sidecar (with CLICKHOUSE_ACCESS_FILE, unless external)
+                             └→ ch-config sidecar (CLICKHOUSE_ACCESS_FILE or BACKUP_SIDECAR, unless external)
 ```
 
 `ch-config` reads env vars, auto-detects from cgroups, computes parameters, writes native ClickHouse YAML config to `config.d/` and `users.d/`, then execs the official ClickHouse entrypoint.

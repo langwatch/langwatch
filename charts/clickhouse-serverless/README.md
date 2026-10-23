@@ -139,20 +139,55 @@ Shared by cold storage and backups. Required when either `cold.enabled` or `back
 
 ### Backups
 
-| Name                          | Description                                                              | Default                                        |
-| ----------------------------- | ------------------------------------------------------------------------ | ---------------------------------------------- |
-| `backup.enabled`              | Enable native ClickHouse BACKUP/RESTORE to S3 (requires `objectStorage`) | `false`                                        |
-| `backup.database`             | Database to back up                                                      | `langwatch`                                    |
-| `backup.user`                 | ClickHouse user for backup/restore operations                            | `default`                                      |
-| `backup.resources`            | CPU/memory requests + limits for the backup/restore Job containers       | requests `100m`/`128Mi`, limits `500m`/`512Mi` |
-| `backup.full.schedule`        | Cron schedule for full backups                                           | `0 */12 * * *`                                 |
-| `backup.incremental.schedule` | Cron schedule for incremental backups                                    | `0 * * * *`                                    |
+Native ClickHouse `BACKUP`/`RESTORE` to the `backups` disk on the object store,
+full and chained incrementals ([ADR-185](../../dev/docs/adr/185-clickhouse-serverless-backups-run-in-the-ch-config-sidecar.md)).
+`backup.mode` picks who takes them:
+
+- `cronjob` (default): the full and incremental CronJobs, as before.
+- `sidecar`: the ch-config sidecar in every ClickHouse pod, on one elected
+  runner, with the same schedules. No backup CronJobs render. It has no
+  readiness probe, so a backup problem never unreadies ClickHouse.
+- `cronjob-observe`: the CronJobs back up and the sidecar only decides and
+  exports metrics. Use it to check the sidecar and its alerts against real
+  backups before switching to `sidecar`; it never writes a second backup.
+
+Retention is the object store's lifecycle rule on the `clickhouse-backup/`
+prefix; set `backup.retentionDays` to match it. To restore, run the suspended
+`<release>-clickhouse-restore-template` CronJob as a Job with `BACKUP_NAME` and
+`CONFIRM_RESTORE=yes`, or inside a pod:
+`kubectl exec <pod> -c backup -- ch-config backup restore --name <name> --confirm`
+(`-c access` when access is on). `ch-config backup list` prints the names. With
+`access.dynamicOnly.enabled`, only `sidecar` mode is allowed: CronJobs and the
+restore template have no password to log in with, and the sidecar uses the
+per-boot local admin.
+
+| Name                                  | Description                                                                                  | Default                                        |
+| ------------------------------------- | -------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| `backup.enabled`                      | Enable native ClickHouse BACKUP/RESTORE to S3 (requires `objectStorage`)                     | `false`                                        |
+| `backup.database`                     | Database to back up                                                                          | `langwatch`                                    |
+| `backup.user`                         | ClickHouse user for backup/restore operations                                                | `default`                                      |
+| `backup.resources`                    | CPU/memory requests + limits for the backup/restore Job containers                           | requests `100m`/`128Mi`, limits `500m`/`512Mi` |
+| `backup.full.schedule`                | Cron schedule for full backups                                                               | `0 */12 * * *`                                 |
+| `backup.incremental.schedule`         | Cron schedule for incremental backups                                                        | `0 * * * *`                                    |
+| `backup.mode`                         | `cronjob`, `sidecar` or `cronjob-observe` (see above)                                        | `cronjob`                                      |
+| `backup.passwordSecret.name` / `.key` | Sidecar modes: Secret key with `backup.user`'s password, mounted as a file                   | chart Secret's password                        |
+| `backup.retentionDays`                | Sidecar modes: lifecycle expiry of the backups prefix; bounds a base's age                   | `7`                                            |
+| `backup.maxBandwidth`                 | Sidecar modes: `max_backup_bandwidth`, bytes per second                                      | `0` (unlimited)                                |
+| `backup.sidecar.runnerOrdinal`        | Pod ordinal that runs backups while it answers; else the next that does                      | `0`                                            |
+| `backup.sidecar.metricsPort`          | `/metrics`, `/status`, `/healthz` on the pod IP                                              | `8125`                                         |
+| `backup.sidecar.resources`            | The `backup` container, when access is off (with access on it shares the `access` container) | `10m`/`32Mi`, limits `200m`/`128Mi`            |
+| `backup.sidecar.podMonitor.enabled`   | Render a prometheus-operator `PodMonitor` for `/metrics`                                     | `false`                                        |
 
 ### Backup alerting
 
-Off by default. When enabled, the chart renders Prometheus alerting rules that
-watch the backup CronJobs through kube-state-metrics, so a Prometheus that
-scrapes kube-state-metrics is the only prerequisite.
+Off by default. When enabled, the chart renders Prometheus alerting rules. While
+backup CronJobs render, rules watch them through kube-state-metrics, so a
+Prometheus that scrapes kube-state-metrics is the only prerequisite. In
+`sidecar` and `cronjob-observe` modes further rules read the sidecar's own
+metrics, which Prometheus must scrape (`backup.sidecar.podMonitor.enabled`):
+`ClickHouseBackupStale` and `ClickHouseBackupFailing` per mode (label
+`source: sidecar`), `ClickHouseBackupNoRunner` (also when the metrics are
+absent), `ClickHouseBackupMultipleRunners` and `ClickHouseBackupConfigError`.
 
 The alert to care about is `ClickHouseBackupStale`, which fires when a backup
 has no successful run inside its window. That is a different condition from "a
@@ -169,17 +204,19 @@ has gone away, which would otherwise resolve every other rule into silence).
 
 Runbook: [`dev/docs/runbooks/clickhouse-backup-alerts.md`](../../dev/docs/runbooks/clickhouse-backup-alerts.md).
 
-| Name                                       | Description                                                                     | Default                                   |
-| ------------------------------------------ | ------------------------------------------------------------------------------- | ----------------------------------------- |
-| `backup.monitoring.enabled`                | Render the backup alerting rules (also requires `backup.enabled`)               | `false`                                   |
-| `backup.monitoring.runbookUrl`             | Value for the `runbook_url` annotation on every alert                           | `""`                                      |
-| `backup.monitoring.additionalLabels`       | Labels merged into every alert, for Alertmanager or Grafana routing             | `{}`                                      |
-| `backup.monitoring.for`                    | How long a backup may look broken before the alert fires                        | `15m`                                     |
-| `backup.monitoring.absentFor`              | How long the CronJob's metrics may be missing before alerting                   | `30m`                                     |
-| `backup.monitoring.prometheusRule.enabled` | Emit a `PrometheusRule` instead of a ConfigMap (needs prometheus-operator CRDs) | `false`                                   |
-| `backup.monitoring.prometheusRule.labels`  | Extra labels on the `PrometheusRule`, for the operator's `ruleSelector`         | `{}`                                      |
-| `backup.monitoring.configMapLabels`        | Labels on the rules ConfigMap, for a rules sidecar to discover it               | `{langwatch.ai/prometheus-rules: "true"}` |
-| `backup.monitoring.targets`                | Backups to watch: `name`, `cronjob` or `cronjobName`, `staleAfterHours`         | full at 26h, incremental at 3h            |
+| Name                                        | Description                                                                     | Default                                   |
+| ------------------------------------------- | ------------------------------------------------------------------------------- | ----------------------------------------- |
+| `backup.monitoring.enabled`                 | Render the backup alerting rules (also requires `backup.enabled`)               | `false`                                   |
+| `backup.monitoring.runbookUrl`              | Value for the `runbook_url` annotation on every alert                           | `""`                                      |
+| `backup.monitoring.additionalLabels`        | Labels merged into every alert, for Alertmanager or Grafana routing             | `{}`                                      |
+| `backup.monitoring.for`                     | How long a backup may look broken before the alert fires                        | `15m`                                     |
+| `backup.monitoring.absentFor`               | How long the CronJob's metrics may be missing before alerting                   | `30m`                                     |
+| `backup.monitoring.prometheusRule.enabled`  | Emit a `PrometheusRule` instead of a ConfigMap (needs prometheus-operator CRDs) | `false`                                   |
+| `backup.monitoring.prometheusRule.labels`   | Extra labels on the `PrometheusRule`, for the operator's `ruleSelector`         | `{}`                                      |
+| `backup.monitoring.configMapLabels`         | Labels on the rules ConfigMap, for a rules sidecar to discover it               | `{langwatch.ai/prometheus-rules: "true"}` |
+| `backup.monitoring.targets`                 | Backups to watch: `name`, `cronjob` or `cronjobName`, `staleAfterHours`         | full at 26h, incremental at 3h            |
+| `backup.monitoring.sidecar.staleAfterHours` | Sidecar rules: hours without a completed backup, per mode                       | full `26`, incremental `3`                |
+| `backup.monitoring.sidecar.selector`        | Sidecar rules: PromQL matchers for the sidecar's series                         | this release's pods in the namespace      |
 
 Add an entry to `backup.monitoring.targets` for any other backup CronJob in the
 same namespace, including ones this chart does not create. Name it either way:
