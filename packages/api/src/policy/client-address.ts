@@ -134,33 +134,76 @@ function stamp(request: object, address: string | undefined): void {
  * address nor a range matches nothing. Empty means no hop is trusted.
  */
 function trustedSet(entries: readonly string[]): BlockList | undefined {
+  const ranges = entries.flatMap((entry) => trustedHopRange(entry) ?? []);
+  if (ranges.length === 0) return void 0;
+
   const set = new BlockList();
-  let declared = 0;
+  for (const { address, bits, family } of ranges) set.addSubnet(address, bits, family);
+  return set;
+}
 
-  for (const entry of entries) {
-    const [network = "", prefix] = entry.trim().split("/");
-    const address = parseAddress(network);
-    if (address === null) continue;
+export type TrustedHopRange = Readonly<{ address: string; bits: number; family: "ipv4" | "ipv6" }>;
 
-    const family = isIP(address) === 6 ? "ipv6" : "ipv4";
-    if (prefix === void 0) {
-      set.addAddress(address, family);
-      declared++;
-      continue;
-    }
+/**
+ * One TRUSTED_PROXY_ADDRESSES entry as the range it trusts, or nothing when it names none: not an
+ * address or CIDR range, or an IPv6 range reaching past the IPv4-mapped block, which would trust
+ * every IPv4 peer. An IPv4-mapped range (`::ffff:10.0.0.0/104`) is read as its IPv4 range.
+ */
+export function trustedHopRange(entry: string): TrustedHopRange | undefined {
+  const [network = "", prefix, extra] = entry.trim().split("/");
+  const address = parseAddress(network);
+  if (address === null || extra !== void 0) return void 0;
 
-    // An IPv4-mapped range (`::ffff:10.0.0.0/104`) is unmapped with its address, so its prefix
-    // drops the 96 bits of the mapping too.
-    const mapped = family === "ipv4" && isIP(network.trim()) === 6;
-    const bits = Number(prefix) - (mapped ? 96 : 0);
-    const widest = family === "ipv6" ? 128 : 32;
-    if (!Number.isInteger(bits) || bits < 0 || bits > widest) continue;
+  const family = isIP(address) === 6 ? "ipv6" : "ipv4";
+  const widest = family === "ipv6" ? 128 : 32;
+  if (prefix === void 0) return { address, bits: widest, family };
+  if (!/^\d+$/.test(prefix)) return void 0;
 
-    set.addSubnet(address, bits, family);
-    declared++;
+  const mapped = family === "ipv4" && isIP(network.trim()) === 6;
+  const bits = Number(prefix) - (mapped ? MAPPED_PREFIX_BITS : 0);
+  if (bits < 0 || bits > widest) return void 0;
+  if (family === "ipv6" && bits < MAPPED_PREFIX_BITS && coversMappedBlock(address, bits)) {
+    return void 0;
   }
 
-  return declared === 0 ? void 0 : set;
+  return { address, bits, family };
+}
+
+/** `::ffff:` and the 32 bits of an IPv4 address: the IPv4 range's prefix plus 96. */
+const MAPPED_PREFIX_BITS = 96;
+
+/** The IPv4-mapped block's 96-bit prefix, as six 16-bit groups: `::ffff:0:0`. */
+const MAPPED_GROUPS = [0, 0, 0, 0, 0, 0xffff] as const;
+
+/** Whether the range `network/bits` contains the IPv4-mapped block, in any notation. */
+function coversMappedBlock(network: string, bits: number): boolean {
+  const groups = ipv6Groups(network);
+
+  return MAPPED_GROUPS.every((mapped, index) => {
+    const masked = Math.max(0, Math.min(16, bits - index * 16));
+    const mask = masked === 0 ? 0 : (0xffff << (16 - masked)) & 0xffff;
+    return ((groups[index] ?? 0) & mask) === (mapped & mask);
+  });
+}
+
+/** An IPv6 address `isIP` accepted, as its eight 16-bit groups; a dotted IPv4 tail is two. */
+function ipv6Groups(address: string): number[] {
+  const [head = "", tail] = address.toLowerCase().split("::");
+  const leading = groupsOf(head);
+  if (tail === void 0) return leading;
+  const trailing = groupsOf(tail);
+
+  return [...leading, ...Array<number>(8 - leading.length - trailing.length).fill(0), ...trailing];
+}
+
+function groupsOf(part: string): number[] {
+  if (part === "") return [];
+
+  return part.split(":").flatMap((group) => {
+    if (isIP(group) !== 4) return [parseInt(group, 16)];
+    const [a = 0, b = 0, c = 0, d = 0] = group.split(".").map(Number);
+    return [(a << 8) | b, (c << 8) | d];
+  });
 }
 
 /** The one address Cloudflare names; anything else in the header (a list, a word) is ignored. */

@@ -107,6 +107,12 @@ Feature: The client address comes only from hops the operator declared
       Then it is the address the process resolved, not a forwarding header
 
     @unit
+    Scenario: A rewritten OTLP request keeps the caller's resolved address
+      Given an OTLP request on a misconfigured exporter path whose caller was resolved
+      When the path is rewritten onto the canonical OTLP route
+      Then the rewritten request carries the same resolved address
+
+    @unit
     Scenario: Hosted MCP ignores a forged CF-Connecting-IP
       Given a hosted MCP request carrying a forged CF-Connecting-IP and X-Forwarded-For
       When its auth-failure limit keys the caller

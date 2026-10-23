@@ -206,6 +206,18 @@ describe("ClientAddress with an IPv4-mapped IPv6 trusted range", () => {
   });
 });
 
+describe("ClientAddress with an IPv6 range reaching past the IPv4-mapped block", () => {
+  it.each(["::/0", "::/80"])("trusts no IPv4 peer through it (%s)", (range) => {
+    expect(
+      resolve({
+        addresses: [range],
+        socketAddress: NODE,
+        headers: { "x-forwarded-for": "198.51.100.7" },
+      }),
+    ).toBe(NODE);
+  });
+});
+
 describe("ClientAddress over a raw Node request", () => {
   /** @scenario "A raw door ahead of the router reads the resolved address" */
   it("stamps the resolved address on the incoming message", () => {

@@ -61,7 +61,7 @@ export type ApiSurfaceComposition = Readonly<{
   instanceAdmin: RestIdentity;
   trustedProxies: readonly string[] | undefined;
   /** TRUST_CLOUDFLARE_CLIENT_IP: honour CF-Connecting-IP from a peer inside `trustedProxies`. */
-  trustCloudflare?: boolean | undefined;
+  trustCloudflare: boolean;
   executionProxyBaseUrl: string | undefined;
   /** The deployment's public address, which a proxy in front of the API may hide from it. */
   publicBaseUrl: string | undefined;
