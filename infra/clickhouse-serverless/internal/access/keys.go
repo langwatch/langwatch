@@ -160,6 +160,12 @@ func (k *keySource) getJSON(ctx context.Context, url string, dst any) error {
 	return json.NewDecoder(io.LimitReader(resp.Body, maxDocumentBytes)).Decode(dst)
 }
 
+func (k *keySource) hasKeys() bool {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	return k.keys != nil
+}
+
 // warm fetches the keys once if none are held, so the first login does not
 // wait for discovery. A failure is left for the first login to retry.
 func (k *keySource) warm(ctx context.Context, now time.Time) error {

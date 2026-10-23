@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -133,6 +134,11 @@ func (v *Verifier) Verify(ctx context.Context, user, token string) error {
 	if std.Expiry == nil {
 		return refuse("claims", "no exp claim")
 	}
+	// No leeway on exp: a token stops working the moment it expires, here
+	// and in the cache. Leeway covers nbf and iat only.
+	if !now.Before(std.Expiry.Time()) {
+		return refuse("expired", "token expired at %s", std.Expiry.Time().UTC().Format(time.RFC3339))
+	}
 	expected := jwt.Expected{Issuer: is.URL, AnyAudience: jwt.Audience{is.Audience}, Time: now}
 	if err := std.ValidateWithLeeway(expected, ClockLeeway); err != nil {
 		return refuse("claims", "%v", err)
@@ -188,13 +194,43 @@ func (v *Verifier) Handler() http.Handler {
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte("ok"))
 	})
+	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, _ *http.Request) {
+		if err := v.Ready(); err != nil {
+			http.Error(w, err.Error(), http.StatusServiceUnavailable)
+			return
+		}
+		_, _ = w.Write([]byte("ok"))
+	})
 	return mux
+}
+
+// Ready reports whether the verifier can decide token logins: an access file
+// is loaded and every issuer's keys have been fetched at least once. Keys
+// already fetched are kept when a refresh fails, so a pod that was ready
+// stays ready while an issuer is briefly unreachable.
+func (v *Verifier) Ready() error {
+	st := v.state.Load()
+	if st == nil {
+		return errors.New("no access file loaded")
+	}
+	var missing []string
+	for name, ks := range st.keys {
+		if !ks.hasKeys() {
+			missing = append(missing, name)
+		}
+	}
+	if len(missing) > 0 {
+		sort.Strings(missing)
+		return fmt.Errorf("no keys fetched yet from issuers %v", missing)
+	}
+	return nil
 }
 
 // tokenCache remembers verified (user, token) pairs until the token expires.
 type tokenCache struct {
 	mu      sync.Mutex
 	entries map[[32]byte]time.Time
+	max     int // maxCacheItems when 0
 }
 
 func (c *tokenCache) valid(key [32]byte, now time.Time) bool {
@@ -214,15 +250,27 @@ func (c *tokenCache) put(key [32]byte, exp, now time.Time) {
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if len(c.entries) >= maxCacheItems {
+	if len(c.entries) >= c.limit() {
+		// Expired entries go first; if none has, the one expiring soonest.
+		var soonest [32]byte
+		var soonestExp time.Time
 		for k, e := range c.entries {
 			if !now.Before(e) {
 				delete(c.entries, k)
+			} else if soonestExp.IsZero() || e.Before(soonestExp) {
+				soonest, soonestExp = k, e
 			}
 		}
-		if len(c.entries) >= maxCacheItems {
-			return
+		if len(c.entries) >= c.limit() {
+			delete(c.entries, soonest)
 		}
 	}
 	c.entries[key] = exp
+}
+
+func (c *tokenCache) limit() int {
+	if c.max > 0 {
+		return c.max
+	}
+	return maxCacheItems
 }

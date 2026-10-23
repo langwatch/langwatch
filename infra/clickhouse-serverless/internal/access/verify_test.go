@@ -212,7 +212,8 @@ func TestVerifier_RefusesUnlessEveryCheckPasses(t *testing.T) {
 	cases := []struct {
 		name, user, token, code string
 	}{
-		{"expired", "alice", valid(func(c map[string]any) { c["exp"] = fx.now().Add(-time.Minute).Unix() }), "claims"},
+		{"expired", "alice", valid(func(c map[string]any) { c["exp"] = fx.now().Add(-time.Minute).Unix() }), "expired"},
+		{"expiring this second", "alice", valid(func(c map[string]any) { c["exp"] = fx.now().Unix() }), "expired"},
 		{"not yet valid", "alice", valid(func(c map[string]any) { c["nbf"] = fx.now().Add(time.Minute).Unix() }), "claims"},
 		{"without exp", "alice", valid(func(c map[string]any) { delete(c, "exp") }), "claims"},
 		{"for another audience", "alice", valid(func(c map[string]any) { c["aud"] = "grafana" }), "claims"},
@@ -357,4 +358,141 @@ func TestVerifier_Healthz(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Errorf("healthz = %d", rec.Code)
 	}
+}
+
+// @scenario "A token stops working the moment it expires"
+func TestVerifier_NoLeewayOnExpiry(t *testing.T) {
+	fx := newVerifyFixture(t)
+	exp := fx.now().Add(10 * time.Second)
+	token := sign(t, fx.key, fx.claims(func(c map[string]any) { c["exp"] = exp.Unix() }))
+
+	fx.setClock(exp.Add(-time.Second))
+	if err := fx.verifier.Verify(context.Background(), "alice", token); err != nil {
+		t.Fatalf("refused a second before exp: %v", err)
+	}
+	fx.setClock(exp)
+	if err := fx.verifier.Verify(context.Background(), "alice", token); codeOf(err) != "expired" {
+		t.Errorf("at exp, from cache: %v, want code expired", err)
+	}
+	// A fresh verifier has no cache entry: the same answer, without leeway.
+	fresh := &Verifier{Now: fx.now, Log: zap.NewNop()}
+	fresh.SetFile(context.Background(), fx.verifier.state.Load().file)
+	if err := fresh.Verify(context.Background(), "alice", token); codeOf(err) != "expired" {
+		t.Errorf("at exp, verified afresh: %v, want code expired", err)
+	}
+
+	t.Run("nbf keeps its clock leeway", func(t *testing.T) {
+		early := sign(t, fx.key, fx.claims(func(c map[string]any) { c["nbf"] = fx.now().Add(ClockLeeway / 2).Unix() }))
+		if err := fx.verifier.Verify(context.Background(), "alice", early); err != nil {
+			t.Errorf("a token valid in %s refused: %v", ClockLeeway/2, err)
+		}
+	})
+}
+
+// @scenario "A verified token is answered from cache until it expires"
+func TestTokenCache(t *testing.T) {
+	key := func(b byte) [32]byte { return [32]byte{b} }
+
+	t.Run("hit until exp, miss from exp on", func(t *testing.T) {
+		c := &tokenCache{entries: map[[32]byte]time.Time{}}
+		c.put(key(1), now.Add(time.Minute), now)
+		if !c.valid(key(1), now.Add(59*time.Second)) {
+			t.Error("miss before exp")
+		}
+		if c.valid(key(1), now.Add(time.Minute)) {
+			t.Error("an expired token was served from cache at exp")
+		}
+		if _, ok := c.entries[key(1)]; ok {
+			t.Error("the expired entry was kept")
+		}
+		if c.valid(key(2), now) {
+			t.Error("hit for a token never put")
+		}
+	})
+
+	t.Run("an expired token is never stored", func(t *testing.T) {
+		c := &tokenCache{entries: map[[32]byte]time.Time{}}
+		c.put(key(1), now, now)
+		c.put(key(2), now.Add(-time.Second), now)
+		if len(c.entries) != 0 {
+			t.Errorf("cache holds %d expired tokens", len(c.entries))
+		}
+	})
+
+	t.Run("full: expired entries go first", func(t *testing.T) {
+		c := &tokenCache{entries: map[[32]byte]time.Time{}, max: 3}
+		c.put(key(1), now.Add(time.Second), now)
+		c.put(key(2), now.Add(time.Hour), now)
+		c.put(key(3), now.Add(time.Hour), now)
+		later := now.Add(2 * time.Second)
+		c.put(key(4), later.Add(time.Hour), later)
+		if _, ok := c.entries[key(1)]; ok || len(c.entries) != 3 {
+			t.Errorf("entries = %d, expired one kept: %v", len(c.entries), ok)
+		}
+	})
+
+	t.Run("full of live tokens: the one expiring soonest goes", func(t *testing.T) {
+		c := &tokenCache{entries: map[[32]byte]time.Time{}, max: 3}
+		c.put(key(1), now.Add(time.Hour), now)
+		c.put(key(2), now.Add(time.Minute), now)
+		c.put(key(3), now.Add(2*time.Hour), now)
+		c.put(key(4), now.Add(3*time.Hour), now)
+		if len(c.entries) != 3 {
+			t.Fatalf("entries = %d, want 3", len(c.entries))
+		}
+		if _, ok := c.entries[key(2)]; ok {
+			t.Error("the soonest-expiring token was not evicted")
+		}
+		if !c.valid(key(4), now) {
+			t.Error("the new token was not stored")
+		}
+	})
+}
+
+// @scenario "The sidecar is ready only once it can decide token logins"
+func TestVerifier_Ready(t *testing.T) {
+	v := &Verifier{Now: func() time.Time { return now }, Log: zap.NewNop()}
+	readyz := func() int {
+		rec := httptest.NewRecorder()
+		v.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/readyz", nil))
+		return rec.Code
+	}
+	if v.Ready() == nil || readyz() != http.StatusServiceUnavailable {
+		t.Error("ready before any access file was loaded")
+	}
+
+	key := newECKey(t, "k1")
+	// The issuer is down at first: no keys, not ready.
+	down := httptest.NewServer(http.NotFoundHandler())
+	down.Close()
+	v.SetFile(context.Background(), mustParse(t, "issuers: [{name: staff, url: '"+down.URL+"'}]\nusers: [{name: alice, tier: inspect, login: {token: {issuer: staff}}}]\n"))
+	time.Sleep(50 * time.Millisecond)
+	if err := v.Ready(); err == nil || !strings.Contains(err.Error(), "staff") {
+		t.Errorf("Ready = %v, want the issuer without keys named", err)
+	}
+
+	t.Run("ready once the keys are fetched", func(t *testing.T) {
+		up := newTestIssuer(t)
+		up.publish(key)
+		file := mustParse(t, "issuers: [{name: staff, url: '"+up.server.URL+"'}]\nusers: [{name: alice, tier: inspect, login: {token: {issuer: staff}}}]\n")
+		v.SetFile(context.Background(), file)
+		deadline := time.Now().Add(5 * time.Second)
+		for v.Ready() != nil && time.Now().Before(deadline) {
+			time.Sleep(10 * time.Millisecond)
+		}
+		if readyz() != http.StatusOK {
+			t.Fatalf("not ready after the keys were fetched: %v", v.Ready())
+		}
+
+		// The issuer goes away: the last good keys keep logins and readiness.
+		up.server.Close()
+		v.Now = func() time.Time { return now.Add(KeyRefreshInterval + time.Minute) }
+		token := sign(t, key, map[string]any{"iss": up.server.URL, "aud": "clickhouse", "sub": "alice", "exp": now.Add(2 * KeyRefreshInterval).Unix()})
+		if err := v.Verify(context.Background(), "alice", token); err != nil {
+			t.Errorf("the last good keys were dropped when the issuer went away: %v", err)
+		}
+		if v.Ready() != nil {
+			t.Error("readiness lost while the issuer was unreachable")
+		}
+	})
 }
