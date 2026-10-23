@@ -68,8 +68,9 @@ export type AuthorizationCondition = z.infer<typeof authorizationConditionSchema
 
 /**
  * ADR-177 / ADR-166: the window as the ledger stores it on a SHARED grant. `type` names the
- * store resource, `where` is an unused OTTL slot, `from`/`until` are ISO instants; an own grant
- * has none. The minter turns this into an {@link AuthorizationCondition}.
+ * store resource, `where` is OTTL text that only a braid's `span` condition fills (ADR-185 §3),
+ * stored beside its `compiledWhere`; `from`/`until` are ISO instants; an own grant has none. The
+ * minter turns this into an {@link AuthorizationCondition}.
  */
 export const grantConditionSchema = z.object({
   type: z.enum(AUTHORIZATION_CONDITION_TYPES),

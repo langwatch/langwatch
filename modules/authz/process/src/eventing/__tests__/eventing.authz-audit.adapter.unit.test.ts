@@ -236,4 +236,13 @@ describe("EventingAuthzAuditAdapter", () => {
       source: "grants-service",
     });
   });
+
+  it("records the braid a braid change replaces", async () => {
+    const store = new RecordingAuditTrailStore();
+    const adapter = EventingAuthzAuditAdapter.create({ store });
+
+    await adapter.handler(attached({ source: "braid", replacesGrantId: "grant_v1" }));
+
+    expect(store.attempts[0]?.metadata).toMatchObject({ replacesGrantId: "grant_v1" });
+  });
 });
