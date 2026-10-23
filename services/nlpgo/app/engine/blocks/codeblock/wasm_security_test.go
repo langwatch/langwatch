@@ -531,3 +531,16 @@ func TestWasmSecurity_EscapedInputIsRefusedBeforeEncoding(t *testing.T) {
 	assert.Contains(t, res.Error.Message, "exceed the 16 MiB limit")
 	assert.Less(t, after.TotalAlloc-before.TotalAlloc, uint64(8<<20), "the oversized request was encoded before it was refused")
 }
+
+// @scenario "a request's size is known before it is encoded"
+func TestWasmSecurity_DeadlinePassedWhileSizingIsATimeout(t *testing.T) {
+	e := newJSExec(t, codeblock.Options{})
+	res := runJS(t, e, codeblock.Request{
+		Code:    "export default () => ({})",
+		Inputs:  map[string]any{"x": strings.Repeat("<", 4<<20)},
+		Timeout: time.Millisecond,
+	})
+	require.NotNil(t, res.Error)
+	assert.Equal(t, codeblock.TimeoutType, res.Error.Type)
+	assert.True(t, res.TimedOut)
+}

@@ -86,7 +86,7 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       When the executor runs the request
       Then the error type is "UserTimeout"
       And the run is not reported as timed out
-      And an error whose name is not a string, or whose fields throw when read, is still reported as the code's own error
+      And an error whose name is not a string, whose fields throw when read, or that is a hostile Proxy, is still reported as the code's own error
 
     @integration
     Scenario: ZeroDivisionError aborts the node and the workflow with the traceback intact
@@ -295,6 +295,7 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       And the engine never allocated the encoded request
       And the measure counts the request's own keys, byte strings as base64, and values that encode themselves
       And an encoded request over the limit is refused even if the measure let it through
+      And a deadline that passes while the request is measured or encoded is reported as a timeout
 
     # /work is held in engine memory with no links, so no path a guest builds
     # resolves on the host; host calls and concurrent runs have budgets too.

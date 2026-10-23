@@ -373,6 +373,7 @@ func TestJavaScript_ErrorWithHostileFieldsIsStillTheCustomers(t *testing.T) {
 		"export default () => { const e = new Error('x'); e.name = { not: 'a string' }; throw e }",
 		"export default () => { const e = new Error('x'); Object.defineProperty(e, 'name', { get() { throw 1 } }); throw e }",
 		"export default () => { throw { toJSON() { throw 1 }, toString() { throw 1 } } }",
+		"export default () => { throw new Proxy(new Error('x'), { getPrototypeOf() { throw 1 } }) }",
 	} {
 		res := runJS(t, e, codeblock.Request{Code: code})
 		require.NotNil(t, res.Error, code)

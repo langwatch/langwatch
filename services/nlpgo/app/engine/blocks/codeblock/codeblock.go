@@ -569,23 +569,37 @@ func (e *Executor) executeWasm(runCtx context.Context, guest *wasmGuest, req Req
 		}), nil
 	}
 	defer admission.release()
-	stripped, failure := e.wasm.erasedTypes(runCtx, &req)
-	if runCtx.Err() != nil {
+	// Erasing, sizing and encoding take time: past the deadline, the run timed out.
+	expired := func() *Result {
+		if runCtx.Err() == nil {
+			return nil
+		}
 		return collectResult(runResult{}, runOutcome{
 			timedOut: errors.Is(runCtx.Err(), context.DeadlineExceeded),
 			elapsed:  time.Since(started),
 			err:      runCtx.Err(),
-		}), nil
+		})
+	}
+	stripped, failure := e.wasm.erasedTypes(runCtx, &req)
+	if res := expired(); res != nil {
+		return res, nil
 	}
 	if failure != nil {
 		return &Result{Error: failure, DurationMS: time.Since(started).Milliseconds()}, nil
 	}
-	if !requestFits(req, maxWasmPayloadBytes) {
+	fits := requestFits(req, maxWasmPayloadBytes)
+	if res := expired(); res != nil {
+		return res, nil
+	}
+	if !fits {
 		return requestTooLarge(), nil
 	}
 	payload, err := marshalRequest(req)
 	if err != nil {
 		return nil, err
+	}
+	if res := expired(); res != nil {
+		return res, nil
 	}
 	if len(payload) > maxWasmPayloadBytes {
 		return requestTooLarge(), nil

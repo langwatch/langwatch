@@ -177,8 +177,13 @@ function text(read, fallback) {
 }
 
 function errorOf(e) {
-  if (!(e instanceof Error))
-    return { type: "Error", message: text(() => describe(e), "Error"), traceback: "" };
+  let isError = false;
+  try {
+    isError = e instanceof Error;
+  } catch {
+    // A Proxy whose prototype trap throws is described as a plain value.
+  }
+  if (!isError) return { type: "Error", message: text(() => describe(e), "Error"), traceback: "" };
   const type = text(() => e.name, "Error");
   const message = text(() => e.message, "");
   return { type, message, traceback: `${type}: ${message}\n${text(() => e.stack, "")}` };
