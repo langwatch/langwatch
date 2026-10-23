@@ -5,6 +5,7 @@ import type {
   ScenarioExecutionPrefetchInput,
   ScenarioExecutionPrefetchResult,
   ScenarioExecutionPreparation,
+  ScenarioRunHooks,
   ScenarioUnsuccessfulExecutionInput,
   SimulationService,
 } from "@langwatch/scenario-contract";
@@ -66,6 +67,19 @@ export class ScenarioExecutionService extends ScenarioExecutionServiceContract {
       tenantId: input.projectId,
       scenarioRunId: input.scenarioRunId,
       agentInstance: input.agentInstance,
+      occurredAt: nowInstant().epochMilliseconds,
+    });
+  }
+
+  recordHooks(input: {
+    projectId: string;
+    scenarioRunId: string;
+    hooks: ScenarioRunHooks;
+  }): Promise<void> {
+    return this.options.simulations.recordHooks({
+      tenantId: input.projectId,
+      scenarioRunId: input.scenarioRunId,
+      hooks: input.hooks,
       occurredAt: nowInstant().epochMilliseconds,
     });
   }

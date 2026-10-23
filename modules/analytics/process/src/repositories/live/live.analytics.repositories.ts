@@ -6,6 +6,7 @@ import { ClickHouseAnalyticsEvaluationRepository } from "../clickhouse/clickhous
 import { ClickHouseAnalyticsRecencyRepository } from "../clickhouse/clickhouse.analytics-recency.repository.ts";
 import { ClickHouseAnalyticsSessionsRepository } from "../clickhouse/clickhouse.analytics-sessions.repository.ts";
 import { ClickHouseAnalyticsRepository } from "../clickhouse/clickhouse.analytics.repository.ts";
+import { FilterOptionsClickHouseRepository } from "../clickhouse/clickhouse.filter-options.repository.ts";
 import { ClickHouseLangWatchQLAppFunctionStoreRepository } from "../clickhouse/clickhouse.langwatch-ql-app-function-store.repository.ts";
 import type { LwqlProvisioningDatabase } from "../langwatch-ql-postgres.repository.ts";
 import { RedisAnalyticsRateLimitRepository } from "../redis/redis.analytics-rate-limit.repository.ts";
@@ -37,10 +38,15 @@ export class LiveAnalyticsRepositories {
     const resolveClient = (tenantId: string) => sessions.resolve(tenantId);
     return {
       sessions,
-      analytics: ClickHouseAnalyticsRepository.create({ resolveClient }),
+      analytics: ClickHouseAnalyticsRepository.create({ clickhouse }),
+      filterOptions: FilterOptionsClickHouseRepository.create({ clickhouse }),
       evaluations: {
         open: ({ defaultRetentionDays }) =>
-          ClickHouseAnalyticsEvaluationRepository.create({ resolveClient, defaultRetentionDays }),
+          ClickHouseAnalyticsEvaluationRepository.create({
+            resolveClient,
+            defaultRetentionDays,
+            clickhouse,
+          }),
       },
       appFunctionStore: ClickHouseLangWatchQLAppFunctionStoreRepository.create(clickhouse),
       recency: ClickHouseAnalyticsRecencyRepository.create(clickhouse),

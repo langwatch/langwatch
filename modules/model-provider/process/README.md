@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Callable model-provider operations shared by process peers after composition.
 
-Peers call these through the token, declared at `../contract/src/model-provider.api.ts:195`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/model-provider.api.ts:196`; nothing else in this package is public.
 
 #### `estimateCost`
 
@@ -218,6 +218,14 @@ findResolvedDefault(input: ModelDefaultResolveInput): Promise<ModelDefaultEffect
 resolveModelForFeature(input: ModelDefaultResolveInput): Promise<ModelProviderResolution>;
 ```
 
+#### `resolveDecisionModel`
+
+What the project's Instant Evals run on: LangWatch's classifier, or the organization's own decision model with its decrypted key. An own model that cannot run answers `own_unavailable`, never `langwatch` (ADR-182 decisions 4 and 5). The answer is kept a minute per project.
+
+```typescript
+resolveDecisionModel(input: { projectId: string }): Promise<DecisionModelResolution>;
+```
+
 #### `findAlternateModel`
 
 ```typescript
@@ -375,14 +383,14 @@ Permission `project:view`. Declared at `src/transport/model-defaults.rest.ts:57`
 Answers at `/api/model-defaults`, `/api/v1/model-defaults`; also, undocumented, `/api/model-defaults/2026-08-07`, `/api/v1/model-defaults/2026-08-07`, `/api/model-defaults/latest`, `/api/v1/model-defaults/latest`.
 
 ```typescript
-type Response = z.infer<typeof apiResponseModelDefaultsSchema>; // ../contract/src/model-provider-rest.schemas.ts:165
+type Response = z.infer<typeof apiResponseModelDefaultsSchema>; // ../contract/src/model-provider-rest.schemas.ts:166
 ```
 
 #### `POST /` · `postApiModelDefaults`
 
-Create a default-model config attached to one or more scopes. JSON keys may be roles (DEFAULT, FAST, LANGY, EMBEDDINGS) or registered feature keys; missing keys inherit from a higher scope.
+Create a default-model config attached to one or more scopes. JSON keys may be roles (DEFAULT, FAST, LANGY, EMBEDDINGS, INSTANT_EVALS) or registered feature keys; missing keys inherit from a higher scope.
 
-Permission `project:manage`. Declared at `src/transport/model-defaults.rest.ts:96`.
+Permission `project:manage`. Declared at `src/transport/model-defaults.rest.ts:97`.
 
 Answers at `/api/model-defaults`, `/api/v1/model-defaults`; also, undocumented, `/api/model-defaults/2026-08-07`, `/api/v1/model-defaults/2026-08-07`, `/api/model-defaults/latest`, `/api/v1/model-defaults/latest`.
 
@@ -395,7 +403,7 @@ interface Body {
     scopeId: string;
   }[];
 }
-// Response: apiResponseConfigCreatedSchema, ../contract/src/model-provider-rest.schemas.ts:174
+// Response: apiResponseConfigCreatedSchema, ../contract/src/model-provider-rest.schemas.ts:175
 interface Response {
   id: string;
 }
@@ -405,7 +413,7 @@ interface Response {
 
 Update a config's JSON payload and/or its scope attachments. Sending `scopes: []` deletes the config.
 
-Permission `project:manage`. Declared at `src/transport/model-defaults.rest.ts:125`.
+Permission `project:manage`. Declared at `src/transport/model-defaults.rest.ts:127`.
 
 Answers at `/api/model-defaults/:id`, `/api/v1/model-defaults/:id`; also, undocumented, `/api/model-defaults/2026-08-07/:id`, `/api/v1/model-defaults/2026-08-07/:id`, `/api/model-defaults/latest/:id`, `/api/v1/model-defaults/latest/:id`.
 
@@ -422,7 +430,7 @@ interface Body {
     scopeId: string;
   }[];
 }
-// Response: inline, src/transport/model-defaults.rest.ts:129
+// Response: inline, src/transport/model-defaults.rest.ts:132
 type Response = unknown;
 ```
 
@@ -430,13 +438,13 @@ type Response = unknown;
 
 Delete a default-model config. Scope attachments cascade.
 
-Permission `project:manage`. Declared at `src/transport/model-defaults.rest.ts:159`.
+Permission `project:manage`. Declared at `src/transport/model-defaults.rest.ts:162`.
 
 Answers at `/api/model-defaults/:id`, `/api/v1/model-defaults/:id`; also, undocumented, `/api/model-defaults/2026-08-07/:id`, `/api/v1/model-defaults/2026-08-07/:id`, `/api/model-defaults/latest/:id`, `/api/v1/model-defaults/latest/:id`.
 
 ```typescript
 type Params = z.infer<typeof modelDefaultsRestParamsSchema>; // ../contract/src/model-provider-rest.schemas.ts:88
-// Response: inline, src/transport/model-defaults.rest.ts:162
+// Response: inline, src/transport/model-defaults.rest.ts:166
 type Response = unknown;
 ```
 
@@ -495,12 +503,12 @@ Permission `playground:view`. Declared at `src/transport/playground.rest.ts:18`.
 Answers at `/api/playground`, `/api/v1/playground`.
 
 ```typescript
-// Body: playgroundRestBodySchema, ../contract/src/model-provider-rest.schemas.ts:192
+// Body: playgroundRestBodySchema, ../contract/src/model-provider-rest.schemas.ts:193
 interface Body {
   messages: unknown[];
 }
-type Headers = z.infer<typeof playgroundRestHeadersSchema>; // ../contract/src/model-provider-rest.schemas.ts:204
-// Response: inline, src/transport/playground.rest.ts:27
+type Headers = z.infer<typeof playgroundRestHeadersSchema>; // ../contract/src/model-provider-rest.schemas.ts:205
+// Response: inline, src/transport/playground.rest.ts:28
 type Response = unknown;
 ```
 
@@ -528,7 +536,7 @@ interface Input {
 
 // llmModelCost.createOrUpdate
 type Input = z.infer<typeof modelCostWriteTrpcInputSchema>; // ../contract/src/model-cost.trpc-schemas.ts:128
-type Output = z.infer<typeof modelCostSchema>; // ../contract/src/model-provider.ts:672
+type Output = z.infer<typeof modelCostSchema>; // ../contract/src/model-provider.ts:674
 
 // llmModelCost.delete
 // Input: modelCostDeleteTrpcInputSchema, ../contract/src/model-cost.trpc-schemas.ts:37
@@ -641,7 +649,7 @@ interface Input {
     scopeId: string;
   }[];
 }
-type Output = z.infer<typeof modelProviderCredentialVerdictSchema>; // ../contract/src/model-provider.ts:326
+type Output = z.infer<typeof modelProviderCredentialVerdictSchema>; // ../contract/src/model-provider.ts:328
 
 // modelProvider.testConnection
 // Input: modelProviderTestConnectionTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:185
@@ -651,7 +659,7 @@ interface Input {
   actorId?: string;
   modelProviderId: string;
 }
-type Output = z.infer<typeof modelProviderCredentialVerdictSchema>; // ../contract/src/model-provider.ts:326
+type Output = z.infer<typeof modelProviderCredentialVerdictSchema>; // ../contract/src/model-provider.ts:328
 
 // modelProvider.codexSignInStart
 type Input = z.infer<typeof modelProviderProjectTrpcInputSchema>; // ../contract/src/model-provider.trpc-schemas.ts:67
@@ -704,7 +712,7 @@ interface Output {
 
 // modelProvider.codexStatus
 type Input = z.infer<typeof modelProviderProjectTrpcInputSchema>; // ../contract/src/model-provider.trpc-schemas.ts:67
-// Output: modelProviderCodexStatusSchema, ../contract/src/model-provider.ts:355
+// Output: modelProviderCodexStatusSchema, ../contract/src/model-provider.ts:357
 type Output =
   | {
       connected: false;
@@ -733,7 +741,7 @@ interface Input {
   provider: string;
   customBaseUrl?: string;
 }
-type Output = z.infer<typeof modelProviderCredentialVerdictSchema>; // ../contract/src/model-provider.ts:326
+type Output = z.infer<typeof modelProviderCredentialVerdictSchema>; // ../contract/src/model-provider.ts:328
 
 // modelProvider.getResolvedDefault
 // Input: modelDefaultResolvedTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:258
@@ -751,14 +759,14 @@ type Output = {
 
 // modelProvider.getDefaultModelsForProject
 type Input = z.infer<typeof modelProviderProjectTrpcInputSchema>; // ../contract/src/model-provider.trpc-schemas.ts:67
-type Output = z.infer<typeof modelDefaultSnapshotSchema>; // ../contract/src/model-provider.ts:521
+type Output = z.infer<typeof modelDefaultSnapshotSchema>; // ../contract/src/model-provider.ts:523
 
 // modelProvider.setRoleAssignmentForScope
 // Input: modelDefaultRoleAssignmentTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:270
 interface Input {
   scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
   scopeId: string;
-  role: "DEFAULT" | "FAST" | "LANGY" | "EMBEDDINGS";
+  role: "DEFAULT" | "FAST" | "LANGY" | "EMBEDDINGS" | "INSTANT_EVALS";
   model: string | null;
 }
 // Output: modelProviderOkAckSchema, ../contract/src/model-provider.trpc-schemas.ts:378
@@ -808,7 +816,7 @@ interface Input {
   }[];
   excludeConfigId?: string;
 }
-type Output = z.infer<typeof modelDefaultInheritedValuesSchema>; // ../contract/src/model-provider.ts:650
+type Output = z.infer<typeof modelDefaultInheritedValuesSchema>; // ../contract/src/model-provider.ts:652
 ```
 
 ### `translate`
@@ -851,8 +859,8 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                                         | Environment variable                           | Declared at                                   |
 | ------ | -------------------------------------------- | ---------------------------------------------- | --------------------------------------------- |
-| secret | `...ModelProviderModule.platformCredentials` | ≈ `...ModelProviderModule.platformCredentials` | `src/app/model-provider.app.ts:250`           |
-| secret | `...ModelProviderModule.operationalSecrets`  | ≈ `...ModelProviderModule.operationalSecrets`  | `src/app/model-provider.app.ts:251`           |
+| secret | `...ModelProviderModule.platformCredentials` | ≈ `...ModelProviderModule.platformCredentials` | `src/app/model-provider.app.ts:253`           |
+| secret | `...ModelProviderModule.operationalSecrets`  | ≈ `...ModelProviderModule.operationalSecrets`  | `src/app/model-provider.app.ts:254`           |
 | config | `blockLocalHttpCalls`                        | `BLOCK_LOCAL_HTTP_CALLS`                       | `../contract/src/model-provider.config.ts:31` |
 | config | `allowedProxyHosts`                          | `ALLOWED_PROXY_HOSTS`                          | `../contract/src/model-provider.config.ts:32` |
 | config | `defaultModel`                               | `LANGWATCH_DEFAULT_MODEL`                      | `../contract/src/model-provider.config.ts:33` |

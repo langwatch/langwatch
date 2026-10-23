@@ -1,4 +1,4 @@
-import type { ExhaustedOutcome } from "@langwatch/group-queue";
+import { type ExhaustedOutcome, sendPreparedInOrder } from "@langwatch/group-queue";
 import { createLogger, type Logger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import { z } from "zod";
@@ -18,10 +18,15 @@ import type {
   DeduplicationStrategy,
   EventSourcedQueueProcessor,
   QueueSendOptions,
+  QueueSendResult,
 } from "../../queues/index.ts";
-import { resolveDeduplicationStrategy } from "../../queues/index.ts";
+import { resolveDeduplicationStrategy, sendEach } from "../../queues/index.ts";
 import type { JobDelivery } from "../../queues/queue.types.ts";
 import type { EventStoreReadContext } from "../../stores/eventStore.types.ts";
+import {
+  type CompactSubscriberJob,
+  compactSubscriberJobSchema,
+} from "../../subscribers/subscriber.types.ts";
 import { mapValidationIssues } from "../../utils/errors.ts";
 import {
   type CommandHandlerOptions,
@@ -59,6 +64,8 @@ export type { JobRegistryEntry } from "./jobLane.ts";
 interface JobSender<P> {
   send: (payload: P, options?: QueueSendOptions<P>) => Promise<void>;
   sendBatch: (payloads: P[], options?: QueueSendOptions<P>) => Promise<void>;
+  /** Each payload as `send` sends it, in bounded batches; one answer per payload, in order. */
+  sendEach: (payloads: P[], options?: QueueSendOptions<P>) => Promise<QueueSendResult[]>;
   close: () => Promise<void>;
   waitUntilReady: () => Promise<void>;
 }
@@ -73,6 +80,84 @@ function withBatchTenant<E extends Event>(
 }
 
 const projectionSubscriberPayloadSchema = z.object({ event: z.unknown(), foldState: z.unknown() });
+
+/** A projection subscriber's queued job: its event and fold state, or a compact body (ADR-069). */
+export type ProjectionSubscriberJob<E extends Event> =
+  | { event: E; foldState: unknown }
+  | CompactSubscriberJob;
+
+/** The full delivery a projection subscriber's job carries, the shape its routing reads. */
+type FullSubscriberJob<E extends Event> = { event: E; foldState: unknown };
+
+function isFullSubscriberJob<E extends Event>(
+  payload: ProjectionSubscriberJob<E>,
+): payload is FullSubscriberJob<E> {
+  return "foldState" in payload;
+}
+
+/** Reads a dequeued job: a compact body only where the subscriber reads one (ADR-069). */
+function parseProjectionSubscriberJob<E extends Event>({
+  payload,
+  subscriberName,
+  readsCompactJobs,
+  parseEvent,
+}: {
+  payload: unknown;
+  subscriberName: string;
+  readsCompactJobs: boolean;
+  parseEvent: (value: unknown) => E;
+}): ProjectionSubscriberJob<E> {
+  if (typeof payload !== "object" || payload === null || !("job" in payload)) {
+    const { event, foldState } = projectionSubscriberPayloadSchema.parse(payload);
+    return { event: parseEvent(event), foldState };
+  }
+  if (!readsCompactJobs) {
+    throw new ValidationError({
+      reason: `Subscriber "${subscriberName}" reads no compact job body`,
+      field: "job",
+    });
+  }
+  return compactSubscriberJobSchema.parse(payload);
+}
+
+/** A lane's stage hook: a full delivery becomes its compact body; a compact one stays. */
+function stageFullDeliveries<E extends Event>(
+  stage: ((payload: FullSubscriberJob<E>) => CompactSubscriberJob) | undefined,
+): Pick<JobLane<ProjectionSubscriberJob<E>>, "stage"> {
+  if (!stage) return {};
+  return { stage: (payload) => (isFullSubscriberJob(payload) ? stage(payload) : payload) };
+}
+
+/** The declared dedup over either body; a compact body re-read for re-drive keys by aggregate. */
+function dedupOverEitherBody<E extends Event>({
+  deduplication,
+  compactId,
+}: {
+  deduplication: DeduplicationConfig<FullSubscriberJob<E>> | undefined;
+  compactId: (payload: CompactSubscriberJob) => string;
+}): DeduplicationConfig<ProjectionSubscriberJob<E>> | undefined {
+  if (!deduplication) return undefined;
+  return {
+    ...deduplication,
+    makeId: (payload) =>
+      isFullSubscriberJob(payload) ? deduplication.makeId(payload) : compactId(payload),
+  };
+}
+
+/** A custom group key reads the full delivery; a compact body groups by its aggregate. */
+function customKeyOrAggregate<E extends Event>({
+  payload,
+  customGroupKeyFn,
+  aggregateKey,
+}: {
+  payload: ProjectionSubscriberJob<E>;
+  customGroupKeyFn: ((payload: FullSubscriberJob<E>) => string) | undefined;
+  aggregateKey: (payload: ProjectionSubscriberJob<E>) => string;
+}): string {
+  return customGroupKeyFn && isFullSubscriberJob(payload)
+    ? customGroupKeyFn(payload)
+    : aggregateKey(payload);
+}
 
 /** A send's dedup config over the queued envelope: its id was computed at send, in `__routing`. */
 function routedDeduplication<P>(
@@ -188,6 +273,25 @@ function buildValidatingCommandFacade<EventType extends Event, Payload extends T
         sendOptionsOverRaw(options, (payload) => rawOf.get(payload) ?? {}),
       );
     },
+    // Validated one by one: an invalid payload is rejected alone, the rest still send.
+    sendEach: (payloads, options) => {
+      const rawOf = new Map<Payload, Record<string, unknown>>();
+      return sendPreparedInOrder({
+        inputs: payloads,
+        prepare: (payload) => {
+          const validated = validateCommandPayload(cmdEntry, payload);
+          rawOf.set(validated, payload);
+          return validated;
+        },
+        send: async (validated) => {
+          await registerPreflight(validated.map(identityOf));
+          return baseFacade.sendEach(
+            validated,
+            sendOptionsOverRaw(options, (payload) => rawOf.get(payload) ?? {}),
+          );
+        },
+      });
+    },
     close: baseFacade.close,
     waitUntilReady: baseFacade.waitUntilReady,
   };
@@ -229,7 +333,7 @@ export class QueueManager<EventType extends Event = Event> {
   private readonly eventQueues = new Map<string, EventSourcedQueueProcessor<EventType>>();
   private readonly projectionSubscriberQueues = new Map<
     string,
-    EventSourcedQueueProcessor<{ event: EventType; foldState: unknown }>
+    EventSourcedQueueProcessor<ProjectionSubscriberJob<EventType>>
   >();
   private readonly commandQueues = new Map<
     string,
@@ -266,7 +370,9 @@ export class QueueManager<EventType extends Event = Event> {
     this.parseEvent = parseEvent;
   }
 
-  private createDefaultDeduplicationId(event: EventType): string {
+  private createDefaultDeduplicationId(
+    event: Pick<EventType, "tenantId" | "aggregateType" | "aggregateId">,
+  ): string {
     return `${String(event.tenantId)}:${event.aggregateType}:${String(event.aggregateId)}`;
   }
 
@@ -363,7 +469,7 @@ export class QueueManager<EventType extends Event = Event> {
     );
 
     const envelopeOf = (payload: P, deduplication: DeduplicationConfig<P> | undefined) => ({
-      ...toRecord(payload),
+      ...toRecord(lane.stage ? lane.stage(payload) : payload),
       __pipelineName: pipelineName,
       __jobType: jobType,
       __jobName: jobName,
@@ -391,6 +497,15 @@ export class QueueManager<EventType extends Event = Event> {
           payloads.map((payload) => envelopeOf(payload, deduplication)),
           queued,
         );
+      },
+      sendEach: (payloads, options) => {
+        const { deduplication, queued } = sendOptionsOf(options);
+        return sendPreparedInOrder({
+          inputs: payloads,
+          prepare: (payload) => envelopeOf(payload, deduplication),
+          send: (envelopes) =>
+            sendEach({ processor: globalQueue, payloads: envelopes, options: queued }),
+        });
       },
       // Global queue lifecycle is owned by EventSourcing — facade close is a no-op
       close: async () => undefined,
@@ -431,10 +546,16 @@ export class QueueManager<EventType extends Event = Event> {
       event: EventType,
       context: EventStoreReadContext<EventType>,
     ) => Promise<void>,
+    onEventBatch?: (
+      subscriberName: string,
+      events: EventType[],
+      context: EventStoreReadContext<EventType>,
+    ) => Promise<void>,
   ): void {
     this.initializeEventConsumerQueues({
       definitions: subscribers,
       onEvent,
+      onEventBatch,
       jobType: "subscriber",
       jobPath: "subscriber",
       incrementCount: () => this.subscriberCount++,
@@ -501,9 +622,12 @@ export class QueueManager<EventType extends Event = Event> {
           onEventBatch &&
           handlerDef.options.coalesceMaxBatch &&
           handlerDef.options.coalesceMaxBatch > 1
-            ? (events: EventType[]) =>
+            ? (events: EventType[], delivery?: JobDelivery) =>
                 withBatchTenant(events, (tenantId) =>
-                  onEventBatch(handlerName, events, { tenantId }),
+                  onEventBatch(handlerName, events, {
+                    tenantId,
+                    deliveryAttempt: delivery?.attempt,
+                  }),
                 )
             : undefined,
         coalesceMaxBatch: handlerDef.options.coalesceMaxBatch,
@@ -872,22 +996,23 @@ export class QueueManager<EventType extends Event = Event> {
         parentProjection: string;
         parentType: "fold" | "map";
         handler: {
-          handle: (payload: { event: EventType; foldState: unknown }) => Promise<void>;
+          handle: (payload: ProjectionSubscriberJob<EventType>) => Promise<void>;
         };
-        groupKeyFn?: (payload: { event: EventType; foldState: unknown }) => string;
+        groupKeyFn?: (payload: FullSubscriberJob<EventType>) => string;
+        /** Whether the subscriber reads compact bodies; elsewhere a compact one is refused. */
+        readsCompactJobs?: boolean;
+        /** Present when the subscriber queues compact bodies; routing reads the full delivery. */
+        stage?: (payload: FullSubscriberJob<EventType>) => CompactSubscriberJob;
         options?: {
           disabled?: boolean;
           delay?: number;
-          deduplication?: DeduplicationStrategy<{
-            event: EventType;
-            foldState: unknown;
-          }>;
+          deduplication?: DeduplicationStrategy<FullSubscriberJob<EventType>>;
         };
       }
     >,
     onEvent: (
       subscriberName: string,
-      payload: { event: EventType; foldState: unknown },
+      payload: ProjectionSubscriberJob<EventType>,
       context: EventStoreReadContext<EventType>,
     ) => Promise<void>,
   ): void {
@@ -897,21 +1022,25 @@ export class QueueManager<EventType extends Event = Event> {
 
     for (const [subscriberName, subscriberDef] of Object.entries(subscribers)) {
       const customGroupKeyFn = subscriberDef.groupKeyFn;
-      const getTenantId = (payload: { event: EventType; foldState: unknown }) =>
+      const getTenantId = (payload: ProjectionSubscriberJob<EventType>) =>
         String(payload.event.tenantId);
+      const aggregateKey = (payload: ProjectionSubscriberJob<EventType>) =>
+        `${payload.event.aggregateType}:${String(payload.event.aggregateId)}`;
       const subscriberGroupKeyFn = this.buildGroupKey({
         jobPath: `${subscriberDef.parentType}/${subscriberDef.parentProjection}/reactor/${subscriberName}`,
         getTenantId,
-        domainKeyFn: customGroupKeyFn
-          ? (payload: { event: EventType; foldState: unknown }) => customGroupKeyFn(payload)
-          : (payload: { event: EventType; foldState: unknown }) =>
-              `${payload.event.aggregateType}:${String(payload.event.aggregateId)}`,
+        domainKeyFn: (payload: ProjectionSubscriberJob<EventType>) =>
+          customKeyOrAggregate({ payload, customGroupKeyFn, aggregateKey }),
       });
-      const lane: JobLane<{ event: EventType; foldState: unknown }> = {
-        parse: (payload) => {
-          const { event, foldState } = projectionSubscriberPayloadSchema.parse(payload);
-          return { event: this.parseEvent(event), foldState };
-        },
+      const lane: JobLane<ProjectionSubscriberJob<EventType>> = {
+        parse: (payload) =>
+          parseProjectionSubscriberJob({
+            payload,
+            subscriberName,
+            readsCompactJobs: subscriberDef.readsCompactJobs ?? false,
+            parseEvent: this.parseEvent,
+          }),
+        ...stageFullDeliveries(subscriberDef.stage),
         groupKeyFn: subscriberGroupKeyFn,
         getTenantId,
         preflightGroupKey: customGroupKeyFn
@@ -919,19 +1048,21 @@ export class QueueManager<EventType extends Event = Event> {
           : this.buildPreflightGroupKey(
               `${subscriberDef.parentType}/${subscriberDef.parentProjection}/reactor/${subscriberName}`,
             ),
-        scoreFn: (payload: { event: EventType; foldState: unknown }) => payload.event.createdAt,
-        process: async (payload: { event: EventType; foldState: unknown }) => {
+        scoreFn: (payload) => payload.event.createdAt,
+        process: async (payload) => {
           await onEvent(subscriberName, payload, {
             tenantId: payload.event.tenantId,
           });
         },
         delay: subscriberDef.options?.delay,
-        deduplication: subscriberDef.options?.deduplication
-          ? resolveDeduplicationStrategy(subscriberDef.options.deduplication, (payload) =>
-              this.createDefaultDeduplicationId(payload.event),
-            )
-          : undefined,
-        spanAttributes: (payload: { event: EventType; foldState: unknown }) => ({
+        deduplication: dedupOverEitherBody({
+          deduplication: resolveDeduplicationStrategy(
+            subscriberDef.options?.deduplication,
+            (payload) => this.createDefaultDeduplicationId(payload.event),
+          ),
+          compactId: (payload) => this.createDefaultDeduplicationId(payload.event),
+        }),
+        spanAttributes: (payload) => ({
           "subscriber.name": subscriberName,
           "event.type": payload.event.type,
           "event.id": payload.event.id,
@@ -1003,7 +1134,7 @@ export class QueueManager<EventType extends Event = Event> {
 
   getProjectionSubscriberQueue(
     subscriberName: string,
-  ): EventSourcedQueueProcessor<{ event: EventType; foldState: unknown }> | undefined {
+  ): EventSourcedQueueProcessor<ProjectionSubscriberJob<EventType>> | undefined {
     return this.projectionSubscriberQueues.get(this.key("reactor", subscriberName));
   }
 

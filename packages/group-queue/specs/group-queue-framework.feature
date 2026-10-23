@@ -118,3 +118,34 @@ Feature: Group Queue framework boundary
       Then the heartbeat is refused
       And the retry's backoff TTL is not extended
       And the ready score still reflects the retry's schedule, not a fresh active window
+
+  Rule: A blocked group's jobs never expire while it waits for an operator
+
+    # Blocking clears the safety-net expiry on the group's jobs and values; arrivals keep it cleared.
+
+    @integration
+    Scenario: Jobs staged one at a time into a blocked group carry no expiry
+      Given a group blocked after its job used up its retry budget
+      When jobs are staged into it singly, including a dedup replacement and a re-send of a staged id
+      Then the group's jobs and values carry no expiry
+
+    @integration
+    Scenario: Jobs staged as a batch into a blocked group carry no expiry
+      Given a group blocked after its job used up its retry budget
+      When a batch stages jobs into it, including a dedup replacement and a re-send of a staged id
+      Then the group's jobs and values carry no expiry
+      And a group in the same batch that is not blocked gets its expiry as before
+
+    @integration
+    Scenario: An unblocked group gets its expiry back and runs every job it held
+      Given a blocked group holding jobs staged after the block, the latest due hours from now
+      When an operator unblocks it
+      Then its expiry runs from its latest job's due time
+      And every job it held is claimed in order
+
+    @integration
+    Scenario: Replaying dead-lettered jobs into a blocked group keeps it held
+      Given a dead-lettered group whose live group an operator has blocked again
+      When an operator replays its dead-lettered jobs
+      Then the jobs are back on the live group with no expiry
+      And the group stays out of the dispatch scan until it is unblocked

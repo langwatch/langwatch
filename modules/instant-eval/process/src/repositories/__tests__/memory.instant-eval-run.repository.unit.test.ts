@@ -176,3 +176,18 @@ describe("given several runs in a project", () => {
     });
   });
 });
+
+describe("given two runs created in the same millisecond", () => {
+  describe("when the project's runs are listed", () => {
+    /** @scenario "Runs are listed newest first and scoped to the credential's project" */
+    it("orders them by id as ClickHouse does, the later id first", async () => {
+      // An upper-case id sorts before a lower-case one by byte, after it by locale.
+      await repository.create(definition({ id: "instanteval_0005Z" }));
+      await repository.create(definition({ id: "instanteval_0005a" }));
+
+      const page = await repository.findPage({ projectId: THIS_PROJECT, limit: 10 });
+
+      expect(page.map((row) => row.id)).toEqual(["instanteval_0005a", "instanteval_0005Z"]);
+    });
+  });
+});
