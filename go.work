@@ -1,4 +1,4 @@
-go 1.27.2
+go 1.27.3
 
 // Monorepo Go workspace. No module sits at the repository root: cmd, pkg,
 // services and tools are one module each, beside the SDK and the ClickHouse

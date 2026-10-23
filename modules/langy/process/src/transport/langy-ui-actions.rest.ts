@@ -82,6 +82,7 @@ export const langyUiActionsRest = defineRestRouter(LangyApi)
   .withAddressing("literal", { v1Twin: true })
 
   .post("/api/langy/ui/actions", "langyUiActionsDispatch")
+  .keepsRecords()
   .withAudit("langy.dispatchUiAction")
   .withAccess(deferredScope({ reason: AUTH_REASON }))
   .withRawBody("text")

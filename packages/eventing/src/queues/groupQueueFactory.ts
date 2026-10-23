@@ -162,6 +162,25 @@ function consumerDependencies({
 }
 
 /**
+ * Consumers first: a draining job sends its fan-out through THIS producer, whose gate shuts
+ * once its own close ends. Every consumer settles before the producer closes; the first drain
+ * failure wins over a producer-close failure. Spec: specs/background/queue-drain-send-gate.feature
+ */
+async function closeConsumersThenProducer({
+  consumers,
+  producer,
+}: {
+  consumers: readonly { close: () => Promise<void> }[];
+  producer: { close: () => Promise<void> };
+}): Promise<void> {
+  const drained = await Promise.allSettled(consumers.map((each) => each.close()));
+  const failed = drained.find((each): each is PromiseRejectedResult => each.status === "rejected");
+  const [producerClosed] = await Promise.allSettled([producer.close()]);
+  if (failed) throw failed.reason;
+  if (producerClosed?.status === "rejected") throw producerClosed.reason;
+}
+
+/**
  * Adapts the capability-split Group Queue API to Eventing's shared runtime
  * queue port. Application composition owns the Redis and storage dependencies;
  * Eventing owns only the routing definition and handler registry.
@@ -241,6 +260,7 @@ export function createEventingGroupQueueFactory({
     return {
       send: (payload, options) => producer.send(payload, options),
       sendBatch: (payloads, options) => producer.sendBatch(payloads, options),
+      sendEach: (payloads, options) => producer.sendEach(payloads, options),
       runListedWork: (input) => producer.runListedWork(input),
       start() {
         if (!consumersEnabled || consumers.length > 0) return;
@@ -254,10 +274,7 @@ export function createEventingGroupQueueFactory({
           ...consumers.map((each) => each.waitUntilReady()),
         ]);
       },
-      async close() {
-        await producer.close();
-        await Promise.all(consumers.map((each) => each.close()));
-      },
+      close: () => closeConsumersThenProducer({ consumers, producer }),
     };
   };
 }

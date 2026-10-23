@@ -30,15 +30,21 @@ export class TraceEventDerivationService {
     spans: TraceDerivationSpanReaderRepository;
     authorize: FoldReadAuthorizer;
   }): TraceEventDerivationService {
-    return new TraceEventDerivationService(options.spans, options.authorize);
+    return new TraceEventDerivationService(options);
   }
 
   private readonly memo = new Map<string, MemoEntry>();
 
-  private constructor(
-    private readonly spans: TraceDerivationSpanReaderRepository,
-    private readonly authorize: FoldReadAuthorizer,
-  ) {}
+  private readonly spans: TraceDerivationSpanReaderRepository;
+  private readonly authorize: FoldReadAuthorizer;
+
+  private constructor(options: {
+    spans: TraceDerivationSpanReaderRepository;
+    authorize: FoldReadAuthorizer;
+  }) {
+    this.spans = options.spans;
+    this.authorize = options.authorize;
+  }
 
   async derive({ projectId, ...input }: TraceDerivedEventsInput): Promise<DerivedTraceEvent[]> {
     const authorization = await this.authorize({
@@ -55,7 +61,7 @@ export class TraceEventDerivationService {
     occurredAtMs?: number | undefined;
     foldVersion?: number | undefined;
   }): Promise<DerivedTraceEvent[]> {
-    const read = () =>
+    const read = async () =>
       this.spans.findDerivedEventsByTraceId({
         authorization: input.authorization,
         traceId: input.traceId,

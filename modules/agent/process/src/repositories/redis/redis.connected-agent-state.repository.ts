@@ -24,6 +24,7 @@ import {
   ConnectedAgentStateRepository,
   type InstanceMeta,
   type InstanceRecord,
+  instanceHooksSchema,
   type StoredLookup,
   type StoredSession,
   storedSessionSchema,
@@ -408,6 +409,7 @@ function fieldsOf({ meta, agentIds }: InstanceRecord): Record<string, string> {
     podId: meta.podId,
     connectedAt: String(meta.connectedAt),
     maxConcurrency: String(meta.maxConcurrency),
+    hooks: JSON.stringify(meta.hooks ?? {}),
     agentIds: agentIds.join(","),
   };
 }
@@ -433,5 +435,20 @@ function metaFromFields(fields: Record<string, string>): InstanceMeta {
     podId: textOf({ fields, name: "podId" }),
     connectedAt: Number(textOf({ fields, name: "connectedAt" })),
     maxConcurrency: Math.max(1, Number(textOf({ fields, name: "maxConcurrency" }))),
+    ...hooksOf(fields.hooks),
   };
+}
+
+/**
+ * The declared hooks. The field is always written, so a re-register clears stale hooks; a hash
+ * from before hooks existed, an unreadable one or an empty one declares none.
+ */
+function hooksOf(raw: string | undefined): Pick<InstanceMeta, "hooks"> {
+  if (!raw) return {};
+  try {
+    const parsed = instanceHooksSchema.safeParse(JSON.parse(raw));
+    return parsed.success && Object.keys(parsed.data).length > 0 ? { hooks: parsed.data } : {};
+  } catch {
+    return {};
+  }
 }

@@ -65,6 +65,31 @@ func renderLimits(input *config.Input, c *config.Computed, configD string) error
 		cfg["max_temporary_data_on_disk_size"] = c.MaxTempDataOnDisk
 	}
 
+	// Small-pod budget: zero means "keep the ClickHouse default".
+	for key, v := range map[string]int64{
+		"mark_cache_size":                              c.MarkCacheSize,
+		"index_mark_cache_size":                        c.IndexMarkCacheSize,
+		"primary_index_cache_size":                     c.PrimaryIndexCacheSize,
+		"query_condition_cache_size":                   c.QueryConditionCacheSize,
+		"compiled_expression_cache_size":               c.CompiledExpressionCacheSize,
+		"mmap_cache_size":                              int64(c.MmapCacheSize),
+		"background_schedule_pool_size":                int64(c.BackgroundSchedulePoolSize),
+		"background_common_pool_size":                  int64(c.BackgroundCommonPoolSize),
+		"background_move_pool_size":                    int64(c.BackgroundMovePoolSize),
+		"background_message_broker_schedule_pool_size": int64(c.BackgroundBrokerPoolSize),
+		"background_distributed_schedule_pool_size":    int64(c.BackgroundDistPoolSize),
+		"background_buffer_flush_schedule_pool_size":   int64(c.BackgroundBufferPoolSize),
+		"background_fetches_pool_size":                 int64(c.BackgroundFetchesPoolSize),
+		"max_thread_pool_free_size":                    int64(c.MaxThreadPoolFreeSize),
+	} {
+		if v != 0 {
+			cfg[key] = v
+		}
+	}
+	if c.MergesMemoryRatio != 0 {
+		cfg["merges_mutations_memory_usage_to_ram_ratio"] = c.MergesMemoryRatio
+	}
+
 	// System logs — table-driven configuration.
 	defaultTTL := input.SystemLogTTLDays
 	logs := []systemLogDef{
@@ -100,8 +125,40 @@ func renderLimits(input *config.Input, c *config.Computed, configD string) error
 		for k, v := range l.extra {
 			entry[k] = v
 		}
+		for k, v := range systemLogQueueCaps(c) {
+			entry[k] = v
+		}
 		cfg[l.key] = entry
 	}
 
+	// Logs left at the image defaults still get the queue caps (merged by key).
+	if caps := systemLogQueueCaps(c); len(caps) > 0 {
+		for _, key := range []string{"error_log", "backup_log"} {
+			cfg[key] = caps
+		}
+	}
+	// Per-query and per-insert detail logs nothing in LangWatch reads.
+	if c.RemoveQueryDetailLogs {
+		for _, key := range []string{"query_metric_log", "query_thread_log", "query_views_log", "asynchronous_insert_log"} {
+			cfg[key] = map[string]string{"@remove": "1"}
+		}
+	}
+
 	return writeYAML(filepath.Join(configD, "limits.yaml"), cfg)
+}
+
+// systemLogQueueCaps returns the non-zero in-memory queue keys for a system
+// log table; empty when the image defaults stand.
+func systemLogQueueCaps(c *config.Computed) map[string]any {
+	caps := map[string]any{}
+	for key, v := range map[string]int{
+		"max_size_rows":                    c.SystemLogMaxSizeRows,
+		"reserved_size_rows":               c.SystemLogReservedSizeRows,
+		"buffer_size_rows_flush_threshold": c.SystemLogFlushThresholdRows,
+	} {
+		if v != 0 {
+			caps[key] = v
+		}
+	}
+	return caps
 }

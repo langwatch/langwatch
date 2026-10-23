@@ -25,7 +25,8 @@ const route = () =>
   defineRestRouter(restApi)
     .withNamespace("door-questions")
     .withVersion("2026-10-05")
-    .post("/run", "run");
+    .post("/run", "run")
+    .keepsRecords();
 
 // E4: a platform-tier permission at the platform; any other permission there is refused.
 route().withPermission("ops:manage", { at: "platform", refusal: "hidden" });

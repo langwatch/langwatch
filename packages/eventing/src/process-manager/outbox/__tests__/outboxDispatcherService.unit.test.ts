@@ -368,6 +368,187 @@ describe("OutboxDispatcherService", () => {
         expect(attempts[0]?.errorMessage).not.toContain("sk-secret");
       });
 
+      /** @scenario "A redacted delivery failure keeps where it failed in the server log" */
+      it("logs the cause's class and stack frames but never its message", async () => {
+        const { logger, lines } = createTestLogger();
+        const cause = new TypeError("Cannot read properties of null (reading 'sk-secret')");
+        const dispatcher = new OutboxDispatcherService({
+          store,
+          handlers: { "worker-dispatch": vi.fn().mockRejectedValue(cause) },
+          retryDelayMs: () => 1_000,
+          maxAttempts: 2,
+          logger,
+        });
+
+        await dispatcher.runOnce({ now: T0 + 1 });
+
+        const attempts = store.findFailedAttempts({
+          processName: pilotRef.processName,
+          projectId: pilotRef.projectId,
+          messageKey: "dispatch:turn_1:1",
+        });
+        expect(attempts[0]?.errorMessage).toBe("Operation failed; sensitive details were omitted");
+        expect(lines.filter((l) => String(l.msg).includes("redacted cause"))).toHaveLength(1);
+        const line = lines.findLine("warn", "redacted cause");
+        expect(line).toMatchObject({
+          messageKey: "dispatch:turn_1:1",
+          attempt: 1,
+          causeType: "TypeError",
+        });
+        const frames = line?.causeStackFrames;
+        expect(frames).toEqual(expect.arrayContaining([expect.stringMatching(/^at /)]));
+        expect(JSON.stringify(line)).not.toContain("sk-secret");
+        expect(line).not.toHaveProperty("payload");
+        expect(line).not.toHaveProperty("error");
+      });
+
+      describe("given a foreign message that spans lines shaped like stack frames", () => {
+        /** @scenario "A redacted delivery failure keeps where it failed in the server log" */
+        it("keeps every line of the message out of the logged frames", async () => {
+          const { logger, lines } = createTestLogger();
+          const cause = new Error(
+            "boom\n    at Authorization: Bearer sk-secret\n    at leak (/sk-secret.js:1:2)",
+          );
+          const dispatcher = new OutboxDispatcherService({
+            store,
+            handlers: { "worker-dispatch": vi.fn().mockRejectedValue(cause) },
+            retryDelayMs: () => 1_000,
+            maxAttempts: 2,
+            logger,
+          });
+
+          await dispatcher.runOnce({ now: T0 + 1 });
+
+          const line = lines.findLine("warn", "redacted cause");
+          expect(line?.causeStackFrames).not.toHaveLength(0);
+          expect(JSON.stringify(line)).not.toContain("sk-secret");
+        });
+
+        /** @scenario "A redacted delivery failure keeps where it failed in the server log" */
+        it("keeps a multi-line name that repeats the message out of the logged frames", async () => {
+          const { logger, lines } = createTestLogger();
+          const cause = new Error("boom");
+          cause.name = "boom\n    at leak (/sk-secret.js:1:2)\nVendorError";
+          cause.stack = `${cause.name}: boom\n    at run (/app/handler.js:3:4)`;
+          const dispatcher = new OutboxDispatcherService({
+            store,
+            handlers: { "worker-dispatch": vi.fn().mockRejectedValue(cause) },
+            retryDelayMs: () => 1_000,
+            maxAttempts: 2,
+            logger,
+          });
+
+          await dispatcher.runOnce({ now: T0 + 1 });
+
+          const line = lines.findLine("warn", "redacted cause");
+          expect(line?.causeStackFrames).toEqual(["at run (/app/handler.js:3:4)"]);
+        });
+      });
+
+      describe("when a redacted cause is logged", () => {
+        /** @scenario "A redacted cause is logged at the level of the delivery outcome" */
+        it.each([
+          ["a scheduled retry", 2, {}, "warn", "error"],
+          [
+            "a customer-fault dead-letter",
+            1,
+            { code: "invalid_action", fault: "customer" },
+            "warn",
+            "error",
+          ],
+          [
+            "a platform dead-letter",
+            1,
+            { code: "internal_failure", fault: "platform" },
+            "error",
+            "warn",
+          ],
+          ["an unattributed dead-letter", 1, {}, "error", "warn"],
+        ] as const)("logs %s at %s", async (_outcome, maxAttempts, fields, level, other) => {
+          const { logger, lines } = createTestLogger();
+          const dispatcher = new OutboxDispatcherService({
+            store,
+            handlers: {
+              "worker-dispatch": vi
+                .fn()
+                .mockRejectedValue(Object.assign(new Error("third-party text"), fields)),
+            },
+            retryDelayMs: () => 1_000,
+            maxAttempts,
+            logger,
+          });
+
+          await dispatcher.runOnce({ now: T0 + 1 });
+
+          expect(lines.findLine(level, "redacted cause")).toBeDefined();
+          expect(lines.findLine(other, "redacted cause")).toBeUndefined();
+        });
+      });
+
+      it("logs no extra cause for an error whose message we wrote", async () => {
+        const { logger, lines } = createTestLogger();
+        const dispatchError = Object.assign(new Error("receiver returned 503"), {
+          name: "DispatchError",
+          retryable: true,
+        });
+        const dispatcher = new OutboxDispatcherService({
+          store,
+          handlers: { "worker-dispatch": vi.fn().mockRejectedValue(dispatchError) },
+          retryDelayMs: () => 1_000,
+          maxAttempts: 2,
+          logger,
+        });
+
+        await dispatcher.runOnce({ now: T0 + 1 });
+
+        expect(lines.findLine("warn", "redacted cause")).toBeUndefined();
+        expect(lines.findLine("error", "redacted cause")).toBeUndefined();
+      });
+
+      describe("when the message is dead-lettered", () => {
+        const DEAD_LINE = "exhausted delivery attempts";
+
+        async function deadLetterOn(error: unknown) {
+          const { logger, lines } = createTestLogger();
+          const dispatcher = new OutboxDispatcherService({
+            store,
+            handlers: { "worker-dispatch": vi.fn().mockRejectedValue(error) },
+            retryDelayMs: () => 1_000,
+            maxAttempts: 1,
+            logger,
+          });
+          const report = await dispatcher.runOnce({ now: T0 + 1 });
+          expect(report.dead).toEqual(["dispatch:turn_1:1"]);
+          return lines;
+        }
+
+        /** @scenario "A message dead-lettered by the customer's own setup is logged as a warning" */
+        it("logs a customer-fault dead-letter at warn, even after serialisation", async () => {
+          const serialised = Object.assign(new Error("invalid_action"), {
+            code: "invalid_action",
+            fault: "customer",
+            retryable: false,
+          });
+
+          const lines = await deadLetterOn(serialised);
+
+          expect(lines.findLine("warn", DEAD_LINE)).toBeDefined();
+          expect(lines.findLine("error", "")).toBeUndefined();
+        });
+
+        /** @scenario "A message dead-lettered by our own or a provider's failure is logged as an error" */
+        it.each([
+          ["platform", { code: "internal_failure", fault: "platform" }],
+          ["provider", { code: "provider_failure", fault: "provider" }],
+          ["unattributed", {}],
+        ])("logs a %s dead-letter at error", async (_fault, fields) => {
+          const lines = await deadLetterOn(Object.assign(new Error("failed"), fields));
+
+          expect(lines.findLine("error", DEAD_LINE)).toBeDefined();
+          expect(lines.findLine("warn", DEAD_LINE)).toBeUndefined();
+        });
+      });
+
       /** @scenario A recording failure never fails the delivery accounting */
       it("retries and retires exactly as it would have when the attempt log write throws", async () => {
         const failingStore = new Proxy(store, {

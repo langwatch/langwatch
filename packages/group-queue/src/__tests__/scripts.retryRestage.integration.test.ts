@@ -97,4 +97,58 @@ describe("GroupStagingScripts", () => {
       expect(await redis.get(attemptKey())).toBeNull();
     });
   });
+
+  describe("when a retry ladder ends in a block and jobs keep arriving one at a time", () => {
+    const jobsKey = () => `${keyPrefix()}group:group-a:jobs`;
+    const dataKey = () => `${keyPrefix()}group:group-a:data`;
+
+    /** @scenario "Jobs staged one at a time into a blocked group carry no expiry" */
+    it("keeps the group's jobs and values persistent through a dedup replacement and a re-send", async () => {
+      const value = JSON.stringify({ v: 1 });
+      await scripts.stage(makeJob({ stagedJobId: "j1", dispatchAfterMs: 100 }));
+      const first = await scripts.dispatch({ nowMs: 200, activeTtlSec: 300 });
+      await scripts.retryRestage({
+        groupId: "group-a",
+        stagedJobId: "j1",
+        newStagedJobId: "j1",
+        dispatchAfterMs: 300,
+        jobDataJson: value,
+        backoffMs: 1_000,
+        attempt: 2,
+        attemptTtlSec: 1800,
+        claimToken: first!.claimToken,
+      });
+      expect(await redis.pttl(jobsKey())).toBeGreaterThan(0);
+
+      // The backoff's active key lapses and the last attempt blocks the group.
+      await redis.del(`${keyPrefix()}group:group-a:active`);
+      const last = await scripts.dispatch({ nowMs: 400, activeTtlSec: 300 });
+      expect(last?.stagedJobId).toBe("j1");
+      expect(
+        await scripts.restageAndBlock({
+          groupId: "group-a",
+          newStagedJobId: "j1",
+          score: 100,
+          jobDataJson: value,
+          errorMessage: "retry budget spent",
+          claimToken: last!.claimToken,
+        }),
+      ).toBe(true);
+      expect(await redis.pttl(jobsKey())).toBe(-1);
+
+      const dedup = { dedupId: "d1", dedupTtlMs: 60_000 };
+      await scripts.stage(makeJob({ stagedJobId: "j2", dispatchAfterMs: 500 }));
+      await scripts.stage(makeJob({ stagedJobId: "j3", dispatchAfterMs: 600, ...dedup }));
+      const replaced = await scripts.stage(
+        makeJob({ stagedJobId: "j4", dispatchAfterMs: 700, jobDataJson: "replacement", ...dedup }),
+      );
+      await scripts.stage(makeJob({ stagedJobId: "j2", dispatchAfterMs: 500 }));
+
+      expect(replaced.isNew).toBe(false);
+      expect(await redis.zrange(jobsKey(), 0, -1)).toEqual(["j1", "j2", "j3"]);
+      expect(await redis.hget(dataKey(), "j3")).toBe("replacement");
+      expect(await redis.pttl(jobsKey())).toBe(-1);
+      expect(await redis.pttl(dataKey())).toBe(-1);
+    });
+  });
 });

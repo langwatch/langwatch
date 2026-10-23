@@ -105,6 +105,7 @@ describe("a platform route", () => {
       .withVersion(VERSION)
       .withCredential("browser")
       .post("/impersonate", "run")
+      .keepsRecords()
       .withPermission(permission, { at: "platform", refusal })
       .withInput(z.object({ userId: z.string() }))
       .withBodyLimit({ maxBytes: 64 })
@@ -226,6 +227,7 @@ describe("a platform route", () => {
         .withVersion(VERSION)
         .withCredential("browser")
         .post("/impersonate", "run")
+        .keepsRecords()
         .withPermission("ops:manage", { at: "platform", hiddenWithout: "ops:view" })
         .withInput(z.object({ userId: z.string() }))
         .withBodyLimit({ maxBytes: 64 })
@@ -283,7 +285,8 @@ describe("a platform route", () => {
           .withNamespace("e4-staff-declared")
           .withVersion(VERSION)
           .withCredential("browser")
-          .post("/run", "run");
+          .post("/run", "run")
+          .keepsRecords();
 
       expect(() =>
         route().withPermission("ops:manage", {
@@ -307,7 +310,8 @@ describe("a platform route", () => {
         .withNamespace("e4-declared")
         .withVersion(VERSION)
         .withCredential("browser")
-        .post("/run", "run");
+        .post("/run", "run")
+        .keepsRecords();
     }
 
     /** @scenario "A platform route asks the operator's platform grant at its door" */
@@ -325,6 +329,7 @@ describe("a platform route", () => {
         .withVersion(VERSION)
         .withCredential("browser")
         .post("/run", "run")
+        .keepsRecords()
         .withPermission("ops:view", { at: "platform" })
         .withOutput(z.object({}))
         .withoutAudit("test route")
@@ -420,12 +425,14 @@ describe("a route that reads the key its door resolved", () => {
     .withNamespace("e5-keys")
     .withVersion(VERSION)
     .post("/read", "run")
+    .keepsRecords()
     .withCredential("project", { key: true })
     .withPermission("traces:create")
     .withOutput(z.object({ key: z.unknown() }))
     .withoutAudit("test route")
     .handle(({ key }) => ({ key }))
     .post("/plain", "plain")
+    .keepsRecords()
     .withPermission("traces:create")
     .withOutput(z.object({ handed: z.boolean() }))
     .withoutAudit("test route")
@@ -537,6 +544,7 @@ describe("a route that admits only the key kinds it names", () => {
     .withNamespace("e7-kinds")
     .withVersion(VERSION)
     .post("/connect", "run")
+    .keepsRecords()
     .withCredential("project", { keyKinds: ["api_key", "access_token", "legacy_project_key"] })
     .withPermission("scenarios:manage")
     .withInput(z.object({ name: z.string() }))
@@ -634,6 +642,7 @@ describe("a permission behind the CLI token door", () => {
       .withVersion(VERSION)
       .withCredential("cli_token")
       .post("/keys", "run")
+      .keepsRecords()
       .withPermission("organization:manage")
       .withInput(z.object({ name: z.string() }))
       .withOutput(z.object({ ran: z.boolean() }))
