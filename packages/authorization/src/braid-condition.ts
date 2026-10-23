@@ -3,8 +3,6 @@
  * the compiler and the store client's fence both read. The tree holds conjunctions of string
  * comparisons only, so the fence renders it as one bracketed conjunction of bound parameters.
  */
-import { sha256 } from "@noble/hashes/sha2.js";
-import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
 import { z } from "zod";
 
 /** Stored with every compiled condition; part of every fence cache key. */
@@ -15,10 +13,6 @@ export const BRAID_CONDITION_MAX_LENGTH = 1000;
 export const BRAID_CONDITION_MAX_TERMS = 16;
 /** Nested parentheses in one condition. */
 export const BRAID_CONDITION_MAX_DEPTH = 4;
-/** Distinct compiled conditions one reader's proof may hold. */
-export const BRAID_MAX_DISTINCT_CONDITIONS = 50;
-/** Verified marks: `<prefix><key>` holds the id of the project that signed `key` (§4). */
-export const VERIFIED_ATTRIBUTE_PREFIX = "langwatch.reserved.verified.";
 
 const conditionText = z.string().min(1).max(BRAID_CONDITION_MAX_LENGTH);
 
@@ -102,27 +96,3 @@ export const compiledWhereSchema = z
     },
   );
 export type CompiledWhere = z.infer<typeof compiledWhereSchema>;
-
-/** A canonical, injective form of a tree: arrays in a fixed order, strings JSON-escaped. */
-function canonicalOf(node: BraidConditionNode): unknown[] {
-  switch (node.kind) {
-    case "and":
-      return ["and", ...node.terms.map(canonicalOf)];
-    case "attributeEquals":
-      return [node.kind, node.on, node.key, node.value];
-    case "nameEquals":
-      return [node.kind, node.value];
-    case "attributePresent":
-    case "verified":
-      return [node.kind, node.key];
-  }
-}
-
-/**
- * The digest a cache or log key carries for a compiled condition: its tree and its compiler
- * version, so a key changes when either does. Braids sharing one digest share one predicate.
- */
-export function braidConditionDigest(compiledWhere: CompiledWhere): string {
-  const canonical = JSON.stringify([compiledWhere.version, canonicalOf(compiledWhere.tree)]);
-  return bytesToHex(sha256(utf8ToBytes(canonical)));
-}
