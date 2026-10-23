@@ -56,11 +56,7 @@ langchain = ["langchain-core>=1.5.4,<2.0.0"]
 dspy = ["dspy-ai>=3.3.0,<4"]
 litellm = ["litellm>=1.96.2"]
 dev = ["ruff>=0.16.2"]
-tests = [
-  "pytest>=9.1.1,<10.0.0",
-  "pytest-asyncio>=1.4.0,<1.5.0",
-  "factory-boy>=3.3.0,<4.0.0",
-]
+tests = ["pytest>=9.1.1,<10.0.0", "pytest-asyncio>=1.4.0,<1.5.0", "factory-boy>=3.3.0,<4.0.0"]
 
 [build-system]
 requires = ["hatchling"]
