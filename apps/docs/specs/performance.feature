@@ -222,6 +222,13 @@ Feature: Static documentation with progressive interaction
     And the page shifts by no more than 0.01
 
   @e2e
+  Scenario: Keep every page template in place while it starts
+    Given the web fonts and the scripts reach the reader after the page has painted
+    When a reader opens one page of each template on a phone and on a desktop
+    Then each page shifts by no more than 0.01
+    And a page that moves is named with its width, its shift and the elements that moved
+
+  @e2e
   Scenario: Fetch only the fonts an English page draws
     When a reader opens an English page
     Then the body and title fonts are requested before the stylesheet asks for them

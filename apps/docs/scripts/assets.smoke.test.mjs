@@ -118,6 +118,39 @@ await it("keeps the endpoint reference in place when the examples settle", async
   });
 });
 
+/** One page of every template, so a layout change anywhere is caught before it ships. */
+const TEMPLATE_PAGES = [
+  "introduction",
+  "ai-governance/ingestion-sources",
+  "integration/quick-start",
+  "integration/python/guide",
+  "agent-testing/connect-your-agent",
+  "datasets/programmatic-access",
+  "cookbooks/tool-selection",
+  "skills/directory",
+  "self-hosting/releases",
+  "api-reference/traces/get-trace",
+];
+
+/** @scenario "Keep every page template in place while it starts" */
+await it("keeps one page of every template in place while fonts and scripts arrive late", async () => {
+  await withPreviewBrowser({
+    outDir,
+    run: async ({ browser, base }) => {
+      const moved = [];
+      for (const slug of TEMPLATE_PAGES) {
+        for (const width of [1440, 390]) {
+          const late = { browser, base, slug, width, lateScripts: true };
+          const { shift, shifted } = await shiftWithLateFonts(late);
+          if (shift > 0.01)
+            moved.push(`${slug} at ${width}px: ${shift.toFixed(4)} (${shifted.join("; ")})`);
+        }
+      }
+      assert.deepEqual(moved, [], `pages that move while they start:\n${moved.join("\n")}`);
+    },
+  });
+});
+
 /** @scenario "Fetch only the fonts an English page draws" */
 await it("preloads the body and title fonts and never fetches extended Latin", async () => {
   await withPreviewBrowser({
