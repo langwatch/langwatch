@@ -12,7 +12,7 @@ import { BearerIdentity } from "../bearer-identity.ts";
 import { defineRestRouter } from "../declaration.ts";
 import { RestHost } from "../host.ts";
 
-const logged = vi.hoisted(() => ({ records: [] as Array<{ fields: unknown; message: string }> }));
+const logged = vi.hoisted(() => ({ records: [] as { fields: unknown; message: string }[] }));
 
 vi.mock("@langwatch/observability", async (importOriginal) => {
   const actual = await importOriginal<typeof Observability>();
