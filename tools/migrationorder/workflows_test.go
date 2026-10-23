@@ -28,6 +28,7 @@ type workflowFile struct {
 	On   map[string]yaml.Node `yaml:"on"`
 	Jobs map[string]struct {
 		If    string         `yaml:"if"`
+		Uses  string         `yaml:"uses"`
 		Steps []workflowStep `yaml:"steps"`
 	} `yaml:"jobs"`
 }
@@ -273,8 +274,15 @@ func TestCompatWorkflowFailsADiffThatErrors(t *testing.T) {
 // @scenario "The previous release's image boots on the schema head migrated"
 func TestCompatWorkflowBootsThePreviousReleaseImageNightly(t *testing.T) {
 	workflow, _ := loadWorkflow(t, "migration-compat.yml")
-	if _, ok := workflow.On["schedule"]; !ok {
-		t.Error("no nightly schedule")
+	if _, ok := workflow.On["workflow_call"]; !ok {
+		t.Error("the nightly suite cannot call it")
+	}
+	nightly, _ := loadWorkflow(t, "nightly.yml")
+	if _, ok := nightly.On["schedule"]; !ok {
+		t.Error("the nightly suite has no schedule")
+	}
+	if uses := nightly.Jobs["migration-compat"].Uses; uses != "./.github/workflows/migration-compat.yml" {
+		t.Errorf("the nightly suite does not run it: uses = %q", uses)
 	}
 	if _, ok := workflow.On["workflow_dispatch"]; !ok {
 		t.Error("no manual dispatch")
