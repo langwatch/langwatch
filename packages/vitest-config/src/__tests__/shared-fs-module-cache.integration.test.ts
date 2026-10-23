@@ -299,6 +299,19 @@ describe("the shared fs module cache", () => {
       expect(readdirSync(join(defaultRoot, lockfileDirs[0] as string)).length).toBeGreaterThan(1);
     }, 60_000);
 
+    /** @scenario "Without XDG_CACHE_HOME either the cache lives under ~/.cache" */
+    it("writes under the home directory's .cache when XDG_CACHE_HOME is unset", async () => {
+      const home = join(base, "home");
+      const homeRoot = checkout("home-default", { "shared/helper.ts": HELPER });
+
+      await runVitest(homeRoot, "file", null, { XDG_CACHE_HOME: "", HOME: home });
+
+      const defaultRoot = join(home, ".cache", "vitest", "fs-module-cache");
+      const lockfileDirs = readdirSync(defaultRoot).filter((name) => /^[0-9a-f_]{8}$/.test(name));
+      expect(lockfileDirs).toHaveLength(1);
+      expect(readdirSync(join(defaultRoot, lockfileDirs[0] as string)).length).toBeGreaterThan(1);
+    }, 60_000);
+
     /** @scenario "A checkout's old node_modules cache is removed" */
     it("removes the checkout's own node_modules/.vitest-cache", async () => {
       const legacyRoot = checkout("legacy", {
@@ -404,6 +417,46 @@ describe("the shared fs module cache", () => {
         expect(results["imports the helper this checkout has"]?.status).toBe("passed");
       }
     }, 120_000);
+  });
+
+  describe("when a module outside the checkout has a source map naming the checkout", () => {
+    /** @scenario "A module outside the checkout keeps no checkout path in its stored source map" */
+    it("stores the module without the checkout's path in its inline source map", async () => {
+      const cache = join(base, "outside-cache");
+      const outsideRoot = join(base, "outside-root");
+      const map = {
+        version: 3,
+        sources: [join(outsideRoot, "shared/outside.ts")],
+        names: [],
+        mappings: "AAAA",
+      };
+      const lib = `export const outside = "outside";\n//# sourceMappingURL=data:application/json;base64,${Buffer.from(JSON.stringify(map)).toString("base64")}\n`;
+      mkdirSync(join(base, "outside-lib"), { recursive: true });
+      writeFileSync(join(base, "outside-lib", "lib.js"), lib);
+      checkout("outside-root", {
+        "shared/helper.ts": HELPER,
+        "pkg/src/outside.test.ts": `import { outside } from "../../../outside-lib/lib.js";
+test("imports the module outside the checkout", () => {
+  expect(outside).toBe("outside");
+});
+`,
+      });
+
+      const outsideRun = await runVitest(outsideRoot, "file", cache);
+
+      const stored = [...outsideRun.cacheLog.matchAll(/\[write\] (\S+) is cached in (\S+)/g)].find(
+        ([, id, path]) => id === join(base, "outside-lib", "lib.js") && path?.startsWith(cache),
+      )?.[2];
+      expect(stored).toBeDefined();
+      // a source made relative to the module's directory would still name the checkout
+      const maps = [
+        ...readFileSync(stored as string, "utf8").matchAll(
+          /sourceMappingURL=data:application\/json;base64,(\S+)/g,
+        ),
+      ].map(([, encoded]) => Buffer.from(encoded as string, "base64").toString("utf8"));
+      for (const decoded of maps) expect(decoded).not.toContain("outside-root");
+      expect(outsideRun.results["imports the module outside the checkout"]?.status).toBe("passed");
+    }, 60_000);
   });
 
   describe("when the main process loads a module the first checkout cached", () => {

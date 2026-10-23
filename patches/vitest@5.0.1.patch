@@ -36,7 +36,7 @@ index 7f8ab40e591a03cffbb914d5bcd8f06702ae4619..f225ac1d63417509cf35a8da6515f61a
  					};
  					return result;
 diff --git a/dist/chunks/index.DzobfTyw.js b/dist/chunks/index.DzobfTyw.js
-index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..0e16671cd33a3d2b8ec241b7006179e1217f4329 100644
+index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..d1246d7a1e17229a1ea5ac852daaaf77ef372b20 100644
 --- a/dist/chunks/index.DzobfTyw.js
 +++ b/dist/chunks/index.DzobfTyw.js
 @@ -6310,7 +6310,7 @@ class ModuleFetcher {
@@ -196,7 +196,7 @@ index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..0e16671cd33a3d2b8ec241b7006179e1
  	fsCacheRoots = /* @__PURE__ */ new WeakMap();
  	fsEnvironmentHashMap = /* @__PURE__ */ new WeakMap();
  	fsCacheKeyGenerators = /* @__PURE__ */ new Set();
-@@ -7130,8 +7185,88 @@ class FileSystemModuleCache {
+@@ -7130,8 +7185,91 @@ class FileSystemModuleCache {
  	fsCacheKeys = /* @__PURE__ */ new WeakMap();
  	constructor(vitest) {
  		this.vitest = vitest;
@@ -268,26 +268,29 @@ index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..0e16671cd33a3d2b8ec241b7006179e1
 +			const newline = code.indexOf("\n", start);
 +			const end = newline === -1 ? code.length : newline;
 +			const json = Buffer.from(code.slice(start, end), "base64").toString("utf-8");
-+			if (json.includes(this.workspaceRoot)) {
++			const underRoot = (path) => typeof path === "string" && path.startsWith(`${this.workspaceRoot}/`);
++			const local = underRoot(file);
++			if (json.includes(this.workspaceRoot) || !local) {
 +				const map = JSON.parse(json);
-+				if (typeof map.file === "string") map.file = basename(cleanUrl(map.file));
-+				if (Array.isArray(map.sources) && !file) {
-+					// no module directory to make the sources relative to: drop the map
-+					// rather than keep this checkout's paths in it
-+					return this.toPortable(`${code.slice(0, at)}${code.slice(end)}`);
++				// a module outside the root (or with no file) has no directory every
++				// checkout shares: drop a map whose sources lead into this checkout
++				const intoRoot = (source) => typeof source === "string" && underRoot(file && !source.startsWith("/") ? resolve$1(dirname(file), source) : source);
++				if (!local && Array.isArray(map.sources) && map.sources.some(intoRoot)) return this.toPortable(`${code.slice(0, at)}${code.slice(end)}`);
++				if (json.includes(this.workspaceRoot)) {
++					if (typeof map.file === "string") map.file = basename(cleanUrl(map.file));
++					if (local && Array.isArray(map.sources)) {
++						const dir = dirname(file);
++						map.sources = map.sources.map((source) => underRoot(source) ? relative(dir, source) : source);
++					}
++					result = `${code.slice(0, start)}${Buffer.from(JSON.stringify(map)).toString("base64")}${code.slice(end)}`;
 +				}
-+				if (Array.isArray(map.sources)) {
-+					const dir = dirname(file);
-+					map.sources = map.sources.map((source) => typeof source === "string" && source.startsWith(`${this.workspaceRoot}/`) ? relative(dir, source) : source);
-+				}
-+				result = `${code.slice(0, start)}${Buffer.from(JSON.stringify(map)).toString("base64")}${code.slice(end)}`;
 +			}
 +		}
 +		return this.toPortable(result);
  	}
  	defineCacheKeyGenerator(callback) {
  		this.fsCacheKeyGenerators.add(callback);
-@@ -7159,16 +7294,20 @@ class FileSystemModuleCache {
+@@ -7159,16 +7297,20 @@ class FileSystemModuleCache {
  		if (log) this.vitest.logger.log(`[cache] cleared fs module cache at ${uniquePaths.join(", ")}`);
  	}
  	readCachedFileConcurrently(cachedFilePath) {
@@ -312,7 +315,7 @@ index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..0e16671cd33a3d2b8ec241b7006179e1
  		}).finally(() => {
  			parallelFsCacheRead.delete(cachedFilePath);
  		}));
-@@ -7193,10 +7332,11 @@ class FileSystemModuleCache {
+@@ -7193,10 +7335,11 @@ class FileSystemModuleCache {
  			moduleType: meta.moduleType,
  			deps: meta.deps,
  			dynamicDeps: meta.dynamicDeps,
@@ -326,7 +329,7 @@ index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..0e16671cd33a3d2b8ec241b7006179e1
  		if ("code" in fetchResult) {
  			const result = {
  				file: fetchResult.file,
-@@ -7207,19 +7347,23 @@ class FileSystemModuleCache {
+@@ -7207,19 +7350,23 @@ class FileSystemModuleCache {
  				moduleType: fetchResult.moduleType,
  				deps: transformResult?.deps,
  				dynamicDeps: transformResult?.dynamicDeps,
@@ -355,7 +358,7 @@ index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..0e16671cd33a3d2b8ec241b7006179e1
  	}
  	invalidateCachePath(environment, id) {
  		debugFs?.(`cache for ${id} in ${environment.name} environment is invalidated`);
-@@ -7243,6 +7387,12 @@ class FileSystemModuleCache {
+@@ -7243,6 +7390,12 @@ class FileSystemModuleCache {
  			debugMemory?.(`${y.yellow("[write]")} ${id} was bailed out because it has "import.meta.glob"`);
  			return null;
  		}
@@ -368,7 +371,7 @@ index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..0e16671cd33a3d2b8ec241b7006179e1
  		let hashString = "";
  		for (const generator of this.fsCacheKeyGenerators) {
  			const result = generator({
-@@ -7279,20 +7429,29 @@ class FileSystemModuleCache {
+@@ -7279,20 +7432,29 @@ class FileSystemModuleCache {
  				configFileDependencies: config.configFileDependencies.map((file) => tryReadFileSync(file)),
  				environment: environment.name,
  				// this affects Vitest CSS plugin
@@ -402,7 +405,7 @@ index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..0e16671cd33a3d2b8ec241b7006179e1
  			this.fsCacheRoots.set(vitestConfig, cacheRoot);
  			if (!existsSync(cacheRoot)) mkdirSync(cacheRoot, { recursive: true });
  		}
-@@ -7309,49 +7468,54 @@ class FileSystemModuleCache {
+@@ -7309,49 +7471,54 @@ class FileSystemModuleCache {
  		}
  		environmentKeys.set(id, cache);
  	}
@@ -495,7 +498,7 @@ index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..0e16671cd33a3d2b8ec241b7006179e1
  }
  /**
  * Performs an atomic write operation using the write-then-rename pattern.
-@@ -9260,7 +9424,8 @@ class ServerModuleRunner extends ModuleRunner {
+@@ -9260,7 +9427,8 @@ class ServerModuleRunner extends ModuleRunner {
  				try {
  					const result = await fetcher(data[0], data[1], environment, false, data[2]);
  					if ("tmp" in result) {
@@ -505,7 +508,7 @@ index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..0e16671cd33a3d2b8ec241b7006179e1
  						return { result: {
  							...result,
  							code
-@@ -10502,6 +10667,7 @@ function createMethodsRPC(project, methodsOptions = {}) {
+@@ -10502,6 +10670,7 @@ function createMethodsRPC(project, methodsOptions = {}) {
  					file: node.file,
  					id: node.id,
  					tmp,

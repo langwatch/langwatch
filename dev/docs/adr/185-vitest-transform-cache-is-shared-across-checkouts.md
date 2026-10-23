@@ -50,7 +50,9 @@ existing Vitest patch (`patches/vitest@5.0.1.patch`) changes `fsModuleCache`:
 **The checkout's path is a token on disk.** On write, the workspace root in the
 code and metadata becomes `@@vitest-fs-module-cache-root@@`, and the inline
 source map's `file` becomes the bare file name, and the metadata is marked
-`portable`. On read, the main process and the worker (which reads the cached file
+`portable`. A module outside the workspace root has no directory every checkout
+shares, so its inline source map is dropped when a source leads into the
+checkout. On read, the main process and the worker (which reads the cached file
 itself) put the reading checkout's root back, only into a file marked portable;
 the main process passes the mark to the worker with each module it serves. A
 module whose source names the checkout's root keeps that root in its key, and a
@@ -92,6 +94,46 @@ patch is the shape an upstream change could take, and moving it there would let
 the patch shrink back to the machine slot. Until then it lives here, and a
 Vitest upgrade has to carry it forward (the integration test below fails if it
 is dropped).
+
+## Upstream proposal
+
+`dev/docs/ARCHITECTURE.md` (Patched dependencies) asks for the upstream change
+to be proposed with the patch. The issue below is filed on `vitest-dev/vitest`
+by a maintainer of this repository, and its URL replaces this line when it
+exists. The machine slot in `vitest.mjs` is specific to this repository and is
+not proposed.
+
+> **Title:** fsModuleCache: share the cache between checkouts of one repository
+>
+> `experimental.fsModuleCache` keys each entry on the module's absolute path
+> and the project's absolute root, and stores code and metadata that name that
+> root. Two git worktrees of the same commit therefore never share an entry,
+> and every new worktree starts cold even when its files are byte-identical to
+> one that has just run.
+>
+> Proposal, behind the existing option:
+>
+> 1. Key on the module's path relative to the workspace root (the directory
+>    `searchForWorkspaceRoot` finds), and hash the config with the root
+>    replaced, so identical checkouts produce identical keys.
+> 2. Store code, inline source map and metadata with the root written as a
+>    token, and put the reading checkout's root back on read, in the main
+>    process and in the worker that reads the file itself. A module whose
+>    source names the absolute root keeps the root in its key; a module whose
+>    source contains the token is not cached.
+> 3. Before using an entry, check that the files its imports resolved to exist
+>    in this checkout, since checkouts at different commits meet in one cache.
+> 4. Default the cache to a per-user directory (`$XDG_CACHE_HOME/vitest`, else
+>    `~/.cache/vitest`), one subdirectory per lockfile hash, and remove a
+>    subdirectory no run has used for a week instead of clearing the cache when
+>    the lockfile changes.
+>
+> In a monorepo of about 150 packages, a new worktree's first run of a
+> 77-test suite fell from 88 to 95 CPU-seconds to 52 to 62, the same as a warm
+> run. A working patch against 5.0.1, with an integration test that runs two
+> checkouts against one cache, is at
+> `https://github.com/langwatch/langwatch/blob/main/patches/vitest@5.0.1.patch`.
+> We are glad to turn it into a pull request if the direction is welcome.
 
 ## Consequences
 

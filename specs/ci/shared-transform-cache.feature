@@ -71,6 +71,13 @@ Feature: Vitest's transform cache is shared across checkouts
     Then its modules are written under vitest/fs-module-cache in that directory
 
   @integration
+  Scenario: Without XDG_CACHE_HOME either the cache lives under ~/.cache
+    Given XDG_CACHE_HOME is not set
+    And VITEST_FS_MODULE_CACHE_DIR is not set
+    When a checkout runs its tests
+    Then its modules are written under .cache/vitest/fs-module-cache in the home directory
+
+  @integration
   Scenario: A checkout's old node_modules cache is removed
     Given a checkout with a node_modules/.vitest-cache directory
     When it runs its tests with the shared cache
@@ -104,6 +111,13 @@ Feature: Vitest's transform cache is shared across checkouts
     When two checkouts run their tests
     Then neither run writes that module to the shared cache or reads it from there
     And the module sees the token exactly as its source writes it
+
+  @integration
+  Scenario: A module outside the checkout keeps no checkout path in its stored source map
+    Given a module outside the workspace root whose source map points into the checkout
+    When the checkout runs a test that imports it
+    Then the cached module's inline source map does not lead into the checkout
+    And the test imports the module
 
   @integration
   Scenario: The main process loads a cached global setup in its own checkout
