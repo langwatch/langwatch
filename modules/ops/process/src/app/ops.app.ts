@@ -354,11 +354,7 @@ import {
   type InstanceAdminShares,
   type OrganizationSsoRouting,
 } from "../services/instance-admin.service.ts";
-import {
-  ManagerExplorerService,
-  OVERDUE_PENDING_MS,
-  OVERDUE_WAKE_MS,
-} from "../services/manager-explorer.service.ts";
+import { ManagerExplorerService } from "../services/manager-explorer.service.ts";
 import { OpsHealthService } from "../services/ops-health.service.ts";
 import { OpsUpgradeService } from "../services/ops-upgrade.service.ts";
 import { OpsService } from "../services/ops.service.ts";
@@ -368,6 +364,7 @@ import {
   type PlatformOperatorSeedSettings,
 } from "../services/platform-operators.service.ts";
 import { ProcessAuditService } from "../services/process-audit.service.ts";
+import { ProcessFleetCollectionService } from "../services/process-fleet-collection.service.ts";
 import { QueueAuditService } from "../services/queue-audit.service.ts";
 import { QueueService } from "../services/queue.service.ts";
 import { SchedulerAuditService } from "../services/scheduler-audit.service.ts";
@@ -739,6 +736,7 @@ type OpsRuntimeDependencies = Readonly<{
   anomalies: AnomalyDetectorService | undefined;
   /** The measurement `ops_storage_stats` runs; absent where a composition built none. */
   storageStats: StorageStatsCollectionService | undefined;
+  processFleet: ProcessFleetCollectionService | undefined;
   /** The stranded-group reap `ops_group_queue_reaper` and the operator action run. */
   groupQueueReaper: GroupQueueReaperService;
   /** The orphaned-organization rate; absent where a composition built none. */
@@ -918,6 +916,12 @@ export class OpsModule implements OpsApi {
       logger,
     });
 
+    const processFleet = ProcessFleetCollectionService.create({
+      fleet: repositories.processFleet,
+      readings: repositories.processFleetReadings,
+      logger,
+    });
+
     const isCloud = config.isSaas || cloudOps;
     const upgradeDiagnostics = UpgradeDiagnosticsService.create({
       ledger: repositories.upgradeLedger,
@@ -945,6 +949,7 @@ export class OpsModule implements OpsApi {
       checkup,
       anomalies,
       storageStats,
+      processFleet,
       signUpHealth: SignUpHealthService.create({
         organizations: dependencies.organizations,
         identity: dependencies.identity,
@@ -975,6 +980,7 @@ export class OpsModule implements OpsApi {
     checkup?: OpsCheckupService;
     anomalies?: AnomalyDetectorService;
     storageStats?: StorageStatsCollectionService;
+    processFleet?: ProcessFleetCollectionService;
     signUpHealth?: SignUpHealthService;
     platformOperators?: PlatformOperatorsService;
     upgradeAlerts?: UpgradeAlertsService;
@@ -1025,6 +1031,7 @@ export class OpsModule implements OpsApi {
       }),
       anomalies: setup.anomalies,
       storageStats: setup.storageStats,
+      processFleet: setup.processFleet,
       groupQueueReaper: GroupQueueReaperService.create({
         repository: repositories.groupQueueReaper,
         audit: QueueAuditService.create({ auditLog: dependencies.auditLog }),
@@ -2224,10 +2231,11 @@ export class OpsModule implements OpsApi {
   }
 
   /** One pass of `ops_storage_stats`: measures every endpoint and saves the readings. */
-  measureStorage(): Promise<void> {
-    const { storageStats } = this.#dependencies;
+  async measureStorage(): Promise<void> {
+    const { storageStats, processFleet } = this.#dependencies;
     if (!storageStats) throw new OpsCapabilityUnavailableError("storage stats");
-    return storageStats.collect();
+    await storageStats.collect();
+    await processFleet?.collect();
   }
 
   /** Deletes the queue groups stranded long enough that no dispatch still holds them. */
@@ -2469,16 +2477,9 @@ function buildOpsInfrastructure(input: {
     stop: () => queueMetricsWriter.stop(),
   });
 
-  // pm_instances / pm_outbox_* are observable gauges that report nothing until a
-  // source is bound; this is the only place that binds one. Every serving role
-  // reports the same global counts, so dashboards aggregate with max().
-  bindProcessFleetMetricsSource(() =>
-    repositories.processFleet.countByProcessName({
-      now: nowInstant().epochMilliseconds,
-      overdueWakeMs: OVERDUE_WAKE_MS,
-      overduePendingMs: OVERDUE_PENDING_MS,
-    }),
-  );
+  // pm_instances / pm_outbox_* report nothing until a source is bound. The source reads the
+  // counts `ops_storage_stats` shares, never the tables; dashboards still aggregate with max().
+  bindProcessFleetMetricsSource(() => repositories.processFleetReadings.findAll());
   resources.own("process fleet metrics source", () => unbindProcessFleetMetricsSource());
 
   const explainRuntime = OpsClickHouseRuntime.create({
