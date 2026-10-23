@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`ApiKeyApi`)
 
-Peers call these through the token, declared at `../contract/src/api-key.api.ts:118`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/api-key.api.ts:119`; nothing else in this package is public.
 
 #### `create`
 
@@ -356,6 +356,14 @@ ADR-183 §4: a project's braid signing keys with their last 24 hours; never a se
 
 ```typescript
 findSigningKeys(input: FindSigningKeysInput): Promise<SigningKey[]>;
+```
+
+#### `findProjectSigning`
+
+Whether a project signs its calls, for the braid dialog of whoever braids into it.
+
+```typescript
+findProjectSigning(input: FindSigningKeysInput): Promise<ProjectSigning>;
 ```
 
 #### `createSigningKey`
@@ -716,41 +724,50 @@ type Output = {
 
 ### `signingKeys`
 
-Contract `../contract/src/signing-key.trpc.ts:15`, router `src/transport/signing-key.trpc.ts:13`.
+Contract `../contract/src/signing-key.trpc.ts:16`, router `src/transport/signing-key.trpc.ts:13`.
 
-| Procedure            | Kind     | Gate                                                                    | Input                          | Output                   |
-| -------------------- | -------- | ----------------------------------------------------------------------- | ------------------------------ | ------------------------ |
-| `signingKeys.list`   | query    | Permission `braids:manage`                                              | `signingKeyProjectInputSchema` | inline                   |
-| `signingKeys.create` | mutation | Permission `braids:manage`; Entitlement `enterprise` (feature `BRAIDS`) | `createSigningKeyInputSchema`  | `issuedSigningKeySchema` |
-| `signingKeys.rotate` | mutation | Permission `braids:manage`; Entitlement `enterprise` (feature `BRAIDS`) | `signingKeyActionInputSchema`  | `issuedSigningKeySchema` |
-| `signingKeys.revoke` | mutation | Permission `braids:manage`; Entitlement `enterprise` (feature `BRAIDS`) | `signingKeyActionInputSchema`  | `signingKeySchema`       |
+| Procedure                    | Kind     | Gate                                                                    | Input                          | Output                   |
+| ---------------------------- | -------- | ----------------------------------------------------------------------- | ------------------------------ | ------------------------ |
+| `signingKeys.list`           | query    | Permission `braids:manage`                                              | `signingKeyProjectInputSchema` | inline                   |
+| `signingKeys.projectSigning` | query    | Permission `traces:view`                                                | `signingKeyProjectInputSchema` | `projectSigningSchema`   |
+| `signingKeys.create`         | mutation | Permission `braids:manage`; Entitlement `enterprise` (feature `BRAIDS`) | `createSigningKeyInputSchema`  | `issuedSigningKeySchema` |
+| `signingKeys.rotate`         | mutation | Permission `braids:manage`; Entitlement `enterprise` (feature `BRAIDS`) | `signingKeyActionInputSchema`  | `issuedSigningKeySchema` |
+| `signingKeys.revoke`         | mutation | Permission `braids:manage`; Entitlement `enterprise` (feature `BRAIDS`) | `signingKeyActionInputSchema`  | `signingKeySchema`       |
 
 ```typescript
 // signingKeys.list
-// Input: signingKeyProjectInputSchema, ../contract/src/signing-key.ts:53
+// Input: signingKeyProjectInputSchema, ../contract/src/signing-key.ts:61
 interface Input {
   projectId: string;
 }
-// Output: signingKeySchema.array() (inline, ../contract/src/signing-key.trpc.ts:18)
+// Output: signingKeySchema.array() (inline, ../contract/src/signing-key.trpc.ts:19)
+
+// signingKeys.projectSigning
+type Input = z.infer<typeof signingKeyProjectInputSchema>; // ../contract/src/signing-key.ts:61
+// Output: projectSigningSchema, ../contract/src/signing-key.ts:43
+type Output = {
+  keyName: string;
+  lastUsedAt: unknown | null;
+} | null;
 
 // signingKeys.create
-// Input: createSigningKeyInputSchema, ../contract/src/signing-key.ts:63
+// Input: createSigningKeyInputSchema, ../contract/src/signing-key.ts:71
 interface Input {
   projectId: string;
   name: string;
 }
-type Output = z.infer<typeof issuedSigningKeySchema>; // ../contract/src/signing-key.ts:45
+type Output = z.infer<typeof issuedSigningKeySchema>; // ../contract/src/signing-key.ts:53
 
 // signingKeys.rotate
-// Input: signingKeyActionInputSchema, ../contract/src/signing-key.ts:73
+// Input: signingKeyActionInputSchema, ../contract/src/signing-key.ts:81
 interface Input {
   projectId: string;
   keyId: string;
 }
-type Output = z.infer<typeof issuedSigningKeySchema>; // ../contract/src/signing-key.ts:45
+type Output = z.infer<typeof issuedSigningKeySchema>; // ../contract/src/signing-key.ts:53
 
 // signingKeys.revoke
-type Input = z.infer<typeof signingKeyActionInputSchema>; // ../contract/src/signing-key.ts:73
+type Input = z.infer<typeof signingKeyActionInputSchema>; // ../contract/src/signing-key.ts:81
 type Output = z.infer<typeof signingKeySchema>; // ../contract/src/signing-key.ts:35
 ```
 
@@ -773,9 +790,9 @@ Declared at `src/eventing/api-key.pipeline.ts:90`.
 
 | Kind   | Leaf                 | Environment variable          | Declared at                  |
 | ------ | -------------------- | ----------------------------- | ---------------------------- |
-| secret | `pepper`             | `API_KEY_PEPPER`              | `src/app/api-key.app.ts:183` |
-| secret | `pepperFallback`     | `CREDENTIALS_SECRET`          | `src/app/api-key.app.ts:184` |
-| secret | `pepperLastFallback` | `NEXTAUTH_SECRET`             | `src/app/api-key.app.ts:185` |
-| secret | `pepperPrevious`     | `CREDENTIALS_SECRET_PREVIOUS` | `src/app/api-key.app.ts:187` |
+| secret | `pepper`             | `API_KEY_PEPPER`              | `src/app/api-key.app.ts:184` |
+| secret | `pepperFallback`     | `CREDENTIALS_SECRET`          | `src/app/api-key.app.ts:185` |
+| secret | `pepperLastFallback` | `NEXTAUTH_SECRET`             | `src/app/api-key.app.ts:186` |
+| secret | `pepperPrevious`     | `CREDENTIALS_SECRET_PREVIOUS` | `src/app/api-key.app.ts:188` |
 
 <!-- readme:generated:end -->
