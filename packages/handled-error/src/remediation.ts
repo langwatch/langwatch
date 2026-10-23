@@ -43,6 +43,14 @@ const registry = {
     ],
   },
 
+  // ---- identity ----
+  identity_password_reset_required: {
+    tips: [
+      "This password may no longer be used; request a reset link from the forgot-password screen and choose a new password",
+      "Signing in through single sign-on, a social provider or a passkey is not affected",
+    ],
+  },
+
   // ---- dataset storage ----
   private_dataplane_unavailable: {
     tips: [
@@ -63,6 +71,14 @@ const registry = {
     tips: [
       "Add the column to the dataset, or remove it from the row, and send it again; retrying unchanged will fail identically",
       "The message names the dataset's valid columns",
+    ],
+  },
+
+  // ---- automations ----
+  automation_dataset_unavailable: {
+    tips: [
+      "Open the automation and pick a dataset that exists, or restore the archived one",
+      "Check the column mapping still names columns the dataset has; retrying unchanged will fail identically",
     ],
   },
 
@@ -538,6 +554,11 @@ const registry = {
     tips: [
       "Add the model to the provider's allowed models list in the model provider settings",
       "Answer each permission card instead; the folder boundary and the privilege rule hold either way",
+    ],
+  },
+  langy_confirmation_required: {
+    tips: [
+      "Wait for the person to choose Yes on the confirmation card in the Langy conversation, then run the same command again",
     ],
   },
   langy_wait_expired: {
@@ -1024,6 +1045,25 @@ const registry = {
     tips: [
       "The app functions are not provisioned on this deployment, so retrying the same query will not help",
       "They are created at deploy time; a redeploy converges them, and the query works unchanged afterwards",
+    ],
+  },
+  upgrade_diagnostics_license_required: {
+    tips: [
+      "Paste or activate a LangWatch licence in Settings, then send the diagnostics again",
+      "Without a licence, download the diagnostics from the step page and email them to support@langwatch.ai",
+    ],
+    docsPath: "/self-hosting/data-and-telemetry",
+  },
+  upgrade_diagnostics_rate_limited: {
+    tips: [
+      "The allowance resets within a day; the step's diagnostics stay on the step page meanwhile",
+      "Download the diagnostics from the step page and email them to support@langwatch.ai if it cannot wait",
+    ],
+    docsPath: "/self-hosting/data-and-telemetry",
+  },
+  upgrade_diagnostics_not_found: {
+    tips: [
+      "The report expired or was never stored; ask the install to send the step's diagnostics again",
     ],
   },
 } as const satisfies Record<string, RemediationEntry>;

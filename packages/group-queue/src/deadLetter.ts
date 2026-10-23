@@ -36,8 +36,12 @@ export function dlqGroupKeys({ keyPrefix, groupId }: { keyPrefix: string; groupI
   };
 }
 
-/** An operator moving a whole live group (usually a blocked one) into the dead-letter layout. */
-export const MOVE_TO_DLQ_LUA = `
+/**
+ * An operator moving a whole live group (usually a blocked one) into the dead-letter layout.
+ * Takes the live jobs it removes off the total-pending counter (KEYS[15]); a dead worker's
+ * claimed jobs were taken off at claim, so they move without touching it.
+ */
+export const MOVE_TO_DLQ_LUA = `#!lua flags=allow-oom
 local srcJobsKey   = KEYS[1]
 local srcDataKey   = KEYS[2]
 local activeKey    = KEYS[3]
@@ -52,11 +56,14 @@ local dlqIndexKey  = KEYS[11]
 local strikesKey   = KEYS[12]
 local attemptKey   = KEYS[13]
 local failStreakKey = KEYS[14]
+local totalPendingKey = KEYS[15]
 local groupId      = ARGV[1]
 local ttl          = tonumber(ARGV[2])
 
 local jobs = redis.call("ZRANGE", srcJobsKey, 0, -1, "WITHSCORES")
 local count = #jobs / 2
+-- Every member read here leaves the live zset in this script, claimed or not.
+local liveRemoved = count
 if count > 0 then
   for i = 1, #jobs, 2 do
     redis.call("ZADD", dstJobsKey, jobs[i+1], jobs[i])
@@ -100,6 +107,7 @@ end
 redis.call("SADD", dlqIndexKey, groupId)
 
 redis.call("DEL", srcJobsKey)
+if liveRemoved > 0 then redis.call("DECRBY", totalPendingKey, liveRemoved) end
 redis.call("DEL", srcDataKey)
 redis.call("DEL", activeKey)
 redis.call("DEL", srcErrorKey)
@@ -123,8 +131,13 @@ redis.call("LTRIM", signalKey, 0, 999)
 return count
 `;
 
-/** Redrive: puts a group's dead-lettered jobs back on its live group and wakes dispatch. */
+/**
+ * Redrive: puts a group's dead-lettered jobs back on its live group and wakes dispatch. A job
+ * id the live group already holds keeps its stored score and value; only new live members are
+ * added to the total-pending counter (KEYS[9]). Answers the dead-lettered jobs it took.
+ */
 export const REPLAY_FROM_DLQ_LUA =
+  "#!lua\n" +
   PENDING_INDEX_HELPER_LUA +
   TTL_HELPER_LUA +
   PARK_HELPER_LUA +
@@ -137,23 +150,25 @@ local dstDataKey   = KEYS[5]
 local readyKey     = KEYS[6]
 local signalKey    = KEYS[7]
 local dlqIndexKey  = KEYS[8]
+local totalPendingKey = KEYS[9]
 local groupId      = ARGV[1]
 local nowMs        = tonumber(ARGV[2])
 
 local jobs = redis.call("ZRANGE", dlqJobsKey, 0, -1, "WITHSCORES")
 local count = #jobs / 2
+local liveAdded = 0
 if count > 0 then
   for i = 1, #jobs, 2 do
-    redis.call("ZADD", dstJobsKey, jobs[i+1], jobs[i])
+    if redis.call("ZADD", dstJobsKey, "NX", jobs[i+1], jobs[i]) == 1 then
+      liveAdded = liveAdded + 1
+      local body = redis.call("HGET", dlqDataKey, jobs[i])
+      if body then redis.call("HSET", dstDataKey, jobs[i], body) end
+    end
   end
+  if liveAdded > 0 then redis.call("INCRBY", totalPendingKey, liveAdded) end
   -- Replaying puts jobs back on the live group, so it is a pending-index write
   -- like any other stage. Same atomic step as the ZADD above.
   gqMarkPending(parkKeyPrefixOf(readyKey), groupId)
-end
-
-local data = redis.call("HGETALL", dlqDataKey)
-for i = 1, #data, 2 do
-  redis.call("HSET", dstDataKey, data[i], data[i+1])
 end
 
 redis.call("DEL", dlqJobsKey)
@@ -165,9 +180,11 @@ if count > 0 then
   -- Route through the parked-aware write so a replay can't clobber a parked
   -- group back into the dispatch scan (TRAP 1). A DLQ group is never itself
   -- parked; if the tenant is over cap, the next dispatch parks it again.
-  addToReadyOrParked(readyKey, groupId, 1, false)
+  -- A group an operator has blocked again stays out of dispatch and keeps no expiry.
+  local isBlocked = redis.call("SISMEMBER", parkKeyPrefixOf(readyKey) .. "blocked", groupId) == 1
+  if not isBlocked then addToReadyOrParked(readyKey, groupId, 1, false) end
   -- Restore the safety-net TTL on the revived group keys (DLQ keys carry none).
-  refreshGroupKeyTtl(dstJobsKey, dstDataKey, nowMs)
+  refreshGroupKeyTtl(dstJobsKey, dstDataKey, nowMs, isBlocked)
 end
 
 redis.call("LPUSH", signalKey, "1")
@@ -180,7 +197,7 @@ return count
  * Discard: the operator marking a group's jobs never-to-run. Answers the job count and last error
  * the audit row records (specs/ops/dead-letter-recovery.feature).
  */
-export const DISCARD_FROM_DLQ_LUA = `
+export const DISCARD_FROM_DLQ_LUA = `#!lua flags=allow-oom
 local dlqJobsKey   = KEYS[1]
 local dlqDataKey   = KEYS[2]
 local dlqErrorKey  = KEYS[3]
@@ -199,10 +216,30 @@ return {count, lastError or ""}
 `;
 
 /**
+ * Drops dead-lettered groups from the index once their entries have expired. KEYS[1] is the
+ * index, then each group's jobs, data and error keys in ARGV order. A group leaves only when
+ * none of its three keys exists at the moment of removal; answers the ids it removed.
+ */
+export const DLQ_INDEX_PRUNE_LUA = `#!lua flags=allow-oom
+if #KEYS ~= 1 + (#ARGV * 3) then
+  return redis.error_reply("DLQ_INDEX_PRUNE expects three keys per group id")
+end
+local pruned = {}
+for i = 1, #ARGV do
+  local base = 1 + ((i - 1) * 3)
+  if redis.call("EXISTS", KEYS[base + 1], KEYS[base + 2], KEYS[base + 3]) == 0 then
+    if redis.call("SREM", KEYS[1], ARGV[i]) == 1 then pruned[#pruned + 1] = ARGV[i] end
+  end
+end
+return pruned
+`;
+
+/**
  * The queue dead-letters one job: the claimed job's own value, or (value "") a drained sibling
  * already re-staged on the live group, taken off it. The group itself stays live.
  */
 const DEAD_LETTER_JOB_LUA =
+  "#!lua flags=allow-oom\n" +
   BLOB_LEASE_HELPER_LUA +
   ROUTING_META_HELPER_LUA +
   `

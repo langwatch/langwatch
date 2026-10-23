@@ -17,6 +17,7 @@ Create one rule per row. Each rule matches the prefix and expires objects after 
 | `group-queue/` | Group-queue S3 tier | No | Expire after 7 days |
 | `evaluation-inputs/r<days>/` | Evaluation inputs | No | One rule per retention class: `r90` after 90 days, `r180` after 180, `r365` after 365, `r730` after 730 |
 | `evaluation-inputs/r-indefinite/` | Evaluation inputs | No | None. Kept for ever |
+| `upgrade-diagnostics/` | Received upgrade diagnostics, on LangWatch Cloud only. A self-hosted install never writes under this prefix | No | Expire after 30 days |
 
 Prefixes are matched from the start of the key, so each one is the first segment of the object key. Existing prefixes are unchanged: if you already hold rules for the three older ones, they keep working.
 

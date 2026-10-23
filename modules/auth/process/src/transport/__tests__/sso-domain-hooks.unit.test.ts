@@ -102,6 +102,7 @@ function hooksRepo(members: Partial<BetterAuthHooksRepository>): BetterAuthHooks
     flagPendingSsoSetup: unused,
     reconcileSsoAccounts: unused,
     recordLastLogin: unused,
+    clearPasswordResetRequirement: unused,
     ...members,
   };
 }
@@ -135,6 +136,7 @@ function accountRepo({
       name: null,
       pendingSsoSetup: false,
       signupConfirmationPending: false,
+      passwordResetRequiredAt: null,
       lastLoginAt: null,
       emailVerified: true,
     }),

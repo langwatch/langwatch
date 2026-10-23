@@ -28,6 +28,7 @@ describe("userFromRecord", () => {
       passkeyNudgeDismissedAt: null,
       joinOfferDismissedDomains: [],
       notificationPreferences: {},
+      passwordResetRequiredAt: null,
     });
 
     expect(Object.keys(user).toSorted()).toEqual(

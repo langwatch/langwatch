@@ -8,6 +8,7 @@ import {
   LangWatchQLCatalogShapesService,
   type LangWatchQLViewDefinition,
 } from "../../../services/langwatch-ql-catalog-shapes.service.ts";
+import { postgresEngineColumnType } from "../rules/lwql-postgres-engine-type.rules.ts";
 import {
   DEFAULT_POSTGRES_ENGINE_POOL_SIZE,
   LangWatchQLPostgresMappingService,
@@ -146,7 +147,7 @@ export class LangWatchQLPostgresViewsService {
         table: view.sourceTable,
         columns: view.columns.map((column) => ({
           name: column.name,
-          type: column.type,
+          type: postgresEngineColumnType(column.type),
         })),
         collection,
         postgresRelation: view.postgres.approvedView,
