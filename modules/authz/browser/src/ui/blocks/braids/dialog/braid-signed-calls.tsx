@@ -39,7 +39,7 @@ function SigningLine({
       ? `last used ${formatDistanceToNow(signing.lastUsedAt)} ago`
       : "not used yet";
     return (
-      <HStack gap={1} color="green.fg" fontSize="xs" data-testid="braid-signing-key">
+      <HStack gap={1.5} color="fg.success" fontSize="xs" data-testid="braid-signing-key">
         <CheckCircle2 size={12} aria-hidden />
         <Text>{`${readerName} signs its calls · key “${signing.keyName}”, ${used}`}</Text>
       </HStack>
@@ -47,7 +47,13 @@ function SigningLine({
   }
   if (signing.state === "none") {
     return (
-      <HStack gap={1} color="orange.fg" fontSize="xs" data-testid="braid-signing-key">
+      <HStack
+        gap={1.5}
+        align="start"
+        color="fg.warning"
+        fontSize="xs"
+        data-testid="braid-signing-key"
+      >
         <AlertTriangle size={12} aria-hidden />
         {keysHref ? (
           <Text>
@@ -77,19 +83,15 @@ function SigningLine({
 export function BraidSignedCalls(props: BraidSignedCallsProps) {
   const reader = props.readerName ?? "the other project";
   return (
-    <HStack
-      gap={4}
-      align="start"
-      justify="space-between"
-      padding={3}
-      borderWidth="1px"
-      borderRadius="lg"
-    >
+    <HStack gap={4} align="start" justify="space-between">
       <Stack gap={1}>
-        <Text fontWeight="medium">Only signed calls</Text>
-        <Text fontSize="sm" color="fg.muted">
+        <Text textStyle="sm" fontWeight="medium">
+          Only signed calls
+        </Text>
+        <Text textStyle="xs" color="fg.muted">
           {`Show spans only when ${reader} really made the call. Adds `}
-          <InlineCode>{`Verified("${props.entryKey}")`}</InlineCode>.
+          <InlineCode variant="neutral">{`Verified("${props.entryKey}")`}</InlineCode> to the
+          condition.
         </Text>
         {props.readerName ? (
           <SigningLine

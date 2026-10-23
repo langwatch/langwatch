@@ -59,15 +59,18 @@ async function openRowMenu() {
 
 describe("BraidsScreen", () => {
   describe("given an Enterprise organisation", () => {
-    /** @scenario A project with no braids shows how braids work */
-    it("A project with no braids shows how braids work", () => {
+    /** @scenario A project with no braids says what a braid does */
+    it("A project with no braids says what a braid does", () => {
       renderAs();
-      const steps = screen.getByTestId("braids-steps");
-      expect(within(steps).getByText("1. Tag the call")).toBeInTheDocument();
-      expect(within(steps).getByText("2. Copy the tag")).toBeInTheDocument();
-      expect(within(steps).getByText("3. Braid")).toBeInTheDocument();
-      expect(screen.getAllByRole("button", { name: /New braid/ }).length).toBeGreaterThan(0);
-      expect(screen.getAllByRole("link", { name: /How braids work/ })[0]).toHaveAttribute(
+      const empty = screen.getByTestId("braids-empty-into");
+      expect(within(empty).getByText("Not braided into any project")).toBeInTheDocument();
+      expect(within(empty).getByText(/inside another project's traces/)).toBeInTheDocument();
+      expect(within(empty).getByRole("link", { name: /Read the docs/ })).toHaveAttribute(
+        "href",
+        "https://langwatch.ai/docs/features/braids",
+      );
+      expect(screen.getByRole("button", { name: /New braid/ })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: /How braids work/ })).toHaveAttribute(
         "href",
         "https://langwatch.ai/docs/features/braids",
       );
@@ -85,7 +88,7 @@ describe("BraidsScreen", () => {
       expect(within(row).getByText('attributes["orchestrator"] == "web"')).toBeInTheDocument();
       expect(within(row).getByText("From 1 Oct 2026")).toBeInTheDocument();
       expect(within(row).getByText("Until 31 Dec 2026")).toBeInTheDocument();
-      expect(within(row).getByTestId("braid-activity")).toHaveTextContent("1,204 spans in 24h");
+      expect(within(row).getByTestId("braid-activity")).toHaveTextContent("1,204 spans");
       await openRowMenu();
       expect(await screen.findByRole("menuitem", { name: "Edit" })).toBeInTheDocument();
       expect(screen.getByRole("menuitem", { name: "View in audit log" })).toHaveAttribute(

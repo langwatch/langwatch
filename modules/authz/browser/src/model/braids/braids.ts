@@ -2,20 +2,14 @@
 // Spec: modules/authz/specs/braids-screen.feature. Decisions: ADR-183.
 
 import { type AuthzBraid, BRAID_AUDIT_TARGET_KIND } from "@langwatch/authz-contract";
-import { featureProjectColour } from "@langwatch/design-system/feature-project-colour";
 import { format } from "@langwatch/time";
 
 /** Into other projects (this project owns the spans) or from other projects (it reads them). */
 export type BraidSide = "into" | "from";
 
-/** Which of the three Braids project colours a project's strand takes, always beside initials. */
-export type BraidStrand = 1 | 2 | 3;
-
 export type BraidProject = {
   id: string;
   name: string;
-  initials: string;
-  strand: BraidStrand;
 };
 
 export type BraidRow = {
@@ -45,22 +39,6 @@ export type OrganizationBraidRow = {
 
 type KnownProject = { id: string; name: string };
 
-/** Up to two letters, from the first two words, so colour is never the only cue. */
-export function projectInitials(name: string): string {
-  const letters = name
-    .split(/[\s_-]+/)
-    .filter((word) => word.length > 0)
-    .slice(0, 2)
-    .map((word) => word[0]?.toUpperCase() ?? "")
-    .join("");
-  return letters.length > 0 ? letters : "?";
-}
-
-/** Stable per project, so a project keeps one colour on every screen, the trace view included. */
-export function strandOf(projectId: string): BraidStrand {
-  return featureProjectColour({ feature: "braids", projectId }).index as BraidStrand;
-}
-
 /** A project the viewer cannot see by name is still a project, never a blank. */
 export function braidProject({
   projectId,
@@ -70,7 +48,7 @@ export function braidProject({
   projects: readonly KnownProject[];
 }): BraidProject {
   const name = projects.find((project) => project.id === projectId)?.name ?? "Another project";
-  return { id: projectId, name, initials: projectInitials(name), strand: strandOf(projectId) };
+  return { id: projectId, name };
 }
 
 function conditionOf(braid: AuthzBraid): string | null {

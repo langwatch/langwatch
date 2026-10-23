@@ -12,8 +12,6 @@ import {
   braidsTabOf,
   organizationBraidRows,
   projectBraidRows,
-  projectInitials,
-  strandOf,
 } from "../braids.ts";
 
 const projects = [
@@ -51,12 +49,9 @@ describe("braid rows", () => {
     expect(rows.into[0]?.where).toBeNull();
   });
 
-  it("gives a project it cannot name a name, initials and a stable strand", () => {
+  it("gives a project it cannot name a name, never a blank", () => {
     const project = braidProject({ projectId: "p-hidden", projects });
-    expect(project.name).toBe("Another project");
-    expect(project.initials).toBe("AP");
-    expect(strandOf("p-hidden")).toBe(project.strand);
-    expect(projectInitials("Web orchestrator")).toBe("WO");
+    expect(project).toEqual({ id: "p-hidden", name: "Another project" });
   });
 });
 

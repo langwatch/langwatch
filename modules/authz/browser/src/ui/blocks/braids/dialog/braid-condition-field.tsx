@@ -47,9 +47,9 @@ function RefusedText({ text, at }: { text: string; at: number }) {
       <Box
         as="mark"
         bg="transparent"
-        color="red.fg"
+        color="fg.error"
         textDecoration="underline wavy"
-        textDecorationColor="red.fg"
+        textDecorationColor="fg.error"
       >
         {text.slice(at, end) || " "}
       </Box>
@@ -75,7 +75,7 @@ function CheckLine({
 }) {
   if (held) {
     return (
-      <Text fontSize="sm" color="fg.muted" data-testid="braid-condition-check">
+      <Text fontSize="xs" color="fg.muted" data-testid="braid-condition-check">
         Type the value between the quotes.
       </Text>
     );
@@ -85,27 +85,27 @@ function CheckLine({
       <HStack
         gap={2}
         align="start"
-        color="red.fg"
-        fontSize="sm"
+        color="fg.error"
+        fontSize="xs"
         role="alert"
         data-testid="braid-condition-check"
       >
-        <AlertTriangle size={14} aria-hidden />
+        <AlertTriangle size={12} aria-hidden />
         <Text>{`${check.construct[0]?.toUpperCase() ?? ""}${check.construct.slice(1)} isn't supported. ${check.fix}`}</Text>
       </HStack>
     );
   }
   if (empty) {
     return (
-      <HStack gap={2} color="orange.fg" fontSize="sm" data-testid="braid-condition-check">
-        <AlertTriangle size={14} aria-hidden />
+      <HStack gap={1.5} color="fg.warning" fontSize="xs" data-testid="braid-condition-check">
+        <AlertTriangle size={12} aria-hidden />
         <Text>{`No condition: every span from ${ownerName} shows in ${readerName}'s traces.`}</Text>
       </HStack>
     );
   }
   return (
-    <HStack gap={2} color="green.fg" fontSize="sm" data-testid="braid-condition-check">
-      <CheckCircle2 size={14} aria-hidden />
+    <HStack gap={1.5} color="fg.success" fontSize="xs" data-testid="braid-condition-check">
+      <CheckCircle2 size={12} aria-hidden />
       <Text>{verified ? "Looks good · signed calls only" : "Looks good"}</Text>
     </HStack>
   );
@@ -141,7 +141,7 @@ export function BraidConditionField(props: BraidConditionFieldProps) {
       <HStack justify="space-between" width="full">
         <Field.Label>
           Condition{" "}
-          <Text as="span" color="fg.subtle" fontSize="xs">
+          <Text as="span" color="fg.muted" fontSize="xs" fontWeight="normal">
             OTTL
           </Text>
         </Field.Label>
@@ -171,7 +171,7 @@ export function BraidConditionField(props: BraidConditionFieldProps) {
                     {key}
                   </Text>
                   <Text
-                    color="fg.subtle"
+                    color="fg.muted"
                     fontSize="xs"
                   >{`${spanCount.toLocaleString("en-GB")} spans`}</Text>
                 </HStack>
@@ -193,7 +193,7 @@ export function BraidConditionField(props: BraidConditionFieldProps) {
         placeholder={'attributes["orchestrator"] == "web"'}
         data-testid="braid-condition"
       />
-      <Stack gap={2} width="full">
+      <Stack gap={1.5} width="full">
         {props.check.ok || held ? null : <RefusedText text={props.value} at={props.check.at} />}
         <CheckLine
           check={props.check}

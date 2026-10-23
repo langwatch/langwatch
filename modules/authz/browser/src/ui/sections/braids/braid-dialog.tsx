@@ -6,9 +6,9 @@
 
 import type { AuthzBraid } from "@langwatch/authz-contract";
 import { Banner } from "@langwatch/design-system/banner";
-import { Drawer } from "@langwatch/design-system/drawer";
-import { FeatureMark } from "@langwatch/design-system/feature-mark";
-import { Grid, HStack, Stack, Text } from "@langwatch/design-system/primitives";
+import { Card } from "@langwatch/design-system/card";
+import { Dialog } from "@langwatch/design-system/dialog";
+import { Box, Grid, HStack, Stack, Text } from "@langwatch/design-system/primitives";
 import { nowInstant } from "@langwatch/time";
 import { Lock } from "lucide-react";
 import { useState } from "react";
@@ -53,7 +53,7 @@ import {
 } from "../../blocks/braids/dialog/braid-signed-calls.tsx";
 import { BraidWindowFields } from "../../blocks/braids/dialog/braid-window-fields.tsx";
 
-export type BraidDrawerProps = {
+export type BraidDialogProps = {
   projectId: string;
   /** The braid Edit opened; absent for New braid. */
   editing: AuthzBraid | undefined;
@@ -126,7 +126,7 @@ function saveBlockedReason({
   return "Change the braid to save it";
 }
 
-export function BraidDrawer({ projectId, editing, braidsInto, onClose }: BraidDrawerProps) {
+export function BraidDialog({ projectId, editing, braidsInto, onClose }: BraidDialogProps) {
   const host = useAuthzHost();
   const { projects } = host.organizationStructure();
   const [nowMs] = useState(() => nowInstant().epochMilliseconds);
@@ -178,32 +178,32 @@ export function BraidDrawer({ projectId, editing, braidsInto, onClose }: BraidDr
   const ready = braidDraftReady({ draft, nowMs }) && !unchanged;
 
   return (
-    <Drawer
+    <Dialog
+      open
       onClose={onClose}
-      size="xl"
-      icon={<FeatureMark feature="braids" size={20} />}
+      size="document"
       title={editing ? "Edit braid" : "New braid"}
-      subtitle="Show this project's matching spans inside another project's traces. Nothing is copied."
+      description="Show this project's matching spans inside another project's traces. Nothing is copied."
       busy={save.isSaving}
-      footer={{
-        note: (
-          <HStack gap={1} color="fg.muted" fontSize="xs">
-            <Lock size={12} aria-hidden />
-            <Text>Admins of either project can remove a braid at any time.</Text>
-          </HStack>
-        ),
-        cancel: { onClick: onClose },
-        primaryAction: {
-          label: editing ? "Save braid" : `Braid into ${reader?.name ?? "a project"}`,
-          icon: <FeatureMark feature="braids" size={14} variant="mono" />,
-          onClick: () => save.save({ draft, nowMs }),
-          loading: save.isSaving,
-          ...(ready ? {} : { disabledReason }),
-          "data-testid": "braid-save",
-        },
+      note={
+        <HStack gap={1.5} color="fg.muted" textStyle="xs">
+          <Lock size={12} aria-hidden />
+          <Text>Admins of either project can remove a braid at any time.</Text>
+        </HStack>
+      }
+      primaryAction={{
+        label: editing ? "Save braid" : `Braid into ${reader?.name ?? "a project"}`,
+        onClick: () => save.save({ draft, nowMs }),
+        loading: save.isSaving,
+        ...(ready ? {} : { disabledReason }),
+        "data-testid": "braid-save",
       }}
     >
-      <Grid templateColumns={{ base: "1fr", lg: "minmax(0, 1.25fr) minmax(0, 1fr)" }} gap={6}>
+      <Grid
+        templateColumns={{ base: "1fr", lg: "minmax(0, 1.4fr) minmax(0, 1fr)" }}
+        gap={8}
+        alignItems="start"
+      >
         <Stack gap={5}>
           {save.refusal ? (
             <Banner status="error" title="The braid wasn't saved">
@@ -253,18 +253,22 @@ export function BraidDrawer({ projectId, editing, braidsInto, onClose }: BraidDr
             onEnds={(ends) => change({ ends })}
           />
         </Stack>
-        <BraidPreviewPanel
-          ownerName={owner.name}
-          readerName={reader?.name}
-          preview={previewState}
-          unsignedWarning={
-            !!reader && check.ok && draft.where.trim().length > 0 && verifiedKey === undefined
-          }
-          viewers={viewers.data ? viewersPhrase(viewers.data) : undefined}
-          test={testState}
-          onTest={setTestedTraceId}
-        />
+        <Box position={{ base: "static", lg: "sticky" }} top={0}>
+          <Card variant="nested">
+            <BraidPreviewPanel
+              ownerName={owner.name}
+              readerName={reader?.name}
+              preview={previewState}
+              unsignedWarning={
+                !!reader && check.ok && draft.where.trim().length > 0 && verifiedKey === undefined
+              }
+              viewers={viewers.data ? viewersPhrase(viewers.data) : undefined}
+              test={testState}
+              onTest={setTestedTraceId}
+            />
+          </Card>
+        </Box>
       </Grid>
-    </Drawer>
+    </Dialog>
   );
 }

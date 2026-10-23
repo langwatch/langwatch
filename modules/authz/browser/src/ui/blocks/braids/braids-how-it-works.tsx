@@ -1,74 +1,101 @@
-// Before there are any braids: the empty-state art, what a braid is, and the three steps.
-// Spec: modules/authz/specs/braids-screen.feature, "The page explains braids before there are any".
+// Before the project braids into any other: the art, one sentence on what a braid does, the steps.
+// Spec: modules/authz/specs/braids-screen.feature, "A project with no braids says what a braid..."
 
-import { Card, CardGrid } from "@langwatch/design-system/card";
+import { Link } from "@langwatch/browser-host/link";
+import { Card } from "@langwatch/design-system/card";
 import { FeatureIllustration } from "@langwatch/design-system/feature-illustration";
 import { FeatureMark } from "@langwatch/design-system/feature-mark";
 import { InlineCode } from "@langwatch/design-system/inline-code";
-import { Box, Heading, HStack, Stack, Text } from "@langwatch/design-system/primitives";
-import { Copy, Tag } from "lucide-react";
+import { Box, Grid, HStack, Stack, Text } from "@langwatch/design-system/primitives";
+import { Copy, ExternalLink, Tag } from "lucide-react";
 import type { ReactNode } from "react";
 
-export type BraidsHowItWorksProps = {
-  /** New braid and the guide link, or nothing for a viewer who may not braid. */
-  actions?: ReactNode;
-};
+import { BRAIDS_GUIDE_HREF } from "../../../model/braids/braids.ts";
 
-export function BraidsHowItWorks({ actions }: BraidsHowItWorksProps) {
+const STEPS: readonly { title: string; icon: ReactNode; body: ReactNode }[] = [
+  {
+    title: "Tag the call",
+    icon: <Tag size={14} aria-hidden />,
+    body: (
+      <>
+        The calling project adds a tag such as{" "}
+        <InlineCode variant="neutral">orchestrator=web</InlineCode> to its calls and signs it.
+      </>
+    ),
+  },
+  {
+    title: "Copy the tag",
+    icon: <Copy size={14} aria-hidden />,
+    body: "This project's SDK copies the tag onto its spans. One line of setup.",
+  },
+  {
+    title: "Braid",
+    icon: <FeatureMark feature="braids" size={14} variant="mono" />,
+    body: "Pick the project and a condition. Only spans that match are shown there.",
+  },
+];
+
+export function BraidsHowItWorks({ projectName }: { projectName: string }) {
   return (
-    <Stack gap={4} data-testid="braids-how-it-works">
-      <Card padding="none">
-        <Box
-          borderBottomWidth="1px"
-          borderColor="border"
-          bg="bg.subtle"
-          display="grid"
-          placeItems="center"
-          css={{ "& > *": { width: "100%", height: "auto", maxWidth: "none" } }}
-        >
+    <Card padding="none" data-testid="braids-empty-into">
+      <Box display="flex" justifyContent="center" paddingX={6}>
+        <Box width="full" maxWidth="720px">
           <FeatureIllustration feature="braids" name="empty-state" />
         </Box>
-        <Stack
-          direction={{ base: "column", md: "row" }}
-          gap={6}
-          padding={6}
-          align={{ base: "stretch", md: "flex-end" }}
+      </Box>
+      <Stack gap={1} align="center" textAlign="center" paddingX={6} paddingBottom={6}>
+        <Text textStyle="md" fontWeight="semibold">
+          Not braided into any project
+        </Text>
+        <Text textStyle="sm" color="fg.muted" maxWidth="60ch">
+          A braid shows {projectName}&apos;s matching spans inside another project&apos;s traces, so
+          it can follow its calls all the way down.
+        </Text>
+        <Link
+          href={BRAIDS_GUIDE_HREF}
+          isExternal
+          textStyle="sm"
+          color="fg.muted"
+          _hover={{ color: "fg" }}
+          display="inline-flex"
+          alignItems="center"
+          gap={1}
+          marginTop={2}
         >
-          <Stack gap={2} flex={1} maxWidth="560px">
-            <Heading as="h2" size="md">
-              One trace, across every project
-            </Heading>
-            <Text color="fg.muted">
-              When your agents call agents in other projects, the trace stops at the project line. A
-              braid shows this project&apos;s matching spans inside the other project&apos;s traces,
-              so it sees its calls all the way down. Nothing is copied.
+          Read the docs
+          <ExternalLink size={12} aria-hidden />
+        </Link>
+      </Stack>
+      <Grid
+        templateColumns={{ base: "1fr", md: "repeat(3, minmax(0, 1fr))" }}
+        borderTopWidth="1px"
+        borderColor="border.muted"
+        data-testid="braids-steps"
+      >
+        {STEPS.map((step, index) => (
+          <Stack
+            key={step.title}
+            gap={1}
+            paddingX={5}
+            paddingY={4}
+            borderColor="border.muted"
+            borderTopWidth={{ base: index === 0 ? 0 : "1px", md: 0 }}
+            borderLeftWidth={{ base: 0, md: index === 0 ? 0 : "1px" }}
+          >
+            <HStack gap={2}>
+              <Box color="fg.muted" display="inline-flex">
+                {step.icon}
+              </Box>
+              <Text textStyle="sm" fontWeight="medium">
+                {index + 1}. {step.title}
+              </Text>
+            </HStack>
+            <Text textStyle="sm" color="fg.muted">
+              {step.body}
             </Text>
           </Stack>
-          {actions ? <HStack gap={2}>{actions}</HStack> : null}
-        </Stack>
-      </Card>
-      <CardGrid columns={3} data-testid="braids-steps">
-        <Card
-          title="1. Tag the call"
-          icon={<Tag size={16} aria-hidden />}
-          description={
-            <>
-              The calling project adds a tag such as <InlineCode>orchestrator=web</InlineCode> to
-              its calls and signs it.
-            </>
-          }
-        />
-        <Card
-          title="2. Copy the tag"
-          icon={<Copy size={16} aria-hidden />}
-          description="This project's SDK copies the tag onto its spans. One line of setup."
-        />
-        <Card
-          title="3. Braid"
-          icon={<FeatureMark feature="braids" size={16} variant="mono" />}
-          description="Pick the project and a condition. Only spans that match ever leave this project."
-        />
-      </CardGrid>
-    </Stack>
+        ))}
+      </Grid>
+    </Card>
   );
 }

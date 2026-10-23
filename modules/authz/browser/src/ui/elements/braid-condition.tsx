@@ -6,7 +6,7 @@ import { Box, Text } from "@langwatch/design-system/primitives";
 export function BraidCondition({ where }: { where: string | null }) {
   if (!where) {
     return (
-      <Text fontSize="sm" color="fg.muted">
+      <Text textStyle="sm" color="fg.muted">
         Every span
       </Text>
     );
@@ -14,7 +14,9 @@ export function BraidCondition({ where }: { where: string | null }) {
   // Ligatures would draw `==` as one glyph, which is not what the condition says.
   return (
     <Box as="span" display="contents" fontVariantLigatures="none">
-      <InlineCode truncate="end">{where}</InlineCode>
+      <InlineCode variant="neutral" truncate="end" title={where}>
+        {where}
+      </InlineCode>
     </Box>
   );
 }

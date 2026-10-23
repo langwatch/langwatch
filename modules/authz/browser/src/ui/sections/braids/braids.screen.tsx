@@ -7,10 +7,10 @@
 import { Link } from "@langwatch/browser-host/link";
 import { Banner, BannerAction } from "@langwatch/design-system/banner";
 import { ContentTabs } from "@langwatch/design-system/content-tabs";
-import { EnterprisePill } from "@langwatch/design-system/enterprise-pill";
 import { FeatureMark } from "@langwatch/design-system/feature-mark";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { HStack, Skeleton, Stack, Text } from "@langwatch/design-system/primitives";
+import { Box, Skeleton, Stack, Text } from "@langwatch/design-system/primitives";
 import { BookOpen, Plus } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
@@ -36,24 +36,19 @@ import { BraidsEnterpriseUpsell } from "../../blocks/braids/braids-enterprise-up
 import { BraidsHowItWorks } from "../../blocks/braids/braids-how-it-works.tsx";
 import { BraidsTable } from "../../blocks/braids/braids-table.tsx";
 import { RemoveBraidDialog } from "../../blocks/braids/remove-braid-dialog.tsx";
+import { BraidsTitle } from "../../elements/braids-title.tsx";
 import { SectionErrorNotice } from "../../elements/section-error-notice.tsx";
-import { BraidDrawer } from "./braid-drawer.tsx";
+import { BraidDialog } from "./braid-dialog.tsx";
 import { BraidsSigningKeys } from "./braids-signing-keys.tsx";
 
 const BRAIDS_MANAGE_PERMISSION = "braids:manage";
 
-/** The braid drawer is URL-routed: `?braid=new`, or `?braid=<id>` for Edit. */
+/** The braid dialog is URL-routed: `?braid=new`, or `?braid=<id>` for Edit. */
 const BRAID_QUERY_KEY = "braid";
 
-function NewBraidButton({
-  placement,
-  onOpen,
-}: {
-  placement: "header" | "inline";
-  onOpen: () => void;
-}) {
+function NewBraidButton({ onOpen }: { onOpen: () => void }) {
   return (
-    <PageLayout.HeaderButton primary onClick={onOpen} data-testid={`new-braid-${placement}`}>
+    <PageLayout.HeaderButton primary onClick={onOpen} data-testid="new-braid-header">
       <Plus size={14} aria-hidden />
       New braid
     </PageLayout.HeaderButton>
@@ -88,11 +83,7 @@ function BraidsHeader({
           : "Show spans from one project inside another project's traces. Nothing is copied."
       }
     >
-      <HStack gap={2}>
-        <FeatureMark feature="braids" size={22} />
-        <PageLayout.Heading>Braids</PageLayout.Heading>
-        <EnterprisePill feature="braids" />
-      </HStack>
+      <BraidsTitle />
     </PageLayout.Header>
   );
 }
@@ -103,24 +94,27 @@ function LoadingBraids() {
       <BraidsHeader />
       <Stack gap={4} paddingTop={4} data-testid="braids-loading">
         <Skeleton height="32px" width="420px" />
-        <Skeleton height="220px" borderRadius="xl" />
+        <Skeleton height="160px" borderRadius="md" />
       </Stack>
     </>
   );
 }
 
-function EmptyLine({ children }: { children: string }) {
+function NothingBraidedIn({ projectName }: { projectName: string }) {
   return (
-    <Stack align="center" gap={3} paddingY={10} color="fg.subtle" textAlign="center">
-      <FeatureMark feature="braids" size={24} variant="mono" />
-      <Text color="fg.muted">{children}</Text>
-    </Stack>
+    <NoDataInfoBlock
+      icon={<FeatureMark feature="braids" size={24} variant="mono" />}
+      title="Nothing braided in"
+      description={`When another project braids its spans into ${projectName}, they show in its traces and are listed here.`}
+      docsHref={BRAIDS_GUIDE_HREF}
+      testId="braids-empty-from"
+    />
   );
 }
 
 function WhoMayBraidHint({ keptToAdmins }: { keptToAdmins: boolean }) {
   return (
-    <Text fontSize="sm" color="fg.muted" paddingTop={3}>
+    <Text textStyle="sm" color="fg.muted" paddingTop={3}>
       {keptToAdmins
         ? "Organisation admins can create, change or remove braids. Every change is in the audit log."
         : "Admins of this project and organisation admins can create, change or remove braids. Every change is in the audit log."}
@@ -203,22 +197,9 @@ export default function BraidsScreen() {
     </>
   );
 
-  const guideAndNew = can.canCreate ? (
-    <>
-      <GuideLink />
-      <NewBraidButton placement="inline" onOpen={() => openBraid("new")} />
-    </>
-  ) : (
-    <GuideLink />
-  );
-  let intoContent: ReactNode = (
-    <EmptyLine>{`${projectName} doesn't braid its spans anywhere yet.`}</EmptyLine>
-  );
-  if (rows.into.length > 0) intoContent = table("into");
-  else if (planState === "enterprise") intoContent = <BraidsHowItWorks actions={guideAndNew} />;
   const asked = query[BRAID_QUERY_KEY];
   const editing = braids.data.intoOtherProjects.find((braid) => braid.braidId === asked);
-  const drawerOpen = (asked === "new" && can.canCreate) || (!!editing && can.canEditInto);
+  const dialogOpen = (asked === "new" && can.canCreate) || (!!editing && can.canEditInto);
 
   return (
     <>
@@ -227,9 +208,7 @@ export default function BraidsScreen() {
         actions={
           <>
             <GuideLink />
-            {can.canCreate ? (
-              <NewBraidButton placement="header" onOpen={() => openBraid("new")} />
-            ) : null}
+            {can.canCreate ? <NewBraidButton onOpen={() => openBraid("new")} /> : null}
           </>
         }
       />
@@ -262,41 +241,59 @@ export default function BraidsScreen() {
             them.
           </Banner>
         ) : null}
+        {/* Only the open tab is mounted: the others hold no read open behind it. */}
         <ContentTabs
           label="Braids"
           value={tab}
           onValueChange={({ value }) => setTab(value)}
+          mount="active"
+          body="flush"
           items={[
             {
               value: "into",
               label: "Into other projects",
               count: rows.into.length,
               testId: "braids-tab-into",
-              content: intoContent,
+              content: (
+                <Box paddingTop={4}>
+                  {rows.into.length > 0 ? (
+                    table("into")
+                  ) : (
+                    <BraidsHowItWorks projectName={projectName} />
+                  )}
+                </Box>
+              ),
             },
             {
               value: "from",
               label: "From other projects",
               count: rows.from.length,
               testId: "braids-tab-from",
-              content:
-                rows.from.length > 0 ? (
-                  table("from")
-                ) : (
-                  <EmptyLine>{`No project braids its spans into ${projectName}.`}</EmptyLine>
-                ),
+              content: (
+                <Box paddingTop={4}>
+                  {rows.from.length > 0 ? (
+                    table("from")
+                  ) : (
+                    <NothingBraidedIn projectName={projectName} />
+                  )}
+                </Box>
+              ),
             },
             {
               value: "keys",
               label: "Signing keys",
               testId: "braids-tab-keys",
-              content: <BraidsSigningKeys projectId={projectId} planState={planState} />,
+              content: (
+                <Box paddingTop={4}>
+                  <BraidsSigningKeys projectId={projectId} planState={planState} />
+                </Box>
+              ),
             },
           ]}
         />
       </Stack>
-      {drawerOpen ? (
-        <BraidDrawer
+      {dialogOpen ? (
+        <BraidDialog
           key={asked}
           projectId={projectId}
           editing={editing}

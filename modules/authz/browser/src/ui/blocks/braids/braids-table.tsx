@@ -8,7 +8,7 @@ import { Link } from "@langwatch/browser-host/link";
 import { MoreVerticalIcon } from "@langwatch/design-system/icons";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
-import { Badge, Button, Stack, Text } from "@langwatch/design-system/primitives";
+import { Badge, Box, Button, Stack, Text } from "@langwatch/design-system/primitives";
 import { format } from "@langwatch/time";
 import { Pause } from "lucide-react";
 
@@ -36,7 +36,7 @@ export type BraidsTableProps = {
 function activityText({ paused, spans }: { paused: boolean; spans: number | undefined }): string {
   if (paused) return "Paused";
   if (spans === undefined) return "Counting spans";
-  return spans === 1 ? "1 span in 24h" : `${spans.toLocaleString("en-GB")} spans in 24h`;
+  return spans === 1 ? "1 span" : `${spans.toLocaleString("en-GB")} spans`;
 }
 
 function day(ms: number): string {
@@ -59,11 +59,9 @@ export function BraidsTable({
   onEdit,
   onRemove,
 }: BraidsTableProps) {
+  const label = side === "into" ? "Braids into other projects" : "Braids from other projects";
   return (
-    <ListTable
-      variant="embedded"
-      aria-label={side === "into" ? "Braids into other projects" : "Braids from other projects"}
-    >
+    <ListTable scroll="x" scrollLabel={label} aria-label={label}>
       <ListTable.Header>
         <ListTable.Row>
           <ListTable.ColumnHeader>
@@ -89,10 +87,12 @@ export function BraidsTable({
               />
             </ListTable.Cell>
             <ListTable.Cell>
-              <BraidCondition where={row.where} />
+              <Box maxWidth="24rem">
+                <BraidCondition where={row.where} />
+              </Box>
             </ListTable.Cell>
-            <ListTable.Cell>
-              <Stack gap={1}>
+            <ListTable.Cell nowrap>
+              <Stack gap={0.5}>
                 {paused ? (
                   <Badge
                     size="sm"
@@ -104,16 +104,16 @@ export function BraidsTable({
                     Paused
                   </Badge>
                 ) : null}
-                <Text fontSize="sm" color="fg.muted">
+                <Text textStyle="sm">
                   {braidFromText({ fromMs: row.fromMs, showsTime: row.fromShowsTime })}
                 </Text>
-                <Text fontSize="sm" color="fg.muted">
+                <Text textStyle="xs" color="fg.muted">
                   {row.expiresAtMs === null ? "No end date" : `Until ${day(row.expiresAtMs)}`}
                 </Text>
               </Stack>
             </ListTable.Cell>
-            <ListTable.Cell>
-              <Text fontSize="sm" color="fg.muted" data-testid="braid-activity">
+            <ListTable.Cell nowrap>
+              <Text textStyle="sm" color="fg.muted" data-testid="braid-activity">
                 {activityText({ paused, spans: activity?.get(row.braidId) })}
               </Text>
             </ListTable.Cell>

@@ -1,6 +1,10 @@
-// A project on a braid: its strand colour paired with initials, so colour is never the only cue.
+// A project on a braid, drawn as the project switcher draws one: its initial on a colour hashed
+// from it, so a project looks the same here as everywhere else in the app.
 
-import { Box, HStack, Stack, Text } from "@langwatch/design-system/primitives";
+import { Avatar } from "@langwatch/design-system/avatar";
+import { firstGrapheme } from "@langwatch/design-system/first-grapheme";
+import { HStack, Stack, Text } from "@langwatch/design-system/primitives";
+import { getAvatarFillForString } from "@langwatch/design-system/rotating-colors";
 import type { ReactNode } from "react";
 
 import type { BraidProject } from "../../model/braids/braids.ts";
@@ -9,27 +13,23 @@ export function BraidProjectBadge({
   project,
   size = "md",
 }: {
-  project: BraidProject;
+  project: Pick<BraidProject, "name">;
   size?: "sm" | "md";
 }) {
-  const box = size === "sm" ? "22px" : "28px";
+  const initial = firstGrapheme(project.name);
+  const box = size === "sm" ? "20px" : "24px";
   return (
-    <Box
+    <Avatar.Root
       aria-hidden
+      size="2xs"
       flexShrink={0}
-      display="inline-grid"
-      placeItems="center"
+      color="fg.onColor"
+      background={getAvatarFillForString(initial)}
       width={box}
       height={box}
-      borderRadius="md"
-      bg={`feature.braids.project.${project.strand}`}
-      color={`feature.braids.projectInk.${project.strand}`}
-      fontSize={size === "sm" ? "2xs" : "xs"}
-      fontWeight="semibold"
-      data-strand={project.strand}
     >
-      {project.initials}
-    </Box>
+      <Avatar.Fallback>{initial}</Avatar.Fallback>
+    </Avatar.Root>
   );
 }
 
@@ -37,18 +37,18 @@ export function BraidProjectLabel({
   project,
   detail,
 }: {
-  project: BraidProject;
+  project: Pick<BraidProject, "name">;
   detail?: ReactNode;
 }) {
   return (
-    <HStack gap={3} minWidth={0}>
+    <HStack gap={2.5} minWidth={0}>
       <BraidProjectBadge project={project} />
       <Stack gap={0} minWidth={0}>
-        <Text fontWeight="medium" truncate>
+        <Text textStyle="sm" fontWeight="medium" truncate>
           {project.name}
         </Text>
         {detail ? (
-          <Text fontSize="xs" color="fg.muted" truncate>
+          <Text textStyle="xs" color="fg.muted" truncate>
             {detail}
           </Text>
         ) : null}

@@ -6,13 +6,13 @@
 
 import { Link } from "@langwatch/browser-host/link";
 import { Banner } from "@langwatch/design-system/banner";
-import { Card } from "@langwatch/design-system/card";
-import { EnterprisePill } from "@langwatch/design-system/enterprise-pill";
-import { FeatureMark } from "@langwatch/design-system/feature-mark";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Button, HStack, Skeleton, Stack, Text } from "@langwatch/design-system/primitives";
-import { SettingsCard } from "@langwatch/design-system/settings-card";
+import { Box, Button, Skeleton, Stack } from "@langwatch/design-system/primitives";
+import { SettingsField } from "@langwatch/design-system/settings-field";
+import { SettingsSection } from "@langwatch/design-system/settings-section";
 import { Switch } from "@langwatch/design-system/switch";
+import { ShieldCheck, Waypoints } from "lucide-react";
 
 import {
   useBraidsPolicy,
@@ -22,7 +22,10 @@ import {
 import { useAuthzHost } from "../../../model/authz-host.ts";
 import { BRAIDS_GUIDE_HREF, organizationBraidRows } from "../../../model/braids/braids.ts";
 import { OrganizationBraidsTable } from "../../blocks/braids/organization-braids-table.tsx";
+import { BraidsTitle } from "../../elements/braids-title.tsx";
 import { SectionErrorNotice } from "../../elements/section-error-notice.tsx";
+
+const KEEP_TO_ADMINS = "Keep braids to organisation admins";
 
 function OrganizationBraidsHeader() {
   return (
@@ -36,17 +39,10 @@ function OrganizationBraidsHeader() {
         </PageLayout.HeaderButton>
       }
     >
-      <HStack gap={2}>
-        <FeatureMark feature="braids" size={22} />
-        <PageLayout.Heading>Braids</PageLayout.Heading>
-        <EnterprisePill feature="braids" />
-      </HStack>
+      <BraidsTitle />
     </PageLayout.Header>
   );
 }
-
-const SETTING_HINT =
-  "While this is off, project admins can braid their projects. Turn it on and only organisation admins can create, change or remove braids.";
 
 function WhoMayBraid({
   organizationId,
@@ -60,36 +56,60 @@ function WhoMayBraid({
   isReading: boolean;
 }) {
   const setting = useSetBraidsPolicy({ organizationId });
-  if (!isEnterprise) {
-    return (
-      <SettingsCard
-        title="Who may braid"
-        hint={SETTING_HINT}
-        data-testid="braids-policy-upsell"
-        actions={
-          <HStack gap={3}>
-            <Text fontSize="sm" color="fg.muted">
-              Choosing who may braid is included in Enterprise.
-            </Text>
-            <Button asChild colorPalette="orange" size="xs">
-              <Link href="/settings/plans">See plans</Link>
-            </Button>
-          </HStack>
-        }
-      />
-    );
-  }
   return (
-    <SettingsCard title="Who may braid" hint={SETTING_HINT}>
-      <Switch
-        checked={keptToAdmins}
-        disabled={isReading || setting.isSaving}
-        onCheckedChange={({ checked }) => setting.set(checked)}
-        data-testid="braids-policy-switch"
+    <SettingsSection
+      icon={<ShieldCheck size={18} />}
+      title="Who may braid"
+      hint="Who can create, change or remove braids in this organisation's projects."
+    >
+      <SettingsField
+        label={KEEP_TO_ADMINS}
+        controlAlign="end"
+        layout="inline"
+        hint={
+          isEnterprise
+            ? "While this is off, project admins can braid their projects. Turn it on and only organisation admins can."
+            : "Choosing who may braid is included in Enterprise."
+        }
+        data-testid={isEnterprise ? undefined : "braids-policy-upsell"}
       >
-        Keep braids to organisation admins
-      </Switch>
-    </SettingsCard>
+        {isEnterprise ? (
+          <Switch
+            checked={keptToAdmins}
+            disabled={isReading || setting.isSaving}
+            onCheckedChange={({ checked }) => setting.set(checked)}
+            inputProps={{ "aria-label": KEEP_TO_ADMINS }}
+            data-testid="braids-policy-switch"
+          />
+        ) : (
+          <Button asChild colorPalette="orange" size="xs">
+            <Link href="/settings/plans">See plans</Link>
+          </Button>
+        )}
+      </SettingsField>
+    </SettingsSection>
+  );
+}
+
+function OrganizationBraidsList({
+  failed,
+  rows,
+  paused,
+}: {
+  failed: boolean;
+  rows: ReturnType<typeof organizationBraidRows>;
+  paused: boolean;
+}) {
+  if (failed) return <SectionErrorNotice title="Couldn't load your organisation's braids" />;
+  if (rows.length > 0) return <OrganizationBraidsTable rows={rows} paused={paused} />;
+  return (
+    <NoDataInfoBlock
+      size="inline"
+      icon={<Waypoints size={24} />}
+      title="No braids yet"
+      description="When a project braids its spans into another, the braid is listed here."
+      docsHref={BRAIDS_GUIDE_HREF}
+    />
   );
 }
 
@@ -105,8 +125,8 @@ export default function OrganizationBraidsScreen() {
       <>
         <OrganizationBraidsHeader />
         <Stack gap={4} paddingTop={4} data-testid="organization-braids-loading">
-          <Skeleton height="96px" borderRadius="xl" />
-          <Skeleton height="220px" borderRadius="xl" />
+          <Skeleton height="72px" borderRadius="md" />
+          <Skeleton height="160px" borderRadius="md" />
         </Stack>
       </>
     );
@@ -121,11 +141,14 @@ export default function OrganizationBraidsScreen() {
   return (
     <>
       <OrganizationBraidsHeader />
-      <Stack gap={6} paddingTop={4}>
+      <Stack gap={0}>
         {paused ? (
-          <Banner status="warning" title="Braids are paused">
-            Braids need the Enterprise plan. They are kept and start working again when you upgrade.
-          </Banner>
+          <Box paddingY={4}>
+            <Banner status="warning" title="Braids are paused">
+              Braids need the Enterprise plan. They are kept and start working again when you
+              upgrade.
+            </Banner>
+          </Box>
         ) : null}
         <WhoMayBraid
           organizationId={organizationId}
@@ -133,22 +156,14 @@ export default function OrganizationBraidsScreen() {
           keptToAdmins={policy.data?.braidsOrganizationAdminsOnly ?? false}
           isReading={policy.isLoading}
         />
-        {braids.isError ? (
-          <SectionErrorNotice title="Couldn't load your organisation's braids" />
-        ) : (
-          <Card
-            title="Braids in this organisation"
-            description="Each braid shows a project's matching spans inside another project's traces."
-            padding={rows.length > 0 ? "none" : "md"}
-            data-testid="organization-braids"
-          >
-            {rows.length > 0 ? (
-              <OrganizationBraidsTable rows={rows} paused={paused} />
-            ) : (
-              <Text color="fg.muted">No project braids its spans into another project yet.</Text>
-            )}
-          </Card>
-        )}
+        <SettingsSection
+          icon={<Waypoints size={18} />}
+          title="Braids in this organisation"
+          hint="Each braid shows a project's matching spans inside another project's traces."
+          data-testid="organization-braids"
+        >
+          <OrganizationBraidsList failed={braids.isError} rows={rows} paused={paused} />
+        </SettingsSection>
       </Stack>
     </>
   );

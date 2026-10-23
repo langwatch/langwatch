@@ -17,11 +17,11 @@ Feature: The Braids screen
   Rule: The page explains braids before there are any
 
     @integration
-    Scenario: A project with no braids shows how braids work
+    Scenario: A project with no braids says what a braid does
       Given "specialists" has no braids
       When ana opens Braids in the project settings
-      Then the page explains in three steps: tag the call, copy the tag, braid
-      And it offers New braid and a link to the guide
+      Then the page says in one sentence what a braid does, with a link to the guide
+      And it offers New braid and a link to the guide in the page header
       And it shows tabs for braids into other projects, braids from other projects and signing keys, each with its count
 
   Rule: The dialog builds a braid and shows what the reader will see

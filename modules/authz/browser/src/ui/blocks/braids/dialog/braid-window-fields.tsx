@@ -30,7 +30,7 @@ export function BraidWindowFields(props: BraidWindowFieldsProps) {
     else props.onEnds({ kind: "never" });
   };
   return (
-    <Grid templateColumns="1fr 1fr" gap={4}>
+    <Grid templateColumns="minmax(0, 1fr) auto" gap={4} alignItems="start">
       <Field.Root>
         <Field.Label>Data from</Field.Label>
         <Input
@@ -48,7 +48,7 @@ export function BraidWindowFields(props: BraidWindowFieldsProps) {
         <Field.Label>Ends</Field.Label>
         <Stack gap={2} width="full">
           <SegmentedControl
-            size="sm"
+            size="md"
             value={endsValue(props.ends)}
             onValueChange={({ value }) => value && pick(value)}
             items={[

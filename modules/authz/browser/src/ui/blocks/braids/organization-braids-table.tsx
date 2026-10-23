@@ -2,8 +2,10 @@
 // Spec: modules/authz/specs/braids-screen.feature, "An organisation admin chooses who may braid".
 
 import { Link } from "@langwatch/browser-host/link";
+import { MoreVerticalIcon } from "@langwatch/design-system/icons";
 import { ListTable } from "@langwatch/design-system/list-table";
-import { Text } from "@langwatch/design-system/primitives";
+import { Menu } from "@langwatch/design-system/menu";
+import { Box, Button, Stack, Text } from "@langwatch/design-system/primitives";
 import { format } from "@langwatch/time";
 
 import {
@@ -26,14 +28,18 @@ export function OrganizationBraidsTable({
   paused: boolean;
 }) {
   return (
-    <ListTable variant="embedded" aria-label="Braids in this organisation">
+    <ListTable
+      scroll="x"
+      scrollLabel="Braids in this organisation"
+      aria-label="Braids in this organisation"
+    >
       <ListTable.Header>
         <ListTable.Row>
           <ListTable.ColumnHeader>From</ListTable.ColumnHeader>
           <ListTable.ColumnHeader>Into</ListTable.ColumnHeader>
           <ListTable.ColumnHeader>Condition</ListTable.ColumnHeader>
           <ListTable.ColumnHeader>Access</ListTable.ColumnHeader>
-          <ListTable.ColumnHeader>History</ListTable.ColumnHeader>
+          <ListTable.ActionHeader />
         </ListTable.Row>
       </ListTable.Header>
       <ListTable.Body>
@@ -46,22 +52,39 @@ export function OrganizationBraidsTable({
               <BraidProjectLabel project={row.reader} />
             </ListTable.Cell>
             <ListTable.Cell>
-              <BraidCondition where={row.where} />
+              <Box maxWidth="24rem">
+                <BraidCondition where={row.where} />
+              </Box>
             </ListTable.Cell>
-            <ListTable.Cell>
-              <Text fontSize="sm" color="fg.muted">
-                {paused ? "Paused · " : ""}
-                {braidFromText({ fromMs: row.fromMs, showsTime: row.fromShowsTime })}
-              </Text>
-              <Text fontSize="sm" color="fg.muted">
-                {row.expiresAtMs === null ? "No end date" : `Until ${day(row.expiresAtMs)}`}
-              </Text>
+            <ListTable.Cell nowrap>
+              <Stack gap={0.5}>
+                <Text textStyle="sm">
+                  {paused ? "Paused · " : ""}
+                  {braidFromText({ fromMs: row.fromMs, showsTime: row.fromShowsTime })}
+                </Text>
+                <Text textStyle="xs" color="fg.muted">
+                  {row.expiresAtMs === null ? "No end date" : `Until ${day(row.expiresAtMs)}`}
+                </Text>
+              </Stack>
             </ListTable.Cell>
-            <ListTable.Cell>
-              <Link href={braidAuditHref(row.braidId)} fontSize="sm">
-                View in audit log
-              </Link>
-            </ListTable.Cell>
+            <ListTable.ActionCell>
+              <Menu.Root>
+                <Menu.Trigger asChild>
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    aria-label={`Actions for the braid from ${row.owner.name} into ${row.reader.name}`}
+                  >
+                    <MoreVerticalIcon size={14} aria-hidden />
+                  </Button>
+                </Menu.Trigger>
+                <Menu.Content>
+                  <Menu.Item value="audit" asChild>
+                    <Link href={braidAuditHref(row.braidId)}>View in audit log</Link>
+                  </Menu.Item>
+                </Menu.Content>
+              </Menu.Root>
+            </ListTable.ActionCell>
           </ListTable.Row>
         ))}
       </ListTable.Body>

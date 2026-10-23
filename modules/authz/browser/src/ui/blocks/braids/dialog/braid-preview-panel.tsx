@@ -53,7 +53,15 @@ const count = (value: number) => value.toLocaleString("en-GB");
 function Legend({ colour, label, value }: { colour: string; label: string; value: number }) {
   return (
     <HStack gap={2} fontSize="sm">
-      <Box width="10px" height="10px" borderRadius="sm" bg={colour} flexShrink={0} />
+      <Box
+        width="10px"
+        height="10px"
+        borderRadius="sm"
+        bg={colour}
+        borderWidth="1px"
+        borderColor="border"
+        flexShrink={0}
+      />
       <Text flex={1} color="fg.muted">
         {label}
       </Text>
@@ -81,7 +89,7 @@ function Counts({
   const share = (value: number) => (value / traces.total) * 100;
   return (
     <Stack gap={3} data-testid="braid-preview-counts">
-      <Text fontSize="2xl" fontWeight="semibold">
+      <Text fontSize="xl" fontWeight="semibold">
         {count(traces.every + traces.some)}{" "}
         <Text as="span" fontSize="sm" fontWeight="normal" color="fg.muted">
           {`of ${count(traces.total)} traces get spans`}
@@ -95,12 +103,12 @@ function Counts({
         bg="bg.emphasized"
         aria-hidden
       >
-        <Box height="full" width={`${share(traces.every)}%`} bg="fg" />
-        <Box height="full" width={`${share(traces.some)}%`} bg="feature.braids.project.1" />
+        <Box height="full" width={`${share(traces.every)}%`} bg="blue.solid" />
+        <Box height="full" width={`${share(traces.some)}%`} bg="blue.muted" />
       </HStack>
       <Stack gap={1}>
-        <Legend colour="fg" label={`Every ${ownerName} span`} value={traces.every} />
-        <Legend colour="feature.braids.project.1" label="Some of its spans" value={traces.some} />
+        <Legend colour="blue.solid" label={`Every ${ownerName} span`} value={traces.every} />
+        <Legend colour="blue.muted" label="Some of its spans" value={traces.some} />
         <Legend colour="bg.emphasized" label={`Nothing from ${ownerName}`} value={traces.none} />
       </Stack>
       {traces.capped ? (
@@ -125,8 +133,16 @@ function TraceRows({
   rowTestId: string;
 }) {
   return (
-    <Stack gap={1} padding={3} borderWidth="1px" borderRadius="md" data-testid={testId}>
-      <Text fontSize="xs" color="fg.subtle">
+    <Stack
+      gap={1}
+      padding={3}
+      borderWidth="1px"
+      borderColor="border.muted"
+      borderRadius="md"
+      bg="bg.panel"
+      data-testid={testId}
+    >
+      <Text fontSize="xs" color="fg.muted">
         {note}
       </Text>
       {rows.map((row) => (
@@ -140,18 +156,18 @@ function TraceRows({
           <Text
             fontFamily="mono"
             fontSize="sm"
-            color={row.kind === "withheld" ? "fg.subtle" : "fg"}
+            color={row.kind === "withheld" ? "fg.muted" : "fg"}
             textDecoration={row.kind === "withheld" ? "line-through" : undefined}
           >
             {row.name}
           </Text>
           {row.kind === "braided" ? (
-            <Badge size="sm" colorPalette="orange">
+            <Badge size="sm" variant="subtle" colorPalette="blue">
               Braided
             </Badge>
           ) : null}
           {row.kind === "withheld" ? (
-            <Text fontSize="xs" color="fg.subtle">
+            <Text fontSize="xs" color="fg.muted">
               Never sent
             </Text>
           ) : null}
@@ -200,7 +216,7 @@ function TestTrace({ test, onTest }: Pick<BraidPreviewPanelProps, "test" | "onTe
         </Text>
       ) : null}
       {test.state === "error" ? (
-        <Text fontSize="sm" color="red.fg">
+        <Text fontSize="sm" color="fg.error">
           Couldn't test that trace. Try again.
         </Text>
       ) : null}
@@ -220,9 +236,9 @@ export function BraidPreviewPanel(props: BraidPreviewPanelProps) {
   const reader = props.readerName ?? "the other project";
   const { preview } = props;
   return (
-    <Stack gap={4} padding={4} borderRadius="lg" bg="bg.subtle" data-testid="braid-preview">
+    <Stack gap={4} data-testid="braid-preview">
       <Stack gap={0}>
-        <Text fontWeight="semibold">{`What ${reader} will see`}</Text>
+        <Text fontWeight="semibold" fontSize="sm">{`What ${reader} will see`}</Text>
         <Text fontSize="xs" color="fg.muted">
           Last 7 days, updates as you type
         </Text>
@@ -233,12 +249,12 @@ export function BraidPreviewPanel(props: BraidPreviewPanelProps) {
         </Text>
       ) : null}
       {preview.state === "refused" ? (
-        <Text fontSize="sm" color="red.fg">
+        <Text fontSize="sm" color="fg.error">
           Fix the condition to see a preview.
         </Text>
       ) : null}
       {preview.state === "error" ? (
-        <Text fontSize="sm" color="red.fg">
+        <Text fontSize="sm" color="fg.error">
           Couldn't load the preview. It updates when you change the braid.
         </Text>
       ) : null}

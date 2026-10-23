@@ -1,6 +1,6 @@
 /**
  * @vitest-environment jsdom
- * The New braid and Edit braid drawer, opened from the Braids page by its URL.
+ * The New braid and Edit braid dialog, opened from the Braids page by its URL.
  * Spec: modules/authz/specs/braids-screen.feature, "The dialog builds a braid".
  */
 
@@ -32,7 +32,7 @@ const STRUCTURE = {
 };
 const CONDITION = 'attributes["orchestrator"] == "web"';
 
-function openDrawer({ braid = "new" }: { braid?: string } = {}) {
+function openDialog({ braid = "new" }: { braid?: string } = {}) {
   const host = new FakeAuthzHost({
     scope: { organizationId: "org-1", projectId: "p-spec" },
     grants: new Set(["project:view", "braids:manage"]),
@@ -97,11 +97,11 @@ function spanNode(spanId: string, name: string, extra: object = {}) {
   };
 }
 
-describe("the braid drawer", () => {
+describe("the braid dialog", () => {
   describe("when ana starts a new braid", () => {
     /** @scenario The braid starts from this project and picks where it goes */
     it("fixes the project it braids from and lists the readable projects, refusing two", async () => {
-      const { user } = openDrawer();
+      const { user } = openDialog();
 
       expect(
         screen.getByText(
@@ -119,11 +119,10 @@ describe("the braid drawer", () => {
         screen.getByRole("menuitem", { name: "rollup, aggregate projects can't be braided" }),
       ).toBeInTheDocument();
       const options = screen.getAllByTestId("braid-target");
-      expect(options.map((option) => option.textContent)).toEqual([
-        "orchestrator",
-        "specialistsThis project",
-        "rollupAggregate projects can't be braided",
-      ]);
+      expect(options).toHaveLength(3);
+      expect(options[0]).toHaveTextContent("orchestrator");
+      expect(options[1]).toHaveTextContent("specialistsThis project");
+      expect(options[2]).toHaveTextContent("rollupAggregate projects can't be braided");
       expect(options[0]).not.toHaveAttribute("data-disabled");
       expect(options[1]).toHaveAttribute("data-disabled");
       expect(options[2]).toHaveAttribute("data-disabled");
@@ -133,7 +132,7 @@ describe("the braid drawer", () => {
   describe("when ana picks a reader", () => {
     /** @scenario The braid starts from this project and picks where it goes */
     it("names the Into button by the picked project", async () => {
-      const { user } = openDrawer();
+      const { user } = openDialog();
       await pickReader(user);
 
       expect(screen.getByRole("button", { name: "Into, orchestrator" })).toBeInTheDocument();
@@ -147,7 +146,7 @@ describe("the braid drawer", () => {
         intoOtherProjects: [liveBraid({ expiresAtMs: null })],
         fromOtherProjects: [],
       };
-      const { user } = openDrawer();
+      const { user } = openDialog();
       await pickReader(user);
 
       const pair = screen.getByTestId("braid-pair-braids");
@@ -159,7 +158,7 @@ describe("the braid drawer", () => {
     });
 
     it("says nothing when the reader has none", async () => {
-      const { user } = openDrawer();
+      const { user } = openDialog();
       await pickReader(user);
 
       expect(screen.queryByTestId("braid-pair-braids")).toBeNull();
@@ -181,7 +180,7 @@ describe("the braid drawer", () => {
             spans: 7400,
           },
         });
-        const { user } = openDrawer();
+        const { user } = openDialog();
         await pickReader(user);
         await writeCondition(user, 'attributes["team"] == "billing"');
 
@@ -207,7 +206,7 @@ describe("the braid drawer", () => {
           spans: 7400,
           live: { braids: 1, traces, spans: 7400 },
         });
-        const { user } = openDrawer();
+        const { user } = openDialog();
         await pickReader(user);
         await writeCondition(user, CONDITION);
 
@@ -224,7 +223,7 @@ describe("the braid drawer", () => {
       braidsFake.state.targets = [
         { projectId: "p-spec", selectable: false, reason: "this_project" },
       ];
-      const { user } = openDrawer();
+      const { user } = openDialog();
 
       await user.click(screen.getByTestId("braid-into"));
       expect(screen.queryByText("orchestrator")).not.toBeInTheDocument();
@@ -237,7 +236,7 @@ describe("the braid drawer", () => {
   describe("when the condition uses an or", () => {
     /** @scenario The condition is checked as it is typed */
     it("marks the or, says how to write it instead and keeps create disabled", async () => {
-      const { user } = openDrawer();
+      const { user } = openDialog();
       await pickReader(user);
 
       await writeCondition(user, `${CONDITION} or attributes["team"] == "a"`);
@@ -255,7 +254,7 @@ describe("the braid drawer", () => {
   describe("when ana inserts an attribute the owner's spans carry", () => {
     /** @scenario The attributes this project's spans carry can be inserted into the condition */
     it("inserts it at the cursor with the caret inside the quotes", async () => {
-      const { user } = openDrawer();
+      const { user } = openDialog();
 
       await user.click(screen.getByTestId("braid-insert-attribute"));
       await user.click(screen.getByTestId("braid-attribute"));
@@ -267,7 +266,7 @@ describe("the braid drawer", () => {
 
     /** @scenario The attributes this project's spans carry can be inserted into the condition */
     it("holds the empty value's refusal until ana types, keeping Save disabled", async () => {
-      const { user } = openDrawer();
+      const { user } = openDialog();
       await pickReader(user);
 
       await user.click(screen.getByTestId("braid-insert-attribute"));
@@ -292,7 +291,7 @@ describe("the braid drawer", () => {
     });
 
     it("refuses the empty value once ana changes the text without filling it in", async () => {
-      const { user } = openDrawer();
+      const { user } = openDialog();
 
       await user.click(screen.getByTestId("braid-insert-attribute"));
       await user.click(screen.getByTestId("braid-attribute"));
@@ -316,7 +315,7 @@ describe("the braid drawer", () => {
         keyName: "Production",
         lastUsedAt: "2026-10-22T09:00:00Z",
       };
-      const { user } = openDrawer();
+      const { user } = openDialog();
       await pickReader(user);
       await writeCondition(user, CONDITION);
 
@@ -337,7 +336,7 @@ describe("the braid drawer", () => {
   describe("when the reader has no signing key", () => {
     /** @scenario Only signed calls offers to set up signing when the reader has no key */
     it("says the reader does not sign yet and where to set it up", async () => {
-      const { user } = openDrawer();
+      const { user } = openDialog();
       await pickReader(user);
 
       await user.click(screen.getByRole("checkbox", { name: "Only signed calls" }));
@@ -359,7 +358,7 @@ describe("the braid drawer", () => {
         traces: { every: 1200, some: 300, none: 3402, total: 4902, capped: true },
         unsignedHidden: 37,
       });
-      const { user } = openDrawer();
+      const { user } = openDialog();
       await pickReader(user);
       await writeCondition(user, `${CONDITION} and Verified("orchestrator")`);
 
@@ -389,7 +388,7 @@ describe("the braid drawer", () => {
           ],
         },
       });
-      const { user } = openDrawer();
+      const { user } = openDialog();
       await pickReader(user);
       await writeCondition(user, CONDITION);
 
@@ -403,7 +402,7 @@ describe("the braid drawer", () => {
     });
 
     it("shows no example when no trace gets spans", async () => {
-      const { user } = openDrawer();
+      const { user } = openDialog();
       await pickReader(user);
       await writeCondition(user, CONDITION);
 
@@ -415,7 +414,7 @@ describe("the braid drawer", () => {
       braidTraces.state.preview = previewOf({
         traces: { every: 0, some: 0, none: 0, total: 0, capped: false },
       });
-      const { user } = openDrawer();
+      const { user } = openDialog();
       await pickReader(user);
       await writeCondition(user, CONDITION);
 
@@ -436,7 +435,7 @@ describe("the braid drawer", () => {
           spanNode("s-3", "fraud_check", { ownerProjectId: "p-spec", braided: false }),
         ],
       };
-      const { user } = openDrawer();
+      const { user } = openDialog();
       await pickReader(user);
 
       await user.type(screen.getByRole("textbox", { name: "Trace id" }), "4bf92f3577b34da6");
@@ -458,7 +457,7 @@ describe("the braid drawer", () => {
   describe("when ana picks the project to braid into", () => {
     /** @scenario The dialog names how many people will see the spans */
     it("says how many of its members will see the braided spans", async () => {
-      const { user } = openDrawer();
+      const { user } = openDialog();
       await pickReader(user);
 
       expect(screen.getByTestId("braid-viewers")).toHaveTextContent(
@@ -470,7 +469,7 @@ describe("the braid drawer", () => {
   describe("when ana completes the braid", () => {
     /** @scenario Creating the braid names the project it goes into */
     it("names the reader on the button, creates it and closes", async () => {
-      const { host, user } = openDrawer();
+      const { host, user } = openDialog();
       await pickReader(user);
       await writeCondition(user, CONDITION);
 
@@ -490,9 +489,9 @@ describe("the braid drawer", () => {
     });
 
     describe("and the server refuses it", () => {
-      it("says the refusal in the drawer and stays open", async () => {
+      it("says the refusal in the dialog and stays open", async () => {
         braidsFake.state.saveError = { code: "braid_already_exists", httpStatus: 409 };
-        const { host, user } = openDrawer();
+        const { host, user } = openDialog();
         await pickReader(user);
         await user.click(screen.getByTestId("braid-save"));
 
@@ -504,7 +503,7 @@ describe("the braid drawer", () => {
 
       it("says the reader holds the most different conditions it can, not that this one is too big", async () => {
         braidsFake.state.saveError = { code: "braid_condition_limit_reached", httpStatus: 422 };
-        const { host, user } = openDrawer();
+        const { host, user } = openDialog();
         await pickReader(user);
         await user.click(screen.getByTestId("braid-save"));
 
@@ -523,7 +522,7 @@ describe("the braid drawer", () => {
     /** @scenario Editing a braid saves only a change */
     it("opens it prefilled with the reader fixed and saves the change", async () => {
       braidsFake.state.project = { intoOtherProjects: [liveBraid()], fromOtherProjects: [] };
-      const { user } = openDrawer({ braid: "b-1" });
+      const { user } = openDialog({ braid: "b-1" });
 
       expect(screen.getByTestId("braid-condition")).toHaveValue(CONDITION);
       expect(screen.getByTestId("braid-into")).toBeDisabled();
@@ -541,7 +540,7 @@ describe("the braid drawer", () => {
     /** @scenario Testing a trace shows it exactly as the reader will see it */
     it("tests a trace with the draft in place of the braid it edits", async () => {
       braidsFake.state.project = { intoOtherProjects: [liveBraid()], fromOtherProjects: [] };
-      const { user } = openDrawer({ braid: "b-1" });
+      const { user } = openDialog({ braid: "b-1" });
 
       await user.type(screen.getByRole("textbox", { name: "Trace id" }), "4bf92f3577b34da6");
       await user.click(screen.getByTestId("braid-test"));
@@ -554,7 +553,7 @@ describe("the braid drawer", () => {
     /** @scenario A further braid on the same pair says what it adds */
     it("asks the preview to count the draft in place of the braid it edits", async () => {
       braidsFake.state.project = { intoOtherProjects: [liveBraid()], fromOtherProjects: [] };
-      const { user } = openDrawer({ braid: "b-1" });
+      const { user } = openDialog({ braid: "b-1" });
       await writeCondition(user, `${CONDITION} and attributes["team"] == "billing"`);
 
       await waitFor(() =>
