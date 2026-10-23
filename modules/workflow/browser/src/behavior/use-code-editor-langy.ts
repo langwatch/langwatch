@@ -107,6 +107,10 @@ export function useCodeEditorAssistant({
 
   const buffer = useRef(savedCode);
   const reads = useRef(new Map<string, ProposalTarget>());
+  // A read answers one visit to one code block: leaving it forgets every read.
+  useEffect(() => {
+    reads.current.clear();
+  }, [reviewKey]);
   const latest = useRef<EditorState>({
     subject,
     language,
@@ -257,6 +261,7 @@ function studioCodeHandlers({
             "A proposal is awaiting the reader's review; wait until they accept or reject it.",
           );
         }
+        reads.current.delete(payload.readToken);
         const next = {
           code: payload.code,
           summary: payload.summary,

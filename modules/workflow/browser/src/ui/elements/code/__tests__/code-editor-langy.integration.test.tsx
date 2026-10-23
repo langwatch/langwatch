@@ -421,6 +421,30 @@ describe("the Studio code editor with Langy", () => {
       expect(screen.queryByTestId("monaco-diff")).toBeNull();
     });
 
+    /** @scenario "A read answers one proposal on one visit to a code block" */
+    it("refuses a read used twice, or carried back to the code block it left", async () => {
+      const { rerender } = openEditor();
+      await screen.findByTestId("monaco");
+      const used = await read();
+      await propose(PROPOSED_CODE, used);
+      fireEvent.click(screen.getByRole("button", { name: "Reject" }));
+
+      await expect(propose(PROPOSED_CODE, used)).rejects.toMatchObject({
+        code: "studio_code_target_changed",
+      });
+
+      const carried = await read();
+      rerender(true, "code_2");
+      await screen.findByTestId("monaco");
+      rerender(true);
+      await screen.findByTestId("monaco");
+
+      await expect(propose(PROPOSED_CODE, carried)).rejects.toMatchObject({
+        code: "studio_code_target_changed",
+      });
+      expect(screen.queryByTestId("monaco-diff")).toBeNull();
+    });
+
     /** @scenario "A second proposal is refused while one awaits review" */
     it("refuses another proposal until the first is accepted or rejected", async () => {
       openEditor();

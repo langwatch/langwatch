@@ -123,6 +123,13 @@ Feature: Langy writes and edits Studio code blocks from the code editor
       And nothing is shown for review on B
 
     @integration
+    Scenario: A read answers one proposal on one visit to a code block
+      Given Langy read code block A and proposed against that read
+      And Langy read A again, then the user left A and came back
+      When Langy proposes against either read
+      Then the proposal is refused with "studio_code_target_changed"
+
+    @integration
     Scenario: Langy rides above Studio's node drawer while the code editor is open
       Given Langy is available on the code block
       When the code editor opens over Studio's node drawer
