@@ -80,3 +80,9 @@ Feature: Publish every deployable image to the artifacts registry
     Given a langwatch@v<version> release
     When publish-docker-ecr publishes a Lambda image
     Then the image also gets the <version> tag, naming the same manifest
+
+  @unit
+  Scenario: A Lambda image starts in a directory Lambda's own user can enter
+    Given a Lambda image whose base sets a home directory only its own user may enter
+    When the image's Dockerfile is checked
+    Then its runtime stage sets a working directory outside every home directory
