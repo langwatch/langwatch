@@ -14,6 +14,9 @@ export const READ_RATE_LIMITS_ENFORCED_FLAG = "release_read_rate_limits_enforced
 
 const CACHE_MS = 60_000;
 
+/** Scopes held at once; past it the longest-held goes first, so the cache stays bounded. */
+export const MAX_CACHED_SCOPES = 10_000;
+
 export type ApiDoorReadBudgetPeers = Readonly<{
   projects: Pick<ProjectApi, "getOrganizationId">;
   featureFlags: Pick<FeatureFlagApi, "isEnabled">;
@@ -41,9 +44,21 @@ export class ApiDoorReadBudgetService {
     if (cached && nowInstant().epochMilliseconds - cached.at < CACHE_MS) return cached.value;
 
     const value = this.#resolve(scope);
-    value.catch(() => this.#limits.delete(key));
-    this.#limits.set(key, { at: nowInstant().epochMilliseconds, value });
+    value.catch(() => {
+      if (this.#limits.get(key)?.value === value) this.#limits.delete(key);
+    });
+    this.#remember(key, { at: nowInstant().epochMilliseconds, value });
     return value;
+  }
+
+  /** Re-inserted at the end, so the first key is always the one held longest. */
+  #remember(key: string, entry: Readonly<{ at: number; value: Promise<Resolved> }>): void {
+    this.#limits.delete(key);
+    this.#limits.set(key, entry);
+    if (this.#limits.size <= MAX_CACHED_SCOPES) return;
+
+    const oldest = this.#limits.keys().next();
+    if (!oldest.done) this.#limits.delete(oldest.value);
   }
 
   async enforced({ scope }: { scope: AuthzDeclaredScopeId | null }): Promise<boolean> {

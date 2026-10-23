@@ -6,6 +6,7 @@ import {
   DeveloperSeatRestrictedError,
   LiteMemberRestrictedError,
   MembershipDisabledError,
+  type Actor,
   type AuthzScopeLineageResult,
   type PermissionDecision,
 } from "@langwatch/authorization";
@@ -366,21 +367,10 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
   #members(options: Parameters<typeof TrpcHost.create>[0]): TrpcRuntimeMembers<TrpcRequestContext> {
     return {
       identity: {
-        caller: (ctx) => {
-          const actor = ctx.tryActor?.();
-          const impersonatorId = ctx.session?.user.impersonator?.id;
-
-          return {
-            actor: actor
-              ? {
-                  type: "user" as const,
-                  id: actor.id,
-                  ...(impersonatorId ? { impersonatorId } : {}),
-                }
-              : null,
-            ...(ctx.session ? { browserSession: { id: ctx.session.sessionId ?? null } } : {}),
-          };
-        },
+        caller: (ctx) => ({
+          actor: sessionActorOf(ctx),
+          ...(ctx.session ? { browserSession: { id: ctx.session.sessionId ?? null } } : {}),
+        }),
       },
       authorization: { forRequest: (ctx) => this.#decisionsFor(ctx) },
       denials: DENIALS,
@@ -578,15 +568,16 @@ function isTrpcRouterDeclaration(
   );
 }
 
+/** The session's person as an actor, naming the operator when one is acting as them. */
+function sessionActorOf(ctx: TrpcRequestContext): Actor | null {
+  const actor = ctx.tryActor?.();
+  if (!actor) return null;
+  const impersonatorId = ctx.session?.user.impersonator?.id;
+
+  return { type: "user", id: actor.id, ...(impersonatorId ? { impersonatorId } : {}) };
+}
+
 /** The read budget's view of a tRPC call: the session's person, or the operator acting as them. */
 function trpcReadBudgetOf(budget: ReadBudget) {
-  return {
-    budget,
-    actorOf: (ctx: TrpcRequestContext) => {
-      const actor = ctx.tryActor?.();
-      if (!actor) return null;
-      const impersonatorId = ctx.session?.user.impersonator?.id;
-      return { type: "user" as const, id: actor.id, ...(impersonatorId ? { impersonatorId } : {}) };
-    },
-  };
+  return { budget, actorOf: sessionActorOf };
 }

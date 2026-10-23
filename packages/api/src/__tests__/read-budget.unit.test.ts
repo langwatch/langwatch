@@ -224,6 +224,21 @@ describe("ReadBudget", () => {
       );
     });
 
+    it("counts the operator's rows against the day's impersonation allowance alone", async () => {
+      const counter = memoryCounter();
+      const { budget, exceeded } = budgetWith({ enforced: true, counter });
+
+      await budget.record({ ...readBy(OPERATOR), rows: LIMITS.impersonationRowsPerDay + 1 });
+
+      expect(counter.used.has("read-budget:impersonation:operator-1:rows-hour")).toBe(false);
+      expect(exceeded().map((line) => line.fields)).toEqual([
+        expect.objectContaining({
+          dimension: "rows_per_day",
+          limit: LIMITS.impersonationRowsPerDay,
+        }),
+      ]);
+    });
+
     /** @scenario "An operator past the impersonation ceiling is refused when enforcement is on" */
     it("refuses past the impersonation ceiling", async () => {
       const { budget, exceeded } = budgetWith({ enforced: true });
@@ -262,6 +277,35 @@ describe("readKindOf", () => {
   describe("when a generated operation id names a POST query", () => {
     it("counts a LangWatchQL query as a read", () => {
       expect(readKindOf({ operation: "postApiV1Query", method: "POST" })).toBe("read");
+    });
+  });
+
+  describe("when an operation exports or downloads", () => {
+    it("counts it as an export, whatever its method", () => {
+      expect(readKindOf({ operation: "exportTraces", method: "POST" })).toBe("export");
+      expect(readKindOf({ operation: "downloadDataset", method: "GET" })).toBe("export");
+      expect(readKindOf({ operation: "getApiV1TracesExport", method: "get" })).toBe("export");
+    });
+  });
+
+  describe("when a call is a GET", () => {
+    it("counts it as a read, whatever its name", () => {
+      expect(readKindOf({ operation: "traces", method: "GET" })).toBe("read");
+      expect(readKindOf({ operation: "createDraft", method: "get" })).toBe("read");
+    });
+  });
+
+  describe("when a POST names a read by its prefix", () => {
+    it.each(["searchTraces", "listDatasets", "getTrace", "findSpans", "queryTraces", "fetchRun"])(
+      "counts %s as a read",
+      (operation) => {
+        expect(readKindOf({ operation, method: "POST" })).toBe("read");
+      },
+    );
+
+    it("reads the prefix past a generated method and address", () => {
+      expect(readKindOf({ operation: "postApiV1SearchTraces", method: "POST" })).toBe("read");
+      expect(readKindOf({ operation: "postApiSearchTraces", method: "POST" })).toBe("read");
     });
   });
 

@@ -1,10 +1,129 @@
+import type { RestProjectIdentity } from "@langwatch/authorization";
 /** Which credential a REST read counts against (specs/security/read-rate-limits.feature). */
 import { describe, expect, it } from "vitest";
 
-import { restReadCredential } from "../read-credential.ts";
+import { actorReadCredential, restReadCredential } from "../read-credential.ts";
 import { recordKeyCredential, recordProjectCredential } from "../rest/credential.ts";
 
 const request = new Request("https://langwatch.test/api/auth/cli/governance/status");
+
+const PROJECT: RestProjectIdentity = {
+  id: "project_k",
+  name: "K",
+  slug: "k",
+  teamId: "team_1",
+  organizationId: "org_1",
+  isPersonal: false,
+  ownerUserId: null,
+  kind: "application",
+};
+
+function projectKeyRequest({
+  ingestion = false,
+  isLangySessionKey,
+}: {
+  ingestion?: boolean;
+  isLangySessionKey?: boolean;
+}): Request {
+  const keyed = new Request("https://langwatch.test/api/traces");
+  recordProjectCredential(keyed, {
+    type: "apiKey",
+    apiKeyId: "key_k",
+    userId: "user_owner",
+    organizationId: PROJECT.organizationId,
+    ingestSourceType: ingestion ? "otel" : null,
+    ingestionTemplateId: ingestion ? "template_1" : null,
+    ...(isLangySessionKey ? { isLangySessionKey } : {}),
+    project: PROJECT,
+  });
+  return keyed;
+}
+
+describe("actorReadCredential", () => {
+  describe("given an operator acting as a person", () => {
+    it("counts against the operator, naming the person acted as", () => {
+      expect(
+        actorReadCredential({ type: "user", id: "user_1", impersonatorId: "operator_1" }),
+      ).toEqual({
+        id: "operator_1",
+        type: "impersonation",
+        impersonatorId: "operator_1",
+        subjectUserId: "user_1",
+      });
+    });
+  });
+
+  describe("given a person in their own session", () => {
+    it("counts against the person's session", () => {
+      expect(actorReadCredential({ type: "user", id: "user_1" })).toEqual({
+        id: "user_1",
+        type: "session",
+      });
+    });
+  });
+
+  describe("given no person", () => {
+    it("counts nothing", () => {
+      expect(actorReadCredential(null)).toBe(null);
+    });
+  });
+});
+
+describe("restReadCredential through a key door", () => {
+  describe("given a project API key", () => {
+    it("counts it by its key id as an API key", () => {
+      expect(
+        restReadCredential({ door: "project", actor: null, request: projectKeyRequest({}) }),
+      ).toEqual({ id: "key_k", type: "api_key" });
+    });
+  });
+
+  describe("given an ingestion key", () => {
+    it("counts it by its key id as an ingestion key", () => {
+      const request = projectKeyRequest({ ingestion: true });
+
+      expect(restReadCredential({ door: "project", actor: null, request })).toEqual({
+        id: "key_k",
+        type: "ingestion_key",
+      });
+    });
+  });
+
+  describe("given a Langy session key", () => {
+    it("counts it by its key id as a Langy session key", () => {
+      const request = projectKeyRequest({ isLangySessionKey: true });
+
+      expect(restReadCredential({ door: "project", actor: null, request })).toEqual({
+        id: "key_k",
+        type: "langy_session_key",
+      });
+    });
+  });
+
+  describe("given a person's access token through the api_key door", () => {
+    it("counts it against its person as an access token", () => {
+      const tokened = new Request("https://langwatch.test/api/v1/query");
+      recordKeyCredential(tokened, {
+        kind: "cliAccessToken",
+        userId: "user_cli",
+        organizationId: "org_1",
+        projectId: "project_k",
+        teamId: "team_1",
+      });
+
+      expect(restReadCredential({ door: "api_key", actor: null, request: tokened })).toEqual({
+        id: "user_cli",
+        type: "access_token",
+      });
+    });
+  });
+
+  describe("given a key door that recorded no key", () => {
+    it("counts nothing", () => {
+      expect(restReadCredential({ door: "api_key", actor: null, request })).toBe(null);
+    });
+  });
+});
 
 describe("restReadCredential", () => {
   describe("given a read through the CLI token door", () => {

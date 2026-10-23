@@ -259,21 +259,27 @@ function admissionWindows(call: ReadCall, limits: ReadBudgetLimits): readonly Wi
   return [...requests, ...rowWindows(call.credential, limits)];
 }
 
+/** An impersonated read has a day's rows only: its allowance has no hourly share. */
 function rowWindows(credential: ReadCredential, limits: ReadBudgetLimits): readonly Window[] {
-  const impersonated = credential.type === "impersonation";
+  if (credential.type === "impersonation") {
+    return [
+      {
+        dimension: "rows_per_day",
+        suffix: "rows-day",
+        requests: limits.impersonationRowsPerDay,
+        seconds: DAY,
+      },
+    ];
+  }
+
   return [
     {
       dimension: "rows_per_hour",
       suffix: "rows-hour",
-      requests: impersonated ? limits.impersonationRowsPerDay : limits.rowsPerHour,
+      requests: limits.rowsPerHour,
       seconds: HOUR,
     },
-    {
-      dimension: "rows_per_day",
-      suffix: "rows-day",
-      requests: impersonated ? limits.impersonationRowsPerDay : limits.rowsPerDay,
-      seconds: DAY,
-    },
+    { dimension: "rows_per_day", suffix: "rows-day", requests: limits.rowsPerDay, seconds: DAY },
   ];
 }
 
