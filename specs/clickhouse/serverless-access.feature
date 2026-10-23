@@ -105,6 +105,22 @@ Feature: clickhouse-serverless gives every login a tier, rotates passwords and a
     When the same user presents it again before it expires
     Then the sidecar answers without verifying it again
     And after it expires, or after the access file changes, the token is verified afresh
+    And a full cache drops expired tokens first, then the one expiring soonest, and never serves an expired one
+
+  @unit
+  Scenario: A token stops working the moment it expires
+    Given a token user's token that expires at an instant
+    When it is presented a second before that instant, and at it
+    Then it is accepted before and refused at the instant, from cache and verified afresh
+    And not-before still allows 30 seconds of clock leeway
+
+  @unit
+  Scenario: The sidecar is ready only once it can decide token logins
+    Given the sidecar has no access file, or an issuer whose keys it has never fetched
+    When readiness is asked
+    Then it answers 503 naming what is missing
+    And once every issuer's keys were fetched it answers 200
+    And it stays ready, and keeps accepting tokens, while an issuer is unreachable later
 
   @unit
   Scenario: The sidecar listens on loopback only
@@ -130,6 +146,95 @@ Feature: clickhouse-serverless gives every login a tier, rotates passwords and a
     Given a values file that still sets the chart's users value
     When the chart is rendered
     Then it renders as without it, and the install notes say users is deprecated
+
+  # Dynamic-only mode (ADR-184 section 7): tokens only, nothing static to steal.
+
+  @unit
+  Scenario: Dynamic-only mode refuses every long-lived password in access.yaml
+    Given an access file with mode dynamic-only
+    When it declares a rolling user, a user named local_admin or default, or an admin token user whose issuer does not allow admins
+    Then loading it fails, naming each offending user
+    And the same rolling user loads in standard mode
+
+  @unit
+  Scenario: Dynamic-only mode starts without any password for the default user
+    Given an access file with mode dynamic-only and neither CLICKHOUSE_PASSWORD nor CLICKHOUSE_PASSWORD_FILE
+    When ch-config loads and validates its input
+    Then it starts in dynamic-only mode
+
+  @unit
+  Scenario: Dynamic-only mode refuses a long-lived password for the default user
+    Given an access file with mode dynamic-only
+    When CLICKHOUSE_PASSWORD or CLICKHOUSE_PASSWORD_FILE is set, the bootstrap directory is relative, or replicas run without the cluster secret
+    Then ch-config fails with a message naming the setting
+
+  @unit
+  Scenario: Dynamic-only mode renders no password a client could hold
+    Given a dynamic-only server
+    When the renderer writes the server configuration
+    Then only default and local_admin carry a password, and only as a hash
+    And default has an empty network list and the hash of a secret nobody keeps, new at every start
+    And no-password and plaintext logins and new SQL passwords are refused server-wide
+
+  @unit
+  Scenario: Dynamic-only mode refuses a users.d file with a long-lived password
+    Given a dynamic-only server
+    When users.xml, users.d or conf.d gives a user a password, no_password or ssh_keys login, such as the rendered LangWatchQL user
+    Then the server refuses to start, naming each file and user
+    And LDAP, Kerberos, certificate and token users are allowed
+
+  @unit
+  Scenario: Every server start gives the local admin a new password that never leaves the pod
+    Given a dynamic-only server
+    When it starts
+    Then a random password is written to the bootstrap tmpfs, readable by uid and group 101 only
+    And users.d holds only its hash
+    And the next start replaces it, and the old password no longer matches
+    And leaving dynamic-only mode removes the local admin and its password
+    And in-pod helpers re-read it for every query
+
+  @unit
+  Scenario: The local admin logs in from loopback only
+    Given the rendered local admin
+    Then its networks are 127.0.0.1 and ::1, replacing any other definition
+
+  @unit
+  Scenario: Initialisation scripts log in as the local admin in dynamic-only mode
+    Given a dynamic-only server with initdb scripts
+    When the entrypoint starts the official entrypoint
+    Then the scripts get local_admin and this start's password
+    And without initdb nothing is handed on
+
+  @unit
+  Scenario: The sidecar never switches mode while the server runs
+    Given the server started in one mode
+    When access.yaml switches to the other
+    Then the sidecar keeps the last rendered users and logs that a restart is needed
+
+  @unit
+  Scenario: The sidecar reports any password login left on a dynamic-only server
+    Given a dynamic-only server with a SQL user created with a password
+    When the sidecar audits system.users as the local admin
+    Then it logs an error naming the user, once per change, and drops nothing
+
+  @unit
+  Scenario: The chart runs a dynamic-only pod with no static password mounted
+    Given access.dynamicOnly.enabled
+    When the chart is rendered
+    Then neither container gets the default password, and a single pod mounts no credentials Secret
+    And both containers share an in-memory bootstrap volume
+    And the sidecar's readiness gates the pod, and replicated probes log in as local_admin
+    And the chart refuses it without access, with password Secrets, with backups, or with replicas but no cluster secret
+
+  @integration
+  Scenario: A dynamic-only server accepts short-lived tokens and no password
+    Given the image runs in dynamic-only mode with an OIDC issuer
+    When users log in over HTTP and over the native protocol
+    Then no password logs in, not default's with any password nor local_admin's from outside loopback
+    And a token gets exactly its tier's rights and fails the moment it expires
+    And a wrong audience, issuer or key, or another user's token, is refused
+    And a rotated issuer key works mid-run, and new logins return soon after the sidecar restarts
+    And a server restart rotates the local admin password
 
   @integration
   Scenario: A real ClickHouse honours tiers, rolling passwords and token logins
