@@ -152,7 +152,9 @@ export default function BraidsScreen() {
     return (
       <>
         <BraidsHeader />
-        <SectionErrorNotice title="Couldn't load this project's braids" />
+        <Box paddingTop={4}>
+          <SectionErrorNotice title="Couldn't load this project's braids" />
+        </Box>
       </>
     );
   }
@@ -168,7 +170,9 @@ export default function BraidsScreen() {
     return (
       <>
         <BraidsHeader actions={<GuideLink />} projectName={projectName} />
-        <BraidsEnterpriseUpsell />
+        <Box paddingTop={4}>
+          <BraidsEnterpriseUpsell />
+        </Box>
       </>
     );
   }
@@ -212,7 +216,7 @@ export default function BraidsScreen() {
           </>
         }
       />
-      <Stack gap={4}>
+      <Stack gap={4} paddingTop={paused || can.showKeptToAdminsNote ? 4 : 0}>
         {paused ? (
           <Banner
             status="warning"
