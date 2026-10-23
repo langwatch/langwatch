@@ -19379,6 +19379,42 @@
           "documentation": ""
         },
         {
+          "name": "codingFirstSessionAt",
+          "columnName": "codingFirstSessionAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "codingAgentTypes",
+          "columnName": "codingAgentTypes",
+          "type": "String",
+          "kind": "scalar",
+          "isList": true,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "codingActiveDays",
+          "columnName": "codingActiveDays",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "codingLastActiveDay",
+          "columnName": "codingLastActiveDay",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
           "name": "updatedAt",
           "columnName": "updatedAt",
           "type": "DateTime",
