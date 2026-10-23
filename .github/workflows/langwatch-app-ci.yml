@@ -144,6 +144,8 @@ jobs:
               - '.github/workflows/migration-compat.yml'
               - '.github/workflows/npx-server-smoke.yml'
               - '.github/workflows/gateway-matrix.yaml'
+              # Read by .github/scripts/release-please-timer.test.ts.
+              - '.github/workflows/release-please-sdks.yml'
               - '.github/.release-please-manifest.json'
               - '.github/scripts/**'
               # ci-scripts-test reads this workflow's path filters and its
@@ -1373,6 +1375,9 @@ jobs:
           .github/scripts/nightly-flaky.test.ts
           .github/scripts/nightly-dashboard.test.ts
           .github/scripts/nightly-workflows.test.ts
+
+      - name: Test when release pull requests refresh
+        run: node --test --experimental-strip-types .github/scripts/release-please-timer.test.ts
 
   ci-self-test:
     needs: changes
