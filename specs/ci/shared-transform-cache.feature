@@ -97,3 +97,9 @@ Feature: Vitest's transform cache is shared across checkouts
     When two checkouts run their tests
     Then neither run writes that module to the shared cache or reads it from there
     And the module sees the token exactly as its source writes it
+
+  @integration
+  Scenario: The main process loads a cached global setup in its own checkout
+    Given two checkouts whose global setup imports a workspace file
+    When the first fills the cache and the second reads the global setup from it
+    Then each checkout's global setup imports its own workspace file

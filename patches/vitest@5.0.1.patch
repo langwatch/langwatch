@@ -36,7 +36,7 @@ index 7f8ab40e591a03cffbb914d5bcd8f06702ae4619..f225ac1d63417509cf35a8da6515f61a
  					};
  					return result;
 diff --git a/dist/chunks/index.DzobfTyw.js b/dist/chunks/index.DzobfTyw.js
-index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..cd836aef75316a580bc850f18f1b24347cf6164a 100644
+index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..0e16671cd33a3d2b8ec241b7006179e1217f4329 100644
 --- a/dist/chunks/index.DzobfTyw.js
 +++ b/dist/chunks/index.DzobfTyw.js
 @@ -6310,7 +6310,7 @@ class ModuleFetcher {
@@ -495,7 +495,17 @@ index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..cd836aef75316a580bc850f18f1b2434
  }
  /**
  * Performs an atomic write operation using the write-then-rename pattern.
-@@ -10502,6 +10666,7 @@ function createMethodsRPC(project, methodsOptions = {}) {
+@@ -9260,7 +9424,8 @@ class ServerModuleRunner extends ModuleRunner {
+ 				try {
+ 					const result = await fetcher(data[0], data[1], environment, false, data[2]);
+ 					if ("tmp" in result) {
+-						const code = await readFile(result.tmp);
++						// LangWatch: an entry marked portable names the root with the shared cache's token
++						const code = await readFile(result.tmp, "utf-8").then((text) => result.portable && process.env[FS_CACHE_ROOT_ENV] ? text.replaceAll(FS_CACHE_ROOT_TOKEN, process.env[FS_CACHE_ROOT_ENV]) : text);
+ 						return { result: {
+ 							...result,
+ 							code
+@@ -10502,6 +10667,7 @@ function createMethodsRPC(project, methodsOptions = {}) {
  					file: node.file,
  					id: node.id,
  					tmp,
