@@ -8,6 +8,7 @@ import {
   INSTANCE_ID_NOT_MINTED,
   USAGE_REPORT_EVENT,
   USAGE_REPORT_SCHEMA_VERSION,
+  type SelfHostedNotice,
   type UsageReportPreview,
   type UsageReportSwitches,
 } from "@langwatch/ops-contract";
@@ -19,6 +20,7 @@ import type {
   CloudLatestRelease,
   CloudLatestReleaseRepository,
 } from "../repositories/cloud-latest-release.repository.ts";
+import type { CloudNoticeRepository } from "../repositories/cloud-notice.repository.ts";
 import { nextNoonUtc } from "../rules/usage-report-schedule.rules.ts";
 import type { UsageReportCollectionService } from "./usage-report-collection.service.ts";
 
@@ -57,8 +59,11 @@ interface UsageReportServiceDependencies {
   readonly channel: UsageReportChannel;
   readonly install: UsageReportInstall;
   readonly latestReleases: CloudLatestReleaseRepository;
+  readonly notices: CloudNoticeRepository;
   /** DISABLE_USAGE_STATS. */
   readonly disabled: boolean;
+  /** DISABLE_LANGWATCH_NOTICES: the reply's notices are never kept. */
+  readonly noticesDisabled: boolean;
   readonly isSaas: boolean;
   readonly now: () => Instant;
 }
@@ -86,7 +91,7 @@ export class UsageReportService {
     const connect = await install.getConnectDeployment();
     // LANGWATCH_CONNECT_DISABLED proves the install calls LangWatch for nothing, this report too.
     if (!connect.permitted) {
-      await this.forgetLatestRelease();
+      await this.forgetCloudReply();
       return "connect_disabled";
     }
     const { ids: organizationIds } = await this.deps.organizations.listAllIds();
@@ -118,6 +123,10 @@ export class UsageReportService {
       await this.deps.latestReleases.save(answer.latestRelease).catch((error: unknown) => {
         logger.warn({ instanceId, error }, "could not keep the latest release cloud named");
       });
+      const kept = this.deps.noticesDisabled ? [] : answer.notices;
+      await this.deps.notices.save(kept).catch((error: unknown) => {
+        logger.warn({ instanceId, error }, "could not keep the notices cloud named");
+      });
       logger.info({ instanceId }, "usage stats sent");
       return "sent";
     } catch (error) {
@@ -135,8 +144,15 @@ export class UsageReportService {
     return this.deps.latestReleases.find();
   }
 
-  private async forgetLatestRelease(): Promise<void> {
+  /** The notices cloud last named; empty when this install does not report usage. */
+  async findNotices(): Promise<SelfHostedNotice[]> {
+    if (this.deps.isSaas || this.deps.disabled || this.deps.noticesDisabled) return [];
+    return this.deps.notices.find();
+  }
+
+  private async forgetCloudReply(): Promise<void> {
     await this.deps.latestReleases.save(null).catch(() => undefined);
+    await this.deps.notices.save([]).catch(() => undefined);
   }
 
   /**

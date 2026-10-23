@@ -1,9 +1,13 @@
+import type { SelfHostedNotice } from "@langwatch/ops-contract";
+
 import type { CloudLatestRelease } from "../repositories/cloud-latest-release.repository.ts";
 
-/** How a posted report came back: its status, and the newest release the reply named, if any. */
+/** How a posted report came back: its status, the newest release and notices it named. */
 export interface UsageReportPostAnswer {
   readonly status: number;
   readonly latestRelease: CloudLatestRelease | null;
+  /** Each well-formed notice the reply named; a malformed one is dropped alone. */
+  readonly notices: readonly SelfHostedNotice[];
 }
 
 /**

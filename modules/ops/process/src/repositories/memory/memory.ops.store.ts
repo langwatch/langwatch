@@ -7,6 +7,7 @@ import {
   type LiveSnapshot,
   type ReplayHistoryEntry,
   type ReplayStatus,
+  type SelfHostedNotice,
 } from "@langwatch/ops-contract";
 
 import type { CloudLatestRelease } from "../cloud-latest-release.repository.ts";
@@ -74,6 +75,7 @@ export class MemoryOpsStore {
   readonly rateBaselines = new Map<string, number>();
   /** Per ClickHouse endpoint, the last storage reading and the last backup it saw. */
   readonly cloudLatestRelease: CloudLatestRelease[] = [];
+  readonly cloudNotices: SelfHostedNotice[] = [];
   processFleetReadings: ProcessFleetReading[] = [];
   readonly storageReadings = new Map<string, Omit<StorageStatsReading, "lastBackup">>();
   readonly storageLastBackups = new Map<string, NonNullable<StorageStatsReading["lastBackup"]>>();

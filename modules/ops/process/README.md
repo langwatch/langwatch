@@ -2266,7 +2266,7 @@ interface Output {
 
 ### `ops.upgrade`
 
-Contract `../contract/src/features/migrations/ops-upgrade.ts:361`, router `src/transport/ops-upgrade.trpc.ts:16`.
+Contract `../contract/src/features/migrations/ops-upgrade.ts:364`, router `src/transport/ops-upgrade.trpc.ts:16`.
 
 | Procedure                                               | Kind     | Gate                                                                                                                                                                                 | Input                                             | Output                                    |
 | ------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------- | ----------------------------------------- |
@@ -2296,22 +2296,22 @@ Contract `../contract/src/features/migrations/ops-upgrade.ts:361`, router `src/t
 
 ```typescript
 // ops.upgrade.status
-// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:364
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:367
 type Input = unknown;
-type Output = z.infer<typeof opsUpgradeStatusSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:137
+type Output = z.infer<typeof opsUpgradeStatusSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:140
 
 // ops.upgrade.attentionNotice
-// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:372
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:375
 type Input = unknown;
-// Output: opsUpgradeAttentionNoticeSchema, ../contract/src/features/migrations/ops-upgrade.ts:358
+// Output: opsUpgradeAttentionNoticeSchema, ../contract/src/features/migrations/ops-upgrade.ts:361
 interface Output {
   show: boolean;
 }
 
 // ops.upgrade.listReleases
-// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:377
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:380
 type Input = unknown;
-// Output: opsUpgradeReleasePageSchema, ../contract/src/features/migrations/ops-upgrade.ts:258
+// Output: opsUpgradeReleasePageSchema, ../contract/src/features/migrations/ops-upgrade.ts:261
 interface Output {
   items: {
     release: string | null;
@@ -2324,28 +2324,28 @@ interface Output {
 }
 
 // ops.upgrade.listSteps
-// Input: opsUpgradeListStepsInputSchema, ../contract/src/features/migrations/ops-upgrade.ts:282
+// Input: opsUpgradeListStepsInputSchema, ../contract/src/features/migrations/ops-upgrade.ts:285
 interface Input {
   release?: string | null;
   mode?: string;
   status?: string;
 }
-type Output = z.infer<typeof opsUpgradeStepPageSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:265
+type Output = z.infer<typeof opsUpgradeStepPageSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:268
 
 // ops.upgrade.getStep
-// Input: opsUpgradeIdInputSchema, ../contract/src/features/migrations/ops-upgrade.ts:320
+// Input: opsUpgradeIdInputSchema, ../contract/src/features/migrations/ops-upgrade.ts:323
 interface Input {
   id: string;
 }
-type Output = z.infer<typeof opsUpgradeStepDetailSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:224
+type Output = z.infer<typeof opsUpgradeStepDetailSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:227
 
 // ops.upgrade.listRuns
-// Input: opsUpgradeListRunsInputSchema, ../contract/src/features/migrations/ops-upgrade.ts:293
+// Input: opsUpgradeListRunsInputSchema, ../contract/src/features/migrations/ops-upgrade.ts:296
 interface Input {
   cursor?: string | null;
   limit?: number;
 }
-// Output: opsUpgradeRunPageSchema, ../contract/src/features/migrations/ops-upgrade.ts:269
+// Output: opsUpgradeRunPageSchema, ../contract/src/features/migrations/ops-upgrade.ts:272
 interface Output {
   items: {
     id: string;
@@ -2359,13 +2359,13 @@ interface Output {
 }
 
 // ops.upgrade.getRun
-type Input = z.infer<typeof opsUpgradeIdInputSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:320
-type Output = z.infer<typeof opsUpgradeRunSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:250
+type Input = z.infer<typeof opsUpgradeIdInputSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:323
+type Output = z.infer<typeof opsUpgradeRunSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:253
 
 // ops.upgrade.listTargets
-// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:401
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:404
 type Input = unknown;
-// Output: inline, ../contract/src/features/migrations/ops-upgrade.ts:402
+// Output: inline, ../contract/src/features/migrations/ops-upgrade.ts:405
 type Output = {
   target: string;
   version: string | null;
@@ -2375,15 +2375,15 @@ type Output = {
 }[];
 
 // ops.upgrade.retryStep
-type Input = z.infer<typeof opsUpgradeIdInputSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:320
-type Output = z.infer<typeof opsUpgradeStepDetailSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:224
+type Input = z.infer<typeof opsUpgradeIdInputSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:323
+type Output = z.infer<typeof opsUpgradeStepDetailSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:227
 
 // ops.upgrade.getDiagnostics
-type Input = z.infer<typeof opsUpgradeIdInputSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:320
+type Input = z.infer<typeof opsUpgradeIdInputSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:323
 type Output = z.infer<typeof upgradeDiagnosticsBundleSchema>; // ../contract/src/features/migrations/ops-upgrade-diagnostics.ts:82
 
 // ops.upgrade.diagnosticsAvailability
-// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:415
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:418
 type Input = unknown;
 // Output: opsUpgradeDiagnosticsAvailabilitySchema, ../contract/src/features/migrations/ops-upgrade-diagnostics.ts:96
 interface Output {
@@ -2393,7 +2393,7 @@ interface Output {
 }
 
 // ops.upgrade.sendDiagnostics
-type Input = z.infer<typeof opsUpgradeSendDiagnosticsInputSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:331
+type Input = z.infer<typeof opsUpgradeSendDiagnosticsInputSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:334
 // Output: opsUpgradeDiagnosticsReceiptSchema, ../contract/src/features/migrations/ops-upgrade-diagnostics.ts:110
 interface Output {
   reportId: string;
@@ -2401,19 +2401,19 @@ interface Output {
 }
 
 // ops.upgrade.listSystemMigrations
-// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:429
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:432
 type Input = unknown;
-// Output: opsMigrationOverviewSchema.array() (inline, ../contract/src/features/migrations/ops-upgrade.ts:430)
+// Output: opsMigrationOverviewSchema.array() (inline, ../contract/src/features/migrations/ops-upgrade.ts:433)
 
 // ops.upgrade.listTenants
-// Input: opsUpgradeListTenantsInputSchema, ../contract/src/features/migrations/ops-upgrade.ts:307
+// Input: opsUpgradeListTenantsInputSchema, ../contract/src/features/migrations/ops-upgrade.ts:310
 interface Input {
   step?: string;
   state?: "migrated" | "finalized" | "parked" | "rolled_back";
   cursor?: string | null;
   limit?: number;
 }
-// Output: opsUpgradeTenantPageSchema, ../contract/src/features/migrations/ops-upgrade.ts:314
+// Output: opsUpgradeTenantPageSchema, ../contract/src/features/migrations/ops-upgrade.ts:317
 interface Output {
   items: {
     migrationName: string;
@@ -2426,7 +2426,7 @@ interface Output {
 }
 
 // ops.upgrade.listMigrationEnrollments
-// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:442
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:445
 type Input = unknown;
 // Output: opsMigrationEnrollmentListingSchema, ../contract/src/features/migrations/ops-system-migration.ts:160
 interface Output {
@@ -2445,7 +2445,7 @@ interface Output {
 interface Input {
   query: string;
 }
-// Output: inline, ../contract/src/features/migrations/ops-upgrade.ts:451
+// Output: inline, ../contract/src/features/migrations/ops-upgrade.ts:454
 type Output = {
   id: string;
   name: string;
@@ -2506,7 +2506,7 @@ interface Output {
 }
 
 // ops.upgrade.runSystemMigrationPass
-// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:494
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:497
 type Input = Record<string, unknown>;
 // Output: opsMigrationPassStartedSchema, ../contract/src/ops.responses.ts:450
 interface Output {
@@ -2640,20 +2640,21 @@ Run by the tasks process, before serve.
 | config | `usageStats.disabled`                | `DISABLE_USAGE_STATS`                   | `../contract/src/ops.config.ts:34` |
 | config | `usageStats.installMethod`           | `INSTALL_METHOD`                        | `../contract/src/ops.config.ts:35` |
 | config | `usageStats.chartVersion`            | `LANGWATCH_CHART_VERSION`               | `../contract/src/ops.config.ts:37` |
-| config | `upgradeDiagnosticsAutoSendDisabled` | `DISABLE_UPGRADE_DIAGNOSTICS_AUTO_SEND` | `../contract/src/ops.config.ts:40` |
-| config | `clickhouseCluster`                  | `CLICKHOUSE_CLUSTER`                    | `../contract/src/ops.config.ts:45` |
-| config | `collectClickHouseBackupMetrics`     | `CLICKHOUSE_BACKUP_METRICS_ENABLED`     | `../contract/src/ops.config.ts:46` |
-| config | `productAnalytics.key`               | `POSTHOG_KEY`                           | `../contract/src/ops.config.ts:53` |
-| config | `productAnalytics.host`              | `POSTHOG_HOST`                          | `../contract/src/ops.config.ts:53` |
-| config | `grafana`                            | `GRAFANA_BASE_URL`                      | `../contract/src/ops.config.ts:55` |
-| config | `bugReportSlackChannel`              | `SLACK_BUG_REPORTS_CHANNEL`             | `../contract/src/ops.config.ts:57` |
-| config | `slackApiBase`                       | `SLACK_API_BASE`                        | `../contract/src/ops.config.ts:59` |
-| config | `cloudOps`                           | `LANGWATCH_CLOUD_OPS`                   | `../contract/src/ops.config.ts:61` |
-| config | `adminEmails`                        | `ADMIN_EMAILS`                          | `../contract/src/ops.config.ts:63` |
-| config | `nodeEnvironment`                    | `NODE_ENV`                              | `../contract/src/ops.config.ts:65` |
-| config | `isSaas`                             | `IS_SAAS`                               | `../contract/src/ops.config.ts:66` |
-| config | `publicBaseUrl`                      | `BASE_HOST`                             | `../contract/src/ops.config.ts:67` |
-| config | `serviceVersion`                     | `SERVICE_VERSION`                       | `../contract/src/ops.config.ts:69` |
-| config | `otelResourceAttributes`             | `OTEL_RESOURCE_ATTRIBUTES`              | `../contract/src/ops.config.ts:70` |
+| config | `noticesDisabled`                    | `DISABLE_LANGWATCH_NOTICES`             | `../contract/src/ops.config.ts:40` |
+| config | `upgradeDiagnosticsAutoSendDisabled` | `DISABLE_UPGRADE_DIAGNOSTICS_AUTO_SEND` | `../contract/src/ops.config.ts:42` |
+| config | `clickhouseCluster`                  | `CLICKHOUSE_CLUSTER`                    | `../contract/src/ops.config.ts:47` |
+| config | `collectClickHouseBackupMetrics`     | `CLICKHOUSE_BACKUP_METRICS_ENABLED`     | `../contract/src/ops.config.ts:48` |
+| config | `productAnalytics.key`               | `POSTHOG_KEY`                           | `../contract/src/ops.config.ts:55` |
+| config | `productAnalytics.host`              | `POSTHOG_HOST`                          | `../contract/src/ops.config.ts:55` |
+| config | `grafana`                            | `GRAFANA_BASE_URL`                      | `../contract/src/ops.config.ts:57` |
+| config | `bugReportSlackChannel`              | `SLACK_BUG_REPORTS_CHANNEL`             | `../contract/src/ops.config.ts:59` |
+| config | `slackApiBase`                       | `SLACK_API_BASE`                        | `../contract/src/ops.config.ts:61` |
+| config | `cloudOps`                           | `LANGWATCH_CLOUD_OPS`                   | `../contract/src/ops.config.ts:63` |
+| config | `adminEmails`                        | `ADMIN_EMAILS`                          | `../contract/src/ops.config.ts:65` |
+| config | `nodeEnvironment`                    | `NODE_ENV`                              | `../contract/src/ops.config.ts:67` |
+| config | `isSaas`                             | `IS_SAAS`                               | `../contract/src/ops.config.ts:68` |
+| config | `publicBaseUrl`                      | `BASE_HOST`                             | `../contract/src/ops.config.ts:69` |
+| config | `serviceVersion`                     | `SERVICE_VERSION`                       | `../contract/src/ops.config.ts:71` |
+| config | `otelResourceAttributes`             | `OTEL_RESOURCE_ATTRIBUTES`              | `../contract/src/ops.config.ts:72` |
 
 <!-- readme:generated:end -->

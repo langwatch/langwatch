@@ -179,6 +179,7 @@ export const prismaTableCatalogue = {
   "InstanceIdentity": "InstanceIdentity",
   "SelfHostedInstance": "SelfHostedInstance",
   "SelfHostedInstanceDiagnostic": "SelfHostedInstanceDiagnostic",
+  "SelfHostedNotice": "SelfHostedNotice",
   "SelfHostedInstanceReport": "SelfHostedInstanceReport",
   "WebPushSubscription": "WebPushSubscription",
   "WebPushVapidKey": "WebPushVapidKey",
@@ -2978,6 +2979,20 @@ export const prismaModelFieldCatalogue = {
     "expiresAt",
     "slackAnnouncedAt"
   ],
+  "SelfHostedNotice": [
+    "id",
+    "severity",
+    "title",
+    "body",
+    "url",
+    "fixedIn",
+    "status",
+    "expiresAt",
+    "publishedAt",
+    "publishedBy",
+    "createdAt",
+    "updatedAt"
+  ],
   "SelfHostedInstanceReport": [
     "id",
     "instanceId",
@@ -3606,6 +3621,7 @@ export const prismaRelationCatalogue = {
   "InstanceIdentity": {},
   "SelfHostedInstance": {},
   "SelfHostedInstanceDiagnostic": {},
+  "SelfHostedNotice": {},
   "SelfHostedInstanceReport": {},
   "WebPushSubscription": {},
   "WebPushVapidKey": {},

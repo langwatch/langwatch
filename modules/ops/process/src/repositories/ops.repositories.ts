@@ -11,6 +11,7 @@ import type { BlobStoreRepository } from "./blob-store.repository.ts";
 import type { BugReportRateLimitRepository, BugReportRepository } from "./bug-report.repository.ts";
 import type { ClickHouseRoutesRepository } from "./clickhouse.routes.repository.ts";
 import type { CloudLatestReleaseRepository } from "./cloud-latest-release.repository.ts";
+import type { CloudNoticeRepository } from "./cloud-notice.repository.ts";
 import type { CredentialsResealRepository } from "./credentials-reseal.repository.ts";
 import type {
   ClickHouseHealthRepository,
@@ -93,6 +94,8 @@ export interface OpsRepositories {
   readonly processFleetReadings: ProcessFleetReadingsRepository;
   /** The newest release cloud named in the last usage-report reply. */
   readonly cloudLatestRelease: CloudLatestReleaseRepository;
+  /** The notices cloud named in the last usage-report reply. */
+  readonly cloudNotices: CloudNoticeRepository;
   readonly redisHealth: RedisHealthRepository;
   readonly clickhouseHealth: ClickHouseHealthRepository;
   readonly events: EventExplorerRepository;

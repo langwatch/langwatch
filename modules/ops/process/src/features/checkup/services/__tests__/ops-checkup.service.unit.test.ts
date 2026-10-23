@@ -15,6 +15,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { MemoryCheckupProbeChannel } from "../../../../channels/memory/memory.checkup-probe.channel.ts";
 import { MemoryUsageReportChannel } from "../../../../channels/memory/memory.usage-report.channel.ts";
 import { MemoryCloudLatestReleaseRepository } from "../../../../repositories/memory/memory.cloud-latest-release.repository.ts";
+import { MemoryCloudNoticeRepository } from "../../../../repositories/memory/memory.cloud-notice.repository.ts";
 import {
   MemoryClickHouseHealthRepository,
   MemoryPostgresHealthRepository,
@@ -31,6 +32,7 @@ const CONFIG: OpsServerConfig = {
   clickhouseCluster: undefined,
   usageStats: { disabled: false, installMethod: undefined, chartVersion: undefined },
   collectClickHouseBackupMetrics: true,
+  noticesDisabled: false,
   upgradeDiagnosticsAutoSendDisabled: false,
   productAnalytics: { key: undefined, host: undefined },
   grafana: { baseUrl: undefined, tempoDatasourceUid: undefined, lokiDatasourceUid: undefined },
@@ -168,6 +170,7 @@ function service() {
       cloudLatestRelease: MemoryCloudLatestReleaseRepository.create({
         store: MemoryOpsStore.create(),
       }),
+      cloudNotices: MemoryCloudNoticeRepository.create({ store: MemoryOpsStore.create() }),
     },
     channels: {
       usageReport: MemoryUsageReportChannel.create(),
