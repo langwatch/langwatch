@@ -29,6 +29,7 @@ import type { LangyApi } from "@langwatch/langy-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { NotificationService as NotificationApi } from "@langwatch/notification-contract";
+import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
 import { OpsApi } from "@langwatch/ops-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApp } from "@langwatch/process";
@@ -45,10 +46,11 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import { isMigrationStep } from "@langwatch/upgrade/step";
 import type { UserApi } from "@langwatch/user-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { opsProcessModule } from "../../ops.module.ts";
 import { MemoryOpsSnapshotRepository } from "../../repositories/memory/memory.ops-snapshot.repository.ts";
+import { MemoryProcessFleetReadingsRepository } from "../../repositories/memory/memory.process-fleet-readings.repository.ts";
 import { OPS_STAFF_ADDRESS, platformOperatorAuthz } from "./ops.fixture.ts";
 
 function process(
@@ -226,6 +228,51 @@ describe("ops app installation", () => {
         expect(release).toHaveBeenCalled();
       },
     );
+  });
+
+  describe("given the fleet collector has shared its counts", () => {
+    const metrics = createRecordingMeterProvider();
+    const reading = {
+      processName: "automations",
+      instances: 310,
+      overdueWakes: 2,
+      pendingMessages: 41,
+      overduePending: 4,
+      lapsedLeases: 1,
+      deadMessages: 7,
+    };
+
+    beforeAll(() => metrics.install());
+    afterAll(() => metrics.uninstall());
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    /** @scenario "A booted worker reports the fleet gauges; api pods do not" */
+    it.each([
+      ["worker", 310, 7],
+      ["api", undefined, undefined],
+    ] as const)("the %s role's pm_* gauges report %s instances", async (role, instances, dead) => {
+      vi.spyOn(MemoryProcessFleetReadingsRepository.prototype, "findAll").mockResolvedValue([
+        reading,
+      ]);
+      const runtime = await process(role).boot();
+
+      try {
+        const before = metrics.recorded.length;
+        await metrics.collect();
+        const observed = metrics.recorded.slice(before);
+        const valueOf = (instrument: string) =>
+          observed.find(
+            (r) => r.instrument === instrument && r.attributes.process_name === "automations",
+          )?.value;
+
+        expect(valueOf("pm_instances")).toBe(instances);
+        expect(valueOf("pm_outbox_dead")).toBe(dead);
+      } finally {
+        await runtime.stop();
+      }
+    });
   });
 
   describe("given a worker holding the snapshot store", () => {

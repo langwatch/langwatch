@@ -852,6 +852,7 @@ export class OpsModule implements OpsApi {
       declaredMigrationSteps: setup.declaredMigrationSteps,
       // Only the worker runs listed work; a tasks pass keeps reading the whole queue's depth.
       runListedWork: setup.role === "worker" ? setup.runListedWork : undefined,
+      reportsFleetGauges: setup.role === "worker",
       logger,
       config: setup.config,
       resources: setup.resources,
@@ -2445,6 +2446,8 @@ function buildOpsInfrastructure(input: {
   /** The kernel's feed (S6-FEED); ops keeps only the tenant steps. */
   declaredMigrationSteps: (() => readonly unknown[]) | undefined;
   runListedWork: SystemMigrationRunnerDeps["runListedWork"];
+  /** Only the worker binds the pm_* gauges, so api and tasks pods never read the fleet counts. */
+  reportsFleetGauges: boolean;
 }): OpsAppInfrastructure {
   const { logger, config, resources, repositories } = input;
   const introspection = EventingIntrospectionService.create(() =>
@@ -2480,8 +2483,10 @@ function buildOpsInfrastructure(input: {
 
   // pm_instances / pm_outbox_* report nothing until a source is bound. The source reads the
   // counts `ops_storage_stats` shares, never the tables; dashboards still aggregate with max().
-  bindProcessFleetMetricsSource(() => repositories.processFleetReadings.findAll());
-  resources.own("process fleet metrics source", () => unbindProcessFleetMetricsSource());
+  if (input.reportsFleetGauges) {
+    bindProcessFleetMetricsSource(() => repositories.processFleetReadings.findAll());
+    resources.own("process fleet metrics source", () => unbindProcessFleetMetricsSource());
+  }
 
   const explainRuntime = OpsClickHouseRuntime.create({
     url: config.clickhouseOpsUrl,

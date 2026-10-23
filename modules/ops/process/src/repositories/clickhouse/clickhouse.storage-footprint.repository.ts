@@ -1,7 +1,7 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { createLogger } from "@langwatch/observability";
 
-import { isClusterReadRefusal, isPlainClusterName } from "../../rules/cluster-name.rules.ts";
+import { isPlainClusterName, isUnknownClusterError } from "../../rules/cluster-name.rules.ts";
 import {
   type BackupStatusRow,
   StorageFootprintRepository,
@@ -109,8 +109,8 @@ export class ClickHouseStorageFootprintRepository extends StorageFootprintReposi
   }
 
   /**
-   * The read across the cluster, or on the local node when the cluster refuses it in a way the
-   * local node can still answer; that degradation is logged, and any other failure is thrown.
+   * The read across the cluster, or on the local node when ClickHouse does not know the cluster;
+   * that degradation is logged. Any other failure is logged and thrown to the collector.
    */
   private async orLocal<T>({
     cluster,
@@ -123,10 +123,13 @@ export class ClickHouseStorageFootprintRepository extends StorageFootprintReposi
     try {
       return { answer: await read(cluster), cluster };
     } catch (error) {
-      if (!isClusterReadRefusal(error)) throw error;
+      if (!isUnknownClusterError(error)) {
+        logger.warn({ cluster, error }, "ClickHouse failed the cluster-wide backup read");
+        throw error;
+      }
       logger.warn(
         { cluster, error },
-        "ClickHouse refused the cluster-wide backup read; reading the local node's backup log",
+        "ClickHouse does not know the configured cluster; reading the local node's backup log",
       );
       return { answer: await read(void 0), cluster: void 0 };
     }

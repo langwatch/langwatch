@@ -3,24 +3,20 @@ export function isPlainClusterName(name: string): boolean {
   return /^[A-Za-z_][A-Za-z0-9_]*$/.test(name);
 }
 
-/** ClickHouse refusals of a cluster-wide read the local node may still answer, by code and name. */
-const LOCAL_FALLBACK_REFUSALS: ReadonlyMap<string, string> = new Map([
-  ["60", "UNKNOWN_TABLE"],
-  ["170", "CLUSTER_DOESNT_EXIST"],
-  ["497", "ACCESS_DENIED"],
-]);
+const UNKNOWN_CLUSTER = { code: "170", name: "CLUSTER_DOESNT_EXIST" } as const;
 
 /**
- * Whether a cluster-wide system read was refused in a way the local node may still answer: a
- * replica without the table, a cluster ClickHouse does not know, or no right to read the others.
- * A timeout or any other failure is not, so it reaches the caller.
+ * Whether a cluster-wide read failed because ClickHouse does not know the named cluster, the one
+ * refusal the local node answers for. A timeout, missing rights or a missing table is not.
  */
-export function isClusterReadRefusal(error: unknown): boolean {
-  const detail = error as { code?: unknown; type?: unknown; message?: unknown } | null;
-  if (LOCAL_FALLBACK_REFUSALS.has(String(detail?.code))) return true;
-  const names = [...LOCAL_FALLBACK_REFUSALS.values()];
-  if (typeof detail?.type === "string" && names.includes(detail.type)) return true;
-  const message = typeof detail?.message === "string" ? detail.message : "";
-
-  return names.some((name) => message.includes(name));
+export function isUnknownClusterError(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  const code = "code" in error ? String(error.code) : "";
+  const type = "type" in error ? error.type : undefined;
+  const message = "message" in error && typeof error.message === "string" ? error.message : "";
+  return (
+    code === UNKNOWN_CLUSTER.code ||
+    type === UNKNOWN_CLUSTER.name ||
+    message.includes(UNKNOWN_CLUSTER.name)
+  );
 }

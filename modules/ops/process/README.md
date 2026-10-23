@@ -2642,19 +2642,19 @@ Run by the tasks process, before serve.
 | config | `usageStats.chartVersion`            | `LANGWATCH_CHART_VERSION`               | `../contract/src/ops.config.ts:37` |
 | config | `noticesDisabled`                    | `DISABLE_LANGWATCH_NOTICES`             | `../contract/src/ops.config.ts:40` |
 | config | `upgradeDiagnosticsAutoSendDisabled` | `DISABLE_UPGRADE_DIAGNOSTICS_AUTO_SEND` | `../contract/src/ops.config.ts:42` |
-| config | `clickhouseCluster`                  | `CLICKHOUSE_CLUSTER`                    | `../contract/src/ops.config.ts:47` |
-| config | `collectClickHouseBackupMetrics`     | `CLICKHOUSE_BACKUP_METRICS_ENABLED`     | `../contract/src/ops.config.ts:48` |
-| config | `productAnalytics.key`               | `POSTHOG_KEY`                           | `../contract/src/ops.config.ts:55` |
-| config | `productAnalytics.host`              | `POSTHOG_HOST`                          | `../contract/src/ops.config.ts:55` |
-| config | `grafana`                            | `GRAFANA_BASE_URL`                      | `../contract/src/ops.config.ts:57` |
-| config | `bugReportSlackChannel`              | `SLACK_BUG_REPORTS_CHANNEL`             | `../contract/src/ops.config.ts:59` |
-| config | `slackApiBase`                       | `SLACK_API_BASE`                        | `../contract/src/ops.config.ts:61` |
-| config | `cloudOps`                           | `LANGWATCH_CLOUD_OPS`                   | `../contract/src/ops.config.ts:63` |
-| config | `adminEmails`                        | `ADMIN_EMAILS`                          | `../contract/src/ops.config.ts:65` |
-| config | `nodeEnvironment`                    | `NODE_ENV`                              | `../contract/src/ops.config.ts:67` |
-| config | `isSaas`                             | `IS_SAAS`                               | `../contract/src/ops.config.ts:68` |
-| config | `publicBaseUrl`                      | `BASE_HOST`                             | `../contract/src/ops.config.ts:69` |
-| config | `serviceVersion`                     | `SERVICE_VERSION`                       | `../contract/src/ops.config.ts:71` |
-| config | `otelResourceAttributes`             | `OTEL_RESOURCE_ATTRIBUTES`              | `../contract/src/ops.config.ts:72` |
+| config | `clickhouseCluster`                  | `CLICKHOUSE_CLUSTER`                    | `../contract/src/ops.config.ts:51` |
+| config | `collectClickHouseBackupMetrics`     | `CLICKHOUSE_BACKUP_METRICS_ENABLED`     | `../contract/src/ops.config.ts:52` |
+| config | `productAnalytics.key`               | `POSTHOG_KEY`                           | `../contract/src/ops.config.ts:59` |
+| config | `productAnalytics.host`              | `POSTHOG_HOST`                          | `../contract/src/ops.config.ts:59` |
+| config | `grafana`                            | `GRAFANA_BASE_URL`                      | `../contract/src/ops.config.ts:61` |
+| config | `bugReportSlackChannel`              | `SLACK_BUG_REPORTS_CHANNEL`             | `../contract/src/ops.config.ts:63` |
+| config | `slackApiBase`                       | `SLACK_API_BASE`                        | `../contract/src/ops.config.ts:65` |
+| config | `cloudOps`                           | `LANGWATCH_CLOUD_OPS`                   | `../contract/src/ops.config.ts:67` |
+| config | `adminEmails`                        | `ADMIN_EMAILS`                          | `../contract/src/ops.config.ts:69` |
+| config | `nodeEnvironment`                    | `NODE_ENV`                              | `../contract/src/ops.config.ts:71` |
+| config | `isSaas`                             | `IS_SAAS`                               | `../contract/src/ops.config.ts:72` |
+| config | `publicBaseUrl`                      | `BASE_HOST`                             | `../contract/src/ops.config.ts:73` |
+| config | `serviceVersion`                     | `SERVICE_VERSION`                       | `../contract/src/ops.config.ts:75` |
+| config | `otelResourceAttributes`             | `OTEL_RESOURCE_ATTRIBUTES`              | `../contract/src/ops.config.ts:76` |
 
 <!-- readme:generated:end -->

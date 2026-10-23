@@ -6,6 +6,27 @@ import { bindProcessFleetMetricsSource, unbindProcessFleetMetricsSource } from "
 
 const metrics = createRecordingMeterProvider();
 
+/** A fleet read that resolves only when the test says so. */
+function lateRead() {
+  let finish: (rows: ReturnType<typeof fleetRow>[]) => void = () => {};
+  const late = new Promise<ReturnType<typeof fleetRow>[]>((resolve) => {
+    finish = resolve;
+  });
+  return { late, finish };
+}
+
+function fleetRow({ processName }: { processName: string }) {
+  return {
+    processName,
+    instances: 1,
+    overdueWakes: 0,
+    pendingMessages: 0,
+    overduePending: 0,
+    lapsedLeases: 0,
+    deadMessages: 1,
+  };
+}
+
 /** What one collection cycle observed, ignoring everything before it. */
 async function collectOnce() {
   const before = metrics.recorded.length;
@@ -84,17 +105,31 @@ describe("process-manager fleet gauges", () => {
   describe("given a read is still in flight when the source is unbound", () => {
     /** @scenario "Unbinding at shutdown silences the gauges" */
     it("discards the late result instead of repopulating the cache", async () => {
-      let finish: (rows: never[]) => void = () => {};
-      const late = new Promise<never[]>((resolve) => {
-        finish = resolve;
-      });
+      const { late, finish } = lateRead();
       bindProcessFleetMetricsSource(() => late);
       const pending = metrics.collect();
       unbindProcessFleetMetricsSource();
-      finish([]);
+      finish([fleetRow({ processName: "stopped" })]);
       await pending;
 
       expect(await collectOnce()).toEqual([]);
+    });
+  });
+
+  describe("given a read is still in flight when another source is bound", () => {
+    /** @scenario "Unbinding at shutdown silences the gauges" */
+    it("reports the new source and drops the old source's late result", async () => {
+      const { late, finish } = lateRead();
+      bindProcessFleetMetricsSource(() => late);
+      const pending = metrics.collect();
+      bindProcessFleetMetricsSource(async () => [fleetRow({ processName: "current" })]);
+      const processNames = (observed: Awaited<ReturnType<typeof collectOnce>>) =>
+        new Set(observed.map((r) => r.attributes.process_name).filter(Boolean));
+
+      expect(processNames(await collectOnce())).toEqual(new Set(["current"]));
+      finish([fleetRow({ processName: "stale" })]);
+      await pending;
+      expect(processNames(await collectOnce())).toEqual(new Set(["current"]));
     });
   });
 

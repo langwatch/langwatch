@@ -4,6 +4,7 @@ Feature: The process-manager fleet gauges report once a source is bound
   until a process binds a source, and nothing again once it unbinds.
 
     # Bindings: packages/eventing/src/process-manager/__tests__/metrics.unit.test.ts
+    # and modules/ops/process/src/app/__tests__/ops-installation.unit.test.ts
 
   @unit
   Scenario: Unbinding at shutdown silences the gauges
@@ -23,3 +24,10 @@ Feature: The process-manager fleet gauges report once a source is bound
     Given the fleet has a saved reading
     When the scheduled fleet read fails
     Then the saved reading remains unchanged
+
+  @unit
+  Scenario: A booted worker reports the fleet gauges; api pods do not
+    Given the scheduled collector has shared the fleet counts
+    When a worker and an api process boot and their gauges are collected
+    Then the worker reports pm_instances and pm_outbox_* per process name
+    And the api process reports none of them

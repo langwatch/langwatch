@@ -68,39 +68,19 @@ describe("given an endpoint's system tables", () => {
       expect(statements[0]?.sql).toContain("clusterAllReplicas('default', system.tables)");
     });
 
-    /** @scenario "A replica without the backup log falls back to the local node" */
-    it("falls back to the local log when the cluster-wide read is refused", async () => {
-      const statements: QueryRequest[] = [];
-      const clickhouse = clickHouseQueryClientDouble({
-        query: async (request: QueryRequest) => {
-          statements.push(request);
-          if (request.sql.includes("system.tables")) return { rows: [{ present: "1" }] };
-          if (request.sql.includes("clusterAllReplicas('default', system.backup_log)")) {
-            throw Object.assign(new Error("Table system.backup_log does not exist"), {
-              code: "60",
-            });
-          }
-          return { rows: [] };
-        },
-      });
-      const repo = ClickHouseStorageFootprintRepository.create({ clickhouse });
-
-      await expect(repo.findBackupStatuses({ cluster: "default" })).resolves.toEqual([]);
-
-      expect(statements.at(-1)?.sql).not.toContain("clusterAllReplicas");
-    });
-
-    /** @scenario "A cluster the server does not know, or may not read, falls back to the local node" */
+    /** @scenario "A cluster the server does not know falls back to the local node" */
     it.each([
-      ["a cluster ClickHouse does not know", "170"],
-      ["no right to read the other replicas", "497"],
-    ])("falls back to the local node when the cluster probe meets %s", async (_label, code) => {
+      ["the table probe", "system.tables"],
+      ["the backup read", "system.backup_log"],
+    ])("falls back to the local node when the cluster is unknown at %s", async (_label, table) => {
       const statements: QueryRequest[] = [];
       const clickhouse = clickHouseQueryClientDouble({
         query: async (request: QueryRequest) => {
           statements.push(request);
-          if (request.sql.includes("clusterAllReplicas")) {
-            throw Object.assign(new Error("refused"), { code });
+          if (request.sql.includes(`clusterAllReplicas('default', ${table})`)) {
+            throw Object.assign(new Error("Requested cluster 'default' not found"), {
+              code: "170",
+            });
           }
           if (request.sql.includes("system.tables")) return { rows: [{ present: "1" }] };
           return { rows: [] };
@@ -115,16 +95,27 @@ describe("given an endpoint's system tables", () => {
     });
 
     /** @scenario "Any other cluster-wide failure is reported, not hidden" */
-    it("throws a cluster-wide read failure the local node cannot stand in for", async () => {
+    it.each([
+      ["a timeout at the backup read", "system.backup_log", "159"],
+      ["a missing table at the backup read", "system.backup_log", "60"],
+      ["missing rights at the table probe", "system.tables", "497"],
+      ["missing rights at the backup read", "system.backup_log", "497"],
+    ])("throws %s instead of reading the local node", async (_label, table, code) => {
+      const statements: QueryRequest[] = [];
       const clickhouse = clickHouseQueryClientDouble({
         query: async (request: QueryRequest) => {
+          statements.push(request);
+          if (request.sql.includes(`clusterAllReplicas('default', ${table})`)) {
+            throw Object.assign(new Error(`refused with ${code}`), { code });
+          }
           if (request.sql.includes("system.tables")) return { rows: [{ present: "1" }] };
-          throw Object.assign(new Error("Timeout exceeded"), { code: "159" });
+          return { rows: [] };
         },
       });
       const repo = ClickHouseStorageFootprintRepository.create({ clickhouse });
 
-      await expect(repo.findBackupStatuses({ cluster: "default" })).rejects.toThrow("Timeout");
+      await expect(repo.findBackupStatuses({ cluster: "default" })).rejects.toThrow(code);
+      expect(statements.every(({ sql }) => sql.includes("clusterAllReplicas"))).toBe(true);
     });
 
     /** @scenario "A cluster name that is not a plain identifier reads the local node" */

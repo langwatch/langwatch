@@ -10,7 +10,6 @@ import (
 	"github.com/langwatch/langwatch/pkg/contexts"
 	"github.com/langwatch/langwatch/pkg/health"
 	"github.com/langwatch/langwatch/pkg/otelsetup"
-	"github.com/langwatch/langwatch/pkg/profiling"
 	"github.com/langwatch/langwatch/services/langyagent/adapters/otelrelay"
 	"github.com/langwatch/langwatch/services/langyagent/internal/telemetry"
 )
@@ -27,10 +26,6 @@ type Deps struct {
 	// key stays out of the worker env. One per manager; the pool registers each
 	// worker at spawn.
 	OTelRelay *otelrelay.Relay
-	// Profiler is the continuous CPU/heap profiler (PYROSCOPE_SERVER_ADDRESS).
-	// Its zero value is a no-op, so an unconfigured deployment carries an
-	// inert struct rather than a nil check at every use.
-	Profiler profiling.Profiler
 }
 
 // NewDeps wires every adapter from the validated Config. It installs the
@@ -49,8 +44,7 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 		return ctx, nil, fmt.Errorf("otel init: %w", err)
 	}
 
-	svcInfo := contexts.MustGetServiceInfo(ctx)
-	probes := health.New(svcInfo.Environment)
+	probes := health.New(contexts.MustGetServiceInfo(ctx).Environment)
 	probes.MarkStarted()
 
 	// The loopback relay for host-mediated worker telemetry + LLM traffic. Binds
@@ -80,6 +74,5 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 		Health:    probes,
 		Telemetry: telemetry.New(),
 		OTelRelay: relay,
-		Profiler:  profiling.StartFromEnv(svcInfo.Service, svcInfo.Environment, logger),
 	}, nil
 }

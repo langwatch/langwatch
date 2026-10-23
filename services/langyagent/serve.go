@@ -84,7 +84,6 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) er
 	)
 	g.Add(
 		lifecycle.Closer("otel", deps.OTel.Shutdown),
-		lifecycle.Closer("profiling", deps.Profiler.Shutdown),
 		// The loopback worker-telemetry/LLM relay. Registered right after "otel"
 		// so it stops just before it (reverse order): AFTER the worker pool has
 		// killed every worker, when nothing exports to it any more.

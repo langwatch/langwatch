@@ -43,7 +43,11 @@ export const opsConfig = Config.define((c) => ({
     "DISABLE_UPGRADE_DIAGNOSTICS_AUTO_SEND",
     environmentOneOrTrueSchema,
   ),
-  /** The ClickHouse cluster; set, backup history is read across all of its replicas. */
+  /**
+   * The ClickHouse cluster; set, backup history is read across all of its replicas. The Helm chart
+   * already sets it for replicated or named external ClickHouse, so those installs read across
+   * replicas from the upgrade on.
+   */
   clickhouseCluster: c.env("CLICKHOUSE_CLUSTER", z.string().optional()),
   collectClickHouseBackupMetrics: c.env(
     "CLICKHOUSE_BACKUP_METRICS_ENABLED",
