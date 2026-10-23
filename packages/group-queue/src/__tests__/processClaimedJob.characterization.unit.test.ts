@@ -574,6 +574,78 @@ describe("given a dispatch that read the group's retry-chain counter inside the 
     });
   });
 
+  describe("when the job spent its earlier retries on an overloaded server", () => {
+    const failing = async () => {
+      throw new Error("handler failed");
+    };
+    const afterOverload = ({
+      attempt,
+      overloadAttempts,
+    }: {
+      attempt: number;
+      overloadAttempts: number;
+    }) => ({
+      ...dispatched,
+      jobDataJson: JSON.stringify({
+        id: "job-1",
+        groupId: GROUP,
+        __jobName: "job",
+        __attempt: attempt,
+        __overloadAttempts: overloadAttempts,
+      }),
+      groupAttempt: attempt,
+    });
+    const encodedRetry = (calls: unknown[]) =>
+      named(calls, "blob.encode").map(
+        (call) => (call as [string, [{ jobData: Record<string, unknown> }]])[1][0].jobData,
+      );
+
+    /** @scenario "An ordinary failure after an overload spell still gets its ordinary budget" */
+    it("re-stages an ordinary failure instead of blocking the group", async () => {
+      const { processor, calls } = recordingProcessor({ process: failing });
+
+      await processor["processWithRetries"](afterOverload({ attempt: 30, overloadAttempts: 29 }));
+
+      expect(named(calls, "scripts.retryRestage")).toHaveLength(1);
+      expect(named(calls, "scripts.restageAndBlock")).toHaveLength(0);
+      expect(encodedRetry(calls)).toEqual([
+        expect.objectContaining({ __attempt: 31, __overloadAttempts: 29 }),
+      ]);
+    });
+
+    /** @scenario "An ordinary failure after an overload spell still gets its ordinary budget" */
+    it("blocks the group once the ordinary rungs on top are spent", async () => {
+      const { processor, calls } = recordingProcessor({ process: failing });
+
+      await processor["processWithRetries"](afterOverload({ attempt: 54, overloadAttempts: 29 }));
+
+      expect(named(calls, "scripts.retryRestage")).toHaveLength(0);
+      expect(named(calls, "scripts.restageAndBlock")).toHaveLength(1);
+    });
+
+    /** @scenario "An ordinary failure after an overload spell still gets its ordinary budget" */
+    it("never retries an ordinary failure past the overload budget", async () => {
+      const { processor, calls } = recordingProcessor({ process: failing });
+
+      await processor["processWithRetries"](
+        afterOverload({ attempt: JOB_RETRY_CONFIG.maxOverloadedAttempts, overloadAttempts: 50 }),
+      );
+
+      expect(named(calls, "scripts.retryRestage")).toHaveLength(0);
+      expect(named(calls, "scripts.restageAndBlock")).toHaveLength(1);
+    });
+
+    it("counts another overload retry in the job it re-stages", async () => {
+      const { processor, calls } = recordingProcessor({ retryAfterMs: 0, process: failing });
+
+      await processor["processWithRetries"](afterOverload({ attempt: 30, overloadAttempts: 29 }));
+
+      expect(encodedRetry(calls)).toEqual([
+        expect.objectContaining({ __attempt: 31, __overloadAttempts: 30 }),
+      ]);
+    });
+  });
+
   it("still reads the counter itself when the claim carried none", async () => {
     const { processor, calls } = recordingProcessor({});
 
