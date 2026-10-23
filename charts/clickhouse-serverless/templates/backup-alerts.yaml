@@ -3,7 +3,7 @@ Prometheus alerting rules for the backup CronJobs.
 
 The CronJob rules are derived from kube-state-metrics, so they see the CronJob
 and Job objects rather than anything the backup scripts report: a backup that
-stops running produces no output to report on. The sidecar rules (ADR-185) read
+stops running produces no output to report on. The sidecar rules (ADR-191) read
 the runner's own metrics, so each also fires when those metrics go missing.
 */}}
 {{- define "clickhouse-serverless.backupAlertRules" -}}

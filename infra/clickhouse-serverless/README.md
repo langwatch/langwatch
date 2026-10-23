@@ -238,7 +238,7 @@ restarting them together (see [Cluster secret](#cluster-secret)).
 
 ## Backups
 
-With `BACKUP_ENABLED=true` the image renders a `backups` disk (`s3_plain`, under `clickhouse-backup/` on the object store). One Go implementation takes native `BACKUP`s to it, full and incremental, from three places: `ch-config backup run` once, `ch-config sidecar` on a schedule, and `/scripts/backup-data.sh` and `/scripts/restore-data.sh`, which now exec `ch-config backup` with the same env as before. Design and limits: [ADR-185](../../dev/docs/adr/185-clickhouse-serverless-backups-run-in-the-ch-config-sidecar.md).
+With `BACKUP_ENABLED=true` the image renders a `backups` disk (`s3_plain`, under `clickhouse-backup/` on the object store). One Go implementation takes native `BACKUP`s to it, full and incremental, from three places: `ch-config backup run` once, `ch-config sidecar` on a schedule, and `/scripts/backup-data.sh` and `/scripts/restore-data.sh`, which now exec `ch-config backup` with the same env as before. Design and limits: [ADR-191](../../dev/docs/adr/191-clickhouse-serverless-backups-run-in-the-ch-config-sidecar.md).
 
 ```bash
 ch-config backup run --mode full                      # or BACKUP_MODE

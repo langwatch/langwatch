@@ -1,4 +1,4 @@
-# ADR-185: clickhouse-serverless backups run in the ch-config sidecar, decided by pure functions
+# ADR-191: clickhouse-serverless backups run in the ch-config sidecar, decided by pure functions
 
 **Date:** 2026-10-23
 
@@ -58,7 +58,7 @@ The CronJob alerts avoided self-telemetry because a backup that stops running re
 
 A backup failure never ends the sidecar process: configuration errors are logged and reported, panics in a run are recovered, the metrics listener retries. The chart's sidecar has a liveness probe and no readiness probe. A crash-looping sidecar container would make the whole pod unready.
 
-The sidecar logs in with `BACKUP_USER` and a password file (`BACKUP_PASSWORD_FILE`), never a password in its environment, and never assumes the `default` user. The login sits behind `chclient.Credentials`, re-read on every request. When the access sidecar runs dynamic-only (ADR-184), there is no outside password: on a loopback host with a per-boot password in `CLICKHOUSE_ACCESS_BOOTSTRAP_DIR`, the sidecar and one-shot commands log in as that local admin instead. One-shot commands also accept `CLICKHOUSE_PASSWORD`, which the CronJobs pass today.
+The sidecar logs in with `BACKUP_USER` and a password file (`BACKUP_PASSWORD_FILE`), never a password in its environment, and never assumes the `default` user. The login sits behind `chclient.Credentials`, re-read on every request. When the access sidecar runs dynamic-only (ADR-190), there is no outside password: on a loopback host with a per-boot password in `CLICKHOUSE_ACCESS_BOOTSTRAP_DIR`, the sidecar and one-shot commands log in as that local admin instead. One-shot commands also accept `CLICKHOUSE_PASSWORD`, which the CronJobs pass today.
 
 ### 8. Retention stays with the object store
 
@@ -70,7 +70,7 @@ The earlier public script pruned with `DROP BACKUP`, which ClickHouse does not h
 
 ## Rationale / Trade-offs
 
-A sidecar beats a better CronJob because the state of a run (what is in flight, what the last attempt did) lives in a process that outlasts the run and can be asked about it. The cost is a second process in the ClickHouse pod, which the access sidecar (ADR-184) already put there; backups add a goroutine and an HTTP listener to it.
+A sidecar beats a better CronJob because the state of a run (what is in flight, what the last attempt did) lives in a process that outlasts the run and can be asked about it. The cost is a second process in the ClickHouse pod, which the access sidecar (ADR-190) already put there; backups add a goroutine and an HTTP listener to it.
 
 Ordinal election accepts one uncovered failure (section 5) for having no lease store and no clock assumptions. Pure decision functions cost a gather step that reads more than a single SQL query would, in exchange for every incident rule being a test.
 
@@ -84,6 +84,6 @@ Ordinal election accepts one uncovered failure (section 5) for having no lease s
 ## References
 
 - Spec: [`specs/clickhouse/serverless-backups.feature`](../../../specs/clickhouse/serverless-backups.feature)
-- Related ADRs: [ADR-184](./184-clickhouse-serverless-access-tiers-rolling-passwords-and-token-logins.md) (the sidecar this extends)
+- Related ADRs: [ADR-190](./190-clickhouse-serverless-access-tiers-rolling-passwords-and-token-logins.md) (the sidecar this extends)
 - Code: `infra/clickhouse-serverless/internal/backup`, `internal/chclient`; chart `charts/clickhouse-serverless` (`backup.mode`); runbook `dev/docs/runbooks/clickhouse-backup-alerts.md`
 - ClickHouse: `BACKUP ... ASYNC` and `system.backups` / `system.backup_log` (docs: Backup and Restore), `clusterAllReplicas`, `skip_unavailable_shards`

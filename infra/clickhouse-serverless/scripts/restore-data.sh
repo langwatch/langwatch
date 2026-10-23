@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Restores one backup from the 'backups' disk: `ch-config backup restore` (ADR-185).
+# Restores one backup from the 'backups' disk: `ch-config backup restore` (ADR-191).
 # Kept at this path for the chart's restore template and existing runbooks.
 #
 # Env, as before: CLICKHOUSE_HOST, CLICKHOUSE_USER (default default),

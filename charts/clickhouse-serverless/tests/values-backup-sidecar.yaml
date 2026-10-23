@@ -1,4 +1,4 @@
-# Backups by the ch-config sidecar (ADR-185) on three replicas, with its
+# Backups by the ch-config sidecar (ADR-191) on three replicas, with its
 # PodMonitor and alerts. tests/backup-sidecar.sh renders it.
 replicas: 3
 autogen:

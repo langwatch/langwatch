@@ -102,7 +102,7 @@ Reusable framework decisions live with their packages:
 | [183](./183-vitest-workers-cache-module-loading.md)                                   | Vitest workers cache how they load installed packages                                                                      | Proposed                  |
 | [184](./184-isolated-jsdom-files-share-a-worker.md)                                   | Isolated jsdom test files share a worker instead of starting a process each                                                | Proposed                  |
 | [190](./190-clickhouse-serverless-access-tiers-rolling-passwords-and-token-logins.md) | clickhouse-serverless access: tiers, rolling passwords and OIDC token logins, rendered as files                            | Accepted                  |
-| [185](./185-clickhouse-serverless-backups-run-in-the-ch-config-sidecar.md)            | clickhouse-serverless backups run in the ch-config sidecar, decided by pure functions                                      | Accepted                  |
+| [191](./191-clickhouse-serverless-backups-run-in-the-ch-config-sidecar.md)            | clickhouse-serverless backups run in the ch-config sidecar, decided by pure functions                                      | Accepted                  |
 
 Package-local decisions are indexed beside their owners. The framework
 records are the [Eventing ADR index](../../../packages/eventing/adrs/README.md)

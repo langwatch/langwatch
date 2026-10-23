@@ -33,7 +33,7 @@ cold:
 # Backups: native ClickHouse BACKUP/RESTORE to S3 (requires objectStorage)
 backup:
   enabled: false
-  # Who takes the backups (ADR-185):
+  # Who takes the backups (ADR-191):
   #   cronjob          CronJobs below, as before (the default)
   #   sidecar          the ch-config sidecar in every ClickHouse pod, on one
   #                    elected runner; no backup CronJobs render

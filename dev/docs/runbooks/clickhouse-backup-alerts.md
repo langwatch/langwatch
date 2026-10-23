@@ -131,7 +131,7 @@ that removes the CronJob, not left to alert.
 With `backup.mode=sidecar` or `cronjob-observe` the rules read the sidecar's own
 metrics (`clickhouse_backup_*`, scraped from `/metrics` on port 8125; enable
 `backup.sidecar.podMonitor`). In `cronjob-observe` both sets render. The design
-is [ADR-185](../adr/185-clickhouse-serverless-backups-run-in-the-ch-config-sidecar.md).
+is [ADR-191](../adr/191-clickhouse-serverless-backups-run-in-the-ch-config-sidecar.md).
 
 | Alert                             | Severity | Means                                                                  |
 | --------------------------------- | -------- | ---------------------------------------------------------------------- |

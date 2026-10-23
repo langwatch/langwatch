@@ -1,6 +1,6 @@
 // Package backup takes native ClickHouse backups to the 'backups' disk: full
 // and incremental, chained, from CronJobs or from the ch-config sidecar
-// (ADR-185). Decisions are pure functions of what the system tables say.
+// (ADR-191). Decisions are pure functions of what the system tables say.
 package backup
 
 import (

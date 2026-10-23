@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Takes one native BACKUP to the 'backups' disk: `ch-config backup run` (ADR-185).
+# Takes one native BACKUP to the 'backups' disk: `ch-config backup run` (ADR-191).
 # Kept at this path for the chart's CronJobs and existing runbooks.
 #
 # Env, as before: CLICKHOUSE_HOST (default localhost), CLICKHOUSE_USER (default

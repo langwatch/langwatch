@@ -4,7 +4,7 @@ Feature: clickhouse-serverless takes chained native backups from CronJobs or its
   scheduled either by CronJobs or by the sidecar in the ClickHouse pod
   So that a broken backup is always loud, and switching schedulers loses nothing
 
-  # ADR-185 (dev/docs/adr/185-clickhouse-serverless-backups-run-in-the-ch-config-sidecar.md).
+  # ADR-191 (dev/docs/adr/191-clickhouse-serverless-backups-run-in-the-ch-config-sidecar.md).
   # The decision is a pure function of system.backups, system.backup_log, configuration and now.
 
   @unit

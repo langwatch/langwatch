@@ -1,5 +1,5 @@
 // Package backupe2e runs tests/e2e-backup-test.sh against a real ClickHouse
-// and S3 store (ADR-185). It needs Docker and runs only when
+// and S3 store (ADR-191). It needs Docker and runs only when
 // CH_BACKUP_E2E_IMAGE names an image: `make e2e-backup` builds and sets it.
 package backupe2e
 

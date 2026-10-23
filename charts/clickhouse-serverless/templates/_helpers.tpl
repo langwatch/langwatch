@@ -217,7 +217,7 @@ app.kubernetes.io/component: keeper
 {{- end -}}
 
 
-{{/* Backup mode (ADR-185): "cronjob", "sidecar" or "cronjob-observe". */}}
+{{/* Backup mode (ADR-191): "cronjob", "sidecar" or "cronjob-observe". */}}
 {{- define "clickhouse-serverless.backupMode" -}}
 {{- $mode := .Values.backup.mode | default "cronjob" -}}
 {{- if not (has $mode (list "cronjob" "sidecar" "cronjob-observe")) -}}

@@ -140,7 +140,7 @@ Shared by cold storage and backups. Required when either `cold.enabled` or `back
 ### Backups
 
 Native ClickHouse `BACKUP`/`RESTORE` to the `backups` disk on the object store,
-full and chained incrementals ([ADR-185](../../dev/docs/adr/185-clickhouse-serverless-backups-run-in-the-ch-config-sidecar.md)).
+full and chained incrementals ([ADR-191](../../dev/docs/adr/191-clickhouse-serverless-backups-run-in-the-ch-config-sidecar.md)).
 `backup.mode` picks who takes them:
 
 - `cronjob` (default): the full and incremental CronJobs, as before.

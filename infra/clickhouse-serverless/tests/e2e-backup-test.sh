@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # E2E test: exercises the shipped /scripts/backup-data.sh and /scripts/restore-data.sh
 # via docker exec, exactly as the Helm CronJobs would run them, then the backup
-# sidecar (ADR-185): a full that survives a sidecar restart, an incremental chained
+# sidecar (ADR-191): a full that survives a sidecar restart, an incremental chained
 # on it, and a restore. Uses RustFS as S3-compatible storage.
 # Usage: ./tests/e2e-backup-test.sh [image:tag]
 set -euo pipefail
