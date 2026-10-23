@@ -17,6 +17,7 @@ export const annotationRest = defineRestRouter(AnnotationApi)
   .get("/", "listAnnotations")
   .withQuery(annotationRestQuerySchema)
   .withPermission("annotations:view")
+  .withLegacyKeyScope("legacy_project_key_annotations_read")
   .withOutput(annotationRestListResponseSchema)
   .withDocs({
     operationId: "getApiAnnotations",
@@ -34,6 +35,7 @@ export const annotationRest = defineRestRouter(AnnotationApi)
   .get("/:id", "getAnnotation")
   .withParams(annotationRestParamsSchema)
   .withPermission("annotations:view")
+  .withLegacyKeyScope("legacy_project_key_annotations_read")
   .withOutput(annotationRestResponseSchema)
   .withDocs({
     operationId: "getApiAnnotationsId",
@@ -98,6 +100,7 @@ export const annotationRest = defineRestRouter(AnnotationApi)
   .withParams(annotationRestParamsSchema)
   .withQuery(annotationRestQuerySchema)
   .withPermission("annotations:view")
+  .withLegacyKeyScope("legacy_project_key_annotations_read")
   .withOutput(annotationRestListResponseSchema)
   .withDocs({
     operationId: "getApiAnnotationsTraceId",

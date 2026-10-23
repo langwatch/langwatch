@@ -9,6 +9,7 @@ export const LEGACY_PROJECT_KEY_SCOPE_FLAGS = [
   "legacy_project_key_prompts_read",
   "legacy_project_key_prompts_write",
   "legacy_project_key_traces_read",
+  "legacy_project_key_annotations_read",
   "legacy_project_key_scenarios",
   "legacy_project_key_evaluations",
   "legacy_project_key_experiments",

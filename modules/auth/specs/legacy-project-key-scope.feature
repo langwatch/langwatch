@@ -4,7 +4,8 @@ Feature: Legacy project keys are ingestion-only, enforced per project
   `traces:create`. Beyond that it passes the routes that name a scope flag listing
   its project, one flag per usage (`LEGACY_PROJECT_KEY_SCOPE_FLAGS` in the api-key
   contract; a route names its flags with `withLegacyKeyScope`): prompts read, prompts
-  write, traces read, scenarios, evaluations, experiments and connected agents. A flag
+  write, traces read, annotations read, scenarios, evaluations, experiments and connected
+  agents. A flag
   opens routes, not permissions: a route that asks the same permission without naming
   the flag is outside the key's scopes. A project on the `legacy_project_key_full_access`
   flag keeps full access and writes no legacy key log line.
@@ -28,6 +29,13 @@ Feature: Legacy project keys are ingestion-only, enforced per project
       Then the route answers 200
       And the line "legacy project key outside its scopes" is logged with enforced false, the project, the permission and the route template
       And a census line is logged with granted by "report_only"
+
+    @integration
+    Scenario: An unenforced project's legacy key on no flag still reads and writes annotations
+      Given a project whose legacy key is on no flag
+      When it calls routes that ask "annotations:view", "annotations:create" and "annotations:manage"
+      Then each answers 200
+      And each is logged outside its scopes with enforced false
 
     @integration
     Scenario: An unenforced project's legacy key passes identify-only routes and the key door
@@ -181,6 +189,14 @@ Feature: Legacy project keys are ingestion-only, enforced per project
       When it calls routes that name each flag
       Then each answers 200
       And a route that names "legacy_project_key_evaluations" answers 403 with the handled error "legacy_project_key_ingestion_only"
+
+    @integration
+    Scenario: The annotations-read flag opens annotation reads and no annotation writes
+      Given an enforced project whose legacy key is on "legacy_project_key_annotations_read" only
+      When it calls a route that asks "annotations:view" and names that flag, as the annotation list, get and trace list do
+      Then the route answers 200
+      When it calls a route that asks "annotations:create" or "annotations:manage", as annotation create, update and delete do
+      Then each answers 403 with the handled error "legacy_project_key_ingestion_only"
 
     @integration
     Scenario: The connected-agents flag opens the connect routes and the model providers read only
