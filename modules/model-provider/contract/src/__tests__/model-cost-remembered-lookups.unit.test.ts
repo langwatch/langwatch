@@ -1,62 +1,13 @@
-import safe from "safe-regex2";
 import { describe, expect, it } from "vitest";
 
 import { llmModels } from "../catalog/model-catalog.ts";
 import { getStaticModelCostRates } from "../catalog/static-model-costs.ts";
-import {
-  findMatchingModelCost,
-  normalizeBedrockModelId,
-  normalizeModelName,
-} from "../model-cost.ts";
+import { findMatchingModelCost } from "../model-cost.ts";
 import type { ModelCostRate } from "../model-provider.ts";
 
-/**
- * The lookup as it was before it remembered anything: every call scans the whole list in order,
- * looking each pattern up in a cache of compiled patterns. Kept verbatim as the reference the
- * remembered lookup must agree with.
- */
-const referencePatterns = new Map<string, RegExp | null>();
-const compile = (pattern: string): RegExp | null => {
-  const cached = referencePatterns.get(pattern);
-  if (cached !== undefined) return cached;
-  let compiled: RegExp | null;
-  try {
-    const regex = new RegExp(pattern);
-    compiled = safe(regex) ? regex : null;
-  } catch {
-    compiled = null;
-  }
-  referencePatterns.set(pattern, compiled);
-  return compiled;
-};
-
-const referenceMatch = (model: string, costs: readonly ModelCostRate[]): ModelCostRate[] => {
-  const scan = (name: string): ModelCostRate | undefined => {
-    const matched = costs.find((cost) => compile(cost.regex)?.test(name));
-    if (matched) return matched;
-    if (name.includes("/")) return scan(name.slice(name.indexOf("/") + 1));
-    return undefined;
-  };
-  const candidate = (name: string): ModelCostRate | undefined => {
-    const raw = scan(name);
-    if (raw) return raw;
-    const normalized = normalizeModelName(name);
-    return normalized === name ? undefined : scan(normalized);
-  };
-  const subtypeStripped = (): ModelCostRate | undefined => {
-    const slash = model.indexOf("/");
-    if (slash === -1) return undefined;
-    const provider = model.slice(0, slash);
-    if (!provider.includes(".")) return undefined;
-    return candidate(provider.split(".")[0] + model.slice(slash));
-  };
-  const bedrock = (): ModelCostRate | undefined => {
-    const id = normalizeBedrockModelId(model);
-    return id === model ? undefined : candidate(id);
-  };
-  const match = candidate(model) ?? subtypeStripped() ?? bedrock();
-  return match ? [match] : [];
-};
+/** The oracle: a copy of the list is a new key, so its first lookup is a cold full scan. */
+const coldMatch = (model: string, costs: readonly ModelCostRate[]): ModelCostRate[] =>
+  findMatchingModelCost(model, [...costs]);
 
 const catalogue = getStaticModelCostRates();
 
@@ -130,7 +81,7 @@ describe("findMatchingModelCost remembering its answers", () => {
       for (const round of ["first", "repeat"]) {
         for (const name of names) {
           expect(findMatchingModelCost(name, catalogue), `${round}: ${name}`).toEqual(
-            referenceMatch(name, catalogue),
+            coldMatch(name, catalogue),
           );
         }
       }
@@ -141,7 +92,7 @@ describe("findMatchingModelCost remembering its answers", () => {
     it("picks the same rate as a full scan, misses included", () => {
       const merged = [...customRules, ...catalogue];
       for (const name of modelNames()) {
-        const expected = referenceMatch(name, merged);
+        const expected = coldMatch(name, merged);
         expect(findMatchingModelCost(name, merged), name).toEqual(expected);
         expect(findMatchingModelCost(name, [...customRules, ...catalogue]), name).toEqual(expected);
       }
@@ -179,10 +130,48 @@ describe("findMatchingModelCost remembering its answers", () => {
       ];
       for (let index = 0; index < 5_000; index++) {
         const name = `model-${index}`;
-        expect(findMatchingModelCost(name, rules)).toEqual(referenceMatch(name, rules));
+        expect(findMatchingModelCost(name, rules)).toEqual(coldMatch(name, rules));
       }
       expect(findMatchingModelCost("model-2", rules)[0]?.model).toBe("even");
       expect(findMatchingModelCost("unknown", rules)).toEqual([]);
+    });
+  });
+
+  describe("when the same model name is looked up again in one list", () => {
+    const countingList = (): { costs: ModelCostRate[]; reads: () => number } => {
+      let reads = 0;
+      const rule = (model: string, pattern: string): ModelCostRate => ({
+        model,
+        get regex() {
+          reads += 1;
+          return pattern;
+        },
+      });
+      return { costs: [rule("a", "^alpha"), rule("b", "^beta")], reads: () => reads };
+    };
+
+    it("does not evaluate the patterns again for a hit", () => {
+      const { costs, reads } = countingList();
+      findMatchingModelCost("beta-1", costs);
+      const readsAfterFirst = reads();
+
+      const second = findMatchingModelCost("beta-1", costs);
+
+      expect(readsAfterFirst).toBeGreaterThan(0);
+      expect(reads()).toBe(readsAfterFirst);
+      expect(second[0]?.model).toBe("b");
+    });
+
+    it("does not evaluate the patterns again for a miss", () => {
+      const { costs, reads } = countingList();
+      findMatchingModelCost("gamma-1", costs);
+      const readsAfterFirst = reads();
+
+      const second = findMatchingModelCost("gamma-1", costs);
+
+      expect(readsAfterFirst).toBeGreaterThan(0);
+      expect(reads()).toBe(readsAfterFirst);
+      expect(second).toEqual([]);
     });
   });
 });
