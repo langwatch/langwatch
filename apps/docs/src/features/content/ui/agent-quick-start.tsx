@@ -14,7 +14,13 @@ const AGENTS = [
 
 function PromptPreview({ prompt, action }: { prompt: string; action: ReactNode }) {
   return (
-    <Box bg="docs.raised" borderWidth="1px" borderColor="border" borderRadius="lg" overflow="hidden">
+    <Box
+      bg="docs.raised"
+      borderWidth="1px"
+      borderColor="border"
+      borderRadius="lg"
+      overflow="hidden"
+    >
       <Flex padding="4" gap="3" alignItems="center" justifyContent="space-between" wrap="wrap">
         <Flex gap="2" alignItems="center" color="fg" fontSize="14px" fontWeight="600">
           <FileText size={16} aria-hidden="true" /> Setup prompt

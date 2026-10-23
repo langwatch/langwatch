@@ -15,10 +15,23 @@ export function ThemeMenu() {
           <rect width="24" height="24" fill="white" />
           <circle className="docs-moon-bite" fill="black" />
         </mask>
-        <circle className="docs-sun-core" cx="12" cy="12" fill="currentColor" mask="url(#docs-moon-bite)" />
+        <circle
+          className="docs-sun-core"
+          cx="12"
+          cy="12"
+          fill="currentColor"
+          mask="url(#docs-moon-bite)"
+        />
         <g className="docs-sun-rays" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
           {RAYS.map((angle) => (
-            <line key={angle} x1="12" y1="2.5" x2="12" y2="4.5" transform={`rotate(${angle} 12 12)`} />
+            <line
+              key={angle}
+              x1="12"
+              y1="2.5"
+              x2="12"
+              y2="4.5"
+              transform={`rotate(${angle} 12 12)`}
+            />
           ))}
         </g>
       </svg>

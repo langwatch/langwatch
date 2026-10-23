@@ -14,7 +14,11 @@ describe("when the preview serves a build", () => {
     expect(cachePolicy({ sitePathname: "/fonts/Inter-Variable-latin.woff2" })).toBe(
       "public, max-age=86400, stale-while-revalidate=604800",
     );
-    for (const sitePathname of ["/integration/quick-start/index.html", "/search-index.json", "/llms.txt"])
+    for (const sitePathname of [
+      "/integration/quick-start/index.html",
+      "/search-index.json",
+      "/llms.txt",
+    ])
       expect(cachePolicy({ sitePathname })).toBe("no-cache");
   });
 });

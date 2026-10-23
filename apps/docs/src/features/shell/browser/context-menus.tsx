@@ -8,9 +8,7 @@ import { PageMenu } from "../ui/page-menu.tsx";
 const roots = new Map<HTMLElement, ReturnType<typeof createRoot>>();
 document.addEventListener("click", (event) => {
   const trigger =
-    event.target instanceof Element
-      ? event.target.closest("[data-docs-page-menu]")
-      : null;
+    event.target instanceof Element ? event.target.closest("[data-docs-page-menu]") : null;
   const container = trigger?.closest<HTMLElement>("[data-docs-menu-root]");
   if (!container || roots.has(container)) return;
   const root = createRoot(container);
