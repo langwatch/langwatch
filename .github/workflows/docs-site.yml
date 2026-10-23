@@ -32,6 +32,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       relevant: ${{ steps.detect.outputs.relevant }}
+      docs-image: ${{ steps.detect.outputs.docs-image }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -56,6 +57,10 @@ jobs:
               - '.github/actions/setup-pnpm-node/**'
               - '.github/actions/nx-cache/**'
               - '.github/actions/detect-changes/**'
+            docs-image:
+              - 'infra/docker/Dockerfile.docs'
+              - '.dockerignore'
+              - '.github/workflows/publish-docker-ecr.yml'
 
   verify:
     needs: changes
@@ -278,10 +283,11 @@ jobs:
           retention-days: 7
 
   # The image publish-docker-ecr.yml pushes on main, built without a push so a
-  # broken Dockerfile fails here first. Full history: the build checks sitemap dates.
+  # broken Dockerfile fails here first; only when its recipe changes (30 minutes).
+  # Full history: the build checks sitemap dates.
   image:
     needs: changes
-    if: needs.changes.outputs.relevant == 'true'
+    if: needs.changes.outputs.docs-image == 'true'
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 30
     steps:
