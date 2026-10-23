@@ -137,6 +137,15 @@ Feature: GroupQueue batch bisection
     When it fails with a failure that names no retry delay
     Then it is re-staged with backoff until it has used the ordinary budget on top of those retries
     And it never retries past the overload budget
+    And a body the blob store cannot reach for a while gets the same budget
+
+  # A job that is not coalesced reads overload the same way a batch does.
+  @unit @bisection
+  Scenario: A single job on an overloaded server takes the overload retry budget
+    Given a job that is processed on its own, not in a coalesced batch
+    When it fails because ClickHouse is overloaded
+    Then the failure names a retry delay
+    And the job takes the longer overload retry budget instead of the ordinary one
 
   @integration @coalescing @bisection
   Scenario: Splitting is bounded within one locked attempt

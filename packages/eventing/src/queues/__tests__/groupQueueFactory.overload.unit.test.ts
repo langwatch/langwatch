@@ -74,6 +74,17 @@ describe("backOffWhenOverloaded", () => {
 
       expect(error).toMatchObject({ retryAfterMs: undefined, cause: wrapped });
     });
+
+    /** @scenario "A statement over its own memory limit splits the batch" */
+    it("finds it among a handled refusal's reasons, as the resilient client raises it", async () => {
+      const handled = new ShedStatement({
+        reasons: [clickHouseError("241", "Memory limit (for query) exceeded: would use 9.3 GiB")],
+      });
+
+      const error = await failed(handled);
+
+      expect(error).toMatchObject({ retryable: true, retryAfterMs: undefined, cause: handled });
+    });
   });
 
   describe("when the client sheds an insert before it reaches the server", () => {
@@ -87,6 +98,7 @@ describe("backOffWhenOverloaded", () => {
   });
 
   describe("when a single job fails on an overloaded server", () => {
+    /** @scenario "A single job on an overloaded server takes the overload retry budget" */
     it("names a retry delay, so the job takes the overload retry budget", async () => {
       const cause = clickHouseError("202", "Too many simultaneous queries");
 

@@ -61,6 +61,7 @@ import {
   PayloadTooLargeError,
   readEnvelopeDescriptor,
   readJobAttempt,
+  readJobOverloadAttempts,
   readJobPayloadBytes,
   readJobRoutingMeta,
   withJobAttempt,
@@ -2170,7 +2171,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     const [quarantineError] = await this.quarantineErrors({ job, error, isRetryable });
     const budget = attemptBudgetOf({ decision, overloadAttempts: job.overloadAttempts });
     if (isRetryable && attempt < budget && !quarantineError) {
-      await this.retryClaimedJob({ job, error, decision, stopHeartbeat });
+      await this.retryClaimedJob({ job, error, decision, budget, stopHeartbeat });
       return;
     }
     await this.exhaustClaimedJob({ job, error, isRetryable, quarantineError, span, offender });
@@ -2242,11 +2243,14 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     job,
     error,
     decision,
+    budget,
     stopHeartbeat,
   }: {
     job: ClaimedJob<Payload>;
     error: Error;
     decision: { retryable: boolean; retryAfterMs?: number };
+    /** The attempt budget the caller enforced, logged as is. */
+    budget: number;
     stopHeartbeat: () => void;
   }): Promise<void> {
     const {
@@ -2382,7 +2386,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
         groupId,
         stagedJobId,
         attempt,
-        maxAttempts: attemptBudgetOf({ decision, overloadAttempts: job.overloadAttempts }),
+        maxAttempts: budget,
         backoffMs,
         // The whole Error, not `error.message`: the serializer emits
         // the stack, and for a handler crash the stack IS the
@@ -3383,7 +3387,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
   }): Promise<void> {
     const attempt =
       Math.max(readJobAttempt(jobDataJson) ?? 0, await this.readGroupAttempt(groupId)) + 1;
-    if (attempt >= JOB_RETRY_CONFIG.maxAttempts) {
+    // The overload retries already spent are not this failure's rungs (they ride the header).
+    const budget = attemptBudgetOf({
+      decision: {},
+      overloadAttempts: readJobOverloadAttempts(jobDataJson),
+    });
+    if (attempt >= budget) {
       // The retry ladder is out of rungs — a discard like any other, not
       // recoverable via replay (#5538). Reaching here means every read failed
       // (~2h27m of sustained unreachability), which says the STORE is down, not
