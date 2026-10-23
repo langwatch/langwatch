@@ -268,6 +268,14 @@ export function findMissingObjects(error: unknown): string[] {
   });
 }
 
+const POSTGRES_ENGINE_COLLECTION = /^PostgreSQL\(\s*`?([A-Za-z0-9_]+)`?\s*,/;
+
+/** The named collection a PostgreSQL engine table reads through (`system.tables.engine_full`). */
+export function postgresEngineCollections(engineFull: string): string[] {
+  const collection = POSTGRES_ENGINE_COLLECTION.exec(engineFull)?.[1];
+  return collection === undefined ? [] : [collection];
+}
+
 type ConfigStoreTolerance = { tolerated: true; code: number } | { tolerated: false };
 
 /**

@@ -23,7 +23,8 @@ var StepRoots = []string{"modules", "enterprise/modules"}
 type manifest struct {
 	Release string `json:"release"`
 	Steps   []struct {
-		ID string `json:"id"`
+		ID   string `json:"id"`
+		Mode string `json:"mode"`
 	} `json:"steps"`
 }
 
@@ -44,10 +45,10 @@ type StepInput struct {
 	Touched  []string
 }
 
-// CheckSteps reports every released code step whose declaring file the branch
-// changed. A step a release shipped has run on real installs, so its file is
-// frozen exactly as a merged migration is (rethink 6.5 point 2); a change is a
-// new step with a new id.
+// CheckSteps reports every released blocking code step whose declaring file the
+// branch changed. A blocking step a release shipped has run on real installs
+// before they served, so its file is frozen exactly as a merged migration is
+// (rethink 6.5 point 2); a change is a new step with a new id.
 func CheckSteps(in StepInput) []Finding {
 	touched := map[string]bool{}
 	for _, p := range in.Touched {
@@ -77,7 +78,7 @@ func isCodeStep(id string) bool {
 	return ok && name != "" && owner != "prisma" && owner != "clickhouse"
 }
 
-// Steps reads the released code steps from the manifests on baseRef and on
+// Steps reads the released blocking code steps from the manifests on baseRef and on
 // every release line, finds the base branch file declaring each by its quoted
 // id, and lists what the branch changed in those files.
 func (r Repo) Steps(ctx context.Context, baseRef string, releasedRefs ...string) (StepInput, error) {
@@ -115,8 +116,10 @@ func (r Repo) Steps(ctx context.Context, baseRef string, releasedRefs ...string)
 	return in, nil
 }
 
-// readManifests adds every code step id the manifests on ref name, keeping
-// the first manifest (base branch first, then in file order) that names each.
+// readManifests adds every blocking code step id the manifests on ref name,
+// keeping the first manifest (base branch first, then in file order) that names
+// each. A background or operator step's module file stays editable (plan
+// MIG-STEP-FILES, pr-7536-migration-plan-2026-10-08.md).
 func (r Repo) readManifests(ctx context.Context, ref string, releaseOf map[string]string) error {
 	files, err := r.entriesAt(ctx, ref, ReleasesDirectory)
 	if err != nil {
@@ -137,7 +140,7 @@ func (r Repo) readManifests(ctx context.Context, ref string, releaseOf map[strin
 
 func addCodeSteps(m manifest, releaseOf map[string]string) {
 	for _, step := range m.Steps {
-		if _, known := releaseOf[step.ID]; isCodeStep(step.ID) && !known {
+		if _, known := releaseOf[step.ID]; isCodeStep(step.ID) && step.Mode == "blocking" && !known {
 			releaseOf[step.ID] = m.Release
 		}
 	}

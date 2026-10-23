@@ -64,6 +64,20 @@ Feature: Directory administration
       And it says that nobody approved it
 
     @integration
+    Scenario: A member who accepted an invitation is a member, not an invitation
+      Given "sam" accepted an invitation to "acme"
+      When "ana" opens the members page
+      Then "sam" carries a chip saying he joined from an invitation
+      And his row does not read "Invited", the word an outstanding invitation carries
+
+    @integration
+    Scenario: An invitation nobody has accepted still reads as invited
+      Given "dana@acme.com" has an invitation she has not accepted
+      When "ana" opens the members page
+      Then the invitation's row reads "Invited"
+      And the invited cut counts it
+
+    @integration
     Scenario: A member we cannot explain carries no chip rather than a guess
       Given "ana" created "acme" herself
       When "ana" opens the members page

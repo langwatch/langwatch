@@ -123,6 +123,50 @@ describe("given two stacks whose databases share one ClickHouse server", () => {
   });
 });
 
+describe("given a config store that delivers the access model (rendered mode)", () => {
+  /** @scenario "Rendered mode keeps the named collection released chart installs bound their engine tables to" */
+  it("binds every engine table to lwql_postgres, the collection released installs already mount", () => {
+    const statementsFor = (database: string) =>
+      selfProvisioning.clickHouseStatements({
+        names: { ...NAMES, database },
+        restrictedPassword: "pw",
+        sourceDatabase: database,
+        postgres: POSTGRES,
+        mode: "rendered",
+      });
+
+    for (const database of ["langwatch", "lw_other"]) {
+      expect(
+        selfProvisioning.namedCollection({ names: { ...NAMES, database }, mode: "rendered" }),
+      ).toBe("lwql_postgres");
+      const engineTables = statementsFor(database).filter((s) => s.includes("ENGINE = PostgreSQL"));
+      expect(engineTables.length).toBeGreaterThan(0);
+      for (const table of engineTables) {
+        expect(table).toContain("ENGINE = PostgreSQL(lwql_postgres,");
+      }
+    }
+  });
+
+  /** @scenario "Rendered mode keeps the named collection released chart installs bound their engine tables to" */
+  it("binds the reconvergence check's repaired engine tables to the same collection", () => {
+    const [engineTable] = selfProvisioning
+      .appOwnedRelations({ names: NAMES })
+      .filter((name) => name.endsWith("_pg"));
+    const repaired = selfProvisioning.clickHouseStatements({
+      names: NAMES,
+      restrictedPassword: "pw",
+      sourceDatabase: SOURCE_DATABASE,
+      postgres: POSTGRES,
+      mode: "rendered",
+      only: [engineTable ?? ""],
+    });
+
+    expect(repaired.filter((s) => s.includes("ENGINE = PostgreSQL(lwql_postgres,"))).toHaveLength(
+      1,
+    );
+  });
+});
+
 describe("when the self-provisioning environment is read", () => {
   it("is not requested without LWQL_CLICKHOUSE_PASSWORD", () => {
     expect(selfProvisioning.request({ source: {} })).toEqual({ requested: false });

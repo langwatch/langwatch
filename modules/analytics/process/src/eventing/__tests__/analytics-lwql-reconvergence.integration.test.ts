@@ -153,7 +153,7 @@ describe("given a rendered install whose config store has not mounted the named 
     );
     // Production provisions into the application's own database, which holds the fact tables.
     names = { ...harness.names, database: harness.factDatabase };
-    collection = selfProvisioning.namedCollection({ names });
+    collection = selfProvisioning.namedCollection({ names, mode: "rendered" });
     // A reused container keeps the facts database, so the app-owned objects go first.
     await harness.applyAsAdmin([
       `DROP NAMED COLLECTION IF EXISTS ${collection}`,

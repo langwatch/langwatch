@@ -13,12 +13,14 @@ import {
   type LwqlAccessModelOwner,
   findMissingObjects,
   findStatementTargets,
+  postgresEngineCollections,
   statementKind,
 } from "../../rules/langwatch-ql-config-store.rules.ts";
 import {
   type ClickHouseAdminStatements,
   LangWatchQLProvisioningRepository,
   type LwqlClickHouseInventory,
+  type LwqlCollectionState,
   type LwqlKeyMapInsertRow,
   type ProvisioningFailureLevel,
   type RunClickHouseStatementsResult,
@@ -109,6 +111,47 @@ async function readClickHouseInventory({
     relations: present.map((row) => String(row.name)),
     functions: held.map((row) => String(row.name)),
   };
+}
+
+/** Two catalog reads; an unreadable one degrades to empty, so the preferred name is used. */
+async function readLwqlCollectionState({
+  client,
+  database,
+  candidates,
+}: {
+  client: ClickHouseAdminStatements;
+  database: string;
+  candidates: readonly string[];
+}): Promise<LwqlCollectionState> {
+  const read = async (sql: string, params: Readonly<Record<string, unknown>>) => {
+    try {
+      return await client.rows(sql, params);
+    } catch (error) {
+      logger.warn(
+        { error: clickHouseErrorSummary(error) },
+        "lwql provisioning could not read the named collections or engine-table bindings; engine tables take the preferred collection",
+      );
+      return [];
+    }
+  };
+  const [collections, tables] = await Promise.all([
+    read("SELECT name FROM system.named_collections WHERE has({names:Array(String)}, name)", {
+      names: [...candidates],
+    }),
+    read(
+      "SELECT name, engine_full FROM system.tables " +
+        "WHERE database = {database:String} AND engine = 'PostgreSQL'",
+      { database },
+    ),
+  ]);
+  const bound: Record<string, string> = {};
+  for (const row of tables) {
+    const engineFull = typeof row.engine_full === "string" ? row.engine_full : "";
+    for (const collection of postgresEngineCollections(engineFull)) {
+      bound[String(row.name)] = collection;
+    }
+  }
+  return { available: collections.map((row) => String(row.name)), bound };
 }
 
 /** An unreadable inventory degrades to "none owned", so the statements then fail loudly. */
@@ -225,6 +268,13 @@ export class ClickHouseLangWatchQLProvisioningRepository extends LangWatchQLProv
     functions: readonly string[];
   }): Promise<LwqlClickHouseInventory> {
     return readClickHouseInventory({ client: this.client, ...input });
+  }
+
+  readCollectionState(input: {
+    database: string;
+    candidates: readonly string[];
+  }): Promise<LwqlCollectionState> {
+    return readLwqlCollectionState({ client: this.client, ...input });
   }
 
   inventoryConfigStore({
