@@ -51,6 +51,17 @@ describe("given an S3 account, when its client is constructed", () => {
 
       await expect(client.config.region()).resolves.toBe("eu-central-1");
     });
+
+    it("leaves an AWS China endpoint's region to the SDK too", async () => {
+      vi.stubEnv("AWS_REGION", "cn-north-1");
+      const client = s3Client({
+        bucket: "acme-dataplane",
+        endpoint: "https://s3.cn-north-1.amazonaws.com.cn",
+        roleArn: ROLE,
+      });
+
+      await expect(client.config.region()).resolves.toBe("cn-north-1");
+    });
   });
 
   describe("when the account carries only a key pair", () => {

@@ -19,7 +19,7 @@ const nlpLambdaFleetSchemaDefinition = z.object({
   AWS_REGION: z.string().min(1),
   AWS_ACCESS_KEY_ID: z.string().min(1).optional(),
   AWS_SECRET_ACCESS_KEY: z.string().min(1).optional(),
-  credentials_role_arn: z.string().min(1).optional(),
+  credentials_role_arn: z.string().trim().min(1).optional(),
   role_arn: z.string().min(1),
   image_uri: z.string().min(1),
   cache_bucket: z.string().min(1),

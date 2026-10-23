@@ -49,7 +49,8 @@ export function s3Client(account: ObjectStorageAccount): S3Client {
   const endpoint = account.endpoint?.trim() || undefined;
   const roleArn = account.roleArn;
   const staticCredentials = roleArn ? undefined : account.credentials;
-  const isAwsEndpoint = endpoint === undefined || endpoint.endsWith(".amazonaws.com");
+  const isAwsEndpoint =
+    endpoint === undefined || endpoint.endsWith(".amazonaws.com") || endpoint.endsWith(".amazonaws.com.cn");
   const region = account.region ?? (isAwsEndpoint && !staticCredentials ? undefined : "auto");
   const credentials = roleArn
     ? fromTokenFile({ roleArn })
