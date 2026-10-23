@@ -383,22 +383,28 @@ func yamlFiles(repoRoot, dir string, recursive bool) ([]string, error) {
 		if entry.IsDir() {
 			return skipNested(path != base && !recursive)
 		}
-		if !isYAML(path) {
-			return nil
-		}
-		rel, err := filepath.Rel(repoRoot, path)
-		if err != nil {
-			return err
-		}
-		files = append(files, filepath.ToSlash(rel))
+		files, err = appendYAML(files, repoRoot, path)
 
-		return nil
+		return err
 	})
 	if err != nil {
 		return nil, fmt.Errorf("walk %s: %w", dir, err)
 	}
 
 	return files, nil
+}
+
+// appendYAML adds path, relative to repoRoot, when it is a YAML file.
+func appendYAML(files []string, repoRoot, path string) ([]string, error) {
+	if !isYAML(path) {
+		return files, nil
+	}
+	rel, err := filepath.Rel(repoRoot, path)
+	if err != nil {
+		return files, err
+	}
+
+	return append(files, filepath.ToSlash(rel)), nil
 }
 
 func skipNested(skip bool) error {
