@@ -100,6 +100,7 @@ Reusable framework decisions live with their packages:
 | [180](./180-scenario-run-hooks.md)                                     | Scenario run hooks: setup and teardown on connected agents                                                                 | Proposed                  |
 | [181](./181-tsrs-runs-behind-tsc.md)                                   | tsrs runs behind `tsc`                                                                                                     | Proposed                  |
 | [183](./183-braids-show-matching-spans-in-another-projects-traces.md)  | Braids show one project's matching spans in another project's traces                                                       | Proposed                  |
+| [184](./184-isolated-jsdom-files-share-a-worker.md)                    | Isolated jsdom test files share a worker instead of starting a process each                                                | Proposed                  |
 
 Package-local decisions are indexed beside their owners. The framework
 records are the [Eventing ADR index](../../../packages/eventing/adrs/README.md)
