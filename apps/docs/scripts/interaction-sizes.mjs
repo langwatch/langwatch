@@ -3,10 +3,11 @@ import path from "node:path";
 import { gzipSync } from "node:zlib";
 
 /* Gzip bytes an island downloads before it can answer its first click: its entry and every
-   chunk that entry imports. Measured 2026-10-23 on Preact; a little headroom above each. */
+   chunk that entry imports. Measured 2026-10-23 on Preact; a little headroom above each.
+   Search grew by its result icons the same day. */
 export const INTERACTION_BUDGETS = {
   contextMenusInteractionGzip: 95_000,
-  searchInteractionGzip: 85_500,
+  searchInteractionGzip: 86_000,
   playgroundInteractionGzip: 24_500,
 };
 const ISLAND_OF = {
