@@ -35,6 +35,12 @@ Feature: The langyagent chart can take over an existing agent Deployment
     Then the pod template keeps the selector's value
 
   @regression
+  Scenario: A numeric label value renders as a string
+    Given selectorLabels or podLabels sets a label to a number
+    When the chart is rendered
+    Then the label's value is rendered as a quoted string
+
+  @regression
   Scenario: Extra environment entries are appended to the agent container
     Given extraEnvs lists an entry that reads a Secret key
     When the chart is rendered

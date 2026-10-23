@@ -33,7 +33,11 @@ app.kubernetes.io/component: langyagent
        install. */ -}}
 {{- define "langyagent.selectorLabels" -}}
 {{- if .Values.selectorLabels -}}
-{{ toYaml .Values.selectorLabels }}
+{{- $labels := dict }}
+{{- range $key, $value := .Values.selectorLabels }}
+{{- $_ := set $labels $key ($value | toString) }}
+{{- end }}
+{{- toYaml $labels }}
 {{- else -}}
 app.kubernetes.io/name: {{ include "langyagent.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
@@ -44,7 +48,11 @@ app.kubernetes.io/instance: {{ .Release.Name }}
        labels win on a shared key, because a pod whose labels stop matching its
        Deployment's selector is rejected by the API server. */ -}}
 {{- define "langyagent.podLabels" -}}
-{{- $labels := deepCopy (.Values.podLabels | default dict) }}
+{{- $labels := dict }}
+{{- /* toString: a label value is a string, and `--set podLabels.version=2` is a number. */ -}}
+{{- range $key, $value := .Values.podLabels | default dict }}
+{{- $_ := set $labels $key ($value | toString) }}
+{{- end }}
 {{- /* set, not merge: merge treats an empty selector value as unset. */ -}}
 {{- range $key, $value := include "langyagent.selectorLabels" . | fromYaml }}
 {{- $_ := set $labels $key $value }}

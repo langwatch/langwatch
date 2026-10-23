@@ -115,6 +115,16 @@ test_pod_labels_keep_selector() {
   fi
 }
 
+# @scenario "A numeric label value renders as a string"
+test_numeric_label_values_quoted() {
+  local dep
+  dep="$(render --set selectorLabels.tier=1 --set podLabels.version=2 | doc_of Deployment)"
+  block_after 'selector:' <<<"$dep" | grep -F 'tier: "1"' >/dev/null &&
+    pass "numeric selector label quoted" || fail "numeric selector label quoted" "tier is not a string"
+  block_after 'template:' <<<"$dep" | block_after 'labels:' | grep -F 'version: "2"' >/dev/null &&
+    pass "numeric pod label quoted" || fail "numeric pod label quoted" "version is not a string"
+}
+
 # @scenario "Extra environment entries are appended to the agent container"
 test_extra_env_appended() {
   local env
@@ -185,6 +195,7 @@ test_scratch_uncapped() {
 test_default_selector
 test_custom_selector_everywhere
 test_pod_labels_keep_selector
+test_numeric_label_values_quoted
 test_extra_env_appended
 test_extra_config_added
 test_extra_config_refuses_owned_key
