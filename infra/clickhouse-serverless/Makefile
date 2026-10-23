@@ -18,6 +18,7 @@ lint: ## Run go vet + helm lint + helm template
 	helm template test $(HELM_DIR) --set cpu=4,memory=8Gi,autogen.enabled=true > /dev/null
 	helm template test-ha $(HELM_DIR) --set cpu=4,memory=8Gi,replicas=3,autogen.enabled=true > /dev/null
 	helm template test-access $(HELM_DIR) -f $(HELM_DIR)/tests/values-access.yaml > /dev/null
+	helm template test-dynamic $(HELM_DIR) -f $(HELM_DIR)/tests/values-dynamic-only.yaml > /dev/null
 
 build: ## Build Docker image
 	docker build -t $(IMAGE):$(TAG) --platform=$(PLATFORM) .

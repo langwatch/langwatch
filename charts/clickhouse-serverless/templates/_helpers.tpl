@@ -92,6 +92,35 @@ app.kubernetes.io/component: keeper
   {{- if and .Values.access.enabled (not .Values.access.existingConfigMap) (empty .Values.access.config) }}
     {{- fail "access.enabled needs access.config or access.existingConfigMap" }}
   {{- end }}
+  {{- if .Values.access.dynamicOnly.enabled }}
+    {{- if not .Values.access.enabled }}
+      {{- fail "access.dynamicOnly.enabled needs access.enabled: token logins are verified by the access sidecar" }}
+    {{- end }}
+    {{- if and (gt (int .Values.replicas) 1) (not .Values.auth.clusterSecretEnabled) }}
+      {{- fail "access.dynamicOnly.enabled with replicas > 1 needs auth.clusterSecretEnabled: replicas would otherwise log in to each other as default, which is locked" }}
+    {{- end }}
+    {{- if .Values.backup.enabled }}
+      {{- fail "access.dynamicOnly.enabled cannot run the backup CronJobs: they log in as default with the static password, which this mode removes" }}
+    {{- end }}
+    {{- if .Values.access.passwordSecrets }}
+      {{- fail "access.dynamicOnly.enabled refuses access.passwordSecrets: rolling passwords are long-lived, use token logins" }}
+    {{- end }}
+  {{- end }}
+{{- end -}}
+
+{{/* True when the pod runs in dynamic-only mode (ADR-184). */}}
+{{- define "clickhouse-serverless.dynamicOnly" -}}
+{{- if and .Values.access.enabled .Values.access.dynamicOnly.enabled }}true{{ end }}
+{{- end -}}
+
+{{/* clickhouse-client login for exec probes: the per-boot local admin in
+     dynamic-only mode, default with the Secret's password otherwise. */}}
+{{- define "clickhouse-serverless.probeLogin" -}}
+{{- if include "clickhouse-serverless.dynamicOnly" . -}}
+--user local_admin --password "$(cat /run/clickhouse-access/password)"
+{{- else -}}
+--user default --password "$(cat /mnt/secrets/password)"
+{{- end -}}
 {{- end -}}
 
 {{/* Access file and password Secrets, mounted read-only into ClickHouse (for
@@ -100,6 +129,11 @@ app.kubernetes.io/component: keeper
 - name: access-config
   mountPath: /etc/clickhouse-access/config
   readOnly: true
+{{- if include "clickhouse-serverless.dynamicOnly" . }}
+# The local admin's per-boot password: ClickHouse writes it, the sidecar reads it.
+- name: access-bootstrap
+  mountPath: /run/clickhouse-access
+{{- end }}
 {{- range $i, $name := .Values.access.passwordSecrets }}
 - name: access-secret-{{ $i }}
   mountPath: /etc/clickhouse-access/secrets/{{ $name }}

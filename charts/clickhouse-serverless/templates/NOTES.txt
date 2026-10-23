@@ -25,8 +25,13 @@ To connect to ClickHouse:
   # Native protocol (port 9000)
   kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "clickhouse-serverless.fullname" . }} 9000:9000
 
+{{- if include "clickhouse-serverless.dynamicOnly" . }}
+  # Dynamic-only mode: there is no password. Log in as a token user from
+  # access.yaml with a fresh OIDC token as the password (README, "Dynamic-only mode").
+{{- else }}
   # Retrieve the password
   kubectl -n {{ .Release.Namespace }} get secret {{ include "clickhouse-serverless.secretName" . }} -o jsonpath='{.data.{{ include "clickhouse-serverless.secretKey" . }}}' | base64 -d
+{{- end }}
 
   # Test connectivity
   curl http://localhost:8123/ping

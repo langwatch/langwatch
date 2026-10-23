@@ -8,7 +8,11 @@ metadata:
     {{- include "clickhouse-serverless.labels" . | nindent 4 }}
 data:
   access.yaml: |
-    {{- toYaml .Values.access.config | nindent 4 }}
+    {{- $config := deepCopy .Values.access.config }}
+    {{- if .Values.access.dynamicOnly.enabled }}
+    {{- $_ := set $config "mode" "dynamic-only" }}
+    {{- end }}
+    {{- toYaml $config | nindent 4 }}
   {{- range $name, $content := .Values.access.extraFiles }}
   {{ $name }}: {{ $content | quote }}
   {{- end }}

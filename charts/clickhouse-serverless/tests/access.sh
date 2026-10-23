@@ -66,8 +66,46 @@ test_users_value_is_a_noop() {
   echo "PASS: users is accepted as a deprecated no-op"
 }
 
+# @scenario "The chart runs a dynamic-only pod with no static password mounted"
+test_dynamic_only() {
+  local out server sidecar out3
+  out="$(statefulset -f tests/values-dynamic-only.yaml)"
+  server="$(sed -n '/^        - name: clickhouse$/,/^        - name: access$/p' <<<"$out")"
+  sidecar="$(sed -n '/^        - name: access$/,/^      volumes:/p' <<<"$out")"
+  ! grep -q 'CLICKHOUSE_PASSWORD_FILE' <<<"$out" || fail "dynamic-only must not hand ClickHouse a default password"
+  ! grep -q '/mnt/secrets' <<<"$out" || fail "a single dynamic-only pod mounts no credentials Secret"
+  for where in "$server" "$sidecar"; do
+    grep -q 'mountPath: /run/clickhouse-access' <<<"$where" || fail "bootstrap volume not mounted in both containers"
+    grep -A1 'name: CLICKHOUSE_ACCESS_BOOTSTRAP_DIR' <<<"$where" | grep -q 'value: /run/clickhouse-access' \
+      || fail "CLICKHOUSE_ACCESS_BOOTSTRAP_DIR missing"
+  done
+  grep -A3 'name: access-bootstrap$' <<<"$(sed -n '/^      volumes:/,$p' <<<"$out")" | grep -q 'medium: Memory' \
+    || fail "the bootstrap volume must be a tmpfs"
+  grep -q '/readyz' <<<"$sidecar" || fail "the sidecar must gate pod readiness in dynamic-only mode"
+  ! grep -q '/readyz' <<<"$(statefulset -f tests/values-access.yaml)" || fail "readiness must not change outside dynamic-only"
+  helm template t . -f tests/values-dynamic-only.yaml --show-only templates/access-configmap.yaml \
+    | grep -q '^    mode: dynamic-only$' || fail "the chart must set mode: dynamic-only in access.yaml"
+
+  out3="$(statefulset -f tests/values-dynamic-only.yaml --set replicas=3 --set auth.clusterSecretEnabled=true)"
+  grep -q 'path: cluster-secret' <<<"$out3" || fail "replicas still need the cluster secret"
+  ! grep -q 'path: password$' <<<"$out3" || fail "replicas must not mount the default password"
+  grep -q 'clickhouse-client --user local_admin --password "$(cat /run/clickhouse-access/password)"' <<<"$out3" \
+    || fail "replicated probes must log in as the local admin"
+
+  for bad in "--set replicas=3" "--set access.passwordSecrets={x}" \
+    "--set backup.enabled=true --set objectStorage.bucket=b --set objectStorage.region=r" \
+    "--set access.enabled=false"; do
+    # shellcheck disable=SC2086
+    if helm template t . -f tests/values-dynamic-only.yaml $bad >/dev/null 2>&1; then
+      fail "dynamic-only should refuse $bad"
+    fi
+  done
+  echo "PASS: dynamic-only mounts no static password and gates readiness on the sidecar"
+}
+
 echo "--- access sidecar assertions ---"
 test_access_off_by_default
 test_access_enabled_wires_sidecar
 test_access_needs_a_file
 test_users_value_is_a_noop
+test_dynamic_only
