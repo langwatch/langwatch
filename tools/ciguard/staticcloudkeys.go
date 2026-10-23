@@ -241,8 +241,9 @@ func conditionTerm(condition string, term *regexp.Regexp) (string, bool) {
 }
 
 // conjunctionTerms splits an expression on the `&&` operators outside its
-// string literals, so a quoted `&&` cannot forge a term. It refuses an `||` or
-// a `${{` outside a literal, and a literal left open. Literals are
+// string literals, so a quoted `&&` cannot forge a term. It refuses an `||`, a
+// parenthesis or a `${{` outside a literal, and a literal left open: a group
+// such as `!(… && …)` can negate a term it holds. Literals are
 // single-quoted, with `”` as an escaped quote.
 func conjunctionTerms(expression string) ([]string, bool) {
 	var parts []string
@@ -255,7 +256,8 @@ func conjunctionTerms(expression string) ([]string, bool) {
 				return nil, false
 			}
 			i = end
-		case strings.HasPrefix(expression[i:], "||"), strings.HasPrefix(expression[i:], "${{"):
+		case strings.HasPrefix(expression[i:], "||"), strings.HasPrefix(expression[i:], "${{"),
+			expression[i] == '(', expression[i] == ')':
 			return nil, false
 		case strings.HasPrefix(expression[i:], "&&"):
 			parts = append(parts, expression[start:i])

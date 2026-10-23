@@ -95,7 +95,7 @@ func TestStaticCloudKeysRejectsAKeyInJobEnv(t *testing.T) {
 	problems, err := ciguard.StaticCloudKeys(writeRepo(t, map[string]string{embedsPath: jobEnv}))
 
 	require.NoError(t, err)
-	assert.NotEmpty(t, problems)
+	assert.Contains(t, problems, embedsPath+":9: stored AWS key: a long-lived key in GitHub can be read by any workflow edit; assume a role with GitHub OIDC (role-to-assume) instead")
 }
 
 // @scenario "A workflow that reads a stored AWS key fails CI"
@@ -195,6 +195,7 @@ func TestStaticCloudKeysRejectsAGateWithAnEscape(t *testing.T) {
 		"or true":         "${{ vars.EMBEDS_AWS_ROLE_ARN == '' || true }}",
 		"or always":       "${{ always() || vars.EMBEDS_AWS_ROLE_ARN == '' }}",
 		"parenthesised":   "${{ !(vars.EMBEDS_AWS_ROLE_ARN == '' && false) }}",
+		"negated group":   "${{ !(true && vars.EMBEDS_AWS_ROLE_ARN == '' && false) }}",
 		"and in a string": "${{ 'x&&vars.EMBEDS_AWS_ROLE_ARN == ''&&' != '' }}",
 		"open string":     "${{ vars.EMBEDS_AWS_ROLE_ARN == '' && 'x }}",
 	} {
