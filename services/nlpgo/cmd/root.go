@@ -218,6 +218,7 @@ func newCodeExecutor(engineCfg nlpgo.EngineConfig, egress ssrf.Options, getenv f
 		WasmMemoryMiB:           engineCfg.CodeBlockMemoryMiB,
 		WasmCompilationCacheDir: engineCfg.WasmCompilationCacheDir,
 		QuickJSWasm:             engineCfg.QuickJSWasm,
+		TypeScriptWasm:          engineCfg.TypeScriptWasm,
 		WasmTotalMemoryMiB:      engineCfg.CodeBlockTotalMemoryMiB,
 		// A wasm run reaches the network only through the engine, under the
 		// HTTP block's policy, but never a private address unless allowed.

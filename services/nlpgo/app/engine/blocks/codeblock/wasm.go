@@ -56,9 +56,11 @@ const defaultWasmTotalMemoryMiB = 4096
 // once; every run instantiates it afresh with its own memory and mounts, so
 // nothing one run does is visible to another and no process outlives a run.
 type wasmRuntime struct {
-	runtime    wazero.Runtime
-	python     *wasmGuest
-	js         *wasmGuest
+	runtime wazero.Runtime
+	python  *wasmGuest
+	js      *wasmGuest
+	// tsstrip erases TypeScript's types for the js guest; nil without it.
+	tsstrip    wazero.CompiledModule
 	client     *http.Client
 	opts       Options
 	workLimits workLimits
@@ -132,6 +134,9 @@ func newWasmRuntime(ctx context.Context, opts Options, sources runnerPair) (*was
 	}
 	if err == nil && opts.QuickJSWasm != "" {
 		w.js, err = w.javascriptGuest(ctx)
+	}
+	if err == nil && opts.QuickJSWasm != "" && opts.TypeScriptWasm != "" {
+		w.tsstrip, err = w.compile(ctx, opts.TypeScriptWasm)
 	}
 	if err != nil {
 		_ = w.runtime.Close(ctx)

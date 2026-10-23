@@ -1,13 +1,15 @@
 package codeblock
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
 
-	"github.com/evanw/esbuild/pkg/api"
+	"github.com/tetratelabs/wazero"
 )
 
 // LanguageTypeScript runs on the JavaScript guest once its types are erased.
@@ -21,31 +23,29 @@ type strippedCode struct {
 	lines []int
 }
 
-// maxTypeScriptBytes bounds TypeScript source. esbuild parses in the engine,
-// outside the sandbox, and its stack grows with nesting: 64 KiB of the worst
-// nesting stays near 200 MiB, inside the run's admitted memory.
+// maxTypeScriptBytes bounds TypeScript source; esbuild's parser can take time
+// quadratic in it, which the run's deadline then cuts short.
 const maxTypeScriptBytes = 64 << 10
 
-// erasedTypes turns a TypeScript request into the JavaScript it runs as. It is
-// called once the run is admitted, so concurrent parses share the memory budget.
-func erasedTypes(req *Request) (*strippedCode, *Error) {
+// maxStrippedBytes bounds what tsstrip hands back: the JavaScript and its map.
+const maxStrippedBytes = 2 << 20
+
+// erasedTypes turns a TypeScript request into the JavaScript it runs as. The
+// erasure runs in its own wasm instance under ctx, once the run is admitted.
+func (w *wasmRuntime) erasedTypes(ctx context.Context, req *Request) (*strippedCode, *Error) {
 	if req.Language != LanguageTypeScript {
 		return nil, nil
 	}
 	if len(req.Code) > maxTypeScriptBytes {
 		return nil, &Error{Type: RunnerErrorType, Message: fmt.Sprintf("TypeScript code blocks are limited to %d KB; use JavaScript for longer code", maxTypeScriptBytes>>10)}
 	}
-	stripped, failure := stripTypes(req.Code)
+	stripped, failure := w.stripTypes(ctx, req.Code)
 	if failure != nil {
 		return nil, failure
 	}
 	req.Language, req.Code = LanguageJavaScript, stripped.js
 	return &stripped, nil
 }
-
-// maxRemappedTraceback bounds the traceback remap rewrites; the guest writes
-// the traceback, so its length is the customer's to choose.
-const maxRemappedTraceback = 64 << 10
 
 // remapResult points a traceback back at the TypeScript lines; nil leaves it be.
 func (s *strippedCode) remapResult(res *Result) *Result {
@@ -59,25 +59,54 @@ func (s *strippedCode) remapResult(res *Result) *Result {
 	return res
 }
 
-// stripTypes erases TypeScript syntax with esbuild. It does not type-check:
+// maxRemappedTraceback bounds the traceback remap rewrites; the guest writes
+// the traceback, so its length is the customer's to choose.
+const maxRemappedTraceback = 64 << 10
+
+// stripTypes erases TypeScript syntax with tsstrip. It does not type-check:
 // only code that does not parse is refused, as a SyntaxError at its line.
-func stripTypes(code string) (strippedCode, *Error) {
-	out := api.Transform(code, api.TransformOptions{
-		Loader:     api.LoaderTS,
-		Target:     api.ESNext,
-		Sourcemap:  api.SourceMapExternal,
-		Sourcefile: "code-block.ts",
-		LogLevel:   api.LogLevelSilent,
-	})
-	if len(out.Errors) > 0 {
-		first := out.Errors[0]
-		failure := &Error{Type: "SyntaxError", Message: first.Text}
-		if loc := first.Location; loc != nil {
-			failure.Traceback = fmt.Sprintf("SyntaxError: %s\n    at code-block.ts:%d:%d", first.Text, loc.Line, loc.Column+1)
-		}
-		return strippedCode{}, failure
+func (w *wasmRuntime) stripTypes(ctx context.Context, code string) (strippedCode, *Error) {
+	if w.tsstrip == nil {
+		return strippedCode{}, &Error{Type: RunnerErrorType, Message: "TypeScript code blocks are not available on this deployment"}
 	}
-	return strippedCode{js: string(out.Code), lines: sourceLines(out.Map)}, nil
+	stdout := limitedBuffer{limit: maxStrippedBytes + 1}
+	config := wazero.NewModuleConfig().
+		WithName("").
+		WithArgs("tsstrip").
+		WithStdin(strings.NewReader(code)).
+		WithStdout(&stdout)
+	instance, err := w.runtime.InstantiateModule(ctx, w.tsstrip, config)
+	if instance != nil {
+		_ = instance.Close(context.WithoutCancel(ctx))
+	}
+	if ctx.Err() != nil {
+		return strippedCode{}, &Error{Type: TimeoutType, Message: "code_block_timeout"}
+	}
+	var out struct {
+		JS    string `json:"js"`
+		Map   string `json:"map"`
+		Error *struct {
+			Text   string `json:"text"`
+			Line   int    `json:"line"`
+			Column int    `json:"column"`
+		} `json:"error"`
+	}
+	if err != nil || stdout.buf.Len() > maxStrippedBytes || json.Unmarshal(stdout.buf.Bytes(), &out) != nil {
+		return strippedCode{}, &Error{Type: "SyntaxError", Message: "the TypeScript is too large or too deeply nested to erase its types" + causeOf(err)}
+	}
+	if failure := out.Error; failure != nil {
+		traceback := fmt.Sprintf("SyntaxError: %s\n    at code-block.ts:%d:%d", failure.Text, failure.Line, failure.Column)
+		return strippedCode{}, &Error{Type: "SyntaxError", Message: failure.Text, Traceback: traceback}
+	}
+	return strippedCode{js: out.JS, lines: sourceLines([]byte(out.Map))}, nil
+}
+
+// causeOf names a trap such as a stack overflow; an exit or no error adds nothing.
+func causeOf(err error) string {
+	if err == nil || errors.Is(err, context.Canceled) {
+		return ""
+	}
+	return " (" + firstLine(err.Error()) + ")"
 }
 
 var jsLocation = regexp.MustCompile(`code-block\.mjs:(\d+)(?::\d+)?`)

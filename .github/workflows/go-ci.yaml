@@ -197,6 +197,7 @@ jobs:
         run: |
           services/nlpgo/scripts/fetch-python-wasm.sh
           services/nlpgo/scripts/fetch-quickjs-wasm.sh
+          services/nlpgo/scripts/build-tsstrip-wasm.sh
       # lingua/language_detection replays langevals over the generated models.
       - run: make lingua-models
       - run: go test -count=1 -race $GO_PKGS

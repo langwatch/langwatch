@@ -495,6 +495,12 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       When it is asked to run a JavaScript code node
       Then it returns an error saying JavaScript is not available
 
+    @unit
+    Scenario: a deployment without tsstrip refuses TypeScript code blocks
+      Given an executor built with QuickJS but without NLPGO_ENGINE_TYPESCRIPT_WASM
+      When it is asked to run a TypeScript code node
+      Then the result is a RunnerError saying TypeScript is not available
+
   Rule: TypeScript code blocks run as JavaScript with their types erased
     # A code node whose `language` is "typescript" has its types erased by
     # esbuild in the engine, then runs on QuickJS like JavaScript. Types are
@@ -527,12 +533,20 @@ Feature: Code block — execute user Python with isolated subprocess and structu
 
     @unit
     Scenario: a TypeScript code block's size is bounded before it is parsed
-      # esbuild parses in the engine, outside the sandbox, so its input is bounded
-      # and parsed only once the run is admitted to the memory budget.
+      # Its input is bounded, and parsed only once the run is admitted to the memory budget.
       Given a TypeScript code node over 64 KB
       When the executor runs the request
       Then it is refused as a RunnerError saying TypeScript is limited to 64 KB
       And the most deeply nested code that fits the limit is refused as a SyntaxError without stopping the engine
+
+    @unit
+    Scenario: a TypeScript code block's types are erased inside the sandbox, within the run's deadline
+      # esbuild's parser takes quadratic time on chains of "<", so it runs as
+      # tsstrip.wasm under the run's deadline and memory cap, never on the host.
+      Given a TypeScript code node whose expression chains thousands of "<" comparisons
+      When the executor runs the request with a 2 second timeout
+      Then the run is reported as timed out within seconds of its deadline
+      And a TypeScript code node nested too deeply to parse is refused as a SyntaxError
 
     @unit
     Scenario: a TypeScript traceback is remapped only up to a bounded length

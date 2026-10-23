@@ -70,20 +70,23 @@ default until the wasm runtime has run in production.
   `fetch` and timers go through the same host bridge and deadline. A trivial
   run takes a few milliseconds. New code nodes default to JavaScript.
 - **TypeScript is JavaScript with its types erased, never checked at run time.**
-  A `typescript` node is transformed by esbuild's Go API in the engine (no
-  type-checking: only code that does not parse is refused, as a SyntaxError at
-  its line), then runs on QuickJS like JavaScript. A traceback names the
+  A `typescript` node is transformed by esbuild (no type-checking: only code
+  that does not parse is refused, as a SyntaxError at its line), then runs on
+  QuickJS like JavaScript. A traceback names the
   TypeScript line, read back through esbuild's source map. Types are checked in
   the Studio editor as the author writes, against the node's contract.
-  esbuild parses outside the sandbox and its stack grows with nesting (about
-  2 to 4 KiB per level), so TypeScript source is capped at 64 KiB and parsed
-  only after the run is admitted; the worst nesting that fits stays near
-  200 MiB of stack, inside the run's admitted share.
+  esbuild runs inside the wasm runtime too, as `tsstrip.wasm` (esbuild's Go
+  API built for wasip1), in its own instance under the run's deadline and
+  memory cap, once the run is admitted. Its parser takes quadratic time on
+  chains of `<` (64 KiB of `a < a < …` took 15 s natively) and its stack grows
+  with nesting, so on the host it was an engine-wide denial of service. Source
+  is still capped at 64 KiB.
 - **The runtime is an artifact, pinned by checksum.** CPython 3.14 for WASI
   (`brettcannon/cpython-wasi-build`), fetched and its stdlib precompiled by
   `services/nlpgo/scripts/fetch-python-wasm.sh`, shipped in the image at
   `NLPGO_ENGINE_PYTHON_WASM_HOME`; QuickJS 0.17.0 by
-  `services/nlpgo/scripts/fetch-quickjs-wasm.sh`.
+  `services/nlpgo/scripts/fetch-quickjs-wasm.sh`; `tsstrip.wasm` is built from
+  this repository by `services/nlpgo/scripts/build-tsstrip-wasm.sh`.
 
 ## Rationale / Trade-offs
 

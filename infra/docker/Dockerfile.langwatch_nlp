@@ -41,6 +41,11 @@ RUN --mount=type=cache,target=/go/pkg/mod,id=go-mod-${TARGETARCH} \
 # into one file nlpgo maps at boot. Arch-independent, about 10 s and 1.5 GB.
 RUN --mount=type=cache,target=/go/pkg/mod,id=go-mod-${TARGETARCH} \
     cd services && go run ./third_party/lingua-go/cmd/genmodels -out /out/lingua-models.bin
+# tsstrip erases TypeScript code blocks' types inside the wasm runtime (ADR-183).
+# wasip1 output is the same on every arch.
+RUN --mount=type=cache,target=/go/pkg/mod,id=go-mod-${TARGETARCH} \
+    --mount=type=cache,target=/root/.cache/go-build,id=go-build-${TARGETARCH} \
+    services/nlpgo/scripts/build-tsstrip-wasm.sh /out/tsstrip-wasm
 
 # ─── Code-block sandbox libraries ──────────────────────────────────────────────
 # The curated set of packages available inside a Studio code block (see
@@ -88,6 +93,7 @@ COPY --from=go-build /out/lingua-models.bin /usr/local/share/langwatch/lingua-mo
 COPY --from=sandbox-build /pylibs /opt/sandbox-libs
 COPY --from=python-wasm /opt/python-wasm /opt/python-wasm
 COPY --from=python-wasm /opt/quickjs-wasm/qjs-wasi.wasm /opt/quickjs-wasm/qjs-wasi.wasm
+COPY --from=go-build /out/tsstrip-wasm/tsstrip.wasm /opt/tsstrip-wasm/tsstrip.wasm
 
 # nlpgo binds this port; compose + the helm chart dial http://langwatch_nlp:5561.
 ENV SERVER_ADDR=:5561
@@ -102,6 +108,8 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV NLPGO_ENGINE_PYTHON_WASM_HOME=/opt/python-wasm
 # JavaScript code blocks run on QuickJS inside nlpgo, whatever the runtime.
 ENV NLPGO_ENGINE_QUICKJS_WASM=/opt/quickjs-wasm/qjs-wasi.wasm
+# TypeScript code blocks have their types erased on wasm too.
+ENV NLPGO_ENGINE_TYPESCRIPT_WASM=/opt/tsstrip-wasm/tsstrip.wasm
 ENV RUNNING_IN_DOCKER=true
 
 EXPOSE 5561

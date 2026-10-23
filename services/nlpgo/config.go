@@ -129,6 +129,8 @@ type EngineConfig struct {
 	WasmCompilationCacheDir string `env:"WASM_COMPILATION_CACHE_DIR"`
 	// QuickJSWasm — qjs-wasi.wasm. JavaScript code blocks need it; ADR-183.
 	QuickJSWasm string `env:"QUICKJS_WASM"`
+	// TypeScriptWasm — tsstrip.wasm. TypeScript code blocks need it; ADR-183.
+	TypeScriptWasm string `env:"TYPESCRIPT_WASM"`
 	// LangWatchBaseURL — base URL for evaluator + agent-workflow callbacks.
 	// In production this is the public LangWatch app URL (eg.
 	// https://app.langwatch.ai); in dev it's typically http://host.docker.internal:5560

@@ -152,6 +152,9 @@ func wasmRuntimeEnv(repoRoot string) []string {
 	if quickjs := filepath.Join(cache, "quickjs-wasm", "qjs-wasi.wasm"); fileExists(quickjs) {
 		env = append(env, "NLPGO_ENGINE_QUICKJS_WASM="+quickjs)
 	}
+	if tsstrip := filepath.Join(cache, "tsstrip-wasm", "tsstrip.wasm"); fileExists(tsstrip) {
+		env = append(env, "NLPGO_ENGINE_TYPESCRIPT_WASM="+tsstrip)
+	}
 	if python := filepath.Join(cache, "python-wasm"); fileExists(filepath.Join(python, "python.wasm")) {
 		env = append(env, "NLPGO_ENGINE_PYTHON_WASM_HOME="+python)
 	}

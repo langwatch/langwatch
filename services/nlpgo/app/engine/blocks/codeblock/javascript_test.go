@@ -30,6 +30,7 @@ func newJSExec(t *testing.T, opts codeblock.Options) *codeblock.Executor {
 		t.Skipf("qjs-wasi.wasm missing at %s: run services/nlpgo/scripts/fetch-quickjs-wasm.sh", path)
 	}
 	opts.QuickJSWasm = path
+	opts.TypeScriptWasm = codeblock.TypeScriptWasmForTests()
 	e, err := codeblock.New(opts)
 	require.NoError(t, err)
 	return e
@@ -322,6 +323,34 @@ func TestTypeScript_SizeIsBoundedBeforeParsing(t *testing.T) {
 	// The worst nesting that fits the limit parses without taking the engine down.
 	deep := "export default () => ({ v: " + strings.Repeat("(", 32<<10) + "1" + strings.Repeat(")", 32<<10)
 	res = runTS(t, e, codeblock.Request{Code: deep[:min(len(deep), 64<<10)]})
+	require.NotNil(t, res.Error)
+	assert.Equal(t, "SyntaxError", res.Error.Type)
+}
+
+// @scenario "a deployment without tsstrip refuses TypeScript code blocks"
+func TestTypeScript_RefusedWithoutTsstrip(t *testing.T) {
+	newJSExec(t, codeblock.Options{})
+	e, err := codeblock.New(codeblock.Options{QuickJSWasm: codeblock.QuickJSWasmForTests()})
+	require.NoError(t, err)
+	res := runTS(t, e, codeblock.Request{Code: "export default () => ({})"})
+	require.NotNil(t, res.Error)
+	assert.Equal(t, codeblock.RunnerErrorType, res.Error.Type)
+	assert.Contains(t, res.Error.Message, "not available")
+}
+
+// @scenario "a TypeScript code block's types are erased inside the sandbox, within the run's deadline"
+func TestTypeScript_ErasureIsHeldToTheRunsDeadline(t *testing.T) {
+	e := newJSExec(t, codeblock.Options{})
+	slow := "export default () => ({});\nlet x = " + strings.Repeat("a < ", (60<<10)/4) + "1;\n"
+	started := time.Now()
+	res := runTS(t, e, codeblock.Request{Code: slow, Timeout: 2 * time.Second})
+	require.NotNil(t, res.Error)
+	assert.Equal(t, codeblock.TimeoutType, res.Error.Type)
+	assert.True(t, res.TimedOut)
+	assert.Less(t, time.Since(started), 6*time.Second, "the erasure ran past the deadline")
+
+	deep := "export default () => ({});\nlet y = " + strings.Repeat("!", 60<<10) + "1;\n"
+	res = runTS(t, e, codeblock.Request{Code: deep})
 	require.NotNil(t, res.Error)
 	assert.Equal(t, "SyntaxError", res.Error.Type)
 }

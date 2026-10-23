@@ -97,11 +97,14 @@ type Options struct {
 	// QuickJSWasm is qjs-wasi.wasm; scripts/fetch-quickjs-wasm.sh. JavaScript
 	// always runs on wasm, so without it a JavaScript code block is refused.
 	QuickJSWasm string
+	// TypeScriptWasm is tsstrip.wasm; scripts/build-tsstrip-wasm.sh. Without
+	// it a TypeScript code block is refused.
+	TypeScriptWasm string
 }
 
 // testRuntime lets the package's tests run the whole suite on another runtime;
 // export_test.go sets it from NLPGO_CODEBLOCK_TEST_RUNTIME. Never set in production.
-var testRuntime, testPythonWasmHome, testQuickJSWasm string
+var testRuntime, testPythonWasmHome, testQuickJSWasm, testTypeScriptWasm string
 
 // Runtime values for Options.Runtime.
 const (
@@ -200,6 +203,7 @@ func New(opts Options) (*Executor, error) {
 	}
 	if opts.Runtime == "" && opts.QuickJSWasm == "" && (testRuntime != "" || testQuickJSWasm != "") {
 		opts.Runtime, opts.PythonWasmHome, opts.QuickJSWasm = testRuntime, testPythonWasmHome, testQuickJSWasm
+		opts.TypeScriptWasm = testTypeScriptWasm
 		opts.Egress.AllowLocal = true
 	}
 	switch opts.Runtime {
@@ -565,7 +569,7 @@ func (e *Executor) executeWasm(runCtx context.Context, guest *wasmGuest, req Req
 		}), nil
 	}
 	defer admission.release()
-	stripped, failure := erasedTypes(&req)
+	stripped, failure := e.wasm.erasedTypes(runCtx, &req)
 	if runCtx.Err() != nil {
 		return collectResult(runResult{}, runOutcome{
 			timedOut: errors.Is(runCtx.Err(), context.DeadlineExceeded),

@@ -2,6 +2,7 @@ package codeblock
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 )
 
@@ -10,6 +11,7 @@ func init() {
 	testPythonWasmHome = PythonWasmHomeForTests()
 	if _, err := os.Stat(QuickJSWasmForTests()); err == nil {
 		testQuickJSWasm = QuickJSWasmForTests()
+		testTypeScriptWasm = buildTypeScriptWasmForTests()
 	}
 	if testRuntime == RuntimeWasm || testQuickJSWasm != "" {
 		// Compile the guests once up front, so no test's timing includes it.
@@ -32,5 +34,29 @@ func QuickJSWasmForTests() string {
 		return path
 	}
 	path, _ := filepath.Abs("../../../../.cache/quickjs-wasm/qjs-wasi.wasm")
+	return path
+}
+
+// TypeScriptWasmForTests is where scripts/build-tsstrip-wasm.sh puts tsstrip.wasm.
+func TypeScriptWasmForTests() string {
+	if path := os.Getenv("NLPGO_TEST_TYPESCRIPT_WASM"); path != "" {
+		return path
+	}
+	path, _ := filepath.Abs("../../../../.cache/tsstrip-wasm/tsstrip.wasm")
+	return path
+}
+
+// buildTypeScriptWasmForTests builds tsstrip.wasm from this tree, so the tests
+// never run a stale one; Go's build cache makes a rebuild cheap.
+func buildTypeScriptWasmForTests() string {
+	path := TypeScriptWasmForTests()
+	if os.Getenv("NLPGO_TEST_TYPESCRIPT_WASM") != "" {
+		return path
+	}
+	build := exec.Command("go", "build", "-trimpath", "-o", path, "./tsstrip")
+	build.Env = append(os.Environ(), "GOOS=wasip1", "GOARCH=wasm", "CGO_ENABLED=0")
+	if out, err := build.CombinedOutput(); err != nil {
+		panic("codeblock tests: build tsstrip.wasm: " + string(out))
+	}
 	return path
 }
