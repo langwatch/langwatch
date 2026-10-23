@@ -31990,6 +31990,27 @@ LangWatch captures traces from Java applications using Spring AI when you export
 ## Setup
 
 <Steps>
+<Step title="Add the dependencies">
+  Spring AI, the OpenTelemetry Spring Boot starter and the OTLP exporter, as in the example repository's `build.gradle`:
+
+```groovy build.gradle
+dependencies {
+  implementation platform("org.springframework.ai:spring-ai-bom:1.0.0")
+  implementation platform("io.opentelemetry.instrumentation:opentelemetry-instrumentation-bom:2.16.0")
+
+  implementation "org.springframework.boot:spring-boot-starter-web"
+  implementation "org.springframework.boot:spring-boot-starter-actuator"
+  implementation "org.springframework.ai:spring-ai-starter-model-openai"
+  implementation "io.opentelemetry.instrumentation:opentelemetry-spring-boot-starter"
+
+  implementation "io.micrometer:micrometer-tracing"
+  implementation "io.micrometer:micrometer-tracing-bridge-otel:1.5.0"
+  implementation "io.opentelemetry:opentelemetry-exporter-otlp:1.50.0"
+}
+```
+
+</Step>
+
 <Step title="Set required environment variables">
   Export your provider API keys as environment variables used by your app.
 
@@ -32008,36 +32029,62 @@ export LANGWATCH_API_KEY="your-langwatch-api-key"
 
 ```yaml application.yaml
 spring.ai:
-chat:
-  client:
+  chat:
+    client:
+      observations:
+        log-prompt: true
     observations:
-      log-prompt: true
-  observations:
-    log-prompt: true # Include prompt content in tracing (disabled by default for privacy)
-    log-completion: true # Include completion content in tracing (disabled by default)
-openai:
-  api-key: ${OPENAI_API_KEY}
+      log-prompt: true # Include prompt content in tracing (disabled by default for privacy)
+      log-completion: true # Include completion content in tracing (disabled by default)
+  openai:
+    api-key: ${OPENAI_API_KEY}
 
 management:
-tracing.enabled: true
-logging.export.enabled: true
+  tracing.enabled: true
+  logging.export.enabled: true
 
 otel:
-java:
-  global-autoconfigure:
-    enabled: true
-exporter:
-  otlp:
-    endpoint: "https://app.langwatch.ai/api/otel"
-    protocol: "http/protobuf"
-    headers:
-      Authorization: ${LANGWATCH_API_KEY}
-traces:
-  exporter: otlp
-  sampler:
-    ratio: 1.0
-metrics.exporter: otlp
-logs.exporter: otlp
+  java:
+    global-autoconfigure:
+      enabled: true
+  exporter:
+    otlp:
+      endpoint: "https://app.langwatch.ai/api/otel"
+      protocol: "http/protobuf"
+      headers:
+        Authorization: ${LANGWATCH_API_KEY}
+  traces:
+    exporter: otlp
+    sampler:
+      ratio: 1.0
+  metrics.exporter: otlp
+  logs.exporter: otlp
+```
+
+</Step>
+
+<Step title="Call a model through Spring AI">
+  Any call made with Spring AI's `ChatClient` is traced. A minimal controller:
+
+```java
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+class ChatController {
+  private final ChatClient chatClient;
+
+  ChatController(ChatClient.Builder builder) {
+    this.chatClient = builder.build();
+  }
+
+  @GetMapping("/chat")
+  String chat(@RequestParam String message) {
+    return chatClient.prompt().user(message).call().content();
+  }
+}
 ```
 
 </Step>
@@ -42020,6 +42067,31 @@ Before your DSPy program compilation starts, initialize langwatch with your expe
 langwatch.dspy.init(experiment="my-awesome-experiment", optimizer=optimizer)
 
 compiled_rag = optimizer.compile(RAG(), trainset=trainset)
+```
+
+A complete run, small enough to try first:
+
+```python
+import dspy
+import langwatch
+from dspy.teleprompt import BootstrapFewShot
+
+dspy.configure(lm=dspy.LM("openai/gpt-5-mini"))
+
+trainset = [
+    dspy.Example(question="What is 2 + 2?", answer="4").with_inputs("question"),
+    dspy.Example(question="What is the capital of France?", answer="Paris").with_inputs("question"),
+]
+
+
+def exact_match(example, prediction, trace=None):
+    return example.answer.lower() == prediction.answer.lower()
+
+
+optimizer = BootstrapFewShot(metric=exact_match)
+langwatch.dspy.init(experiment="my-awesome-experiment", optimizer=optimizer)
+
+compiled = optimizer.compile(dspy.ChainOfThought("question -> answer"), trainset=trainset)
 ```
 
 `init` tracks `BootstrapFewShot`, `BootstrapFewShotWithRandomSearch`, `COPRO`, `MIPROv2` and `GEPA`, and a `dspy.Evaluate` through the `evaluator` parameter. A GEPA run gets one step for the seed program and one for every candidate evaluated on the validation set, with the candidate's instructions and the score of each validation example. For any other optimizer, see [Custom optimizer tracking](/dspy-visualization/custom-optimizer).

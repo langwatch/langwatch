@@ -245,10 +245,6 @@
         "/prompt-management/features/essential/tags",
         "/prompt-management/features/essential/version-control"
       ],
-      "integration-no-complete-sample": [
-        "/dspy-visualization/quickstart",
-        "/integration/java/integrations/spring-ai"
-      ],
       "tokens-over-budget": [
         "/agent-testing/connect-your-agent",
         "/api-reference/agents/create-agents",
