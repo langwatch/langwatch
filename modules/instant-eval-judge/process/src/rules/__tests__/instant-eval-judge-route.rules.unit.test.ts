@@ -43,25 +43,25 @@ describe("the unsure rule", () => {
 describe("the route plan", () => {
   /** @scenario "A slot is picked by job, length bucket and arithmetic flag" */
   it.each([
-    [1, "<=2k"],
-    [2000, "<=2k"],
-    [2001, "2k-8k"],
-    [8000, "2k-8k"],
-    [8001, ">8k"],
+    [1, "short"],
+    [1500, "short"],
+    [1501, "medium"],
+    [6000, "medium"],
+    [6001, "long"],
   ])("puts %i tokens in the %s bucket", (tokens, bucket) => {
     expect(plan({ job: "search", tokens }).bucket).toBe(bucket);
   });
 
   it("plans the job's default mode", () => {
     const p = plan({ job: "search", tokens: 900 });
-    expect(p).toMatchObject({ mode: "balanced", primary: "decisions", escalateTo: "haiku" });
-    expect(p.threshold).toBe(0.7);
+    expect(p).toMatchObject({ mode: "balanced", primary: "decision-a", escalateTo: "llm-b" });
+    expect(p.threshold).toBe(0.6);
   });
 
   /** @scenario "A slot is picked by job, length bucket and arithmetic flag" */
   it("lets the caller's flag beat the regex where the job's source allows it", () => {
     const counted = yesNo("q", "how many refunds over 20 dollars");
-    expect(plan({ job: "search", arithmetic: false }, counted).slot).toBe("<=2k");
+    expect(plan({ job: "search", arithmetic: false }, counted).slot).toBe("short");
     expect(plan({ job: "search", arithmetic: true }).slot).toBe("arithmetic");
     expect(plan({ job: "search" }, yesNo("q", "what is the total price")).slot).toBe("arithmetic");
   });
@@ -69,12 +69,12 @@ describe("the route plan", () => {
   it("reads the regex alone for a regex-sourced job, and the request alone for a request one", () => {
     const refund = yesNo("q", "The refund amount is correct");
     expect(plan({ job: "llm_judge", arithmetic: false }, refund).slot).toBe("arithmetic");
-    expect(plan({ job: "scenario_judge" }, refund).slot).toBe("<=2k");
+    expect(plan({ job: "scenario_judge" }, refund).slot).toBe("short");
   });
 
   it("keeps a long arithmetic input in its length bucket", () => {
     const p = plan({ job: "search", tokens: 20_000 }, yesNo("q", "total price"));
-    expect(p).toMatchObject({ slot: ">8k", arithmetic: true });
+    expect(p).toMatchObject({ slot: "long", arithmetic: true });
   });
 
   /** @scenario "A mode with no usable entry falls back to the next cheaper mode" */
@@ -82,7 +82,7 @@ describe("the route plan", () => {
     expect(plan({ job: "llm_judge", tokens: 20_000, mode: "accurate" })).toMatchObject({
       modeRequested: "accurate",
       mode: "balanced",
-      escalateTo: "luna",
+      escalateTo: "llm-a",
     });
     expect(plan({ job: "search", tokens: 5000, mode: "accurate" }).mode).toBe("instant");
   });
@@ -90,7 +90,7 @@ describe("the route plan", () => {
   /** @scenario "A mode with no usable entry falls back to the next cheaper mode" */
   it("skips an entry whose backend is switched off", () => {
     const off = syntheticRouteTable({
-      backends: { haiku: { kind: "anthropic_messages", enabled: false } },
+      backends: { "llm-b": { kind: "openai_responses", model: "llm-model-b", enabled: false } },
     });
     const p = instantEvalJudgeRoutePlanOf({
       route: { job: "search", tokens: 900, mode: "accurate" },
@@ -98,13 +98,13 @@ describe("the route plan", () => {
       questions: [UPSET],
       table: off,
     });
-    expect(p).toMatchObject({ mode: "instant", primary: "decisions", pairWith: "jev" });
+    expect(p).toMatchObject({ mode: "instant", primary: "decision-a", pairWith: "decision-b" });
   });
 
   it("keeps only enabled fallbacks", () => {
     expect(plan({ job: "search", tokens: 900, mode: "instant" }).fallbacks).toEqual({
-      decisions: ["jev"],
-      jev: [],
+      "decision-a": ["decision-b"],
+      "decision-b": [],
     });
   });
 
@@ -128,8 +128,8 @@ describe("the route plan", () => {
       questionCategory: "sentiment",
       views: { text: "short" },
     } as const;
-    expect(plan(route, UPSET, "a".repeat(30_000)).bucket).toBe("<=2k");
-    expect(plan({ ...route, inputView: "full" }, UPSET, "a".repeat(30_000)).bucket).toBe(">8k");
+    expect(plan(route, UPSET, "a".repeat(30_000)).bucket).toBe("short");
+    expect(plan({ ...route, inputView: "full" }, UPSET, "a".repeat(30_000)).bucket).toBe("long");
   });
 
   /** @scenario "The text view is judged only by a decision model allowed to read it" */
@@ -146,7 +146,7 @@ describe("the route plan", () => {
       refusedView: "text",
     });
     const llm = plan({ ...route, mode: "accurate" }, UPSET, "full trace");
-    expect(llm).toMatchObject({ inputView: "full", primary: "haiku", refusedView: "text" });
+    expect(llm).toMatchObject({ inputView: "full", primary: "llm-b", refusedView: "text" });
     const decisions = plan(route, UPSET, "full trace");
     expect(decisions).toMatchObject({ inputView: "text", fullText: "full trace" });
     expect(decisions.refusedView).toBeUndefined();

@@ -7,7 +7,6 @@ import type {
 } from "../instant-eval-hosted-decisions.channel.ts";
 
 const DECISIONS_ENDPOINT = "https://api.openai.com/v1/decisions";
-const DECISIONS_DEFAULT_MODEL = "gpt-6-luna";
 
 /** The own decision model channel, held with LangWatch's key and the input tokens kept. */
 export class HttpInstantEvalHostedDecisionsChannel implements InstantEvalHostedDecisionsChannel {
@@ -27,7 +26,7 @@ export class HttpInstantEvalHostedDecisionsChannel implements InstantEvalHostedD
   }
 
   classify(
-    { text, questions, model = DECISIONS_DEFAULT_MODEL }: InstantEvalHostedDecisionsRequest,
+    { text, questions, model }: InstantEvalHostedDecisionsRequest,
     signal?: AbortSignal,
   ): Promise<InstantEvalJudgement> {
     return this.decisionModels.classify(

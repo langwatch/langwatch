@@ -97,7 +97,7 @@ function harness({
   const routePricing = {
     version: "test",
     markup: 2,
-    backends: { decisions: { usdPerMillionInputTokens: 1, usdPerMillionOutputTokens: 0 } },
+    backends: { "decision-a": { usdPerMillionInputTokens: 1, usdPerMillionOutputTokens: 0 } },
   };
   const router = InstantEvalJudgeRouterService.create({
     table: syntheticRouteTable(),

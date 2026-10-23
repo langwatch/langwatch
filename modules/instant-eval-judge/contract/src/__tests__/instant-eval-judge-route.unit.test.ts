@@ -32,7 +32,10 @@ function tableWith(overrides: Record<string, unknown> = {}) {
       maxTokens: 0,
       source: { search: "regex", llm_judge: "regex", scenario_judge: "regex" },
     },
-    backends: { jev: { kind: "jev" }, haiku: { kind: "anthropic_messages" } },
+    backends: {
+      jev: { kind: "jev" },
+      "llm-a": { kind: "anthropic_messages", model: "llm-model-a" },
+    },
     routes,
     ...overrides,
   };
@@ -71,7 +74,7 @@ describe("judge route table", () => {
     it("refuses an escalation without a threshold, naming the slot", () => {
       const table = tableWith();
       (table.routes as Record<string, Record<string, unknown>>).llm_judge!.all = {
-        instant: { primary: "jev", escalateTo: "haiku" },
+        instant: { primary: "jev", escalateTo: "llm-a" },
       };
       const parsed = instantEvalJudgeRouteTableSchema.safeParse(table);
       expect(parsed.success).toBe(false);
@@ -89,9 +92,21 @@ describe("judge route table", () => {
       ).toBe(false);
     });
 
+    /** @scenario "A decision-model backend names its model in the table" */
+    it("refuses a Decisions backend with no model, naming it", () => {
+      const parsed = instantEvalJudgeRouteTableSchema.safeParse(
+        tableWith({ backends: { jev: { kind: "jev" }, hosted: { kind: "decisions" } } }),
+      );
+      expect(parsed.success).toBe(false);
+      expect(JSON.stringify(parsed.error?.issues)).toContain("backend hosted");
+    });
+
     it("refuses an instant entry on a switched-off backend", () => {
       const table = tableWith({
-        backends: { jev: { kind: "jev", enabled: false }, haiku: { kind: "anthropic_messages" } },
+        backends: {
+          jev: { kind: "jev", enabled: false },
+          "llm-a": { kind: "anthropic_messages", model: "llm-model-a" },
+        },
       });
       expect(instantEvalJudgeRouteTableSchema.validate(table)).toBe(false);
     });
@@ -107,7 +122,7 @@ describe("judge route table", () => {
           backends: { jev: { usdPerMillionInputTokens: 1 } },
         }),
       });
-      expect(config.judgeRoutes?.backends.haiku?.timeoutMs).toBe(30_000);
+      expect(config.judgeRoutes?.backends["llm-a"]?.timeoutMs).toBe(30_000);
       expect(config.judgeRoutePricing?.backends.jev?.usdPerMillionOutputTokens).toBe(0);
     });
 

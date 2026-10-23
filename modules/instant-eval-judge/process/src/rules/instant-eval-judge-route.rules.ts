@@ -61,7 +61,7 @@ export function instantEvalJudgeRoutePlanOf({
   const asked = instantEvalJudgeInputViewOf({ route, table });
   const plan = planForView({ route, text, questions, table, inputView: asked });
   if (asked === "full" || isViewAllowed({ plan, table })) return plan;
-  // A model not measured on the partial view would lose accuracy, so it gets the full one.
+  // A backend kind the table does not allow on the partial view gets the full one.
   const full = planForView({
     route: { ...route, tokens: undefined },
     text,
@@ -230,8 +230,8 @@ function fallbacksOf({
 }
 
 /**
- * Whether a question asks for arithmetic, by the rule the routes were measured with. It fires on
- * any digit, so it flags many everyday checks; a caller's own flag wins where the table allows.
+ * Whether a question asks for arithmetic, by the router's keyword rule. It fires on any digit,
+ * so it flags many everyday checks; a caller's own flag wins where the table allows.
  */
 const ARITHMETIC_PATTERN = new RegExp(
   [

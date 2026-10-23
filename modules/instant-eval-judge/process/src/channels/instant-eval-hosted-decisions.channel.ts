@@ -18,8 +18,8 @@ export const hostedDecisionsApiKey = Secret.load("INSTANT_EVAL_DECISIONS_API_KEY
 export interface InstantEvalHostedDecisionsRequest {
   readonly text: string;
   readonly questions: readonly InstantEvalQuestion[];
-  /** The provider's model id; absent, the channel's default. */
-  readonly model?: string;
+  /** The provider's model id, from the route table; there is no default. */
+  readonly model: string;
 }
 
 export interface InstantEvalHostedDecisionsChannel {

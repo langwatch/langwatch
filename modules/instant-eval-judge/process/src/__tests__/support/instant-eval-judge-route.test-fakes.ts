@@ -4,56 +4,59 @@ import {
   type InstantEvalJudgeRouteTable,
 } from "@langwatch/instant-eval-judge-contract";
 
-/** A synthetic route table shaped like a real one; its picks are made up, not measured. */
+/**
+ * A made-up route table shaped like a real one: invented backend names, bounds, thresholds and
+ * picks, so a suite never carries a deployment's table.
+ */
 export function syntheticRouteTable(
   overrides: { backends?: Record<string, unknown>; inputViews?: unknown } = {},
 ): InstantEvalJudgeRouteTable {
-  const pairShort = {
-    instant: { primary: "decisions", pairWith: "jev" },
-    balanced: { primary: "decisions", escalateTo: "haiku", threshold: 0.7 },
-    accurate: { primary: "haiku" },
+  const escalating = {
+    instant: { primary: "decision-a", pairWith: "decision-b" },
+    balanced: { primary: "decision-a", escalateTo: "llm-b", threshold: 0.6 },
+    accurate: { primary: "llm-b" },
   };
   return instantEvalJudgeRouteTableSchema.parse({
     version: 1,
-    defaultMode: { search: "balanced", llm_judge: "balanced", scenario_judge: "balanced" },
+    defaultMode: { search: "balanced", llm_judge: "balanced", scenario_judge: "instant" },
     buckets: [
-      { name: "<=2k", maxTokens: 2000 },
-      { name: "2k-8k", maxTokens: 8000 },
-      { name: ">8k", maxTokens: null },
+      { name: "short", maxTokens: 1500 },
+      { name: "medium", maxTokens: 6000 },
+      { name: "long", maxTokens: null },
     ],
     arithmetic: {
-      maxTokens: 8000,
+      maxTokens: 6000,
       source: { search: "request_then_regex", llm_judge: "regex", scenario_judge: "request" },
     },
     inputViews: { default: "full", byCategory: { sentiment: "text", tool_args: "full" } },
     backends: {
-      decisions: { kind: "decisions", fallbacks: ["jev"] },
-      jev: { kind: "jev" },
-      haiku: { kind: "anthropic_messages" },
-      luna: { kind: "openai_responses" },
+      "decision-a": { kind: "decisions", model: "decision-model-a", fallbacks: ["decision-b"] },
+      "decision-b": { kind: "jev" },
+      "llm-a": { kind: "anthropic_messages", model: "llm-model-a" },
+      "llm-b": { kind: "openai_responses", model: "llm-model-b" },
       ...overrides.backends,
     },
     routes: {
       search: {
-        "<=2k": pairShort,
-        "2k-8k": { instant: { primary: "decisions", pairWith: "jev" } },
-        ">8k": { instant: { primary: "decisions" }, balanced: { primary: "luna" } },
-        arithmetic: { instant: { primary: "decisions" }, balanced: { primary: "haiku" } },
+        short: escalating,
+        medium: { instant: { primary: "decision-a", pairWith: "decision-b" } },
+        long: { instant: { primary: "decision-a" }, balanced: { primary: "llm-a" } },
+        arithmetic: { instant: { primary: "decision-a" }, balanced: { primary: "llm-b" } },
       },
       llm_judge: {
-        "<=2k": pairShort,
-        "2k-8k": pairShort,
-        ">8k": {
-          instant: { primary: "decisions" },
-          balanced: { primary: "decisions", escalateTo: "luna", threshold: 0.7 },
+        short: escalating,
+        medium: escalating,
+        long: {
+          instant: { primary: "decision-a" },
+          balanced: { primary: "decision-a", escalateTo: "llm-a", threshold: 0.6 },
         },
-        arithmetic: { instant: { primary: "decisions" }, balanced: { primary: "luna" } },
+        arithmetic: { instant: { primary: "decision-a" }, balanced: { primary: "llm-a" } },
       },
       scenario_judge: {
-        "<=2k": { instant: { primary: "decisions" } },
-        "2k-8k": { instant: { primary: "decisions" } },
-        ">8k": { instant: { primary: "jev" } },
-        arithmetic: { instant: { primary: "jev" } },
+        short: { instant: { primary: "decision-b" } },
+        medium: { instant: { primary: "decision-a" } },
+        long: { instant: { primary: "decision-b" } },
+        arithmetic: { instant: { primary: "decision-b" } },
       },
     },
     ...(overrides.inputViews ? { inputViews: overrides.inputViews } : {}),

@@ -37,7 +37,7 @@ function llm(keys = { anthropic_messages: "lw-anthropic", openai_responses: "lw-
 
 const request = (wire: "anthropic_messages" | "openai_responses") => ({
   wire,
-  model: wire === "anthropic_messages" ? "haiku-model" : "luna-model",
+  model: wire === "anthropic_messages" ? "llm-model-a" : "llm-model-b",
   job: "search" as const,
   question: QUESTION,
   text: "user: my order is late",
@@ -73,7 +73,7 @@ describe("HttpInstantEvalLlmJudgeChannel", () => {
     });
     expect(headers["x-api-key"]).toBe("lw-anthropic");
     expect(sent.tool_choice).toEqual({ type: "tool", name: "evaluation" });
-    expect(sent.model).toBe("haiku-model");
+    expect(sent.model).toBe("llm-model-a");
     expect(JSON.stringify(sent.messages)).toContain(
       "Answer this question about the text above with true (yes) or false (no): Is the user upset?",
     );
