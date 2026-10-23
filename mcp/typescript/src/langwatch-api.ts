@@ -13,6 +13,9 @@ export const MCP_IDENTITY_HEADERS: Record<string, string> = {
   "X-LangWatch-SDK-Version": packageJson.version,
 };
 
+/** Names the hosted MCP server's calls apart from a local server's. */
+export const HOSTED_MCP_HEADER = "X-LangWatch-MCP-Host";
+
 // --- Response types ---
 
 export interface TraceSearchResult {
@@ -279,6 +282,9 @@ export async function makeRequest(
   };
   if (config.projectId) {
     headers["X-Project-Id"] = config.projectId;
+  }
+  if (config.hosted) {
+    headers[HOSTED_MCP_HEADER] = "hosted";
   }
 
   if (body !== undefined) {

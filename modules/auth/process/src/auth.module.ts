@@ -1,4 +1,5 @@
 import { bindApiDoor } from "@langwatch/api/hosting";
+import { callerAddressOfRequest } from "@langwatch/api/rest";
 import { bindTrpcMiddlewareContext, type TrpcRuntimeContext } from "@langwatch/api/trpc";
 import type { AuthApi, AuthServerConfig } from "@langwatch/auth-contract";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
@@ -29,6 +30,7 @@ export const authProcessModule: PublishedProcessModule<"auth", AuthApi, AuthServ
     .withTransports(authTrpcTransport, signInSecurityTrpcTransport, authCliDeviceFlowRest, authRest)
     .withEventing(authEventing)
     .withEventing(authLifecycleEventing)
+    .provideMiddlewareContext({ callerAddress: callerAddressOfRequest })
     .withTasks(({ app, repositories, dependencies }) => [
       ClearStalePendingSsoSetupTask.create({
         candidates: repositories.pendingSsoSetup,

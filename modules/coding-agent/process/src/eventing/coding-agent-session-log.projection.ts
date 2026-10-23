@@ -260,11 +260,11 @@ export class CodingAgentSessionLogProjection {
     return isLogsOnly
       ? this.stateProjection.chargeContextUsage({
           before: withReported,
-          after: this.stateProjection.foldModelCall(
-            { ...withReported, costUsd: withReported.costUsd + reported },
+          after: this.stateProjection.foldModelCall({
+            state: { ...withReported, costUsd: withReported.costUsd + reported },
             attrs,
-            0,
-          ),
+            fallbackDurationMs: 0,
+          }),
           context,
         })
       : withReported;
