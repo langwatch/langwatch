@@ -451,4 +451,13 @@ describe("given the input panel of a span braided in from another project", () =
     }
     expect(screen.queryByRole("link", { name: /Open in Playground/ })).not.toBeInTheDocument();
   });
+
+  it("offers a viewer who may not annotate no comment or suggestion to be refused", () => {
+    mocks.canManage = false;
+    renderViewer({ isBraided: true });
+
+    expect(screen.queryByRole("button", { name: /^Comment/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Suggest edit/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Open in Playground/ })).toBeDisabled();
+  });
 });

@@ -68,7 +68,16 @@ function buildIOActions({
     },
   ];
 
-  if (isBraided) return [...actions, ...unavailableOnBraidedSpan({ playgroundHref })];
+  if (isBraided) {
+    return [
+      ...actions,
+      ...unavailableOnBraidedSpan({
+        comment: !!traceId && !!fieldAnchor && showComment,
+        suggest: !!traceId && !!fieldAnchor && showSuggest,
+        playground: !!playgroundHref,
+      }),
+    ];
+  }
 
   if (traceId && fieldAnchor && showComment) {
     actions.push({
@@ -105,22 +114,32 @@ function buildIOActions({
   return actions;
 }
 
-/** A braided span is another project's data: annotating it and the playground are off. */
-function unavailableOnBraidedSpan({ playgroundHref }: { playgroundHref: string }): IOAction[] {
+/** A braided span is another project's data: each action an own span would offer is off. */
+function unavailableOnBraidedSpan(offered: {
+  comment: boolean;
+  suggest: boolean;
+  playground: boolean;
+}): IOAction[] {
   const unavailable = [
     { id: "comment", label: "Comment", icon: LuMessageSquare },
     { id: "suggest", label: "Suggest edit", icon: LuLightbulb },
-    ...(playgroundHref ? [{ id: "playground", label: "Open in Playground", icon: LuPlay }] : []),
-  ];
-  return unavailable.map(({ id, label, icon }) => ({
-    id,
-    menuLabel: label,
-    menuIcon: icon,
-    disabled: true,
-    render: () => (
-      <UnavailableActionButton icon={icon} label={label} reason={BRAIDED_ACTION_DISABLED_REASON} />
-    ),
-  }));
+    { id: "playground", label: "Open in Playground", icon: LuPlay },
+  ] as const;
+  return unavailable
+    .filter(({ id }) => offered[id])
+    .map(({ id, label, icon }) => ({
+      id,
+      menuLabel: label,
+      menuIcon: icon,
+      disabled: true,
+      render: () => (
+        <UnavailableActionButton
+          icon={icon}
+          label={label}
+          reason={BRAIDED_ACTION_DISABLED_REASON}
+        />
+      ),
+    }));
 }
 
 /**
