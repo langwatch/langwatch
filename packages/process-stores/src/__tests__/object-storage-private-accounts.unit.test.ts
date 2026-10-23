@@ -122,6 +122,20 @@ describe("given the stores' DATAPLANE_S3__ family", () => {
     });
   });
 
+  describe("when an entry's role is only whitespace", () => {
+    /** @scenario "S3 env var missing a field is logged and skipped" */
+    it("skips it and warns naming the role, rather than assuming a blank role over the keys", () => {
+      const blankRole = JSON.stringify({ ...JSON.parse(ACME), roleArn: "   " });
+      const { accounts, lines } = parse({ DATAPLANE_S3__blank__org666: blankRole });
+
+      expect(accounts).toEqual([]);
+      expect(lines.findLine("warn", "invalid fields")).toMatchObject({
+        envVar: "DATAPLANE_S3__blank__org666",
+        fields: ["roleArn"],
+      });
+    });
+  });
+
   describe("when an entry names no role and only half a key pair", () => {
     /** @scenario "S3 env var missing a field is logged and skipped" */
     it("skips it and warns naming the missing key", () => {

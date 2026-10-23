@@ -17,7 +17,7 @@ const dataplaneS3Schema = z
     bucket: z.string().min(1, "bucket must not be empty"),
     accessKeyId: z.string().min(1, "accessKeyId must not be empty").optional(),
     secretAccessKey: z.string().min(1, "secretAccessKey must not be empty").optional(),
-    roleArn: z.string().min(1, "roleArn must not be empty").optional(),
+    roleArn: z.string().trim().min(1, "roleArn must not be empty").optional(),
   })
   .superRefine((config, ctx) => {
     if (config.roleArn) return;

@@ -62,6 +62,28 @@ describe("given an S3 account, when its client is constructed", () => {
 
       await expect(client.config.region()).resolves.toBe("cn-north-1");
     });
+
+    it("reads an AWS endpoint by its hostname, so a trailing slash still counts", async () => {
+      vi.stubEnv("AWS_REGION", "cn-north-1");
+      const client = s3Client({
+        bucket: "acme-dataplane",
+        endpoint: "https://s3.cn-north-1.amazonaws.com.cn/",
+        roleArn: ROLE,
+      });
+
+      await expect(client.config.region()).resolves.toBe("cn-north-1");
+    });
+
+    it("keeps the 'auto' region for an endpoint that is not AWS", async () => {
+      vi.stubEnv("AWS_REGION", "eu-central-1");
+      const client = s3Client({
+        bucket: "acme-dataplane",
+        endpoint: "https://minio.internal:9000/",
+        roleArn: ROLE,
+      });
+
+      await expect(client.config.region()).resolves.toBe("auto");
+    });
   });
 
   describe("when the account carries only a key pair", () => {
@@ -71,6 +93,19 @@ describe("given an S3 account, when its client is constructed", () => {
 
       expect(webIdentity.fromTokenFile).not.toHaveBeenCalled();
       await expect(client.config.credentials()).resolves.toMatchObject(keys);
+    });
+  });
+
+  describe("when the account carries neither a role nor a key pair", () => {
+    it("leaves the credentials to the SDK's default chain", async () => {
+      vi.stubEnv("AWS_ACCESS_KEY_ID", "from-default-chain");
+      vi.stubEnv("AWS_SECRET_ACCESS_KEY", "chain-secret");
+      const client = s3Client(account);
+
+      expect(webIdentity.fromTokenFile).not.toHaveBeenCalled();
+      await expect(client.config.credentials()).resolves.toMatchObject({
+        accessKeyId: "from-default-chain",
+      });
     });
   });
 });

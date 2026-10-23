@@ -49,10 +49,7 @@ export function s3Client(account: ObjectStorageAccount): S3Client {
   const endpoint = account.endpoint?.trim() || undefined;
   const roleArn = account.roleArn;
   const staticCredentials = roleArn ? undefined : account.credentials;
-  const isAwsEndpoint =
-    endpoint === undefined ||
-    endpoint.endsWith(".amazonaws.com") ||
-    endpoint.endsWith(".amazonaws.com.cn");
+  const isAwsEndpoint = endpoint === undefined || isAwsHost(endpoint);
   const region = account.region ?? (isAwsEndpoint && !staticCredentials ? undefined : "auto");
   const credentials = roleArn
     ? fromTokenFile({ roleArn })
@@ -66,6 +63,20 @@ export function s3Client(account: ObjectStorageAccount): S3Client {
     requestChecksumCalculation: "WHEN_REQUIRED",
     responseChecksumValidation: "WHEN_REQUIRED",
   });
+}
+
+/**
+ * Reads the endpoint's hostname, so a trailing slash, path or port still counts
+ * as AWS. A bare host without a scheme is read as https.
+ */
+function isAwsHost(endpoint: string): boolean {
+  let host: string;
+  try {
+    host = new URL(endpoint.includes("://") ? endpoint : `https://${endpoint}`).hostname;
+  } catch {
+    return false;
+  }
+  return host.endsWith(".amazonaws.com") || host.endsWith(".amazonaws.com.cn");
 }
 
 function isMissing(error: unknown): boolean {
