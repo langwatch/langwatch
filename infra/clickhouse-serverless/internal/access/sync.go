@@ -3,11 +3,14 @@ package access
 import (
 	"bytes"
 	"context"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"go.uber.org/zap"
+
+	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/bootstrap"
 )
 
 const (
@@ -52,6 +55,15 @@ func (s *Syncer) Sync() time.Duration {
 		s.Log.Error("access file not applied, keeping the last rendered users", zap.Error(err))
 		return SyncInterval
 	}
+	// The server fixed its mode at start (default's lock, the local admin).
+	// A file switching it live would leave the two out of step: in standard
+	// mode the sidecar would render passwords onto a dynamic-only server.
+	if server := s.serverDynamicOnly(); f.DynamicOnly() != server {
+		s.Log.Error("access file not applied: its mode differs from the one the server started in; "+
+			"restart the server to change mode, keeping the last rendered users",
+			zap.Bool("file_dynamic_only", f.DynamicOnly()), zap.Bool("server_dynamic_only", server))
+		return SyncInterval
+	}
 	if !bytes.Equal(f.Raw, s.lastRaw) {
 		s.lastRaw = f.Raw
 		if s.OnLoad != nil {
@@ -78,6 +90,13 @@ func (s *Syncer) Sync() time.Duration {
 		s.Log.Info("access users updated", zap.Strings("users", p.UserNames()))
 	}
 	return nextDelay(p, now)
+}
+
+// serverDynamicOnly reports whether the server started in dynamic-only mode:
+// `ch-config generate` renders the local admin into users.d then, and only then.
+func (s *Syncer) serverDynamicOnly() bool {
+	_, err := os.Stat(filepath.Join(s.UsersD, bootstrap.UsersFileName))
+	return err == nil
 }
 
 func nextDelay(p Planned, now time.Time) time.Duration {

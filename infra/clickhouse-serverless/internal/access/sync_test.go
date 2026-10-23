@@ -9,6 +9,8 @@ import (
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest/observer"
+
+	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/bootstrap"
 )
 
 type syncFixture struct {
@@ -131,4 +133,42 @@ func TestSyncer_WritesOnlyOnChange(t *testing.T) {
 			t.Errorf("temporary file left behind: %s", e.Name())
 		}
 	}
+}
+
+// @scenario "The sidecar never switches mode while the server runs"
+func TestSyncer_KeepsTheServersMode(t *testing.T) {
+	const tokenOnly = "mode: dynamic-only\nissuers: [{name: s, url: 'https://oidc.example.com'}]\n" +
+		"users:\n  - {name: grafana, tier: inspect, login: {token: {issuer: s}}}\n"
+
+	t.Run("a standard server ignores a file turning dynamic-only on", func(t *testing.T) {
+		fx := newSyncFixture(t)
+		fx.syncer.Sync()
+		good := fx.rendered()
+		fx.writeAccess(tokenOnly)
+		loads := fx.loads
+		fx.syncer.Sync()
+		if fx.rendered() != good || fx.loads != loads {
+			t.Error("a mode switch was applied without a restart")
+		}
+		if fx.logs.FilterMessageSnippet("its mode differs from the one the server started in").Len() == 0 {
+			t.Error("the refusal was not logged")
+		}
+	})
+
+	t.Run("a dynamic-only server ignores a file turning it off", func(t *testing.T) {
+		fx := newSyncFixture(t)
+		writeFiles(t, fx.syncer.UsersD, map[string]string{bootstrap.UsersFileName: "users: {}\n"})
+		fx.writeAccess(tokenOnly)
+		fx.syncer.Sync()
+		good := fx.rendered()
+		if strings.Contains(good, "password") {
+			t.Fatalf("dynamic-only rendered a password:\n%s", good)
+		}
+		// Back to standard mode with a rolling user: its password must not appear.
+		fx.writeAccess("users:\n  - {name: metabase, tier: read, databases: [analytics], login: {rolling: {dir: " + fx.secrets + "}}}\n")
+		fx.syncer.Sync()
+		if got := fx.rendered(); got != good || strings.Contains(got, sha("current-password-0123")) {
+			t.Errorf("a dynamic-only server got a rolling password without a restart:\n%s", got)
+		}
+	})
 }
