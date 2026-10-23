@@ -18,7 +18,7 @@ import { promisify } from "node:util";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-// LangWatch's fsModuleCache patch (ADR-185): two checkouts share one cache, each run
+// LangWatch's fsModuleCache patch (ADR-193): two checkouts share one cache, each run
 // by a child Vitest from a package below its workspace root, importing a workspace
 // file and an installed package, so the code names both by `/@fs/<checkout>/...`.
 

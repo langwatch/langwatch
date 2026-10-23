@@ -161,7 +161,7 @@ index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..d1246d7a1e17229a1ea5ac852daaaf77
  // whenever dependencies are reinstalled.
  const DEFAULT_CACHE_DIRNAME = ".vitest-cache";
 +// LangWatch: the module cache is shared by every checkout (git worktree) of a
-+// repository, in one per-user directory (dev/docs/adr/185-*). The key is built
++// repository, in one per-user directory (dev/docs/adr/193-*). The key is built
 +// from the module's path relative to the workspace root, and the transformed
 +// code and its metadata are stored with the workspace root written as
 +// FS_CACHE_ROOT_TOKEN. The token is put back on read, here and in the worker

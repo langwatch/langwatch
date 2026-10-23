@@ -3,7 +3,7 @@ Feature: Vitest's transform cache is shared across checkouts
   I want a new worktree's first run to reuse what another worktree transformed
   So that a fresh worktree does not pay for transforming every module again
 
-  # ADR-185. The cache lives in one per-user directory, keyed by the module's
+  # ADR-193. The cache lives in one per-user directory, keyed by the module's
   # path relative to the workspace root, and stores the workspace root as a
   # token that each checkout replaces with its own on read.
 
