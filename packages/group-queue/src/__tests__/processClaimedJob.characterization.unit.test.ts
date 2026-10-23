@@ -232,7 +232,8 @@ describe("given a claimed job", () => {
 
   describe("when the job spent its earlier retries on an overloaded server", () => {
     /** A stored envelope whose header carries the attempt and the overload retries spent. */
-    const storedAfterOverload = ({ attempt, overloadAttempts }: Record<string, number>) => {
+    type SpentRetries = { attempt: number; overloadAttempts: number };
+    const storedAfterOverload = ({ attempt, overloadAttempts }: SpentRetries) => {
       const header = JSON.stringify({
         v: 2,
         e: "j",
@@ -243,7 +244,7 @@ describe("given a claimed job", () => {
     const unreachable = async (): Promise<Record<string, unknown>> => {
       throw new TransientBlobStoreError({ projectId: "project_1", hash: "h", cause: "down" });
     };
-    const transientOutcome = async ({ attempt, overloadAttempts }: Record<string, number>) => {
+    const transientOutcome = async ({ attempt, overloadAttempts }: SpentRetries) => {
       const { processor, calls } = recordingProcessor({ decode: unreachable });
       await processor["processClaimedJob"]({
         stagedJobId: "job-1",
