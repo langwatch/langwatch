@@ -143,32 +143,42 @@ export async function backOffWhenOverloaded<T>({
   try {
     return await run();
   } catch (error) {
-    const overloaded = overloadedClickHouseError(error);
-    if (overloaded === undefined) throw error;
-    const code = codeOf(overloaded);
-    const detail = error instanceof Error ? error.message : String(error);
-    if (isQueryMemoryLimitExceeded(error)) {
-      throw new GroupQueueError({
-        queueName,
-        operation: unit === "batch" ? "processBatch" : "process",
-        message:
-          unit === "batch"
-            ? `ClickHouse statement over its memory limit (code ${code}); splitting the batch: ${detail}`
-            : `ClickHouse statement over its memory limit (code ${code}); retrying the job: ${detail}`,
-        cause: error,
-      });
-    }
-    throw new GroupQueueError({
+    throw overloadFailureOf({ error, queueName, unit });
+  }
+}
+
+/** The failure to throw for a run: overload names a retry delay, a per-query limit does not. */
+function overloadFailureOf({
+  error,
+  queueName,
+  unit,
+}: {
+  error: unknown;
+  queueName: string;
+  unit: "batch" | "job";
+}): unknown {
+  const overloaded = overloadedClickHouseError(error);
+  if (overloaded === undefined) return error;
+  const code = codeOf(overloaded);
+  const detail = error instanceof Error ? error.message : String(error);
+  const operation = unit === "batch" ? "processBatch" : "process";
+  if (isQueryMemoryLimitExceeded(error)) {
+    const next = unit === "batch" ? "splitting the batch" : "retrying the job";
+    return new GroupQueueError({
       queueName,
-      operation: unit === "batch" ? "processBatch" : "process",
-      message:
-        unit === "batch"
-          ? `ClickHouse overloaded (code ${code}); backing the batch off whole: ${detail}`
-          : `ClickHouse overloaded (code ${code}); backing the job off: ${detail}`,
+      operation,
+      message: `ClickHouse statement over its memory limit (code ${code}); ${next}: ${detail}`,
       cause: error,
-      retryAfterMs: 0,
     });
   }
+  const next = unit === "batch" ? "backing the batch off whole" : "backing the job off";
+  return new GroupQueueError({
+    queueName,
+    operation,
+    message: `ClickHouse overloaded (code ${code}); ${next}: ${detail}`,
+    cause: error,
+    retryAfterMs: 0,
+  });
 }
 
 /** The queue's own consumer, and one that runs only listed groups when asked for. */
