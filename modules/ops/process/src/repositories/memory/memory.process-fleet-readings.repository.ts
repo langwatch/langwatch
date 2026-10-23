@@ -1,5 +1,5 @@
 import {
-  type ProcessFleetReading,
+  type ProcessFleetSnapshot,
   ProcessFleetReadingsRepository,
 } from "../process-fleet-readings.repository.ts";
 import type { MemoryOpsStore } from "./memory.ops.store.ts";
@@ -14,11 +14,11 @@ export class MemoryProcessFleetReadingsRepository extends ProcessFleetReadingsRe
     super();
   }
 
-  async save(readings: ProcessFleetReading[]): Promise<void> {
-    this.store.processFleetReadings = readings;
+  async save(snapshot: ProcessFleetSnapshot): Promise<void> {
+    this.store.processFleetSnapshots.splice(0, this.store.processFleetSnapshots.length, snapshot);
   }
 
-  async findAll(): Promise<ProcessFleetReading[]> {
-    return this.store.processFleetReadings;
+  async find(): Promise<ProcessFleetSnapshot | null> {
+    return this.store.processFleetSnapshots[0] ?? null;
   }
 }

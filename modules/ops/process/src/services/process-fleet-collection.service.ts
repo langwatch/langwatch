@@ -2,9 +2,15 @@ import { HandledError, isTransientRefusal } from "@langwatch/handled-error";
 import type { Logger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
-import type { ProcessFleetReadingsRepository } from "../repositories/process-fleet-readings.repository.ts";
+import type {
+  ProcessFleetReading,
+  ProcessFleetReadingsRepository,
+} from "../repositories/process-fleet-readings.repository.ts";
 import type { ProcessOpsRepository } from "../repositories/process-ops.repository.ts";
 import { OVERDUE_PENDING_MS, OVERDUE_WAKE_MS } from "./manager-explorer.service.ts";
+
+/** Four `ops_storage_stats` wakes: older readings mean the collection has stopped working. */
+export const FLEET_READINGS_STALE_AFTER_MS = 60_000;
 
 /**
  * Counts every process manager's instances and outbox once, on the `ops_storage_stats` wake, and
@@ -27,15 +33,16 @@ export class ProcessFleetCollectionService {
     },
   ) {}
 
-  /** A failed read keeps the last counts rather than zeroing the gauges. */
+  /** A failed read keeps the last counts; they go stale and the gauges report the failure. */
   async collect(): Promise<void> {
     try {
-      const counts = await this.options.fleet.countByProcessName({
-        now: nowInstant().epochMilliseconds,
+      const takenAtMs = nowInstant().epochMilliseconds;
+      const readings = await this.options.fleet.countByProcessName({
+        now: takenAtMs,
         overdueWakeMs: OVERDUE_WAKE_MS,
         overduePendingMs: OVERDUE_PENDING_MS,
       });
-      await this.options.readings.save(counts);
+      await this.options.readings.save({ takenAtMs, readings });
     } catch (error) {
       const transient = error instanceof HandledError && isTransientRefusal(error);
       this.options.logger[transient ? "warn" : "error"](
@@ -43,5 +50,18 @@ export class ProcessFleetCollectionService {
         "failed to collect fleet counts",
       );
     }
+  }
+
+  /**
+   * The shared counts the gauges report. Missing or stale counts are refused, so the fleet
+   * collection gauge reads 0 and its last-success time stops instead of serving old numbers.
+   */
+  async currentReadings(): Promise<ProcessFleetReading[]> {
+    const snapshot = await this.options.readings.find();
+    const age = snapshot ? nowInstant().epochMilliseconds - snapshot.takenAtMs : Infinity;
+    if (!snapshot || age > FLEET_READINGS_STALE_AFTER_MS) {
+      throw new Error("the shared fleet counts are missing or stale");
+    }
+    return snapshot.readings;
   }
 }

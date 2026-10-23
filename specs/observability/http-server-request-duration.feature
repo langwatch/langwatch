@@ -10,7 +10,7 @@ Feature: Inbound HTTP requests are timed by route template
   Scenario: A request is recorded under its mount prefix, method and status
     Given a mux with an api mount and a page mount
     When a POST to a deep api path is answered with a 503
-    Then one duration is recorded with the mount prefix, the method and the status class
+    Then one duration is recorded with the mount prefix, the method and the status code
     And the raw path appears in no label
 
   @unit
@@ -29,4 +29,4 @@ Feature: Inbound HTTP requests are timed by route template
   Scenario: A route that throws is recorded as a server error
     Given a route that throws
     When a request reaches it
-    Then the duration is recorded with a 5xx status class
+    Then the duration is recorded with status code 500

@@ -12,7 +12,7 @@ import {
 
 import type { CloudLatestRelease } from "../cloud-latest-release.repository.ts";
 import type { ImpersonationTarget } from "../impersonation.repository.ts";
-import type { ProcessFleetReading } from "../process-fleet-readings.repository.ts";
+import type { ProcessFleetSnapshot } from "../process-fleet-readings.repository.ts";
 import type { StorageStatsReading } from "../storage-stats-readings.repository.ts";
 
 /** One event as the in-memory event log keeps it, with the columns the explorer reads by. */
@@ -76,7 +76,8 @@ export class MemoryOpsStore {
   /** Per ClickHouse endpoint, the last storage reading and the last backup it saw. */
   readonly cloudLatestRelease: CloudLatestRelease[] = [];
   readonly cloudNotices: SelfHostedNotice[] = [];
-  processFleetReadings: ProcessFleetReading[] = [];
+  /** The last fleet measurement; at most one entry, replaced in place on save. */
+  readonly processFleetSnapshots: ProcessFleetSnapshot[] = [];
   readonly storageReadings = new Map<string, Omit<StorageStatsReading, "lastBackup">>();
   readonly storageLastBackups = new Map<string, NonNullable<StorageStatsReading["lastBackup"]>>();
   /** The published snapshots and the writer lease over them; a lease here never lapses. */

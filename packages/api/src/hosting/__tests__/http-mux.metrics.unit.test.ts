@@ -29,7 +29,6 @@ describe("given a mux that serves requests", () => {
     expect(api?.attributes).toMatchObject({
       http_request_method: "POST",
       http_response_status_code: "503",
-      status_class: "5xx",
     });
     const raw = provider.recorded.map((m) => String(m.attributes.http_route));
     expect(raw.some((route) => route.includes("abc-123") || route.includes("secret-slug"))).toBe(
@@ -47,7 +46,7 @@ describe("given a mux that serves requests", () => {
     await mux.fetch(new Request("http://localhost/api/users/42"));
 
     expect(
-      provider.valuesOf(NAME, { http_route: "/api/users/:id", status_class: "2xx" }),
+      provider.valuesOf(NAME, { http_route: "/api/users/:id", http_response_status_code: "200" }),
     ).toHaveLength(1);
   });
 
@@ -68,6 +67,8 @@ describe("given a mux that serves requests", () => {
 
     await mux.fetch(new Request("http://localhost/api/x"));
 
-    expect(provider.valuesOf(NAME, { http_route: "/api", status_class: "5xx" })).toHaveLength(1);
+    expect(
+      provider.valuesOf(NAME, { http_route: "/api", http_response_status_code: "500" }),
+    ).toHaveLength(1);
   });
 });

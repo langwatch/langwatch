@@ -5,15 +5,28 @@ import {
 } from "@langwatch/eventing";
 import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
 import { createTestLogger } from "@langwatch/test-harness";
+import { nowInstant } from "@langwatch/time";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { MemoryOpsStore } from "../../repositories/memory/memory.ops.store.ts";
 import { MemoryProcessFleetReadingsRepository } from "../../repositories/memory/memory.process-fleet-readings.repository.ts";
 import { MemoryProcessOpsRepository } from "../../repositories/memory/memory.process-ops.repository.ts";
 import type { ProcessOpsRepository } from "../../repositories/process-ops.repository.ts";
-import { ProcessFleetCollectionService } from "../process-fleet-collection.service.ts";
+import {
+  FLEET_READINGS_STALE_AFTER_MS,
+  ProcessFleetCollectionService,
+} from "../process-fleet-collection.service.ts";
 
 const metrics = createRecordingMeterProvider();
+const READING = {
+  processName: "p",
+  instances: 3,
+  overdueWakes: 0,
+  pendingMessages: 0,
+  overduePending: 0,
+  lapsedLeases: 0,
+  deadMessages: 0,
+};
 
 describe("given the scheduled fleet collection", () => {
   beforeAll(() => metrics.install());
@@ -41,9 +54,10 @@ describe("given the scheduled fleet collection", () => {
       processName: "automations",
       status: "dead",
     } as (typeof store.outbox)[number]);
-    bindProcessFleetMetricsSource(() => readings.findAll());
+    const collection = ProcessFleetCollectionService.create({ fleet: counting, readings, logger });
+    bindProcessFleetMetricsSource(() => collection.currentReadings());
 
-    await ProcessFleetCollectionService.create({ fleet: counting, readings, logger }).collect();
+    await collection.collect();
     await metrics.collect();
     await metrics.collect();
 
@@ -58,17 +72,7 @@ describe("given the scheduled fleet collection", () => {
   it("keeps the last counts when a read fails", async () => {
     const store = MemoryOpsStore.create();
     const readings = MemoryProcessFleetReadingsRepository.create({ store });
-    await readings.save([
-      {
-        processName: "p",
-        instances: 3,
-        overdueWakes: 0,
-        pendingMessages: 0,
-        overduePending: 0,
-        lapsedLeases: 0,
-        deadMessages: 0,
-      },
-    ]);
+    await readings.save({ takenAtMs: nowInstant().epochMilliseconds, readings: [READING] });
     const failing = MemoryProcessOpsRepository.create({ store });
     failing.countByProcessName = async () => {
       throw new Error("db down");
@@ -77,7 +81,39 @@ describe("given the scheduled fleet collection", () => {
 
     await ProcessFleetCollectionService.create({ fleet: failing, readings, logger }).collect();
 
-    expect(await readings.findAll()).toHaveLength(1);
+    expect((await readings.find())?.readings).toEqual([READING]);
     expect(lines.some((line) => line.level >= 40)).toBe(true);
+  });
+});
+
+describe("given shared fleet counts older than a few collection wakes", () => {
+  beforeAll(() => metrics.install());
+  afterAll(() => {
+    unbindProcessFleetMetricsSource();
+    metrics.uninstall();
+  });
+
+  /** @scenario "Stale fleet counts report a failed collection" */
+  it("reads the collection as failed and never advances its last-success time", async () => {
+    const store = MemoryOpsStore.create();
+    const readings = MemoryProcessFleetReadingsRepository.create({ store });
+    const { logger } = createTestLogger();
+    const collection = ProcessFleetCollectionService.create({
+      fleet: MemoryProcessOpsRepository.create({ store }),
+      readings,
+      logger,
+    });
+    const takenAtMs = nowInstant().epochMilliseconds - FLEET_READINGS_STALE_AFTER_MS - 1;
+    await readings.save({ takenAtMs, readings: [READING] });
+    bindProcessFleetMetricsSource(() => collection.currentReadings());
+
+    const before = metrics.recorded.length;
+    await metrics.collect();
+
+    const valueOf = (instrument: string) =>
+      metrics.recorded.slice(before).find((r) => r.instrument === instrument)?.value;
+    expect(valueOf("pm_fleet_collection_success")).toBe(0);
+    expect(valueOf("pm_fleet_last_success_timestamp_seconds")).toBe(0);
+    await expect(collection.currentReadings()).rejects.toThrow(/missing or stale/);
   });
 });

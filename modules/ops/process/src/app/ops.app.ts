@@ -2485,9 +2485,14 @@ function buildOpsInfrastructure(input: {
   });
 
   // pm_instances / pm_outbox_* report nothing until a source is bound. The source reads the
-  // counts `ops_storage_stats` shares, never the tables; dashboards still aggregate with max().
+  // counts `ops_storage_stats` shares, never the tables, and refuses them once stale.
   if (input.reportsFleetGauges) {
-    bindProcessFleetMetricsSource(() => repositories.processFleetReadings.findAll());
+    const fleetReadings = ProcessFleetCollectionService.create({
+      fleet: repositories.processFleet,
+      readings: repositories.processFleetReadings,
+      logger,
+    });
+    bindProcessFleetMetricsSource(() => fleetReadings.currentReadings());
     resources.own("process fleet metrics source", () => unbindProcessFleetMetricsSource());
   }
 

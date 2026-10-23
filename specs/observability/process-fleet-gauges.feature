@@ -26,6 +26,13 @@ Feature: The process-manager fleet gauges report once a source is bound
     Then the saved reading remains unchanged
 
   @unit
+  Scenario: Stale fleet counts report a failed collection
+    Given the shared fleet counts were taken longer ago than a few collection wakes
+    When the fleet gauges are collected
+    Then the fleet collection success gauge reads 0
+    And its last-success time does not advance
+
+  @unit
   Scenario: A booted worker reports the fleet gauges; api pods do not
     Given the scheduled collector has shared the fleet counts
     When a worker and an api process boot and their gauges are collected

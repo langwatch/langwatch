@@ -42,6 +42,7 @@ import type { ShareApi } from "@langwatch/share-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { nowInstant } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { isMigrationStep } from "@langwatch/upgrade/step";
 import type { UserApi } from "@langwatch/user-contract";
@@ -253,9 +254,10 @@ describe("ops app installation", () => {
       ["worker", 310, 7],
       ["api", undefined, undefined],
     ] as const)("the %s role's pm_* gauges report %s instances", async (role, instances, dead) => {
-      vi.spyOn(MemoryProcessFleetReadingsRepository.prototype, "findAll").mockResolvedValue([
-        reading,
-      ]);
+      vi.spyOn(MemoryProcessFleetReadingsRepository.prototype, "find").mockResolvedValue({
+        takenAtMs: nowInstant().epochMilliseconds,
+        readings: [reading],
+      });
       const runtime = await process(role).boot();
 
       try {

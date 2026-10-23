@@ -15,11 +15,19 @@ export const processFleetReadingSchema = z.object({
 /** One process manager's counts, as the last measurement of the fleet read them. */
 export type ProcessFleetReading = ProcessNameCounts;
 
+/** One measurement of the whole fleet and when it was taken, so a reader can tell it is stale. */
+export const processFleetSnapshotSchema = z.object({
+  takenAtMs: z.number(),
+  readings: z.array(processFleetReadingSchema),
+});
+
+export type ProcessFleetSnapshot = z.infer<typeof processFleetSnapshotSchema>;
+
 /**
  * The fleet's shared process counts: one process measures, every process's gauges read, so
- * N replicas never repeat the aggregate query. A save replaces the whole set.
+ * N replicas never repeat the aggregate query. A save replaces the last measurement.
  */
 export abstract class ProcessFleetReadingsRepository {
-  abstract save(readings: ProcessFleetReading[]): Promise<void>;
-  abstract findAll(): Promise<ProcessFleetReading[]>;
+  abstract save(snapshot: ProcessFleetSnapshot): Promise<void>;
+  abstract find(): Promise<ProcessFleetSnapshot | null>;
 }

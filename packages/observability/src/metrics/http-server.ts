@@ -21,11 +21,6 @@ function normalizeHttpMethod(method: string): string {
   return KNOWN_METHODS.has(upper) ? upper : "_OTHER";
 }
 
-/** `2xx`, `4xx`, `5xx`; anything outside 100-599 is `unknown`. */
-function statusClass(status: number): string {
-  return status >= 100 && status <= 599 ? `${Math.floor(status / 100)}xx` : "unknown";
-}
-
 const templates = new WeakMap<Request, string>();
 
 /**
@@ -61,6 +56,5 @@ export function recordHttpServerRequest({
     http_request_method: normalizeHttpMethod(method),
     http_route: route,
     http_response_status_code: String(status),
-    status_class: statusClass(status),
   });
 }
