@@ -504,6 +504,15 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       When the executor runs the request
       Then the traceback names code-block.ts at line 7, not the erased JavaScript
 
+    @unit
+    Scenario: a TypeScript code block's size is bounded before it is parsed
+      # esbuild parses in the engine, outside the sandbox, so its input is bounded
+      # and parsed only once the run is admitted to the memory budget.
+      Given a TypeScript code node over 64 KB
+      When the executor runs the request
+      Then it is refused as a RunnerError saying TypeScript is limited to 64 KB
+      And the most deeply nested code that fits the limit is refused as a SyntaxError without stopping the engine
+
   Rule: The wasm runtime runs each execution in its own WebAssembly instance
 
     # NLPGO_ENGINE_CODE_BLOCK_RUNTIME=wasm runs user code in a WASI CPython

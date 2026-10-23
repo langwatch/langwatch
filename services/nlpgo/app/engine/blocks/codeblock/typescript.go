@@ -1,7 +1,6 @@
 package codeblock
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -22,22 +21,34 @@ type strippedCode struct {
 	lines []int
 }
 
-// executeTypeScript erases the code's types, runs it as JavaScript, and points
-// the traceback back at the lines the author wrote.
-func (e *Executor) executeTypeScript(ctx context.Context, req Request) (*Result, error) {
-	if len(req.Code) > maxWasmPayloadBytes {
-		return &Result{Error: &Error{Type: RunnerErrorType, Message: fmt.Sprintf("the code block's code and inputs exceed the %d MiB limit", maxWasmPayloadBytes>>20)}}, nil
+// maxTypeScriptBytes bounds TypeScript source. esbuild parses in the engine,
+// outside the sandbox, and its stack grows with nesting: 64 KiB of the worst
+// nesting stays near 200 MiB, inside the run's admitted memory.
+const maxTypeScriptBytes = 64 << 10
+
+// erasedTypes turns a TypeScript request into the JavaScript it runs as. It is
+// called once the run is admitted, so concurrent parses share the memory budget.
+func erasedTypes(req *Request) (*strippedCode, *Error) {
+	if req.Language != LanguageTypeScript {
+		return nil, nil
+	}
+	if len(req.Code) > maxTypeScriptBytes {
+		return nil, &Error{Type: RunnerErrorType, Message: fmt.Sprintf("TypeScript code blocks are limited to %d KB; use JavaScript for longer code", maxTypeScriptBytes>>10)}
 	}
 	stripped, failure := stripTypes(req.Code)
 	if failure != nil {
-		return &Result{Error: failure}, nil
+		return nil, failure
 	}
 	req.Language, req.Code = LanguageJavaScript, stripped.js
-	res, err := e.Execute(ctx, req)
-	if res != nil && res.Error != nil {
-		res.Error.Traceback = stripped.remap(res.Error.Traceback)
+	return &stripped, nil
+}
+
+// remapResult points a traceback back at the TypeScript lines; nil leaves it be.
+func (s *strippedCode) remapResult(res *Result) *Result {
+	if s != nil && res != nil && res.Error != nil {
+		res.Error.Traceback = s.remap(res.Error.Traceback)
 	}
-	return res, err
+	return res
 }
 
 // stripTypes erases TypeScript syntax with esbuild. It does not type-check:

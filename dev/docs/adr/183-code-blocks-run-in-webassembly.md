@@ -75,6 +75,10 @@ default until the wasm runtime has run in production.
   its line), then runs on QuickJS like JavaScript. A traceback names the
   TypeScript line, read back through esbuild's source map. Types are checked in
   the Studio editor as the author writes, against the node's contract.
+  esbuild parses outside the sandbox and its stack grows with nesting (about
+  2 to 4 KiB per level), so TypeScript source is capped at 64 KiB and parsed
+  only after the run is admitted; the worst nesting that fits stays near
+  200 MiB of stack, inside the run's admitted share.
 - **The runtime is an artifact, pinned by checksum.** CPython 3.14 for WASI
   (`brettcannon/cpython-wasi-build`), fetched and its stdlib precompiled by
   `services/nlpgo/scripts/fetch-python-wasm.sh`, shipped in the image at

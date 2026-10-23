@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -306,4 +307,21 @@ func TestTypeScript_ThrownErrorPointsAtTheTypeScriptLine(t *testing.T) {
 	assert.Equal(t, "RangeError", res.Error.Type)
 	assert.Contains(t, res.Error.Traceback, "code-block.ts:7")
 	assert.NotContains(t, res.Error.Traceback, "code-block.mjs")
+}
+
+// @scenario "a TypeScript code block's size is bounded before it is parsed"
+func TestTypeScript_SizeIsBoundedBeforeParsing(t *testing.T) {
+	e := newJSExec(t, codeblock.Options{})
+	res := runTS(t, e, codeblock.Request{
+		Code: "export default () => ({});\n" + strings.Repeat("//", 64<<10),
+	})
+	require.NotNil(t, res.Error)
+	assert.Equal(t, codeblock.RunnerErrorType, res.Error.Type)
+	assert.Contains(t, res.Error.Message, "limited to 64 KB")
+
+	// The worst nesting that fits the limit parses without taking the engine down.
+	deep := "export default () => ({ v: " + strings.Repeat("(", 32<<10) + "1" + strings.Repeat(")", 32<<10)
+	res = runTS(t, e, codeblock.Request{Code: deep[:min(len(deep), 64<<10)]})
+	require.NotNil(t, res.Error)
+	assert.Equal(t, "SyntaxError", res.Error.Type)
 }

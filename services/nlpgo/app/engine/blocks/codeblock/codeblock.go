@@ -401,9 +401,6 @@ func withSandboxCredential(env []string, apiKey, endpoint string) []string {
 
 // Execute runs the request. Wall-clock timeout kills the subprocess.
 func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
-	if req.Language == LanguageTypeScript {
-		return e.executeTypeScript(ctx, req)
-	}
 	// The operator's ceiling wins. A per-request value only ever shortens the
 	// budget: a workflow author must not be able to escape
 	// NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS by writing a bigger number into
@@ -491,7 +488,7 @@ func (e *Executor) guestFor(language string) (*wasmGuest, error) {
 			return e.wasm.python, nil
 		}
 		return nil, nil
-	case LanguageJavaScript:
+	case LanguageJavaScript, LanguageTypeScript:
 		if e.wasm == nil || e.wasm.js == nil {
 			return nil, errors.New("codeblock: JavaScript code blocks are not available on this deployment")
 		}
@@ -568,6 +565,10 @@ func (e *Executor) executeWasm(runCtx context.Context, guest *wasmGuest, req Req
 		}), nil
 	}
 	defer admission.release()
+	stripped, failure := erasedTypes(&req)
+	if failure != nil {
+		return &Result{Error: failure, DurationMS: time.Since(started).Milliseconds()}, nil
+	}
 	payload, err := marshalRequest(req)
 	if err != nil {
 		return nil, err
@@ -589,7 +590,7 @@ func (e *Executor) executeWasm(runCtx context.Context, guest *wasmGuest, req Req
 	if outcome.err == nil && run.exitCode != 0 {
 		outcome.err = fmt.Errorf("the interpreter exited with status %d", run.exitCode)
 	}
-	return collectResult(run.result, outcome), nil
+	return stripped.remapResult(collectResult(run.result, outcome)), nil
 }
 
 // collectResult turns what a run left behind into a Result: the runner's own
