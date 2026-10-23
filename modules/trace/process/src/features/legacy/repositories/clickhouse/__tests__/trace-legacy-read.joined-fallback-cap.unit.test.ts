@@ -354,7 +354,11 @@ describe("the traces-with-spans memory-limit fallback", () => {
 
     /** @scenario "A batch refused for its result size is split until it fits" */
     it("splits the batch when the refusal arrives wrapped in a handled error", async () => {
-      clickHouseThatOOMsThenBatches({ spansPerTrace: 1, maxTracesByBytes: 4, wrapBytesRefusal: true });
+      clickHouseThatOOMsThenBatches({
+        spansPerTrace: 1,
+        maxTracesByBytes: 4,
+        wrapBytesRefusal: true,
+      });
       const service = mappedLegacyRead({
         resolveClickHouseClient: testResolveClickHouseClient,
         traceCanonicalisation,
