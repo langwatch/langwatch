@@ -184,7 +184,7 @@ export const JOB_RETRY_CONFIG = {
   maxBackoffMs: 600_000,
 } as const;
 
-/** The attempts a failure may use: an overload, which names a retry delay, gets the longer budget. */
+/** The attempts a failure may use: an overload names a retry delay and gets the longer budget. */
 export function attemptBudgetOf(decision: { retryAfterMs?: number }): number {
   return decision.retryAfterMs === undefined
     ? JOB_RETRY_CONFIG.maxAttempts

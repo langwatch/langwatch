@@ -12,6 +12,13 @@ const failed = (error: unknown) =>
     run: () => Promise.reject(error),
   }).catch((caught: unknown) => caught);
 
+/** The client's refusal for a statement it shed, as the process store raises it. */
+class ShedStatement extends HandledError {
+  constructor({ reasons }: { reasons: readonly Error[] }) {
+    super("clickhouse_overloaded", "clickhouse_overloaded", { reasons });
+  }
+}
+
 const clickHouseError = (code: string, message: string) =>
   Object.assign(new Error(message), { code });
 
@@ -71,9 +78,7 @@ describe("backOffWhenOverloaded", () => {
 
   describe("when the client sheds an insert before it reaches the server", () => {
     it("names a retry delay, so the batch is retried whole and its writes are not lost", async () => {
-      const shed = new HandledError("clickhouse_overloaded", "clickhouse_overloaded", {
-        reasons: [new Error("statement queue full")],
-      });
+      const shed = new ShedStatement({ reasons: [new Error("statement queue full")] });
 
       const error = await failed(shed);
 
