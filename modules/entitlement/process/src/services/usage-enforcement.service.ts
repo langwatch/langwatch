@@ -348,7 +348,11 @@ export class UsageService {
       return "unlimited";
     }
 
-    return this.computeCurrentMonthCount({ organizationId, plan: activePlan });
+    return this.computeCurrentMonthCount({
+      organizationId,
+      plan: activePlan,
+      reuseFailure: true,
+    });
   }
 
   /**
@@ -360,15 +364,17 @@ export class UsageService {
   }: {
     organizationId: string;
   }): Promise<UsageCount> {
-    return this.computeCurrentMonthCount({ organizationId });
+    return this.computeCurrentMonthCount({ organizationId, reuseFailure: false });
   }
 
   private async computeCurrentMonthCount({
     organizationId,
     plan,
+    reuseFailure,
   }: {
     organizationId: string;
     plan?: PlanInfo;
+    reuseFailure: boolean;
   }): Promise<UsageCount> {
     const decision = await this.getCachedUsageMeterReading(organizationId, plan);
     const cacheKey = `${organizationId}:${decision.usageUnit}`;
@@ -379,7 +385,9 @@ export class UsageService {
     }
 
     const failed = this.#failedCounts.get(cacheKey);
-    if (failed && failed.retryAt > this.now()) {
+    if (failed && failed.retryAt <= this.now()) {
+      this.#failedCounts.delete(cacheKey);
+    } else if (failed && reuseFailure) {
       throw failed.error;
     }
 
@@ -395,10 +403,12 @@ export class UsageService {
       this.#failedCounts.delete(cacheKey);
       return value;
     } catch (error) {
-      this.#failedCounts.set(cacheKey, {
-        error,
-        retryAt: this.now() + FAILED_COUNT_RETRY_AFTER_MS,
-      });
+      if (reuseFailure) {
+        this.#failedCounts.set(cacheKey, {
+          error,
+          retryAt: this.now() + FAILED_COUNT_RETRY_AFTER_MS,
+        });
+      }
       throw error;
     } finally {
       this.#countsInFlight.delete(cacheKey);
