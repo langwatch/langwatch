@@ -69,6 +69,13 @@ Feature: A simulation run reports its true state and never leaks secrets
     And the rest of its platform context still reads: target, suite, models, who started it and the agent instance
 
   @unit
+  Scenario: An unreadable hooks value keeps its setup status, so a run whose setup failed stays unscored
+    Given a stored run whose hooks value does not read but whose setup status does
+    When the run is read
+    Then the run keeps that setup status and stays unscored
+    And a hooks value with no readable setup status is dropped while the other fields read
+
+  @unit
   Scenario: A run whose platform context names no readable target still reads, with no platform context
     Given a stored run whose platform namespace has no target reference id that reads
     When the run is read

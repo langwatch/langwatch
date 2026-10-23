@@ -26,7 +26,7 @@ import { type DrawerChromeState, useDrawerChrome } from "./drawer-chrome.store.t
 export interface TraceHistoryEntry {
   traceId: string;
   viewMode: DrawerViewMode;
-  /** The trace's `occurredAt` (ms since epoch), the partition-pruning hint its reads need. */
+  /** The trace's `occurredAt` (ms since epoch), the partition-pruning hint its reads may send. */
   occurredAtMs?: number;
   /** The member that owns the trace on an aggregate, so going back reopens that member's trace. */
   tenantId?: string;

@@ -68,14 +68,16 @@ function harness() {
     projectId,
     route,
     actor = "user_ana",
+    permission = "traces:view",
   }: {
     projectId: string;
     route: string;
     actor?: string;
+    permission?: "traces:view" | "analytics:view";
   }) =>
     authz.authorize({
       principal: { type: "user", id: actor },
-      permission: "traces:view",
+      permission,
       scope: { type: "project", id: projectId, teamId: TEAM, organizationId: ORG },
       proof: { actor: { type: "user", id: actor }, purpose: { kind: "route", route } },
     });
@@ -127,6 +129,31 @@ describe("Feature: every read of an aggregate is audited", () => {
         await read({ projectId: AGGREGATE, route: "traces.spanTree" });
 
         expect(sent.map((row) => row.aggregateProjectId)).toEqual([AGGREGATE]);
+      });
+    });
+  });
+
+  describe("given an aggregate project queried through LangWatchQL", () => {
+    describe("when ana runs two statements on it within five minutes", () => {
+      /** @scenario "Every run on the aggregate is audited" */
+      it("writes one row of kind aggregate for ana from the query route's proof", async () => {
+        const { read, sent, advance } = harness();
+
+        await read({
+          projectId: AGGREGATE,
+          route: "analyticsLwql.query",
+          permission: "analytics:view",
+        });
+        advance(MINUTE);
+        await read({
+          projectId: AGGREGATE,
+          route: "analyticsLwql.query",
+          permission: "analytics:view",
+        });
+
+        expect(sent.map((row) => [row.actorUserId, row.aggregateProjectId])).toEqual([
+          ["user_ana", AGGREGATE],
+        ]);
       });
     });
   });

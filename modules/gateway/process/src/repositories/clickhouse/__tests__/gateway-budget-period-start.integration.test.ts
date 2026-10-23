@@ -13,6 +13,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { GatewayBudgetClickHouseRepository } from "../clickhouse.gateway-budget.repository.ts";
 import {
   createTestClickHouseClient,
+  gatewayClickHouseOver,
   testClickHouseUrl,
 } from "./support/clickhouse-endpoint.support.ts";
 
@@ -63,7 +64,9 @@ describe.skipIf(!chUrl)("given a debit recorded against a budget in ClickHouse",
   let spendByBudgetId: Map<string, string>;
 
   beforeAll(async () => {
-    repo = new GatewayBudgetClickHouseRepository(async () => createTestClickHouseClient(chUrl!));
+    repo = new GatewayBudgetClickHouseRepository(
+      gatewayClickHouseOver(createTestClickHouseClient(chUrl!)),
+    );
 
     // One pinned instant for every debit and for the read below. The
     // reader computes the current period from the instant it is handed;

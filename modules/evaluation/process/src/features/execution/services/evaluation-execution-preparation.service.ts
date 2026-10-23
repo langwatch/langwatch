@@ -30,7 +30,7 @@ export type PreparedEvaluation = {
 export type EvaluationPreparationResult =
   | { kind: "ready"; value: PreparedEvaluation }
   | { kind: "reported-skip"; details: string }
-  | { kind: "drop" };
+  | { kind: "drop"; reason: string };
 
 export class EvaluationExecutionPreparationService {
   static create(input: {
@@ -80,7 +80,7 @@ export class EvaluationExecutionPreparationService {
     }
 
     if (!this.isSampled(data, monitor.sample)) {
-      return { kind: "drop" };
+      return { kind: "drop", reason: "Excluded by sampling" };
     }
 
     const spans = await this.deps.traces.getEvaluationSpans({
@@ -98,7 +98,7 @@ export class EvaluationExecutionPreparationService {
         "Evaluator required fields not met — skipping evaluation",
       );
 
-      return { kind: "drop" };
+      return { kind: "drop", reason: "Evaluator required fields not met" };
     }
 
     const events = await this.loadEvents(data, monitor.preconditions);
@@ -119,7 +119,7 @@ export class EvaluationExecutionPreparationService {
         "Preconditions not met — skipping evaluation",
       );
 
-      return { kind: "drop" };
+      return { kind: "drop", reason: "Preconditions not met" };
     }
 
     const resolved = this.settings.resolve({
@@ -165,6 +165,9 @@ export class EvaluationExecutionPreparationService {
   }
 
   private isSampled(data: ExecuteEvaluationCommandData, sample: number): boolean {
+    // A retry was already picked by the first attempt's roll; rolling again could drop it.
+    if ((data.attempt ?? 1) > 1) return true;
+
     const sampled = Math.random() <= sample;
     if (!sampled) {
       logger.debug(

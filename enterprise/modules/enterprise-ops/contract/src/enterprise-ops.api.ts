@@ -13,6 +13,8 @@ import type {
   SelfHostedInstanceFilters,
   SelfHostedInstancePage,
   SelfHostedInstanceSummary,
+  UpgradeDiagnosticsDownload,
+  UpgradeDiagnosticsReport,
   SignedIssuedLicense,
 } from "@langwatch/enterprise-licensing-contract";
 import { moduleApi } from "@langwatch/module";
@@ -127,6 +129,16 @@ export interface EnterpriseOpsApi {
   summarizeSelfHostedInstances(input: {
     operator: OpsOperator | null;
   }): Promise<SelfHostedInstanceSummary>;
+  /** The upgrade diagnostics one install sent, newest first. */
+  findUpgradeDiagnostics(input: {
+    instanceRowId: string;
+    operator: OpsOperator | null;
+  }): Promise<UpgradeDiagnosticsReport[]>;
+  /** A five-minute link to one bundle: the sensitive read, so it asks `ops:manage`. */
+  getUpgradeDiagnosticsDownload(input: {
+    id: string;
+    operator: OpsOperator | null;
+  }): Promise<UpgradeDiagnosticsDownload>;
 }
 
 export const EnterpriseOpsApi = moduleApi<EnterpriseOpsApi>()("enterprise-ops");

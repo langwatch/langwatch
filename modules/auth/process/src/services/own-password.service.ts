@@ -41,6 +41,11 @@ export interface CredentialAccounts {
   hashPassword(input: { password: string }): Promise<string>;
   passwordMatches(input: { password: string; hash: string }): Promise<boolean>;
 }
+/** The forced-reset mark a newly written password lifts
+ *  (modules/auth/specs/forced-password-reset.feature). */
+export interface PasswordResetMarks {
+  clearPasswordResetRequirement(input: { userId: string }): Promise<void>;
+}
 type PasswordDoors = Pick<
   AuthApi,
   "resolveAuthProvider" | "route" | "isWithinBudget" | "revokeOtherBrowserSessions"
@@ -53,17 +58,20 @@ export class OwnPasswordService {
   private readonly credentials: CredentialAccounts;
   private readonly auth: PasswordDoors;
   private readonly issuesOwnPasswords: () => boolean;
+  private readonly passwordResetMarks: PasswordResetMarks;
 
   private constructor(deps: {
     users: PasswordReads;
     credentials: CredentialAccounts;
     auth: PasswordDoors;
     issuesOwnPasswords: () => boolean;
+    passwordResetMarks: PasswordResetMarks;
   }) {
     this.users = deps.users;
     this.credentials = deps.credentials;
     this.auth = deps.auth;
     this.issuesOwnPasswords = deps.issuesOwnPasswords;
+    this.passwordResetMarks = deps.passwordResetMarks;
   }
 
   static create(deps: {
@@ -71,6 +79,7 @@ export class OwnPasswordService {
     credentials: CredentialAccounts;
     auth: PasswordDoors;
     issuesOwnPasswords: () => boolean;
+    passwordResetMarks: PasswordResetMarks;
   }): OwnPasswordService {
     return new OwnPasswordService(deps);
   }
@@ -111,6 +120,7 @@ export class OwnPasswordService {
       await this.credentials.linkPassword({ userId: input.userId, passwordHash });
     }
 
+    await this.passwordResetMarks.clearPasswordResetRequirement({ userId: input.userId });
     await this.#endOtherSessions(input);
   }
 
@@ -145,6 +155,7 @@ export class OwnPasswordService {
       passwordHash: await this.credentials.hashPassword({ password: input.newPassword }),
     });
 
+    await this.passwordResetMarks.clearPasswordResetRequirement({ userId: input.userId });
     await this.#endOtherSessions(input);
   }
 

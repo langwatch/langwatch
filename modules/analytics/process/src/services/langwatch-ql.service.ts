@@ -10,6 +10,7 @@ import {
   langWatchQLPassSchema,
   type LangWatchQLEvalGate,
   type LangWatchQLExecuteInput,
+  type LangWatchQLMemberScope,
   type LangWatchQLPassInput,
   type LangWatchQLProjectSetExecuteInput,
   type LangWatchQLProtections,
@@ -314,9 +315,12 @@ export class LangWatchQLService {
     granularitySeconds,
     onBudgetOverflow,
     excludeOrigins = [],
+    memberWindows,
     isInstantEvalsEnabled,
     signal,
-  }: LangWatchQLProjectSetExecuteInput & LangWatchQLEvalGate): Promise<LangWatchQLQueryResult> {
+  }: LangWatchQLProjectSetExecuteInput &
+    LangWatchQLEvalGate &
+    LangWatchQLMemberScope): Promise<LangWatchQLQueryResult> {
     const projectIds = projects.map((project) => project.id);
     const validation = this.validate({
       projectId: projectIds.join(",") || "(none)",
@@ -364,6 +368,7 @@ export class LangWatchQLService {
       granularity,
       tenantCapability,
       excludeOrigins,
+      ...(memberWindows ? { memberWindows } : {}),
       ...(followedWindow ? { timeWindow: followedWindow } : {}),
       ...(signal ? { signal } : {}),
     });
@@ -375,6 +380,7 @@ export class LangWatchQLService {
       database: this.deps.database,
       views: this.views,
       excludeOrigins,
+      ...(memberWindows ? { memberWindows } : {}),
       timeWindow: followedWindow,
       granularitySeconds: granularity.followsGranularity ? granularity.granularitySeconds : void 0,
     });

@@ -238,20 +238,22 @@ export class ClickHouseExperimentRunStateRepository<
           WHERE t.TenantId = {tenantId:String}
             AND t.RunId = {runId:String}
             AND t.ExperimentId = {experimentId:String}
+            {{idBound:experiment_runs.RunId:runId:t}}
             AND (t.TenantId, t.RunId, t.ExperimentId, t.UpdatedAt) IN (
               SELECT TenantId, RunId, ExperimentId, max(UpdatedAt)
               FROM ${TABLE_NAME}
               WHERE TenantId = {tenantId:String}
                 AND RunId = {runId:String}
                 AND ExperimentId = {experimentId:String}
+                {{idBound:experiment_runs.RunId:runId}}
               GROUP BY TenantId, RunId, ExperimentId
             )
           LIMIT 1
         `,
         query_params: { tenantId: context.tenantId, runId, experimentId },
         format: "JSONEachRow",
+        idBound: { fallback: "unbounded" },
       });
-
       const rows = await result.json<ClickHouseExperimentRunRecord>();
       const row = rows[0];
       if (!row) return null;

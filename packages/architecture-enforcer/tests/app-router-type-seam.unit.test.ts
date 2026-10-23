@@ -15,11 +15,10 @@ import { createWorkspaceModuleResolver, moduleImports } from "../src/workspace/m
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
 /**
- * Measured at 1,595 when the aggregated `AppRouter` gave way to per-module maps
- * derived from each contract. A ceiling, not a target. Lower it when earned;
- * never raise it without saying why.
+ * 1,540 with `pnpm ensure:built` (#8795) once ops imports system-migrations types only.
+ * A ceiling, not a target. Lower it when earned; never raise it without saying why.
  */
-const CEILING = 1_700;
+const CEILING = 1_560;
 
 /** Every browser file that declares a module's typed procedures through `createModuleApi`. */
 function moduleApiDeclarations(): string[] {

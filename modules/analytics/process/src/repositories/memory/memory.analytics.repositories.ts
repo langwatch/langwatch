@@ -37,6 +37,8 @@ export class MemoryAnalyticsRepositories {
     return {
       sessions: MemoryAnalyticsSessionsRepository.create(),
       analytics: MemoryAnalyticsRepository.create(),
+      // No ClickHouse holds filter values here; the picker refuses at the call.
+      filterOptions: null,
       evaluations: { open: () => evaluations },
       appFunctionStore: MemoryLangWatchQLAppFunctionStoreRepository.create(),
       recency: MemoryAnalyticsRecencyRepository.create({ evaluations: evaluationRows }),
