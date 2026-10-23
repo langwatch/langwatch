@@ -1,4 +1,4 @@
-// Package bootstrap is the local admin of dynamic-only mode (ADR-184): a
+// Package bootstrap is the local admin of dynamic-only mode (ADR-190): a
 // password generated at every server start, written only to an in-pod tmpfs
 // and valid only from loopback. In-pod helpers (the access sidecar, the backup
 // runner) read it through Read or Client, once per connection.

@@ -96,7 +96,7 @@ func validateObjectStorage(i *Input) []string {
 	return errs
 }
 
-// dynamicOnlyErrors are the inputs dynamic-only mode refuses (ADR-184).
+// dynamicOnlyErrors are the inputs dynamic-only mode refuses (ADR-190).
 func (i *Input) dynamicOnlyErrors() []string {
 	var errs []string
 	const mode = "dynamic-only mode (access.yaml): "

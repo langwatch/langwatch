@@ -117,7 +117,7 @@ spec:
               value: {{ if gt $replicas 1 }}"true"{{ else }}"false"{{ end }}
 
             {{- if $dynamicOnly }}
-            # Dynamic-only (ADR-184): default gets no password; the local
+            # Dynamic-only (ADR-190): default gets no password; the local
             # admin's per-boot password goes to this in-memory volume.
             - name: CLICKHOUSE_ACCESS_BOOTSTRAP_DIR
               value: /run/clickhouse-access
@@ -303,7 +303,7 @@ spec:
 
         {{- if .Values.access.enabled }}
         # Keeps users.d/access-users.yaml current and verifies token logins on
-        # loopback (ADR-184). Same image; it never sees the default password.
+        # loopback (ADR-190). Same image; it never sees the default password.
         - name: access
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}

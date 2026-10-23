@@ -22,7 +22,7 @@ import (
 // File is access.yaml: the issuers token users trust and the users the image
 // renders. Load decodes it strictly and validates it.
 type File struct {
-	// Mode ModeDynamicOnly refuses every long-lived password (ADR-184).
+	// Mode ModeDynamicOnly refuses every long-lived password (ADR-190).
 	Mode    Mode     `yaml:"mode"`
 	Issuers []Issuer `yaml:"issuers"`
 	Users   []User   `yaml:"users"`
@@ -79,7 +79,7 @@ const (
 	// ModeStandard (the default) allows rolling passwords and operator users.
 	ModeStandard Mode = ""
 	// ModeDynamicOnly allows token logins only: no rolling users, default
-	// locked, and a per-boot local admin as the only password (ADR-184).
+	// locked, and a per-boot local admin as the only password (ADR-190).
 	ModeDynamicOnly Mode = "dynamic-only"
 )
 

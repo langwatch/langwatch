@@ -5,7 +5,7 @@ Feature: clickhouse-serverless gives every login a tier, rotates passwords and a
   So that nobody shares the admin password and nothing ships with a default one,
   while a server that has none of this configured behaves as it did before
 
-  # ADR-184 (dev/docs/adr/184-clickhouse-serverless-access-tiers-rolling-passwords-and-token-logins.md).
+  # ADR-190 (dev/docs/adr/190-clickhouse-serverless-access-tiers-rolling-passwords-and-token-logins.md).
   # access.yaml users are rendered into users.d and kept current by `ch-config sidecar`.
 
   @unit
@@ -147,7 +147,7 @@ Feature: clickhouse-serverless gives every login a tier, rotates passwords and a
     When the chart is rendered
     Then it renders as without it, and the install notes say users is deprecated
 
-  # Dynamic-only mode (ADR-184 section 7): tokens only, nothing static to steal.
+  # Dynamic-only mode (ADR-190 section 7): tokens only, nothing static to steal.
 
   @unit
   Scenario: Dynamic-only mode refuses every long-lived password in access.yaml
