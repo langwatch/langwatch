@@ -51,25 +51,38 @@ function useEditorTransport() {
   return { projectId: project?.id, secretNames };
 }
 
-/** The app retains its render-error boundary and overlay policy around feature content. */
+/** Langy's dock sits at this layer; beside it the editor's backdrop stays below. */
+const BELOW_LANGY_DOCK = 1199;
+
+/**
+ * The app retains its render-error boundary and overlay policy around feature content. The
+ * editor fills what the positioner leaves, which stops short of Langy's dock while it is open;
+ * beside Langy the dock stays sharp and usable, so the editor is not modal.
+ */
 export const WorkflowCodeEditorModalHost: WorkflowCodeEditorModalHostApi = ({
   open,
   onRequestClose,
+  besideLangy,
   children,
 }) => (
   <Dialog.Root
     open={open}
     onOpenChange={({ open: nextOpen }) => !nextOpen && onRequestClose()}
     closeOnEscape={false}
+    modal={!besideLangy}
+    closeOnInteractOutside={!besideLangy}
   >
     <Dialog.Content
       margin="8"
-      minWidth="calc(100vw - 64px)"
+      width="calc(100% - 64px)"
+      maxWidth="none"
       height="calc(100vh - 64px)"
       display="flex"
       flexDirection="column"
       overflow="hidden"
-      positionerProps={{ zIndex: 1502 }}
+      pointerEvents="auto"
+      backdropProps={besideLangy ? { zIndex: BELOW_LANGY_DOCK } : undefined}
+      positionerProps={{ zIndex: 1502, pointerEvents: besideLangy ? "none" : undefined }}
     >
       {children}
     </Dialog.Content>

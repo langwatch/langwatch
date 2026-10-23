@@ -49,6 +49,8 @@ export interface WorkflowCodeEditorContractProps {
 export type WorkflowCodeEditorModalHost = (input: {
   open: boolean;
   onRequestClose: () => void;
+  /** Langy is on offer here: the editor leaves its dock in view and usable beside it. */
+  besideLangy: boolean;
   children: ReactNode;
 }) => ReactNode;
 
@@ -187,7 +189,7 @@ export function WorkflowCodeEditorModal({
   const Modal = renderModal;
 
   return (
-    <Modal open={open} onRequestClose={onClose_}>
+    <Modal open={open} onRequestClose={onClose_} besideLangy={assistant !== undefined}>
       <>
         {/* File-tab strip — mimics a single VS Code editor tab so the modal
             reads as "you're editing one file" rather than a generic dialog. */}

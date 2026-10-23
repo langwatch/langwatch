@@ -108,6 +108,13 @@ Feature: Langy writes and edits Studio code blocks from the code editor
   Rule: A proposal is reviewed, never applied silently
 
     @integration
+    Scenario: The code editor leaves Langy's dock in view and usable
+      Given Langy is available on the code block
+      When the code editor is open
+      Then the editor stops short of Langy's dock
+      And the reader can read and type into Langy without closing the editor
+
+    @integration
     Scenario: The open code editor registers its actions with Langy while it is open
       When the code editor opens on a code block with Langy available
       Then Langy holds handlers for exactly studio.code.read and studio.code.propose
