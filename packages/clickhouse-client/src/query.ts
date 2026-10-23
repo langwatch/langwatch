@@ -6,6 +6,8 @@
 
 import type { AbortSignalLike } from "@langwatch/limiter";
 
+import type { IdBoundOptions } from "./idBound.ts";
+
 /** Whether a statement reads or writes, which several policies branch on. */
 export type QueryKind = "read" | "write";
 
@@ -46,6 +48,8 @@ export interface QueryRequest {
    * sweep), so the cold-scan warning stays for accidental ones. A comment above gives the reason.
    */
   SKIP_COLD_SCAN_CHECK?: true | undefined;
+  /** For a statement carrying `{{idBound}}`: a time the caller has, and today's fallback. */
+  idBound?: IdBoundOptions | undefined;
 }
 
 /**

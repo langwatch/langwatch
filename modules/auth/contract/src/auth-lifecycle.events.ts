@@ -7,6 +7,13 @@ export const SSO_AUTO_ADDED_EVENT_TYPE = "lw.auth.sso_auto_added" as const;
 /** A new person, from a Better Auth or passkey sign-up; nurturing derives signed_up. */
 export const SIGNED_UP_EVENT_TYPE = "lw.auth.signed_up" as const;
 
+/** A person opened one of the app's pages with a browser login session. */
+export const APP_PAGE_OPENED_EVENT_TYPE = "lw.auth.app_page_opened" as const;
+
+/** The pages whose opening is announced. */
+export const appPageSchema = z.enum(["me_sessions"]);
+export type AppPage = z.infer<typeof appPageSchema>;
+
 /** A member of some organization minted a session; the tenant is the person. */
 const sessionStartedEventDataSchemaDefinition = z.object({
   tenantId: z.string().min(1),
@@ -44,3 +51,17 @@ const signedUpEventDataSchemaDefinition = z.object({
 export interface SignedUpEventDataSchema extends Named<typeof signedUpEventDataSchemaDefinition> {}
 export const signedUpEventDataSchema: SignedUpEventDataSchema = signedUpEventDataSchemaDefinition;
 export type SignedUpEventData = z.infer<typeof signedUpEventDataSchema>;
+
+/** A person with an organization opened a page in the browser; the tenant is the person. */
+const appPageOpenedEventDataSchemaDefinition = z.object({
+  tenantId: z.string().min(1),
+  userId: z.string().min(1),
+  page: appPageSchema,
+  occurredAt: z.number().int().nonnegative(),
+});
+export interface AppPageOpenedEventDataSchema extends Named<
+  typeof appPageOpenedEventDataSchemaDefinition
+> {}
+export const appPageOpenedEventDataSchema: AppPageOpenedEventDataSchema =
+  appPageOpenedEventDataSchemaDefinition;
+export type AppPageOpenedEventData = z.infer<typeof appPageOpenedEventDataSchema>;

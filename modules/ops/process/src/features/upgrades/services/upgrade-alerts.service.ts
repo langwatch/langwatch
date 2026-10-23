@@ -1,10 +1,14 @@
 import type { MailRender, UpgradeAlertEmailProps } from "@langwatch/mail";
 import type { NotificationService as NotificationApi } from "@langwatch/notification-contract";
+import { createLogger } from "@langwatch/observability";
 
 import type { UpgradeLedgerRepository } from "#repositories/upgrade-ledger.repository";
 import type { PlatformOperatorsService } from "#services/platform-operators.service";
 
 import { type UpgradeAlert, upgradeAlertsBetween } from "../rules/upgrade-alerts.rules.ts";
+import type { UpgradeDiagnosticsService } from "./upgrade-diagnostics.service.ts";
+
+const logger = createLogger("langwatch:ops:upgrade-alerts");
 
 /** The host an operator knows this install by; the bare phrase when no public URL is set. */
 function installationOf(upgradesUrl: string): string {
@@ -15,10 +19,12 @@ function toUpgradeAlertMail({
   alerts,
   upgradesUrl,
   audience,
+  diagnostics,
 }: {
   alerts: UpgradeAlert[];
   upgradesUrl: string;
   audience: UpgradeAlertEmailProps["audience"];
+  diagnostics: UpgradeAlertEmailProps["diagnostics"];
 }): UpgradeAlertEmailProps {
   const failedSteps = alerts.flatMap((alert) =>
     alert.kind === "step-failed"
@@ -42,6 +48,7 @@ function toUpgradeAlertMail({
     audience,
     failedSteps,
     runnerStopped: runner ? { owner: runner.owner, host: runner.host } : null,
+    diagnostics,
   };
 }
 
@@ -59,6 +66,8 @@ export class UpgradeAlertsService {
     upgradesUrl: string;
     /** LangWatch staff read ids and errors on Cloud; a self-hosted operator reads plain words. */
     audience: UpgradeAlertEmailProps["audience"];
+    /** Absent on Cloud, which never sends diagnostics to itself. */
+    diagnostics?: Pick<UpgradeDiagnosticsService, "getAvailability" | "send">;
   }): UpgradeAlertsService {
     return new UpgradeAlertsService(input);
   }
@@ -75,8 +84,9 @@ export class UpgradeAlertsService {
     const alerts = upgradeAlertsBetween({ status, failedSteps: failed.items, since, until });
     if (alerts.length === 0) return alerts;
 
+    const diagnostics = await this.sendDiagnostics({ alerts });
     const { subject, html } = await renderer.renderUpgradeAlert(
-      toUpgradeAlertMail({ alerts, upgradesUrl, audience }),
+      toUpgradeAlertMail({ alerts, upgradesUrl, audience, diagnostics }),
     );
     const recipients = (await operators.list()).flatMap(({ email }) => (email ? [email] : []));
     await Promise.all(
@@ -85,5 +95,37 @@ export class UpgradeAlertsService {
       ),
     );
     return alerts;
+  }
+
+  /**
+   * Sends each newly failed step's diagnostics when the install sends them by itself; the alert
+   * window tells each failure once, so each is sent once. A failed send falls back to the email.
+   */
+  private async sendDiagnostics({
+    alerts,
+  }: {
+    alerts: UpgradeAlert[];
+  }): Promise<UpgradeAlertEmailProps["diagnostics"]> {
+    const { diagnostics } = this.deps;
+    if (!diagnostics) return "download";
+    const availability = await diagnostics.getAvailability().catch((error: unknown) => {
+      logger.warn({ error }, "could not tell whether upgrade diagnostics can be sent");
+      return null;
+    });
+    if (!availability?.available) return "download";
+    if (!availability.automatic) return "send";
+    const stepIds = alerts.flatMap((alert) => (alert.kind === "step-failed" ? [alert.stepId] : []));
+    const sent = await Promise.all(
+      stepIds.map((id) =>
+        diagnostics.send({ id, trigger: "automatic" }).then(
+          () => true,
+          (error: unknown) => {
+            logger.warn({ stepId: id, error }, "upgrade diagnostics were not sent; the email asks");
+            return false;
+          },
+        ),
+      ),
+    );
+    return sent.length > 0 && sent.every(Boolean) ? "sent" : "send";
   }
 }

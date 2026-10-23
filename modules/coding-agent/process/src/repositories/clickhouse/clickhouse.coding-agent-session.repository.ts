@@ -23,6 +23,7 @@ import type {
   CodingAgentReadMetrics,
   CodingAgentSessionListReadOutcome,
   CodingAgentSessionRepository as SessionRepository,
+  OtherSessionKind,
 } from "../coding-agent-session.repository.ts";
 import {
   clickHouseMomentOf,
@@ -34,6 +35,17 @@ import {
 } from "./clickhouse.mapper.ts";
 
 const TABLE_NAME = "coding_agent_sessions" as const;
+
+/** A time predicate spliced into a statement, with the parameters it names. */
+type TimeBound = { sql: string; params: Record<string, number> };
+
+/** The newest version first; ties keep the one that folded the most (ADR-071). */
+const LATEST_SESSION_ORDER = `ORDER BY
+          LastEventOccurredAt DESC,
+          ModelCalls + ToolCalls + Prompts DESC,
+          length(MetricSeries) DESC,
+          length(AppliedEventIds) DESC,
+          StartedAt ASC`;
 
 const asString = (value: unknown): string =>
   typeof value === "string" || typeof value === "number" || typeof value === "bigint"
@@ -471,8 +483,9 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
   }
 
   /**
-   * Reads the latest raw session record without `FINAL`: late signals can move `StartedAt`,
-   * leaving superseded ReplacingMergeTree rows until TTL.
+   * Reads the latest raw session record without `FINAL`: late signals can move `StartedAt`.
+   * A caller's window bounds the outer scan only, since a newer version may sit outside it;
+   * with none, the id index (once ready) bounds both scans to the range all versions span.
    */
   private async findLatestRecord({
     tenantId,
@@ -487,11 +500,29 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
       { tenantId },
       "CodingAgentSessionClickHouseRepository.findBySessionId",
     );
-    const partitionFilter =
-      window !== undefined
-        ? "AND StartedAt BETWEEN fromUnixTimestamp64Milli({from:Int64}) AND fromUnixTimestamp64Milli({to:Int64})"
-        : "";
+    if (window !== undefined) {
+      // A caller's window bounds the outer scan only: a newer version may sit outside it.
+      return this.readLatestRecord({
+        tenantId,
+        sessionId,
+        outer: {
+          sql: "AND StartedAt BETWEEN fromUnixTimestamp64Milli({from:Int64}) AND fromUnixTimestamp64Milli({to:Int64})",
+          params: { from: window.fromMs, to: window.toMs },
+        },
+        inner: { sql: "", params: {} },
+      });
+    }
+    return this.readLatestRecordById({ tenantId, sessionId });
+  }
 
+  /** The latest version by id, both scans bounded by the session id index once ready. */
+  private async readLatestRecordById({
+    tenantId,
+    sessionId,
+  }: {
+    tenantId: string;
+    sessionId: string;
+  }): Promise<Record<string, unknown> | null> {
     const { rows } = await this.clickhouse.query<Record<string, unknown>>({
       tenantId,
       table: TABLE_NAME,
@@ -501,27 +532,58 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
         FROM ${TABLE_NAME}
         WHERE TenantId = {tenantId:String}
           AND SessionId = {sessionId:String}
-          ${partitionFilter}
+          {{idBound:coding_agent_sessions.SessionId:sessionId}}
           AND (TenantId, SessionId, UpdatedAt) IN (
             SELECT TenantId, SessionId, max(UpdatedAt)
             FROM ${TABLE_NAME}
             WHERE TenantId = {tenantId:String}
               AND SessionId = {sessionId:String}
+              {{idBound:coding_agent_sessions.SessionId:sessionId}}
             GROUP BY TenantId, SessionId
           )
-        ORDER BY
-          LastEventOccurredAt DESC,
-          ModelCalls + ToolCalls + Prompts DESC,
-          length(MetricSeries) DESC,
-          length(AppliedEventIds) DESC,
-          StartedAt ASC
+        ${LATEST_SESSION_ORDER}
         LIMIT 1
       `,
-      params: {
-        tenantId,
-        sessionId,
-        ...(window !== undefined ? { from: window.fromMs, to: window.toMs } : {}),
-      },
+      params: { tenantId, sessionId },
+      idBound: { fallback: "unbounded" },
+    });
+    return rows[0] ?? null;
+  }
+
+  private async readLatestRecord({
+    tenantId,
+    sessionId,
+    outer,
+    inner,
+  }: {
+    tenantId: string;
+    sessionId: string;
+    outer: TimeBound;
+    inner: TimeBound;
+  }): Promise<Record<string, unknown> | null> {
+    const { rows } = await this.clickhouse.query<Record<string, unknown>>({
+      tenantId,
+      table: TABLE_NAME,
+      kind: "read",
+      // ID_BOUND_SKIP: a caller's own window on the outer scan, never by the index (ADR-071).
+      sql: `
+        SELECT *
+        FROM ${TABLE_NAME}
+        WHERE TenantId = {tenantId:String}
+          AND SessionId = {sessionId:String}
+          ${outer.sql}
+          AND (TenantId, SessionId, UpdatedAt) IN (
+            SELECT TenantId, SessionId, max(UpdatedAt)
+            FROM ${TABLE_NAME}
+            WHERE TenantId = {tenantId:String}
+              AND SessionId = {sessionId:String}
+              ${inner.sql}
+            GROUP BY TenantId, SessionId
+          )
+        ${LATEST_SESSION_ORDER}
+        LIMIT 1
+      `,
+      params: { tenantId, sessionId, ...outer.params, ...inner.params },
     });
 
     return rows[0] ?? null;
@@ -556,6 +618,42 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
       row: fromRecord(record),
       appliedEventIds: asStringArray(record.AppliedEventIds),
     };
+  }
+
+  /**
+   * Two `LIMIT 1` existence probes. A row-level match can only mistake a helper for main,
+   * which reads as "not first": the safe side.
+   */
+  async findOtherSessionKind({
+    tenantId,
+    excludeSessionIds,
+  }: {
+    tenantId: string;
+    excludeSessionIds: string[];
+  }): Promise<OtherSessionKind> {
+    EventUtils.validateTenantId(
+      { tenantId },
+      "CodingAgentSessionClickHouseRepository.findOtherSessionKind",
+    );
+    const probe = async (extraCondition: string): Promise<boolean> => {
+      const { rows } = await this.clickhouse.query<Record<string, unknown>>({
+        tenantId,
+        table: TABLE_NAME,
+        kind: "read",
+        sql: `
+          SELECT SessionId
+          FROM ${TABLE_NAME}
+          WHERE TenantId = {tenantId:String}
+            AND SessionId NOT IN {excludeSessionIds:Array(String)}
+            ${extraCondition}
+          LIMIT 1
+        `,
+        params: { tenantId, excludeSessionIds },
+      });
+      return rows.length > 0;
+    };
+    if (await probe("AND Auxiliary = 0")) return "main";
+    return (await probe("")) ? "helpers_only" : "none";
   }
 
   /**
@@ -843,6 +941,7 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
       table: TABLE_NAME,
       kind: "read",
       tenantIds,
+      // ID_BOUND_SKIP: a page of sessions, bounded from below by the caller's own time.
       sql: `
           SELECT ${BRANCH_SESSION_COLUMNS}
           FROM ${TABLE_NAME}

@@ -22,6 +22,7 @@ export const experimentWorkbenchRunRest = defineRestRouter(ExperimentV3RestApi)
   // session this door opens on, so publishing it would document an endpoint
   // that answers 401 to everyone reading the reference.
   .post("/execute", "executeExperiment")
+  .keepsRecords()
   .withInput(executionRequestSchema)
   .withPermission("evaluations:manage", { at: "route", param: "projectId" })
   .withoutAudit("run, not a change")
@@ -33,6 +34,7 @@ export const experimentWorkbenchRunRest = defineRestRouter(ExperimentV3RestApi)
 
   // ── POST /abort ────────────────────────────────────────────────────────
   .post("/abort", "abortExperimentRun")
+  .keepsRecords()
   .withInput(abortExperimentRunRequestSchema)
   .withPermission("evaluations:manage", { at: "route", param: "projectId" })
   .withoutAudit("run, not a change")

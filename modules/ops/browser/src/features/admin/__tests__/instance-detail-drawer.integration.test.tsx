@@ -57,6 +57,10 @@ vi.mock("../../../behavior/ops-api.ts", () => ({
             ? { data: byIdState.current.data, error: null, isLoading: false }
             : { data: undefined, error: null, isLoading: false },
       },
+      findDiagnostics: { useQuery: () => ({ data: [], error: null, isLoading: false }) },
+      getDiagnosticsDownload: {
+        useMutation: () => ({ mutate: () => undefined, isPending: false, variables: undefined }),
+      },
     },
   },
 }));

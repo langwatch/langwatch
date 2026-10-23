@@ -31,8 +31,10 @@ import {
   IdempotencyLedger,
   type IdempotentRunner,
   loggerMiddleware,
+  openConfirmationGate,
   recordAnsweredCause,
   RestHost,
+  type RestConfirmationGate,
 } from "@langwatch/api/rest";
 import {
   bindTrpcMiddlewareContext,
@@ -94,7 +96,17 @@ class ApiSurface {
       : void 0;
     const rateLimiter = stores.redis ? members.read("rateLimiter") : void 0;
 
-    return new ApiSurface({ composition, door, sessions, idempotency, rateLimiter });
+    // The module that shows confirmation cards binds the gate; none bound refuses Langy deletes.
+    const confirmations = openConfirmationGate(peers);
+
+    return new ApiSurface({
+      composition,
+      door,
+      sessions,
+      idempotency,
+      rateLimiter,
+      confirmations,
+    });
   }
 
   readonly #rest: RestHost | undefined;
@@ -110,24 +122,33 @@ class ApiSurface {
     sessions,
     idempotency,
     rateLimiter,
+    confirmations,
   }: {
     composition: ApiSurfaceComposition;
     door: ApiDoor;
     sessions: SessionReader;
     idempotency: IdempotentRunner | undefined;
     rateLimiter: RateLimiter | undefined;
+    confirmations: RestConfirmationGate | undefined;
   }) {
     this.composition = composition;
     this.door = door;
     this.sessions = sessions;
-    if (composition.selection.selected.rest) this.#rest = this.#restHost(idempotency, rateLimiter);
+    if (composition.selection.selected.rest) {
+      this.#rest = this.#restHost({ idempotency, rateLimiter, confirmations });
+    }
     if (composition.selection.selected.trpc) this.#trpc = this.#trpcHost(rateLimiter);
   }
 
-  #restHost(
-    idempotency: IdempotentRunner | undefined,
-    rateLimiter: RateLimiter | undefined,
-  ): RestHost {
+  #restHost({
+    idempotency,
+    rateLimiter,
+    confirmations,
+  }: {
+    idempotency: IdempotentRunner | undefined;
+    rateLimiter: RateLimiter | undefined;
+    confirmations: RestConfirmationGate | undefined;
+  }): RestHost {
     return RestHost.create({
       identities: {
         ...this.door.identities,
@@ -139,6 +160,7 @@ class ApiSurface {
       rateLimiter,
       entitlements: this.door.entitlements,
       authz: this.door.authz,
+      confirmations,
     });
   }
 

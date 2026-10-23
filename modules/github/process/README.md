@@ -236,31 +236,31 @@ Public: GitHub App webhook delivery URL: protocol-mandated public endpoint; ever
 Answers at `/api/github/webhook`, `/api/v1/github/webhook`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/github-install.rest.ts:127)
-// Response: inline, src/transport/github-install.rest.ts:130
+// Rawbody: "text" (inline, src/transport/github-install.rest.ts:128)
+// Response: inline, src/transport/github-install.rest.ts:131
 type Response = unknown;
 ```
 
 #### `GET /api/github-langy/setup` · `completeGithubInstallationOnLegacyPath`
 
-Public: GitHub App Setup URL: protocol-mandated public endpoint; all sensitive state is HMAC-signed and bound to the session that started the flow. Declared at `src/transport/github-install.rest.ts:140`.
+Public: GitHub App Setup URL: protocol-mandated public endpoint; all sensitive state is HMAC-signed and bound to the session that started the flow. Declared at `src/transport/github-install.rest.ts:141`.
 
 Answers at `/api/github-langy/setup`, `/api/v1/github-langy/setup`.
 
 ```typescript
-// Response: inline, src/transport/github-install.rest.ts:142
+// Response: inline, src/transport/github-install.rest.ts:143
 type Response = unknown;
 ```
 
 #### `POST /api/github-langy/webhook` · `receiveGithubWebhookOnLegacyPath`
 
-Public: GitHub App webhook delivery URL: protocol-mandated public endpoint; every payload is verified in-handler by its X-Hub-Signature-256 HMAC. Declared at `src/transport/github-install.rest.ts:150`.
+Public: GitHub App webhook delivery URL: protocol-mandated public endpoint; every payload is verified in-handler by its X-Hub-Signature-256 HMAC. Declared at `src/transport/github-install.rest.ts:151`.
 
 Answers at `/api/github-langy/webhook`, `/api/v1/github-langy/webhook`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/github-install.rest.ts:152)
-// Response: inline, src/transport/github-install.rest.ts:155
+// Rawbody: "text" (inline, src/transport/github-install.rest.ts:154)
+// Response: inline, src/transport/github-install.rest.ts:157
 type Response = unknown;
 ```
 

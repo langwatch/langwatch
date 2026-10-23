@@ -1,4 +1,5 @@
 import type {
+  ResolvedRetention,
   RetentionCategory,
   RetroactiveMutationProgress,
 } from "@langwatch/data-retention-contract";
@@ -36,4 +37,18 @@ export interface RetroactiveRetentionRepository {
   findKeepForeverRewrites(input: ClickHouseTarget): Promise<KeepForeverRewrite[]>;
   /** Re-stamps every never-expiring event-log row on one target to be kept forever. */
   startKeepForeverRewrite(input: ClickHouseTarget): Promise<void>;
+  /** The id indexes among `indexes` that retention governs and the target already holds. */
+  findHeldIdIndexes(input: ClickHouseTarget & { indexes: readonly string[] }): Promise<string[]>;
+  /** The tenants with rows in any of the named id indexes on one target. */
+  findIdIndexTenantIds(input: ClickHouseTarget & { indexes: readonly string[] }): Promise<string[]>;
+  /**
+   * Raises the named id indexes' rows on one target to each tenant's retention, never lowering
+   * one; a tenant missing from `retentionByTenant` is left as it is. Answers the tables raised.
+   */
+  raiseIdIndexRetention(
+    input: ClickHouseTarget & {
+      indexes: readonly string[];
+      retentionByTenant: ReadonlyMap<string, ResolvedRetention>;
+    },
+  ): Promise<string[]>;
 }

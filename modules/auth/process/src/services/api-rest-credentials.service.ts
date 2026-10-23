@@ -20,7 +20,6 @@ import {
 } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { HandledError } from "@langwatch/handled-error";
-import { classifyForLangy } from "@langwatch/langy-contract";
 import { createLogger, createWarnThrottle, type Logger } from "@langwatch/observability";
 import { type OrganizationApi } from "@langwatch/organization-contract";
 import { isAggregateProjectKind } from "@langwatch/project-contract";
@@ -31,6 +30,7 @@ import {
   extractApiKeyRequestCredentials,
   type ApiKeyRequestCredentials,
 } from "../rules/api-credential-request.rules.ts";
+import { isUndelegatedForLangy } from "../rules/langy-key-delegation.rules.ts";
 import { ApiKeyHoldsService } from "./api-key-holds.service.ts";
 import {
   ApiOrganizationCredentialsService,
@@ -276,6 +276,7 @@ export class ApiRestCredentialsService {
           userId: resolved.userId,
           organizationId: resolved.organizationId,
           resolvedProject: { id: resolved.project.id, teamId: resolved.project.teamId },
+          ...(resolved.isLangySessionKey ? { isLangySessionKey: true } : {}),
         },
         organizationId: resolved.organizationId,
         markUsed: () => this.apiKeys.markUsed({ id: resolved.apiKeyId }),
@@ -284,10 +285,10 @@ export class ApiRestCredentialsService {
 
     const organization = await this.apiKeys.resolveOrganizationToken({ token: credentials.token });
     if (!organization.ok) throw new ProjectInvalidCredentialsError();
-    const { apiKeyId, userId, organizationId } = organization.resolved;
+    const { apiKeyId, userId, organizationId, isLangySessionKey } = organization.resolved;
 
     return {
-      principal: { kind: "apiKey", apiKeyId, userId, organizationId },
+      principal: { kind: "apiKey", apiKeyId, userId, organizationId, isLangySessionKey },
       organizationId,
       markUsed: () => this.apiKeys.markUsed({ id: apiKeyId }),
     };
@@ -306,6 +307,9 @@ export class ApiRestCredentialsService {
     const { reach } = input;
     const credential = await this.identifyKey({ request: input.request });
     for (const permission of asked(input.permissions)) {
+      if (isUndelegatedForLangy({ key: credential.principal, permission })) {
+        throw new ApiKeyPermissionNotDelegableError(permission, { subject: "Langy" });
+      }
       const allowed = await this.keyHolds.holds({
         principal: credential.principal,
         permission,
@@ -484,9 +488,7 @@ function apiKeyCeilingRefusal({
       "API key ceiling denial",
     );
   }
-  const langy = resolved.isLangySessionKey ? classifyForLangy(permission) : null;
-  if (langy && langy.disposition !== "granted") {
-    return new ApiKeyPermissionNotDelegableError(permission, { subject: "Langy" });
-  }
-  return new ApiKeyPermissionDeniedError(permission);
+  return isUndelegatedForLangy({ key: resolved, permission })
+    ? new ApiKeyPermissionNotDelegableError(permission, { subject: "Langy" })
+    : new ApiKeyPermissionDeniedError(permission);
 }

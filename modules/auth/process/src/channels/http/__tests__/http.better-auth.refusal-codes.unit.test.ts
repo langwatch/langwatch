@@ -1,5 +1,6 @@
 /**
  * @see modules/auth/specs/auth-refusal-codes.feature
+ * @see modules/auth/specs/forced-password-reset.feature
  */
 import { createErrorHandler } from "@langwatch/api";
 import { betterAuth } from "better-auth";
@@ -9,6 +10,7 @@ import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 
 import { findRegisteredRefusals } from "../../../rules/better-auth-error-code.rules.ts";
+import { PASSWORD_RESET_REQUIRED_CODE } from "../http.better-auth-hooks.channel.ts";
 import {
   answerAuthRefusalByRegisteredCode,
   releaseHandledRefusal,
@@ -16,13 +18,28 @@ import {
 
 const BASE = "http://localhost:3000/api/auth";
 
-function refusalHarness() {
+function refusalHarness({ passwordResetRequired = false } = {}) {
   const auth = betterAuth({
     baseURL: "http://localhost:3000",
     secret: "test-secret-test-secret-test-secret",
     database: memoryAdapter({ user: [], session: [], account: [], verification: [] }),
     emailAndPassword: { enabled: true },
     onAPIError: { onError: releaseHandledRefusal },
+    databaseHooks: {
+      session: {
+        create: {
+          // Stands in for the session-create hook's forced-reset refusal.
+          before: async (_session, context) => {
+            if (passwordResetRequired && context?.path === "/sign-in/email") {
+              throw APIError.from("FORBIDDEN", {
+                code: PASSWORD_RESET_REQUIRED_CODE,
+                message: PASSWORD_RESET_REQUIRED_CODE,
+              });
+            }
+          },
+        },
+      },
+    },
     hooks: {
       after: createAuthMiddleware(async (ctx) => {
         answerAuthRefusalByRegisteredCode(ctx);
@@ -84,6 +101,36 @@ describe("sign-in refusals", () => {
 
     const response = await post("/sign-in/email", {
       email: "nobody@company.test",
+      password: "wrong-guess-1",
+    });
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toMatchObject({ code: "identity_sign_in_refused" });
+  });
+});
+
+describe("a password marked as requiring a reset", () => {
+  /** @scenario "The refusal reaches the browser as identity_password_reset_required" */
+  it("answers the correct password under identity_password_reset_required", async () => {
+    const post = refusalHarness({ passwordResetRequired: true });
+    await post("/sign-up/email", HOLDER);
+
+    const response = await post("/sign-in/email", {
+      email: HOLDER.email,
+      password: HOLDER.password,
+    });
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ code: "identity_password_reset_required" });
+  });
+
+  /** @scenario "A wrong password for a marked user is refused like any wrong password" */
+  it("answers a wrong password exactly as for an unmarked account", async () => {
+    const post = refusalHarness({ passwordResetRequired: true });
+    await post("/sign-up/email", HOLDER);
+
+    const response = await post("/sign-in/email", {
+      email: HOLDER.email,
       password: "wrong-guess-1",
     });
 

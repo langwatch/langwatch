@@ -1,14 +1,13 @@
 import type { ClickHouseSettings } from "@clickhouse/client";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import { nowInstant } from "@langwatch/time";
 
 import type { EvaluationAnalyticsClickHouseClient } from "./clickhouse.analytics-persistence.repository.ts";
-import { translateClickHouseQueryError } from "./clickhouse.query-error-translation.mapper.ts";
+import { translatingQueryFailures } from "./clickhouse.query-error-translation.mapper.ts";
 
 /**
- * Adapts the process's routing `clickhouse` member to the per-tenant session Analytics'
- * repositories read through. Every analytics read passes `query`, so a failed read is
- * translated here once the client's retries are spent; inserts keep the raw error.
+ * The per-tenant session Analytics' repositories read their own tenant through. A `query` failure
+ * is translated here once retries are spent; inserts keep the raw error; fenced series reads skip
+ * this session and are translated in `ClickHouseAnalyticsRepository`.
  */
 export class ClickHouseAnalyticsSessionRepository implements EvaluationAnalyticsClickHouseClient {
   static create({
@@ -32,18 +31,15 @@ export class ClickHouseAnalyticsSessionRepository implements EvaluationAnalytics
     format: "JSONEachRow";
     clickhouse_settings?: ClickHouseSettings;
   }): Promise<{ json(): Promise<Record<string, unknown>[]> }> {
-    const startedAt = nowInstant().epochMilliseconds;
-    try {
-      const { rows } = await this.clickhouse.query<Record<string, unknown>>({
+    const { rows } = await translatingQueryFailures(() =>
+      this.clickhouse.query<Record<string, unknown>>({
         tenantId: this.tenantId,
         sql: input.query,
         params: input.query_params,
         settings: input.clickhouse_settings as Record<string, string | number> | undefined,
-      });
-      return { json: () => Promise.resolve(rows) };
-    } catch (error) {
-      throw translateClickHouseQueryError(error, nowInstant().epochMilliseconds - startedAt);
-    }
+      }),
+    );
+    return { json: () => Promise.resolve(rows) };
   }
 
   async insert(input: {

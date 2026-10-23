@@ -264,7 +264,7 @@ describe("trace's project milestones", () => {
   });
 
   it("raise a later trace keyed by the project and the trace's instant", () => {
-    expect(traceReceivedSignal({ data: trace, aggregateId: "project-1" })).toEqual({
+    expect(traceReceivedSignal({ data: trace })).toEqual({
       kind: "trace_received",
       sourceEventId: `project-1:${AT}`,
       ...trace,
