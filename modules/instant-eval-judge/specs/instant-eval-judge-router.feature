@@ -121,6 +121,13 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     And time spent waiting on the rate limiter does not count against the provider timeout
 
   @unit
+  Scenario: Decisions and LLM legs draw on the rate limiter too
+    Given a routed call whose plan escalates two unsure questions to an LLM
+    When it is judged
+    Then the Decisions send and each LLM send wait on the rate limiter first
+    And each leg kind draws on its own per-project share under the deployment's global cap
+
+  @unit
   Scenario: Nothing answered gives the last backend's skip reason
     Given every backend of the plan fails
     When the call is judged
