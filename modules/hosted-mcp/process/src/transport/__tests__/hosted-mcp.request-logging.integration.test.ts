@@ -40,16 +40,16 @@ import { MemoryMcpOAuthClientRepository } from "../../repositories/memory/memory
 import { MemoryMcpSessionRepository } from "../../repositories/memory/memory.mcp-session.repository.ts";
 import { RedisMcpOAuthTokenRepository } from "../../repositories/redis/redis.mcp-oauth-token.repository.ts";
 import type { AuthzMcpSessionGrantService } from "../../services/authz-mcp-session-grant.service.ts";
-import type {
-  HeaderMcpClientAddressService,
-  McpClientAddressSource,
-} from "../../services/header-mcp-client-address.service.ts";
 import type { McpHandler } from "../../services/mcp-endpoint.service.ts";
 import { McpEndpointService } from "../../services/mcp-endpoint.service.ts";
 import type {
   McpLiveProjectLookup,
   ProjectMcpProjectLookupService,
 } from "../../services/project-mcp-project-lookup.service.ts";
+import type {
+  McpClientAddressSource,
+  ResolvedMcpClientAddressService,
+} from "../../services/resolved-mcp-client-address.service.ts";
 import { answerMcpExchange } from "../mcp-endpoint.rest.ts";
 import { FakeCliSessions } from "./support/fake-cli-sessions.ts";
 
@@ -72,9 +72,9 @@ class AlwaysGranted implements Pick<AuthzMcpSessionGrantService, "stillGranted">
   }
 }
 
-class LoopbackAddress implements Pick<HeaderMcpClientAddressService, "clientIp"> {
+class LoopbackAddress implements Pick<ResolvedMcpClientAddressService, "clientIp"> {
   clientIp(request: McpClientAddressSource): string {
-    return request.remoteAddress ?? "127.0.0.1";
+    return request.clientAddress ?? "127.0.0.1";
   }
 }
 

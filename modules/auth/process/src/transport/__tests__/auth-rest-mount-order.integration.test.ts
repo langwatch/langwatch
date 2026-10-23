@@ -6,6 +6,8 @@
 import { publicRoute } from "@langwatch/api/access";
 import {
   BearerIdentity,
+  bindMiddlewareContext,
+  callerAddressContext,
   MANAGEMENT_API_VERSION,
   defineRestRouter,
   RestHost,
@@ -78,6 +80,7 @@ function mountedInInstallOrder() {
     },
     bearers: () => closed,
     audit: { record: async () => {} },
+    middlewareContext: [bindMiddlewareContext(callerAddressContext, () => null)],
   });
   host.mount(authRest.router(), () => door);
   host.mount(cliPlaneRest.router(), () => ({

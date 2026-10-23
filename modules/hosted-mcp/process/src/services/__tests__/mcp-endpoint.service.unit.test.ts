@@ -8,8 +8,8 @@ import { afterAll, describe, expect, it } from "vitest";
 
 import { MemoryHostedMcpRepositories } from "../../repositories/memory/memory.hosted-mcp.repositories.ts";
 import { FakeCliSessions } from "../../transport/__tests__/support/fake-cli-sessions.ts";
-import { HeaderMcpClientAddressService } from "../header-mcp-client-address.service.ts";
 import { McpEndpointService } from "../mcp-endpoint.service.ts";
+import { ResolvedMcpClientAddressService } from "../resolved-mcp-client-address.service.ts";
 
 const BASE_HOST = "https://app.langwatch.ai";
 
@@ -35,7 +35,7 @@ function endpointOver(
     projects: { resolveLiveProjectByApiKey: () => Promise.resolve({ kind: "unknown" }) },
     grants: { stillGranted: () => Promise.resolve(false) },
     cliSessions: new FakeCliSessions(),
-    address: HeaderMcpClientAddressService.create(),
+    address: ResolvedMcpClientAddressService.create(),
     baseHost: BASE_HOST,
     ...overrides,
   });
@@ -57,7 +57,7 @@ function request(input: Partial<McpDoorRequest> & { url: string }): McpDoorReque
   return {
     method: "GET",
     headers: {},
-    remoteAddress: "127.0.0.1",
+    clientAddress: "127.0.0.1",
     readBody: () => Promise.resolve({ kind: "read", body: "" }),
     ...input,
   };

@@ -25,7 +25,7 @@ function requestWithBody(read: Awaited<ReturnType<McpDoorRequest["readBody"]>>):
     method: "POST",
     url: "/oauth/register",
     headers: { "content-type": "text/plain" },
-    remoteAddress: "127.0.0.1",
+    clientAddress: "127.0.0.1",
     readBody: () => Promise.resolve(read),
   };
 }

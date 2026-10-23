@@ -105,7 +105,10 @@ describe("AuthDoorService", () => {
     it("hands Better Auth the caller the platform resolved, over the one it claimed", async () => {
       const world = door();
       const request = signIn();
-      ClientAddress.classifyByAddress().handle({ request, socketAddress: "198.51.100.11" });
+      ClientAddress.fromTrustedProxies({ addresses: [] }).handle({
+        request,
+        socketAddress: "198.51.100.11",
+      });
 
       await world.service.betterAuthHandshake(request);
 
@@ -128,7 +131,10 @@ describe("AuthDoorService", () => {
         },
         body: JSON.stringify({ email: "new@acme.com", password: "hunter2hunter2", name: "New" }),
       });
-      ClientAddress.classifyByAddress().handle({ request, socketAddress: "198.51.100.11" });
+      ClientAddress.fromTrustedProxies({ addresses: [] }).handle({
+        request,
+        socketAddress: "198.51.100.11",
+      });
 
       await world.service.betterAuthHandshake(request);
 

@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 import { RawHttpProtocol } from "@langwatch/api";
+import { ClientAddress } from "@langwatch/api/policy";
 import type {
   HostedMcpApiContract,
   HostedMcpHandler,
@@ -53,13 +54,7 @@ export function answerMcpExchange(input: {
   const closedAt = new Promise<number>((resolve) => {
     response.once("close", () => resolve(nowInstant().epochMilliseconds));
   });
-  const exchange: McpDoorRequest = {
-    method: request.method ?? "GET",
-    url: request.url ?? "",
-    headers: request.headers,
-    remoteAddress: request.socket.remoteAddress,
-    readBody: () => readBody(request),
-  };
+  const exchange = mcpDoorRequest(request);
 
   void endpoint.answer(exchange).then(({ answer, accessLog, onClosed }) => {
     logOnClose({ accessLog, onClosed, response, startedAt, closedAt });
@@ -70,6 +65,17 @@ export function answerMcpExchange(input: {
       return writeAnswer({ answer: failure, runner, request, response });
     });
   });
+}
+
+/** The raw request as plain values; the caller is the address the process resolved. */
+export function mcpDoorRequest(request: IncomingMessage): McpDoorRequest {
+  return {
+    method: request.method ?? "GET",
+    url: request.url ?? "",
+    headers: request.headers,
+    clientAddress: ClientAddress.resolvedFor(request) ?? request.socket.remoteAddress,
+    readBody: () => readBody(request),
+  };
 }
 
 async function writeAnswer(input: {

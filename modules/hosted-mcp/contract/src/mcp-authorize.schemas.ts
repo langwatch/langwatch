@@ -84,8 +84,8 @@ export type McpDoorRequest = Readonly<{
   url: string;
   /** Lower-cased names, as Node reads them. */
   headers: Readonly<Record<string, string | readonly string[] | undefined>>;
-  /** The socket's peer, the address of last resort when no forwarding header names one. */
-  remoteAddress: string | undefined;
+  /** The caller's address as the process resolved it, else the socket's peer. */
+  clientAddress: string | undefined;
   /** Read only by the routes that take a body, after any refusal that needs none. */
   readBody: () => Promise<McpDoorBodyRead>;
 }>;

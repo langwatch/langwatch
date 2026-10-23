@@ -6,7 +6,12 @@
 import { randomUUID } from "node:crypto";
 
 import { ProjectInvalidCredentialsError } from "@langwatch/api";
-import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
+import {
+  bindMiddlewareContext,
+  callerAddressContext,
+  canonicalErrorResponse,
+  createRestRuntime,
+} from "@langwatch/api/rest";
 import { InMemoryProcessStore } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { BugReportRateLimitedError, type BugReport } from "@langwatch/ops-contract";
@@ -109,6 +114,10 @@ describe.skipIf(!DB_URL)("bug reports intake", () => {
     return runtime.mount(opsBugReportRest.router(), {
       app: () => app,
       onError: (error, context) => canonicalErrorResponse(error, context),
+      // Distinct caller per namespace so the rate limiter never bleeds between test runs.
+      middlewareContext: [
+        bindMiddlewareContext(callerAddressContext, () => `test-${testNamespace}`),
+      ],
     });
   }
 
@@ -121,9 +130,6 @@ describe.skipIf(!DB_URL)("bug reports intake", () => {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        // Distinct caller per namespace so the rate limiter never bleeds
-        // between test runs.
-        "x-forwarded-for": `test-${testNamespace}`,
         ...headers,
       },
       body: JSON.stringify(body),

@@ -12,7 +12,6 @@ import { nowInstant } from "@langwatch/time";
 
 import { extractBearerToken, extractSingleHeader } from "../rules/mcp-routes.rules.ts";
 import type { AuthzMcpSessionGrantService } from "./authz-mcp-session-grant.service.ts";
-import type { HeaderMcpClientAddressService } from "./header-mcp-client-address.service.ts";
 import type { McpAnswerService, McpRequest } from "./mcp-answer.service.ts";
 import type { McpCliSessions } from "./mcp-oauth-token.service.ts";
 import { McpRateLimitService } from "./mcp-rate-limit.service.ts";
@@ -20,6 +19,7 @@ import type {
   McpLiveProjectLookup,
   ProjectMcpProjectLookupService,
 } from "./project-mcp-project-lookup.service.ts";
+import type { ResolvedMcpClientAddressService } from "./resolved-mcp-client-address.service.ts";
 
 const logger = createLogger("langwatch:mcp");
 
@@ -63,7 +63,7 @@ type McpCallerAuthCollaborators = Readonly<{
   cliSessions: Pick<McpCliSessions, "getCliAccessSession">;
   projects: Pick<ProjectMcpProjectLookupService, "resolveLiveProjectByApiKey">;
   grants: Pick<AuthzMcpSessionGrantService, "stillGranted">;
-  address: Pick<HeaderMcpClientAddressService, "clientIp">;
+  address: Pick<ResolvedMcpClientAddressService, "clientIp">;
   answers: McpAnswerService;
 }>;
 

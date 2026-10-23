@@ -69,6 +69,7 @@ const TARGET_FILES = new Set([
   "rest/legacy-error.ts",
   "rest/openapi.ts",
   "rest/otlp-path-alias.ts",
+  "rest/request-principal.ts",
   "rest/request.ts",
   "rest/response.ts",
   "rest/response-kind.ts",

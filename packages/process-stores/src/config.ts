@@ -129,6 +129,8 @@ export interface ObjectStorageAccount {
     secretAccessKey: string;
     sessionToken?: string;
   }>;
+  /** Assumed through the pod's web-identity token; when present it wins over `credentials`. */
+  readonly roleArn?: string;
   /** Absent keeps the bucket in the path, which every S3-compatible endpoint accepts. */
   readonly forcePathStyle?: boolean;
 }

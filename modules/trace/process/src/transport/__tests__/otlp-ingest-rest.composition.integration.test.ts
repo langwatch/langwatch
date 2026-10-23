@@ -1,4 +1,5 @@
 import type { ApiKeyApi, ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
+import { ClientAddress } from "@langwatch/api/policy";
 /**
  * @vitest-environment node
  * `POST /api/otel/v1/{...}` against the COMPOSITION-built app and
@@ -246,7 +247,17 @@ function deployment(
       for (const [name, value] of Object.entries({ "X-Auth-Token": TOKEN, ...headers })) {
         if (value !== null) sent[name] = value;
       }
-      return family.request(path, { method: "POST", headers: sent, body: JSON.stringify(body) });
+      const request = new Request(`http://localhost${path}`, {
+        method: "POST",
+        headers: sent,
+        body: JSON.stringify(body),
+      });
+      // As the process's mux does, behind a declared ingress at 10.0.0.1.
+      ClientAddress.fromTrustedProxies({ addresses: ["10.0.0.0/8"] }).handle({
+        request,
+        socketAddress: "10.0.0.1",
+      });
+      return family.request(request);
     }
 
     // Nothing mounted: the same 404 an exporter met while this family was
@@ -455,6 +466,7 @@ describe("given the trace module as a process composes it", () => {
       doorLog.lines.filter((line) => line.msg?.startsWith("Authentication failed"));
 
     /** @scenario A request with no credential header is logged with its fingerprint */
+    /** @scenario "Authentication diagnostics record the resolved address" */
     it("carries the request's fingerprint and says no empty token was sent", async () => {
       const { post } = deployment();
       doorLog.lines.length = 0;
@@ -474,7 +486,7 @@ describe("given the trace module as a process composes it", () => {
         method: "POST",
         userAgent: "otel-exporter/1.2",
         traceparent: "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01",
-        forwardedFor: "203.0.113.9",
+        clientAddress: "203.0.113.9",
         hasEmptyAuthToken: false,
       });
     });

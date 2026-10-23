@@ -11,15 +11,15 @@ import { LiveHostedMcpRepositories } from "../../../repositories/live/live.hoste
 import type { McpSessionCipher } from "../../../repositories/mcp-session.repository.ts";
 import { RedisMcpSessionRepository } from "../../../repositories/redis/redis.mcp-session.repository.ts";
 import type { AuthzMcpSessionGrantService } from "../../../services/authz-mcp-session-grant.service.ts";
-import type {
-  HeaderMcpClientAddressService,
-  McpClientAddressSource,
-} from "../../../services/header-mcp-client-address.service.ts";
 import type { McpHandler } from "../../../services/mcp-endpoint.service.ts";
 import type {
   McpLiveProjectLookup,
   ProjectMcpProjectLookupService,
 } from "../../../services/project-mcp-project-lookup.service.ts";
+import type {
+  McpClientAddressSource,
+  ResolvedMcpClientAddressService,
+} from "../../../services/resolved-mcp-client-address.service.ts";
 import { answerMcpExchange } from "../../mcp-endpoint.rest.ts";
 import { FakeCliSessions } from "./fake-cli-sessions.ts";
 
@@ -68,9 +68,9 @@ class HarnessCipher implements McpSessionCipher {
 }
 
 /** Every replica answers on loopback, so every caller is the same address. */
-class HarnessClientAddress implements Pick<HeaderMcpClientAddressService, "clientIp"> {
+class HarnessClientAddress implements Pick<ResolvedMcpClientAddressService, "clientIp"> {
   clientIp(request: McpClientAddressSource): string {
-    return request.remoteAddress ?? "127.0.0.1";
+    return request.clientAddress ?? "127.0.0.1";
   }
 }
 

@@ -44,9 +44,15 @@ import {
   type ResolvedError,
 } from "../errors.ts";
 import type { RestIdentity } from "../hosting/api-door.ts";
+import { ClientAddress } from "../policy/client-address.ts";
 import type { ResponseCache } from "../ports.ts";
 import { parseApiSchema, type ApiSchema, type ApiSchemaOutput } from "../schema.ts";
 import type { RestDoorCredential } from "./declaration.ts";
+import {
+  REQUEST_PRINCIPAL,
+  type RequestPrincipal,
+  requestPrincipalLogFields,
+} from "./request-principal.ts";
 import type { RestProtocolRefusal } from "./response-kind.ts";
 import {
   DECLARED_ANSWER,
@@ -693,12 +699,14 @@ export async function isBodyAbsent(request: HonoRequest): Promise<boolean> {
 
 /** The request a route reads after the body has been drained to measure it. */
 function withBufferedBody(request: Request, body: Uint8Array<ArrayBuffer>): Request {
-  return new Request(request.url, {
+  const buffered = new Request(request.url, {
     method: request.method,
     headers: request.headers,
     body,
     signal: request.signal,
   });
+
+  return ClientAddress.carried({ from: request, to: buffered });
 }
 
 /** Caps the size of a request body, rejecting anything larger with 413. */
@@ -781,6 +789,7 @@ function logRequestOutcome({
   error,
   start,
   name,
+  clientAddress,
   credential,
   span,
 }: {
@@ -789,6 +798,8 @@ function logRequestOutcome({
   error: unknown;
   start: number;
   name: string | undefined;
+  /** Read when the request arrived: a body cap replaces the request it was resolved on. */
+  clientAddress: string | undefined;
   /** What the request authenticated with, when a door or the key directory noted it. */
   credential: RequestCredential | undefined;
   /** The request's span, open while the request is answered. */
@@ -831,6 +842,11 @@ function logRequestOutcome({
       ...(route ? { route } : {}),
       ...(family ? { family } : {}),
       ...(resolved?.traceId ? { traceId: resolved.traceId } : {}),
+      // The client address is logged on purpose: the access record exists to tell callers apart.
+      ...requestPrincipalLogFields({
+        principal: c.get(REQUEST_PRINCIPAL) as RequestPrincipal | undefined,
+        clientAddress,
+      }),
       ...(projectId ? { projectId } : {}),
       ...(credential ? { credentialType: credential.credentialType } : {}),
     },
@@ -982,6 +998,7 @@ async function logAround({
   slot: CredentialSlot;
 }): Promise<void> {
   const span = trace.getActiveSpan();
+  const clientAddress = ClientAddress.resolvedFor(c.req.raw);
   const start = nowInstant().epochMilliseconds;
   let error: unknown = c.error;
 
@@ -1000,7 +1017,16 @@ async function logAround({
     throw err;
   } finally {
     const logRequest = () =>
-      logRequestOutcome({ logger, c, error, start, name, credential: slot.credential, span });
+      logRequestOutcome({
+        logger,
+        c,
+        error,
+        start,
+        name,
+        credential: slot.credential,
+        span,
+        clientAddress,
+      });
 
     runAfterSSECompletion({
       c,

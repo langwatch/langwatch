@@ -6,7 +6,7 @@ The server half of [auth](../README.md). Signing in and staying signed in: the b
 
 ## Installation
 
-`defineProcessModule("auth").withRepositories(authRepositories).withChannels(authChannels).withApi(AuthModule).withTransports(authTrpcTransport, signInSecurityTrpcTransport, authCliDeviceFlowRest, authRest).withEventing(authEventing).withEventing(authLifecycleEventing).withTasks(…).provideMiddlewareBindings(…)`, `src/auth.module.ts:25`.
+`defineProcessModule("auth").withRepositories(authRepositories).withChannels(authChannels).withApi(AuthModule).withTransports(authTrpcTransport, signInSecurityTrpcTransport, authCliDeviceFlowRest, authRest).withEventing(authEventing).withEventing(authLifecycleEventing).provideMiddlewareContext(…).withTasks(…).provideMiddlewareBindings(…)`, `src/auth.module.ts:26`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -591,20 +591,20 @@ type Response = unknown;
 
 |             |                                        |
 | ----------- | -------------------------------------- |
-| Declared at | `src/transport/auth.rest.ts:112`       |
+| Declared at | `src/transport/auth.rest.ts:110`       |
 | Base URL    | none: each route's path is its address |
 | Addressing  | literal                                |
 | Credential  | project                                |
 
 #### `POST /api/auth/validate` · `validateProjectAuthToken`
 
-Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:117`.
+Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:115`.
 
 Answers at `/api/auth/validate`.
 
 ```typescript
-type Headers = z.infer<typeof VALIDATE_HEADERS>; // src/transport/auth.rest.ts:86
-// Response: inline, src/transport/auth.rest.ts:122
+type Headers = z.infer<typeof VALIDATE_HEADERS>; // src/transport/auth.rest.ts:87
+// Response: inline, src/transport/auth.rest.ts:120
 interface Response {
   projectSlug: string;
 }
@@ -612,46 +612,46 @@ interface Response {
 
 #### `GET /api/auth/session` · `readBrowserAuthSession`
 
-Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:130`.
+Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:126`.
 
 Answers at `/api/auth/session`.
 
 ```typescript
-type Headers = z.infer<typeof COOKIE_HEADERS>; // src/transport/auth.rest.ts:91
-// Response: inline, src/transport/auth.rest.ts:133
+type Headers = z.infer<typeof COOKIE_HEADERS>; // src/transport/auth.rest.ts:89
+// Response: inline, src/transport/auth.rest.ts:129
 type Response = unknown;
 ```
 
 #### `GET /api/auth/logout` · `endBrowserSessionAndRedirect`
 
-Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:138`.
+Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:134`.
 
 Answers at `/api/auth/logout`.
 
 ```typescript
-// Response: inline, src/transport/auth.rest.ts:140
+// Response: inline, src/transport/auth.rest.ts:136
 type Response = unknown;
 ```
 
 #### `POST /api/auth/logout` · `endBrowserSession`
 
-Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:143`.
+Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:139`.
 
 Answers at `/api/auth/logout`.
 
 ```typescript
-// Response: inline, src/transport/auth.rest.ts:147
+// Response: inline, src/transport/auth.rest.ts:143
 type Response = unknown;
 ```
 
 #### `ALL /api/auth/*` · `betterAuthHandshake`
 
-Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:155`.
+Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:151`.
 
 Answers at `/api/auth/*`.
 
 ```typescript
-// Response: inline, src/transport/auth.rest.ts:157
+// Response: inline, src/transport/auth.rest.ts:153
 type Response = unknown;
 ```
 
