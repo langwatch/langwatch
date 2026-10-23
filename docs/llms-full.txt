@@ -65511,6 +65511,7 @@ LangWatch keeps a received bundle for 30 days, in the EU (Frankfurt), and then d
 | `DISABLE_USAGE_STATS=true` | Environment, or `app.telemetry.usage.enabled: false` in the chart | The usage report as a whole. No report leaves the install |
 | Usage counts and onboarding dates | **Settings, Checkup** | The optional category: usage counts, onboarding dates, email domains, model provider names. The report keeps the release, the counts of organizations and projects, and the sign-in method |
 | Hostname | **Settings, Checkup** | The `hostname` field alone. It names your own network, so it has a switch of its own |
+| `DISABLE_LANGWATCH_NOTICES=true` | Environment | The notices LangWatch sends back with the usage report reply, such as a new release or a security fix, shown on **Ops, Upgrades**. The report itself is still sent |
 | Upgrade diagnostics | **Settings, Checkup**, or `DISABLE_UPGRADE_DIAGNOSTICS_AUTO_SEND=true` | The automatic sending of a failed upgrade step's [diagnostics](#upgrade-diagnostics). It is not part of the usage report, and an admin can still send them from the step |
 
 `LANGWATCH_CONNECT_DISABLED=true` is one more switch, for an audit that has to prove absence rather than derive it from the license. With it set the install opens no connection to LangWatch for any reason, see [To LangWatch](#to-langwatch).

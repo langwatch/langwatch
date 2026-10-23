@@ -48,6 +48,16 @@ export interface CioPersonTraits {
   first_trace_at?: number;
   last_trace_at?: number;
 
+  // Coding-agent signals
+  coding_first_session_at?: number;
+  coding_last_session_at?: number;
+  coding_active_days?: number;
+  coding_agent_types?: string[];
+  uses_coding_agent?: boolean;
+
+  // The person's own last page open
+  app_last_opened_at?: number;
+
   // Evaluation milestones
   has_evaluations: boolean;
   evaluation_count?: number;
@@ -134,6 +144,8 @@ export type CioEventName =
   | "first_evaluation_created"
   | "evaluation_ran"
   | "first_simulation_ran"
+  | "coding_agent_first_session"
+  | "sessions_page_viewed"
   | "joined_via_invite"
   | "joined_via_sso"
   | "onboarding_paths_selected"

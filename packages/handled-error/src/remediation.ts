@@ -43,6 +43,14 @@ const registry = {
     ],
   },
 
+  // ---- identity ----
+  identity_password_reset_required: {
+    tips: [
+      "This password may no longer be used; request a reset link from the forgot-password screen and choose a new password",
+      "Signing in through single sign-on, a social provider or a passkey is not affected",
+    ],
+  },
+
   // ---- dataset storage ----
   private_dataplane_unavailable: {
     tips: [

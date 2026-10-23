@@ -346,6 +346,7 @@ export const APP_ERROR_CODES = [
   "identity_passkey_ceremony_failed",
   "identity_passkey_not_recognized",
   "identity_password_rejected",
+  "identity_password_reset_required",
   "identity_primary_must_demote_first",
   "identity_primary_requires_verified",
   "identity_reset_link_invalid",

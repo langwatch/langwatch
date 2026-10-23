@@ -23,7 +23,7 @@ name: gateway-matrix
 # Triggers:
 #   - PR push (path-filtered to gateway-relevant files only — doc-only
 #     PRs don't pay the ~$0.07 cost)
-#   - Nightly cron (catches drift in shared provider infra)
+#   - Nightly, called from nightly.yml (catches drift in shared provider infra)
 #   - Manual workflow_dispatch (with optional provider-tag override)
 # Fork PRs without secrets: the per-job guard skips the live run
 # cleanly so external contributors don't see a phantom CI red.
@@ -56,9 +56,9 @@ on:
       - "modules/gateway/**"
       - "charts/gateway/**"
       - ".github/workflows/gateway-matrix.yaml"
-  schedule:
-    # 04:00 UTC daily — quiet provider tier, runs while EMEA is asleep
-    - cron: "0 4 * * *"
+  # Nightly: the nightly suite (.github/workflows/nightly.yml, 01:00 UTC) calls
+  # this with its secrets inherited. It owns the schedule.
+  workflow_call:
 
 permissions:
   contents: read
