@@ -124,9 +124,7 @@ describe("the daily-insights skill", () => {
       expect(rendered).toContain(
         "- `bad`: it got worse or it is broken. The body says what to do.",
       );
-      expect(rendered).toContain(
-        "- `watch`: it may matter. The body says exactly what to check.",
-      );
+      expect(rendered).toContain("- `watch`: it may matter. The body says exactly what to check.");
       expect(rendered).toContain("Never report an improvement on its own");
       expect(rendered).toContain("- `tone` (required): `bad` or `watch`.");
       expect(rendered).not.toContain("`good`");
