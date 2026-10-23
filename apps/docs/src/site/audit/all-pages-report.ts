@@ -66,7 +66,9 @@ export function scoreDot(score: Cell) {
 }
 
 function score(value: Cell) {
-  return value === null || value === undefined ? "⚪ n/a" : `${scoreDot(value)} ${Math.round(value * 100)}`;
+  return value === null || value === undefined
+    ? "⚪ n/a"
+    : `${scoreDot(value)} ${Math.round(value * 100)}`;
 }
 
 function metricDot({ value, good, poor }: { value: Cell; good: number; poor: number }) {
@@ -111,7 +113,8 @@ function code(path: string) {
 /** The section a page belongs to: its first path segment, or "Top level" for one-segment pages. */
 export function sectionOf(path: string) {
   const segments = path.split("/").filter(Boolean);
-  return segments.length > 1 ? segments[0] : "Top level";
+  const [first] = segments;
+  return segments.length > 1 && first ? first : "Top level";
 }
 
 /** One audited run per page and device; a later shard's run replaces an earlier one. */
@@ -136,7 +139,13 @@ function seoCell(seo: PageSeo | undefined) {
   return seo.issues.length === 0 ? "✅" : `❌ ${seo.issues.map(code).join(", ")}`;
 }
 
-function budgetText({ budgets, formFactor }: { budgets: AllPagesInput["budgets"]; formFactor: AuditRun["formFactor"] }) {
+function budgetText({
+  budgets,
+  formFactor,
+}: {
+  budgets: AllPagesInput["budgets"];
+  formFactor: AuditRun["formFactor"];
+}) {
   return CATEGORIES.map((category) => {
     const minimum = Math.round((budgets.categories[formFactor]?.[category] ?? 0) * 100);
     return `${LABELS[category]} ${minimum === 100 ? "= 100" : `≥ ${minimum}`}`;
@@ -146,13 +155,22 @@ function budgetText({ budgets, formFactor }: { budgets: AllPagesInput["budgets"]
 function headline({ input, run }: { input: AllPagesInput; run: ReturnType<typeof indexRuns> }) {
   const { pages, budgets, seo } = input;
   const lines = ["### 🏁 Headline", ""];
-  const header = ["Profile", "Pages audited", ...CATEGORIES.map((c) => LABELS[c]), "Agentic browsing"];
+  const header = [
+    "Profile",
+    "Pages audited",
+    ...CATEGORIES.map((c) => LABELS[c]),
+    "Agentic browsing",
+  ];
   const rows = FORM_FACTORS.toReversed().map((formFactor) => {
-    const audited = pages.map((path) => usable(run(formFactor, path))).filter((r) => r !== undefined);
+    const audited = pages
+      .map((path) => usable(run(formFactor, path)))
+      .filter((r) => r !== undefined);
     const cells = CATEGORIES.map((category) => {
       const scores = audited.map((r) => r.scores[category]);
       const minimum = budgets.categories[formFactor]?.[category] ?? 0;
-      const passing = scores.filter((value) => typeof value === "number" && value >= minimum).length;
+      const passing = scores.filter(
+        (value) => typeof value === "number" && value >= minimum,
+      ).length;
       return `${score(average(scores))} · ${passing}/${audited.length} pass`;
     });
     const agentic = audited.filter((r) => r.agentic && r.agentic.passed === r.agentic.applicable);
@@ -170,7 +188,7 @@ function headline({ input, run }: { input: AllPagesInput; run: ReturnType<typeof
   lines.push(
     `**On-page SEO:** ${clean === seo.length ? "✅" : "❌"} ${clean}/${seo.length} pages pass every check.`,
     "",
-    "Scores are averages; \"pass\" counts pages at or above the docs budget. Informational: the budgets gate only the representative pages in the `audit` job.",
+    'Scores are averages; "pass" counts pages at or above the docs budget. Informational: the budgets gate only the representative pages in the `audit` job.',
     "",
   );
   return lines;
@@ -179,7 +197,9 @@ function headline({ input, run }: { input: AllPagesInput; run: ReturnType<typeof
 function vitals({ input, run }: { input: AllPagesInput; run: ReturnType<typeof indexRuns> }) {
   const header = ["Profile", ...METRICS.map(([, label]) => `${label} p75`), "Worst LCP"];
   const rows = FORM_FACTORS.toReversed().map((formFactor) => {
-    const audited = input.pages.map((path) => usable(run(formFactor, path))).filter((r) => r !== undefined);
+    const audited = input.pages
+      .map((path) => usable(run(formFactor, path)))
+      .filter((r) => r !== undefined);
     const worst = audited.toSorted(
       (a, b) => (b.metrics.largestContentfulPaint ?? 0) - (a.metrics.largestContentfulPaint ?? 0),
     )[0];
@@ -193,7 +213,12 @@ function vitals({ input, run }: { input: AllPagesInput; run: ReturnType<typeof i
         : "n/a",
     ];
   });
-  return ["### ⏱ Core Web Vitals (lab, 75th percentile over pages)", "", ...table(header, rows), ""];
+  return [
+    "### ⏱ Core Web Vitals (lab, 75th percentile over pages)",
+    "",
+    ...table(header, rows),
+    "",
+  ];
 }
 
 /** The pages scoring lowest in a category on either device, only those below 100. */
@@ -217,16 +242,25 @@ function worstPages({
   if (below.length === 0) return [title, "", "Every audited page scores 100 on both devices.", ""];
   const extra =
     category === "performance" ? (["📱 LCP", "📱 TBT", "📱 CLS"] as const) : ([] as const);
-  const metricOf = { "📱 LCP": "largestContentfulPaint", "📱 TBT": "totalBlockingTime", "📱 CLS": "cumulativeLayoutShift" } as const;
-  const rows = below.slice(0, WORST).map((path) => [
-    code(path),
-    ...FORM_FACTORS.toReversed().map((formFactor) =>
-      score(usable(run(formFactor, path))?.scores[category]),
-    ),
-    ...extra.map((label) =>
-      metricCell({ metric: metricOf[label], value: usable(run("mobile", path))?.metrics[metricOf[label]] }),
-    ),
-  ]);
+  const metricOf = {
+    "📱 LCP": "largestContentfulPaint",
+    "📱 TBT": "totalBlockingTime",
+    "📱 CLS": "cumulativeLayoutShift",
+  } as const;
+  const rows = below
+    .slice(0, WORST)
+    .map((path) => [
+      code(path),
+      ...FORM_FACTORS.toReversed().map((formFactor) =>
+        score(usable(run(formFactor, path))?.scores[category]),
+      ),
+      ...extra.map((label) =>
+        metricCell({
+          metric: metricOf[label],
+          value: usable(run("mobile", path))?.metrics[metricOf[label]],
+        }),
+      ),
+    ]);
   const shown = Math.min(WORST, below.length);
   return [
     title,
@@ -244,7 +278,10 @@ function seoSection({ input }: { input: AllPagesInput }) {
     input.seo.filter((page) => page.issues.some((issue) => codes.includes(issue))).length;
   const rows = SEO_CHECKS.map(([label, codes]) => {
     const failed = failing(codes);
-    return [label, `${failed === 0 ? "✅" : "❌"} ${input.seo.length - failed}/${input.seo.length}`];
+    return [
+      label,
+      `${failed === 0 ? "✅" : "❌"} ${input.seo.length - failed}/${input.seo.length}`,
+    ];
   });
   lines.push(...table(["Check", "Pages passing"], rows), "");
   const worst = input.seo
@@ -254,7 +291,10 @@ function seoSection({ input }: { input: AllPagesInput }) {
     lines.push(
       `<details><summary>${worst.length} pages with gaps (the worst ${Math.min(WORST, worst.length)})</summary>`,
       "",
-      ...table(["Page", "Gaps"], worst.slice(0, WORST).map((page) => [code(page.path), page.issues.map(code).join(", ")])),
+      ...table(
+        ["Page", "Gaps"],
+        worst.slice(0, WORST).map((page) => [code(page.path), page.issues.map(code).join(", ")]),
+      ),
       "",
       "</details>",
       "",
@@ -282,7 +322,8 @@ function errors({ input, run }: { input: AllPagesInput; run: ReturnType<typeof i
         `- ${DEVICES[formFactor]}: ${missing.length} pages not audited (a shard did not report), such as ${missing.slice(0, 5).map(code).join(", ")}`,
       );
     for (const line of failed.slice(0, 20)) lines.push(`- ${ICONS[formFactor]} ${line}`);
-    if (failed.length > 20) lines.push(`- ${ICONS[formFactor]} and ${failed.length - 20} more Lighthouse errors`);
+    if (failed.length > 20)
+      lines.push(`- ${ICONS[formFactor]} and ${failed.length - 20} more Lighthouse errors`);
   }
   if (lines.length === 0) return [];
   return ["### ⚠️ Pages without scores", "", ...lines, ""];
@@ -293,7 +334,8 @@ export function fullTable({ input }: { input: AllPagesInput }) {
   const run = indexRuns({ runs: input.runs });
   const seo = new Map(input.seo.map((page) => [page.path, page]));
   const sections = new Map<string, string[]>();
-  for (const path of input.pages) sections.set(sectionOf(path), [...(sections.get(sectionOf(path)) ?? []), path]);
+  for (const path of input.pages)
+    sections.set(sectionOf(path), [...(sections.get(sectionOf(path)) ?? []), path]);
   const header = [
     "Page",
     ...FORM_FACTORS.toReversed().flatMap((formFactor) =>
@@ -321,8 +363,14 @@ export function fullTable({ input }: { input: AllPagesInput }) {
         ...FORM_FACTORS.toReversed().flatMap((formFactor) =>
           CATEGORIES.map((category) => score(usable(run(formFactor, path))?.scores[category])),
         ),
-        metricCell({ metric: "largestContentfulPaint", value: mobile?.metrics.largestContentfulPaint }),
-        metricCell({ metric: "cumulativeLayoutShift", value: mobile?.metrics.cumulativeLayoutShift }),
+        metricCell({
+          metric: "largestContentfulPaint",
+          value: mobile?.metrics.largestContentfulPaint,
+        }),
+        metricCell({
+          metric: "cumulativeLayoutShift",
+          value: mobile?.metrics.cumulativeLayoutShift,
+        }),
         `${agenticCell(run("desktop", path))} / ${agenticCell(run("mobile", path))}`,
         seoCell(seo.get(path)),
       ];
@@ -359,12 +407,19 @@ export function allPagesMarkdown({ input }: { input: AllPagesInput }) {
     ...seoSection({ input }),
     ...errors({ input, run }),
   ];
-  const all = [`### 📋 Every page (${input.pages.length}), by section`, "", ...fullTable({ input })];
+  const all = [
+    `### 📋 Every page (${input.pages.length}), by section`,
+    "",
+    ...fullTable({ input }),
+  ];
   const full = [...top, ...all, ...footer({ input })].join("\n") + "\n";
   if (full.length <= COMMENT_LIMIT) return { comment: full, full, inline: true };
   const link = input.fullReportUrl
     ? `The table of every page does not fit in a comment: it is in the [run summary](${input.fullReportUrl}) and the \`docs-lighthouse-all-report\` artifact.`
     : "The table of every page does not fit in a comment: it is in the run summary and the `docs-lighthouse-all-report` artifact.";
-  const comment = [...top, `### 📋 Every page (${input.pages.length})`, "", link, "", ...footer({ input })].join("\n") + "\n";
+  const comment =
+    [...top, `### 📋 Every page (${input.pages.length})`, "", link, "", ...footer({ input })].join(
+      "\n",
+    ) + "\n";
   return { comment, full, inline: false };
 }

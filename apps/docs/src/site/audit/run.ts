@@ -8,6 +8,7 @@ import { parseArgs } from "node:util";
 import { nowInstant } from "@langwatch/time";
 import { z } from "zod";
 
+import { DOCS_URL } from "../../lib/site-path.ts";
 import { docsRoot } from "../../paths.ts";
 import { startPreview } from "../preview-server.ts";
 import { agentReadinessMarkdown, agentReadinessReport } from "./agent-readiness-report.ts";
@@ -23,7 +24,6 @@ import {
   type PageBudget,
 } from "./budgets.ts";
 import { summaryMarkdown } from "./report.ts";
-import { DOCS_URL } from "../../lib/site-path.ts";
 import {
   applyKnownIssues,
   builtBasePath,
@@ -44,7 +44,7 @@ const shard = z
   .string()
   .regex(/^\d+\/\d+$/, "use --shard <index>/<count>, counting from 1")
   .transform((value) => {
-    const [index, count] = value.split("/").map(Number);
+    const [index = 0, count = 0] = value.split("/").map(Number);
     return { index, count };
   })
   .refine(({ index, count }) => index >= 1 && index <= count, "the shard index runs 1..count");
