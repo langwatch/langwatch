@@ -184,11 +184,27 @@ export const JOB_RETRY_CONFIG = {
   maxBackoffMs: 600_000,
 } as const;
 
-/** The attempts a failure may use: an overload names a retry delay and gets the longer budget. */
-export function attemptBudgetOf(decision: { retryAfterMs?: number }): number {
-  return decision.retryAfterMs === undefined
-    ? JOB_RETRY_CONFIG.maxAttempts
-    : JOB_RETRY_CONFIG.maxOverloadedAttempts;
+/**
+ * The attempts a failure may use: an overload names a retry delay and gets the longer budget.
+ * An ordinary failure gets its own rungs on top of the overload retries already spent.
+ */
+export function attemptBudgetOf({
+  decision,
+  overloadAttempts,
+}: {
+  decision: { retryAfterMs?: number };
+  overloadAttempts: number;
+}): number {
+  if (decision.retryAfterMs !== undefined) return JOB_RETRY_CONFIG.maxOverloadedAttempts;
+  return Math.min(
+    JOB_RETRY_CONFIG.maxAttempts + overloadAttempts,
+    JOB_RETRY_CONFIG.maxOverloadedAttempts,
+  );
+}
+
+/** Carried in job data only once an overload retry was spent, so other jobs encode unchanged. */
+function overloadAttemptsField(count: number): { __overloadAttempts?: number } {
+  return count > 0 ? { __overloadAttempts: count } : {};
 }
 
 export function getBackoffMs(attempt: number): number {
@@ -323,6 +339,7 @@ const INTERNAL_FIELDS = [
   "__dispatchScore",
   "__attempt",
   "__handedBackSince",
+  "__overloadAttempts",
 ] as const;
 
 /**
@@ -387,6 +404,8 @@ type ClaimedJob<Payload> = {
   jobAttempt: number;
   /** When a worker first handed this job back for want of a handler; absent if none has. */
   handedBackSince: number | undefined;
+  /** Retries this job spent on failures that named a retry delay (an overloaded server). */
+  overloadAttempts: number;
   jobName: string;
   routingLabels: { queue_name: string; pipeline_name: string; job_type: string; job_name: string };
   batchPayloads: Payload[] | null;
@@ -1698,6 +1717,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     const attempt = Math.max(jobAttempt, await (groupAttempt ?? this.readGroupAttempt(groupId)));
     const handedBackSince =
       typeof jobData.__handedBackSince === "number" ? jobData.__handedBackSince : undefined;
+    const overloadAttempts =
+      typeof jobData.__overloadAttempts === "number" ? jobData.__overloadAttempts : 0;
     // Checked, not asserted: these become Prometheus label values, and `??`
     // would let a non-string through to be stringified into one.
     const pipelineName = nonEmptyString(jobData.__pipelineName) ?? "unknown";
@@ -1727,6 +1748,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       attempt,
       jobAttempt,
       handedBackSince,
+      overloadAttempts,
       jobName,
       routingLabels,
     };
@@ -2146,7 +2168,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     span.recordException(error);
     span.setStatus({ code: SpanStatusCode.ERROR });
     const [quarantineError] = await this.quarantineErrors({ job, error, isRetryable });
-    if (isRetryable && attempt < attemptBudgetOf(decision) && !quarantineError) {
+    const budget = attemptBudgetOf({ decision, overloadAttempts: job.overloadAttempts });
+    if (isRetryable && attempt < budget && !quarantineError) {
       await this.retryClaimedJob({ job, error, decision, stopHeartbeat });
       return;
     }
@@ -2263,6 +2286,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
           __context: contextMetadata,
           __attempt: attempt + 1,
           ...(job.handedBackSince === undefined ? {} : { __handedBackSince: job.handedBackSince }),
+          ...overloadAttemptsField(
+            job.overloadAttempts + (decision.retryAfterMs === undefined ? 0 : 1),
+          ),
         },
         groupId,
       });
@@ -2356,7 +2382,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
         groupId,
         stagedJobId,
         attempt,
-        maxAttempts: attemptBudgetOf(decision),
+        maxAttempts: attemptBudgetOf({ decision, overloadAttempts: job.overloadAttempts }),
         backoffMs,
         // The whole Error, not `error.message`: the serializer emits
         // the stack, and for a handler crash the stack IS the
@@ -2394,6 +2420,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
           __context: contextMetadata,
           __attempt: attempt,
           __handedBackSince: since,
+          ...overloadAttemptsField(job.overloadAttempts),
         },
         groupId,
       });

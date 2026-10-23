@@ -129,6 +129,15 @@ Feature: GroupQueue batch bisection
     Then it is re-staged with backoff instead of blocking its group
     And its group blocks only once the longer overload budget is spent
 
+  # Overload retries are not the job's own failures, so a job that rode them out
+  # still has its ordinary rungs once the server recovers.
+  @unit @bisection
+  Scenario: An ordinary failure after an overload spell still gets its ordinary budget
+    Given a job that spent its earlier retries on failures that named a retry delay
+    When it fails with a failure that names no retry delay
+    Then it is re-staged with backoff until it has used the ordinary budget on top of those retries
+    And it never retries past the overload budget
+
   @integration @coalescing @bisection
   Scenario: Splitting is bounded within one locked attempt
     Given a handler that only ever accepts a single payload
