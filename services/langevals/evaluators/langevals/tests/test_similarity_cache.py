@@ -251,9 +251,11 @@ APP_SIDE = Path("modules/evaluation/process/src/features/execution/services/eval
 
 def test_the_project_env_var_is_the_one_the_app_sets():
     """The app names the variable in TypeScript; a rename on either side must fail here."""
-    root = next((p for p in Path(__file__).resolve().parents if (p / APP_SIDE).is_file()), None)
+    marker = Path("modules/catalogue.json")
+    root = next((p for p in Path(__file__).resolve().parents if (p / marker).is_file()), None)
     if root is None:
         pytest.skip("not run from a LangWatch checkout")
+    assert (root / APP_SIDE).is_file(), f"{APP_SIDE} moved: point this check at its new path"
     source = (root / APP_SIDE).read_text()
     match = re.search(r'export const EVALUATION_PROJECT_ENV = "([A-Z_]+)";', source)
     assert match, f"EVALUATION_PROJECT_ENV is no longer declared in {APP_SIDE}"
