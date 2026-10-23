@@ -157,6 +157,14 @@ Feature: A read that cannot be pruned must still be bounded
     Then ClickHouse applies the read's own limit
     And a read that limits only its rows is still refused past the default size
 
+  # `break` asks ClickHouse for a partial result on overflow. A default ceiling under it would
+  # truncate the read silently, so a read that chose `break` keeps exactly the limits it named.
+  @unit
+  Scenario: A read that asks for a partial result on overflow keeps only its own limits
+    Given a read that buffers its whole result and asks for a partial result on overflow
+    When it is sent to ClickHouse
+    Then no default size limit is added to it
+
   @unit
   Scenario: A read that streams its result batch by batch is not capped by size
     Given a read that streams its result

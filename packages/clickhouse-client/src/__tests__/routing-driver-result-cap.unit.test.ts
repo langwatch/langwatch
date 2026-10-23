@@ -110,6 +110,7 @@ describe("routingDriver result size", () => {
   });
 
   describe("when a buffered read asks for a partial result on overflow", () => {
+    /** @scenario "A read that asks for a partial result on overflow keeps only its own limits" */
     it("leaves its settings as they are, so no limit of ours silently truncates it", async () => {
       const { client, connection, sentSettings } = routed();
       try {

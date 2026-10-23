@@ -2,6 +2,7 @@
  * The traces-with-spans memory-limit fallback must not exhaust the heap. On
  * OOM the read retries in batches, merged into one map. Spec:
  * specs/clickhouse/bounded-reads.feature */
+import { HandledError } from "@langwatch/handled-error";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TraceCanonicalisationService } from "#features/derivation/services/trace-canonicalisation.service";
@@ -11,6 +12,17 @@ import { traceSummaryRow } from "../../../../../repositories/clickhouse/__tests_
 import { mappedLegacyRead } from "./support/legacy-trace-mapping.support.ts";
 
 const OWN_READ = ownProof({ projectId: "proj-1" });
+
+/** The resilient client's translation of a driver failure, named here as the sibling suite does. */
+class WrappedClickHouseError extends HandledError {
+  constructor(reasons: Error[]) {
+    super("clickhouse_unavailable" as never, "The analytics store could not answer this query", {
+      httpStatus: 503,
+      fault: "platform",
+      reasons,
+    });
+  }
+}
 
 const mockClickHouseQuery = vi.hoisted(() => vi.fn());
 
@@ -91,11 +103,14 @@ function clickHouseThatOOMsThenBatches({
   spansPerTrace,
   firstRefusal = "Code: 241. DB::Exception: MEMORY_LIMIT_EXCEEDED",
   maxTracesByBytes = Number.POSITIVE_INFINITY,
+  wrapBytesRefusal = false,
 }: {
   spansPerTrace: number;
   firstRefusal?: string;
   /** A batched read covering more traces than this is refused on its result size. */
   maxTracesByBytes?: number;
+  /** Refuse as production does: a handled error carrying the driver's exception in `reasons`. */
+  wrapBytesRefusal?: boolean;
 }) {
   let refusedOnce = false;
   const spanReadSettings: Record<string, unknown>[] = [];
@@ -115,9 +130,10 @@ function clickHouseThatOOMsThenBatches({
         }
         spanReadSettings.push(args.clickhouse_settings ?? {});
         if (ids.length > maxTracesByBytes) {
-          throw new Error(
+          const refusal = new Error(
             "Code: 396. DB::Exception: Limit for result exceeded, max bytes: 256.00 MiB. (TOO_MANY_ROWS_OR_BYTES)",
           );
+          throw wrapBytesRefusal ? new WrappedClickHouseError([refusal]) : refusal;
         }
 
         const rowCount = ids.length * spansPerTrace;
@@ -334,6 +350,24 @@ describe("the traces-with-spans memory-limit fallback", () => {
 
       expect(traces).toHaveLength(60);
       expect(spanReadSettings.length).toBeGreaterThan(3);
+    });
+
+    /** @scenario "A batch refused for its result size is split until it fits" */
+    it("splits the batch when the refusal arrives wrapped in a handled error", async () => {
+      clickHouseThatOOMsThenBatches({ spansPerTrace: 1, maxTracesByBytes: 4, wrapBytesRefusal: true });
+      const service = mappedLegacyRead({
+        resolveClickHouseClient: testResolveClickHouseClient,
+        traceCanonicalisation,
+      });
+
+      const traces = await service.findTracesWithSpans({
+        authorization: OWN_READ,
+        projectId: PROJECT,
+        traceIds: traceIds(60),
+        protections: openProtections,
+      });
+
+      expect(traces).toHaveLength(60);
     });
 
     /** @scenario "A single trace too large to hold is refused naming the size limit" */
