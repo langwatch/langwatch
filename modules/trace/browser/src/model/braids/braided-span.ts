@@ -1,11 +1,9 @@
-import { featureProjectColour } from "@langwatch/design-system/feature-project-colour";
 import type { BraidedOwner, SpanTreeNode } from "@langwatch/trace-contract";
 
-/** How a braided span is drawn: the owner's name and its strand colour token. */
+/** How a braided span is drawn: the project it came from, by name. */
 export interface BraidStrand {
   ownerProjectId: string;
   ownerName: string;
-  colour: string;
 }
 
 export const BRAIDED_ACTION_DISABLED_REASON = "Not available on spans braided from another project";
@@ -19,29 +17,7 @@ export function spanNodeKey(span: Pick<SpanTreeNode, "spanId" | "ownerProjectId"
   return span.ownerProjectId ? JSON.stringify([span.ownerProjectId, span.spanId]) : span.spanId;
 }
 
-/**
- * Each owner's colour, in header order: the colour the Braids page gives its project, else, when
- * an earlier owner holds it, the next one free. Past three owners colours repeat.
- */
-export function braidColourIndexes(
-  owners: readonly Pick<BraidedOwner, "projectId">[],
-): Map<string, number> {
-  const indexes = new Map<string, number>();
-  const taken = new Set<number>();
-  for (const { projectId } of owners) {
-    if (indexes.has(projectId)) continue;
-    const { index: own, count } = featureProjectColour({ feature: "braids", projectId });
-    const free = Array.from({ length: count }, (_, step) => ((own - 1 + step) % count) + 1).find(
-      (index) => !taken.has(index),
-    );
-    const index = free ?? own;
-    taken.add(index);
-    indexes.set(projectId, index);
-  }
-  return indexes;
-}
-
-/** A braided span's strand: its owner's name and colour from the header; null on an own span. */
+/** A braided span's strand: its owner's name from the header; null on an own span. */
 export function braidStrandFor({
   ownerProjectId,
   owners,
@@ -50,14 +26,10 @@ export function braidStrandFor({
   owners: readonly BraidedOwner[] | null | undefined;
 }): BraidStrand | null {
   if (!ownerProjectId) return null;
-  const index =
-    braidColourIndexes(owners ?? []).get(ownerProjectId) ??
-    featureProjectColour({ feature: "braids", projectId: ownerProjectId }).index;
   return {
     ownerProjectId,
     ownerName:
       owners?.find((owner) => owner.projectId === ownerProjectId)?.name ?? "another project",
-    colour: `feature.braids.project.${index}`,
   };
 }
 

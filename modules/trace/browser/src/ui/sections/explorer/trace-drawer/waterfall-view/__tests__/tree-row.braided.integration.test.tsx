@@ -50,11 +50,7 @@ describe("given a trace holding braided spans", () => {
         />
         <TreeRow
           node={{ span: braidedSpan, children: [], depth: 0, isOrphaned: false }}
-          braid={{
-            ownerProjectId: "specialists",
-            ownerName: "Specialists",
-            colour: "feature.braids.project.1",
-          }}
+          braid={{ ownerProjectId: "specialists", ownerName: "Specialists" }}
           {...rowProps}
         />
       </>,

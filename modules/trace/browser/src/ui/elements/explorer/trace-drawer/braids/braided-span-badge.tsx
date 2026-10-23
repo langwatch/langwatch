@@ -5,8 +5,8 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { BraidStrand } from "../../../../../model/braids/braided-span.ts";
 
 /**
- * Names the project a braided span came from, in that project's colour. Compact, it is the mark
- * alone in that colour, naming the owner in its tooltip and accessible label.
+ * Names the project a braided span came from, drawn as the row's model pill is. Compact, it is
+ * the mark alone, naming the owner in its tooltip and accessible label.
  */
 export function BraidedSpanBadge({
   strand,
@@ -24,11 +24,11 @@ export function BraidedSpanBadge({
           as="span"
           display="inline-flex"
           flexShrink={0}
-          color={strand.colour}
+          color="fg.muted"
           data-testid="braided-span-badge"
           data-compact="true"
         >
-          <FeatureMark feature="braids" size={12} variant="mono" label={label} />
+          <FeatureMark feature="braids" size={12} label={label} />
         </Box>
       </Tooltip>
     );
@@ -42,12 +42,13 @@ export function BraidedSpanBadge({
         paddingX={1.5}
         borderRadius="full"
         borderWidth="1px"
-        borderColor={strand.colour}
-        color={strand.colour}
+        borderColor="border.muted"
+        bg="bg.subtle"
+        color="fg.muted"
         data-testid="braided-span-badge"
       >
-        <FeatureMark feature="braids" size={12} variant="mono" />
-        <Text as="span" textStyle="2xs" color="fg" whiteSpace="nowrap" lineHeight={1.4}>
+        <FeatureMark feature="braids" size={10} />
+        <Text as="span" textStyle="2xs" whiteSpace="nowrap" lineHeight={1.4}>
           {strand.ownerName}
         </Text>
       </HStack>

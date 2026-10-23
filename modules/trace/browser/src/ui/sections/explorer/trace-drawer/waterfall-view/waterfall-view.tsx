@@ -385,7 +385,6 @@ export const WaterfallView = memo(function WaterfallView({
           COLLAPSE_TIMELINE_BELOW_PX; nothing to divide or show. */}
       {showTimeline && (
         <TimelinePanel
-          braidedOwners={braidedOwners}
           flatRows={flatRows}
           onDividerStart={handleDividerStart}
           onSelectSpan={handleSelectSpan}
@@ -800,7 +799,6 @@ function WaterfallVirtualRow({
  * below COLLAPSE_TIMELINE_BELOW_PX — there is nothing left to divide or show.
  */
 function TimelinePanel({
-  braidedOwners,
   flatRows,
   onDividerStart,
   onSelectSpan,
@@ -814,7 +812,6 @@ function TimelinePanel({
   virtualItems,
   visibleTimeMarkers,
 }: {
-  braidedOwners: WaterfallViewProps["braidedOwners"];
   flatRows: ReturnType<typeof flattenTree>;
   onDividerStart: (e: React.MouseEvent) => void;
   onSelectSpan: (spanId: string) => void;
@@ -979,12 +976,6 @@ function TimelinePanel({
                 >
                   <TimelineBar
                     span={node.span}
-                    colour={
-                      braidStrandFor({
-                        ownerProjectId: node.span.ownerProjectId,
-                        owners: braidedOwners,
-                      })?.colour
-                    }
                     rootStart={rootStart}
                     rootDuration={rootDuration}
                     rowHeight={virtualRow.size}
