@@ -140062,6 +140062,7 @@ type GetApiCodingAgentPullRequestUsageResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *struct {
 		ModelBreakdown []struct {
+			AiUnits             *float32 `json:"aiUnits"`
 			CacheCreationTokens float32  `json:"cacheCreationTokens"`
 			CacheReadTokens     float32  `json:"cacheReadTokens"`
 			CostUsd             *float32 `json:"costUsd"`
@@ -148514,6 +148515,7 @@ type GetPullRequestUsageResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *struct {
 		ModelBreakdown []struct {
+			AiUnits             *float32 `json:"aiUnits"`
 			CacheCreationTokens float32  `json:"cacheCreationTokens"`
 			CacheReadTokens     float32  `json:"cacheReadTokens"`
 			CostUsd             *float32 `json:"costUsd"`
@@ -169175,6 +169177,7 @@ func ParseGetApiCodingAgentPullRequestUsageResponse(rsp *http.Response) (*GetApi
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
 			ModelBreakdown []struct {
+				AiUnits             *float32 `json:"aiUnits"`
 				CacheCreationTokens float32  `json:"cacheCreationTokens"`
 				CacheReadTokens     float32  `json:"cacheReadTokens"`
 				CostUsd             *float32 `json:"costUsd"`
@@ -178869,6 +178872,7 @@ func ParseGetPullRequestUsageResponse(rsp *http.Response) (*GetPullRequestUsageR
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
 			ModelBreakdown []struct {
+				AiUnits             *float32 `json:"aiUnits"`
 				CacheCreationTokens float32  `json:"cacheCreationTokens"`
 				CacheReadTokens     float32  `json:"cacheReadTokens"`
 				CostUsd             *float32 `json:"costUsd"`

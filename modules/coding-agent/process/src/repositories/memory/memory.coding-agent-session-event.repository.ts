@@ -86,6 +86,7 @@ export class MemoryCodingAgentSessionEventRepository extends CodingAgentSessionE
       row.cacheReadTokens += held.cacheReadTokens;
       row.cacheCreationTokens += held.cacheCreationTokens;
       row.costUsd += held.costUsd;
+      row.aiUnits += held.aiUnits;
       totals.set(key, row);
     }
 
@@ -112,11 +113,12 @@ function emptyTotals(held: CodingAgentSessionEventRecord): SessionModelTotalsRow
     cacheReadTokens: 0,
     cacheCreationTokens: 0,
     costUsd: 0,
+    aiUnits: 0,
   };
 }
 
 function asEvent(record: CodingAgentSessionEventRecord): CodingAgentSessionEvent {
-  const { tenantId: _tenantId, ...event } = record;
+  const { tenantId: _tenantId, aiUnits: _aiUnits, ...event } = record;
   return event;
 }
 
