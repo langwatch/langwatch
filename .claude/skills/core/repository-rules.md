@@ -95,7 +95,9 @@ shared if two lanes could plausibly need it in the same hour.
 
 Never grep or `sed` for a symbol you intend to rename or move. Use rush's
 `ts` plugin (`rush plugin on ts` once). In a rush session it is the `ts` tools;
-from a shell:
+from a shell (rush is machine-local and may be absent: check `command -v rush`
+once; without it, use your editor's TypeScript rename, the language service's
+`findRenameLocations`):
 
 ```
 rush ts references --file F --line N --symbol Name
