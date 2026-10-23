@@ -7,6 +7,7 @@ import {
   recordKeyCredential,
   recordOrganizationCredential,
   recordProjectCredential,
+  routeTemplateOf,
 } from "@langwatch/api/rest";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
@@ -65,6 +66,7 @@ export type ApiDoorPeers = Readonly<{
   entitlements: Pick<EntitlementApi, "getActivePlan">;
   auditLog: Pick<AuditLogApi, "record">;
   featureFlags: ApiRestCredentialPeers["featureFlags"];
+  legacyKeyLogger?: ApiRestCredentialPeers["legacyKeyLogger"];
 }>;
 
 /** The API door auth binds for the process: who is calling, and what they may do (record §8). */
@@ -79,6 +81,8 @@ export class ApiDoorService {
   readonly #audit: ApiDoorAuditService;
   readonly #callerCredentials = new WeakMap<RestCaller, ApiOrganizationCredential["resolved"]>();
   readonly #projectCredentials = new WeakMap<RestCaller, ApiProjectCredential>();
+  /** The route each project caller came in on, as `METHOD /path/:param`. */
+  readonly #projectRoutes = new WeakMap<RestCaller, string>();
   readonly #standings = new Map<string, Promise<OrganizationMfaStanding>>();
 
   private constructor(peers: ApiDoorPeers) {
@@ -89,6 +93,7 @@ export class ApiDoorService {
       cliProjects: peers.cliProjects,
       organizations: peers.organizations,
       featureFlags: peers.featureFlags,
+      ...(peers.legacyKeyLogger ? { legacyKeyLogger: peers.legacyKeyLogger } : {}),
     });
     this.#sessions = BrowserSessionVerificationService.create({ sessions: peers.sessions });
     this.#audit = ApiDoorAuditService.create({ authz: peers.authz, auditLog: peers.auditLog });
@@ -275,6 +280,7 @@ export class ApiDoorService {
           credential,
           permission,
           projectId: target.id,
+          route: this.#projectRoutes.get(caller) ?? "unknown route",
         });
       },
     };
@@ -283,6 +289,7 @@ export class ApiDoorService {
   #projectCaller(request: Request, credential: ApiProjectCredential): RestCaller {
     const caller = projectCaller(request, credential);
     this.#projectCredentials.set(caller, credential);
+    this.#projectRoutes.set(caller, routeTemplateOf(request));
 
     return caller;
   }

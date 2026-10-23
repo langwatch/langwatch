@@ -1,26 +1,45 @@
 /**
  * @vitest-environment node
  * The project-keyed `/api/health/*` probes with a legacy project key, through the module's own
- * key resolution: only the collector probe runs unless the project is on
- * `legacy_project_key_full_access`.
+ * key resolution: every probe runs and logs outside the collector, only the collector runs once
+ * the project is on `legacy_project_key_scope_enforced`, and full access runs all silently.
  * @see modules/auth/specs/legacy-project-key-scope.feature
  */
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AutomationApi } from "@langwatch/automation-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { LangyApi } from "@langwatch/langy-contract";
+import type * as Observability from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import type { SuiteApi } from "@langwatch/suite-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { MemorySubsystemProbeChannel } from "../../channels/memory/memory.subsystem-probe.channel.ts";
 import { PlatformHealthModule } from "../platform-health.app.ts";
 
 const LEGACY_KEY = "legacy-project-key";
+const FULL_ACCESS = "legacy_project_key_full_access";
+const ENFORCED = "legacy_project_key_scope_enforced";
+
+const lines = vi.hoisted(() => [] as { fields: Record<string, unknown>; message: string }[]);
+
+vi.mock("@langwatch/observability", async (importOriginal) => {
+  const actual: typeof Observability = await importOriginal();
+  const record = (fields: Record<string, unknown>, message: string) =>
+    void lines.push({ fields, message });
+
+  return {
+    ...actual,
+    createLogger: (name: string) =>
+      name === "langwatch:legacy-project-key"
+        ? { ...actual.createLogger(name), info: record, warn: record }
+        : actual.createLogger(name),
+  };
+});
 const PROJECT = {
   id: "project-1",
   name: "Project",
@@ -32,7 +51,7 @@ const PROJECT = {
   kind: "application",
 };
 
-async function probes({ fullAccess }: { fullAccess: boolean }) {
+async function probes({ enabled }: { enabled: readonly string[] }) {
   const canaries = MemorySubsystemProbeChannel.create({
     answer: () => new Response(JSON.stringify({ passed: true }), { status: 200 }),
   });
@@ -48,7 +67,9 @@ async function probes({ fullAccess }: { fullAccess: boolean }) {
       scenarios: createApiFixture<ScenarioApi>(),
       suites: createApiFixture<SuiteApi>(),
       langy: createApiFixture<LangyApi>(),
-      featureFlags: createApiFixture<FeatureFlagApi>({ isEnabled: async () => fullAccess }),
+      featureFlags: createApiFixture<FeatureFlagApi>({
+        isEnabled: async (flag) => enabled.includes(flag),
+      }),
     },
     config: { publicBaseUrl: undefined },
     resources: { own: () => void 0, ownService: () => void 0 },
@@ -70,10 +91,28 @@ async function probes({ fullAccess }: { fullAccess: boolean }) {
 }
 
 describe("a legacy project key on the project-keyed health probes", () => {
-  describe("when its project is not on the full-access flag", () => {
-    /** @scenario "A legacy project key may run only the collector health probe" */
+  describe("when its project is on no flag", () => {
+    /** @scenario "The health probes run for an unenforced project's legacy key and log it" */
+    it("runs a probe other than the collector and logs it outside its scopes", async () => {
+      lines.length = 0;
+      const { probe, canaries } = await probes({ enabled: [] });
+
+      const response = await probe("evaluations");
+
+      expect(response.status).toBe(200);
+      expect(canaries.requests()).toHaveLength(1);
+      expect(lines[0]).toMatchObject({
+        message: "legacy project key outside its scopes",
+        fields: { projectId: "project-1", route: "GET /api/health/evaluations", enforced: false },
+      });
+      expect(JSON.stringify(lines)).not.toContain(LEGACY_KEY);
+    });
+  });
+
+  describe("when its project is enforced and not on the full-access flag", () => {
+    /** @scenario "A legacy project key on an enforced project may run only the collector health probe" */
     it("runs the collector probe", async () => {
-      const { probe, canaries } = await probes({ fullAccess: false });
+      const { probe, canaries } = await probes({ enabled: [ENFORCED] });
 
       const response = await probe("collector");
 
@@ -81,9 +120,9 @@ describe("a legacy project key on the project-keyed health probes", () => {
       expect(canaries.requests().length).toBeGreaterThan(0);
     });
 
-    /** @scenario "A legacy project key may run only the collector health probe" */
+    /** @scenario "A legacy project key on an enforced project may run only the collector health probe" */
     it("refuses every other probe with the ingestion-only code, sending no canary", async () => {
-      const { probe, scenarios, canaries } = await probes({ fullAccess: false });
+      const { probe, scenarios, canaries } = await probes({ enabled: [ENFORCED] });
 
       for (const response of [
         await probe("evaluations"),
@@ -100,7 +139,7 @@ describe("a legacy project key on the project-keyed health probes", () => {
   describe("when its project is on the full-access flag", () => {
     /** @scenario "The health probes run for a legacy project key on the full-access flag" */
     it("runs a probe other than the collector", async () => {
-      const { probe, canaries } = await probes({ fullAccess: true });
+      const { probe, canaries } = await probes({ enabled: [FULL_ACCESS, ENFORCED] });
 
       const response = await probe("evaluations");
 

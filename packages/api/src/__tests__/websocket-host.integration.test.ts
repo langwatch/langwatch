@@ -276,6 +276,34 @@ describe("WebSocketHost", () => {
         await stop();
       }
     });
+
+    /** @scenario "A socket naming an unknown scope flag is refused at mount" */
+    it("refuses at mount a legacy key scope the door does not list", () => {
+      const listing: RestIdentity = {
+        ...door,
+        legacyKeyScopes: ["legacy_project_key_connected_agents"],
+      };
+      const typo = WebSocketProtocol.create({
+        path: "/typo",
+        maxPayloadBytes: 1024,
+        middlewareContext: headerContext,
+        headers: { authorization: "authorization" },
+        door: {
+          credential: "project",
+          permission: "scenarios:manage",
+          legacyKeyScopes: ["legacy_project_key_everything"],
+        },
+        handle: async () => {},
+        refuse: async () => {},
+      });
+      const host = WebSocketHost.create().withDoor({
+        identities: { project: listing, organization: listing, api_key: listing },
+      });
+
+      expect(() => host.mount(typo, () => ({ name: "agent" }))).toThrow(
+        /legacy_project_key_everything/,
+      );
+    });
   });
 
   describe("when a protocol declares its module's session key door", () => {

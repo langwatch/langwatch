@@ -7,7 +7,10 @@ export const CONNECT_KEY_KINDS = ["api_key", "legacy_project_key"] as const;
 /** The scope a process needs to connect. */
 export const CONNECT_PERMISSION = "scenarios:manage";
 
-/** The flag that opens the connect routes, and only them, to a legacy project key. */
+/**
+ * The flag that opens the connect routes, the connect socket and the model providers read to a
+ * legacy project key.
+ */
 export const CONNECT_LEGACY_KEY_SCOPE = "legacy_project_key_connected_agents";
 
 /**

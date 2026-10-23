@@ -32,7 +32,7 @@ function probe() {
     probes,
     resolveCaller: async ({ token }) =>
       token === KEY
-        ? { projectId: "project-1", userId: null, apiKeyId: null, ingestionOnly: false }
+        ? { projectId: "project-1", userId: null, apiKeyId: null, legacyKeyOutsideScope: null }
         : null,
     scenarioCanary: ScenarioCanaryService.create({
       peers: {

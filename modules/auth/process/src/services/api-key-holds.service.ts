@@ -30,12 +30,15 @@ export class ApiKeyHoldsService {
     organizationId: string;
     permission: AuthzPermission;
     reach: ApiKeyPermissionReach | undefined;
+    /** The route that asked, which a legacy key's census line names. */
+    route: string;
   }): Promise<boolean> {
     const { principal, permission, reach } = input;
     if (principal.kind === "project") {
       return this.legacyKeys.holds({
         project: { id: principal.projectId, organizationId: input.organizationId },
         permission,
+        route: input.route,
       });
     }
     if (principal.kind === "cliAccessToken") {

@@ -8,7 +8,12 @@ import {
   ApiKeyPermissionNotDelegableError,
   type ApiKeyApi,
 } from "@langwatch/api-key-contract";
-import { assertKeyKind, keyCredentialOf, type RestKeyKind } from "@langwatch/api/rest";
+import {
+  assertKeyKind,
+  keyCredentialOf,
+  routeTemplateOf,
+  type RestKeyKind,
+} from "@langwatch/api/rest";
 import {
   type AuthzPermission,
   type PermissionDecision,
@@ -88,6 +93,8 @@ export type ApiRestCredentialPeers = Readonly<{
   /** Reads which projects' legacy keys keep full access (`legacy_project_key_full_access`). */
   featureFlags: Pick<FeatureFlagApi, "isEnabled">;
   logger?: Pick<Logger, "error" | "warn">;
+  /** Where legacy key outside-scope and census lines go; the legacy key logger by default. */
+  legacyKeyLogger?: Pick<Logger, "info" | "warn">;
   /** Epoch milliseconds the ceiling-refusal window is read against. */
   now?: () => number;
 }>;
@@ -99,6 +106,7 @@ export class ApiRestCredentialsService {
       ...peers,
       logger: peers.logger ?? createLogger("langwatch:api:rest:credential"),
       now: peers.now ?? Date.now,
+      legacyKeyLogger: peers.legacyKeyLogger,
     });
   }
 
@@ -112,8 +120,15 @@ export class ApiRestCredentialsService {
   private readonly legacyKeys: LegacyProjectKeyScopeService;
   private readonly organizationCredentials: ApiOrganizationCredentialsService;
 
-  private constructor(peers: Required<ApiRestCredentialPeers>) {
-    this.legacyKeys = LegacyProjectKeyScopeService.create({ featureFlags: peers.featureFlags });
+  private constructor(
+    peers: Required<Omit<ApiRestCredentialPeers, "legacyKeyLogger">> &
+      Pick<ApiRestCredentialPeers, "legacyKeyLogger">,
+  ) {
+    this.legacyKeys = LegacyProjectKeyScopeService.create({
+      featureFlags: peers.featureFlags,
+      now: peers.now,
+      ...(peers.legacyKeyLogger ? { logger: peers.legacyKeyLogger } : {}),
+    });
     this.keyHolds = ApiKeyHoldsService.create({ authz: peers.authz, legacyKeys: this.legacyKeys });
     this.organizationCredentials = ApiOrganizationCredentialsService.create(peers);
     this.apiKeys = peers.apiKeys;
@@ -149,7 +164,8 @@ export class ApiRestCredentialsService {
 
     for (const permission of asked(input.permissions)) {
       const routeScopes = input.legacyKeyScopes;
-      if (!(await this.#projectHolds({ credential, permission, routeScopes }))) {
+      const route = routeTemplateOf(input.request);
+      if (!(await this.#projectHolds({ credential, permission, route, routeScopes }))) {
         throw this.refusals.project({ credential, permission });
       }
     }
@@ -162,12 +178,14 @@ export class ApiRestCredentialsService {
     credential: ApiProjectCredential;
     permission: AuthzPermission;
     projectId: string;
+    /** The route that asked, which a legacy key's census line names. */
+    route: string;
   }): Promise<PermissionDecision> {
-    const { credential, permission, projectId } = input;
+    const { credential, permission, projectId, route } = input;
     if (projectId !== credential.project.id) return { permitted: false, organizationRole: null };
 
     return {
-      permitted: await this.#projectHolds({ credential, permission }),
+      permitted: await this.#projectHolds({ credential, permission, route }),
       organizationRole: null,
     };
   }
@@ -176,9 +194,10 @@ export class ApiRestCredentialsService {
   #projectHolds(input: {
     credential: ApiProjectCredential;
     permission: AuthzPermission;
+    route: string;
     routeScopes?: readonly string[];
   }): Promise<boolean> {
-    const { credential, permission, routeScopes } = input;
+    const { credential, permission, route, routeScopes } = input;
     if (credential.actsAsPerson) {
       return this.authz.hasProjectPermission({
         userId: credential.actsAsPerson.userId,
@@ -191,6 +210,7 @@ export class ApiRestCredentialsService {
       return this.legacyKeys.holds({
         project: resolved.project,
         permission,
+        route,
         ...(routeScopes ? { routeScopes } : {}),
       });
     }
@@ -199,11 +219,14 @@ export class ApiRestCredentialsService {
     return this.isWithinCeiling({ resolved, permission });
   }
 
-  /** The caller with nothing asked of it; a legacy key passes only with full access. */
+  /** The caller with nothing asked of it; a legacy key passes on full access or report-only. */
   async identify(input: { request: Request }): Promise<ApiProjectCredential> {
     const credential = await this.#resolveProjectCredential(input);
     if (!credential.actsAsPerson && credential.resolved.type === "legacyProjectKey") {
-      await this.legacyKeys.assertMayIdentify(credential.resolved.project);
+      await this.legacyKeys.assertMayIdentify({
+        project: credential.resolved.project,
+        route: routeTemplateOf(input.request),
+      });
     }
 
     return credential;
@@ -246,8 +269,8 @@ export class ApiRestCredentialsService {
     const credential = await this.#resolveKeyCredential(input);
     if (credential.principal.kind === "project") {
       await this.legacyKeys.assertMayIdentify({
-        id: credential.principal.projectId,
-        organizationId: credential.organizationId,
+        project: { id: credential.principal.projectId, organizationId: credential.organizationId },
+        route: routeTemplateOf(input.request),
       });
     }
 
@@ -328,6 +351,7 @@ export class ApiRestCredentialsService {
         organizationId: credential.organizationId,
         permission,
         reach,
+        route: routeTemplateOf(input.request),
       });
       if (!allowed) {
         throw this.refusals.key({ credential, permission, ...(reach ? { reach } : {}) });
@@ -431,7 +455,8 @@ export class ApiRestCredentialsService {
           markUsed: () => {},
         };
         for (const permission of input.permissions) {
-          if (!(await this.#projectHolds({ credential, permission }))) return [];
+          const route = "(reachable project listing)";
+          if (!(await this.#projectHolds({ credential, permission, route }))) return [];
         }
         return [{ id: project.id, name: project.name }];
       }),

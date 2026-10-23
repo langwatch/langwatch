@@ -90,13 +90,18 @@ function probe() {
     }),
     resolveCaller: async ({ token }) => {
       if (token === KEY)
-        return { projectId: "project-1", userId: null, apiKeyId: null, ingestionOnly: false };
+        return {
+          projectId: "project-1",
+          userId: null,
+          apiKeyId: null,
+          legacyKeyOutsideScope: null,
+        };
       if (token === MEMBER_KEY)
         return {
           projectId: "project-1",
           userId: "user-1",
           apiKeyId: "key-1",
-          ingestionOnly: false,
+          legacyKeyOutsideScope: null,
         };
       return null;
     },

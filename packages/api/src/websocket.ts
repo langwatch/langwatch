@@ -23,7 +23,7 @@ import type { ApiDoor, RestIdentity } from "./hosting/api-door.ts";
 import type { MiddlewareBinding } from "./hosting/transport-hosts.ts";
 import { ConnectUpgradeRouter, type UpgradeHandler } from "./ports.ts";
 import { projectCredentialOf } from "./rest/credential-census.ts";
-import { projectCredentialOfRequest } from "./rest/credential.ts";
+import { projectCredentialOfRequest, recordRouteTemplate } from "./rest/credential.ts";
 import { assertKeyKind, keyCredentialOf, type RestKeyKinds } from "./rest/key-credential.ts";
 import { isRestCredentialBinding } from "./rest/request.ts";
 
@@ -243,6 +243,7 @@ export class WebSocketProtocol<
     });
 
     this.#servers.add(server);
+    assertKnownLegacyKeyScopes({ path: this.#options.path, door: this.#options.door, doors });
 
     router.register(this.#options.path, (request, socket, head) => {
       const values = Object.fromEntries(
@@ -299,7 +300,7 @@ export class WebSocketProtocol<
 
       openAfter({
         ...upgrade,
-        admitted: admit({ door: options.door, identity, request }),
+        admitted: admit({ door: options.door, identity, request, path: options.path }),
         handle: (connection, caller) =>
           options.handle(app, connection, { middlewareContext: parsed.data, caller }),
         refuse,
@@ -368,6 +369,7 @@ function admit(input: {
   door: WebSocketDoor;
   identity: RestIdentity;
   request: IncomingMessage;
+  path: string;
 }): Promise<Admission<WebSocketCaller>> {
   return runWithCredentialSlot(async (slot) => {
     const admission = await admitThroughDoor(input);
@@ -409,12 +411,15 @@ async function admitThroughDoor({
   door,
   identity,
   request,
+  path,
 }: {
   door: WebSocketDoor;
   identity: RestIdentity;
   request: IncomingMessage;
+  path: string;
 }): Promise<Admission<WebSocketCaller>> {
   const asked = requestOf(request);
+  recordRouteTemplate(asked, `GET ${path}`);
   try {
     const caller = await identity.authenticate({
       request: asked,
@@ -431,6 +436,25 @@ async function admitThroughDoor({
     return { caller: { actor: caller.actor, scope: caller.scope, credential } };
   } catch (error) {
     return { failure: error instanceof Error ? error : new Error(String(error)) };
+  }
+}
+
+/** A project door that lists its legacy key scopes refuses, at mount, a protocol naming another. */
+function assertKnownLegacyKeyScopes({
+  path,
+  door,
+  doors,
+}: {
+  path: string;
+  door: WebSocketDoor | WebSocketSessionKeyDoor<z.ZodType> | undefined;
+  doors: ProtocolDoors;
+}): void {
+  if (door?.credential !== "project" || !door.legacyKeyScopes) return;
+  const known = doors.project()?.legacyKeyScopes;
+  if (!known) return;
+  const unknown = door.legacyKeyScopes.filter((scope) => !known.includes(scope));
+  if (unknown.length > 0) {
+    throw new Error(`WebSocket ${path} names unknown legacy key scopes: ${unknown.join(", ")}`);
   }
 }
 

@@ -339,7 +339,15 @@ export const FEATURE_FLAGS = [
     defaultValue: false,
     family: "Legacy project keys",
     description:
-      "Lets a project's legacy key, the one stored on the project itself rather than an API key, do everything in its project. Off by default: a legacy key can only send traces, logs, metrics and tracked events, plus the routes the legacy_project_key_* scope flags open for its project, and every other route, the hosted MCP and the project-keyed health probes refuse it with legacy_project_key_ingestion_only. Enable it for the projects whose owners are still moving to an API key with one rule naming them all, { projectId: [ids] }; remove an id from the list to end it for that project. A self-hosted install can set LEGACY_PROJECT_KEY_FULL_ACCESS=1 to keep full access for every legacy key (spec: modules/auth/specs/legacy-project-key-scope.feature).",
+      "Lets a project's legacy key, the one stored on the project itself rather than an API key, do everything in its project, with no outside-scope or census log line. Off by default: a legacy key can send traces, logs, metrics and tracked events, plus the routes the legacy_project_key_* scope flags open for its project. Anything else is allowed and logged, or, for a project on legacy_project_key_scope_enforced, refused with legacy_project_key_ingestion_only. List the projects in one rule, { projectId: [ids] }; remove an id from the list to end it for that project. A self-hosted install can set LEGACY_PROJECT_KEY_FULL_ACCESS=1 to keep full access for every legacy key (spec: modules/auth/specs/legacy-project-key-scope.feature).",
+  },
+  {
+    key: "legacy_project_key_scope_enforced",
+    scope: "PRODUCT",
+    defaultValue: false,
+    family: "Legacy project keys",
+    description:
+      "Refuses a project's legacy key outside its scopes. Off by default: a legacy key on any route beyond ingestion that no scope flag opens for its project, a route that asks no permission, the key door, the hosted MCP and the project-keyed health probes are all allowed as before, and each such request is logged as 'legacy project key outside its scopes' with enforced: false. On for a project, the same requests are refused with legacy_project_key_ingestion_only and logged with enforced: true. Seed the legacy_project_key_* scope flags from the census first, then list projects here in one rule, { projectId: [ids] }, in small batches. legacy_project_key_full_access wins over it. A self-hosted install can set LEGACY_PROJECT_KEY_SCOPE_ENFORCED=1 to refuse for every project (spec: modules/auth/specs/legacy-project-key-scope.feature).",
   },
   {
     key: "legacy_project_key_prompts_read",

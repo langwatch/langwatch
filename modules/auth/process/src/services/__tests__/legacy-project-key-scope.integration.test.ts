@@ -1,8 +1,7 @@
 /**
  * @vitest-environment node
- * A legacy project key through the real door and the real REST runtime: it sends traces, passes
- * the routes that name a scope flag listing its project, and keeps full access only on
- * `legacy_project_key_full_access`.
+ * A legacy project key through the real door and the REST runtime: ingestion, scope flags, full
+ * access, and outside its scopes answered and logged, or refused once its project is enforced.
  * @see modules/auth/specs/legacy-project-key-scope.feature
  */
 import { createErrorHandler } from "@langwatch/api";
@@ -62,9 +61,13 @@ const FULL_ACCESS = "legacy_project_key_full_access";
 const PROMPTS_READ = "legacy_project_key_prompts_read";
 const TRACES_READ = "legacy_project_key_traces_read";
 const CONNECTED_AGENTS = "legacy_project_key_connected_agents";
+const ENFORCED = "legacy_project_key_scope_enforced";
+
+type Line = { level: "info" | "warn"; fields: Record<string, unknown>; message: string };
 
 /** The real door over fixtures; `enabled` names the flags whose rule lists the project. */
 function world({ enabled }: { enabled: readonly string[] }) {
+  const lines: Line[] = [];
   const flagReads: FlagRead[] = [];
   const featureFlags = createApiFixture<FeatureFlagApi>({
     isEnabled: async (...read) => {
@@ -123,9 +126,15 @@ function world({ enabled }: { enabled: readonly string[] }) {
     },
     entitlements: { getActivePlan: refuseEverything },
     auditLog: { record: refuseEverything },
+    legacyKeyLogger: {
+      info: (fields: Record<string, unknown>, message: string) =>
+        void lines.push({ level: "info", fields, message }),
+      warn: (fields: Record<string, unknown>, message: string) =>
+        void lines.push({ level: "warn", fields, message }),
+    } as never,
   };
 
-  return { door: ApiDoorService.create(peers).door(), flagReads };
+  return { door: ApiDoorService.create(peers).door(), flagReads, lines };
 }
 
 const OPERATIONS = [
@@ -142,6 +151,7 @@ const OPERATIONS = [
   "identified",
   "keyIdentified",
   "keyPrompts",
+  "promptById",
 ] as const;
 type Operation = (typeof OPERATIONS)[number];
 type ProbeApi = Record<Operation, () => Promise<{ ok: boolean }>>;
@@ -171,6 +181,13 @@ const projectRoutes = defineRestRouter(ProbeApi)
   .withOutput(ANSWER)
   .withoutAudit("test route")
   .handle(({ app }) => app.prompts())
+  .post("/prompts/:promptId", "promptById")
+  .keepsRecords()
+  .withPermission("prompts:view")
+  .withParams(z.object({ promptId: z.string() }))
+  .withOutput(ANSWER)
+  .withoutAudit("test route")
+  .handle(({ app }) => app.promptById())
   .post("/traces", "traces")
   .keepsRecords()
   .withPermission("traces:view")
@@ -275,7 +292,7 @@ async function call({
   path: string;
   token?: string;
 }) {
-  const { door, flagReads } = world({ enabled });
+  const { door, flagReads, lines } = world({ enabled });
   const ran: string[] = [];
   const app = Object.fromEntries(
     OPERATIONS.map((operation) => [
@@ -302,14 +319,80 @@ async function call({
     });
   const body: unknown = response.status === 200 ? null : await response.json();
 
-  return { response, body, ran, flagReads };
+  return { response, body, ran, flagReads, lines };
 }
 
-describe("a legacy project key whose project is not on the full-access flag", () => {
+describe("a legacy project key on a project that is not enforced", () => {
+  describe("when it calls a prompts route no flag opens for it", () => {
+    /** @scenario "A legacy key on an unenforced project reaches a prompts route" */
+    it("is answered, and logged outside its scopes with the route template", async () => {
+      const { response, ran, lines } = await call({ enabled: [], path: "prompts" });
+
+      expect(response.status).toBe(200);
+      expect(ran).toEqual(["prompts"]);
+      expect(lines).toEqual([
+        expect.objectContaining({
+          level: "warn",
+          message: "legacy project key outside its scopes",
+          fields: expect.objectContaining({
+            projectId: "project-1",
+            organizationId: "org-1",
+            permission: "prompts:view",
+            routeScopes: [PROMPTS_READ],
+            enforced: false,
+            route: expect.stringMatching(/^POST \/api\/legacy-scope\/.*prompts$/),
+          }),
+        }),
+        expect.objectContaining({
+          message: "legacy project key request",
+          fields: expect.objectContaining({ grantedBy: "report_only" }),
+        }),
+      ]);
+    });
+  });
+
+  describe("when it calls identify-only routes and the key door", () => {
+    /** @scenario "An unenforced project's legacy key passes identify-only routes and the key door" */
+    it.each([
+      ["project", "identified", null],
+      ["api_key", "identified", null],
+      ["api_key", "prompts", "prompts:view"],
+    ] as const)("is answered on the %s door at /%s and logged", async (door, path, permission) => {
+      const { response, ran, lines } = await call({ enabled: [], door, path });
+
+      expect(response.status).toBe(200);
+      expect(ran).toEqual([path]);
+      expect(lines[0]).toMatchObject({
+        message: "legacy project key outside its scopes",
+        fields: { permission, enforced: false },
+      });
+    });
+  });
+
+  describe("when it calls a route whose path carries an id and a query", () => {
+    /** @scenario "The census line carries the route template and no token" */
+    it("logs the method and path template, never the path, query or token", async () => {
+      const { response, lines } = await call({
+        enabled: [],
+        path: "prompts/prompt_secret_id?filter=private",
+      });
+
+      expect(response.status).toBe(200);
+      const census = lines.find((line) => line.message === "legacy project key request");
+      expect(census?.fields.route).toMatch(/^POST \/api\/legacy-scope\/.*prompts\/:promptId$/);
+      const written = JSON.stringify(lines);
+      for (const leak of ["prompt_secret_id", "filter=private", "legacy-key"]) {
+        expect(written).not.toContain(leak);
+      }
+    });
+  });
+});
+
+describe("a legacy project key on an enforced project, not on the full-access flag", () => {
   describe("when it calls a route that asks traces:create", () => {
     /** @scenario "A legacy project key passes a route that asks traces:create" */
     it("is answered and never reads the flag", async () => {
-      const { response, ran, flagReads } = await call({ enabled: [], path: "ingest" });
+      const { response, ran, flagReads } = await call({ enabled: [ENFORCED], path: "ingest" });
 
       expect(response.status).toBe(200);
       expect(ran).toEqual(["ingest"]);
@@ -318,21 +401,30 @@ describe("a legacy project key whose project is not on the full-access flag", ()
   });
 
   describe("when it calls routes beyond ingestion", () => {
-    /** @scenario "A legacy project key is refused prompts, traces, evaluations and datasets" */
+    /** @scenario "A legacy project key on an enforced project is refused prompts, traces, evaluations and datasets" */
     it.each(ASKED)("refuses %s with the ingestion-only code before any handler", async (asked) => {
-      const { response, body, ran } = await call({ enabled: [], path: PATHS[asked]! });
+      const { response, body, ran, lines } = await call({
+        enabled: [ENFORCED],
+        path: PATHS[asked]!,
+      });
 
       expect(response.status).toBe(403);
       expect(body).toMatchObject({ code: "legacy_project_key_ingestion_only" });
       expect(JSON.stringify(body)).toContain(asked);
       expect(ran).toEqual([]);
+      expect(lines).toEqual([
+        expect.objectContaining({
+          message: "legacy project key outside its scopes",
+          fields: expect.objectContaining({ permission: asked, enforced: true }),
+        }),
+      ]);
     });
   });
 
   describe("when it calls a project route that asks no permission", () => {
-    /** @scenario "A legacy project key is refused a project route that asks no permission" */
+    /** @scenario "A legacy project key on an enforced project is refused a route that asks no permission" */
     it("refuses with the ingestion-only code", async () => {
-      const { response, body, ran } = await call({ enabled: [], path: "identified" });
+      const { response, body, ran } = await call({ enabled: [ENFORCED], path: "identified" });
 
       expect(response.status).toBe(403);
       expect(body).toMatchObject({ code: "legacy_project_key_ingestion_only" });
@@ -341,9 +433,9 @@ describe("a legacy project key whose project is not on the full-access flag", ()
   });
 
   describe("when it calls the key door", () => {
-    /** @scenario "A legacy project key is refused on the key door" */
+    /** @scenario "A legacy project key on an enforced project is refused on the key door" */
     it.each(["identified", "prompts"])("refuses /%s with the ingestion-only code", async (path) => {
-      const { response, body, ran } = await call({ enabled: [], door: "api_key", path });
+      const { response, body, ran } = await call({ enabled: [ENFORCED], door: "api_key", path });
 
       expect(response.status).toBe(403);
       expect(body).toMatchObject({ code: "legacy_project_key_ingestion_only" });
@@ -374,11 +466,11 @@ async function refused(result: Awaited<ReturnType<typeof call>>) {
   expect(result.ran).toEqual([]);
 }
 
-describe("a legacy project key whose project is on scope flags", () => {
+describe("a legacy project key on an enforced project with scope flags", () => {
   describe("given the prompts-read flag only", () => {
-    const enabled = [PROMPTS_READ];
+    const enabled = [PROMPTS_READ, ENFORCED];
 
-    /** @scenario "A project on the prompts-read flag fetches prompts and nothing else" */
+    /** @scenario "An enforced project on the prompts-read flag reads prompts and nothing else" */
     it("fetches prompts and is refused trace reads and prompt writes", async () => {
       const prompts = await call({ enabled, path: "prompts" });
       expect(prompts.response.status).toBe(200);
@@ -390,7 +482,7 @@ describe("a legacy project key whose project is on scope flags", () => {
   });
 
   describe("given the prompts-read and traces-read flags", () => {
-    const enabled = [PROMPTS_READ, TRACES_READ];
+    const enabled = [PROMPTS_READ, TRACES_READ, ENFORCED];
 
     /** @scenario "A project on two scope flags holds both" */
     it("holds both and is still refused evaluations", async () => {
@@ -403,7 +495,7 @@ describe("a legacy project key whose project is on scope flags", () => {
   });
 
   describe("given the connected-agents flag only", () => {
-    const enabled = [CONNECTED_AGENTS];
+    const enabled = [CONNECTED_AGENTS, ENFORCED];
 
     /** @scenario "The connected-agents flag opens the connect routes and the model providers read only" */
     it("connects and reads model providers, and is refused suite archive and the agents list", async () => {
@@ -445,7 +537,11 @@ describe("a legacy project key whose project is on scope flags", () => {
       ["api_key", "identified"],
       ["api_key", "prompts"],
     ] as const)("is refused on the %s door at /%s", async (door, path) => {
-      const result = await call({ enabled: LEGACY_PROJECT_KEY_SCOPE_FLAGS, door, path });
+      const result = await call({
+        enabled: [...LEGACY_PROJECT_KEY_SCOPE_FLAGS, ENFORCED],
+        door,
+        path,
+      });
 
       expect(result.response.status).toBe(403);
       await refused(result);

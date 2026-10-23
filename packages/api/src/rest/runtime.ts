@@ -79,6 +79,7 @@ import { doorCredentialOf } from "./credential-census.ts";
 import {
   admittedOwnerlessProjectKeyFor,
   OWNERLESS_PROJECT_KEY_PROOF_CODE_PATH,
+  recordRouteTemplate,
 } from "./credential.ts";
 import {
   DOOR_SCOPE_TIER,
@@ -839,7 +840,12 @@ function routeStack<Api>({
   const publishable = route.anyMethod !== true && declaration.credential !== "browser";
   const documents = documented && publishable;
   const credential = route.credential ?? declaration.credential;
-  const door = authenticateMiddleware({ route, credential, ports });
+  const door = authenticateMiddleware({
+    route,
+    credential,
+    ports,
+    template: `${route.method.toUpperCase()} ${basePathOf(declaration)}${route.path}`,
+  });
   const refusal = routeRefusal({ route, door: doorOf({ credential, ports }) });
 
   // Ahead of the validators: they read the body to parse it, and a stream
@@ -932,13 +938,17 @@ function authenticateMiddleware({
   route,
   credential,
   ports,
+  template,
 }: {
   route: RestTransportRoute<unknown>;
   credential: RestDoorCredential;
   ports: RestRuntimeMembers;
+  /** The route as `METHOD /path/:param`, which the door may log; never the concrete URL. */
+  template: string;
 }): MiddlewareHandler {
   return async (context, next) => {
     if (route.access?.kind !== "public") {
+      recordRouteTemplate(context.req.raw, template);
       const caller = await callerOf({
         route,
         door: doorOf({ credential, ports }),

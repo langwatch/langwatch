@@ -2,7 +2,11 @@ import { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { RestIdentity } from "@langwatch/api/hosting";
 import { BearerIdentity } from "@langwatch/api/rest";
 import { AutomationApi } from "@langwatch/automation-contract";
-import { FeatureFlagApi, legacyProjectKeyHasFullAccess } from "@langwatch/feature-flag-contract";
+import {
+  FeatureFlagApi,
+  legacyProjectKeyHasFullAccess,
+  legacyProjectKeyScopeEnforced,
+} from "@langwatch/feature-flag-contract";
 import { LangyApi, type LangyKeyCaller } from "@langwatch/langy-contract";
 import {
   PlatformHealthApi,
@@ -127,17 +131,19 @@ export class PlatformHealthModule implements PlatformHealthApiContract {
           const resolved = await dependencies.apiKeys.findResolvedToken(input);
           if (!resolved) return null;
           const isApiKey = resolved.type === "apiKey";
-          const ingestionOnly =
-            resolved.type === "legacyProjectKey" &&
-            !(await legacyProjectKeyHasFullAccess({
-              featureFlags: dependencies.featureFlags,
-              project: resolved.project,
-            }));
+          const flags = { featureFlags: dependencies.featureFlags, project: resolved.project };
+          const legacyKeyOutsideScope =
+            resolved.type === "legacyProjectKey" && !(await legacyProjectKeyHasFullAccess(flags))
+              ? {
+                  organizationId: resolved.project.organizationId,
+                  enforced: await legacyProjectKeyScopeEnforced(flags),
+                }
+              : null;
           return {
             projectId: resolved.project.id,
             userId: isApiKey ? resolved.userId : null,
             apiKeyId: isApiKey ? resolved.apiKeyId : null,
-            ingestionOnly,
+            legacyKeyOutsideScope,
           };
         },
         scenarioCanary: ScenarioCanaryService.create({

@@ -1,6 +1,6 @@
 /** @vitest-environment node */
 // A legacy project key as an MCP bearer, through the real endpoint and the real project lookup:
-// refused unless its project is on `legacy_project_key_full_access`
+// admitted and logged, refused once its project is enforced, admitted silently on full access
 // (modules/auth/specs/legacy-project-key-scope.feature).
 import { createServer, type IncomingMessage, type Server } from "node:http";
 
@@ -21,6 +21,9 @@ import { FakeCliSessions } from "./support/fake-cli-sessions.ts";
 
 const LEGACY_KEY = "legacy-project-key";
 const FULL_ACCESS = "legacy_project_key_full_access";
+const ENFORCED = "legacy_project_key_scope_enforced";
+
+type Line = { level: string; fields: Record<string, unknown>; message: string };
 const IDENTITY: ProjectIdentity = {
   id: "project-1",
   name: "Project",
@@ -55,7 +58,13 @@ afterEach(async () => {
 });
 
 /** `enabled` names the flags whose rule lists the project. */
-async function endpoint({ enabled }: { enabled: readonly string[] }): Promise<string> {
+async function endpoint({
+  enabled,
+  lines = [],
+}: {
+  enabled: readonly string[];
+  lines?: Line[];
+}): Promise<string> {
   const handler = McpEndpointService.create({
     sessionRecords: MemoryMcpSessionRepository.create(),
     oauthTokenRecords: RedisMcpOAuthTokenRepository.create({ redis: null }),
@@ -68,6 +77,12 @@ async function endpoint({ enabled }: { enabled: readonly string[] }): Promise<st
       featureFlags: createApiFixture<FeatureFlagApi>({
         isEnabled: async (flag) => enabled.includes(flag),
       }),
+      logger: {
+        info: (fields: Record<string, unknown>, message: string) =>
+          void lines.push({ level: "info", fields, message }),
+        warn: (fields: Record<string, unknown>, message: string) =>
+          void lines.push({ level: "warn", fields, message }),
+      } as never,
     }),
     grants: new GrantHolds(),
     cliSessions: new FakeCliSessions(),
@@ -107,22 +122,43 @@ async function initialize(url: string): Promise<{ response: Response; text: stri
 }
 
 describe("given a legacy project key as the MCP bearer", () => {
-  describe("when its project is not on the full-access flag", () => {
-    /** @scenario "The hosted MCP refuses a legacy project key" */
+  describe("when its project is on no flag", () => {
+    /** @scenario "The hosted MCP admits an unenforced project's legacy key and logs it" */
+    it("opens a session and logs it outside its scopes", async () => {
+      const lines: Line[] = [];
+      const { response } = await initialize(await endpoint({ enabled: [], lines }));
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get("mcp-session-id")).toBeTruthy();
+      expect(lines[0]).toMatchObject({
+        level: "warn",
+        message: "legacy project key outside its scopes",
+        fields: { projectId: "project-1", route: "MCP /mcp", permission: null, enforced: false },
+      });
+      expect(JSON.stringify(lines)).not.toContain(LEGACY_KEY);
+    });
+  });
+
+  describe("when its project is enforced and not on the full-access flag", () => {
+    /** @scenario "The hosted MCP refuses a legacy project key on an enforced project" */
     it("is refused 403 with the ingestion-only code and opens no session", async () => {
-      const { response, text } = await initialize(await endpoint({ enabled: [] }));
+      const lines: Line[] = [];
+      const { response, text } = await initialize(await endpoint({ enabled: [ENFORCED], lines }));
 
       expect(response.status).toBe(403);
       expect(JSON.parse(text)).toMatchObject({ code: "legacy_project_key_ingestion_only" });
       expect(response.headers.get("mcp-session-id")).toBeNull();
+      expect(lines).toEqual([
+        expect.objectContaining({ fields: expect.objectContaining({ enforced: true }) }),
+      ]);
     });
   });
 
-  describe("when its project is on every scope flag but not the full-access flag", () => {
+  describe("when its project is enforced and on every scope flag but not the full-access flag", () => {
     /** @scenario "The hosted MCP refuses a legacy project key on scope flags only" */
     it("is refused 403 with the ingestion-only code", async () => {
       const { response, text } = await initialize(
-        await endpoint({ enabled: LEGACY_PROJECT_KEY_SCOPE_FLAGS }),
+        await endpoint({ enabled: [...LEGACY_PROJECT_KEY_SCOPE_FLAGS, ENFORCED] }),
       );
 
       expect(response.status).toBe(403);

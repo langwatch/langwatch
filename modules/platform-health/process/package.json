@@ -37,6 +37,7 @@
     "@langwatch/suite-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
+    "@opentelemetry/api": "catalog:",
     "hono": "catalog:",
     "zod": "catalog:"
   },
