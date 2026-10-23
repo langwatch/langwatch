@@ -9,6 +9,7 @@ import { readFrontmatter, withoutFrontmatter } from "../../content/compile/front
 import { readDocsConfig } from "../../navigation/compile/nav.ts";
 import { withReleaseNotes } from "../../releases/compile/releases.ts";
 import { FENCE, mapProse, markedLines, mdxToMarkdown } from "./mdx-markdown.ts";
+import { pageDescription } from "./page-head.ts";
 
 const JSON_LINE = 80;
 
@@ -236,7 +237,7 @@ export function pageMarkdown({
     throw new Error(`Cannot export unresolved OpenAPI operation for ${slug}`);
   const fallbackTitle = (slug.split("/").pop() ?? slug).replaceAll("-", " ");
   const title = (metadata.title ?? operation?.summary ?? fallbackTitle) || fallbackTitle;
-  const description = metadata.description ?? operation?.description ?? "";
+  const description = pageDescription({ title, description: metadata.description, operation });
   const authored = withoutFrontmatter({ source: withReleaseNotes({ source, slug, docsRoot }) });
   const markdown = mdxToMarkdown({ source: inlineSnippets({ docsRoot, source: authored }) });
   const body = absoluteLinks({ source: markdown }).trim();

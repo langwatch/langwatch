@@ -75,6 +75,27 @@ describe("when an API page contains only OpenAPI frontmatter", () => {
   });
 });
 
+describe("when an API operation has no description", () => {
+  /** @scenario "Open an undescribed API operation with a sentence naming its endpoint" */
+  it("follows the title with a sentence naming the method and path", () => {
+    const fixture = docsFixture({
+      config: {},
+      pages: { "api.mdx": "---\ntitle: Delete trace\nopenapi: DELETE /traces/{id}\n---\n" },
+      main: {
+        servers: [{ url: "https://api.example.com/v1" }],
+        paths: { "/traces/{id}": { delete: { responses: { "204": { description: "Gone" } } } } },
+      },
+    });
+    try {
+      expect(pageMarkdown({ docsRoot: fixture.docsRoot, slug: "api" })).toContain(
+        "# Delete trace\n\nDelete trace: DELETE /v1/traces/{id} in the LangWatch REST API.",
+      );
+    } finally {
+      fixture.dispose();
+    }
+  });
+});
+
 describe("when a guide declares its title and description", () => {
   /** @scenario "Preserve guide metadata in Markdown exports" */
   it("includes metadata before the readable source and its code", () => {

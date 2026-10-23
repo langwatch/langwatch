@@ -144,6 +144,8 @@ const ANY_IMPORT: Record<Language, RegExp> = {
   go: /^\s*import\s/m,
   java: /^\s*import\s/m,
 };
+/* Strings and comments may say "langwatch.ai" or "langwatch.user.id" without calling the SDK. */
+const NOT_CODE = /"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|`[^`]*`|(?:#|\/\/).*$/gm;
 /** Below this many lines a block reads as a call fragment, not a sample to paste. */
 const MIN_SAMPLE_LINES = 4;
 
@@ -169,7 +171,8 @@ function codeIssues({ codes }: { codes: CodeBlock[] }): PageIssue[] {
     const language = LANGUAGE_OF[code.lang];
     if (!language || filled({ code }).length < MIN_SAMPLE_LINES) return false;
     const text = code.lines.join("\n");
-    return SDK_CALL[language].test(text) && !SDK_IMPORT[language].test(text);
+    const calls = SDK_CALL[language].test(text.replace(NOT_CODE, '""'));
+    return calls && !SDK_IMPORT[language].test(text);
   }).length;
   return [
     ...counted({ code: "code-untagged", count: untagged, what: "blocks without a language" }),

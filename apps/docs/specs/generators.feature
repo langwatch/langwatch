@@ -9,6 +9,12 @@ Feature: Generate documentation data from authored sources
     And an unresolved operation fails instead of producing an empty export
 
   @unit
+  Scenario: Open an undescribed API operation with a sentence naming its endpoint
+    Given an API page and its OpenAPI operation carry no description
+    When its Markdown export is generated
+    Then a sentence naming the method and path follows the title
+
+  @unit
   Scenario: Preserve guide metadata in Markdown exports
     Given a guide has a title, description and authored MDX
     When its Markdown export is generated

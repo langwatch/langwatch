@@ -49,6 +49,7 @@ Feature: Audit how well the documentation serves coding agents
     And a block made only of placeholders, ellipses and comments is reported
     And a Python, TypeScript or Go sample that calls the LangWatch SDK without importing it is reported
     But a one-line call fragment is not held to the import rule
+    And a "langwatch." inside a string or a comment is not an SDK call
 
   @unit
   Scenario: Components export as readable Markdown

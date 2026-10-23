@@ -79,6 +79,19 @@ describe("checkPageMarkdown", () => {
         "> **Tip** copy a prompt\n\nLangWatch captures every OpenAI call as a span.\n\n## Install";
       expect(codes({ markdown: exportOf({ body }) })).toEqual([]);
     });
+
+    /** @scenario "Code samples can be pasted as they are" */
+    it("does not count a langwatch name inside a string or a comment as an SDK call", () => {
+      const sample = [
+        "import requests",
+        'url = "https://app.langwatch.ai/api/collector"',
+        "attributes = {'langwatch.user.id': 'u1'}",
+        "# see langwatch.ai for details",
+        "requests.post(url, json=attributes)",
+      ].join("\n");
+      const body = `LangWatch captures calls.\n\n${FENCE}python\n${sample}\n${FENCE}\n\n${SAMPLE}`;
+      expect(codes({ markdown: exportOf({ body }) })).toEqual([]);
+    });
   });
 
   describe("when an integration page is read", () => {
