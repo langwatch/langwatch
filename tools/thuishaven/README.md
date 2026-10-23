@@ -158,6 +158,16 @@ haven logs       captured service logs from any terminal, attached or detached:
                  --stack <slug> reads another worktree, `logs obs` streams LGTM
 haven status     one-shot report: selection, per-service health, shared servers,
                  RAM footprints, every running Nx daemon (--json for machines)
+haven obs        this stack's own telemetry: `obs traces|metrics|profiles|query`
+                 read Tempo, Prometheus, Pyroscope and Loki. `obs cpu [lane]`
+                 CPU-profiles a running Node lane (api by default; ui, workers)
+                 over its inspector: --duration 30s, --load telemetry:<rate>
+                 drives llm-trace load meanwhile, --limit rows; prints busy/GC
+                 and self time by function, package and file, and saves a
+                 .cpuprofile under .claude/tmp/haven-profiles/<stack>/.
+                 `obs heap [lane]` samples the heap (--live, or --snapshot for
+                 retained size, two-byte strings and duplicate packages);
+                 `obs compare [lane | <before> <after>]` diffs two CPU profiles
 haven db         this stack's data: `db seed [preset]` (reseed in place, drops
                  nothing) · `db reset [preset]` (fresh databases and this
                  stack's Redis db flushed, confirmed; --yes for scripts) · `db url [engine]`. Presets: demo,
@@ -493,6 +503,22 @@ datasource uids as the container; files under `<haven home>/observability`;
 install line and never fails `up`. `LANGWATCH_HAVEN_OBS_TIER=container` runs
 the `grafana/otel-lgtm` container on colima instead (the default off macOS).
 Both tiers serve profiles on Pyroscope's port 4040. See ADR-042.
+
+**Profiling a Node lane.** `haven obs cpu|heap|compare` need no observability
+tier: they talk to the lane's process over the Chrome DevTools protocol
+(`adapters/nodeinspector`). haven finds the pid listening on the lane's port,
+uses an inspector the process already has open, or opens one with SIGUSR1 and
+closes it again afterwards. Lanes start with `--inspect-port=0` in
+`NODE_OPTIONS`, so SIGUSR1 opens the inspector on a free port and two stacks can
+be profiled at once; a lane started before that opens on 9229, and a second one
+finds it taken and says so. The analysis (`domain/nodeprofile`) is self time by
+function, file and package (pnpm paths collapse to the package name,
+repository code to its workspace directory), inclusive time, sampled heap by
+function and package, and for a snapshot retained size by constructor via
+dominators, the biggest strings (flagging two-byte ones) and packages loaded
+from two pnpm directories. Profiles land in the stack's
+`.claude/tmp/haven-profiles/<stack>/`, where `obs compare <lane>` finds the
+last two. ADR-064, amendment 2026-10-23.
 
 **Machine limits.** `haven machine limits` prints the ClickHouse, observability and
 Redis memory caps, the colima VM's CPUs and memory, and the unit test worker

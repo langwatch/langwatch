@@ -1,0 +1,12 @@
+{
+  "head": {
+    "callFrame": {"functionName": "(root)", "url": "", "lineNumber": -1, "columnNumber": -1}, "selfSize": 0, "id": 1,
+    "children": [
+      {"callFrame": {"functionName": "decode", "url": "file:///repo/node_modules/.pnpm/protobufjs@7.4.0/node_modules/protobufjs/src/reader.js", "lineNumber": 10, "columnNumber": 0}, "selfSize": 3145728, "id": 2, "children": [
+        {"callFrame": {"functionName": "", "url": "file:///repo/modules/traces/process/src/x.ts", "lineNumber": 4, "columnNumber": 0}, "selfSize": 1048576, "id": 3, "children": []}
+      ]},
+      {"callFrame": {"functionName": "decode", "url": "file:///repo/node_modules/.pnpm/protobufjs@7.4.0/node_modules/protobufjs/src/reader.js", "lineNumber": 10, "columnNumber": 0}, "selfSize": 1048576, "id": 4, "children": []}
+    ]
+  },
+  "samples": []
+}
