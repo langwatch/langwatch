@@ -345,7 +345,8 @@ func (w *wasmRuntime) run(parent context.Context, guest *wasmGuest, req wasmRunR
 	var exit *sys.ExitError
 	switch {
 	case errors.Is(context.Cause(ctx), errUnreadReplies), errors.Is(context.Cause(ctx), errTooManyFailedCalls):
-		out.err = context.Cause(ctx)
+		// The bridge stopped the run; a result it still managed to write does not count.
+		out.err, out.result = context.Cause(ctx), runResult{}
 	case err == nil:
 	case errors.As(err, &exit):
 		out.exitCode = exit.ExitCode()
