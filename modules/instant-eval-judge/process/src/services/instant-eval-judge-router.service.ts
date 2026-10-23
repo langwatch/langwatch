@@ -8,6 +8,7 @@
 import {
   estimateJudgedTextTokens,
   instantEvalCostUsd,
+  InstantEvalJudgeStoppedError,
   instantEvalQuestionTokens,
   instantEvalSkipped,
   NANO_USD_PER_USD,
@@ -156,7 +157,19 @@ class RouteRun {
     if (refusedView) this.flags.push(`${refusedView}_view_refused`);
   }
 
+  /** A caller's stop after paid legs carries their spend, so the stopped batch still bills it. */
   async judge(questions: readonly InstantEvalBooleanQuestion[]): Promise<InstantEvalJudgement> {
+    try {
+      return await this.judgeLegs(questions);
+    } catch (error) {
+      if (!this.signal?.aborted || this.inputTokens <= 0) throw error;
+      throw new InstantEvalJudgeStoppedError({ ...this.spent(), cause: error });
+    }
+  }
+
+  private async judgeLegs(
+    questions: readonly InstantEvalBooleanQuestion[],
+  ): Promise<InstantEvalJudgement> {
     const { primary, pairWith, escalateTo } = this.plan;
     if (pairWith) return this.pair({ questions, primary, pairWith });
     const first = await this.ask({ backend: primary, questions });
@@ -304,7 +317,8 @@ class RouteRun {
     questions: readonly InstantEvalBooleanQuestion[];
     deadline: LegDeadline;
   }): Promise<Leg> {
-    const judgement = await this.callDecisionModel({ kind, model, questions, deadline });
+    const text = this.textFor({ backend, kind });
+    const judgement = await this.callDecisionModel({ kind, model, text, questions, deadline });
     if (!judgement) {
       this.flags.push(`${backend}_unavailable`);
       return { outcome: "failed", reason: "classifier_provider_unavailable" };
@@ -335,16 +349,17 @@ class RouteRun {
   private async callDecisionModel({
     kind,
     model,
+    text,
     questions,
     deadline,
   }: {
     kind: "jev" | "decisions";
     model: string | undefined;
+    text: string;
     questions: readonly InstantEvalBooleanQuestion[];
     deadline: LegDeadline;
   }): Promise<InstantEvalJudgement | undefined> {
     const { classifier, hostedDecisions } = this.deps;
-    const { text } = this.plan;
     const signal = deadline.signalWith(this.signal);
     const limiter = deadline.pausing({ limiter: this.deps.limiter, signal: this.signal });
     if (kind === "jev") {
@@ -353,6 +368,19 @@ class RouteRun {
     if (!hostedDecisions || !model) return undefined;
     await limiter.acquire(this.permitOf({ pool: "decisions", text, questions }));
     return hostedDecisions.classify({ text, questions, model }, signal);
+  }
+
+  /**
+   * The planned view for a leg whose kind the table allows on it, else the full trace: the plan
+   * checks only the primary and pair, so a fallback or a decision-kind escalation is checked here.
+   */
+  private textFor({ backend, kind }: { backend: string; kind: "jev" | "decisions" }): string {
+    const { inputView, text, fullText } = this.plan;
+    if (inputView === "full" || text === fullText) return text;
+    const allowed: readonly string[] = this.deps.table.inputViews.allowedKinds[inputView];
+    if (allowed.includes(kind)) return text;
+    this.flags.push(`${inputView}_view_refused:${backend}`);
+    return fullText;
   }
 
   /** One send's ask of the limiter: a tenant share per leg kind, under the shared global cap. */

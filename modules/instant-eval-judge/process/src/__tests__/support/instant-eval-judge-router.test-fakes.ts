@@ -45,19 +45,18 @@ export function hangUntilAborted<T>(signal?: AbortSignal): Promise<T> {
   });
 }
 
+type LlmJudgeAnswer = (
+  request: InstantEvalLlmJudgeRequest,
+  signal?: AbortSignal,
+) => InstantEvalLlmJudgeAnswer | Promise<InstantEvalLlmJudgeAnswer>;
+
 /** The LLM legs' twin: answers each question as scripted and keeps every request. */
 export class ScriptedInstantEvalLlmJudgeChannel implements InstantEvalLlmJudgeChannel {
   readonly requests: InstantEvalLlmJudgeRequest[] = [];
 
-  private constructor(
-    private readonly answer: (request: InstantEvalLlmJudgeRequest) => InstantEvalLlmJudgeAnswer,
-  ) {}
+  private constructor(private readonly answer: LlmJudgeAnswer) {}
 
-  static create({
-    answer,
-  }: {
-    answer: (request: InstantEvalLlmJudgeRequest) => InstantEvalLlmJudgeAnswer;
-  }): ScriptedInstantEvalLlmJudgeChannel {
+  static create({ answer }: { answer: LlmJudgeAnswer }): ScriptedInstantEvalLlmJudgeChannel {
     return new ScriptedInstantEvalLlmJudgeChannel(answer);
   }
 
@@ -65,8 +64,11 @@ export class ScriptedInstantEvalLlmJudgeChannel implements InstantEvalLlmJudgeCh
     return true;
   }
 
-  async judge(request: InstantEvalLlmJudgeRequest): Promise<InstantEvalLlmJudgeAnswer> {
+  async judge(
+    request: InstantEvalLlmJudgeRequest,
+    signal?: AbortSignal,
+  ): Promise<InstantEvalLlmJudgeAnswer> {
     this.requests.push(request);
-    return this.answer(request);
+    return this.answer(request, signal);
   }
 }

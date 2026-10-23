@@ -11,6 +11,7 @@ import {
   INSTANT_EVAL_PROJECTION_VERSIONS,
   type InstantEvalProcessingEvent,
 } from "@langwatch/instant-eval-contract";
+import { NANO_USD_PER_USD } from "@langwatch/instant-eval-judge-contract";
 
 import type { InstantEvalStoredStatus } from "../rules/instant-eval-run-status.rules.ts";
 
@@ -146,8 +147,6 @@ export function createInstantEvalRunProjection(deps: {
     key: (event) => String(event.aggregateId),
   };
 }
-
-const NANO_USD_PER_USD = 1_000_000_000;
 
 function nanoUsdRounded(usd: number): number {
   return Math.round(usd * NANO_USD_PER_USD) / NANO_USD_PER_USD;

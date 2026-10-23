@@ -11,6 +11,7 @@ import {
   type InstantEvalJudgeSpendRecord,
   type InstantEvalVerdict,
   INSTANT_EVAL_PRICING,
+  InstantEvalJudgeStoppedError,
   instantEvalCostUsd,
   instantEvalPriceUsd,
 } from "@langwatch/instant-eval-judge-contract";
@@ -403,6 +404,33 @@ describe("InstantEvalQueryJudgingService.judgeQuery", () => {
       expect(judged.rows.map((row) => row.annoyed)).toEqual([0.7, null, null]);
       expect(judged.cancellation).toEqual({ unjudgedRows: [1, 2] });
       expect(records.map((record) => record.inputTokens)).toEqual([TOKENS_PER_TEXT]);
+    });
+  });
+
+  describe("given a routed call stopped after some of its calls were paid", () => {
+    /** @scenario "A caller's stop keeps the legs already paid billed" */
+    it("bills what the stopped call's paid legs spent with the answered rows", async () => {
+      const controller = new AbortController();
+      const judge = new ScriptedJudge(async ({ request, index }) => {
+        if (index === 0) return answerEvery({ probability: 0.7 })({ request, index });
+        controller.abort();
+        throw new InstantEvalJudgeStoppedError({
+          inputTokens: 40,
+          costNanoUsd: 0,
+          cause: controller.signal.reason,
+        });
+      });
+      const { service, records } = harness({ judge, concurrency: 1 });
+
+      const judged = await service.judgeQuery({
+        projectId: "project-1",
+        judgements: [booleanCall("annoyed")],
+        rows: [{ annoyed: "one" }, { annoyed: "two" }],
+        signal: controller.signal,
+      });
+
+      expect(judged.cancellation).toEqual({ unjudgedRows: [1] });
+      expect(records.map((record) => record.inputTokens)).toEqual([TOKENS_PER_TEXT + 40]);
     });
   });
 

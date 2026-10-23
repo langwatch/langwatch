@@ -6,6 +6,7 @@
 
 import {
   InstantEvalClassifierUnavailableError,
+  InstantEvalJudgeStoppedError,
   instantEvalSkipped,
   type InstantEvalJudgement,
   type InstantEvalJudgeRoute,
@@ -33,7 +34,6 @@ const Q = yesNo("q", "is the user upset");
 
 const PRICING: InstantEvalJudgeRoutePricing = {
   version: "test",
-  markup: 1.3,
   backends: {
     "decision-a": { usdPerMillionInputTokens: 0.1, usdPerMillionOutputTokens: 0 },
     "decision-b": { usdPerMillionInputTokens: 0.05, usdPerMillionOutputTokens: 0 },
@@ -65,7 +65,7 @@ function harness({
 }: {
   decisions?: Script;
   jev?: Script;
-  llm?: () => InstantEvalLlmJudgeAnswer;
+  llm?: (signal?: AbortSignal) => InstantEvalLlmJudgeAnswer | Promise<InstantEvalLlmJudgeAnswer>;
   hasDecisions?: boolean;
   table?: InstantEvalJudgeRouteTable;
   limiter?: MemoryInstantEvalRateLimiter;
@@ -73,12 +73,16 @@ function harness({
   const hostedDecisions = ScriptedInstantEvalHostedDecisionsChannel.create({
     answer: (_request, signal) => decisions(signal),
   });
-  const llmJudge = ScriptedInstantEvalLlmJudgeChannel.create({ answer: llm });
+  const llmJudge = ScriptedInstantEvalLlmJudgeChannel.create({
+    answer: (_request, signal) => llm(signal),
+  });
   let jevCalls = 0;
+  const jevTexts: string[] = [];
   // Paces each send through the limiter it is handed, as the HTTP classifier does.
   const classifier = MemoryInstantEvalClassifierChannel.create({
     answer: async (request, signal) => {
       jevCalls += 1;
+      jevTexts.push(request.text);
       await request.limiter.acquire({ tokens: 10, tenantId: request.projectId }, signal);
       return jev(signal);
     },
@@ -103,7 +107,7 @@ function harness({
       route,
       ...(signal ? { signal } : {}),
     });
-  return { classify, hostedDecisions, llmJudge, limiter, jevCalls: () => jevCalls };
+  return { classify, hostedDecisions, llmJudge, limiter, jevTexts, jevCalls: () => jevCalls };
 }
 
 /** The made-up table with short provider timeouts, and no fallback unless one is given. */
@@ -336,6 +340,21 @@ describe("InstantEvalJudgeRouterService", () => {
     expect(limiter.permits.every((permit) => permit.tokens > 0)).toBe(true);
   });
 
+  /** @scenario "A caller's stop keeps the legs already paid billed" */
+  it("carries the paid legs' spend on a caller's stop during the escalation", async () => {
+    const stop = new AbortController();
+    const { classify } = harness({
+      decisions: () => {
+        setTimeout(() => stop.abort(new DOMException("stopped", "AbortError")), 5);
+        return judged(0.4);
+      },
+      llm: (signal) => hangUntilAborted(signal),
+    });
+    const error = await classify(SHORT, [Q], stop.signal).catch((thrown: unknown) => thrown);
+    expect(error).toBeInstanceOf(InstantEvalJudgeStoppedError);
+    expect(error).toMatchObject({ name: "AbortError", inputTokens: 1000, costNanoUsd: 100_000 });
+  });
+
   describe("given a text-view plan", () => {
     /** @scenario "A text view the caller did not render judges the full text, flagged" */
     it("judges the full text and names the missing view", async () => {
@@ -352,6 +371,20 @@ describe("InstantEvalJudgeRouterService", () => {
       await classify({ ...SHORT, inputView: "text", views: { text: "user: late" } });
       expect(hostedDecisions.requests[0]?.text).toBe("user: late");
       expect(llmJudge.requests[0]?.text).toBe("user: late again");
+    });
+
+    /** @scenario "The text view is judged only by a decision model allowed to read it" */
+    it("gives a fallback whose kind may not read the view the full trace", async () => {
+      const { classify, jevTexts } = harness({ hasDecisions: false, jev: () => judged(0.2) });
+      const judgement = await classify({
+        job: "search",
+        tokens: 20_000,
+        mode: "instant",
+        inputView: "text",
+        views: { text: "user: late" },
+      });
+      expect(jevTexts).toEqual(["user: late again"]);
+      expect(judgement.routing?.flags).toContain("text_view_refused:decision-b");
     });
 
     /** @scenario "The text view is judged only by a decision model allowed to read it" */

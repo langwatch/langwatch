@@ -5,7 +5,7 @@
  * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
-import { instantEvalSpentPriceUsd } from "@langwatch/instant-eval-judge-contract";
+import { instantEvalSpentPriceUsd, NANO_USD_PER_USD } from "@langwatch/instant-eval-judge-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
@@ -312,7 +312,7 @@ export class InstantEvalJudgePageService {
    */
   #spentSoFarUsd({ tokens, costUsd }: { tokens: number; costUsd: number }): number {
     if (tokens <= 0) return 0;
-    const costNanoUsd = Math.round(costUsd * 1_000_000_000);
+    const costNanoUsd = Math.round(costUsd * NANO_USD_PER_USD);
     return instantEvalSpentPriceUsd({
       inputTokens: tokens,
       costNanoUsd,

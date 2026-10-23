@@ -34,7 +34,7 @@ export interface InstantEvalJudgeRoutePlan {
   readonly text: string;
   /** The full text, which an escalation always judges: an unsure answer may turn on the trace. */
   readonly fullText: string;
-  /** A partial view was planned but the caller did not render it. */
+  /** A partial view was planned but the caller did not render it, or rendered it empty. */
   readonly isViewMissing: boolean;
   /** The partial view asked for that the planned decision model may not judge, if any. */
   readonly refusedView?: InstantEvalJudgeInputView;
@@ -100,8 +100,9 @@ function planForView({
   inputView: InstantEvalJudgeInputView;
 }): InstantEvalJudgeRoutePlan {
   const rendered = inputView === "full" ? text : route.views?.[inputView];
-  const isViewMissing = rendered === undefined;
-  const judged = rendered ?? text;
+  // An empty rendering (a trace of tool spans only) is no view: judging "" answers about nothing.
+  const isViewMissing = inputView !== "full" && !rendered?.trim();
+  const judged = isViewMissing || rendered === undefined ? text : rendered;
   const tokens = route.tokens ?? estimateJudgedTextTokens({ text: judged });
   const bucket = bucketOf({ tokens, table });
   const arithmetic = isArithmeticCall({ route, questions, table });

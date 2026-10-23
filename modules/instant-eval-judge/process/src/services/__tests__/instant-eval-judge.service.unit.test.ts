@@ -3,10 +3,11 @@
  * budget, classify, price, priced fact. Refusals are returned and call no classifier.
  * @see modules/instant-eval/specs/instant-eval-judge-model.feature
  */
-import type {
-  InstantEvalJudgement,
-  InstantEvalJudgeSpendPricedEventData,
-  InstantEvalQuestion,
+import {
+  INSTANT_EVAL_PRICING,
+  type InstantEvalJudgement,
+  type InstantEvalJudgeSpendPricedEventData,
+  type InstantEvalQuestion,
 } from "@langwatch/instant-eval-judge-contract";
 import { createTestLogger } from "@langwatch/test-harness";
 import { Temporal } from "@langwatch/time";
@@ -96,7 +97,6 @@ function harness({
   const limiter = MemoryInstantEvalRateLimiter.create();
   const routePricing = {
     version: "test",
-    markup: 2,
     backends: { "decision-a": { usdPerMillionInputTokens: 1, usdPerMillionOutputTokens: 0 } },
   };
   const router = InstantEvalJudgeRouterService.create({
@@ -525,21 +525,21 @@ describe("given a judge call on an own decision model", () => {
 
 describe("given a judge call that carries a route", () => {
   /** @scenario "A routed judgement is priced from the summed cost of every call" */
-  it("prices the summed cost at the router's markup, under the router's model and rate", async () => {
+  it("prices the summed cost at the one published markup, under the router's model and rate", async () => {
     const { service, classifier, recorded, seed } = harness({ isRouted: true });
     await seed();
 
     const answer = await service.judge({ ...call, route: { job: "llm_judge", tokens: 100 } });
 
-    // One million Decisions tokens at $1 per million, at a markup of two.
-    expect(answer).toMatchObject({ outcome: "judged", priceUsd: 2 });
+    // One million Decisions tokens at $1 per million, at the published markup.
+    expect(answer).toMatchObject({ outcome: "judged", priceUsd: INSTANT_EVAL_PRICING.markup });
     expect(classifier.classify).not.toHaveBeenCalled();
     expect(recorded).toHaveLength(1);
     expect(recorded[0]).toMatchObject({
       model: "langwatch-judge",
-      rateVersion: "instant_eval_judge_router@testx2",
+      rateVersion: `instant_eval_judge_router@testx${INSTANT_EVAL_PRICING.markup}`,
       costNanoUsd: 1_000_000_000,
-      priceNanoUsd: 2_000_000_000,
+      priceNanoUsd: INSTANT_EVAL_PRICING.markup * 1_000_000_000,
       inputTokens: 1_000_000,
     });
   });
@@ -575,7 +575,7 @@ describe("given a judge call that carries a route", () => {
 
     expect(recorded[0]).toMatchObject({
       costNanoUsd: 500,
-      priceNanoUsd: 1_000,
+      priceNanoUsd: Math.round(500 * INSTANT_EVAL_PRICING.markup),
       model: "langwatch-judge",
     });
   });

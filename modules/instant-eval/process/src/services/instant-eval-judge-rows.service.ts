@@ -7,6 +7,7 @@
 
 import {
   InstantEvalClassifierUnavailableError,
+  InstantEvalJudgeStoppedError,
   type InstantEvalJudgement,
   type InstantEvalVerdict,
 } from "@langwatch/instant-eval-judge-contract";
@@ -106,7 +107,7 @@ export class InstantEvalJudgeRowsService {
       limit: this.concurrency,
       signal,
       run: async (unit) => {
-        const judgement = await this.#classify({ projectId, unit, signal });
+        const judgement = await this.#classify({ projectId, unit, signal, usage });
         if (judgement === null) failures += 1;
         record({ unit, judgement: judgement ?? LOST_JUDGEMENT, cells, usage });
       },
@@ -135,10 +136,12 @@ export class InstantEvalJudgeRowsService {
     projectId,
     unit,
     signal,
+    usage,
   }: {
     projectId: string;
     unit: InstantEvalJudgementUnit;
     signal: AbortSignal | null;
+    usage: InstantEvalJudgeUsage;
   }): Promise<InstantEvalJudgement | null> {
     try {
       return await this.judge.classify(
@@ -150,6 +153,12 @@ export class InstantEvalJudgeRowsService {
         signal ?? undefined,
       );
     } catch (error) {
+      // A routed call stopped after paid legs: what they spent is billed with the batch.
+      if (error instanceof InstantEvalJudgeStoppedError) {
+        usage.requests += 1;
+        usage.inputTokens += error.inputTokens;
+        usage.costNanoUsd += error.costNanoUsd;
+      }
       if (signal?.aborted || isAbortError(error)) throw error;
 
       return null;
