@@ -266,6 +266,7 @@ func TestRenderAll_LimitsContainsMergeTreeSettings(t *testing.T) {
 	}
 }
 
+// @scenario "The image holds 25.10 behaviour on ClickHouse 26.8"
 func TestRenderAll_UpgradePinsHold25_10Behaviour(t *testing.T) {
 	dir := t.TempDir()
 	input := testInput()
@@ -289,6 +290,7 @@ func TestRenderAll_UpgradePinsHold25_10Behaviour(t *testing.T) {
 		},
 		"users.d/profiles.yaml": {
 			`compatibility: "25.10"`,
+			"input_format_read_datetime_number_as_raw_value: 1",
 			"deduplicate_insert: backward_compatible_choice",
 		},
 	}
