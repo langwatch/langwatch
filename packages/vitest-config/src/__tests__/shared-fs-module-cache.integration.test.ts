@@ -206,6 +206,11 @@ describe("the shared fs module cache", () => {
 
       const off = await runVitest(offRoot, "file");
 
+      const probeCopy = [...off.cacheLog.matchAll(/\[write\] (\S+) is cached in (\S+)/g)].find(
+        ([, id]) => id === join(offRoot, "pkg/src/probe.test.ts"),
+      )?.[2];
+      expect(probeCopy).toBeDefined();
+      expect(readFileSync(probeCopy as string, "utf8")).toContain(join(offRoot, "shared/helper"));
       expect(off.results["imports the helper this checkout has"]?.status).toBe("passed");
       expect(off.results["imports an installed package"]?.status).toBe("passed");
     }, 60_000);
@@ -375,7 +380,8 @@ describe("the shared fs module cache", () => {
     /** @scenario "A module whose source contains the cache's root token is never cached" */
     it("never caches a module whose source contains the root token", async () => {
       const cache = fresh("token-cache");
-      // built in two parts: a literal token in this file would be rewritten by the cache the test itself runs under
+      // built in two parts: a literal token in this file would be rewritten by the cache
+      // the test itself runs under
       const token = ["@@vitest-fs-module", "cache-root@@"].join("-");
       const helper = HELPER.replace('"file"', `"${token}"`);
       const first = checkout("token-first", { "shared/helper.ts": helper });
@@ -411,19 +417,31 @@ export default function () {
     /** @scenario "The main process loads a cached global setup in its own checkout" */
     it("imports the global setup's workspace file in both checkouts", async () => {
       const cache = join(base, "main-runner-cache");
-      const files = { "shared/helper.ts": HELPER, "pkg/global-setup.ts": GLOBAL_SETUP };
       const extra = 'globalSetup: ["./global-setup.ts"],';
-      const first = checkout("main-runner-first", files, true, extra);
-      const second = checkout("main-runner-second", files, true, extra);
+      // the helpers differ, so each global setup's output shows whose helper it imported
+      const first = checkout(
+        "main-runner-first",
+        { "shared/helper.ts": HELPER, "pkg/global-setup.ts": GLOBAL_SETUP },
+        true,
+        extra,
+      );
+      const second = checkout(
+        "main-runner-second",
+        {
+          "shared/helper.ts": HELPER.replace('"file"', '"second"'),
+          "pkg/global-setup.ts": GLOBAL_SETUP,
+        },
+        true,
+        extra,
+      );
 
       await runVitest(first, "file", cache);
-      const secondRun = await runVitest(second, "file", cache);
+      const secondRun = await runVitest(second, "second", cache);
 
       expect(secondRun.cacheLog).toContain(`[read] ${join(second, "pkg/global-setup.ts")}`);
       // the entry is portable, so the main process puts each checkout's root back too
-      for (const root of [first, second]) {
-        expect(readFileSync(join(root, "global-setup.txt"), "utf8")).toBe("file");
-      }
+      expect(readFileSync(join(first, "global-setup.txt"), "utf8")).toBe("file");
+      expect(readFileSync(join(second, "global-setup.txt"), "utf8")).toBe("second");
     }, 120_000);
   });
 });

@@ -37,10 +37,11 @@ existing Vitest patch (`patches/vitest@5.0.1.patch`) changes `fsModuleCache`:
 - The cache lives in `~/.cache/vitest/fs-module-cache` (`$XDG_CACHE_HOME` when
   set; `VITEST_FS_MODULE_CACHE_DIR` overrides it; a config's
   `fsModuleCachePath` still wins). Every checkout of every clone uses it.
-- The key is the module's path relative to the workspace root, its source, and
-  the environment's config (project root relative to the workspace root,
-  resolve options, plugin names, config file contents, `define`, Vite's `env`,
-  the Vitest and Vite versions).
+- The key is the module's path relative to the workspace root, its source, the
+  nearest `tsconfig.json` above it with the files it extends, and the
+  environment's config (project root relative to the workspace root, resolve
+  options, plugin names, config file contents, `define`, Vite's `env`, the Vitest
+  and Vite versions).
 - Under the cache root, each lockfile gets its own directory, named by Vitest's
   existing lockfile hash, which covers dependency versions and the pnpm patches.
   A lockfile change starts a new directory instead of clearing the one another
@@ -107,10 +108,10 @@ Each worktree's `node_modules/.vitest-cache` is removed on its first run with
 the patch, which frees up to about 460 MB per worktree.
 
 Two limits carry over from upstream and matter more with sharing. A transform
-that depends on a file other than the module and its config (a `tsconfig.json`
-option, a workspace package's `exports` that sends an import to a different
-file that also exists here) is not in the key. And a lockfile directory grows
-until the lockfile changes or it goes unused for a week. `vitest --clearCache`
+that depends on a file other than the module, its tsconfig chain and its config
+(a workspace package's `exports` that sends an import to a different file that
+also exists here) is not in the key. And a lockfile directory grows until the
+lockfile changes or it goes unused for a week. `vitest --clearCache`
 clears the shared cache for every worktree.
 
 `packages/vitest-config/src/__tests__/shared-fs-module-cache.integration.test.ts`
