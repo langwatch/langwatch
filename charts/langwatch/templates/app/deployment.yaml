@@ -92,10 +92,9 @@ spec:
              grace must still cover the sleep plus the process deadline (drain + 20s)
              plus 5s for the last log line. specs/background/worker-graceful-shutdown.feature */}}
       {{- $preStop := .Values.app.preStopSleepSeconds | default 0 }}
-      {{- if not (or (kindIs "int" $preStop) (kindIs "int64" $preStop) (kindIs "float64" $preStop)) }}
-      {{- fail (printf "app.preStopSleepSeconds must be a whole number of seconds, got %v" $preStop) }}
-      {{- end }}
-      {{- if or (lt (float64 $preStop) 0.0) (ne (float64 $preStop) (float64 (int $preStop))) }}
+      {{- /* By its string, as langwatch.positiveSeconds does: Helm v3.18.0 hands values.yaml's 5 over as a string. */}}
+      {{- $preStopRaw := toString $preStop }}
+      {{- if or (not (regexMatch "^[0-9]+$" $preStopRaw)) (ne (toString (int $preStop)) $preStopRaw) }}
       {{- fail (printf "app.preStopSleepSeconds must be a whole number of seconds, zero or more, got %v" $preStop) }}
       {{- end }}
       {{- $preStop = int $preStop }}

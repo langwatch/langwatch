@@ -136,6 +136,7 @@ function composedAnnouncements() {
     },
     recordSessionStarted: { send: async () => undefined },
     recordSsoAutoAdded: { send: async () => undefined },
+    recordAppPageOpened: { send: async () => undefined },
   });
   const { logger } = createTestLogger();
   const signups = SignupAnnouncementService.create({
@@ -178,6 +179,7 @@ function hooksRepo(members: Partial<BetterAuthHooksRepository>): BetterAuthHooks
     flagPendingSsoSetup: unused,
     reconcileSsoAccounts: unused,
     recordLastLogin: unused,
+    clearPasswordResetRequirement: unused,
     ...members,
   };
 }
@@ -251,6 +253,7 @@ describe("afterUserCreate", () => {
           deactivatedAt: null,
           pendingSsoSetup: false,
           signupConfirmationPending: false,
+          passwordResetRequiredAt: null,
           lastLoginAt: null,
           emailVerified: true,
         }),

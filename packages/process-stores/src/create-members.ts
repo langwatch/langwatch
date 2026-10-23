@@ -3,7 +3,9 @@
  * same client would split one process into duplicate caches and dedup
  * keyspaces. An unconfigured member REFUSES BY NAME, never a silent omission.
  */
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { EventReadSeat } from "@langwatch/eventing";
+import { eventLogIdIndexReadiness } from "@langwatch/eventing/server";
 import { GROUP_QUEUE_CONFIG } from "@langwatch/group-queue";
 import { createLogger } from "@langwatch/observability";
 import type { OperatorReadMint } from "@langwatch/prisma-client";
@@ -243,13 +245,25 @@ function eventingMember({
     ...(eventing.groupQueue === undefined ? {} : { redis: read("redis") }),
     ...(eventing.store.kind === "producer-only" && !clickhouseConfigured(config)
       ? {}
-      : {
-          eventLog: {
-            clickhouse: read("clickhouse"),
-            organizationOf: (tenantId: string) => tenantDirectory().organizationForTenant(tenantId),
-          },
-        }),
+      : eventLogMembers({
+          clickhouse: read("clickhouse"),
+          organizationOf: (tenantId: string) => tenantDirectory().organizationForTenant(tenantId),
+        })),
   });
+}
+
+/** The event log a role reads, and its aggregate index's readiness from the index's marker row. */
+function eventLogMembers({
+  clickhouse,
+  organizationOf,
+}: {
+  clickhouse: ClickHouseQueryClient;
+  organizationOf: (tenantId: string) => Promise<string | null>;
+}) {
+  return {
+    eventLog: { clickhouse, organizationOf },
+    eventLogIndexReadiness: eventLogIdIndexReadiness({ clickhouse }),
+  };
 }
 
 /** A role whose eventing reads no event log still hands a seat: only a read through it refuses. */

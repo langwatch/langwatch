@@ -1,6 +1,6 @@
 """Signature analysis: turn fields, run parameters and their JSON Schema.
 
-The decorator reads the function signature once. The five turn fields are
+The decorator reads the function signature once. The six turn fields are
 passed by declared name; every other parameter is a run parameter, typed by
 its annotation and defaulted by its default value. The schema this module
 builds is the `parameters` object of the `register` frame.
@@ -10,10 +10,11 @@ from __future__ import annotations
 
 import enum
 import inspect
+import json
 import types
 import typing
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import (
     Annotated,
     Any,
@@ -23,11 +24,14 @@ from typing import (
     get_origin,
 )
 
-from pydantic import TypeAdapter, ValidationError
+from pydantic import BaseModel, TypeAdapter, ValidationError
 from pydantic_core import to_jsonable_python
 
-TURN_FIELDS = ("messages", "new_messages", "thread_id", "session", "trace_id")
+TURN_FIELDS = ("messages", "new_messages", "thread_id", "session", "state", "trace_id")
 """The fields the platform sends on every call, in the order the frame lists them."""
+
+STATE_MAX_BYTES = 64 * 1024
+"""The cap on a scenario hook's state and on teardown's returned object (ADR-180)."""
 
 _JSON_TYPES: dict[Any, str] = {
     str: "string",
@@ -91,6 +95,83 @@ class AgentReplyInvalid(TypeError):
     def __init__(self, *, reason: str) -> None:
         super().__init__(f"returned {reason}; return {ACCEPTED_REPLY_SHAPES}")
         self.reason = reason
+
+
+class AgentStateInvalid(TypeError):
+    """A hook or a turn returned a state that is not a JSON object.
+
+    Answered to the platform as `agent_call_failed`, naming the state.
+    """
+
+    code = "agent_call_failed"
+
+    def __init__(self, *, reason: str) -> None:
+        super().__init__(
+            f"returned a state that is {reason}; return a JSON object or None"
+        )
+        self.reason = reason
+
+
+class AgentPayloadTooLarge(ValueError):
+    """A state is above its cap, answered as `agent_payload_too_large`."""
+
+    code = "agent_payload_too_large"
+
+    def __init__(self, *, size_bytes: int, limit_bytes: int) -> None:
+        super().__init__(
+            f"The state is {size_bytes} bytes, above the limit of {limit_bytes} bytes."
+        )
+        self.size_bytes = size_bytes
+        self.limit_bytes = limit_bytes
+
+
+class HookNotDeclared(Exception):
+    """The platform called a scenario hook this agent does not have."""
+
+    code = "hook_not_declared"
+
+    def __init__(self, *, agent: str, kind: str) -> None:
+        super().__init__(f"{agent} declares no {kind} hook")
+        self.kind = kind
+
+
+class ParameterConflict(ValueError):
+    """Two signatures declare one run parameter with different types or defaults.
+
+    A run has one value per name, shared by the agent and its hooks. The
+    platform refuses a schema that cannot hold both as `parameters_invalid`,
+    so the SDK refuses it first, at decoration.
+    """
+
+    code = "parameters_invalid"
+
+    def __init__(self, *, parameter: str, reason: str) -> None:
+        super().__init__(
+            f"run parameter {parameter!r} {reason}; the agent and its hooks share "
+            "one value per name, so they must declare it alike"
+        )
+        self.parameter = parameter
+
+
+def coerce_state(value: Any) -> dict[str, Any] | None:
+    """The state a call answers with: None, or a JSON object under the cap."""
+    if value is None:
+        return None
+    if isinstance(value, BaseModel):
+        value = value.model_dump(mode="json")
+    if not isinstance(value, Mapping):
+        raise AgentStateInvalid(reason=f"a {type(value).__name__}, not an object")
+    try:
+        # The platform measures `JSON.stringify`, which has no spaces.
+        encoded = json.dumps(
+            value, separators=(",", ":"), ensure_ascii=False, allow_nan=False
+        )
+    except (TypeError, ValueError) as error:
+        raise AgentStateInvalid(reason=f"not JSON ({error})") from None
+    size = len(encoded.encode("utf-8"))
+    if size > STATE_MAX_BYTES:
+        raise AgentPayloadTooLarge(size_bytes=size, limit_bytes=STATE_MAX_BYTES)
+    return dict(value)
 
 
 @dataclass(frozen=True)
@@ -339,17 +420,62 @@ def _type_hints(func: Callable[..., Any]) -> dict[str, Any]:
         return {}
 
 
+_NUMERIC_TYPES = {"integer", "number"}
+
+
+def _merged_spec(
+    name: str, existing: ParameterSpec, spec: ParameterSpec
+) -> ParameterSpec:
+    """One spec for a name two signatures declare, or `ParameterConflict`."""
+    types = (existing.schema.get("type"), spec.schema.get("type"))
+    numeric = set(types) <= _NUMERIC_TYPES
+    if types[0] != types[1] and not numeric:
+        raise ParameterConflict(
+            parameter=name, reason=f"is declared as {types[0]} and as {types[1]}"
+        )
+    if not existing.required and not spec.required and existing.default != spec.default:
+        raise ParameterConflict(
+            parameter=name,
+            reason=f"has the default {existing.default!r} and the default {spec.default!r}",
+        )
+    kept = spec if spec.required and not existing.required else existing
+    if numeric and types[0] != types[1]:
+        # An integer is a number; the schema says number so either value fits.
+        kept = replace(kept, schema={**kept.schema, "type": "number"})
+    return kept
+
+
+def merge_parameters(*signatures: AgentSignature) -> dict[str, ParameterSpec]:
+    """One run-parameter set for an agent and its hooks.
+
+    A name declared twice must carry one JSON type (integer and number merge
+    as number) and one default, or `ParameterConflict` names it. A name any
+    signature requires stays required.
+    """
+    merged: dict[str, ParameterSpec] = {}
+    for signature in signatures:
+        for name, spec in signature.parameters.items():
+            existing = merged.get(name)
+            merged[name] = (
+                spec if existing is None else _merged_spec(name, existing, spec)
+            )
+    return merged
+
+
 def analyze_signature(
     func: Callable[..., Any],
     *,
     agent_call_type: type,
     parameters: Mapping[str, Any] | None = None,
+    skip: int = 0,
 ) -> AgentSignature:
     """Read the signature once.
 
     `parameters`, when given, replaces the run parameters read from the
     signature. It is a definition map (`{name: {type, options, default,
-    description}}`) or a JSON Schema object with `properties`.
+    description}}`) or a JSON Schema object with `properties`. `skip` leaves
+    out the leading positional parameters a scenario hook receives (`run`,
+    and `state` for teardown).
     """
     signature = inspect.signature(func)
     hints = _type_hints(func)
@@ -357,6 +483,8 @@ def analyze_signature(
     reflected: dict[str, ParameterSpec] = {}
 
     for index, (name, parameter) in enumerate(signature.parameters.items()):
+        if index < skip:
+            continue
         if parameter.kind is inspect.Parameter.VAR_KEYWORD:
             result.has_kwargs = True
             continue

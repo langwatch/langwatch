@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { scopeLangWatchQLToOrigins } from "../langwatch-ql-query-scope.rules.ts";
+import { scopeLangWatchQL } from "../langwatch-ql-query-scope.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../lwql-view-catalog.rules.ts";
 
 const WINDOW = { start: "2026-02-01T00:00:00.000Z", end: "2026-02-04T00:00:00.000Z" };
@@ -29,7 +29,7 @@ function scope({
   excludeOrigins?: readonly string[];
   timeWindow?: { start: string; end: string };
 }): string {
-  return scopeLangWatchQLToOrigins({
+  return scopeLangWatchQL({
     sql,
     excludeOrigins,
     database: "analytics",
@@ -38,7 +38,7 @@ function scope({
   });
 }
 
-describe("scopeLangWatchQLToOrigins", () => {
+describe("scopeLangWatchQL", () => {
   describe("given a view that carries each row's origin", () => {
     it("reads the view minus the rows of the origins left out", () => {
       expect(scope({ sql: "SELECT count() FROM trace_metrics" })).toBe(
@@ -137,6 +137,13 @@ describe("scopeLangWatchQLToOrigins", () => {
           `(SELECT * FROM spans WHERE ${notALangyTrace()}) AS spans WHERE Cost > 0) ` +
           "SELECT count() FROM costly",
       );
+    });
+
+    /** @scenario "A WITH name spelt like a narrowed view is refused" */
+    it("reads a WITH named like a view as the WITH, since only member windows refuse it", () => {
+      const sql = "WITH traces AS (SELECT 1 AS n) SELECT n FROM traces";
+
+      expect(scope({ sql })).toBe(sql);
     });
 
     it("scopes both halves of a UNION ALL", () => {

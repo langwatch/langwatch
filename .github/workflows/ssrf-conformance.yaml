@@ -40,10 +40,9 @@ permissions:
 
 concurrency:
   group: ssrf-conformance-${{ github.ref_name }}
-  # Supersede an outdated run on a PR branch, never on main: every commit
-  # that lands on main has to keep its own validation, and cancelling here
-  # would let a merge silently void the run for the commit before it.
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  # A newer commit supersedes an older run, on main too: the newest verdict
+  # covers the commits before it. Image and release builds keep their own rule.
+  cancel-in-progress: true
 
 jobs:
   conformance:

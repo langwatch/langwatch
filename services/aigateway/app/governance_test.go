@@ -8,6 +8,7 @@ import (
 
 	"github.com/tidwall/gjson"
 
+	"github.com/langwatch/langwatch/pkg/providererr"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
@@ -59,6 +60,28 @@ func TestApplyGovernanceMessage_RewritesAccountError(t *testing.T) {
 	}
 	if gotResp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("response status must be preserved: %d", gotResp.StatusCode)
+	}
+
+	// Readers past the gateway classify on the code, not the sentence.
+	for name, b := range map[string][]byte{"stream": got.Body, "response": gotResp.Body} {
+		if c := gjson.GetBytes(b, "error.code").String(); c != providererr.GatewayAccountExhaustedCode {
+			t.Fatalf("%s body must carry the exhaustion code, got %q", name, c)
+		}
+	}
+	if got.ErrorCode != providererr.GatewayAccountExhaustedCode {
+		t.Fatalf("UpstreamError.ErrorCode must carry the exhaustion code, got %q", got.ErrorCode)
+	}
+}
+
+// A provider's own code survives, and the message rewrite alone sets no code.
+func TestMarkAccountExhausted_KeepsProviderCode(t *testing.T) {
+	body := []byte(`{"error":{"message":"quota","type":"insufficient_quota","code":"insufficient_quota"}}`)
+	if c := gjson.GetBytes(markAccountExhausted(body), "error.code").String(); c != "insufficient_quota" {
+		t.Fatalf("provider code must be kept, got %q", c)
+	}
+	plain := []byte(`{"error":{"message":"quota"}}`)
+	if gjson.GetBytes(rewriteErrorMessage(plain, "x"), "error.code").Exists() {
+		t.Fatal("rewriteErrorMessage must not set a code")
 	}
 }
 

@@ -22,6 +22,10 @@ export class MemoryNurturingClaimRepository implements NurturingClaimRepository 
     this.#claimedUntil.set(key, now + ttlSeconds * 1000);
     return true;
   }
+
+  async release(key: string): Promise<void> {
+    this.#claimedUntil.delete(key);
+  }
 }
 
 export class MemoryNurturingRepositories {

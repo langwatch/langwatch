@@ -2,6 +2,7 @@
  * The password doors auth now owns (D-A1U-4), over a user stub, auth's own reads and an
  * in-memory stand-in for Better Auth's account storage, the store sign-in reads.
  * @see specs/settings/change-password-auth0.feature
+ * @see modules/auth/specs/forced-password-reset.feature
  */
 import { ValidationError } from "@langwatch/handled-error";
 import {
@@ -82,14 +83,23 @@ async function doors({
     isWithinBudget: vi.fn(async () => ({ allowed })),
     revokeOtherBrowserSessions: vi.fn(async () => undefined),
   };
+  const passwordResetMarks = { clearPasswordResetRequirement: vi.fn(async () => undefined) };
   const service = OwnPasswordService.create({
     users,
     credentials: store.credentials,
     auth,
     issuesOwnPasswords: () => localPasswords,
+    passwordResetMarks,
   });
 
-  return { users, auth, service, credentials: store.credentials, signsIn: store.signsIn };
+  return {
+    users,
+    auth,
+    service,
+    credentials: store.credentials,
+    signsIn: store.signsIn,
+    passwordResetMarks,
+  };
 }
 
 describe("setting a first password", () => {
@@ -261,6 +271,25 @@ describe("changing an existing password", () => {
       userId: "user-1",
       keepSessionId: "session-1",
     });
+  });
+
+  /** @scenario "Changing the password from the account settings clears the mark" */
+  it("lifts the forced-reset mark once the new password is written", async () => {
+    const { service, passwordResetMarks } = await doors();
+
+    await service.change(change);
+
+    expect(passwordResetMarks.clearPasswordResetRequirement).toHaveBeenCalledWith({
+      userId: "user-1",
+    });
+  });
+
+  it("keeps the forced-reset mark when the current password is wrong", async () => {
+    const { service, passwordResetMarks } = await doors({ storedPassword: "another-pw-123" });
+
+    await expect(service.change(change)).rejects.toBeInstanceOf(UserPasswordIncorrectError);
+
+    expect(passwordResetMarks.clearPasswordResetRequirement).not.toHaveBeenCalled();
   });
 
   it("names the wrong current password, and a missing one", async () => {

@@ -225,6 +225,7 @@ describe("LangWatchExporter", () => {
   describe("when choosing compression", () => {
     const lastConfig = () => vi.mocked(OTLPTraceExporter).mock.calls.at(-1)?.[0];
 
+    /** @scenario "The TypeScript SDK sends gzipped protobuf by default" */
     it("defaults to gzip", () => {
       vi.stubEnv("OTEL_EXPORTER_OTLP_COMPRESSION", "");
       vi.stubEnv("OTEL_EXPORTER_OTLP_TRACES_COMPRESSION", "");

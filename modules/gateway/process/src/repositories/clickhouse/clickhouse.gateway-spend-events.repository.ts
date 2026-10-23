@@ -1,3 +1,4 @@
+import type { IdBoundOptions } from "@langwatch/clickhouse-client";
 import {
   type GatewaySpendDay,
   type GatewayUsageCount,
@@ -269,12 +270,14 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
         FROM ${TABLE} FINAL
         WHERE TenantId = {tenantId:String}
           AND GatewayRequestId = {gatewayRequestId:String}
+          {{idBound:gateway_spend.GatewayRequestId:gatewayRequestId}}
         LIMIT 1
       `,
       query_params: { tenantId, gatewayRequestId },
       format: "JSONEachRow",
+      idBound: { fallback: "unbounded" },
     });
-    const raw = (await result.json()) as Record<string, unknown>[];
+    const raw = await result.json<Record<string, unknown>>();
     const r = raw[0];
     if (!r) return null;
     if (String(r.Version) !== GATEWAY_SPEND_PROJECTION_VERSION_LATEST) {
@@ -483,8 +486,10 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
         WHERE TenantId = {tenantId:String}
           AND GatewayRequestId = {gatewayRequestId:String}
           AND Status IN {statuses:Array(String)}
+          {{idBound:gateway_spend.GatewayRequestId:gatewayRequestId}}
         LIMIT 1`,
           params: { gatewayRequestId: input.gatewayRequestId, statuses: input.statuses },
+          idBound: { fallback: "unbounded" },
         }),
       ),
     );
@@ -496,16 +501,19 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
     tenantId,
     query,
     params,
+    idBound,
   }: {
     tenantId: string;
     query: string;
     params: Record<string, unknown>;
+    idBound?: IdBoundOptions;
   }): Promise<SpendEventRow[]> {
     const client = await this.resolveClient(tenantId);
     const result = await client.query({
       query,
       query_params: { ...params, tenantId },
       format: "JSONEachRow",
+      ...(idBound === undefined ? {} : { idBound }),
     });
     const raw = await result.json<Record<string, unknown>>();
     return raw.map((row) => ClickHouseGatewaySpendEventsRepository.mapSpendEventRow(row));

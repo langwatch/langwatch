@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { ResourceLimitNotifierInput } from "@langwatch/enterprise-billing-contract";
-import type { PeerSubscriberDefinition } from "@langwatch/eventing";
+import type { PeerEventSubscriberDefinition } from "@langwatch/eventing";
 import {
   SEAT_LIMIT_REACHED_EVENT_TYPE,
   seatLimitReachedEventDataSchema,
@@ -13,7 +13,7 @@ export function seatLimitReachedSubscriber({
   alerts,
 }: {
   alerts: { notifyResourceLimitReached(input: ResourceLimitNotifierInput): Promise<void> };
-}): PeerSubscriberDefinition<typeof seatLimitReachedEventDataSchema> {
+}): PeerEventSubscriberDefinition<typeof seatLimitReachedEventDataSchema> {
   return {
     eventType: SEAT_LIMIT_REACHED_EVENT_TYPE,
     data: seatLimitReachedEventDataSchema,

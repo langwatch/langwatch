@@ -574,6 +574,7 @@ describe("the pull request detail drawer", () => {
           sessions: [
             sessionFact({
               sessionId: "session-a",
+              projectId: "proj-personal",
               title: "Teach the fold about branches",
             }),
           ],
@@ -720,6 +721,97 @@ describe("the pull request detail drawer", () => {
           projectId: "proj-personal",
           conversationId: "session-a",
         });
+      });
+    });
+  });
+
+  describe("given a group project's pull request detail listing a member project's session", () => {
+    beforeEach(() => {
+      pinDetail(
+        detailPayload({
+          sessions: [
+            sessionFact({
+              sessionId: "session-a",
+              projectId: "member-b",
+              title: "Teach the fold about branches",
+            }),
+          ],
+        }),
+      );
+    });
+
+    /**
+     * @see specs/governance/aggregate-project.feature
+     * @scenario "Opening a member project's session replays that member's conversation"
+     */
+    it("reads the session under the member project that recorded it", async () => {
+      utils.traces.conversationContext.fetch.mockResolvedValue({
+        turns: [{ traceId: "trace-last", timestamp: 2_000 }],
+      });
+      const user = userEvent.setup();
+      renderDrawer();
+
+      await user.click(screen.getByText("Teach the fold about branches"));
+
+      await waitFor(() =>
+        expect(host.recording.queries.map((write) => write.next)).toEqual([
+          {
+            "drawer.open": "traceV2Details",
+            "drawer.traceId": "trace-last",
+            "drawer.t": "2000",
+            "drawer.mode": "terminal",
+            "drawer.projectId": "proj-personal",
+            "drawer.tenantId": "member-b",
+          },
+        ]),
+      );
+      expect(utils.traces.conversationContext.fetch).toHaveBeenCalledWith({
+        projectId: "proj-personal",
+        conversationId: "session-a",
+        tenantId: "member-b",
+      });
+    });
+  });
+
+  describe("given a personal workspace's pull request detail listing a session another project recorded", () => {
+    beforeEach(() => {
+      pinDetail(
+        detailPayload({
+          sessions: [
+            sessionFact({
+              sessionId: "session-a",
+              projectId: "proj-shared",
+              title: "Ran in the shared project",
+            }),
+          ],
+        }),
+      );
+    });
+
+    describe("when the reader chooses it and the read refuses a project no grant names", () => {
+      it("names that project to the read, reports the refusal and opens no replay", async () => {
+        utils.traces.conversationContext.fetch.mockRejectedValue(
+          new Error("You do not have access to this project"),
+        );
+        const user = userEvent.setup();
+        renderDrawer();
+
+        await user.click(screen.getByText("Ran in the shared project"));
+
+        await waitFor(() =>
+          expect(host.recording.failures).toContainEqual(
+            expect.objectContaining({
+              fallbackTitle: "Couldn't open the terminal replay",
+            }),
+          ),
+        );
+        expect(utils.traces.conversationContext.fetch).toHaveBeenCalledWith({
+          projectId: "proj-personal",
+          conversationId: "session-a",
+          tenantId: "proj-shared",
+        });
+        expect(host.recording.infos).toEqual([]);
+        expect(host.recording.queries).toEqual([]);
       });
     });
   });

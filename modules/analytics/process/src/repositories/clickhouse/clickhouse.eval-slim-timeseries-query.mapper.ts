@@ -1,10 +1,11 @@
 /**
  * Slim SQL builder for `evaluation_analytics` (ADR-034 Phase 6); `pickAnalyticsTable` routes
- * here and an unsupported shape throws. Every query leads with `TenantId = {tenantId:String}`,
- * filters on `OccurredAt` and dedups with `latestVersionSubquery`.
+ * here and an unsupported shape throws. Every query is fenced on `OccurredAt` by the proof's
+ * `tenantScope` marker and dedups with `latestVersionSubquery`.
  */
 
 import type { AnalyticsAggregation, BuiltAnalyticsQuery } from "@langwatch/analytics-contract";
+import { tenantScope } from "@langwatch/clickhouse-client";
 
 import type { TimeseriesQueryInput } from "./clickhouse.aggregation-builder.mapper.ts";
 import { latestVersionSubquery } from "./clickhouse.latest-version-dedup.mapper.ts";
@@ -141,7 +142,7 @@ function dedupedSlim({
     alias,
     keyColumns,
     columns: columns.map((name) => ({ name })),
-    where: `TenantId = {tenantId:String} ${dateClause}`,
+    where: `${tenantScope("OccurredAt")} ${dateClause}`,
   });
 }
 
@@ -229,10 +230,8 @@ export function buildEvalSlimTimeseriesQuery(input: TimeseriesQueryInput): Built
 
   const havingClause = groupByColumn ? `HAVING group_key != ''` : "";
 
-  // Outer WHERE is wrapped in one enclosing paren: `dedupedSlim`'s own
-  // tenant predicate sits one bracket deep already, so this OR (and any
-  // filter clause) must nest deeper still to stay outside the tenant guard's
-  // reach — see the matching note on `baseWhere` in aggregation-builder.mapper.ts.
+  // The fence leads the outer WHERE as one bracket; every OR after it nests deeper, so the
+  // tenant guard never sees a disjunction beside the tenant set.
   const sql = `
     SELECT
       ${selectExprs.join(",\n      ")}
@@ -241,13 +240,13 @@ export function buildEvalSlimTimeseriesQuery(input: TimeseriesQueryInput): Built
       dateClause: SLIM_DATE_FILTER_BOTH_PERIODS,
       expressions: selectExprs,
     })}
-    WHERE (${ea}.TenantId = {tenantId:String}
+    WHERE ${tenantScope("OccurredAt")}
       AND (
         (${ea}.OccurredAt >= {currentStart:DateTime64(3)} AND ${ea}.OccurredAt < {currentEnd:DateTime64(3)})
         OR
         (${ea}.OccurredAt >= {previousStart:DateTime64(3)} AND ${ea}.OccurredAt < {previousEnd:DateTime64(3)})
       )
-      ${filterWhere})
+      ${filterWhere}
     GROUP BY ${groupByExprs.join(", ")}
     ${havingClause}
     ORDER BY period${typeof input.timeScale === "number" ? ", date" : ""}
@@ -256,7 +255,6 @@ export function buildEvalSlimTimeseriesQuery(input: TimeseriesQueryInput): Built
   return {
     sql,
     params: {
-      tenantId: input.projectId,
       currentStart: input.startDate,
       currentEnd: input.endDate,
       previousStart: input.previousPeriodStartDate,

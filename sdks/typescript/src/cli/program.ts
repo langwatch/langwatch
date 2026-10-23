@@ -1494,13 +1494,13 @@ function registerEvaluatorCommands(program: Command): void {
 
   emitsResult(
     evaluatorCmd
-      .command("get <idOrSlug>")
-      .description("Get evaluator details by ID or slug")
+      .command("get <idSlugOrName>")
+      .description("Get evaluator details by ID, slug or display name")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (idOrSlug: string) => {
+    async (idSlugOrName: string) => {
       try {
         const { getEvaluatorCommand: impl } = await import("./commands/evaluators/get.js");
-        return await impl(idOrSlug);
+        return await impl(idSlugOrName);
       } catch (error) {
         const { reportCommandError } = await import("./utils/errorOutput.js");
         reportCommandError({ error });
@@ -1550,7 +1550,7 @@ function registerEvaluatorCommands(program: Command): void {
   emitsResult(
     evaluatorCmd
       .command("update <idOrSlug>")
-      .description("Update an evaluator name or settings")
+      .description("Update an evaluator by id or slug (find the id with `evaluator get <name>`)")
       .option("--name <name>", "New evaluator name")
       .option("--settings <json>", "Evaluator config settings as JSON")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
@@ -1569,7 +1569,9 @@ function registerEvaluatorCommands(program: Command): void {
   emitsResult(
     evaluatorCmd
       .command("delete <idOrSlug>")
-      .description("Archive (soft-delete) an evaluator")
+      .description(
+        "Archive (soft-delete) an evaluator by id or slug (find the id with `evaluator get <name>`)",
+      )
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (idOrSlug: string) => {
       try {
@@ -4522,12 +4524,12 @@ function registerMonitorCommands(program: Command): void {
 
   emitsResult(
     monitorCmd
-      .command("get <id>")
-      .description("Get monitor details by ID")
+      .command("get <idOrSlugOrName>")
+      .description("Get monitor details by id, slug or name")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (id: string) => {
+    async (idOrSlugOrName: string) => {
       const { getMonitorCommand: impl } = await import("./commands/monitors/get.js");
-      return impl(id);
+      return impl(idOrSlugOrName);
     },
   );
 
@@ -4571,7 +4573,7 @@ function registerMonitorCommands(program: Command): void {
   emitsResult(
     monitorCmd
       .command("update <id>")
-      .description("Update a monitor")
+      .description("Update a monitor by id (find the id with `monitor get <name>`)")
       .option("--name <name>", "New monitor name")
       .option("--enabled <boolean>", "Enable or disable the monitor (true/false)")
       .option("--execution-mode <mode>", "Execution mode: ON_MESSAGE, AS_GUARDRAIL, MANUALLY")
@@ -4596,7 +4598,7 @@ function registerMonitorCommands(program: Command): void {
   emitsResult(
     monitorCmd
       .command("delete <id>")
-      .description("Delete a monitor")
+      .description("Delete a monitor by id (find the id with `monitor get <name>`)")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (id: string) => {
       const { deleteMonitorCommand: impl } = await import("./commands/monitors/delete.js");

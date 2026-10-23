@@ -27,6 +27,10 @@ export const modelProviderIcons: Record<keyof typeof modelProviders, React.React
   cerebras: designSystemIcons.cerebras,
   voyage: designSystemIcons.voyage,
   azure_safety: <Azure />,
+  // Decision model providers (ADR-182) have no mark in the design system yet.
+  inception: designSystemIcons.custom,
+  perplexity: designSystemIcons.custom,
+  cloudflare: designSystemIcons.custom,
 };
 
 /**
