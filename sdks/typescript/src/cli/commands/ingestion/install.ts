@@ -254,11 +254,30 @@ function buildEnvBlock(tool: SupportedTool, endpoint: string, token: string): st
         // sub-agent. Without it, every sub-agent collapses into one
         // synthesized per-turn trace; content still rides the log events.
         `export CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1`,
-        // OTel content unlock knobs: log prompts, tool details, tool content, api bodies
+        // OTel content unlock knobs (the light content set):
+        //   OTEL_LOG_USER_PROMPTS=1        lifts user prompt text onto user_prompt events
+        //   OTEL_LOG_TOOL_DETAILS=1        lifts tool metadata expansion onto tool_* events
+        //   OTEL_LOG_TOOL_CONTENT=1        lifts tool_input (Bash command, Edit diff, file
+        //                                  paths) onto tool_decision + tool_result so the
+        //                                  trace shows WHAT the tool did
+        //   OTEL_LOG_ASSISTANT_RESPONSES=1 emits the light claude_code.assistant_response
+        //                                  event carrying just the assistant reply text
+        //                                  (claude-code 2.1.193+). We deliberately do NOT
+        //                                  set OTEL_LOG_RAW_API_BODIES: it serialises the
+        //                                  ENTIRE request + response JSON on every model
+        //                                  call (avoidable CPU/memory that grows with the
+        //                                  conversation) for content we already get from
+        //                                  the light events. Set it yourself only if you
+        //                                  need the full request JSON for debugging.
         `export OTEL_LOG_USER_PROMPTS=1`,
         `export OTEL_LOG_TOOL_DETAILS=1`,
         `export OTEL_LOG_TOOL_CONTENT=1`,
-        `export OTEL_LOG_RAW_API_BODIES=1`,
+        `export OTEL_LOG_ASSISTANT_RESPONSES=1`,
+        // These instructions are pasted into a shell rc by hand, so an older
+        // `export OTEL_LOG_RAW_API_BODIES=1` line from a previous install is
+        // not replaced for the user — tell them, rather than `unset` it
+        // unconditionally, since setting it is the documented opt-in.
+        `# Upgrading? Remove any older OTEL_LOG_RAW_API_BODIES=1 line from your shell rc unless you intentionally want the full request/response JSON.`,
         `export OTEL_TRACES_EXPORTER=otlp`,
         `export OTEL_LOGS_EXPORTER=otlp`,
         `export OTEL_METRICS_EXPORTER=otlp`,
