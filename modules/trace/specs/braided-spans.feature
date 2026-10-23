@@ -225,9 +225,8 @@ Feature: Braided spans in the reader's traces
     Scenario: A trace content read cannot swap the route's proof for an own-only one
       When a trace operation that reads span content mints its own proof instead of taking the caller's
       Then the trace route gate fails the build
-      # Today the trace app mints an own-only proof for content reads, which is
-      # why braided spans could never appear. Next to the route gate in
-      # specs/governance/aggregate-project.feature.
+      # Every content read takes the caller's proof, so the braids it carries reach
+      # the read. Next to the route gate in specs/governance/aggregate-project.feature.
 
   Rule: The braid dialog previews what the reader will see
 
