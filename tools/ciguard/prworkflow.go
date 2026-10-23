@@ -274,7 +274,7 @@ func settleProblems(pr *prFile) []string {
 	}
 	readsLabel := false
 	for _, step := range pr.Jobs["changes"].Steps {
-		readsLabel = readsLabel || strings.Contains(step.Run, "'ci:now'")
+		readsLabel = readsLabel || strings.Contains(step.Run, "ci:now")
 	}
 	if !readsLabel {
 		problems = append(problems, PRWorkflowFile+": the changes job does not read the ci:now label")
