@@ -56,7 +56,8 @@ def _write_executable(path: Path, content: str) -> None:
 
 def _repo_shaped_tree(root: Path) -> Path:
     """A copy of what the target touches, with a committed client in place."""
-    spec = root / "platform/app/src/app/api/openapiLangWatch.json"
+    # Must match API_SPEC in the Makefile.
+    spec = root / "specs/api-reference/openapi-document.json"
     spec.parent.mkdir(parents=True)
     spec.write_text(
         json.dumps(
