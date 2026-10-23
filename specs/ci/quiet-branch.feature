@@ -13,7 +13,7 @@ Feature: Pull request checks wait for a quiet branch, and main runs them once a 
 
   @unit
   Scenario: The ci:now label skips the wait
-    Given a pull request labelled ci:now
+    Given a pull request labelled ci:now or firefighting
     When the changes job reads its labels from GitHub, not from the event
     Then settle is skipped and the checks start at once
 

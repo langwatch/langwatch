@@ -2,7 +2,7 @@
 # for the checks: `changes` decides once which of them a change reaches, the
 # cheap `checks` run at once, the rest wait in `settle` until the branch has
 # been quiet for the settle environment's timer (a newer push cancels the wait;
-# the `ci:now` label skips it), and `ci-complete` reports one verdict. A call
+# the `ci:now` or `firefighting` label skips it), and `ci-complete` reports one verdict. A call
 # that is skipped takes no runner. Plan: dev/docs/plans/ci-redesign.md
 # Specs: specs/ci/one-pull-request-workflow.feature, specs/ci/quiet-branch.feature
 name: pr
@@ -73,14 +73,14 @@ jobs:
         id: force
         run: echo "all=true" >> "$GITHUB_OUTPUT"
       # Read live, not from the event: adding ci:now and re-running skips the wait.
-      - name: Wait for a quiet branch unless labelled ci:now
+      - name: Wait for a quiet branch unless labelled ci:now or firefighting
         if: github.event_name == 'pull_request'
         id: quiet
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
         run: |
-          if gh api "repos/$GITHUB_REPOSITORY/issues/$PR/labels" --jq '.[].name' | grep -qx 'ci:now'; then
+          if gh api "repos/$GITHUB_REPOSITORY/issues/$PR/labels" --jq '.[].name' | grep -qxE 'ci:now|firefighting'; then
             echo "wait=false" >> "$GITHUB_OUTPUT"
           else
             echo "wait=true" >> "$GITHUB_OUTPUT"
