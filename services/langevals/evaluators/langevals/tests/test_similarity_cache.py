@@ -5,6 +5,7 @@ request the evaluator makes.
 """
 
 import hashlib
+import threading
 import time
 
 import litellm
@@ -104,6 +105,41 @@ def test_batch_of_entries_embeds_the_target_once(embedding_requests):
     assert [r.status for r in results] == ["processed"] * 10
     assert [r["input"] for r in embedding_requests].count("You suck") == 1
     assert len(embedding_requests) == 11
+
+
+# @scenario "Entries waiting on a failed target embedding share its failure"
+def test_waiters_share_a_failed_target_embedding(monkeypatch):
+    calls: list[str] = []
+
+    def failing_embedding(*, model, input, **kwargs):
+        calls.append(input)
+        time.sleep(0.2)  # long enough for every entry to wait on this call
+        raise RuntimeError("provider timed out")
+
+    monkeypatch.setattr(litellm, "embedding", failing_embedding)
+    monkeypatch.setattr(litellm, "encode", lambda model, text: text.split())
+    similarity.target_embedding_cache.clear()
+    cache = similarity.target_embedding_cache
+    key = TargetEmbeddingCache.key("m", {}, "You suck")
+    outcomes: list[str] = []
+
+    def wait_on_target():
+        try:
+            cache.get_or_compute(
+                key, lambda: make_evaluator().embed_target("You suck")
+            )
+        except RuntimeError as error:
+            outcomes.append(str(error))
+
+    threads = [threading.Thread(target=wait_on_target) for _ in range(10)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert outcomes == ["provider timed out"] * 10
+    assert calls == ["You suck"]
+    assert len(cache) == 0
 
 
 # @scenario "Different credentials embed the target again"

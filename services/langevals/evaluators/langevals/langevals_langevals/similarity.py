@@ -2,6 +2,7 @@ import hashlib
 import json
 import threading
 from collections import OrderedDict
+from concurrent.futures import Future
 from typing import Literal, Optional
 from langevals_core.base_evaluator import (
     DEFAULT_MAX_TOKENS,
@@ -38,7 +39,7 @@ class TargetEmbeddingCache:
         self.max_entries = max_entries
         self._entries: OrderedDict[tuple[str, str, str], np.ndarray] = OrderedDict()
         self._lock = threading.Lock()
-        self._in_flight: dict[tuple[str, str, str], threading.Lock] = {}
+        self._in_flight: dict[tuple[str, str, str], Future] = {}
 
     @staticmethod
     def key(model: str, env: dict[str, str], text: str) -> tuple[str, str, str]:
@@ -65,28 +66,38 @@ class TargetEmbeddingCache:
     def get_or_compute(self, key: tuple[str, str, str], compute):
         """Return the cached embedding, or compute it once for all waiting threads.
 
-        Threads that miss on the same key wait on one call instead of each
-        embedding the target. Only arrays are cached; a skipped result is
-        returned as is, and the next waiter computes again.
+        Threads that miss on the same key wait for the one call already in
+        flight and get its outcome: the array, a skipped result, or the same
+        error. A failure is never retried here one waiter after another, so a
+        waiter waits at most as long as one embedding call. Only arrays are
+        cached.
         """
         cached = self.get(key)
         if cached is not None:
             return cached
         with self._lock:
-            flight = self._in_flight.setdefault(key, threading.Lock())
-        with flight:
-            cached = self.get(key)
-            if cached is not None:
-                return cached
-            try:
+            flight = self._in_flight.get(key)
+            owns_flight = flight is None
+            if flight is None:
+                flight = Future()
+                self._in_flight[key] = flight
+        if not owns_flight:
+            return flight.result()
+        try:
+            result = self.get(key)
+            if result is None:
                 result = compute()
                 if isinstance(result, np.ndarray):
                     self.put(key, result)
-                return result
-            finally:
-                with self._lock:
-                    if self._in_flight.get(key) is flight:
-                        del self._in_flight[key]
+            flight.set_result(result)
+            return result
+        except BaseException as error:
+            flight.set_exception(error)
+            raise
+        finally:
+            with self._lock:
+                if self._in_flight.get(key) is flight:
+                    del self._in_flight[key]
 
     def clear(self) -> None:
         with self._lock:

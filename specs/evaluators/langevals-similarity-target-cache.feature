@@ -29,6 +29,13 @@ Feature: Semantic similarity embeds its fixed target text once per process
     Then the target is embedded once and each entry is embedded once
 
   @unit
+  Scenario: Entries waiting on a failed target embedding share its failure
+    Given several entries miss on the same target at once
+    When the one embedding call for the target fails
+    Then every waiting entry gets that failure without calling the provider again
+    And nothing is cached
+
+  @unit
   Scenario: Different credentials embed the target again
     Given the target was embedded with one set of credentials
     When the same target is evaluated with other credentials
