@@ -52,6 +52,7 @@ const keys = defineRestRouter(KeyApi)
   .withCredential("organization")
 
   .post("/", "createApiKey")
+  .keepsRecords()
   .withCredential("instance_admin")
   .withAudit("api-key.created")
   .withInput(z.object({ name: z.string() }))
@@ -75,6 +76,7 @@ const keys = defineRestRouter(KeyApi)
 
   .delete("/:id", "deleteApiKey")
   .withParams(z.object({ id: z.string() }))
+  .withoutConfirmation("test route")
   .withAudit("api-key.deleted")
   .withPermission("organization:manage")
   .withOutput(z.object({ id: z.string() }))
@@ -299,6 +301,7 @@ describe("given a route that declares the trail it leaves", () => {
           .withNamespace("api-keys")
           .withVersion(VERSION)
           .post("/", "createApiKey")
+          .keepsRecords()
           .withAudit("Created An API Key"),
       ).toThrow(/must be dotted segments/);
     });
@@ -309,6 +312,7 @@ describe("given a route that declares the trail it leaves", () => {
           .withNamespace("api-keys")
           .withVersion(VERSION)
           .post("/", "createApiKey")
+          .keepsRecords()
           .withAudit("modelProvider.role_defined"),
       ).not.toThrow();
     });
@@ -321,6 +325,7 @@ describe("given a route that declares the trail it leaves", () => {
           .withNamespace("api-keys")
           .withVersion(VERSION)
           .post("/", "createApiKey")
+          .keepsRecords()
           .withPermission("organization:manage")
           .handle(async () => void 0),
       ).toThrow(/REST createApiKey is a write route: declare withAudit/);
@@ -345,6 +350,7 @@ describe("given a route that declares the trail it leaves", () => {
           .withNamespace("api-keys")
           .withVersion(VERSION)
           .post("/", "createApiKey")
+          .keepsRecords()
           .withAudit("api-key.created")
           .withoutAudit("ingestion"),
       ).toThrow(/already declared withAudit\(\) or withoutAudit\(\)/);
@@ -356,6 +362,7 @@ describe("given a route that declares the trail it leaves", () => {
           .withNamespace("api-keys")
           .withVersion(VERSION)
           .post("/", "createApiKey")
+          .keepsRecords()
           .withoutAudit(" "),
       ).toThrow(/needs a reason/);
     });

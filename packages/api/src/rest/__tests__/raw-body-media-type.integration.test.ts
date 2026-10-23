@@ -58,6 +58,7 @@ const notes = defineRestRouter(NoteApi)
   .withCredential("organization")
 
   .post("/", "recordNote")
+  .keepsRecords()
   .withRawBody("text", { mediaType: JSON_TYPE })
   .withPermission("organization:manage")
   .withOutput(answer)
@@ -65,6 +66,7 @@ const notes = defineRestRouter(NoteApi)
   .handle(async ({ app, raw }) => app.record({ raw }))
 
   .post("/legacy", "recordLegacyNote")
+  .keepsRecords()
   .withRawBody("text", { mediaType: JSON_TYPE, mismatch: "malformed_request" })
   .withPermission("organization:manage")
   .withOutput(answer)
@@ -72,6 +74,7 @@ const notes = defineRestRouter(NoteApi)
   .handle(async ({ app, raw }) => app.record({ raw }))
 
   .post("/protocol", "recordProtocolNote")
+  .keepsRecords()
   .withRawBody("text", { mediaType: JSON_TYPE, mismatch: "malformed_request" })
   .withPermission("organization:manage")
   .withResponse("protocol", {
@@ -89,6 +92,7 @@ const notes = defineRestRouter(NoteApi)
   )
 
   .post("/accepted", "recordAcceptedNote")
+  .keepsRecords()
   .withRawBody("text", { mediaType: JSON_TYPE, mismatch: "accepted" })
   .withPermission("organization:manage")
   .withOutput(answer)
@@ -96,6 +100,7 @@ const notes = defineRestRouter(NoteApi)
   .handle(async ({ app, raw }) => app.record({ raw }))
 
   .post("/signed", "recordSignedNote")
+  .keepsRecords()
   .withRawBody("text", { mediaType: JSON_TYPE })
   .withAccess(anyAuthenticated({ reason: "the body's signature is the whole gate" }))
   .withOutput(answer)
@@ -103,6 +108,7 @@ const notes = defineRestRouter(NoteApi)
   .handle(async ({ app, raw }) => app.record({ raw }))
 
   .post("/unchecked", "recordUncheckedNote")
+  .keepsRecords()
   .withRawBody("text")
   .withPermission("organization:manage")
   .withOutput(answer)
@@ -110,6 +116,7 @@ const notes = defineRestRouter(NoteApi)
   .handle(async ({ app, raw }) => app.record({ raw }))
 
   .post("/refusing", "recordRefusingNote")
+  .keepsRecords()
   .withRawBody("text", { refuses: ["application/grpc"] })
   .withPermission("organization:manage")
   .withOutput(answer)
@@ -333,6 +340,7 @@ describe("a raw-body route that names no media type of its own", () => {
           .withNamespace("notes")
           .withVersion(VERSION)
           .post("/", "recordNote")
+          .keepsRecords()
           .withRawBody("text", { mismatch: "malformed_request" }),
       ).toThrow(/names none it reads/);
     });
@@ -348,6 +356,7 @@ describe("a raw-body route that names no media type of its own", () => {
             .withNamespace("notes")
             .withVersion(VERSION)
             .post("/", "recordNote")
+            .keepsRecords()
             .withRawBody("text", { mediaType }),
         ).toThrow(/names no single media type/);
       });
@@ -415,7 +424,8 @@ describe("a raw-body route that refuses media types by name and reads any other"
         defineRestRouter(NoteApi)
           .withNamespace("notes")
           .withVersion(VERSION)
-          .post("/", "recordNote");
+          .post("/", "recordNote")
+          .keepsRecords();
 
       expect(() =>
         route().withRawBody("text", { mediaType: JSON_TYPE, refuses: ["application/grpc"] }),

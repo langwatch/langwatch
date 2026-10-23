@@ -81,6 +81,7 @@ function localControlConnectRest(mount: LangyControlMount) {
     .withAddressing("literal", { v1Twin: true })
 
     .post(`/api/langy/control${mount}/connect/register`, "langyControlConnectRegister")
+    .keepsRecords()
     .withAudit("langy.registerLocalControl")
     .withCredential("session_key", { session: localControlCredentialSchema })
     .withAccess(
@@ -150,6 +151,7 @@ function localControlConnectRest(mount: LangyControlMount) {
     )
 
     .post(`/api/langy/control${mount}/connect/frames`, "langyControlConnectFrames")
+    .keepsRecords()
     .withoutAudit("ingestion")
     .withAccess({ kind: "public", reason: ADDRESSED_BY_INSTANCE_TOKEN })
     .withInput(langyControlFramesBodySchema)

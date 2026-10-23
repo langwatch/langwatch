@@ -370,6 +370,22 @@ Feature: Evaluation service boundary
     Then the fact carries the project, the evaluation, its evaluator type, score and verdict
     And it names no admin and no organization count
 
+  # Keyed by the evaluation, not the project (2026-10-20): keyed by project, every settled
+  # evaluation in a project queued behind the one before it, so one busy project held its whole
+  # backlog in a single queue group.
+  @unit
+  Scenario: A settled evaluation's fact is keyed by the evaluation, not its project
+    Given two evaluations in the same project settle
+    When their lifecycle facts are recorded
+    Then each fact is keyed by its own evaluation, so neither waits for the other
+
+  @unit
+  Scenario: A hand-run evaluation's fact is keyed by the run, not its project
+    Given two people in the same project each run an evaluation by hand
+    When their ran facts are recorded
+    Then each fact is keyed by its person and instant, so neither waits for the other
+    And the same run sent twice is still one fact
+
   @integration
   Scenario: An evaluate request that fails validation answers 400 with the sentence
     Given a project API key that may manage evaluations
@@ -384,3 +400,53 @@ Feature: Evaluation service boundary
     When a reader holding evaluations:view and analytics:view asks for the trend
     Then evaluation lists the project's monitors itself and compares the last seven days with the window analytics resolves
     And a project with no monitors answers no rows without querying evaluations
+
+  @unit
+  Scenario: An evaluator called before the evaluator service is up is retried, not recorded as a failure
+    Given the evaluator service cannot be reached yet, or answers 503 while it starts
+    When an evaluation calls an evaluator
+    Then the failure is retryable, answers 503 and keeps the code evaluator_execution_error
+    And a queued evaluation sends its next attempt, delayed, instead of being recorded as an error
+
+  @unit
+  Scenario: Each failed attempt records an attempt event with its number, error and next try
+    Given the evaluator service is not up yet
+    When attempt 1 of a queued evaluation fails inside the retry window
+    Then an attempt event records attempt 1, the error the customer may see and when the next try is due
+    And attempt 2 is sent with the same evaluation, delayed until that time, and measured from the first try
+    And the next attempt is not collapsed onto the first send or onto another attempt
+
+  @unit
+  Scenario: Attempts back off from five seconds, doubling, up to ten minutes
+    Given an attempt failed because the evaluator service was not up
+    When the next attempt is planned
+    Then it waits five seconds after attempt 1, doubling with each attempt
+    And never less than the evaluator service asked for, nor more than ten minutes
+
+  @unit
+  Scenario: An evaluator service that stays down is recorded as an error once the retry window ends
+    Given the evaluator service has been unreachable since the evaluation was issued
+    And the retry window is two hours by default, a deployment setting
+    When the evaluation fails retryably and its next attempt would start after the retry window
+    Then it is recorded as an error, as before
+    And no further attempt is sent
+
+  @unit
+  Scenario: A retried evaluation always ends with a result
+    Given attempt 1 failed because the evaluator service was not up
+    When attempt 2 runs again and its monitor is gone or its preconditions are no longer met
+    Then the evaluation is recorded as skipped, not left retrying
+    And attempt 2 is not dropped by the sampling roll that attempt 1 already passed
+
+  @unit
+  Scenario: A retrying evaluation shows as in progress
+    Given the evaluator service is not up yet
+    When an attempt of the evaluation fails inside the retry window
+    Then the run is in progress and shows its number of attempts, the last attempt's time and error, and the next try
+
+  @unit
+  Scenario: A run that ends after failed attempts keeps how many attempts failed
+    Given a run with failed attempts
+    When the run is recorded as processed, skipped or an error
+    Then it keeps its number of attempts and its last attempt's time and error
+    And it has no next try

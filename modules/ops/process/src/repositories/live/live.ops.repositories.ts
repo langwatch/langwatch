@@ -1,6 +1,9 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { EventSourcing } from "@langwatch/eventing";
-import { EventingClickHouseEventExplorer } from "@langwatch/eventing/server";
+import {
+  EventingClickHouseEventExplorer,
+  eventLogIdIndexReadiness,
+} from "@langwatch/eventing/server";
 import { privateTenantListing } from "@langwatch/process-stores";
 import type { RedisConnection } from "@langwatch/redis-client";
 
@@ -62,6 +65,7 @@ export const LiveOpsRepositories = {
         redis,
         clickhouse,
         eventing,
+        eventLogIndexReadiness: eventLogIdIndexReadiness({ clickhouse }),
         ...(privateTenants === undefined ? {} : { privateTenants }),
       }),
       pipelineDefinitions: EventingPipelineDefinitionsRepository.create({ eventing }),

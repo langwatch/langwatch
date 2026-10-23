@@ -3,10 +3,26 @@
  * DashboardPageBody did. Public pages never draw the shell body at all.
  */
 
+import { organizationWeb } from "@langwatch/organization-browser/declaration";
+import { JoinOfferToken } from "@langwatch/organization-client";
+import { userWeb } from "@langwatch/user-browser/declaration";
 import { isValidElement, type ReactElement } from "react";
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 
 import { joinOffer } from "../navigation-host-capabilities";
+
+// Importing the capabilities starts fetching their chunks, and this file ends in
+// milliseconds. Wait for the same modules, so none lands after the environment is gone.
+afterAll(async () => {
+  const lend = organizationWeb.installation.lends.find(
+    ({ token }) => token.key === JoinOfferToken.key,
+  );
+  await Promise.all([
+    lend !== undefined && "load" in lend ? lend.load() : undefined,
+    userWeb.installation.capabilities.secureAccountNudge.load(),
+    userWeb.installation.capabilities.organizationMfaGate.load(),
+  ]);
+});
 
 const takeoverFallback = (tree: unknown): unknown => {
   if (!isValidElement<{ children: ReactElement<{ fallback: unknown }> }>(tree)) {
