@@ -22,12 +22,12 @@ The image refuses to start without a password for the `default` user, as it alre
 
 With an access file (`CLICKHOUSE_ACCESS_FILE`, or the chart's `access.enabled`), or with `CLICKHOUSE_ACCESS_TIERS=true` for operator-written users, `ch-config` writes `users.d/access-tiers.yaml` at every start: one role and one settings profile per tier. Without either, no `tier_*` role or profile exists, so an existing install sees no new entities and no reserved names; turning access off again removes the file.
 
-| Tier | Role grants | Per-user grants on each listed database | Profile |
-|---|---|---|---|
-| `tier_inspect` | `SHOW ON *.*`, `SELECT ON information_schema.*` | none (no database list) | `readonly=2`, capped execution time and memory |
-| `tier_read` | as inspect | `SELECT` | as inspect |
-| `tier_write` | as inspect | `SELECT, INSERT, ALTER UPDATE, ALTER DELETE` (lightweight `DELETE` checks `ALTER DELETE`) | capped memory, writable |
-| `tier_admin` | `ALL ON *.* WITH GRANT OPTION` | none | inherits `default` |
+| Tier           | Role grants                                     | Per-user grants on each listed database                                                   | Profile                                        |
+| -------------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| `tier_inspect` | `SHOW ON *.*`, `SELECT ON information_schema.*` | none (no database list)                                                                   | `readonly=2`, capped execution time and memory |
+| `tier_read`    | as inspect                                      | `SELECT`                                                                                  | as inspect                                     |
+| `tier_write`   | as inspect                                      | `SELECT, INSERT, ALTER UPDATE, ALTER DELETE` (lightweight `DELETE` checks `ALTER DELETE`) | capped memory, writable                        |
+| `tier_admin`   | `ALL ON *.* WITH GRANT OPTION`                  | none                                                                                      | inherits `default`                             |
 
 Tier = what, databases = where. A tier role carries only database-independent grants; the database list becomes direct grants on the user. Read profiles use `readonly=2`, not `1`, because tools such as Grafana set `max_execution_time` per query and `readonly=1` rejects that; constraints cap `max_execution_time` (`READ_TIER_MAX_EXECUTION_TIME`, default 300 s) and `max_memory_usage` (the computed per-query budget) so a read user cannot raise them. The `tier_` prefix keeps the names clear of roles an operator already created.
 
@@ -67,12 +67,12 @@ The sidecar accepts a token only when all hold:
 
 1. The login name is a token user in `access.yaml`; the issuer is the one that user names, never the token's own `iss` choice.
 2. The signature verifies against that issuer's JWKS, found by OIDC discovery (`<url>/.well-known/openid-configuration`, whose `issuer` must equal the configured URL) or a configured `jwks_url`. Allowed algorithms are RS/PS/ES 256-512 and EdDSA; `none` and HMAC are refused.
-3. `iss` equals the issuer URL, `aud` contains its `audience` (default `clickhouse`), `exp` is present and in the future and `nbf` has passed, with 30 seconds of leeway.
+3. `iss` equals the issuer URL, `aud` contains its `audience` (default `clickhouse`), `exp` is present and in the future, and `nbf` has passed. `nbf` and `iat` get 30 seconds of clock leeway; `exp` gets none, so a token stops working the moment it expires, fresh or cached alike.
 4. The issuer's `username_claim` (default `sub`) equals the user's `subject`, and every `required_claims` entry (for example `email_verified: true`) matches exactly.
 
 An explicit `subject` per user replaces the design's username template. Mapping the local part of an email (`alice@...` to `alice`) would let any account at any domain the issuer serves claim `alice`, so the binding is a full claim value or nothing.
 
-ClickHouse re-authenticates every HTTP request and caches only LDAP results (`src/Access/ExternalAuthenticators.cpp`), so the sidecar caches each verified (user, token) pair until the token's `exp`, keyed by a SHA-256 of both, at most 10 000 entries, cleared whenever `access.yaml` changes. Keys are fetched at start and refreshed every 15 minutes; a token signed by an unknown `kid` triggers at most one refetch per issuer every 30 seconds, so a rotated key works within seconds and a flood of forged `kid`s cannot hammer the issuer. Issuer URLs must be `https`, except loopback (tests). A per-issuer `ca_file` trusts a private CA, for in-cluster Kubernetes issuers. ClickHouse waits up to 5 seconds for the sidecar (`receive_timeout_ms`), enough for a cold JWKS fetch.
+ClickHouse re-authenticates every HTTP request and caches only LDAP results (`src/Access/ExternalAuthenticators.cpp`), so the sidecar caches each verified (user, token) pair until the token's `exp`, keyed by a SHA-256 of both, at most 10 000 entries (when full, expired entries go first, then the one expiring soonest), cleared whenever `access.yaml` changes. Keys are fetched at start and refreshed every 15 minutes; a token signed by an unknown `kid` triggers at most one refetch per issuer every 30 seconds, so a rotated key works within seconds and a flood of forged `kid`s cannot hammer the issuer. Issuer URLs must be `https`, except loopback (tests). A per-issuer `ca_file` trusts a private CA, for in-cluster Kubernetes issuers. ClickHouse waits up to 5 seconds for the sidecar (`receive_timeout_ms`), enough for a cold JWKS fetch.
 
 JWT size: the native protocol accepts a password of up to 64 KiB (`MAX_HELLO_STRING_SIZE`, `src/Server/TCPHandler.cpp:2093`) and HTTP a header value of up to 128 KiB (`http_max_field_value_size`). The sidecar refuses tokens over 16 KiB. Typical OIDC tokens are 1 to 2 KiB.
 
@@ -81,6 +81,40 @@ Token verification uses `github.com/go-jose/go-jose/v4`, already in this workspa
 ### 6. Where it runs
 
 The chart (`access.enabled`, off by default) runs the sidecar as a second container of the ClickHouse pod, sharing `users.d`, the `access.yaml` ConfigMap and the listed password Secrets. A plain `docker run` with `CLICKHOUSE_ACCESS_FILE` set runs it inside the same container (`CLICKHOUSE_ACCESS_SIDECAR=embedded`, the default), supervised by the entrypoint.
+
+### 7. Dynamic-only mode: no long-lived password in ClickHouse
+
+`mode: dynamic-only` in `access.yaml` (chart: `access.dynamicOnly.enabled`) is off by default; absent, nothing above changes. On, every person and workload logs in with a short-lived OIDC token, and nothing a client could hold stays valid for longer than a token does.
+
+What `ch-config generate` does, failing the start with a message naming each offender:
+
+- **`access.yaml`.** A `rolling` user is refused at validation. `local_admin` joins `default` and `tier_*` as reserved names.
+- **`default`.** `CLICKHOUSE_PASSWORD` and `CLICKHOUSE_PASSWORD_FILE` must be unset. `default` is kept, because ClickHouse internals and the official `users.xml` expect it, but locked: its hash is of 32 random bytes nobody keeps, and its network list is empty (`networks` with `replace`, so the image's `::/0` goes). ClickHouse checks the address before any credential (`IAccessStorage::authenticateImpl`), so no address may log in as `default` at all.
+- **Operator files.** `users.xml`, `users.d` and `conf.d` are read, and any user other than the image's own with `password*`, `no_password` or `ssh_keys` stops the start. `ldap`, `kerberos`, `ssl_certificates` and `http_authentication` defer to a system that can expire or revoke the credential, so they stay allowed. The LangWatchQL rendered user (`lwql-access.yaml`, a static `password_sha256_hex`) is refused too, until the app moves it to a token login.
+- **Server settings.** `allow_no_password=0` and `allow_plaintext_password=0`, and a `password_complexity` rule that never matches, so `CREATE USER ... IDENTIFIED BY` is refused. A pre-hashed `IDENTIFIED WITH sha256_hash BY` skips ClickHouse's complexity check, and SQL users created before the mode was on survive it. The sidecar therefore queries `system.users` every minute and logs, at error level, every user other than `local_admin` with a password or key login (`default` only while some network may reach it). It reports and never drops: an admin may have done it on purpose.
+- **Replicas.** The cluster secret must be on (`CLICKHOUSE_CLUSTER_SECRET_ENABLED`), or replicas would log in to each other as the locked `default`.
+
+The sidecar pins the mode the server started in (it is in `users.d` as the local admin file) and refuses an `access.yaml` that switches it live, keeping the last good users. Otherwise a file returning to standard mode would render rolling passwords onto a server that started dynamic-only. Changing mode needs a restart.
+
+**The local admin.** initdb scripts, the sidecar's audit and the backup runner still need an admin login inside the pod. At every server start `ch-config generate` writes a fresh 32-byte random password to `CLICKHOUSE_ACCESS_BOOTSTRAP_DIR` (default `/run/clickhouse-access`; a tmpfs, mode 0440 for uid and group 101) and renders `local_admin` with only its SHA-256, networks `127.0.0.1` and `::1`, full rights and `access_management`. It is the only file-defined user with a password; it changes on every restart and never leaves the pod. The chart mounts an in-memory `emptyDir` into the ClickHouse and sidecar containers; a plain `docker run` runs the sidecar in the same container and should mount a `--tmpfs` there. In-pod helpers read it through `internal/bootstrap` (`Read`, or `Client.Query`, which re-reads the file per call), so a restart needs nothing from them. Leaving the mode deletes the file. The entrypoint hands initdb scripts `local_admin` instead of `default`. A distributed query initiated by `local_admin` is refused by the other replicas, whose network check sees a pod address; it is for local work.
+
+We considered `<replicated>` SQL storage with a reconciler identity again and kept rendered files, for the reasons in section 4. The reconciler the design brief assumed does not exist: the sidecar writes files and needs no SQL identity, except for the audit.
+
+**Workloads.** Kubernetes projected ServiceAccount tokens (`audience: clickhouse`, `expirationSeconds` 600 or more, the kubelet's minimum), GitHub Actions OIDC, or a person's ID token. The kubelet rewrites the projected file at 80% of its lifetime, so a client must read the token file per connection, or per request over HTTP, and never cache it past `exp`. The LangWatch app's ClickHouse client takes its password from the URL once today and needs that change before it can run against a dynamic-only server.
+
+**Availability.** Every login, including the app's, now depends on the sidecar. It answers from its verified-token cache without network calls, keeps an issuer's last good keys when a refresh fails, bounds every fetch at 4 seconds (below ClickHouse's 5-second wait) and every refetch for an unknown key at once per 30 seconds. `GET /readyz` answers 200 once an access file is loaded and every issuer's keys were fetched once; the chart uses it as the sidecar's readiness probe in this mode, so a pod that cannot verify tokens leaves the Service, and Kubernetes restarts a sidecar whose health check fails. The cost: an issuer unreachable when a pod starts keeps that pod out of the Service, and an outage of the sidecar is an outage of every login on that pod. The embedded sidecar restarts within 2 seconds; the CI end-to-end test asserts new logins return within 30.
+
+**Threat model.**
+
+Protected: a credential leaked from a Kubernetes Secret, Terraform state, an environment variable, a backup, a CI log or a laptop expires within its token lifetime, minutes; nothing in ClickHouse's config, its data volume or the chart's Secrets is a login (`default` has none, `local_admin`'s plaintext lives only in the pod's memory and is valid only from loopback); each login is tied to a workload identity or a person, and `system.query_log` shows that user.
+
+Not protected:
+
+- An attacker inside the pod, who can read the local admin password or the rendered config, or talk to the sidecar.
+- Anyone who can mint tokens: the issuer's signing key, a Kubernetes user who can create ServiceAccount tokens (`create serviceaccounts/token`) or pods under a mapped ServiceAccount, or write access to a workflow whose subject is mapped.
+- The cluster secret, the one remaining shared secret: any holder who reaches port 9000 can send queries as any user. Rotating it needs every replica restarted together (README, Cluster secret): replace the Secret value, then delete the server pods at once.
+- `interserver_http_credentials`, when `CLICKHOUSE_INTERSERVER_PASSWORD_FILE` is set: a part-fetch credential, not a login, rotated the same way.
+- Tokens stolen while live: they work until `exp`, which is why lifetimes should stay short.
 
 ## Rationale / Trade-offs
 
@@ -96,11 +130,12 @@ A directory of password files beat `current` plus `previous {file, valid_until}`
 - The chart's `users` value, documented earlier but never rendered, stays accepted as a deprecated no-op with a NOTES warning, and goes in the next major release.
 - An `access.yaml` user must not also be defined as a SQL user or in an operator's own `users.d` file. `ch-config` cannot see either: a second `users.d` definition merges into the rendered one and a SQL user of the same name is shadowed by it. Migrating a user means dropping the old definition once its consumers moved.
 - Changes to `access.yaml` and to password directories apply live within about 10 seconds; changing the sidecar's listen address or adding the first `access.yaml` needs a restart, because the auth server is part of the server config.
+- Dynamic-only mode (section 7) is off by default and refuses, at start, what it cannot keep: rolling users, a default password, static users in operator files (including the LangWatchQL rendered user), replicas without the cluster secret and, in the chart, the backup CronJobs and `passwordSecrets`. `local_admin` is a reserved name in every mode. Backups in this mode wait for an in-pod runner that logs in as `local_admin`.
 - Rolling user names are restricted to `[A-Za-z_][A-Za-z0-9_-]*` (a dot breaks ClickHouse's config paths).
 
 ## References
 
 - Spec: [`specs/clickhouse/serverless-access.feature`](../../../specs/clickhouse/serverless-access.feature)
 - Related ADRs: [ADR-159](./159-the-app-owns-the-lwql-access-model.md) (rendered access delivery, `<replicated>` storage rejected)
-- ClickHouse source at tag `v26.8.34.13-lts`: `src/Access/UsersConfigParser.cpp` (`auth_methods`, `http_authentication`, config roles and grants), `src/Access/ExternalAuthenticators.cpp` (`http_authentication_servers` keys: `uri`, `connection_timeout_ms`, `receive_timeout_ms`, `send_timeout_ms`, `max_tries`, `retry_initial_backoff_ms`, `retry_max_backoff_ms`, `forward_headers`), `src/Access/IAccessStorage.cpp` (per-method `VALID UNTIL` checked at login, SQL storage only), `src/Parsers/Access/ParserCreateUserQuery.cpp` (`ADD IDENTIFIED`, per-method `VALID UNTIL`, `http SERVER ... SCHEME`), `src/Storages/System/StorageSystemUsers.cpp` (`system.users` exposes types and `valid_until`, never hashes), `tests/integration/test_external_http_authenticator`
+- ClickHouse source at tag `v26.8.34.13-lts`: `src/Access/UsersConfigParser.cpp` (`auth_methods`, `http_authentication`, config roles and grants, `networks` cleared when present), `src/Access/AccessControl.cpp` (`allow_no_password`, `allow_plaintext_password`, `password_complexity`), `src/Access/ExternalAuthenticators.cpp` (`http_authentication_servers` keys: `uri`, `connection_timeout_ms`, `receive_timeout_ms`, `send_timeout_ms`, `max_tries`, `retry_initial_backoff_ms`, `retry_max_backoff_ms`, `forward_headers`), `src/Access/IAccessStorage.cpp` (per-method `VALID UNTIL` checked at login, SQL storage only), `src/Parsers/Access/ParserCreateUserQuery.cpp` (`ADD IDENTIFIED`, per-method `VALID UNTIL`, `http SERVER ... SCHEME`), `src/Storages/System/StorageSystemUsers.cpp` (`system.users` exposes types and `valid_until`, never hashes), `tests/integration/test_external_http_authenticator`
 - Image docs: `infra/clickhouse-serverless/README.md`; chart: `charts/clickhouse-serverless/README.md`; operator guide: `docs/self-hosting/configuration/clickhouse-access.mdx`
