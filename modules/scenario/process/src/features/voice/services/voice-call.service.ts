@@ -11,6 +11,7 @@ import {
   type VoiceTransport,
   VoiceNameRequiredError,
   VoiceScenarioNotFoundError,
+  callReachedLimit,
 } from "@langwatch/scenario-contract";
 
 import {
@@ -49,7 +50,10 @@ export type VoiceCallFinishInput = {
   transcript: BrowserTranscriptTurn[];
   startedAt: number;
   endedAt: number;
-  isCutAtLimit: boolean;
+  /** The configured maximum call duration, the same one the mint handed the
+   *  browser as its countdown. Whether the limit ended this call is derived
+   *  from the reported span against it, never read from the body (#8028). */
+  maxCallSeconds: number;
   conversationId?: string;
   /** Set for a "Call it myself" run: the scenario the call is scored under
    *  (AC23). Absent for a drawer call, which is not written as a run (#8020). */
@@ -260,7 +264,7 @@ async function ingestFinishedCall(
     transcript: BrowserTranscriptTurn[];
     startedAt: number;
     endedAt: number;
-    isCutAtLimit: boolean;
+    maxCallSeconds: number;
   },
   {
     transport,
@@ -303,6 +307,16 @@ async function ingestFinishedCall(
     existingAgentId,
   });
 
+  // Whether the limit ended the call is the server's finding, from the span
+  // the finish reports against the configured limit — not a flag the browser
+  // asserts. The span is what the run's own timing is built from, so a call
+  // cannot read as cut without also having run that long, nor hide a cutoff
+  // without also shortening itself (#8028).
+  const isCutAtLimit = callReachedLimit({
+    durationMs: Math.max(0, input.endedAt - input.startedAt),
+    maxCallSeconds: input.maxCallSeconds,
+  });
+
   const record = selectCallRecord({
     providerRecord,
     transcript: input.transcript,
@@ -310,7 +324,7 @@ async function ingestFinishedCall(
     transport,
     startedAt: input.startedAt,
     endedAt: input.endedAt,
-    isCutAtLimit: input.isCutAtLimit,
+    isCutAtLimit,
   });
 
   // Record one trace per exchange before any run is written, so every message
@@ -338,7 +352,7 @@ async function finishDrawerCall(
     transcript: BrowserTranscriptTurn[];
     startedAt: number;
     endedAt: number;
-    isCutAtLimit: boolean;
+    maxCallSeconds: number;
   },
   {
     transport,

@@ -20,8 +20,7 @@ export function useTalkToItCall(props: TalkToItPanelProps) {
   refs.stateRef.current = state;
 
   const finish = useCallback(
-    ({ isCutAtLimit, nameOverride }: { isCutAtLimit: boolean; nameOverride?: string }) =>
-      runFinish({ props, refs, dispatch, isCutAtLimit, nameOverride }),
+    ({ nameOverride }: { nameOverride?: string }) => runFinish({ props, refs, dispatch, nameOverride }),
     [props, refs],
   );
   const endCall = useCallback(
@@ -41,9 +40,9 @@ export function useTalkToItCall(props: TalkToItPanelProps) {
     });
   }, [props, refs, endCall]);
   const saveWithName = useCallback(
-    ({ isCutAtLimit, name }: { isCutAtLimit: boolean; name: string }) => {
+    ({ name }: { name: string }) => {
       dispatch({ type: "HANG_UP" });
-      void finish({ isCutAtLimit, nameOverride: name });
+      void finish({ nameOverride: name });
     },
     [finish],
   );

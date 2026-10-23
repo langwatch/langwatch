@@ -44,17 +44,24 @@ export async function runEndCall({
 }: {
   refs: TalkRefs;
   dispatch: TalkDispatch;
-  finish: (args: { isCutAtLimit: boolean }) => Promise<void>;
+  finish: (args: { nameOverride?: string }) => Promise<void>;
+  // Drives this panel's LIMIT_REACHED vs HANG_UP display only; the server
+  // derives the run's cut-at-limit marker from the call span (#8028).
   isCutAtLimit: boolean;
 }): Promise<void> {
+  // Single-flight: hangUp fires onDisconnect, which re-enters here. The first
+  // end instant is the one the server's cutoff (endedAt - startedAt) must see,
+  // so a re-entry after slow cleanup neither moves it nor finishes twice (#8028).
+  if (refs.endedAt.current !== 0) return;
   stopTick(refs);
+  refs.endedAt.current = nowInstant().epochMilliseconds;
   dispatch(isCutAtLimit ? { type: "LIMIT_REACHED" } : { type: "HANG_UP" });
   try {
     await refs.session.current?.hangUp();
   } catch {
     // The socket may already be closed; the finish still runs.
   }
-  await finish({ isCutAtLimit });
+  await finish({});
 }
 
 function startTick({
@@ -104,6 +111,7 @@ export async function runStart({
   refs.maxSeconds.current = mint.maxDurationSeconds;
   refs.sessionToken.current = mint.sessionToken;
   refs.startedAt.current = nowInstant().epochMilliseconds;
+  refs.endedAt.current = 0;
 
   const client = getVoiceTransportClient(props.transport);
   if (!client) return dispatch(failed(PHONE_NO_BROWSER_CALL_NOTICE));
