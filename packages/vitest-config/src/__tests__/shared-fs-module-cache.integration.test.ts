@@ -271,20 +271,38 @@ describe("the shared fs module cache", () => {
     }, 60_000);
 
     /** @scenario "A lockfile change starts a new directory and leaves the other alone" */
-    it("keeps this lockfile's modules in a directory of their own", async () => {
+    it("keeps each lockfile's modules in a directory of their own", async () => {
       const lockCache = join(base, "lock-cache");
-      seedDirectory(lockCache, "cafef00d", hoursAgo(1));
-      const lockRoot = checkout("lock", { "shared/helper.ts": HELPER });
+      // the copy pnpm writes on install, which is the lockfile Vitest reads under pnpm
+      const lockfile = (version: string) => `lockfileVersion: '9.0'\n# probe ${version}\n`;
+      const oldLockRoot = checkout("lock-old", {
+        "shared/helper.ts": HELPER,
+        "node_modules/.pnpm/lock.yaml": lockfile("old"),
+      });
+      const newLockRoot = checkout("lock-new", {
+        "shared/helper.ts": HELPER,
+        "node_modules/.pnpm/lock.yaml": lockfile("new"),
+      });
+      const filesIn = (dir: string) =>
+        readdirSync(join(lockCache, dir), { recursive: true, withFileTypes: true })
+          .filter((entry) => entry.isFile())
+          .map((entry) => {
+            const path = join(entry.parentPath, entry.name);
+            return { path, mtimeMs: statSync(path).mtimeMs };
+          });
 
-      await runVitest(lockRoot, "file", lockCache);
+      await runVitest(oldLockRoot, "file", lockCache);
+      const oldDir = readdirSync(lockCache)[0] ?? "";
+      const oldFiles = filesIn(oldDir);
+      await runVitest(newLockRoot, "file", lockCache);
 
-      const own = readdirSync(lockCache).filter((name) => name !== "cafef00d");
-      expect(own).toHaveLength(1);
-      expect(readdirSync(join(lockCache, "cafef00d"))).toEqual(["module"]);
+      const dirs = readdirSync(lockCache).filter((name) => /^[0-9a-f_]{8}$/.test(name));
       // the shape the pruning pattern in the patch recognises, or the directory is never pruned
-      expect(own[0]).toMatch(/^[0-9a-f_]{8}$/);
-      expect(readdirSync(join(lockCache, own[0] as string)).length).toBeGreaterThan(1);
-    }, 60_000);
+      expect(dirs).toHaveLength(2);
+      const newDir = dirs.find((name) => name !== oldDir) ?? "";
+      expect(filesIn(newDir).length).toBeGreaterThan(1);
+      expect(filesIn(oldDir)).toEqual(oldFiles);
+    }, 120_000);
 
     /** @scenario "Without VITEST_FS_MODULE_CACHE_DIR the cache lives under XDG_CACHE_HOME" */
     it("writes under XDG_CACHE_HOME when no cache directory is set", async () => {
@@ -397,15 +415,15 @@ describe("the shared fs module cache", () => {
       // the test itself runs under
       const token = ["@@vitest-fs-module", "cache-root@@"].join("-");
       const helper = HELPER.replace('"file"', `"${token}"`);
-      const first = checkout("token-first", { "shared/helper.ts": helper });
-      const second = checkout("token-second", { "shared/helper.ts": helper });
+      const tokenFirstRoot = checkout("token-first", { "shared/helper.ts": helper });
+      const tokenSecondRoot = checkout("token-second", { "shared/helper.ts": helper });
 
-      const firstRun = await runVitest(first, token, cache);
-      const secondRun = await runVitest(second, token, cache);
+      const firstRun = await runVitest(tokenFirstRoot, token, cache);
+      const secondRun = await runVitest(tokenSecondRoot, token, cache);
 
       for (const [root, log] of [
-        [first, firstRun.cacheLog],
-        [second, secondRun.cacheLog],
+        [tokenFirstRoot, firstRun.cacheLog],
+        [tokenSecondRoot, secondRun.cacheLog],
       ] as const) {
         // the forks pool's own temporary copy is logged as a write too, so only
         // a write into the shared cache counts
@@ -472,13 +490,13 @@ export default function () {
       const cache = join(base, "main-runner-cache");
       const extra = 'globalSetup: ["./global-setup.ts"],';
       // the helpers differ, so each global setup's output shows whose helper it imported
-      const first = checkout(
+      const mainRunnerFirstRoot = checkout(
         "main-runner-first",
         { "shared/helper.ts": HELPER, "pkg/global-setup.ts": GLOBAL_SETUP },
         true,
         extra,
       );
-      const second = checkout(
+      const mainRunnerSecondRoot = checkout(
         "main-runner-second",
         {
           "shared/helper.ts": HELPER.replace('"file"', '"second"'),
@@ -488,13 +506,15 @@ export default function () {
         extra,
       );
 
-      await runVitest(first, "file", cache);
-      const secondRun = await runVitest(second, "second", cache);
+      await runVitest(mainRunnerFirstRoot, "file", cache);
+      const secondRun = await runVitest(mainRunnerSecondRoot, "second", cache);
 
-      expect(secondRun.cacheLog).toContain(`[read] ${join(second, "pkg/global-setup.ts")}`);
+      expect(secondRun.cacheLog).toContain(
+        `[read] ${join(mainRunnerSecondRoot, "pkg/global-setup.ts")}`,
+      );
       // the entry is portable, so the main process puts each checkout's root back too
-      expect(readFileSync(join(first, "global-setup.txt"), "utf8")).toBe("file");
-      expect(readFileSync(join(second, "global-setup.txt"), "utf8")).toBe("second");
+      expect(readFileSync(join(mainRunnerFirstRoot, "global-setup.txt"), "utf8")).toBe("file");
+      expect(readFileSync(join(mainRunnerSecondRoot, "global-setup.txt"), "utf8")).toBe("second");
     }, 120_000);
   });
 });

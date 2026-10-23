@@ -98,9 +98,9 @@ is dropped).
 ## Upstream proposal
 
 `dev/docs/ARCHITECTURE.md` (Patched dependencies) asks for the upstream change
-to be proposed with the patch. The issue below is filed on `vitest-dev/vitest`
-by a maintainer of this repository, and its URL replaces this line when it
-exists. The machine slot in `vitest.mjs` is specific to this repository and is
+to be proposed with the patch. It is not filed yet: the issue below is the
+draft a maintainer of this repository files on `vitest-dev/vitest`, and its URL
+is recorded here once it is. The machine slot in `vitest.mjs` is specific to this repository and is
 not proposed.
 
 > **Title:** fsModuleCache: share the cache between checkouts of one repository
