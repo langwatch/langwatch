@@ -1,6 +1,6 @@
 import type { FilterField } from "@langwatch/analytics-contract";
 import { type Authorization, projectIdsReadBy } from "@langwatch/authorization";
-import { HandledError, isTransientRefusal } from "@langwatch/handled-error";
+import { HandledError, isHandledTransientRefusal } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
 import { getLangWatchTracer } from "langwatch";
 
@@ -95,7 +95,7 @@ export class FilterService {
           // The whole error, not its message: the logger records its type, code, stack and
           // cause chain, which the generic error thrown below deliberately does not carry.
           // A busy ClickHouse is a retryable refusal, so it warns rather than errors.
-          const level = isTransientRefusalError(error) ? "warn" : "error";
+          const level = isHandledTransientRefusal(error) ? "warn" : "error";
           this.logger[level](
             {
               projectId: input.projectId,
@@ -109,7 +109,7 @@ export class FilterService {
           // code the client renders guidance from - overload in particular,
           // which is a retry-in-a-moment, not a broken filter. Flattening it
           // here would throw away the very thing the typed error exists for.
-          if (error instanceof HandledError) {
+          if (HandledError.isHandled(error)) {
             throw error;
           }
 
@@ -121,9 +121,4 @@ export class FilterService {
       },
     );
   }
-}
-
-/** A busy or unreachable ClickHouse, refused as a handled, retryable error. */
-function isTransientRefusalError(error: unknown): boolean {
-  return HandledError.isHandled(error) && isTransientRefusal(error);
 }

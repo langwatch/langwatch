@@ -53,7 +53,7 @@ Feature: Usage decisions when the count cannot be taken
   Scenario: A count that failed is not read again until its retry window passes
     Given the counting store failed to read an organization's count
     When limit checks for that organization run within the 30-second retry window
-    Then each fails with the same error without reading the store
+    Then each fails naming the earlier failure, without reading the store
     And the first check after the window reads the store again
       # the doors admit a batch whose check failed, so the window costs at most
       # one count-cache TTL of enforcement after the store recovers
@@ -81,3 +81,15 @@ Feature: Usage decisions when the count cannot be taken
     Given a limit check left a failed count for an organization
     When the usage display asks for that organization's count
     Then it reads the store instead of answering the failure
+
+  @unit
+  Scenario: A failed enforcement count does not fail the licence usage read
+    Given a limit check left a failed count for an organization
+    When the licence status asks for that organization's count
+    Then it reads the store instead of answering the failure
+
+  @unit
+  Scenario: A busy or unreachable store is asked again on the next check
+    Given the counting store refused an organization's count as busy or unreachable
+    When the next limit check for that organization runs
+    Then it reads the store again rather than waiting out a retry window

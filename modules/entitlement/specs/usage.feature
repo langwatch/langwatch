@@ -75,6 +75,13 @@ Feature: Entitlement's meters, decisions and who learns them
     Then the count groups on a hash of each trace, not its id
     And the grouping may spill to disk instead of failing the count
 
+  @integration @usage
+  Scenario: The trace count's statements run on the shipped schema
+    Given ClickHouse on the shipped migrations holding trace usage rows for two projects over two months
+    When the month is counted, in total and per project
+    Then each trace counts once, in the earliest month it has a row
+    And each project's count is reported under its own id, and a quiet project not at all
+
   @integration @usage @unimplemented
   Scenario: A month's trace count equals trace's own count for that month
     Given ClickHouse holding a month of trace summaries and no trace usage rows

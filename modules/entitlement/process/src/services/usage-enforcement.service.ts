@@ -270,7 +270,7 @@ export class UsageService {
     organizationId: string;
   }): Promise<UsageLimitResult> {
     const plan = await this.planResolver(organizationId);
-    const count = await this.getCurrentMonthCount({ organizationId, plan });
+    const count = await this.getCurrentMonthCount({ organizationId, plan, reuseFailure: true });
 
     if (count === "unlimited") {
       return { exceeded: false };
@@ -321,12 +321,15 @@ export class UsageService {
     return decision.usageUnit;
   }
 
+  /** `reuseFailure`: answer a recent failed count without reading; only the ingest check does. */
   async getCurrentMonthCount({
     organizationId,
     plan,
+    reuseFailure = false,
   }: {
     organizationId: string;
     plan?: PlanInfo;
+    reuseFailure?: boolean;
   }): Promise<UsageCount | "unlimited"> {
     // Skip the heavy ClickHouse query for unlimited plans (e.g. seat-based pricing).
     // The count would never exceed the limit, so querying is wasted work for
@@ -338,7 +341,7 @@ export class UsageService {
       return "unlimited";
     }
 
-    return this.computeCurrentMonthCount({ organizationId, plan: activePlan, reuseFailure: true });
+    return this.computeCurrentMonthCount({ organizationId, plan: activePlan, reuseFailure });
   }
 
   /**
