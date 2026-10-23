@@ -14,6 +14,7 @@ import {
   type ConfigOf,
 } from "@langwatch/config";
 import { defineBrowserConfig } from "@langwatch/config/public-app-config";
+import { namedProviderServesOnlyLegacySso } from "@langwatch/identity-contract";
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
@@ -113,7 +114,7 @@ const authWebConfigSchemaDefinition = z.strictObject({
   publicUrl: z.string().min(1).optional(),
   /** Whether the email/password routes mount here, so the password section shows. */
   emailPasswordEnabled: z.boolean(),
-  /** Provider ids the Connect buttons offer: the named one, then each social one set up. */
+  /** Provider ids the Connect buttons offer: the named one (never cloud's Auth0), then social. */
   federatedProviders: z.array(z.string().min(1)),
   /**
    * `invite_only` hides the create-account links. The server refuses an uninvited sign-up
@@ -126,22 +127,30 @@ export const authWebConfigSchema: AuthWebConfigSchema = authWebConfigSchemaDefin
 
 export type AuthWebConfig = z.infer<typeof authWebConfigSchema>;
 
-/** Rail order; Microsoft keeps its legacy callback id, as the sign-in rail does. */
+/** Rail order, as on the sign-in rail: Microsoft keeps its legacy callback id; no cloud Auth0. */
 function federatedProvidersOf({
   authProvider,
   providers,
+  isSaas,
 }: {
   authProvider: string | undefined;
   providers: AuthServerConfig["signInProviders"];
+  isSaas: boolean;
 }): string[] {
   if (!authProvider || authProvider === "email") return [];
+  const named = namedProviderServesOnlyLegacySso({
+    authProvider,
+    selfHosted: !isSaas,
+  })
+    ? []
+    : [authProvider];
   const social = [
     providers.googleClientId && "google",
     providers.githubClientId && "github",
     providers.gitlabClientId && "gitlab",
     providers.azureAdClientId && providers.azureAdTenantId && "azure-ad",
   ].filter((id): id is string => !!id);
-  return Array.from(new Set([authProvider, ...social]));
+  return Array.from(new Set([...named, ...social]));
 }
 
 /** The identifier-first screens are the only sign-in front door (ADR-117, bake end). */
@@ -162,6 +171,7 @@ export const authBrowserConfig = defineBrowserConfig({
       federatedProviders: federatedProvidersOf({
         authProvider,
         providers: config.signInProviders,
+        isSaas: config.isSaas,
       }),
       signUpMode: config.signUpMode,
       ...(authProvider ? { authProvider } : {}),

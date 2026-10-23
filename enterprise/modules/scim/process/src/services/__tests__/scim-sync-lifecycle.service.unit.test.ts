@@ -102,6 +102,7 @@ describe("ScimSyncLifecycleService", () => {
         userId: "user_sam",
         externalId: "u-1",
         op: "create",
+        changed: true,
       });
 
       const [entry] = ledger.commits;
@@ -116,6 +117,7 @@ describe("ScimSyncLifecycleService", () => {
         userId: "user_sam",
         externalId: "u-1",
         op: "create",
+        changed: true,
       });
       await lifecycle.userPushed({
         organizationId: ORGANIZATION,
@@ -123,6 +125,7 @@ describe("ScimSyncLifecycleService", () => {
         userId: "user_kim",
         externalId: "c-99",
         op: "create",
+        changed: true,
       });
 
       const actors = ledger.commits.map((entry) => entry.command.data.actor);
@@ -136,6 +139,7 @@ describe("ScimSyncLifecycleService", () => {
         userId: "user_sam",
         externalId: "u-1",
         op: "create",
+        changed: true,
       });
 
       const actor = ledger.commits[0]?.command.data.actor;
@@ -154,6 +158,7 @@ describe("ScimSyncLifecycleService", () => {
         userId: "user_sam",
         externalId: "u-1",
         op: "create",
+        changed: true,
       });
 
       const { data } = ledger.commits[0]!.command;
@@ -205,6 +210,7 @@ describe("ScimSyncLifecycleService", () => {
         userId: "user_sam",
         externalId: "u-1",
         op: "update",
+        changed: true,
       });
 
       expect(ledger.commits).toEqual([]);

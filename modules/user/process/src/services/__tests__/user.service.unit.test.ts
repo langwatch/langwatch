@@ -72,6 +72,8 @@ class StubRepository implements UserRepository {
   }));
   createPasskeyUser = vi.fn(async () => ({ id: user.id }));
   hasPassword = vi.fn(async () => true);
+  findPasswordHolders = vi.fn(async () => []);
+  markPasswordResetRequired = vi.fn(async () => 0);
   setFirstPassword = vi.fn(async () => "set" as const);
   adoptUnconfirmed = vi.fn(async () => "adopted" as const);
   findPasskeyNudgeStatus = vi.fn(async () => ({
@@ -269,12 +271,41 @@ describe("UserService", () => {
     expect(repository.updateProfile).toHaveBeenCalledWith({
       id: "user-1",
       email: "new@example.com",
+      emailVerified: false,
     });
 
     repository.findById.mockResolvedValueOnce(null);
     await expect(
       service.updateEmail({ id: "user-9", email: "a@example.com" }),
     ).rejects.toMatchObject({ code: "user_not_found" });
+  });
+
+  describe("when the address is changed", () => {
+    /** @scenario "Changing an email clears its verification" */
+    it("stores the new address as not yet verified", async () => {
+      const { service, repository } = createService();
+
+      await service.updateEmail({ id: "user-1", email: "other@example.com" });
+
+      expect(repository.updateProfile).toHaveBeenCalledWith({
+        id: "user-1",
+        email: "other@example.com",
+        emailVerified: false,
+      });
+    });
+
+    /** @scenario "Changing an email clears its verification" */
+    it("keeps the verification when only the case differs", async () => {
+      const { service, repository } = createService();
+      repository.findById.mockResolvedValueOnce({ ...user, email: "Ada@Example.com" });
+
+      await service.updateEmail({ id: "user-1", email: "ADA@example.com" });
+
+      expect(repository.updateProfile).toHaveBeenCalledWith({
+        id: "user-1",
+        email: "ada@example.com",
+      });
+    });
   });
 
   it("updates a name without changing email", async () => {

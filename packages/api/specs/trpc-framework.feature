@@ -91,6 +91,13 @@ Feature: tRPC framework boundary
     Then nothing is logged as an SSE handler error
 
   @unit
+  Scenario: A live subscription refused for access is logged as a warning, not an error
+    Given a subscription the access policy refuses because the subscriber is signed out or not allowed
+    When the stream is being served
+    Then the refusal is logged as a warning
+    And nothing is logged as an error
+
+  @unit
   Scenario: A live subscription whose own signal aborted is the stream closing, not a failure
     Given a subscription whose request signal aborted before its stream rejected with an abort
     When the stream is being served
@@ -275,10 +282,18 @@ Feature: tRPC framework boundary
   Scenario: A procedure asks a platform-tier permission of the operator's grant
     Given a procedure declares a platform-tier permission at the platform (Alex, 2026-10-05, E4)
     When a caller holding that permission at the platform calls it
-    Then the platform question is asked before the handler, of the operator behind an impersonated caller where there is one
+    Then the platform question is asked before the handler, of the operator behind an impersonated caller where there is one, except ops:manage
     And a caller lacking it is refused FORBIDDEN permission_denied, and a hidden procedure answers NOT_FOUND not_found to a caller lacking it and to an anonymous one
     And a non-platform permission asked at the platform is refused by the compiler and where it is written
     And a process that cannot answer the platform question refuses the call, and the handler never runs
+
+  @unit
+  Scenario: An impersonated caller is never answered ops:manage at the platform
+    Given an operator holding ops:view and ops:manage is impersonating another person (Alex, 2026-10-14)
+    When they call a procedure that asks ops:manage at the platform
+    Then it is refused as a caller lacking the permission, before the platform question is asked
+    And a procedure that asks ops:view is still answered by the operator's own grant
+    And the same operator signed in as themselves is answered as before
 
   @unit
   Scenario: A staff procedure hides from non-staff and refuses staff by name

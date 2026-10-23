@@ -334,8 +334,8 @@ Authenticated: a SCIM token carries no RBAC permission: the organization it was 
 Answers at `/api/scim/v2/Users`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/scim-protocol.rest.ts:544)
-// Response: inline, src/transport/scim-protocol.rest.ts:547
+// Rawbody: "text" (inline, src/transport/scim-protocol.rest.ts:545)
+// Response: inline, src/transport/scim-protocol.rest.ts:548
 type Response = unknown;
 ```
 
@@ -343,7 +343,7 @@ type Response = unknown;
 
 Get a provisioned user
 
-Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:580`.
+Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:581`.
 
 Answers at `/api/scim/v2/Users/:id`.
 
@@ -352,7 +352,7 @@ Answers at `/api/scim/v2/Users/:id`.
 interface Params {
   id: string;
 }
-// Response: inline, src/transport/scim-protocol.rest.ts:584
+// Response: inline, src/transport/scim-protocol.rest.ts:585
 type Response = unknown;
 ```
 
@@ -360,14 +360,14 @@ type Response = unknown;
 
 Replace a provisioned user
 
-Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:599`.
+Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:600`.
 
 Answers at `/api/scim/v2/Users/:id`.
 
 ```typescript
 type Params = z.infer<typeof idParams>; // src/transport/scim-protocol.rest.ts:158
-// Rawbody: "text" (inline, src/transport/scim-protocol.rest.ts:602)
-// Response: inline, src/transport/scim-protocol.rest.ts:605
+// Rawbody: "text" (inline, src/transport/scim-protocol.rest.ts:604)
+// Response: inline, src/transport/scim-protocol.rest.ts:607
 type Response = unknown;
 ```
 
@@ -375,14 +375,14 @@ type Response = unknown;
 
 Update a provisioned user
 
-Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:629`.
+Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:631`.
 
 Answers at `/api/scim/v2/Users/:id`.
 
 ```typescript
 type Params = z.infer<typeof idParams>; // src/transport/scim-protocol.rest.ts:158
-// Rawbody: "text" (inline, src/transport/scim-protocol.rest.ts:632)
-// Response: inline, src/transport/scim-protocol.rest.ts:635
+// Rawbody: "text" (inline, src/transport/scim-protocol.rest.ts:635)
+// Response: inline, src/transport/scim-protocol.rest.ts:638
 type Response = unknown;
 ```
 
@@ -390,13 +390,13 @@ type Response = unknown;
 
 Deprovision a user
 
-Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:659`.
+Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:662`.
 
 Answers at `/api/scim/v2/Users/:id`.
 
 ```typescript
 type Params = z.infer<typeof idParams>; // src/transport/scim-protocol.rest.ts:158
-// Response: inline, src/transport/scim-protocol.rest.ts:664
+// Response: inline, src/transport/scim-protocol.rest.ts:668
 type Response = unknown;
 ```
 
@@ -404,7 +404,7 @@ type Response = unknown;
 
 List provisioned groups
 
-Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:683`.
+Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:687`.
 
 Answers at `/api/scim/v2/Groups`.
 
@@ -416,7 +416,7 @@ interface Query {
   count?: number;
   excludedAttributes?: string;
 }
-// Response: inline, src/transport/scim-protocol.rest.ts:687
+// Response: inline, src/transport/scim-protocol.rest.ts:691
 type Response = unknown;
 ```
 
@@ -424,13 +424,13 @@ type Response = unknown;
 
 Provision a group
 
-Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:716`.
+Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:720`.
 
 Answers at `/api/scim/v2/Groups`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/scim-protocol.rest.ts:718)
-// Response: inline, src/transport/scim-protocol.rest.ts:721
+// Rawbody: "text" (inline, src/transport/scim-protocol.rest.ts:723)
+// Response: inline, src/transport/scim-protocol.rest.ts:726
 type Response = unknown;
 ```
 
@@ -438,7 +438,7 @@ type Response = unknown;
 
 Get a provisioned group
 
-Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:759`.
+Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:764`.
 
 Answers at `/api/scim/v2/Groups/:id`.
 
@@ -448,7 +448,7 @@ type Params = z.infer<typeof idParams>; // src/transport/scim-protocol.rest.ts:1
 interface Query {
   excludedAttributes?: string;
 }
-// Response: inline, src/transport/scim-protocol.rest.ts:764
+// Response: inline, src/transport/scim-protocol.rest.ts:769
 type Response = unknown;
 ```
 
@@ -456,14 +456,14 @@ type Response = unknown;
 
 Replace a provisioned group
 
-Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:787`.
+Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:792`.
 
 Answers at `/api/scim/v2/Groups/:id`.
 
 ```typescript
 type Params = z.infer<typeof idParams>; // src/transport/scim-protocol.rest.ts:158
-// Rawbody: "text" (inline, src/transport/scim-protocol.rest.ts:790)
-// Response: inline, src/transport/scim-protocol.rest.ts:793
+// Rawbody: "text" (inline, src/transport/scim-protocol.rest.ts:796)
+// Response: inline, src/transport/scim-protocol.rest.ts:799
 type Response = unknown;
 ```
 
@@ -471,14 +471,14 @@ type Response = unknown;
 
 Update a provisioned group
 
-Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:817`.
+Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:823`.
 
 Answers at `/api/scim/v2/Groups/:id`.
 
 ```typescript
 type Params = z.infer<typeof idParams>; // src/transport/scim-protocol.rest.ts:158
-// Rawbody: "text" (inline, src/transport/scim-protocol.rest.ts:820)
-// Response: inline, src/transport/scim-protocol.rest.ts:823
+// Rawbody: "text" (inline, src/transport/scim-protocol.rest.ts:827)
+// Response: inline, src/transport/scim-protocol.rest.ts:830
 type Response = unknown;
 ```
 
@@ -486,13 +486,13 @@ type Response = unknown;
 
 Deprovision a group
 
-Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:847`.
+Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:854`.
 
 Answers at `/api/scim/v2/Groups/:id`.
 
 ```typescript
 type Params = z.infer<typeof idParams>; // src/transport/scim-protocol.rest.ts:158
-// Response: inline, src/transport/scim-protocol.rest.ts:852
+// Response: inline, src/transport/scim-protocol.rest.ts:860
 type Response = unknown;
 ```
 
@@ -541,7 +541,7 @@ interface Body {
   description?: string;
   connectionId?: string;
 }
-// Response: inline, src/transport/scim-token.rest.ts:66
+// Response: inline, src/transport/scim-token.rest.ts:67
 interface Response {
   id: string;
   token: string;
@@ -554,7 +554,7 @@ interface Response {
 
 Revoke a SCIM token so it stops verifying immediately. An unknown or already-revoked id answers 404 scim_token_not_found.
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `SCIM`). Declared at `src/transport/scim-token.rest.ts:113`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `SCIM`). Declared at `src/transport/scim-token.rest.ts:114`.
 
 Answers at `/api/scim-tokens/:id`, `/api/v1/scim-tokens/:id`; also, undocumented, `/api/scim-tokens/2026-08-07/:id`, `/api/v1/scim-tokens/2026-08-07/:id`, `/api/scim-tokens/latest/:id`, `/api/v1/scim-tokens/latest/:id`.
 
@@ -563,7 +563,7 @@ Answers at `/api/scim-tokens/:id`, `/api/v1/scim-tokens/:id`; also, undocumented
 interface Params {
   id: string;
 }
-// Response: inline, src/transport/scim-token.rest.ts:118
+// Response: inline, src/transport/scim-token.rest.ts:120
 interface Response {
   success: true;
 }
@@ -587,8 +587,8 @@ Public: the provider signs every delivery with the deployment secret and the rou
 Answers at `/api/webhooks/auth0-scim`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/scim-webhook.rest.ts:54)
-// Response: inline, src/transport/scim-webhook.rest.ts:65
+// Rawbody: "text" (inline, src/transport/scim-webhook.rest.ts:55)
+// Response: inline, src/transport/scim-webhook.rest.ts:66
 type Response = unknown;
 ```
 
@@ -596,14 +596,14 @@ type Response = unknown;
 
 ### `scimOversight`
 
-Contract `../contract/src/scim-oversight.trpc.ts:18`, router `src/transport/scim-oversight.trpc.ts:28`.
+Contract `../contract/src/scim-oversight.trpc.ts:18`, router `src/transport/scim-oversight.trpc.ts:26`.
 
-| Procedure                           | Kind     | Gate                                                                                                                                                  | Input                            | Output                            |
-| ----------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- | --------------------------------- |
-| `scimOversight.getAll`              | query    | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `listOversightSyncsInputSchema`  | `oversightSyncListSchema`         |
-| `scimOversight.getById`             | query    | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `oversightConnectionInputSchema` | inline                            |
-| `scimOversight.directoryIdentities` | query    | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `oversightConnectionInputSchema` | inline                            |
-| `scimOversight.redriveRetiredApply` | mutation | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `redriveRetiredApplyInputSchema` | `redriveRetiredApplyResultSchema` |
+| Procedure                           | Kind     | Gate                             | Input                            | Output                            |
+| ----------------------------------- | -------- | -------------------------------- | -------------------------------- | --------------------------------- |
+| `scimOversight.getAll`              | query    | Platform permission `ops:manage` | `listOversightSyncsInputSchema`  | `oversightSyncListSchema`         |
+| `scimOversight.getById`             | query    | Platform permission `ops:manage` | `oversightConnectionInputSchema` | inline                            |
+| `scimOversight.directoryIdentities` | query    | Platform permission `ops:manage` | `oversightConnectionInputSchema` | inline                            |
+| `scimOversight.redriveRetiredApply` | mutation | Platform permission `ops:manage` | `redriveRetiredApplyInputSchema` | `redriveRetiredApplyResultSchema` |
 
 ```typescript
 // scimOversight.getAll
@@ -795,17 +795,18 @@ Declared at `src/eventing/scim-sso-connection.pipeline.ts:21`.
 
 ### Pipeline `scim-sync` (aggregate `scim_sync`)
 
-Declared at `src/eventing/scim-sync.pipeline.ts:50`. Events: `scimTokenIssuedEventSchema`, `scimUserPushedEventSchema`, `scimGroupMappedEventSchema`, `scimApplyFailedEventSchema`, `scimApplyRecoveredEventSchema`, `scimApplyRetiredEventSchema`, `scimApplyRedrivenEventSchema`, `scimTokenRevokedEventSchema`.
+Declared at `src/eventing/scim-sync.pipeline.ts:62`. Events: `scimTokenIssuedEventSchema`, `scimUserPushedEventSchema`, `scimGroupMappedEventSchema`, `scimApplyFailedEventSchema`, `scimApplyRecoveredEventSchema`, `scimApplyRetiredEventSchema`, `scimApplyRedrivenEventSchema`, `scimTokenRevokedEventSchema`.
 
-| Kind                | Name                                                                          | Handles | Declared at                             |
-| ------------------- | ----------------------------------------------------------------------------- | ------- | --------------------------------------- |
-| command             | –                                                                             | –       | `src/eventing/scim-sync.pipeline.ts:71` |
-| command             | –                                                                             | –       | `src/eventing/scim-sync.pipeline.ts:76` |
-| command             | –                                                                             | –       | `src/eventing/scim-sync.pipeline.ts:81` |
-| command             | –                                                                             | –       | `src/eventing/scim-sync.pipeline.ts:86` |
-| command             | –                                                                             | –       | `src/eventing/scim-sync.pipeline.ts:91` |
-| command             | –                                                                             | –       | `src/eventing/scim-sync.pipeline.ts:96` |
-| Postgres projection | `≈ new ScimSyncStateFoldProjection({ store: deps.scimSyncProjectionStore, })` | –       | `src/eventing/scim-sync.pipeline.ts:66` |
+| Kind                | Name                                                                          | Handles                 | Declared at                              |
+| ------------------- | ----------------------------------------------------------------------------- | ----------------------- | ---------------------------------------- |
+| command             | –                                                                             | –                       | `src/eventing/scim-sync.pipeline.ts:83`  |
+| command             | –                                                                             | –                       | `src/eventing/scim-sync.pipeline.ts:88`  |
+| command             | –                                                                             | –                       | `src/eventing/scim-sync.pipeline.ts:93`  |
+| command             | –                                                                             | –                       | `src/eventing/scim-sync.pipeline.ts:98`  |
+| command             | –                                                                             | –                       | `src/eventing/scim-sync.pipeline.ts:103` |
+| command             | –                                                                             | –                       | `src/eventing/scim-sync.pipeline.ts:108` |
+| process manager     | `scimSyncSummary`                                                             | intents `post` (outbox) | `src/eventing/scim-sync.pipeline.ts:113` |
+| Postgres projection | `≈ new ScimSyncStateFoldProjection({ store: deps.scimSyncProjectionStore, })` | –                       | `src/eventing/scim-sync.pipeline.ts:78`  |
 
 ### Pipeline `scim_maintenance` (aggregate `global`)
 
@@ -817,12 +818,14 @@ Declared at `src/eventing/scim.pipeline.ts:39`.
 
 ## Configuration
 
-| Kind   | Leaf                  | Environment variable          | Declared at                               |
-| ------ | --------------------- | ----------------------------- | ----------------------------------------- |
-| secret | `auth0WebhookSecret`  | `AUTH0_SCIM_WEBHOOK_SECRET`   | `../contract/src/scim.config.ts:22`       |
-| secret | `tokenPepper`         | `CREDENTIALS_SECRET`          | `../contract/src/scim-token-pepper.ts:10` |
-| secret | `tokenPepperFallback` | `NEXTAUTH_SECRET`             | `../contract/src/scim-token-pepper.ts:11` |
-| secret | `tokenPepperPrevious` | `CREDENTIALS_SECRET_PREVIOUS` | `../contract/src/scim-token-pepper.ts:13` |
-| config | `provenOffboarding`   | `SCIM_V2_GRANTS`              | `../contract/src/scim.config.ts:15`       |
+| Kind   | Leaf                          | Environment variable          | Declared at                               |
+| ------ | ----------------------------- | ----------------------------- | ----------------------------------------- |
+| secret | `auth0WebhookSecret`          | `AUTH0_SCIM_WEBHOOK_SECRET`   | `../contract/src/scim.config.ts:27`       |
+| secret | `tokenPepper`                 | `CREDENTIALS_SECRET`          | `../contract/src/scim-token-pepper.ts:10` |
+| secret | `tokenPepperFallback`         | `NEXTAUTH_SECRET`             | `../contract/src/scim-token-pepper.ts:11` |
+| secret | `tokenPepperPrevious`         | `CREDENTIALS_SECRET_PREVIOUS` | `../contract/src/scim-token-pepper.ts:13` |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`       | `src/app/scim.app.ts:243`                 |
+| config | `provenOffboarding`           | `SCIM_V2_GRANTS`              | `../contract/src/scim.config.ts:19`       |
+| config | `publicBaseUrl`               | `BASE_HOST`                   | `../contract/src/scim.config.ts:20`       |
 
 <!-- readme:generated:end -->

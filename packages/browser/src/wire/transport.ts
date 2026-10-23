@@ -6,12 +6,14 @@
 
 import type { ModuleApiClient, ModuleApiMap, RouterFromMap } from "@langwatch/api/web";
 import type { CacheDeclaringContract } from "@langwatch/browser-host/cache-tiers";
+import { readTimeoutFetch } from "@langwatch/browser-host/read-timeout";
 import type { QueryClient } from "@tanstack/react-query";
 import { createTRPCClient, getUntypedClient, httpLink, loggerLink, splitLink } from "@trpc/client";
 import type { ComponentType, ReactNode } from "react";
 
 import { type SseEventSourceConstructor, sseSubscriptionLink } from "./sse-subscription-link";
 import { logTrpcOperation } from "./trpc-request-log";
+import { unavailableRetryFetch } from "./unavailable-retry";
 
 /** Same-origin, so the browser sends the session cookie without configuration. */
 export const UI_TRPC_ENDPOINT = "/api/trpc";
@@ -60,21 +62,25 @@ function uiFeatureApiLinks({
   eventSource,
   isDevelopment = false,
 }: UiFeatureApiClientOptions) {
+  // A process starting or draining refuses before any handler runs, so the call is sent again.
+  const resend = unavailableRetryFetch({ fetch });
+  // A read the network swallows gives up, so the retry policy gets its turn.
+  const send = readTimeoutFetch({ fetch: resend });
   // One request per call: the server does not batch (Alex, 2026-10-01).
-  const plainRouting = httpLink({ url, ...(fetch ? { fetch } : {}) });
+  const plainRouting = httpLink({ url, fetch: send });
   // A write sent moments before the document goes away ("Not now" on a
   // dialog, then a navigation) opts in with `context: { keepalive: true }`:
   // the browser would otherwise cancel it and the answer is lost. Bodies are
   // capped at 64 KB across keepalive requests, so this is for answers only.
   const keepaliveRouting = httpLink({
     url,
-    fetch: (input, init) => (fetch ?? globalThis.fetch)(input, { ...init, keepalive: true }),
+    fetch: (input, init) => resend(input, { ...init, keepalive: true }),
   });
   // A polling read opts in with `context: { background: true }`: the session it
   // rides on is judged against its idle window but not kept alive by it.
   const backgroundRouting = httpLink({
     url,
-    ...(fetch ? { fetch } : {}),
+    fetch: send,
     headers: { [UI_BACKGROUND_READ_HEADER]: "1" },
   });
   const httpRouting = splitLink({

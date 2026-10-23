@@ -2,6 +2,7 @@
  * @vitest-environment jsdom
  * Integration tests for /auth/forgot-password: the full tree renders under
  * Chakra; only the BetterAuth client and the public-env hook are mocked.
+ * @see modules/auth/specs/forced-password-reset.feature
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
@@ -10,15 +11,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const { mockRequestPasswordReset, publicEnvRef } = vi.hoisted(() => ({
   mockRequestPasswordReset: vi.fn(),
   publicEnvRef: {
-    // `IS_SAAS` is stated everywhere rather than left off, because it is the
-    // thing this screen now turns on: reset follows the IDENTIFIER, not the
-    // deployment, so the refusal is the HOSTED rule and a self-hosted install
-    // keeps the door open however it federates. A case that does not say
-    // which kind of deployment it is would be leaving out its own premise.
+    // The screen offers reset wherever this installation issues its own passwords.
     current: {
       NEXTAUTH_PROVIDER: "email" as string | undefined,
       HAS_EMAIL_PROVIDER_KEY: true,
       IS_SAAS: false,
+      EMAIL_PASSWORD_ENABLED: true,
     },
   },
 }));
@@ -48,11 +46,49 @@ describe("ForgotPassword page", () => {
       NEXTAUTH_PROVIDER: "email",
       HAS_EMAIL_PROVIDER_KEY: true,
       IS_SAAS: false,
+      EMAIL_PASSWORD_ENABLED: true,
     };
   });
 
   afterEach(() => {
     cleanup();
+  });
+
+  describe("when the sign-in sent the user here to replace their password", () => {
+    afterEach(() => {
+      window.history.replaceState(null, "", "/");
+    });
+
+    /** @scenario "The forgot-password screen says why a new password is needed" */
+    it("says a new password is needed, prefills the address and sends the link to it", async () => {
+      window.history.replaceState(
+        null,
+        "",
+        "/auth/forgot-password#email=sam%40acme.test&reset=required",
+      );
+      renderPage();
+
+      expect(await screen.findByText(/choose a new password/i)).toBeTruthy();
+      expect(screen.getByText(/need to set a new password before you can sign in/i)).toBeTruthy();
+      expect(window.location.hash).toBe("");
+      expect((screen.getByRole("textbox") as HTMLInputElement).value).toBe("sam@acme.test");
+
+      fireEvent.click(screen.getByRole("button", { name: /send reset link/i }));
+
+      await waitFor(() => {
+        expect(mockRequestPasswordReset).toHaveBeenCalledWith({
+          email: "sam@acme.test",
+          redirectTo: "/auth/reset-password",
+        });
+      });
+    });
+
+    it("keeps the ordinary wording when nothing asked for a new password", async () => {
+      renderPage();
+
+      expect(await screen.findByText(/forgot your password/i)).toBeTruthy();
+      expect(screen.queryByText(/choose a new password/i)).toBeNull();
+    });
   });
 
   describe("when the user submits their email in credential mode", () => {
@@ -122,6 +158,7 @@ describe("ForgotPassword page", () => {
         NEXTAUTH_PROVIDER: "email",
         HAS_EMAIL_PROVIDER_KEY: false,
         IS_SAAS: false,
+        EMAIL_PASSWORD_ENABLED: true,
       };
     });
 
@@ -147,6 +184,17 @@ describe("ForgotPassword page", () => {
 
       expect(screen.getByText(/contact langwatch support/i)).toBeTruthy();
     });
+
+    /** @scenario "A marked user on a deployment without email is told who can help" */
+    it("says why a new password is needed and who can help when the sign-in sent the user", () => {
+      window.history.replaceState(null, "", "/auth/forgot-password#reset=required");
+      renderPage();
+
+      expect(screen.getByText(/choose a new password/i)).toBeTruthy();
+      expect(screen.getByText(/need to set a new password before you can sign in/i)).toBeTruthy();
+      expect(screen.getByText(/contact your administrator/i)).toBeTruthy();
+      window.history.replaceState(null, "", "/");
+    });
   });
 
   describe("when the reset endpoint fails", () => {
@@ -162,20 +210,32 @@ describe("ForgotPassword page", () => {
     });
   });
 
-  describe("when a hosted organization signs in through an identity provider", () => {
-    // Reset follows the IDENTIFIER, not the deployment: a self-hosted install
-    // keeps this door open however it federates, so the refusal is the hosted
-    // rule and names itself as one.
+  describe("when this installation issues no passwords of its own", () => {
     it("explains the password is managed by the provider instead of a form", () => {
       publicEnvRef.current = {
-        NEXTAUTH_PROVIDER: "auth0",
-        IS_SAAS: true,
+        NEXTAUTH_PROVIDER: "okta",
+        IS_SAAS: false,
         HAS_EMAIL_PROVIDER_KEY: true,
+        EMAIL_PASSWORD_ENABLED: false,
       };
       renderPage();
 
       expect(screen.getByText(/managed by your identity provider/i)).toBeTruthy();
       expect(screen.queryByRole("button", { name: /send reset link/i })).toBeNull();
+    });
+  });
+
+  describe("when cloud names Auth0 but issues its own passwords", () => {
+    it("offers the reset form", () => {
+      publicEnvRef.current = {
+        NEXTAUTH_PROVIDER: "auth0",
+        IS_SAAS: true,
+        HAS_EMAIL_PROVIDER_KEY: true,
+        EMAIL_PASSWORD_ENABLED: true,
+      };
+      renderPage();
+
+      expect(screen.getByRole("button", { name: /send reset link/i })).toBeTruthy();
     });
   });
 });

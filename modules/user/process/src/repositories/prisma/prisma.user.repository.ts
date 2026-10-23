@@ -37,6 +37,7 @@ import type {
   CreateCredentialUserRow,
   CreatedCredentialUser,
   CreatePasskeyUserRow,
+  PasswordHolderRow,
   SetFirstUserPasswordRow,
   UserAddressReplacement,
   UserAddressRow,
@@ -376,6 +377,42 @@ export class PrismaUserRepository
     return row ? userCredentialAccountRowSchema.parse(row).password !== null : false;
   }
 
+  async findPasswordHolders({
+    emails,
+  }: {
+    emails: readonly string[] | null;
+  }): Promise<PasswordHolderRow[]> {
+    const rows = await this.prisma.user.findMany({
+      where: {
+        accounts: { some: { provider: CREDENTIAL_PROVIDER, password: { not: null } } },
+        ...(emails === null ? {} : { email: { in: [...emails], mode: "insensitive" as const } }),
+      },
+      select: { id: true, email: true, passwordResetRequiredAt: true },
+      orderBy: { id: "asc" },
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      email: row.email,
+      passwordResetRequiredAt:
+        row.passwordResetRequiredAt === null ? null : fromDate(row.passwordResetRequiredAt),
+    }));
+  }
+
+  async markPasswordResetRequired({
+    ids,
+    at,
+  }: {
+    ids: readonly string[];
+    at: Instant;
+  }): Promise<number> {
+    if (ids.length === 0) return 0;
+    const { count } = await this.prisma.user.updateMany({
+      where: { id: { in: [...ids] }, passwordResetRequiredAt: null },
+      data: { passwordResetRequiredAt: toDate(at) },
+    });
+    return count;
+  }
+
   async setFirstPassword(input: SetFirstUserPasswordRow): Promise<SetFirstUserPasswordResult> {
     const credential = await this.prisma.account.findFirst({
       where: { userId: input.id, provider: CREDENTIAL_PROVIDER },
@@ -472,9 +509,10 @@ export class PrismaUserRepository
   }
 
   async updateProfile(input: StoredProfileChange): Promise<UserProfile> {
-    const data: { name?: string; email?: string } = {};
+    const data: { name?: string; email?: string; emailVerified?: boolean } = {};
     if (input.name !== undefined) data.name = input.name;
     if (input.email !== undefined) data.email = input.email;
+    if (input.emailVerified !== undefined) data.emailVerified = input.emailVerified;
 
     return userProfileSchema.parse(
       await this.prisma.user.update({

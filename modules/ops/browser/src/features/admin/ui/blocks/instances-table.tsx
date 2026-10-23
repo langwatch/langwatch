@@ -7,8 +7,8 @@ import { Inbox } from "lucide-react";
 import {
   ACTIVITY_COLORS,
   ACTIVITY_LABELS,
+  instanceName,
   reportNumber,
-  sortedDomains,
   type SelfHostedInstance,
 } from "../../model/self-hosted-instance.ts";
 import { AdminDate, EmptyCell } from "../elements/admin-cells.tsx";
@@ -113,14 +113,9 @@ function InstancesTableRow({
  * email domain when it did not, and the instance id when neither is known.
  */
 function WhoCell({ instance, onOpen }: { instance: SelfHostedInstance; onOpen: () => void }) {
-  const domains = sortedDomains(instance.userEmailDomains);
-  const leading = domains[0];
-
   return (
     <VStack align="start" gap={0}>
-      <ListTable.RowAction onActivate={onOpen}>
-        {instance.organizationName ?? leading?.domain ?? "Unknown"}
-      </ListTable.RowAction>
+      <ListTable.RowAction onActivate={onOpen}>{instanceName(instance)}</ListTable.RowAction>
       {instance.hostname ? (
         <Text fontSize="xs" color="fg.muted">
           {instance.hostname}

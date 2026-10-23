@@ -44,7 +44,9 @@ Feature: An aggregate project reads its member projects
     Given a project-reader grant from an aggregate to a member project
     When the grant is asked for traces manage, project manage or prompts view
     Then each is denied
-    And traces view and analytics view are allowed
+    And traces view, analytics view and cost view are allowed
+    # Cost view lets a cost read reach the members. Whether the viewer sees cost
+    # is still their own cost view on the aggregate.
 
   @integration
   Scenario: Revoking a shared grant keeps its row
@@ -322,11 +324,65 @@ Feature: An aggregate project reads its member projects
   @integration
   Scenario: Test, Build and Online Evals are hidden on the aggregate
     When ana opens the aggregate project
-    Then the navigation shows Traces
-    And Analytics, Prompts, Experiments and Online Evaluations are absent
-    # Analytics leaves the navigation until analytics across members ships.
+    Then the navigation shows Traces and Analytics
+    And Dashboards, Prompts, Experiments and Online Evaluations are absent
     And Quick Search offers the same pages as the navigation and no action that creates data
     And no monitor can be created on the aggregate
+
+  # An aggregate records no coding-agent session of its own, so the recency
+  # signal an ordinary project grows the Sessions destination from never
+  # arrives; the aggregate offers it on its kind alone (v4.12).
+
+  @integration
+  Scenario: The aggregate offers Sessions without a session of its own
+    Given the aggregate recorded no coding-agent session
+    When ana opens the aggregate project
+    Then the navigation shows Sessions beside Trace Explorer
+
+  @unit
+  Scenario: The aggregate's Sessions page lists its members' sessions under their windows
+    Given an aggregate reading two members through shared grants
+    And one member's grant starts after some of its sessions
+    When ana opens the aggregate's Sessions page
+    Then the sessions of both members show, newest first
+    And the sessions before that grant's start are absent
+
+  # A session id is unique only within the project that recorded it, so every
+  # row carries its member project and the replay reads under that member.
+
+  @unit
+  Scenario: Two member projects' sessions that share an id stay two rows on the aggregate's Sessions page
+    Given an aggregate reading two members through shared grants
+    And each member recorded a session with the same id, in its own repository, pull request and cost
+    When ana opens the aggregate's Sessions page
+    Then two rows show, each carrying its own member project, project name, cost and pull requests
+    And the member project names are looked up once for the page
+
+  @unit
+  Scenario: A member project the name lookup cannot find is named by its id
+    Given an aggregate whose member project has no name the lookup can find
+    When ana opens the aggregate's Sessions page
+    Then that member's rows are named by the member project's id
+
+  @integration
+  Scenario: The group project's Sessions page names the member project on each row
+    Given the aggregate's Sessions page lists sessions from two member projects
+    Then each row names the member project that recorded it
+    And a page whose rows all come from one project names none
+
+  @integration
+  Scenario: Opening a member project's session replays that member's conversation
+    Given the aggregate's Sessions page lists two sessions that share an id, from member A and member B
+    When ana opens member B's session
+    Then the replay reads member B's conversation and opens the trace drawer on member B
+    And member A's row is not marked as opening
+
+  @unit
+  Scenario: A sessions read through the proof names no tenant of its own
+    Given a repository reading sessions through the proof-checked client
+    When it reads an aggregate's page
+    Then the statement's tenants and the window on StartedAt come from the proof
+    And the latest-version group is bound to the same tenants
 
   # ── E. The reconciler keeps members current ──────────────────────────────
 
@@ -376,12 +432,35 @@ Feature: An aggregate project reads its member projects
     Then the ledger holds the same grant rows with the same ids
     And no duplicate row exists
 
-  @integration
-  Scenario: A nightly sweep catches a missed trigger
-    Given an aggregate project with the rule "all personal projects"
-    And a personal project that was created while the reconciler was unavailable
-    When the nightly sweep runs for the organisation
-    Then that personal project is a member
+  # Reconciles come from facts alone: no daily re-check of every aggregate (ADR-177, ADR-025).
+  @unit
+  Scenario: A burst of changes in one organisation queues one reconcile
+    Given an organisation with an aggregate project
+    When several members are removed, moved or disabled within 30 seconds
+    Then one reconcile job is queued for the organisation after the 30 seconds settle
+    And that job carries the newest fact
+
+  @unit
+  Scenario: A reconcile that keeps failing is parked for an operator after five tries
+    Given a reconcile of an aggregate project that fails on every attempt
+    When the outbox has tried it five times
+    Then it is marked dead and tried no more
+    And it stays in the outbox for an operator to redrive
+
+  @unit
+  Scenario: A reconcile that attaches every member but one is tried again
+    Given a reconcile of an aggregate project in which one member's attach is refused
+    When the outbox runs it
+    Then the reconcile is not marked finished
+    And it is tried again, and finishes once that member's attach goes through
+
+  @unit
+  Scenario: The daily wake only clears finished reconciles
+    Given a finished reconcile and a dead one, both older than two days
+    When the daily wake runs
+    Then the finished reconcile is deleted
+    And the dead reconcile is kept
+    And no reconcile is queued
 
   # A member's read starts at the beginning of time under an all-personal or
   # explicit rule, and on the day it joined under a department rule, so a move
@@ -405,7 +484,7 @@ Feature: An aggregate project reads its member projects
   Scenario: An aggregate whose reads start at their join date is widened to full history
     Given an aggregate project with the rule "all personal projects"
     And a member whose read was attached before full history was the rule
-    When the reconciler or the nightly sweep runs
+    When the reconciler runs for that aggregate
     Then that read is revoked as a window change
     And the member is attached again with a read from the beginning of time
 
@@ -478,14 +557,113 @@ Feature: An aggregate project reads its member projects
     When ana opens that span in the prompt playground, with or without the link naming its trace
     Then the playground loads the span's messages and model either way
 
-  # Unimplemented: analytics read through raw clients and the rollup windows
-  # on BucketStart, a time column the fence does not admit yet; the fifth
-  # time column awaits a decision (ADR-144 open questions).
-  @integration @unimplemented
+  @unit
+  Scenario: A rollup bucket a grant's edge cuts through is left out
+    Given a shared grant that starts or ends part way through a minute
+    When a read on a minute rollup is fenced on BucketStart
+    Then only the minute buckets wholly inside the window are admitted
+    And an open grant admits every bucket from its start
+
+  @integration
+  Scenario: The aggregate's analytics rollup counts members inside their windows
+    Given an aggregate project with one member shared from a point in time
+    And another project in the organisation that is not a member and holds spans
+    When the aggregate's trace cost is read from the trace analytics rollup under its proof
+    Then the member's spans inside the window are counted
+    And the member's spans before the window and the non-member's spans are not
+
+  @integration
+  Scenario: The aggregate's slim analytics counts members inside their windows
+    Given an aggregate project with one member shared for a window of time
+    And another project in the organisation that is not a member and holds traces
+    When the aggregate's trace cost is read from the slim trace analytics table under its proof
+    Then the member's traces inside the window are counted
+    And the member's traces outside the window and the non-member's traces are not
+
+  @integration
+  Scenario: The aggregate counts a member's evaluations by when their trace occurred
+    Given an aggregate project with one member shared from a date
+    And a member trace from before that date, evaluated after it
+    And a member trace from after that date, evaluated after it
+    When the aggregate's evaluation runs are counted under its proof
+    Then only the evaluation of the trace from after the date is counted
+    And the member's own read still counts both evaluations
+
+  @integration
+  Scenario: The aggregate's trace summaries count members inside their windows
+    Given an aggregate project with one member shared for its whole history
+    And a second member shared only from a point in time
+    And another project in the organisation that is not a member and holds traces
+    When the aggregate's trace cost is read from the trace summaries under its proof
+    Then every trace of the first member is counted
+    And the second member's traces are counted only from the point its grant starts
+    And the non-member's traces are not
+
+  @integration
+  Scenario: The aggregate's evaluation chart counts members inside their windows
+    Given an aggregate project with one member shared for its whole history
+    And a second member shared only from a point in time
+    And another project in the organisation that is not a member and holds evaluation runs
+    When the aggregate's score for one check is read from the evaluation runs under its proof
+    Then the check's runs on the members' traces inside their windows are counted
+    And the runs of another check and the non-member's runs are not
+
+  @integration
   Scenario: Analytics aggregate across members
     Given an aggregate project with two members each holding traces
     When ana opens the aggregate's analytics
     Then the counts cover both members' traces
+
+  @integration
+  Scenario: The aggregate's filter pickers offer member values inside their windows
+    Given an aggregate project with one member shared for its whole history
+    And a second member shared only from a point in time
+    And another project in the organisation that is not a member
+    When the aggregate's filter picker lists trace, span and evaluator values under its proof
+    Then it offers the first member's values and the second member's from the point its grant starts
+    And it offers none of the non-member's values
+
+  @integration
+  Scenario: The aggregate's top documents and feedbacks read members inside their windows
+    Given an aggregate project with one member shared for its whole history
+    And a second member shared only from a point in time
+    And another project in the organisation that is not a member
+    When the aggregate's top documents and feedbacks are read under its cost view proof
+    Then they cover the first member and the second member from the point its grant starts
+    And none of the non-member's documents or feedbacks
+
+  @integration
+  Scenario: The aggregate hides the views that only make sense inside one project
+    Given an aggregate project
+    When ana opens its analytics
+    Then the Topics view is not offered
+    And opening the Topics address leads back to the analytics overview
+    And the evaluations page shows the overall health and pass or fail trend cards
+    And no card for a single monitor, since no monitor runs on member traces
+    And an ordinary project still shows its topics and per-monitor cards
+
+  @unit
+  Scenario: A scheduled report or a graph alert on an aggregate is refused by name
+    Given an aggregate project
+    When a scheduled report or a graph alert reads a series with no viewer
+    Then it is refused because the project is an aggregate
+    And no series is read
+    # Allowing them needs a decision on whose permission the read runs under.
+    # Until then the refusal stops a report that would say zero.
+
+  @unit
+  Scenario: A chart on the aggregate waits for each member's share
+    Given an aggregate project reading two members
+    When a chart on the aggregate runs
+    Then it holds one slot of the aggregate's bound and one of each member's
+    And it takes them in one sorted order, so two charts never wait on each other
+    And a plain project's chart holds only its own slot
+
+  @unit
+  Scenario: A chart on an aggregate with too many members is refused before any read
+    Given an aggregate project reading more members than the LangWatchQL member cap
+    When a chart on the aggregate runs
+    Then it is refused by name before any read
 
   @integration
   Scenario: The owner's existing evaluation results show on a member trace
@@ -702,11 +880,10 @@ Feature: An aggregate project reads its member projects
     And managing the aggregate itself stays available
 
   @integration
-  Scenario: A direct link to the aggregate's analytics says it is not available yet
+  Scenario: A direct link to the aggregate's analytics opens the page
     Given an aggregate project
-    When ana opens a link to its analytics, LLM metrics, topics, users, online evaluations, reports or custom graph page
-    Then the page shows its heading and says "Analytics across member projects is not available yet. Open Trace Explorer to see member traces."
-    And it draws no chart and runs no analytics query
+    When ana opens a link to its analytics, LLM metrics, users, online evaluations, reports or custom graph page
+    Then the page draws its charts over the members
     And it shows no saved views bar, so no view can be edited, renamed or deleted from it, and reads no saved views
     And an ordinary project's analytics still show the saved views bar
 

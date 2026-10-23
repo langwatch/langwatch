@@ -29,6 +29,7 @@ const rootFamily = defineRestRouter(ReceiverApi)
   .withVersion("2026-09-24")
   .withAddressing("literal", { v1Twin: false })
   .post("/api/otel/v1/traces", "receiveTraces")
+  .keepsRecords()
   .withAccess({ kind: "public", reason: "The test receiver authenticates nothing." })
   .withOutput(z.object({ received: z.literal(true) }))
   .withDocs({ hide: true })
@@ -50,7 +51,6 @@ const surface = apiSurface({
   logger: createLogger("process-server:api-root-routes-test"),
   stores: { database: false, redis: false },
   bundle: void 0,
-  storage: {},
   instanceAdmin: bearerDoor({ name: "instance-admin", token: void 0 }),
   trustedProxies: void 0,
   executionProxyBaseUrl: void 0,

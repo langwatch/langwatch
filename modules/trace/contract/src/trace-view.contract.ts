@@ -175,6 +175,23 @@ const restrictedAttributeSchema = z.object({
 
 export type RestrictedAttribute = z.infer<typeof restrictedAttributeSchema>;
 
+/** The span attribute naming every value cut on a span before it was stored. */
+export const TRUNCATED_ATTRIBUTES_KEY = "langwatch.truncated_attributes";
+
+/** One cut attribute: its key, its original size, and the surface when not the span itself. */
+const truncatedAttributeSchemaDefinition = z.object({
+  key: z.string(),
+  bytes: z.number(),
+  on: z.enum(["event", "link", "resource"]).optional(),
+});
+export interface TruncatedAttributeSchema extends Named<
+  typeof truncatedAttributeSchemaDefinition
+> {}
+export const truncatedAttributeSchema: TruncatedAttributeSchema =
+  truncatedAttributeSchemaDefinition;
+
+export type TruncatedAttribute = z.infer<typeof truncatedAttributeSchema>;
+
 /** Full selected-span response for the trace drawer. */
 const spanDetailSchemaDefinition = z.object({
   spanId: z.string(),
@@ -197,6 +214,8 @@ const spanDetailSchemaDefinition = z.object({
   contentPrivacy: contentPrivacySchema.nullish(),
   /** Strict PII analysis was requested but did not complete. */
   piiAnalysisIncomplete: z.boolean().nullish(),
+  /** Attribute values too large to store whole, cut to a placeholder before storage. */
+  truncatedAttributes: z.array(truncatedAttributeSchema).nullish(),
   restrictedAttributes: z.array(restrictedAttributeSchema).nullish(),
   error: z
     .object({

@@ -75,6 +75,7 @@ export interface LwqlPrismaRows {
     readonly passkeyNudgeDismissedAt: "DateTime?";
     readonly joinOfferDismissedDomains: "String[]";
     readonly notificationPreferences: "Json";
+    readonly passwordResetRequiredAt: "DateTime?";
   };
   readonly VerificationToken: {
     readonly id: "String";
@@ -743,6 +744,30 @@ export interface LwqlPrismaRows {
     readonly projectId: "String";
     readonly position: "Int";
     readonly createdAt: "DateTime";
+  };
+  readonly DashboardsV2: {
+    readonly id: "String";
+    readonly projectId: "String";
+    readonly name: "String";
+    readonly description: "String?";
+    readonly createdById: "String?";
+    readonly scope: "DashboardScope";
+    readonly organizationId: "String?";
+    readonly createdAt: "DateTime";
+    readonly updatedAt: "DateTime";
+  };
+  readonly DashboardWidget: {
+    readonly id: "String";
+    readonly projectId: "String";
+    readonly dashboardId: "String?";
+    readonly name: "String";
+    readonly definition: "Json";
+    readonly gridColumn: "Int";
+    readonly gridRow: "Int";
+    readonly colSpan: "Int";
+    readonly rowSpan: "Int";
+    readonly createdAt: "DateTime";
+    readonly updatedAt: "DateTime";
   };
   readonly InsightProjection: {
     readonly id: "String";
@@ -1750,6 +1775,10 @@ export interface LwqlPrismaRows {
     readonly seeded: "Boolean";
     readonly evaluationCount: "Int";
     readonly simulationRunCount: "Int";
+    readonly codingFirstSessionAt: "DateTime?";
+    readonly codingAgentTypes: "String[]";
+    readonly codingActiveDays: "Int";
+    readonly codingLastActiveDay: "String?";
     readonly updatedAt: "DateTime";
   };
   readonly BillingMeterCheckpoint: {
@@ -2404,6 +2433,7 @@ export interface LwqlPrismaRows {
     readonly lastReportError: "String?";
     readonly optionalMetricsOptOut: "Boolean";
     readonly hostnameOptOut: "Boolean";
+    readonly upgradeDiagnosticsOptOut: "Boolean";
   };
   readonly SelfHostedInstance: {
     readonly id: "String";
@@ -2429,6 +2459,20 @@ export interface LwqlPrismaRows {
     readonly raisedSignals: "String[]";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
+  };
+  readonly SelfHostedInstanceDiagnostic: {
+    readonly id: "String";
+    readonly instanceId: "String";
+    readonly stepId: "String";
+    readonly stepDescription: "String?";
+    readonly release: "String?";
+    readonly attempt: "Int";
+    readonly trigger: "String";
+    readonly byteLength: "Int";
+    readonly objectKey: "String";
+    readonly receivedAt: "DateTime";
+    readonly expiresAt: "DateTime";
+    readonly slackAnnouncedAt: "DateTime?";
   };
   readonly SelfHostedInstanceReport: {
     readonly id: "String";

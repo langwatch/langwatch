@@ -208,6 +208,9 @@ export interface Authorize {
 /** The platform question's answer: a platform grant carries no organization role. */
 export type PlatformDecision = Readonly<{ permitted: boolean }>;
 
+/** Never answered for an impersonated caller: staff read, and write as themselves (ADR-092). */
+const REFUSED_WHILE_IMPERSONATING: ReadonlySet<PlatformTierPermission> = new Set(["ops:manage"]);
+
 /**
  * Who a platform permission is asked of: the operator behind an impersonated caller, else the
  * caller (record §8, ADR-092). Null for an actor that is no person.
@@ -326,8 +329,12 @@ export async function decidePlatform({
   }
 
   const userId = platformPrincipalOf(actor);
-  const holds = async (permission: PlatformTierPermission) =>
-    userId ? (await ask({ userId, permission })).permitted : false;
+  const impersonated = actor?.type === "user" && actor.impersonatorId !== undefined;
+  const holds = async (permission: PlatformTierPermission) => {
+    if (!userId || (impersonated && REFUSED_WHILE_IMPERSONATING.has(permission))) return false;
+
+    return (await ask({ userId, permission })).permitted;
+  };
   const staff = declaration.hiddenWithout;
 
   if (staff !== void 0 && !(await holds(staff))) {

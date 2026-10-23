@@ -12,7 +12,7 @@ Feature: Platform administration package boundary
     Given authz answers ops:view and ops:manage at the platform tier per user
     When a procedure's platform permission, an instance-admin write and the operator scope are asked
     Then reads need ops:view and writes need ops:manage
-    And an impersonating operator is read by the impersonator's own grant
+    And an impersonating operator is read by the impersonator's own grant, for ops:view only
     And a caller who holds nothing is refused, or answered as no scope
 
   @unit
@@ -141,12 +141,48 @@ Feature: Platform administration package boundary
     Then the write is refused with validation_error
     And no user row is written and nothing is audited
 
+  # Alex, 2026-10-14 (ADR-092): an operator keeps reading while impersonating,
+  # so Deja View stays open, and writes only when signed in as themselves.
+  @unit
+  Scenario: An impersonating operator keeps ops reads and loses ops writes
+    Given an operator holding ops:view and ops:manage who is impersonating an account
+    When they ask an ops read, an ops write, or a Back office write
+    Then the read is answered by their own grant
+    And every write is refused, ops_impersonated_operator_refused in the application and the hidden 404 at a door that asks ops:manage
+    And the Back office is never reached by a refused write
+
+  @unit
+  Scenario: An impersonating operator can always end the impersonation
+    Given an operator who is impersonating an account
+    When they end the impersonation
+    Then the door asks ops:view, which they still hold, and the session returns to their own
+
   @unit
   Scenario: An impersonating operator cannot deactivate or reactivate an account from the back office
     Given an operator holding the manage grant who is impersonating an account
     When they write a user's deactivation through the Back office
     Then the write is refused with ops_impersonated_operator_refused
     And user is never asked to deactivate or reactivate the account
+
+  # Operators manage each other on the Operators page: an operator's account is
+  # edited only once its grant has been revoked there.
+  @unit
+  Scenario: The Back office does not edit an operator's account
+    Given an operator holding the manage grant
+    And another account that holds the platform-operator grant
+    When they edit, change the email of, deactivate, reactivate or delete that account through the Back office
+    Then the write is refused with validation_error
+    And no user row is written and nothing is audited
+    And an account holding no operator grant is still edited
+
+  # An address is verified by its owner; a changed address starts unverified
+  # (modules/user/specs/user.feature).
+  @unit
+  Scenario: The Back office does not set an address's verification
+    Given an operator holding the manage grant
+    When they create or update a user through the Back office with an emailVerified value
+    Then the write is refused with validation_error naming emailVerified
+    And no user row is written and nothing is audited
 
   @unit
   Scenario: The Back office creates an account only as active

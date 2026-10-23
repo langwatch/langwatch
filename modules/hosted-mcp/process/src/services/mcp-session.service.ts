@@ -3,24 +3,30 @@ import { getConfig, runWithConfig } from "@langwatch/mcp-server/config";
 import { createMcpServer } from "@langwatch/mcp-server/create-mcp-server";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
-import type { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import type { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 
-import type { McpSessionRelayRepository } from "../repositories/mcp-session-relay.repository.ts";
 import type {
   McpSessionRecordLookup,
   McpSessionRepository,
-  McpSessionTransport,
 } from "../repositories/mcp-session.repository.ts";
 import type { McpCallerLookup } from "./mcp-caller-auth.service.ts";
 
 const logger = createLogger("langwatch:mcp");
 
-/** Local transports idle this long are closed; their records expire by TTL. */
+/**
+ * A local transport idle this long is closed to free memory; its record stays, so the session's
+ * next request rebuilds it here or on any replica. Also the window a session counts as active.
+ */
 const SESSION_MAX_AGE_MS = 30 * 60 * 1000;
 
-/** Max concurrent sessions per API key, across both transports and every replica. */
+/** A session lasts this long from when it opened; use never extends it. */
+const SESSION_LIFETIME_MS = 30 * 24 * 3600 * 1000;
+
+/** An SSE comment line, which clients ignore and idle-timing proxies count as traffic. */
+const KEEPALIVE_COMMENT = ": keepalive\n\n";
+
+/** Max concurrent sessions per API key, across every replica. */
 export const MAX_SESSIONS_PER_KEY = 20;
 
 /**
@@ -34,26 +40,25 @@ type McpOpenSession<T> = {
   projectId: string | undefined;
   userId: string | undefined;
   lastActivityAt: number;
+  /** When the session ends (epoch ms); a copy past it is dropped and its next request 404s. */
+  expiresAt: number;
 };
 
 export type McpStreamableSession = McpOpenSession<StreamableHTTPServerTransport>;
-export type McpSseSession = McpOpenSession<SSEServerTransport>;
 
 type McpSessionCollaborators = Readonly<{
   records: McpSessionRepository;
-  relay: McpSessionRelayRepository;
   sessionTools: Pick<GovernanceRestApi, "registerMcpTools"> | undefined;
 }>;
 
 /**
  * The sessions this replica holds, and the records that let every other replica find, count and
- * reach them. Record writes are best-effort: a session keeps working until its record's TTL.
+ * reach them. Record writes are best-effort. Only the client's DELETE removes a record.
  */
 export class McpSessionService {
   readonly #collaborators: McpSessionCollaborators;
   /** Maps, not objects: the session id comes from user input. */
   readonly streamable = new Map<string, McpStreamableSession>();
-  readonly sse = new Map<string, McpSseSession>();
 
   private constructor(collaborators: McpSessionCollaborators) {
     this.#collaborators = collaborators;
@@ -63,13 +68,20 @@ export class McpSessionService {
     return new McpSessionService(collaborators);
   }
 
+  /** A new session ends 30 days from now; one rebuilt from its record keeps the record's end. */
   openSession<T>(input: {
     transport: T;
     apiKey: string;
     projectId: string | undefined;
     userId: string | undefined;
+    expiresAt?: number;
   }): McpOpenSession<T> {
-    return { ...input, lastActivityAt: nowInstant().epochMilliseconds };
+    const now = nowInstant().epochMilliseconds;
+    return {
+      ...input,
+      lastActivityAt: now,
+      expiresAt: input.expiresAt ?? now + SESSION_LIFETIME_MS,
+    };
   }
 
   /** Runs `work` with the MCP server configured for this session's key. */
@@ -103,7 +115,6 @@ export class McpSessionService {
    * same person and project, which the session adopts so a client's hourly refresh keeps it.
    */
   adoptsCaller<T>(input: {
-    transport: McpSessionTransport;
     sessionId: string;
     session: McpOpenSession<T>;
     caller: McpCallerLookup;
@@ -121,18 +132,16 @@ export class McpSessionService {
 
     const previous = session.apiKey;
     session.apiKey = caller.apiKey;
-    void this.removeRecord({
-      transport: input.transport,
-      sessionId: input.sessionId,
-      apiKey: previous,
-    })
+    // Written under the new token before the old one stops counting, so no failure loses it.
+    void this.#collaborators.records
+      .rewrite({
+        sessionId: input.sessionId,
+        apiKey: caller.apiKey,
+        projectId,
+        userId: session.userId,
+      })
       .then(() =>
-        this.storeRecord({
-          transport: input.transport,
-          sessionId: input.sessionId,
-          apiKey: caller.apiKey,
-          projectId,
-        }),
+        this.#collaborators.records.forgetKey({ sessionId: input.sessionId, apiKey: previous }),
       )
       .catch((err: unknown) => {
         logger.error({ error: err }, "Failed to move an MCP session record to its refreshed token");
@@ -144,75 +153,67 @@ export class McpSessionService {
     session.lastActivityAt = nowInstant().epochMilliseconds;
   }
 
+  /**
+   * Awaited before the client learns the session id, so its DELETE always lands after this write.
+   * A failure is logged, never raised: the session still serves from the replica that opened it.
+   */
   async storeRecord(input: {
-    transport: McpSessionTransport;
     sessionId: string;
     apiKey: string;
     projectId: string;
+    userId: string | undefined;
   }): Promise<void> {
-    await this.#collaborators.records.store(input);
-  }
-
-  /** Streamable records are written in the background; a failure is logged, never raised. */
-  storeStreamableRecord(input: { sessionId: string; apiKey: string; projectId: string }): void {
-    this.storeRecord({ transport: "streamable", ...input }).catch((err: unknown) => {
+    await this.#collaborators.records.store(input).catch((err: unknown) => {
       logger.error({ error: err }, "Failed to store session in Redis");
     });
   }
 
-  touchRecord(input: {
-    transport: McpSessionTransport;
-    sessionId: string;
-    apiKey: string;
-  }): Promise<void> {
+  touchRecord(input: { sessionId: string; apiKey: string }): Promise<void> {
     return this.#collaborators.records.touch(input).catch(() => undefined);
   }
 
-  removeRecord(input: {
-    transport: McpSessionTransport;
-    sessionId: string;
-    apiKey?: string;
-  }): Promise<void> {
+  /** Ends the session everywhere; only the client's own DELETE calls this. */
+  removeRecord(input: { sessionId: string; apiKey?: string }): Promise<void> {
     return this.#collaborators.records.remove(input).catch(() => undefined);
   }
 
   /** Older replicas wrote no project: the first reader that resolves one writes it back. */
   async backfillRecordProject(input: {
-    transport: McpSessionTransport;
     sessionId: string;
-    record: Readonly<{ apiKey: string; projectId: string | undefined }>;
+    record: Readonly<{ apiKey: string; projectId: string | undefined; userId: string | undefined }>;
     projectId: string | undefined;
   }): Promise<void> {
     const { record, projectId } = input;
     if (record.projectId || !projectId) return;
-    await this.storeRecord({
-      transport: input.transport,
-      sessionId: input.sessionId,
-      apiKey: record.apiKey,
-      projectId,
-    }).catch(() => undefined);
+    await this.#collaborators.records
+      .rewrite({
+        sessionId: input.sessionId,
+        apiKey: record.apiKey,
+        projectId,
+        userId: record.userId,
+      })
+      .catch(() => undefined);
   }
 
   /** A record that cannot be read or decrypted reads as missing, and is logged. */
-  async getRecordKey(input: {
-    transport: McpSessionTransport;
-    sessionId: string;
-  }): Promise<McpSessionRecordLookup> {
+  async getRecordKey(input: { sessionId: string }): Promise<McpSessionRecordLookup> {
     try {
-      const record = await this.#collaborators.records.getRecord(input);
-      if (record.kind === "missing") return record;
-      return record;
+      return await this.#collaborators.records.getRecord(input);
     } catch (err) {
-      logger.error({ error: err, transport: input.transport }, "Redis session lookup failed");
+      logger.error({ error: err }, "Redis session lookup failed");
       return { kind: "missing" };
     }
   }
 
-  /** Across every replica; with no shared store, this replica's own count. Fails open at zero. */
+  /**
+   * Sessions active in the last {@link SESSION_MAX_AGE_MS}, across every replica; with no shared
+   * store, this replica's own count. Fails open at zero.
+   */
   async countForKey(apiKey: string): Promise<number> {
     if (!this.#collaborators.records.isAvailable()) return this.#countLocal(apiKey);
     try {
-      return await this.#collaborators.records.countLive({ apiKey });
+      const since = nowInstant().epochMilliseconds - SESSION_MAX_AGE_MS;
+      return await this.#collaborators.records.countActive({ apiKey, since });
     } catch (err) {
       logger.error({ error: err }, "Redis session count failed");
       return 0;
@@ -223,61 +224,70 @@ export class McpSessionService {
     return (await this.countForKey(apiKey)) >= MAX_SESSIONS_PER_KEY;
   }
 
-  listenForRelayed(input: { sessionId: string; onMessage: (raw: string) => void }): Promise<void> {
-    return this.#collaborators.relay.listen(input);
-  }
-
-  relay(input: { sessionId: string; message: string }): Promise<number> {
-    return this.#collaborators.relay.publish(input);
-  }
-
-  /** Drops every trace of an SSE session: the local entry, its relay subscription, its record. */
-  async releaseSse(sessionId: string, apiKey: string): Promise<void> {
-    this.sse.delete(sessionId);
-    await this.#collaborators.relay.stopListening({ sessionId });
-    await this.removeRecord({ transport: "sse", sessionId, apiKey });
-  }
-
-  /** Closes idle local transports; the SSE ones take their record and relay subscription along. */
+  /**
+   * Closes idle local transports, whose records stay so each session can be rebuilt, and ended
+   * ones, whose records Redis expires at the same moment.
+   */
   reapIdle(now: number): void {
     for (const [id, session] of this.streamable) {
-      if (now - session.lastActivityAt > SESSION_MAX_AGE_MS) {
-        session.transport.close().catch(() => undefined);
-        this.streamable.delete(id);
-        void this.removeRecord({ transport: "streamable", sessionId: id, apiKey: session.apiKey });
-      }
+      const idle = now - session.lastActivityAt > SESSION_MAX_AGE_MS;
+      if (idle || now >= session.expiresAt) this.#dropLocal(id, session);
     }
-    for (const [id, session] of this.sse) {
-      if (now - session.lastActivityAt > SESSION_MAX_AGE_MS) {
-        session.transport.close().catch(() => undefined);
-        this.releaseSse(id, session.apiKey).catch(() => undefined);
-      }
-    }
+  }
+
+  /** Drops this replica's copies at shutdown; the records stay for the replica that takes over. */
+  closeAll(): Promise<void> {
+    for (const [id, session] of this.streamable) this.#dropLocal(id, session);
+    return Promise.resolve();
   }
 
   /**
-   * Resolves once every SSE record this replica owns is released: a released record frees a slot
-   * against the per-key limit, and exiting without waiting leaves it allocated until its TTL.
+   * Writes a comment on every open stream so idle-timing proxies keep it. A session with an open
+   * stream is active: it is not reaped as idle and keeps counting against its key's session limit.
    */
-  async closeAll(): Promise<void> {
-    for (const [id, session] of this.streamable) {
-      session.transport.close().catch(() => undefined);
-      this.streamable.delete(id);
+  pingOpenStreams(): void {
+    for (const [sessionId, session] of this.streamable) {
+      if (writeToOpenStreams(session.transport, KEEPALIVE_COMMENT) === 0) continue;
+      this.markActive(session);
+      void this.touchRecord({ sessionId, apiKey: session.apiKey });
     }
-    const released: Promise<void>[] = [];
-    for (const [id, session] of this.sse) {
-      session.transport.close().catch(() => undefined);
-      released.push(this.releaseSse(id, session.apiKey).catch(() => undefined));
-    }
-    await Promise.all(released);
-    this.#collaborators.relay.close();
+  }
+
+  #dropLocal(id: string, session: McpStreamableSession): void {
+    this.streamable.delete(id);
+    session.transport.close().catch(() => undefined);
   }
 
   #countLocal(apiKey: string): number {
     let count = 0;
-    for (const session of [...this.streamable.values(), ...this.sse.values()]) {
+    for (const session of this.streamable.values()) {
       if (session.apiKey === apiKey) count++;
     }
     return count;
   }
+}
+
+/**
+ * Enqueues `text` on each stream the transport holds open, answering how many took it.
+ * WORKAROUND: the SDK keeps its stream controllers private; checked against
+ * @modelcontextprotocol/sdk@1.32.0, and a changed shape writes nothing rather than throwing.
+ */
+function writeToOpenStreams(transport: StreamableHTTPServerTransport, text: string): number {
+  const transportFields: Record<string, unknown> = Object(transport);
+  const innerFields: Record<string, unknown> = Object(transportFields._webStandardTransport);
+  const streams = innerFields._streamMapping;
+  if (!(streams instanceof Map)) return 0;
+  let written = 0;
+  for (const stream of streams.values()) {
+    const { controller, encoder }: Record<string, unknown> = Object(stream);
+    if (!(controller instanceof ReadableStreamDefaultController)) continue;
+    if (!(encoder instanceof TextEncoder)) continue;
+    try {
+      controller.enqueue(encoder.encode(text));
+      written++;
+    } catch {
+      // A stream closing under us is about to leave the map.
+    }
+  }
+  return written;
 }

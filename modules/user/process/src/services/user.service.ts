@@ -28,6 +28,7 @@ import {
   type RemoveUserAvatarInput,
   type SetUserAvatarInput,
   type SetUserHomePathInput,
+  type PasswordHolder,
   type SetFirstUserPasswordInput,
   type SetFirstUserPasswordResult,
   type UpdateUserEmailInput,
@@ -230,6 +231,36 @@ export class UserService {
     return this.repository.hasPassword(parsed.id);
   }
 
+  /** Addresses are matched lower-cased on both sides, so a stored mixed-case address is found. */
+  async findPasswordHolders({
+    emails,
+  }: {
+    emails: readonly string[] | null;
+  }): Promise<PasswordHolder[]> {
+    const wanted =
+      emails === null
+        ? null
+        : [...new Set(emails.map((email) => email.trim().toLowerCase()))].filter(Boolean);
+    if (wanted?.length === 0) return [];
+    const rows = await this.repository.findPasswordHolders({ emails: wanted });
+    return rows.map((row) => ({
+      id: row.id,
+      email: row.email,
+      markedForReset: row.passwordResetRequiredAt !== null,
+    }));
+  }
+
+  async markPasswordResetRequired({
+    userIds,
+  }: {
+    userIds: readonly string[];
+  }): Promise<{ marked: number }> {
+    if (userIds.length === 0) return { marked: 0 };
+    return {
+      marked: await this.repository.markPasswordResetRequired({ ids: userIds, at: this.now() }),
+    };
+  }
+
   setFirstPassword(input: SetFirstUserPasswordInput): Promise<SetFirstUserPasswordResult> {
     return this.repository.setFirstPassword({
       ...setFirstUserPasswordInputSchema.parse(input),
@@ -270,12 +301,21 @@ export class UserService {
     return this.repository.updateProfile(update);
   }
 
-  /** Stored trimmed and lower-cased, as the parse left it; auth's door ends the old sessions. */
+  /**
+   * Stored trimmed and lower-cased, as the parse left it; auth's door ends the old sessions.
+   * A different address is not yet verified; a change of case alone keeps the verification.
+   */
   async updateEmail(input: UpdateUserEmailInput): Promise<UserProfile> {
     const parsed = updateUserEmailInputSchema.parse(input);
-    if (!(await this.repository.findById(parsed.id))) throw new UserNotFoundError(parsed.id);
+    const current = await this.repository.findById(parsed.id);
+    if (!current) throw new UserNotFoundError(parsed.id);
+    const sameAddress = (current.email ?? "").toLowerCase() === parsed.email;
 
-    return this.repository.updateProfile({ id: parsed.id, email: parsed.email });
+    return this.repository.updateProfile({
+      id: parsed.id,
+      email: parsed.email,
+      ...(sameAddress ? {} : { emailVerified: false }),
+    });
   }
 
   async getAccountInfo(input: UserIdInput): Promise<UserAccountInfo> {

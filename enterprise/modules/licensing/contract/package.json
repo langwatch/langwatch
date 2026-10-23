@@ -25,6 +25,7 @@
     "@langwatch/entitlement-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/module": "workspace:*",
+    "@langwatch/ops-contract": "workspace:*",
     "@langwatch/plans": "workspace:*",
     "@langwatch/secrets": "workspace:*",
     "zod": "catalog:"

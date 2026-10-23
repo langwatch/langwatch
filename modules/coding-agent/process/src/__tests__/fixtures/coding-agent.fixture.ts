@@ -11,14 +11,19 @@ import {
   codingAgentSessionFixture,
 } from "@langwatch/coding-agent-contract/testing";
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
+import { type Authorization, sealAuthorization } from "@langwatch/authorization";
 import {
-  ClickHouseQueryClient,
-  TenantGuard,
+  type ClickHouseQueryClient,
+  fenceFor,
   type InsertRequest,
   type QueryDriver,
   type QueryRequest,
   type QueryResult,
 } from "@langwatch/clickhouse-client";
+import {
+  idIndexedClientDouble,
+  readyIdIndexedClientDouble,
+} from "@langwatch/clickhouse-client/testing";
 import { createServer, type Server } from "node:http";
 import {
   type GithubApi,
@@ -27,6 +32,7 @@ import {
 import {
   type PaginatedProjects,
   type ProjectApi,
+  type ProjectIdentity,
   projectWithTeamSchema,
   type ProjectWithTeam,
 } from "@langwatch/project-contract";
@@ -34,8 +40,12 @@ import type { Instant } from "@langwatch/time";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { CodingAgentBillingPolicy } from "../../services/coding-agent-cost-attribution.service.ts";
 import type { CodingAgentClock } from "../../services/coding-agent-clock.service.ts";
+import { CODING_AGENT_ID_INDEXES } from "../../repositories/clickhouse/clickhouse.coding-agent-id-indexes.database.ts";
 import { CodingAgentSessionEventRepository } from "../../repositories/coding-agent-session-event.repository.ts";
-import { CodingAgentSessionRepository } from "../../repositories/coding-agent-session.repository.ts";
+import {
+  CodingAgentSessionRepository,
+  type OtherSessionKind,
+} from "../../repositories/coding-agent-session.repository.ts";
 import { CodingAgentTraceSessionRepository } from "../../repositories/coding-agent-trace-session.repository.ts";
 import {
   SessionMetricSeriesRepository,
@@ -60,14 +70,18 @@ export class TestClickHouseEndpoint {
     private readonly client: ClickHouseClient,
     readonly requests: ClickHouseRequest[],
     readonly queryRows: Record<string, unknown>[][],
+    clickhouse: ClickHouseQueryClient,
   ) {
-    this.clickhouse = new ClickHouseQueryClient({
-      driver: singleEndpointDriver(client),
-      tenantGuard: new TenantGuard(),
-    });
+    this.clickhouse = clickhouse;
   }
 
-  static async create(): Promise<TestClickHouseEndpoint> {
+  /**
+   * An endpoint whose client declares coding-agent's id indexes: not filled by default, so a
+   * read by id takes today's path; `idIndexReady` reads them as filled, without asking the server.
+   */
+  static async create({
+    idIndexReady = false,
+  }: { idIndexReady?: boolean } = {}): Promise<TestClickHouseEndpoint> {
     const requests: ClickHouseRequest[] = [];
     const queryRows: Record<string, unknown>[][] = [];
     const server = createServer(async (request, response) => {
@@ -83,13 +97,12 @@ export class TestClickHouseEndpoint {
     if (address === null || typeof address === "string") {
       throw new Error("test ClickHouse endpoint did not bind a TCP port");
     }
-    const endpoint = new TestClickHouseEndpoint(
-      server,
-      createClient({ url: `http://127.0.0.1:${address.port}` }),
-      requests,
-      queryRows,
-    );
-    return endpoint;
+    const client = createClient({ url: `http://127.0.0.1:${address.port}` });
+    const driver = singleEndpointDriver(client);
+    const clickhouse = idIndexReady
+      ? await readyIdIndexedClientDouble({ indexes: CODING_AGENT_ID_INDEXES, driver })
+      : idIndexedClientDouble({ indexes: CODING_AGENT_ID_INDEXES, driver });
+    return new TestClickHouseEndpoint(server, client, requests, queryRows, clickhouse);
   }
 
   async close(): Promise<void> {
@@ -140,6 +153,56 @@ function singleEndpointDriver(client: ClickHouseClient): QueryDriver {
 
 export function session(overrides: Partial<CodingAgentSession> = {}): CodingAgentSession {
   return codingAgentSessionFixture(overrides);
+}
+
+const TEST_ACTOR = { type: "user", id: "test-user" } as const;
+const TEST_PROOF_LIFETIME_MS = 5 * 60 * 1000;
+
+/** The proof a plain project's route mints: one own grant, nothing shared (ADR-177). */
+export function ownProof({
+  projectId,
+  now = Date.now(),
+}: {
+  projectId: string;
+  now?: number;
+}): Authorization {
+  return sealAuthorization({
+    actor: TEST_ACTOR,
+    principal: TEST_ACTOR,
+    scope: { organizationId: "test-organization" },
+    grants: [{ projectId, permissions: ["traces:view"], via: [], kind: "own" }],
+    expiresAt: now + TEST_PROOF_LIFETIME_MS,
+    purpose: { kind: "route", route: "test" },
+  });
+}
+
+/** An aggregate's proof: own on the aggregate, one shared grant per member with its window. */
+export function aggregateProof({
+  projectId,
+  members,
+  now = Date.now(),
+}: {
+  projectId: string;
+  members: { projectId: string; from: number; until?: number | null }[];
+  now?: number;
+}): Authorization {
+  return sealAuthorization({
+    actor: TEST_ACTOR,
+    principal: TEST_ACTOR,
+    scope: { organizationId: "test-organization" },
+    grants: [
+      { projectId, permissions: ["traces:view"], via: [], kind: "own" },
+      ...members.map((member, index) => ({
+        projectId: member.projectId,
+        permissions: ["traces:view"],
+        via: [`grant_${index}`],
+        kind: "shared" as const,
+        condition: { type: "trace" as const, from: member.from, until: member.until ?? null },
+      })),
+    ],
+    expiresAt: now + TEST_PROOF_LIFETIME_MS,
+    purpose: { kind: "route", route: "test" },
+  });
 }
 
 export function branchSession(
@@ -280,6 +343,12 @@ export class TestSessions extends CodingAgentSessionRepository {
     toMs: number;
     limit: number;
   }[] = [];
+  fencedInputs: {
+    authorization: Authorization;
+    fromMs: number;
+    toMs: number;
+    limit: number;
+  }[] = [];
   branchInputs: {
     tenantIds: string[];
     repositoryHost: string;
@@ -339,6 +408,17 @@ export class TestSessions extends CodingAgentSessionRepository {
     return this.applied;
   }
 
+  async findOtherSessionKind(input: {
+    tenantId: string;
+    excludeSessionIds: string[];
+  }): Promise<OtherSessionKind> {
+    const others = this.rows.filter(
+      (row) => row.tenantId === input.tenantId && !input.excludeSessionIds.includes(row.sessionId),
+    );
+    if (others.some((row) => !row.auxiliary)) return "main";
+    return others.length > 0 ? "helpers_only" : "none";
+  }
+
   async findManyRecent(input: {
     tenantId: string;
     userId?: string;
@@ -348,6 +428,32 @@ export class TestSessions extends CodingAgentSessionRepository {
   }): Promise<CodingAgentSession[]> {
     this.recentInputs.push(input);
     return this.recentRowsByTenant.get(input.tenantId) ?? this.rows;
+  }
+
+  /** The fence applied in memory: own rows whole, a shared tenant's rows cut to its window. */
+  async findManyRecentFenced(input: {
+    authorization: Authorization;
+    fromMs: number;
+    toMs: number;
+    limit: number;
+  }): Promise<CodingAgentSession[]> {
+    this.fencedInputs.push(input);
+    const fence = fenceFor({ authorization: input.authorization, reads: "traces" });
+    const rowsOf = (tenantId: string) => this.recentRowsByTenant.get(tenantId) ?? this.rows;
+    const own = fence.own.flatMap((tenantId) =>
+      rowsOf(tenantId).filter((row) => row.tenantId === tenantId),
+    );
+    const shared = fence.shared.flatMap((window) =>
+      rowsOf(window.projectId).filter(
+        (row) =>
+          row.tenantId === window.projectId &&
+          row.startedAtMs >= window.from &&
+          (window.until === null || row.startedAtMs < window.until),
+      ),
+    );
+    return [...own, ...shared]
+      .filter((row) => row.startedAtMs >= input.fromMs && row.startedAtMs <= input.toMs)
+      .slice(0, input.limit);
   }
 
   async findByRepositoryBranch(input: {
@@ -685,7 +791,10 @@ export class TestGithubService implements GithubApi {
   }
 }
 
-function projectRow(id: string): PaginatedProjects["data"][number] {
+export function projectRow(
+  id: string,
+  overrides: Partial<PaginatedProjects["data"][number]> = {},
+): PaginatedProjects["data"][number] {
   const at = new Date(0);
   return {
     id,
@@ -716,11 +825,28 @@ function projectRow(id: string): PaginatedProjects["data"][number] {
     langyEgressAllowlist: null,
     lastCodingAgentSessionAt: null,
     lastCodingAgentPullRequestAt: null,
+    ...overrides,
+  };
+}
+
+function projectIdentity({ id, name }: { id: string; name: string }): ProjectIdentity {
+  return {
+    id,
+    name,
+    slug: id,
+    teamId: "team-1",
+    organizationId: "organization-1",
+    isPersonal: false,
+    ownerUserId: null,
+    kind: "application",
   };
 }
 
 export interface TestProjectState {
   projects: { id: string }[];
+  /** The names `listNamesByIds` answers with; an id left out has no live project. */
+  readonly projectNames: Map<string, string>;
+  readonly nameLookups: { projectIds: string[] }[];
   readonly sessionActivity: { projectId: string; at: Instant }[];
   teamProject: ProjectWithTeam | null;
 }
@@ -742,12 +868,23 @@ export function createTestProjects(overrides: Partial<ProjectApi> = {}): TestPro
           projects.sessionActivity.push(input);
           return Promise.resolve();
         },
+        listNamesByIds: (input) => {
+          projects.nameLookups.push(input);
+          return Promise.resolve(
+            input.projectIds.flatMap((id) => {
+              const name = projects.projectNames.get(id);
+              return name === undefined ? [] : [projectIdentity({ id, name })];
+            }),
+          );
+        },
         ...overrides,
       },
       "ProjectApi",
     ),
     {
       projects: [],
+      projectNames: new Map(),
+      nameLookups: [],
       sessionActivity: [],
       teamProject: projectWithTeamSchema.parse({
   id: "project-1",

@@ -1,3 +1,4 @@
+import type { Authorization } from "@langwatch/authorization";
 import {
   codingAgentPullRequestDetailSchema,
   codingAgentPullRequestUsageInputSchema,
@@ -39,7 +40,10 @@ import {
   type CodingAgentModelUsage,
   type CodingAgentUsageRow,
 } from "./coding-agent-pull-request-usage.service.ts";
-import type { CodingAgentSessionListPullRequestService } from "./coding-agent-session-list-pull-request.service.ts";
+import {
+  type CodingAgentSessionListPullRequestService,
+  sessionListKey,
+} from "./coding-agent-session-list-pull-request.service.ts";
 
 export const SESSIONS_LIST_WINDOW_MS = 90 * 24 * 60 * 60 * 1000;
 export const SESSIONS_LIST_LIMIT = 200;
@@ -79,6 +83,7 @@ export class CodingAgentPullRequestReadService {
       sessionEvents: CodingAgentSessionEventRepository;
       sessionReads: CodingAgentSessionReadService;
       github: GithubApi;
+      projects: Pick<ProjectApi, "listNamesByIds">;
       clock: CodingAgentClock;
       assignments: CodingAgentPullRequestAssignmentService;
       shares: CodingAgentPullRequestShareService;
@@ -89,20 +94,28 @@ export class CodingAgentPullRequestReadService {
     },
   ) {}
 
-  async listForProject(input: { projectId: string }): Promise<CodingAgentSessionListRow[]> {
+  async listForProject(input: {
+    projectId: string;
+    authorization: Authorization;
+  }): Promise<CodingAgentSessionListRow[]> {
     const toMs = this.dependencies.clock.nowMs();
-    const rows = await this.dependencies.sessionReads.listRecent({
-      projectId: input.projectId,
+    const rows = await this.dependencies.sessionReads.listRecentFenced({
+      authorization: input.authorization,
       fromMs: toMs - SESSIONS_LIST_WINDOW_MS,
       toMs,
       limit: SESSIONS_LIST_LIMIT,
     });
-    const pullRequests = await this.dependencies.sessionListPullRequests.findForProject({
-      projectId: input.projectId,
-      sessions: rows,
-    });
+    const [pullRequests, projectNames] = await Promise.all([
+      this.dependencies.sessionListPullRequests.findForProject({
+        projectId: input.projectId,
+        sessions: rows,
+      }),
+      this.projectNamesOf(rows),
+    ]);
 
     return rows.map((row) => ({
+      tenantId: row.tenantId,
+      projectName: projectNames.get(row.tenantId) ?? row.tenantId,
       sessionId: row.sessionId,
       title: row.title === "" ? null : row.title,
       agent: row.agent,
@@ -128,8 +141,16 @@ export class CodingAgentPullRequestReadService {
       activeTimeCliSec: row.activeTimeCliSec,
       blockedOnUserMs: row.blockedOnUserMs,
       models: row.models,
-      pullRequests: pullRequests.get(row.sessionId) ?? [],
+      pullRequests: pullRequests.get(sessionListKey(row)) ?? [],
     }));
+  }
+
+  /** One name lookup per page, over the distinct member projects its rows came from. */
+  private async projectNamesOf(rows: { tenantId: string }[]): Promise<Map<string, string>> {
+    const projectIds = [...new Set(rows.map((row) => row.tenantId))];
+    if (projectIds.length === 0) return new Map();
+    const identities = await this.dependencies.projects.listNamesByIds({ projectIds });
+    return new Map(identities.map((identity) => [identity.id, identity.name]));
   }
 
   async getPullRequestUsage(

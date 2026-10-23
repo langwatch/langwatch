@@ -66,9 +66,17 @@ export type UserAddressReplacement = "replaced" | "changed" | "taken";
  * Persistence owned by User. It never crosses the feature boundary. Every mint commits user's
  * created fact (and a self-registration its registered fact) to the fact outbox with the row.
  */
-/** A name change, an address change, or both, as the two `UserApi` writes ask for them. */
+/** A name change, an address change, or both; a new address carries its cleared verification. */
 export type StoredProfileChange = UpdateUserProfileInput &
-  Partial<Pick<UpdateUserEmailInput, "email">>;
+  Partial<Pick<UpdateUserEmailInput, "email">> &
+  Partial<Pick<UserProfile, "emailVerified">>;
+
+/** A user holding a credential password, and whether it is already marked for a reset. */
+export type PasswordHolderRow = Readonly<{
+  id: string;
+  email: string | null;
+  passwordResetRequiredAt: Instant | null;
+}>;
 
 export interface UserRepository {
   findProfiles(userIds: string[]): Promise<UserFullProfile[]>;
@@ -81,6 +89,12 @@ export interface UserRepository {
   createCredentialUser(input: CreateCredentialUserRow): Promise<CreatedCredentialUser>;
   createPasskeyUser(input: CreatePasskeyUserRow): Promise<CreatedUser>;
   hasPassword(id: string): Promise<boolean>;
+  /** Users holding a credential password, oldest id first; `emails` narrows to those addresses,
+   *  matched case-insensitively. */
+  findPasswordHolders(input: { emails: readonly string[] | null }): Promise<PasswordHolderRow[]>;
+  /** Marks these passwords as requiring a reset; a mark already set keeps its time. Answers how
+   *  many were newly marked. */
+  markPasswordResetRequired(input: { ids: readonly string[]; at: Instant }): Promise<number>;
   setFirstPassword(input: SetFirstUserPasswordRow): Promise<SetFirstUserPasswordResult>;
   /**
    * Confirms an unfinished account and drops every account row and passkey it holds, as ONE

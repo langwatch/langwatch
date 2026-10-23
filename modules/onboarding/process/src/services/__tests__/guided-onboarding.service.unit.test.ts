@@ -144,8 +144,8 @@ describe("GuidedOnboardingService over a real organization read/write", () => {
     expect(state.providerSkippedAt).toEqual(expect.any(String));
   });
 
-  /** @scenario "Skip anyway skips the tour as well" */
-  it("records the tour as skipped in the same call and announces both skips", async () => {
+  /** @scenario "Skip anyway leaves the tour to run" */
+  it("records the provider skip only and announces only that", async () => {
     const { api, records } = createOrganizations({
       org_1: { state: { paths: [], donePaths: [] }, variant: "guided" },
     });
@@ -157,15 +157,50 @@ describe("GuidedOnboardingService over a real organization read/write", () => {
 
     await service.recordProviderSkipped({ organizationId: "org_1", userId: "user_1" });
 
-    expect(records.get("org_1")?.state).toMatchObject({
-      providerSkippedAt: expect.any(String),
-      tourSkippedAt: expect.any(String),
-    });
+    const state = records.get("org_1")?.state;
+    expect(state?.providerSkippedAt).toEqual(expect.any(String));
+    expect(state?.tourSkippedAt).toBeUndefined();
+    expect(state?.tourCompletedAt).toBeUndefined();
     expect(announced.events.map((announcement) => announcement.event)).toEqual([
       "provider_skipped",
-      "tour_skipped",
     ]);
     expect(announced.events.every((announcement) => announcement.userId === "user_1")).toBe(true);
+  });
+
+  /** @scenario "putting off the model prompt is recorded" */
+  it("records when the model prompt was put off and leaves the rest as it was", async () => {
+    const skippedAt = "2026-10-18T09:00:00.000Z";
+    const { api, records } = createOrganizations({
+      org_1: {
+        state: {
+          paths: ["llmops"],
+          currentPath: "llmops",
+          donePaths: [],
+          providerSkippedAt: skippedAt,
+          tourCompletedAt: skippedAt,
+        },
+        variant: "guided",
+      },
+    });
+    const announced = collectAnnouncements();
+    const service = GuidedOnboardingService.create({
+      organizations: api,
+      announce: announced.announce,
+      now: () => "2026-10-18T09:05:00.000Z",
+    });
+
+    await service.recordProviderPromptDismissed({ organizationId: "org_1", userId: "user_1" });
+
+    expect(records.get("org_1")?.state).toEqual({
+      paths: ["llmops"],
+      currentPath: "llmops",
+      donePaths: [],
+      providerSkippedAt: skippedAt,
+      tourCompletedAt: skippedAt,
+      providerPromptDismissedAt: "2026-10-18T09:05:00.000Z",
+    });
+    // Bookkeeping: no peer reacts to it.
+    expect(announced.events).toEqual([]);
   });
 
   /** @scenario "completing, skipping and replaying the tour are recorded" */

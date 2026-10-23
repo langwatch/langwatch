@@ -365,6 +365,9 @@ func (cell *run) freshStores(ctx context.Context) error {
 		return fmt.Errorf("private-down gates: %w", err)
 	}
 	if cell.profile.Objects {
+		if err := cell.ensureServiceBinary(ctx, cell.options.ServiceBin); err != nil {
+			return err
+		}
 		if err := cell.startObjectStores(slices.Collect(maps.Keys(shape.PrivateObjectTargets()))); err != nil {
 			return err
 		}

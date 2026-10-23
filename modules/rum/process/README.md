@@ -44,9 +44,9 @@ Public: browser telemetry ingest; the browser has no credential to present and t
 Answers at `/api/rum/v1/traces`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/rum.rest.ts:26)
+// Rawbody: "text" (inline, src/transport/rum.rest.ts:27)
 type Headers = z.infer<typeof rumReportHeadersSchema>; // ../contract/src/rum.api.ts:11
-// Response: inline, src/transport/rum.rest.ts:39
+// Response: inline, src/transport/rum.rest.ts:40
 type Response = unknown;
 ```
 
@@ -67,9 +67,9 @@ None: rum declares no pipeline, process manager, subscriber or task.
 | Kind   | Leaf                | Environment variable          | Declared at                        |
 | ------ | ------------------- | ----------------------------- | ---------------------------------- |
 | secret | `–`                 | `RUM_COLLECTOR_HEADERS`       | `src/app/rum.app.ts:29`            |
-| config | `enabled`           | `RUM_ENABLED`                 | `../contract/src/rum.config.ts:15` |
-| config | `sampleRatio`       | `RUM_SAMPLE_RATIO`            | `../contract/src/rum.config.ts:22` |
-| config | `collectorEndpoint` | `RUM_COLLECTOR_ENDPOINT`      | `../contract/src/rum.config.ts:26` |
-| config | `telemetryEndpoint` | `OTEL_EXPORTER_OTLP_ENDPOINT` | `../contract/src/rum.config.ts:30` |
+| config | `enabled`           | `RUM_ENABLED`                 | `../contract/src/rum.config.ts:19` |
+| config | `sampleRatio`       | `RUM_SAMPLE_RATIO`            | `../contract/src/rum.config.ts:26` |
+| config | `collectorEndpoint` | `RUM_COLLECTOR_ENDPOINT`      | `../contract/src/rum.config.ts:30` |
+| config | `telemetryEndpoint` | `OTEL_EXPORTER_OTLP_ENDPOINT` | `../contract/src/rum.config.ts:34` |
 
 <!-- readme:generated:end -->

@@ -224,6 +224,14 @@ const hasReasonCode = (reasons: readonly SerializedReason[], codes: ReadonlySet<
       hasReasonCode(reason.reasons ?? [], codes),
   );
 
+/** The providers' own limit codes: when one is named, it says more than the proxy's reason. */
+const PROVIDER_LIMIT_CODES: ReadonlySet<string> = new Set([
+  "usage_limit_reached",
+  "codex_plan_limit",
+  "insufficient_quota",
+  "billing_hard_limit_reached",
+]);
+
 /**
  * The provider discriminants meaning "this account has nothing left to spend"
  * — a plan allowance, a prepaid balance, a hard billing cap.
@@ -234,11 +242,10 @@ const hasReasonCode = (reasons: readonly SerializedReason[], codes: ReadonlySet<
  * balance is too low" beats "try again"), and naming the discriminants is how
  * we keep that meaning without carrying the sentence that came with it.
  */
-const PROVIDER_ALLOWANCE_REASONS: ReadonlySet<string> = new Set([
-  "usage_limit_reached",
-  "codex_plan_limit",
-  "insufficient_quota",
-  "billing_hard_limit_reached",
+export const PROVIDER_ALLOWANCE_REASONS: ReadonlySet<string> = new Set([
+  ...PROVIDER_LIMIT_CODES,
+  // The proxy's own name for a spent balance a provider states only in prose.
+  "llm_provider_out_of_credit",
 ]);
 
 /**
@@ -284,6 +291,8 @@ export const PROVIDER_CREDENTIAL_REASONS: ReadonlySet<string> = new Set([
   // Google's statuses for the same two refusals.
   "UNAUTHENTICATED",
   "PERMISSION_DENIED",
+  // The proxy's own name for a refused key a provider answers with a 400.
+  "llm_provider_key_rejected",
 ]);
 
 /**
@@ -322,12 +331,14 @@ const PROVIDER_OUTAGE_REASONS: ReadonlySet<string> = new Set([
 
 /**
  * The provider refused the request itself as malformed: Bedrock's
- * "ValidationException", or a 422 status. Deterministic, so the fix is another
- * model, not a retry. The broad "invalid_request_error" and bare 400 are left
- * out: Anthropic files a spent balance under them, and that one can pass.
+ * "ValidationException", Anthropic's "invalid_request_error", a 400 or a 422.
+ * Deterministic, so the fix is another model, not a retry. A spent balance
+ * Anthropic files under the same 400 carries `llm_provider_out_of_credit` too.
  */
 export const PROVIDER_INVALID_REQUEST_REASONS: ReadonlySet<string> = new Set([
+  "upstream_bad_request",
   "upstream_unprocessable_entity",
+  "invalid_request_error",
   "ValidationException",
 ]);
 
@@ -471,6 +482,28 @@ const presentations = {
     title: "Queries are queued up right now",
     describe: () => "Too many queries were running at once. Try again in a few seconds.",
   },
+  lwql_member_grant_closed: {
+    title: "A member project is shared up to a date",
+    describe: (error) => {
+      const names = strList(error, "projectNames");
+      if (names.length === 0) {
+        return "One of the projects this group project reads is shared only up to a date, which queries can't keep to. Ask your administrator to share it without an end.";
+      }
+      const plural = names.length > 1;
+      return `${listLabels(names.map((name) => `"${name}"`))} ${plural ? "are" : "is"} shared only up to a date, which queries can't keep to. Ask your administrator to share ${plural ? "them" : "it"} without an end.`;
+    },
+  },
+  lwql_member_key_missing: {
+    title: "A member project can't be queried yet",
+    describe: (error) => {
+      const names = strList(error, "projectNames");
+      if (names.length === 0) {
+        return "One of the projects this group project reads isn't set up for queries yet. Try again later, or ask your administrator.";
+      }
+      const plural = names.length > 1;
+      return `${listLabels(names.map((name) => `"${name}"`))} ${plural ? "aren't" : "isn't"} set up for queries yet. Try again later, or ask your administrator.`;
+    },
+  },
   lwql_not_permitted: {
     title: "This query isn't allowed here",
     describe: () =>
@@ -495,6 +528,21 @@ const presentations = {
     // loop runs up is the project's, so the budget is too.
     title: "Too many queries just now",
     describe: () => "Wait a minute, then run the query again.",
+  },
+  lwql_table_modifier_unsupported: {
+    title: "FINAL and SAMPLE can't be used here",
+    describe: () =>
+      "This read keeps each project to its own dates, and that can't be combined with FINAL or SAMPLE. The datasets already keep one row per item, so remove them and run it again.",
+  },
+  lwql_view_shadowed: {
+    title: "A WITH name repeats a view's name",
+    describe: () =>
+      "This read keeps each project to its own dates, and finds the views it reads by name. Rename the WITH so it does not reuse a view's name, then run it again.",
+  },
+  lwql_too_many_members: {
+    title: "This aggregate reads too many projects",
+    describe: () =>
+      "A query can read only so many projects at once. Narrow the aggregate's projects and try again.",
   },
   lwql_reserved_parameter_supplied: {
     // One code covers three reserved names, so both halves of the copy are
@@ -2429,6 +2477,11 @@ const presentations = {
         : "Ask an organization admin to grant you access to this project.";
     },
   },
+  evaluation_report_unavailable: {
+    title: "The result could not be saved",
+    describe: () =>
+      "The evaluation ran, but its result could not be recorded just now. Send the same request again in a few seconds.",
+  },
   evaluation_trace_not_evaluatable: {
     title: "This trace cannot be evaluated",
     describe: () =>
@@ -3025,6 +3078,14 @@ const presentations = {
   },
 
   // ---- analytics ----
+  analytics_aggregate_unattended_read: {
+    // A scheduled report or alert runs with no person behind it, so there is
+    // no grant to read the member projects through. The chart still works
+    // when someone opens it.
+    title: "Reports and alerts aren't available on a group project yet",
+    describe: () =>
+      "Open the chart on the group project to see it, or set the report or alert up on a member project.",
+  },
   analytics_series_percentage_unsupported: {
     // A percentage is the series divided by the same measurement without the
     // series' own filters. A per-entity measurement (average per user, sum per
@@ -3166,6 +3227,11 @@ const presentations = {
     title: "That password wasn't accepted",
     describe: () =>
       "Choose one of at least 8 characters, with at least one character that is not a space.",
+  },
+  identity_password_reset_required: {
+    title: "Choose a new password to sign in",
+    describe: () =>
+      "Your password needs to be replaced before you can use it again. We will email you a link to set a new one.",
   },
   identity_reset_link_invalid: {
     // Expired, already spent and never issued collapse to one answer on purpose.
@@ -3636,7 +3702,7 @@ const presentations = {
   platform_operator_user_not_found: {
     title: "No active user has that address",
     describe: () =>
-      "Only an existing, active account can be made a platform operator. Ask them to sign up first.",
+      "Only an existing, active account with a verified address can be made a platform operator; on LangWatch Cloud, only a staff account.",
   },
   platform_permission_not_assignable: {
     title: "Operations permissions cannot be added to a role",
@@ -3857,6 +3923,10 @@ const presentations = {
     title: "There is nothing to retry",
     describe: () =>
       "This dataset has no failed or stuck import. Upload the file again to add its rows.",
+  },
+  dataset_invalid_column: {
+    title: "That column is not in this dataset",
+    describe: () => "Add the column to the dataset, or remove it from the row, and try again.",
   },
   dataset_name_taken: {
     title: "That name is taken",
@@ -4164,6 +4234,13 @@ const presentations = {
     title: "Webhook automations can't be created this way",
     describe: () =>
       "Set this one up on the automations page, where the destination is checked before it's saved.",
+  },
+  automation_dataset_unavailable: {
+    // Raised at dispatch, not on save: the automation was valid when saved and
+    // its dataset has since gone, or lost every column the mapping names.
+    title: "This automation's dataset is unavailable",
+    describe: () =>
+      "The dataset it adds traces to was removed, or no longer has the columns it maps. Edit the automation to pick a dataset and mapping that exist.",
   },
   automation_filters_unsupported: {
     // `meta.fields` holds the field names that no longer match anything. They
@@ -4626,6 +4703,11 @@ const presentations = {
     describe: () =>
       "Check the allowed models list in the provider settings, or answer each card as it comes.",
   },
+  langy_confirmation_required: {
+    title: "Waiting for your confirmation",
+    describe: () =>
+      "Langy asked to remove or turn off something. It runs only after you choose Yes on the card in the conversation.",
+  },
   langy_wait_expired: {
     title: "That card is not waiting any more",
     describe: (error) => {
@@ -4944,6 +5026,10 @@ const presentations = {
       return field ? `There's a problem with ${field}.` : "Some of the values aren't valid.";
     },
   },
+  request_body_unreadable: {
+    title: "The request did not arrive in full",
+    describe: () => "The connection closed before the whole request was sent. Send it again.",
+  },
   malformed_request: {
     title: "That request couldn't be read",
     describe: () => "Check the format of what was sent, then try again.",
@@ -4951,6 +5037,57 @@ const presentations = {
   unsupported_media_type: {
     title: "That request was sent in the wrong format",
     describe: () => "Send the body with the Content-Type this endpoint reads, then try again.",
+  },
+  // ==========================================================================
+  // Hosted MCP. Read by an MCP client and the person who configured it, not on
+  // a LangWatch page, so the words say what to do in the client.
+  // ==========================================================================
+  mcp_authorization_required: {
+    title: "Sign in to use the LangWatch MCP server",
+    describe: () =>
+      "Connect your MCP client to LangWatch, or send a project API key as the bearer.",
+  },
+  mcp_invalid_token: {
+    title: "Your MCP sign-in has expired",
+    describe: () => "Sign in to LangWatch again from your MCP client.",
+  },
+  mcp_invalid_api_key: {
+    title: "That API key isn't valid",
+    describe: () => "Check the project API key your MCP client sends, or create a new one.",
+  },
+  mcp_grant_revoked: {
+    title: "Your access to this project has ended",
+    describe: () =>
+      "You no longer have access to the project this sign-in was for. Ask an admin, then sign in again.",
+  },
+  mcp_session_not_found: {
+    title: "This MCP session has ended",
+    describe: () => "Your MCP client opens a new session on its own. Reconnect if it does not.",
+  },
+  mcp_route_not_found: {
+    title: "Not found",
+    describe: () => "Check the MCP server URL your client is configured with.",
+  },
+  mcp_metadata_unpublished: {
+    title: "No document is published here",
+    describe: () => "LangWatch publishes its OAuth metadata at the protected-resource path.",
+  },
+  mcp_session_id_required: {
+    title: "That MCP request needs a session",
+    describe: () => "Send an initialize request first, then the session id it returns.",
+  },
+  mcp_method_not_allowed: {
+    title: "That method isn't supported here",
+    describe: () => "Check the MCP server URL and the request your client sends.",
+  },
+  mcp_session_limit_reached: {
+    title: "Too many open MCP sessions",
+    describe: (error) =>
+      `This key already has ${num(error, "maxSessions", 0) || "the most"} open sessions. Close some, then try again.`,
+  },
+  mcp_store_unavailable: {
+    title: "The MCP server is briefly unavailable",
+    describe: () => "Your MCP client retries on its own. Try again in a moment.",
   },
   upgrade_in_progress: {
     title: "LangWatch is upgrading",
@@ -5728,10 +5865,17 @@ const presentations = {
     // the customer better than a sentence we cannot vouch for.
     title: "The model provider rejected that",
     // A refused key has one fix, so the headline names it like the body does.
-    titleFor: (error) =>
-      hasReasonCode(error.reasons, PROVIDER_CREDENTIAL_REASONS)
+    titleFor: (error) => {
+      if (hasReasonCode(error.reasons, PROVIDER_LIMIT_CODES)) {
+        return "This provider account has no allowance left";
+      }
+      if (hasReasonCode(error.reasons, PROVIDER_ALLOWANCE_REASONS)) {
+        return "This provider account is out of credit";
+      }
+      return hasReasonCode(error.reasons, PROVIDER_CREDENTIAL_REASONS)
         ? "This provider rejected the API key"
-        : undefined,
+        : undefined;
+    },
     describe: (error) => {
       if (hasReasonCode(error.reasons, PROVIDER_ALLOWANCE_REASONS)) {
         return "Your account with this model provider has no allowance left. Check its billing or usage limits, or pick a model from a different provider.";
@@ -5753,6 +5897,18 @@ const presentations = {
       }
       return "Try again, or pick a different model.";
     },
+  },
+  llm_provider_out_of_credit: {
+    // A reason under `llm_upstream_error`; read on its own only by a surface
+    // that renders reasons one by one.
+    title: "This provider account is out of credit",
+    describe: () =>
+      "The model provider took the key and refused to generate: the account behind it has no credit left. Top it up with the provider, or pick a model from a different provider.",
+  },
+  llm_provider_key_rejected: {
+    title: "This provider rejected the API key",
+    describe: () =>
+      "The model provider says the API key is not valid. Check the key saved for it in the model provider settings.",
   },
   lwql_app_function_hydration_failed: {
     // Deliberately says nothing about retrying a different way: the query
@@ -6206,6 +6362,20 @@ const presentations = {
   activation_rate_limited: {
     title: "Too many activation attempts",
     describe: () => "Too many activation attempts. Try again shortly.",
+  },
+  upgrade_diagnostics_license_required: {
+    title: "A LangWatch licence is needed to send diagnostics",
+    describe: () =>
+      "Download the diagnostics from the step page and send them to support@langwatch.ai instead.",
+  },
+  upgrade_diagnostics_rate_limited: {
+    title: "Too many diagnostics sent today",
+    describe: () =>
+      "This install has sent its diagnostics allowance for today. Try again tomorrow.",
+  },
+  upgrade_diagnostics_not_found: {
+    title: "Diagnostics report not found",
+    describe: () => "This diagnostics report no longer exists. Reports are kept for 30 days.",
   },
   self_hosted_instance_not_found: {
     title: "Install not found",

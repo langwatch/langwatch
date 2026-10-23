@@ -24,13 +24,17 @@ import {
   SessionReader,
   type TransportSelection,
 } from "@langwatch/api/hosting";
-import { ClientAddress, SecurityHeaders, type StorageEndpoints } from "@langwatch/api/policy";
+import { ClientAddress, SecurityHeaders } from "@langwatch/api/policy";
 import {
   BrowserSessionIdentity,
   canonicalErrorAnswer,
   IdempotencyLedger,
   type IdempotentRunner,
+  loggerMiddleware,
+  openConfirmationGate,
+  recordAnsweredCause,
   RestHost,
+  type RestConfirmationGate,
 } from "@langwatch/api/rest";
 import {
   bindTrpcMiddlewareContext,
@@ -41,8 +45,9 @@ import {
 } from "@langwatch/api/trpc";
 import type { Logger } from "@langwatch/observability";
 import type { ProcessMemberSource } from "@langwatch/process-stores";
+import { TRPCError } from "@trpc/server";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
-import { Hono } from "hono";
+import { type Context, Hono } from "hono";
 import { z } from "zod";
 
 import type { ExposedSurface } from "../process-supply.ts";
@@ -53,7 +58,6 @@ export type ApiSurfaceComposition = Readonly<{
   logger: Logger;
   stores: Readonly<{ database: boolean; redis: boolean }>;
   bundle: ApiUiBundle | undefined;
-  storage: StorageEndpoints;
   instanceAdmin: RestIdentity;
   trustedProxies: readonly string[] | undefined;
   executionProxyBaseUrl: string | undefined;
@@ -92,7 +96,17 @@ class ApiSurface {
       : void 0;
     const rateLimiter = stores.redis ? members.read("rateLimiter") : void 0;
 
-    return new ApiSurface({ composition, door, sessions, idempotency, rateLimiter });
+    // The module that shows confirmation cards binds the gate; none bound refuses Langy deletes.
+    const confirmations = openConfirmationGate(peers);
+
+    return new ApiSurface({
+      composition,
+      door,
+      sessions,
+      idempotency,
+      rateLimiter,
+      confirmations,
+    });
   }
 
   readonly #rest: RestHost | undefined;
@@ -108,24 +122,33 @@ class ApiSurface {
     sessions,
     idempotency,
     rateLimiter,
+    confirmations,
   }: {
     composition: ApiSurfaceComposition;
     door: ApiDoor;
     sessions: SessionReader;
     idempotency: IdempotentRunner | undefined;
     rateLimiter: RateLimiter | undefined;
+    confirmations: RestConfirmationGate | undefined;
   }) {
     this.composition = composition;
     this.door = door;
     this.sessions = sessions;
-    if (composition.selection.selected.rest) this.#rest = this.#restHost(idempotency, rateLimiter);
+    if (composition.selection.selected.rest) {
+      this.#rest = this.#restHost({ idempotency, rateLimiter, confirmations });
+    }
     if (composition.selection.selected.trpc) this.#trpc = this.#trpcHost(rateLimiter);
   }
 
-  #restHost(
-    idempotency: IdempotentRunner | undefined,
-    rateLimiter: RateLimiter | undefined,
-  ): RestHost {
+  #restHost({
+    idempotency,
+    rateLimiter,
+    confirmations,
+  }: {
+    idempotency: IdempotentRunner | undefined;
+    rateLimiter: RateLimiter | undefined;
+    confirmations: RestConfirmationGate | undefined;
+  }): RestHost {
     return RestHost.create({
       identities: {
         ...this.door.identities,
@@ -137,6 +160,7 @@ class ApiSurface {
       rateLimiter,
       entitlements: this.door.entitlements,
       authz: this.door.authz,
+      confirmations,
     });
   }
 
@@ -379,6 +403,11 @@ const answerApiFailure: HttpFailureAnswer = (failure) => canonicalErrorAnswer(fa
 function trpcLanes(trpc: TrpcHost): Hono {
   const app = new Hono();
   app.onError((failure) => answerApiFailure(failure));
+  // The same access record every REST family writes, so a dashboard 5xx is seen and alerted
+  // on; the procedure's own failure line stays tRPC's (policy.ts). Spec:
+  // specs/observability/request-log-cause-and-level.feature
+  app.use(`${TrpcHost.path}/*`, loggerMiddleware({ name: "trpc" }));
+  app.use("/api/sse/*", loggerMiddleware({ name: "sse" }));
 
   app.all(`${TrpcHost.path}/*`, async (context) => {
     const request = context.req.raw;
@@ -400,6 +429,7 @@ function trpcLanes(trpc: TrpcHost): Hono {
       ...(await trpc.sessionVersionHeaders({ context: createContext })),
       ...trpc.schemaHashHeaders({ path }),
     };
+    let failure: unknown;
     const response = await fetchRequestHandler({
       endpoint: TrpcHost.path,
       req: bodylessAsNoInput(request),
@@ -407,8 +437,12 @@ function trpcLanes(trpc: TrpcHost): Hono {
       createContext,
       allowBatching: false,
       responseMeta: ({ errors }) => ({ headers: trpc.retryAfterHeaders({ errors }) }),
+      onError: ({ error }) => {
+        failure = error;
+      },
     });
     for (const [name, value] of Object.entries(versionHeaders)) response.headers.set(name, value);
+    recordTrpcFailure({ context, failure, status: response.status });
 
     return response;
   });
@@ -430,6 +464,17 @@ function trpcLanes(trpc: TrpcHost): Hono {
   app.get("/api/sse/*", (context) => sse.answer(context.req.raw, context.res.headers));
 
   return app;
+}
+
+/** Records a failed answer's handled cause, not tRPC's wrapper, with its code and fault. */
+function recordTrpcFailure({
+  context,
+  failure,
+  status,
+}: Readonly<{ context: Context; failure: unknown; status: number }>): void {
+  if (failure === undefined || status < 400) return;
+  const cause = failure instanceof TRPCError && failure.cause ? failure.cause : failure;
+  recordAnsweredCause(context, { error: cause, status });
 }
 
 /** httpLink posts a no-input mutation with no body; tRPC would parse it as JSON and refuse. */

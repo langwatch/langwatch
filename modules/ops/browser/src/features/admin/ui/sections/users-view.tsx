@@ -329,7 +329,6 @@ function UserEditDrawer({ user, onClose }: { user: AdminUser | null; onClose: ()
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [image, setImage] = useState("");
-  const [emailVerified, setEmailVerified] = useState(false);
   const [pendingSsoSetup, setPendingSsoSetup] = useState(false);
   const [deactivate, setDeactivate] = useState(false);
 
@@ -339,7 +338,6 @@ function UserEditDrawer({ user, onClose }: { user: AdminUser | null; onClose: ()
     setName(user.name ?? "");
     setEmail(user.email ?? "");
     setImage(user.image ?? "");
-    setEmailVerified(!!user.emailVerified);
     setPendingSsoSetup(!!user.pendingSsoSetup);
     setDeactivate(!!user.deactivatedAt);
   }, [user]);
@@ -350,9 +348,6 @@ function UserEditDrawer({ user, onClose }: { user: AdminUser | null; onClose: ()
     if (name !== (user.name ?? "")) data.name = name;
     if (email !== (user.email ?? "")) data.email = email;
     if (image !== (user.image ?? "")) data.image = image || null;
-    if (emailVerified !== !!user.emailVerified) {
-      data.emailVerified = emailVerified;
-    }
     if (pendingSsoSetup !== !!user.pendingSsoSetup) {
       data.pendingSsoSetup = pendingSsoSetup;
     }
@@ -413,12 +408,6 @@ function UserEditDrawer({ user, onClose }: { user: AdminUser | null; onClose: ()
               placeholder="https://…"
             />
           </Field.Root>
-          <ToggleRow
-            label="Email verified"
-            hint="Flip manually after an out-of-band verification."
-            checked={emailVerified}
-            onChange={setEmailVerified}
-          />
           <ToggleRow
             label="Pending SSO setup"
             hint="Allows first-time SSO provider linking."

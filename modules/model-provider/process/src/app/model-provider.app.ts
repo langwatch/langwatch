@@ -6,6 +6,7 @@ import { ManagedProviderApi } from "@langwatch/enterprise-managed-provider-contr
  * The model-provider feature's application: what `modelProvider.*`, `llmModelCost.*` and
  * `translate.*` all call, so caller attribution and Codex-role defaults are written once.
  */
+import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import {
   CODEX_DEFAULT_MODEL,
   findFeatureByKey,
@@ -59,6 +60,7 @@ import {
   type ModelProviderPlaygroundRequest,
   type ModelProviderListOrganizationInput,
   type ModelProviderListProjectInput,
+  type DecisionModelResolution,
   type ModelProviderResolution,
   type ModelProviderSummary,
   type TranslateInput,
@@ -191,7 +193,7 @@ type ModelProviderBuildConfig = Readonly<{
   egress: Readonly<{ blockLocal: boolean; allowedHosts: string[]; verifyTls: boolean }>;
   /** Where a resolved model is executed, fully formed: nlpgo's `/go/proxy/v1`. */
   executionProxyBaseUrl: string;
-  /** A system provider's fallback-credential env map. Always empty: see the handoff. */
+  /** The install-wide value a provider row falls back to for each field it left empty. */
   environment: Readonly<Record<string, string | undefined>>;
   /** Per provider, the API root the credential probe uses in place of the vendor's own. */
   probeBaseUrls: Readonly<Record<string, string | undefined>>;
@@ -217,6 +219,7 @@ export class ModelProviderModule implements ModelProviderApi {
     dataPrivacy: DataPrivacyApi,
     managed: ManagedProviderApi,
     secrets: SecretApi,
+    featureFlags: FeatureFlagApi,
   };
   static readonly config = modelProviderConfig;
   /**
@@ -254,7 +257,11 @@ export class ModelProviderModule implements ModelProviderApi {
   static async create(setup: ModelProviderSetup): Promise<ModelProviderModule> {
     const platformChain = await ModelProviderModule.resolvePlatformChain(setup.secrets);
     return setup.secrets.into(ModelProviderModule.secrets.nlpInternal, (nlpInternalSecret) =>
-      ModelProviderModule.withPlatformChain(setup, { platformChain, nlpInternalSecret }),
+      ModelProviderModule.withPlatformChain(setup, {
+        platformChain,
+        nlpInternalSecret,
+        environment: { ...setup.config.providerFallbacks },
+      }),
     );
   }
 
@@ -278,7 +285,12 @@ export class ModelProviderModule implements ModelProviderApi {
     {
       platformChain,
       nlpInternalSecret,
-    }: { platformChain: PlatformProviderChainService; nlpInternalSecret: string | undefined },
+      environment,
+    }: {
+      platformChain: PlatformProviderChainService;
+      nlpInternalSecret: string | undefined;
+      environment: Readonly<Record<string, string | undefined>>;
+    },
   ): ModelProviderModule {
     const executionProxyBaseUrl = executionProxyBaseUrlOf(config);
     const buildConfig: ModelProviderBuildConfig = {
@@ -288,7 +300,7 @@ export class ModelProviderModule implements ModelProviderApi {
         verifyTls: true,
       },
       executionProxyBaseUrl,
-      environment: {},
+      environment,
       probeBaseUrls: config.probeBaseUrls,
       codexOAuthIssuer: config.codexOAuthIssuer,
       isSaas: false,
@@ -306,6 +318,7 @@ export class ModelProviderModule implements ModelProviderApi {
       executionProxyBaseUrl,
       nlpInternalSecret,
       platformChain,
+      environment,
     });
   }
 
@@ -377,6 +390,7 @@ export class ModelProviderModule implements ModelProviderApi {
         setup.executionProxyBaseUrl ?? "http://nlp-engine-not-configured.invalid",
       nlpInternalSecret: void 0,
       platformChain: setup.platformChain ?? PlatformProviderChainService.create(),
+      environment: {},
     });
   }
 
@@ -419,6 +433,7 @@ export class ModelProviderModule implements ModelProviderApi {
     executionProxyBaseUrl,
     nlpInternalSecret,
     platformChain,
+    environment,
   }: {
     repositories: ModelProviderRepositories;
     dependencies: ModelProviderSetup["dependencies"];
@@ -426,6 +441,7 @@ export class ModelProviderModule implements ModelProviderApi {
     executionProxyBaseUrl: string;
     nlpInternalSecret: string | undefined;
     platformChain: PlatformProviderChainService;
+    environment: Readonly<Record<string, string | undefined>>;
   }) {
     this.platformChain = platformChain;
     this.#dataPrivacy = dependencies.dataPrivacy;
@@ -445,6 +461,11 @@ export class ModelProviderModule implements ModelProviderApi {
       ids: infrastructure.ids,
       codexTokenRefresher: infrastructure.codexTokenRefresher,
       connectionRateLimiter: infrastructure.connectionRateLimiter,
+      isOwnDecisionModelAllowed: ({ organizationId }) =>
+        dependencies.featureFlags.isEnabled("release_instant_evals_own_decision_model", {
+          kind: "organization",
+          organizationId,
+        }),
     });
     this.#providerAuthorization = ModelProviderWriteAuthorizationService.create(
       ModelProviderAuthorizationService.create(dependencies.permissions),
@@ -452,10 +473,10 @@ export class ModelProviderModule implements ModelProviderApi {
     this.#credentialProbe = infrastructure.credentialProbe;
     this.#codexAccounts = infrastructure.codexAccounts;
     this.#spans = infrastructure.spans;
-    // The same always-empty fallback map `ModelProviderBuildConfig.environment` carries.
+    // The same install-wide fallback map `ModelProviderBuildConfig.environment` carries.
     this.#evaluatorModelEnv = ModelProviderEvaluatorModelEnvService.create({
       modelProviders: this,
-      environment: {},
+      environment,
     });
     this.#playground = ModelProviderPlaygroundService.create({
       modelProviders: this,
@@ -738,6 +759,10 @@ export class ModelProviderModule implements ModelProviderApi {
 
   resolveModelForFeature(input: ModelDefaultResolveInput): Promise<ModelProviderResolution> {
     return this.#modelProviders.resolveModelForFeature(input);
+  }
+
+  resolveDecisionModel(input: { projectId: string }): Promise<DecisionModelResolution> {
+    return this.#modelProviders.resolveDecisionModel(input);
   }
 
   findAlternateModel(input: {

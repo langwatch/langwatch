@@ -1,12 +1,11 @@
 .PHONY: help start sync-all-openapi user-delete-dry-run user-delete es-delete-dry-run es-delete
 .PHONY: down logs clean ps quickstart quickstart-help worktree refresh-dev-s3
 .PHONY: dev-up dev-down dev-logs setup-hooks service service-watch test-scripts
-.PHONY: dogfood-langy-local
+.PHONY: dogfood-langy-local dogfood-langy-hooks
 .PHONY: herrgen herrgen-check test-scripts-run lint-rules-run
 .PHONY: lint-rules lint-rules-changed lint-rules-test go-lint go-lint-slot go-lint-changed
 .PHONY: _dev-up-deprecation-warning
 
-# Surface every target — boxd-* are pulled in via include below.
 help:
 	@echo "LangWatch dev targets:"
 	@echo ""
@@ -50,28 +49,18 @@ help:
 	@echo "    make go-lint                        golangci-lint at the pinned version CI uses"
 	@echo "    make go-lint-changed                ...uncommitted edits only"
 	@echo ""
-	@echo "  Boxd workflows (multi-step orchestration over the boxd CLI):"
-	@echo "    make boxd-help                      full boxd target reference"
-	@echo "    make boxd-golden                    create the canonical base VM"
-	@echo "    make boxd-fork-pr PR=<n>            fork golden for an existing PR"
-	@echo "    make boxd-fork-branch BRANCH=<n>    fork golden for a branch"
-	@echo "    make boxd-fork-issue ISSUE=<n>      fork + worktree + tmux+claude in VM"
-	@echo "    make boxd-connect-{pr,branch,issue} <ARG>=<v>   attach to the in-VM session"
-	@echo "    make boxd-preview BRANCH=<n>        ephemeral PR-preview VM (team golden)"
-	@echo "    make boxd-preview-down BRANCH=<n>   destroy preview VM"
-	@echo "    make boxd-preview-status BRANCH=<n> VM status + stack state"
-	@echo ""
 	@echo "  Dogfood applications (the customer application Langy works on):"
 	@echo "    make dogfood-langy-local lang=python      boot the ACME support demo (FastAPI)"
 	@echo "    make dogfood-langy-local lang=typescript  boot the ACME support demo (Hono)"
 	@echo "    make dogfood-langy-local lang=langgraph   boot the ACME checkout demo (LangGraph)"
+	@echo "    make dogfood-langy-hooks                  connect Langy itself as the agent \"langy\""
 	@echo ""
 	@echo "  Per-worktree isolated stacks (for AI agents / parallel work):"
 	@echo "    make dev-up [PROFILE=full]            start isolated containers"
 	@echo "    make dev-down                          stop isolated containers"
 	@echo "    make dev-logs                          tail isolated logs"
 	@echo ""
-	@echo "  See: dev/docs/adr/004-docker-dev-environment.md, dev/docs/runbooks/boxd-makefile.md"
+	@echo "  See: dev/docs/adr/004-docker-dev-environment.md"
 
 # The demo applications keep their own Makefile; this only picks the folder
 # and forwards `lang`.
@@ -82,7 +71,10 @@ else
 	@$(MAKE) -C dev/dogfood/acme-support dogfood-langy-local $(if $(lang),lang=$(lang))
 endif
 
-include dev/boxd.mk
+# Langy as a connected agent with scenario hooks, in the background; see dev/dogfood/langy/README.md.
+dogfood-langy-hooks:
+	@dev/dogfood/langy/run.sh
+
 # dev/haven.mk is included at the BOTTOM of this file: its `make haven <sub>`
 # passthrough neutralises the trailing words (e.g. `down`, `install`) as no-op
 # goals, and for that override to beat the real `down` / `install` recipes it
@@ -98,7 +90,7 @@ COMPOSE = docker compose -f dev/compose.dev.yml --project-directory .
 
 # Sources dev/scripts/lib/sanitize-dev-env.sh and rewrites stale localhost-pinned
 # NEXTAUTH_URL / BASE_HOST exports to the compose-derived APP_PORT (default
-# 5560). Real overrides like boxd-proxy URLs are left untouched. Prepended
+# 5560). Real overrides like tunnel URLs are left untouched. Prepended
 # to every dev `up` recipe so `make dev*` paths can't silently 403 on login
 # if a previous session leaked the env (lw#3453).
 SANITIZE_DEV_ENV = APP_PORT=$${APP_PORT:-5560} . dev/scripts/lib/sanitize-dev-env.sh && sanitize_localhost_dev_env
@@ -143,7 +135,7 @@ DEV_ENV_FILE ?= .env
 # combined_dev.go); release images build untagged. SIM_CONSOLES are the
 # simulators the run hosts; any at all builds @langwatch/sims, the one app holding
 # every console (ADR-160). Nx caches the build, so unchanged consoles cost a cache hit.
-SIMULATORS = idpsim mailsim storagesim voicesim llmsim analyticssim telemetrysim outboundsim paymentsim lambdasim githubsim
+SIMULATORS = idpsim mailsim storagesim voicesim llmsim analyticssim telemetrysim outboundsim paymentsim lambdasim githubsim mcpsim
 SIM_CONSOLES = $(if $(filter combined,$(svc)),$(if $(args),$(filter $(SIMULATORS),$(args)),$(SIMULATORS)),$(filter $(SIMULATORS),$(svc)))
 BUILD_SIM_CONSOLES = $(if $(SIM_CONSOLES),$(NX) run @langwatch/sims:build --outputStyle=static || echo "@langwatch/sims did not build; each console names the fix",true)
 # pipefail needs bash; CI runners default to dash.
@@ -205,7 +197,7 @@ refresh-dev-s3:
 
 # Run all *.unit.bats tests under dev/scripts/__tests__/. Dev-only — these
 # tests cover shell behavior of `dev.sh` / `write-dev-overrides.sh` /
-# `worktree.sh` / `boxd-fork.sh`. CI does NOT run them; the launchers
+# `worktree.sh`. CI does NOT run them; the launchers
 # are local dev tools, not part of the shipped product. If you're
 # editing one of those scripts, run `make test-scripts` to verify.
 #
@@ -455,7 +447,7 @@ sync-all-openapi:
 	@cd sdks/go/client && GOWORK=off go generate ./...
 	@cd docs && make sync-api-spec && make generate-api-reference
 
-# Included last on purpose (see the note next to `include dev/boxd.mk`): the
+# Included last on purpose (see the dev/haven.mk note after `dogfood-langy-local`): the
 # `make haven <sub>` passthrough must define its no-op goals after the real
 # `down` / `install` targets so its override wins.
 include dev/haven.mk

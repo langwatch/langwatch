@@ -1,3 +1,4 @@
+import type { Authorization } from "@langwatch/authorization";
 import type {
   CodingAgentSession,
   CodingAgentSessionBranchRecord,
@@ -5,6 +6,9 @@ import type {
 } from "@langwatch/coding-agent-contract";
 
 export type CodingAgentSessionListReadOutcome = "hit" | "empty" | "error";
+
+/** The other sessions a tenant holds: a main-thread one, only helper threads, or none. */
+export type OtherSessionKind = "none" | "helpers_only" | "main";
 
 /** Observes the bounded session-list storage read without coupling the feature to app metrics. */
 export interface CodingAgentReadMetrics {
@@ -46,9 +50,29 @@ export abstract class CodingAgentSessionRepository {
     appliedEventIds: string[];
   } | null>;
 
+  /**
+   * What kind of other session the tenant holds besides those named: a main-thread one, only
+   * helper threads, or none. "none" means nothing in retention, not "no history ever".
+   */
+  abstract findOtherSessionKind(input: {
+    tenantId: string;
+    excludeSessionIds: string[];
+  }): Promise<OtherSessionKind>;
+
   abstract findManyRecent(input: {
     tenantId: string;
     userId?: string;
+    fromMs: number;
+    toMs: number;
+    limit: number;
+  }): Promise<CodingAgentSession[]>;
+
+  /**
+   * The same page through a proof's fence (ADR-177): every project the proof
+   * names, a shared one cut to its grant's window on `StartedAt`.
+   */
+  abstract findManyRecentFenced(input: {
+    authorization: Authorization;
     fromMs: number;
     toMs: number;
     limit: number;

@@ -49,6 +49,7 @@ var (
 		"services/sims/telemetrysim",
 		"services/sims/lambdasim",
 		"services/sims/githubsim",
+		"services/sims/mcpsim",
 		"services/scenariorunner",
 		"tools/workerrun",
 		"tools/seedgen",
@@ -83,7 +84,6 @@ var (
 		"specs/langy/langy-projection-independent-reactions.feature",
 	}
 	legacyInert = []string{
-		"specs/clickhouse/id-index-reads.feature",
 		"modules/authz/specs/access-reviews.feature",
 		"modules/authz/specs/agent-principals.feature",
 		"modules/authz/specs/authz-passports.feature",
@@ -180,7 +180,6 @@ var (
 		"specs/dependencies/supply-chain-age-gates.feature",
 		"specs/evaluations/experiments-online-evaluations-separation.feature",
 		"specs/evaluators/create-workflow-evaluator.feature",
-		"specs/evaluators/evaluator-cli.feature",
 		"specs/evaluators/evaluator-error-propagation.feature",
 		"specs/evaluators/satisfaction-score-migration.feature",
 		"specs/evaluators/thread-eval-skips-without-thread-id.feature",
@@ -214,7 +213,6 @@ var (
 		"specs/features/evaluation-cli.feature",
 		"specs/features/graph-cli.feature",
 		"specs/features/model-provider-cli.feature",
-		"specs/features/monitor-cli.feature",
 		"specs/features/onboarding/primary-use-setting.feature",
 		"specs/features/prompt-versions-cli.feature",
 		"specs/features/secret-cli.feature",
@@ -266,7 +264,6 @@ var (
 		"specs/model-config/unified-reasoning-ui.feature",
 		"specs/model-providers/custom-model-max-tokens.feature",
 		"specs/model-providers/default-provider.feature",
-		"specs/model-providers/provider-list.feature",
 		"specs/monitors/evaluation-trigger-skips-derived-and-stale-traces.feature",
 		"specs/monitors/guardrails-api-compatibility.feature",
 		"specs/monitors/monitor-execution-backend.feature",
@@ -280,7 +277,6 @@ var (
 		"specs/nlp-go/proxy.feature",
 		"specs/nlp-go/python-removal.feature",
 		"specs/nlp-go/remove-execute-evaluation.feature",
-		"specs/nlp-go/topic-clustering.feature",
 		"specs/nlp-go/tracing-parity.feature",
 		"specs/npx-installer/01-bootstrap.feature",
 		"specs/npx-installer/02-predeps.feature",
@@ -387,6 +383,12 @@ var (
 		"specs/workflows/studio-usage-limits.feature",
 	}
 	legacyPartial = []string{
+		// Reason: left legacyInert when evaluator get gained name resolution; its
+		// scenarios are enforced. The other CLI scenarios stay untagged.
+		"specs/evaluators/evaluator-cli.feature",
+		// Reason: left legacyInert when monitor get gained name resolution; its
+		// scenarios are enforced. The other CLI scenarios stay untagged.
+		"specs/features/monitor-cli.feature",
 		"specs/langy/langy-peek-dock.feature",
 		"specs/traces-v2/grouping-engine.feature",
 		"specs/traces-v2/metrics.feature",
@@ -468,6 +470,9 @@ var (
 		"specs/model-providers/onboarding-flow.feature",
 		"specs/model-providers/provider-configuration.feature",
 		"specs/model-providers/provider-deletion.feature",
+		// Reason: left legacyInert when the providers table's page width was bound
+		// (langwatch/tasks#963). The @visual and @unimplemented scenarios stay as they were.
+		"specs/model-providers/provider-list.feature",
 		"specs/model-providers/scope-and-multi-instance.feature",
 		"specs/monitors/online-evaluator-loop-prevention.feature",
 		"specs/navigation/shared-section-navigation-layout.feature",

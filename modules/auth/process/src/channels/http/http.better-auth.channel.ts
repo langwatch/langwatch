@@ -64,6 +64,7 @@ import {
   createBeforeUserCreateHook,
   type BetterAuthHookCollaborators,
   type FindGoverningConnections,
+  PASSWORD_RESET_REQUIRED_CODE,
   type SessionMintClaims,
   type SignUpPolicy,
   toConcretePath,
@@ -93,6 +94,53 @@ import {
 import { socialProviderBasesPlugin } from "./http.social-provider-bases.channel.ts";
 
 const logger = createLogger("langwatch:better-auth");
+
+/**
+ * Return addresses better-auth's origin check refuses ("Invalid callbackURL: ..."): the caller
+ * is answered and needs nothing from us.
+ */
+const CALLER_REFUSAL_MESSAGES = [
+  /^Invalid (?:callbackURL|errorCallbackURL|newUserCallbackURL|redirectURL)\b/,
+];
+
+/**
+ * better-auth logs "Failed to parse state" for any failure reading a sign-in's state back. Only
+ * these `StateError` codes are the caller's (an expired or tampered attempt, started again);
+ * `state_generation_error` or a non-state error is ours and stays at error.
+ */
+const CALLER_STATE_CODES: ReadonlySet<string> = new Set([
+  "state_not_found",
+  "state_mismatch",
+  "state_invalid",
+  "state_security_mismatch",
+]);
+
+function isCallerStateRefusal({ message, args }: { message: string; args: readonly unknown[] }) {
+  if (!/^Failed to parse state\b/.test(message)) return false;
+  const first = args[0];
+  const code = typeof first === "object" && first !== null && "code" in first ? first.code : void 0;
+  return typeof code === "string" && CALLER_STATE_CODES.has(code);
+}
+
+/** The level a better-auth log line is written at here: its own, but caller refusals warn. */
+export function betterAuthLogLevel({
+  level,
+  message,
+  args = [],
+}: {
+  level: string | undefined;
+  message: string;
+  /** What better-auth logged alongside the message; the state refusal's error is first. */
+  args?: readonly unknown[];
+}): "error" | "warn" | "info" {
+  if (level === "error") {
+    const refused =
+      CALLER_REFUSAL_MESSAGES.some((pattern) => pattern.test(message)) ||
+      isCallerStateRefusal({ message, args });
+    return refused ? "warn" : "error";
+  }
+  return level === "warn" ? "warn" : "info";
+}
 
 /**
  * Everything about this deployment the option set is built from.
@@ -179,6 +227,9 @@ function refusesCredentialRoute({
 /** Whether an organization's own connection governs this address (D04). */
 type AddressRoutesToConnection = (input: { email: string }) => Promise<boolean>;
 
+/** The two assertion questions the connection's own sign-in route asks of identity. */
+type SsoAssertions = Pick<SsoAssertionApi, "decide" | "resolveUser">;
+
 /**
  * A password reset for an address an organization signs in through its own
  * provider would mint the local password that connection exists to prevent,
@@ -234,7 +285,10 @@ async function countSignInAttempt({
   const [identifier] = findSubmittedAddresses(ctx.body);
   if (identifier === undefined) return;
 
-  const refused = ctx.context?.returned instanceof APIError;
+  const returned = ctx.context?.returned;
+  // A correct password refused only because it must be replaced is not a failed guess.
+  if (returned instanceof APIError && returned.body?.code === PASSWORD_RESET_REQUIRED_CODE) return;
+  const refused = returned instanceof APIError;
   try {
     await (refused
       ? signInLockout.recordFailure({ identifier })
@@ -760,8 +814,9 @@ export const createAuthOptions = ({
   // BetterAuth logger wiring
   logger: {
     disabled: false,
-    log: (level, message, ...args) => {
+    log: (stated, message, ...args) => {
       idTokenIssuerRefusals?.note([message, ...args]);
+      const level = betterAuthLogLevel({ level: stated, message, args });
       if (level === "error") {
         logger.error({ args }, message);
       } else if (level === "warn") {
@@ -849,7 +904,7 @@ function ssoPlugin({
   assertions,
   evidence,
 }: {
-  assertions: SsoAssertionApi;
+  assertions: SsoAssertions;
   evidence: Pick<SessionCallbackEvidenceChannel, "recordAuthenticatedSsoAccount">;
 }): ReturnType<typeof sso> {
   return sso({
@@ -909,7 +964,7 @@ export async function resolveSsoUser({
   input,
   context,
 }: {
-  assertions: SsoAssertionApi;
+  assertions: SsoAssertions;
   input: SSOUserResolutionInput;
   context: SSOUserResolutionContext;
 }): Promise<SSOUserResolution> {
@@ -987,7 +1042,7 @@ type BetterAuthTransportOptions = Readonly<{
   /** The connection's arrival door every federated sign-in is asked of. */
   arrivals: BetterAuthHookCollaborators["arrivals"];
   /** Whether a customer's identity provider may assert this address at all. */
-  ssoAssertions: SsoAssertionApi;
+  ssoAssertions: SsoAssertions;
   /** Whose registered issuers this request is allowed to reach. */
   ssoIssuers: BetterAuthSsoIssuers;
   /** Where a sign-in through a connection is recorded as having happened. */
@@ -1128,6 +1183,7 @@ const transportOptions = ({
         await sendResetPassword({ email: user.email, token });
       },
       onPasswordReset: async ({ user }, request) => {
+        await database.clearPasswordResetRequirement({ userId: user.id });
         await auth.revokeAllBrowserSessions({ userId: user.id });
         passwordResetSession.recordPasswordReset({ userId: user.id, request });
       },

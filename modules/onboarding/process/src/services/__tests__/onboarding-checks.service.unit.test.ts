@@ -1,6 +1,6 @@
 import type { AuthzApi, AuthzTeamMemberBinding } from "@langwatch/authz-contract";
 import type { DashboardApi } from "@langwatch/dashboard-contract";
-import type { DatasetApi, DatasetSummary } from "@langwatch/dataset-contract";
+import type { DatasetApi, DatasetListEntry } from "@langwatch/dataset-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import {
@@ -67,7 +67,7 @@ function checklist(holdings: Holdings = {}) {
       datasets: createApiFixture<DatasetApi>({
         listDatasets: async () => ({
           data: many(Math.min(holdings.datasets ?? 0, 1), () =>
-            createApiFixture<DatasetSummary>({}),
+            createApiFixture<DatasetListEntry>({}),
           ),
           pagination: { page: 1, limit: 1, total: holdings.datasets ?? 0, totalPages: 1 },
         }),

@@ -72,7 +72,13 @@ describe("the LangWatchQL catalog is opt-in", () => {
     /** @scenario "A ClickHouse table not listed in the catalog is not queryable" */
     it("has no view and is granted nothing", () => {
       // Real manifest tables the catalog deliberately does not list.
-      for (const table of ["instant_eval_runs", "goose_db_version", "automation_audit"]) {
+      const unlisted = [
+        "instant_eval_runs",
+        "goose_db_version",
+        "automation_audit",
+        "stored_spans_id_index",
+      ];
+      for (const table of unlisted) {
         expect(sourceTables.has(table)).toBe(false);
         expect(
           [...allowed].some((entry) => entry.endsWith(`.${table}`)),
@@ -195,7 +201,9 @@ describe("the LangWatchQL catalog is opt-in", () => {
       ["costs", "costs_pg"],
       ["custom_graphs", "custom_graphs_pg"],
       ["custom_llm_model_costs", "custom_llm_model_costs_pg"],
+      ["dashboard_widgets", "dashboard_widgets_pg"],
       ["dashboards", "dashboards_pg"],
+      ["dashboards_v2", "dashboards_v2_pg"],
       ["data_privacy_policies", "data_privacy_policies_pg"],
       ["dataset_records", "dataset_records_pg"],
       ["datasets", "datasets_pg"],
@@ -269,10 +277,10 @@ describe("the LangWatchQL catalog is opt-in", () => {
     ];
 
     /** @scenario "The catalog view names match the pinned list" */
-    it("equals the pinned list of 128 views, in order", () => {
+    it("equals the pinned list of 130 views, in order", () => {
       const actual = LWQL_VIEW_CATALOG.map((view) => [view.name, view.sourceTable] as const);
       expect(actual).toEqual(PINNED_VIEWS);
-      expect(PINNED_VIEWS).toHaveLength(128);
+      expect(PINNED_VIEWS).toHaveLength(130);
     });
   });
 });

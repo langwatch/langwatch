@@ -3,6 +3,8 @@
  * access.
  */
 
+import { tenantSet } from "@langwatch/clickhouse-client";
+
 /**
  * Identity columns always included in trace_summaries dedup subqueries.
  * These are required for deduplication (TraceId, UpdatedAt),
@@ -495,7 +497,7 @@ export function buildJoinClause({
         : SPAN_ANALYTICS_COLUMNS;
       const timeBound = spanTimeFilter ? ` ${spanTimeFilter}` : "";
       const rowFilter = spanRowFilter ? ` ${spanRowFilter}` : "";
-      return `JOIN (SELECT ${Array.from(columns).join(", ")} FROM stored_spans WHERE TenantId = {tenantId:String}${timeBound}${rowFilter}) ${alias} ON ${baseAlias}.TenantId = ${alias}.TenantId AND ${baseAlias}.TraceId = ${alias}.TraceId`;
+      return `JOIN (SELECT ${Array.from(columns).join(", ")} FROM stored_spans WHERE ${tenantSet()}${timeBound}${rowFilter}) ${alias} ON ${baseAlias}.TenantId = ${alias}.TenantId AND ${baseAlias}.TraceId = ${alias}.TraceId`;
     }
     case "evaluation_runs": {
       const columns = requiredColumns
@@ -504,11 +506,11 @@ export function buildJoinClause({
       const evalTimeBound = evalTimeFilter ? ` ${evalTimeFilter}` : "";
       return `JOIN (
         SELECT ${Array.from(columns).join(", ")} FROM evaluation_runs
-        WHERE TenantId = {tenantId:String}${evalTimeBound}
+        WHERE ${tenantSet()}${evalTimeBound}
           AND (TenantId, EvaluationId, UpdatedAt) IN (
             SELECT TenantId, EvaluationId, max(UpdatedAt)
             FROM evaluation_runs
-            WHERE TenantId = {tenantId:String}${evalTimeBound}
+            WHERE ${tenantSet()}${evalTimeBound}
             GROUP BY TenantId, EvaluationId
           )
       ) ${alias} ON ${baseAlias}.TenantId = ${alias}.TenantId AND ${baseAlias}.TraceId = ${alias}.TraceId`;

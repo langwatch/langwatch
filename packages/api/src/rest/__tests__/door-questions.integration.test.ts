@@ -91,13 +91,22 @@ describe("a platform route", () => {
     return { asked, door };
   }
 
-  function declaration({ refusal, ran }: { refusal: "denied" | "hidden"; ran: string[] }) {
+  function declaration({
+    refusal,
+    ran,
+    permission = "ops:manage",
+  }: {
+    refusal: "denied" | "hidden";
+    ran: string[];
+    permission?: "ops:view" | "ops:manage";
+  }) {
     return defineRestRouter(DoorsApi)
       .withNamespace(`e4-${refusal}`)
       .withVersion(VERSION)
       .withCredential("browser")
       .post("/impersonate", "run")
-      .withPermission("ops:manage", { at: "platform", refusal })
+      .keepsRecords()
+      .withPermission(permission, { at: "platform", refusal })
       .withInput(z.object({ userId: z.string() }))
       .withBodyLimit({ maxBytes: 64 })
       .withOutput(z.object({ actor: z.string() }))
@@ -144,13 +153,30 @@ describe("a platform route", () => {
     it("asks about the grant of the operator behind them", async () => {
       const ran: string[] = [];
       const { asked, door } = browserDoor({ holders: ["operator-1"] });
-      const app = mount(declaration({ refusal: "denied", ran }), door);
+      const app = mount(declaration({ refusal: "denied", ran, permission: "ops:view" }), door);
 
       const response = await call(app, "denied", "impersonated", JSON.stringify({ userId: "u" }));
 
       expect(response.status).toBe(200);
-      expect(asked).toEqual([{ userId: "operator-1", permission: "ops:manage" }]);
+      expect(asked).toEqual([{ userId: "operator-1", permission: "ops:view" }]);
       expect(ran).toEqual(["member-1"]);
+    });
+
+    /** @scenario "A platform route asks the operator's platform grant at its door" */
+    it("refuses ops:manage 403 permission_denied without asking, before the body is read", async () => {
+      const ran: string[] = [];
+      const { asked, door } = browserDoor({ holders: ["operator-1"] });
+      const app = mount(declaration({ refusal: "denied", ran }), door);
+
+      const response = await call(app, "denied", "impersonated", "{not json");
+
+      expect(response.status).toBe(403);
+      expect(await bodyOf(response)).toMatchObject({
+        code: "permission_denied",
+        meta: { permission: "ops:manage" },
+      });
+      expect(asked).toEqual([]);
+      expect(ran).toEqual([]);
     });
   });
 
@@ -201,6 +227,7 @@ describe("a platform route", () => {
         .withVersion(VERSION)
         .withCredential("browser")
         .post("/impersonate", "run")
+        .keepsRecords()
         .withPermission("ops:manage", { at: "platform", hiddenWithout: "ops:view" })
         .withInput(z.object({ userId: z.string() }))
         .withBodyLimit({ maxBytes: 64 })
@@ -258,7 +285,8 @@ describe("a platform route", () => {
           .withNamespace("e4-staff-declared")
           .withVersion(VERSION)
           .withCredential("browser")
-          .post("/run", "run");
+          .post("/run", "run")
+          .keepsRecords();
 
       expect(() =>
         route().withPermission("ops:manage", {
@@ -282,7 +310,8 @@ describe("a platform route", () => {
         .withNamespace("e4-declared")
         .withVersion(VERSION)
         .withCredential("browser")
-        .post("/run", "run");
+        .post("/run", "run")
+        .keepsRecords();
     }
 
     /** @scenario "A platform route asks the operator's platform grant at its door" */
@@ -300,6 +329,7 @@ describe("a platform route", () => {
         .withVersion(VERSION)
         .withCredential("browser")
         .post("/run", "run")
+        .keepsRecords()
         .withPermission("ops:view", { at: "platform" })
         .withOutput(z.object({}))
         .withoutAudit("test route")
@@ -395,12 +425,14 @@ describe("a route that reads the key its door resolved", () => {
     .withNamespace("e5-keys")
     .withVersion(VERSION)
     .post("/read", "run")
+    .keepsRecords()
     .withCredential("project", { key: true })
     .withPermission("traces:create")
     .withOutput(z.object({ key: z.unknown() }))
     .withoutAudit("test route")
     .handle(({ key }) => ({ key }))
     .post("/plain", "plain")
+    .keepsRecords()
     .withPermission("traces:create")
     .withOutput(z.object({ handed: z.boolean() }))
     .withoutAudit("test route")
@@ -512,6 +544,7 @@ describe("a route that admits only the key kinds it names", () => {
     .withNamespace("e7-kinds")
     .withVersion(VERSION)
     .post("/connect", "run")
+    .keepsRecords()
     .withCredential("project", { keyKinds: ["api_key", "access_token", "legacy_project_key"] })
     .withPermission("scenarios:manage")
     .withInput(z.object({ name: z.string() }))
@@ -609,6 +642,7 @@ describe("a permission behind the CLI token door", () => {
       .withVersion(VERSION)
       .withCredential("cli_token")
       .post("/keys", "run")
+      .keepsRecords()
       .withPermission("organization:manage")
       .withInput(z.object({ name: z.string() }))
       .withOutput(z.object({ ran: z.boolean() }))

@@ -37,9 +37,6 @@ const logger = createLogger("langwatch:ops:system-migrations");
 const PASSES_PER_RUN = 25;
 const PASS_GAP_MS = 5_000;
 
-/** Held rows the pending check reads; a row held for queued work is re-written each pass. */
-const PENDING_SCAN_LIMIT = 200;
-
 /** How many tenant rows one `listTenants` page holds when the caller names no limit. */
 const TENANT_PAGE_LIMIT = 50;
 
@@ -63,7 +60,7 @@ export class SystemMigrationsService {
   /**
    * Per migration: the status rollup, plus the tenants needing attention - held (`migrated`,
    * parity disagreements in the report) and `parked` (errored, retried next pass). Finalized
-   * tenants are a count, not a listing, and neither are rolled-back ones.
+   * tenants are a count, not a listing, and neither are rolled-back ones or those held on a person.
    */
   async getOverview(): Promise<MigrationOverview[]> {
     const isSaaS = this.deps.isSaaS();
@@ -81,14 +78,17 @@ export class SystemMigrationsService {
         const enrolledCount = enrolledByMigration?.get(migration.name) ?? 0;
         // Together, not one after the other: the page polls this, and the
         // rollup does not feed the listing.
-        const [counts, attention] = await Promise.all([
+        const [counts, attention, waitingOnPerson] = await Promise.all([
           this.deps.state.findStatusCounts({ migrationName: migration.name }),
           this.deps.state.findRecordsByStatus({
             migrationName: migration.name,
             // A step whose `migrated` is its steady state holds nobody; only parked rows count.
             statuses: migration.migratedIsSteady ? ["parked"] : ["migrated", "parked"],
+            // Waits on the user proving the account or an operator lifting a pin: counted apart.
+            exceptHeldReason: "person",
             limit: ATTENTION_LIMIT,
           }),
+          this.deps.state.countHeld({ migrationName: migration.name, heldReason: "person" }),
         ]);
 
         return {
@@ -101,6 +101,7 @@ export class SystemMigrationsService {
           tenant: migration.tenant ?? "organization",
           migratedIsSteady: migration.migratedIsSteady ?? false,
           counts,
+          waitingOnPerson,
           // Null for a migration that admits every organization automatically:
           // the gauge would describe rows that decide nothing. That is what
           // `MigrationOverview.enrollment` documents, and the guard was lost in
@@ -230,13 +231,17 @@ export class SystemMigrationsService {
     await this.deps.requestPass({ actorUserId: SYSTEM_MIGRATION_FOLLOW_UP_REQUESTER });
   }
 
-  /** A tenant held while its queued work drains moves by itself, so it is pending, not stuck. */
+  /**
+   * A tenant held while its queued work drains moves by itself, so it is pending, not stuck. Asked
+   * of the store, so no number of other holds can crowd it out of a page.
+   */
   private async hasHeldForPendingWork(): Promise<boolean> {
     const held = await this.deps.state.findRecordsByStatus({
       statuses: ["migrated"],
-      limit: PENDING_SCAN_LIMIT,
+      heldReason: "pending",
+      limit: 1,
     });
-    return held.some((row) => row.heldReason === "pending");
+    return held.length > 0;
   }
 
   /** One pass of the startup convergence the tasks process drives, stopping at `signal`. */

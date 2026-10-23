@@ -21,6 +21,8 @@ export type AuthPublicEnvironment = Readonly<{
   NEXTAUTH_PROVIDER: string | undefined;
   /** `invite_only` when accounts on this installation are created by invitation. */
   SIGN_UP_MODE: "open" | "invite_only";
+  /** Whether this installation issues its own passwords, so reset by email applies. */
+  EMAIL_PASSWORD_ENABLED: boolean;
 }>;
 
 /** The address a front-door screen is rendering, as data. */

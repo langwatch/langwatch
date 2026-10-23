@@ -98,15 +98,20 @@ func (cell *run) startIdentityProvider(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	if err := cell.ensureServiceBinary(ctx, binary); err != nil {
+		return err
+	}
 	if cell.stores.IDP, err = FreePort(); err != nil {
 		return err
 	}
 	tenants := connectionTenant
 	if cell.profile.LegacySSO {
 		tenants = samlTenant
-		if err := cell.startIdentityProxy(); err != nil {
-			return fmt.Errorf("TLS proxy: %w", err)
-		}
+	}
+	// Every SSO profile, not only legacy: main's issuer discovery refuses a non-https issuer,
+	// so an organization connection registered on main needs idpsim behind TLS (E7).
+	if err := cell.startIdentityProxy(); err != nil {
+		return fmt.Errorf("TLS proxy: %w", err)
 	}
 	proc, err := Start(ProcSpec{Name: "idpsim", Dir: cell.options.RunDir, Log: cell.logPath("idpsim"), Args: []string{binary, "idpsim"},
 		Env: Env(map[string]string{"PATH": os.Getenv("PATH"), "HOME": os.Getenv("HOME"), "SERVER_ADDR": "127.0.0.1:" + itoa(cell.stores.IDP),

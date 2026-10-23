@@ -9,6 +9,8 @@ import { z } from "zod";
 
 import { bootInstalledProcess } from "./boot-installed-process.ts";
 import { processShutdownDeadlineMs } from "./lifecycle/shutdown-deadline.ts";
+import type { IdIndexRetention } from "./migration/id-index-fill-step.ts";
+import { warnIgnoredMigrationSkips } from "./migration/ignored-migration-skips.ts";
 import {
   type UpgradeGate,
   upgradeGateComponent,
@@ -50,6 +52,7 @@ export class ProcessServer implements ProcessBoot {
     healthPort?: number;
     ownsProcess?: boolean;
     modules: readonly ProcessModule[];
+    idIndexRetention?: IdIndexRetention;
   }): ProcessServer {
     const settings = processSettings.parse(options.config.process ?? {});
     const server = Server.create({
@@ -68,6 +71,7 @@ export class ProcessServer implements ProcessBoot {
       resolver: options.resolver,
       settings,
       modules: options.modules,
+      idIndexRetention: options.idIndexRetention,
     });
   }
 
@@ -77,6 +81,7 @@ export class ProcessServer implements ProcessBoot {
   private readonly resolver: SecretsResolver;
   private readonly settings: z.infer<typeof processSettings>;
   private upgradeGate: UpgradeGate | undefined;
+  private readonly idIndexRetention: IdIndexRetention | undefined;
 
   private constructor(deps: {
     server: Server;
@@ -84,8 +89,10 @@ export class ProcessServer implements ProcessBoot {
     resolver: SecretsResolver;
     settings: z.infer<typeof processSettings>;
     modules: readonly ProcessModule[];
+    idIndexRetention: IdIndexRetention | undefined;
   }) {
     this.modules = deps.modules;
+    this.idIndexRetention = deps.idIndexRetention;
     this.server = deps.server;
     this.config = deps.config;
     this.resolver = deps.resolver;
@@ -96,9 +103,20 @@ export class ProcessServer implements ProcessBoot {
     if (!this.config.http)
       throw new Error("The HTTP config owner must be installed before exposing transports.");
     const config = this.config.http as ApiHostConfig;
+    const storage = (this.config.stores as StoresConfig | undefined)?.objectStorage;
     return {
       production: this.production,
       assetOrigin: assetBaseOrigin(normalizeAssetBase(config.assetBase)),
+      ...(storage
+        ? {
+            storage: {
+              s3Endpoint: storage.s3.endpoint,
+              s3Region: storage.s3.region,
+              s3Bucket: storage.s3.bucket,
+              azureBlobEndpoint: storage.azure.endpoint,
+            },
+          }
+        : {}),
     };
   }
 
@@ -185,6 +203,7 @@ export class ProcessServer implements ProcessBoot {
         // refuses every resolve attempted after boot.
         secrets: (owner, declared) => this.resolver.scopeTo(owner, declared),
         operatorReads: (scope) => operatorReadsResolver.scopeTo(scope),
+        ...this.retentionArgs(),
         // The opened stores state their tier; boot selects every registry from it (§7).
         stores: {
           ...(opened.tier === void 0 ? {} : { tier: opened.tier }),
@@ -208,7 +227,9 @@ export class ProcessServer implements ProcessBoot {
           }),
         );
       }
-      this.server.with(hostedStores(members));
+      this.server.with(
+        hostedStores({ source: members, drainTimeoutMs: config.shutdownDrainTimeoutMs }),
+      );
       // Hosted after the members, so the doors close their sessions while the stores are open.
       const hosted = doors;
       if (hosted) this.server.with({ name: "raw http doors", stop: () => hosted.close() });
@@ -222,6 +243,11 @@ export class ProcessServer implements ProcessBoot {
       this.resolver.seal();
       operatorReads?.seal();
     }
+  }
+
+  /** The id-index retention raise the application composed, for every module's fill step. */
+  private retentionArgs(): { idIndexRetention?: IdIndexRetention } {
+    return this.idIndexRetention === undefined ? {} : { idIndexRetention: this.idIndexRetention };
   }
 
   /** Derived, not declared: `NODE_ENV` has one owner, the process slice. */
@@ -247,6 +273,7 @@ export class ProcessServer implements ProcessBoot {
     logger: ServerLogger;
   }): void {
     this.upgradeGate = gate;
+    if (role === "worker") warnIgnoredMigrationSkips({ skips: this.settings, logger });
     this.server.with(
       upgradeGateComponent({
         server: this.server.name,
@@ -296,4 +323,6 @@ const processSettings = z.object({
   nlpCodeBlockTimeoutSeconds: z.string().optional(),
   outboundProxy: z.record(z.string(), z.string().optional()).optional(),
   rawSocketPort: z.number().int().min(0).max(65535).default(3300),
+  skipPrismaMigrate: z.string().optional(),
+  skipClickHouseMigrate: z.string().optional(),
 });

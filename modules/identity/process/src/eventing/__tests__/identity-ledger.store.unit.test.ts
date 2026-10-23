@@ -11,7 +11,8 @@ import {
   IdentityIdentifierNotFoundError,
   reduceIdentity,
 } from "@langwatch/identity-contract";
-import { describe, expect, it, vi } from "vitest";
+import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   inMemoryIdentityReservations,
@@ -22,10 +23,7 @@ import { CryptoIdentifierIdentityService } from "../../services/crypto-identifie
 import { IdentityGuardsService } from "../../services/identity-guards.service.ts";
 import { IdentityService } from "../../services/identity.service.ts";
 import { identityEventsFor } from "../identity-events.intent.ts";
-import {
-  IdentityLedgerStore,
-  identityProjectionConvergenceTimeoutsTotal,
-} from "../identity-ledger.store.ts";
+import { IdentityLedgerStore } from "../identity-ledger.store.ts";
 import type { IdentityEvent, IdentityFoldState } from "../identity-state.projection.ts";
 
 const USER = "user_sam";
@@ -223,12 +221,10 @@ function attachData(overrides?: Record<string, unknown>) {
   };
 }
 
-async function counterValue(counter: {
-  get: () => Promise<{ values: { value: number }[] }>;
-}): Promise<number> {
-  const metric = await counter.get();
-  return metric.values.reduce((sum, sample) => sum + sample.value, 0);
-}
+const meter = createRecordingMeterProvider();
+
+beforeEach(() => meter.install());
+afterEach(() => meter.uninstall());
 
 describe("the identity ledger writer", () => {
   describe("when a ceremony commits facts", () => {
@@ -298,13 +294,12 @@ describe("the identity ledger writer", () => {
     /** @scenario "A lagging fold does not fail the ceremony" */
     it("the ceremony still succeeds, and the timeout is counted", async () => {
       const { identity, staged } = harness({ foldNeverLands: true });
-      const before = await counterValue(identityProjectionConvergenceTimeoutsTotal);
 
       const events = await identity.attachIdentifier(attachData());
 
       expect(events).toHaveLength(1);
       expect(staged).toHaveLength(1);
-      expect(await counterValue(identityProjectionConvergenceTimeoutsTotal)).toBe(before + 1);
+      expect(meter.valueOf("identity_projection_convergence_timeouts_total")).toBe(1);
     });
   });
 

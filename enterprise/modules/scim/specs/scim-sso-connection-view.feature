@@ -54,3 +54,11 @@ Feature: SCIM folds identity's SSO connection facts into its own connection list
     And identity's reducer folded a connection whose first fact SCIM saw was not its registration
     When SCIM's store writes each state as JSON and parses it back with identity's state schema
     Then it reads back the state it wrote, field for field
+
+  # Production's log holds registrations from before ADR-117 §3; one of them failed every replay batch.
+  @unit
+  Scenario: SCIM's connection view replay reads a registration written before the arrival policy existed
+    Given identity's connection log holds registrations stating whether they provision, and none stating an arrival policy
+    When SCIM's connection view replay step runs
+    Then it replays every one of those connections into the view
+    And no replay batch fails

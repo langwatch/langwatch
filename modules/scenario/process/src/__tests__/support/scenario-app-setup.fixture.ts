@@ -22,6 +22,7 @@ export const scenarioTestConfig: ScenarioServerConfig = {
   consumedResourceClasses: ["light", "voice"],
   slotBudget: 3,
   voiceCallMaxSeconds: void 0,
+  voiceRunsMaxConcurrent: 2,
   allowLoopbackVoiceProviders: false,
   blockLocalHttpCalls: true,
   allowedProxyHosts: [],

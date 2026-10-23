@@ -1,97 +1,46 @@
 /** Customer code evaluator on NLP engine; dispatch uses Studio path for trace consistency. */
-import type { StudioClientEvent } from "@langwatch/workflow-contract";
-import { z } from "zod";
+import type {
+  StudioClientEvent,
+  WorkflowApi,
+  WorkflowRunAnswer,
+} from "@langwatch/workflow-contract";
 
-const codeExecutionResponseBodySchema = z.object({
-  status: z.string(),
-  result: z.record(z.string(), z.unknown()).optional(),
-  error: z
-    .object({
-      message: z.string().optional(),
-      traceback: z.string().optional(),
-    })
-    .optional(),
-});
+/** The one workflow operation a code evaluator's run needs. */
+type EvaluatorStudioRunner = Pick<WorkflowApi, "executeStudioEventSync">;
 
-/**
- * The one capability this module needs from the process's NLP runtime, named
- * structurally: a module server package may not depend on another module's
- * server package, and what this needs is one method rather than a vertical.
- */
-type EvaluatorNlpDispatcher = {
-  dispatch(input: {
-    projectId: string;
-    body: StudioClientEvent;
-    origin: "evaluation";
-    causalityDepth?: number;
-    parentTrace?: { traceId: string; parentSpanId: string };
-  }): Promise<{
-    ok: boolean;
-    status: number;
-    statusText: string;
-    json(): Promise<unknown>;
-  }>;
-};
-
-/** One run of a code evaluator, as the code service reads the answer. */
-type EvaluatorCodeExecutionResult = {
-  ok: boolean;
-  statusText: string;
-  body: {
-    result?: Record<string, unknown>;
-    status: string;
-    error?: { message?: string; traceback?: string };
-  };
-};
-
-/** Where a code evaluator's one-node graph runs. */
+/** Where a code evaluator's one-node graph runs; an engine refusal throws a handled error. */
 export interface EvaluatorCodeExecution {
   execute(input: {
     projectId: string;
     event: StudioClientEvent;
     causalityDepth: number;
     parentTrace?: { traceId: string; parentSpanId: string };
-  }): Promise<EvaluatorCodeExecutionResult>;
+  }): Promise<WorkflowRunAnswer>;
 }
 
 export class EvaluatorCodeExecutionService implements EvaluatorCodeExecution {
-  static create(nlp: EvaluatorNlpDispatcher): EvaluatorCodeExecutionService {
-    return new EvaluatorCodeExecutionService(nlp);
+  static create({
+    workflows,
+  }: {
+    workflows: EvaluatorStudioRunner;
+  }): EvaluatorCodeExecutionService {
+    return new EvaluatorCodeExecutionService(workflows);
   }
 
-  /** Refuses by name when no deployment supplies this module an NLP runtime. */
-  static withoutNlpRuntime(): EvaluatorCodeExecutionService {
-    return new EvaluatorCodeExecutionService({
-      dispatch() {
-        return Promise.reject(
-          new Error(
-            "This deployment did not supply the evaluator module an NLP runtime, so a code evaluator cannot run",
-          ),
-        );
-      },
-    });
-  }
+  private constructor(private readonly workflows: EvaluatorStudioRunner) {}
 
-  private constructor(private readonly nlp: EvaluatorNlpDispatcher) {}
-
-  async execute(input: {
+  execute(input: {
     projectId: string;
     event: StudioClientEvent;
     causalityDepth: number;
     parentTrace?: { traceId: string; parentSpanId: string };
-  }): Promise<EvaluatorCodeExecutionResult> {
-    const response = await this.nlp.dispatch({
+  }): Promise<WorkflowRunAnswer> {
+    return this.workflows.executeStudioEventSync({
       projectId: input.projectId,
-      body: input.event,
+      event: input.event,
       origin: "evaluation",
       causalityDepth: input.causalityDepth,
       ...(input.parentTrace ? { parentTrace: input.parentTrace } : {}),
     });
-
-    return {
-      ok: response.ok,
-      statusText: response.statusText,
-      body: codeExecutionResponseBodySchema.parse(await response.json()),
-    };
   }
 }

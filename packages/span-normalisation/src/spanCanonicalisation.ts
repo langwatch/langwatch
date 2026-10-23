@@ -1,3 +1,4 @@
+import { AnthropicCanonicaliserService } from "./anthropic/anthropicCanonicaliser.ts";
 import {
   type AttributeCanonicaliser,
   canonicalLogRecordStore,
@@ -18,6 +19,7 @@ import { CodexCanonicaliserService } from "./codex/codexCanonicaliser.ts";
 import type { CodexScopes } from "./codex/codexSpan.ts";
 import { CopilotCanonicaliserService } from "./copilotCanonicaliser.ts";
 import { FallbackCanonicaliserService } from "./fallbackCanonicaliser.ts";
+import { FreshInputCanonicaliserService } from "./freshInputCanonicaliser.ts";
 import { GenAICanonicaliserService } from "./genAiCanonicaliser.ts";
 import { HaystackCanonicaliserService } from "./haystackCanonicaliser.ts";
 import { canonicaliseLangWatchIdentity } from "./langwatch/langwatchIdentity.ts";
@@ -79,6 +81,8 @@ export function orderedSpanCanonicalisers({
   return [
     LangWatchCanonicaliserService.create(),
     GenAICanonicaliserService.create(),
+    // Reads the usage the GenAI pass canonicalised.
+    AnthropicCanonicaliserService.create(),
     VertexAdkCanonicaliserService.create(),
     MastraCanonicaliserService.create(),
     OpenInferenceCanonicaliserService.create(),
@@ -95,6 +99,8 @@ export function orderedSpanCanonicalisers({
     HaystackCanonicaliserService.create(),
     LegacyOtelCanonicaliserService.create(),
     FallbackCanonicaliserService.create(),
+    // Restates input counts that include the cache, once every source has named its buckets.
+    FreshInputCanonicaliserService.create(),
   ];
 }
 

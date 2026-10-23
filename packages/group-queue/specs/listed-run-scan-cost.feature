@@ -11,7 +11,10 @@ Feature: A listed run's dispatch costs Redis little however many groups wait
   that window and is never read twice in one claim. A group already running is scored a second
   ahead, so claims in that second pass it by; when its job completes and the group still holds
   work, the completion scores it back to that work's due time, so it runs next without waiting
-  out the second. Waiting, parked and blocked groups are looked at on every claim, as before.
+  out the second. A group holding work it can't run yet (parked at its tenant's cap, blocked, or
+  paused) is scored five seconds ahead: looking at it on every claim kept the listed consumer
+  polling every 50ms over a 155,000-group parked backlog. A listed run's claim never unparks
+  groups past the tenant cap, since its scan only runs the run's own groups.
 
   Background:
     Given a GroupQueue with its Lua scripts deployed
@@ -26,6 +29,26 @@ Feature: A listed run's dispatch costs Redis little however many groups wait
     When the first job completes
     Then the group's candidate score is the second job's due time
     And the next claim dispatches the second job
+
+  @integration
+  Scenario: A claim leaves a group parked at its tenant's cap out of the next claims
+    Given a tenant capped at one job in flight, with two groups in a listed run
+    When a claim dispatches the first group and parks the second
+    Then the parked group's candidate score is more than a second ahead
+
+  @integration
+  Scenario: A claim leaves a blocked group out of the next claims
+    Given a listed run's group that is blocked
+    When a claim runs
+    Then it dispatches nothing
+    And the blocked group's candidate score is more than a second ahead
+
+  @integration
+  Scenario: A claim over a listed run leaves other tenants' parked groups parked
+    Given a tenant at its cap with a group parked, outside the listed run
+    And a global budget, so the work-conserving override is on
+    When a claim over the listed run dispatches its group with slots to spare
+    Then the other tenant's group is still parked
 
   @integration
   Scenario: A claim with fewer due groups than free slots looks at each waiting group once

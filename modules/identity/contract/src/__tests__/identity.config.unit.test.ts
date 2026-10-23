@@ -27,4 +27,14 @@ describe("identity server configuration", () => {
       ).toEqual(["127.0.0.1:15353", "::1"]);
     });
   });
+
+  describe("given the nameservers separated by whitespace, as the previous release read them", () => {
+    /** @scenario "A setting written the way the previous release read it keeps that meaning" */
+    it("reads each nameserver rather than one joined entry", () => {
+      expect(
+        read({ SSO_DOMAIN_PROOF_DNS_SERVERS: "127.0.0.1:15353 [::1]:15353" })
+          .ssoDomainProofDnsServers,
+      ).toEqual(["127.0.0.1:15353", "[::1]:15353"]);
+    });
+  });
 });

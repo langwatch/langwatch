@@ -5,6 +5,7 @@ import { FieldMappingSchema } from "../../resolve-field-mappings.ts";
 import { scenarioCriterionResultSchema } from "../../scenario-criterion-result.ts";
 import { scenarioEvaluationResultSchema } from "../../scenario-evaluation-result.ts";
 import { runParameterValuesSchema } from "../../scenario.parameters.ts";
+import { SCENARIO_HOOK_STATUSES, scenarioRunHooksSchema } from "../execution/scenario-hooks.ts";
 import { runActorLabelSchema } from "../run/run-actor.ts";
 
 /**
@@ -72,6 +73,88 @@ export const simulationRunResultSchema: SimulationRunResultSchema =
   simulationRunResultSchemaDefinition;
 export type SimulationRunResult = z.infer<typeof simulationRunResultSchema>;
 
+const runTargetTypes = ["prompt", "http", "code", "workflow", "connected", "voice"] as const;
+
+/** The reserved namespace the queue path stamps on a run. */
+const runLangwatchNamespaceSchema = z.looseObject({
+  targetReferenceId: z.string(),
+  /**
+   * Absent when the stored or SDK-sent type is not one this version knows, so a legacy run
+   * keeps the rest of its namespace rather than losing it to one unreadable field.
+   */
+  targetType: z.enum(runTargetTypes).optional(),
+  /**
+   * The key the target folds under: the reference id alone, or the
+   * reference id and a hash of its parameter overrides. Absent on runs
+   * recorded before targets carried parameters.
+   */
+  targetKey: z.string().optional(),
+  /** The overrides of this target alone, so a reader can name the variant. */
+  targetParameters: runParameterValuesSchema.optional(),
+  simulationSuiteId: z.string().optional(),
+  /** The scenario version the run was queued from. */
+  scenarioVersion: z.number().int().optional(),
+  /** The models the run plan was CONFIGURED with. */
+  simulatorModel: z.string().optional(),
+  judgeModel: z.string().optional(),
+  /** The models the run actually RESOLVED and ran on. */
+  resolvedSimulatorModel: z.string().optional(),
+  resolvedJudgeModel: z.string().optional(),
+  /** Who started the run, and the surface they acted through. */
+  actorId: z.string().optional(),
+  actorLabel: runActorLabelSchema.optional(),
+  /** The connected agent instance that served the run. */
+  agentInstance: z.object({ hostname: z.string(), label: z.string().nullable() }).optional(),
+  /** The setup and teardown results of the run (ADR-180). */
+  hooks: scenarioRunHooksSchema.optional(),
+  /** Started with "Rerun and keep data", so its teardown was skipped (ADR-180). */
+  keepData: z.boolean().optional(),
+});
+
+function isRunTargetType(value: string): value is (typeof runTargetTypes)[number] {
+  return (runTargetTypes as readonly string[]).includes(value);
+}
+
+// An unreadable hooks value still keeps a readable setup status, so a failed setup stays unscored.
+function readSetupStatusOnly(hooks: unknown): unknown {
+  const setup = (hooks as { setup?: Record<string, unknown> } | null | undefined)?.setup;
+  const status = setup?.status;
+  if (!(SCENARIO_HOOK_STATUSES as readonly unknown[]).includes(status)) return undefined;
+  const ms = setup?.durationMs;
+  return { setup: { status, durationMs: typeof ms === "number" && ms >= 0 ? ms : 0 } };
+}
+
+/**
+ * A namespace is read, never refused: the target type is matched case-blind and an unreadable
+ * optional field is dropped. Only one with no readable target reference id is absent.
+ * @see modules/scenario/specs/simulation-run.feature
+ */
+function readRunLangwatchNamespace(value: unknown): unknown {
+  if (value == null || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const record: Record<string, unknown> = { ...value };
+  const targetType =
+    typeof record.targetType === "string" ? record.targetType.trim().toLowerCase() : undefined;
+  if (targetType !== undefined && isRunTargetType(targetType)) {
+    record.targetType = targetType;
+  } else {
+    delete record.targetType;
+  }
+  if (runLangwatchNamespaceSchema.validate(record)) return record;
+  dropUnreadableFields(record);
+  return runLangwatchNamespaceSchema.validate(record) ? record : undefined;
+}
+
+/** Drops each unreadable optional field in place, keeping a readable setup status of hooks. */
+function dropUnreadableFields(record: Record<string, unknown>): void {
+  const hooks = record.hooks;
+  for (const [name, field] of Object.entries(runLangwatchNamespaceSchema.shape)) {
+    if (name in record && !field.validate(record[name])) delete record[name];
+  }
+  if (hooks === undefined || "hooks" in record) return;
+  const kept = readSetupStatusOnly(hooks);
+  if (kept) record.hooks = kept;
+}
+
 /** Platform metadata carried with runs started by a simulation suite. */
 const simulationRunMetadataSchemaDefinition = z
   .looseObject({
@@ -87,32 +170,7 @@ const simulationRunMetadataSchemaDefinition = z
      * The reserved namespace the queue path stamps.
      */
     langwatch: z
-      .looseObject({
-        targetReferenceId: z.string(),
-        targetType: z.enum(["prompt", "http", "code", "workflow", "connected", "voice"]),
-        /**
-         * The key the target folds under: the reference id alone, or the
-         * reference id and a hash of its parameter overrides. Absent on runs
-         * recorded before targets carried parameters.
-         */
-        targetKey: z.string().optional(),
-        /** The overrides of this target alone, so a reader can name the variant. */
-        targetParameters: runParameterValuesSchema.optional(),
-        simulationSuiteId: z.string().optional(),
-        /** The scenario version the run was queued from. */
-        scenarioVersion: z.number().int().optional(),
-        /** The models the run plan was CONFIGURED with. */
-        simulatorModel: z.string().optional(),
-        judgeModel: z.string().optional(),
-        /** The models the run actually RESOLVED and ran on. */
-        resolvedSimulatorModel: z.string().optional(),
-        resolvedJudgeModel: z.string().optional(),
-        /** Who started the run, and the surface they acted through. */
-        actorId: z.string().optional(),
-        actorLabel: runActorLabelSchema.optional(),
-        /** The connected agent instance that served the run. */
-        agentInstance: z.object({ hostname: z.string(), label: z.string().nullable() }).optional(),
-      })
+      .preprocess(readRunLangwatchNamespace, runLangwatchNamespaceSchema.optional())
       .optional(),
   })
   .nullable()

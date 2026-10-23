@@ -127,6 +127,16 @@ export function formatRelativeTimeAgo(timestamp: number): string {
   return `${Math.floor(diffMs / MS_PER_DAY)}d ago`;
 }
 
+/** Compact time until a future moment, "in 4m"; "due now" once it has passed. */
+export function formatRelativeTimeUntil(timestamp: number): string {
+  const diffMs = timestamp - nowInstant().epochMilliseconds;
+  if (diffMs < 1000) return "due now";
+  if (diffMs < MS_PER_MINUTE) return `in ${Math.ceil(diffMs / 1000)}s`;
+  if (diffMs < MS_PER_HOUR) return `in ${Math.ceil(diffMs / MS_PER_MINUTE)}m`;
+  if (diffMs < MS_PER_DAY) return `in ${Math.ceil(diffMs / MS_PER_HOUR)}h`;
+  return `in ${Math.ceil(diffMs / MS_PER_DAY)}d`;
+}
+
 export function formatAbsoluteTime(timestamp: number): string {
   // Render in UTC and tag the suffix so engineers reading a trace can
   // line up timestamps against their server logs without doing the TZ

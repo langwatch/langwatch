@@ -420,6 +420,20 @@ describe("the settings shell in a new navigation mode", () => {
       expect(screen.queryByRole("link", { name: "Foundry" })).not.toBeInTheDocument();
     });
 
+    /** @scenario "Settings points operators to the Operations console" */
+    it("pins an Ops have moved link to the Operations console", () => {
+      renderSettingsSidebar({ hasOpsAccess: true });
+
+      expect(screen.getByRole("link", { name: "Ops have moved" })).toHaveAttribute("href", "/ops");
+    });
+
+    /** @scenario "Settings shows no signpost to a reader without ops access" */
+    it("offers no Ops have moved link without ops access", () => {
+      renderSettingsSidebar({ hasOpsAccess: false });
+
+      expect(screen.queryByRole("link", { name: "Ops have moved" })).not.toBeInTheDocument();
+    });
+
     /** @scenario "The Admin console has its own sidebar" */
     it("groups the Admin sidebar as Health, Tools, Instance and Cloud", () => {
       renderSettingsSidebar({

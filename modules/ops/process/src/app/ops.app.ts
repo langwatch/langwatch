@@ -49,6 +49,7 @@ import { IdentityApi, type IdentityApi as IdentityApiContract } from "@langwatch
 import { InsightApi } from "@langwatch/insight-contract";
 import { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import { LangyApi } from "@langwatch/langy-contract";
+import { ReactEmailMailRenderer } from "@langwatch/mail";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";
 import { NotificationService as NotificationApi } from "@langwatch/notification-contract";
@@ -65,6 +66,7 @@ import {
   type ExplicitCheckInput,
   type ProjectCheckupReport,
   OpsCapabilityUnavailableError,
+  type UpgradeDiagnosticsAutoSendAnswer,
   type UsageReportAnswer,
   opsBrowserConfig,
   opsConfig,
@@ -239,6 +241,7 @@ import {
   type SignUpHealth,
   type OpsDoorAnswer,
   type OpsUpgradeIdInput,
+  type OpsUpgradeSendDiagnosticsInput,
   type OpsUpgradeListRunsInput,
   type OpsUpgradeListStepsInput,
   type OpsUpgradeListTenantsInput,
@@ -248,6 +251,9 @@ import {
   type OpsUpgradeRunPage,
   type OpsUpgradeStatus,
   type OpsUpgradeStepDetail,
+  type OpsUpgradeDiagnosticsAvailability,
+  type OpsUpgradeDiagnosticsReceipt,
+  type UpgradeDiagnosticsBundle,
   type OpsUpgradeStepPage,
   type OpsUpgradeTenantPage,
   type OpsUpgradeTargetSummary,
@@ -282,6 +288,7 @@ import { UserApi, type UserApi as UserApiContract } from "@langwatch/user-contra
 import { WorkflowApi } from "@langwatch/workflow-contract";
 
 import { UpgradeAlertsService } from "#features/upgrades/services/upgrade-alerts.service";
+import { UpgradeDiagnosticsService } from "#features/upgrades/services/upgrade-diagnostics.service";
 import { OpsExplainClickHouseRepository } from "#repositories/clickhouse/clickhouse.ops-explain.repository";
 import type { OpsExplainClients } from "#repositories/ops-explain.repository";
 import type { OpsRepositories } from "#repositories/ops.repositories";
@@ -734,6 +741,8 @@ type OpsRuntimeDependencies = Readonly<{
   upgrades: OpsUpgradeService;
   /** The check `ops_upgrade_alerts` runs hourly; absent where a composition built none. */
   upgradeAlerts: UpgradeAlertsService | undefined;
+  /** A failed step's redacted bundle, and sending it over Connect; absent where none was built. */
+  upgradeDiagnostics: UpgradeDiagnosticsService | undefined;
   operatorSeed: PlatformOperatorSeedSettings | undefined;
   findOpsApiKey(): string | null;
   findProductAnalyticsTargets(): ProductAnalyticsTarget[];
@@ -900,10 +909,25 @@ export class OpsModule implements OpsApi {
       logger,
     });
 
+    const isCloud = config.isSaas || cloudOps;
+    const upgradeDiagnostics = UpgradeDiagnosticsService.create({
+      ledger: repositories.upgradeLedger,
+      licensing: dependencies.licensing,
+      deployment: {
+        imageRelease: releaseVersionOf(config),
+        chartVersion: config.usageStats.chartVersion ?? null,
+        installMethod: config.usageStats.installMethod ?? "self-hosted",
+      },
+      automaticDisabled: config.upgradeDiagnosticsAutoSendDisabled,
+    });
     const platformOperators = PlatformOperatorsService.create({
       authz: dependencies.authz,
       users: dependencies.users,
       organizations: dependencies.organizations,
+      deployment: {
+        cloud: config.isSaas || cloudOps,
+        isLocalDevelopment: config.nodeEnvironment === "development",
+      },
     });
     const app = OpsModule.fromInfrastructure({
       infrastructure,
@@ -921,8 +945,12 @@ export class OpsModule implements OpsApi {
         ledger: repositories.upgradeLedger,
         operators: platformOperators,
         mail: dependencies.notifications,
+        renderer: ReactEmailMailRenderer.create(),
         upgradesUrl: `${(config.publicBaseUrl ?? "").replace(/\/$/, "")}/ops/upgrades`,
+        audience: isCloud ? "langwatch-cloud" : "self-hosted",
+        ...(isCloud ? {} : { diagnostics: upgradeDiagnostics }),
       }),
+      upgradeDiagnostics,
     });
     return app;
   }
@@ -941,6 +969,7 @@ export class OpsModule implements OpsApi {
     signUpHealth?: SignUpHealthService;
     platformOperators?: PlatformOperatorsService;
     upgradeAlerts?: UpgradeAlertsService;
+    upgradeDiagnostics?: UpgradeDiagnosticsService;
   }): OpsModule {
     const { infrastructure: members, dependencies, repositories } = setup;
 
@@ -994,6 +1023,7 @@ export class OpsModule implements OpsApi {
       signUpHealth: setup.signUpHealth,
       platformOperators: setup.platformOperators,
       upgradeAlerts: setup.upgradeAlerts,
+      upgradeDiagnostics: setup.upgradeDiagnostics,
       operatorSeed: members.operatorSeed,
       findOpsApiKey: () => members.findOpsApiKey(),
       findProductAnalyticsTargets: () => members.findProductAnalyticsTargets(),
@@ -1293,14 +1323,6 @@ export class OpsModule implements OpsApi {
       });
     }
     if (resource.data === "subscription") this.#refuseWithoutCloudOps();
-    // A deactivation change is account lifecycle: refused when impersonating, as user's door does.
-    if (
-      input.actor?.impersonator &&
-      resource.data === "user" &&
-      "deactivatedAt" in (input.params.data ?? {})
-    ) {
-      throw new OpsImpersonatedOperatorRefusedError();
-    }
 
     return this.#dependencies.ops.adminOperation({
       resource: resource.data,
@@ -1527,8 +1549,8 @@ export class OpsModule implements OpsApi {
 
   /**
    * The acting operator, or nothing where the caller does not hold the grant. An
-   * impersonating operator is read as the operator: somebody debugging a
-   * customer account is still staff, and the grant is asked of the impersonator.
+   * impersonating operator is read by the impersonator's grant, for reads only:
+   * `ops:manage` waits until they are signed in as themselves (ADR-092).
    */
   async #operatorOf({
     operator,
@@ -1538,6 +1560,9 @@ export class OpsModule implements OpsApi {
     permission: OpsOperatorPermission;
   }): Promise<OpsOperator | null> {
     if (!operator) return null;
+    if (operator.impersonator && permission === "ops:manage") {
+      throw new OpsImpersonatedOperatorRefusedError();
+    }
 
     const held = await this.#dependencies.ops.holds({
       identity: operator.impersonator ?? operator,
@@ -1966,7 +1991,7 @@ export class OpsModule implements OpsApi {
   }
 
   async setUsageReportSwitches({
-    organizationId,
+    organizationId: _installWide,
     operator,
     ...switches
   }: {
@@ -1977,11 +2002,36 @@ export class OpsModule implements OpsApi {
   }): Promise<UsageReportAnswer> {
     const checkup = this.#checkup;
     if (checkup.isSaas) return { deployment: "saas" };
-    if (!(await this.#readsCheckupDetails({ organizationId, operator }))) {
-      throw new OpsOperatorRequiredError("ops:manage");
-    }
+    await this.admitOperator(operator, "ops:manage");
     const report = await checkup.setUsageReportSwitches(switches);
     return { deployment: "self-hosted", ...report };
+  }
+
+  async getUpgradeDiagnosticsAutoSend({
+    organizationId: _installWide,
+    operator,
+  }: {
+    organizationId: string;
+    operator: OpsOperator | null;
+  }): Promise<UpgradeDiagnosticsAutoSendAnswer> {
+    if (this.#checkup.isSaas) return { deployment: "saas" };
+    await this.admitOperator(operator, "ops:manage");
+    return { deployment: "self-hosted", ...(await this.#upgradeDiagnostics.getAutoSend()) };
+  }
+
+  async setUpgradeDiagnosticsAutoSend({
+    organizationId: _installWide,
+    operator,
+    enabled,
+  }: {
+    organizationId: string;
+    operator: OpsOperator | null;
+    enabled: boolean;
+  }): Promise<UpgradeDiagnosticsAutoSendAnswer> {
+    if (this.#checkup.isSaas) return { deployment: "saas" };
+    await this.admitOperator(operator, "ops:manage");
+    const autoSend = await this.#upgradeDiagnostics.setAutoSend({ enabled });
+    return { deployment: "self-hosted", ...autoSend };
   }
 
   /** A project key has no person behind it, so it reads its organization's verdicts only. */
@@ -2019,6 +2069,20 @@ export class OpsModule implements OpsApi {
 
   retryUpgradeStep(input: OpsUpgradeIdInput): Promise<OpsUpgradeStepDetail> {
     return this.#dependencies.upgrades.retryStep(input);
+  }
+
+  getUpgradeStepDiagnostics(input: OpsUpgradeIdInput): Promise<UpgradeDiagnosticsBundle> {
+    return this.#upgradeDiagnostics.getBundle(input);
+  }
+
+  getUpgradeDiagnosticsAvailability(): Promise<OpsUpgradeDiagnosticsAvailability> {
+    return this.#upgradeDiagnostics.getAvailability();
+  }
+
+  sendUpgradeStepDiagnostics(
+    input: OpsUpgradeSendDiagnosticsInput,
+  ): Promise<OpsUpgradeDiagnosticsReceipt> {
+    return this.#upgradeDiagnostics.sendReviewed({ bundle: input.bundle });
   }
 
   async getProjectCheckup({ projectId }: { projectId: string }): Promise<ProjectCheckupReport> {
@@ -2163,6 +2227,12 @@ export class OpsModule implements OpsApi {
   ): Promise<OpsQueueReapedStrandedGroups> {
     const audited = input.requestedBy !== GROUP_QUEUE_REAPER_PIPELINE_NAME;
     return this.#dependencies.groupQueueReaper.reap({ ...input, audited });
+  }
+
+  get #upgradeDiagnostics(): UpgradeDiagnosticsService {
+    const { upgradeDiagnostics } = this.#dependencies;
+    if (!upgradeDiagnostics) throw new OpsCapabilityUnavailableError("upgrade diagnostics");
+    return upgradeDiagnostics;
   }
 
   get #signUpHealth(): SignUpHealthService {
@@ -2566,6 +2636,7 @@ export class OpsOperations {
         repository: repositories.instanceAdmin,
         users: this.options.users,
         accounts: this.options.accounts,
+        operators: access,
         audit: this.options.audit,
         projects: this.options.scheduler.projects,
         shares: this.options.shares,

@@ -3,7 +3,9 @@ Feature: Who reads what of the checkup
   and versions, and the usage report counts every organization on the install.
   Install admins read all of it: the platform operators (ops:view at the
   platform tier) and the organization's managers (organization:manage), so an
-  install with no platform operator still has someone who can. Every other
+  install with no platform operator still has someone who can read. Changing
+  what the install reports is the platform operators' alone (ops:manage at the
+  platform tier), asked of the caller at the door. Every other
   caller, an organization member or a project API key, reads each check's
   verdict and a usage report for their own organization.
 
@@ -25,11 +27,12 @@ Feature: Who reads what of the checkup
     And the usage report names where the report goes, its switches and when it next goes
 
   @unit
-  Scenario: An organization manager changes what the install reports
+  Scenario: An organization manager cannot change what the install reports
     Given the install has no platform operator
     And the caller holds organization:manage in the organization
     When the usage report switches are changed
-    Then the switches are written
+    Then the change is refused as operator-only
+    And nothing is written
 
   @unit
   Scenario: An organization member reads each check's verdict and nothing more

@@ -3,6 +3,7 @@ import chalk from "chalk";
 import type { LocalOrchestratorDevelopmentConfig } from "../platform/config/local-orchestrator.config.ts";
 import { paths } from "../shared/paths.ts";
 import { predepRegistry } from "./registry.ts";
+import type { PredepId } from "./types.ts";
 
 export type DoctorRow = {
   id: string;
@@ -16,11 +17,16 @@ export type DoctorRow = {
 export async function inspectPredeps({
   version,
   development,
+  skip = [],
 }: {
   version: string;
   development: LocalOrchestratorDevelopmentConfig;
+  /** The databases this install brings itself: not its to install, so not reported missing. */
+  skip?: readonly PredepId[];
 }): Promise<DoctorRow[]> {
-  const predeps = predepRegistry({ version, development });
+  const predeps = predepRegistry({ version, development }).filter(
+    (predep) => !skip.includes(predep.id),
+  );
   const rows: DoctorRow[] = [];
   for (const p of predeps) {
     const det = await p.detect(paths);

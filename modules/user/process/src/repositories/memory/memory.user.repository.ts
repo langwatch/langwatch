@@ -30,6 +30,7 @@ import type {
   CreateCredentialUserRow,
   CreatedCredentialUser,
   CreatePasskeyUserRow,
+  PasswordHolderRow,
   SetFirstUserPasswordRow,
   UserAddressReplacement,
   UserAddressRow,
@@ -204,6 +205,38 @@ export class MemoryUserRepository implements UserRepository {
     return account ? account.password !== null : false;
   }
 
+  async findPasswordHolders({
+    emails,
+  }: {
+    emails: readonly string[] | null;
+  }): Promise<PasswordHolderRow[]> {
+    const wanted = emails === null ? null : new Set(emails.map((email) => email.toLowerCase()));
+    return this.#database
+      .rows()
+      .filter((row) =>
+        wanted === null ? true : row.email !== null && wanted.has(row.email.toLowerCase()),
+      )
+      .filter((row) => Boolean(this.#credentialAccount(row.id)?.password))
+      .map((row) => ({
+        id: row.id,
+        email: row.email,
+        passwordResetRequiredAt: row.passwordResetRequiredAt ?? null,
+      }))
+      .toSorted((a, b) => a.id.localeCompare(b.id));
+  }
+
+  async markPasswordResetRequired({
+    ids,
+    at,
+  }: {
+    ids: readonly string[];
+    at: Instant;
+  }): Promise<number> {
+    const unmarked = this.#database.usersById(ids).filter((row) => !row.passwordResetRequiredAt);
+    for (const row of unmarked) this.#database.writeUser({ ...row, passwordResetRequiredAt: at });
+    return unmarked.length;
+  }
+
   async setFirstPassword(input: SetFirstUserPasswordRow): Promise<SetFirstUserPasswordResult> {
     const account = this.#credentialAccount(input.id);
     if (account?.password) return "already_set";
@@ -273,6 +306,7 @@ export class MemoryUserRepository implements UserRepository {
       ...row,
       ...(input.name === undefined ? {} : { name: input.name }),
       ...(input.email === undefined ? {} : { email: input.email }),
+      ...(input.emailVerified === undefined ? {} : { emailVerified: input.emailVerified }),
       updatedAt: nowInstant(),
     };
     this.#database.writeUser(updated);

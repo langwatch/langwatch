@@ -43,7 +43,7 @@ import { PresenceApi } from "@langwatch/presence-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
 import { type ShareViewer, ShareApi } from "@langwatch/share-contract";
-import { StoredObjectApi } from "@langwatch/stored-object-contract";
+import { isObjectRetentionConfirmed, StoredObjectApi } from "@langwatch/stored-object-contract";
 import { nowInstant, toEpochMs } from "@langwatch/time";
 import {
   TraceCapabilityUnavailableError,
@@ -262,9 +262,12 @@ import { TraceIngestCredentialService } from "../features/ingestion/services/tra
 import { TraceIngestSourceBillingService } from "../features/ingestion/services/trace-ingest-source-billing.service.ts";
 import {
   TraceIngestionService,
-  TraceIngressCommand,
   type CodingAgentIngestFilter,
 } from "../features/ingestion/services/trace-ingestion.service.ts";
+import {
+  TraceIngressCommand,
+  type RecordSpanOutcome,
+} from "../features/ingestion/services/trace-span-collection.service.ts";
 import type {
   ResolveTraceSpansBatchFn,
   ResolveTraceSpansFn,
@@ -432,6 +435,7 @@ import {
   hiddenAttributeKeyMatcher,
   readDroppedFromParams,
   readPiiIncompleteFromParams,
+  findTruncatedAttributesInParams,
   redactV2Content,
   toConversationContextTurn,
 } from "../rules/trace-read-mappers.rules.ts";
@@ -923,10 +927,10 @@ export class TraceModule implements TraceApi, CollectorApp {
     const resolveClickHouseClient: TraceClickHouseResolver = (tenantId) =>
       repositories.clickhouseClients.resolve(tenantId);
     const canonicalisation = TraceCanonicalisation.create();
-    const blobStore = TraceBlobStoreService.create({
-      legacySpool: setup.channels.legacySpool,
-      payloads: repositories.eventPayloads,
-      logger: createLogger("langwatch:trace:blob-store"),
+    const blobStore = TraceModule.composeBlobStore({
+      repositories,
+      channels: setup.channels,
+      config: setup.config,
     });
     const { publicBaseUrl, disableCodingAgentSpanFilter } = setup.config;
     const app = new TraceModule({
@@ -978,6 +982,7 @@ export class TraceModule implements TraceApi, CollectorApp {
       projects: setup.dependencies.projects,
       usageCount: setup.repositories.usageCount,
       milestones,
+      logger: createLogger("langwatch:trace:month-trace-ids"),
     });
     app.#retention = {
       resolve: (tenantId) =>
@@ -995,6 +1000,7 @@ export class TraceModule implements TraceApi, CollectorApp {
       }),
       canonicalisation,
       commands,
+      spool: blobStore,
       findSummary: (lookup) => app.findSummary(lookup),
       recordTrackedEvent: ({ tenantId, body, eventId }) =>
         app.recordTrackedEvent({ project: { id: tenantId }, body, eventId }),
@@ -1002,6 +1008,34 @@ export class TraceModule implements TraceApi, CollectorApp {
       milestones,
     });
     return app;
+  }
+
+  /**
+   * ADR-022: the one blob store both halves of the spool share. The ingestion door writes an
+   * over-threshold command through it and the worker's record-span command reads it back, so it
+   * is built with its spool storage or the worker refuses every spooled span (langwatch-saas#1316).
+   */
+  static composeBlobStore({
+    repositories,
+    channels,
+    config,
+  }: {
+    repositories: Pick<TraceRepositories, "eventPayloads" | "spoolObjects">;
+    channels: Pick<TraceSetup["channels"], "legacySpool">;
+    config: Pick<
+      TraceSetup["config"],
+      "objectRetentionConfirmed" | "legacySpoolRetentionConfirmed"
+    >;
+  }): TraceBlobStoreService {
+    return TraceBlobStoreService.create({
+      legacySpool: channels.legacySpool,
+      payloads: repositories.eventPayloads,
+      spoolStorage: {
+        objects: repositories.spoolObjects,
+        azureRetentionConfirmed: isObjectRetentionConfirmed({ config }),
+      },
+      logger: createLogger("langwatch:trace:blob-store"),
+    });
   }
 
   /** Builds over an already-composed read graph, as a unit test hands one in. */
@@ -1883,6 +1917,7 @@ export class TraceModule implements TraceApi, CollectorApp {
       detailParams,
       traceReadMapperPorts.contentPrivacy,
     );
+    redactedDetail.truncatedAttributes = findTruncatedAttributesInParams(detailParams);
     redactedDetail.restrictedAttributes = protections.restrictedAttributes ?? null;
 
     return redactedDetail;
@@ -2542,6 +2577,7 @@ export class TraceModule implements TraceApi, CollectorApp {
   translateLegacyFilters(input: {
     filters: Readonly<Record<string, unknown>>;
     window?: { startDate?: number; endDate?: number };
+    fenced?: boolean;
   }): GenerateFilterConditionsResult {
     return translateLegacyFilters(input);
   }
@@ -3975,6 +4011,16 @@ class TraceComposedIngressCommand extends TraceIngressCommand {
 
   async recordSpan(data: RecordSpanCommandData): Promise<void> {
     await this.#commands.recordSpan(data);
+  }
+
+  /** A span the queue staged or folded into one already staged is recorded; else it failed. */
+  async recordSpans(data: readonly RecordSpanCommandData[]): Promise<RecordSpanOutcome[]> {
+    const results = await this.#commands.recordSpans(data);
+    return results.map((result) =>
+      result.status === "staged" || result.status === "deduplicated"
+        ? { status: "recorded" }
+        : { status: "failed", error: result.error },
+    );
   }
 }
 

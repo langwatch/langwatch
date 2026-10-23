@@ -9,7 +9,10 @@ import {
   unionReplayTenants,
   upcastReplayEventSource,
 } from "@langwatch/eventing";
-import { EventingClickHouseReplayEventSource } from "@langwatch/eventing/server";
+import {
+  EventingClickHouseReplayEventSource,
+  type EventLogIndexReadiness,
+} from "@langwatch/eventing/server";
 import type { RedisConnection } from "@langwatch/redis-client";
 
 import type { OpsReplayRuntime } from "../../app/ops.app.ts";
@@ -27,6 +30,8 @@ export class LiveReplayRuntimeRepository extends ReplayRuntimeRepository {
       clickhouse: ClickHouseQueryClient;
       eventing: Pick<EventSourcing, "definitions">;
       privateTenants?: () => AsyncIterable<string>;
+      /** Whether the event log's aggregate index may bound a batch; none keeps it unbounded. */
+      eventLogIndexReadiness?: EventLogIndexReadiness;
     }>,
   ) {
     super();
@@ -37,12 +42,13 @@ export class LiveReplayRuntimeRepository extends ReplayRuntimeRepository {
     clickhouse: ClickHouseQueryClient;
     eventing: Pick<EventSourcing, "definitions">;
     privateTenants?: () => AsyncIterable<string>;
+    eventLogIndexReadiness?: EventLogIndexReadiness;
   }): LiveReplayRuntimeRepository {
     return new LiveReplayRuntimeRepository(members);
   }
 
   create({ retention }: { retention: RetentionPolicyResolver }): OpsReplayRuntime {
-    const { redis, clickhouse, eventing, privateTenants } = this.members;
+    const { redis, clickhouse, eventing, privateTenants, eventLogIndexReadiness } = this.members;
     if (redis.isCluster) {
       throw new Error(
         "Replay requires a standalone Redis: a Cluster refuses its multi-key operations.",
@@ -54,6 +60,9 @@ export class LiveReplayRuntimeRepository extends ReplayRuntimeRepository {
       source: new EventingClickHouseReplayEventSource({
         clickhouse,
         lean: replayLeanOf(definitions),
+        ...(eventLogIndexReadiness === undefined
+          ? {}
+          : { eventLogIndex: { reader: clickhouse, readiness: eventLogIndexReadiness } }),
       }),
       upcasts: pipelineUpcastsOf(definitions),
     });

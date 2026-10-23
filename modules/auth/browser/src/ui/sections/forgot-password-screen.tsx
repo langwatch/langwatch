@@ -6,7 +6,11 @@ import { z } from "zod";
 
 import { authClient } from "../../behavior/auth-client.tsx";
 import { usePublicEnv } from "../../behavior/use-public-env.ts";
-import { forgetCarriedEmail, readCarriedEmail } from "../../model/carried-email.ts";
+import {
+  forgetCarriedEmail,
+  readCarriedEmail,
+  readCarriedResetRequirement,
+} from "../../model/carried-email.ts";
 import { AuthCard } from "../../ui/elements/auth-card.tsx";
 import { CheckYourEmail } from "../../ui/elements/check-your-email.tsx";
 import { FIELD_FOCUS, FIELD_SURFACE, FrontDoorField } from "../../ui/elements/front-door-field.tsx";
@@ -26,16 +30,15 @@ export default function ForgotPassword() {
 
 function ForgotPasswordScreen() {
   const publicEnv = usePublicEnv();
-  const isAuthProvider = publicEnv.data?.NEXTAUTH_PROVIDER;
+  // The sign-in step hands over the address just typed, in the fragment, read at first paint.
+  const [carriedEmail] = useState(readCarriedEmail);
+  const [resetRequired] = useState(readCarriedResetRequirement);
 
   if (!publicEnv.data) {
     return null;
   }
 
-  // Reset follows account (has password?), not deployment provider.
-  const deploymentHoldsNoPasswords = Boolean(publicEnv.data.IS_SAAS) && isAuthProvider !== "email";
-
-  if (deploymentHoldsNoPasswords) {
+  if (!publicEnv.data.EMAIL_PASSWORD_ENABLED) {
     return (
       <AuthCard title="Forgot your password?">
         <Text>
@@ -51,9 +54,11 @@ function ForgotPasswordScreen() {
   // does not say why; it says who can help (ARCHITECTURE.md §6, mail off).
   if (!publicEnv.data.HAS_EMAIL_PROVIDER_KEY) {
     return (
-      <AuthCard title="Forgot your password?">
+      <AuthCard title={resetRequired ? "Choose a new password" : "Forgot your password?"}>
         <Text>
-          Password reset by email is not available.{" "}
+          {resetRequired
+            ? "You need to set a new password before you can sign in, and password reset by email is not available."
+            : "Password reset by email is not available."}{" "}
           {publicEnv.data.IS_SAAS
             ? "Contact LangWatch support to get back into your account."
             : "Contact your administrator to get back into your account."}
@@ -63,13 +68,17 @@ function ForgotPasswordScreen() {
     );
   }
 
-  return <ForgotPasswordForm />;
+  return <ForgotPasswordForm carriedEmail={carriedEmail} resetRequired={resetRequired} />;
 }
 
-function ForgotPasswordForm() {
-  // The sign-in step hands over the address just typed, in the fragment; read
-  // at first paint to prefill the field, then taken out of the address bar.
-  const [carriedEmail] = useState(readCarriedEmail);
+function ForgotPasswordForm({
+  carriedEmail,
+  resetRequired,
+}: {
+  carriedEmail: string | undefined;
+  resetRequired: boolean;
+}) {
+  // Only the form takes the address back out of the address bar, having prefilled it.
   useEffect(forgetCarriedEmail, []);
   const form = useForm<z.infer<typeof forgotPasswordSchema>>({
     resolver: zodResolver(forgotPasswordSchema),
@@ -113,8 +122,12 @@ function ForgotPasswordForm() {
 
   return (
     <AuthCard
-      title="Forgot your password?"
-      intro="Enter the email for your account and we will send you a link to reset your password."
+      title={resetRequired ? "Choose a new password" : "Forgot your password?"}
+      intro={
+        resetRequired
+          ? "You need to set a new password before you can sign in. We will email you a link to choose one."
+          : "Enter the email for your account and we will send you a link to reset your password."
+      }
     >
       <form onSubmit={form.handleSubmit(onSubmit)} style={{ width: "100%" }}>
         <VStack width="full" align="stretch" gap="3.5">

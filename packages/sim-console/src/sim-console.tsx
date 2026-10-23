@@ -12,7 +12,8 @@ export type SimKind =
   | "outbound"
   | "payment"
   | "telemetry"
-  | "lambda";
+  | "lambda"
+  | "mcp";
 
 export type SimTab = { id: string; label: string; count?: number };
 
