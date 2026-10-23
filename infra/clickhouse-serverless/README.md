@@ -25,19 +25,19 @@ CPU and RAM are auto-detected from cgroups. Override with `CH_CPU` and `CH_RAM` 
 
 Settings with a fixed default rather than one computed from CPU + RAM:
 
-| Variable                                       | Default       | Description                                                                                                                         |
-| ---------------------------------------------- | ------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Variable                                       | Default       | Description                                                                                                                           |
+| ---------------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | `CLICKHOUSE_CLUSTER_SECRET_FILE`               | —             | File holding the `remote_servers` cluster secret (replicated mode). Read by `ch-config` only with `CLICKHOUSE_CLUSTER_SECRET_ENABLED` |
-| `CLICKHOUSE_CLUSTER_SECRET_ENABLED`            | `false`       | Recommended. Applies the cluster secret; see [Cluster secret](#cluster-secret) before turning it on                                 |
-| `CLICKHOUSE_INTERSERVER_PASSWORD_FILE`         | —             | File holding the interserver HTTP password. When set, `interserver_http_credentials` is rendered                                    |
-| `CLICKHOUSE_INTERSERVER_USER`                  | `interserver` | Interserver HTTP user, used only with `CLICKHOUSE_INTERSERVER_PASSWORD_FILE`                                                        |
-| `DEFAULT_USER_ACCESS_MANAGEMENT`               | `true`        | `false` leaves the `default` user without `access_management` and `named_collection_control` from `ch-config`                       |
-| `LOG_TO_FILE`                                  | `true`        | `false` removes the server's file loggers, so it logs to the console only                                                           |
-| `MERGE_MAX_BLOCK_SIZE_BYTES`                   | `0`           | `merge_tree.merge_max_block_size_bytes`; `0` leaves the ClickHouse default                                                          |
-| `MAX_CONCURRENT_SELECT_QUERIES`                | `0`           | SELECTs' own admission cap inside `max_concurrent_queries`; `0` means none                                                          |
-| `NETWORK_COMPRESSION_METHOD`                   | —             | Default profile `network_compression_method`; unset leaves the ClickHouse default. `zstd` suits replicated clusters                |
-| `NETWORK_ZSTD_COMPRESSION_LEVEL`               | —             | Default profile `network_zstd_compression_level`; unset leaves the ClickHouse default                                              |
-| `CANCEL_HTTP_READONLY_QUERIES_ON_CLIENT_CLOSE` | —             | Default profile; `1` stops a read whose HTTP client has gone (recommended), unset leaves the ClickHouse default (`0`)              |
+| `CLICKHOUSE_CLUSTER_SECRET_ENABLED`            | `false`       | Recommended. Applies the cluster secret; see [Cluster secret](#cluster-secret) before turning it on                                   |
+| `CLICKHOUSE_INTERSERVER_PASSWORD_FILE`         | —             | File holding the interserver HTTP password. When set, `interserver_http_credentials` is rendered                                      |
+| `CLICKHOUSE_INTERSERVER_USER`                  | `interserver` | Interserver HTTP user, used only with `CLICKHOUSE_INTERSERVER_PASSWORD_FILE`                                                          |
+| `DEFAULT_USER_ACCESS_MANAGEMENT`               | `true`        | `false` leaves the `default` user without `access_management` and `named_collection_control` from `ch-config`                         |
+| `LOG_TO_FILE`                                  | `true`        | `false` removes the server's file loggers, so it logs to the console only                                                             |
+| `MERGE_MAX_BLOCK_SIZE_BYTES`                   | `0`           | `merge_tree.merge_max_block_size_bytes`; `0` leaves the ClickHouse default                                                            |
+| `MAX_CONCURRENT_SELECT_QUERIES`                | `0`           | SELECTs' own admission cap inside `max_concurrent_queries`; `0` means none                                                            |
+| `NETWORK_COMPRESSION_METHOD`                   | —             | Default profile `network_compression_method`; unset leaves the ClickHouse default. `zstd` suits replicated clusters                   |
+| `NETWORK_ZSTD_COMPRESSION_LEVEL`               | —             | Default profile `network_zstd_compression_level`; unset leaves the ClickHouse default                                                 |
+| `CANCEL_HTTP_READONLY_QUERIES_ON_CLIENT_CLOSE` | —             | Default profile; `1` stops a read whose HTTP client has gone (recommended), unset leaves the ClickHouse default (`0`)                 |
 
 The `NUMBER_OF_FREE_ENTRIES_IN_POOL_TO_*` thresholds are derived from the
 effective `background_pool_size`, including a `BACKGROUND_POOL_SIZE` override;
