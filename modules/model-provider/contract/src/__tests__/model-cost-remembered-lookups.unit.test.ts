@@ -75,6 +75,7 @@ const customRules: ModelCostRate[] = [
 
 describe("findMatchingModelCost remembering its answers", () => {
   describe("when looking up every model name against the full catalogue", () => {
+    /** @scenario "A remembered lookup picks the same rate as a full scan" */
     it("picks the same rate as a full scan, on the first and on a repeated lookup", () => {
       const names = modelNames();
       expect(names.length).toBeGreaterThan(1_000);
@@ -89,6 +90,7 @@ describe("findMatchingModelCost remembering its answers", () => {
   });
 
   describe("when a project's custom rules come ahead of the catalogue", () => {
+    /** @scenario "A remembered lookup picks the same rate as a full scan" */
     it("picks the same rate as a full scan, misses included", () => {
       const merged = [...customRules, ...catalogue];
       for (const name of modelNames()) {
@@ -99,6 +101,7 @@ describe("findMatchingModelCost remembering its answers", () => {
   });
 
   describe("when the same model name is looked up in different cost lists", () => {
+    /** @scenario "A changed price list is matched afresh" */
     it("answers from each list's own rates", () => {
       const first = [{ model: "first", regex: "^my-model" }];
       const second = [{ model: "second", regex: "^my-model" }];
@@ -110,6 +113,7 @@ describe("findMatchingModelCost remembering its answers", () => {
   });
 
   describe("when a model name missed and a rule for it arrives in a new list", () => {
+    /** @scenario "A changed price list is matched afresh" */
     it("finds the new rule", () => {
       const rules: ModelCostRate[] = [{ model: "other", regex: "^other" }];
       expect(findMatchingModelCost("late-model", rules)).toEqual([]);
@@ -122,6 +126,7 @@ describe("findMatchingModelCost remembering its answers", () => {
   });
 
   describe("when more model names are looked up than one list remembers", () => {
+    /** @scenario "A cost list past its memory limit still answers like a full scan" */
     it("keeps answering like a full scan", () => {
       const rules: ModelCostRate[] = [
         { model: "even", regex: "[02468]$" },
@@ -149,6 +154,7 @@ describe("findMatchingModelCost remembering its answers", () => {
       return { costs: [rule("a", "^alpha"), rule("b", "^beta")], reads: () => reads };
     };
 
+    /** @scenario "A repeated lookup does not scan the patterns again" */
     it("does not evaluate the patterns again for a hit", () => {
       const { costs, reads } = countingList();
       findMatchingModelCost("beta-1", costs);
@@ -161,6 +167,7 @@ describe("findMatchingModelCost remembering its answers", () => {
       expect(second[0]?.model).toBe("b");
     });
 
+    /** @scenario "A repeated lookup does not scan the patterns again" */
     it("does not evaluate the patterns again for a miss", () => {
       const { costs, reads } = countingList();
       findMatchingModelCost("gamma-1", costs);

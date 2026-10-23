@@ -198,7 +198,10 @@ export const findMatchingModelCost = (
       findSubtypeStrippedModelCost({ model, costs }) ??
       findBedrockModelCost({ model, costs }) ??
       null;
-    if (matches.size >= MATCHES_PER_COST_LIST_MAX_ENTRIES) matches.clear();
+    // Drop the oldest name only, so a burst of new names never flushes the common ones.
+    const oldest =
+      matches.size >= MATCHES_PER_COST_LIST_MAX_ENTRIES ? matches.keys().next() : undefined;
+    if (oldest && !oldest.done) matches.delete(oldest.value);
     matches.set(model, match);
   }
   return match ? [match] : [];
