@@ -95,10 +95,10 @@ describe("buildJavaScriptRuntimeDts", () => {
      * @scenario "Secret values never reach the editor"
      */
     it("never carries a secret's value into the declarations", () => {
-      const withValues = { ...contract, secretValues: { API_KEY: "sk-live-0123456789" } };
+      const withValues = { ...contract, secretValues: { API_KEY: "secret-value-here" } };
       const text = buildJavaScriptRuntimeDts(withValues);
       expect(text).toContain("readonly API_KEY: string;");
-      expect(text).not.toContain("sk-live-0123456789");
+      expect(text).not.toContain("secret-value-here");
     });
 
     /**

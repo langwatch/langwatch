@@ -740,7 +740,7 @@ Messages:
 
 - `aliasReexport`
   - what: `{{local}}` is re-exported here as `{{exported}}`.
-  - fix: Rename `{{local}}` to `{{exported}}` with tslsp-cli and export it under one name. Read the `linting` skill.
+  - fix: Rename `{{local}}` to `{{exported}}` with the tsrs language server and export it under one name. Read the `linting` skill.
   - why: Two names for one symbol split every search and rename across both spellings.
 
 ## `langwatch/no-ambient-context`

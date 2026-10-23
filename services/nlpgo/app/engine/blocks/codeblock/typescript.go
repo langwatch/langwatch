@@ -112,7 +112,7 @@ func causeOf(err error) string {
 var jsLocation = regexp.MustCompile(`code-block\.mjs:(\d+)(?::\d+)?`)
 
 // remap rewrites code-block.mjs:<line> to the TypeScript line it came from.
-func (s strippedCode) remap(traceback string) string {
+func (s *strippedCode) remap(traceback string) string {
 	return jsLocation.ReplaceAllStringFunc(traceback, func(match string) string {
 		line, err := strconv.Atoi(jsLocation.FindStringSubmatch(match)[1])
 		if err != nil || line < 1 || line > len(s.lines) || s.lines[line-1] == 0 {

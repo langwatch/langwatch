@@ -65,3 +65,8 @@ f483fe302e7c3dfb100e1d6fa9c99b6d9a049c20:specs/server/feature-configuration.feat
 # fixture now reads "Incorrect API key provided." with no key, so the tree is
 # clean and only this pull request's history still carries the literal.
 785058250c14fe307ce07f37644f3668c23cea47:services/langyagent/adapters/otelrelay/llmproxy_credit_test.go:generic-api-key:129
+# A test of the code editor's type declarations used a made-up key
+# (`sk-live-…`) as a secret's value, to prove values never reach the editor.
+# It was never a credential; the fixture now reads "secret-value-here", so
+# only this pull request's history still carries the literal.
+6191c51d0ed5ba782ba1b605bd29a1fb2bcf0980:modules/workflow/browser/src/model/code/__tests__/javascript-runtime-types.unit.test.ts:generic-api-key:84
