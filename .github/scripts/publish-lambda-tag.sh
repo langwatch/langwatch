@@ -28,6 +28,8 @@ IS_RELEASE="${IS_RELEASE:-false}"
 VERSION="${VERSION:-}"
 HEAD_COMMIT="${HEAD_COMMIT:-HEAD}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+err_file="$(mktemp)"
+trap 'rm -f "${err_file}"' EXIT
 
 is_single_manifest() {
   case "$1" in
@@ -62,18 +64,26 @@ put_manifest() {
 
 if [ "${IMAGE_WAS_BUILT}" = "true" ]; then
   # build-and-push-lambda pushed the bare tag itself. Missing means that leg
-  # failed.
-  if ! aws ecr describe-images --repository-name "${image}" \
-      --image-ids imageTag="${IMAGE_TAG}" >/dev/null 2>&1; then
-    echo "::error::${image}:${IMAGE_TAG} was due to be built this run and is not in ECR; see build-and-push-lambda"
+  # failed; any other describe-images error is printed as it is.
+  if ! media_type=$(media_type_of "${IMAGE_TAG}" 2>"${err_file}"); then
+    if grep -q ImageNotFoundException "${err_file}"; then
+      echo "::error::${image}:${IMAGE_TAG} was due to be built this run and is not in ECR; see build-and-push-lambda"
+    else
+      cat "${err_file}" >&2
+      echo "::error::could not look up ${image}:${IMAGE_TAG} in ECR"
+    fi
+    exit 1
+  fi
+  # Checked here too, so the release tag below never copies an index.
+  if ! is_single_manifest "${media_type}"; then
+    echo "::error::${image}:${IMAGE_TAG} is ${media_type}, not a single manifest; see build-and-push-lambda"
     exit 1
   fi
 else
   # Not rebuilt: re-tag the image built from the nearest ancestor of this
   # commit (see nearest-ancestor-tag.sh).
   candidates=$(aws ecr describe-images --repository-name "${image}" \
-    --query 'reverse(sort_by(imageDetails, &imagePushedAt))[].imageTags[]' \
-    --output text | tr '\t' '\n')
+    --query 'imageDetails[].imageTags[]' --output text | tr '\t' '\n')
   previous=$(printf '%s\n' "${candidates}" | HEAD_COMMIT="${HEAD_COMMIT}" "${SCRIPT_DIR}/nearest-ancestor-tag.sh")
   if [ -z "${previous}" ]; then
     echo "::warning::${image} has no previous git-* image from an ancestor commit to re-tag as ${IMAGE_TAG}; run this workflow via workflow_dispatch to seed it"

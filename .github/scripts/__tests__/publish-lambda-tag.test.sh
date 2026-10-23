@@ -85,6 +85,10 @@ case "$1 $2" in
       ls -t "$tags" | paste -sd '\t' -
       exit 0
     fi
+    if [ -n "${STUB_DESCRIBE_ERROR:-}" ]; then
+      echo "An error occurred ($STUB_DESCRIBE_ERROR)" >&2
+      exit 254
+    fi
     [ -f "$tags/$tag_arg" ] || { echo "An error occurred (ImageNotFoundException)" >&2; exit 254; }
     cut -d' ' -f1 "$tags/$tag_arg"
     ;;
@@ -226,6 +230,32 @@ test_a_lambda_image_that_was_not_built_fails() {
   fi
 }
 
+# @scenario "A Lambda image is never re-tagged from an index"
+test_a_rebuilt_index_is_never_given_the_release_tag() {
+  local reg
+  reg="$(new_registry)"
+  push "$reg" "git-$HEAD_SHA" "$INDEX" '{"index":true}'
+  run_subject "$reg" IMAGE_TAG="git-$HEAD_SHA" IMAGE_WAS_BUILT=true IS_RELEASE=true VERSION=3.9.0
+  if [ "$LAST_STATUS" -ne 0 ] && [ ! -f "$reg/tags/3.9.0" ]; then
+    record yes "a rebuilt tag that is an index fails and gets no version tag"
+  else
+    record no "a rebuilt tag that is an index fails and gets no version tag"
+  fi
+}
+
+test_a_failed_lookup_of_a_rebuilt_tag_shows_the_registry_error() {
+  local reg
+  reg="$(new_registry)"
+  push "$reg" "git-$HEAD_SHA" "$PLAIN" '{"built":true}'
+  run_subject "$reg" IMAGE_TAG="git-$HEAD_SHA" IMAGE_WAS_BUILT=true STUB_DESCRIBE_ERROR=AccessDeniedException
+  if [ "$LAST_STATUS" -ne 0 ] && printf '%s' "$LAST_OUTPUT" | grep -q AccessDeniedException \
+      && ! printf '%s' "$LAST_OUTPUT" | grep -q "was due to be built"; then
+    record yes "a failed lookup shows the registry error, not a missing build"
+  else
+    record no "a failed lookup shows the registry error, not a missing build"
+  fi
+}
+
 # @scenario "A release also tags each Lambda image with its version"
 test_a_release_also_tags_the_version() {
   local reg
@@ -284,6 +314,8 @@ test_a_tag_that_cannot_be_written_fails
 test_a_lambda_image_is_never_retagged_from_an_index
 test_a_lambda_image_that_was_not_built_fails
 test_a_release_also_tags_the_version
+test_a_rebuilt_index_is_never_given_the_release_tag
+test_a_failed_lookup_of_a_rebuilt_tag_shows_the_registry_error
 
 echo
 echo "publish-lambda-tag.sh: ${PASS} passed, ${FAIL} failed"

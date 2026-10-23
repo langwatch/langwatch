@@ -56,10 +56,11 @@ test_every_filter_rebuilds_on_a_dockerignore_change() {
   done
 }
 
-# @scenario "An image the commit did not change is re-tagged only from an ancestor commit"
+# A wiring check, not a scenario binding: which tag nearest-ancestor-tag.sh
+# picks is proved by nearest-ancestor-tag.test.sh and publish-lambda-tag.test.sh.
+# This only pins that the service-image re-tag calls it, and that its output,
+# not a mention in a comment, is what `previous` is set from.
 test_service_images_are_retagged_from_the_nearest_ancestor() {
-  # The invocation itself, not a mention in a comment: the helper's output must
-  # be what `previous` is set from.
   if grep -vE '^[[:space:]]*#' "$WORKFLOW" \
       | grep -qE '\|[[:space:]]*HEAD_COMMIT="\$\{GITHUB_SHA\}"[[:space:]]+\.github/scripts/nearest-ancestor-tag\.sh\)$'; then
     echo "PASS: service images pick their previous tag with nearest-ancestor-tag.sh"

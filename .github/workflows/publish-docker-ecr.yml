@@ -756,8 +756,7 @@ jobs:
               # `set -e`.
               local candidates
               candidates=$(aws ecr describe-images --repository-name "${image}" \
-                --query 'reverse(sort_by(imageDetails, &imagePushedAt))[].imageTags[]' \
-                --output text)
+                --query 'imageDetails[].imageTags[]' --output text)
               previous=$(printf '%s\n' "${candidates}" | tr '\t' '\n' \
                 | HEAD_COMMIT="${GITHUB_SHA}" .github/scripts/nearest-ancestor-tag.sh)
 

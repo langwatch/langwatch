@@ -13,10 +13,8 @@
 # Dockerfile.langwatch_nlp: both images install byte-identically from the one
 # sandbox-requirements.txt.
 
-# The Lambda Web Adapter. Overridable so a registry mirror can stand in for
-# public.ecr.aws.
-ARG LAMBDA_ADAPTER_IMAGE=public.ecr.aws/awsguru/aws-lambda-adapter:0.9.1
-FROM ${LAMBDA_ADAPTER_IMAGE} AS lambda-adapter
+# The Lambda Web Adapter.
+FROM public.ecr.aws/awsguru/aws-lambda-adapter:0.9.1 AS lambda-adapter
 
 # ─── Go build ─────────────────────────────────────────────────────────────────
 FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine AS go-build
@@ -63,8 +61,12 @@ RUN set -eux; \
     find /pylibs/babel/locale-data -type f ! -name 'en*.dat' ! -name 'root.dat' -delete 2>/dev/null || true
 
 # ─── Runtime ───────────────────────────────────────────────────────────────────
-# The default (root) distroless variant, as the function runs today. Switching
-# to :nonroot is a separate change that needs a test on Lambda first.
+# The default distroless variant, as the function runs today. On Lambda its
+# USER does not decide who runs the code: Lambda runs a container image as its
+# own default Linux user with least-privileged permissions, not as root, so
+# nlpgo and every code block run without uid 0. That user must be able to read
+# every file the function needs.
+# https://docs.aws.amazon.com/lambda/latest/dg/images-create.html#images-reqs
 FROM gcr.io/distroless/python3-debian12
 COPY --from=lambda-adapter /lambda-adapter /opt/extensions/lambda-adapter
 COPY --from=sandbox-build /pylibs /opt/sandbox-libs
