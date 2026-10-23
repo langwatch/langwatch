@@ -45,8 +45,22 @@ describe("TRUSTED_PROXY_ADDRESSES", () => {
   });
 
   describe("when an entry is an IPv4-mapped IPv6 range", () => {
-    it("reads it, since the mapped block is an IPv4 range", () => {
-      expect(parsed("::ffff:10.0.0.0/104")).toEqual(["::ffff:10.0.0.0/104"]);
+    it.each(["::ffff:10.0.0.0/104", "::ffff:a00:0/104", "::ffff:10.0.0.0/96", "::ffff:a00:0/96"])(
+      "reads it, since the mapped block is an IPv4 range (%s)",
+      (entry) => {
+        expect(parsed(entry)).toEqual([entry]);
+      },
+    );
+
+    it.each(["::ffff:10.0.0.0/80", "::ffff:a00:0/80", "0:0:0:0:0:FFFF:a00:0/80", "::/80", "::/0"])(
+      "refuses a range wider than the mapped block, which would trust every IPv4 peer (%s)",
+      (entry) => {
+        expect(() => parsed(`10.0.0.0/8,${entry}`)).toThrow(entry);
+      },
+    );
+
+    it("reads an IPv6 range that does not reach the mapped block", () => {
+      expect(parsed("fc00::/7,2001:db8::/32")).toEqual(["fc00::/7", "2001:db8::/32"]);
     });
   });
 
