@@ -412,6 +412,13 @@ Feature: The insights inbox
       When they look at the Dashboards side menu
       Then it holds no Insights entry
 
+    @integration
+    Scenario: An aggregate project's side menu holds no Insights entry
+      Given release_insights is on and a member with analytics:view
+      And the project is an aggregate, which files no insight
+      When they look at the Dashboards side menu
+      Then it holds no Insights entry
+
     @unit
     Scenario: The Insights page stays in the Dashboards product
       Given a member in Dashboards

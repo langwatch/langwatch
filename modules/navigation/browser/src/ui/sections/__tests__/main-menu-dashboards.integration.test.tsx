@@ -81,17 +81,19 @@ function renderSidebar({
   pathname,
   permissions = ["analytics:view"],
   insightsOn = false,
+  project = PROJECT,
 }: {
   surface: "llm-ops" | "dashboards" | "gateway" | "settings";
   pathname: string;
   permissions?: string[];
   insightsOn?: boolean;
+  project?: NavigationProject;
 }) {
   declarations.current = analyticsLends;
   return renderWithDesignSystem(
     <WithStubNavigationHost
       readings={{
-        project: PROJECT,
+        project,
         pathname,
         permissions,
         flags: {
@@ -201,6 +203,21 @@ describe("the Insights entry", () => {
       });
 
       await screen.findByRole("button", { name: "Quick Search" });
+      expect(screen.queryByRole("link", { name: /Insights/ })).toBeNull();
+    });
+  });
+
+  describe("given an aggregate project, which files no insight", () => {
+    /** @scenario "An aggregate project's side menu holds no Insights entry" */
+    it("draws no Insights entry in the Dashboards sidebar", async () => {
+      renderSidebar({
+        surface: "dashboards",
+        pathname: "/demo/dashboards",
+        insightsOn: true,
+        project: { ...PROJECT, kind: "aggregate" },
+      });
+
+      await screen.findByTestId("saved-dashboards");
       expect(screen.queryByRole("link", { name: /Insights/ })).toBeNull();
     });
   });
