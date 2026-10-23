@@ -96,3 +96,4 @@ Feature: Vitest's transform cache is shared across checkouts
     Given a module whose source contains the cache's root token
     When two checkouts run their tests
     Then neither run writes that module to the shared cache or reads it from there
+    And the module sees the token exactly as its source writes it

@@ -48,13 +48,15 @@ existing Vitest patch (`patches/vitest@5.0.1.patch`) changes `fsModuleCache`:
 
 **The checkout's path is a token on disk.** On write, the workspace root in the
 code and metadata becomes `@@vitest-fs-module-cache-root@@`, and the inline
-source map's `file` becomes the bare file name. On read, the main process and
-the worker (which reads the cached file itself) put the reading checkout's root
-back. A module whose source names the checkout's root keeps that root in its
-key, and a module whose source contains the token is not cached. Only the shared
-cache's files carry the token: the copies of transformed modules the forks pool
-keeps when `fsModuleCache` is off are written as before, because nothing puts a
-root back into them.
+source map's `file` becomes the bare file name, and the metadata is marked
+`portable`. On read, the main process and the worker (which reads the cached file
+itself) put the reading checkout's root back, only into a file marked portable;
+the main process passes the mark to the worker with each module it serves. A
+module whose source names the checkout's root keeps that root in its key, and a
+module whose source contains the token is not cached. Only the shared cache's
+files carry the token: the copies of transformed modules the forks pool keeps
+(when `fsModuleCache` is off, or for a module the cache skips) are written as
+before and not marked, so a token in such a module's source reaches it unchanged.
 
 **A cached import that is missing here is transformed again.** Worktrees at
 different commits meet in one cache. An importer whose source did not change

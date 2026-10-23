@@ -374,6 +374,10 @@ describe("the shared fs module cache", () => {
         expect(log).not.toContain(`[write] ${helperLine(root)} is cached in ${cache}`);
         expect(log).not.toContain(`[read] ${helperLine(root)}`);
       }
+      // the temporary copy is not portable, so the worker leaves the token as written
+      for (const { results } of [firstRun, secondRun]) {
+        expect(results["imports the helper this checkout has"]?.status).toBe("passed");
+      }
     }, 120_000);
   });
 });
