@@ -79,6 +79,7 @@ import { doorCredentialOf } from "./credential-census.ts";
 import {
   admittedOwnerlessProjectKeyFor,
   OWNERLESS_PROJECT_KEY_PROOF_CODE_PATH,
+  recordRouteTemplate,
 } from "./credential.ts";
 import {
   DOOR_SCOPE_TIER,
@@ -544,6 +545,8 @@ function assertPortsBound<Api>({
 
     assertDoorQuestions({ address, route, door, credential });
 
+    assertLegacyKeyScopes({ address, route, door, credential });
+
     if (anonymousOnRefusal(route) && !door.identify) {
       throw new Error(
         `REST ${address} answers a refused credential as none, and this runtime ` +
@@ -599,6 +602,38 @@ function assertDoorQuestions({
 /** Whether the route asks its plan before its permission (Q31), at the credential's scope. */
 function planFirst(route: RestTransportRoute<unknown>): boolean {
   return route.entitlement?.before === "permission";
+}
+
+/**
+ * A legacy key scope is told to the project door when it asks the route's permission, so the
+ * route must ask one before the body; a door that lists its scopes refuses a name it lacks.
+ */
+function assertLegacyKeyScopes({
+  address,
+  route,
+  door,
+  credential,
+}: {
+  address: string;
+  route: RestTransportRoute<unknown>;
+  door: RestIdentity;
+  credential: RestDoorCredential;
+}): void {
+  const scopes = route.legacyKeyScopes;
+  if (!scopes) return;
+
+  if (credential !== "project" || !route.permission || identifiedFirst({ route, credential })) {
+    throw new Error(
+      `REST ${address} names a legacy key scope, which only a project door route that asks ` +
+        "its permission before the body can carry",
+    );
+  }
+  const unknown = door.legacyKeyScopes
+    ? scopes.filter((scope) => !door.legacyKeyScopes?.includes(scope))
+    : [];
+  if (unknown.length > 0) {
+    throw new Error(`REST ${address} names unknown legacy key scopes: ${unknown.join(", ")}`);
+  }
 }
 
 /** Whether the door only identifies the caller, leaving the permission to be asked later. */
@@ -806,7 +841,12 @@ function routeStack<Api>({
   const publishable = route.anyMethod !== true && declaration.credential !== "browser";
   const documents = documented && publishable;
   const credential = route.credential ?? declaration.credential;
-  const door = authenticateMiddleware({ route, credential, ports });
+  const door = authenticateMiddleware({
+    route,
+    credential,
+    ports,
+    template: `${route.method.toUpperCase()} ${basePathOf(declaration)}${route.path}`,
+  });
   const refusal = routeRefusal({ route, door: doorOf({ credential, ports }) });
 
   // Ahead of the validators: they read the body to parse it, and a stream
@@ -899,13 +939,17 @@ function authenticateMiddleware({
   route,
   credential,
   ports,
+  template,
 }: {
   route: RestTransportRoute<unknown>;
   credential: RestDoorCredential;
   ports: RestRuntimeMembers;
+  /** The route as `METHOD /path/:param`, which the door may log; never the concrete URL. */
+  template: string;
 }): MiddlewareHandler {
   return async (context, next) => {
     if (route.access?.kind !== "public") {
+      recordRouteTemplate(context.req.raw, template);
       const caller = await callerOf({
         route,
         door: doorOf({ credential, ports }),
@@ -2283,6 +2327,7 @@ async function callerOf({
     permissions: routePermissions(route),
     ...(route.permissionReach ? { reach: route.permissionReach } : {}),
     ...(route.keyKinds ? { keyKinds: route.keyKinds } : {}),
+    ...(route.legacyKeyScopes ? { legacyKeyScopes: route.legacyKeyScopes } : {}),
   });
 }
 

@@ -1118,7 +1118,7 @@ interface Query {
   format?: string;
   llmMode?: string;
 }
-// Response: inline, src/transport/trace-legacy.rest.ts:387
+// Response: inline, src/transport/trace-legacy.rest.ts:388
 type Response = unknown;
 ```
 
@@ -1126,13 +1126,13 @@ type Response = unknown;
 
 Returns a public path for a trace
 
-Permission `traces:share`. Declared at `src/transport/trace-legacy.rest.ts:407`.
+Permission `traces:share`. Declared at `src/transport/trace-legacy.rest.ts:408`.
 
 Answers at `/api/trace/:id/share`.
 
 ```typescript
 type Params = z.infer<typeof traceLegacyIdParamsSchema>; // ../contract/src/trace-rest.schemas.ts:159
-// Response: inline, src/transport/trace-legacy.rest.ts:412
+// Response: inline, src/transport/trace-legacy.rest.ts:413
 type Response = unknown;
 ```
 
@@ -1140,13 +1140,13 @@ type Response = unknown;
 
 Deletes a public path for a trace
 
-Permission `traces:share`. Declared at `src/transport/trace-legacy.rest.ts:428`.
+Permission `traces:share`. Declared at `src/transport/trace-legacy.rest.ts:429`.
 
 Answers at `/api/trace/:id/unshare`.
 
 ```typescript
 type Params = z.infer<typeof traceLegacyIdParamsSchema>; // ../contract/src/trace-rest.schemas.ts:159
-// Response: inline, src/transport/trace-legacy.rest.ts:433
+// Response: inline, src/transport/trace-legacy.rest.ts:434
 type Response = unknown;
 ```
 
@@ -1154,20 +1154,20 @@ type Response = unknown;
 
 Search traces
 
-Permission `traces:view`. Declared at `src/transport/trace-legacy.rest.ts:452`.
+Permission `traces:view`. Declared at `src/transport/trace-legacy.rest.ts:453`.
 
 Answers at `/api/trace/search`.
 
 ```typescript
-// Body: inline, src/transport/trace-legacy.rest.ts:455
+// Body: inline, src/transport/trace-legacy.rest.ts:456
 type Body = Record<string, unknown>;
-// Response: inline, src/transport/trace-legacy.rest.ts:459
+// Response: inline, src/transport/trace-legacy.rest.ts:461
 type Response = unknown;
 ```
 
 #### `GET /api/thread/:threadId` · `getLegacyThread`
 
-Permission `traces:view`. Hidden from the OpenAPI document. Declared at `src/transport/trace-legacy.rest.ts:481`.
+Permission `traces:view`. Hidden from the OpenAPI document. Declared at `src/transport/trace-legacy.rest.ts:483`.
 
 Answers at `/api/thread/:threadId`.
 
@@ -1176,7 +1176,7 @@ Answers at `/api/thread/:threadId`.
 interface Params {
   threadId: string;
 }
-// Response: inline, src/transport/trace-legacy.rest.ts:485
+// Response: inline, src/transport/trace-legacy.rest.ts:488
 type Response = unknown;
 ```
 
@@ -1200,7 +1200,7 @@ Answers at `/api/traces/search`, `/api/v1/traces/search`; also, undocumented, `/
 
 ```typescript
 type Body = z.infer<typeof traceSearchBodySchema>; // ../contract/src/trace-rest.schemas.ts:131
-// Response: inline, src/transport/traces.rest.ts:328
+// Response: inline, src/transport/traces.rest.ts:329
 type Response = unknown;
 ```
 
@@ -1208,7 +1208,7 @@ type Response = unknown;
 
 Discover what the trace filter fields hold
 
-Permission `traces:view`. Declared at `src/transport/traces.rest.ts:350`.
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:351`.
 
 Answers at `/api/traces/facets`, `/api/v1/traces/facets`; also, undocumented, `/api/traces/2026-08-07/facets`, `/api/v1/traces/2026-08-07/facets`, `/api/traces/latest/facets`, `/api/v1/traces/latest/facets`.
 
@@ -1230,7 +1230,7 @@ type Response = Record<string, unknown>;
 
 Derived coding-agent transcript for a trace: what the agent did, in order, with per-call token and cost economics. Empty entries for traces without coding-agent content.
 
-Permission `traces:view`. Declared at `src/transport/traces.rest.ts:383`.
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:385`.
 
 Answers at `/api/traces/:traceId/transcript`, `/api/v1/traces/:traceId/transcript`; also, undocumented, `/api/traces/2026-08-07/:traceId/transcript`, `/api/v1/traces/2026-08-07/:traceId/transcript`, `/api/traces/latest/:traceId/transcript`, `/api/v1/traces/latest/:traceId/transcript`.
 
@@ -1246,7 +1246,7 @@ type Response = z.infer<typeof transcriptRestResponseSchema>; // ../contract/src
 
 Update metadata on a trace after creation. Inserts a synthetic span carrying the new attributes through the standard ingestion pipeline. New keys are added, existing keys are updated, missing keys are preserved. Labels replace entirely.
 
-Permission `traces:update`. Declared at `src/transport/traces.rest.ts:422`.
+Permission `traces:update`. Declared at `src/transport/traces.rest.ts:425`.
 
 Answers at `/api/traces/:traceId/metadata`, `/api/v1/traces/:traceId/metadata`; also, undocumented, `/api/traces/2026-08-07/:traceId/metadata`, `/api/v1/traces/2026-08-07/:traceId/metadata`, `/api/traces/latest/:traceId/metadata`, `/api/v1/traces/latest/:traceId/metadata`.
 
@@ -1266,7 +1266,7 @@ interface Response {
 
 Get a single trace by ID.
 
-Permission `traces:view`. Declared at `src/transport/traces.rest.ts:448`.
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:451`.
 
 Answers at `/api/traces/:traceId`, `/api/v1/traces/:traceId`; also, undocumented, `/api/traces/2026-08-07/:traceId`, `/api/v1/traces/2026-08-07/:traceId`, `/api/traces/latest/:traceId`, `/api/v1/traces/latest/:traceId`.
 
