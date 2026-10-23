@@ -59,6 +59,7 @@ const TARGET_FILES = new Set([
   "rest/cli-token-identity.ts",
   "rest/confirmation.ts",
   "rest/credential.ts",
+  "rest/credential-census.ts",
   "rest/declaration.ts",
   "rest/door.ts",
   "rest/host.ts",

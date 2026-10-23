@@ -13,12 +13,12 @@ import { MemoryMcpOAuthClientRepository } from "../../repositories/memory/memory
 import { MemoryMcpSessionRepository } from "../../repositories/memory/memory.mcp-session.repository.ts";
 import { RedisMcpOAuthTokenRepository } from "../../repositories/redis/redis.mcp-oauth-token.repository.ts";
 import type { AuthzMcpSessionGrantService } from "../../services/authz-mcp-session-grant.service.ts";
-import type { HeaderMcpClientAddressService } from "../../services/header-mcp-client-address.service.ts";
 import { McpEndpointService, type McpHandler } from "../../services/mcp-endpoint.service.ts";
 import type {
   McpLiveProjectLookup,
   ProjectMcpProjectLookupService,
 } from "../../services/project-mcp-project-lookup.service.ts";
+import type { ResolvedMcpClientAddressService } from "../../services/resolved-mcp-client-address.service.ts";
 import { FakeCliSessions } from "./support/fake-cli-sessions.ts";
 
 const counted = vi.hoisted(() => [] as Census.CensusRequest[]);
@@ -52,7 +52,7 @@ class AlwaysGranted implements Pick<AuthzMcpSessionGrantService, "stillGranted">
   }
 }
 
-class LoopbackAddress implements Pick<HeaderMcpClientAddressService, "clientIp"> {
+class LoopbackAddress implements Pick<ResolvedMcpClientAddressService, "clientIp"> {
   clientIp(request: IncomingMessage): string {
     return request.socket.remoteAddress ?? "127.0.0.1";
   }
