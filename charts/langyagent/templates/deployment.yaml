@@ -95,12 +95,12 @@ spec:
                   key: {{ $.Values.mirror.traceKeyKey }}
             {{- end }}
             {{- $owned := splitList "," (include "langyagent.ownedEnvNames" .) }}
-            {{- range .Values.extraEnv }}
+            {{- range .Values.extraEnvs }}
             {{- if has .name $owned }}
-            {{- fail (printf "langyagent.extraEnv sets %s, which the chart sets itself; use the chart value that controls it instead of extraEnv" .name) }}
+            {{- fail (printf "langyagent.extraEnvs sets %s, which the chart sets itself; use the chart value that controls it instead of extraEnvs" .name) }}
             {{- end }}
             {{- end }}
-            {{- with .Values.extraEnv }}
+            {{- with .Values.extraEnvs }}
             # Operator-supplied environment, appended after the chart's own.
             {{- toYaml . | nindent 12 }}
             {{- end }}

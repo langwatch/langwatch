@@ -122,7 +122,7 @@ workspaceVolume:
   # emptyDir spec (e.g. medium: Memory).
   sizeLimit: 2Gi
 
-## @param scratchSizeLimit [string, default: 1Gi] Size cap for the writable /tmp emptyDir required under readOnlyRootFilesystem. Empty renders an uncapped emptyDir.
+## @param scratchSizeLimit [string, default: 1Gi] Size cap for the writable /tmp emptyDir required under readOnlyRootFilesystem. Empty renders an uncapped emptyDir, which removes the only bound on a path the agent's workers write to: a worker can then fill the node's ephemeral storage and get neighbouring pods evicted. Leave it set unless the node's own ephemeral-storage limits cover this.
 scratchSizeLimit: 1Gi
 
 ## SecurityContext.
@@ -368,16 +368,19 @@ fullnameOverride: ""
 # ── Taking over objects created by another tool ─────────────────────────────
 # These values let an install hand an existing langyagent Deployment, Service
 # and ConfigMap over to this chart without deleting and recreating them. Leave
-# them at their defaults on a fresh install.
+# them at their defaults on a fresh install. Helm refuses an object it does not
+# own: run the install with --take-ownership (Helm 3.17 or later), or first
+# annotate each object meta.helm.sh/release-name and
+# meta.helm.sh/release-namespace and label it app.kubernetes.io/managed-by=Helm.
 
-## @param selectorLabels [object, default: {}] Replaces the default selector labels (app.kubernetes.io/name + instance) on the Deployment selector, the Service selector, the NetworkPolicy and the PDB. A Deployment's selector cannot be changed after creation, so set this only to keep an existing Deployment's selector when this chart takes it over.
+## @param selectorLabels [object, default: {}] Replaces the default selector labels (app.kubernetes.io/name + instance) on the Deployment selector, the Service selector, the NetworkPolicy, the CiliumNetworkPolicy and the PDB. A Deployment's selector cannot be changed after creation, so set this only to keep an existing Deployment's selector when this chart takes it over.
 selectorLabels: {}
 
 ## @param podLabels [object, default: {}] Extra labels on the pod template. The selector labels win on a shared key.
 podLabels: {}
 
-## @param extraEnv [array, default: []] Extra container environment entries, appended after the chart's own (same shape as a container's env list, so valueFrom works).
-extraEnv: []
+## @param extraEnvs [array, default: []] Extra container environment entries, appended after the chart's own (same shape as a container's env list, so valueFrom works).
+extraEnvs: []
 
 ## @param extraConfig [object, default: {}] Extra keys for the agent ConfigMap. A key the chart already writes is refused at render time; set it through its own value.
 extraConfig: {}

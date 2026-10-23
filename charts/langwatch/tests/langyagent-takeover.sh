@@ -2,7 +2,7 @@
 #
 # Renders the standalone langyagent chart and asserts the values that let an
 # install take over existing agent objects in place: selectorLabels, podLabels,
-# extraEnv, extraConfig, service.annotations, progressDeadlineSeconds and an
+# extraEnvs, extraConfig, service.annotations, progressDeadlineSeconds and an
 # uncapped scratch volume. See specs/langy/langyagent-chart-takeover.feature.
 #
 # The selector matters most: a Deployment's spec.selector is immutable, so a
@@ -62,9 +62,9 @@ scratch_volume() { awk 'done { next } /^        - name: tmp$/ { grab = 1; next }
 TAKEOVER=(
   --set-json 'selectorLabels={"app":"existing-agent"}'
   --set-json 'podLabels={"team":"agents","app":"other"}'
-  --set-json 'extraEnv=[{"name":"EXTRA_FROM_SECRET","valueFrom":{"secretKeyRef":{"name":"agent-extra","key":"EXTRA"}}}]'
+  --set-json 'extraEnvs=[{"name":"EXTRA_FROM_SECRET","valueFrom":{"secretKeyRef":{"name":"agent-extra","key":"EXTRA"}}}]'
   --set-json 'extraConfig={"LOG_FORMAT":"json"}'
-  --set-json 'service.annotations={"service.kubernetes.io/topology-mode":"Auto"}'
+  --set-json 'service.annotations={"service.kubernetes.io/topology-mode":"Auto","prometheus.io/scrape":true}'
   --set progressDeadlineSeconds=1800
   --set scratchSizeLimit=
 )
@@ -120,9 +120,9 @@ test_extra_env_appended() {
   local env
   env="$(render "${TAKEOVER[@]}" | doc_of Deployment | block_after '          env:' | grep -E '^ *- name:' | sed 's/.*name: //')"
   if [[ "$(head -1 <<<"$env")" == "LANGY_INTERNAL_SECRET" && "$(tail -1 <<<"$env")" == "EXTRA_FROM_SECRET" ]]; then
-    pass "extraEnv appended"
+    pass "extraEnvs appended"
   else
-    fail "extraEnv appended" "env order: $(tr '\n' ' ' <<<"$env")"
+    fail "extraEnvs appended" "env order: $(tr '\n' ' ' <<<"$env")"
   fi
 }
 
@@ -149,9 +149,9 @@ test_extra_env_refuses_owned_name() {
   local out
   # A container's env entries win over its envFrom, so this pair would turn
   # worker isolation off in a production pod if it rendered.
-  if out="$(render --set-json 'extraEnv=[{"name":"ENVIRONMENT","value":"local"},{"name":"LANGY_UNSAFE_DEV_DISABLE_ISOLATION","value":"true"}]' 2>&1)"; then
+  if out="$(render --set-json 'extraEnvs=[{"name":"ENVIRONMENT","value":"local"},{"name":"LANGY_UNSAFE_DEV_DISABLE_ISOLATION","value":"true"}]' 2>&1)"; then
     fail "owned env name refused" "render succeeded"
-  elif grep -q 'extraEnv sets ENVIRONMENT, which the chart sets itself' <<<"$out"; then
+  elif grep -q 'extraEnvs sets ENVIRONMENT, which the chart sets itself' <<<"$out"; then
     pass "owned env name refused"
   else
     fail "owned env name refused" "failed for another reason: $(tr '\n' ' ' <<<"$out" | cut -c1-200)"
@@ -162,8 +162,11 @@ test_extra_env_refuses_owned_name() {
 test_annotations_and_deadline() {
   local out
   out="$(render "${TAKEOVER[@]}")"
-  doc_of Service <<<"$out" | grep 'service.kubernetes.io/topology-mode: Auto' >/dev/null &&
+  doc_of Service <<<"$out" | grep 'service.kubernetes.io/topology-mode: "Auto"' >/dev/null &&
     pass "Service annotations" || fail "Service annotations" "missing"
+  doc_of Service <<<"$out" | grep 'prometheus.io/scrape: "true"' >/dev/null &&
+    pass "Service annotation values are strings" ||
+    fail "Service annotation values are strings" "a boolean value was not quoted"
   doc_of Deployment <<<"$out" | grep '^  progressDeadlineSeconds: 1800$' >/dev/null &&
     pass "progressDeadlineSeconds" || fail "progressDeadlineSeconds" "missing"
   render | doc_of Deployment | grep 'progressDeadlineSeconds' >/dev/null &&

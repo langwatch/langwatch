@@ -5,6 +5,10 @@ Feature: The langyagent chart can take over an existing agent Deployment
   selector can never change after creation, so the chart has to be able to
   render the selector, names, labels and settings the existing objects have.
   A fresh install sets none of these values and renders exactly as before.
+  Helm itself still refuses an object it does not own: the takeover install
+  runs with --take-ownership (Helm 3.17 or later), or each object is first
+  annotated with meta.helm.sh/release-name and meta.helm.sh/release-namespace
+  and labelled app.kubernetes.io/managed-by=Helm.
 
   Bound by charts/langwatch/tests/langyagent-takeover.sh.
 
@@ -32,7 +36,7 @@ Feature: The langyagent chart can take over an existing agent Deployment
 
   @regression
   Scenario: Extra environment entries are appended to the agent container
-    Given extraEnv lists an entry that reads a Secret key
+    Given extraEnvs lists an entry that reads a Secret key
     When the chart is rendered
     Then the agent container has that entry after the chart's own
 
@@ -50,7 +54,7 @@ Feature: The langyagent chart can take over an existing agent Deployment
 
   @regression
   Scenario: Extra environment entries cannot replace a variable the chart sets
-    Given extraEnv sets ENVIRONMENT, which the chart writes to the ConfigMap
+    Given extraEnvs sets ENVIRONMENT, which the chart writes to the ConfigMap
     When the chart is rendered
     Then the render fails and names the value to use instead
 
@@ -58,7 +62,7 @@ Feature: The langyagent chart can take over an existing agent Deployment
   Scenario: Service annotations and the rollout deadline are rendered when set
     Given service.annotations and progressDeadlineSeconds are set
     When the chart is rendered
-    Then the Service carries the annotations
+    Then the Service carries the annotations, each value a string
     And the Deployment has that progress deadline
 
   @regression

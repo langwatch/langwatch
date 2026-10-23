@@ -9,7 +9,10 @@ metadata:
   name: {{ include "langyagent.fullname" . }}
   labels: {{- include "langyagent.labels" . | nindent 4 }}
   {{- with .Values.service.annotations }}
-  annotations: {{- toYaml . | nindent 4 }}
+  annotations:
+    {{- range $key, $value := . }}
+    {{ $key }}: {{ $value | toString | quote }}
+    {{- end }}
   {{- end }}
 spec:
   # ClusterIP only — the agent is never exposed outside the cluster. The
