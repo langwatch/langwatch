@@ -11,6 +11,7 @@ import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import { MemoryInstantEvalRateLimiter } from "../../__tests__/support/instant-eval-rate-limiter.test-fakes.ts";
+import { MemoryInstantEvalDecisionModelChannel } from "../../channels/memory/memory.instant-eval-decision-model.channel.ts";
 import {
   MemoryInstantEvalJudgeProjectRepository,
   MemoryInstantEvalJudgeRepositories,
@@ -52,6 +53,7 @@ describe("given the judge's spend pipeline", () => {
     it("records one spend row with the customer price, and answers that price", async () => {
       const { repositories, facts, append } = harness();
       const judge = InstantEvalJudgeService.create({
+        decisionModels: MemoryInstantEvalDecisionModelChannel.create(),
         repositories,
         limiter: MemoryInstantEvalRateLimiter.create(),
         classifier: {

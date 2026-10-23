@@ -1,0 +1,659 @@
+name: nightly
+
+# The nightly suite: every check too slow or too costly for a pull request, once
+# a night at 01:00 UTC when the runners are idle, reported on one pinned issue.
+#
+# - codebase-health, migration-compat, npx-server-smoke and gateway-matrix are
+#   the workflows that used to schedule themselves. They are reusable now
+#   (workflow_call) and keep their own manual and pull request or push triggers;
+#   this workflow is their only schedule.
+# - hygiene: the full typecheck, oxlint plain and type-aware, the architecture
+#   enforcer, the pull request lint job's blocking checks and golangci-lint,
+#   counted per rule against last night. A report, not a gate: it goes red only
+#   on something new (.github/scripts/nightly-hygiene.ts).
+# - flaky: every package suite three times in shuffled order, each run under its
+#   own seed, sharded like the pull request package-suites job. Red only for a
+#   test that was not flaky last night (.github/scripts/nightly-flaky.ts).
+# - upgrade-lab: one representative upgradelab cell, the last release upgraded
+#   to head under traffic (tools/upgradelab).
+# - dashboard: after every job, rewrites the pinned issue labelled
+#   codebase-health-dashboard and raises a failed job as a nightly-regression
+#   issue. On any branch but the default one it writes the run summary only.
+#
+# GitHub schedules from the default branch's copy of this file, so the first
+# scheduled run is the first 01:00 UTC after it lands there. A dispatch from a
+# branch runs everything and touches no issue.
+#
+# Spec: specs/ci/nightly-suite.feature
+
+on:
+  schedule:
+    - cron: "0 1 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# No concurrency group, on purpose. A group with cancel-in-progress would let one
+# nightly cancel another, and even without it GitHub cancels whichever run is
+# already pending in a group when a new one queues. The called workflows keep
+# their own groups, which cancel only for a pull request or a branch push.
+
+jobs:
+  codebase-health:
+    uses: ./.github/workflows/codebase-health.yml
+    permissions:
+      contents: read
+      issues: write
+      actions: read
+    with:
+      publish: ${{ github.ref_name == github.event.repository.default_branch }}
+
+  migration-compat:
+    uses: ./.github/workflows/migration-compat.yml
+    permissions:
+      contents: read
+
+  npx-server-smoke:
+    uses: ./.github/workflows/npx-server-smoke.yml
+    permissions:
+      contents: read
+    secrets: inherit
+
+  gateway-matrix:
+    uses: ./.github/workflows/gateway-matrix.yaml
+    permissions:
+      contents: read
+      pull-requests: read
+    secrets: inherit
+
+  # ---------------------------------------------------------------------------
+  # Hygiene and lint: what the pull request jobs check, over the whole tree.
+
+  hygiene-ts:
+    name: hygiene (TypeScript)
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      SKIP_ENV_VALIDATION: "true"
+      # As the pull request lint job: no local slot queue on a runner of its own.
+      LANGWATCH_LINT_SLOTS: "0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            /*
+            !/docs/media/
+            !/docs/images/
+          sparse-checkout-cone-mode: false
+
+      # The architecture policy tests read the released cutoff from the newest
+      # langwatch@v* tag and fail without one; this shallow clone has no tags.
+      - name: Fetch release tags
+        run: git fetch --no-tags --depth=1 --filter=blob:none origin '+refs/tags/langwatch@v*:refs/tags/langwatch@v*'
+
+      - uses: ./.github/actions/setup-pnpm-node
+        with:
+          install: all
+
+      - uses: ./.github/actions/prepare-generated-files
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
+
+      # The blocking checks of langwatch-app-ci.yml's lint job, each recorded as
+      # pass or fail so a check that starts failing on main is new tonight.
+      # Keep this list in step with that job.
+      - name: Pull request lint checks
+        run: |
+          check() {
+            local name="$1"; shift
+            echo "::group::$name"
+            set +e
+            "$@"
+            local status=$?
+            set -e
+            echo "::endgroup::"
+            printf '%s\t%s\n' "$name" "$status" >> hygiene/checks.tsv
+          }
+          mkdir -p hygiene
+          check workspace-invariants pnpm --filter @langwatch/server run test:invariants
+          check oxfmt pnpm format:check
+          check architecture-policy-typecheck pnpm --filter @langwatch/architecture-enforcer typecheck
+          check architecture-policy-tests pnpm --filter @langwatch/architecture-enforcer test
+          check oxlint-rule-tests pnpm --filter @langwatch/oxlint-rules test
+          check lint-rule-reference pnpm --filter @langwatch/architecture-enforcer docs:check
+          check project-references env NX_LOAD_DOT_ENV_FILES=false pnpm exec nx sync:check
+          check image-code-steps node --disable-warning=ExperimentalWarning --experimental-transform-types packages/upgrade/scripts/image-code-steps.ts --check
+          check generated-readmes pnpm check:readmes
+          cat hygiene/checks.tsv
+
+      - name: Typecheck, whole workspace
+        run: |
+          set +e
+          pnpm typecheck --skip-nx-cache > hygiene/typecheck.log 2>&1
+          echo $? > hygiene/typecheck-exit.txt
+          tail -n 20 hygiene/typecheck.log
+
+      # Every policy but `declarations`, which needs `tsc -b`'s output. Exit 1 means
+      # findings; a crash leaves no summary, which the report reads as no report,
+      # so the step never stops the lint steps after it.
+      - name: Architecture enforcer, every policy but declarations
+        run: pnpm lint:architecture --no-declarations > hygiene/architecture.txt 2>&1 || tail -n 3 hygiene/architecture.txt
+
+      # Exit 1 is findings. stderr is kept with them: a process that failed to
+      # run says so there, which is how the report tells a crash from a clean tree.
+      - name: Oxlint, whole tree
+        run: pnpm lint > hygiene/lint.txt 2>&1 || tail -n 3 hygiene/lint.txt
+
+      - name: Oxlint type-aware, every project
+        run: pnpm lint:types > hygiene/lint-types.txt 2>&1 || tail -n 3 hygiene/lint-types.txt
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: nightly-hygiene-ts
+          path: hygiene/
+          retention-days: 7
+          if-no-files-found: warn
+
+  hygiene-go:
+    name: hygiene (Go)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
+
+      # The version go-ci pins. Installed only: the run below writes JSON.
+      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: v2.14.0
+          install-only: true
+
+      # go-ci's module selection, with tools/thuishaven kept in and every linter
+      # on, the house rules (funlen, gocognit, revive) included: go-ci gates
+      # those on changed lines, and this is where their standing count shows.
+      - name: golangci-lint, every module and linter
+        run: |
+          mkdir -p hygiene
+          mapfile -t pkgs < <(go work edit -json | jq -r '.Use[].DiskPath | select(. != "./sdks/go" and . != "./infra/clickhouse-serverless") | . + "/..."')
+          mapfile -t dirs < <(go list -f '{{.Dir}}' "${pkgs[@]}" | sed "s#^$PWD/#./#")
+          golangci-lint run --issues-exit-code=0 --output.json.path=hygiene/golangci.json "${dirs[@]}" || echo "golangci-lint exited $?"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: nightly-hygiene-go
+          path: hygiene/
+          retention-days: 7
+          if-no-files-found: warn
+
+  hygiene-report:
+    name: hygiene report
+    needs: [hygiene-ts, hygiene-go]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            .github
+            dev/scripts
+
+      - uses: ./.github/actions/setup-pnpm-node
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: nightly-hygiene-*
+          path: inputs
+          merge-multiple: true
+
+      - name: Last night's report
+        run: node --experimental-strip-types .github/scripts/nightly-artifacts.ts --name nightly-hygiene --min-age-days 0 --dir previous
+
+      - name: Count, compare and report
+        run: >-
+          node --experimental-strip-types .github/scripts/nightly-hygiene.ts
+          --dir inputs --previous previous/hygiene.json --out hygiene.json --markdown hygiene.md
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: nightly-hygiene
+          path: |
+            hygiene.json
+            hygiene.md
+          retention-days: 35
+          if-no-files-found: warn
+
+  # ---------------------------------------------------------------------------
+  # Flaky-test hunt: the package suites, three times each in shuffled order.
+  # The setup mirrors langwatch-app-ci.yml's package-suites job; keep them in step.
+
+  flaky-hunt:
+    name: flaky hunt (shard ${{ matrix.shard }}/8, run ${{ matrix.run }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 12
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+        run: [1, 2, 3]
+    env:
+      # langwatch-app-ci.yml sets this at workflow level; the tasks refuse to boot without it.
+      NODE_ENV: "test"
+      BUILD_TIME: "true"
+      BASE_HOST: "localhost:3000"
+      NEXTAUTH_SECRET: "nextauth-secret-for-ci-testing"
+      NEXTAUTH_URL: "http://localhost:3000"
+      API_TOKEN_JWT_SECRET: "api-jwt-secret-for-ci-testing"
+      DATABASE_URL: "postgresql://langwatch_ci:ci_password@localhost:5432/langwatch_test"
+      CLICKHOUSE_URL: "http://default:ci_password@localhost:8123/test_langwatch"
+      REDIS_URL: "redis://localhost:6379"
+      CI_REDIS_URL: "redis://localhost:6379"
+      CI_CLICKHOUSE_URL: "http://default:ci_password@localhost:8123/test_langwatch"
+      LANGWATCH_NLP_SERVICE: "http://localhost:5561"
+      LANGWATCH_ENDPOINT: "http://localhost:3000"
+      VITEST_ISOLATE_WORKER_REDIS: "1"
+      CI: "true"
+    services:
+      redis:
+        image: redis:alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      postgres:
+        image: postgres:16
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_USER: langwatch_ci
+          POSTGRES_PASSWORD: ci_password
+          POSTGRES_DB: langwatch_test
+        options: >-
+          --health-cmd "PGPASSWORD=ci_password psql -U langwatch_ci -d langwatch_test -c 'select 1'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          sparse-checkout: |
+            /*
+            !/docs/media/
+            !/docs/images/
+          sparse-checkout-cone-mode: false
+
+      - name: Fetch release tags
+        run: git fetch --no-tags --depth=1 --filter=blob:none origin '+refs/tags/langwatch@v*:refs/tags/langwatch@v*'
+
+      - uses: ./.github/actions/setup-pnpm-node
+        with:
+          install: "all"
+
+      - uses: ./.github/actions/prepare-generated-files
+
+      - name: Generate a throwaway CREDENTIALS_SECRET
+        run: echo "CREDENTIALS_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+
+      - name: Install Goose migration tool
+        run: bash .github/scripts/install-goose.sh
+
+      - name: Start ClickHouse with storage policy
+        env:
+          CLICKHOUSE_PASSWORD: ci_password
+        run: bash .github/scripts/start-clickhouse-with-storage-policy.sh
+
+      - name: Build workspace packages
+        run: pnpm run ensure:built
+
+      - name: Run the upgrade (Postgres and ClickHouse migrations)
+        working-directory: apps/tasks
+        run: |
+          for i in 1 2 3; do
+            if env -u BUILD_TIME pnpm task upgrade; then
+              exit 0
+            fi
+            if [ "$i" -lt 3 ]; then
+              echo "upgrade attempt $i failed; sleeping 5s and retrying"
+              sleep 5
+            fi
+          done
+          exit 1
+
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
+      - name: Build chart dependencies
+        run: pnpm exec nx run chart-langwatch:helm:deps --outputStyle=static
+
+      # The same seed for a run index on every shard, different per run index
+      # and per night. The seed is in each report's directory name.
+      - name: Choose the seed
+        id: seed
+        run: echo "seed=$(( (GITHUB_RUN_ID % 100000) * 10 + ${{ matrix.run }} ))" >> "$GITHUB_OUTPUT"
+
+      # A failing suite is what this job is looking for, so it does not fail the job;
+      # the report job reads every run and decides.
+      - name: Run the package suites shuffled
+        env:
+          REQUIRE_HELM_TESTS: "1"
+          PACKAGE_SUITES_SHARD: ${{ matrix.shard }}/8
+          PACKAGE_SUITES_VITEST_ARGS: --sequence.shuffle --sequence.seed=${{ steps.seed.outputs.seed }}
+          PACKAGE_SUITES_REPORT_DIR: flaky-results/seed-${{ steps.seed.outputs.seed }}
+        run: |
+          mkdir -p "$PACKAGE_SUITES_REPORT_DIR"
+          node --experimental-strip-types .github/scripts/run-package-suites.ts || echo "some suites failed with seed ${{ steps.seed.outputs.seed }}"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: flaky-results-${{ matrix.shard }}-${{ matrix.run }}
+          path: flaky-results/
+          retention-days: 7
+          if-no-files-found: warn
+
+  flaky-report:
+    name: flaky-test report
+    needs: flaky-hunt
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            .github
+            dev/scripts
+
+      - uses: ./.github/actions/setup-pnpm-node
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: flaky-results-*
+          path: results
+          merge-multiple: true
+
+      - name: Last night's report
+        run: node --experimental-strip-types .github/scripts/nightly-artifacts.ts --name nightly-flaky --min-age-days 0 --dir previous
+
+      # The hunt's runners checked out to the same path as this one, so the
+      # reports' absolute test paths are made relative against it.
+      - name: Find the flaky tests
+        run: >-
+          node --experimental-strip-types .github/scripts/nightly-flaky.ts
+          --dir results --root "$GITHUB_WORKSPACE" --previous previous/flaky.json
+          --out flaky.json --markdown flaky.md
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: nightly-flaky
+          path: |
+            flaky.json
+            flaky.md
+          retention-days: 35
+          if-no-files-found: warn
+
+  # ---------------------------------------------------------------------------
+  # Upgrade lab: the last release upgraded to head under traffic, judged on its
+  # invariants. tools/upgradelab/README.md; specs/upgrade/upgrade-matrix.feature.
+  # The cell manages its own redis-server; Postgres and ClickHouse are service
+  # containers handed to it directly, since haven's native datastores are
+  # brew-managed and do not run on Linux.
+
+  upgrade-lab:
+    name: upgrade lab (cloud S typical seed 1)
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    services:
+      postgres:
+        image: postgres:16
+        ports:
+          - 5433:5432
+        env:
+          POSTGRES_DB: postgres
+          POSTGRES_USER: prisma
+          POSTGRES_PASSWORD: prisma
+        options: >-
+          --health-cmd "pg_isready -U prisma"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      clickhouse:
+        image: clickhouse/clickhouse-server:25.10.2.65
+        ports:
+          - 8123:8123
+        env:
+          CLICKHOUSE_DB: default
+          CLICKHOUSE_USER: default
+          CLICKHOUSE_PASSWORD: ci_password
+        options: >-
+          --health-cmd "wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      CELL: cloud-S-typical-1
+    steps:
+      # Two monorepo installs and two builds do not fit the runner's free disk.
+      - name: Free disk space
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/boost /opt/hostedtoolcache/CodeQL
+          df -h /
+
+      - name: Check out head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          path: head
+          sparse-checkout: |
+            /*
+            !/docs/media/
+            !/docs/images/
+          sparse-checkout-cone-mode: false
+
+      # The last release is the newest manifest in packages/upgrade/releases, as
+      # migration-compat's previous-release job reads it; its tag is v<version>.
+      - name: Find the last release
+        id: release
+        run: |
+          release="$(find head/packages/upgrade/releases -maxdepth 1 -name '*.json' -printf '%f\n' | sed -n 's/^\([0-9]*\.[0-9]*\.[0-9]*\)\.json$/\1/p' | sort -V | tail -n 1)"
+          test -n "$release"
+          echo "version=$release" >> "$GITHUB_OUTPUT"
+          echo "Upgrading from v$release"
+
+      - name: Check out the last release
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          ref: v${{ steps.release.outputs.version }}
+          path: from
+          sparse-checkout: |
+            /*
+            !/docs/media/
+            !/docs/images/
+          sparse-checkout-cone-mode: false
+
+      - name: Datastore clients and redis-server
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q redis-server postgresql-client
+          # The cell starts its own redis-server on a free port; the system one is not used.
+          sudo systemctl stop redis-server || true
+          bash head/.github/scripts/install-goose.sh
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: head/go.work
+          cache-dependency-path: "head/*/go.sum"
+
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: 12.6.0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: "24.22.1"
+
+      # node-pty's postinstall rebuilds with pnpm's vendored node-gyp, whose
+      # gyp_main.py ships without the execute bit; e2e-ci.yml explains it.
+      - name: Install node-gyp (for node-pty postinstall)
+        run: |
+          set -euo pipefail
+          npm install -g node-gyp@12.3.0
+          gyp="$(npm root -g)/node-gyp/bin/node-gyp.js"
+          test -f "$gyp"
+          echo "npm_config_node_gyp=$gyp" >> "$GITHUB_ENV"
+
+      # The cell builds both sides itself, but it passes its children only a few
+      # environment variables, so the node-gyp fix above would not reach an
+      # install it ran. Installed here, its own install of head finds nothing to do.
+      # The release side runs no install at all (tools/upgradelab/cell/stack.go).
+      - name: Install head
+        working-directory: head
+        run: CI=true pnpm install --frozen-lockfile
+
+      - name: Install the last release
+        working-directory: from
+        run: CI=true pnpm install --frozen-lockfile
+
+      - name: Chromium for the cell's screenshots
+        working-directory: head/apps/ui
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run the cell
+        id: cell
+        working-directory: head
+        run: |
+          set +e
+          go run ./cmd/upgradelab cell \
+            -deployment cloud -tier S -shape typical -seed 1 \
+            -from-dir ../from -head-dir . \
+            -postgres-base postgresql://prisma:prisma@localhost:5433 \
+            -clickhouse-base http://default:ci_password@localhost:8123 \
+            -run-dir "$RUNNER_TEMP/cell"
+          status=$?
+          echo "exit=$status" >> "$GITHUB_OUTPUT"
+          echo "upgradelab exited $status (0 passed, 1 an invariant did not, 2 the cell could not judge)"
+
+      - name: Upgrade lab section
+        if: always()
+        working-directory: head
+        run: >-
+          node --experimental-strip-types .github/scripts/nightly-upgrade-lab.ts
+          --cell "$CELL" --run-dir "$RUNNER_TEMP/cell" --exit-code "${{ steps.cell.outputs.exit || '2' }}"
+          --markdown "$RUNNER_TEMP/upgrade-lab.md"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: upgrade-lab-cloud-S-typical-1
+          path: ${{ runner.temp }}/cell/
+          retention-days: 14
+          if-no-files-found: warn
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: nightly-upgrade-lab
+          path: ${{ runner.temp }}/upgrade-lab.md
+          retention-days: 35
+          if-no-files-found: warn
+
+      # B1 and N4 cannot pass on a hosted runner until upgradelab's gaps 6 and 7 are
+      # closed, and this seed has no open suite runs for I5 to count (dev/docs/nightly-suite.md).
+      # Any other result that is not pass, or no verdict, is red.
+      - name: Verdict
+        working-directory: head
+        run: >-
+          node --experimental-strip-types .github/scripts/nightly-upgrade-lab.ts --verdict
+          --run-dir "$RUNNER_TEMP/cell" --exit-code "${{ steps.cell.outputs.exit || '2' }}"
+          --known-failing B1,N4,I5:inconclusive
+
+  # ---------------------------------------------------------------------------
+
+  dashboard:
+    name: nightly dashboard
+    needs:
+      [
+        codebase-health,
+        migration-compat,
+        npx-server-smoke,
+        gateway-matrix,
+        hygiene-report,
+        flaky-report,
+        upgrade-lab,
+      ]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            .github
+            dev/scripts
+
+      - uses: ./.github/actions/setup-pnpm-node
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: "{codebase-health,nightly-hygiene,nightly-flaky,nightly-upgrade-lab}"
+          path: reports
+
+      - name: Gather the sections
+        run: |
+          mkdir -p sections
+          copy() { if [ -f "$1" ]; then cp "$1" "sections/$2"; fi; }
+          copy reports/codebase-health/dashboard-body.md codebase-health.md
+          copy reports/nightly-hygiene/hygiene.md hygiene.md
+          copy reports/nightly-flaky/flaky.md flaky.md
+          copy reports/nightly-upgrade-lab/upgrade-lab.md upgrade-lab.md
+          ls sections
+
+      - name: Write the dashboard
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+          PUBLISH: ${{ github.ref_name == github.event.repository.default_branch && '--publish' || '--no-publish' }}
+        run: node --experimental-strip-types .github/scripts/nightly-dashboard.ts --sections sections "$PUBLISH"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: nightly-dashboard
+          path: nightly-dashboard.md
+          retention-days: 35
+          if-no-files-found: warn

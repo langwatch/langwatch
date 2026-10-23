@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
 import { defineConfig, type ViteUserConfig } from "vitest/config";
 
+import { isolateInVmContexts } from "./isolate-in-vm-contexts.ts";
 import { moduleLoadingCacheExecArgv } from "./module-loading-cache.ts";
 import { splitIsolationByMocking } from "./split-isolation-by-mocking.ts";
 
@@ -36,6 +37,18 @@ export interface ModuleVitestConfigOptions {
    * one by relative path, runs isolated. Say what leaks.
    */
   alsoIsolate?: string[];
+  /**
+   * Where an isolated file runs: a process each (the default), or with
+   * `"vm-context"` a fresh vm context on `vmForks`, in a worker that loads
+   * jsdom once. Fast mode only; see ADR-184.
+   */
+  isolateIn?: "process" | "vm-context";
+  /**
+   * Globs, relative to the package, for isolated files that cannot run in a vm
+   * context under `isolateIn: "vm-context"`, so keep a process each. Files that
+   * ask for `@vitest-environment node` keep one without being named. Say why.
+   */
+  needsOwnProcess?: string[];
   /** Overrides fast-mode default; set `true` for suites needing CSS processing. */
   css?: boolean;
   setupFiles?: string[];
@@ -114,16 +127,25 @@ export function moduleVitestTestOptions(
     ...(dir === undefined ? {} : { dir }),
     ...test,
   };
+  // vitest runs a package script from the package directory, its default root.
+  const suiteRoot = root ?? process.cwd();
   // Every way of asking for isolation, the `test` override included, isolates
   // only the files that need it. `"all"` and fast mode off keep the whole suite.
-  return fast && isolate !== "all" && resolved.isolate === true
-    ? splitIsolationByMocking({
-        test: resolved,
-        // vitest runs a package script from the package directory, its default root.
-        root: root ?? process.cwd(),
-        alsoIsolate: options.alsoIsolate,
+  const split =
+    fast && isolate !== "all" && resolved.isolate === true
+      ? splitIsolationByMocking({
+          test: resolved,
+          root: suiteRoot,
+          alsoIsolate: options.alsoIsolate,
+        })
+      : resolved;
+  return fast && options.isolateIn === "vm-context"
+    ? isolateInVmContexts({
+        test: split,
+        root: suiteRoot,
+        needsOwnProcess: options.needsOwnProcess,
       })
-    : resolved;
+    : split;
 }
 
 export function defineModuleVitestConfig(options: ModuleVitestConfigOptions): ViteUserConfig {

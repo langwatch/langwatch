@@ -800,6 +800,12 @@ async function refuseNativeProviderOnSignIn({
   });
 }
 
+/** The one path where a password mints a session
+ *  (modules/auth/specs/forced-password-reset.feature). */
+const PASSWORD_SIGN_IN_PATH = "/sign-in/email";
+/** better-auth's code for a correct password whose user must choose a new one first. */
+export const PASSWORD_RESET_REQUIRED_CODE = "PASSWORD_RESET_REQUIRED";
+
 /**
  * Blocks deactivated users at this last layer, and refuses a way in the
  * cutover retired: a member linked before it started creates no account row,
@@ -834,6 +840,14 @@ export function createBeforeSessionCreateHook({
         "Blocked session create: sign-up confirmation pending",
       );
       return false;
+    }
+    if (user?.passwordResetRequiredAt && path === PASSWORD_SIGN_IN_PATH) {
+      logger.warn({ userId: session.userId }, "Blocked session create: password reset required");
+      // Thrown with a code so the sign-in screen sends the person to choose a new password.
+      throw APIError.from("FORBIDDEN", {
+        code: PASSWORD_RESET_REQUIRED_CODE,
+        message: PASSWORD_RESET_REQUIRED_CODE,
+      });
     }
 
     const authentication = await collaborators.ssoMigration.authorizeAndRecordAuthentication({

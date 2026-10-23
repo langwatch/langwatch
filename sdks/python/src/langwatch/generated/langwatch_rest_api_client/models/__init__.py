@@ -1386,6 +1386,9 @@ from .get_api_model_defaults_response_200_effective_embeddings_type_0 import (
     GetApiModelDefaultsResponse200EffectiveEMBEDDINGSType0,
 )
 from .get_api_model_defaults_response_200_effective_fast_type_0 import GetApiModelDefaultsResponse200EffectiveFASTType0
+from .get_api_model_defaults_response_200_effective_instantevals_type_0 import (
+    GetApiModelDefaultsResponse200EffectiveINSTANTEVALSType0,
+)
 from .get_api_model_defaults_response_200_scope import GetApiModelDefaultsResponse200Scope
 from .get_api_model_defaults_response_400 import GetApiModelDefaultsResponse400
 from .get_api_model_defaults_response_401 import GetApiModelDefaultsResponse401
@@ -9425,6 +9428,7 @@ __all__ = (
     "GetApiModelDefaultsResponse200EffectiveDEFAULTType0",
     "GetApiModelDefaultsResponse200EffectiveEMBEDDINGSType0",
     "GetApiModelDefaultsResponse200EffectiveFASTType0",
+    "GetApiModelDefaultsResponse200EffectiveINSTANTEVALSType0",
     "GetApiModelDefaultsResponse200Scope",
     "GetApiModelDefaultsResponse400",
     "GetApiModelDefaultsResponse401",

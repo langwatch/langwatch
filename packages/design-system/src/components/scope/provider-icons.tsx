@@ -38,6 +38,10 @@ export const modelProviderIcons = {
   cerebras: <Cerebras />,
   voyage: <Voyage />,
   azure_safety: <Azure />,
+  // Decision-model providers (ADR-182) have no brand mark yet.
+  inception: <Custom />,
+  perplexity: <Custom />,
+  cloudflare: <Custom />,
 };
 
 export type ProviderKey = keyof typeof modelProviderIcons;
