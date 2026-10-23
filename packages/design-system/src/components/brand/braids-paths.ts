@@ -24,30 +24,38 @@ export const BRAIDS_MARK_SMALL: MarkMaster = {
 };
 
 /**
- * The illustrations' 760 by 350 canvas: three project strands braided into one trace. Every
- * crossing is the same curve, the outer strand passing over the middle one as a braid does, and
- * each strand ends on the trace row of its project's span (rows 118, 186 and 254).
+ * The illustrations' 760-wide canvas: three projects, listed by name, braid together and land in
+ * one trace in the order they were called. Every crossing is the mark's curve, the outer strand
+ * passing over the middle one; each strand ends on its project's first span row. By project 1 to 3.
  */
 export const BRAIDS_ART_STRANDS = [
-  "M207 118H247C287 118 287 186 327 186H372C412 186 412 254 452 254H492",
-  "M207 186H247C287 186 287 118 327 118H492",
-  "M207 254H372C412 254 412 186 452 186H492",
+  "M200 188C238 188 238 144 276 144H316C336 144 336 128 356 128C376 128 376 112 396 112H436C472 112 472 100 508 100",
+  "M200 68C238 68 238 112 276 112C296 112 296 128 316 128C336 128 336 144 356 144H396C416 144 416 128 436 128H508",
+  "M200 128H276C296 128 296 112 316 112H356C376 112 376 128 396 128C416 128 416 144 436 144C472 144 472 184 508 184",
 ] as const;
 
-/** Where each strand ends on the trace's edge, by index into BRAIDS_ART_STRANDS. */
-export const BRAIDS_ART_STRAND_ENDS = [254, 118, 186] as const;
+/** Each project's row on the left, where its strand starts, by project 1 to 3. */
+export const BRAIDS_ART_PROJECT_ROWS = [188, 68, 128] as const;
 
-/** Which strand each strand passes under, by index into BRAIDS_ART_STRANDS. */
-export const BRAIDS_ART_UNDER: readonly (number | undefined)[] = [2, 0, undefined];
+/** Where each strand meets the trace's edge, by project 1 to 3. */
+export const BRAIDS_ART_STRAND_ENDS = [100, 128, 184] as const;
+
+/** The braid's four crossings: the over strand's stretch, which cuts a gap in the under strand. */
+export const BRAIDS_ART_CROSSINGS = [
+  { over: 2, under: 3, d: "M276 112C296 112 296 128 316 128" },
+  { over: 1, under: 2, d: "M316 144C336 144 336 128 356 128" },
+  { over: 3, under: 1, d: "M356 112C376 112 376 128 396 128" },
+  { over: 2, under: 3, d: "M396 144C416 144 416 128 436 128" },
+] as const;
 
 /** The trace's span bars, one a row: x, the row's centre, width and owning project (1 to 3). */
 export const BRAIDS_ART_SPANS = [
-  { x: 508, y: 118, width: 201, project: 2 },
-  { x: 524, y: 152, width: 132, project: 2 },
-  { x: 548, y: 186, width: 104, project: 3 },
-  { x: 566, y: 220, width: 72, project: 3 },
-  { x: 612, y: 254, width: 97, project: 1 },
+  { x: 524, y: 100, width: 188, project: 1 },
+  { x: 540, y: 128, width: 128, project: 2 },
+  { x: 556, y: 156, width: 76, project: 2 },
+  { x: 596, y: 184, width: 96, project: 3 },
+  { x: 660, y: 212, width: 52, project: 1 },
 ] as const;
 
-export const BRAIDS_ART_DIVIDER_PATH = "M508 97H716";
-export const BRAIDS_ART_LOCK_SHACKLE_PATH = "M303 283V279A5 5 0 0 1 313 279V283";
+export const BRAIDS_ART_DIVIDER_PATH = "M509 78.5H727";
+export const BRAIDS_ART_LOCK_SHACKLE_PATH = "M318 226V223.5A3 3 0 0 1 324 223.5V226";

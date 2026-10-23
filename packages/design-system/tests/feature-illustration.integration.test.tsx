@@ -97,7 +97,7 @@ describe("FeatureIllustration", () => {
         </>,
       );
       const ids = [...container.querySelectorAll("mask")].map((mask) => mask.id);
-      expect(ids.length).toBe(4);
+      expect(ids.length).toBe(6);
       expect(new Set(ids).size).toBe(ids.length);
     });
   });

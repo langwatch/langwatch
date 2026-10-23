@@ -42,9 +42,10 @@ and the mark on whatever the feature adds to other screens.
 - **The art explains, once.** The empty state before anything exists and the upgrade show the
   illustration inside a `Card` or `AccessState`, with the app's type scale around it. Its lines
   are drawn as the mark is: solid, one curve for every crossing, a clean gap where a strand passes
-  under another, each ending level with the row it feeds. Never dotted or tangled.
+  under another. The crossings sit together in one even braid, not spread across the canvas, and
+  each strand ends on a dot level with the row it feeds. Never dotted or tangled.
 - **Projects look like projects.** A project is a round avatar with its initial, in the art as in
-  the app's project switcher.
+  the app's project switcher, and the art's project colours are the app's avatar hues.
 - **Meaning through semantic tokens.** Errors, warnings and successes use `fg.error`,
   `fg.warning` and `fg.success`. A badge, outline or bar is never painted in the feature's lead,
   and a span bar keeps its span type's colour.
@@ -62,7 +63,7 @@ and a braided span carries the mark and a chip naming its project, like the mode
 | Lockup           | Mark beside the name in Sentient, the display face                         | `FeatureLockup feature="braids"`                             |
 | Tagline          | One short line for landing pages and the lockup                            | One trace. Every project.                                    |
 | Colour roles     | Named tokens under `feature.<name>.*`, light and dark values               | `lead`, `weave`, `project.1-3`, `projectInk.1-3`             |
-| Illustration set | An empty state, an Enterprise upsell and a hero, 760 by 350                | Project strands weaving into one trace                       |
+| Illustration set | An empty state, an Enterprise upsell and a hero, 760 wide                  | Three projects braided into one trace                        |
 | Motion           | At most one arrival animation, in the hero                                 | Strands weave in over 650ms, spans land after                |
 | Enterprise chip  | The sidebar's ENT chip, after the title of any page the plan gates         | `EnterprisePill`                                             |
 

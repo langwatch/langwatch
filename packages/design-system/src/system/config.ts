@@ -510,11 +510,11 @@ export const designSystemConfig = defineConfig({
           braids: {
             lead: { value: { _light: "{colors.orange.solid}", _dark: "{colors.orange.solid}" } },
             weave: { value: { _light: "#3D3D4D", _dark: "#E7ECF2" } },
-            // Fictional example projects in the illustrations, always shown with initials.
+            // Fictional example projects in the illustrations, in the app's avatar hues.
             project: {
-              1: { value: { _light: "{colors.orange.solid}", _dark: "#FF9E2C" } },
-              2: { value: { _light: "#2563EB", _dark: "#90CDF4" } },
-              3: { value: { _light: "#5B7A4A", _dark: "#9AE6B4" } },
+              1: { value: { _light: "{colors.orange.solid}", _dark: "{colors.orange.300}" } },
+              2: { value: { _light: "{colors.blue.400}", _dark: "{colors.blue.300}" } },
+              3: { value: { _light: "{colors.purple.400}", _dark: "{colors.purple.300}" } },
             },
             projectInk: {
               1: { value: { _light: "#141417", _dark: "#141417" } },

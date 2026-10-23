@@ -39,7 +39,7 @@ export function BraidsHowItWorks({ projectName }: { projectName: string }) {
   return (
     <Card padding="none" data-testid="braids-empty-into">
       <Box display="flex" justifyContent="center" paddingX={6}>
-        <Box width="full" maxWidth="720px">
+        <Box width="full" maxWidth="760px">
           <FeatureIllustration feature="braids" name="empty-state" />
         </Box>
       </Box>
