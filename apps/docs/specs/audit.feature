@@ -65,3 +65,15 @@ Feature: Audit the built documentation for search, agents and page quality
     Then each page and device shows how many of the checks that apply passed
     And the failing checks are named once
     But they never fail the audit, because the checklist is still changing
+
+  @unit
+  Scenario: Report Lighthouse and on-page SEO for every page on the pull request
+    Given Lighthouse ran once per page on mobile and desktop for every published page, split across runners
+    And the static search checks ran on every page
+    When the runs are merged into one report
+    Then one comment on the pull request is updated on each run, never a new one per push
+    And it opens with the average score per category and device and how many pages meet each budget
+    And it lists the lowest scoring pages per category, and the pages with on-page search gaps
+    And the table of every page, grouped by section, is in the comment when it fits and linked when it does not
+    And pages a runner never reported, or Lighthouse could not load, are named
+    But the report never fails the run: budgets gate only the representative pages

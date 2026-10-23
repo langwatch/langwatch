@@ -23,7 +23,14 @@ import {
   type PageBudget,
 } from "./budgets.ts";
 import { summaryMarkdown } from "./report.ts";
-import { applyKnownIssues, builtBasePath, checkSeo, knownIssuesOf } from "./seo-check.ts";
+import { DOCS_URL } from "../../lib/site-path.ts";
+import {
+  applyKnownIssues,
+  builtBasePath,
+  checkSeo,
+  knownIssuesOf,
+  sitemapPages,
+} from "./seo-check.ts";
 
 const RUNNER = fileURLToPath(new URL("./lighthouse-run.ts", import.meta.url));
 const list = z.string().transform((value) =>
@@ -33,12 +40,24 @@ const list = z.string().transform((value) =>
     .filter(Boolean),
 );
 
+const shard = z
+  .string()
+  .regex(/^\d+\/\d+$/, "use --shard <index>/<count>, counting from 1")
+  .transform((value) => {
+    const [index, count] = value.split("/").map(Number);
+    return { index, count };
+  })
+  .refine(({ index, count }) => index >= 1 && index <= count, "the shard index runs 1..count");
+
 const optionsSchema = z.object({
   "out-dir": z.string().default("dist"),
   "base-path": z.string().default("/docs"),
   "report-dir": z.string().optional(),
   summary: z.string().optional(),
   pages: list.optional(),
+  "all-pages": z.boolean().default(false),
+  shard: shard.optional(),
+  "report-only": z.boolean().default(false),
   "form-factors": list.pipe(z.array(z.enum(FORM_FACTORS))).default([...FORM_FACTORS]),
   concurrency: z.coerce.number().int().min(1).optional(),
   runs: z.coerce.number().int().min(1).default(1),
@@ -58,6 +77,9 @@ function readOptions() {
       "report-dir": { type: "string" },
       summary: { type: "string" },
       pages: { type: "string" },
+      "all-pages": { type: "boolean" },
+      shard: { type: "string" },
+      "report-only": { type: "boolean" },
       "form-factors": { type: "string" },
       concurrency: { type: "string" },
       runs: { type: "string" },
@@ -85,8 +107,29 @@ function selectPage({ pages, entry }: { pages: PageBudget[]; entry: string }): P
   return { id: entry, path: entry, why: "ad hoc", categories: {}, knownFailures: {} };
 }
 
-function selectPages({ pages, selected }: { pages: PageBudget[]; selected?: string[] }) {
-  return selected ? selected.map((entry) => selectPage({ pages, entry })) : pages;
+/**
+ * The pages to audit: the named ones, every sitemap page (`--all-pages`), or the representative
+ * budget pages. `--shard i/n` keeps every n-th, so each shard gets a mix of sections.
+ */
+function selectPages({
+  options,
+  pages,
+  outDir,
+}: {
+  options: ReturnType<typeof readOptions>;
+  pages: PageBudget[];
+  outDir: string;
+}) {
+  const sitemap = options["all-pages"]
+    ? sitemapPages({ outDir })
+        .filter((url) => url === DOCS_URL || url.startsWith(`${DOCS_URL}/`))
+        .map((url) => url.slice(DOCS_URL.length) || "/")
+    : undefined;
+  const selected = options.pages ?? sitemap;
+  const chosen = selected ? selected.map((entry) => selectPage({ pages, entry })) : pages;
+  const { shard } = options;
+  if (!shard) return chosen;
+  return chosen.filter((_, index) => index % shard.count === shard.index - 1);
 }
 
 function parseRun({ stdout }: { stdout: string }) {
@@ -227,20 +270,19 @@ function agentReadiness({
 /** Lighthouse over the selected pages and form factors, the median of each page's runs. */
 async function lighthouseRuns({
   options,
-  budgets,
+  pages,
   origin,
   basePath,
   reportDir,
   json,
 }: {
   options: ReturnType<typeof readOptions>;
-  budgets: ReturnType<typeof readBudgets>;
+  pages: PageBudget[];
   origin: string;
   basePath: string;
   reportDir: string;
   json: boolean;
 }): Promise<AuditRun[]> {
-  const pages = selectPages({ pages: budgets.pages, selected: options.pages });
   const tasks = pages.flatMap((page) =>
     options["form-factors"].flatMap((formFactor) =>
       Array.from({ length: options.runs }, (_, attempt) => ({ page, formFactor, attempt })),
@@ -301,6 +343,7 @@ async function main() {
   const reportDir = path.resolve(options["report-dir"] ?? outDir);
   const budgets = readBudgets();
   assertBuiltFor({ outDir, basePath });
+  const pages = selectPages({ options, pages: budgets.pages, outDir });
 
   const seoResult = options["skip-static"]
     ? { pages: 0, issues: [], exports: [] }
@@ -328,14 +371,14 @@ async function main() {
     const origin = new URL(server.resolvedUrls?.local[0] ?? "http://127.0.0.1").origin;
     seo.failures.push(...(await checkExportTypes({ origin, exports: seoResult.exports })));
     if (!options["static-only"])
-      runs = await lighthouseRuns({ options, budgets, origin, basePath, reportDir, json });
+      runs = await lighthouseRuns({ options, pages, origin, basePath, reportDir, json });
   } finally {
     await new Promise((resolve) => server.httpServer.close(resolve));
   }
 
   const { failures, notes } = evaluateBudgets({
     runs,
-    budgets: { ...budgets, pages: selectPages({ pages: budgets.pages, selected: options.pages }) },
+    budgets: { ...budgets, pages },
   });
   const wallClockMs = nowInstant().epochMilliseconds - started;
   const report = { wallClockMs, runs, failures, notes, seo: { pages: seoResult.pages, ...seo } };
@@ -353,7 +396,9 @@ async function main() {
   if (options.summary) appendFileSync(options.summary, markdown);
   if (json) process.stdout.write(`${JSON.stringify(report)}\n`);
   else process.stdout.write(markdown);
-  if (failures.length > 0 || seo.failures.length > 0 || agentFailures > 0) process.exitCode = 1;
+  const failed = failures.length > 0 || seo.failures.length > 0 || agentFailures > 0;
+  // `--report-only` measures without judging: the every-page report is informational.
+  if (failed && !options["report-only"]) process.exitCode = 1;
 }
 
 await main();
