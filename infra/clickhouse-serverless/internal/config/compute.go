@@ -94,6 +94,7 @@ type Computed struct {
 	OptimizeOnInsert int `env:"OPTIMIZE_ON_INSERT"`
 
 	// Default profile: inter-server compression and abandoned HTTP reads.
+	// Unset (empty or 0) renders nothing, so the ClickHouse default holds.
 	NetworkCompressionMethod               string `env:"NETWORK_COMPRESSION_METHOD"`
 	NetworkZstdCompressionLevel            int    `env:"NETWORK_ZSTD_COMPRESSION_LEVEL"`
 	CancelHTTPReadonlyQueriesOnClientClose int    `env:"CANCEL_HTTP_READONLY_QUERIES_ON_CLIENT_CLOSE"`
@@ -187,11 +188,6 @@ func ComputeFromResources(cpu int, ramBytes int64, input *Input) *Computed {
 
 	// --- Insert performance ---
 	c.OptimizeOnInsert = 0
-
-	// --- Default profile (constants) ---
-	c.NetworkCompressionMethod = "zstd"
-	c.NetworkZstdCompressionLevel = 3
-	c.CancelHTTPReadonlyQueriesOnClientClose = 1
 
 	// --- Query limits (from input, passthrough) ---
 	if input != nil {

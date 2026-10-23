@@ -25,8 +25,11 @@ type Input struct {
 	Password          string `env:"CLICKHOUSE_PASSWORD" validate:"required"`
 	ClusterSecretFile string `env:"CLICKHOUSE_CLUSTER_SECRET_FILE"` // path to mounted cluster secret
 
-	// Read from ClusterSecretFile by Load: ClickHouse has no from_file substitution.
-	ClusterSecret string
+	// Opt-in: render the real cluster secret (read from ClusterSecretFile by
+	// Load). Off keeps the old from_file attribute ClickHouse ignores, so the
+	// cluster runs with no secret; see the README before enabling it.
+	ClusterSecretEnabled bool `env:"CLICKHOUSE_CLUSTER_SECRET_ENABLED"`
+	ClusterSecret        string
 
 	// Interserver HTTP credentials (replica part fetches); rendered only when
 	// the password file is set. InterserverPassword is read from it by Load.
@@ -57,7 +60,7 @@ type Input struct {
 	// Logging
 	LogLevel         string `env:"LOG_LEVEL" default:"warning" validate:"oneof=trace debug information warning error"`
 	LogFormat        string `env:"LOG_FORMAT" default:"json"   validate:"oneof=json plain"`
-	LogToFile        bool   `env:"LOG_TO_FILE"` // false: console only, no server log files
+	LogToFile        bool   `env:"LOG_TO_FILE" default:"true"` // false: console only, no server log files
 	SystemLogTTLDays int    `env:"SYSTEM_LOG_TTL_DAYS" default:"30"`
 
 	// System logs — each log has enable + TTL + optional flush settings
@@ -159,12 +162,13 @@ func Load() (*Input, error) {
 
 	for _, f := range []struct {
 		env, path string
+		read      bool
 		dst       *string
 	}{
-		{"CLICKHOUSE_CLUSTER_SECRET_FILE", i.ClusterSecretFile, &i.ClusterSecret},
-		{"CLICKHOUSE_INTERSERVER_PASSWORD_FILE", i.InterserverPasswordFile, &i.InterserverPassword},
+		{"CLICKHOUSE_CLUSTER_SECRET_FILE", i.ClusterSecretFile, i.ClusterSecretEnabled, &i.ClusterSecret},
+		{"CLICKHOUSE_INTERSERVER_PASSWORD_FILE", i.InterserverPasswordFile, true, &i.InterserverPassword},
 	} {
-		if f.path == "" {
+		if f.path == "" || !f.read {
 			continue
 		}
 		secret, err := readSecretFile(f.path)

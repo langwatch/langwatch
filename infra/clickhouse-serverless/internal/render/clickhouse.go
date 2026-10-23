@@ -46,10 +46,13 @@ func renderKeeper(input *config.Input, configD string) error {
 			"replica":              replicas,
 		},
 	}
-	// The value itself: ClickHouse substitutes from_env and from_zk, not
-	// from_file, so a from_file attribute would leave the secret empty.
-	if input.ClusterSecret != "" {
+	// ClickHouse substitutes from_env and from_zk, not from_file, so only the
+	// value itself sets a secret. Without the opt-in, keep the earlier
+	// from_file attribute: no secret, matching pods that have not rolled yet.
+	if input.ClusterSecretEnabled {
 		cluster["secret"] = input.ClusterSecret
+	} else {
+		cluster["secret"] = map[string]string{"@from_file": input.ClusterSecretFile}
 	}
 
 	return writeYAML(filepath.Join(configD, "keeper.yaml"), map[string]any{

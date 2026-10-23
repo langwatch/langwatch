@@ -120,6 +120,10 @@ backup:
 auth:
   password: "" # Used as autogen seed when autogen.enabled=true and this is unset
   clusterSecret: "" # Used as autogen seed when autogen.enabled=true and this is unset
+  # Apply clusterSecret to remote_servers (replicas>1). Recommended; off keeps
+  # the earlier no-secret cluster. Turning it on mid-roll mixes pods with and
+  # without it, so see the README (Cluster secret) before enabling.
+  clusterSecretEnabled: false
   existingSecret: "" # Operator-owned Secret name. Required when autogen.enabled=false.
   secretKeys:
     passwordKey: "password"

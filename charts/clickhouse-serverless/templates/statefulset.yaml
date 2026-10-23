@@ -120,6 +120,10 @@ spec:
             {{- if gt $replicas 1 }}
             - name: CLICKHOUSE_CLUSTER_SECRET_FILE
               value: "/mnt/secrets/cluster-secret"
+            {{- if .Values.auth.clusterSecretEnabled }}
+            - name: CLICKHOUSE_CLUSTER_SECRET_ENABLED
+              value: "true"
+            {{- end }}
             - name: CH_CLUSTER
               value: {{ .Values.clusterName | quote }}
             - name: CH_SHARD

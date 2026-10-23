@@ -32,6 +32,7 @@ func testInput() *config.Input {
 		S3Region:             "us-east-1",
 		LogLevel:             "warning",
 		LogFormat:            "json",
+		LogToFile:            true,
 		SystemLogTTLDays:     30,
 		EnableQueryLog:       true,
 		QueryLogTTLDays:      7,
@@ -145,13 +146,14 @@ func replicatedInput() *config.Input {
 	input.DataNodes = "ch-0.ch-headless,ch-1.ch-headless,ch-2.ch-headless"
 	input.DataNodePort = 9000
 	input.ClusterSecretFile = "/mnt/secrets/cluster-secret"
-	input.ClusterSecret = "cluster-secret-value"
 	return input
 }
 
 func TestRenderAll_KeeperWrittenForReplicated(t *testing.T) {
 	dir := t.TempDir()
 	input := replicatedInput()
+	input.ClusterSecretEnabled = true
+	input.ClusterSecret = "cluster-secret-value"
 	computed := config.ComputeFromResources(input.CPU, input.RAMBytes, input)
 
 	if err := render.RenderAll(testLogger(), input, computed, dir); err != nil {
@@ -181,6 +183,25 @@ func TestRenderAll_KeeperWrittenForReplicated(t *testing.T) {
 	// ClickHouse has no from_file substitution; the attribute would leave the secret empty.
 	if strings.Contains(content, "from_file") {
 		t.Errorf("keeper.yaml must carry the secret value, not a from_file attribute\n%s", content)
+	}
+}
+
+// Without the opt-in the secret renders as before (an ignored from_file
+// attribute), so a rolling upgrade never mixes secret and no-secret pods.
+func TestRenderAll_ClusterSecretOffKeepsEarlierShape(t *testing.T) {
+	dir := t.TempDir()
+	input := replicatedInput()
+	computed := config.ComputeFromResources(input.CPU, input.RAMBytes, input)
+
+	if err := render.RenderAll(testLogger(), input, computed, dir); err != nil {
+		t.Fatalf("RenderAll: %v", err)
+	}
+	data, err := os.ReadFile(filepath.Join(dir, "config.d/keeper.yaml"))
+	if err != nil {
+		t.Fatalf("read keeper.yaml: %v", err)
+	}
+	if !strings.Contains(string(data), "'@from_file': /mnt/secrets/cluster-secret") {
+		t.Errorf("keeper.yaml should keep the from_file attribute without the opt-in\n%s", data)
 	}
 }
 

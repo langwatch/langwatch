@@ -76,9 +76,15 @@ func TestRenderAll_SettingDefaults(t *testing.T) {
 	renderInto(t, testInput(), dir)
 
 	profile := defaultProfile(t, dir)
-	assertValue(t, "default profile", profile, "network_compression_method", "zstd")
-	assertValue(t, "default profile", profile, "network_zstd_compression_level", 3)
-	assertValue(t, "default profile", profile, "cancel_http_readonly_queries_on_client_close", 1)
+	for _, key := range []string{
+		"network_compression_method",
+		"network_zstd_compression_level",
+		"cancel_http_readonly_queries_on_client_close",
+	} {
+		if _, ok := profile[key]; ok {
+			t.Errorf("default profile: %s must be omitted (ClickHouse default) unless its env is set", key)
+		}
+	}
 
 	limits := readYAML(t, dir, "config.d/limits.yaml")
 	assertValue(t, "limits", limits, "max_concurrent_select_queries", 0)
@@ -94,7 +100,7 @@ func TestRenderAll_SettingEnvOverrides(t *testing.T) {
 	t.Setenv("MAX_CONCURRENT_SELECT_QUERIES", "40")
 	t.Setenv("NETWORK_COMPRESSION_METHOD", "lz4")
 	t.Setenv("NETWORK_ZSTD_COMPRESSION_LEVEL", "1")
-	t.Setenv("CANCEL_HTTP_READONLY_QUERIES_ON_CLIENT_CLOSE", "0")
+	t.Setenv("CANCEL_HTTP_READONLY_QUERIES_ON_CLIENT_CLOSE", "1")
 
 	dir := t.TempDir()
 	renderInto(t, testInput(), dir)
@@ -102,7 +108,7 @@ func TestRenderAll_SettingEnvOverrides(t *testing.T) {
 	profile := defaultProfile(t, dir)
 	assertValue(t, "default profile", profile, "network_compression_method", "lz4")
 	assertValue(t, "default profile", profile, "network_zstd_compression_level", 1)
-	assertValue(t, "default profile", profile, "cancel_http_readonly_queries_on_client_close", 0)
+	assertValue(t, "default profile", profile, "cancel_http_readonly_queries_on_client_close", 1)
 
 	limits := readYAML(t, dir, "config.d/limits.yaml")
 	assertValue(t, "limits", limits, "max_concurrent_select_queries", 40)
@@ -159,15 +165,15 @@ func TestRenderAll_InterserverCredentials(t *testing.T) {
 	assertExists(t, path, false)
 }
 
-// @scenario "The server logs to the console only unless file logging is asked for"
+// @scenario "The server keeps its log files unless console-only logging is asked for"
 func TestRenderAll_LogToFile(t *testing.T) {
 	for _, tc := range []struct {
 		name       string
 		logToFile  bool
 		wantRemove bool
 	}{
-		{"console only by default", false, true},
-		{"file loggers kept with LOG_TO_FILE", true, false},
+		{"file loggers kept by default", true, false},
+		{"console only with LOG_TO_FILE=false", false, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			input := testInput()

@@ -25,13 +25,6 @@ func renderProfiles(c *config.Computed, usersD string) error {
 		"http_send_timeout":                  c.HTTPSendTimeout,
 		"tcp_keep_alive_timeout":             c.TCPKeepAliveTimeout,
 
-		// Compress inter-server traffic (distributed reads, replicated insert
-		// fan-out). User-level settings: in config.d the server refuses to boot.
-		"network_compression_method":     c.NetworkCompressionMethod,
-		"network_zstd_compression_level": c.NetworkZstdCompressionLevel,
-		// Stop a read once its HTTP client has gone; inserts still commit.
-		"cancel_http_readonly_queries_on_client_close": c.CancelHTTPReadonlyQueriesOnClientClose,
-
 		// Query-level defaults as of 25.10. Among the ones 26.4 to 26.8
 		// change: an unquoted JSON integer into DateTime64 is read as Unix
 		// seconds instead of ticks (ClickHouse #108091), so an epoch-ms
@@ -40,6 +33,18 @@ func renderProfiles(c *config.Computed, usersD string) error {
 		// 26.2 turns insert deduplication on for async inserts and
 		// materialized views (#95970), which would change the ingest path.
 		"deduplicate_insert": "backward_compatible_choice",
+	}
+
+	// Opt-in, user-level settings (in config.d the server refuses to boot):
+	// inter-server compression, and stopping a read whose HTTP client has gone.
+	if c.NetworkCompressionMethod != "" {
+		profile["network_compression_method"] = c.NetworkCompressionMethod
+	}
+	if c.NetworkZstdCompressionLevel != 0 {
+		profile["network_zstd_compression_level"] = c.NetworkZstdCompressionLevel
+	}
+	if c.CancelHTTPReadonlyQueriesOnClientClose != 0 {
+		profile["cancel_http_readonly_queries_on_client_close"] = c.CancelHTTPReadonlyQueriesOnClientClose
 	}
 
 	// Query limits — only include non-zero values.

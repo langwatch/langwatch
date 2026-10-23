@@ -28,6 +28,7 @@ func setMinimalEnv(t *testing.T) {
 
 func TestLoad_ReadsClusterSecretAndInterserverPassword(t *testing.T) {
 	setMinimalEnv(t)
+	t.Setenv("CLICKHOUSE_CLUSTER_SECRET_ENABLED", "true")
 	t.Setenv("CLICKHOUSE_CLUSTER_SECRET_FILE", writeSecret(t, "cluster-secret", "cluster-value\n"))
 	t.Setenv("CLICKHOUSE_INTERSERVER_PASSWORD_FILE", writeSecret(t, "interserver", "  inter-value \n"))
 
@@ -50,6 +51,7 @@ func TestLoad_RefusesEmptyOrMissingSecretFiles(t *testing.T) {
 	for _, env := range []string{"CLICKHOUSE_CLUSTER_SECRET_FILE", "CLICKHOUSE_INTERSERVER_PASSWORD_FILE"} {
 		t.Run(env+" empty", func(t *testing.T) {
 			setMinimalEnv(t)
+			t.Setenv("CLICKHOUSE_CLUSTER_SECRET_ENABLED", "true")
 			t.Setenv(env, writeSecret(t, "empty", " \n"))
 			if _, err := Load(); err == nil || !strings.Contains(err.Error(), env) {
 				t.Errorf("Load() error = %v, want one naming %s", err, env)
@@ -57,11 +59,41 @@ func TestLoad_RefusesEmptyOrMissingSecretFiles(t *testing.T) {
 		})
 		t.Run(env+" missing", func(t *testing.T) {
 			setMinimalEnv(t)
+			t.Setenv("CLICKHOUSE_CLUSTER_SECRET_ENABLED", "true")
 			t.Setenv(env, "/nonexistent/secret")
 			if _, err := Load(); err == nil || !strings.Contains(err.Error(), env) {
 				t.Errorf("Load() error = %v, want one naming %s", err, env)
 			}
 		})
+	}
+}
+
+// Without the opt-in the cluster secret file is not read, so an empty or
+// missing one fails nothing, as before.
+func TestLoad_ClusterSecretFileIgnoredWithoutOptIn(t *testing.T) {
+	for name, path := range map[string]string{
+		"empty":   writeSecret(t, "empty", ""),
+		"missing": "/nonexistent/secret",
+	} {
+		t.Run(name, func(t *testing.T) {
+			setMinimalEnv(t)
+			t.Setenv("CLICKHOUSE_CLUSTER_SECRET_FILE", path)
+			input, err := Load()
+			if err != nil {
+				t.Fatalf("Load() error: %v", err)
+			}
+			if input.ClusterSecret != "" {
+				t.Errorf("ClusterSecret = %q, want it unread", input.ClusterSecret)
+			}
+		})
+	}
+}
+
+func TestValidate_ClusterSecretOptInNeedsFile(t *testing.T) {
+	i := validInput()
+	i.ClusterSecretEnabled = true
+	if err := i.Validate(); err == nil || !strings.Contains(err.Error(), "CLICKHOUSE_CLUSTER_SECRET_FILE") {
+		t.Errorf("expected CLICKHOUSE_CLUSTER_SECRET_FILE error, got: %v", err)
 	}
 }
 
@@ -71,8 +103,8 @@ func TestLoad_NewSwitchDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load() error: %v", err)
 	}
-	if input.LogToFile {
-		t.Error("LOG_TO_FILE should default to false")
+	if !input.LogToFile {
+		t.Error("LOG_TO_FILE should default to true (file logs, as before)")
 	}
 	if !input.GrantsDefaultAccessManagement() {
 		t.Error("DEFAULT_USER_ACCESS_MANAGEMENT should default to true")
@@ -81,14 +113,14 @@ func TestLoad_NewSwitchDefaults(t *testing.T) {
 		t.Error("interserver credentials should be unset by default")
 	}
 
-	t.Setenv("LOG_TO_FILE", "true")
+	t.Setenv("LOG_TO_FILE", "false")
 	t.Setenv("DEFAULT_USER_ACCESS_MANAGEMENT", "false")
 	input, err = Load()
 	if err != nil {
 		t.Fatalf("Load() error: %v", err)
 	}
-	if !input.LogToFile {
-		t.Error("LOG_TO_FILE=true should be read")
+	if input.LogToFile {
+		t.Error("LOG_TO_FILE=false should be read")
 	}
 	if input.GrantsDefaultAccessManagement() {
 		t.Error("DEFAULT_USER_ACCESS_MANAGEMENT=false should be read")

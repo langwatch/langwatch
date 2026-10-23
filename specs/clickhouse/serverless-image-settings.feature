@@ -2,14 +2,15 @@ Feature: The clickhouse-serverless image renders every server setting from env
   The image's config renderer is the only writer of the files it names in
   config.d and users.d. Each tunable setting has one env var with a default,
   so a deployment runs the public image by setting env and mounting extra
-  files, never by patching the image.
+  files, never by patching the image. Every default keeps the behaviour of the
+  image before these settings existed; new behaviour is opt-in.
 
   @unit
   Scenario: Server and profile settings render their defaults
     Given no env var sets them
     When the renderer writes the server configuration
-    Then the default profile compresses inter-server traffic with zstd at level 3
-    And the default profile cancels a read-only HTTP query when its client goes away
+    Then the default profile sets no network compression method or level, leaving the ClickHouse default
+    And the default profile does not set read-only HTTP query cancellation, leaving the ClickHouse default
     And SELECT queries get no admission cap of their own
     And no byte cap is set on a merge block
 
@@ -34,11 +35,28 @@ Feature: The clickhouse-serverless image renders every server setting from env
     And a later run without the password file removes the credentials it wrote
 
   @unit
-  Scenario: The server logs to the console only unless file logging is asked for
+  Scenario: The server keeps its log files unless console-only logging is asked for
     Given LOG_TO_FILE is not set
     When the renderer writes the server configuration
-    Then the image's file and error-file loggers are removed
-    And with LOG_TO_FILE=true they are kept
+    Then the image's file and error-file loggers are kept
+    And with LOG_TO_FILE=false they are removed, so the server logs to the console only
+
+  @unit
+  Scenario: The cluster secret is applied only when asked for
+    Given a replicated server with CLICKHOUSE_CLUSTER_SECRET_FILE set
+    And CLICKHOUSE_CLUSTER_SECRET_ENABLED is not set
+    When the configuration is loaded and rendered
+    Then the secret file is not read, so an empty or missing one fails nothing
+    And remote_servers renders the secret as it did before, which ClickHouse ignores
+    And the renderer logs a warning naming CLICKHOUSE_CLUSTER_SECRET_ENABLED
+    And with CLICKHOUSE_CLUSTER_SECRET_ENABLED=true remote_servers carries the secret's value
+
+  @unit
+  Scenario: The cluster secret opt-in needs a secret file
+    Given CLICKHOUSE_CLUSTER_SECRET_ENABLED is true
+    And CLICKHOUSE_CLUSTER_SECRET_FILE is not set
+    When the configuration is validated
+    Then validation fails naming CLICKHOUSE_CLUSTER_SECRET_FILE
 
   @unit
   Scenario: The default user can be left without access management
@@ -51,3 +69,13 @@ Feature: The clickhouse-serverless image renders every server setting from env
     Given a deployment has mounted its own files into config.d and users.d
     When the renderer writes the server configuration, with optional files on and then off
     Then every mounted file is still there, unchanged
+
+  @unit
+  Scenario: Initialisation scripts and CLICKHOUSE_DB still log in as default
+    Given the default user's password comes from CLICKHOUSE_PASSWORD or CLICKHOUSE_PASSWORD_FILE
+    And /docker-entrypoint-initdb.d holds a script or CLICKHOUSE_DB is set
+    When the entrypoint hands over to the official ClickHouse entrypoint
+    Then that entrypoint skips its own default-user setup, so the renderer's default user stands
+    And it receives the password in CLICKHOUSE_PASSWORD, so its initialisation client can log in
+    And CLICKHOUSE_PASSWORD_FILE is unset
+    And with neither initialisation input present CLICKHOUSE_PASSWORD is unset too

@@ -95,6 +95,10 @@ func RenderAll(log *zap.Logger, input *config.Input, computed *config.Computed, 
 		}
 	}
 
+	if input.Replicated && !input.ClusterSecretEnabled {
+		log.Warn("remote_servers carries no cluster secret; set CLICKHOUSE_CLUSTER_SECRET_ENABLED=true " +
+			"to apply CLICKHOUSE_CLUSTER_SECRET_FILE (README: Cluster secret)")
+	}
 	if input.ColdEnabled {
 		log.Info("cold storage configured")
 	}
