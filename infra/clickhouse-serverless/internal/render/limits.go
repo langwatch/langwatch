@@ -41,6 +41,9 @@ type mergeTreeConfig struct {
 	// 26.8 packs skip indices into one file per part (#111816); versions
 	// before 26.6 then skip them when pruning, so a rollback reads slower.
 	PackedSkipIndexMaxBytes int `yaml:"packed_skip_index_max_bytes"`
+	// 26.4 builds column statistics in every merge (26.7: basic, uniq_v2).
+	// A table setting, so compatibility leaves it on; keep merges as they were.
+	AutoStatisticsTypes string `yaml:"auto_statistics_types"`
 }
 
 // systemLogDef defines a ClickHouse system log table with its configuration knobs.
@@ -78,6 +81,7 @@ func renderLimits(input *config.Input, c *config.Computed, configD string) error
 			StringSerializationVersion:                       "single_stream",
 			PatchPartsVersion:                                "v1",
 			PackedSkipIndexMaxBytes:                          0,
+			AutoStatisticsTypes:                              "",
 		},
 		// 26.8 folds per-disk, per-device and per-CPU asynchronous metrics
 		// into one labelled metric (#115333). legacy_names keeps the names
