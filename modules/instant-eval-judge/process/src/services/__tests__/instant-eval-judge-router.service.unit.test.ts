@@ -349,4 +349,18 @@ describe("InstantEvalJudgeRouterService", () => {
     expect(hostedDecisions.requests).toHaveLength(0);
     expect(judgement.routing).toBeUndefined();
   });
+
+  /** @scenario "Every judgement a routed call returns carries its cost" */
+  it("prices an unrouted call at the hosted classifier's routed rate, so no token bills at zero", async () => {
+    const { classify } = harness({ jev: () => judged(0.5, 2000) });
+    const score: InstantEvalQuestion = {
+      id: "s",
+      kind: "score",
+      instructions: "how polite",
+      range: { min: 1, max: 5 },
+    };
+    const judgement = await classify(SHORT, [score]);
+    // decision-b is the table's hosted-classifier backend: 2000 tokens x 0.05
+    expect(judgement.costNanoUsd).toBe(100_000);
+  });
 });

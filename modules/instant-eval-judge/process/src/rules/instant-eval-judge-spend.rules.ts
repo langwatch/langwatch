@@ -12,6 +12,7 @@ import {
   instantEvalJudgeRouteRateVersion,
   instantEvalPriceUsd,
   instantEvalRateVersion,
+  NANO_USD_PER_USD,
   type InstantEvalJudgeRoutePricing,
   type InstantEvalJudgeSpendPricedEventData,
   type InstantEvalPricing,
@@ -19,8 +20,6 @@ import {
 
 /** The prefix a keyed judge call's request id carries, so the id is the evaluation's own. */
 const KEYED_REQUEST_ID_PREFIX = "instantevaljudge_";
-
-const NANO_USD_PER_USD = 1_000_000_000;
 
 /**
  * A redelivered evaluation carries the same retry key, so it lands on the same request id and
