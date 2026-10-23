@@ -3,7 +3,7 @@ package config
 import "strings"
 
 // publishedPasswords are defaults shipped in compose files, docs and
-// examples. A server using one starts, but warns at every boot (ADR-184).
+// examples. A server using one starts, but warns at every boot (ADR-190).
 var publishedPasswords = map[string]bool{
 	"langwatch":  true,
 	"clickhouse": true,

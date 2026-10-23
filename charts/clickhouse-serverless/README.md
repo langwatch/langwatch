@@ -231,7 +231,7 @@ databases), `tier_write` (plus `INSERT`, `ALTER UPDATE`, `ALTER DELETE`, no DDL)
 and `tier_admin`; an access file declares users with one tier each, and a
 sidecar container keeps them current and verifies OIDC token logins on
 `127.0.0.1` inside the pod. `env.CLICKHOUSE_ACCESS_TIERS: "true"` renders the
-tiers alone, for users you write yourself. Design and limits: [ADR-184](../../dev/docs/adr/184-clickhouse-serverless-access-tiers-rolling-passwords-and-token-logins.md).
+tiers alone, for users you write yourself. Design and limits: [ADR-190](../../dev/docs/adr/190-clickhouse-serverless-access-tiers-rolling-passwords-and-token-logins.md).
 
 | Name                               | Description                                                                                     | Default          |
 | ---------------------------------- | ----------------------------------------------------------------------------------------------- | ---------------- |

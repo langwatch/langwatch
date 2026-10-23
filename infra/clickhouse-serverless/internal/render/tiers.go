@@ -9,7 +9,7 @@ import (
 
 const tiersFile = "access-tiers.yaml"
 
-// renderTiers writes the four tier roles and their settings profiles (ADR-184).
+// renderTiers writes the four tier roles and their settings profiles (ADR-190).
 // Every profile inherits default. Read tiers run with readonly=2, which lets
 // tools set their own query settings, and constraints stop them raising the caps.
 func renderTiers(input *config.Input, c *config.Computed, usersD string) error {

@@ -39,7 +39,7 @@ type Input struct {
 	InterserverPasswordFile string `env:"CLICKHOUSE_INTERSERVER_PASSWORD_FILE"`
 	InterserverPassword     string
 
-	// Optional access.yaml (ADR-184): users, their tiers and logins. The
+	// Optional access.yaml (ADR-190): users, their tiers and logins. The
 	// sidecar answers token logins on AccessListen and re-renders the users.
 	AccessFile    string `env:"CLICKHOUSE_ACCESS_FILE"`
 	AccessListen  string `env:"CLICKHOUSE_ACCESS_LISTEN" default:"127.0.0.1:8124"`
@@ -103,7 +103,7 @@ type Input struct {
 	EnableBlobLog         bool   `env:"ENABLE_BLOB_STORAGE_LOG"`
 	EnablePrometheus      bool   `env:"ENABLE_PROMETHEUS_METRICS"`
 
-	// Execution-time cap of the inspect and read tiers' profiles (ADR-184).
+	// Execution-time cap of the inspect and read tiers' profiles (ADR-190).
 	ReadTierMaxExecutionTime int `env:"READ_TIER_MAX_EXECUTION_TIME" default:"300" validate:"gte=1"`
 
 	// Query limits (0 = unlimited)

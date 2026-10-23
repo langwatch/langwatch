@@ -181,7 +181,7 @@ Reusable framework decisions live with their packages:
 | [177](./177-aggregate-project-reads-member-projects-through-grants.md)                | An aggregate project reads its member projects through shared grants                                                       | Accepted                  |
 | [180](./180-scenario-run-hooks.md)                                                    | Scenario run hooks: setup and teardown on connected agents                                                                 | Proposed                  |
 | [181](./181-tsrs-runs-behind-tsc.md)                                                  | tsrs runs behind `tsc`                                                                                                     | Proposed                  |
-| [184](./184-clickhouse-serverless-access-tiers-rolling-passwords-and-token-logins.md) | clickhouse-serverless access: tiers, rolling passwords and OIDC token logins, rendered as files                            | Accepted                  |
+| [190](./190-clickhouse-serverless-access-tiers-rolling-passwords-and-token-logins.md) | clickhouse-serverless access: tiers, rolling passwords and OIDC token logins, rendered as files                            | Accepted                  |
 
 Package-local decisions are indexed beside their owners. The framework
 records are the [Eventing ADR index](../../../packages/eventing/adrs/README.md)

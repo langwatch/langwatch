@@ -108,7 +108,7 @@ app.kubernetes.io/component: keeper
   {{- end }}
 {{- end -}}
 
-{{/* True when the pod runs in dynamic-only mode (ADR-184). */}}
+{{/* True when the pod runs in dynamic-only mode (ADR-190). */}}
 {{- define "clickhouse-serverless.dynamicOnly" -}}
 {{- if and .Values.access.enabled .Values.access.dynamicOnly.enabled }}true{{ end }}
 {{- end -}}

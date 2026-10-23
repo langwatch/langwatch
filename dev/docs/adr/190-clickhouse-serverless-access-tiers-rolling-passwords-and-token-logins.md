@@ -1,4 +1,4 @@
-# ADR-184: clickhouse-serverless access - tiers, rolling passwords and OIDC token logins, rendered as files
+# ADR-190: clickhouse-serverless access - tiers, rolling passwords and OIDC token logins, rendered as files
 
 **Date:** 2026-10-23
 

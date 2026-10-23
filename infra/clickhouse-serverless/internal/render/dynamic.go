@@ -15,7 +15,7 @@ import (
 const dynamicOnlyFile = "access-dynamic-only.yaml"
 
 // renderLocalAdmin generates this start's local admin password into the
-// bootstrap tmpfs, then renders the user with only its hash (ADR-184).
+// bootstrap tmpfs, then renders the user with only its hash (ADR-190).
 func renderLocalAdmin(input *config.Input, usersD string) error {
 	cred, err := bootstrap.Generate(input.AccessBootstrapDir)
 	if err != nil {
@@ -42,7 +42,7 @@ func renderDynamicOnlyServer(configD string) error {
 		"password_complexity": map[string]any{
 			"rule": map[string]string{
 				"pattern": refusedSQLPassword,
-				"message": "be absent: this server is in dynamic-only mode, give the user a token login (ADR-184)",
+				"message": "be absent: this server is in dynamic-only mode, give the user a token login (ADR-190)",
 			},
 		},
 	})

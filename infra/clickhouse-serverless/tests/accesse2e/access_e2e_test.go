@@ -1,4 +1,4 @@
-// Package accesse2e runs the image against a real ClickHouse (ADR-184). It
+// Package accesse2e runs the image against a real ClickHouse (ADR-190). It
 // needs Docker on Linux and runs only when CH_ACCESS_E2E_IMAGE names an image:
 // `make e2e-access` builds one and sets it, CI's docker e2e job runs that.
 package accesse2e

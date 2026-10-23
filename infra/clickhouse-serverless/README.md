@@ -119,7 +119,7 @@ which **only `sql` mode uses**; rendered delivery runs no access DDL. See
 
 ## Access: tiers, rolling passwords and token logins
 
-Design and limits: [ADR-184](../../dev/docs/adr/184-clickhouse-serverless-access-tiers-rolling-passwords-and-token-logins.md).
+Design and limits: [ADR-190](../../dev/docs/adr/190-clickhouse-serverless-access-tiers-rolling-passwords-and-token-logins.md).
 
 **Tiers.** With `CLICKHOUSE_ACCESS_FILE` set, or `CLICKHOUSE_ACCESS_TIERS=true`
 for users you write yourself, the server renders `users.d/access-tiers.yaml` with
@@ -203,7 +203,7 @@ docker run -d \
 
 `mode: dynamic-only` at the top of the access file leaves ClickHouse with no
 long-lived password. Every person and workload logs in with an OIDC token
-([ADR-184](../../dev/docs/adr/184-clickhouse-serverless-access-tiers-rolling-passwords-and-token-logins.md), section 7).
+([ADR-190](../../dev/docs/adr/190-clickhouse-serverless-access-tiers-rolling-passwords-and-token-logins.md), section 7).
 
 - Leave `CLICKHOUSE_PASSWORD` and `CLICKHOUSE_PASSWORD_FILE` unset. `default`
   is locked: no network may log in as it.
