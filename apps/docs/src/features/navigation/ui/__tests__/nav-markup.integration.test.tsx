@@ -1,20 +1,11 @@
 import { DesignSystemTestProvider } from "@langwatch/design-system/testing";
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import type { NavItem } from "../../model/nav.ts";
 import { MobileNav } from "../mobile-nav.tsx";
 import { NavTree } from "../nav-tree.tsx";
-
-vi.mock("virtual:docs-nav", () => ({
-  default: {
-    pages: {},
-    anchors: [],
-    support: [],
-    site: { llms: "/llms.txt", signIn: "https://app.langwatch.ai" },
-  },
-}));
 
 /* Markup without the design system's inline style blocks. */
 const render = (node: ReactNode) =>
@@ -45,7 +36,13 @@ const items: NavItem[] = [
 
 describe("when a page lists collapsible navigation groups", () => {
   const html = render(
-    <NavTree items={items} current="evaluations/online" section="Platform" id="page-tree" />,
+    <NavTree
+      items={items}
+      pages={{}}
+      current="evaluations/online"
+      section="Platform"
+      id="page-tree"
+    />,
   );
   const toggles = html.match(/<button[^>]*data-docs-group[\s\S]*?<\/button>/g) ?? [];
 
@@ -74,6 +71,7 @@ describe("when a page lists collapsible navigation groups", () => {
 describe("when a navigation group holds a single page", () => {
   const html = render(
     <NavTree
+      pages={{}}
       items={[
         {
           type: "group",
@@ -98,7 +96,16 @@ describe("when a navigation group holds a single page", () => {
 });
 
 describe("when a page renders the mobile navigation drawer", () => {
-  const html = render(<MobileNav open={false} onClose={() => {}} active={undefined} slug="x" />);
+  const html = render(
+    <MobileNav
+      site={{
+        llms: "/llms.txt",
+        signIn: "https://app.langwatch.ai",
+        github: "https://github.com/langwatch/langwatch",
+        stars: null,
+      }}
+    />,
+  );
 
   /** @scenario "Open the mobile navigation from the page's one navigation tree" */
   it("ships the drawer without a second copy of the page tree", () => {

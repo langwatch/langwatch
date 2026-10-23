@@ -1,20 +1,16 @@
 import { DesignSystemTestProvider } from "@langwatch/design-system/testing";
 import { renderToStaticMarkup } from "react-dom/server";
-import { afterAll, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
-import { DocsIframe, DocsImage, DocsSource, DocsVideo } from "../ui/media.tsx";
+import { DocsIframe, DocsImage, DocsSource, DocsVideo, MediaBasePath } from "../ui/media.tsx";
 
-// Suites share modules (isolate: false): drop modules earlier files loaded so this file's imports
-// see the mocked base path, and restore the real one for the files after it.
-vi.hoisted(() => vi.resetModules());
-vi.mock("../../../config.ts", () => ({ docsBasePath: "/docs", isProduction: false }));
-afterAll(() => {
-  vi.doUnmock("../../../config.ts");
-  vi.resetModules();
-});
-
+/* Renders media as a build under the `/docs` base path serves it. */
 function render({ element }: { element: React.ReactElement }) {
-  return renderToStaticMarkup(<DesignSystemTestProvider>{element}</DesignSystemTestProvider>);
+  return renderToStaticMarkup(
+    <DesignSystemTestProvider>
+      <MediaBasePath.Provider value="/docs">{element}</MediaBasePath.Provider>
+    </DesignSystemTestProvider>,
+  );
 }
 
 describe("when the docs are built under a base path", () => {

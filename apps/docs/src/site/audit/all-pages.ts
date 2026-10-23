@@ -1,4 +1,11 @@
-import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 import { parseArgs } from "node:util";
 
@@ -55,14 +62,18 @@ function main() {
   const basePath = args["base-path"].replace(/\/$/, "");
   const built = builtBasePath({ outDir });
   if (built !== null && built !== basePath)
-    throw new Error(`${outDir} was built for base path "${built || "/"}", not "${basePath || "/"}"`);
+    throw new Error(
+      `${outDir} was built for base path "${built || "/"}", not "${basePath || "/"}"`,
+    );
   const budgets = readBudgets();
 
   const pages = sitemapPages({ outDir })
     .map(sitePath)
     .filter((page) => page !== null);
   const files = shardFiles(path.resolve(args["shards-dir"]));
-  const runs = files.flatMap((file) => shardReport.parse(JSON.parse(readFileSync(file, "utf8"))).runs);
+  const runs = files.flatMap(
+    (file) => shardReport.parse(JSON.parse(readFileSync(file, "utf8"))).runs,
+  );
 
   const { issues } = checkSeo({ outDir, basePath, seo: budgets.seo });
   const byPage = new Map<string, string[]>(pages.map((page) => [page, []]));
@@ -73,7 +84,10 @@ function main() {
     if (list) list.push(issue.code);
     else siteIssues.push(issue);
   }
-  const seo: PageSeo[] = [...byPage].map(([page, codes]) => ({ path: page, issues: [...new Set(codes)] }));
+  const seo: PageSeo[] = [...byPage].map(([page, codes]) => ({
+    path: page,
+    issues: [...new Set(codes)],
+  }));
 
   const input = {
     pages,
@@ -89,7 +103,10 @@ function main() {
   mkdirSync(reportDir, { recursive: true });
   writeFileSync(path.join(reportDir, "comment.md"), comment);
   writeFileSync(path.join(reportDir, "full.md"), full);
-  writeFileSync(path.join(reportDir, "report.json"), JSON.stringify({ pages, runs, seo, siteIssues }));
+  writeFileSync(
+    path.join(reportDir, "report.json"),
+    JSON.stringify({ pages, runs, seo, siteIssues }),
+  );
   if (args.summary) appendFileSync(args.summary, full);
   process.stdout.write(
     `[docs-audit] every page: ${pages.length} pages, ${runs.length} runs from ${files.length} shards; ` +

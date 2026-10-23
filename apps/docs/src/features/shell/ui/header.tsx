@@ -16,7 +16,7 @@ export const HEADER_HEIGHT = { base: "56px", lg: "72px" } as const;
 /** The frame width for every page kind: the 1440 split. */
 const FRAME_WIDTH = "90rem";
 
-export function Header({ kind, onMenu }: { kind: PageKind; onMenu: () => void }) {
+export function Header({ kind }: { kind: PageKind }) {
   return (
     <Box
       as="header"
@@ -59,7 +59,6 @@ export function Header({ kind, onMenu }: { kind: PageKind; onMenu: () => void })
             height="44px"
             marginInlineStart="-2"
             data-docs-mobile=""
-            onClick={onMenu}
           >
             <MenuIcon size={20} aria-hidden="true" />
           </IconButton>
@@ -135,7 +134,7 @@ export function Header({ kind, onMenu }: { kind: PageKind; onMenu: () => void })
             <Search size={20} aria-hidden="true" />
           </IconButton>
           <Box display={{ base: "none", xl: "block" }}>
-            <GithubLink compact />
+            <GithubLink compact site={site} />
           </Box>
           <Link
             href={site.signIn}

@@ -19,7 +19,8 @@ import { pruneCache, writeAtomically } from "./media-cache.ts";
 
 const run = promisify(execFile);
 
-/* Twice the 840px article column, at most 30 frames a second: screen recordings gain nothing more. */
+/* Twice the 840px article column, at most 30 frames a second: screen recordings gain nothing
+   more. */
 const MAX_WIDTH = 1680;
 const MAX_FPS = 30;
 /* Below this peak level an audio track is silence and is dropped. */
@@ -302,6 +303,34 @@ async function encodingInput({ sources, docsRoot }: { sources: string[]; docsRoo
   return best;
 }
 
+/** A `<video>` tag's attributes for its encoding: poster, preload, autoplay and size settled. */
+function encodedVideoTag({
+  attributes,
+  found,
+  basePath,
+}: {
+  attributes: string;
+  found: PublishedVideo;
+  basePath: string;
+}) {
+  let tag = removeAttribute({ tag: attributes, name: "src" });
+  if (!hasAttribute({ tag, name: "poster" }) && !hasAttribute({ tag, name: "data-docs-tour" }))
+    tag = setAttribute({
+      tag,
+      name: "poster",
+      value: withBasePath({ basePath, path: found.poster }),
+    });
+  if (hasAttribute({ tag, name: "autoplay" }) && !hasAttribute({ tag, name: "muted" }))
+    tag = removeAttribute({ tag, name: "autoplay" });
+  if (hasAttribute({ tag, name: "poster" }) && !hasAttribute({ tag, name: "autoplay" }))
+    tag = setAttribute({ tag, name: "preload", value: "none" });
+  if (!/\sheight="\d+"/.test(tag) || !/\swidth="\d+"/.test(tag)) {
+    tag = setAttribute({ tag, name: "width", value: String(found.width) });
+    tag = setAttribute({ tag, name: "height", value: String(found.height) });
+  }
+  return tag;
+}
+
 /**
  * Each published `<video>` offering its WebM and MP4, with the generated poster unless one is
  * authored or the tour draws its own (`data-docs-tour`). With a poster it fetches nothing until
@@ -322,17 +351,7 @@ export function rewritePageVideos({
       .map((sitePath) => videos.get(sitePath))
       .find(Boolean);
     if (!found) return element;
-    let tag = removeAttribute({ tag: attributes, name: "src" });
-    if (!hasAttribute({ tag, name: "poster" }) && !hasAttribute({ tag, name: "data-docs-tour" }))
-      tag = setAttribute({ tag, name: "poster", value: site(found.poster) });
-    if (hasAttribute({ tag, name: "autoplay" }) && !hasAttribute({ tag, name: "muted" }))
-      tag = removeAttribute({ tag, name: "autoplay" });
-    if (hasAttribute({ tag, name: "poster" }) && !hasAttribute({ tag, name: "autoplay" }))
-      tag = setAttribute({ tag, name: "preload", value: "none" });
-    if (!/\sheight="\d+"/.test(tag) || !/\swidth="\d+"/.test(tag)) {
-      tag = setAttribute({ tag, name: "width", value: String(found.width) });
-      tag = setAttribute({ tag, name: "height", value: String(found.height) });
-    }
+    const tag = encodedVideoTag({ attributes, found, basePath });
     const sources = found.sources
       .map(
         (source) =>
@@ -346,7 +365,10 @@ export function rewritePageVideos({
   });
 }
 
-/** Names an encoded video's files by their content beside the authored path and adds them to `files`. */
+/**
+ * Names an encoded video's files by their content beside the authored path and adds them to
+ * `files`.
+ */
 function publish({
   sitePath,
   encoded,
@@ -375,6 +397,50 @@ function publish({
 }
 
 /**
+ * Encodes each group of a video's authored sources once, publishing its files into `files`.
+ * Returns each authored path's published video and MP4 alias, and the inputs left unencoded.
+ */
+async function encodeGroups({
+  groups,
+  docsRoot,
+  cacheDir,
+  toolchain,
+  used,
+  files,
+}: {
+  groups: string[][];
+  docsRoot: string;
+  cacheDir: string | null;
+  toolchain: Toolchain;
+  used: Set<string>;
+  files: Map<string, Buffer>;
+}) {
+  const aliases = new Map<string, string>();
+  const videos = new Map<string, PublishedVideo>();
+  const byInput = new Map<string, PublishedVideo | null>();
+  const missing: string[] = [];
+  for (const sources of groups) {
+    const input = await encodingInput({ sources, docsRoot });
+    if (!input) continue;
+    if (!byInput.has(input.sitePath)) {
+      const encoded = await encodeVideo({ file: input.file, cacheDir, toolchain, used });
+      if (!encoded) missing.push(input.sitePath);
+      byInput.set(
+        input.sitePath,
+        encoded ? publish({ sitePath: input.sitePath, encoded, files }) : null,
+      );
+    }
+    const published = byInput.get(input.sitePath);
+    if (!published) continue;
+    for (const sitePath of sources) {
+      videos.set(sitePath, published);
+      aliases.set(sitePath, published.sources[1]?.path ?? "");
+    }
+  }
+  return { aliases, videos, encoded: byInput.size - missing.length, missing };
+}
+
+/**
  * Encodes every local video the pages play and rewrites each page to offer the encodings.
  * Returns the rewritten pages, the files to publish, per authored path the MP4 that replaces it
  * wherever a page or export still links to the original, and the videos left as authored.
@@ -395,29 +461,15 @@ export async function optimisePageVideos({
   const chain = toolchain === undefined ? await videoToolchain() : toolchain;
   const groups = [...new Set(pages.values())].flatMap((html) => pageVideos({ html, basePath }));
   const files = new Map<string, Buffer>();
-  const aliases = new Map<string, string>();
-  const videos = new Map<string, PublishedVideo>();
-  const byInput = new Map<string, PublishedVideo | null>();
   const used = new Set<string>();
-  const missing: string[] = [];
-  for (const sources of groups) {
-    const input = await encodingInput({ sources, docsRoot });
-    if (!input) continue;
-    if (!byInput.has(input.sitePath)) {
-      const encoded = await encodeVideo({ file: input.file, cacheDir, toolchain: chain, used });
-      if (!encoded) missing.push(input.sitePath);
-      byInput.set(
-        input.sitePath,
-        encoded ? publish({ sitePath: input.sitePath, encoded, files }) : null,
-      );
-    }
-    const published = byInput.get(input.sitePath);
-    if (!published) continue;
-    for (const sitePath of sources) {
-      videos.set(sitePath, published);
-      aliases.set(sitePath, published.sources[1]?.path ?? "");
-    }
-  }
+  const { aliases, videos, encoded, missing } = await encodeGroups({
+    groups,
+    docsRoot,
+    cacheDir,
+    toolchain: chain,
+    used,
+    files,
+  });
   if (chain) await pruneCache({ directory: cacheDir, keep: used });
   const byHtml = new Map<string, string>();
   const rewritten = new Map<string, string>();
@@ -426,16 +478,19 @@ export async function optimisePageVideos({
     byHtml.set(html, page);
     rewritten.set(target, page);
   }
-  /* A clip with an authored poster, or the tour drawing its own, leaves the generated one unused. */
+  /* A clip with an authored poster, or the tour drawing its own, leaves the generated one
+     unused. */
   const shown = [...new Set(rewritten.values())];
-  for (const { poster } of new Set(videos.values()))
-    if (!shown.some((html) => html.includes(`"${withBasePath({ basePath, path: poster })}"`)))
-      files.delete(poster.slice(1));
+  for (const { poster } of new Set(videos.values())) {
+    const attribute = `"${withBasePath({ basePath, path: poster })}"`;
+    const isShown = shown.some((html) => html.includes(attribute));
+    if (!isShown) files.delete(poster.slice(1));
+  }
   return {
     pages: rewritten,
     files,
     aliases,
-    encoded: byInput.size - missing.length,
+    encoded,
     unencoded: missing,
   };
 }

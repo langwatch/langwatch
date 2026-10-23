@@ -62,7 +62,8 @@ type Cell = number | null | undefined;
 
 export function scoreDot(score: Cell) {
   if (score === null || score === undefined) return "⚪";
-  return score >= 0.9 ? "🟢" : score >= 0.5 ? "🟠" : "🔴";
+  if (score >= 0.9) return "🟢";
+  return score >= 0.5 ? "🟠" : "🔴";
 }
 
 function score(value: Cell) {
@@ -73,7 +74,8 @@ function score(value: Cell) {
 
 function metricDot({ value, good, poor }: { value: Cell; good: number; poor: number }) {
   if (value === null || value === undefined) return "⚪";
-  return value <= good ? "🟢" : value <= poor ? "🟠" : "🔴";
+  if (value <= good) return "🟢";
+  return value <= poor ? "🟠" : "🔴";
 }
 
 function metricValue({ metric, value }: { metric: Metric; value: Cell }) {
@@ -247,20 +249,18 @@ function worstPages({
     "📱 TBT": "totalBlockingTime",
     "📱 CLS": "cumulativeLayoutShift",
   } as const;
-  const rows = below
-    .slice(0, WORST)
-    .map((path) => [
-      code(path),
-      ...FORM_FACTORS.toReversed().map((formFactor) =>
-        score(usable(run(formFactor, path))?.scores[category]),
-      ),
-      ...extra.map((label) =>
-        metricCell({
-          metric: metricOf[label],
-          value: usable(run("mobile", path))?.metrics[metricOf[label]],
-        }),
-      ),
-    ]);
+  const rows = below.slice(0, WORST).map((path) => [
+    code(path),
+    ...FORM_FACTORS.toReversed().map((formFactor) =>
+      score(usable(run(formFactor, path))?.scores[category]),
+    ),
+    ...extra.map((label) =>
+      metricCell({
+        metric: metricOf[label],
+        value: usable(run("mobile", path))?.metrics[metricOf[label]],
+      }),
+    ),
+  ]);
   const shown = Math.min(WORST, below.length);
   return [
     title,

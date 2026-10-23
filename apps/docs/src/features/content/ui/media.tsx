@@ -11,20 +11,23 @@ import {
 } from "react";
 import type { ComponentProps } from "react";
 
-import { sitePath } from "../../../lib/site-path.ts";
+import { BASE_PATH, withBasePath } from "../../../lib/site-path.ts";
+
+/** The base path media URLs are served under: the build's own unless a render provides one. */
+export const MediaBasePath = createContext(BASE_PATH);
 
 /** A local media URL under the site's base path; external and relative URLs pass through. */
-function mediaPath({ path }: { path?: string }) {
-  return path ? sitePath({ path }) : path;
+function mediaPath({ basePath, path }: { basePath: string; path?: string }) {
+  return path ? withBasePath({ basePath, path }) : path;
 }
 
 /** Prefixes each candidate URL of a `srcset`, keeping its width or density descriptor. */
-function mediaSrcSet({ srcSet }: { srcSet?: string }) {
+function mediaSrcSet({ basePath, srcSet }: { basePath: string; srcSet?: string }) {
   return srcSet
     ?.split(",")
     .map((candidate) => {
       const [url = "", ...descriptors] = candidate.trim().split(/\s+/);
-      return [sitePath({ path: url }), ...descriptors].join(" ");
+      return [withBasePath({ basePath, path: url }), ...descriptors].join(" ");
     })
     .join(", ");
 }
@@ -48,12 +51,13 @@ export function shotKind({ src }: { src?: string }): "bare" | "diagram" | "shot"
 /** Broken images retain their authored alternative text. */
 export function DocsImage({ className, alt, src, srcSet, width, ...rest }: ComponentProps<"img">) {
   const [failed, setFailed] = useState(false);
+  const basePath = useContext(MediaBasePath);
   const kind = useContext(InFrame) ? "bare" : shotKind({ src });
   const percent = typeof width === "string" && width.endsWith("%") ? width : undefined;
   if (failed) {
     return (
       <Link
-        href={mediaPath({ path: src })}
+        href={mediaPath({ basePath, path: src })}
         fontSize="14px"
         color="blue.fg"
         className={themeClass({ className })}
@@ -67,8 +71,8 @@ export function DocsImage({ className, alt, src, srcSet, width, ...rest }: Compo
       className={`docs-img ${kind === "bare" ? themeClass({ className }) : ""} ${className ?? ""}`
         .replace(/\s+/g, " ")
         .trim()}
-      src={mediaPath({ path: src })}
-      srcSet={mediaSrcSet({ srcSet })}
+      src={mediaPath({ basePath, path: src })}
+      srcSet={mediaSrcSet({ basePath, srcSet })}
       alt={alt ?? ""}
       loading="lazy"
       decoding="async"
@@ -98,11 +102,11 @@ const TOUR_POSTER = { width: 1664, height: 1040, widths: [640, 1024, 1664] };
 const TOUR_POSTER_SIZES =
   "(min-width: 1280px) calc(100vw - 620px), (min-width: 1024px) calc(100vw - 380px), calc(100vw - 40px)";
 
-function tourPosterSet({ format }: { format: "avif" | "webp" }) {
+function tourPosterSet({ basePath, format }: { basePath: string; format: "avif" | "webp" }) {
   return TOUR_POSTER.widths
     .map(
       (width) =>
-        `${sitePath({ path: `/media/posters/introduction-${width}.${format}` })} ${width}w`,
+        `${withBasePath({ basePath, path: `/media/posters/introduction-${width}.${format}` })} ${width}w`,
     )
     .join(", ");
 }
@@ -112,20 +116,21 @@ function tourPosterSet({ format }: { format: "avif" | "webp" }) {
  * the docs home's largest paint at every width, so it is fetched first.
  */
 function TourPoster() {
+  const basePath = useContext(MediaBasePath);
   return (
     <picture>
       <source
         type="image/avif"
-        srcSet={tourPosterSet({ format: "avif" })}
+        srcSet={tourPosterSet({ basePath, format: "avif" })}
         sizes={TOUR_POSTER_SIZES}
       />
       <source
         type="image/webp"
-        srcSet={tourPosterSet({ format: "webp" })}
+        srcSet={tourPosterSet({ basePath, format: "webp" })}
         sizes={TOUR_POSTER_SIZES}
       />
       <img
-        src={sitePath({ path: "/media/posters/introduction.jpg" })}
+        src={withBasePath({ basePath, path: "/media/posters/introduction.jpg" })}
         width={TOUR_POSTER.width}
         height={TOUR_POSTER.height}
         alt=""
@@ -147,6 +152,7 @@ export function DocsVideo({ autoPlay, children, src, poster, ...rest }: Componen
   const ref = useRef<HTMLVideoElement>(null);
   const [started, setStarted] = useState(false);
   const [failed, setFailed] = useState(false);
+  const basePath = useContext(MediaBasePath);
   const introduction = Children.toArray(children).some(
     (child) =>
       isValidElement<{ src?: string }>(child) &&
@@ -165,8 +171,8 @@ export function DocsVideo({ autoPlay, children, src, poster, ...rest }: Componen
     return (
       <video
         {...rest}
-        src={mediaPath({ path: src })}
-        poster={mediaPath({ path: poster })}
+        src={mediaPath({ basePath, path: src })}
+        poster={mediaPath({ basePath, path: poster })}
         style={{ display: "block", maxWidth: "100%", height: "auto" }}
         controls
         muted
@@ -200,8 +206,8 @@ export function DocsVideo({ autoPlay, children, src, poster, ...rest }: Componen
           data-docs-tour={introduction ? "" : undefined}
           playsInline
           preload={introduction ? "none" : "metadata"}
-          src={mediaPath({ path: src })}
-          poster={introduction ? undefined : mediaPath({ path: poster })}
+          src={mediaPath({ basePath, path: src })}
+          poster={introduction ? undefined : mediaPath({ basePath, path: poster })}
           style={{
             display: "block",
             width: "100%",
@@ -259,10 +265,18 @@ export function DocsVideo({ autoPlay, children, src, poster, ...rest }: Componen
 
 /** A video source under the site's base path; MDX `<source>` tags compile to this. */
 export function DocsSource({ src, srcSet, ...rest }: ComponentProps<"source">) {
-  return <source {...rest} src={mediaPath({ path: src })} srcSet={mediaSrcSet({ srcSet })} />;
+  const basePath = useContext(MediaBasePath);
+  return (
+    <source
+      {...rest}
+      src={mediaPath({ basePath, path: src })}
+      srcSet={mediaSrcSet({ basePath, srcSet })}
+    />
+  );
 }
 
 export function DocsIframe({ title, src, ...rest }: ComponentProps<"iframe">) {
+  const basePath = useContext(MediaBasePath);
   return (
     <Box
       marginY="6"
@@ -277,7 +291,7 @@ export function DocsIframe({ title, src, ...rest }: ComponentProps<"iframe">) {
         loading="lazy"
         style={{ width: "100%", height: "100%", border: 0 }}
         {...rest}
-        src={mediaPath({ path: src })}
+        src={mediaPath({ basePath, path: src })}
       />
     </Box>
   );

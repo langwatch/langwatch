@@ -114,7 +114,8 @@ export function rewriteHtmlMedia({
   basePath: string;
   rename: Rename;
 }) {
-  return html.replace(URL_ATTRIBUTE, (match, open: string, name: string, value: string, close) => {
+  return html.replace(URL_ATTRIBUTE, (match: string, ...groups: string[]) => {
+    const [open = "", name = "", value = "", close = ""] = groups;
     const decoded = value.replaceAll("&amp;", "&");
     const mapped = /srcset$/i.test(name)
       ? mapSrcSet({ value: decoded, basePath, rename })
@@ -168,6 +169,36 @@ async function filesUnder({ root, directory }: { root: string; directory: string
     );
 }
 
+/** The referenced files to publish: stable ones keep their path, the rest go under their hash. */
+async function referencedFiles({
+  referenced,
+  docsRoot,
+  aliases,
+}: {
+  referenced: ReadonlySet<string>;
+  docsRoot: string;
+  aliases: ReadonlyMap<string, string>;
+}) {
+  const stable: string[] = [];
+  const hashed: { sitePath: string; name: string; file: string }[] = [];
+  for (const sitePath of [...referenced].toSorted()) {
+    if (aliases.has(sitePath)) continue;
+    const file = path.join(docsRoot, sitePath);
+    if (!file.startsWith(docsRoot + path.sep)) continue;
+    if (!existsSync(file)) continue;
+    if (isStableAsset({ sitePath })) {
+      stable.push(sitePath);
+      continue;
+    }
+    hashed.push({
+      sitePath,
+      name: hashedName({ name: sitePath, bytes: await readFile(file) }),
+      file,
+    });
+  }
+  return { stable, hashed };
+}
+
 /**
  * Publishes the media `pages` (HTML) and `texts` (agent exports) reference: `aliases` sends a path
  * to a file another pass published (a screenshot to its WebP), others go under their content hash.
@@ -196,16 +227,11 @@ export async function publishMedia({
   const stable = [...STABLE_FILES];
   for (const directory of STABLE_DIRS)
     stable.push(...(await filesUnder({ root: docsRoot, directory })));
-  for (const sitePath of [...referenced].toSorted()) {
-    const file = path.join(docsRoot, sitePath);
-    if (aliases.has(sitePath) || !file.startsWith(docsRoot + path.sep) || !existsSync(file))
-      continue;
-    if (isStableAsset({ sitePath })) stable.push(sitePath);
-    else {
-      const name = hashedName({ name: sitePath, bytes: await readFile(file) });
-      renames.set(sitePath, name);
-      copies.set(name.slice(1), file);
-    }
+  const found = await referencedFiles({ referenced, docsRoot, aliases });
+  stable.push(...found.stable);
+  for (const { sitePath, name, file } of found.hashed) {
+    renames.set(sitePath, name);
+    copies.set(name.slice(1), file);
   }
   for (const sitePath of stable) {
     const file = path.join(docsRoot, sitePath);

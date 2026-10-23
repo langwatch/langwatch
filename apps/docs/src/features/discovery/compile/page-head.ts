@@ -10,7 +10,10 @@ import {
   type Section,
 } from "../../navigation/model/nav.ts";
 
-/** Where the web fonts live: dev serves them at this path, a build renames each to Vite's hashed file. */
+/**
+ * Where the web fonts live: dev serves them at this path, a build renames each to Vite's hashed
+ * file.
+ */
 export const FONT_SOURCE = "/src/app/fonts";
 
 /* The body font and the title font paint above the fold on every page; the rest load on demand. */

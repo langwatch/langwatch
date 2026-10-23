@@ -123,6 +123,48 @@ export async function encodeImage({
 }
 
 /**
+ * Encodes the rasters `queue` yields into `files`, `aliases` and `variants`. Workers share one
+ * queue, so each raster is encoded once.
+ */
+async function encodeQueued({
+  queue,
+  docsRoot,
+  basePath,
+  cacheDir,
+  used,
+  files,
+  aliases,
+  variants,
+}: {
+  queue: IterableIterator<string>;
+  docsRoot: string;
+  basePath: string;
+  cacheDir: string | null;
+  used: Set<string>;
+  files: Map<string, Buffer>;
+  aliases: Map<string, string>;
+  variants: Map<string, ImageVariant[]>;
+}) {
+  for (const sitePath of queue) {
+    const file = path.join(docsRoot, sitePath);
+    if (!file.startsWith(docsRoot + path.sep) || !existsSync(file)) continue;
+    const encoded = await encodeImage({ input: await readFile(file), sitePath, cacheDir, used });
+    for (const { name, bytes } of encoded) files.set(name, bytes);
+    const fallback = fallbackVariant({ variants: encoded });
+    if (fallback) aliases.set(sitePath, `/${fallback.name}`);
+    if (encoded.length === 0) continue;
+    variants.set(
+      sitePath,
+      encoded.map(({ name, type, width }) => ({
+        type,
+        width,
+        path: withBasePath({ basePath, path: `/${name}` }),
+      })),
+    );
+  }
+}
+
+/**
  * Encodes every local raster the pages' articles show and rewrites each page to offer the
  * encodings in a `<picture>`, preloading the first image above the fold. Returns the rewritten
  * pages, the encoded files to publish and, per authored path, the encoding that replaces it.
@@ -145,29 +187,12 @@ export async function optimisePageImages({
   const files = new Map<string, Buffer>();
   const aliases = new Map<string, string>();
   const used = new Set<string>();
-  let next = 0;
-  async function drain() {
-    while (next < sources.length) {
-      const sitePath = sources[next] ?? "";
-      next += 1;
-      const file = path.join(docsRoot, sitePath);
-      if (!file.startsWith(docsRoot + path.sep) || !existsSync(file)) continue;
-      const encoded = await encodeImage({ input: await readFile(file), sitePath, cacheDir, used });
-      for (const { name, bytes } of encoded) files.set(name, bytes);
-      const fallback = fallbackVariant({ variants: encoded });
-      if (fallback) aliases.set(sitePath, `/${fallback.name}`);
-      if (encoded.length > 0)
-        variants.set(
-          sitePath,
-          encoded.map(({ name, type, width }) => ({
-            type,
-            width,
-            path: withBasePath({ basePath, path: `/${name}` }),
-          })),
-        );
-    }
-  }
-  await Promise.all(Array.from({ length: CONCURRENT_IMAGES }, drain));
+  const queue = sources.values();
+  await Promise.all(
+    Array.from({ length: CONCURRENT_IMAGES }, () =>
+      encodeQueued({ queue, docsRoot, basePath, cacheDir, used, files, aliases, variants }),
+    ),
+  );
   await pruneCache({ directory: cacheDir, keep: used });
   const known: ImageVariants = variants;
   const byPage = new Map<string, string>();

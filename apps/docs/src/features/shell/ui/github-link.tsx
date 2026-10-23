@@ -2,11 +2,17 @@ import { GitHubIcon } from "@langwatch/design-system/icons";
 import { Link, Text } from "@langwatch/design-system/primitives";
 import { Star } from "lucide-react";
 
-import { site } from "../../navigation/ui/site-nav.ts";
+import type { SiteMeta } from "../../navigation/model/nav.ts";
 
 const COUNT = new Intl.NumberFormat("en-GB");
 
-export function GithubLink({ compact }: { compact: boolean }) {
+export function GithubLink({
+  compact,
+  site,
+}: {
+  compact: boolean;
+  site: Pick<SiteMeta, "github" | "stars">;
+}) {
   const stars = site.stars;
   return (
     <Link

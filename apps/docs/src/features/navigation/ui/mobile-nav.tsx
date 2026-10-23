@@ -2,17 +2,16 @@ import { Box, Button, Flex, Link, Text } from "@langwatch/design-system/primitiv
 
 import { sitePath } from "../../../lib/site-path.ts";
 import { GithubLink } from "../../shell/ui/github-link.tsx";
-import { site } from "./site-nav.ts";
+import type { SiteMeta } from "../model/nav.ts";
 
 /**
  * The drawer ships empty: opening it copies the left rail's sections and page tree in, so
  * every page carries its navigation once. The drawer needs JavaScript to open either way.
  */
-export function MobileNav(_props: {
-  open: boolean;
-  onClose: () => void;
-  active: unknown;
-  slug: string;
+export function MobileNav({
+  site,
+}: {
+  site: Pick<SiteMeta, "llms" | "signIn" | "github" | "stars">;
 }) {
   return (
     <dialog
@@ -50,7 +49,7 @@ export function MobileNav(_props: {
       <Flex padding="4" gap="3" borderTopWidth="1px" borderColor="border" wrap="wrap">
         <Link href={sitePath({ path: site.llms })}>Docs for agents</Link>
         <Link href={site.signIn}>Open app</Link>
-        <GithubLink compact />
+        <GithubLink compact site={site} />
       </Flex>
     </dialog>
   );

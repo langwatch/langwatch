@@ -1,11 +1,12 @@
 import { Box, chakra, Text } from "@langwatch/design-system/primitives";
-import nav from "virtual:docs-nav";
 
 import { isColourLogo } from "../../../lib/logos.ts";
 import { pagePath, sitePath } from "../../../lib/site-path.ts";
 import { Icon } from "../../content/ui/icon.tsx";
 import { endpointCount, groupTarget, methodOf, soleChild, startsOpen } from "../model/nav.ts";
-import type { NavItem } from "../model/nav.ts";
+import type { NavItem, PageMeta } from "../model/nav.ts";
+
+type Pages = Record<string, PageMeta>;
 
 type Group = Extract<NavItem, { type: "group" }>;
 
@@ -86,19 +87,21 @@ function NavGlyph({ icon }: { icon: string }) {
 /** `group` is set when a one-page group shows as its page: the row takes the group's name. */
 function PageRow({
   item,
+  pages,
   current,
   nested,
   group,
   depth = 1,
 }: {
   item: Extract<NavItem, { type: "page" }>;
+  pages: Pages;
   current: string;
   nested: boolean;
   group?: Group;
   depth?: number;
 }) {
   const active = item.slug === current;
-  const meta = nav.pages[item.slug];
+  const meta = pages[item.slug];
   const method = methodOf({ meta });
   const glyph = group?.icon || meta?.icon || meta?.logo;
   const title = group?.title ?? item.title;
@@ -150,18 +153,20 @@ function PageRow({
 
 function GroupRow({
   item,
+  pages,
   current,
   depth,
   trail,
 }: {
   item: Group;
+  pages: Pages;
   current: string;
   depth: number;
   trail: string;
 }) {
-  const open = startsOpen({ group: item, slug: current, pages: nav.pages });
+  const open = startsOpen({ group: item, slug: current, pages });
   const [slug = "", hash] = groupTarget({ group: item }).split("#");
-  const endpoints = endpointCount({ group: item, pages: nav.pages });
+  const endpoints = endpointCount({ group: item, pages });
   const key = `${trail}/${item.title}`;
   return (
     <Box
@@ -243,7 +248,13 @@ function GroupRow({
         marginTop="0.5"
         marginBottom="1"
       >
-        <NavList items={item.children} current={current} depth={depth + 1} trail={key} />
+        <NavList
+          items={item.children}
+          pages={pages}
+          current={current}
+          depth={depth + 1}
+          trail={key}
+        />
       </Box>
     </Box>
   );
@@ -251,11 +262,13 @@ function GroupRow({
 
 function NavList({
   items,
+  pages,
   current,
   depth,
   trail,
 }: {
   items: NavItem[];
+  pages: Pages;
   current: string;
   depth: number;
   trail: string;
@@ -264,20 +277,36 @@ function NavList({
     <ul>
       {items.map((item) => {
         if (item.type === "page") {
-          return <PageRow key={item.slug} item={item} current={current} nested={depth > 0} />;
+          return (
+            <PageRow
+              key={item.slug}
+              item={item}
+              pages={pages}
+              current={current}
+              nested={depth > 0}
+            />
+          );
         }
         const only = soleChild({ group: item });
         return only ? (
           <PageRow
             key={item.title}
             item={only}
+            pages={pages}
             group={item}
             current={current}
             nested={depth > 0}
             depth={depth}
           />
         ) : (
-          <GroupRow key={item.title} item={item} current={current} depth={depth} trail={trail} />
+          <GroupRow
+            key={item.title}
+            item={item}
+            pages={pages}
+            current={current}
+            depth={depth}
+            trail={trail}
+          />
         );
       })}
     </ul>
@@ -287,11 +316,14 @@ function NavList({
 /** The active section's tree. Group headers link to their page; the chevron opens the group. */
 export function NavTree({
   items,
+  pages,
   current,
   section,
   id,
 }: {
   items: NavItem[];
+  /** Each page's metadata by slug, as the navigation was compiled. */
+  pages: Pages;
   current: string;
   section: string;
   id?: string;
@@ -305,7 +337,7 @@ export function NavTree({
       tabIndex={id ? -1 : undefined}
       aria-label="Page navigation"
     >
-      <NavList items={items} current={current} depth={0} trail={section} />
+      <NavList items={items} pages={pages} current={current} depth={0} trail={section} />
     </Box>
   );
 }

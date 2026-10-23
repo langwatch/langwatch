@@ -81,7 +81,10 @@ describe("the every-page report", () => {
         : r,
     );
     const { comment } = allPagesMarkdown({ input: input({ runs }) });
-    const section = comment.slice(comment.indexOf("#### A11y"), comment.indexOf("#### Best practices"));
+    const section = comment.slice(
+      comment.indexOf("#### A11y"),
+      comment.indexOf("#### Best practices"),
+    );
     expect(section).toContain("2 pages below 100 on a device");
     expect(section.indexOf("/guide/b")).toBeLessThan(section.indexOf("/guide/a"));
     expect(section).toContain("| `/guide/b` | 🔴 30 | 🟢 100 |");

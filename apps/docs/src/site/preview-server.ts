@@ -24,7 +24,10 @@ function setExportContentType({
     response.setHeader("Content-Type", "text/markdown; charset=utf-8");
 }
 
-/** How long a host may keep a file: hashed files forever, other media a day, documents never stale. */
+/**
+ * How long a host may keep a file: hashed files forever, other media a day, documents never
+ * stale.
+ */
 export function cachePolicy({ sitePathname }: { sitePathname: string }) {
   if (isHashedFile({ sitePath: sitePathname })) return "public, max-age=31536000, immutable";
   if (/^\/(fonts|images|media|logo)\//.test(sitePathname))

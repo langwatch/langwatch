@@ -98,11 +98,10 @@ describe.skipIf(!toolchain)("encoding a video with ffmpeg", () => {
   it("encodes a silent WebM and MP4 no wider than twice the column, cached by content", async () => {
     const source = path.join(root, "media/videos/wide.mp4");
     mkdirSync(path.dirname(source), { recursive: true });
-    execFileSync("ffmpeg", [
-      ...["-v", "error", "-f", "lavfi", "-i", "testsrc=size=1920x1080:rate=60:duration=1"],
-      ...["-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo", "-shortest"],
-      ...["-c:v", "libx264", "-preset", "ultrafast", "-c:a", "aac", source],
-    ]);
+    const testPicture = ["-f", "lavfi", "-i", "testsrc=size=1920x1080:rate=60:duration=1"];
+    const silentAudio = ["-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo", "-shortest"];
+    const h264 = ["-c:v", "libx264", "-preset", "ultrafast", "-c:a", "aac", source];
+    execFileSync("ffmpeg", ["-v", "error", ...testPicture, ...silentAudio, ...h264]);
     const cacheDir = path.join(root, "cache");
     const encoded = await encodeVideo({ file: source, cacheDir, toolchain });
     expect(encoded).not.toBeNull();

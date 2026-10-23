@@ -1,5 +1,4 @@
 import { Box } from "@langwatch/design-system/primitives";
-import { useState } from "react";
 import type { ReactNode } from "react";
 
 import { TypeRegion } from "../../../lib/type-mode.tsx";
@@ -75,7 +74,6 @@ export function DocsShell({
   tag = "",
   aside,
 }: ShellProps) {
-  const [menuOpen, setMenuOpen] = useState(false);
   const section = sectionOf({ slug });
   const trail = section ? (trailOf({ items: section.children, slug }) ?? []) : [];
   const breadcrumb = [section?.title ?? "Docs", ...trail.slice(-1)];
@@ -124,7 +122,7 @@ export function DocsShell({
       <Box className="docs-top" position="sticky" top="0" zIndex="sticky">
         <SiteAnnouncement announcement={site.announcement} />
         <SiteBanner />
-        <Header kind={kind} onMenu={() => setMenuOpen(true)} />
+        <Header kind={kind} />
       </Box>
       <Box
         className="docs-layout"
@@ -227,7 +225,7 @@ export function DocsShell({
         ) : null}
       </Box>
       <SiteFooter />
-      <MobileNav open={menuOpen} onClose={() => setMenuOpen(false)} active={section} slug={slug} />
+      <MobileNav site={site} />
     </Box>
   );
 }
