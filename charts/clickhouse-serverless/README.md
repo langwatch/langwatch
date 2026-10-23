@@ -233,17 +233,18 @@ sidecar container keeps them current and verifies OIDC token logins on
 `127.0.0.1` inside the pod. `env.CLICKHOUSE_ACCESS_TIERS: "true"` renders the
 tiers alone, for users you write yourself. Design and limits: [ADR-184](../../dev/docs/adr/184-clickhouse-serverless-access-tiers-rolling-passwords-and-token-logins.md).
 
-| Name                              | Description                                                                                         | Default |
-| --------------------------------- | --------------------------------------------------------------------------------------------------- | ------- |
-| `access.enabled`                  | Run the access sidecar and mount the access file                                                    | `false` |
-| `access.config`                   | The access file (`issuers`, `users`), rendered into a ConfigMap                                     | `{}`    |
-| `access.extraFiles`               | More files next to `access.yaml` at `/etc/clickhouse-access/config/<name>`, such as a `ca_file`      | `{}`    |
-| `access.existingConfigMap`        | Use this ConfigMap (its `access.yaml` key and any others) instead of `access.config`                | `""`    |
-| `access.passwordSecrets`          | Secrets mounted as password directories at `/etc/clickhouse-access/secrets/<name>`                  | `[]`    |
-| `access.sidecar.resources`        | Sidecar requests and limits                                                                         | small   |
-| `env.CLICKHOUSE_ACCESS_LISTEN`    | Loopback address the sidecar listens on, for ClickHouse's token checks                              | `127.0.0.1:8124` |
-| `env.CLICKHOUSE_ACCESS_TIERS`     | Render the tiers without an access file                                                             | `false` |
-| `env.READ_TIER_MAX_EXECUTION_TIME`| Execution-time cap (seconds) of the inspect and read tiers                                          | `300`   |
+| Name                               | Description                                                                                     | Default          |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------- | ---------------- |
+| `access.enabled`                   | Run the access sidecar and mount the access file                                                | `false`          |
+| `access.config`                    | The access file (`issuers`, `users`), rendered into a ConfigMap                                 | `{}`             |
+| `access.extraFiles`                | More files next to `access.yaml` at `/etc/clickhouse-access/config/<name>`, such as a `ca_file` | `{}`             |
+| `access.existingConfigMap`         | Use this ConfigMap (its `access.yaml` key and any others) instead of `access.config`            | `""`             |
+| `access.passwordSecrets`           | Secrets mounted as password directories at `/etc/clickhouse-access/secrets/<name>`              | `[]`             |
+| `access.dynamicOnly.enabled`       | Token logins only, no static password (see below)                                               | `false`          |
+| `access.sidecar.resources`         | Sidecar requests and limits                                                                     | small            |
+| `env.CLICKHOUSE_ACCESS_LISTEN`     | Loopback address the sidecar listens on, for ClickHouse's token checks                          | `127.0.0.1:8124` |
+| `env.CLICKHOUSE_ACCESS_TIERS`      | Render the tiers without an access file                                                         | `false`          |
+| `env.READ_TIER_MAX_EXECUTION_TIME` | Execution-time cap (seconds) of the inspect and read tiers                                      | `300`            |
 
 ```yaml
 access:
@@ -273,6 +274,29 @@ at that instant instead. Each change applies within about 10 seconds without a
 restart. Under the umbrella `langwatch` chart these values sit under
 `clickhouse.access`. The operator guide is in the docs: Self-hosting,
 Configuration, ClickHouse access.
+
+#### Dynamic-only mode
+
+`access.dynamicOnly.enabled: true` adds `mode: dynamic-only` to the access file
+(with `existingConfigMap`, put it in your file). The pod then holds no static
+password: `default` gets none and is locked, the credentials Secret mounts only
+the cluster secret (replicas) or nothing (one pod), and a `local_admin` password
+is generated at every start into an in-memory `emptyDir` shared with the
+sidecar. The sidecar's `/readyz` gates the pod's readiness. The chart refuses
+the mode with `passwordSecrets`, with `backup.enabled`, or with replicas but no
+`auth.clusterSecretEnabled`. Clients use short-lived tokens, for example a
+projected ServiceAccount token:
+
+```yaml
+volumes:
+  - name: clickhouse-token
+    projected:
+      sources:
+        - serviceAccountToken: { audience: clickhouse, expirationSeconds: 600, path: token }
+```
+
+The client reads the file for each connection. Example values:
+[`tests/values-dynamic-only.yaml`](tests/values-dynamic-only.yaml).
 
 ### Advanced
 

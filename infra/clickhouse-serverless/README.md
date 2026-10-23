@@ -27,24 +27,25 @@ CPU and RAM are auto-detected from cgroups. Override with `CH_CPU` and `CH_RAM` 
 
 Settings with a fixed default rather than one computed from CPU + RAM:
 
-| Variable                                       | Default       | Description                                                                                                                         |
-| ---------------------------------------------- | ------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `CLICKHOUSE_CLUSTER_SECRET_FILE`               | —             | File holding the `remote_servers` cluster secret (replicated mode). Read by `ch-config` only with `CLICKHOUSE_CLUSTER_SECRET_ENABLED` |
-| `CLICKHOUSE_CLUSTER_SECRET_ENABLED`            | `false`       | Recommended. Applies the cluster secret; see [Cluster secret](#cluster-secret) before turning it on                                 |
-| `CLICKHOUSE_INTERSERVER_PASSWORD_FILE`         | —             | File holding the interserver HTTP password. When set, `interserver_http_credentials` is rendered                                    |
-| `CLICKHOUSE_INTERSERVER_USER`                  | `interserver` | Interserver HTTP user, used only with `CLICKHOUSE_INTERSERVER_PASSWORD_FILE`                                                        |
-| `DEFAULT_USER_ACCESS_MANAGEMENT`               | `true`        | `false` leaves the `default` user without `access_management` and `named_collection_control` from `ch-config`                       |
-| `CLICKHOUSE_ACCESS_FILE`                       | —             | Access file declaring users, tiers and logins; see [Access](#access-tiers-rolling-passwords-and-token-logins) |
-| `CLICKHOUSE_ACCESS_LISTEN`                     | `127.0.0.1:8124` | Loopback address of the access sidecar's token check; anything else is refused |
-| `CLICKHOUSE_ACCESS_SIDECAR`                    | `embedded`    | `embedded` runs the sidecar inside this container; `external` when it runs in its own (the chart does) |
-| `CLICKHOUSE_ACCESS_TIERS`                      | `false`       | Render the tier roles and profiles without an access file, for users you write yourself |
-| `READ_TIER_MAX_EXECUTION_TIME`                 | `300`         | Execution-time cap, in seconds, of the inspect and read tiers |
-| `LOG_TO_FILE`                                  | `true`        | `false` removes the server's file loggers, so it logs to the console only                                                           |
-| `MERGE_MAX_BLOCK_SIZE_BYTES`                   | `0`           | `merge_tree.merge_max_block_size_bytes`; `0` leaves the ClickHouse default                                                          |
-| `MAX_CONCURRENT_SELECT_QUERIES`                | `0`           | SELECTs' own admission cap inside `max_concurrent_queries`; `0` means none                                                          |
-| `NETWORK_COMPRESSION_METHOD`                   | —             | Default profile `network_compression_method`; unset leaves the ClickHouse default. `zstd` suits replicated clusters                |
-| `NETWORK_ZSTD_COMPRESSION_LEVEL`               | —             | Default profile `network_zstd_compression_level`; unset leaves the ClickHouse default                                              |
-| `CANCEL_HTTP_READONLY_QUERIES_ON_CLIENT_CLOSE` | —             | Default profile; `1` stops a read whose HTTP client has gone (recommended), unset leaves the ClickHouse default (`0`)              |
+| Variable                                       | Default                  | Description                                                                                                                           |
+| ---------------------------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `CLICKHOUSE_CLUSTER_SECRET_FILE`               | —                        | File holding the `remote_servers` cluster secret (replicated mode). Read by `ch-config` only with `CLICKHOUSE_CLUSTER_SECRET_ENABLED` |
+| `CLICKHOUSE_CLUSTER_SECRET_ENABLED`            | `false`                  | Recommended. Applies the cluster secret; see [Cluster secret](#cluster-secret) before turning it on                                   |
+| `CLICKHOUSE_INTERSERVER_PASSWORD_FILE`         | —                        | File holding the interserver HTTP password. When set, `interserver_http_credentials` is rendered                                      |
+| `CLICKHOUSE_INTERSERVER_USER`                  | `interserver`            | Interserver HTTP user, used only with `CLICKHOUSE_INTERSERVER_PASSWORD_FILE`                                                          |
+| `DEFAULT_USER_ACCESS_MANAGEMENT`               | `true`                   | `false` leaves the `default` user without `access_management` and `named_collection_control` from `ch-config`                         |
+| `CLICKHOUSE_ACCESS_FILE`                       | —                        | Access file declaring users, tiers and logins; see [Access](#access-tiers-rolling-passwords-and-token-logins)                         |
+| `CLICKHOUSE_ACCESS_LISTEN`                     | `127.0.0.1:8124`         | Loopback address of the access sidecar's token check; anything else is refused                                                        |
+| `CLICKHOUSE_ACCESS_SIDECAR`                    | `embedded`               | `embedded` runs the sidecar inside this container; `external` when it runs in its own (the chart does)                                |
+| `CLICKHOUSE_ACCESS_BOOTSTRAP_DIR`              | `/run/clickhouse-access` | Dynamic-only mode: where the local admin's per-boot password is written; mount a tmpfs there                                          |
+| `CLICKHOUSE_ACCESS_TIERS`                      | `false`                  | Render the tier roles and profiles without an access file, for users you write yourself                                               |
+| `READ_TIER_MAX_EXECUTION_TIME`                 | `300`                    | Execution-time cap, in seconds, of the inspect and read tiers                                                                         |
+| `LOG_TO_FILE`                                  | `true`                   | `false` removes the server's file loggers, so it logs to the console only                                                             |
+| `MERGE_MAX_BLOCK_SIZE_BYTES`                   | `0`                      | `merge_tree.merge_max_block_size_bytes`; `0` leaves the ClickHouse default                                                            |
+| `MAX_CONCURRENT_SELECT_QUERIES`                | `0`                      | SELECTs' own admission cap inside `max_concurrent_queries`; `0` means none                                                            |
+| `NETWORK_COMPRESSION_METHOD`                   | —                        | Default profile `network_compression_method`; unset leaves the ClickHouse default. `zstd` suits replicated clusters                   |
+| `NETWORK_ZSTD_COMPRESSION_LEVEL`               | —                        | Default profile `network_zstd_compression_level`; unset leaves the ClickHouse default                                                 |
+| `CANCEL_HTTP_READONLY_QUERIES_ON_CLIENT_CLOSE` | —                        | Default profile; `1` stops a read whose HTTP client has gone (recommended), unset leaves the ClickHouse default (`0`)                 |
 
 The `NUMBER_OF_FREE_ENTRIES_IN_POOL_TO_*` thresholds are derived from the
 effective `background_pool_size`, including a `BACKGROUND_POOL_SIZE` override;
@@ -124,12 +125,12 @@ Design and limits: [ADR-184](../../dev/docs/adr/184-clickhouse-serverless-access
 for users you write yourself, the server renders `users.d/access-tiers.yaml` with
 four roles and settings profiles of the same names (without either, none exists):
 
-| Tier | Can | Profile |
-| --- | --- | --- |
-| `tier_inspect` | see database, table and column names; no rows | `readonly=2`, capped execution time and memory |
-| `tier_read` | inspect, plus `SELECT` on its databases | as inspect |
-| `tier_write` | read, plus `INSERT`, `ALTER UPDATE`, `ALTER DELETE` (and lightweight `DELETE`); no DDL | capped memory |
-| `tier_admin` | everything, including DDL and access management | `default` |
+| Tier           | Can                                                                                    | Profile                                        |
+| -------------- | -------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| `tier_inspect` | see database, table and column names; no rows                                          | `readonly=2`, capped execution time and memory |
+| `tier_read`    | inspect, plus `SELECT` on its databases                                                | as inspect                                     |
+| `tier_write`   | read, plus `INSERT`, `ALTER UPDATE`, `ALTER DELETE` (and lightweight `DELETE`); no DDL | capped memory                                  |
+| `tier_admin`   | everything, including DDL and access management                                        | `default`                                      |
 
 `system.query_log` and the other system tables holding query text stay closed to
 every tier but admin (`select_from_system_db_requires_grant` is on in 26.8). Your
@@ -143,17 +144,17 @@ missing password directory) stops the container.
 ```yaml
 issuers:
   - name: staff
-    url: https://idp.example.com        # exact `iss`; discovery at /.well-known/openid-configuration
-    audience: clickhouse                # default
-    username_claim: email               # default: sub
+    url: https://idp.example.com # exact `iss`; discovery at /.well-known/openid-configuration
+    audience: clickhouse # default
+    username_claim: email # default: sub
     required_claims: { email_verified: true }
 users:
   - name: alice
     tier: read
     databases: [analytics]
-    networks: [10.0.0.0/8]              # default: anywhere
+    networks: [10.0.0.0/8] # default: anywhere
     login:
-      token: { issuer: staff, subject: alice@example.com }   # subject defaults to the user name
+      token: { issuer: staff, subject: alice@example.com } # subject defaults to the user name
   - name: metabase
     tier: read
     databases: [analytics]
@@ -197,6 +198,43 @@ docker run -d \
   -v "$PWD/access:/run/access:ro" \
   langwatch/clickhouse-serverless
 ```
+
+### Dynamic-only mode
+
+`mode: dynamic-only` at the top of the access file leaves ClickHouse with no
+long-lived password. Every person and workload logs in with an OIDC token
+([ADR-184](../../dev/docs/adr/184-clickhouse-serverless-access-tiers-rolling-passwords-and-token-logins.md), section 7).
+
+- Leave `CLICKHOUSE_PASSWORD` and `CLICKHOUSE_PASSWORD_FILE` unset. `default`
+  is locked: no network may log in as it.
+- Declare token users only. A `rolling` user, or a `users.d`, `conf.d` or
+  `users.xml` user with a password, `no_password` or `ssh_keys`, stops the
+  start with a message naming it.
+- With replicas, set `CLICKHOUSE_CLUSTER_SECRET_ENABLED=true`.
+- `CREATE USER ... IDENTIFIED BY` is refused. The sidecar checks
+  `system.users` every minute and logs any password login left.
+
+The only password is `local_admin`'s. The image generates it at every start
+into `CLICKHOUSE_ACCESS_BOOTSTRAP_DIR` (mode 0440), valid from `127.0.0.1` and
+`::1` only. initdb scripts run as `local_admin`. In-pod tools read the file for
+every connection, because a restart replaces it.
+
+```bash
+docker run -d \
+  --tmpfs /run/clickhouse-access:uid=101,gid=101,mode=0750 \
+  -e CLICKHOUSE_ACCESS_FILE=/run/access/access.yaml \
+  -v "$PWD/access:/run/access:ro" \
+  langwatch/clickhouse-serverless
+```
+
+Clients must read their token file for each connection or request, and never
+use a token after its `exp`: the sidecar refuses it at that second. Every
+login now depends on the sidecar; its `GET /readyz` answers 200 once it has the
+access file and every issuer's keys. Changing mode needs a restart.
+
+The remaining shared secret is the cluster secret (and the interserver HTTP
+password, when set). Rotate it by replacing the file on every replica and
+restarting them together (see [Cluster secret](#cluster-secret)).
 
 ## What Gets Computed
 
