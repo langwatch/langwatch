@@ -179,15 +179,15 @@ describe("given a Langy answer that carries an insights card", () => {
       ]);
     });
 
-    /** @scenario "The save form offers Act now and Check this, and no Good news" */
-    it("offers Act now and Check this as the verdict, with no Good news", async () => {
+    /** @scenario "The save form offers no Good news" */
+    it("offers no Good news as the verdict", async () => {
       mountCardAnswer();
 
       await openDialog();
 
       const verdict = await screen.findByRole("combobox", { name: "Verdict" });
       const options = within(verdict).getAllByRole("option");
-      expect(options.map((option) => option.textContent)).toEqual(["Act now", "Check this"]);
+      expect(options.map((option) => option.textContent)).toEqual(["Warning", "Worth a look"]);
     });
 
     it("offers the findings not saved yet, and says saved once every one is", async () => {

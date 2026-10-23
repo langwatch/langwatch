@@ -170,8 +170,8 @@ export const choicesCardFields = {
 } as const;
 
 /**
- * Langy's verdict on a finding: `bad` (act now) or `watch` (check this), each naming a next
- * step. `good` is no longer asked for or filed; it stays so stored cards and insights still read.
+ * Langy's verdict on a finding: `bad` or `watch`, each naming a next step.
+ * `good` is no longer asked for or filed; it stays so stored cards and insights still read.
  */
 export const INSIGHTS_CARD_TONES = ["bad", "watch", "good"] as const;
 

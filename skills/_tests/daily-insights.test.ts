@@ -117,15 +117,15 @@ describe("the daily-insights skill", () => {
     });
 
     /** @scenario "The skill asks only for findings that name a next step" */
-    it("asks for a next step in every finding, as act now or check this, and no improvement alone", () => {
+    it("asks for a next step in every finding, and no improvement alone", () => {
       expect(rendered).toContain(
         "Report a finding only when you can name a concrete next step, and say that step in its body.",
       );
       expect(rendered).toContain(
-        "- `bad`: act now. It got worse or it is broken. The body says what to do.",
+        "- `bad`: it got worse or it is broken. The body says what to do.",
       );
       expect(rendered).toContain(
-        "- `watch`: check this. It may matter. The body says exactly what to check.",
+        "- `watch`: it may matter. The body says exactly what to check.",
       );
       expect(rendered).toContain("Never report an improvement on its own");
       expect(rendered).toContain("- `tone` (required): `bad` or `watch`.");

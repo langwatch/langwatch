@@ -107,7 +107,7 @@ Feature: The daily-insights skill
       Given the daily-insights skill
       When it is read
       Then it tells Langy to report a finding only when it can name a concrete next step, and to say that step in the body
-      And it defines bad as act now, with what to do, and watch as check this, with exactly what to check
+      And it asks bad findings to say what to do, and watch findings to say exactly what to check
       And it tells Langy never to report an improvement on its own
       And it offers bad and watch as the only tones
 

@@ -7,7 +7,7 @@ export const insightToneSchema = z.enum(INSIGHT_TONES);
 export type InsightTone = z.infer<typeof insightToneSchema>;
 
 /**
- * The verdicts a new insight is filed with: each names a next step, act now or check this.
+ * The verdicts a new insight is filed with: each names a next step.
  * `good` names none, so only insights stored before it was retired still carry it.
  */
 export const ACTIONABLE_INSIGHT_TONES = ["bad", "watch"] as const satisfies readonly InsightTone[];

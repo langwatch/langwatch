@@ -2,7 +2,7 @@ import { Box } from "@langwatch/design-system/primitives";
 
 /**
  * The unread count, like an email app, in one neutral colour: the count alone, never a
- * verdict, since the cards already say Act now or Check this. Draws nothing at zero.
+ * verdict. Draws nothing at zero.
  */
 export function UnreadPill({ count, size = "sm" }: { count: number; size?: "sm" | "xs" }) {
   if (count <= 0) return null;

@@ -374,8 +374,7 @@ Feature: The daily insights run
       And each query was validated with the protections of the person the run is for
 
   Rule: A run files only findings that name a next step
-    An insight says what to do (bad, read as Act now) or exactly what to check (watch, read
-    as Check this). Good news names no next step: the skill asks for none, and the run drops
+    An insight says what to do (bad) or exactly what to check (watch). Good news names no next step: the skill asks for none, and the run drops
     a good finding before the cut to the maximum, so a model slip files nothing. Insights
     stored with the good tone still read.
 

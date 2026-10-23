@@ -16,12 +16,12 @@ import {
 import { differenceInCalendarDays, format } from "@langwatch/time";
 
 /**
- * The verdict, written out as the next step: not a colour to decode. Nothing new is filed
- * `good`; its label stays so an insight stored before then still reads.
+ * The verdict, written out: why you should care, not a colour to decode. Nothing new is filed
+ * `good`; its label stays so an older insight still reads.
  */
 export const TONE_PRESENTATION: Record<InsightTone, { label: string; color: string }> = {
-  bad: { label: "Act now", color: "red.solid" },
-  watch: { label: "Check this", color: "yellow.solid" },
+  bad: { label: "Warning", color: "red.solid" },
+  watch: { label: "Worth a look", color: "yellow.solid" },
   good: { label: "Good news", color: "green.solid" },
 };
 

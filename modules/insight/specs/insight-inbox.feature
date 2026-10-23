@@ -225,14 +225,8 @@ Feature: The insights inbox
       Then the form starts from the answer's own text
 
   Rule: The verdict names the next step
-    A new insight is Act now (bad) or Check this (watch). Good news is no longer filed, but
+    A new insight is bad or watch, and names a next step. Good news is no longer filed, but
     an insight stored with it still reads.
-
-    @unit
-    Scenario: A verdict reads Act now or Check this
-      Given an insight with the bad tone and one with the watch tone
-      When their verdicts are written out
-      Then the first reads "Act now" and the second "Check this"
 
     @unit
     Scenario: An insight stored with the good tone still reads Good news
@@ -241,10 +235,10 @@ Feature: The insights inbox
       Then it reads "Good news" on the color it had
 
     @integration
-    Scenario: The save form offers Act now and Check this, and no Good news
+    Scenario: The save form offers no Good news
       Given a Langy answer that carries an insights card
       When a member opens the form to save it as an insight
-      Then the verdict offers "Act now" and "Check this" and nothing else
+      Then the verdict offers no "Good news", only bad and watch
 
     @unit @integration
     Scenario: A good finding of an insights card is never filed

@@ -53,8 +53,8 @@ Report the most important finding first, and never more than the brief's maximum
 
 Each finding carries a verdict, its `tone`:
 
-- `bad`: act now. It got worse or it is broken. The body says what to do.
-- `watch`: check this. It may matter. The body says exactly what to check.
+- `bad`: it got worse or it is broken. The body says what to do.
+- `watch`: it may matter. The body says exactly what to check.
 
 Never report an improvement on its own: a finding that only says something got better names no next step. Never mark an improvement as `watch` to get it filed.
 

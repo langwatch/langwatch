@@ -136,13 +136,10 @@ function DerivedBlockBody({
 /** Cap so a long list of findings stays a card, not a page. */
 const MAX_FINDING_ROWS = 10;
 
-/**
- * The verdict as the next step, on its colour. `good` is no longer asked for; its label stays
- * so a card from before then still reads.
- */
+/** The verdict in words, on its colour: why the reader should care, never a colour to decode. */
 const FINDING_TONE: Record<LangyInsightsCardFinding["tone"], { label: string; color: string }> = {
-  bad: { label: "Act now", color: "red.solid" },
-  watch: { label: "Check this", color: "yellow.solid" },
+  bad: { label: "Warning", color: "red.solid" },
+  watch: { label: "Worth a look", color: "yellow.solid" },
   good: { label: "Good news", color: "green.solid" },
 };
 

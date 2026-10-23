@@ -96,10 +96,9 @@ window.
 **A run files only findings that name a next step.** Owner decision of 2026-10-20 (issue
 #8859): the inbox holds only what a person can act on. The skill asks for a finding only
 when Langy can name a concrete next step, said in its body, with one of two tones: `bad`
-(read as "Act now": it got worse or is broken, and the body says what to do) or `watch`
-(read as "Check this": it may matter, and the body says exactly what to check). It never
-asks for an improvement on its own. The `good` tone ("Good news") names no next step, so
-the check drops a `good` finding before the cut to the run's maximum: it takes no place,
+(it got worse or is broken, and the body says what to do) or `watch` (it may matter, and the
+body says exactly what to check). It never asks for an improvement on its own. The `good`
+tone names no next step, so the check drops a `good` finding before the cut to the run's maximum: it takes no place,
 is never filed or renewed, and the run logs how many it dropped. A model slip therefore
 files nothing. The checks above still apply to it, so a link in a dropped finding still
 refuses the answer. `good` stays in `INSIGHT_TONES` and the stored schema, so an insight
