@@ -6,6 +6,7 @@ import { Anthropic } from "../icons/provider/anthropic.tsx";
 import { AWS } from "../icons/provider/aws.tsx";
 import { Azure } from "../icons/provider/azure.tsx";
 import { Cerebras } from "../icons/provider/cerebras.tsx";
+import { Cloudflare } from "../icons/provider/cloudflare.tsx";
 import { Codex } from "../icons/provider/codex.tsx";
 import { Custom } from "../icons/provider/custom.tsx";
 import { DeepSeek } from "../icons/provider/deep-seek.tsx";
@@ -13,7 +14,10 @@ import { ElevenLabs } from "../icons/provider/eleven-labs.tsx";
 import { Gemini } from "../icons/provider/gemini.tsx";
 import { GoogleCloud } from "../icons/provider/google-cloud.tsx";
 import { Groq } from "../icons/provider/groq.tsx";
+import { Inception } from "../icons/provider/inception.tsx";
+import { LangWatch } from "../icons/provider/langwatch.tsx";
 import { OpenAI } from "../icons/provider/open-ai.tsx";
+import { Perplexity } from "../icons/provider/perplexity.tsx";
 import { Twilio } from "../icons/provider/twilio.tsx";
 import { Voyage } from "../icons/provider/voyage.tsx";
 import { Xai } from "../icons/provider/xai.tsx";
@@ -38,10 +42,11 @@ export const modelProviderIcons = {
   cerebras: <Cerebras />,
   voyage: <Voyage />,
   azure_safety: <Azure />,
-  // Decision-model providers (ADR-182) have no brand mark yet.
-  inception: <Custom />,
-  perplexity: <Custom />,
-  cloudflare: <Custom />,
+  inception: <Inception />,
+  perplexity: <Perplexity />,
+  cloudflare: <Cloudflare />,
+  // Not a configurable provider: the prefix of LangWatch's hosted models.
+  langwatch: <LangWatch />,
 };
 
 export type ProviderKey = keyof typeof modelProviderIcons;
@@ -55,7 +60,12 @@ export function isProviderKey(value: string): value is ProviderKey {
  * no `fill`, defaulting to SVG black), near-invisible on the dark theme.
  * Coloured-brand icons are left alone; they already read well in both modes.
  */
-export const MONOCHROME_PROVIDER_ICONS = new Set<ProviderKey>(["openai", "anthropic", "voyage"]);
+export const MONOCHROME_PROVIDER_ICONS = new Set<ProviderKey>([
+  "openai",
+  "anthropic",
+  "voyage",
+  "inception",
+]);
 
 /**
  * Wraps a `modelProviderIcons[provider]` glyph so it stays legible in dark

@@ -101,6 +101,7 @@ Reusable framework decisions live with their packages:
 | [181](./181-tsrs-runs-behind-tsc.md)                                                  | tsrs runs behind `tsc`                                                                                                     | Proposed                  |
 | [183](./183-vitest-workers-cache-module-loading.md)                                   | Vitest workers cache how they load installed packages                                                                      | Proposed                  |
 | [184](./184-isolated-jsdom-files-share-a-worker.md)                                   | Isolated jsdom test files share a worker instead of starting a process each                                                | Proposed                  |
+| [186](./186-test-changed-runs-the-tests-an-edit-reaches.md)                           | `test:changed` runs the tests an edit reaches, from a kept import graph                                                    | Proposed                  |
 | [190](./190-clickhouse-serverless-access-tiers-rolling-passwords-and-token-logins.md) | clickhouse-serverless access: tiers, rolling passwords and OIDC token logins, rendered as files                            | Accepted                  |
 | [191](./191-clickhouse-serverless-backups-run-in-the-ch-config-sidecar.md)            | clickhouse-serverless backups run in the ch-config sidecar, decided by pure functions                                      | Accepted                  |
 
