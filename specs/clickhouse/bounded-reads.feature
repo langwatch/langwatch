@@ -168,3 +168,18 @@ Feature: A read that cannot be pruned must still be bounded
     Given a joined trace read that ClickHouse refuses because its result is too large
     When the read is handled
     Then it is retried in batches under the span budget, as a memory refusal is
+
+  @unit @regression
+  Scenario: A batch refused for its result size is split until it fits
+    Given the batched retry of a joined trace read
+    And one batch is refused because its result is too large
+    When the retry continues
+    Then that batch is split into smaller batches and read again
+    And every requested trace is returned when the smaller batches fit
+
+  @unit
+  Scenario: A single trace too large to hold is refused naming the size limit
+    Given the batched retry of a joined trace read
+    And one trace alone is refused because its result is too large
+    When the retry reaches it
+    Then the read fails naming the result size limit, not the span budget
