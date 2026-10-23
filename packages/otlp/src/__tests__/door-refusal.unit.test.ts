@@ -2,6 +2,12 @@
 
 import { HandledError } from "@langwatch/handled-error";
 import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
+import { type Span, SpanStatusCode } from "@opentelemetry/api";
+import {
+  BasicTracerProvider,
+  InMemorySpanExporter,
+  SimpleSpanProcessor,
+} from "@opentelemetry/sdk-trace-base";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -71,44 +77,47 @@ describe("recordIngestDoorRefusal", () => {
 });
 
 describe("withClientFaultSpan", () => {
-  /** A tracer-like opener that marks the span ERROR when the callback throws, as the SDK does. */
-  function opener() {
-    const span = { recordException: vi.fn(), setAttributes: vi.fn(), status: "UNSET" };
-    const open = async <T>(run: (s: typeof span) => Promise<T>) => {
-      try {
-        return await run(span);
-      } catch (error) {
-        span.status = "ERROR";
-        throw error;
-      }
-    };
-    return { span, open };
-  }
+  /** A real tracer, so the asserted status is what the SDK records, not what a double claims. */
+  const exporter = new InMemorySpanExporter();
+  const tracer = new BasicTracerProvider({
+    spanProcessors: [new SimpleSpanProcessor(exporter)],
+  }).getTracer("door-refusal-test");
+  const open = <T>(run: (span: Span) => Promise<T>) => tracer.startActiveSpan("receiver", run);
+  const recorded = () => {
+    const [span, ...others] = exporter.getFinishedSpans();
+    if (!span || others.length > 0) throw new Error("expected exactly one finished span");
+    return span;
+  };
+
+  afterEach(() => exporter.reset());
 
   /** @scenario An OTLP receiver span stays unset for a caller fault */
   it("rethrows a customer fault with the span left unset and the exception recorded", async () => {
-    const { span, open } = opener();
     const error = refusal();
 
     await expect(withClientFaultSpan(open, () => Promise.reject(error))).rejects.toBe(error);
 
-    expect(span.status).toBe("UNSET");
-    expect(span.recordException).toHaveBeenCalledWith(error);
+    const span = recorded();
+    expect(span.status.code).toBe(SpanStatusCode.UNSET);
+    expect(span.events.map((event) => event.name)).toEqual(["exception"]);
+    expect(span.attributes).toMatchObject({
+      "langwatch.error.code": "invalid_credentials",
+      "langwatch.error.fault": "customer",
+    });
   });
 
   /** @scenario An OTLP receiver span still records any other failure as ERROR */
-  it("lets any other failure through the span", async () => {
-    const { span, open } = opener();
+  it("marks any other failure ERROR with its message", async () => {
+    const error = new Error("boom");
 
-    await expect(
-      withClientFaultSpan(open, () => Promise.reject(new Error("boom"))),
-    ).rejects.toThrow("boom");
+    await expect(withClientFaultSpan(open, () => Promise.reject(error))).rejects.toBe(error);
 
-    expect(span.status).toBe("ERROR");
+    expect(recorded().status).toEqual({ code: SpanStatusCode.ERROR, message: "boom" });
   });
 
-  it("returns the body's value on success", async () => {
-    const { open } = opener();
+  it("returns the body's value with the span OK on success", async () => {
     await expect(withClientFaultSpan(open, () => Promise.resolve(7))).resolves.toBe(7);
+
+    expect(recorded().status.code).toBe(SpanStatusCode.OK);
   });
 });

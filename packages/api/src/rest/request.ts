@@ -754,7 +754,11 @@ function closeRequestSpan({ c, span, error }: { c: Context; span: Span; error: u
   if (error) {
     // The handler's resolved error wins: the raw throw may be a wrapper that hides its fault.
     const resolved = c.get(RESOLVED_ERROR) as ResolvedError | undefined;
-    recordRequestSpanFailure({ span, error: resolved?.error ?? error });
+    recordRequestSpanFailure({
+      span,
+      error: resolved?.error ?? error,
+      answeredStatus: resolved?.status ?? c.res.status,
+    });
   }
   span.end();
 }

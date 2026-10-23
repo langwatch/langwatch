@@ -54,7 +54,7 @@ export class OtlpMetricReceiverService {
 
     return withClientFaultSpan<Span, MetricOtlpDoorResult>(
       (run) =>
-        this.#tracer.withActiveSpan("[POST] /api/otel/v1/metrics", { kind: SpanKind.SERVER }, run),
+        this.#tracer.startActiveSpan("[POST] /api/otel/v1/metrics", { kind: SpanKind.SERVER }, run),
       (span) => this.#receive({ request, credential, span }),
     );
   }

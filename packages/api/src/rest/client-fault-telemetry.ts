@@ -20,17 +20,15 @@ const clientFaultRequestsTotal = counter({
 const CLIENT_FAULT_LOG_WINDOW_MS = 60_000;
 const clientFaultLog = createWarnThrottle(CLIENT_FAULT_LOG_WINDOW_MS);
 
-/** The reason code of an error answered below 500, whatever its shape. */
-function clientFaultCodeOf(error: unknown): string | undefined {
+/**
+ * The reason code of a caller's fault, whatever its shape. A bare 4xx counts only when the caller
+ * was answered below 500 too: the error handler may answer an odd thrown value as a 500.
+ */
+function clientFaultCodeOf(error: unknown, answeredStatus?: number): string | undefined {
   if (HandledError.isHandled(error)) return error.fault === "customer" ? error.code : undefined;
   const status = getStatusCodeFromError(error);
-  if (error && status >= 400 && status < 500) return `http_${status}`;
-  return undefined;
-}
-
-/** Whether the failure is the caller's to fix, so it is not a server error. */
-export function isClientFault(error: unknown): boolean {
-  return clientFaultCodeOf(error) !== undefined;
+  if (!error || (answeredStatus ?? status) >= 500) return undefined;
+  return status >= 400 && status < 500 ? `http_${status}` : undefined;
 }
 
 /**
@@ -40,13 +38,15 @@ export function isClientFault(error: unknown): boolean {
 export function recordRequestSpanFailure({
   span,
   error,
+  answeredStatus,
 }: {
   span: Pick<Span, "recordException" | "setAttributes" | "setStatus">;
   error: unknown;
+  answeredStatus?: number;
 }): void {
   span.recordException(error as Error);
 
-  const code = clientFaultCodeOf(error);
+  const code = clientFaultCodeOf(error, answeredStatus);
   if (code !== undefined) {
     span.setAttributes({ "langwatch.error.code": code, "langwatch.error.fault": "customer" });
     return;
@@ -79,7 +79,7 @@ export function sampleClientFaultLog({
   statusCode: number;
   now?: number;
 }): { level: "warn" | "debug"; suppressedRequests: number } | undefined {
-  const code = clientFaultCodeOf(error);
+  const code = clientFaultCodeOf(error, statusCode);
   if (code === undefined) return undefined;
 
   clientFaultRequestsTotal.inc({ family: family ?? "unknown", code, status: statusCode });

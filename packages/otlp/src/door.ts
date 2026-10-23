@@ -10,6 +10,7 @@ import type { Named } from "@langwatch/module";
 import { createWarnThrottle, type Logger } from "@langwatch/observability";
 import { counter } from "@langwatch/observability/metrics";
 import { nowInstant } from "@langwatch/time";
+import { type Span, SpanStatusCode } from "@opentelemetry/api";
 import { z } from "zod";
 
 import { OtlpIngestSourceBillingUnavailableError } from "./errors.ts";
@@ -105,38 +106,43 @@ const ingestDoorRefusalsTotal = counter({
   description: "Ingest requests refused at the credential door, by signal, reason code and status.",
 });
 
-/** The slice of a span the client-fault guard writes. */
-type FaultSpan = {
-  recordException(exception: Error): void;
-  setAttributes(attributes: Record<string, string>): void;
-};
-
-type Held<T> = { ok: true; value: T } | { ok: false; error: unknown };
+/** The slice of a span the client-fault guard writes and closes. */
+type FaultSpan = Pick<Span, "recordException" | "setAttributes" | "setStatus" | "end">;
 
 /**
- * Runs `body` in a span `open` starts, without the caller's own fault marking it ERROR. A
- * customer-fault refusal is held as an exception event with its code and rethrown once the span
- * has closed UNSET; anything else is thrown through the span as before.
+ * Runs `body` in a span `open` starts and leaves open (a tracer's `startActiveSpan`), then closes
+ * it: OK on success, UNSET with the exception and its code for a customer-fault refusal, ERROR
+ * with its message for anything else. The error is rethrown either way.
  */
-export async function withClientFaultSpan<S extends FaultSpan, T>(
-  open: (run: (span: S) => Promise<Held<T>>) => Promise<Held<T>>,
+export function withClientFaultSpan<S extends FaultSpan, T>(
+  open: (run: (span: S) => Promise<T>) => Promise<T>,
   body: (span: S) => Promise<T>,
 ): Promise<T> {
-  const held = await open(async (span) => {
+  return open(async (span) => {
     try {
-      return { ok: true, value: await body(span) };
+      const value = await body(span);
+      span.setStatus({ code: SpanStatusCode.OK });
+      return value;
     } catch (error) {
-      if (!HandledError.isHandled(error) || error.fault !== "customer") throw error;
-      span.recordException(error);
-      span.setAttributes({
-        "langwatch.error.code": error.code,
-        "langwatch.error.fault": "customer",
-      });
-      return { ok: false, error };
+      recordFailure({ span, error });
+      throw error;
+    } finally {
+      span.end();
     }
   });
-  if (!held.ok) throw held.error;
-  return held.value;
+}
+
+function recordFailure({ span, error }: { span: FaultSpan; error: unknown }): void {
+  if (HandledError.isHandled(error) && error.fault === "customer") {
+    span.recordException(error);
+    span.setAttributes({ "langwatch.error.code": error.code, "langwatch.error.fault": "customer" });
+    return;
+  }
+  if (error instanceof Error) span.recordException(error);
+  span.setStatus({
+    code: SpanStatusCode.ERROR,
+    message: error instanceof Error ? error.message : String(error),
+  });
 }
 
 /** Clears the sampled-log state; tests only. */

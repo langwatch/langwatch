@@ -36,7 +36,6 @@ export {
   isUnknownCredentialRefusal,
   logCorrectedOtlpPath,
   recordIngestDoorRefusal,
-  resetIngestDoorRefusalLog,
   withClientFaultSpan,
   otlpBodyForensics,
   OTLP_REFUSED_MEDIA_TYPES,

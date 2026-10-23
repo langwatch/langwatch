@@ -6,7 +6,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ProjectInvalidCredentialsError } from "../../errors.ts";
 import {
-  isClientFault,
   recordRequestSpanFailure,
   resetClientFaultLog,
   sampleClientFaultLog,
@@ -53,6 +52,16 @@ describe("recordRequestSpanFailure", () => {
     });
   });
 
+  describe("when a thrown 4xx value is answered as a 500", () => {
+    it("marks the span ERROR", () => {
+      const { span, asSpan } = fakeSpan();
+
+      recordRequestSpanFailure({ span: asSpan, error: { status: 404 }, answeredStatus: 500 });
+
+      expect(span.setStatus).toHaveBeenCalledWith({ code: SpanStatusCode.ERROR });
+    });
+  });
+
   describe("when the server fails", () => {
     /** @scenario A server fault marks the span ERROR with its cause */
     it("marks the span ERROR and carries the cause in the status message", () => {
@@ -65,13 +74,6 @@ describe("recordRequestSpanFailure", () => {
         message: "clickhouse down",
       });
     });
-  });
-});
-
-describe("isClientFault", () => {
-  it("is true for a customer-fault handled error and false for a bare error", () => {
-    expect(isClientFault(new ProjectInvalidCredentialsError())).toBe(true);
-    expect(isClientFault(new Error("boom"))).toBe(false);
   });
 });
 

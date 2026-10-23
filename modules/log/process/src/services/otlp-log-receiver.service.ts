@@ -54,7 +54,7 @@ export class OtlpLogReceiverService {
 
     return withClientFaultSpan<Span, LogOtlpDoorResult>(
       (run) =>
-        this.#tracer.withActiveSpan("[POST] /api/otel/v1/logs", { kind: SpanKind.SERVER }, run),
+        this.#tracer.startActiveSpan("[POST] /api/otel/v1/logs", { kind: SpanKind.SERVER }, run),
       (span) => this.#receive({ request, credential, span }),
     );
   }

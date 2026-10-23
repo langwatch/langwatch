@@ -283,7 +283,7 @@ export const otlpIngestRest = defineRestRouter(TraceApi)
     response.write(
       await withClientFaultSpan<Span, OtlpAnswer>(
         (run) =>
-          getLangWatchTracer("langwatch.otel.traces").withActiveSpan(
+          getLangWatchTracer("langwatch.otel.traces").startActiveSpan(
             "TracesV1.handleTracesRequest",
             { kind: SpanKind.SERVER },
             run,

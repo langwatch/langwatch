@@ -71,24 +71,6 @@ Feature: A request the caller must fix is not a server error
     And no counter label carries a tenant, key or token
 
   @unit
-  Scenario: An unknown ingest token is not looked up again for ten seconds
-    Given an ingest token the key directory does not know
-    When the same token is sent again within ten seconds
-    Then it is refused as invalid without asking the directory
-
-  @unit
-  Scenario: An unknown ingest token is looked up again once its memory expires
-    Given an ingest token was refused as unknown
-    When it is sent again after ten seconds
-    Then the directory is asked again
-
-  @unit
-  Scenario: A different unknown token or project is looked up on its own
-    Given an unknown ingest token was refused
-    When a different token, or the same token for another project, is sent
-    Then the directory is asked for it
-
-  @unit
   Scenario: The gateway leaves a 4xx request span unset
     Given the AI gateway answers a request with a 4xx
     When its request span ends
