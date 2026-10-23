@@ -5,8 +5,10 @@ request the evaluator makes.
 """
 
 import hashlib
+import re
 import threading
 import time
+from pathlib import Path
 
 import litellm
 import numpy as np
@@ -242,3 +244,17 @@ def test_cache_is_bounded_and_drops_the_least_recently_used():
     assert cache.get(b) is None
     assert cache.get(a) is not None
     assert cache.get(c) is not None
+
+
+APP_SIDE = Path("modules/evaluation/process/src/features/execution/services/evaluation-execution.service.ts")
+
+
+def test_the_project_env_var_is_the_one_the_app_sets():
+    """The app names the variable in TypeScript; a rename on either side must fail here."""
+    root = next((p for p in Path(__file__).resolve().parents if (p / APP_SIDE).is_file()), None)
+    if root is None:
+        pytest.skip("not run from a LangWatch checkout")
+    source = (root / APP_SIDE).read_text()
+    match = re.search(r'export const EVALUATION_PROJECT_ENV = "([A-Z_]+)";', source)
+    assert match, f"EVALUATION_PROJECT_ENV is no longer declared in {APP_SIDE}"
+    assert match.group(1) == PROJECT_SCOPE_ENV

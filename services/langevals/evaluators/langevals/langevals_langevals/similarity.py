@@ -19,6 +19,7 @@ import litellm
 import numpy as np
 
 # Sent by the app beside the credentials; names the project an evaluation runs for.
+# The app names it EVALUATION_PROJECT_ENV; tests/test_similarity_cache.py keeps the two equal.
 PROJECT_SCOPE_ENV = "LANGWATCH_EVALUATION_PROJECT_ID"
 
 # The project, the embeddings model, the env digest and the text digest.

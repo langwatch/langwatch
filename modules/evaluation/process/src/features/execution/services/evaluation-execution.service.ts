@@ -39,7 +39,10 @@ import type { EvaluationExecutionMetricsService } from "./evaluation-execution-m
 import { EvaluationJudgingService } from "./evaluation-judging.service.ts";
 import type { EvaluationSpanDigestService } from "./evaluation-span-digest.service.ts";
 
-/** Sent to langevals beside the credentials: the project an evaluation runs for. */
+/**
+ * Sent to langevals beside the credentials: the project an evaluation runs for. langevals
+ * reads it by this name (similarity.py); its test_similarity_cache.py fails if the two differ.
+ */
 export const EVALUATION_PROJECT_ENV = "LANGWATCH_EVALUATION_PROJECT_ID";
 
 // Evaluations need full access to trace data — no user-facing redaction.
