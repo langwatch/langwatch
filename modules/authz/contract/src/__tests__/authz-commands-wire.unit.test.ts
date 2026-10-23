@@ -38,6 +38,13 @@ const SHARE_TERMS = {
   permission: "traces:view",
 } as const;
 
+const BRAID_SHAPE = {
+  principal: { type: "project", id: "proj_reader" },
+  roleKey: "project-reader",
+  scope: { type: "PROJECT", id: "proj_owner" },
+  condition: { type: "span", from: "2026-10-01T00:00:00.000Z" },
+};
+
 function parse(overrides: Record<string, unknown> = {}, entryOverrides = {}) {
   return attachGrantCommandDataSchema.safeParse({
     tenantId: ORG,
@@ -385,7 +392,9 @@ describe("the grants ledger's wire boundary", () => {
      *  @scenario "The wire accepts every source the vocabulary names" */
     it("accepts every source the vocabulary names", () => {
       for (const source of GRANT_EVENT_SOURCES) {
-        expect(parse({}, { source }).success).toBe(true);
+        // ADR-183 §1: a braid exists only as the shared span read, so it is driven in that shape.
+        const shape = source === "braid" ? BRAID_SHAPE : {};
+        expect(parse({}, { source, ...shape }).success).toBe(true);
       }
     });
 

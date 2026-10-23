@@ -5,6 +5,7 @@
  */
 import { z } from "zod";
 
+import { compiledWhereSchema } from "./braid-condition.ts";
 import type { AuthzPermission } from "./registry.ts";
 import { SYSTEM_ACTORS, type SystemActorName } from "./system-actors.ts";
 
@@ -40,17 +41,29 @@ const actorSchema = z.discriminatedUnion("type", [
     .strict(),
 ]);
 
-/** The window a shared grant opens. `from` and `until` are epoch
- *  milliseconds; `until` null means open-ended. `where` is an OTTL slot
- *  that nothing compiles in v1, so a minter must not copy a non-empty one. */
+/** The window a shared grant opens. `from` and `until` are epoch milliseconds; `until` null
+ *  means open-ended. Only a `span` condition (a braid, ADR-183 §3) carries `compiledWhere`, and
+ *  one with a non-empty `where` must, so no condition reaches a fence it cannot apply. */
 export const authorizationConditionSchema = z
   .object({
     type: z.enum(AUTHORIZATION_CONDITION_TYPES),
     where: z.string().optional(),
+    compiledWhere: compiledWhereSchema.optional(),
     from: z.number().int(),
     until: z.number().int().nullable(),
   })
-  .strict();
+  .strict()
+  .refine((condition) => condition.compiledWhere === undefined || condition.type === "span", {
+    message: "only a span condition carries a compiled where",
+    path: ["compiledWhere"],
+  })
+  .refine(
+    (condition) =>
+      condition.type !== "span" ||
+      (condition.where ?? "").trim() === "" ||
+      condition.compiledWhere !== undefined,
+    { message: "a span condition with a where carries its compiled form", path: ["compiledWhere"] },
+  );
 export type AuthorizationCondition = z.infer<typeof authorizationConditionSchema>;
 
 /**
@@ -61,6 +74,7 @@ export type AuthorizationCondition = z.infer<typeof authorizationConditionSchema
 export const grantConditionSchema = z.object({
   type: z.enum(AUTHORIZATION_CONDITION_TYPES),
   where: z.string().optional(),
+  compiledWhere: compiledWhereSchema.optional(),
   from: z.string().datetime({ offset: true }).optional(),
   until: z.string().datetime({ offset: true }).optional(),
 });
