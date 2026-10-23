@@ -37,22 +37,11 @@ export const INSTANT_EVAL_PIPELINE_NAME = "instant_eval_processing";
 export const INSTANT_EVAL_EVENT_VERSIONS = {
   REQUESTED: "2026-09-18",
   PLANNED: "2026-09-18",
-  PAGE_JUDGED: "2026-10-23",
+  // The router's fields are additive and default, so a pod not yet rolled reads them.
+  PAGE_JUDGED: "2026-09-18",
   CANCEL_REQUESTED: "2026-09-18",
-  FINISHED: "2026-10-23",
+  FINISHED: "2026-09-18",
 } as const;
-
-/** Every page_judged version still read; the router's cost fields default for the older one. */
-export const INSTANT_EVAL_PAGE_JUDGED_EVENT_VERSIONS = [
-  "2026-09-18",
-  INSTANT_EVAL_EVENT_VERSIONS.PAGE_JUDGED,
-] as const;
-
-/** Every finished version still read; the routed cost defaults to zero for the older one. */
-export const INSTANT_EVAL_FINISHED_EVENT_VERSIONS = [
-  "2026-09-18",
-  INSTANT_EVAL_EVENT_VERSIONS.FINISHED,
-] as const;
 
 /** Projection schema versions, calendar versioned. */
 export const INSTANT_EVAL_PROJECTION_VERSIONS = {
