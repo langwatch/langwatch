@@ -75,3 +75,9 @@ Feature: Usage decisions when the count cannot be taken
       # its whole premise is that usage is high; sending it with every project
       # reading 0 tells an admin their usage collapsed
     And the threshold is still crossed on the next run, when the numbers are real
+
+  @unit
+  Scenario: A failed enforcement count does not fail the usage display
+    Given a limit check left a failed count for an organization
+    When the usage display asks for that organization's count
+    Then it reads the store instead of answering the failure

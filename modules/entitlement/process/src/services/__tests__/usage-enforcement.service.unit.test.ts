@@ -472,7 +472,7 @@ describe("given limit checks that read the counting store", () => {
     }
   }
 
-  function serviceOver(counter: UsageVolumeCounter, clock: { ms: number }) {
+  function serviceOver({ counter, clock }: { counter: UsageVolumeCounter; clock: { ms: number } }) {
     return UsageService.create({
       organizations: new TestOrganizations(),
       traceCounter: counter,
@@ -490,7 +490,7 @@ describe("given limit checks that read the counting store", () => {
     /** @scenario Concurrent limit checks for one organization share one count */
     it("reads the store once and answers every check", async () => {
       const counter = new GatedCounter();
-      const service = serviceOver(counter, { ms: 0 });
+      const service = serviceOver({ counter, clock: { ms: 0 } });
 
       const checks = [1, 2, 3].map(() =>
         service.checkLimitForOrganization({ organizationId: "org-1" }),
@@ -518,7 +518,7 @@ describe("given limit checks that read the counting store", () => {
           return [{ projectId: "project-1", count: 10 }];
         },
       };
-      const service = serviceOver(counter, clock);
+      const service = serviceOver({ counter, clock });
 
       await expect(service.checkLimitForOrganization({ organizationId: "org-1" })).rejects.toBe(
         outOfMemory,
@@ -534,6 +534,28 @@ describe("given limit checks that read the counting store", () => {
         { exceeded: false },
       );
       expect(reads).toBe(2);
+    });
+  });
+
+  describe("when a limit check left a failed count behind", () => {
+    /** @scenario A failed enforcement count does not fail the usage display */
+    it("still reads the count for display", async () => {
+      let reads = 0;
+      const counter: UsageVolumeCounter = {
+        getCountByProjects: async () => {
+          reads++;
+          if (reads === 1) throw new Error("memory limit exceeded");
+          return [{ projectId: "project-1", count: 10 }];
+        },
+      };
+      const service = serviceOver({ counter, clock: { ms: 0 } });
+
+      await expect(
+        service.checkLimitForOrganization({ organizationId: "org-1" }),
+      ).rejects.toThrow();
+      await expect(
+        service.getCurrentMonthCountForDisplay({ organizationId: "org-1" }),
+      ).resolves.toBe(10);
     });
   });
 });

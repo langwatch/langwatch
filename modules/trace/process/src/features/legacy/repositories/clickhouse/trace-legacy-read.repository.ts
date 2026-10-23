@@ -2700,7 +2700,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     reader,
     projectId,
     effectiveOccurredAt,
-    unfiled = false,
+    unfiled,
     retentionDays,
     batchTraceIds,
     maxSpanRows,
@@ -2709,7 +2709,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     projectId: string;
     effectiveOccurredAt: OccurredAtRange | undefined;
     /** No summary of these traces is filed after the epoch, per the resolve. */
-    unfiled?: boolean;
+    unfiled: boolean;
     retentionDays: RetentionDaysProvider | undefined;
     batchTraceIds: string[];
     /** Rows the span read may return before ClickHouse refuses it. */
