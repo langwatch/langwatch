@@ -33,6 +33,7 @@ import {
   loggerMiddleware,
   openConfirmationGate,
   recordAnsweredCause,
+  recordRequestPrincipal,
   RestHost,
   type RestConfirmationGate,
 } from "@langwatch/api/rest";
@@ -454,27 +455,47 @@ function trpcLanes(trpc: TrpcHost): Hono {
     });
     for (const [name, value] of Object.entries(versionHeaders)) response.headers.set(name, value);
     recordTrpcFailure({ context, failure, status: response.status });
+    const caller = resolved ? await resolved.catch(() => void 0) : void 0;
+    recordRequestPrincipal({ context, read: () => trpcPrincipalOf(caller) });
 
     return response;
   });
 
+  // The context each subscription's caller was built over, so its access record names the user.
+  const sseContexts = new WeakMap<Request, TrpcRequestContext>();
   const sse = SseLane.create({
     members: {
       procedureTypeAt: (path) => trpc.procedureTypeAt(path),
-      createCaller: async ({ request, signal }) =>
-        trpc.router.createCaller(
+      createCaller: async ({ request, signal }) => {
+        const resolvedContext = await trpc.context({ request, signal });
+        sseContexts.set(request, resolvedContext);
+        return trpc.router.createCaller(
           // On the context AND in the caller's options: a subscription
           // procedure reads whichever its own transport gives it, and only
           // the context reaches one resolved through a v10-shaped caller.
-          { ...(await trpc.context({ request, signal })), signal },
+          { ...resolvedContext, signal },
           signal ? { signal } : {},
-        ),
+        );
+      },
     },
   });
 
-  app.get("/api/sse/*", (context) => sse.answer(context.req.raw, context.res.headers));
+  app.get("/api/sse/*", async (context) => {
+    const request = context.req.raw;
+    try {
+      return await sse.answer(request, context.res.headers);
+    } finally {
+      recordRequestPrincipal({ context, read: () => trpcPrincipalOf(sseContexts.get(request)) });
+    }
+  });
 
   return app;
+}
+
+/** The user a tRPC request's session resolved, for its access record. */
+function trpcPrincipalOf(context: TrpcRequestContext | undefined): { userId?: string } {
+  const userId = context?.tryActor()?.id;
+  return userId ? { userId } : {};
 }
 
 /** Records a failed answer's handled cause, not tRPC's wrapper, with its code and fault. */

@@ -109,6 +109,7 @@ export type {
   IdempotencyReceiptRecord,
 } from "./repositories/prisma/prisma.idempotency-receipt.ts";
 
+export { recordRequestPrincipal } from "./request-principal.ts";
 export {
   bindMiddlewareContext,
   bodyLimit,
