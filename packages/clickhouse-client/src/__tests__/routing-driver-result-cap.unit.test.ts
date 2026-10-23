@@ -34,9 +34,12 @@ function routed() {
   });
   const driver = routingDriver(connection);
   const client = new ClickHouseQueryClient({ driver, tenantGuard: new TenantGuard() });
-  const sentSettings = () =>
-    (server.query.mock.calls[0]?.[0] as { clickhouse_settings?: Record<string, unknown> })
-      .clickhouse_settings;
+  const sentSettings = () => {
+    const sent = server.query.mock.calls[0]?.[0] as
+      | { clickhouse_settings?: Record<string, unknown> }
+      | undefined;
+    return sent?.clickhouse_settings;
+  };
   return { client, driver, connection, sentSettings };
 }
 

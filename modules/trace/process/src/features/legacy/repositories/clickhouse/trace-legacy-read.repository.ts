@@ -2632,30 +2632,17 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           maxSpanRows: remainingSpanBudget,
         });
       } catch (batchError) {
-        if (!TraceLegacyReadClickHouseRepository.isClickHouseResultOverflowError(batchError))
-          throw batchError;
-        if (TraceLegacyReadClickHouseRepository.isClickHouseResultBytesOverflowError(batchError)) {
-          // Too many bytes, not too many spans: a smaller batch may fit, so halve it and retry.
-          // A single trace that still does not fit is refused, naming the limit that fired.
-          if (batch.length > 1) {
-            const half = Math.ceil(batch.length / 2);
-            pending.unshift(batch.slice(0, half), batch.slice(half));
-            continue;
-          }
-          throw new Error(
-            `Traces-with-spans join fallback: trace ${batch[0]} alone exceeds the result size ` +
-              `ceiling (${merged.size} of ${traceIds.length} traces already merged); ` +
-              `refusing to materialise it`,
-            { cause: batchError },
-          );
-        }
-        throw new Error(
-          `Traces-with-spans join fallback exceeded ${MAX_SPANS_PER_JOINED_FALLBACK} spans ` +
-            `(${mergedSpanCount} already merged across ${merged.size} of ${traceIds.length} traces, ` +
-            `and the next batch of ${batch.length} overran the remaining ${remainingSpanBudget}); ` +
-            `refusing to materialise the rest`,
-          { cause: batchError },
+        pending.unshift(
+          ...TraceLegacyReadClickHouseRepository.smallerBatchesAfterRefusal({
+            batchError,
+            batch,
+            mergedSpanCount,
+            mergedTraceCount: merged.size,
+            totalTraceCount: traceIds.length,
+            remainingSpanBudget,
+          }),
         );
+        continue;
       }
 
       for (const [traceId, value] of batchMap) {
@@ -2675,6 +2662,50 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
       }
     }
     return merged;
+  }
+
+  /**
+   * A batch refused for its size is halved and read again; a single trace that still does not
+   * fit, a batch refused for its span count, or any other failure is thrown, naming its limit.
+   */
+  private static smallerBatchesAfterRefusal({
+    batchError,
+    batch,
+    mergedSpanCount,
+    mergedTraceCount,
+    totalTraceCount,
+    remainingSpanBudget,
+  }: {
+    batchError: unknown;
+    batch: string[];
+    mergedSpanCount: number;
+    mergedTraceCount: number;
+    totalTraceCount: number;
+    remainingSpanBudget: number;
+  }): string[][] {
+    if (!TraceLegacyReadClickHouseRepository.isClickHouseResultOverflowError(batchError))
+      throw batchError;
+    const isBytes =
+      TraceLegacyReadClickHouseRepository.isClickHouseResultBytesOverflowError(batchError);
+    if (isBytes && batch.length > 1) {
+      const half = Math.ceil(batch.length / 2);
+      return [batch.slice(0, half), batch.slice(half)];
+    }
+    if (isBytes) {
+      throw new Error(
+        `Traces-with-spans join fallback: trace ${batch[0]} alone exceeds the result size ` +
+          `ceiling (${mergedTraceCount} of ${totalTraceCount} traces already merged); ` +
+          `refusing to materialise it`,
+        { cause: batchError },
+      );
+    }
+    throw new Error(
+      `Traces-with-spans join fallback exceeded ${MAX_SPANS_PER_JOINED_FALLBACK} spans ` +
+        `(${mergedSpanCount} already merged across ${mergedTraceCount} of ${totalTraceCount} traces, ` +
+        `and the next batch of ${batch.length} overran the remaining ${remainingSpanBudget}); ` +
+        `refusing to materialise the rest`,
+      { cause: batchError },
+    );
   }
 
   private async readJoinedTraceBatch({
