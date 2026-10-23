@@ -377,6 +377,15 @@ export const FEATURE_FLAGS = [
       "Lets a project's legacy key read and search traces and threads over REST. Sharing, metadata updates and coding-agent reads still need full access. Off by default. List the projects in one rule, { projectId: [ids] }; remove an id to end it for that project. The routes it opens name it with withLegacyKeyScope. Internal flag store only; a self-hosted install uses LEGACY_PROJECT_KEY_FULL_ACCESS instead.",
   },
   {
+    key: "legacy_project_key_annotations_read",
+    scope: "PRODUCT",
+    defaultValue: false,
+    envOverridable: false,
+    family: "Legacy project keys",
+    description:
+      "Lets a project's legacy key list and read annotations, a project's or a trace's, over REST. Creating, updating and deleting an annotation still need full access. Off by default. List the projects in one rule, { projectId: [ids] }; remove an id to end it for that project. The routes it opens name it with withLegacyKeyScope. Internal flag store only; a self-hosted install uses LEGACY_PROJECT_KEY_FULL_ACCESS instead.",
+  },
+  {
     key: "legacy_project_key_scenarios",
     scope: "PRODUCT",
     defaultValue: false,
