@@ -3,6 +3,7 @@ import { Box, chakra, HStack, Text } from "@langwatch/design-system/primitives";
 import { Edit2 } from "lucide-react";
 import { useState } from "react";
 
+import type { CodeBlockLangySubject } from "../../../model/code/code-block-langy.ts";
 import { CodeEditorModal } from "../optimization_studio/code/workflow-code-editor.transport.tsx";
 
 export interface CodeBlockField {
@@ -44,6 +45,8 @@ export type CodeBlockEditorProps = {
    * a per-instance random id if omitted, meaning state is not preserved.
    */
   viewStateKey?: string;
+  /** The code node being edited, which is what Langy may be asked about in the editor. */
+  langySubject?: CodeBlockLangySubject;
 };
 
 /**
@@ -59,6 +62,7 @@ export function CodeBlockEditor({
   inputs,
   outputs,
   viewStateKey,
+  langySubject,
 }: CodeBlockEditorProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -133,6 +137,7 @@ export function CodeBlockEditor({
           inputs={inputs}
           outputs={outputs}
           viewStateKey={viewStateKey}
+          langySubject={langySubject}
         />
       )}
     </Box>

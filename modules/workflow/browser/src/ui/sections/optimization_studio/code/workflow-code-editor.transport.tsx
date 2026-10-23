@@ -4,7 +4,12 @@ import type { editor } from "monaco-editor";
 import { useMemo } from "react";
 
 import { useOrganizationTeamProject } from "../../../../behavior/studio-host/use-organization-team-project.ts";
+import { useCodeEditorLangy } from "../../../../behavior/use-code-editor-langy.ts";
 import { workflowApi } from "../../../../behavior/workflow-api.ts";
+import {
+  type CodeBlockLangySubject,
+  codeBlockSecretNames,
+} from "../../../../model/code/code-block-langy.ts";
 import { type PythonField } from "../../../../model/code/python-provider.shared.ts";
 import {
   WorkflowCodeEditor,
@@ -31,6 +36,8 @@ type EditorModalProps = WorkflowCodeEditorContractProps & {
   onClose: () => void;
   language?: string;
   viewStateKey?: string;
+  /** The code node this editor is open on, which is what Langy may be asked about. */
+  langySubject?: CodeBlockLangySubject;
 };
 
 function useEditorTransport() {
@@ -39,10 +46,7 @@ function useEditorTransport() {
     { projectId: project?.id ?? "" },
     { enabled: Boolean(project?.id) },
   );
-  const secretNames = useMemo(
-    () => (secrets.data ?? []).map((secret) => secret.name),
-    [secrets.data],
-  );
+  const secretNames = useMemo(() => codeBlockSecretNames(secrets.data ?? []), [secrets.data]);
 
   return { projectId: project?.id, secretNames };
 }
@@ -73,12 +77,22 @@ export const WorkflowCodeEditorModalHost: WorkflowCodeEditorModalHostApi = ({
 );
 
 /** App composition for project-scoped secret transport into the Workflow editor. */
-export function CodeEditorModal(props: EditorModalProps) {
+export function CodeEditorModal({ langySubject, ...props }: EditorModalProps) {
   const { projectId, secretNames } = useEditorTransport();
+  const assistant = useCodeEditorLangy({
+    subject: langySubject,
+    open: props.open,
+    language: props.language === "javascript" ? "javascript" : "python",
+    savedCode: props.code,
+    inputs: props.inputs ?? [],
+    outputs: props.outputs ?? [],
+    secretNames,
+  });
 
   return (
     <WorkflowCodeEditorModal
       {...props}
+      assistant={assistant}
       projectId={projectId}
       secretNames={secretNames}
       renderModal={WorkflowCodeEditorModalHost}

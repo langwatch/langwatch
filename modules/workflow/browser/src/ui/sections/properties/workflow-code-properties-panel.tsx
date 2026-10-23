@@ -171,6 +171,13 @@ export function CodePropertiesPanel({
         inputs={inputs}
         outputs={outputs}
         viewStateKey={`code-node:${node.id}`}
+        langySubject={{
+          nodeId: node.id,
+          nodeName: node.data.name ?? node.id,
+          ...(node.data.execution_state?.status === "error" && node.data.execution_state.error
+            ? { lastError: node.data.execution_state.error }
+            : {}),
+        }}
       />
 
       {/* Inputs using VariablesSection */}

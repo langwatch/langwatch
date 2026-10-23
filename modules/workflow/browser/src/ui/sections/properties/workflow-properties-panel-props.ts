@@ -53,6 +53,8 @@ export type WorkflowCodeEditorProps = {
   inputs?: readonly { identifier: string; type: string }[];
   outputs?: readonly { identifier: string; type: string }[];
   viewStateKey?: string;
+  /** The code node being edited, which is what Langy may be asked about in the editor. */
+  langySubject?: { nodeId: string; nodeName: string; lastError?: string };
 };
 
 export type WorkflowHttpConfigProps = {

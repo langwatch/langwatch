@@ -29,14 +29,19 @@ const SCOPED_KEY: RestResolvedProjectCredential = {
   project: PROJECT,
 };
 
-function door(options: { caller?: LangyRestCaller; allowed?: boolean }) {
+function door(options: { caller?: LangyRestCaller; allowed?: boolean; asked?: string[] }) {
   return LangyUiActionDoorService.create({
     callers: {
       getCaller: async () =>
         options.caller ?? { dark: false, projectId: PROJECT.id, userId: "user-1" },
     },
     catalog: LangyUiActionCatalogService.create(),
-    authz: createApiFixture<AuthzApi>({ hasApiKeyPermission: async () => options.allowed ?? true }),
+    authz: createApiFixture<AuthzApi>({
+      hasApiKeyPermission: async ({ permission }) => {
+        options.asked?.push(permission);
+        return options.allowed ?? true;
+      },
+    }),
     actions: createApiFixture<LangyUiActionService>(),
   });
 }
@@ -82,7 +87,38 @@ describe("given the CLI's UI-action door", () => {
     });
   });
 
+  describe("when the key does not hold workflows:manage", () => {
+    /** @scenario "A key without workflows:manage cannot propose code" */
+    it("refuses studio.code.propose before it reaches the page", async () => {
+      const asked: string[] = [];
+
+      await expect(
+        door({ allowed: false, asked }).dispatch(
+          dispatch({
+            conversationId: "c",
+            kind: "studio.code.propose",
+            payload: { code: "x = 1", summary: "Sets x" },
+          }),
+        ),
+      ).rejects.toMatchObject({ code: "api_key_permission_denied" });
+      expect(asked).toEqual(["workflows:manage"]);
+    });
+  });
+
   describe("when it lists the catalogue", () => {
+    /** @scenario "The server catalogue serves the studio.code actions" */
+    it("lists the Studio code editor's kinds with their permission and no backend", async () => {
+      const listed = await door({}).list({ actor: null, projectId: PROJECT.id });
+      if (listed.dark) throw new Error("the rollout is open in this test");
+      const studio = listed.actions
+        .filter((action) => action.kind.startsWith("studio."))
+        .map(({ kind, permission, backend }) => ({ kind, permission, backend }));
+      expect(studio).toEqual([
+        { kind: "studio.code.read", permission: "workflows:view", backend: undefined },
+        { kind: "studio.code.propose", permission: "workflows:manage", backend: undefined },
+      ]);
+    });
+
     it("lists every page family's kinds with their permission", async () => {
       const listed = await door({}).list({ actor: null, projectId: PROJECT.id });
       if (listed.dark) throw new Error("the rollout is open in this test");

@@ -2,6 +2,7 @@ import type { AuthzPermission } from "@langwatch/authorization";
 import { WORKBENCH_ACTIONS } from "@langwatch/experiment-contract";
 import { LangyUiActionUnknownError, type LangyUiActionListing } from "@langwatch/langy-contract";
 import { EXPLORER_ACTIONS } from "@langwatch/trace-contract";
+import { STUDIO_CODE_ACTIONS } from "@langwatch/workflow-contract";
 import { z } from "zod";
 
 import type { LangyUiActionBackendMode } from "./langy-ui-action-backend.service.ts";
@@ -52,11 +53,12 @@ export interface LangyUiActionCatalog {
 /**
  * The server's own registry of every page action an agent may dispatch: a kind is dispatchable
  * only when it appears here, and its payload is parsed with the schema HERE. A kind's domain
- * prefix (`workbench.`, `explorer.`) names the page family it belongs to.
+ * prefix (`workbench.`, `explorer.`, `studio.`) names the page family it belongs to.
  */
 const PAGE_ACTION_MANIFESTS = {
   workbench: WORKBENCH_ACTIONS,
   explorer: EXPLORER_ACTIONS,
+  studio: STUDIO_CODE_ACTIONS,
 } as const;
 
 type PageManifest = (typeof PAGE_ACTION_MANIFESTS)[keyof typeof PAGE_ACTION_MANIFESTS];
@@ -91,7 +93,8 @@ export class LangyUiActionCatalogService implements LangyUiActionCatalog {
       Object.entries(manifest).map(([kind, definition]) => ({
         kind,
         permission: definition.requiredPermission,
-        backend: definition.backend,
+        // The Studio code editor's kinds declare none: they run on an open page only.
+        backend: "backend" in definition ? definition.backend : undefined,
         payloadSchema: z.toJSONSchema(definition.payloadSchema, {
           target: "draft-07",
           reused: "inline",

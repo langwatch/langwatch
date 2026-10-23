@@ -16247,6 +16247,12 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
+      '@langwatch/langy-client':
+        specifier: workspace:*
+        version: link:../../langy/client
+      '@langwatch/langy-contract':
+        specifier: workspace:*
+        version: link:../../langy/contract
       '@langwatch/model-provider-client':
         specifier: workspace:*
         version: link:../../model-provider/client
