@@ -159,10 +159,12 @@ describe("a probe sending a canary", () => {
         answer: () => new Response("{}", { status: 503 }),
       });
 
-      await probes(canaries)
+      const failed = await probes(canaries)
         .runCollector(CREDENTIAL)
-        .catch(() => undefined);
+        .catch((error: unknown) => error);
 
+      expect(failed).toBeInstanceOf(HealthCheckFailedError);
+      expect((failed as HealthCheckFailedError).code).toBe("health_check_failed");
       expect(canaries.requests()).toHaveLength(2);
     });
   });
