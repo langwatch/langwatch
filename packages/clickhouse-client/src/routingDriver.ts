@@ -93,6 +93,33 @@ function queryParams(request: QueryRequest): Record<string, unknown> {
 }
 
 /**
+ * The largest result a read that buffers its whole result may receive, in ClickHouse's own
+ * uncompressed bytes. ClickHouse's per-query memory cap protects the server, not this process:
+ * a read can stream far more than it could hold, and parsed JSON rows take several times their
+ * size in the heap. One such read OOM-killed two app pods (specs/clickhouse/bounded-reads.feature).
+ */
+export const BUFFERED_READ_MAX_RESULT_BYTES = 256 * 1024 * 1024;
+
+/**
+ * A buffered read's settings with the default result ceiling. A read that names its own
+ * `max_result_bytes`, or asks for `break` rather than `throw`, keeps exactly what it asked for;
+ * one that only names a row limit keeps it and gains the ceiling. `throw`, never `break`: `break`
+ * would hand back a partial result as if it were complete.
+ */
+function bufferedReadSettings(
+  settings: Record<string, string | number> | undefined,
+): Record<string, string | number> | undefined {
+  const overflowMode = settings?.result_overflow_mode;
+  if (settings?.max_result_bytes !== undefined) return settings;
+  if (overflowMode !== undefined && overflowMode !== "throw") return settings;
+  return {
+    ...settings,
+    max_result_bytes: String(BUFFERED_READ_MAX_RESULT_BYTES),
+    result_overflow_mode: "throw",
+  };
+}
+
+/**
  * A server before 25.11 that fails after its 200 writes the failure as a last `{"exception"}`
  * row, which the vendor client hands over as data; read it as the failure it is, with the
  * server's code, as VendorClientResilience does (specs/clickhouse/single-client-access.feature).
@@ -179,7 +206,10 @@ export function routingDriver<Client extends RoutableStatementClient>(
 
       const started = nowInstant().epochMilliseconds;
       const rows = await onTarget(connection, vendor, async () => {
-        const resultSet = await vendor.query({ ...queryParams(request), format: "JSONEachRow" });
+        const resultSet = await vendor.query({
+          ...queryParams({ ...request, settings: bufferedReadSettings(request.settings) }),
+          format: "JSONEachRow",
+        });
         const read = (await resultSet.json()) as Row[];
         refuseInbandException(read);
         return read;

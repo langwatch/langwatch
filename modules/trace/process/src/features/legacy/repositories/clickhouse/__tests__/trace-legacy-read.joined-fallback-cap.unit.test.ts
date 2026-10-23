@@ -87,7 +87,13 @@ function spanRow({ traceId, spanIndex }: { traceId: string; spanIndex: number })
 /** Refuses the first whole-list span read for memory (triggering the
  * fallback), then serves each batched retry. spanRowsServed records what
  * actually crossed the socket for heap assertions. */
-function clickHouseThatOOMsThenBatches({ spansPerTrace }: { spansPerTrace: number }) {
+function clickHouseThatOOMsThenBatches({
+  spansPerTrace,
+  firstRefusal = "Code: 241. DB::Exception: MEMORY_LIMIT_EXCEEDED",
+}: {
+  spansPerTrace: number;
+  firstRefusal?: string;
+}) {
   let refusedOnce = false;
   const spanReadSettings: Record<string, unknown>[] = [];
   const served = { spanRowsServed: 0 };
@@ -102,7 +108,7 @@ function clickHouseThatOOMsThenBatches({ spansPerTrace }: { spansPerTrace: numbe
       if (args.query.includes("FROM stored_spans")) {
         if (!refusedOnce) {
           refusedOnce = true;
-          throw new Error("Code: 241. DB::Exception: MEMORY_LIMIT_EXCEEDED");
+          throw new Error(firstRefusal);
         }
         spanReadSettings.push(args.clickhouse_settings ?? {});
 
@@ -272,6 +278,31 @@ describe("the traces-with-spans memory-limit fallback", () => {
       });
 
       expect(traces).toHaveLength(60);
+    });
+  });
+
+  describe("given the whole-list read is refused because its result is too large", () => {
+    /** @scenario "A joined trace read whose result is too large retries in batches" */
+    it("retries in batches under the span budget and returns every trace", async () => {
+      const { spanReadSettings } = clickHouseThatOOMsThenBatches({
+        spansPerTrace: 1,
+        firstRefusal:
+          "Code: 396. DB::Exception: Limit for result exceeded, max bytes: 256.00 MiB. (TOO_MANY_ROWS_OR_BYTES)",
+      });
+      const service = mappedLegacyRead({
+        resolveClickHouseClient: testResolveClickHouseClient,
+        traceCanonicalisation,
+      });
+
+      const traces = await service.findTracesWithSpans({
+        authorization: OWN_READ,
+        projectId: PROJECT,
+        traceIds: traceIds(60),
+        protections: openProtections,
+      });
+
+      expect(traces).toHaveLength(60);
+      expect(spanReadSettings[0]).toMatchObject({ result_overflow_mode: "throw" });
     });
   });
 });

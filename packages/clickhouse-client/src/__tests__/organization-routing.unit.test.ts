@@ -60,11 +60,13 @@ describe("organization routing", () => {
 
       expect(result.rows).toEqual([{ total: 7 }]);
       expect(shared.query).not.toHaveBeenCalled();
-      expect(isolated.query).toHaveBeenCalledWith({
-        query: sql,
-        query_params: { organizationId: "org-private" },
-        format: "JSONEachRow",
-      });
+      expect(isolated.query).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: sql,
+          query_params: { organizationId: "org-private" },
+          format: "JSONEachRow",
+        }),
+      );
     } finally {
       await connection.closeOnce();
     }

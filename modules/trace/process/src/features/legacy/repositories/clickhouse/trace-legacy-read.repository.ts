@@ -2544,7 +2544,12 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
         try {
           return await this.readJoinedTraceBatch({ ...batchRead, batchTraceIds: traceIds });
         } catch (error) {
-          if (!TraceLegacyReadClickHouseRepository.isClickHouseMemoryLimitError(error)) {
+          // A result too large to buffer is refused by the client's default result ceiling;
+          // it is the same over-large read a memory refusal is, so it gets the same budget.
+          if (
+            !TraceLegacyReadClickHouseRepository.isClickHouseMemoryLimitError(error) &&
+            !TraceLegacyReadClickHouseRepository.isClickHouseResultOverflowError(error)
+          ) {
             throw error;
           }
           return this.readJoinedTracesInBatches({ ...batchRead, traceIds });

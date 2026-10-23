@@ -128,3 +128,43 @@ Feature: A read that cannot be pruned must still be bounded
     And the batched retry fits under the cap
     When the retry runs
     Then every requested trace is returned
+
+  # ---------------------------------------------------------------------------
+  # The result ceiling
+  #
+  # ClickHouse's per-query memory cap protects ClickHouse, not us. A read that
+  # stays under it while streaming can still send a result this process cannot
+  # hold: on 2026-10-23 one trace-list page asked for the full spans of 25
+  # traces, ClickHouse streamed them, and two app pods went from about 1.5 GiB
+  # to 4.6 and 5.9 GiB in a minute and were killed, taking every request and
+  # in-process job on them. A read that buffers its whole result is refused by
+  # ClickHouse once the result passes a size, so the failure is one request,
+  # not the pod.
+  # ---------------------------------------------------------------------------
+
+  @unit @regression
+  Scenario: A read that buffers its whole result is refused by ClickHouse past a result size
+    Given a read that buffers its whole result
+    And it does not name its own result limit
+    When it is sent to ClickHouse
+    Then ClickHouse is told to refuse a result larger than the default limit
+    And to fail the read rather than return part of it
+
+  @unit
+  Scenario: A read that names its own result limit keeps it
+    Given a read that buffers its whole result and names its own result limit
+    When it is sent to ClickHouse
+    Then ClickHouse applies the read's own limit
+    And a read that limits only its rows is still refused past the default size
+
+  @unit
+  Scenario: A read that streams its result batch by batch is not capped by size
+    Given a read that streams its result
+    When it is sent to ClickHouse
+    Then no result size limit is added, because only one batch is held at a time
+
+  @unit @regression
+  Scenario: A joined trace read whose result is too large retries in batches
+    Given a joined trace read that ClickHouse refuses because its result is too large
+    When the read is handled
+    Then it is retried in batches under the span budget, as a memory refusal is
