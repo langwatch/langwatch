@@ -121,10 +121,9 @@ export class AutomationSettlementDispatchService extends AutomationSettlementExe
   }
 
   /**
-   * One line per failure. A refusal the customer fixes in the automation is a
-   * warning, logged once per automation per window, and ends the dispatch;
-   * anything else is reported once through the process's error capture, and
-   * rethrown when another attempt could succeed.
+   * A refusal the customer fixes is a warning, once per automation per window,
+   * and ends the dispatch. Anything else is captured once and rethrown when a
+   * retry could succeed.
    */
   private rethrowIfRetryable({
     error,
