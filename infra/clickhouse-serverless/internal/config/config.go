@@ -72,6 +72,10 @@ type Input struct {
 	LocalDiskKeepFreeBytes    int64  `env:"LOCAL_DISK_KEEP_FREE_BYTES" default:"1073741824"`
 	MaxDataPartSizeBytes      int64  `env:"MAX_DATA_PART_SIZE_BYTES"`
 
+	// No longer read: ClickHouse built no cache from it on the s3 disk. Kept
+	// only so the renderer can warn a deployment that still sets it.
+	RetiredCacheMaxSize string `env:"CACHE_MAX_SIZE"`
+
 	// Logging
 	LogLevel         string `env:"LOG_LEVEL" default:"warning" validate:"oneof=trace debug information warning error"`
 	LogFormat        string `env:"LOG_FORMAT" default:"json"   validate:"oneof=json plain"`

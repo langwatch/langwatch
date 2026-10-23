@@ -18,6 +18,13 @@ Feature: The clickhouse-serverless image renders every server setting from env
     And a bare integer into DateTime64 still reads as epoch milliseconds
 
   @unit
+  Scenario: A deployment that still sets CACHE_MAX_SIZE is told it is no longer read
+    Given CACHE_MAX_SIZE is set
+    When the renderer writes the server configuration
+    Then the renderer logs a warning naming CACHE_MAX_SIZE
+    And without CACHE_MAX_SIZE it logs no such warning
+
+  @unit
   Scenario: Server and profile settings render their defaults
     Given no env var sets them
     When the renderer writes the server configuration
