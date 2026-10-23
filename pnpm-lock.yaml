@@ -16515,6 +16515,9 @@ importers:
       '@aws-sdk/client-lambda':
         specifier: 'catalog:'
         version: 3.1121.0
+      '@aws-sdk/credential-providers':
+        specifier: ^3.1080.0
+        version: 3.1108.0
       '@langwatch/agent-contract':
         specifier: workspace:*
         version: link:../../agent/contract
@@ -17866,6 +17869,9 @@ importers:
     dependencies:
       '@aws-sdk/client-s3':
         specifier: 'catalog:'
+        version: 3.1108.0
+      '@aws-sdk/credential-providers':
+        specifier: ^3.1080.0
         version: 3.1108.0
       '@aws-sdk/s3-request-presigner':
         specifier: 'catalog:'
