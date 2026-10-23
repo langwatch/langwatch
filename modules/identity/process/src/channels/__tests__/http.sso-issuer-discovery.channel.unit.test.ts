@@ -1,5 +1,5 @@
 import type { SsrfUrlValidator, SsrfValidationResult } from "@langwatch/egress";
-import { RedirectRefusedError } from "@langwatch/egress";
+import { OutboundProxyMisconfiguredError, RedirectRefusedError } from "@langwatch/egress";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -122,6 +122,17 @@ describe("given an issuer an administrator typed", () => {
     await expect(channel.discover({ issuer: ISSUER })).resolves.toEqual({
       reachable: false,
       reason: "redirect_refused",
+    });
+  });
+
+  it("names a malformed outbound proxy setting, not the issuer", async () => {
+    const { channel } = channelAnswering(async () => {
+      throw new OutboundProxyMisconfiguredError();
+    });
+
+    await expect(channel.discover({ issuer: ISSUER })).resolves.toEqual({
+      reachable: false,
+      reason: "proxy_misconfigured",
     });
   });
 

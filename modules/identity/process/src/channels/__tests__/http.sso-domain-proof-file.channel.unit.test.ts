@@ -1,5 +1,5 @@
 import type { SsrfUrlValidator, SsrfValidationResult } from "@langwatch/egress";
-import { RedirectRefusedError } from "@langwatch/egress";
+import { OutboundProxyMisconfiguredError, RedirectRefusedError } from "@langwatch/egress";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -163,6 +163,18 @@ describe("given a fetch of the verification file", () => {
       expect(await fetchFile(channel)).toEqual({
         outcome: "unreachable",
         reason: "redirect_refused",
+      });
+    });
+
+    /** @scenario "A fetch that could not happen says so, and blames nobody" */
+    it("reports a malformed outbound proxy setting as its own reason", async () => {
+      const { channel } = channelAnswering(async () => {
+        throw new OutboundProxyMisconfiguredError();
+      });
+
+      expect(await fetchFile(channel)).toEqual({
+        outcome: "unreachable",
+        reason: "proxy_misconfigured",
       });
     });
   });
