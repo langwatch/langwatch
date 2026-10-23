@@ -7,6 +7,7 @@ import { defineTrpcContract } from "@langwatch/module";
 import {
   createSigningKeyInputSchema,
   issuedSigningKeySchema,
+  projectSigningSchema,
   signingKeyActionInputSchema,
   signingKeyProjectInputSchema,
   signingKeySchema,
@@ -16,6 +17,10 @@ export const signingKeyTrpc = defineTrpcContract("signingKeys")
   .query("list")
   .withInput(signingKeyProjectInputSchema)
   .withOutput(signingKeySchema.array())
+
+  .query("projectSigning")
+  .withInput(signingKeyProjectInputSchema)
+  .withOutput(projectSigningSchema)
 
   .mutation("create")
   .withInput(createSigningKeyInputSchema)

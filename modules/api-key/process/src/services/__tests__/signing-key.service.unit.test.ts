@@ -2,7 +2,7 @@
  * Issuing, rotating, revoking and listing a project's signing keys over the memory tier.
  * @see modules/api-key/specs/signing-keys.feature
  */
-import { fromDate, type Instant } from "@langwatch/time";
+import { fromDate, type Instant, toDate } from "@langwatch/time";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { MemorySigningKeyUsageRepository } from "../../repositories/memory/memory.signing-key-usage.repository.ts";
@@ -103,6 +103,28 @@ describe("managing a project's signing keys", () => {
       reason: { code: "not_found" },
     });
     expect(listed.filter((key) => key.status === "active")).toHaveLength(1);
+  });
+
+  /** @scenario "A project signs its calls with its live key used last" */
+  it("names the live key used last, and nothing for a project with only revoked keys", async () => {
+    const make = (name: string) =>
+      service.create({ projectId: "orchestrator", name, userId: "ana" });
+    const revoked = await make("Old");
+    await make("Unused");
+    const used = await make("Production");
+    await keys.markUsed({ organizationId: "org_a", ids: [used.signingKey.id], at: now });
+    await service.revoke({ projectId: "orchestrator", keyId: revoked.signingKey.id });
+
+    const signing = await service.findProjectSigning({ projectId: "orchestrator" });
+    const onlyRevoked = await service.create({
+      projectId: "elsewhere",
+      name: "Gone",
+      userId: "ana",
+    });
+    await service.revoke({ projectId: "elsewhere", keyId: onlyRevoked.signingKey.id });
+
+    expect(signing).toEqual({ keyName: "Production", lastUsedAt: toDate(now) });
+    expect(await service.findProjectSigning({ projectId: "elsewhere" })).toBeNull();
   });
 
   /** @scenario "Revoking a key ends it at once" */

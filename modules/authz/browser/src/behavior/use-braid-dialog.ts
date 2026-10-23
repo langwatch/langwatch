@@ -43,8 +43,8 @@ export function useTraceViewers({ readerProjectId }: { readerProjectId: string |
   );
 }
 
-export function useReaderSigningKeys({ readerProjectId }: { readerProjectId: string | undefined }) {
-  return authzApi.signingKeys.list.useQuery(
+export function useReaderSigning({ readerProjectId }: { readerProjectId: string | undefined }) {
+  return authzApi.signingKeys.projectSigning.useQuery(
     { projectId: readerProjectId ?? "" },
     { enabled: !!readerProjectId, retry: false },
   );

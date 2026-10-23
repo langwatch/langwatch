@@ -26,7 +26,8 @@ export type BraidsApiState = {
   setPolicy: Mock<(input: unknown) => void>;
   targets: { projectId: string; selectable: boolean; reason?: "this_project" | "aggregate" }[];
   viewers: { count: number; exact: boolean };
-  signingKeys: { id: string; name: string; status: "active"; lastUsedAt: string | null }[];
+  /** Whether the reader signs its calls: its key in use, or null. */
+  readerSigning: { keyName: string; lastUsedAt: string | null } | null;
   create: Mock<(input: unknown) => void>;
   change: Mock<(input: unknown) => void>;
   /** When set, the next save fails with it instead of answering. */
@@ -61,7 +62,7 @@ export function braidsApiFake() {
     setPolicy: vi.fn(),
     targets: [],
     viewers: { count: 0, exact: true },
-    signingKeys: [],
+    readerSigning: null,
     create: vi.fn(),
     change: vi.fn(),
     saveError: undefined,
@@ -129,7 +130,10 @@ export function braidsApiFake() {
       ),
     },
   };
-  return { api: { ...api, signingKeys: { list: asked(() => state.signingKeys) } }, state };
+  return {
+    api: { ...api, signingKeys: { projectSigning: asked(() => state.readerSigning) } },
+    state,
+  };
 }
 
 export function braidTraceFake() {

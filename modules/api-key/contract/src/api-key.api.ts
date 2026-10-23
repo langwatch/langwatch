@@ -44,6 +44,7 @@ import type {
   CreateSigningKeyInput,
   FindSigningKeysInput,
   IssuedSigningKey,
+  ProjectSigning,
   RevokeSigningKeyInput,
   RotateSigningKeyInput,
   SigningKey,
@@ -297,6 +298,8 @@ export interface ApiKeyApi {
   ): Promise<ApiKeyUser[]>;
   /** ADR-183 §4: a project's braid signing keys with their last 24 hours; never a secret. */
   findSigningKeys(input: FindSigningKeysInput): Promise<SigningKey[]>;
+  /** Whether a project signs its calls, for the braid dialog of whoever braids into it. */
+  findProjectSigning(input: FindSigningKeysInput): Promise<ProjectSigning>;
   /** Issues a signing key; the answer is the only place its secret is ever returned. */
   createSigningKey(input: CreateSigningKeyInput): Promise<IssuedSigningKey>;
   /** Issues a replacement; the old key keeps verifying for `SIGNING_KEY_ROTATION_OVERLAP_MS`. */

@@ -36,6 +36,14 @@ export const signingKeySchema: SigningKeySchema = signingKeySchemaDefinition;
 /** One signing key as listed; never its secret. */
 export type SigningKey = z.infer<typeof signingKeySchema>;
 
+const projectSigningSchemaDefinition = z
+  .object({ keyName: z.string(), lastUsedAt: z.date().nullable() })
+  .nullable();
+export interface ProjectSigningSchema extends Named<typeof projectSigningSchemaDefinition> {}
+export const projectSigningSchema: ProjectSigningSchema = projectSigningSchemaDefinition;
+/** Whether a project signs its calls: its live key used last, or null. Never a secret or key id. */
+export type ProjectSigning = z.infer<typeof projectSigningSchema>;
+
 const issuedSigningKeySchemaDefinition = z.object({
   signingKey: signingKeySchema,
   /** The whole key, `lwsk_<publicId>_<secret>`, answered once by create or rotate. */

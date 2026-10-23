@@ -1,7 +1,7 @@
 /**
  * The server half of `signingKeys.*` (ADR-183 §4 and §9). Whoever may braid out of a project
- * manages its keys: every procedure asks `braids:manage` at the input's project. Writes need
- * Enterprise naming BRAIDS, asked after access; the list stays open. Create and rotate mint.
+ * manages its keys: each key procedure asks `braids:manage` at the input's project. Writes need
+ * Enterprise naming BRAIDS; the list stays open. `projectSigning` asks the braid door's read.
  */
 import { ApiKeyApi, signingKeyTrpc } from "@langwatch/api-key-contract";
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
@@ -14,6 +14,11 @@ export const signingKeyTrpcTransport: TrpcRouterDeclaration<ApiKeyApi, typeof si
     .procedure("list")
     .withPermission("braids:manage")
     .handle(({ app, input }) => app.findSigningKeys({ projectId: input.projectId }))
+
+    // The braid dialog's switch: whoever braids into a project reads its traces (ADR-183 §2).
+    .procedure("projectSigning")
+    .withPermission("traces:view")
+    .handle(({ app, input }) => app.findProjectSigning({ projectId: input.projectId }))
 
     .procedure("create")
     .mintsCredential("braids:manage")

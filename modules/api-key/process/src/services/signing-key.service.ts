@@ -2,6 +2,7 @@ import { randomInt } from "node:crypto";
 
 import {
   type IssuedSigningKey,
+  type ProjectSigning,
   SIGNING_KEY_PREFIX,
   SIGNING_KEY_ROTATION_OVERLAP_MS,
   type SigningKey,
@@ -70,6 +71,21 @@ export class SigningKeyService {
   async find({ projectId }: { projectId: string }): Promise<SigningKey[]> {
     const organizationId = await this.projects.getOrganizationId(projectId);
     return this.listed({ rows: await this.keys.findByProject({ organizationId, projectId }) });
+  }
+
+  /** Whether the project signs its calls: its live key used last, or the newest never used. */
+  async findProjectSigning({ projectId }: { projectId: string }): Promise<ProjectSigning> {
+    const organizationId = await this.projects.getOrganizationId(projectId);
+    const rows = await this.keys.findByProject({ organizationId, projectId });
+    const at = this.now().epochMilliseconds;
+    const [key] = rows
+      .filter((row) => signingKeyStatusOf({ key: row, at }) !== "revoked")
+      .toSorted(
+        (a, b) =>
+          (b.lastUsedAt?.epochMilliseconds ?? -1) - (a.lastUsedAt?.epochMilliseconds ?? -1) ||
+          b.createdAt.epochMilliseconds - a.createdAt.epochMilliseconds,
+      );
+    return key ? { keyName: key.name, lastUsedAt: key.lastUsedAt && toDate(key.lastUsedAt) } : null;
   }
 
   async create(input: {

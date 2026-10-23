@@ -42,6 +42,7 @@ import {
   type CreateSigningKeyInput,
   type FindSigningKeysInput,
   type IssuedSigningKey,
+  type ProjectSigning,
   type RevokeSigningKeyInput,
   type RotateSigningKeyInput,
   type SigningKey,
@@ -749,6 +750,10 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
 
   async findSigningKeys(input: FindSigningKeysInput): Promise<SigningKey[]> {
     return this.#signingKeys.find(input);
+  }
+
+  async findProjectSigning(input: FindSigningKeysInput): Promise<ProjectSigning> {
+    return this.#signingKeys.findProjectSigning(input);
   }
 
   async createSigningKey(input: CreateSigningKeyInput): Promise<IssuedSigningKey> {

@@ -18,7 +18,7 @@ import {
   useBraidTargets,
   useBraidTestTrace,
   useOwnerAttributeKeys,
-  useReaderSigningKeys,
+  useReaderSigning,
   useSaveBraid,
   useTraceViewers,
 } from "../../../behavior/use-braid-dialog.ts";
@@ -62,15 +62,11 @@ export type BraidDrawerProps = {
   onClose: () => void;
 };
 
-function signingOf(keys: ReturnType<typeof useReaderSigningKeys>): ReaderSigning {
-  if (keys.isLoading) return { state: "loading" };
-  if (keys.isError || !keys.data) return { state: "unknown" };
-  const live = keys.data
-    .filter((key) => key.status !== "revoked")
-    .toSorted((a, b) => String(b.lastUsedAt ?? "").localeCompare(String(a.lastUsedAt ?? "")));
-  const key = live[0];
-  return key
-    ? { state: "signs", keyName: key.name, lastUsedAt: key.lastUsedAt }
+function signingOf(signing: ReturnType<typeof useReaderSigning>): ReaderSigning {
+  if (signing.isLoading) return { state: "loading" };
+  if (signing.isError || signing.data === undefined) return { state: "unknown" };
+  return signing.data
+    ? { state: "signs", keyName: signing.data.keyName, lastUsedAt: signing.data.lastUsedAt }
     : { state: "none" };
 }
 
@@ -142,7 +138,7 @@ export function BraidDrawer({ projectId, editing, braidsInto, onClose }: BraidDr
 
   const targets = useBraidTargets({ projectId, projectIds: projects.map((project) => project.id) });
   const attributeKeys = useOwnerAttributeKeys({ projectId });
-  const signingKeys = useReaderSigningKeys({ readerProjectId: draft.readerProjectId });
+  const signing = useReaderSigning({ readerProjectId: draft.readerProjectId });
   const viewers = useTraceViewers({ readerProjectId: draft.readerProjectId });
   const preview = useBraidPreview({ projectId, draft, braidId: editing?.braidId });
   const tested = useBraidTestTrace({
@@ -242,7 +238,7 @@ export function BraidDrawer({ projectId, editing, braidsInto, onClose }: BraidDr
             }
             entryKey={entryKey}
             readerName={reader?.name}
-            signing={signingOf(signingKeys)}
+            signing={signingOf(signing)}
             readerKeysHref={
               readerSlug ? braidsSigningKeysHref({ projectSlug: readerSlug }) : undefined
             }

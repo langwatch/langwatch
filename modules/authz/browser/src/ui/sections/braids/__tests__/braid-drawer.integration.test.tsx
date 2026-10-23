@@ -69,7 +69,7 @@ beforeEach(() => {
     { projectId: "p-roll", selectable: false, reason: "aggregate" },
   ];
   state.viewers = { count: 14, exact: true };
-  state.signingKeys = [];
+  state.readerSigning = null;
   state.saveError = undefined;
   state.create.mockClear();
   state.change.mockClear();
@@ -312,9 +312,10 @@ describe("the braid drawer", () => {
   describe("when the reader has a signing key in use", () => {
     /** @scenario The signed calls switch and the condition stay in step */
     it("adds and removes Verified with the switch and names the key", async () => {
-      braidsFake.state.signingKeys = [
-        { id: "k-1", name: "Production", status: "active", lastUsedAt: "2026-10-22T09:00:00Z" },
-      ];
+      braidsFake.state.readerSigning = {
+        keyName: "Production",
+        lastUsedAt: "2026-10-22T09:00:00Z",
+      };
       const { user } = openDrawer();
       await pickReader(user);
       await writeCondition(user, CONDITION);

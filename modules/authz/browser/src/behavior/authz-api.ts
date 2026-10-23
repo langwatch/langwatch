@@ -140,17 +140,12 @@ export type AuthzApiMap = {
     };
   };
 
-  /** The reader's signing keys, which the only-signed-calls switch names. */
+  /** Whether the reader signs its calls, which the only-signed-calls switch names. */
   signingKeys: {
-    list: {
+    projectSigning: {
       query: {
         input: { projectId: string };
-        output: {
-          id: string;
-          name: string;
-          status: "active" | "verifying" | "revoked";
-          lastUsedAt: string | null;
-        }[];
+        output: { keyName: string; lastUsedAt: string | null } | null;
       };
     };
   };

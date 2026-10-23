@@ -98,3 +98,19 @@ Feature: Signing keys
       Given "orchestrator" holds a signing key whose signatures passed and failed in the last 24 hours
       When ana opens the signing keys of "orchestrator"
       Then the key's row shows its status, when it was created and last used, and how many signed spans passed and failed
+
+  Rule: Whoever braids into a project can see whether it signs its calls
+
+    @unit
+    Scenario: A braid's author sees whether the reader signs without managing its keys
+      Given tom may read the traces of "orchestrator" but may not manage its signing keys
+      When tom asks whether "orchestrator" signs its calls
+      Then he is told the name of its key used last and when, and never a key id or secret
+      And someone who may not read the traces of "orchestrator" is refused
+
+    @unit
+    Scenario: A project signs its calls with its live key used last
+      Given "orchestrator" holds a revoked key, a key never used and a key used an hour ago
+      When whether "orchestrator" signs its calls is asked
+      Then the answer names the key used an hour ago
+      And a project with only revoked keys signs nothing

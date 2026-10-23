@@ -46,6 +46,7 @@ type Holds = (input: { permission: AuthzPermission; scope: AuthzDeclaredScopeId 
 
 function mount({ holds = () => true, enterprise = true }: { holds?: Holds; enterprise?: boolean }) {
   const app = {
+    findProjectSigning: vi.fn(async () => ({ keyName: "Production", lastUsedAt: null })),
     createSigningKey: vi.fn(async () => issued),
     rotateSigningKey: vi.fn(async () => issued),
     revokeSigningKey: vi.fn(async () => ({ ...listed, status: "revoked" as const })),
@@ -123,6 +124,23 @@ describe("the signingKeys tRPC namespace", () => {
         caller.revoke({ projectId: OTHER_TEAMS_PROJECT, keyId: "key_2" }),
       ).rejects.toMatchObject(denied);
       expect(app.revokeSigningKey).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("given tom, who may read the reader's traces but not manage its keys", () => {
+    /** @scenario "A braid's author sees whether the reader signs without managing its keys" */
+    it("tells him whether it signs, and refuses someone who may not read its traces", async () => {
+      const readsOrchestrator: Holds = ({ permission, scope }) =>
+        permission === "traces:view" && scope.id === ORCHESTRATOR;
+      const { caller } = mount({ holds: readsOrchestrator });
+
+      const signing = await caller.projectSigning({ projectId: ORCHESTRATOR });
+
+      expect(signing).toEqual({ keyName: "Production", lastUsedAt: null });
+      await expect(caller.list({ projectId: ORCHESTRATOR })).rejects.toMatchObject(denied);
+      await expect(caller.projectSigning({ projectId: OTHER_TEAMS_PROJECT })).rejects.toMatchObject(
+        denied,
+      );
     });
   });
 
