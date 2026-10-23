@@ -271,6 +271,7 @@ export const prismaModelFieldCatalogue = {
     "passkeyNudgeDismissedAt",
     "joinOfferDismissedDomains",
     "notificationPreferences",
+    "passwordResetRequiredAt",
     "Annotation",
     "shareLinks",
     "Workflow",
