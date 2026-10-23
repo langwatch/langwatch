@@ -1,0 +1,79 @@
+# LangWatch Judge route table, v1: routing only (see README.md).
+# Lookup: job x length bucket (token count of the full input) x arithmetic flag -> mode -> plan.
+# A mode with no enabled entry falls back to the next cheaper mode (accurate -> balanced -> instant).
+# Escalation: escalate when |2p - 1| < threshold (0.7 means 0.15 < p < 0.85). A missing p always escalates.
+# An optional routes.metrics.yaml beside this file adds per-entry metrics; it is not part of this repo.
+
+version: 1
+max_usd_per_1k: 5.0  # entries with metrics are enabled only under this cost; without metrics it is not applied
+default_mode: {search: balanced, llm_judge: balanced, scenario_judge: balanced}
+
+buckets:  # by token count of the full input, upper bound inclusive
+  - {name: "<=2k", max_tokens: 2000}
+  - {name: "2k-8k", max_tokens: 8000}
+  - {name: "8k-32k", max_tokens: 32000}
+  - {name: ">32k", max_tokens: null}
+
+arithmetic:
+  max_tokens: 8000  # longer inputs use their length bucket even when the flag is set
+  # request: the caller passes the flag; regex: the rule in features.py; request_then_regex: the caller's, else the regex
+  source: {search: request_then_regex, llm_judge: regex, scenario_judge: regex}
+
+backends:
+  decisions: {kind: decisions, enabled: true, timeout_s: 10, model: gpt-6-luna}
+  jev:       {kind: jev, enabled: true, timeout_s: 10, model: jev-latest}
+  haiku:     {kind: anthropic, enabled: true, timeout_s: 30, model: claude-haiku-5-5}
+  luna:      {kind: openai_responses, enabled: true, timeout_s: 45, model: gpt-6-luna}
+  # Self-run GPU models: off in v1, kept so their fallback wiring exists.
+  vega:      {kind: vllm, enabled: false, gpu: true, timeout_s: 5, model: vega-run2, fallbacks: [decisions]}
+  nox:       {kind: vllm, enabled: false, gpu: true, timeout_s: 3, model: nox-4b-lora-run1, fallbacks: [decisions]}
+
+routes:
+  search:
+    "<=2k":
+      instant:  {primary: decisions, pair_with: jev}
+      balanced: {primary: decisions, escalate_to: haiku, threshold: 0.7}
+      accurate: {primary: haiku}
+    "2k-8k":
+      instant:  {primary: decisions, pair_with: jev}
+      balanced: {primary: decisions, pair_with: jev}
+    "8k-32k":
+      instant:  {primary: decisions}
+      balanced: {primary: haiku}
+    ">32k":
+      instant:  {primary: decisions}
+      balanced: {primary: luna}
+    arithmetic:
+      instant:  {primary: decisions, pair_with: jev}
+      balanced: {primary: haiku}
+  llm_judge:
+    "<=2k": &judge_short
+      instant:  {primary: decisions}
+      balanced: {primary: decisions, escalate_to: haiku, threshold: 0.7}
+      accurate: {primary: luna}
+    "2k-8k": *judge_short
+    "8k-32k":
+      instant:  {primary: decisions}
+      balanced: {primary: decisions, escalate_to: luna, threshold: 0.7}
+      accurate: {primary: luna}
+    ">32k":
+      instant:  {primary: decisions}
+      balanced: {primary: decisions, escalate_to: luna, threshold: 0.7}
+    arithmetic:
+      instant:  {primary: decisions, pair_with: jev}
+      balanced: {primary: luna}
+      accurate: {primary: haiku}
+  scenario_judge:
+    "<=2k": &scen_short
+      instant:  {primary: decisions}
+      balanced: {primary: decisions, escalate_to: luna, threshold: 0.7}
+    "2k-8k": *scen_short
+    "8k-32k":
+      instant:  {primary: decisions, pair_with: jev}
+      balanced: {primary: jev, escalate_to: luna, threshold: 0.7}
+    ">32k":
+      instant:  {primary: jev}
+      balanced: {primary: luna}
+    arithmetic:
+      instant:  {primary: jev}
+      balanced: {primary: luna}

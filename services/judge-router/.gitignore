@@ -1,0 +1,2 @@
+# Private benchmark overlay (per-entry metrics); never commit it.
+routes.metrics.yaml
