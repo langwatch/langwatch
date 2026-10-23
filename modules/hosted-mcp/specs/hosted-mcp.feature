@@ -206,7 +206,8 @@ Feature: Hosted MCP answers main's root paths on the api process
     Then the answer carries Retry-After
 
   @unit
-  Scenario: The client address is read from forwarding headers before the socket
+  Scenario: The client address is the one the process resolved, never a header
     Given a request with forwarding headers and a socket peer
     When the endpoint reads the client address
-    Then the edge-authored header wins, a forwarded list yields its first entry, and the socket is the last resort
+    Then it is the address the process resolved through its trusted proxies, else the socket peer
+    And no forwarding header is read by the endpoint itself

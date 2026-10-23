@@ -34,9 +34,16 @@ Feature: A module's runtime code does not import a devDependency
     @unit @architecture
     Scenario: A type-only import of a dev-only package passes
       Given a process package lists a package only in devDependencies
-      And a production file imports it with import type, and with inline type specifiers only
+      And a production file imports it with import type and re-exports it with export type
       When the runtime-dev-dependency policy reads the tree
       Then it reports nothing
+
+    @unit @architecture
+    Scenario: An import of inline type specifiers still loads a dev-only package
+      Given a process package lists a package only in devDependencies
+      And a production file imports it with inline type specifiers only
+      When the runtime-dev-dependency policy reads the tree
+      Then it reports the import, because verbatimModuleSyntax keeps it as import {} from
 
     @unit @architecture
     Scenario: Tests, testing helpers and declaration files are skipped

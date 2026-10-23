@@ -4,6 +4,7 @@ import { Socket } from "node:net";
 /**
  * Which caller the hosted MCP doors count: the address the process resolved, never a header.
  * @see specs/security/trusted-client-address.feature
+ * @see modules/hosted-mcp/specs/hosted-mcp.feature
  */
 import { ClientAddress } from "@langwatch/api/policy";
 import { describe, expect, it } from "vitest";
@@ -51,6 +52,7 @@ describe("the hosted MCP door's caller address", () => {
   });
 
   describe("when nothing stamped the request", () => {
+    /** @scenario "The client address is the one the process resolved, never a header" */
     it("falls back to the socket peer and never reads a header", () => {
       expect(address.clientIp(mcpDoorRequest(forgedRequest({ socketAddress: SOCKET_PEER })))).toBe(
         SOCKET_PEER,

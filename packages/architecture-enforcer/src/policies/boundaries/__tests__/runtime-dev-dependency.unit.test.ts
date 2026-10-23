@@ -143,10 +143,25 @@ describe("runtime-dev-dependency", () => {
         write({
           path: "modules/a/process/src/a.ts",
           content:
-            'import type { A } from "@langwatch/api-key-contract";\nimport { type B, type C } from "@langwatch/api-key-contract";\nexport type { D } from "@langwatch/api-key-contract";\nexport type X = [A, B, C];\n',
+            'import type { A } from "@langwatch/api-key-contract";\nexport type { D } from "@langwatch/api-key-contract";\nexport type X = A;\n',
         });
 
         expect(read([pkg({ kind: "process", manifest: DEV_ONLY })])).toEqual([]);
+      });
+    });
+
+    describe("when every specifier is an inline type one", () => {
+      /** @scenario "An import of inline type specifiers still loads a dev-only package" */
+      it("reports the import, which verbatimModuleSyntax emits as import {} from", () => {
+        write({
+          path: "modules/a/process/src/a.ts",
+          content:
+            'import { type B, type C } from "@langwatch/api-key-contract";\nexport type X = [B, C];\n',
+        });
+
+        expect(read([pkg({ kind: "process", manifest: DEV_ONLY })])).toEqual([
+          "modules/a/process/src/a.ts:1|@langwatch/api-key-contract",
+        ]);
       });
     });
 

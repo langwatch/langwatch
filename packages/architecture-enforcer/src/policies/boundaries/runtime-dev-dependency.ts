@@ -42,31 +42,21 @@ function packageOf(specifier: string): string | undefined {
   return specifier.startsWith("@") ? parts.slice(0, 2).join("/") : parts[0];
 }
 
-/** Whether a non-empty list of import or export specifiers is all `type` ones. */
-function allTypeOnly(elements: readonly (ts.ImportSpecifier | ts.ExportSpecifier)[]): boolean {
-  return elements.length > 0 && elements.every((element) => element.isTypeOnly);
-}
-
+/**
+ * Only a statement-level `import type` is erased: under verbatimModuleSyntax an all-inline-`type`
+ * list (`import { type A } from "x"`) still emits `import {} from "x"`, which loads the package.
+ */
 function importSpecifier(node: ts.ImportDeclaration): ts.StringLiteralLike | undefined {
-  const clause = node.importClause;
-  if (clause === undefined) return stringOf(node.moduleSpecifier);
-  if (clause.isTypeOnly) return undefined;
+  if (node.importClause?.isTypeOnly) return undefined;
 
-  const bindings = clause.namedBindings;
-  const named = clause.name === undefined && bindings !== undefined && ts.isNamedImports(bindings);
-  const onlyTypes = named && allTypeOnly(bindings.elements);
-
-  return onlyTypes ? undefined : stringOf(node.moduleSpecifier);
+  return stringOf(node.moduleSpecifier);
 }
 
+/** As for imports: only a statement-level `export type` is erased. */
 function exportSpecifier(node: ts.ExportDeclaration): ts.StringLiteralLike | undefined {
-  if (node.isTypeOnly || node.moduleSpecifier === undefined) return undefined;
+  if (node.isTypeOnly) return undefined;
 
-  const clause = node.exportClause;
-  const named = clause !== undefined && ts.isNamedExports(clause);
-  const onlyTypes = named && allTypeOnly(clause.elements);
-
-  return onlyTypes ? undefined : stringOf(node.moduleSpecifier);
+  return stringOf(node.moduleSpecifier);
 }
 
 function importEqualsSpecifier(node: ts.ImportEqualsDeclaration): ts.StringLiteralLike | undefined {
