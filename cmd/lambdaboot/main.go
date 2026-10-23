@@ -13,6 +13,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"time"
@@ -30,25 +31,40 @@ func (e *envFlags) Set(kv string) error {
 }
 
 func main() {
+	os.Exit(run(os.Args[1:], lambdaboot.Real, output{out: os.Stdout, err: os.Stderr}))
+}
+
+// output is where the command reports to.
+type output struct{ out, err io.Writer }
+
+// run parses args, runs the check and returns the exit code: 0 when the image
+// started, 1 when it did not, 2 when the arguments are wrong.
+func run(args []string, rt lambdaboot.Runtime, w output) int {
+	stdout, stderr := w.out, w.err
 	var env envFlags
 	opts := lambdaboot.Options{}
-	flag.StringVar(&opts.Image, "image", "", "the image to start (required)")
-	flag.StringVar(&opts.User, "user", "9999:9999", "uid:gid to run as; Lambda never runs the image's own USER")
-	flag.IntVar(&opts.Port, "port", 8080, "the container port the health check listens on")
-	flag.StringVar(&opts.Path, "path", "/healthz", "the health check path")
-	flag.DurationVar(&opts.Timeout, "timeout", 60*time.Second, "how long the health check may take to answer")
-	flag.DurationVar(&opts.Interval, "interval", time.Second, "the wait between health check attempts")
-	flag.Var(&env, "e", "KEY=VALUE set in the container, as Lambda would (repeatable)")
-	flag.Parse()
+	flags := flag.NewFlagSet("lambdaboot", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	flags.StringVar(&opts.Image, "image", "", "the image to start (required)")
+	flags.StringVar(&opts.User, "user", "9999:9999", "numeric uid:gid to run as; Lambda never runs the image's own USER")
+	flags.IntVar(&opts.Port, "port", 8080, "the container port the health check listens on")
+	flags.StringVar(&opts.Path, "path", "/healthz", "the health check path")
+	flags.DurationVar(&opts.Timeout, "timeout", 60*time.Second, "how long the whole check may take")
+	flags.DurationVar(&opts.Interval, "interval", time.Second, "the wait between health check attempts")
+	flags.Var(&env, "e", "KEY=VALUE set in the container, as Lambda would (repeatable)")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
 	opts.Env = env
 
 	if opts.Image == "" {
-		fmt.Fprintln(os.Stderr, "lambdaboot: -image is required")
-		os.Exit(2)
+		_, _ = fmt.Fprintln(stderr, "lambdaboot: -image is required")
+		return 2
 	}
-	if err := lambdaboot.Check(context.Background(), opts, lambdaboot.Real); err != nil {
-		fmt.Fprintf(os.Stderr, "::error::%s cannot start the way Lambda starts it, so it is not pushed.\n%v\n", opts.Image, err)
-		os.Exit(1)
+	if err := lambdaboot.Check(context.Background(), opts, rt); err != nil {
+		_, _ = fmt.Fprintf(stderr, "::error::%s cannot start the way Lambda starts it, so it is not pushed.\n%v\n", opts.Image, err)
+		return 1
 	}
-	fmt.Printf("%s started as user %s and answered %s.\n", opts.Image, opts.User, opts.Path)
+	_, _ = fmt.Fprintf(stdout, "%s started as user %s and answered %s.\n", opts.Image, opts.User, opts.Path)
+	return 0
 }

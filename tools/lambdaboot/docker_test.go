@@ -51,7 +51,7 @@ func realOptions(image string) lambdaboot.Options {
 	}
 }
 
-// @scenario "A Lambda image that serves its health check as a foreign user is pushed"
+// @scenario "The boot check passes an image that serves its health check as a foreign user"
 func TestCheckWithDockerPassesAnImageAForeignUserCanStart(t *testing.T) {
 	requireDocker(t)
 	image := buildFixture(t, "good")
@@ -61,7 +61,7 @@ func TestCheckWithDockerPassesAnImageAForeignUserCanStart(t *testing.T) {
 	}
 }
 
-// @scenario "A Lambda image that cannot start as a foreign user is never pushed"
+// @scenario "The boot check refuses a working directory a foreign user cannot enter"
 func TestCheckWithDockerFailsAnImageThatStartsInAPrivateHome(t *testing.T) {
 	requireDocker(t)
 	image := buildFixture(t, "private-home")
