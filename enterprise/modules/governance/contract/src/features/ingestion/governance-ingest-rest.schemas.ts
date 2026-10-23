@@ -39,8 +39,6 @@ const governanceIngestHeadersSchemaDefinition = z.object({
   authorization: z.string().optional(),
   "content-type": z.string().optional(),
   "content-encoding": z.string().optional(),
-  "x-forwarded-for": z.string().optional(),
-  "x-real-ip": z.string().optional(),
 });
 export interface GovernanceIngestHeadersSchema extends Named<
   typeof governanceIngestHeadersSchemaDefinition
@@ -62,10 +60,14 @@ export type GovernanceIngestOtlpInput = Readonly<{
   sourceId: string;
   raw: Uint8Array;
   headers: GovernanceIngestHeaders;
+  /** The caller's address as the door resolved it, or null where none was. */
+  callerAddress: string | null;
 }>;
 
 export type GovernanceIngestWebhookInput = Readonly<{
   sourceId: string;
   raw: string;
   headers: GovernanceIngestHeaders;
+  /** The caller's address as the door resolved it, or null where none was. */
+  callerAddress: string | null;
 }>;

@@ -8,7 +8,7 @@ import type {
 
 import type { Authorize, Entitlements, PlatformDecision } from "../access/access.ts";
 import type { ReadBudgetDeps } from "../read-budget.ts";
-import type { RestKeyKind } from "../rest/key-credential.ts";
+import type { RestKeyCredential, RestKeyKind } from "../rest/key-credential.ts";
 import type { SessionVerification } from "./session-reader.ts";
 import type { MiddlewareBinding, TransportPeers } from "./transport-hosts.ts";
 
@@ -99,6 +99,8 @@ export type RestCaller = Readonly<{
   markUsed?: () => void;
   /** What a session-bearing door resolved beside the actor; a route parses it by its schema. */
   session?: unknown;
+  /** The key a module-bound door resolved, for the access record; key doors record theirs. */
+  key?: RestKeyCredential;
   /** A person in a browser session, the caller the second-factor gate holds (Q184). */
   browserSession?: Readonly<{ id: string | null }>;
 }>;

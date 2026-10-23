@@ -292,10 +292,9 @@ describe("CopilotCanonicaliserService", () => {
   });
 
   describe("when a VS Code copilot-chat span runs through the chain", () => {
-    // VS Code Copilot Chat emits under the `copilot-chat` instrumentation
-    // scope (not `github.copilot`), so the shared GenAI core canonicalizes
-    // it and the copilot extractor stays inert — ADR-039 §Extension #2's
-    // "no VS-Code-specific extractor code in v1".
+    // VS Code Copilot Chat emits under the `copilot-chat` scope. The shared
+    // GenAI core lifts model and tokens; the copilot extractor adds only
+    // Copilot's extras (ADR-039 §Extension S2, S6).
     const canonicalizeVscode = (attrs: Record<string, unknown>) =>
       canonicalisation.canonicalizeSpanAttributes({
         spanAttributes: attrs,
@@ -311,25 +310,22 @@ describe("CopilotCanonicaliserService", () => {
       });
 
     /** @scenario A copilot-chat span yields model and token usage on the canonical trace */
-    it("GenAI lifts model and token usage from a copilot-chat span with no copilot-specific code", () => {
+    it("GenAI lifts model and token usage from a copilot-chat span", () => {
       const result = canonicalizeVscode({
         "gen_ai.operation.name": "chat",
         "gen_ai.request.model": "oswe-vscode-prime",
         "gen_ai.usage.input_tokens": 618820,
         "gen_ai.usage.output_tokens": 11348,
-        // VS Code's own AI-unit attr (not github.copilot.nano_aiu) — v1
-        // ignores it (tokens-only); asserted below via the absence of
-        // copilot: rules.
-        copilot_usage_nano_aiu: 230235000,
+        "copilot_chat.copilot_usage_nano_aiu": 230235000,
       });
 
       expect(result.appliedRules.some((r) => r.startsWith("genai:"))).toBe(true);
       expect(result.attributes["gen_ai.request.model"]).toBe("oswe-vscode-prime");
       expect(result.attributes["gen_ai.usage.input_tokens"]).toBe(618820);
       expect(result.attributes["gen_ai.usage.output_tokens"]).toBe(11348);
-      // the copilot extractor gates on the github.copilot scope, so it never
-      // fires for copilot-chat — no VS-Code-specific extractor code.
-      expect(result.appliedRules.some((r) => r.startsWith("copilot:"))).toBe(false);
+      // Copilot's AI units are lifted as their own count and never become a dollar cost.
+      expect(result.attributes["metadata.copilot_nano_aiu"]).toBe("230235000");
+      expect(result.attributes["langwatch.span.cost"]).toBeUndefined();
     });
 
     /** @scenario Captured prompt content is lifted as span input */

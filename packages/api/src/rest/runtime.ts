@@ -8,6 +8,7 @@ import {
 } from "@langwatch/authorization";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, REQUEST_CAUSE_FIELD, validationMeta } from "@langwatch/observability";
+import { noteRequestCredential } from "@langwatch/observability/credential-census";
 import type { Context, ErrorHandler, Hono as HonoApp, MiddlewareHandler } from "hono";
 import { Hono } from "hono";
 import { uniqueSymbol, validator as openApiValidator } from "hono-openapi";
@@ -76,6 +77,7 @@ import {
   type RestConfirmationGate,
   type RestConfirmationReceipt,
 } from "./confirmation.ts";
+import { doorCredentialOf } from "./credential-census.ts";
 import {
   admittedOwnerlessProjectKeyFor,
   OWNERLESS_PROJECT_KEY_PROOF_CODE_PATH,
@@ -113,6 +115,7 @@ import {
   documentRoute,
   requiresBody,
 } from "./openapi.ts";
+import { recordRequestPrincipal, requestPrincipalOf } from "./request-principal.ts";
 import {
   bodyLimit,
   cachedRestAnswer,
@@ -148,6 +151,7 @@ import {
   ENDPOINT_ROUTE,
   isDeclined,
   REQUEST_FAMILY,
+  ROUTE_TEMPLATE,
   withRetryAfter,
 } from "./response.ts";
 
@@ -334,6 +338,7 @@ function mountFamilyRoutes<Api>({
           ports,
           options,
           contexts,
+          template: basePath === "" ? mount.path : mergePath(basePath, mount.path),
           ...mount.context,
         }),
         policy: registryPolicy({ route, options, credential }),
@@ -776,6 +781,7 @@ function routeStack<Api>({
   ports,
   options,
   contexts,
+  template,
   version,
   status,
   paramSource = "route",
@@ -786,6 +792,8 @@ function routeStack<Api>({
   ports: RestRuntimeMembers;
   options: RestMountOptions<Api>;
   contexts: ReadonlyMap<string, MiddlewareContextBinding>;
+  /** The full path template this mount answers, which the credential census counts by. */
+  template: string;
   version: string;
   status: VersionStatus;
   paramSource?: "route" | "context";
@@ -831,7 +839,7 @@ function routeStack<Api>({
   return [
     ...legacyErrorScopes(route),
     ...(refusal ? [protocolRefusalScope({ route, refusal })] : []),
-    versionContext({ route, family, version, status }),
+    versionContext({ route, family, template, version, status }),
     ...(documents
       ? [
           documentRoute({
@@ -917,7 +925,21 @@ function authenticateMiddleware({
         });
       }
 
+      if (caller) {
+        noteRequestCredential(doorCredentialOf({ credential, caller, request: context.req.raw }));
+      }
       callers.set(context, caller);
+      recordRequestPrincipal({
+        context,
+        read: () =>
+          requestPrincipalOf({
+            actor: caller?.actor,
+            key:
+              caller && isKeyDoor(credential)
+                ? recordedKeyOfDoor({ door: credential, request: context.req.raw })
+                : (caller?.key ?? null),
+          }),
+      });
     }
 
     await next();
@@ -1076,11 +1098,13 @@ function deprecationLog<Api>({
 function versionContext({
   route,
   family,
+  template,
   version,
   status,
 }: {
   route: RestTransportRoute<unknown>;
   family: string;
+  template: string;
   version: string;
   status: VersionStatus;
 }): MiddlewareHandler {
@@ -1089,6 +1113,7 @@ function versionContext({
 
   return async (context, next) => {
     context.set(ENDPOINT_ROUTE, identity);
+    context.set(ROUTE_TEMPLATE, template);
     context.set(REQUEST_FAMILY, family);
 
     try {
@@ -1434,6 +1459,11 @@ function handlerMiddleware<Api>({
           actor: null,
           scope: null,
           target: null,
+          recordKey: (key) =>
+            recordRequestPrincipal({
+              context,
+              read: () => requestPrincipalOf({ actor: null, key }),
+            }),
         }),
         ...(await resolveContexts({ route, contexts, context, input })),
       );
@@ -2026,6 +2056,7 @@ function handlerArguments<Api>({
   authorization = null,
   session,
   key,
+  recordKey,
 }: {
   context: Context;
   route: RestTransportRoute<Api>;
@@ -2037,6 +2068,7 @@ function handlerArguments<Api>({
   authorization?: Authorization | null;
   session?: unknown;
   key?: RestKeyCredential | undefined;
+  recordKey?: ((key: RestKeyCredential) => void) | undefined;
 }): StoredHandlerArguments<Api> {
   return {
     app: options.app(),
@@ -2058,6 +2090,7 @@ function handlerArguments<Api>({
     response: route.response
       ? producerFor({ kind: route.response.kind, accept: context.req.header("Accept") ?? "" })
       : undefined,
+    ...(recordKey ? { recordKey } : {}),
   };
 }
 
@@ -2905,6 +2938,7 @@ function dateFallback<Api>({
       ports,
       options,
       contexts,
+      template: mergePath(basePath, route.path || "/"),
       version: declaration.version,
       status: "stable",
       paramSource: "context",

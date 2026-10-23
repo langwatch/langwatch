@@ -9,9 +9,9 @@ import { createLogger } from "@langwatch/observability";
 import type { GovernanceRateLimitRepository } from "../../../repositories/governance-rate-limit.repository.ts";
 import type { IngestionSourceService } from "../../ingestion-source/services/ingestion-source.service.ts";
 import {
-  extractClientIp,
   INGEST_RATE_LIMIT_MAX_REQUESTS,
   INGEST_RATE_LIMIT_WINDOW_SECONDS,
+  ingestRateLimitKey,
 } from "../rules/governance-ingest-rate-limit.rules.ts";
 
 const logger = createLogger("langwatch:ingest");
@@ -34,6 +34,7 @@ export interface GovernanceIngestAccessApi {
   authorize: (input: {
     headers: Headers;
     sourceId: string;
+    callerAddress: string | null;
   }) => Promise<GovernanceIngestAuthorization>;
 }
 
@@ -52,8 +53,9 @@ export class GovernanceIngestAccessService implements GovernanceIngestAccessApi 
   async authorize(input: {
     headers: Headers;
     sourceId: string;
+    callerAddress: string | null;
   }): Promise<GovernanceIngestAuthorization> {
-    const throttled = await this.throttle(input.headers);
+    const throttled = await this.throttle(input.callerAddress);
 
     if (throttled) return throttled;
 
@@ -65,11 +67,12 @@ export class GovernanceIngestAccessService implements GovernanceIngestAccessApi 
   }
 
   /** Wedged BEFORE the secret lookup, so scanners shed at the edge. */
-  private async throttle(headers: Headers): Promise<GovernanceIngestAuthorization | null> {
+  private async throttle(
+    callerAddress: string | null,
+  ): Promise<GovernanceIngestAuthorization | null> {
     if (this.members.rateLimitDisabled) return null;
 
-    const ip = extractClientIp(headers);
-    const decision = await this.members.rateLimits.check(`ingest:${ip}`, {
+    const decision = await this.members.rateLimits.check(ingestRateLimitKey(callerAddress), {
       requests: INGEST_RATE_LIMIT_MAX_REQUESTS,
       seconds: INGEST_RATE_LIMIT_WINDOW_SECONDS,
     });
@@ -77,7 +80,10 @@ export class GovernanceIngestAccessService implements GovernanceIngestAccessApi 
     if (decision.allowed) return null;
 
     const retryAfterSec = decision.retryAfterSeconds ?? INGEST_RATE_LIMIT_WINDOW_SECONDS;
-    logger.warn({ ip, retryAfterSec }, "ingest rate-limit exceeded; rejecting with 429");
+    logger.warn(
+      { ip: callerAddress, retryAfterSec },
+      "ingest rate-limit exceeded; rejecting with 429",
+    );
 
     return { outcome: "rate-limited", retryAfterSec };
   }
