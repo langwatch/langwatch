@@ -89,10 +89,21 @@ const row = (o: Partial<Row> = {}): Row => ({
 
 describe("LangyConversationService", () => {
   describe("given a conversation whose create was just dispatched (projection lagging)", () => {
-    // The dispatch window: the create command is accepted (a pending handoff
-    // exists, written synchronously) before the projection row lands. A read
-    // in that window must wait it out, not report "not found" — the panel
-    // used to render the lie moments before the turn was accepted.
+    // Dispatch window (#7987): a read before the row lands must wait, not say
+    // "not found". Log evidence of visibility extends to the full budget;
+    // anything else exits at the short grace.
+    const startedEvent = (userId: string) => ({
+      id: "e-start",
+      aggregateId: "c1",
+      aggregateType: "langy_conversation",
+      tenantId: "p1",
+      createdAt: 100,
+      occurredAt: 90,
+      type: "lw.langy_conversation.conversation_started",
+      version: "2026-07-10",
+      data: { conversationId: "c1", userId },
+    });
+
     /** @scenario "A read in the dispatch window waits for the projection row" */
     it("getById waits out the projection lag and returns the row", async () => {
       vi.useFakeTimers();
@@ -102,11 +113,13 @@ describe("LangyConversationService", () => {
           .mockRejectedValueOnce(new LangyConversationNotFoundError("c1"))
           .mockRejectedValueOnce(new LangyConversationNotFoundError("c1"))
           .mockResolvedValue(row());
-        const repo = makeRepo({
-          getVisibleById,
-          hasAdmittedTurn: vi.fn().mockResolvedValue(true),
+        const repo = makeRepo({ getVisibleById });
+        const svc = LangyConversationService.create({
+          commands: makeCommands(),
+          repository: repo,
+          // The log says alice is the owner, so the visible row WILL land.
+          events: { getEventsOccurredSince: vi.fn(async () => [startedEvent("alice")] as never) },
         });
-        const svc = LangyConversationService.create({ commands: makeCommands(), repository: repo });
         const pending = svc.getById({
           id: "c1",
           projectId: "p1",
@@ -126,11 +139,13 @@ describe("LangyConversationService", () => {
       vi.useFakeTimers();
       try {
         const getVisibleById = vi.fn().mockRejectedValue(new LangyConversationNotFoundError("c1"));
-        const repo = makeRepo({
-          getVisibleById,
-          hasAdmittedTurn: vi.fn().mockResolvedValue(false),
+        const repo = makeRepo({ getVisibleById });
+        const svc = LangyConversationService.create({
+          commands: makeCommands(),
+          repository: repo,
+          // Empty log — no evidence a create is in flight for this id.
+          events: { getEventsOccurredSince: vi.fn(async () => [] as never) },
         });
-        const svc = LangyConversationService.create({ commands: makeCommands(), repository: repo });
         const pending = svc.getById({
           id: "c-unknown",
           projectId: "p1",
@@ -147,11 +162,10 @@ describe("LangyConversationService", () => {
       }
     });
 
-    // The other half of the same race: the receipt is written by the very
-    // send being waited on, so a read that arrived before IT landed found no
-    // evidence, took the fast path, and reported "not found" without ever
-    // retrying.
-    it("waits when the receipt itself has not landed yet either", async () => {
+    // The other half of the same race: the append trails the accept, so a read
+    // that arrived before the first event landed found an empty log early, then
+    // the owner-establishing event appears and the wait extends.
+    it("waits when the log evidence has not landed yet either", async () => {
       vi.useFakeTimers();
       try {
         const getVisibleById = vi
@@ -159,13 +173,19 @@ describe("LangyConversationService", () => {
           .mockRejectedValueOnce(new LangyConversationNotFoundError("c1"))
           .mockRejectedValueOnce(new LangyConversationNotFoundError("c1"))
           .mockResolvedValue(row());
-        const repo = makeRepo({
-          getVisibleById,
-          // Nothing to see on the first probe — the send is younger than
-          // this read by a few milliseconds.
-          hasAdmittedTurn: vi.fn().mockResolvedValueOnce(false).mockResolvedValue(true),
+        const repo = makeRepo({ getVisibleById });
+        const svc = LangyConversationService.create({
+          commands: makeCommands(),
+          repository: repo,
+          // Nothing on the log on the first probe — the append is younger than
+          // this read by a few milliseconds — then the start event appears.
+          events: {
+            getEventsOccurredSince: vi
+              .fn()
+              .mockResolvedValueOnce([] as never)
+              .mockResolvedValue([startedEvent("alice")] as never),
+          },
         });
-        const svc = LangyConversationService.create({ commands: makeCommands(), repository: repo });
         const pending = svc.getById({
           id: "c1",
           projectId: "p1",
@@ -184,9 +204,12 @@ describe("LangyConversationService", () => {
       try {
         const repo = makeRepo({
           getVisibleById: vi.fn().mockRejectedValue(new LangyConversationNotFoundError("c1")),
-          hasAdmittedTurn: vi.fn().mockResolvedValue(true),
         });
-        const svc = LangyConversationService.create({ commands: makeCommands(), repository: repo });
+        const svc = LangyConversationService.create({
+          commands: makeCommands(),
+          repository: repo,
+          events: { getEventsOccurredSince: vi.fn(async () => [startedEvent("alice")] as never) },
+        });
         const pending = svc.getById({
           id: "c1",
           projectId: "p1",
@@ -198,6 +221,119 @@ describe("LangyConversationService", () => {
       } finally {
         vi.useRealTimers();
       }
+    });
+
+    it("gives up at the short grace for a foreign caller the log will never show the row to", async () => {
+      vi.useFakeTimers();
+      try {
+        const getVisibleById = vi.fn().mockRejectedValue(new LangyConversationNotFoundError("c1"));
+        const repo = makeRepo({ getVisibleById });
+        const svc = LangyConversationService.create({
+          commands: makeCommands(),
+          repository: repo,
+          // The log names bob as owner; alice is not it, so waiting cannot
+          // help — the same quick exit as an absent id (no existence oracle).
+          events: { getEventsOccurredSince: vi.fn(async () => [startedEvent("bob")] as never) },
+        });
+        const pending = svc.getById({
+          id: "c1",
+          projectId: "p1",
+          userId: "alice",
+        });
+        pending.catch(() => undefined);
+        await vi.advanceTimersByTimeAsync(20_000);
+        await expect(pending).rejects.toThrow(LangyConversationNotFoundError);
+        expect(getVisibleById.mock.calls.length).toBeLessThanOrEqual(5);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
+  describe("when the durable result path cross-checks a turn (turnExists)", () => {
+    const triple = { projectId: "p1", conversationId: "c1", turnId: "turn-7" };
+    const acceptedTurn = (turnId: string) => ({
+      id: `e-${turnId}`,
+      aggregateId: "c1",
+      aggregateType: "langy_conversation",
+      tenantId: "p1",
+      createdAt: 100,
+      occurredAt: 90,
+      type: "lw.langy_conversation.agent_turn_accepted",
+      version: "2026-07-10",
+      data: { conversationId: "c1", turnId },
+    });
+
+    it("a projected turn is definitive — the event log is never consulted", async () => {
+      const getEventsOccurredSince = vi.fn(async () => [] as never);
+      const svc = LangyConversationService.create({
+        commands: makeCommands(),
+        repository: makeRepo({ turnExists: vi.fn(async () => true) }),
+        events: { getEventsOccurredSince },
+      });
+      expect(await svc.turnExists(triple)).toBe(true);
+      expect(getEventsOccurredSince).not.toHaveBeenCalled();
+    });
+
+    it("finds the acceptance event on a projection miss — a finished answer is never discarded for projection lag", async () => {
+      const svc = LangyConversationService.create({
+        commands: makeCommands(),
+        repository: makeRepo({ turnExists: vi.fn(async () => false) }),
+        events: { getEventsOccurredSince: vi.fn(async () => [acceptedTurn("turn-7")] as never) },
+      });
+      expect(await svc.turnExists(triple)).toBe(true);
+    });
+
+    it("says no when the log has no acceptance for that turnId", async () => {
+      const svc = LangyConversationService.create({
+        commands: makeCommands(),
+        repository: makeRepo({ turnExists: vi.fn(async () => false) }),
+        events: {
+          getEventsOccurredSince: vi.fn(async () => [acceptedTurn("turn-other")] as never),
+        },
+      });
+      expect(await svc.turnExists(triple)).toBe(false);
+    });
+
+    it("says no without a reader, exactly as before", async () => {
+      const svc = LangyConversationService.create({
+        commands: makeCommands(),
+        repository: makeRepo({ turnExists: vi.fn(async () => false) }),
+      });
+      expect(await svc.turnExists(triple)).toBe(false);
+    });
+
+    it("lets a reader failure propagate — 'cannot verify' must not read as 'verified absent'", async () => {
+      const readerFailure = new Error("reader unavailable");
+      const svc = LangyConversationService.create({
+        commands: makeCommands(),
+        repository: makeRepo({ turnExists: vi.fn(async () => false) }),
+        events: {
+          getEventsOccurredSince: vi.fn(async () => {
+            throw readerFailure;
+          }),
+        },
+      });
+      await expect(svc.turnExists(triple)).rejects.toBe(readerFailure);
+    });
+
+    it("bounds the fallback read to a recent window instead of the whole history", async () => {
+      const now = Date.parse("2026-10-01T00:00:00.000Z");
+      const getEventsOccurredSince = vi.fn(
+        async (_request: { occurredAtFromMs: number }) => [acceptedTurn("turn-7")] as never,
+      );
+      const svc = LangyConversationService.create({
+        commands: makeCommands(),
+        repository: makeRepo({ turnExists: vi.fn(async () => false) }),
+        events: { getEventsOccurredSince },
+        runtime: { now: () => now, generateId: () => "id", createTurnId: () => "turn" },
+      });
+
+      expect(await svc.turnExists(triple)).toBe(true);
+
+      const fromMs = getEventsOccurredSince.mock.calls[0]?.[0].occurredAtFromMs;
+      expect(fromMs).toBeGreaterThan(0);
+      expect(fromMs).toBeLessThan(now);
     });
   });
 
@@ -1017,12 +1153,14 @@ describe("LangyConversationService", () => {
     });
 
     describe("when the conversation is not visible to the caller", () => {
-      it("throws not-found and never touches the event log", async () => {
-        const events = makeEvents([]);
+      it("throws not-found and never reads the tail, only the bounded evidence window", async () => {
+        const getEventsOccurredSince = vi.fn(
+          async (_request: { occurredAtFromMs: number }) => [] as never,
+        );
         const svc = LangyConversationService.create({
           commands: makeCommands(),
           repository: makeRepo(),
-          events,
+          events: { getEventsOccurredSince },
         });
         await expect(
           svc.getEventsAfter({
@@ -1032,7 +1170,13 @@ describe("LangyConversationService", () => {
             after: { acceptedAt: 0, eventId: "" },
           }),
         ).rejects.toThrow(LangyConversationNotFoundError);
-        expect(events.getEventsOccurredSince).not.toHaveBeenCalled();
+
+        // The tail read for `after.acceptedAt: 0` starts at 0; evidence reads start recently.
+        const fromMs = getEventsOccurredSince.mock.calls.map(
+          ([request]) => request.occurredAtFromMs,
+        );
+        expect(fromMs.length).toBeGreaterThan(0);
+        expect(fromMs.every((value) => value > 0)).toBe(true);
       });
     });
 

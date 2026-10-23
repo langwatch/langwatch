@@ -255,7 +255,7 @@ describe("catchUpConversationFold", () => {
   });
 
   describe("when a durable cursor names a freshly minted conversation", () => {
-    it("confirms it exists, so a later not-found read stops reading as pending", async () => {
+    it("leaves it unconfirmed, so a not-found read during projection lag stays pending (#7987)", async () => {
       useLangyStore.setState({ unconfirmedConversations: { "conv-1": true } });
       const { utils } = utilsWith({});
 
@@ -266,7 +266,7 @@ describe("catchUpConversationFold", () => {
         targetCursor: { acceptedAt: 200, eventId: "e2" },
       });
 
-      expect(useLangyStore.getState().unconfirmedConversations["conv-1"]).toBeUndefined();
+      expect(useLangyStore.getState().unconfirmedConversations["conv-1"]).toBe(true);
     });
   });
 

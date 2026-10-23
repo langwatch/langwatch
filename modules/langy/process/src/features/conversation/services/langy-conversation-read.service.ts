@@ -6,6 +6,7 @@ import {
 import { HandledError } from "@langwatch/handled-error";
 import {
   cursorHasReachedEvent,
+  LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_TURN_EVENT_TYPES,
   type LangyConversationTurnData,
   makeConversationTurnKey,
@@ -16,7 +17,9 @@ import {
   LangyConversationNotFoundError,
 } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
 
+import type { LangyConversationProcessingEvent } from "../../../eventing/langy-conversation-state.projection.ts";
 import type {
   LangyConversationListCursor,
   LangyConversationRepository,
@@ -51,13 +54,46 @@ const CONVERSATION_EVENT_TAIL_LIMIT = 1_000;
 const DISPATCH_LAG_ATTEMPTS = 12;
 const DISPATCH_LAG_RETRY_MS = 400;
 /**
- * How many attempts may pass with no admitted-turn receipt before concluding
- * the id is unknown. Cannot be zero: the receipt is written by the send
- * itself, so an immediate read can find no evidence and wrongly return not-found.
+ * Lookback for the evidence read: well past the dispatch budget, so every in-flight
+ * create is caught, yet bounded so a long FOREIGN conversation costs no more than an
+ * absent id (no timing oracle, CWE-208). Older conversations exit at the grace.
  */
-const DISPATCH_HANDOFF_GRACE_ATTEMPTS = 3;
+const DISPATCH_EVIDENCE_WINDOW_MS = 5 * 60 * 1000;
+/**
+ * No-evidence attempts before giving up. Non-zero because the queued append trails
+ * the accept; one shared exit for absent, foreign, archived ids and reader outages,
+ * so an invisible id never answers on a different clock than a missing one.
+ */
+const DISPATCH_EVIDENCE_GRACE_ATTEMPTS = 3;
 
 const conversationServiceLogger = createLogger("langwatch:langy:conversation-service");
+
+/**
+ * Whether the caller will see the row once the fold lands it, by the fold's rules:
+ * first started/forked/message_recorded names the owner (message_imported never does),
+ * latest metadata decides shared, archive is terminal. Only meaningful for a NON-EMPTY log.
+ */
+function eventLogSaysVisible(
+  events: readonly LangyConversationProcessingEvent[],
+  userId: string,
+): boolean {
+  let owner: string | null = null;
+  let isShared = false;
+  for (const event of events) {
+    if (
+      event.type === LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_STARTED ||
+      event.type === LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_FORKED ||
+      event.type === LANGY_CONVERSATION_EVENT_TYPES.MESSAGE_RECORDED
+    ) {
+      owner ??= event.data.userId;
+    } else if (event.type === LANGY_CONVERSATION_EVENT_TYPES.METADATA_UPDATED) {
+      isShared = event.data.isShared ?? isShared;
+    } else if (event.type === LANGY_CONVERSATION_EVENT_TYPES.ARCHIVED) {
+      return false;
+    }
+  }
+  return owner === userId || isShared;
+}
 
 /**
  * Reading a conversation back: one by id, the event tail after a cursor, the local-control
@@ -78,9 +114,9 @@ export class LangyConversationReadService {
   private constructor(private readonly deps: LangyConversationReadOptions) {}
 
   /**
-   * The visibility read, tolerant of the DISPATCH window: a just-admitted
-   * send has a turn receipt before its projection row lands, so "missing row
-   * + receipt" means NOT YET, retried briefly rather than reported as absent.
+   * Visibility read tolerant of the async fold. Log evidence that the caller will see
+   * the row extends the wait to the full budget; every other miss exits at one shared
+   * grace (no existence oracle). The answer always comes from the retried read.
    */
   private async findVisibleToleratingDispatchLag({
     id,
@@ -91,6 +127,7 @@ export class LangyConversationReadService {
     projectId: string;
     userId: string;
   }) {
+    let waitOutFullBudget = false;
     for (let attempt = 0; attempt <= DISPATCH_LAG_ATTEMPTS; attempt++) {
       const row = await this.deps.repository
         .getVisibleById({ id, projectId, userId })
@@ -104,13 +141,13 @@ export class LangyConversationReadService {
         return row;
       }
 
-      // Re-asked every beat, not once up front: the receipt lands on the same
-      // send we are waiting for, so "no receipt yet" early on means "too soon
-      // to tell", not "no such conversation".
-      const admitted = await this.deps.repository
-        .hasAdmittedTurn({ projectId, conversationId: id, userId })
-        .catch(() => false);
-      if (!admitted && attempt >= DISPATCH_HANDOFF_GRACE_ATTEMPTS) {
+      // Short-circuits once the log has said wait: evidence is not re-read
+      // every beat after, only the projection is. Re-asked until then because
+      // commands are queued — the event append can trail the accept by a beat,
+      // so "nothing on the log yet" early on means "too soon to tell".
+      waitOutFullBudget =
+        waitOutFullBudget || (await this.dispatchInFlightEvidence({ id, projectId, userId }));
+      if (!waitOutFullBudget && attempt >= DISPATCH_EVIDENCE_GRACE_ATTEMPTS) {
         return null;
       }
 
@@ -122,6 +159,42 @@ export class LangyConversationReadService {
     }
 
     return null;
+  }
+
+  /**
+   * Whether a projection miss is worth waiting out, read from the event log the fold
+   * consumes. Empty log, no reader, or a failed read all mean "no evidence": only
+   * evidence ESTABLISHING visibility may extend the wait (else a CWE-208 timing signal).
+   */
+  private async dispatchInFlightEvidence({
+    id,
+    projectId,
+    userId,
+  }: {
+    id: string;
+    projectId: string;
+    userId: string;
+  }): Promise<boolean> {
+    if (!this.deps.events) return false;
+    try {
+      const events = await this.deps.events.getEventsOccurredSince({
+        aggregateId: id,
+        context: { tenantId: createTenantId(projectId) },
+        aggregateType: "langy_conversation",
+        occurredAtFromMs: Math.max(0, nowInstant().epochMilliseconds - DISPATCH_EVIDENCE_WINDOW_MS),
+      });
+      return events.length > 0 && eventLogSaysVisible(events, userId);
+    } catch (error) {
+      conversationServiceLogger.warn(
+        {
+          projectId,
+          conversationId: id,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Event-log evidence read failed during the dispatch window — treating as no evidence (short grace)",
+      );
+      return false;
+    }
   }
 
   /**
