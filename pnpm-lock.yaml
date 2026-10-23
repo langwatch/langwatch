@@ -594,8 +594,8 @@ catalogs:
       specifier: ^1.6.9
       version: 1.6.9
     stripe:
-      specifier: ^15.12.0
-      version: 15.12.0
+      specifier: ^23.0.0
+      version: 23.0.0
     ts-pattern:
       specifier: ^5.9.0
       version: 5.9.0
@@ -2676,7 +2676,7 @@ importers:
         version: 6.0.0
       stripe:
         specifier: 'catalog:'
-        version: 15.12.0
+        version: 23.0.0(@types/node@26.2.0)
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -18196,7 +18196,7 @@ importers:
         version: 10.3.1
       stripe:
         specifier: 'catalog:'
-        version: 15.12.0
+        version: 23.0.0(@types/node@26.2.0)
       typescript:
         specifier: 'catalog:'
         version: 7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)
@@ -28625,9 +28625,14 @@ packages:
     resolution: {integrity: sha512-1tB5mhVo7U+ETBKNf92xT4hrQa3pm0MZ0PQvuDnWgAAGHDsfp4lPSpiS6psrSiet87wyGPh9ft6wmhOMQ0hDiw==}
     engines: {node: '>=14.16'}
 
-  stripe@15.12.0:
-    resolution: {integrity: sha512-slTbYS1WhRJXVB8YXU8fgHizkUrM9KJyrw4Dd8pLEwzKHYyQTIE46EePC2MVbSDZdE24o1GdNtzmJV4PrPpmJA==}
-    engines: {node: '>=12.*'}
+  stripe@23.0.0:
+    resolution: {integrity: sha512-MDE2A5ZVVluYURORaZEVghSmnLJc3w6aHAlZSxDQMsOjOb3V0O6ro/CiaeFlJS4N7uIVmsg98ocRsPmUK6YfyA==}
+    engines: {node: '>=20'}
+    peerDependencies:
+      '@types/node': ^26.0.1
+    peerDependenciesMeta:
+      '@types/node':
+        optional: true
 
   strnum@2.4.2:
     resolution: {integrity: sha512-rDG3Ah4TV0k1hWvLSzkZtMmLN9+eS+h3knq4MP6A42Y3Yh5qGNnOUs1jJkoSr8FG5dsL28c7KgkIBzSEykqtuw==}
@@ -41005,10 +41010,9 @@ snapshots:
 
   strip-json-comments@5.0.3: {}
 
-  stripe@15.12.0:
-    dependencies:
+  stripe@23.0.0(@types/node@26.2.0):
+    optionalDependencies:
       '@types/node': 26.2.0
-      qs: 6.16.0
 
   strnum@2.4.2:
     dependencies:
