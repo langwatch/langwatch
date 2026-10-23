@@ -240,6 +240,46 @@ export const formatMeasured = (measured: { name: string; seconds: number }[]): s
     .toSorted((a, b) => b.seconds - a.seconds || (a.name < b.name ? -1 : 1))
     .map((entry) => `${entry.name}  ${Math.round(entry.seconds)}`);
 
+/**
+ * The nightly flaky-test hunt names each package suite's JSON report after the
+ * package and script, so the report alone says what to rerun. `:` is not allowed
+ * in an artifact path, so a script's colon is written as `~`.
+ */
+export const reportFileName = ({ pkg, script }: { pkg: string; script: string }): string =>
+  `${encodeURIComponent(pkg)}__${script.replaceAll(":", "~")}.json`;
+
+export const parseReportFileName = (name: string): { pkg: string; script: string } | undefined => {
+  const match = /^(.+)__([^_]+(?:_[^_]+)*)\.json$/.exec(name);
+  if (!match) return undefined;
+  return { pkg: decodeURIComponent(match[1]), script: match[2].replaceAll("~", ":") };
+};
+
+/**
+ * A script's extra arguments in the flaky-test hunt, or undefined when its last command is not
+ * `vitest run`: pnpm appends arguments to a script's end, so only one ending in vitest can
+ * take them, and any other is not run in the hunt. dev/docs/nightly-suite.md.
+ */
+export const vitestArgsFor = ({
+  body,
+  extra,
+  reportFile,
+}: {
+  body: string;
+  extra: string[];
+  reportFile?: string;
+}): string[] | undefined => {
+  const last =
+    body
+      .split(/&&|;|\|\|/)
+      .at(-1)
+      ?.trim() ?? "";
+  if (!/^(?:[A-Z_][A-Z0-9_]*=\S*\s+)*vitest\s+run\b/.test(last)) return undefined;
+  const report = reportFile
+    ? ["--reporter=default", "--reporter=json", `--outputFile.json=${reportFile}`]
+    : [];
+  return [...extra, ...report];
+};
+
 /** One script of one package: the unit the pool schedules. */
 export interface SuiteJob {
   pkg: DiscoveredPackage;
@@ -670,6 +710,22 @@ if (isEntrypoint()) {
     `Shard ${shard.index}/${shard.total}: ${assigned.length} of ${reached.length} packages, ` +
       `about ${Math.round(expected)}s of suites.`,
   );
+  // The nightly flaky-test hunt (.github/workflows/nightly.yml) reruns the suites
+  // with vitest's shuffle and seed and a JSON report each; unset, nothing changes.
+  const hunt = process.env.PACKAGE_SUITES_VITEST_ARGS;
+  const reportDir = process.env.PACKAGE_SUITES_REPORT_DIR;
+  const extraArgsFor = (pkg: DiscoveredPackage, script: string): string[] | undefined => {
+    if (hunt === undefined || hunt.trim() === "") return [];
+    const body = (JSON.parse(readFileSync(join(root, pkg.dir, "package.json"), "utf8")).scripts ??
+      {})[script] as string | undefined;
+    return vitestArgsFor({
+      body: body ?? "",
+      extra: hunt.trim().split(/\s+/),
+      reportFile: reportDir
+        ? join(resolve(reportDir), reportFileName({ pkg: pkg.name, script }))
+        : undefined,
+    });
+  };
   let concurrency: number;
   try {
     concurrency = parseConcurrency(process.env.PACKAGE_SUITES_CONCURRENCY);
@@ -682,10 +738,15 @@ if (isEntrypoint()) {
   // outrank it, and an integration suite's serial files would then overlap.
   const live = concurrency === 1;
   console.log(`Running up to ${concurrency} suite(s) at once.`);
+  const huntCommandFor = (job: SuiteJob): string[] | undefined => {
+    const extra = extraArgsFor(job.pkg, job.script) ?? [];
+    return extra.length > 0 ? ["--filter", job.pkg.name, "run", job.script, ...extra] : undefined;
+  };
   const runner = createSuiteRunner({
     live,
     start: (job) =>
-      spawn("pnpm", commandFor(job), {
+      // The hunt skips nx, whose cache would replay a result instead of rerunning under the seed.
+      spawn("pnpm", huntCommandFor(job) ?? commandFor(job), {
         stdio: live ? "inherit" : ["ignore", "pipe", "pipe"],
       }),
     log: (line) => console.log(line),
@@ -704,7 +765,13 @@ if (isEntrypoint()) {
   const statuses = await runJobs({
     jobs: jobsFor(heaviestFirst({ packages: assigned, weightOf }), excluded),
     concurrency,
-    run: runner.run,
+    run: (job) => {
+      if (extraArgsFor(job.pkg, job.script) !== undefined) return runner.run(job);
+      console.log(
+        `not a vitest script, not run in the flaky-test hunt: ${job.pkg.name} ${job.script}`,
+      );
+      return Promise.resolve(0);
+    },
     isHeavy: (pkg) => isHeavyPackage({ weightOf, pkg }),
   });
   const statusOf = (pkg: DiscoveredPackage) => (script: string) =>

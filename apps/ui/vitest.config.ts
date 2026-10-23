@@ -7,6 +7,16 @@ export default defineModuleVitestConfig({
   // file's state decide another's result. The failing SET changed between
   // identical runs, which is how it was found. Correctness over speed here.
   isolate: "all",
+  // Every file gets a fresh module registry and jsdom window in a worker that
+  // loads jsdom once, instead of a process each (ADR-184).
+  isolateIn: "vm-context",
+  needsOwnProcess: [
+    // Loads Vite, whose native bundler rejects a vm context's String and RegExp.
+    "vite/__tests__/vite-config-loader.unit.test.ts",
+    // Stub `window.location`, which a vm context's window will not let go.
+    "src/shell/__tests__/navigation-host.integration.test.tsx",
+    "src/shell/__tests__/ui-waiting-for-api-page.integration.test.tsx",
+  ],
   test: {
     fsModuleCache: true,
     environment: "jsdom",
