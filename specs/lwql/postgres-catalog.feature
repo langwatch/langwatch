@@ -217,3 +217,14 @@ Feature: Every catalogued Postgres model is queryable through LangWatchQL
       Then no error occurs
       And the view's columns match the derived catalog's order
       And the reader role can still select from it
+
+  Rule: A read of a Postgres view takes no table modifier
+
+    # ClickHouse pushes FINAL or SAMPLE through the view to its PostgreSQL engine
+    # table, which supports neither, so the store refuses with ILLEGAL_FINAL. The
+    # view already keeps one row per key, so FINAL would add nothing.
+    @unit
+    Scenario: FINAL or SAMPLE on a PostgreSQL-resident view is refused with a clear message
+      When ana runs a statement that reads a Postgres view with FINAL or SAMPLE
+      Then the run is refused saying FINAL and SAMPLE cannot be used on this read
+      And no statement reaches the store
