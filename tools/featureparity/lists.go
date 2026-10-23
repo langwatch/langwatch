@@ -61,6 +61,7 @@ var (
 		"tools/migrationorder",
 		"tools/linkcheck",
 		"cmd/linkcheck",
+		"tools/lambdaboot",
 		"cmd/service",
 		"tools/upgradelab",
 		"services/sims/telemetrysim",
