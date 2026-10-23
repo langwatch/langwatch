@@ -119,7 +119,7 @@ type EngineConfig struct {
 	PythonWasmHome string `env:"PYTHON_WASM_HOME"`
 	// CodeBlockMemoryMiB — one wasm run's memory ceiling. Zero means 512.
 	CodeBlockMemoryMiB int `env:"CODE_BLOCK_MEMORY_MIB"`
-	// CodeBlockTotalMemoryMiB — what all concurrent wasm runs may hold together. Zero means 2048.
+	// CodeBlockTotalMemoryMiB — what all concurrent wasm runs may hold together. Zero means 4096.
 	CodeBlockTotalMemoryMiB int `env:"CODE_BLOCK_TOTAL_MEMORY_MIB"`
 	// CodeBlockAllowLocalEgress — lets wasm code blocks reach private and
 	// loopback addresses. Off by default whatever BLOCK_LOCAL_HTTP_CALLS says:

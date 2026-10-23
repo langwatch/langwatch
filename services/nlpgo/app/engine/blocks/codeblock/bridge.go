@@ -249,7 +249,7 @@ func (b *bridge) fetch(req bridgeRequest) bridgeReply {
 	if method == "" {
 		method = http.MethodGet
 	}
-	httpReq, err := http.NewRequestWithContext(ctx, method, req.URL, bytes.NewReader(body))
+	httpReq, err := http.NewRequestWithContext(withFetchContext(ctx), method, req.URL, bytes.NewReader(body))
 	if err != nil {
 		return bridgeFailure("protocol", "request could not be built: "+err.Error())
 	}
@@ -298,6 +298,8 @@ func newFetchClient(egress ssrf.Options) *http.Client {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.Proxy = nil
 	transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		ctx, stop := dialEndsWithFetch(ctx)
+		defer stop()
 		return ssrf.SafeDialer(withContextResolver(ctx, egress))(ctx, network, addr)
 	}
 	return &http.Client{
@@ -309,6 +311,26 @@ func newFetchClient(egress ssrf.Options) *http.Client {
 			return ssrf.CheckURL(req.URL.String(), withContextResolver(req.Context(), egress))
 		},
 	}
+}
+
+// fetchContextKey carries a fetch's context to its dial. The transport dials
+// on a context detached from the request's cancellation but keeps its values.
+type fetchContextKey struct{}
+
+func withFetchContext(ctx context.Context) context.Context {
+	return context.WithValue(ctx, fetchContextKey{}, ctx)
+}
+
+// dialEndsWithFetch cancels a dial, DNS lookups included, when the fetch that
+// started it ends, so no lookup outlives its run.
+func dialEndsWithFetch(ctx context.Context) (context.Context, func()) {
+	fetch, ok := ctx.Value(fetchContextKey{}).(context.Context)
+	if !ok {
+		return ctx, func() {}
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	stop := context.AfterFunc(fetch, cancel)
+	return ctx, func() { stop(); cancel() }
 }
 
 // withContextResolver makes the egress policy's DNS lookups end with ctx, so a

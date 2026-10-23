@@ -31,8 +31,8 @@ default until the wasm runtime has run in production.
   from memory, read-only), the runner and its stand-ins (`/runner`,
   read-only), and its own run directory (`/work`). `/work` is held in engine
   memory (`codeblock/workfs.go`), never on the host disk, with no links of any
-  kind and a budget of 64 MiB, 4096 entries, 256 open files and 255-byte
-  names. Files are stored and charged in 64 KiB chunks, so the budget counts
+  kind and a budget of 64 MiB, 4096 entries, 256 open files (counted across
+  every mount, the read-only ones too), 255-byte names and 4096-byte paths. Files are stored and charged in 64 KiB chunks, so the budget counts
   what the engine holds; a deleted file still open keeps its charge until the
   last handle closes. The runner's
   result is read from it. A host directory mount was rejected: wazero refuses
@@ -46,11 +46,13 @@ default until the wasm runtime has run in production.
   and `httpx` are stand-ins built on that call, covering the verb helpers,
   sessions/clients and responses.
 - **Budgets.** Concurrent runs share a memory budget
-  (`NLPGO_ENGINE_CODE_BLOCK_TOTAL_MEMORY_MIB`, 2048 by default) held by the
+  (`NLPGO_ENGINE_CODE_BLOCK_TOTAL_MEMORY_MIB`, 4096 by default) held by the
   executor (the engine builds one). A run is charged its memory ceiling,
-  `/work`, unread replies and twice its request, which is capped at 16 MiB; it
-  holds the charge until its result is collected, and waits for room within
-  its own deadline. A budget below one run's charge refuses to start. Host calls are bounded per run: 64
+  `/work`, unread replies, twice the result cap and twice its request, capped
+  at 16 MiB. It is admitted before its request is encoded, holds the charge
+  until its result is collected, and waits for room within its own deadline.
+  A result is walked before it is decoded and refused past 100,000 values or
+  128 levels. A budget below one run's charge refuses to start. Host calls are bounded per run: 64
   requests, 256 failing calls and 32 MiB of unread replies stop the run, and
   the result it hands back is capped at 32 MiB.
 - **Egress.** Code blocks use the HTTP block's policy but never reach private

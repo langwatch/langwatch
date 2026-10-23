@@ -376,6 +376,37 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       Then the run is refused before it starts with an error naming the limit
 
     @unit
+    Scenario: a run's open files count against one budget across every mount
+      Given a JavaScript code node that opens the read-only runner file 20000 times
+      When the executor runs the request
+      Then the opens stop at the run's handle budget
+      And files open on /work and on the read-only mounts share that budget
+
+    @unit
+    Scenario: listing a large directory pages through it without holding a copy
+      Given a run directory with many entries
+      When the code node lists it a page at a time and deletes an entry mid-listing
+      Then each remaining entry is listed once, in name order
+
+    @unit
+    Scenario: a request's DNS lookups end with the request
+      Given a code block's request whose dial runs on a context detached from the request
+      When the request ends
+      Then the dial and its DNS lookups are cancelled
+
+    @unit
+    Scenario: a result with too many values is refused before it is decoded
+      Given a JavaScript code node that returns 200000 values or 500 levels of nesting
+      When the executor runs the request
+      Then the run fails with a runner error naming the limit and no outputs
+
+    @unit
+    Scenario: a run that times out waiting for room is reported as a timeout
+      Given an executor whose memory budget is held by another run
+      When a run's deadline passes while it waits for room
+      Then it is reported as timed out
+
+    @unit
     Scenario: an engine error reaches the user without the guest's stack trace
       Given a JavaScript code node that exhausts its memory
       When the executor runs the request

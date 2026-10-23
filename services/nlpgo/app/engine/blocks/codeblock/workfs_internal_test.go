@@ -3,14 +3,18 @@ package codeblock
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"math"
 	"strings"
 	"testing"
+	"testing/fstest"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
+	"github.com/tetratelabs/wazero/experimental/sysfs"
 )
 
 func createFile(t *testing.T, w *workFS, name string) experimentalsys.File {
@@ -88,9 +92,9 @@ func TestWorkFS_OpenDeletedFileKeepsItsStorage(t *testing.T) {
 	require.Zero(t, f.Close())
 	assert.Zero(t, w.used)
 	assert.Zero(t, w.nodes)
-	assert.Zero(t, w.open)
+	assert.Zero(t, w.handles.open)
 	require.Zero(t, f.Close(), "a second close must be harmless")
-	assert.Zero(t, w.open)
+	assert.Zero(t, w.handles.open)
 }
 
 func TestWorkFS_RenameOverAnOpenFileKeepsItsStorage(t *testing.T) {
@@ -157,4 +161,95 @@ func TestBridge_OversizedFramesCountAsFailedCalls(t *testing.T) {
 	}
 	require.Error(t, ctx.Err(), "oversized frames never stopped the run")
 	assert.ErrorIs(t, context.Cause(ctx), errTooManyFailedCalls)
+}
+
+// @scenario "a run's open files count against one budget across every mount"
+func TestWorkFS_ReadOnlyMountsShareTheHandleBudget(t *testing.T) {
+	w := newWorkFS(workLimits{bytes: workChunk, nodes: 10, open: 3})
+	mount := limitedFS{FS: &sysfs.AdaptFS{FS: fstest.MapFS{"runner.mjs": {Data: []byte("x")}}}, handles: w.handles}
+	first, errno := mount.OpenFile("runner.mjs", experimentalsys.O_RDONLY, 0)
+	require.Zero(t, errno)
+	_, errno = mount.OpenFile("runner.mjs", experimentalsys.O_RDONLY, 0)
+	require.Zero(t, errno)
+	createFile(t, w, "f")
+	_, errno = mount.OpenFile("runner.mjs", experimentalsys.O_RDONLY, 0)
+	assert.Equal(t, experimentalsys.EIO, errno, "a read-only mount opened past the run's handle budget")
+	_, errno = w.OpenFile("g", experimentalsys.O_CREAT|experimentalsys.O_RDWR, 0o644)
+	assert.Equal(t, experimentalsys.EIO, errno)
+
+	require.Zero(t, first.Close())
+	require.Zero(t, first.Close())
+	assert.Equal(t, 2, w.handles.open, "closing twice returned two handles")
+	_, errno = mount.OpenFile("missing", experimentalsys.O_RDONLY, 0)
+	assert.Equal(t, experimentalsys.ENOENT, errno)
+	assert.Equal(t, 2, w.handles.open, "a failed open kept its handle")
+}
+
+func TestWorkFS_LongPathsAreRefused(t *testing.T) {
+	w := newWorkFS(defaultWorkLimits)
+	long := strings.Repeat("a/", maxWorkPath/2) + "f"
+	_, errno := w.OpenFile(long, experimentalsys.O_CREAT|experimentalsys.O_RDWR, 0o644)
+	assert.Equal(t, experimentalsys.ENAMETOOLONG, errno)
+	_, errno = w.Stat(long)
+	assert.Equal(t, experimentalsys.ENAMETOOLONG, errno)
+}
+
+// @scenario "listing a large directory pages through it without holding a copy"
+func TestWorkFS_ReaddirPagesWithACursor(t *testing.T) {
+	w := newWorkFS(defaultWorkLimits)
+	for i := range 10 {
+		require.Zero(t, createFile(t, w, fmt.Sprintf("f%02d", i)).Close())
+	}
+	dir, errno := w.OpenFile(".", experimentalsys.O_RDONLY, 0)
+	require.Zero(t, errno)
+	var seen []string
+	for {
+		page, errno := dir.Readdir(3)
+		require.Zero(t, errno)
+		if len(page) == 0 {
+			break
+		}
+		for _, d := range page {
+			seen = append(seen, d.Name)
+		}
+		if len(seen) == 3 {
+			require.Zero(t, w.Unlink("f05"), "an entry removed mid-listing")
+		}
+	}
+	assert.Equal(t, []string{"f00", "f01", "f02", "f03", "f04", "f06", "f07", "f08", "f09"}, seen)
+	_, errno = dir.Seek(0, io.SeekStart)
+	require.Zero(t, errno)
+	all, errno := dir.Readdir(-1)
+	require.Zero(t, errno)
+	assert.Len(t, all, 9)
+}
+
+func TestWorkFS_EmptiedDirectoryIsRebuilt(t *testing.T) {
+	w := newWorkFS(defaultWorkLimits)
+	for i := range 200 {
+		require.Zero(t, createFile(t, w, fmt.Sprintf("f%03d", i)).Close())
+	}
+	assert.Equal(t, 200, w.root.peak)
+	for i := range 200 {
+		require.Zero(t, w.Unlink(fmt.Sprintf("f%03d", i)))
+	}
+	assert.Less(t, w.root.peak, 64, "an emptied directory kept its largest map")
+}
+
+// @scenario "a request's DNS lookups end with the request"
+func TestBridge_DialEndsWithItsFetch(t *testing.T) {
+	fetch, cancel := context.WithCancel(context.Background())
+	detached := context.WithoutCancel(withFetchContext(fetch))
+	dial, stop := dialEndsWithFetch(detached)
+	defer stop()
+	cancel()
+	select {
+	case <-dial.Done():
+	case <-time.After(time.Second):
+		t.Fatal("a dial outlived the fetch that started it")
+	}
+
+	plain, stopPlain := dialEndsWithFetch(context.Background())
+	stopPlain()
+	assert.NoError(t, plain.Err(), "a dial with no fetch was cancelled")
 }

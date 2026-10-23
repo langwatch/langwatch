@@ -3,6 +3,7 @@ package codeblock
 import (
 	"io"
 	"io/fs"
+	"maps"
 	"path"
 	"sort"
 	"strings"
@@ -27,8 +28,36 @@ var defaultWorkLimits = workLimits{bytes: 64 << 20, nodes: 4096, open: 256}
 // exactly this size, so what the budget counts is what the engine holds.
 const workChunk = 64 << 10
 
-// maxWorkName bounds one path component, so names cannot outgrow the budget.
-const maxWorkName = 255
+// maxWorkName and maxWorkPath bound names and paths, so the tree's own
+// metadata stays small beside the byte budget.
+const (
+	maxWorkName = 255
+	maxWorkPath = 4096
+)
+
+// handleBudget bounds the files a run holds open across all its mounts, the
+// read-only ones included: each open file holds engine memory.
+type handleBudget struct {
+	mu    sync.Mutex
+	open  int
+	limit int
+}
+
+func (b *handleBudget) take() bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.open >= b.limit {
+		return false
+	}
+	b.open++
+	return true
+}
+
+func (b *handleBudget) give() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.open--
+}
 
 // workFS is a run's /work: in engine memory, never on the host disk, with no
 // links of any kind, so no path a guest builds can resolve outside it. The run
@@ -42,7 +71,7 @@ type workFS struct {
 	limits  workLimits
 	used    int64
 	nodes   int
-	open    int
+	handles *handleBudget
 	nextIno uint64
 }
 
@@ -55,13 +84,14 @@ type workNode struct {
 	size     int64
 	chunks   [][]byte
 	children map[string]*workNode
+	peak     int
 	mtim     int64
 	linked   bool
 	handles  int
 }
 
 func newWorkFS(limits workLimits) *workFS {
-	w := &workFS{limits: limits}
+	w := &workFS{limits: limits, handles: &handleBudget{limit: limits.open}}
 	w.root = w.newNode(true, 0o755)
 	w.root.linked = true
 	return w
@@ -86,6 +116,9 @@ func split(p string) []string {
 }
 
 func (w *workFS) lookup(p string) (*workNode, experimentalsys.Errno) {
+	if len(p) > maxWorkPath {
+		return nil, experimentalsys.ENAMETOOLONG
+	}
 	node := w.root
 	for _, part := range split(p) {
 		if !node.dir {
@@ -102,6 +135,9 @@ func (w *workFS) lookup(p string) (*workNode, experimentalsys.Errno) {
 
 // parent resolves the directory holding p and p's own name.
 func (w *workFS) parent(p string) (*workNode, string, experimentalsys.Errno) {
+	if len(p) > maxWorkPath {
+		return nil, "", experimentalsys.ENAMETOOLONG
+	}
 	parts := split(p)
 	if len(parts) == 0 {
 		return nil, "", experimentalsys.EINVAL
@@ -126,14 +162,32 @@ func (w *workFS) addNode(dir *workNode, name string, node *workNode) experimenta
 	}
 	w.nodes++
 	node.linked = true
-	dir.children[name] = node
-	dir.mtim = time.Now().UnixNano()
+	dir.place(name, node)
 	return 0
+}
+
+// place links node under name. The name is copied: a guest's path string
+// must not stay reachable through the tree.
+func (dir *workNode) place(name string, node *workNode) {
+	dir.children[strings.Clone(name)] = node
+	dir.peak = max(dir.peak, len(dir.children))
+	dir.mtim = time.Now().UnixNano()
+}
+
+// remove unlinks name. Go maps never shrink, so a directory that emptied out
+// is rebuilt rather than keeping its largest size for the run.
+func (dir *workNode) remove(name string) {
+	delete(dir.children, name)
+	if dir.peak > 64 && len(dir.children)*4 < dir.peak {
+		dir.children = maps.Clone(dir.children)
+		dir.peak = len(dir.children)
+	}
+	dir.mtim = time.Now().UnixNano()
 }
 
 // unlink takes node out of the tree; it is released once no handle holds it.
 func (w *workFS) unlink(dir *workNode, name string, node *workNode) {
-	delete(dir.children, name)
+	dir.remove(name)
 	node.linked = false
 	w.releaseIfUnused(node)
 }
@@ -150,9 +204,23 @@ func (w *workFS) releaseIfUnused(node *workNode) {
 func (w *workFS) OpenFile(p string, flag experimentalsys.Oflag, perm fs.FileMode) (experimentalsys.File, experimentalsys.Errno) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	if w.open >= w.limits.open {
+	if !w.handles.take() {
 		return nil, experimentalsys.EIO
 	}
+	node, errno := w.openFile(p, flag, perm)
+	if errno != 0 {
+		w.handles.give()
+		return nil, errno
+	}
+	node.handles++
+	access := flag & (experimentalsys.O_RDONLY | experimentalsys.O_RDWR | experimentalsys.O_WRONLY)
+	writable := access == experimentalsys.O_RDWR || access == experimentalsys.O_WRONLY
+	return &workFile{fs: w, node: node, readable: access != experimentalsys.O_WRONLY, writable: writable,
+		appendMode: flag&experimentalsys.O_APPEND != 0}, 0
+}
+
+// openFile resolves p for OpenFile and checks the flags against it. Callers hold mu.
+func (w *workFS) openFile(p string, flag experimentalsys.Oflag, perm fs.FileMode) (*workNode, experimentalsys.Errno) {
 	node, errno := w.openNode(p, flag, perm)
 	if errno != 0 {
 		return nil, errno
@@ -168,10 +236,7 @@ func (w *workFS) OpenFile(p string, flag experimentalsys.Oflag, perm fs.FileMode
 	if writable && flag&experimentalsys.O_TRUNC != 0 {
 		_ = w.resize(node, 0) // shrinking never fails
 	}
-	w.open++
-	node.handles++
-	return &workFile{fs: w, node: node, readable: access != experimentalsys.O_WRONLY, writable: writable,
-		appendMode: flag&experimentalsys.O_APPEND != 0}, 0
+	return node, 0
 }
 
 // openNode finds p, creating it when flag asks to. Callers hold mu.
@@ -256,8 +321,8 @@ func (w *workFS) Rename(from, to string) experimentalsys.Errno {
 		}
 		w.unlink(toDir, toName, existing)
 	}
-	delete(fromDir.children, fromName)
-	toDir.children[toName] = node
+	fromDir.remove(fromName)
+	toDir.place(toName, node)
 	return 0
 }
 
@@ -452,8 +517,9 @@ type workFile struct {
 	writable   bool
 	appendMode bool
 	closed     bool
-	dirents    []experimentalsys.Dirent
-	listed     bool
+	// cursor is the last name Readdir returned; a listing holds no snapshot.
+	cursor  string
+	started bool
 }
 
 func (f *workFile) Ino() (sys.Inode, experimentalsys.Errno) { return f.node.ino, 0 }
@@ -530,7 +596,7 @@ func (f *workFile) Seek(offset int64, whence int) (int64, experimentalsys.Errno)
 	}
 	next := base + offset
 	if f.node.dir && next == 0 {
-		f.dirents, f.listed = nil, false
+		f.cursor, f.started = "", false
 	}
 	f.offset = next
 	return next, 0
@@ -604,26 +670,12 @@ func (f *workFile) Readdir(n int) ([]experimentalsys.Dirent, experimentalsys.Err
 	if !f.node.dir {
 		return nil, experimentalsys.ENOTDIR
 	}
-	if !f.listed {
-		f.dirents, f.listed = f.list(), true
+	names := f.remaining()
+	if n <= 0 || n > len(names) {
+		n = len(names)
 	}
-	if n <= 0 || n > len(f.dirents) {
-		n = len(f.dirents)
-	}
-	out := f.dirents[:n]
-	f.dirents = f.dirents[n:]
-	return out, 0
-}
-
-// list snapshots the directory's entries in name order. Callers hold mu.
-func (f *workFile) list() []experimentalsys.Dirent {
-	names := make([]string, 0, len(f.node.children))
-	for name := range f.node.children {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	dirents := make([]experimentalsys.Dirent, 0, len(names))
-	for _, name := range names {
+	dirents := make([]experimentalsys.Dirent, 0, n)
+	for _, name := range names[:n] {
 		child := f.node.children[name]
 		var kind fs.FileMode
 		if child.dir {
@@ -631,7 +683,22 @@ func (f *workFile) list() []experimentalsys.Dirent {
 		}
 		dirents = append(dirents, experimentalsys.Dirent{Ino: child.ino, Name: name, Type: kind})
 	}
-	return dirents
+	if n > 0 {
+		f.cursor, f.started = names[n-1], true
+	}
+	return dirents, 0
+}
+
+// remaining lists, in name order, the entries after the cursor. Callers hold mu.
+func (f *workFile) remaining() []string {
+	names := make([]string, 0, len(f.node.children))
+	for name := range f.node.children {
+		if !f.started || name > f.cursor {
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
+	return names
 }
 
 func (f *workFile) Close() experimentalsys.Errno {
@@ -641,8 +708,39 @@ func (f *workFile) Close() experimentalsys.Errno {
 		return 0
 	}
 	f.closed = true
-	f.fs.open--
+	f.fs.handles.give()
 	f.node.handles--
 	f.fs.releaseIfUnused(f.node)
 	return 0
+}
+
+// limitedFS is a read-only mount whose open files count against the run's
+// handle budget, like /work's.
+type limitedFS struct {
+	experimentalsys.FS
+	handles *handleBudget
+}
+
+func (l limitedFS) OpenFile(p string, flag experimentalsys.Oflag, perm fs.FileMode) (experimentalsys.File, experimentalsys.Errno) {
+	if !l.handles.take() {
+		return nil, experimentalsys.EIO
+	}
+	f, errno := l.FS.OpenFile(p, flag, perm)
+	if errno != 0 {
+		l.handles.give()
+		return nil, errno
+	}
+	return &limitedFile{File: f, handles: l.handles}, 0
+}
+
+type limitedFile struct {
+	experimentalsys.File
+	handles *handleBudget
+	once    sync.Once
+}
+
+func (f *limitedFile) Close() experimentalsys.Errno {
+	errno := f.File.Close()
+	f.once.Do(f.handles.give)
+	return errno
 }

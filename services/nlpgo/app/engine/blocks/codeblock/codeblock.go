@@ -92,7 +92,7 @@ type Options struct {
 	// Egress is the policy a wasm run's outbound requests are held to.
 	Egress ssrf.Options
 	// WasmTotalMemoryMiB caps the memory all concurrent wasm runs hold
-	// together; a run waits for room, within its own deadline. Zero means 2048.
+	// together; a run waits for room, within its own deadline. Zero means 4096.
 	WasmTotalMemoryMiB int
 	// QuickJSWasm is qjs-wasi.wasm; scripts/fetch-quickjs-wasm.sh. JavaScript
 	// always runs on wasm, so without it a JavaScript code block is refused.
@@ -418,43 +418,12 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	payload, err := json.Marshal(map[string]any{
-		"code":    req.Code,
-		"inputs":  req.Inputs,
-		"outputs": req.DeclaredOutputs,
-		"secrets": req.Secrets,
-		"params":  req.Params,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("codeblock: marshal request: %w", err)
-	}
-
 	if guest != nil {
-		// A wasm run never touches the host disk: its /work, result included,
-		// lives in engine memory for the length of the run.
-		if len(payload) > maxWasmPayloadBytes {
-			return &Result{Error: &Error{Type: RunnerErrorType, Message: fmt.Sprintf("the code block's code and inputs exceed the %d MiB limit", maxWasmPayloadBytes>>20)}}, nil
-		}
-		started := time.Now()
-		release, err := e.wasm.admit(runCtx, len(payload))
-		if err != nil {
-			return collectResult(runResult{}, runOutcome{elapsed: time.Since(started), err: err}), nil
-		}
-		defer release()
-		run := e.wasm.run(runCtx, guest, wasmRunRequest{
-			payload: payload,
-			env:     withSandboxCredential(nil, req.SandboxAPIKey, e.opts.SandboxEndpoint),
-		})
-		outcome := runOutcome{
-			timedOut: errors.Is(runCtx.Err(), context.DeadlineExceeded),
-			elapsed:  time.Since(started),
-			stderr:   run.stderr,
-			err:      run.err,
-		}
-		if outcome.err == nil && run.exitCode != 0 {
-			outcome.err = fmt.Errorf("the interpreter exited with status %d", run.exitCode)
-		}
-		return collectResult(run.result, outcome), nil
+		return e.executeWasm(runCtx, guest, req)
+	}
+	payload, err := marshalRequest(req)
+	if err != nil {
+		return nil, err
 	}
 
 	// One directory per execution, holding the runner pair and the result
@@ -568,6 +537,58 @@ func readHostResult(path string) runResult {
 	return runResult{data: data}
 }
 
+func marshalRequest(req Request) ([]byte, error) {
+	payload, err := json.Marshal(map[string]any{
+		"code":    req.Code,
+		"inputs":  req.Inputs,
+		"outputs": req.DeclaredOutputs,
+		"secrets": req.Secrets,
+		"params":  req.Params,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("codeblock: marshal request: %w", err)
+	}
+	return payload, nil
+}
+
+// executeWasm runs req on guest. The run is admitted before its request is
+// encoded, and never touches the host disk: its /work, result included, lives
+// in engine memory for the length of the run.
+func (e *Executor) executeWasm(runCtx context.Context, guest *wasmGuest, req Request) (*Result, error) {
+	started := time.Now()
+	admission, err := e.wasm.admit(runCtx)
+	if err != nil {
+		return collectResult(runResult{}, runOutcome{
+			timedOut: errors.Is(runCtx.Err(), context.DeadlineExceeded),
+			elapsed:  time.Since(started),
+			err:      err,
+		}), nil
+	}
+	defer admission.release()
+	payload, err := marshalRequest(req)
+	if err != nil {
+		return nil, err
+	}
+	if len(payload) > maxWasmPayloadBytes {
+		return &Result{Error: &Error{Type: RunnerErrorType, Message: fmt.Sprintf("the code block's code and inputs exceed the %d MiB limit", maxWasmPayloadBytes>>20)}}, nil
+	}
+	admission.fit(e.wasm.runWeight, len(payload))
+	run := e.wasm.run(runCtx, guest, wasmRunRequest{
+		payload: payload,
+		env:     withSandboxCredential(nil, req.SandboxAPIKey, e.opts.SandboxEndpoint),
+	})
+	outcome := runOutcome{
+		timedOut: errors.Is(runCtx.Err(), context.DeadlineExceeded),
+		elapsed:  time.Since(started),
+		stderr:   run.stderr,
+		err:      run.err,
+	}
+	if outcome.err == nil && run.exitCode != 0 {
+		outcome.err = fmt.Errorf("the interpreter exited with status %d", run.exitCode)
+	}
+	return collectResult(run.result, outcome), nil
+}
+
 // collectResult turns what a run left behind into a Result: the runner's own
 // result file when it wrote one, otherwise a synthesized timeout or error.
 func collectResult(result runResult, outcome runOutcome) *Result {
@@ -578,6 +599,15 @@ func collectResult(result runResult, outcome runOutcome) *Result {
 			TimedOut:   timedOut,
 			Stderr:     stderr,
 			Error:      &Error{Type: RunnerErrorType, Message: fmt.Sprintf("the code block's result exceeds the %d MiB limit", maxResultBytes>>20)},
+		}
+	}
+	if resultTooLarge(result.data) {
+		return &Result{
+			DurationMS: elapsed.Milliseconds(),
+			TimedOut:   timedOut,
+			Stderr:     stderr,
+			Error: &Error{Type: RunnerErrorType, Message: fmt.Sprintf(
+				"the code block's result has more than %d values or %d levels of nesting", maxResultValues, maxResultDepth)},
 		}
 	}
 	if data := result.data; len(data) > 0 {
@@ -637,6 +667,39 @@ func killGroup(pid int) error {
 		return err
 	}
 	return syscall.Kill(-pgid, syscall.SIGKILL)
+}
+
+// Decoding bounds for a run's result. The byte cap alone does not bound what
+// decoding allocates: compact JSON of many small values expands severalfold.
+const (
+	maxResultValues = 100_000
+	maxResultDepth  = 128
+)
+
+// resultTooLarge walks the result's tokens without building it, and reports
+// one with more values or deeper nesting than the engine decodes. A malformed
+// result ends the walk; decoding reports it as before.
+func resultTooLarge(data []byte) bool {
+	dec := json.NewDecoder(bytes.NewReader(data))
+	values, depth := 0, 0
+	for dec.More() || depth > 0 {
+		tok, err := dec.Token()
+		if err != nil {
+			break
+		}
+		switch tok {
+		case json.Delim('{'), json.Delim('['):
+			depth++
+		case json.Delim('}'), json.Delim(']'):
+			depth--
+			continue
+		}
+		values++
+		if values > maxResultValues || depth > maxResultDepth {
+			return true
+		}
+	}
+	return false
 }
 
 // firstLine keeps an engine error to its message: a wasm trap's error carries

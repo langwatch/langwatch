@@ -49,7 +49,7 @@ var sharedCompilationCache = wazero.NewCompilationCache()
 const defaultWasmMemoryMiB = 512
 
 // defaultWasmTotalMemoryMiB caps what all concurrent runs may hold together.
-const defaultWasmTotalMemoryMiB = 2048
+const defaultWasmTotalMemoryMiB = 4096
 
 // wasmRuntime runs code blocks inside WebAssembly guests: a WASI CPython when
 // Python runs on wasm, and QuickJS for JavaScript. Each module is compiled
@@ -104,8 +104,9 @@ func newWasmRuntime(ctx context.Context, opts Options, sources runnerPair) (*was
 		cache = dirCache
 	}
 	config = config.WithCompilationCache(cache)
-	// A run's footprint: its linear memory, its /work and its queued bridge replies.
-	runWeight := int64(memoryMiB) + defaultWorkLimits.bytes>>20 + maxQueuedReplyBytes>>20
+	// A run's footprint: its linear memory, its /work, its queued bridge replies
+	// and its result, which the engine copies and then decodes.
+	runWeight := int64(memoryMiB) + defaultWorkLimits.bytes>>20 + maxQueuedReplyBytes>>20 + 2*maxResultBytes>>20
 	totalMiB := int64(opts.WasmTotalMemoryMiB)
 	if totalMiB <= 0 {
 		totalMiB = defaultWasmTotalMemoryMiB
@@ -267,15 +268,33 @@ const maxWasmPayloadBytes = 16 << 20
 // the guest a copy, until the run's result is collected.
 func payloadWeight(size int) int64 { return 2 * ((int64(size) + 1<<20 - 1) >> 20) }
 
-// admit takes a run's share of the memory budget, waiting for room until ctx
-// ends. The caller releases it once the run's result is collected.
-func (w *wasmRuntime) admit(ctx context.Context, payloadBytes int) (func(), error) {
-	weight := w.runWeight + payloadWeight(payloadBytes)
+// admitted is a run's share of the memory budget, taken before its request is
+// encoded so a waiting run holds no payload, and given back once its result
+// is collected.
+type admitted struct {
+	budget *semaphore.Weighted
+	weight int64
+}
+
+// admit takes a run's share for the largest request, waiting for room until
+// ctx ends; fit gives back what the actual request does not need.
+func (w *wasmRuntime) admit(ctx context.Context) (*admitted, error) {
+	weight := w.runWeight + payloadWeight(maxWasmPayloadBytes)
 	if err := w.admission.Acquire(ctx, weight); err != nil {
 		return nil, errEngineAtCapacity
 	}
-	return func() { w.admission.Release(weight) }, nil
+	return &admitted{budget: w.admission, weight: weight}, nil
 }
+
+func (a *admitted) fit(runWeight int64, payloadBytes int) {
+	need := runWeight + payloadWeight(payloadBytes)
+	if need < a.weight {
+		a.budget.Release(a.weight - need)
+		a.weight = need
+	}
+}
+
+func (a *admitted) release() { a.budget.Release(a.weight) }
 
 // run executes one code block on guest, admitted by the caller. The guest sees
 // no host path at all: its /work is a workFS in engine memory.
@@ -289,7 +308,8 @@ func (w *wasmRuntime) run(parent context.Context, guest *wasmGuest, req wasmRunR
 	work := newWorkFS(w.workLimits)
 	fsConfig := wazero.NewFSConfig()
 	for at, files := range guest.mounts {
-		fsConfig = fsConfig.WithFSMount(files, at)
+		mount := limitedFS{FS: &sysfs.AdaptFS{FS: files}, handles: work.handles}
+		fsConfig = fsConfig.(sysfs.FSConfig).WithSysFSMount(mount, at)
 	}
 	fsConfig = fsConfig.(sysfs.FSConfig).WithSysFSMount(work, guestWorkDir)
 	config := wazero.NewModuleConfig().

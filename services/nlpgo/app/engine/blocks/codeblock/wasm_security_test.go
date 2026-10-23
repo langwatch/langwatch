@@ -383,9 +383,10 @@ export default ({ url }) => {
 
 // @scenario "concurrent wasm runs share a memory budget"
 func TestWasmSecurity_ConcurrentRunsWaitForMemory(t *testing.T) {
-	// One run's footprint (64 memory + 64 /work + 32 replies + 32 request)
-	// is 192 MiB, so this budget admits one run at a time.
-	e := newJSExec(t, codeblock.Options{WasmMemoryMiB: 64, WasmTotalMemoryMiB: 200})
+	// One run takes 256 MiB while it waits (64 memory, 64 /work, 32 replies,
+	// 64 result, 32 request) and about 225 once its request is sized, so this
+	// budget admits one run at a time.
+	e := newJSExec(t, codeblock.Options{WasmMemoryMiB: 64, WasmTotalMemoryMiB: 300})
 	var wg sync.WaitGroup
 	start := time.Now()
 	for range 3 {
@@ -429,7 +430,7 @@ func TestWasmSecurity_BudgetBelowOneRunIsRefused(t *testing.T) {
 		WasmTotalMemoryMiB: 100,
 	})
 	require.ErrorContains(t, err, "100 MiB")
-	require.ErrorContains(t, err, "192 MiB")
+	require.ErrorContains(t, err, "256 MiB")
 }
 
 // @scenario "a run's request is charged to the memory budget and capped"
@@ -456,4 +457,60 @@ func TestWasmSecurity_EngineErrorsAreOneLine(t *testing.T) {
 	require.NotNil(t, res.Error)
 	assert.NotContains(t, res.Error.Message, "\n")
 	assert.NotContains(t, res.Error.Message, "wasm stack trace")
+}
+
+// @scenario "a run's open files count against one budget across every mount"
+func TestWasmSecurity_ReadOnlyMountHandlesAreBounded(t *testing.T) {
+	e := newJSExec(t, codeblock.Options{})
+	out := runJSOK(t, e, codeblock.Request{
+		Code: `import * as os from "qjs:os"
+export default () => {
+  const fds = []
+  for (let i = 0; i < 20000; i++) {
+    const fd = os.open("/runner/runner.mjs", os.O_RDONLY)
+    if (fd < 0) break
+    fds.push(fd)
+  }
+  for (const fd of fds) os.close(fd)
+  return { opened: fds.length }
+}`,
+	})
+	assert.Less(t, out["opened"], float64(300), "the runner mount opened without a handle budget")
+}
+
+// @scenario "a result with too many values is refused before it is decoded"
+func TestWasmSecurity_ResultWithTooManyValuesIsRefused(t *testing.T) {
+	e := newJSExec(t, codeblock.Options{})
+	res := runJS(t, e, codeblock.Request{
+		Code: "export default () => ({ many: Array.from({ length: 200000 }, () => 0) })",
+	})
+	require.NotNil(t, res.Error)
+	assert.Equal(t, codeblock.RunnerErrorType, res.Error.Type)
+	assert.Contains(t, res.Error.Message, "values")
+	assert.Nil(t, res.Outputs)
+
+	nested := runJS(t, e, codeblock.Request{
+		Code: "export default () => { let v = 0; for (let i = 0; i < 500; i++) v = [v]; return { v } }",
+	})
+	require.NotNil(t, nested.Error)
+	assert.Contains(t, nested.Error.Message, "nesting")
+}
+
+// @scenario "a run that times out waiting for room is reported as a timeout"
+func TestWasmSecurity_TimeoutWhileWaitingForRoom(t *testing.T) {
+	e := newJSExec(t, codeblock.Options{WasmMemoryMiB: 64, WasmTotalMemoryMiB: 300})
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		_, _ = e.Execute(context.Background(), codeblock.Request{
+			Language: codeblock.LanguageJavaScript,
+			Code:     "export default () => new Promise((r) => setTimeout(() => r({}), 1500))",
+		})
+	}()
+	time.Sleep(200 * time.Millisecond)
+	res := runJS(t, e, codeblock.Request{Code: "export default () => ({})", Timeout: 300 * time.Millisecond})
+	require.NotNil(t, res.Error)
+	assert.True(t, res.TimedOut)
+	assert.Equal(t, codeblock.TimeoutType, res.Error.Type)
+	<-done
 }
