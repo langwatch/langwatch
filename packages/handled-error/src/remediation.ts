@@ -258,8 +258,8 @@ const registry = {
   },
   lwql_unavailable: {
     tips: [
-      "The LangWatchQL analytics SQL API is not provisioned on this deployment; retrying will not help",
-      "Contact support to have it enabled for this workspace",
+      "The LangWatchQL analytics SQL API is not provisioned on this deployment, usually because its setup did not finish; retrying the same query will not help",
+      "An admin can retry the setup from Ops > Upgrades; otherwise ask an admin or contact support",
     ],
   },
   lwql_provisioning_incomplete: {

@@ -194,6 +194,15 @@ Feature: Handled errors — what the customer actually reads
     Then the description names exactly the parameters that were supplied
     And it does not name a reserved parameter the request never sent
 
+  @unit @bdd @handled-errors @presentation
+  Scenario: An unavailable analytics SQL layer says what failed and who can retry it
+    Given a handled error carries the code "lwql_unavailable"
+    When it is surfaced to a customer
+    Then the description says the deployment's query layer is not ready
+    And it points an admin at Ops > Upgrades to retry the setup
+    And it tells everyone else to ask an admin or contact support
+    But it does not say the feature is switched off for the workspace
+
   @unit @integration @bdd @handled-errors @presentation
   Scenario: An unhandled failure says nothing, but stays traceable
     Given a procedure fails with an unhandled error
