@@ -131,6 +131,13 @@ Feature: Read and navigate the generated documentation
     When the page is compiled
     Then each item's checkbox is labelled with the item's text
 
+  @unit
+  Scenario: Head each row of a table whose corner cell is empty
+    Given an MDX table whose first header cell is empty
+    When the page is compiled
+    Then the first cell of each row is a header for that row
+    And a table with a filled first header cell is left alone
+
   @integration
   Scenario: Tab panels are named by ids without spaces
     Given authored tabs or a code group whose labels contain spaces

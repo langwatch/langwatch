@@ -566,6 +566,13 @@ figure > .docs-shot {
   color: var(--chakra-colors-fg);
   white-space: nowrap;
 }
+.docs-prose th[scope="row"] {
+  background: none;
+  white-space: normal;
+}
+.docs-table-scroll tr:last-child th[scope="row"] {
+  border-bottom: 0;
+}
 .docs-prose td {
   color: var(--chakra-colors-docs-body);
 }

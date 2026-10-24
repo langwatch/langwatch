@@ -228,6 +228,22 @@ function labelTaskItem({ node }: { node: TreeNode }) {
     box.properties = { ...box.properties, ariaLabel: label };
 }
 
+/** In a table whose corner header cell is empty, each row's first cell is that row's header. */
+function headRows({ node }: { node: TreeNode }) {
+  if (node.type !== "element" || node.tagName !== "table") return;
+  const section = (name: string) => node.children?.find((child) => child.tagName === name);
+  const cellsOf = (row: TreeNode) => row.children?.filter((child) => child.type === "element");
+  const headerRow = section("thead")?.children?.find((row) => row.tagName === "tr");
+  const corner = headerRow ? cellsOf(headerRow)?.[0] : undefined;
+  if (!corner || textOf({ node: corner }).trim()) return;
+  for (const row of section("tbody")?.children ?? []) {
+    const first = row.tagName === "tr" ? cellsOf(row)?.[0] : undefined;
+    if (first?.tagName !== "td") continue;
+    first.tagName = "th";
+    first.properties = { ...first.properties, scope: "row" };
+  }
+}
+
 /** The markup Markdown writes, given the names and headers assistive technology needs. */
 export function rehypeDocsAccessibility() {
   return (tree: TreeNode) =>
@@ -235,6 +251,7 @@ export function rehypeDocsAccessibility() {
       node: tree,
       visitor: (node) => {
         labelTaskItem({ node });
+        headRows({ node });
       },
     });
 }

@@ -82,3 +82,49 @@ describe("when a page has a task list", () => {
     expect(loose.properties?.ariaLabel).toBe("Back up");
   });
 });
+
+describe("when a table's corner header cell is empty", () => {
+  /** @scenario "Head each row of a table whose corner cell is empty" */
+  it("makes each row's first cell its row header, and leaves other tables alone", () => {
+    const cell = (tagName: string, value: string): TreeNode => ({
+      type: "element",
+      tagName,
+      children: value ? [{ type: "text", value }] : [],
+    });
+    const table = (corner: string): TreeNode => ({
+      type: "element",
+      tagName: "table",
+      children: [
+        {
+          type: "element",
+          tagName: "thead",
+          children: [
+            {
+              type: "element",
+              tagName: "tr",
+              children: [cell("th", corner), cell("th", "API key")],
+            },
+          ],
+        },
+        {
+          type: "element",
+          tagName: "tbody",
+          children: [
+            {
+              type: "element",
+              tagName: "tr",
+              children: [cell("td", "Owner"), cell("td", "One user")],
+            },
+          ],
+        },
+      ],
+    });
+    const matrix = table("");
+    const plain = table("Name");
+    rehypeDocsAccessibility()({ type: "root", children: [matrix, plain] });
+    const firstCell = (node: TreeNode) => node.children?.[1]?.children?.[0]?.children?.[0];
+    expect(firstCell(matrix)).toMatchObject({ tagName: "th", properties: { scope: "row" } });
+    expect(firstCell(matrix)?.children?.[0]?.value).toBe("Owner");
+    expect(firstCell(plain)?.tagName).toBe("td");
+  });
+});
