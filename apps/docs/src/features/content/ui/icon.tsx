@@ -17,6 +17,8 @@ export function Icon({ icon: name, size = 20 }: IconProps) {
       <Image
         src={sitePath({ path: icon })}
         alt=""
+        loading="lazy"
+        decoding="async"
         width={`${pixels}px`}
         height={`${pixels}px`}
         flexShrink={0}
