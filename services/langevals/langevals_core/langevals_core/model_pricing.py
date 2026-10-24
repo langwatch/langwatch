@@ -75,8 +75,11 @@ def to_litellm_cost_map(
             continue
         entry: Dict[str, Any] = {"litellm_provider": provider, "mode": mode}
         for ours, theirs in _PRICE_FIELDS.items():
-            if isinstance(pricing.get(ours), (int, float)):
-                entry[theirs] = pricing[ours]
+            # A negative rate marks a router priced by what it routes to:
+            # no price, never a refund. A router is left with no input rate.
+            rate = pricing.get(ours)
+            if isinstance(rate, (int, float)) and rate >= 0:
+                entry[theirs] = rate
         if "input_cost_per_token" not in entry:
             continue
         cost_map[model_id] = entry
