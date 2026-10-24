@@ -305,6 +305,11 @@ export interface LangyRegistrationsState {
   clearHandlers: () => void;
   registerActions: (handlers: LangyUiActionHandlers) => void;
   clearActions: () => void;
+  /**
+   * Holds Langy's panel above the page's overlays while a surface that works with Langy is
+   * open over them (the Studio code editor over its node drawer); the call returned releases it.
+   */
+  holdAbove: () => () => void;
 }
 
 /** What a page sees where Langy is not mounted: registering is a no-op. */
@@ -313,4 +318,5 @@ export const LANGY_ABSENT_REGISTRATIONS: LangyRegistrationsState = {
   clearHandlers: nothing,
   registerActions: nothing,
   clearActions: nothing,
+  holdAbove: () => nothing,
 };

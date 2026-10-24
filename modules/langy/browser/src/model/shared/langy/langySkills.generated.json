@@ -200,6 +200,13 @@
 		"category": "recipe"
 	},
 	{
+		"id": "studio-code-blocks",
+		"label": "Studio code blocks",
+		"description": "Write or change the code of a Studio code block while the user has its code editor open. Read the block with studio.code.read, then hand the editor new code with studio.code.propose for the user to review as a diff. Use when the user asks from the code editor, or the turn names a code block open in the Studio code editor.",
+		"category": "skill",
+		"internal": true
+	},
+	{
 		"id": "test-cli-usability",
 		"label": "Test CLI usability",
 		"description": "Write scenario tests that verify your CLI tool is usable by AI agents. Ensures commands work non-interactively, provide clear output, and don't hang on prompts. Use when you want to prove your CLI is agent-friendly.",

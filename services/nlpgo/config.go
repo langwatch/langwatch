@@ -113,6 +113,25 @@ type EngineConfig struct {
 	// set the unprefixed SANDBOX_PYTHON instead, which resolveSandboxPython
 	// accepts as a fallback.
 	SandboxPython string `env:"SANDBOX_PYTHON"`
+	// CodeBlockRuntime — where user code runs: "subprocess" (default) or
+	// "wasm", a WASI CPython inside the engine (ADR-183).
+	CodeBlockRuntime string `env:"CODE_BLOCK_RUNTIME"`
+	// PythonWasmHome — python.wasm and its stdlib, for the wasm runtime.
+	PythonWasmHome string `env:"PYTHON_WASM_HOME"`
+	// CodeBlockMemoryMiB — one wasm run's memory ceiling. Zero means 512.
+	CodeBlockMemoryMiB int `env:"CODE_BLOCK_MEMORY_MIB"`
+	// CodeBlockTotalMemoryMiB — what all concurrent wasm runs may hold together. Zero means 4096.
+	CodeBlockTotalMemoryMiB int `env:"CODE_BLOCK_TOTAL_MEMORY_MIB"`
+	// CodeBlockAllowLocalEgress — lets wasm code blocks reach private and
+	// loopback addresses. Off by default whatever BLOCK_LOCAL_HTTP_CALLS says:
+	// a code block is arbitrary code, not a configured request. ADR-183.
+	CodeBlockAllowLocalEgress bool `env:"CODE_BLOCK_ALLOW_LOCAL_EGRESS"`
+	// WasmCompilationCacheDir — keeps compiled guest binaries across restarts.
+	WasmCompilationCacheDir string `env:"WASM_COMPILATION_CACHE_DIR"`
+	// QuickJSWasm — qjs-wasi.wasm. JavaScript code blocks need it; ADR-183.
+	QuickJSWasm string `env:"QUICKJS_WASM"`
+	// TypeScriptWasm — tsstrip.wasm. TypeScript code blocks need it; ADR-183.
+	TypeScriptWasm string `env:"TYPESCRIPT_WASM"`
 	// LangWatchBaseURL — base URL for evaluator + agent-workflow callbacks.
 	// In production this is the public LangWatch app URL (eg.
 	// https://app.langwatch.ai); in dev it's typically http://host.docker.internal:5560

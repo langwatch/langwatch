@@ -242,6 +242,7 @@ beforeEach(() => {
     panelMode: "floating",
     dockShellClaims: 0,
     dockShifted: false,
+    aboveHolds: 0,
   });
   sidecarMounts.count = 0;
   deepLinkReads.count = 0;
@@ -343,6 +344,22 @@ describe("ProjectLangyLayout", () => {
       await userEvent.click(screen.getByRole("button", { name: "Open Langy assistant" }));
 
       expect((await screen.findByTestId("langy-drawer")).getAttribute("data-open")).toBe("true");
+    });
+
+    /** @scenario "Langy rides above Studio's node drawer while the code editor is open" */
+    it("steps the launcher aside while a surface holds Langy above the page", () => {
+      gate.peekDock = false;
+      renderAt("/demo/traces");
+      let release = () => {};
+      act(() => {
+        release = useLangyStore.getState().holdAbove();
+      });
+
+      expect(screen.queryByRole("button", { name: "Open Langy assistant" })).toBeNull();
+
+      act(() => release());
+
+      expect(screen.getByRole("button", { name: "Open Langy assistant" })).toBeTruthy();
     });
   });
 

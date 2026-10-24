@@ -12,14 +12,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
 	_ "embed"
+
+	"github.com/langwatch/langwatch/pkg/ssrf"
 )
 
 //go:embed runner.py
@@ -76,7 +80,43 @@ type Options struct {
 	// an endpoint with no key, gives agent code half a credential and one
 	// failure it cannot read.
 	SandboxEndpoint string
+	// Runtime picks where user code runs: RuntimeSubprocess (the default) or
+	// RuntimeWasm, a WASI CPython inside the engine; see ADR-183.
+	Runtime string
+	// PythonWasmHome holds python.wasm and lib/; scripts/fetch-python-wasm.sh.
+	PythonWasmHome string
+	// WasmMemoryMiB caps one wasm run's memory. Zero means 512.
+	WasmMemoryMiB int
+	// WasmCompilationCacheDir, when set, keeps compiled python.wasm across restarts.
+	WasmCompilationCacheDir string
+	// Egress is the policy a wasm run's outbound requests are held to.
+	Egress ssrf.Options
+	// WasmTotalMemoryMiB caps the memory all concurrent wasm runs hold
+	// together; a run waits for room, within its own deadline. Zero means 4096.
+	WasmTotalMemoryMiB int
+	// QuickJSWasm is qjs-wasi.wasm; scripts/fetch-quickjs-wasm.sh. JavaScript
+	// always runs on wasm, so without it a JavaScript code block is refused.
+	QuickJSWasm string
+	// TypeScriptWasm is tsstrip.wasm; scripts/build-tsstrip-wasm.sh. Without
+	// it a TypeScript code block is refused.
+	TypeScriptWasm string
 }
+
+// testRuntime lets the package's tests run the whole suite on another runtime;
+// export_test.go sets it from NLPGO_CODEBLOCK_TEST_RUNTIME. Never set in production.
+var testRuntime, testPythonWasmHome, testQuickJSWasm, testTypeScriptWasm string
+
+// Runtime values for Options.Runtime.
+const (
+	RuntimeSubprocess = "subprocess"
+	RuntimeWasm       = "wasm"
+)
+
+// Language values for Request.Language.
+const (
+	LanguagePython     = "python"
+	LanguageJavaScript = "javascript"
+)
 
 // defaultEnvAllowlist is the environment passed into the code-block
 // subprocess when Options.EnvAllowlist is nil. It carries only what the
@@ -116,6 +156,7 @@ type Executor struct {
 	opts           Options
 	runnerSource   []byte
 	fakeDspySource []byte
+	wasm           *wasmRuntime
 }
 
 // New builds an Executor, resolving the runner sources it will write for
@@ -155,11 +196,38 @@ func New(opts Options) (*Executor, error) {
 			return nil, fmt.Errorf("codeblock: read fake_dspy %q: %w", sibling, err)
 		}
 	}
-	return &Executor{
+	executor := &Executor{
 		opts:           opts,
 		runnerSource:   runnerSource,
 		fakeDspySource: fakeDspySource,
-	}, nil
+	}
+	if opts.Runtime == "" && opts.QuickJSWasm == "" && (testRuntime != "" || testQuickJSWasm != "") {
+		opts.Runtime, opts.PythonWasmHome, opts.QuickJSWasm = testRuntime, testPythonWasmHome, testQuickJSWasm
+		opts.TypeScriptWasm = testTypeScriptWasm
+		opts.Egress.AllowLocal = true
+	}
+	switch opts.Runtime {
+	case "", RuntimeSubprocess, RuntimeWasm:
+	default:
+		return nil, fmt.Errorf("codeblock: unknown runtime %q", opts.Runtime)
+	}
+	if opts.Runtime == RuntimeWasm || opts.QuickJSWasm != "" {
+		wasm, err := newWasmRuntime(context.Background(), opts, runnerPair{runner: runnerSource, fakeDspy: fakeDspySource})
+		if err != nil {
+			return nil, err
+		}
+		executor.wasm = wasm
+	}
+	executor.opts = opts
+	return executor, nil
+}
+
+// Runtime reports which runtime this executor runs user code on.
+func (e *Executor) Runtime() string {
+	if e.wasm != nil && e.wasm.python != nil {
+		return RuntimeWasm
+	}
+	return RuntimeSubprocess
 }
 
 // runnerFileMode is read-only even for the owner. User code runs as the same
@@ -220,6 +288,8 @@ func removeRunDir(dir string) {
 
 // Request is what the engine hands to the executor per node invocation.
 type Request struct {
+	// Language is LanguagePython (also when empty), LanguageJavaScript or LanguageTypeScript.
+	Language        string
 	Code            string
 	Inputs          map[string]any
 	DeclaredOutputs []string
@@ -348,6 +418,18 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 	runCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
+	guest, err := e.guestFor(req.Language)
+	if err != nil {
+		return nil, err
+	}
+	if guest != nil {
+		return e.executeWasm(runCtx, guest, req)
+	}
+	payload, err := marshalRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
 	// One directory per execution, holding the runner pair and the result
 	// file, removed on the way out. Nothing the user's code writes here
 	// survives to be read, imported or executed by a later run.
@@ -356,20 +438,8 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 		return nil, err
 	}
 	defer removeRunDir(runDir)
-
 	runnerPath := filepath.Join(runDir, "runner.py")
 	resultPath := filepath.Join(runDir, "result.json")
-
-	payload, err := json.Marshal(map[string]any{
-		"code":    req.Code,
-		"inputs":  req.Inputs,
-		"outputs": req.DeclaredOutputs,
-		"secrets": req.Secrets,
-		"params":  req.Params,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("codeblock: marshal request: %w", err)
-	}
 
 	cmd := exec.CommandContext(runCtx, e.opts.Python, runnerPath, resultPath) //nolint:gosec // runnerPath is this execution's own copy of the engine's embedded runner
 	// Withhold the pod environment from user code. cmd.Env is always set to
@@ -406,28 +476,228 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 		_ = killGroup(cmd.Process.Pid)
 	}
 
-	if data, readErr := os.ReadFile(resultPath); readErr == nil && len(data) > 0 {
-		var parsed struct {
-			Outputs    map[string]any `json:"outputs"`
-			Stdout     string         `json:"stdout"`
-			Stderr     string         `json:"stderr"`
-			DurationMS int64          `json:"duration_ms"`
-			Error      *Error         `json:"error"`
+	return collectResult(readHostResult(resultPath), runOutcome{
+		timedOut: timedOut,
+		elapsed:  elapsed,
+		stderr:   stderrBuf.String(),
+		err:      runErr,
+	}), nil
+}
+
+// guestFor picks the wasm guest a request runs on; nil means a subprocess.
+func (e *Executor) guestFor(language string) (*wasmGuest, error) {
+	switch language {
+	case "", LanguagePython:
+		if e.wasm != nil {
+			return e.wasm.python, nil
 		}
-		if err := json.Unmarshal(data, &parsed); err == nil {
-			res := &Result{
-				Outputs:    parsed.Outputs,
-				Stdout:     parsed.Stdout,
-				Stderr:     parsed.Stderr,
-				DurationMS: parsed.DurationMS,
-				Error:      parsed.Error,
-				TimedOut:   timedOut,
-			}
-			if timedOut && res.Error == nil {
-				res.Error = &Error{Type: TimeoutType, Message: "code_block_timeout"}
-			}
-			return res, nil
+		return nil, nil
+	case LanguageJavaScript, LanguageTypeScript:
+		if e.wasm == nil || e.wasm.js == nil {
+			return nil, errors.New("codeblock: JavaScript code blocks are not available on this deployment")
 		}
+		return e.wasm.js, nil
+	default:
+		return nil, fmt.Errorf("codeblock: unknown language %q", language)
+	}
+}
+
+// maxResultBytes caps the result file a run may hand back to the engine.
+const maxResultBytes = 32 << 20
+
+// runOutcome is how a run ended, on either runtime.
+type runOutcome struct {
+	timedOut bool
+	elapsed  time.Duration
+	stderr   string
+	err      error
+}
+
+// runResult is the result file a run left behind, as the engine read it.
+type runResult struct {
+	data     []byte
+	tooLarge bool
+}
+
+// readHostResult reads a subprocess run's result file. The file is the run's
+// to make, so a link or a device in its place is not followed or read, and
+// nothing past the size limit is read.
+func readHostResult(path string) runResult {
+	file, err := os.OpenFile(path, os.O_RDONLY|syscall.O_NOFOLLOW, 0)
+	if err != nil {
+		return runResult{}
+	}
+	defer func() { _ = file.Close() }()
+	if info, err := file.Stat(); err != nil || !info.Mode().IsRegular() {
+		return runResult{}
+	}
+	data, err := io.ReadAll(io.LimitReader(file, maxResultBytes+1))
+	if err != nil {
+		return runResult{}
+	}
+	if len(data) > maxResultBytes {
+		return runResult{tooLarge: true}
+	}
+	return runResult{data: data}
+}
+
+func marshalRequest(req Request) ([]byte, error) {
+	payload, err := json.Marshal(map[string]any{
+		"code":    req.Code,
+		"inputs":  req.Inputs,
+		"outputs": req.DeclaredOutputs,
+		"secrets": req.Secrets,
+		"params":  req.Params,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("codeblock: marshal request: %w", err)
+	}
+	return payload, nil
+}
+
+// executeWasm runs req on guest. The run is admitted before its request is
+// encoded, and never touches the host disk: its /work, result included, lives
+// in engine memory for the length of the run.
+func (e *Executor) executeWasm(runCtx context.Context, guest *wasmGuest, req Request) (*Result, error) {
+	started := time.Now()
+	admission, err := e.wasm.admit(runCtx)
+	if err != nil {
+		return cancelledRun(runCtx, started, err), nil
+	}
+	defer admission.release()
+	stripped, payload, early, err := e.wasmPayload(runCtx, &req, started)
+	if err != nil || early != nil {
+		return early, err
+	}
+	admission.fit(e.wasm.runWeight, len(payload))
+	run := e.wasm.run(runCtx, guest, wasmRunRequest{
+		payload: payload,
+		env:     withSandboxCredential(nil, req.SandboxAPIKey, e.opts.SandboxEndpoint),
+	})
+	outcome := runOutcome{
+		timedOut: errors.Is(runCtx.Err(), context.DeadlineExceeded),
+		elapsed:  time.Since(started),
+		stderr:   run.stderr,
+		err:      run.err,
+	}
+	if outcome.err == nil && run.exitCode != 0 {
+		outcome.err = fmt.Errorf("the interpreter exited with status %d", run.exitCode)
+	}
+	return stripped.remapResult(collectResult(run.result, outcome)), nil
+}
+
+// wasmPayload erases req's types and encodes it. Erasing, sizing and encoding
+// take time: past the deadline at any step, the run timed out. A non-nil
+// Result ends the run before it starts.
+func (e *Executor) wasmPayload(runCtx context.Context, req *Request, started time.Time) (*strippedCode, []byte, *Result, error) {
+	expired := func() *Result {
+		if runCtx.Err() == nil {
+			return nil
+		}
+		return cancelledRun(runCtx, started, runCtx.Err())
+	}
+	stripped, failure := e.wasm.erasedTypes(runCtx, req)
+	if res := expired(); res != nil {
+		return nil, nil, res, nil
+	}
+	if failure != nil {
+		return nil, nil, &Result{Error: failure, DurationMS: time.Since(started).Milliseconds()}, nil
+	}
+	fits := requestFits(*req, maxWasmPayloadBytes)
+	if res := expired(); res != nil {
+		return nil, nil, res, nil
+	}
+	if !fits {
+		return nil, nil, requestTooLarge(), nil
+	}
+	payload, err := marshalRequest(*req)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if res := expired(); res != nil {
+		return nil, nil, res, nil
+	}
+	if len(payload) > maxWasmPayloadBytes {
+		return nil, nil, requestTooLarge(), nil
+	}
+	return stripped, payload, nil, nil
+}
+
+// cancelledRun is the result of a run stopped by err before it started.
+func cancelledRun(runCtx context.Context, started time.Time, err error) *Result {
+	return collectResult(runResult{}, runOutcome{
+		timedOut: errors.Is(runCtx.Err(), context.DeadlineExceeded),
+		elapsed:  time.Since(started),
+		err:      err,
+	})
+}
+
+// parsedResult reads the runner's own result file, or nil when there is none
+// or it does not parse.
+func parsedResult(data []byte, timedOut bool) *Result {
+	if len(data) == 0 {
+		return nil
+	}
+	var parsed struct {
+		Outputs    map[string]any `json:"outputs"`
+		Stdout     string         `json:"stdout"`
+		Stderr     string         `json:"stderr"`
+		DurationMS int64          `json:"duration_ms"`
+		Error      *Error         `json:"error"`
+	}
+	if err := json.Unmarshal(data, &parsed); err != nil {
+		return nil
+	}
+	disownReservedType(parsed.Error)
+	res := &Result{
+		Outputs:    parsed.Outputs,
+		Stdout:     parsed.Stdout,
+		Stderr:     parsed.Stderr,
+		DurationMS: parsed.DurationMS,
+		Error:      parsed.Error,
+		TimedOut:   timedOut,
+	}
+	if timedOut && res.Error == nil {
+		res.Error = &Error{Type: TimeoutType, Message: "code_block_timeout"}
+	}
+	return res
+}
+
+func requestTooLarge() *Result {
+	return &Result{Error: &Error{Type: RunnerErrorType, Message: fmt.Sprintf("the code block's code and inputs exceed the %d MiB limit", maxWasmPayloadBytes>>20)}}
+}
+
+// disownReservedType renames an error the run reported under a type only the
+// engine may give, so customer code cannot pose as a timeout or a runner fault.
+func disownReservedType(err *Error) {
+	if err != nil && (err.Type == TimeoutType || err.Type == RunnerErrorType) {
+		err.Type = "User" + err.Type
+	}
+}
+
+// collectResult turns what a run left behind into a Result: the runner's own
+// result file when it wrote one, otherwise a synthesized timeout or error.
+func collectResult(result runResult, outcome runOutcome) *Result {
+	timedOut, elapsed, stderr, runErr := outcome.timedOut, outcome.elapsed, outcome.stderr, outcome.err
+	if result.tooLarge {
+		return &Result{
+			DurationMS: elapsed.Milliseconds(),
+			TimedOut:   timedOut,
+			Stderr:     stderr,
+			Error:      &Error{Type: RunnerErrorType, Message: fmt.Sprintf("the code block's result exceeds the %d MiB limit", maxResultBytes>>20)},
+		}
+	}
+	if resultTooLarge(result.data) {
+		return &Result{
+			DurationMS: elapsed.Milliseconds(),
+			TimedOut:   timedOut,
+			Stderr:     stderr,
+			Error: &Error{Type: RunnerErrorType, Message: fmt.Sprintf(
+				"the code block's result has more than %d values or %d levels of nesting", maxResultValues, maxResultDepth)},
+		}
+	}
+	if res := parsedResult(result.data, timedOut); res != nil {
+		return res
 	}
 
 	// No result file (most likely: timeout killed the process before
@@ -436,25 +706,25 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 		return &Result{
 			DurationMS: elapsed.Milliseconds(),
 			TimedOut:   true,
-			Stderr:     stderrBuf.String(),
+			Stderr:     stderr,
 			Error:      &Error{Type: TimeoutType, Message: "code_block_timeout"},
-		}, nil
+		}
 	}
 	if runErr != nil {
 		return &Result{
 			DurationMS: elapsed.Milliseconds(),
-			Stderr:     stderrBuf.String(),
+			Stderr:     stderr,
 			Error: &Error{
 				Type:    RunnerErrorType,
-				Message: runErr.Error(),
+				Message: firstLine(runErr.Error()),
 			},
-		}, nil
+		}
 	}
 	return &Result{
 		DurationMS: elapsed.Milliseconds(),
-		Stderr:     stderrBuf.String(),
+		Stderr:     stderr,
 		Error:      &Error{Type: RunnerErrorType, Message: "empty_result"},
-	}, nil
+	}
 }
 
 func killGroup(pid int) error {
@@ -463,4 +733,44 @@ func killGroup(pid int) error {
 		return err
 	}
 	return syscall.Kill(-pgid, syscall.SIGKILL)
+}
+
+// Decoding bounds for a run's result. The byte cap alone does not bound what
+// decoding allocates: compact JSON of many small values expands severalfold.
+const (
+	maxResultValues = 100_000
+	maxResultDepth  = 128
+)
+
+// resultTooLarge walks the result's tokens without building it, and reports
+// one with more values or deeper nesting than the engine decodes. A malformed
+// result ends the walk; decoding reports it as before.
+func resultTooLarge(data []byte) bool {
+	dec := json.NewDecoder(bytes.NewReader(data))
+	values, depth := 0, 0
+	for dec.More() || depth > 0 {
+		tok, err := dec.Token()
+		if err != nil {
+			break
+		}
+		switch tok {
+		case json.Delim('{'), json.Delim('['):
+			depth++
+		case json.Delim('}'), json.Delim(']'):
+			depth--
+			continue
+		}
+		values++
+		if values > maxResultValues || depth > maxResultDepth {
+			return true
+		}
+	}
+	return false
+}
+
+// firstLine keeps an engine error to its message: a wasm trap's error carries
+// the guest's stack trace after it, which is engine detail, not the user's.
+func firstLine(message string) string {
+	head, _, _ := strings.Cut(message, "\n")
+	return head
 }

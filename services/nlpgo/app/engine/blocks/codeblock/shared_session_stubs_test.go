@@ -70,7 +70,10 @@ func sharedSessionExec(t *testing.T, endpoint string) *codeblock.Executor {
 		if err := exec.Command(resolved, "-c", "import requests, langwatch").Run(); err != nil {
 			continue
 		}
+		// The subprocess runtime on both suite runs: the LangWatch SDK does
+		// not run on the wasm runtime yet (ADR-183).
 		e, err := codeblock.New(codeblock.Options{
+			Runtime:         codeblock.RuntimeSubprocess,
 			Python:          resolved,
 			SandboxEndpoint: endpoint,
 		})

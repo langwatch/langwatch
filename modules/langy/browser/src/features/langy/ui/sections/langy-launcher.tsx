@@ -9,6 +9,7 @@ import { useReducedMotion } from "@langwatch/design-system/use-reduced-motion";
 // and pushes the mark off-centre until the panel's chunk loads the sheet.
 import "@langwatch/design-system/langy-theme.css";
 
+import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import { useLangyOrbProximity } from "../../../../behavior/use-langy-orb-proximity.ts";
 import { useLingeringDodge } from "../../../../behavior/use-lingering-dodge.ts";
 import { LANGY_DODGE_STAGGER_MS } from "../../../../model/langy-panel-layout.ts";
@@ -43,7 +44,10 @@ export function LangyLauncher({ isOpen, onOpen }: { isOpen: boolean; onOpen: () 
   const { orbRef, glowRef, activate } = useLangyOrbProximity({
     enabled: !reduceMotion && !isOpen,
   });
-  if (isOpen) return null;
+  // A surface held above the page's overlays (the Studio code editor) sits over this corner
+  // and offers its own way into Langy, so the orb steps aside rather than hide under it.
+  const heldAbove = useLangyStore((s) => s.aboveHolds > 0);
+  if (isOpen || heldAbove) return null;
   return (
     <Tooltip
       content={

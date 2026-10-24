@@ -99,6 +99,10 @@ interface LangyState extends TurnPhaseState, LangySliceSurface {
   // Spec: specs/langy/langy-peek-dock.feature
   closePanel: () => void;
   togglePanel: () => void;
+  /** Surfaces holding the panel above the page's overlays; never persisted. */
+  aboveHolds: number;
+  /** Holds the panel above the page's overlays until the returned release runs. */
+  holdAbove: () => () => void;
 
   // Command-bar → panel handoff: a question queued from the Cmd+K "Ask Langy"
   // activation, auto-sent by the panel once it is mounted and idle. Ephemeral
@@ -700,6 +704,17 @@ function resetScope(state: LangyState, scope: Partial<LangyScope>): Partial<Lang
   };
 }
 
+/** One hold on the panel's place above the page's overlays; releasing it twice is harmless. */
+function holdAbove({ shift }: { shift: (by: number) => void }): () => void {
+  shift(1);
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    shift(-1);
+  };
+}
+
 export const useLangyStore = defineSlice<LangyState>({
   name: LANGY_STORE_SLICE,
   create: (set, get) => ({
@@ -708,6 +723,12 @@ export const useLangyStore = defineSlice<LangyState>({
     closePanel: () => set({ isOpen: false }),
 
     togglePanel: () => set((state) => ({ isOpen: !state.isOpen })),
+
+    aboveHolds: 0,
+    holdAbove: () =>
+      holdAbove({
+        shift: (by) => set((state) => ({ aboveHolds: Math.max(0, state.aboveHolds + by) })),
+      }),
 
     pendingPrompt: null,
     askLangy: (prompt) =>

@@ -14,7 +14,7 @@ import {
 
 import { useLangyPageContextStore } from "../../../../behavior/langy-page-context.store.ts";
 import { useLangyRegistrationsStore } from "../../../../behavior/langy-registrations.store.ts";
-import { type LangyContextChip } from "../../../../behavior/langy.store.ts";
+import { type LangyContextChip, useLangyStore } from "../../../../behavior/langy.store.ts";
 import type { LangyUiActionHandlers } from "../../../../model/ui-actions/langy-ui-action-types.ts";
 import type { ProposalHandlers } from "../../model/langy-proposal-handlers.ts";
 
@@ -86,6 +86,7 @@ export function LangyProvider({ children }: { children: ReactNode }) {
       clearHandlers,
       registerActions,
       clearActions,
+      holdAbove: useLangyStore.getState().holdAbove,
     });
     return () => useLangyRegistrationsStore.setState(LANGY_ABSENT_REGISTRATIONS);
   }, [registerHandlers, clearHandlers, registerActions, clearActions]);

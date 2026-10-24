@@ -41,6 +41,11 @@ RUN --mount=type=cache,target=/go/pkg/mod,id=go-mod-${TARGETARCH} \
 # into one file nlpgo maps at boot. Arch-independent, about 10 s and 1.5 GB.
 RUN --mount=type=cache,target=/go/pkg/mod,id=go-mod-${TARGETARCH} \
     cd services && go run ./third_party/lingua-go/cmd/genmodels -out /out/lingua-models.bin
+# tsstrip erases TypeScript code blocks' types inside the wasm runtime (ADR-183).
+# wasip1 output is the same on every arch.
+RUN --mount=type=cache,target=/go/pkg/mod,id=go-mod-${TARGETARCH} \
+    --mount=type=cache,target=/root/.cache/go-build,id=go-build-${TARGETARCH} \
+    services/nlpgo/scripts/build-tsstrip-wasm.sh /out/tsstrip-wasm
 
 # ─── Code-block sandbox libraries ──────────────────────────────────────────────
 # The curated set of packages available inside a Studio code block (see
@@ -65,6 +70,19 @@ RUN set -eux; \
     find /pylibs/babel/locale-data -type f ! -name 'en*.dat' ! -name 'root.dat' -delete 2>/dev/null || true; \
     du -sh /pylibs
 
+# ─── Code-block wasm runtime ───────────────────────────────────────────────────
+# CPython 3.14 for WASI plus its precompiled stdlib, run inside nlpgo by the wasm
+# code-block runtime (NLPGO_ENGINE_CODE_BLOCK_RUNTIME=wasm, ADR-183). Pinned by
+# checksum in the script. Arch-independent: python.wasm is the same everywhere.
+FROM --platform=$BUILDPLATFORM python:3.14-slim-bookworm AS python-wasm
+RUN apt-get update && apt-get install -y --no-install-recommends curl unzip ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+COPY services/nlpgo/scripts/fetch-python-wasm.sh /tmp/fetch-python-wasm.sh
+RUN /tmp/fetch-python-wasm.sh /opt/python-wasm
+# QuickJS for WASI, which JavaScript code blocks always run on.
+COPY services/nlpgo/scripts/fetch-quickjs-wasm.sh /tmp/fetch-quickjs-wasm.sh
+RUN /tmp/fetch-quickjs-wasm.sh /opt/quickjs-wasm
+
 # ─── Runtime ───────────────────────────────────────────────────────────────────
 # distroless/python3 (Python 3.11) provides a stdlib python3 for the code-block
 # sandbox with no shell and no package manager. The static Go binary is the only
@@ -73,6 +91,9 @@ FROM gcr.io/distroless/python3-debian12:nonroot AS runtime
 COPY --from=go-build /out/service /usr/local/bin/service
 COPY --from=go-build /out/lingua-models.bin /usr/local/share/langwatch/lingua-models.bin
 COPY --from=sandbox-build /pylibs /opt/sandbox-libs
+COPY --from=python-wasm /opt/python-wasm /opt/python-wasm
+COPY --from=python-wasm /opt/quickjs-wasm/qjs-wasi.wasm /opt/quickjs-wasm/qjs-wasi.wasm
+COPY --from=go-build /out/tsstrip-wasm/tsstrip.wasm /opt/tsstrip-wasm/tsstrip.wasm
 
 # nlpgo binds this port; compose + the helm chart dial http://langwatch_nlp:5561.
 ENV SERVER_ADDR=:5561
@@ -83,6 +104,12 @@ ENV NLPGO_LINGUA_MODELS=/usr/local/share/langwatch/lingua-models.bin
 ENV SANDBOX_PYTHON=/usr/bin/python3.11
 ENV PYTHONPATH=/opt/sandbox-libs
 ENV PYTHONDONTWRITEBYTECODE=1
+# The wasm code-block runtime's interpreter; used only when it is selected.
+ENV NLPGO_ENGINE_PYTHON_WASM_HOME=/opt/python-wasm
+# JavaScript code blocks run on QuickJS inside nlpgo, whatever the runtime.
+ENV NLPGO_ENGINE_QUICKJS_WASM=/opt/quickjs-wasm/qjs-wasi.wasm
+# TypeScript code blocks have their types erased on wasm too.
+ENV NLPGO_ENGINE_TYPESCRIPT_WASM=/opt/tsstrip-wasm/tsstrip.wasm
 ENV RUNNING_IN_DOCKER=true
 
 EXPOSE 5561

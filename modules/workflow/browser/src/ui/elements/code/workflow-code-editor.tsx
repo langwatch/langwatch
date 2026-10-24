@@ -1,17 +1,22 @@
 import { useColorMode } from "@langwatch/design-system/color-mode";
-import { Box, HStack, Text } from "@langwatch/design-system/primitives";
+import { Box, Button, HStack, Text } from "@langwatch/design-system/primitives";
 import { TYPE_SCALE_PX } from "@langwatch/design-system/typography";
-import { FileCode as LuFileCode, X as LuX } from "lucide-react";
+import { FileCode as LuFileCode, Sparkles as LuSparkles, X as LuX } from "lucide-react";
 import type * as MonacoApi from "monaco-editor";
 import type { editor } from "monaco-editor";
 import { registerCompletion } from "monacopilot";
 import { lazy, type ReactNode, Suspense, useEffect, useRef, useState } from "react";
 
+import type { CodeEditorAssistant } from "../../../model/code/code-block-langy.ts";
+import { codeEditorLanguage } from "../../../model/code/code-editor-language.ts";
+import { registerJavaScriptLanguageService } from "../../../model/code/javascript-language-service.ts";
 import type {
   PythonField,
   PythonProviderHandle,
 } from "../../../model/code/python-provider.shared.ts";
 import { registerPythonProviders } from "../../../model/code/python-providers.ts";
+import { CodeAskPrompt } from "./code-ask-prompt.tsx";
+import { CodeProposalReview } from "./code-proposal-review.tsx";
 import { EditorStatusBar } from "./editor-status-bar.tsx";
 
 /** The monaco namespace; `@monaco-editor/react`'s own `Monaco` type reads as `any` here. */
@@ -44,14 +49,28 @@ export interface WorkflowCodeEditorContractProps {
 export type WorkflowCodeEditorModalHost = (input: {
   open: boolean;
   onRequestClose: () => void;
+  /** Langy is on offer here: the editor leaves its dock in view and usable beside it. */
+  besideLangy: boolean;
   children: ReactNode;
 }) => ReactNode;
+
+type EditorShortcut = "save" | "save-and-close" | "ask";
+
+/** Cmd/Ctrl+S saves and stays open, Cmd/Ctrl+Enter saves and closes, Cmd/Ctrl+I asks Langy. */
+function editorShortcut(e: KeyboardEvent): EditorShortcut | undefined {
+  if (!e.ctrlKey && !e.metaKey) return undefined;
+  if (e.key === "s") return "save";
+  if (e.key === "Enter") return "save-and-close";
+  if (e.key.toLowerCase() === "i") return "ask";
+  return undefined;
+}
 
 export function WorkflowCodeEditorModal({
   code,
   setCode,
   open,
   onClose,
+  language,
   inputs,
   outputs,
   viewStateKey,
@@ -59,19 +78,28 @@ export function WorkflowCodeEditorModal({
   secretNames,
   renderSecretControls,
   renderModal,
+  assistant,
 }: {
   code: string;
   setCode: (code: string) => void;
   open: boolean;
   onClose: () => void;
+  /** The code node's language; absent or unknown edits as Python. */
+  language?: string;
   /** Stable id used to persist cursor/scroll state across modal opens. */
   viewStateKey?: string;
   projectId?: string;
   secretNames: readonly string[];
   renderSecretControls?: (input: { onInsertSecret: (secretName: string) => void }) => ReactNode;
   renderModal: WorkflowCodeEditorModalHost;
+  /** Langy, where it is available on this code block; its proposals wait for the reader. */
+  assistant?: CodeEditorAssistant;
 } & WorkflowCodeEditorContractProps) {
   const [localCode, setLocalCode] = useState(code);
+  const [isAskOpen, setAskOpen] = useState(false);
+  const proposal = assistant?.proposal ?? null;
+  const openAsk = assistant ? () => setAskOpen(true) : undefined;
+  const editorLanguage = codeEditorLanguage({ language });
   const editorRef = useRef<MonacoEditorInstance | null>(null);
   // Kept in component state (not just refs) so the status bar re-renders when
   // the editor mounts. The status bar subscribes to the editor + monaco events
@@ -84,6 +112,21 @@ export function WorkflowCodeEditorModal({
     setSeededFrom({ code, open });
     setLocalCode(code);
   }
+
+  useEffect(() => {
+    assistant?.observe(localCode);
+  }, [assistant, localCode]);
+
+  const askLangy = (instruction: string) => {
+    setAskOpen(false);
+    assistant?.ask(instruction);
+  };
+
+  // Accepting replaces the unsaved buffer only; the reader still saves.
+  const acceptProposal = () => {
+    if (proposal) setLocalCode(proposal.code);
+    assistant?.settle();
+  };
 
   // Save = persist the buffer back to the parent and keep the modal open so
   // the user can keep editing. Mirrors a file editor's "save" — never closes.
@@ -105,32 +148,32 @@ export function WorkflowCodeEditorModal({
     onClose();
   };
 
+  // The shortcuts act on the latest buffer and handlers, read when a key is pressed.
+  const shortcutActions = useRef<Record<EditorShortcut, (() => void) | undefined>>({
+    save: undefined,
+    "save-and-close": undefined,
+    ask: undefined,
+  });
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Cmd/Ctrl+S → Save (don't close)
-      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
-        e.preventDefault();
-        setCode(localCode);
-        return;
-      }
-      // Cmd/Ctrl+Enter → Save & Close
-      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-        e.preventDefault();
-        setCode(localCode);
-        onClose();
-      }
+    shortcutActions.current = {
+      save: handleSave,
+      "save-and-close": handleSaveAndClose,
+      ask: openAsk,
     };
+  });
 
-    if (open) {
-      window.addEventListener("keydown", handleKeyDown);
-      return () => window.removeEventListener("keydown", handleKeyDown);
-    }
-    // Nothing was subscribed while the editor is closed, so there is nothing to
-    // tear down. Stated rather than fallen through: `apps/ui` compiles this
-    // source under `noImplicitReturns`, and an effect that returns on one branch
-    // and not the other is exactly the shape that rule is looking for.
-    return undefined;
-  }, [setCode, onClose, open, localCode]);
+  useEffect(() => {
+    if (!open) return undefined;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const shortcut = editorShortcut(e);
+      const action = shortcut ? shortcutActions.current[shortcut] : undefined;
+      if (!action) return;
+      e.preventDefault();
+      action();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [open]);
 
   const insertAtCursor = (text: string) => {
     const ed = editorRef.current;
@@ -146,7 +189,7 @@ export function WorkflowCodeEditorModal({
   const Modal = renderModal;
 
   return (
-    <Modal open={open} onRequestClose={onClose_}>
+    <Modal open={open} onRequestClose={onClose_} besideLangy={assistant !== undefined}>
       <>
         {/* File-tab strip — mimics a single VS Code editor tab so the modal
             reads as "you're editing one file" rather than a generic dialog. */}
@@ -180,9 +223,21 @@ export function WorkflowCodeEditorModal({
             }}
           >
             <LuFileCode size={14} />
-            <Text textStyle="mono">Code.py</Text>
+            <Text textStyle="mono">{editorLanguage.fileName}</Text>
           </HStack>
           <Box flex={1} />
+          {assistant && (
+            <Button
+              size="xs"
+              variant="ghost"
+              marginRight={1}
+              onClick={() => setAskOpen(true)}
+              data-testid="code-editor-ask-langy"
+            >
+              <LuSparkles size={14} />
+              Ask Langy
+            </Button>
+          )}
           {renderSecretControls?.({ onInsertSecret: handleInsertSecret })}
           <HStack
             as="button"
@@ -200,21 +255,35 @@ export function WorkflowCodeEditorModal({
         </HStack>
 
         {/* Editor fills the body edge-to-edge — no Dialog.Body padding chrome. */}
-        <Box flex={1} minHeight={0}>
-          {open && (
+        <Box flex={1} minHeight={0} position="relative">
+          {open && proposal && (
+            <CodeProposalReview
+              original={localCode}
+              proposed={proposal.code}
+              summary={proposal.summary}
+              language={editorLanguage.monacoLanguage}
+              onAccept={acceptProposal}
+              onReject={() => assistant?.settle()}
+            />
+          )}
+          {open && !proposal && isAskOpen && (
+            <CodeAskPrompt onAsk={askLangy} onClose={() => setAskOpen(false)} />
+          )}
+          {open && !proposal && (
             <WorkflowCodeEditor
               code={localCode}
               setCode={setLocalCode}
               onClose={onClose_}
               onSave={handleSave}
               onSaveAndClose={handleSaveAndClose}
-              language="python"
-              technologies={["python", "dspy"]}
+              language={editorLanguage.monacoLanguage}
+              technologies={editorLanguage.technologies}
               inputs={inputs}
               outputs={outputs}
               viewStateKey={viewStateKey}
               projectId={projectId}
               secretNames={secretNames}
+              onAskLangy={openAsk}
               onEditorMount={(ed, monaco) => {
                 editorRef.current = ed;
                 setEditorInstance(ed);
@@ -230,7 +299,8 @@ export function WorkflowCodeEditorModal({
         <EditorStatusBar
           editor={editorInstance}
           monaco={monacoInstance}
-          language="python"
+          language={editorLanguage.label}
+          tabSize={editorLanguage.tabSize}
           onSave={handleSave}
           onSaveAndClose={handleSaveAndClose}
         />
@@ -390,10 +460,13 @@ export function WorkflowCodeEditor({
   onEditorMount,
   projectId,
   secretNames,
+  onAskLangy,
 }: {
   code: string;
   setCode: (code: string) => void;
   onClose: () => void;
+  /** Opens the inline Langy prompt; Cmd/Ctrl+I is bound to it only when it is given. */
+  onAskLangy?: () => void;
   /** Persist the buffer without dismissing the editor (⌘S muscle memory). */
   onSave?: () => void;
   /** Persist + dismiss (⌘↵). */
@@ -480,15 +553,16 @@ export function WorkflowCodeEditor({
           editor.focus();
           onEditorMount?.(editor, monaco);
 
+          const contract = { secretNames, inputs: inputFields, outputs: outputFields };
+          providersRef.current?.dispose();
+          providersRef.current = null;
           if (language === "python") {
-            providersRef.current?.dispose();
-            providersRef.current = registerPythonProviders({
+            providersRef.current = registerPythonProviders({ monaco, contract });
+          } else if (language === "javascript" || language === "typescript") {
+            providersRef.current = registerJavaScriptLanguageService({
               monaco,
-              contract: {
-                secretNames,
-                inputs: inputFields,
-                outputs: outputFields,
-              },
+              contract,
+              flavour: language,
             });
           }
 
@@ -500,6 +574,9 @@ export function WorkflowCodeEditor({
           wireSecretDragAndDrop(editor);
           persistViewStateOnDispose({ editor, viewStateKey });
           wireEditorSaveShortcuts(editor);
+          if (onAskLangy) {
+            editor.addCommand?.(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyI, () => onAskLangy());
+          }
           registerCompletion(monaco, editor, {
             language,
             endpoint: `/api/workflows/code-completion?projectId=${projectId}`,
@@ -541,7 +618,7 @@ export function WorkflowCodeEditor({
           // Show the parameter hint widget on call open and re-trigger between
           // arguments.
           parameterHints: { enabled: true, cycle: true },
-          tabSize: 4,
+          tabSize: codeEditorLanguage({ language }).tabSize,
           insertSpaces: true,
           padding: {
             top: 0,

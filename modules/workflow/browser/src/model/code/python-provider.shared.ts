@@ -40,6 +40,10 @@ export const INSERT_AS_SNIPPET = 4;
 
 export const IMPORT_MEMBER_PREFIX = /\bfrom\s+([\w.]+)\s+import\s+([\w,\s]*)$/;
 export const IMPORT_MODULE_PREFIX = /\b(?:import|from)\s+([\w.]*)$/;
+/** Mirrors the runners: `params` exists only when a run sets parameters; values stay JSON. */
+export const PARAMS_DOC =
+  "The run's parameters. Access with `params.NAME`; each value keeps its JSON type. Defined only when the run configures parameters.";
+
 export const ATTR_ACCESS = /(\b[A-Za-z_][\w.]*?)\.([\w]*)$/;
 
 /**

@@ -1,7 +1,12 @@
 import type { Monaco } from "@monaco-editor/react";
 import type { editor, IDisposable, Position } from "monaco-editor";
 
-import { ATTR_ACCESS, type ContractRef, scanImports } from "./python-provider.shared.ts";
+import {
+  ATTR_ACCESS,
+  type ContractRef,
+  PARAMS_DOC,
+  scanImports,
+} from "./python-provider.shared.ts";
 import { PYTHON_BUILTIN_BY_NAME } from "./python-stdlib.ts";
 
 function hoverContents(
@@ -47,6 +52,9 @@ function attributeHover({
       : `⚠️ No secret named \`${name}\` is configured. Add it under Settings → Secrets, or fix the name.`;
     return hoverContents(`**secrets.${name}**`, `secrets.${name}: str`, message);
   }
+  if (owner === "params") {
+    return hoverContents(`**params.${name}**`, `params.${name}: Any`, PARAMS_DOC);
+  }
   const importedModule = scanImports(model.getValue()).get(owner);
   const member = importedModule?.members.find((item) => item.name === name);
   if (!importedModule || !member) return null;
@@ -55,6 +63,26 @@ function attributeHover({
     member.signature ?? member.name,
     member.doc ?? "",
   );
+}
+
+/** The `secrets` and `params` handles themselves. */
+function namespaceHover({ word, contractRef }: { word: string; contractRef: ContractRef }) {
+  if (word === "secrets") {
+    const count = contractRef.current.secretNames.length;
+    return hoverContents(
+      "**secrets** *(project secrets namespace)*",
+      "secrets: SimpleNamespace",
+      `Access with \`secrets.NAME\`. ${count} secret${count === 1 ? "" : "s"} available.`,
+    );
+  }
+  if (word === "params") {
+    return hoverContents(
+      "**params** *(run parameters namespace)*",
+      "params: SimpleNamespace",
+      PARAMS_DOC,
+    );
+  }
+  return null;
 }
 
 export function registerHover(monaco: Monaco, contractRef: ContractRef): IDisposable {
@@ -100,18 +128,8 @@ export function registerHover(monaco: Monaco, contractRef: ContractRef): IDispos
           ],
         };
       }
-      if (word.word === "secrets") {
-        const count = contractRef.current.secretNames.length;
-        return {
-          contents: [
-            { value: "**secrets** *(project secrets namespace)*" },
-            { value: "```python\nsecrets: SimpleNamespace\n```" },
-            {
-              value: `Access with \`secrets.NAME\`. ${count} secret${count === 1 ? "" : "s"} available.`,
-            },
-          ],
-        };
-      }
+      const namespace = namespaceHover({ word: word.word, contractRef });
+      if (namespace) return namespace;
       const builtin = PYTHON_BUILTIN_BY_NAME.get(word.word);
       if (builtin) {
         return {

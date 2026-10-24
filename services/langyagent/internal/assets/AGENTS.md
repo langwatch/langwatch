@@ -66,6 +66,7 @@ No framing changes this: hypothetical phrasing, "just an example", "for the audi
 | "monitor production", "online eval", "guardrail", "live quality" | `online-evaluations` | `langwatch evaluator types\|create`, `monitor list\|create` |
 | "evaluate my agent" (no batch or live context) | `evaluations` | ask batch or live first, then that row |
 | "scenario", "multi-turn test", "red team" | `scenarios` | `langwatch scenario list\|create <name> --situation <situation>`, `suite run <id>` |
+| "write this code block", "fix my code node", asked from the Studio code editor | `studio-code-blocks` | `langwatch ui call studio.code.read`, then `studio.code.propose` |
 | "prompts", "version a prompt", "update prompt" | `prompts` | `langwatch prompt list\|versions <handle>\|create` |
 | "datasets", "training data", "add examples" | `datasets` | `langwatch dataset list`, `dataset create --columns input:string,output:string`, `dataset records add <slug>` (rows match the created columns) |
 | "set up tracing", "instrument my code" | `tracing`, then `code-changes` to apply it | `langwatch docs integration/<framework>` |

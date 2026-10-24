@@ -69,3 +69,9 @@ For the prompt improvement loop that uses these, follow the prompt-optimization 
 With no Explorer open, `explorer.setFilter`, `explorer.setTimeRange` and `explorer.setLens` answer `executedVia: "backend"` with an `href` to the Explorer in that state, and the card links there as "View in Trace Explorer". `explorer.getState` answers `source: "saved"` with the defaults and no count. The other kinds need an open page and are refused with `langy_ui_no_browser`.
 
 For choosing between driving the Explorer and answering with cards, follow the find-traces skill.
+
+## Studio code editor action kinds
+
+`studio.code.read`, `studio.code.propose`.
+
+Both need the code block's editor open in the user's browser; with it closed they are refused with `langy_ui_no_browser`. A proposal waits for the user to accept it and save. For writing the code, follow the studio-code-blocks skill.

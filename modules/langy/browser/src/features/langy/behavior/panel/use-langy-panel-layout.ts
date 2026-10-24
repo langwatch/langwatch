@@ -42,12 +42,15 @@ export function useLangyPanelPlacement() {
     immediate: reduceMotion,
   });
   const viewportWidth = useViewportWidth();
+  const heldAbove = useLangyStore((s) => s.aboveHolds > 0);
   return {
     panelMode,
     floating,
     reduceMotion,
     drawerEdgeHeld,
     isDrawerCompanion: isOpen && !!currentDrawer && !floating,
+    /** A surface open over the page's overlays holds the panel above them. */
+    heldAbove,
     floatingDodgesDrawer: isOpen && drawerEdgeHeld && floating,
     floatingPanelWidth: resolveFloatingPanelWidth(viewportWidth),
   };

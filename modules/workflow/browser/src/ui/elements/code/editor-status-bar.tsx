@@ -13,12 +13,14 @@ export function EditorStatusBar({
   editor: editorInstance,
   monaco,
   language,
+  tabSize = 4,
   onSave,
   onSaveAndClose,
 }: {
   editor: editor.IStandaloneCodeEditor | null;
   monaco: Monaco | null;
   language: string;
+  tabSize?: number;
   /** ⌘S — persist without dismissing. */
   onSave?: () => void;
   /** ⌘↵ — persist then close. */
@@ -106,7 +108,7 @@ export function EditorStatusBar({
       <Separator />
       <Text color={problemsColor}>{problemsLabel}</Text>
       <HStack flex={1} justify="flex-end" gap={3}>
-        <Text>Spaces: 4</Text>
+        <Text>Spaces: {tabSize}</Text>
         <Separator />
         <Text>UTF-8</Text>
         <Separator />
