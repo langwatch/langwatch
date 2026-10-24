@@ -715,8 +715,8 @@ jobs:
           set -euo pipefail
 
           # A re-tagged app image needs its frontend assets under the new tag too:
-          # the deployment points LANGWATCH_ASSET_BASE at this tag. Copied inside S3
-          # from the tag it was re-tagged from; `.complete` last, as on a build.
+          # the deployment points LANGWATCH_ASSET_BASE at this tag. Copied from the
+          # tag it was re-tagged from; `.complete` last, as on a build.
           copy_cdn_assets() {
             local previous="$1"
             if aws s3api head-object --bucket "${BUCKET}" --key "${IMAGE_TAG}/.complete" >/dev/null 2>&1; then
@@ -728,9 +728,21 @@ jobs:
               return 1
             fi
             aws configure set default.s3.max_concurrent_requests 64
-            aws s3 sync "s3://${BUCKET}/${previous}/assets" "s3://${BUCKET}/${IMAGE_TAG}/assets" \
-              --size-only --no-progress --exclude "*.map" \
-              --cache-control "public, max-age=31536000, immutable" --metadata-directive REPLACE
+            # Through the runner, not inside S3: an S3-to-S3 copy has no local
+            # file name for the CLI to derive a Content-Type from, and copying
+            # the source's properties would carry a wrong type forward from any
+            # prefix that already has one. Uploaded from disk, every file gets
+            # its type from its extension, exactly as on a build. Browsers
+            # refuse a module script that is not served as JavaScript.
+            local dir="${RUNNER_TEMP}/cdn-copy/${IMAGE_TAG}"
+            aws s3 sync "s3://${BUCKET}/${previous}/assets" "${dir}" \
+              --no-progress --exclude "*.map"
+            test -n "$(ls -A "${dir}")"
+            # cp, not sync: overwrite every object, so a same-size file left by
+            # an earlier failed attempt cannot keep a wrong type.
+            aws s3 cp "${dir}" "s3://${BUCKET}/${IMAGE_TAG}/assets" \
+              --recursive --no-progress --exclude "*.map" \
+              --cache-control "public, max-age=31536000, immutable"
             aws s3api put-object --bucket "${BUCKET}" --key "${IMAGE_TAG}/.complete" \
               --cache-control "no-cache" --content-length 0 >/dev/null
             echo "Copied CDN assets ${previous} -> ${IMAGE_TAG}" >> "$GITHUB_STEP_SUMMARY"
