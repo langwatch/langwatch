@@ -149,13 +149,13 @@ keywords: LangWatch, concepts, tracing, observability, LLM, AI, travel, blog, us
 
 LangWatch organizes what your LLM application sends into threads, traces and spans, each with its own ID. The optional `user_id`, `customer_id` and `labels` fields add correlation and filtering on top of them. The examples below come from an AI travel assistant and a text generation service.
 
-### Threads: The Whole Conversation
+## Threads: The Whole Conversation
 
 Field: `thread_id`
 
 Think of a **Thread** as the entire journey a user takes in a single session. It's the complete chat with your AI travel buddy, from "Where should I go?" to booking the flight. For the blog post generator, a `thread_id` bundles up the whole session, from brainstorming headlines to polishing the final SEO-optimized draft. It groups _all_ the back-and-forth interactions (Traces) for a specific task or conversation.
 
-### Traces: One Task, End-to-End
+## Traces: One Task, End-to-End
 
 Field: `trace_id`
 
@@ -171,7 +171,7 @@ Zooming in from Threads, a **Trace** represents a single, complete task performe
 
 Each `trace_id` captures an entire end-to-end generation, no matter how many internal steps (Spans) it takes.
 
-### Spans: The Building Blocks
+## Spans: The Building Blocks
 
 Field: `span_id`
 
@@ -187,19 +187,19 @@ Now, let's get granular! **Spans** are the individual steps or operations _withi
 
 Each `span_id` pinpoints a specific action taken by your system or an LLM call.
 
-### User ID: Who's Using the App?
+## User ID: Who's Using the App?
 
 Field: `user_id`
 
 Simple but crucial: The **User ID** identifies the actual end-user interacting with your product. Whether they're planning trips or writing posts, this `user_id` (usually their account ID in your system) links the activity back to a real person, helping you see how different users experience your AI features.
 
-### Customer ID: For Platform Builders
+## Customer ID: For Platform Builders
 
 Field: `customer_id`
 
 Are you building a platform _for other companies_ to create _their own_ LLM apps? That is what the **Customer ID** is for. If you're providing the tools for others (your customers) to build AI assistants for _their_ users, the `customer_id` lets you (and them!) track usage and performance per customer account. Scoping analytics by `customer_id` is what lets you give each customer a dashboard of how _their_ AI implementation is doing.
 
-### Labels: Organizing and Filtering Traces
+## Labels: Organizing and Filtering Traces
 
 Field: `labels`
 
@@ -10376,7 +10376,7 @@ Any client that lets you set an OpenAI base URL and an API key works with the ga
 | `POST /v1/chat/completions`  | OpenAI    | `Authorization: Bearer vk-lw-...`        |
 | `POST /v1/messages`          | Anthropic | `X-Api-Key: vk-lw-...`                   |
 
-The virtual key (`vk-lw-...`) is not your LangWatch API key. For the SDKs, see [TypeScript](/ai-gateway/sdks/typescript), [Python](/ai-gateway/sdks/python) and [Go](/ai-gateway/sdks/go).
+The virtual key (`vk-lw-...`) is not your LangWatch API key. For the SDKs, see the [TypeScript SDK](/ai-gateway/sdks/typescript), the [Python SDK](/ai-gateway/sdks/python) and the [Go SDK](/ai-gateway/sdks/go).
 
 ## Chat completions
 
@@ -10440,7 +10440,7 @@ curl https://gateway.langwatch.ai/v1/chat/completions \
   }'
 ```
 
-The format is `00-<trace id>-<span id>-<flags>`, with a 32-character trace id and a 16-character span id in hexadecimal. In an instrumented application, inject the current context rather than writing the value by hand; see the OpenTelemetry samples in [TypeScript](/ai-gateway/sdks/typescript#link-the-gateway-span-to-your-trace), [Python](/ai-gateway/sdks/python#link-the-gateway-span-to-your-trace) and [Go](/ai-gateway/sdks/go#link-the-gateway-span-to-your-trace).
+The format is `00-<trace id>-<span id>-<flags>`, with a 32-character trace id and a 16-character span id in hexadecimal. In an instrumented application, inject the current context rather than writing the value by hand; see the OpenTelemetry samples in [the TypeScript SDK](/ai-gateway/sdks/typescript#link-the-gateway-span-to-your-trace), [the Python SDK](/ai-gateway/sdks/python#link-the-gateway-span-to-your-trace) and [the Go SDK](/ai-gateway/sdks/go#link-the-gateway-span-to-your-trace).
 
 ## Headers you can send
 
@@ -26051,7 +26051,7 @@ keywords: manual instrumentation, context managers, span, trace, async, synchron
 
 While decorators offer a concise way to instrument functions, you might prefer or need to manually manage trace and span lifecycles. This is useful in asynchronous contexts, for finer control, or when decorators are inconvenient. The LangWatch Python SDK provides two primary ways to do this manually:
 
-### Using Context Managers (`with`/`async with`)
+## Using Context Managers (`with`/`async with`)
 
 The `langwatch.trace()` and `langwatch.span()` functions can be used directly as asynchronous (`async with`) or synchronous (`with`) context managers. This is the recommended approach for manual instrumentation as it automatically handles ending the trace/span, even if errors occur.
 
@@ -26130,7 +26130,7 @@ Key points for manual instrumentation with context managers:
 - Use methods like `span.add_event()`, and primarily `span.update(...)`, `trace.update(...)` to add details. The `update()` method is flexible for adding structured data like `input`, `output`, `metadata`, and `contexts`.
 - This approach gives explicit control over the start and end of each instrumented block, as the context manager handles ending the span automatically.
 
-### Direct Span Creation (`span.end()`)
+## Direct Span Creation (`span.end()`)
 
 Alternatively, you can manage span and trace lifecycles completely manually. Call `langwatch.span()` or `langwatch.trace()` directly to start them, and then explicitly call the `end()` method on the returned object (`span.end()` or `trace.end()`) when the operation finishes. **This requires careful handling to ensure `end()` is always called, even if errors occur (e.g., using `try...finally`).** Context managers are generally preferred as they handle this automatically.
 
@@ -31323,7 +31323,7 @@ This will display the tool call with a tool icon in the trace visualization and 
 
 ---
 title: Amazon Bedrock Integration
-sidebarTitle: Go
+sidebarTitle: Go SDK
 description: Instrument AWS Bedrock Runtime calls in Go using LangWatch to capture model usage, tokens, and cost for AI agent evaluation.
 icon: golang
 keywords: go, golang, aws, amazon bedrock, bedrockruntime, instrumentation, langwatch, smithy, converse
@@ -31440,7 +31440,7 @@ If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment th
 
 ---
 title: Anthropic (Claude) Integration
-sidebarTitle: Go
+sidebarTitle: Go SDK
 description: Instrument Anthropic Claude API calls in Go using LangWatch to track performance, detect errors, and improve AI agent testing.
 icon: golang
 keywords: go, golang, anthropic, claude, instrumentation, langwatch, messages api, native
@@ -31541,7 +31541,7 @@ If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment th
 
 ---
 title: Azure OpenAI Integration
-sidebarTitle: Go
+sidebarTitle: Go SDK
 description: Instrument Azure OpenAI API calls in Go using LangWatch to monitor model usage, latency, and AI agent evaluation metrics.
 icon: golang
 keywords: go, golang, azure, azure openai, instrumentation, langwatch, native
@@ -31738,7 +31738,7 @@ If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment th
 
 ---
 title: Google Gemini Integration
-sidebarTitle: Go
+sidebarTitle: Go SDK
 description: Instrument Google Gemini and Vertex AI calls in Go using the LangWatch SDK's native genai instrumentation.
 icon: golang
 keywords: go, golang, google, gemini, vertex ai, genai, instrumentation, langwatch, native
@@ -32134,7 +32134,7 @@ If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment th
 
 ---
 title: OpenAI Instrumentation
-sidebarTitle: Go
+sidebarTitle: Go SDK
 description: Instrument OpenAI API calls with the Go SDK to trace LLM interactions, measure performance, and support agent evaluation pipelines.
 icon: golang
 keywords: openai, instrumentation, golang, go, langwatch, middleware, streaming
@@ -33048,7 +33048,7 @@ All `timestamps` are unix epoch **milliseconds**. The optional `first_token_at` 
 
 For the type reference of how a `span` should look like, check out our [types definitions](https://github.com/langwatch/langwatch/blob/main/sdks/python/src/langwatch/types.py).
 
-It's optional but highly recommended to pass the `user_id` on the metadata if you want to use user-specific analytics and the `thread_id` to group related traces together. Read more about those and other concepts [here](../concepts).
+It's optional but highly recommended to pass the `user_id` on the metadata if you want to use user-specific analytics and the `thread_id` to group related traces together. Read more about those and other [concepts](../concepts).
 
 3.  Execute the `curl` command. If successful, LangWatch will process your trace data.
 
@@ -33056,7 +33056,7 @@ This method of integration sends traces from any system capable of making HTTP r
 
 Remember to handle errors and retries as needed. You might need to script additional logic around the `curl` command to handle these cases.
 
-### The same request from Python
+## The same request from Python
 
 ```bash
 pip install requests
@@ -33098,7 +33098,7 @@ response = requests.post(
 response.raise_for_status()
 ```
 
-### Check it worked
+## Check it worked
 
 A successful request returns a `2xx` status. Then open your project in LangWatch: the trace `trace-123` appears in the traces list within a few seconds, with one LLM span holding the input and output you sent. Use a new `trace_id` for each trace you send.
 
@@ -40115,7 +40115,7 @@ The Python and TypeScript SDKs, the CLI, the MCP server and the REST API list, c
 # FILE: ./datasets/programmatic-access.mdx
 
 ---
-title: "Datasets: programmatic access from the SDKs, CLI and MCP server"
+title: "Datasets: programmatic access from SDKs, CLI and MCP"
 sidebarTitle: Programmatic Access
 description: Manage datasets from the Python and TypeScript SDKs, the CLI and the MCP server for offline evaluations and automated workflows.
 ---
@@ -46672,7 +46672,7 @@ Returns the per-row dataset entries (input, output, trace id, duration) and eval
 # FILE: ./evaluations/experiments/multimodal-evaluation.mdx
 
 ---
-title: "Multimodal Evaluation: images, PDFs and vision models in experiments"
+title: "Multimodal Evaluation: images, PDFs and vision models"
 sidebarTitle: Multimodal Evaluation
 description: Evaluate image generation, document parsing, and other multimodal AI pipelines with LLM-as-a-Judge vision models.
 ---
@@ -48328,7 +48328,7 @@ See [CI/CD Integration](/evaluations/experiments/ci-cd) for complete examples wi
 # FILE: ./evaluations/experiments/ui/answer-correctness.mdx
 
 ---
-title: "Answer Correctness: check LLM answers against the expected output"
+title: "Answer Correctness: check answers against expected output"
 sidebarTitle: Answer Correctness
 description: Score every answer against the expected output in your dataset with the Exact Match or the LLM Answer Match evaluator, and compare runs as you change the prompt.
 ---
@@ -48441,7 +48441,7 @@ Each saved prompt version is what your application loads through the [prompt lib
 # FILE: ./evaluations/experiments/ui/llm-as-a-judge.mdx
 
 ---
-title: "LLM-as-a-Judge: score outputs on criteria without expected answers"
+title: "LLM-as-a-Judge: score outputs without expected answers"
 sidebarTitle: LLM-as-a-Judge
 description: Score outputs against written criteria with an LLM-as-a-Judge evaluator when your dataset has inputs but no expected answers, and read the reason behind each verdict.
 ---
@@ -48536,7 +48536,7 @@ Change the prompt, click **Run** again, then open **Results** and tick both runs
 # FILE: ./evaluations/experiments/ui/pairwise-compare.mdx
 
 ---
-title: "Pairwise Comparison: judge prompts, models or agents head-to-head"
+title: "Pairwise Comparison: judge candidates head-to-head"
 sidebarTitle: Comparison
 description: Use the Comparison evaluator to judge two or more candidate outputs against each other, with built-in position-bias mitigation, and rank three or more candidates on a Bradley-Terry leaderboard.
 ---
@@ -49589,7 +49589,7 @@ See [Custom scoring](/evaluations/evaluators/custom-scoring) for the result fiel
 # FILE: ./evaluations/online-evaluation/setup-monitors.mdx
 
 ---
-title: "Online Evaluations: set up a monitor on your production traffic"
+title: "Online Evaluations: monitor your production traffic"
 sidebarTitle: Setting up Monitors
 description: Create an online evaluation that scores every incoming trace or thread with an evaluator, filter and sample the traffic it runs on, and read the results on the trace and in analytics.
 ---
@@ -52471,7 +52471,7 @@ To evaluate a conversational AI such as an AI coach, score each response with a 
 
 We'll use LangWatch to orchestrate this evaluation, track the boolean (pass/fail) outputs from each judge, and compare them against an expert-annotated dataset.
 
-### **1. The Scenario**
+## **1. The Scenario**
 
 Our AI coach needs to hold nuanced, reflective conversations. We want to verify that its responses adhere to our desired coaching methodology. For example, we want it to ask open-ended questions but avoid giving direct advice or repeating itself.
 
@@ -52479,7 +52479,7 @@ Our AI coach needs to hold nuanced, reflective conversations. We want to verify 
 - **Output**: The AI coach's response.
 - **Evaluation**: A set of boolean judgments on the quality and style of the response.
 
-### **2. Setup and Data Preparation**
+## **2. Setup and Data Preparation**
 
 Our evaluation dataset is key. It contains not only the conversation turns but also the expected outcomes for each of our custom judges. These ground truth labels are typically annotated by domain experts.
 
@@ -52518,7 +52518,7 @@ print("Sample evaluation data:")
 print(df)
 ```
 
-### **3. Defining the Custom LLM Judges**
+## **3. Defining the Custom LLM Judges**
 
 Each "judge" is a function that calls an LLM with a specific prompt, asking it to evaluate one aspect of the AI's response. It takes the conversation context and returns a simple boolean.
 
@@ -52565,7 +52565,7 @@ def run_looping_judge_llm(model_output: str, history_json: str) -> bool:
     return response.output
 ```
 
-### **4. Implementing the Evaluation Script**
+## **4. Implementing the Evaluation Script**
 
 Now we'll use LangWatch to run our judges against the dataset and log the results. We'll use `evaluation.submit()` to run the evaluations in parallel, which is highly effective when running multiple independent judges per data sample.
 
@@ -52620,7 +52620,7 @@ for idx, row in evaluation.loop(df.iterrows(), threads=4):
 print("\nEvaluation complete! Check your results in the LangWatch dashboard.")
 ```
 
-### **5. Analyzing the Results in LangWatch**
+## **5. Analyzing the Results in LangWatch**
 
 This script produces a detailed, multi-faceted evaluation of your AI coach. In the LangWatch dashboard, you can:
 
@@ -52628,7 +52628,7 @@ This script produces a detailed, multi-faceted evaluation of your AI coach. In t
 - **Filter for Failures**: Instantly isolate all conversation turns where a specific judge failed. For example, you can view all samples where `looping_judge_passed` was False to understand why your model is getting repetitive.
 - **Compare Runs**: Compare results from `ai-coach-quality-v3-run-001` against future runs to track the impact of your changes and prevent regressions.
 
-### **6. Conclusion**
+## **6. Conclusion**
 
 By implementing this evaluation framework with LangWatch, you can systematically improve the quality and consistency of your AI coaching conversations. The combination of specialized LLM judges and ground truth annotations gives you a way to measure and enhance key aspects of coaching interactions, from question quality to conversational flow.
 
@@ -52648,7 +52648,7 @@ An evaluation script measures how well the LLM behind a taxi booking chatbot ext
 
 We'll use LangWatch to create a simple, repeatable evaluation script to measure and track the model's accuracy.
 
-### **1. The Problem**
+## **1. The Problem**
 
 Our LLM's job is to interpret short chat messages and extract key details for a ride booking.
 
@@ -52657,7 +52657,7 @@ Our LLM's job is to interpret short chat messages and extract key details for a 
 
 We need to evaluate how accurately our model can extract fields like `pickup_address`, `airport_found`, and `passenger_count`, even when the input is incomplete.
 
-### **2. Setup and Data Preparation**
+## **2. Setup and Data Preparation**
 
 First, let's set up our environment and create a simple dataset for the evaluation. Our dataset will be a pandas DataFrame with the `user_message` and a `ground_truth` column containing the expected JSON output.
 
@@ -52690,7 +52690,7 @@ df = pd.DataFrame(data)
 print(df)
 ```
 
-### **3. Define the Extraction Logic**
+## **3. Define the Extraction Logic**
 
 Next, we'll define a placeholder function, `extract_booking_details()`, that simulates our LLM pipeline. This function takes a user message and returns a JSON object with the extracted details.
 
@@ -52719,7 +52719,7 @@ def extract_booking_details(message: str) -> BookingDetails:
     return response.output
 ```
 
-### **4. Implementing the Evaluation Script**
+## **4. Implementing the Evaluation Script**
 
 Now, let's tie it all together with LangWatch. We'll initialize an evaluation, loop through our dataset, call our model, and log custom metrics to track the accuracy of each extracted field.
 
@@ -52792,7 +52792,7 @@ for idx, row in evaluation.loop(df.iterrows()):
 print("Evaluation complete! Check your results in the LangWatch dashboard.")
 ```
 
-### **5. Analyzing the Results**
+## **5. Analyzing the Results**
 
 After running the script, you can navigate to the LangWatch dashboard to see your results. You'll get:
 
@@ -52802,11 +52802,11 @@ After running the script, you can navigate to the LangWatch dashboard to see you
 
 For example, you could quickly filter for all samples where `hallucination_check` failed to debug why your model is inventing a destination_address. This level of detail is crucial for iterating on your prompts and improving model reliability.
 
-### **6. Conclusion**
+## **6. Conclusion**
 
 By implementing this evaluation-driven approach with LangWatch, you can systematically measure and improve the accuracy of your structured data extraction for your chatbot. The detailed field-by-field analysis helps identify specific areas for improvement, whether it's handling incomplete addresses, detecting airport mentions, or preventing hallucinations. With continuous monitoring, you can ensure your booking system remains reliable as it processes real-world, unstructured user messages.
 
-### **7. Optimizing Your Extraction**
+## **7. Optimizing Your Extraction**
 
 Now that you've set up evaluation for your structured data extraction, you can use [Workflows](/workflows/overview) to improve your extraction pipeline. Put the extraction prompt in an LLM node, attach the dataset, evaluate each prompt variation on the same rows and compare the results run by run.
 
@@ -52824,7 +52824,7 @@ A RAG (Retrieval-Augmented Generation) chatbot that answers technical questions 
 
 The goal is to verify that the chatbot provides accurate, relevant, and faithful answers based on the official documentation. We'll use LangWatch to automate this evaluation so it can run in a CI/CD workflow.
 
-### **1. The Scenario**
+## **1. The Scenario**
 
 Our RAG chatbot must answer precise technical questions from operators and technicians. The quality of its answers is critical for safety and proper machine maintenance.
 
@@ -52834,7 +52834,7 @@ Our RAG chatbot must answer precise technical questions from operators and techn
 
 We need to evaluate if the RAG pipeline can reliably retrieve the correct information and synthesize an accurate answer.
 
-### **2. Setup and Data Preparation**
+## **2. Setup and Data Preparation**
 
 First, let's set up the environment. For this evaluation, we'll use a "golden dataset" that contains question-answer pairs.
 
@@ -52862,7 +52862,7 @@ data = {
 df = pd.DataFrame(data)
 ```
 
-### **3. Defining the RAG Pipeline**
+## **3. Defining the RAG Pipeline**
 
 Next, we'll define placeholder functions for our RAG pipeline. In a real application, these would contain your logic for vector search and calling an LLM.
 
@@ -52898,7 +52898,7 @@ def generate_answer(question: str, contexts: List[str]) -> str:
     return response.output
 ```
 
-### **4. Implementing the Evaluation Script**
+## **4. Implementing the Evaluation Script**
 
 Now, we'll use LangWatch to evaluate our RAG pipeline against the golden dataset. We'll initialize an evaluation run, loop through our questions, and use LangWatch's built-in evaluators to score the results.
 
@@ -52960,7 +52960,7 @@ for idx, row in evaluation.loop(df.iterrows()):
 print("Evaluation complete! Check your results in the LangWatch dashboard.")
 ```
 
-### **5. Analyzing the Results**
+## **5. Analyzing the Results**
 
 Once the script finishes, you can go to the LangWatch dashboard to analyze the performance of your RAG pipeline. The dashboard allows you to:
 
@@ -52968,7 +52968,7 @@ Once the script finishes, you can go to the LangWatch dashboard to analyze the p
 - **Drill into Failures**: Filter for all samples where `expected_answer_accuracy` failed. For each failure, you can inspect the question, the contexts that were retrieved, the generated answer, and the expected answer to quickly diagnose the root cause (e.g. a retrieval issue or a generation problem).
 - **Collaborate with Experts**: Share direct links to evaluation results with the domain experts who created the dataset, so they can close the feedback loop.
 
-### **6. Conclusion**
+## **6. Conclusion**
 
 By implementing this evaluation-driven approach with LangWatch, you can transform dense technical documentation into a reliable RAG-based assistant that technicians and operators can trust. The continuous monitoring and evaluation ensure that as documentation evolves, your AI assistant maintains its accuracy and reliability.
 
@@ -66376,7 +66376,7 @@ For a month with hosted usage, LangWatch emails a statement to your billing cont
 # FILE: ./self-hosting/data-and-telemetry.mdx
 
 ---
-title: "Data and telemetry: every outbound connection of a self-hosted install"
+title: "Data and telemetry: every outbound connection"
 description: "Every connection a self-hosted install can open to LangWatch and to third parties, what each one carries, and the switch that stops it"
 sidebarTitle: Data and telemetry
 keywords: telemetry, usage report, upgrade diagnostics, usage statistics, self-hosted, privacy, opt out, DISABLE_USAGE_STATS, license sync, checkup, egress, outbound connections, firewall, managed models, instant evals, air-gapped, LANGWATCH_CONNECT_DISABLED
@@ -69756,7 +69756,7 @@ A compact section at the bottom shows the latest projection replay run with its 
 
 ---
 title: Deja View
-description: "Time-travel debugger for event-sourced aggregates"
+description: "Deja View is a time-travel debugger for event-sourced aggregates: search an aggregate, read its events and compute any projection at any point."
 ---
 
 **Deja View** (`/ops/dejaview`) is a time-travel debugger for LangWatch's event-sourcing system. It lets you search for any aggregate, inspect its full event history, and compute any projection's state at any point in that history, all from a single interface.
@@ -70463,7 +70463,7 @@ LangWatch manages the application. Your data lives on exclusive, dedicated insta
 <Card title="Hybrid" icon="arrows-split-up-and-left">
 LangWatch manages the control plane (App, Workers, NLP, LangEvals). You provide the data plane, ClickHouse and S3 in your VPC. Your trace data never leaves your network.
 
-[Learn more](/hybrid-setup/overview)
+[Read the hybrid setup guide](/hybrid-setup/overview)
 
 </Card>
 </CardGroup>
@@ -71915,7 +71915,7 @@ For timeouts or connection issues, the tool uses exponential backoff (up to 5 re
 
 ---
 title: Upgrade Guide
-description: "How to upgrade LangWatch to the latest version"
+description: "How to upgrade a self-hosted LangWatch to the latest version: what to check first, how migrations run and how to confirm they finished."
 ---
 
 <Info>
@@ -72397,7 +72397,7 @@ If you encounter issues during an upgrade:
 # FILE: ./self-hosting/usage-report-dictionary.mdx
 
 ---
-title: "Usage report dictionary: every field a self-hosted install sends"
+title: "Usage report dictionary: every field an install sends"
 description: "The fields of the daily usage report, their category, their window, why each is collected, and what is never collected. Generated from the dictionary the install reports from."
 sidebarTitle: Usage report dictionary
 keywords: usage report, telemetry, self-hosted, dictionary, fields, opt out, privacy
@@ -73027,7 +73027,7 @@ With the Annotations API, you can annotate traces with additional information. T
 
 To make a call to the Annotations API, you will need to pass through your LangWatch API key in the header as `X-Auth-Token`. Your API key can be found on the setup page under settings.
 
-#### Allowed Methods
+### Allowed Methods
 
 - `GET /api/v1/annotations` - Get a list of annotations
 - `GET /api/v1/annotations/:id` - Get a single annotation
@@ -73494,7 +73494,7 @@ Manage datasets for evaluations, experiments, and fine-tuning. Create, update, u
 # FILE: ./api-reference/datasets/post-dataset-entries.mdx
 
 ---
-title: "Add dataset entries programmatically using the LangWatch API to build evaluation sets for LLM testing and agent validation."
+title: "Add dataset entries"
 openapi: "POST /api/v1/dataset/{datasetSlug}/entries"
 ---
 
@@ -73833,7 +73833,7 @@ While here you can find a reference list, to get the execution code you can use 
 
 To make a call to the Evaluators API, you will need to pass through your LangWatch API key in the header as `X-Auth-Token`. Your API key can be found on the setup page under settings.
 
-#### Allowed Methods
+### Allowed Methods
 
 - `POST /api/v1/evaluations/{evaluator}/evaluate` - Run an evaluation using a specific evaluator
 
@@ -76001,7 +76001,7 @@ With the Prompts API, you can manage and version your prompts. This is useful fo
 
 To make a call to the Prompts API, you will need to pass through your LangWatch API key in the header as `X-Auth-Token`. Your API key can be found on the setup page under settings.
 
-#### Allowed Methods
+### Allowed Methods
 
 - `GET /api/v1/prompts` - Get all prompts for a project
 - `POST /api/v1/prompts` - Create a new prompt
@@ -78729,7 +78729,7 @@ openapi: "PATCH /api/v1/workflows/{id}"
 
 ---
 title: Status Page
-description: Something wrong? Check our status page
+description: Check the LangWatch status page for the current state of the platform, ongoing incidents and scheduled maintenance.
 ---
 
 Visit the [status page](https://status.langwatch.ai) to see the current status of LangWatch and any ongoing maintenance or incidents.
