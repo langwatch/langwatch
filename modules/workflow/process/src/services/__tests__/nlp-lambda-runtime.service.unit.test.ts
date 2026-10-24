@@ -16,6 +16,7 @@ import {
 } from "../../rules/nlp-lambda-config.rules.ts";
 import {
   NLP_LAMBDA_ARN_CACHE_TTL_SECONDS,
+  NLP_LAMBDA_UNPROTECTED_ARN_CACHE_TTL_SECONDS,
   NlpLambdaRuntimeService,
 } from "../nlp-lambda-runtime.service.ts";
 
@@ -473,6 +474,36 @@ describe("the per-project NLP Lambda runtime", () => {
       });
       expect(newer.resolve).not.toHaveBeenCalled();
       expect(cache.deleted).toEqual([]);
+    });
+
+    /** @scenario "A function left unmoved for want of an order is served briefly from cache" */
+    it("files an unprotected resolution under the pod's own image for a short window", async () => {
+      const cache = new SharedCache();
+      const unmoved = vi.fn(async () => ({
+        arn: ARN,
+        imageUri: NEXT_IMAGE,
+        imageOrder: 200,
+        unprotected: true,
+      }));
+      const resolver = new (class implements NlpLambdaArnResolver {
+        resolve = unmoved;
+      })();
+      const engine = runtime({ cache, resolver, imageUri: NEXT_IMAGE, imageOrder: 200 });
+
+      await engine.resolveArn(PROJECT);
+      const again = await runtime({
+        cache,
+        resolver,
+        imageUri: NEXT_IMAGE,
+        imageOrder: 200,
+      }).resolveArn(PROJECT);
+
+      expect(again).toBe(ARN);
+      expect(unmoved).toHaveBeenCalledTimes(1);
+      expect(cache.deleted).toEqual([]);
+      expect(cache.entries.get("lambda_arn:projectA")?.ttlSeconds).toBe(
+        NLP_LAMBDA_UNPROTECTED_ARN_CACHE_TTL_SECONDS,
+      );
     });
   });
 });

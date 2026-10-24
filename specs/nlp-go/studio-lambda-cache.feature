@@ -137,7 +137,7 @@ Feature: Per-project NLP Lambda resolution
     Given the fleet configuration names an image_order
     And Lambda answers GetFunction with a TagsError instead of the function's tags
     When the pod resolves that project
-    Then it answers with the function's ARN and the image it still carries
+    Then it answers with the function's ARN, marked as left unprotected
     And it sends no UpdateFunctionCode, UpdateFunctionConfiguration or TagResource call
 
   @unit
@@ -191,3 +191,10 @@ Feature: Per-project NLP Lambda resolution
     Given a pod on a lower image order resolves "projectA" and its resolver leaves the function alone
     Then the shared entry carries the image and order the function holds
     And a pod on that newer order serves the entry without calling AWS
+
+  @unit
+  Scenario: A function left unmoved for want of an order is served briefly from cache
+    Given the pod's resolver left a function unmoved because it could not read or record the order
+    When the runtime shares that resolution
+    Then the entry is filed under the pod's own image and order with a 60 second TTL
+    And the next resolution on any pod of that release is served from cache without deleting it

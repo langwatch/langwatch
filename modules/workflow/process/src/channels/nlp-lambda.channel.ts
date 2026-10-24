@@ -20,6 +20,8 @@ export type NlpLambdaResolution = Readonly<{
   arn: string;
   imageUri: string;
   imageOrder?: number | undefined;
+  /** The pod could not read or record the order, so it left the function on its old image. */
+  unprotected?: boolean | undefined;
 }>;
 
 /** The AWS flow that finds, creates or updates the project's function. */

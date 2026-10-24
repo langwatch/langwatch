@@ -64,6 +64,7 @@ export class AwsNlpLambdaArnResolverChannel implements NlpLambdaArnResolver {
       : {
           current: await this.createFunction({ functionName, projectId: input.projectId }),
           ...this.ownImage(),
+          unprotected: false,
         };
 
     await this.pollUntilReady(functionName);
@@ -73,7 +74,12 @@ export class AwsNlpLambdaArnResolverChannel implements NlpLambdaArnResolver {
       throw new Error(`AWS reported no ARN for the studio Lambda ${functionName}.`);
     }
 
-    return { arn, imageUri: synced.imageUri, imageOrder: synced.imageOrder };
+    return {
+      arn,
+      imageUri: synced.imageUri,
+      imageOrder: synced.imageOrder,
+      ...(synced.unprotected ? { unprotected: true } : {}),
+    };
   }
 
   private ownImage(): { imageUri: string; imageOrder: number | undefined } {
@@ -177,6 +183,7 @@ export class AwsNlpLambdaArnResolverChannel implements NlpLambdaArnResolver {
     current: FunctionConfiguration;
     imageUri: string;
     imageOrder: number | undefined;
+    unprotected?: boolean;
   }> {
     const { config } = this.options;
     const details = await this.options.lambda.send(
@@ -195,23 +202,34 @@ export class AwsNlpLambdaArnResolverChannel implements NlpLambdaArnResolver {
       tags: details.Tags,
       tagsUnreadable: details.TagsError !== undefined,
     });
-    if (standing === "behind" || standing === "unknown") {
+    if (standing === "behind") {
       this.options.logger?.info(
-        { projectId: input.projectId, imageOrder: config.imageOrder, standing },
-        "the studio Lambda's rollout order is newer or unreadable; leaving it as it is",
+        { projectId: input.projectId, imageOrder: config.imageOrder },
+        "a newer release owns the studio Lambda; leaving it as it is",
       );
 
       return left;
     }
 
+    // Filed under this pod's own image so its cache serves it until the short retry window ends.
+    const unprotected = { current, ...this.ownImage(), unprotected: true };
+    if (standing === "unknown") {
+      this.options.logger?.warn(
+        { projectId: input.projectId, tagsError: details.TagsError },
+        "could not read the studio Lambda's tags; leaving it as it is",
+      );
+
+      return unprotected;
+    }
+
     // Recorded before the image moves, so a pod still on the older release
     // that reads the function mid-update already sees it is behind.
     if (standing === "ahead") {
-      const recorded = await this.recordImageOrder({
+      const tagged = await this.recordImageOrder({
         functionArn: details.Configuration?.FunctionArn ?? input.existing.FunctionArn,
         projectId: input.projectId,
       });
-      if (!recorded) return left;
+      if (!tagged) return unprotected;
     }
 
     const deployedImage = details.Code?.ImageUri;

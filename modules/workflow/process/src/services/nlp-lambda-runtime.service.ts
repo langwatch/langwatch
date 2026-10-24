@@ -20,6 +20,9 @@ export const NLP_LAMBDA_ARN_CACHE_PREFIX = "lambda_arn:";
  */
 export const NLP_LAMBDA_ARN_CACHE_TTL_SECONDS = 600;
 
+/** How long a function left unmoved for want of a usable order is served before a retry. */
+export const NLP_LAMBDA_UNPROTECTED_ARN_CACHE_TTL_SECONDS = 60;
+
 export class NlpLambdaRuntimeService {
   static create(options: {
     cache: NlpLambdaArnCache;
@@ -132,7 +135,9 @@ export class NlpLambdaRuntimeService {
       await this.options.cache.set({
         key: this.keyFor(projectId),
         value: JSON.stringify(entry),
-        ttlSeconds: this.options.ttlSeconds ?? NLP_LAMBDA_ARN_CACHE_TTL_SECONDS,
+        ttlSeconds: resolved.unprotected
+          ? NLP_LAMBDA_UNPROTECTED_ARN_CACHE_TTL_SECONDS
+          : (this.options.ttlSeconds ?? NLP_LAMBDA_ARN_CACHE_TTL_SECONDS),
       });
     } catch (error) {
       this.options.logger?.warn(

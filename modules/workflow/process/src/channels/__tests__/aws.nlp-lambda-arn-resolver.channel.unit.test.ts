@@ -362,7 +362,7 @@ describe("given pods of two releases serving the same project during a rollout",
 
   describe("when Lambda cannot return the function's tags", () => {
     /** @scenario "A pod that cannot read the function's order leaves it alone" */
-    it("writes nothing and reports the image the function still carries", async () => {
+    it("writes nothing and marks the resolution unprotected", async () => {
       const { sent, subject } = resolver({
         config: ORDERED,
         reads: onImage({
@@ -373,7 +373,12 @@ describe("given pods of two releases serving the same project during a rollout",
 
       const resolution = await subject.resolve({ projectId: "project-1" });
 
-      expect(resolution).toEqual({ arn: ARN, imageUri: "registry/nlp:v10", imageOrder: undefined });
+      expect(resolution).toEqual({
+        arn: ARN,
+        imageUri: CONFIG.imageUri,
+        imageOrder: 1700000200,
+        unprotected: true,
+      });
       expect(writes(sent)).toEqual([]);
     });
   });
@@ -389,7 +394,7 @@ describe("given pods of two releases serving the same project during a rollout",
 
       const resolution = await subject.resolve({ projectId: "project-1" });
 
-      expect(resolution).toMatchObject({ arn: ARN, imageUri: "registry/nlp:v8" });
+      expect(resolution).toMatchObject({ arn: ARN, imageUri: CONFIG.imageUri, unprotected: true });
       expect(writes(sent)).toEqual(["TagResourceCommand"]);
     });
   });
