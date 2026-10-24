@@ -13,7 +13,7 @@ export const IMAGE_SIZES = "(min-width: 64rem) 840px, 100vw";
 /* An image counts as above the fold while the article text before it fits the first screen. */
 const FOLD_TEXT = 600;
 const FOLD_HEADINGS = 1;
-const RASTER = /\.(png|jpe?g)$/i;
+const RASTER = /\.(png|jpe?g|webp)$/i;
 const VOID = new Set(["img", "br", "hr", "input", "meta", "link", "source", "wbr", "col", "area"]);
 const THEMES = { "docs-light-only": "light", "docs-dark-only": "dark" } as const;
 

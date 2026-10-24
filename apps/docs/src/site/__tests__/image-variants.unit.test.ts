@@ -131,4 +131,23 @@ describe("modern image encodings", () => {
       expect(page).toContain(`<img class="docs-img" src="/${names[1]}"`);
     }
   });
+
+  /** @scenario "Serve authored screenshots as modern images" */
+  it("serves an authored WebP wider than the column at the column's widths", async () => {
+    mkdirSync(path.join(root, "images"));
+    const wide = await sharp(await capture({ width: 2400, height: 40 }))
+      .webp({ quality: 100 })
+      .toBuffer();
+    writeFileSync(path.join(root, "images/wide.webp"), wide);
+    const html = `<html><head><title>T</title></head><body><article class="docs-prose"><img class="docs-img" src="/images/wide.webp" alt=""/></article></body></html>`;
+    const result = await optimisePageImages({
+      pages: new Map([["guide/index.html", html]]),
+      docsRoot: root,
+      basePath: "",
+      cacheDir: null,
+    });
+    const page = result.pages.get("guide/index.html") ?? "";
+    expect(page).toMatch(/<source type="image\/webp" srcset="\/images\/wide-840\.\w+\.webp 840w/);
+    expect(result.aliases.get("/images/wide.webp")).toMatch(/^\/images\/wide-1680\./);
+  });
 });

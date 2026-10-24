@@ -56,7 +56,7 @@ Feature: Static documentation with progressive interaction
 
   @unit
   Scenario: Serve authored screenshots as modern images
-    Given a guide shows a local PNG or JPEG image
+    Given a guide shows a local PNG, JPEG or WebP image
     When the site is built
     Then the page offers AVIF and WebP encodings of it in a picture, at the article column's width and twice it
     And the image element names the largest WebP encoding, so the original is not published
