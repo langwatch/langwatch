@@ -95,8 +95,8 @@ describe("TraceCountClickHouseRepository", () => {
 
       const sql = statements[0]?.query.replace(/\s+/g, " ") ?? "";
       expect(organizationsResolved).toContain(ORGANIZATION);
-      expect(sql).toContain("SELECT TenantId, TraceId, min(Month) AS FirstMonth");
-      expect(sql).toContain("GROUP BY TenantId, TraceId");
+      expect(sql).toContain("sipHash64(TenantId, TraceId) AS TraceKey, min(Month) AS FirstMonth");
+      expect(sql).toContain("GROUP BY TraceKey");
       expect(sql).not.toContain("FINAL");
       expect(statements[0]?.query_params).toMatchObject({
         organizationId: ORGANIZATION,
@@ -120,7 +120,31 @@ describe("TraceCountClickHouseRepository", () => {
           month: "2026-10",
         }),
       ).resolves.toEqual([{ projectId: "project_1", count: 7 }]);
-      expect(statements[0]?.query).toContain("TenantId IN {projectIds:Array(String)}");
+      const sql = statements[0]?.query.replace(/\s+/g, " ") ?? "";
+      expect(sql).toContain("TenantId IN {projectIds:Array(String)}");
+      expect(sql).toContain("GROUP BY ProjectIndex, TraceKey");
+      expect(sql).toContain("{projectIds:Array(String)}[ProjectIndex] AS projectId");
+    });
+  });
+
+  describe("when an organization's month is too large to group in memory", () => {
+    /** @scenario "A large organization's trace count spills rather than failing the ingest check" */
+    it("lets both counts spill their grouping to disk", async () => {
+      const { counts, statements } = countOver([{ projectId: "project_1", total: "7" }]);
+
+      await counts.findTotal({ organizationId: ORGANIZATION, month: "2026-10" });
+      await counts.countByProjects({
+        organizationId: ORGANIZATION,
+        projectIds: ["project_1"],
+        month: "2026-10",
+      });
+
+      const spillThresholds = statements.map(
+        (statement) =>
+          (statement as { clickhouse_settings?: Record<string, unknown> }).clickhouse_settings
+            ?.max_bytes_before_external_group_by,
+      );
+      expect(spillThresholds).toEqual([String(256 * 1024 * 1024), String(256 * 1024 * 1024)]);
     });
   });
 });

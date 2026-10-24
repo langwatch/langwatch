@@ -417,3 +417,8 @@ const TRANSIENT_CODES: ReadonlySet<string> = new Set(TRANSIENT_REFUSAL_CODES);
 export function isTransientRefusal(error: Pick<HandledError, "code" | "httpStatus">): boolean {
   return error.httpStatus === TRANSIENT_REFUSAL_STATUS && TRANSIENT_CODES.has(error.code);
 }
+
+/** True for any thrown value that is a handled error and a {@link isTransientRefusal}. */
+export function isHandledTransientRefusal(error: unknown): boolean {
+  return HandledError.isHandled(error) && isTransientRefusal(error);
+}
