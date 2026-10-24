@@ -153,8 +153,9 @@ function findViewReferences({
 }
 
 /**
- * Refuses `FINAL` or `SAMPLE` on a view about to be read as a subquery, which ClickHouse rejects
- * with a bare error. The parser gives neither a position, so neither can be moved inside.
+ * Refuses `FINAL` or `SAMPLE` on the given references: a view about to be read as a subquery, or
+ * a PostgreSQL-resident view. The parser gives neither modifier a position, so neither can be moved
+ * inside a subquery.
  * @throws {LangWatchQLTableModifierError} naming the modifiers written.
  */
 function assertNoTableModifiers({
@@ -164,18 +165,68 @@ function assertNoTableModifiers({
   statements: readonly SqlAstNode[];
   references: readonly ViewReference[];
 }): void {
-  const rewritten = new Set(references.map((reference) => reference.start));
+  const refused = new Set(references.map((reference) => reference.start));
   const modifiers = new Set<string>();
   for (const expression of collectNodes(statements, "TableExpression", [])) {
     const table = expression.database_and_table_name as
       | { location?: { start?: { offset?: unknown } } }
       | undefined;
     const start = table?.location?.start?.offset;
-    if (typeof start !== "number" || !rewritten.has(start)) continue;
+    if (typeof start !== "number" || !refused.has(start)) continue;
     if (expression.final === true) modifiers.add("FINAL");
     if (expression.sample_size !== undefined) modifiers.add("SAMPLE");
   }
   if (modifiers.size > 0) throw new LangWatchQLTableModifierError({ modifiers: [...modifiers] });
+}
+
+/**
+ * The references to a PostgreSQL-resident view. Its PostgreSQL engine table refuses `FINAL` with
+ * ILLEGAL_FINAL, and the view already keeps one row per key, so neither modifier buys anything.
+ */
+function postgresReferences({
+  references,
+  views,
+  database,
+}: {
+  references: readonly ViewReference[];
+  views: readonly LangWatchQLViewDefinition[];
+  database: string;
+}): ViewReference[] {
+  const postgres = new Set(
+    views
+      .filter((view) => view.postgres !== undefined)
+      .map((view) => qualifyTableName({ table: view.name, defaultDatabase: database })),
+  );
+  return references.filter((reference) => postgres.has(reference.qualified));
+}
+
+/**
+ * Refuses `FINAL` or `SAMPLE` on a PostgreSQL-resident view in a statement read as written.
+ * A statement that does not parse is left for the validator to refuse, as before.
+ * @throws {LangWatchQLTableModifierError} naming the modifiers written.
+ */
+export function assertNoPostgresTableModifiers({
+  sql,
+  views,
+  database,
+}: {
+  sql: string;
+  views: readonly LangWatchQLViewDefinition[];
+  database: string;
+}): void {
+  if (!/\b(final|sample)\b/i.test(sql)) return;
+  if (!views.some((view) => view.postgres !== undefined)) return;
+  const parsed = clickHouseSqlParser.parse(sql);
+  if (!parsed.ok) return;
+  const references = findViewReferences({
+    statements: parsed.statements,
+    database,
+    withNames: findWithNames(parsed.statements),
+  });
+  assertNoTableModifiers({
+    statements: parsed.statements,
+    references: postgresReferences({ references, views, database }),
+  });
 }
 
 /**
@@ -372,7 +423,10 @@ export function scopeLangWatchQL({
 }): string {
   // Whole-history members need no rewrite: the row policy bounds them exactly.
   const isWindowed = memberWindows?.some((window) => window.from > 0) === true;
-  if (excludeOrigins.length === 0 && !isWindowed) return sql;
+  if (excludeOrigins.length === 0 && !isWindowed) {
+    assertNoPostgresTableModifiers({ sql, views, database });
+    return sql;
+  }
 
   const parsed = clickHouseSqlParser.parse(sql);
   if (!parsed.ok) {
@@ -394,11 +448,8 @@ export function scopeLangWatchQL({
       : undefined;
   const withNames = findWithNames(parsed.statements);
   assertNoShadowedView({ withNames, views, windows });
-  const rewrites = findViewReferences({
-    statements: parsed.statements,
-    database,
-    withNames,
-  }).flatMap((reference) => {
+  const references = findViewReferences({ statements: parsed.statements, database, withNames });
+  const rewrites = references.flatMap((reference) => {
     const window =
       windows === undefined ? undefined : (windows.get(reference.qualified) ?? NO_ROWS);
     const predicate = [origins.get(reference.qualified), window]
@@ -408,7 +459,10 @@ export function scopeLangWatchQL({
   });
   assertNoTableModifiers({
     statements: parsed.statements,
-    references: rewrites.map(({ reference }) => reference),
+    references: [
+      ...rewrites.map(({ reference }) => reference),
+      ...postgresReferences({ references, views, database }),
+    ],
   });
   let scoped = sql;
   for (const { reference, predicate } of rewrites) {

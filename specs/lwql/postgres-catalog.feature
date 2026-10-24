@@ -217,3 +217,19 @@ Feature: Every catalogued Postgres model is queryable through LangWatchQL
       Then no error occurs
       And the view's columns match the derived catalog's order
       And the reader role can still select from it
+
+  Rule: A read of a Postgres view takes no table modifier
+
+    # The view's PostgreSQL engine table refuses FINAL with ILLEGAL_FINAL, and the
+    # view already keeps one row per key, so neither modifier adds anything.
+    @unit
+    Scenario: FINAL or SAMPLE on a PostgreSQL-resident view is refused with a clear message
+      When ana runs a statement that reads a Postgres view with FINAL or SAMPLE
+      Then the run is refused saying FINAL and SAMPLE cannot be used on this read
+      And no statement reaches the store
+
+    @unit
+    Scenario: A pass over a PostgreSQL-resident view with FINAL is refused too
+      When an instant-eval pass runs a statement that reads a Postgres view with FINAL
+      Then the pass is refused saying FINAL and SAMPLE cannot be used on this read
+      And no statement reaches the store

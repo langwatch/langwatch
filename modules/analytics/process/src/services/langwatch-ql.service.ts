@@ -28,6 +28,7 @@ import type {
   LangWatchQLResultLimits,
 } from "../repositories/langwatch-ql-executor.repository.ts";
 import { langWatchQLPassSql } from "../rules/langwatch-ql-pass-sql.rules.ts";
+import { assertNoPostgresTableModifiers } from "../rules/langwatch-ql-query-scope.rules.ts";
 import { DEFAULT_LWQL_RESULT_LIMITS } from "../rules/langwatch-ql-result-limits.rules.ts";
 import {
   langWatchQLMissingParameters,
@@ -276,6 +277,8 @@ export class LangWatchQLService {
       ...(parameters ? { parameters } : {}),
       awaitingTimeWindow: validation.awaitingTimeWindow,
     });
+    // A pass is not scoped, so the FINAL/SAMPLE refusal on a PostgreSQL view runs here too.
+    assertNoPostgresTableModifiers({ sql, views: this.views, database: this.deps.database });
 
     const { executor } = this.deps;
     if (!executor) {
