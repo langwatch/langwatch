@@ -70,7 +70,8 @@ Feature: Request log level and where the cause is attached
   @unit @regression
   Scenario: A handled customer failure is logged below error
     When the failure is attributed to the customer
-    Then the record is logged at warning level
+    Then the first record for its family, code and status in a minute is logged at warning level
+    And the repeats in that minute are logged at debug
     And the handled code and fault are carried on the record
 
   @unit @regression
