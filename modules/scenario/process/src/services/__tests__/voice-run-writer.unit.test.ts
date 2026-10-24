@@ -13,6 +13,7 @@ const mockFindById = vi.fn();
 const mockStartRun = vi.fn().mockResolvedValue(undefined);
 const mockMessageSnapshot = vi.fn().mockResolvedValue(undefined);
 const mockFinishRun = vi.fn().mockResolvedValue(undefined);
+const mockRefreshMetadata = vi.fn().mockResolvedValue(undefined);
 
 // The writer is composed over in-memory collaborators, the same way the
 // module's composition composes it over the real ones.
@@ -27,6 +28,9 @@ const { writeCallRun: writeVoiceCallRun } = VoiceCallRunService.create({
     },
     finishRun: async (input) => {
       await mockFinishRun(input);
+    },
+    refreshMetadata: async (input) => {
+      await mockRefreshMetadata(input);
     },
   },
 });
@@ -104,6 +108,73 @@ describe("writeVoiceCallRun", () => {
         await writeVoiceCallRun(args);
 
         expect(mockFinishRun).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("when the write is a re-drive", () => {
+      /** @scenario "A re-driven run's metadata is refreshed to the latest attempt" */
+      it("emits a refresh carrying this attempt's source, audio and cutoff (#8032)", async () => {
+        await writeVoiceCallRun({
+          projectId: "project_1",
+          scenarioRunId: "run_1",
+          agentRowId: "agent_1",
+          agentDisplayName: "Support Bot",
+          record: fakeRecord({
+            source: "provider",
+            audioUrl: "https://audio.example/run_1.wav",
+            isCutAtLimit: true,
+          }),
+          scenario: { scenarioId: "scenario_1", scenarioSetId: "set_x" },
+          turnTraceIds: [],
+          isRedrive: true,
+        });
+
+        expect(mockRefreshMetadata).toHaveBeenCalledTimes(1);
+        const refresh = mockRefreshMetadata.mock.calls[0]?.[0] as {
+          scenarioRunId: string;
+          attemptId: string;
+          metadata: { source: string; audioUrl: string | null; langwatch: { isCutAtLimit: boolean } };
+        };
+        expect(refresh.scenarioRunId).toBe("run_1");
+        expect(refresh.attemptId).toBeTruthy();
+        expect(refresh.metadata.source).toBe("provider");
+        expect(refresh.metadata.audioUrl).toBe("https://audio.example/run_1.wav");
+        expect(refresh.metadata.langwatch.isCutAtLimit).toBe(true);
+      });
+
+      it("clears a stale audio link when this attempt has no recording", async () => {
+        await writeVoiceCallRun({
+          projectId: "project_1",
+          scenarioRunId: "run_1",
+          agentRowId: "agent_1",
+          agentDisplayName: "Support Bot",
+          // A browser-sourced attempt carries no recording (audioUrl omitted).
+          record: fakeRecord({ source: "browser" }),
+          scenario: { scenarioId: "scenario_1", scenarioSetId: "set_x" },
+          turnTraceIds: [],
+          isRedrive: true,
+        });
+
+        const refresh = mockRefreshMetadata.mock.calls[0]?.[0] as {
+          metadata: { audioUrl: string | null };
+        };
+        // The refresh maps an absent recording to an explicit null, so the fold
+        // clears a stale link the first attempt may have written (#8032).
+        expect(refresh.metadata.audioUrl).toBeNull();
+      });
+
+      it("does not refresh on a first write — the started event already carries the metadata", async () => {
+        await writeVoiceCallRun({
+          projectId: "project_1",
+          scenarioRunId: "run_1",
+          agentRowId: "agent_1",
+          agentDisplayName: "Support Bot",
+          record: fakeRecord(),
+          scenario: { scenarioId: "scenario_1", scenarioSetId: "set_x" },
+          turnTraceIds: [],
+        });
+
+        expect(mockRefreshMetadata).not.toHaveBeenCalled();
       });
     });
 

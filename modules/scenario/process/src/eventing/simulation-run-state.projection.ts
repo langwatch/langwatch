@@ -22,6 +22,7 @@ import {
   SimulationRunEvaluatedEventSchema,
   SimulationRunHooksRecordedEventSchema,
   SimulationRunFinishedEventSchema,
+  SimulationRunMetadataRefreshedEventSchema,
   SimulationRunMetricsComputedEventSchema,
   SimulationRunQueuedEventSchema,
   SimulationRunStartedEventSchema,
@@ -38,6 +39,7 @@ import {
   type SimulationRunEvaluatedEvent,
   type SimulationRunHooksRecordedEvent,
   type SimulationRunFinishedEvent,
+  type SimulationRunMetadataRefreshedEvent,
   type SimulationRunMetricsComputedEvent,
   type SimulationRunQueuedEvent,
   type SimulationRunStartedEvent,
@@ -304,6 +306,7 @@ const simulationRunEvents = [
   SimulationRunCancelRequestedEventSchema,
   SimulationRunAgentInstanceRecordedEventSchema,
   SimulationRunCutAtLimitRecordedEventSchema,
+  SimulationRunMetadataRefreshedEventSchema,
   SimulationRunHooksRecordedEventSchema,
   SimulationRunDeletedEventSchema,
 ] as const;
@@ -364,6 +367,36 @@ export class SimulationRunStateFoldProjection
    */
   static withCutAtLimit(metadata: string | null): string {
     return mergeLangwatchNamespace(metadata, { isCutAtLimit: true });
+  }
+
+  /**
+   * The stored metadata with a later attempt's fields merged over it, written
+   * back as one JSON string (#8032). A re-driven run's first attempt could not
+   * know what its second one does — a voice finish that failed before the
+   * provider's record was ready wrote `source: "browser"` and no `audioUrl`;
+   * the retry has the recording. The started event is first-wins on metadata,
+   * so this merges the refresh over the top-level object and deep-merges the
+   * reserved `langwatch` namespace rather than replacing it, so a refresh that
+   * carries `source` / `audioUrl` does not drop the run's `targetType` /
+   * `callerKind`. Only the keys the refresh carries are touched;
+   * `secretParameters` is stripped so it is never written into the stored JSON.
+   */
+  static withRefreshedMetadata({
+    metadata,
+    refresh,
+  }: {
+    metadata: string | null;
+    refresh: Record<string, unknown>;
+  }): string {
+    const { secretParameters: _secretParameters, ...fields } = refresh;
+    const current = parseMetadataObject(metadata);
+    const merged: Record<string, unknown> = { ...current, ...fields };
+    const currentLangwatch = isRecord(current.langwatch) ? current.langwatch : {};
+    const refreshLangwatch = isRecord(fields.langwatch) ? fields.langwatch : null;
+    if (refreshLangwatch) {
+      merged.langwatch = { ...currentLangwatch, ...refreshLangwatch };
+    }
+    return JSON.stringify(merged);
   }
 
   /**
@@ -808,6 +841,20 @@ export class SimulationRunStateFoldProjection
       ...state,
       ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
       Metadata: SimulationRunStateFoldProjection.withCutAtLimit(state.Metadata),
+    };
+  }
+
+  handleSimulationRunMetadataRefreshed(
+    event: SimulationRunMetadataRefreshedEvent,
+    state: SimulationRunStateData,
+  ): SimulationRunStateData {
+    return {
+      ...state,
+      ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
+      Metadata: SimulationRunStateFoldProjection.withRefreshedMetadata({
+        metadata: state.Metadata,
+        refresh: event.data.metadata,
+      }),
     };
   }
 
