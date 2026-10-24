@@ -55,7 +55,7 @@ func buildTable() []commandSpec {
 	up.rewrite, down.rewrite = retireUpSpellings, retireShortForce("down")
 	top := []commandSpec{
 		hidden("simulator"), hidden("static"), hidden("go-watch"), hidden("ui-watch"), hidden("keep"), hidden("daemon"), hidden("gate"),
-		up, down, take("restart"), take("reload"), serviceCommand(), statusCommand(take("status")), take("logs"), take("errors"), take("env"),
+		up, down, take("restart"), take("reload"), serviceCommand(), statusCommand(take("status")), take("logs"), take("errors"), take("env"), secretsCommand(),
 		browserCommand(take("browser"), take("auth"), take("mfa")),
 		take("pr"), take("switch"), take("focus"), waitSpec(), defaultsSpec(),
 		{name: "sim", args: "[<name> <verb>]", summary: "every simulator: bare lists them; sim <name> <verb> drives one", run: runSims, flags: simFlags(), subs: sims},

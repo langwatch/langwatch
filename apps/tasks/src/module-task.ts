@@ -44,9 +44,7 @@ export async function withTasksApp<Result>({
     .withConfig(processConfig(processModules))
     // Ephemeral health door: API_PORT is the api's. specs/tasks/task-launcher.feature
     .withHealthPort(0)
-    .withSecrets((config, secrets) =>
-      secrets.withEnv().withFile().withOnePassword(config.process.onePasswordAccount),
-    )
+    .withSecrets((_, secrets) => secrets.withEnv().withFile())
     .withProcessOwnership(false)
     .withIdIndexRetention(raiseThroughDataRetention)
     .start();

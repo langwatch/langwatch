@@ -155,6 +155,10 @@ func envShower(worktreeDir string, reveal bool) func(key, value string) string {
 		return func(_, value string) string { return value }
 	}
 	classes := domain.SecretClasses(worktreeDir)
+	fields, _ := onePasswordFields(localDevEnv(worktreeDir)[domain.OnePasswordAccountKey])
+	for key := range fields {
+		classes[key] = domain.ClassSecret // a value from the vault is masked whatever its name
+	}
 	return func(key, value string) string { return domain.MaskEnvValue(classes, key, value) }
 }
 

@@ -76,11 +76,11 @@ func (o *Orchestrator) removeStackCredentials(slug string) {
 }
 
 // toolEnv is what `haven env` hands a shell or a tool: the overlay, the
-// generated credentials, and the model keys the tools need, taken from where
-// the stack itself resolves them (.env under the shell).
+// generated credentials, and the model keys the tools need from the shell and
+// .env; never the 1Password item, whose values haven never prints.
 func (o *Orchestrator) toolEnv(st domain.Stack) []string {
 	env := append(st.OverlayEnv(), o.credentialEnv(st.Slug, st.WorktreeDir)...)
-	resolved := resolvedDevEnv(st.WorktreeDir)
+	resolved := localDevEnv(st.WorktreeDir) // never the item: haven env does not print its values
 	for _, key := range domain.ToolPassthroughKeys {
 		if resolved[key] != "" {
 			env = append(env, key+"="+resolved[key])

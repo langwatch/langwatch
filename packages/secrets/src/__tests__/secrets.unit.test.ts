@@ -39,11 +39,6 @@ describe("the chain", () => {
     const bare = SecretsChain.start({ environment: {} }).withFile(path.join(dir, "absent"));
     await expect(bare.fetch("ANYTHING")).resolves.toBeUndefined();
   });
-
-  it("leaves withOnePassword inert without an account", async () => {
-    const same = chain.withOnePassword(undefined).withOnePassword("  ");
-    await expect(same.fetch("IN_ENV")).resolves.toBe("abc");
-  });
 });
 
 describe("the scoped resolver", () => {

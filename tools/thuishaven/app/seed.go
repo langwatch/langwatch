@@ -226,7 +226,7 @@ func (o *Orchestrator) runSeedgen(ctx context.Context, t seedTarget, args []stri
 	}
 	env := append(append([]string{}, t.Env...), "LANGWATCH_TASK_MODULES="+filepath.Join(t.Dir, seedTaskModule))
 	env = append(env, o.licenceEnv(t.Slug, resolvedDevEnv(t.Dir), true)...)
-	err := o.sup.RunOnce(ctx, "seed", t.Dir, shell, env)
+	err := o.sup.RunOnce(ctx, "seed", t.Dir, shell, o.itemEnvForStack(t.Slug, t.Dir, env))
 	status.Exit, status.FinishedAt = exitCodeOf(err), o.sys.Now()
 	if dir := o.seedRunDir(t.Slug, args, t.Anchor); err != nil && dir != "" {
 		reason, _ := os.ReadFile(filepath.Join(dir, seedgen.FailureFile))

@@ -46,12 +46,11 @@ export class SecretsResolver {
 
   seal(): void {
     this.#sealed = true;
-    this.chain.forget();
   }
 
   /**
-   * Fails the boot at second zero with the whole shopping list. Every single
-   * id is fetched at once, so 1Password reads in parallel and holds until seal.
+   * Fails the boot at second zero with the whole shopping list: every single
+   * id is fetched at once.
    */
   async preflight(declared: readonly SecretHandle<unknown>[]): Promise<void> {
     const singles = declared.filter((h) => !h.family);

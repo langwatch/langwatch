@@ -18,11 +18,6 @@ export const processOwner = {
   name: "process",
   config: Config.define((c) => ({
     /**
-     * Routing, not a secret: which 1Password account the secrets chain asks.
-     * Absent, the 1Password adapter is inert and env/file answer alone.
-     */
-    onePasswordAccount: c.env("LANGWATCH_OP_ACCOUNT", z.string().optional()),
-    /**
      * The deployment's environment name: the shared leaf, so the http owner
      * derives `production` from it and an owner holding it too is admitted.
      */

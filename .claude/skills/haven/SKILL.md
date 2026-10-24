@@ -41,6 +41,7 @@ only the part you need.
 | Last distinct failures, grouped             | `haven errors --agent`                                                                   |
 | Restart one lane                            | `haven restart api`                                                                      |
 | Logins and stack credentials                | `haven db seed --json --reveal`, `haven env --reveal` (never paste)                      |
+| Move `.env` credentials into 1Password      | `haven secrets move` (dry run), then `--apply --account <shorthand>` (`haven-env`)       |
 | Keyed REST call, key never printed          | `haven api GET /api/... [--key project\|org\|personal] [--project slug]`                 |
 | Which principal and scope a key has         | `haven api whoami --key org`                                                             |
 | AI gateway call with a held virtual key     | `haven api --gateway POST /v1/chat/completions --body - [--vk name]`                     |

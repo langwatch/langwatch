@@ -425,7 +425,8 @@ const NoMailKnob = "HAVEN_NO_MAIL"
 
 // NoMailEnv blanks every mail setting for `haven up --no-mail`: an empty
 // variable beats the root .env under node --env-file, so the app sees no
-// provider. A key only 1Password holds is out of its reach.
+// provider. A key the 1Password item holds is blanked the same way, since
+// haven injects the item's fields only where these leave a key unset.
 func NoMailEnv() []string {
 	env := []string{"SENDGRID_API_KEY=", "RESEND_API_KEY="}
 	for _, key := range MailProviderEnvVars {
@@ -612,9 +613,9 @@ func RefuseLiveStripe(resolved map[string]string) error {
 func StripeNotice(resolved map[string]string, isPaymentSimOn bool) string {
 	switch {
 	case resolved["STRIPE_API_BASE"] != "":
-		return "Stripe: custom base " + resolved["STRIPE_API_BASE"]
+		return "Stripe: your own base (STRIPE_API_BASE)"
 	case HasOwnStripe(resolved):
-		return "Stripe: your test key from .env"
+		return "Stripe: your own test keys"
 	case isPaymentSimOn:
 		return "Stripe: paymentsim"
 	}

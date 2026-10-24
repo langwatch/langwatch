@@ -79,3 +79,35 @@ EOF
   grep -qE "^LW_GATEWAY_JWT_SECRET=[0-9a-f]{64}$"      "$ENV_FILE"
   grep -qE "^LW_VIRTUAL_KEY_PEPPER=[0-9a-f]{64}$"      "$ENV_FILE"
 }
+
+@test "leaves a key the environment already holds out of .env" {
+  printf 'SOMETHING_ELSE=keep-me\n' > "$ENV_FILE"
+  run env -u LANGWATCH_OP_ACCOUNT LW_GATEWAY_JWT_SECRET=from-the-environment \
+    bash "$TEST_DIR/dev/scripts/ensure-ai-gateway-secrets.sh"
+  [ "$status" -eq 0 ]
+  run grep -q "^LW_GATEWAY_JWT_SECRET=" "$ENV_FILE"
+  [ "$status" -ne 0 ]
+  grep -qE "^LW_GATEWAY_INTERNAL_SECRET=[0-9a-f]{64}$" "$ENV_FILE"
+}
+
+@test "under a 1Password account in .env, names a missing key and generates nothing" {
+  printf 'LANGWATCH_OP_ACCOUNT=acme\n' > "$ENV_FILE"
+  cp "$ENV_FILE" "$TEST_DIR/.env.snapshot"
+  run env -u LANGWATCH_OP_ACCOUNT -u LW_GATEWAY_INTERNAL_SECRET -u LW_GATEWAY_JWT_SECRET \
+    LW_VIRTUAL_KEY_PEPPER=from-the-item \
+    bash "$TEST_DIR/dev/scripts/ensure-ai-gateway-secrets.sh"
+  [ "$status" -eq 0 ]
+  diff "$ENV_FILE" "$TEST_DIR/.env.snapshot"
+  [[ "$output" == *"LW_GATEWAY_INTERNAL_SECRET is unset"* ]]
+  [[ "$output" == *"LW_GATEWAY_JWT_SECRET is unset"* ]]
+  [[ "$output" != *"LW_VIRTUAL_KEY_PEPPER"* ]]
+}
+
+@test "under a 1Password account named only in the shell, generates nothing" {
+  printf 'SOMETHING_ELSE=keep-me\n' > "$ENV_FILE"
+  run env -u LW_GATEWAY_INTERNAL_SECRET -u LW_GATEWAY_JWT_SECRET -u LW_VIRTUAL_KEY_PEPPER \
+    LANGWATCH_OP_ACCOUNT=acme bash "$TEST_DIR/dev/scripts/ensure-ai-gateway-secrets.sh"
+  [ "$status" -eq 0 ]
+  run grep -q "^LW_" "$ENV_FILE"
+  [ "$status" -ne 0 ]
+}

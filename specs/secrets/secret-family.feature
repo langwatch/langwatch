@@ -4,7 +4,7 @@ Feature: A secret family answers every name under one prefix
   So that credentials a deployment names by convention resolve through the chain, never the env
 
   # ADR-132 amendment (Alex, 2026-09-29) and ARCHITECTURE.md §6: a family handle answers
-  # name -> value for one prefix; env and .env scan by prefix; 1Password answers none; the
+  # name -> value for one prefix; env and .env scan by prefix; the
   # resolver scopes by prefix; preflight treats a family as optional; config may not claim a
   # name under a declared prefix.
 

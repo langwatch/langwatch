@@ -289,7 +289,7 @@ func containsAny(value string, needles []string) bool {
 // is cancelled, then SIGTERMs the process group and SIGKILLs after 5s.
 func (s Supervisor) superviseChild(ctx context.Context, ac app.Child) {
 	c := proc{
-		name: ac.Name, dir: ac.Dir, shell: ac.Shell, env: ac.Env, color: ac.Color, isPlain: s.isPlain,
+		name: ac.Name, dir: ac.Dir, shell: ac.Shell, env: ac.Env, envAtStart: ac.EnvAtStart, color: ac.Color, isPlain: s.isPlain,
 		preview: s.recent, sink: newCapture(ac, s.startedAt), crash: &crashDedup{},
 	}
 	// Gate the start on a dependency being ready (e.g. the web lane on the API),
@@ -396,6 +396,7 @@ func waitForReady(ctx context.Context, url string, log func(string)) {
 type proc struct {
 	name, dir, shell, color string
 	env                     []string
+	envAtStart              func() []string // read at each start; never stored
 	isPlain                 bool
 	preview                 *recentLogs
 	// sink captures every line (timestamped) to the per-service log file the
@@ -477,7 +478,11 @@ func levelRecordLine(level, msg string, at time.Time) string {
 func (c proc) command(ctx context.Context) *exec.Cmd {
 	cmd := exec.CommandContext(ctx, "bash", "-lc", c.shell)
 	cmd.Dir = c.dir
-	cmd.Env = append(os.Environ(), c.env...)
+	cmd.Env = os.Environ()
+	if c.envAtStart != nil {
+		cmd.Env = append(cmd.Env, c.envAtStart()...)
+	}
+	cmd.Env = append(cmd.Env, c.env...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true} // own group so we kill the tree
 	cmd.Cancel = func() error { return nil }              // we manage teardown ourselves
 	return cmd

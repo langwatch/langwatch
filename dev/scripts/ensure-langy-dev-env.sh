@@ -57,7 +57,16 @@ note() {
   written=$((written + 1))
 }
 
-if env_file_key_is_empty_or_missing "$ENV_FILE" LANGY_INTERNAL_SECRET; then
+op_account="${LANGWATCH_OP_ACCOUNT:-$(env_file_key_value "$ENV_FILE" LANGWATCH_OP_ACCOUNT || true)}"
+langy_secret_missing=false
+if [ -z "${LANGY_INTERNAL_SECRET:-}" ] && env_file_key_is_empty_or_missing "$ENV_FILE" LANGY_INTERNAL_SECRET; then
+  langy_secret_missing=true
+fi
+
+# Kept in 1Password, it is never generated into .env, where it would disagree with the item's.
+if $langy_secret_missing && [ -n "$op_account" ]; then
+  echo '  ! LANGY_INTERNAL_SECRET is unset: add it to the 1Password item "LangWatch haven secrets" (openssl rand -hex 32)' >&2
+elif $langy_secret_missing; then
   if ! command -v openssl >/dev/null 2>&1; then
     echo "ERROR: openssl not found — cannot generate LANGY_INTERNAL_SECRET." >&2
     echo "       Install openssl, or set it manually in $ENV_FILE." >&2
