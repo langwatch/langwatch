@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/config"
 	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/render"
@@ -32,6 +33,7 @@ func testInput() *config.Input {
 		S3Region:             "us-east-1",
 		LogLevel:             "warning",
 		LogFormat:            "json",
+		LogToFile:            true,
 		SystemLogTTLDays:     30,
 		EnableQueryLog:       true,
 		QueryLogTTLDays:      7,
@@ -148,9 +150,12 @@ func replicatedInput() *config.Input {
 	return input
 }
 
+// @scenario "The cluster secret is applied only when asked for"
 func TestRenderAll_KeeperWrittenForReplicated(t *testing.T) {
 	dir := t.TempDir()
 	input := replicatedInput()
+	input.ClusterSecretEnabled = true
+	input.ClusterSecret = "cluster-secret-value"
 	computed := config.ComputeFromResources(input.CPU, input.RAMBytes, input)
 
 	if err := render.RenderAll(testLogger(), input, computed, dir); err != nil {
@@ -171,11 +176,58 @@ func TestRenderAll_KeeperWrittenForReplicated(t *testing.T) {
 		"shard_01",
 		"node-0",
 		"internal_replication: true",
-		"from_file",
-		"/mnt/secrets/cluster-secret",
+		"secret: cluster-secret-value",
 	} {
 		if !strings.Contains(content, want) {
 			t.Errorf("keeper.yaml missing %q\n--- actual content ---\n%s", want, content)
+		}
+	}
+	// ClickHouse has no from_file substitution; the attribute would leave the secret empty.
+	if strings.Contains(content, "from_file") {
+		t.Errorf("keeper.yaml must carry the secret value, not a from_file attribute\n%s", content)
+	}
+}
+
+// Without the opt-in the secret renders as before (an ignored from_file
+// attribute), so a rolling upgrade never mixes secret and no-secret pods.
+// @scenario "The cluster secret is applied only when asked for"
+func TestRenderAll_ClusterSecretOffKeepsEarlierShape(t *testing.T) {
+	dir := t.TempDir()
+	input := replicatedInput()
+	computed := config.ComputeFromResources(input.CPU, input.RAMBytes, input)
+
+	core, logs := observer.New(zap.WarnLevel)
+	if err := render.RenderAll(zap.New(core), input, computed, dir); err != nil {
+		t.Fatalf("RenderAll: %v", err)
+	}
+	if logs.FilterMessageSnippet("CLICKHOUSE_CLUSTER_SECRET_ENABLED").Len() != 1 {
+		t.Errorf("want one warning naming CLICKHOUSE_CLUSTER_SECRET_ENABLED, got %v", logs.All())
+	}
+	data, err := os.ReadFile(filepath.Join(dir, "config.d/keeper.yaml"))
+	if err != nil {
+		t.Fatalf("read keeper.yaml: %v", err)
+	}
+	if !strings.Contains(string(data), "'@from_file': /mnt/secrets/cluster-secret") {
+		t.Errorf("keeper.yaml should keep the from_file attribute without the opt-in\n%s", data)
+	}
+}
+
+// @scenario "A deployment that still sets CACHE_MAX_SIZE is told it is no longer read"
+func TestRenderAll_RetiredCacheMaxSizeWarns(t *testing.T) {
+	for _, tc := range []struct {
+		value string
+		warns int
+	}{{"", 0}, {"10737418240", 1}} {
+		input := testInput()
+		input.RetiredCacheMaxSize = tc.value
+		computed := config.ComputeFromResources(input.CPU, input.RAMBytes, input)
+
+		core, logs := observer.New(zap.WarnLevel)
+		if err := render.RenderAll(zap.New(core), input, computed, t.TempDir()); err != nil {
+			t.Fatalf("RenderAll: %v", err)
+		}
+		if got := logs.FilterMessageSnippet("CACHE_MAX_SIZE").Len(); got != tc.warns {
+			t.Errorf("CACHE_MAX_SIZE=%q: %d warnings, want %d: %v", tc.value, got, tc.warns, logs.All())
 		}
 	}
 }
@@ -226,6 +278,48 @@ func TestRenderAll_LimitsContainsMergeTreeSettings(t *testing.T) {
 	for _, check := range checks {
 		if !strings.Contains(content, check) {
 			t.Errorf("limits.yaml missing %q", check)
+		}
+	}
+}
+
+// @scenario "The image holds 25.10 behaviour on ClickHouse 26.8"
+func TestRenderAll_UpgradePinsHold25_10Behaviour(t *testing.T) {
+	dir := t.TempDir()
+	input := testInput()
+	computed := config.ComputeFromResources(input.CPU, input.RAMBytes, input)
+
+	if err := render.RenderAll(testLogger(), input, computed, dir); err != nil {
+		t.Fatalf("RenderAll: %v", err)
+	}
+
+	files := map[string][]string{
+		"config.d/limits.yaml": {
+			"propagate_types_serialization_versions_to_nested_types: 0",
+			"escape_index_filenames: 0",
+			"serialization_info_version: basic",
+			"string_serialization_version: single_stream",
+			"patch_parts_version: v1",
+			"packed_skip_index_max_bytes: 0",
+			`auto_statistics_types: ""`,
+			"asynchronous_metrics_key_values_mode: legacy_names",
+			"memory_worker_dynamic_hard_limit: 0",
+		},
+		"users.d/profiles.yaml": {
+			`compatibility: "25.10"`,
+			"input_format_read_datetime_number_as_raw_value: 1",
+			"deduplicate_insert: backward_compatible_choice",
+		},
+	}
+
+	for file, checks := range files {
+		data, err := os.ReadFile(filepath.Join(dir, file))
+		if err != nil {
+			t.Fatalf("read %s: %v", file, err)
+		}
+		for _, check := range checks {
+			if !strings.Contains(string(data), check) {
+				t.Errorf("%s missing %q", file, check)
+			}
 		}
 	}
 }

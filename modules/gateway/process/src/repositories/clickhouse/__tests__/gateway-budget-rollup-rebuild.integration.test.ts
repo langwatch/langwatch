@@ -6,7 +6,7 @@ import { Prisma } from "@langwatch/prisma-client/generated";
  * History folded by an older rollup view must survive the rebuild that
  * replaced it. Spec: specs/ai-gateway/budgets.feature
  */
-import { type Instant, nowInstant } from "@langwatch/time";
+import { type Instant, nowInstant, toDate } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { beforeAll, describe, expect, it } from "vitest";
 
@@ -157,7 +157,8 @@ async function insertPreUpgradeDebits(
       ProviderSlot: "",
       DurationMS: 120,
       Status: "success",
-      OccurredAt: occurredAt.epochMilliseconds,
+      // A Date, as insertDebit writes it: 26.8 reads an unquoted integer here as seconds.
+      OccurredAt: toDate(occurredAt),
       EventTimestamp: occurredAt.epochMilliseconds,
     })),
     format: "JSONEachRow",

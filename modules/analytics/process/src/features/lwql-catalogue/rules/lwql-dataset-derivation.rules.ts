@@ -239,15 +239,17 @@ function projectColumn({
       return {
         type: finalized,
         aggregate: true,
-        expression: (source) => contentFilteredMapSql(value(source)),
+        expression: (source) => `CAST(${contentFilteredMapSql(value(source))} AS ${finalized})`,
       };
     }
     return { type: finalized, aggregate: true, expression: value };
   }
   if (isMapType(type)) {
+    // Cast, as mapFilter keeps a LowCardinality key from 26.x and drops it before.
+    const plain = filteredMapType(type);
     return {
-      type: filteredMapType(type),
-      expression: (source) => contentFilteredMapSql(source(sourceColumn)),
+      type: plain,
+      expression: (source) => `CAST(${contentFilteredMapSql(source(sourceColumn))} AS ${plain})`,
     };
   }
   return { type };

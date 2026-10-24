@@ -36,3 +36,8 @@ To override any auto-tuned parameter, use the env map in values.yaml:
   env:
     MAX_CONCURRENT_QUERIES: "200"
     BACKGROUND_POOL_SIZE: "32"
+{{- if and (gt (int .Values.replicas) 1) (not .Values.auth.clusterSecretEnabled) }}
+
+WARNING: remote_servers carries no cluster secret. Set auth.clusterSecretEnabled=true
+(see "Cluster secret" in infra/clickhouse-serverless/README.md for the restart it needs).
+{{- end }}

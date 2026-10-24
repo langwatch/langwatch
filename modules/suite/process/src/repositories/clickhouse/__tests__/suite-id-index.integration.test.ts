@@ -18,6 +18,7 @@ import {
 import {
   idIndexedClientDouble,
   migrateTestClickHouseOnce,
+  partsAfterPartitionPruning,
   readyIdIndexedClientDouble,
   type ScriptedStatements,
   startTestClickHouseEndpoints,
@@ -71,15 +72,23 @@ function recordingDriver(client: ClickHouseClient): ScriptedStatements {
   };
 }
 
-/** The parts the planner reaches for one statement, summed over the tables it names. */
+/**
+ * The parts left once the time bound has pruned partitions (EXPLAIN's Partition stage). Not
+ * EXPLAIN ESTIMATE: from 26.4 that also counts column-statistics pruning, which can narrow an
+ * unbounded read to the same part and hide what the bound saves.
+ */
 async function partsReached(request: QueryRequest): Promise<number> {
+  return partsAfterPartitionPruning({ query: queryRows, request });
+}
+
+/** One query on the test server, its rows as JSONEachRow parses them. */
+async function queryRows(query: string, params?: Record<string, unknown>): Promise<unknown[]> {
   const result = await ch.query({
-    query: `EXPLAIN ESTIMATE ${request.sql}`,
+    query,
     format: "JSONEachRow",
-    ...(request.params === undefined ? {} : { query_params: request.params }),
+    ...(params === undefined ? {} : { query_params: params }),
   });
-  const rows = await result.json<{ parts: number | string }>();
-  return rows.reduce((total, row) => total + Number(row.parts), 0);
+  return result.json();
 }
 
 /** The one statement that read `table`'s source rows, not its index. */

@@ -40,6 +40,21 @@ func renderKeeper(input *config.Input, configD string) error {
 		replicas[i] = map[string]any{"host": host, "port": input.DataNodePort}
 	}
 
+	cluster := map[string]any{
+		"shard": map[string]any{
+			"internal_replication": true,
+			"replica":              replicas,
+		},
+	}
+	// ClickHouse substitutes from_env and from_zk, not from_file, so only the
+	// value itself sets a secret. Without the opt-in, keep the earlier
+	// from_file attribute: no secret, matching pods that have not rolled yet.
+	if input.ClusterSecretEnabled {
+		cluster["secret"] = input.ClusterSecret
+	} else {
+		cluster["secret"] = map[string]string{"@from_file": input.ClusterSecretFile}
+	}
+
 	return writeYAML(filepath.Join(configD, "keeper.yaml"), map[string]any{
 		"zookeeper": map[string]any{
 			"node":                 znodes,
@@ -52,13 +67,18 @@ func renderKeeper(input *config.Input, configD string) error {
 			"cluster": input.ClusterName,
 		},
 		"remote_servers": map[string]any{
-			input.ClusterName: map[string]any{
-				"secret": map[string]string{"@from_file": input.ClusterSecretFile},
-				"shard": map[string]any{
-					"internal_replication": true,
-					"replica":             replicas,
-				},
-			},
+			input.ClusterName: cluster,
+		},
+	})
+}
+
+// renderInterserver writes interserver.yaml: the credentials replicas present
+// to each other's interserver HTTP endpoint when fetching parts.
+func renderInterserver(input *config.Input, configD string) error {
+	return writeYAML(filepath.Join(configD, "interserver.yaml"), map[string]any{
+		"interserver_http_credentials": map[string]string{
+			"user":     input.InterserverUser,
+			"password": input.InterserverPassword,
 		},
 	})
 }
@@ -75,13 +95,20 @@ func parseCSV(s string) []string {
 }
 
 // renderLogging writes logging.yaml with log level and format settings.
+// Without LOG_TO_FILE the image's file and error-file loggers are removed, so
+// the server logs to the console only.
 func renderLogging(input *config.Input, configD string) error {
+	logger := map[string]any{
+		"level":      input.LogLevel,
+		"console":    true,
+		"formatting": map[string]string{"type": input.LogFormat},
+	}
+	if !input.LogToFile {
+		logger["log"] = map[string]string{"@remove": "1"}
+		logger["errorlog"] = map[string]string{"@remove": "1"}
+	}
 	return writeYAML(filepath.Join(configD, "logging.yaml"), map[string]any{
-		"logger": map[string]any{
-			"level":      input.LogLevel,
-			"console":    true,
-			"formatting": map[string]string{"type": input.LogFormat},
-		},
+		"logger": logger,
 	})
 }
 
@@ -99,12 +126,12 @@ func renderNetwork(c *config.Computed, configD string) error {
 func renderPrometheus(configD string) error {
 	return writeYAML(filepath.Join(configD, "prometheus.yaml"), map[string]any{
 		"prometheus": map[string]any{
-			"endpoint":              "/metrics",
-			"port":                  9363,
-			"metrics":               true,
-			"events":                true,
-			"asynchronous_metrics":  true,
-			"errors":                true,
+			"endpoint":             "/metrics",
+			"port":                 9363,
+			"metrics":              true,
+			"events":               true,
+			"asynchronous_metrics": true,
+			"errors":               true,
 		},
 	})
 }

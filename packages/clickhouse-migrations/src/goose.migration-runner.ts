@@ -31,6 +31,29 @@ const AGGREGATING_DIMENSION_SETTING = "allow_dimensions_outside_sorting_key";
 const LAST_MIGRATION_NEEDING_DIMENSION_COMPAT = 86;
 
 /**
+ * What a replay of one migration's CREATE TABLE appends so it runs as goose's
+ * compat pass would: the relaxed setting through 00086 where the server
+ * enforces the check, else nothing.
+ */
+export function dimensionCompatSettingFor({
+  version,
+  serverEnforces,
+}: {
+  version: number;
+  serverEnforces: boolean;
+}): string {
+  return serverEnforces && version <= LAST_MIGRATION_NEEDING_DIMENSION_COMPAT
+    ? `, ${AGGREGATING_DIMENSION_SETTING} = 1`
+    : "";
+}
+
+/** Whether the server knows the setting, the runner's own test for "enforces the check". */
+export const DIMENSION_COMPAT_PROBE = {
+  query: "SELECT name FROM system.merge_tree_settings WHERE name = {setting:String}",
+  params: { setting: AGGREGATING_DIMENSION_SETTING },
+} as const;
+
+/**
  * The child-process default is one megabyte and kills a verbose migration run
  * past it, which reads as a failed migration that in fact applied.
  * See specs/clickhouse/migration-output-buffer.feature.
@@ -735,8 +758,8 @@ async function bootstrapDatabase(config: ClickHouseConfig, verbose?: boolean): P
   // setting's presence — not a version number — says whether the server enforces this.
   await withClient(config.databaseUrl, async (client) => {
     const result = await client.query({
-      query: `SELECT name FROM system.merge_tree_settings WHERE name = {setting:String}`,
-      query_params: { setting: AGGREGATING_DIMENSION_SETTING },
+      query: DIMENSION_COMPAT_PROBE.query,
+      query_params: DIMENSION_COMPAT_PROBE.params,
       format: "JSONEachRow",
     });
     config.requiresDimensionCompat = (await result.json()).length > 0;

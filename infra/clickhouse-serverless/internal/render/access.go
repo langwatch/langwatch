@@ -43,6 +43,10 @@ type accessManagementGrants struct {
 	// renderAccessManagement.
 }
 
+// accessManagementFile is not written with DEFAULT_USER_ACCESS_MANAGEMENT=false,
+// for deployments that create no access entities through the default user.
+const accessManagementFile = "zz-access-management.yaml"
+
 // renderAccessManagement writes zz-access-management.yaml granting the
 // `default` (admin) user the right to create users, profiles, row policies and
 // named collections through SQL — what the app's LangWatchQL self-provisioning
@@ -58,7 +62,7 @@ type accessManagementGrants struct {
 // order and the later file wins, so this must sort after any file declaring
 // `access_management: 0` for the same user.
 func renderAccessManagement(usersD string) error {
-	return writeYAML(filepath.Join(usersD, "zz-access-management.yaml"), accessManagementConfig{
+	return writeYAML(filepath.Join(usersD, accessManagementFile), accessManagementConfig{
 		Users: accessManagementUsers{
 			Default: accessManagementGrants{
 				AccessManagement:       1,

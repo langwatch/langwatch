@@ -203,17 +203,18 @@ has no kube-state-metrics series and cannot be watched from here.
 
 ### Authentication
 
-| Name                               | Description                                                                                                                                                      | Default             |
-| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
-| `autogen.enabled`                  | Chart materialises the credentials Secret via per-key `lookup-or-rand` (existing values reused on upgrade). Must be enabled unless `auth.existingSecret` is set. | `false`             |
-| `auth.password`                    | Seed value when `autogen.enabled=true` and you want a deterministic password instead of `randAlphaNum`. Ignored when `auth.existingSecret` is set.               | `""`                |
-| `auth.clusterSecret`               | Seed value for the Keeper inter-node cluster secret (only used when `replicas>1`). Ignored when `auth.existingSecret` is set.                                    | `""`                |
-| `auth.existingSecret`              | Name of an operator-owned Secret. When set, the chart skips its own Secret render and a preflight Job verifies the required keys exist before pods roll.         | `""`                |
-| `auth.secretKeys.passwordKey`      | Key name for the password in both autogen and existingSecret paths                                                                                               | `password`          |
-| `auth.secretKeys.clusterSecretKey` | Key name for the Keeper cluster secret                                                                                                                           | `clusterSecret`     |
-| `preflight.enabled`                | Run the pre-install/pre-upgrade Secret-keys Job when `auth.existingSecret` is set                                                                                | `true`              |
-| `preflight.image`                  | Container image (needs `sh` + `kubectl` + `jq`; the Job fails fast if `jq` is missing)                                                                           | `alpine/k8s:1.30.0` |
-| `preflight.activeDeadlineSeconds`  | Hard timeout for the preflight Job                                                                                                                               | `60`                |
+| Name                               | Description                                                                                                                                                                                      | Default             |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------- |
+| `autogen.enabled`                  | Chart materialises the credentials Secret via per-key `lookup-or-rand` (existing values reused on upgrade). Must be enabled unless `auth.existingSecret` is set.                                 | `false`             |
+| `auth.password`                    | Seed value when `autogen.enabled=true` and you want a deterministic password instead of `randAlphaNum`. Ignored when `auth.existingSecret` is set.                                               | `""`                |
+| `auth.clusterSecret`               | Seed value for the Keeper inter-node cluster secret (only used when `replicas>1`). Ignored when `auth.existingSecret` is set.                                                                    | `""`                |
+| `auth.clusterSecretEnabled`        | Apply the cluster secret to `remote_servers` (`replicas>1`). Recommended, off by default: see [Cluster secret](../../infra/clickhouse-serverless/README.md#cluster-secret) before turning it on. | `false`             |
+| `auth.existingSecret`              | Name of an operator-owned Secret. When set, the chart skips its own Secret render and a preflight Job verifies the required keys exist before pods roll.                                         | `""`                |
+| `auth.secretKeys.passwordKey`      | Key name for the password in both autogen and existingSecret paths                                                                                                                               | `password`          |
+| `auth.secretKeys.clusterSecretKey` | Key name for the Keeper cluster secret                                                                                                                                                           | `clusterSecret`     |
+| `preflight.enabled`                | Run the pre-install/pre-upgrade Secret-keys Job when `auth.existingSecret` is set                                                                                                                | `true`              |
+| `preflight.image`                  | Container image (needs `sh` + `kubectl` + `jq`; the Job fails fast if `jq` is missing)                                                                                                           | `alpine/k8s:1.30.0` |
+| `preflight.activeDeadlineSeconds`  | Hard timeout for the preflight Job                                                                                                                                                               | `60`                |
 
 ### Users
 
