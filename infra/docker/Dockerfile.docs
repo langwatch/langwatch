@@ -26,8 +26,9 @@ RUN find . ! -type d ! -name package.json -delete && find . -depth -type d -empt
 # ── Build ───────────────────────────────────────────────────────────
 # Debian, not Alpine: the build renders Mermaid diagrams in Playwright's
 # headless Chromium, which has no musl build. git reads each page's commit date; ffmpeg
-# transcodes the videos (apps/docs/src/site/video-variants.ts).
-FROM node:24.22.1-bookworm-slim AS build
+# transcodes the videos (apps/docs/src/site/video-variants.ts). Trixie: bookworm ships SVT-AV1 1.4,
+# which encoded too slowly on the arm64 runner (over 50 minutes).
+FROM node:24.22.1-trixie-slim AS build
 RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates ffmpeg \
     && rm -rf /var/lib/apt/lists/* \
     && git config --global --add safe.directory '*'
