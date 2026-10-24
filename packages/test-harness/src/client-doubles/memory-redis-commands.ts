@@ -98,6 +98,12 @@ function connectionCommands({
       store.expiries.set(name, Number(seconds) * 1000);
       return 1;
     },
+    pexpire: async (key: unknown, milliseconds: unknown) => {
+      const name = String(key);
+      if (!hasKey({ store, key: name })) return 0;
+      store.expiries.set(name, Number(milliseconds));
+      return 1;
+    },
     ttl: async (key: unknown) => {
       const name = String(key);
       if (!hasKey({ store, key: name })) return -2;

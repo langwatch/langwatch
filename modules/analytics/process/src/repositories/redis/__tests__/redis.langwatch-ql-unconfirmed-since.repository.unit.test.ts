@@ -8,17 +8,7 @@ const HOUR_MS = 60 * 60_000;
 
 function clock() {
   const store = memoryRedisStore();
-  const redis = memoryRedisDouble({
-    store,
-    script: {
-      // The double has no `pexpire`; this one keeps the store's expiry the way Redis would.
-      pexpire: async (key: unknown, ms: unknown) => {
-        if (!store.strings.has(String(key))) return 0;
-        store.expiries.set(String(key), Number(ms));
-        return 1;
-      },
-    },
-  });
+  const redis = memoryRedisDouble({ store });
   return { store, repository: RedisLwqlUnconfirmedSinceRepository.create({ redis }) };
 }
 
@@ -52,14 +42,23 @@ describe("RedisLwqlUnconfirmedSinceRepository", () => {
     });
   });
 
-  describe("given a stored value that is not a time", () => {
-    it("falls back to the failure's own time", async () => {
-      const { store, repository } = clock();
-      store.strings.set(KEY, "not-a-time");
+  describe.each(["0", "-1", "not-a-time", "", "  ", "NaN", "Infinity", "-Infinity"])(
+    "given a corrupt stored value %j",
+    (corrupt) => {
+      /** @scenario "A corrupt unconfirmed clock is repaired and retained" */
+      it("repairs it with the failure's time and keeps that first time", async () => {
+        const { store, repository } = clock();
+        store.strings.set(KEY, corrupt);
 
-      expect(await repository.mark(5_000)).toBe(5_000);
-    });
-  });
+        expect(await repository.mark(5_000)).toBe(5_000);
+        expect(store.strings.get(KEY)).toBe("5000");
+        expect(store.expiries.get(KEY)).toBe(HOUR_MS);
+        expect(await repository.mark(905_000)).toBe(5_000);
+        expect(store.strings.get(KEY)).toBe("5000");
+        expect(store.expiries.get(KEY)).toBe(HOUR_MS);
+      });
+    },
+  );
 
   describe("given a converged check", () => {
     it("clears the clock, so the next failure starts a new one", async () => {

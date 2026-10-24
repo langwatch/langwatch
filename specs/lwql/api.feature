@@ -1180,6 +1180,13 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
   # The first failure's time is kept in Redis, shared by every worker, so the alert does not wait
   # for one worker to run several checks in a row.
   @unit
+  Scenario: A corrupt unconfirmed clock is repaired and retained
+    Given Redis contains a nonpositive or nonnumeric unconfirmed clock
+    When a failed check records its time and a later check runs at least 15 minutes afterward
+    Then the first check's time replaces the corrupt value with a one-hour expiry
+    And later checks retain the repaired time
+
+  @unit
   Scenario: A collection that stays unconfirmed alerts 15 minutes after the first failed check
     Given a check left engine tables on their old credentials because the reads did not pass
     When later checks find the same, on any worker

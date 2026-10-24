@@ -36,6 +36,23 @@ describe("given a memory Redis double", () => {
       ]);
     });
 
+    it("sets a millisecond expiry without changing the value and ignores missing keys", async () => {
+      const store = memoryRedisStore();
+      const redis = memoryRedisDouble({ store });
+      await redis.set("string", "value");
+
+      await expect(redis.pexpire("string", 12_345)).resolves.toBe(1);
+      expect(store.expiries.get("string")).toBe(12_345);
+      await expect(redis.get("string")).resolves.toBe("value");
+      await expect(redis.pexpire("missing", 50)).resolves.toBe(0);
+      expect(store.expiries.has("missing")).toBe(false);
+
+      await redis.sadd("members", "x");
+      await expect(redis.pexpire("members", 678)).resolves.toBe(1);
+      expect(store.expiries.get("members")).toBe(678);
+      await expect(redis.smembers("members")).resolves.toEqual(["x"]);
+    });
+
     it("drops a collection when its last member goes", async () => {
       const redis = memoryRedisDouble();
       await redis.zadd("jobs", 1, "job-1");
