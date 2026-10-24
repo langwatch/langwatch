@@ -36,7 +36,7 @@ const { CONFIGURED, TURNED_OFF, REARM_REQUESTED, RUN_STARTED, RUN_SETTLED } =
 const TEMPLATE: InsightRunBoard = { kind: "template", id: "llm-costs", name: "LLM costs" };
 const TWO_FINDINGS = answerWith([
   finding(),
-  finding({ title: "Errors fell by half", tone: "good" }),
+  finding({ title: "Errors rose on search", tone: "watch" }),
 ]);
 const TODAY = "2026-10-10";
 const TOMORROW = "2026-10-11";
