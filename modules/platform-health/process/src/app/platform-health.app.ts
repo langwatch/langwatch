@@ -31,7 +31,10 @@ import type { PlatformHealthChannels } from "../channels/platform-health.channel
 import type { LangyProbeAnswer, ProjectKeyedProbeAnswer } from "../rules/probe-answers.rules.ts";
 import { LangyCanaryService } from "../services/langy-canary.service.ts";
 import { PlatformHealthService } from "../services/platform-health.service.ts";
-import { ProjectKeyedProbeService } from "../services/project-keyed-probe.service.ts";
+import {
+  ProjectKeyedProbeService,
+  type LegacyKeyLogger,
+} from "../services/project-keyed-probe.service.ts";
 import { ScenarioCanaryService } from "../services/scenario-canary.service.ts";
 import { SubsystemProbeRunService } from "../services/subsystem-probe-run.service.ts";
 import {
@@ -90,7 +93,9 @@ export class PlatformHealthModule implements PlatformHealthApiContract {
     dependencies,
     channels,
     secrets,
-  }: PlatformHealthSetup): Promise<PlatformHealthModule> {
+    legacyKeyLogger,
+  }: PlatformHealthSetup &
+    Readonly<{ legacyKeyLogger?: LegacyKeyLogger }>): Promise<PlatformHealthModule> {
     const probeApiKey = await secrets.into(
       PlatformHealthModule.secrets.probeApiKey,
       (value) => value ?? "",
@@ -128,6 +133,7 @@ export class PlatformHealthModule implements PlatformHealthApiContract {
       monitorDoor,
       projectKeyed: ProjectKeyedProbeService.create({
         probes,
+        legacyKeyLogger,
         resolveCaller: async (input) => {
           const resolved = await dependencies.apiKeys.findResolvedToken(input);
           if (!resolved) return null;

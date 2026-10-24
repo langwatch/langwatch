@@ -1,6 +1,5 @@
 import {
   INGESTION_PERMISSIONS,
-  LEGACY_PROJECT_KEY_LOG_WINDOW_MS,
   LEGACY_PROJECT_KEY_LOGGER_NAME,
   LegacyProjectKeyIngestionOnlyError,
   legacyProjectKeyScopeFlagSchema,
@@ -18,6 +17,9 @@ import {
 } from "@langwatch/feature-flag-contract";
 import { createLogger, createWarnThrottle, type Logger } from "@langwatch/observability";
 import { trace } from "@opentelemetry/api";
+
+/** One legacy key line per project, route, permission and kind per minute in this process. */
+const LEGACY_KEY_LOG_WINDOW_MS = 60_000;
 
 /** The project a legacy key is, as far as its scope is concerned. */
 type LegacyKeyProject = Readonly<{ id: string; organizationId: string }>;
@@ -51,7 +53,7 @@ export class LegacyProjectKeyScopeService {
   }
 
   /** One line per project, route and permission per window: the census needs presence. */
-  private readonly window = createWarnThrottle(LEGACY_PROJECT_KEY_LOG_WINDOW_MS);
+  private readonly window = createWarnThrottle(LEGACY_KEY_LOG_WINDOW_MS);
 
   private constructor(
     private readonly featureFlags: Pick<FeatureFlagApi, "isEnabled">,

@@ -204,8 +204,8 @@ None: platform-health declares no pipeline, process manager, subscriber or task.
 
 | Kind   | Leaf            | Environment variable            | Declared at                                   |
 | ------ | --------------- | ------------------------------- | --------------------------------------------- |
-| secret | `probeApiKey`   | `PLATFORM_HEALTH_PROBE_API_KEY` | `src/app/platform-health.app.ts:68`           |
-| secret | `apiKey`        | `PLATFORM_HEALTH_API_KEY`       | `src/app/platform-health.app.ts:69`           |
+| secret | `probeApiKey`   | `PLATFORM_HEALTH_PROBE_API_KEY` | `src/app/platform-health.app.ts:71`           |
+| secret | `apiKey`        | `PLATFORM_HEALTH_API_KEY`       | `src/app/platform-health.app.ts:72`           |
 | config | `publicBaseUrl` | `BASE_HOST`                     | `../contract/src/platform-health.config.ts:4` |
 
 <!-- readme:generated:end -->

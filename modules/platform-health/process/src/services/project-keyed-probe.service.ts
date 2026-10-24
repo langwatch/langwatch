@@ -1,5 +1,4 @@
 import {
-  LEGACY_PROJECT_KEY_LOG_WINDOW_MS,
   LEGACY_PROJECT_KEY_LOGGER_NAME,
   LegacyProjectKeyIngestionOnlyError,
   legacyProjectKeyUseLines,
@@ -7,7 +6,7 @@ import {
   legacyProjectKeyUseWindowKey,
   type LegacyProjectKeyUse,
 } from "@langwatch/api-key-contract";
-import { createLogger, createWarnThrottle } from "@langwatch/observability";
+import { createLogger, createWarnThrottle, type Logger } from "@langwatch/observability";
 import type { ProjectKeyedProbeRequest } from "@langwatch/platform-health-contract";
 import { deriveRunActor } from "@langwatch/scenario-contract";
 import { nowInstant } from "@langwatch/time";
@@ -17,6 +16,9 @@ import type { ProjectKeyedProbeAnswer } from "../rules/probe-answers.rules.ts";
 import { canaryAnswer, MAX_CANARY_QUERY_PARAM_LENGTH } from "../rules/scenario-canary.rules.ts";
 import type { ScenarioCanaryService } from "./scenario-canary.service.ts";
 import type { SubsystemProbeOutcome, SubsystemProbeService } from "./subsystem-probe.service.ts";
+
+/** One legacy key line per project, route, permission and kind per minute in this process. */
+const LEGACY_KEY_LOG_WINDOW_MS = 60_000;
 
 /**
  * Who a probe's key acts as: its project, and the key and its owner when it is an API key.
@@ -30,7 +32,10 @@ type ProbeCaller = Readonly<{
   legacyKeyOutsideScope: Readonly<{ organizationId: string; enforced: boolean }> | null;
 }>;
 
-const legacyKeyLogger = createLogger(LEGACY_PROJECT_KEY_LOGGER_NAME);
+/** Where legacy key lines go; a test passes its own logger rather than patching the shared one. */
+export type LegacyKeyLogger = Pick<Logger, "info" | "warn">;
+
+const legacyKeyLogger: LegacyKeyLogger = createLogger(LEGACY_PROJECT_KEY_LOGGER_NAME);
 
 /** Resolves a raw token, project key or API key, to its caller as main's TokenResolver did. */
 type ProbeCallerResolver = (
@@ -55,23 +60,27 @@ export class ProjectKeyedProbeService {
   readonly #probes: SubsystemProbeService;
   readonly #resolveCaller: ProbeCallerResolver;
   readonly #scenarioCanary: ScenarioCanaryService;
+  readonly #legacyKeyLogger: LegacyKeyLogger;
   /** One legacy key line per project and probe per window in this process. */
-  readonly #legacyKeyWindow = createWarnThrottle(LEGACY_PROJECT_KEY_LOG_WINDOW_MS);
+  readonly #legacyKeyWindow = createWarnThrottle(LEGACY_KEY_LOG_WINDOW_MS);
 
   private constructor(options: {
     probes: SubsystemProbeService;
     resolveCaller: ProbeCallerResolver;
     scenarioCanary: ScenarioCanaryService;
+    legacyKeyLogger?: LegacyKeyLogger | undefined;
   }) {
     this.#probes = options.probes;
     this.#resolveCaller = options.resolveCaller;
     this.#scenarioCanary = options.scenarioCanary;
+    this.#legacyKeyLogger = options.legacyKeyLogger ?? legacyKeyLogger;
   }
 
   static create(options: {
     probes: SubsystemProbeService;
     resolveCaller: ProbeCallerResolver;
     scenarioCanary: ScenarioCanaryService;
+    legacyKeyLogger?: LegacyKeyLogger | undefined;
   }): ProjectKeyedProbeService {
     return new ProjectKeyedProbeService(options);
   }
@@ -135,7 +144,7 @@ export class ProjectKeyedProbeService {
     });
     if (suppressed === undefined) return;
     for (const line of legacyProjectKeyUseLines({ use, decision, suppressed })) {
-      legacyKeyLogger[line.level](line.fields, line.message);
+      this.#legacyKeyLogger[line.level](line.fields, line.message);
     }
   }
 

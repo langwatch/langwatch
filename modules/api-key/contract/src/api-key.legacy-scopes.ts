@@ -23,8 +23,6 @@ export const LEGACY_PROJECT_KEY_LOGGER_NAME = "langwatch:legacy-project-key";
 export const LEGACY_PROJECT_KEY_OUTSIDE_SCOPE_MESSAGE = "legacy project key outside its scopes";
 /** A census line: a legacy key request beyond ingestion that was answered. */
 export const LEGACY_PROJECT_KEY_CENSUS_MESSAGE = "legacy project key request";
-/** One line per project, route, permission and kind per window in a process. */
-export const LEGACY_PROJECT_KEY_LOG_WINDOW_MS = 60_000;
 
 /** A legacy key request beyond ingestion, as the lines and the span record it; never the token. */
 export type LegacyProjectKeyUse = Readonly<{
