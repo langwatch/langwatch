@@ -15,6 +15,7 @@ import {
   type ScopeTierField,
   type Authorization,
   type ProofBearingPermission,
+  SCOPE_TIER_FIELDS,
 } from "@langwatch/authorization";
 import { HandledError, isZodLikeError, ValidationError } from "@langwatch/handled-error";
 import {
@@ -70,6 +71,7 @@ import {
   platformPermissionOf,
   refuseImpersonatedMint,
   type AccessDeclaration,
+  type AccessDecision,
   type AccessDenial,
   type ApiEntitlement,
   type Authorize,
@@ -318,6 +320,32 @@ type HandlerArgumentsFor<Caller extends TrpcCallerKind, Input, App> = Caller ext
     ? TrpcContractHandlerArguments<Input, App> & Readonly<{ authorization: Authorization }>
     : TrpcContractHandlerArguments<Input, App>;
 
+/** A procedure asking at several targets is handed each proof-bearing target's proof by field. */
+type TargetProofArguments<Composed extends boolean, Fields extends string> = Composed extends true
+  ? [Fields] extends [never]
+    ? unknown
+    : Readonly<{ authorizations: Readonly<Record<Fields, Authorization>> }>
+  : unknown;
+
+/** A permission asked at a further project, named by an input field of its own (ADR-185 §2). */
+export type TrpcFurtherPermission = Readonly<{
+  permission: AuthzPermission;
+  via: ScopeTierField;
+  field: string;
+}>;
+
+/** A further target: the tier `via` names, at the id the input's `field` holds. */
+export type TrpcFurtherTarget<Field extends string = string> = Readonly<{
+  via: ScopeTierField;
+  field: Field;
+}>;
+
+/** An input field a further target may name: never a scope field, which name the first target. */
+type FurtherField<
+  Contract extends BuiltTrpcContract,
+  Name extends keyof Contract["members"],
+> = Exclude<keyof z.output<Contract["members"][Name]["input"]> & string, ScopeTierField>;
+
 /** The middleware context a handler is handed beside its input, in declaration order. */
 type TrpcMiddlewareContextValues<Contexts extends readonly MiddlewareContext[]> = {
   [Index in keyof Contexts]: z.output<Contexts[Index]["schema"]>;
@@ -386,6 +414,8 @@ export type TrpcProcedureRequest<TContext extends object> = Readonly<{
   procedure: string;
   member: TrpcContractMember;
   access: TrpcAccess;
+  /** Present exactly when the procedure asks at several targets: each after the first, in order. */
+  furtherPermissions?: readonly TrpcFurtherPermission[];
   /** Present exactly when the procedure asks the tenant to hold an entitlement. */
   entitlement?: EntitlementGate;
   /** Present exactly when the procedure mints a credential: the permission its refusal names. */
@@ -539,7 +569,15 @@ export interface TrpcRouterAccess<
   withPermission(
     permission: ProofBearingPermission,
     options?: { via: ScopeTierField },
-  ): TrpcRouterImplementation<Api, Contract, Implemented, Name, Contexts, "proven">;
+  ): TrpcComposableImplementation<
+    Api,
+    Contract,
+    Implemented,
+    Name,
+    Contexts,
+    "proven",
+    "projectId"
+  >;
   withPermission<const Choice extends InputPermission>(
     choice: Choice & ExactInputPermission<z.output<Contract["members"][Name]["input"]>, Choice>,
     options?: { via: ScopeTierField },
@@ -551,7 +589,7 @@ export interface TrpcRouterAccess<
   withPermission(
     permission: AuthzPermission,
     options: { via: ScopeTierField },
-  ): TrpcRouterImplementation<Api, Contract, Implemented, Name, Contexts, "authenticated">;
+  ): TrpcComposableImplementation<Api, Contract, Implemented, Name, Contexts, "authenticated">;
   /**
    * A platform-tier permission, asked of the operator's PLATFORM grant before the handler (E4);
    * `hidden` answers NOT_FOUND to every caller it refuses, an anonymous one included.
@@ -600,17 +638,65 @@ export interface TrpcRouterImplementation<
   Name extends keyof Contract["members"] & string,
   Contexts extends readonly MiddlewareContext[] = [],
   Caller extends TrpcCallerKind = "authenticated",
+  Proofs extends string = never,
+  Composed extends boolean = false,
 > {
   handle(
     handler: (
-      args: HandlerArgumentsFor<Caller, z.output<Contract["members"][Name]["input"]>, Api>,
+      args: HandlerArgumentsFor<Caller, z.output<Contract["members"][Name]["input"]>, Api> &
+        TargetProofArguments<Composed, Proofs>,
       ...contexts: TrpcMiddlewareContextValues<Contexts>
     ) => DeclaredResult<Contract["members"][Name]>,
   ): TrpcRouterBuilder<Api, Contract, Implemented | Name>;
 }
 
+/**
+ * A procedure asking one permission, which may ask one more at a further project its input names
+ * by a field of its own (ADR-185 §2): both asked before the handler, one proof per target.
+ */
+export interface TrpcComposableImplementation<
+  Api,
+  Contract extends BuiltTrpcContract,
+  Implemented extends string,
+  Name extends keyof Contract["members"] & string,
+  Contexts extends readonly MiddlewareContext[] = [],
+  Caller extends TrpcCallerKind = "authenticated",
+  Proofs extends string = never,
+  Composed extends boolean = false,
+> extends TrpcRouterImplementation<
+  Api,
+  Contract,
+  Implemented,
+  Name,
+  Contexts,
+  Caller,
+  Proofs,
+  Composed
+> {
+  /** A proof-bearing permission at the further project: the handler is handed its proof. */
+  withPermission<const Field extends FurtherField<Contract, Name>>(
+    permission: ProofBearingPermission,
+    target: TrpcFurtherTarget<Field>,
+  ): TrpcComposableImplementation<
+    Api,
+    Contract,
+    Implemented,
+    Name,
+    Contexts,
+    Caller,
+    Proofs | Field,
+    true
+  >;
+  /** One more permission, asked before the handler at the scope `field` names. */
+  withPermission<const Field extends FurtherField<Contract, Name>>(
+    permission: AuthzPermission,
+    target: TrpcFurtherTarget<Field>,
+  ): TrpcComposableImplementation<Api, Contract, Implemented, Name, Contexts, Caller, Proofs, true>;
+}
+
 type Implementation = Readonly<{
   access: TrpcAccess;
+  furtherPermissions?: readonly TrpcFurtherPermission[];
   entitlement?: EntitlementGate;
   mintsCredential?: AuthzPermission;
   refusedOnAggregate?: true;
@@ -738,18 +824,31 @@ function routerBuilder<Api, Contract extends BuiltTrpcContract, Implemented exte
     marks: ProcedureMarks = {},
   ) => {
     const { entitlement } = marks;
-    const implement = (access: TrpcAccess) => {
+    const implement = (access: TrpcAccess, further: readonly TrpcFurtherPermission[] = []) => {
       assertRefusable({ contract, name, access, onRefused: marks.onRefused });
+      const composed = further.length > 0 ? { furtherPermissions: further } : {};
 
       return {
         handle: (handle: (args: never, ...values: never[]) => unknown) =>
           routerBuilder(
             api,
             contract,
-            new Map(implementations).set(name, { access, contexts, handle, ...marks }),
+            new Map(implementations).set(name, { access, contexts, handle, ...marks, ...composed }),
           ),
       };
     };
+    /** A declared access, and each further permission asked after it (ADR-185 §2). */
+    const composable = (
+      access: AccessDeclaration,
+      further: readonly TrpcFurtherPermission[],
+    ): ReturnType<typeof implement> & Readonly<{ withPermission: unknown }> => ({
+      ...implement(access, further),
+      withPermission: (permission: PermissionArgument, target?: TrpcFurtherTarget) =>
+        composable(access, [
+          ...further,
+          furtherPermissionOf({ contract, name, first: access, further, permission, target }),
+        ]),
+    });
 
     return {
       withMiddlewareContext: (...added: readonly MiddlewareContext[]) => {
@@ -792,12 +891,7 @@ function routerBuilder<Api, Contract extends BuiltTrpcContract, Implemented exte
       withPermission: (
         access: PermissionArgument,
         options?: { via: ScopeTierField } | PlatformPermissionTarget,
-      ) =>
-        implement(
-          options && "at" in options
-            ? platformDeclarationOf({ contract, name, access, target: options })
-            : permissionDeclarationOf({ contract, name, access, via: options?.via }),
-        ),
+      ) => composable(accessDeclarationOf({ contract, name, access, options }), []),
       withAccess: (access: PublicRouteAccess) => {
         assertNoTenantQuestion({ contract, name, entitlement });
 
@@ -955,6 +1049,74 @@ function permissionDeclarationOf({
   }
 
   return access;
+}
+
+/** A permission at the platform when the options name it, else at the scope the input names. */
+function accessDeclarationOf({
+  contract,
+  name,
+  access,
+  options,
+}: {
+  contract: TrpcContract;
+  name: string;
+  access: PermissionArgument;
+  options: { via: ScopeTierField } | PlatformPermissionTarget | undefined;
+}): AccessDeclaration {
+  if (options && "at" in options) {
+    return platformDeclarationOf({ contract, name, access, target: options });
+  }
+
+  return permissionDeclarationOf({ contract, name, access, via: options?.via });
+}
+
+/**
+ * A further permission composes only as one permission beside a first that asks one, at a field
+ * of the input's own that no scope field and no earlier target already names (ADR-185 §2).
+ */
+function furtherPermissionOf({
+  contract,
+  name,
+  first,
+  further,
+  permission,
+  target,
+}: {
+  contract: TrpcContract;
+  name: string;
+  first: AccessDeclaration;
+  further: readonly TrpcFurtherPermission[];
+  permission: PermissionArgument;
+  target: TrpcFurtherTarget | undefined;
+}): TrpcFurtherPermission {
+  const address = `tRPC ${contract.namespace}.${name}`;
+  const input = contract.members[name]?.input;
+  const shape = input instanceof z.ZodObject ? Object.keys(input.shape) : [];
+
+  const composes = first.kind === "permission" && typeof permission === "string";
+  const targeted =
+    target !== undefined &&
+    SCOPE_INPUT_FIELDS.includes(target.via) &&
+    typeof target.field === "string";
+  if (!composes || !targeted) {
+    throw new Error(
+      `${address} declares withPermission() twice; a further permission is one permission at ` +
+        "{ via, field }, beside a first that asks one",
+    );
+  }
+
+  assertNotPlatformPermission({ address, permissions: [permission] });
+
+  const named = [...SCOPE_INPUT_FIELDS, ...further.map((asked) => asked.field)];
+  if (named.includes(target.field)) {
+    throw new Error(`${address} asks a permission at "${target.field}" twice`);
+  }
+
+  if (!shape.includes(target.field)) {
+    throw new Error(`${address} asks at "${target.field}", a field its input does not carry`);
+  }
+
+  return { permission, via: target.via, field: target.field };
 }
 
 /** One platform-tier permission at the platform (E4); anything else is refused where written. */
@@ -1243,6 +1405,7 @@ export function createTrpcRuntime<
         access({
           members,
           declaration: request.access,
+          further: request.furtherPermissions ?? [],
           procedure: request.procedure,
           kind: request.member.kind,
           app: request.app,
@@ -1392,6 +1555,8 @@ type HandlerArguments = Readonly<{
   actor: (Actor & { id: string }) | null;
   scope: unknown;
   authorization: unknown;
+  /** Each proof-bearing target's proof by its field; present only on a procedure asking several. */
+  authorizations?: Readonly<Record<string, Authorization>>;
   signal: AbortSignal | undefined;
 }>;
 
@@ -1422,6 +1587,7 @@ type ResolverOptions = Readonly<{
 function access<TContext extends object>({
   members,
   declaration,
+  further,
   procedure,
   kind,
   entitlement,
@@ -1433,6 +1599,7 @@ function access<TContext extends object>({
 }: {
   members: TrpcRuntimeMembers<TContext>;
   declaration: TrpcAccess;
+  further: readonly TrpcFurtherPermission[];
   procedure: string;
   kind: TrpcContractMember["kind"];
   entitlement?: EntitlementGate;
@@ -1454,6 +1621,7 @@ function access<TContext extends object>({
     check({
       members,
       declaration,
+      further,
       procedure,
       kind,
       app,
@@ -1474,6 +1642,7 @@ type BoundContext<TContext> = Readonly<{
 function check<TContext extends object>({
   members,
   declaration,
+  further,
   procedure,
   kind,
   entitlement,
@@ -1485,6 +1654,7 @@ function check<TContext extends object>({
 }: {
   members: TrpcRuntimeMembers<TContext>;
   declaration: TrpcAccess;
+  further: readonly TrpcFurtherPermission[];
   procedure: string;
   kind: TrpcContractMember["kind"];
   entitlement?: EntitlementGate;
@@ -1520,7 +1690,7 @@ function check<TContext extends object>({
       return next({ ctx: { handlerArguments: anonymous } });
     }
 
-    const decision = await authorized({ members, declaration, ctx, input }).catch(
+    const decision = await authorized({ members, declaration, further, ctx, input }).catch(
       async (failure: unknown) => {
         if (onRefused && isRefusal(failure)) {
           await onRefused({ app: app(ctx), input, actor: members.identity.caller(ctx).actor });
@@ -1555,17 +1725,20 @@ function check<TContext extends object>({
       });
     }
 
+    const authorize = members.authorization.forRequest(ctx);
+    const admitted = await admittedScope({
+      declaration,
+      decision,
+      kind,
+      refusedOnAggregate,
+      procedure,
+      authorize,
+    });
     const handlerArguments: ResolvedAccess = {
       app: app(ctx),
       actor: decision.actor,
-      ...(await admittedScope({
-        declaration,
-        decision,
-        kind,
-        refusedOnAggregate,
-        procedure,
-        authorize: members.authorization.forRequest(ctx),
-      })),
+      ...admitted,
+      ...(await targetProofs({ decision, first: admitted.authorization, authorize, procedure })),
       contexts: await resolveContexts({ contexts, ctx }),
     };
 
@@ -1591,7 +1764,7 @@ async function admittedScope({
   refusedOnAggregate: boolean;
   procedure: string;
   authorize: Authorize;
-}): Promise<Pick<ResolvedAccess, "scope" | "authorization">> {
+}): Promise<Pick<ResolvedAccess, "scope"> & Readonly<{ authorization: Authorization | null }>> {
   const scope = await scopeWithOrganization({ scope: decision.scope, authorize });
   if (kind === "mutation") {
     refuseWriteUnderAggregate({
@@ -1611,6 +1784,50 @@ async function admittedScope({
       route: procedure,
     }),
   };
+}
+
+/** A target after the first, with the scope its own input field named (ADR-185 §2). */
+type FurtherTarget = Readonly<{
+  permission: AuthzPermission;
+  field: string;
+  scope: AuthzDeclaredScopeId;
+}>;
+
+/** The first target's decision, and each further target the door admitted after it. */
+type TargetedDecision = AccessDecision & Readonly<{ targets: readonly FurtherTarget[] }>;
+
+/** One proof per proof-bearing target, by the field naming it; the first's is reused. */
+async function targetProofs({
+  decision,
+  first,
+  authorize,
+  procedure,
+}: {
+  decision: TargetedDecision;
+  first: Authorization | null;
+  authorize: Authorize;
+  procedure: string;
+}): Promise<Pick<ResolvedAccess, "authorizations">> {
+  if (decision.targets.length === 0) return {};
+
+  const proofs: Record<string, Authorization> = {};
+  if (first && decision.scope) {
+    proofs[SCOPE_TIER_FIELDS[decision.scope.tier]] = first;
+  }
+
+  for (const { permission, field, scope } of decision.targets) {
+    const { actor } = decision;
+    const proof = await mintAuthorization({
+      permission,
+      actor,
+      scope,
+      authorize,
+      route: procedure,
+    });
+    if (proof) proofs[field] = proof;
+  }
+
+  return { authorizations: proofs };
 }
 
 /**
@@ -1648,22 +1865,40 @@ function isRefusal(failure: unknown): boolean {
 async function authorized<TContext extends object>({
   members,
   declaration,
+  further,
   ctx,
   input,
 }: {
   members: TrpcRuntimeMembers<TContext>;
   declaration: AccessDeclaration;
+  further: readonly TrpcFurtherPermission[];
   ctx: TContext;
   input: unknown;
-}) {
+}): Promise<TargetedDecision> {
+  const { denials } = members;
+
   try {
-    return await decide({
-      declaration,
-      caller: members.identity.caller(ctx),
-      input,
-      authorize: members.authorization.forRequest(ctx),
-      denials: members.denials,
-    });
+    const caller = members.identity.caller(ctx);
+    const authorize = members.authorization.forRequest(ctx);
+    const decision = await decide({ declaration, caller, input, authorize, denials });
+    const targets: FurtherTarget[] = [];
+
+    // Each further target is the question the first is, at the scope its own field names.
+    for (const { permission, via, field } of further) {
+      const named =
+        typeof input === "object" && input !== null ? Reflect.get(input, field) : void 0;
+      const { scope } = await decide({
+        declaration: { kind: "permission", permission, via },
+        caller,
+        input: { [via]: named },
+        authorize,
+        denials,
+      });
+      if (!scope) throw new Error(`a further target at "${field}" was admitted with no scope`);
+      targets.push({ permission, field, scope });
+    }
+
+    return { ...decision, targets };
   } catch (failure) {
     if (failure instanceof AuthenticationRequiredError) {
       throw new TRPCError({ code: "UNAUTHORIZED", message: failure.message });

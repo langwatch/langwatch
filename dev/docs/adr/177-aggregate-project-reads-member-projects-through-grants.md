@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-26, revised 2026-10-21
 
-**Status:** Accepted (v4.15, 2026-10-21)
+**Status:** Accepted (v4.16, 2026-10-21)
 
 **Builds on:** ADR-166 (grant-scoped data access: a sealed `Authorization`
 proof minted once at the door, carried by hand, applied by the store client),
@@ -949,3 +949,19 @@ side keeps its existing guards until ADR-166's `prisma.as` lands.
     trace, so it reads only members shared for their whole history. An
     evaluation that names no trace keeps its own time.
     Spec: `specs/governance/aggregate-project.feature`, section D.
+- v4.16 (2026-10-21, ADR-185 builds on this one; no decision here changed).
+  Braids reuse the shared grant, the proof and the fence for project-to-project
+  reads between plain projects. Decision 4's refusal of a non-empty `where`
+  stands for every `trace` condition, so the reconciler's grants are
+  unchanged; ADR-185 adds a second legal placement, `project-reader` with a
+  `span` condition and source `braid`, whose `where` is compiled on save.
+  v4.9's rule that a window opens only its own resource is what keeps a braid
+  from widening any trace or analytics read. Decisions 5 and 9 stay the
+  aggregate's: a braid is created by an organisation admin rather than opened
+  by one, applies each span's owning project's policy rather than the
+  strictest, and is audited per actor, reader and owner by the same read audit,
+  generalised from "the project is an aggregate" to "the proof carries a
+  shared grant". An aggregate is never either side of a braid, and shares do
+  not chain: an aggregate's member trace shows none of the spans braided into
+  that member. v4.5's narrowing to one member stays for an aggregate; a plain
+  project's detail read keeps its own grant and its braids.

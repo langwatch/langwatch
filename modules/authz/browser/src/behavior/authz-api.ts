@@ -6,11 +6,21 @@
 import { createModuleApi, type OutputsFromMap } from "@langwatch/api/web";
 import type { AuthzPermission } from "@langwatch/authorization";
 import type {
+  AuthzBraid,
+  AuthzBraidRemoved,
+  AuthzBraidTargets,
+  AuthzChangeBraidInput,
+  AuthzCreateBraidInput,
+  AuthzProjectMembersHolding,
   AuthzChangeGrantRoleInput,
   AuthzCreateGrantInput,
   AuthzListGrantsInput,
   AuthzManagedOrganizationBinding,
+  AuthzOrganizationBraids,
+  AuthzOrganizationPolicy,
   AuthzOwnStanding,
+  AuthzProjectBraids,
+  AuthzRemoveBraidInput,
   AuthzRevokeGrantByIdInput,
   Grant,
   GrantPage,
@@ -89,6 +99,55 @@ export type AuthzApiMap = {
     listManagedGrants: {
       query: { input: OrganizationScope; output: AuthzManagedOrganizationBinding[] };
     };
+
+    /** A project's braids, both directions; any member of either project reads them. */
+    listBraids: {
+      query: { input: { projectId: string }; output: AuthzProjectBraids };
+    };
+    /** Either side's admins, on any plan: stopping a braid only narrows access. */
+    removeBraid: {
+      mutation: {
+        input: Omit<AuthzRemoveBraidInput, "caller" | "actor">;
+        output: AuthzBraidRemoved;
+      };
+    };
+    /** Whether only organisation admins may braid; any member reads it. */
+    getBraidsPolicy: { query: { input: OrganizationScope; output: AuthzOrganizationPolicy } };
+    setBraidsPolicy: {
+      mutation: {
+        input: OrganizationScope & { braidsOrganizationAdminsOnly: boolean };
+        output: AuthzOrganizationPolicy;
+      };
+    };
+    /** Every live braid in the organisation, for its admins. */
+    listOrganizationBraids: {
+      query: { input: OrganizationScope; output: AuthzOrganizationBraids };
+    };
+    /** The braid dialog's writes; Enterprise, and refused by code (`braid_*`). */
+    createBraid: {
+      mutation: { input: Omit<AuthzCreateBraidInput, "caller" | "actor">; output: AuthzBraid };
+    };
+    changeBraid: {
+      mutation: { input: Omit<AuthzChangeBraidInput, "caller" | "actor">; output: AuthzBraid };
+    };
+    /** The picker: of the projects named, those the viewer may braid into or why not. */
+    listBraidTargets: {
+      query: { input: { projectId: string; projectIds: string[] }; output: AuthzBraidTargets };
+    };
+    /** How many people can read the reader's traces; a floor when not `exact`. */
+    countProjectTraceViewers: {
+      query: { input: { projectId: string }; output: AuthzProjectMembersHolding };
+    };
+  };
+
+  /** Whether the reader signs its calls, which the only-signed-calls switch names. */
+  signingKeys: {
+    projectSigning: {
+      query: {
+        input: { projectId: string };
+        output: { keyName: string; lastUsedAt: string | null } | null;
+      };
+    };
   };
 
   organization: {
@@ -109,7 +168,11 @@ export type AuthzApiMap = {
         output: {
           id: string;
           name: string;
-          teams: { id: string; name: string; projects: { id: string; name: string }[] }[];
+          teams: {
+            id: string;
+            name: string;
+            projects: { id: string; slug: string; name: string }[];
+          }[];
         }[];
       };
     };

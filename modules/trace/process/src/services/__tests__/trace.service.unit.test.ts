@@ -262,7 +262,26 @@ describe("TraceService span-tree read", () => {
       }),
     ).resolves.toEqual({
       nodes: [node],
-      nextCursor: { startTimeMs: 10, spanId: "span_1" },
+      nextCursor: { startTimeMs: 10, spanId: "span_1", ownerProjectId: null },
+    });
+  });
+
+  describe("when the page ends on a span braided in from another project", () => {
+    /** @scenario "Two projects holding the same span id show both spans" */
+    it("names that span's owner in the cursor so the next page starts after it", async () => {
+      const page = await service([{ ...node, ownerProjectId: "project_owner" }]).getSpanTreePage({
+        authorization: treeProof,
+        projectId: "project_1",
+        traceId: "trace_1",
+        limit: 1,
+        canSeeCosts: true,
+      });
+
+      expect(page.nextCursor).toEqual({
+        startTimeMs: 10,
+        spanId: "span_1",
+        ownerProjectId: "project_owner",
+      });
     });
   });
 

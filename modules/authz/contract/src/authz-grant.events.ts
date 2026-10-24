@@ -66,7 +66,12 @@ export const GRANT_EVENT_SOURCES = [
   "read-through-mint",
   "migration",
   "aggregate-reconciler",
+  "braid",
 ] as const;
+/** ADR-185 §1: a braid's grant, a `span` read from the owner project to the reader project. */
+export const GRANT_SOURCE_BRAID = "braid" as const satisfies (typeof GRANT_EVENT_SOURCES)[number];
+/** ADR-185 §8: the audit log target kind of a braid's entries; the target id is its grant id. */
+export const BRAID_AUDIT_TARGET_KIND = "braid" as const;
 export const grantEventSourceSchema = z.enum(GRANT_EVENT_SOURCES);
 export type GrantEventSource = z.infer<typeof grantEventSourceSchema>;
 
@@ -89,9 +94,9 @@ export const resourceGrantTermsSchema: ResourceGrantTermsSchema =
 export type ResourceGrantTerms = z.infer<typeof resourceGrantTermsSchema>;
 
 /**
- * A `project` principal sits at RESOURCE scope, as its own project's credential,
- * or as the ADR-177 shared read: `project-reader` on another project's PROJECT
- * scope carrying a condition whose `where` is empty (nothing compiles OTTL yet).
+ * A `project` principal sits at RESOURCE scope, as its own project's credential, or as a shared
+ * `project-reader` read of another project carrying a condition. Only a braid (ADR-185 §1) has a
+ * `where`, on a `span` condition with its `compiledWhere`; a braid is only that shared span read.
  */
 export const grantShapeRefinement = {
   check: (grant: {
@@ -100,8 +105,11 @@ export const grantShapeRefinement = {
     scope: { type: string; id: string };
     resource?: unknown;
     expiresAtMs?: number;
-    condition?: { where?: string };
+    source?: string;
+    condition?: { type?: string; where?: string; compiledWhere?: unknown };
+    replacesGrantId?: string;
   }): boolean => {
+    if (grant.replacesGrantId !== undefined && grant.source !== GRANT_SOURCE_BRAID) return false;
     const isResourceScope = grant.scope.type === "RESOURCE";
     if (grant.principal.type === "anyone" && !isResourceScope) return false;
     if (isResourceScope && grant.expiresAtMs !== undefined) return false;
@@ -113,7 +121,8 @@ export const grantShapeRefinement = {
       grant.principal.id !== grant.scope.id &&
       grant.roleKey === PROJECT_READER_ROLE_KEY &&
       grant.condition !== undefined &&
-      (grant.condition.where === undefined || grant.condition.where === "");
+      sharedConditionIsLegal({ condition: grant.condition, source: grant.source });
+    if (grant.source === GRANT_SOURCE_BRAID && !isSharedProjectRead) return false;
     if (
       grant.principal.type === "project" &&
       !isResourceScope &&
@@ -130,9 +139,30 @@ export const grantShapeRefinement = {
     );
   },
   message:
-    "a RESOURCE grant carries resource terms and a null roleKey, every other scope carries a roleKey and no resource terms; a RESOURCE grant states its expiry inside those terms and never as the grant's own `expiresAtMs`; `anyone` principals exist only at RESOURCE scope, a `project` principal exists at RESOURCE scope, as its own project's credential (a PROJECT scope whose id is the principal's), or as a `project-reader` on another project's PROJECT scope carrying a condition with an empty where; only that shared read carries a condition or the `project-reader` role",
+    "a RESOURCE grant carries resource terms and a null roleKey, every other scope carries a roleKey and no resource terms; a RESOURCE grant states its expiry inside those terms and never as the grant's own `expiresAtMs`; `anyone` principals exist only at RESOURCE scope, a `project` principal exists at RESOURCE scope, as its own project's credential (a PROJECT scope whose id is the principal's), or as a `project-reader` on another project's PROJECT scope carrying a non-span condition with an empty where, or, from a braid alone, a span condition whose where carries its compiled form; only that shared read carries a condition or the `project-reader` role, and a braid is only that shared span read; only a braid names the grant it replaces",
   path: ["resource"] as const,
 };
+
+/**
+ * Only a braid writes a span condition, so no other writer makes a braid without the braid
+ * routes' checks; it may carry a where with its compiled form. Any other has neither.
+ */
+function sharedConditionIsLegal({
+  condition,
+  source,
+}: {
+  condition: { type?: string; where?: string; compiledWhere?: unknown };
+  source: string | undefined;
+}): boolean {
+  const hasWhere = condition.where !== undefined && condition.where !== "";
+  const hasCompiledWhere = condition.compiledWhere !== undefined;
+  if (source !== GRANT_SOURCE_BRAID) {
+    return condition.type !== "span" && !hasWhere && !hasCompiledWhere;
+  }
+  if (condition.type !== "span") return false;
+
+  return hasWhere === hasCompiledWhere;
+}
 
 const grantAttachedPayloadSchemaDefinition = z
   .object({
@@ -155,6 +185,8 @@ const grantAttachedPayloadSchemaDefinition = z
     /** Present when the writer asked to skip an identical live grant: the fold
      *  drops this fact when one already landed, so a write inside the lag adds no row. */
     onDuplicate: z.literal("skip").optional(),
+    /** A braid change (ADR-185 §2): the grant this one replaces, revoked after it attaches. */
+    replacesGrantId: z.string().min(1).optional(),
   })
   .strict()
   .refine(grantShapeRefinement.check, {

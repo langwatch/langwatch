@@ -1,9 +1,9 @@
-import type { Authorization } from "@langwatch/authorization";
+import { type Authorization, isSpanBraidGrant } from "@langwatch/authorization";
 
 /**
- * The projects whose privacy policies govern a read (ADR-177 decision 9): the
- * own project first, then every project the proof reads through a shared
- * grant. A proof minted for another project says nothing about this read.
+ * The projects whose privacy policies govern a read (ADR-177 decision 9): the own project, then
+ * every project read through a shared grant. A braid's owner is left out: its spans carry its own
+ * policy and never govern the reader's (ADR-185 §5). A proof minted elsewhere says nothing.
  */
 export function policyProjectIdsOf({
   projectId,
@@ -19,7 +19,7 @@ export function policyProjectIdsOf({
     ...new Set([
       projectId,
       ...authorization.grants.flatMap((grant) =>
-        grant.projectId === undefined ? [] : [grant.projectId],
+        grant.projectId === undefined || isSpanBraidGrant(grant) ? [] : [grant.projectId],
       ),
     ]),
   ];

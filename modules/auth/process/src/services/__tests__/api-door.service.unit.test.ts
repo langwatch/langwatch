@@ -599,6 +599,65 @@ describe("the plan questions (E6)", () => {
       expect(refusal).toMatchObject({ code: "enterprise_plan_required" });
     });
   });
+
+  describe("given enterprise asked of a project", () => {
+    function projectEntitlementsOn(active: Plan) {
+      const asked: string[] = [];
+      const getScope: AuthzApi["getScope"] = async (ids) => {
+        if (ids.projectId === "project-1") {
+          return { type: "project", id: "project-1", teamId: "team-1", organizationId: "org-1" };
+        }
+        throw new AuthzScopeNotFoundError(ids);
+      };
+      const entitlements = ApiDoorService.create({
+        ...peers,
+        authz: { ...peers.authz, getScope },
+        entitlements: {
+          getActivePlan: async ({ organizationId }) => {
+            asked.push(organizationId);
+            return active;
+          },
+        },
+      }).door().entitlements;
+
+      return { asked, entitlements };
+    }
+
+    /** @scenario "A project-scoped Enterprise gate below Enterprise answers 402 enterprise_plan_required" */
+    it("reads the plan of the organization holding the project, refusing below Enterprise", async () => {
+      const below = projectEntitlementsOn(plan("LAUNCH", true));
+
+      await expect(
+        below.entitlements.holds({
+          entitlement: "enterprise",
+          scope: { tier: "project", id: "project-1" },
+        }),
+      ).resolves.toBe(false);
+      expect(below.asked).toEqual(["org-1"]);
+      expect(
+        below.entitlements.refusal?.({ entitlement: "enterprise", feature: "BRAIDS" }),
+      ).toMatchObject({ code: "enterprise_plan_required" });
+    });
+
+    /** @scenario "A project-scoped Enterprise gate below Enterprise answers 402 enterprise_plan_required" */
+    it("holds on an Enterprise organization, and not for a project authz cannot resolve", async () => {
+      const enterprise = projectEntitlementsOn(plan("ENTERPRISE", false));
+
+      await expect(
+        enterprise.entitlements.holds({
+          entitlement: "enterprise",
+          scope: { tier: "project", id: "project-1" },
+        }),
+      ).resolves.toBe(true);
+      await expect(
+        enterprise.entitlements.holds({
+          entitlement: "enterprise",
+          scope: { tier: "project", id: "project-gone" },
+        }),
+      ).resolves.toBe(false);
+      expect(enterprise.asked).toEqual(["org-1"]);
+    });
+  });
 });
 
 describe("the platform question", () => {

@@ -10,6 +10,7 @@ import {
   levelOf,
   offeredActions,
   offeredAreas,
+  offersReadLevel,
   permissionSentence,
   permissionsNeedingOrganizationScope,
   permissionTakesEffectAt,
@@ -130,6 +131,26 @@ describe("given the access level of one resource", () => {
     it("offers reading and nothing else", () => {
       expect(offeredActions("cost")).toEqual(["view"]);
       expect(offeredActions("auditLog")).toEqual(["view"]);
+    });
+  });
+
+  describe("when a resource has only full access", () => {
+    /** ADR-185 §2: braiding is one permission, `braids:manage`. */
+    it("offers full access to braids and no read level", () => {
+      expect(offeredActions("braids")).toEqual(["manage"]);
+      expect(offersReadLevel("braids")).toBe(false);
+      expect(offersReadLevel("datasets")).toBe(true);
+      const next = setLevel({ resource: "braids", level: "full", selected: [] });
+      expect(next).toEqual(["braids:manage"]);
+      expect(levelOf({ resource: "braids", selected: next })).toBe("full");
+    });
+
+    it("names the row in the customer's words", () => {
+      expect(resourceCopy("braids")).toEqual({
+        label: "Braids",
+        blurb: "Create, change and remove braids, and manage signing keys.",
+        area: "Data and analysis",
+      });
     });
   });
 });

@@ -6,11 +6,13 @@ import { EventingAuthzPlatformGrantRepository } from "../eventing/eventing.authz
 import { EventingAuthzReadRepository } from "../eventing/eventing.authz-read.repository.ts";
 import { PrismaAuthzAdmissionRepository } from "./prisma.authz-admission.repository.ts";
 import { PrismaAuthzAuditRepository } from "./prisma.authz-audit.repository.ts";
+import { PrismaAuthzBraidLockRepository } from "./prisma.authz-braid-lock.repository.ts";
 import { PrismaAuthzCutoverRepository } from "./prisma.authz-cutover.repository.ts";
 import { PrismaAuthzLedgerReadRepository } from "./prisma.authz-ledger-read.repository.ts";
 import { PrismaAuthzManagedGrantRepository } from "./prisma.authz-managed-grant.repository.ts";
 import { PrismaAuthzMembershipStampRepository } from "./prisma.authz-membership-stamp.repository.ts";
 import { PrismaAuthzMigrationRepository } from "./prisma.authz-migration.repository.ts";
+import { PrismaAuthzOrganizationPolicyRepository } from "./prisma.authz-organization-policy.repository.ts";
 import { PrismaAuthzProjectionRepository } from "./prisma.authz-projection.repository.ts";
 import { PrismaAuthzRevocationRepository } from "./prisma.authz-revocation.repository.ts";
 import { PrismaAuthzUserStandingRepository } from "./prisma.authz-user-standing.repository.ts";
@@ -41,6 +43,8 @@ export class PostgresAuthzRepositories {
       listing: EventingAuthzListingRepository.create(prisma),
       migration: PrismaAuthzMigrationRepository.create(prisma),
       ledgerReads: PrismaAuthzLedgerReadRepository.create({ prisma }),
+      braidLocks: PrismaAuthzBraidLockRepository.create({ prisma }),
+      organizationPolicies: PrismaAuthzOrganizationPolicyRepository.create({ database: prisma }),
     };
   }
 }

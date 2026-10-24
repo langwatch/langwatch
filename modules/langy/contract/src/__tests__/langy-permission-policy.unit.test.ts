@@ -273,3 +273,12 @@ describe("langyUnattendedPermissions", () => {
     });
   });
 });
+
+describe("braiding", () => {
+  /** ADR-185 §2: braiding is a person's decision, so an agent never braids. */
+  it("refuses braids:manage and never mints it on Langy's key", () => {
+    expect(classifyForLangy("braids:manage").disposition).toBe("excluded");
+    expect(langyCandidatePermissions()).not.toContain("braids:manage");
+    expect(langyUnattendedPermissions()).not.toContain("braids:manage");
+  });
+});

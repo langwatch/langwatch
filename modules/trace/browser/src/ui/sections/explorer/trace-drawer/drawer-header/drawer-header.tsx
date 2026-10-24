@@ -51,6 +51,7 @@ import {
 } from "../../../../../model/explorer/trace-drawer/drawer-header/utils.ts";
 import { isTerminalOrigin } from "../../../../../model/terminal-origin.ts";
 import { TokenBreakdownTooltipContent } from "../../../../blocks/explorer/shared/token-breakdown-tooltip.tsx";
+import { BraidedTracePill } from "../../../../blocks/explorer/trace-drawer/braids/braided-trace-pill.tsx";
 import { SyntheticTraceBadge } from "../../../../blocks/explorer/trace-drawer/drawer-header/synthetic-trace-badge.tsx";
 import {
   type FittedChip,
@@ -71,6 +72,7 @@ import { EditedOriginalToggle } from "../edit-mode/edited-original-toggle.tsx";
 import { ModeSwitch } from "../mode-switch.tsx";
 import { RawJsonDialog } from "../raw-json-dialog.tsx";
 import { useTraceHeaderChipDefs } from "../trace-header-chips.tsx";
+import { withBraidedTotals } from "./braided-totals.tsx";
 import { MemberProjectChip } from "./member-project-chip.tsx";
 import { MetricPill } from "./metric-pill.tsx";
 import { type CategorizedPin, type PinCategory, renderPinPills } from "./pin-strip.tsx";
@@ -1294,7 +1296,9 @@ function HeaderMetricsRow({
 
   return (
     <FittedChipRow
-      chips={metrics}
+      chips={
+        trace.braided ? withBraidedTotals({ metrics, trace, braided: trace.braided }) : metrics
+      }
       ariaLabel="Trace metrics"
       trailing={
         isPlaceholder && (
@@ -1503,6 +1507,7 @@ function HeaderIdentity({
       )}
       <StatusChip trace={trace} statusColor={statusColor} />
       <MemberProjectChip />
+      <BraidedTracePill owners={trace.braided?.owners ?? []} />
       <SyntheticTraceBadge attributes={trace.attributes} />
     </HStack>
   );

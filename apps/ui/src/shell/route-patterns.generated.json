@@ -46,6 +46,8 @@
   "/settings/model-providers",
   "/settings/plans",
   "/settings/roles",
+  "/settings/braids",
+  "/settings/organization-braids",
   "/settings/api-keys",
   "/settings/profile",
   "/settings/scim",

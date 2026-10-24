@@ -8,6 +8,7 @@ import type { AuthzRepositories } from "../authz.repositories.ts";
 import { AuthzMemoryStore } from "./authz-memory.store.ts";
 import { MemoryAuthzAdmissionRepository } from "./memory.authz-admission.repository.ts";
 import { MemoryAuthzAuditTrailRepository } from "./memory.authz-audit-trail.repository.ts";
+import { MemoryAuthzBraidLockRepository } from "./memory.authz-braid-lock.repository.ts";
 import { MemoryAuthzGrantProjectionRepository } from "./memory.authz-grant-projection.repository.ts";
 import { MemoryAuthzLedgerReadRepository } from "./memory.authz-ledger-read.repository.ts";
 import { MemoryAuthzLineageEpochRepository } from "./memory.authz-lineage-epoch.repository.ts";
@@ -15,6 +16,7 @@ import { MemoryAuthzListingRepository } from "./memory.authz-listing.repository.
 import { MemoryAuthzManagedGrantRepository } from "./memory.authz-managed-grant.repository.ts";
 import { MemoryAuthzMembershipStampRepository } from "./memory.authz-membership-stamp.repository.ts";
 import { MemoryAuthzMigrationRepository } from "./memory.authz-migration.repository.ts";
+import { MemoryAuthzOrganizationPolicyRepository } from "./memory.authz-organization-policy.repository.ts";
 import { MemoryAuthzPlatformGrantRepository } from "./memory.authz-platform-grant.repository.ts";
 import { MemoryAuthzReadRepository } from "./memory.authz-read.repository.ts";
 import { MemoryAuthzRevocationRepository } from "./memory.authz-revocation.repository.ts";
@@ -43,6 +45,8 @@ export class MemoryAuthzRepositories {
       listing: MemoryAuthzListingRepository.create({ memory }),
       migration: MemoryAuthzMigrationRepository.create({ memory }),
       ledgerReads: MemoryAuthzLedgerReadRepository.create({ memory }),
+      braidLocks: MemoryAuthzBraidLockRepository.create(),
+      organizationPolicies: MemoryAuthzOrganizationPolicyRepository.create(),
     };
   }
 }

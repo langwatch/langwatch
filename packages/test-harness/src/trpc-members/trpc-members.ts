@@ -10,8 +10,8 @@ export type TrpcTestDecision<TContext> = (permission: Permission<TContext>) => b
 
 /**
  * A mounted tRPC declaration's members as a test supplies them: the context's person, an
- * authorization answer the test decides, an own-grant proof per proof-bearing read; audit
- * and error reporting silent (pass overrides to observe them).
+ * authorization answer the test decides, an own-grant proof per proof-bearing read, no
+ * entitlement held; audit and error reporting silent (pass overrides to observe them).
  */
 export function trpcTestMembers<TContext extends { actor: { id: string } | null }>({
   permits = () => true,
@@ -49,6 +49,7 @@ export function trpcTestMembers<TContext extends { actor: { id: string } | null 
       exempt: () => false,
       organizationOf: async () => null,
     },
+    entitlements: { holds: async () => false },
     errors: {
       report: () => {},
       asError: (failure) => (failure instanceof Error ? failure : new Error(String(failure))),

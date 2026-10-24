@@ -4,6 +4,8 @@ import {
   GRANT_ATTACHED_EVENT_TYPE,
   GRANT_EVENT_SOURCES,
   GRANT_REVOKED_EVENT_TYPE,
+  GRANT_SOURCE_BRAID,
+  PROJECT_READER_ROLE_KEY,
   ROLE_DEFINED_EVENT_TYPE,
 } from "@langwatch/authz-contract";
 import { createTenantId } from "@langwatch/eventing";
@@ -14,6 +16,7 @@ import {
   AuthzAuditTrailRepository,
   type AuthzAuditRow,
 } from "../../repositories/authz-audit-trail.repository.ts";
+import type { LedgerBraidRow } from "../../repositories/authz-ledger-read.repository.ts";
 import type { AuthzGrantsEvent } from "../authz-grant.events.ts";
 import { EventingAuthzAuditAdapter } from "../authz-grant.subscriber.ts";
 
@@ -236,4 +239,156 @@ describe("EventingAuthzAuditAdapter", () => {
       source: "grants-service",
     });
   });
+
+  describe("when a braid is created, changed and removed", () => {
+    /** @scenario "A braid's audit entries are filed under the braid and its owner project" */
+    it("files every entry under the braid's grant and the owner, the change naming what it replaced", async () => {
+      const { store, adapter } = braidAudit();
+
+      await adapter.handler(
+        sharedReadAttached({ grantId: "grant_v1", source: GRANT_SOURCE_BRAID }),
+      );
+      await adapter.handler(
+        sharedReadAttached({
+          grantId: "grant_v2",
+          source: GRANT_SOURCE_BRAID,
+          replacesGrantId: "grant_v1",
+        }),
+      );
+      await adapter.handler(revoked({ grantId: "grant_v1", reason: "braid-changed" }));
+      await adapter.handler(revoked({ grantId: "grant_v2", reason: "braid-removed" }));
+
+      expect(
+        store.attempts.map(({ action, projectId, targetKind, targetId }) => ({
+          action,
+          projectId,
+          targetKind,
+          targetId,
+        })),
+      ).toEqual([
+        {
+          action: "authz.grants.attach",
+          projectId: OWNER,
+          targetKind: "braid",
+          targetId: "grant_v1",
+        },
+        {
+          action: "authz.grants.attach",
+          projectId: OWNER,
+          targetKind: "braid",
+          targetId: "grant_v2",
+        },
+        {
+          action: "authz.grants.revoke",
+          projectId: OWNER,
+          targetKind: "braid",
+          targetId: "grant_v1",
+        },
+        {
+          action: "authz.grants.revoke",
+          projectId: OWNER,
+          targetKind: "braid",
+          targetId: "grant_v2",
+        },
+      ]);
+      expect(store.attempts[1]?.metadata).toMatchObject({ replacesGrantId: "grant_v1" });
+      expect(store.attempts[3]?.metadata).toEqual({
+        grantId: "grant_v2",
+        reason: "braid-removed",
+        principal: { type: "project", id: READER },
+        scope: { type: "PROJECT", id: OWNER },
+        condition: BRAID_CONDITION,
+      });
+    });
+  });
+
+  describe("when an ADR-177 shared read is attached and revoked", () => {
+    /** @scenario "A shared read that is not a braid names no braid in the audit log" */
+    it("writes its entries exactly as any other grant's, with no target", async () => {
+      const { store, adapter } = braidAudit();
+
+      await adapter.handler(
+        sharedReadAttached({ grantId: "grant_shared", source: "aggregate-reconciler" }),
+      );
+      await adapter.handler(revoked({ grantId: "grant_shared", reason: "member-left" }));
+
+      expect(store.attempts).toHaveLength(2);
+      for (const row of store.attempts) {
+        expect(row).not.toHaveProperty("targetKind");
+        expect(row).not.toHaveProperty("targetId");
+        expect(row).not.toHaveProperty("projectId");
+      }
+      expect(store.attempts[1]?.metadata).toEqual({
+        grantId: "grant_shared",
+        reason: "member-left",
+      });
+    });
+  });
 });
+
+const READER = "proj_orchestrator";
+const OWNER = "proj_specialists";
+const BRAID_CONDITION = { type: "span", where: "" } as const;
+
+/** The adapter over a projection holding the braid grants the events below attach. */
+function braidAudit() {
+  const store = new RecordingAuditTrailStore();
+  const braidRows: LedgerBraidRow[] = ["grant_v1", "grant_v2"].map((grantId) => ({
+    grantId,
+    ownerProjectId: OWNER,
+    readerProjectId: READER,
+    condition: BRAID_CONDITION,
+    expiresAt: null,
+    createdByUserId: "user_ana",
+    occurredAt: Temporal.Instant.fromEpochMilliseconds(OCCURRED_AT),
+    revokedReason: null,
+    isLive: true,
+    replacesGrantId: grantId === "grant_v2" ? "grant_v1" : null,
+  }));
+  const adapter = EventingAuthzAuditAdapter.create({
+    store,
+    braids: {
+      findBraids: async ({ grantId }) => braidRows.filter((row) => row.grantId === grantId),
+    },
+  });
+  return { store, adapter };
+}
+
+function sharedReadAttached({
+  grantId,
+  source,
+  replacesGrantId,
+}: {
+  grantId: string;
+  source: (typeof GRANT_EVENT_SOURCES)[number];
+  replacesGrantId?: string;
+}): AuthzGrantsEvent {
+  return event(
+    {
+      type: GRANT_ATTACHED_EVENT_TYPE,
+      data: {
+        grantId,
+        principal: { type: "project", id: READER },
+        roleKey: PROJECT_READER_ROLE_KEY,
+        scope: { type: "PROJECT", id: OWNER },
+        condition:
+          source === GRANT_SOURCE_BRAID
+            ? BRAID_CONDITION
+            : { type: "trace", from: "2026-10-01T00:00:00.000Z" },
+        ...(replacesGrantId === undefined ? {} : { replacesGrantId }),
+        source,
+        actor: USER_ACTOR,
+      },
+    },
+    grantId,
+    `evt_attach_${grantId}`,
+  );
+}
+
+function revoked({ grantId, reason }: { grantId: string; reason: string }): AuthzGrantsEvent {
+  return event(
+    { type: GRANT_REVOKED_EVENT_TYPE, data: { grantId, reason, actor: USER_ACTOR } },
+    grantId,
+    `evt_revoke_${grantId}`,
+  );
+}

@@ -87,6 +87,12 @@ client = langwatch.setup(
   `SpanProcessingExcludeRule` for details.
 </ParamField>
 
+<ParamField path="braid_copy_entries" type="Optional[Sequence[str]]" default="None">
+  The called side of a braid's signed calls: copies these baggage entries, and
+  `langwatch.signature`, onto every span started on the tracer provider. See
+  [Braids](#braids-signed-calls).
+</ParamField>
+
 <ParamField path="debug" type="bool" default="False">
   If `True`, enables debug logging for the LangWatch client, providing more verbose output about its
   operations.
@@ -956,6 +962,32 @@ compiled_prompt = prompt.compile_strict(
   Strict compilation will throw a `PromptCompilationError` if any template variables are missing,
   ensuring all required data is provided.
 </Warning>
+
+## Braids: signed calls
+
+A braid can require that the calling project really made a call. The calling service signs the
+baggage entries it names with one of its project's signing keys; the called service copies those
+entries and the signature onto its spans, and LangWatch checks the signature at ingest.
+
+```python
+import os
+from langwatch.braids import signed_baggage, sign_baggage
+
+# Calling side, inside an active span: the signature covers the current trace.
+with signed_baggage(os.environ["LANGWATCH_SIGNING_KEY"], {"orchestrator": "web"}):
+    call_the_other_service()
+
+# Or build the context yourself and attach it.
+ctx = sign_baggage(signing_key, {"orchestrator": "web"})
+```
+
+On the called side, pass `braid_copy_entries=["orchestrator"]` to `langwatch.setup()`, or add
+`BraidBaggageSpanProcessor(["orchestrator"])` to your own `TracerProvider`. Your propagator must
+carry W3C baggage (OpenTelemetry's default does).
+
+Signing raises `BraidSigningError` whose `code` is `malformed_signing_key`, `empty_entries`,
+`invalid_entry_key` (keys match `[A-Za-z0-9._-]{1,128}`), `invalid_entry_value` or
+`no_active_trace`.
 
 ## Core Data Types
 

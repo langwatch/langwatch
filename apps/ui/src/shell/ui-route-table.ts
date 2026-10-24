@@ -399,6 +399,14 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
             page: "pages/settings/roles",
           },
           {
+            path: "/settings/braids",
+            page: "pages/settings/braids",
+          },
+          {
+            path: "/settings/organization-braids",
+            page: "pages/settings/organization-braids",
+          },
+          {
             path: "/settings/api-keys",
             page: "pages/settings/api-keys",
           },

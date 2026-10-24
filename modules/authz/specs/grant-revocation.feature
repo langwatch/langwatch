@@ -37,3 +37,13 @@ Feature: A revoke ends a grant only inside its own organization
     Given a binding whose role confers nothing beyond the caller's standing
     When the caller revokes that binding
     Then the binding is revoked
+
+  # ADR-166 section 6, needed by ADR-185's removed braids. The revoke is durable
+  # before the epoch moves, and a failed move is reported, never swallowed.
+  @unit
+  Scenario: A revoke that cannot move the organization's epoch reports failure
+    Given the organization's epoch cannot be moved
+    When a grant is revoked
+    Then the grant is recorded as revoked
+    And the revoke reports failure
+    And repeating the revoke once the epoch can move moves it without revoking twice

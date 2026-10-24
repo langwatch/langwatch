@@ -28,6 +28,7 @@ class HostServiceAuthzHost extends AuthzHostApi {
   constructor(
     private readonly deps: {
       organizationId: string | undefined;
+      projectId: string | undefined;
       session: UiSession;
       feedback: UiFeedback;
       plan: AuthzPlanReading;
@@ -40,7 +41,7 @@ class HostServiceAuthzHost extends AuthzHostApi {
   }
 
   scope(): AuthzHostScope {
-    return { organizationId: this.deps.organizationId };
+    return { organizationId: this.deps.organizationId, projectId: this.deps.projectId };
   }
 
   hasPermission(permission: string): boolean {
@@ -83,7 +84,7 @@ class HostServiceAuthzHost extends AuthzHostApi {
 export default function AuthzHostMount({ children }: { children?: ReactNode }) {
   const { session, feedback, route } = useUiHostServices();
   const { query } = route.reading();
-  const { organizationId } = useUiScope().activeScope();
+  const { organizationId, projectId } = useUiScope().activeScope();
   // The plan tier only: the session-cached read, not the monthly usage count.
   const activePlan = authzApi.plan.getActivePlan.useQuery(
     { organizationId: organizationId ?? "" },
@@ -106,7 +107,12 @@ export default function AuthzHostMount({ children }: { children?: ReactNode }) {
       organizationName: organization?.name,
       teams: teams.map((team) => ({ id: team.id, name: team.name })),
       projects: teams.flatMap((team) =>
-        team.projects.map((project) => ({ id: project.id, name: project.name, teamId: team.id })),
+        team.projects.map((project) => ({
+          id: project.id,
+          name: project.name,
+          slug: project.slug,
+          teamId: team.id,
+        })),
       ),
     };
   }, [organizations.data, organizationId]);
@@ -114,6 +120,7 @@ export default function AuthzHostMount({ children }: { children?: ReactNode }) {
     () =>
       new HostServiceAuthzHost({
         organizationId: organizationId ?? void 0,
+        projectId: projectId ?? void 0,
         session,
         feedback,
         plan,
@@ -121,7 +128,7 @@ export default function AuthzHostMount({ children }: { children?: ReactNode }) {
         route: { query },
         setQuery: (next, options) => route.setQuery(next, options),
       }),
-    [organizationId, session, feedback, plan, structure, query, route],
+    [organizationId, projectId, session, feedback, plan, structure, query, route],
   );
   return <AuthzHostProvider value={host}>{children}</AuthzHostProvider>;
 }

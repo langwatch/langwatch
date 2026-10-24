@@ -1,8 +1,9 @@
-import type { Authorization } from "@langwatch/authorization";
+import { type Authorization, ownProjectIdReadBy } from "@langwatch/authorization";
 import {
   type AuthorizedClickHouse,
   type IdBoundOptions,
   tenantScope,
+  tenantScopeWithConditions,
 } from "@langwatch/clickhouse-client";
 import { nowInstant } from "@langwatch/time";
 import {
@@ -14,6 +15,7 @@ import {
 } from "@langwatch/trace-contract";
 import { z } from "zod";
 
+import { braidedOwnerOf, readsBraidedSpans } from "../../rules/braided-span-owner.rules.ts";
 import {
   TraceProjectedReadRepository,
   type TraceIngestLagSample,
@@ -60,6 +62,7 @@ const spanSummaryRowSchema = z.looseObject({
   DurationMs: numeric,
   UpdatedAtMs: numeric,
   StatusCode: numeric.nullable(),
+  TenantId: chString.optional(),
 });
 
 const spanSummaryRowsSchema = z.array(spanSummaryRowSchema);
@@ -95,6 +98,10 @@ const summarySelect = `
   toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAtMs,
   StatusCode
 `;
+
+/** A braided read names each span's owner; a read without braids keeps today's statement. */
+const summarySelectFor = (authorization: Authorization): string =>
+  readsBraidedSpans(authorization) ? `${summarySelect},\n  TenantId` : summarySelect;
 
 /** The dedup election under the proof's fence; the tree reads never name a tenant (ADR-177). */
 // ID_BOUND_SKIP: a dedup subquery fragment; its statement carries the marker.
@@ -280,15 +287,15 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
     sinceUpdatedAtMs: number;
     occurredAtMs?: number;
   }): Promise<TraceSpanSummaryRecord[]> {
-    const client = this.clickhouse.as(input.authorization, { reads: "traces" });
+    const client = this.clickhouse.as(input.authorization, { reads: "spans" });
     // `UpdatedAt` is not the partition key, so the trace-id marker bounds the
     // read from below only: a live trace can run past any upper bound.
     const sinceFilter = "AND UpdatedAt > fromUnixTimestamp64Milli({sinceUpdatedAtMs:Int64})";
     const result = await client.query({
       query: `
-        SELECT ${summarySelect}
+        SELECT ${summarySelectFor(input.authorization)}
         FROM ${STORED_SPANS_TABLE}
-        WHERE ${tenantScope("StartTime")} AND TraceId = {traceId:String}
+        WHERE ${tenantScopeWithConditions("StartTime")} AND TraceId = {traceId:String}
           ${STORED_SPANS_ID_BOUND}
           ${sinceFilter}
           AND ${fencedDedupInTuple(`${STORED_SPANS_ID_BOUND} ${sinceFilter}`)}
@@ -309,7 +316,7 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
     });
     return spanSummaryRowsSchema
       .parse(await result.json())
-      .map((row) => ClickHouseTraceSpanRepository.mapSummary(row));
+      .map((row) => ClickHouseTraceSpanRepository.mapSummary(row, input.authorization));
   }
 
   private async queryPage(
@@ -322,22 +329,32 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
     },
     idBound: IdBoundOptions | undefined,
   ): Promise<TraceSpanPage> {
-    const client = this.clickhouse.as(input.authorization, { reads: "traces" });
+    const client = this.clickhouse.as(input.authorization, { reads: "spans" });
+    const cursorTenant = input.cursor
+      ? ClickHouseTraceSpanRepository.cursorTenantOf({
+          authorization: input.authorization,
+          cursor: input.cursor,
+        })
+      : null;
+    const cursorTuple =
+      cursorTenant === null
+        ? "(toUnixTimestamp64Milli(StartTime), SpanId) > ({cursorStart:Int64}, {cursorSpan:String})"
+        : "(toUnixTimestamp64Milli(StartTime), SpanId, TenantId) > ({cursorStart:Int64}, {cursorSpan:String}, {cursorTenant:String})";
     const cursor = input.cursor
-      ? "AND StartTime >= fromUnixTimestamp64Milli({cursorStart:Int64}) AND (toUnixTimestamp64Milli(StartTime), SpanId) > ({cursorStart:Int64}, {cursorSpan:String})"
+      ? `AND StartTime >= fromUnixTimestamp64Milli({cursorStart:Int64}) AND ${cursorTuple}`
       : "";
     // A cursor page is bounded by the cursor's own start, so it reads no index.
     const timeFilter = idBound === undefined ? "" : STORED_SPANS_ID_BOUND;
     const result = await client.query({
       // ID_BOUND_SKIP: a first page carries the marker in timeFilter; a cursor page, its cursor.
       query: `
-        SELECT ${summarySelect}
+        SELECT ${summarySelectFor(input.authorization)}
         FROM ${STORED_SPANS_TABLE}
-        WHERE ${tenantScope("StartTime")} AND TraceId = {traceId:String}
+        WHERE ${tenantScopeWithConditions("StartTime")} AND TraceId = {traceId:String}
           ${timeFilter}
           ${cursor}
           AND ${fencedDedupInTuple(timeFilter)}
-        ORDER BY StartTimeMs ASC, SpanId ASC
+        ORDER BY StartTimeMs ASC, SpanId ASC, TenantId ASC
         LIMIT {limit:UInt32}
       `,
       query_params: {
@@ -347,6 +364,7 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
           ? {
               cursorStart: Math.trunc(input.cursor.startTimeMs),
               cursorSpan: input.cursor.spanId,
+              ...(cursorTenant === null ? {} : { cursorTenant }),
             }
           : {}),
       },
@@ -354,11 +372,28 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
       ...(idBound === undefined ? {} : { idBound }),
     });
     const rows = spanSummaryRowsSchema.parse(await result.json());
-    const mapped = rows.map((row) => ClickHouseTraceSpanRepository.mapSummary(row));
+    const mapped = rows.map((row) =>
+      ClickHouseTraceSpanRepository.mapSummary(row, input.authorization),
+    );
     return {
       rows: mapped.slice(0, input.limit),
       hasMore: mapped.length > input.limit,
     };
+  }
+
+  /**
+   * The tenant a cursor's last span sits in, so one span id held by two tenants is two positions.
+   * Null when the read spans no braid or the cursor predates braids: those page as before.
+   */
+  private static cursorTenantOf({
+    authorization,
+    cursor,
+  }: {
+    authorization: Authorization;
+    cursor: SpanTreeCursor;
+  }): string | null {
+    if (!readsBraidedSpans(authorization) || cursor.ownerProjectId === undefined) return null;
+    return cursor.ownerProjectId ?? ownProjectIdReadBy(authorization);
   }
 
   private async resolveTraceOccurredAtMs(
@@ -461,7 +496,23 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
     };
   }
 
-  private static mapSummary(row: SpanSummaryRow) {
+  /** The tree's summary columns, for a statement of the module's own reading the same nodes. */
+  static readonly summarySelect: string = summarySelect;
+
+  /** Rows selected with `summarySelect`, mapped as the tree maps them. */
+  static summaryRecordsOf({
+    rows,
+    authorization,
+  }: {
+    rows: unknown;
+    authorization: Authorization;
+  }): TraceSpanSummaryRecord[] {
+    return spanSummaryRowsSchema
+      .parse(rows)
+      .map((row) => ClickHouseTraceSpanRepository.mapSummary(row, authorization));
+  }
+
+  private static mapSummary(row: SpanSummaryRow, authorization: Authorization) {
     const explicitCost = ClickHouseTraceSpanRepository.numberOrNull(row.Cost);
     const cost = explicitCost !== null && explicitCost > 0 ? explicitCost : null;
 
@@ -483,6 +534,7 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
       cacheCreationTokens: ClickHouseTraceSpanRepository.numberOrNull(row.CacheCreationTokens),
       updatedAtMs: Number(row.UpdatedAtMs),
       costInput: ClickHouseTraceSpanRepository.costInputOf(row),
+      ...braidedOwnerOf({ authorization, tenantId: row.TenantId }),
     };
   }
 

@@ -75,6 +75,22 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
     return rows.map((row) => row.userId);
   };
 
+  findActiveMemberIds = async ({
+    organizationId,
+    limit,
+  }: {
+    organizationId: string;
+    limit: number;
+  }): Promise<string[]> => {
+    const rows = (await this.database.organizationUser.findMany({
+      where: { organizationId, disabledAt: null },
+      select: { userId: true },
+      orderBy: { userId: "asc" },
+      take: limit,
+    })) as { userId: string }[];
+    return rows.map((row) => row.userId);
+  };
+
   findUserBindings = async ({
     userId,
     organizationId,
@@ -311,6 +327,23 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
       organizationId: project.team.organizationId,
       kind: project.kind,
     };
+  };
+
+  findProjectLineages = async ({
+    projectIds,
+  }: {
+    projectIds: readonly string[];
+  }): Promise<Map<string, { teamId: string; organizationId: string; kind: string }>> => {
+    if (projectIds.length === 0) return new Map();
+    const projects = (await this.database.project.findMany({
+      where: { id: { in: [...new Set(projectIds)] }, archivedAt: null },
+      select: { id: true, kind: true, team: { select: { id: true, organizationId: true } } },
+    })) as { id: string; kind: string; team: { id: string; organizationId: string } | null }[];
+    return new Map(
+      projects.flatMap(({ id, kind, team }) =>
+        team ? [[id, { teamId: team.id, organizationId: team.organizationId, kind }] as const] : [],
+      ),
+    );
   };
 
   findLiveSharedReads = async ({

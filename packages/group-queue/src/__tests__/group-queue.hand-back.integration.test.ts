@@ -72,6 +72,9 @@ describe("GroupQueueProcessor - hand-back of a job a worker has no handler for",
           timeout: 10_000,
           interval: 50,
         });
+        // Only the worker that handed the job back knows when it is due again, so left claiming
+        // it can win the job back on every retry; paused, the other worker's claim is the next.
+        older.pause();
 
         const ranAt: number[] = [];
         const newer = worker({

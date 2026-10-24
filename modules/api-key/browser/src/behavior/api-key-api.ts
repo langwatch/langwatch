@@ -4,7 +4,7 @@
  * (cache key); no read below carries key material — see ADR-001.
  */
 
-import type { apiKeyTrpc } from "@langwatch/api-key-contract";
+import type { apiKeyTrpc, signingKeyTrpc } from "@langwatch/api-key-contract";
 import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
 import type { AuthzOwnStanding, AuthzOwnStandingInput } from "@langwatch/authz-contract";
 
@@ -47,7 +47,9 @@ type BorrowedProcedures = {
 };
 
 /** Everything this family calls: the declared namespace plus the borrowed ones. */
-export type ApiKeyApiMap = ContractApiMap<typeof apiKeyTrpc> & BorrowedProcedures;
+export type ApiKeyApiMap = ContractApiMap<typeof apiKeyTrpc> &
+  ContractApiMap<typeof signingKeyTrpc> &
+  BorrowedProcedures;
 
 /**
  * The API Key family's typed tRPC hooks, sharing machinery, transport and

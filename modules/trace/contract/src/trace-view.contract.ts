@@ -67,6 +67,36 @@ const traceListItemSchemaDefinition = z.object({
 export interface TraceListItemSchema extends Named<typeof traceListItemSchemaDefinition> {}
 export const traceListItemSchema: TraceListItemSchema = traceListItemSchemaDefinition;
 
+/** A project that braided spans into the trace, in strand order (ADR-185 §5). */
+const braidedOwnerSchemaDefinition = z.object({
+  projectId: z.string(),
+  name: z.string(),
+  canOpen: z.boolean(),
+  /** Set only when `canOpen`: the owner's slug, for the "Open in" link. */
+  slug: z.string().nullish(),
+});
+export interface BraidedOwnerSchema extends Named<typeof braidedOwnerSchemaDefinition> {}
+export const braidedOwnerSchema: BraidedOwnerSchema = braidedOwnerSchemaDefinition;
+
+export type BraidedOwner = z.infer<typeof braidedOwnerSchema>;
+
+/** The header's totals over the whole trace, braided spans included; the list keeps its own. */
+const traceBraidedSummarySchemaDefinition = z.object({
+  owners: z.array(braidedOwnerSchema),
+  spanCount: z.number(),
+  durationMs: z.number(),
+  cost: z.number().nullable(),
+  inputTokens: z.number().nullable(),
+  outputTokens: z.number().nullable(),
+});
+export interface TraceBraidedSummarySchema extends Named<
+  typeof traceBraidedSummarySchemaDefinition
+> {}
+export const traceBraidedSummarySchema: TraceBraidedSummarySchema =
+  traceBraidedSummarySchemaDefinition;
+
+export type TraceBraidedSummary = z.infer<typeof traceBraidedSummarySchema>;
+
 /** Trace drawer header and summary response. */
 const traceHeaderSchemaDefinition = z.object({
   traceId: z.string(),
@@ -117,6 +147,8 @@ const traceHeaderSchemaDefinition = z.object({
    * Absent on a shared trace, whose viewer is told nothing about the project.
    */
   projectId: z.string().optional(),
+  /** Present only when the trace holds braided spans; absent means the reader's own spans alone. */
+  braided: traceBraidedSummarySchema.nullish(),
 });
 export interface TraceHeaderSchema extends Named<typeof traceHeaderSchemaDefinition> {}
 export const traceHeaderSchema: TraceHeaderSchema = traceHeaderSchemaDefinition;
@@ -140,6 +172,8 @@ export type LangwatchSignalBucket = z.infer<typeof langwatchSignalBucketSchema>;
 const spanLangwatchSignalsSchemaDefinition = z.object({
   spanId: z.string(),
   signals: z.array(langwatchSignalBucketSchema),
+  /** Set only on a span braided in from another project (ADR-185 §5); absent: the reader's own. */
+  ownerProjectId: z.string().nullish(),
 });
 export interface SpanLangwatchSignalsSchema extends Named<
   typeof spanLangwatchSignalsSchemaDefinition
@@ -192,6 +226,21 @@ export const truncatedAttributeSchema: TruncatedAttributeSchema =
 
 export type TruncatedAttribute = z.infer<typeof truncatedAttributeSchema>;
 
+/** Why a braided span shows in the reader's trace, and who it belongs to (ADR-185 §5). */
+const spanBraidSchemaDefinition = z.object({
+  ownerProjectId: z.string(),
+  ownerName: z.string(),
+  /** Set only when `canOpenOwner`: the owner's slug, for the "Open in" link. */
+  ownerProjectSlug: z.string().nullish(),
+  canOpenOwner: z.boolean(),
+  matchedConditions: z.array(z.string()),
+  signedBy: z.object({ projectId: z.string(), name: z.string() }).nullable(),
+});
+export interface SpanBraidSchema extends Named<typeof spanBraidSchemaDefinition> {}
+export const spanBraidSchema: SpanBraidSchema = spanBraidSchemaDefinition;
+
+export type SpanBraid = z.infer<typeof spanBraidSchema>;
+
 /** Full selected-span response for the trace drawer. */
 const spanDetailSchemaDefinition = z.object({
   spanId: z.string(),
@@ -241,6 +290,8 @@ const spanDetailSchemaDefinition = z.object({
   ),
   /** Offered only for an unpriced model with recorded token usage. */
   costSuggestion: z.object({ model: z.string() }).nullish(),
+  /** Present only on a span braided in from another project; absent means the reader's own. */
+  braid: spanBraidSchema.nullish(),
 });
 export interface SpanDetailSchema extends Named<typeof spanDetailSchemaDefinition> {}
 export const spanDetailSchema: SpanDetailSchema = spanDetailSchemaDefinition;
@@ -290,6 +341,8 @@ const spanResourceInfoSchema = z.object({
   parentSpanId: z.string().nullable(),
   resourceAttributes: z.record(z.string(), z.string()),
   scope: instrumentationScopeSchema,
+  /** Set only on a span braided in from another project (ADR-185 §5); absent: the reader's own. */
+  ownerProjectId: z.string().nullish(),
 });
 
 export type SpanResourceInfoDto = z.infer<typeof spanResourceInfoSchema>;

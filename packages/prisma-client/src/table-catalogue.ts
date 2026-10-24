@@ -122,11 +122,13 @@ export const prismaTableCatalogue = {
   "GroupMembership": "GroupMembership",
   "AuthzUserStanding": "AuthzUserStanding",
   "AuthzEngineSwitch": "AuthzEngineSwitch",
+  "AuthzOrganizationPolicy": "AuthzOrganizationPolicy",
   "RoleBinding": "RoleBinding",
   "Grant": "Grant",
   "GrantUsage": "GrantUsage",
   "Role": "Role",
   "ApiKey": "ApiKey",
+  "SigningKey": "SigningKey",
   "ProjectActiveDay": "ProjectActiveDay",
   "NurturingProject": "NurturingProject",
   "NurturingOrganization": "NurturingOrganization",
@@ -2137,6 +2139,12 @@ export const prismaModelFieldCatalogue = {
     "lastAppliedEventId",
     "updatedAt"
   ],
+  "AuthzOrganizationPolicy": [
+    "organizationId",
+    "braidsOrganizationAdminsOnly",
+    "updatedByUserId",
+    "updatedAt"
+  ],
   "RoleBinding": [
     "id",
     "organizationId",
@@ -2173,6 +2181,7 @@ export const prismaModelFieldCatalogue = {
     "expiresAt",
     "maxViews",
     "condition",
+    "replacesGrantId",
     "occurredAt",
     "createdAt",
     "updatedAt",
@@ -2224,6 +2233,20 @@ export const prismaModelFieldCatalogue = {
     "isSystemManaged",
     "createdAt",
     "updatedAt"
+  ],
+  "SigningKey": [
+    "id",
+    "organizationId",
+    "projectId",
+    "name",
+    "publicId",
+    "secretCiphertext",
+    "createdByUserId",
+    "createdAt",
+    "rotatedAt",
+    "verifiesUntil",
+    "revokedAt",
+    "lastUsedAt"
   ],
   "ProjectActiveDay": [
     "id",
@@ -3497,6 +3520,7 @@ export const prismaRelationCatalogue = {
   },
   "AuthzUserStanding": {},
   "AuthzEngineSwitch": {},
+  "AuthzOrganizationPolicy": {},
   "RoleBinding": {
     "organization": "Organization",
     "user": "User",
@@ -3512,6 +3536,7 @@ export const prismaRelationCatalogue = {
     "organization": "Organization",
     "roleBindings": "RoleBinding"
   },
+  "SigningKey": {},
   "ProjectActiveDay": {},
   "NurturingProject": {},
   "NurturingOrganization": {},

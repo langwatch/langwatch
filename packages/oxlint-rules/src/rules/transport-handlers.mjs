@@ -18,6 +18,8 @@ const FLUENT_ENDPOINT_METHODS = new Set([
   "withoutResourceLimit",
 ]);
 const ROUTE_VERBS = new Set(["delete", "get", "patch", "post", "put", "register"]);
+/** Where one route's own chain begins: its REST verb, or the tRPC procedure it names. */
+const CHAIN_STARTS = new Set([...ROUTE_VERBS, "procedure"]);
 const PRODUCED_BY_DECLARATION = new Map([
   ["withRawBody", ["raw"]],
   ["withMultipart", ["files"]],
@@ -270,14 +272,18 @@ export function declaredProducerFields(call) {
   const fields = new Set();
   let link = call.callee.object;
   let routeCredential;
+  let permissions = 0;
   while (link?.type === "CallExpression") {
     for (const field of fieldsProducedBy(link)) fields.add(field);
     routeCredential ??= credentialSession(link);
     const name = propertyName(link.callee);
-    if (name === undefined || ROUTE_VERBS.has(name)) break;
+    if (name === "withPermission") permissions += 1;
+    if (name === undefined || CHAIN_STARTS.has(name)) break;
     link = link.callee.object;
   }
   if (routeCredential ?? routerSessionOf(link)) fields.add("session");
+  // A route asking at several projects is handed each one's proof by field (ADR-185 §2).
+  if (permissions > 1) fields.add("authorizations");
 
   return fields;
 }
