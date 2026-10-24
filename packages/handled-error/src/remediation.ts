@@ -43,6 +43,14 @@ const registry = {
     ],
   },
 
+  // ---- identity ----
+  identity_password_reset_required: {
+    tips: [
+      "This password may no longer be used; request a reset link from the forgot-password screen and choose a new password",
+      "Signing in through single sign-on, a social provider or a passkey is not affected",
+    ],
+  },
+
   // ---- dataset storage ----
   private_dataplane_unavailable: {
     tips: [
@@ -303,6 +311,12 @@ const registry = {
   },
   api_key_permission_denied: {
     tips: ["Re-create the API key with the required scope, or ask an admin to raise your role"],
+    docsPath: "/api-reference/api-keys/create-api-key",
+  },
+  legacy_project_key_ingestion_only: {
+    tips: [
+      "A legacy project key is limited to ingestion and the scopes enabled for its project; create an API key with the permissions this call needs and send it instead",
+    ],
     docsPath: "/api-reference/api-keys/create-api-key",
   },
   api_key_permission_not_delegable: {
@@ -1037,6 +1051,25 @@ const registry = {
     tips: [
       "The app functions are not provisioned on this deployment, so retrying the same query will not help",
       "They are created at deploy time; a redeploy converges them, and the query works unchanged afterwards",
+    ],
+  },
+  upgrade_diagnostics_license_required: {
+    tips: [
+      "Paste or activate a LangWatch licence in Settings, then send the diagnostics again",
+      "Without a licence, download the diagnostics from the step page and email them to support@langwatch.ai",
+    ],
+    docsPath: "/self-hosting/data-and-telemetry",
+  },
+  upgrade_diagnostics_rate_limited: {
+    tips: [
+      "The allowance resets within a day; the step's diagnostics stay on the step page meanwhile",
+      "Download the diagnostics from the step page and email them to support@langwatch.ai if it cannot wait",
+    ],
+    docsPath: "/self-hosting/data-and-telemetry",
+  },
+  upgrade_diagnostics_not_found: {
+    tips: [
+      "The report expired or was never stored; ask the install to send the step's diagnostics again",
     ],
   },
 } as const satisfies Record<string, RemediationEntry>;

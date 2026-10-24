@@ -482,6 +482,28 @@ const presentations = {
     title: "Queries are queued up right now",
     describe: () => "Too many queries were running at once. Try again in a few seconds.",
   },
+  lwql_member_grant_closed: {
+    title: "A member project is shared up to a date",
+    describe: (error) => {
+      const names = strList(error, "projectNames");
+      if (names.length === 0) {
+        return "One of the projects this group project reads is shared only up to a date, which queries can't keep to. Ask your administrator to share it without an end.";
+      }
+      const plural = names.length > 1;
+      return `${listLabels(names.map((name) => `"${name}"`))} ${plural ? "are" : "is"} shared only up to a date, which queries can't keep to. Ask your administrator to share ${plural ? "them" : "it"} without an end.`;
+    },
+  },
+  lwql_member_key_missing: {
+    title: "A member project can't be queried yet",
+    describe: (error) => {
+      const names = strList(error, "projectNames");
+      if (names.length === 0) {
+        return "One of the projects this group project reads isn't set up for queries yet. Try again later, or ask your administrator.";
+      }
+      const plural = names.length > 1;
+      return `${listLabels(names.map((name) => `"${name}"`))} ${plural ? "aren't" : "isn't"} set up for queries yet. Try again later, or ask your administrator.`;
+    },
+  },
   lwql_not_permitted: {
     title: "This query isn't allowed here",
     describe: () =>
@@ -506,6 +528,21 @@ const presentations = {
     // loop runs up is the project's, so the budget is too.
     title: "Too many queries just now",
     describe: () => "Wait a minute, then run the query again.",
+  },
+  lwql_table_modifier_unsupported: {
+    title: "FINAL and SAMPLE can't be used here",
+    describe: () =>
+      "This read keeps each project to its own dates, and that can't be combined with FINAL or SAMPLE. The datasets already keep one row per item, so remove them and run it again.",
+  },
+  lwql_view_shadowed: {
+    title: "A WITH name repeats a view's name",
+    describe: () =>
+      "This read keeps each project to its own dates, and finds the views it reads by name. Rename the WITH so it does not reuse a view's name, then run it again.",
+  },
+  lwql_too_many_members: {
+    title: "This aggregate reads too many projects",
+    describe: () =>
+      "A query can read only so many projects at once. Narrow the aggregate's projects and try again.",
   },
   lwql_reserved_parameter_supplied: {
     // One code covers three reserved names, so both halves of the copy are
@@ -3041,6 +3078,14 @@ const presentations = {
   },
 
   // ---- analytics ----
+  analytics_aggregate_unattended_read: {
+    // A scheduled report or alert runs with no person behind it, so there is
+    // no grant to read the member projects through. The chart still works
+    // when someone opens it.
+    title: "Reports and alerts aren't available on a group project yet",
+    describe: () =>
+      "Open the chart on the group project to see it, or set the report or alert up on a member project.",
+  },
   analytics_series_percentage_unsupported: {
     // A percentage is the series divided by the same measurement without the
     // series' own filters. A per-entity measurement (average per user, sum per
@@ -3182,6 +3227,11 @@ const presentations = {
     title: "That password wasn't accepted",
     describe: () =>
       "Choose one of at least 8 characters, with at least one character that is not a space.",
+  },
+  identity_password_reset_required: {
+    title: "Choose a new password to sign in",
+    describe: () =>
+      "Your password needs to be replaced before you can use it again. We will email you a link to set a new one.",
   },
   identity_reset_link_invalid: {
     // Expired, already spent and never issued collapse to one answer on purpose.
@@ -6236,6 +6286,11 @@ const presentations = {
     title: "License not found",
     describe: () => "No license with that identity exists in the registry. Check the license id.",
   },
+  legacy_project_key_ingestion_only: {
+    title: "Legacy project key is limited",
+    describe: () =>
+      "This legacy project key is limited to ingestion and the scopes enabled for its project. Create an API key in Settings > API Keys and use it here instead.",
+  },
   license_already_registered: {
     title: "License already registered",
     describe: () => "This license is already in the registry, so it cannot be registered again.",
@@ -6312,6 +6367,20 @@ const presentations = {
   activation_rate_limited: {
     title: "Too many activation attempts",
     describe: () => "Too many activation attempts. Try again shortly.",
+  },
+  upgrade_diagnostics_license_required: {
+    title: "A LangWatch licence is needed to send diagnostics",
+    describe: () =>
+      "Download the diagnostics from the step page and send them to support@langwatch.ai instead.",
+  },
+  upgrade_diagnostics_rate_limited: {
+    title: "Too many diagnostics sent today",
+    describe: () =>
+      "This install has sent its diagnostics allowance for today. Try again tomorrow.",
+  },
+  upgrade_diagnostics_not_found: {
+    title: "Diagnostics report not found",
+    describe: () => "This diagnostics report no longer exists. Reports are kept for 30 days.",
   },
   self_hosted_instance_not_found: {
     title: "Install not found",
@@ -6428,6 +6497,14 @@ function listLabels(labels: string[]): string {
 }
 
 /**
+ * What to do about an HTTP 402. The status comes from a provider whose account
+ * ran out of credit and also from the AI gateway when an organization budget is
+ * spent, so the advice names both. Shared so every surface says the same thing.
+ */
+export const OUT_OF_CREDIT_ADVICE =
+  "Check the provider's billing and your gateway budget, then try again.";
+
+/**
  * Body copy for a node failure that carries the upstream's HTTP status.
  *
  * `meta.upstreamStatus` is attached by Workflow's node-error contract mapper
@@ -6455,6 +6532,9 @@ function describeUpstreamStatus({
   const status = error.meta.upstreamStatus;
   if (typeof status !== "number") return whenAbsent;
   if (status === 401 || status === 403) return whenRejected;
+  if (status === 402) {
+    return `Its account has no credit or budget left. ${OUT_OF_CREDIT_ADVICE}`;
+  }
   if (status === 429) return "It's rate limiting us. Try again shortly.";
   if (status >= 500) return "It's having trouble. Try again in a moment.";
   return whenOther;

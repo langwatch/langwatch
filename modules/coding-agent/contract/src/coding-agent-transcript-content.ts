@@ -147,11 +147,32 @@ function extractPartsText(parts: unknown): string | null {
   if (!Array.isArray(parts)) return null;
 
   const texts = parts.flatMap((part) => {
-    const candidate = part as { text?: unknown; thought?: unknown };
-    return isReplyTextPart(candidate) ? [candidate.text] : [];
+    const candidate = part as {
+      text?: unknown;
+      thought?: unknown;
+      type?: unknown;
+      content?: unknown;
+    };
+    if (isReplyTextPart(candidate)) return [candidate.text];
+    // GenAI semconv spells a text part `{ type: "text", content }`; a reasoning part is no reply.
+    const isSemconvText = candidate.type === "text" && typeof candidate.content === "string";
+    return isSemconvText && candidate.content !== "" ? [candidate.content as string] : [];
   });
 
   return texts.length > 0 ? texts.join("\n") : null;
+}
+
+/** The user's words a model call answers: its last input message, when that is the user's. */
+export function extractAnsweredPromptText(input: string | null | undefined): string | null {
+  const last = parseChatMessages(input)?.at(-1) as
+    | { role?: unknown; content?: unknown; parts?: unknown }
+    | null
+    | undefined;
+  if (last?.role !== "user") return null;
+
+  const text =
+    typeof last.content === "string" ? last.content : (extractPartsText(last.parts) ?? "");
+  return text.trim() === "" ? null : text;
 }
 
 export function extractGeminiResponseText(raw: string | null): string | null {

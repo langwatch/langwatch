@@ -1,5 +1,5 @@
 import type { FeatureFlagRules } from "@langwatch/feature-flag-contract";
-import { emailDomainsOf } from "@langwatch/feature-flag-contract";
+import { emailDomainsOf, projectIdsOf } from "@langwatch/feature-flag-contract";
 import { toEpochMs, readableDate } from "@langwatch/time";
 
 /**
@@ -155,9 +155,12 @@ function firstDecisionPerTarget({
 }): Map<string, boolean> {
   const decisions = new Map<string, boolean>();
   for (const rule of rules) {
-    const target = rule.match[key];
-    if (!target || decisions.has(target)) continue;
-    decisions.set(target, rule.enabled);
+    const targets =
+      key === "projectId" ? projectIdsOf(rule.match.projectId) : [rule.match[key] ?? ""];
+    for (const target of targets) {
+      if (!target || decisions.has(target)) continue;
+      decisions.set(target, rule.enabled);
+    }
   }
   return decisions;
 }

@@ -23,7 +23,50 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 app.kubernetes.io/component: langyagent
 {{- end }}
 
+{{- /* The labels that pick this release's pods: the Deployment selector, the
+       Service selector, the NetworkPolicy podSelector, the CiliumNetworkPolicy
+       endpointSelector and the PDB selector all render from here. `selectorLabels` replaces the default pair entirely.
+       It exists for one case: handing an existing Deployment over to this
+       chart. A Deployment's spec.selector is immutable, so an install whose
+       Deployment was created with other labels can only keep running in place
+       if the chart renders that same selector. Leave it empty on a fresh
+       install. */ -}}
 {{- define "langyagent.selectorLabels" -}}
+{{- if .Values.selectorLabels -}}
+{{- $labels := dict }}
+{{- range $key, $value := .Values.selectorLabels }}
+{{- $_ := set $labels $key ($value | toString) }}
+{{- end }}
+{{- toYaml $labels }}
+{{- else -}}
 app.kubernetes.io/name: {{ include "langyagent.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}
+{{- end }}
+
+{{- /* Pod-template labels: the selector labels plus `podLabels`. The selector
+       labels win on a shared key, because a pod whose labels stop matching its
+       Deployment's selector is rejected by the API server. */ -}}
+{{- define "langyagent.podLabels" -}}
+{{- $labels := dict }}
+{{- /* toString: a label value is a string, and `--set podLabels.version=2` is a number. */ -}}
+{{- range $key, $value := .Values.podLabels | default dict }}
+{{- $_ := set $labels $key ($value | toString) }}
+{{- end }}
+{{- /* set, not merge: merge treats an empty selector value as unset. */ -}}
+{{- range $key, $value := include "langyagent.selectorLabels" . | fromYaml }}
+{{- $_ := set $labels $key $value }}
+{{- end }}
+{{- toYaml $labels }}
+{{- end }}
+
+{{- /* The environment variable names the chart writes itself, comma-joined: the
+       ConfigMap keys and the Secret-backed entries of the Deployment env.
+       extraConfig and extraEnvs may not set any of them, because these carry
+       guards (ENVIRONMENT gates the manager's refusal to disable worker
+       isolation) that an operator-supplied value would bypass. A container's
+       env entries win over its envFrom, so extraEnvs could otherwise replace a
+       ConfigMap key. */ -}}
+{{- define "langyagent.ownedEnvNames" -}}
+ENVIRONMENT,PORT,LANGY_MAX_WORKERS,LANGY_WORKER_IDLE_MS,LANGY_READINESS_TIMEOUT_MS,LANGY_EGRESS_FQDN_FLOOR,LANGY_EGRESS_REQUIRE_TLS,LANGY_EGRESS_ENFORCE_FLOOR,LANGY_EGRESS_SNI_CROSSCHECK,LANGY_MIRROR_TRACE_ENDPOINT,LANGY_INTERNAL_SECRET,LANGY_MIRROR_TRACE_KEY
 {{- end }}

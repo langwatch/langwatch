@@ -2,7 +2,7 @@ import { admitsCodingAgentSpan } from "@langwatch/coding-agent-contract";
 import { NormalizedSpanKind, type NormalizedSpan } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { liftSpanContribution } from "../coding-agent-span-facts.rules.ts";
+import { liftSpanContribution, type SpanContribution } from "../coding-agent-span-facts.rules.ts";
 
 const TRACE_ID = "trace-1";
 
@@ -37,6 +37,11 @@ function span(overrides: Partial<NormalizedSpan>): NormalizedSpan {
   };
 }
 
+function contributionOf(lifted: SpanContribution) {
+  if (lifted.outcome === "ignored") throw new Error("expected the span to contribute");
+  return lifted.contribution;
+}
+
 describe("admitsCodingAgentSpan", () => {
   /** @scenario "a foreign span reusing codex's bare turn name is declined at the gate" */
   it("declines a bare declared name whose scope names no coding agent", () => {
@@ -49,11 +54,13 @@ describe("admitsCodingAgentSpan", () => {
 describe("liftSpanContribution", () => {
   /** @scenario a session without a session id is not lost */
   it("degrades to the trace id as a one-trace session", () => {
-    const lifted = liftSpanContribution({
-      tenantId: "project-1",
-      occurredAt: 3_000,
-      span: span({ spanAttributes: { tool_name: "Bash" } }),
-    });
+    const lifted = contributionOf(
+      liftSpanContribution({
+        tenantId: "project-1",
+        occurredAt: 3_000,
+        span: span({ spanAttributes: { tool_name: "Bash" } }),
+      }),
+    );
 
     expect(lifted.sessionId).toBe(TRACE_ID);
     expect(lifted.sessionKeySource).toBe("trace_fallback");
@@ -61,15 +68,17 @@ describe("liftSpanContribution", () => {
 
   /** @scenario Cowork telemetry that shares Claude Code's event vocabulary is still Cowork */
   it("labels the contribution claude_cowork from the resource service", () => {
-    const lifted = liftSpanContribution({
-      tenantId: "project-1",
-      occurredAt: 3_000,
-      span: span({
-        name: "claude_code.llm_request",
-        spanAttributes: { "gen_ai.conversation.id": "cw-sess-1" },
-        resourceAttributes: { "service.name": "cowork" },
+    const lifted = contributionOf(
+      liftSpanContribution({
+        tenantId: "project-1",
+        occurredAt: 3_000,
+        span: span({
+          name: "claude_code.llm_request",
+          spanAttributes: { "gen_ai.conversation.id": "cw-sess-1" },
+          resourceAttributes: { "service.name": "cowork" },
+        }),
       }),
-    });
+    );
 
     expect(lifted.agent).toBe("claude_cowork");
     expect(lifted.sessionId).toBe("cw-sess-1");

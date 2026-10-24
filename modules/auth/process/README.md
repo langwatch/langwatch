@@ -6,7 +6,7 @@ The server half of [auth](../README.md). Signing in and staying signed in: the b
 
 ## Installation
 
-`defineProcessModule("auth").withRepositories(authRepositories).withChannels(authChannels).withApi(AuthModule).withTransports(authTrpcTransport, signInSecurityTrpcTransport, authCliDeviceFlowRest, authRest).withEventing(authEventing).withEventing(authLifecycleEventing).withTasks(…).provideMiddlewareBindings(…)`, `src/auth.module.ts:24`.
+`defineProcessModule("auth").withRepositories(authRepositories).withChannels(authChannels).withApi(AuthModule).withTransports(authTrpcTransport, signInSecurityTrpcTransport, authCliDeviceFlowRest, authRest).withEventing(authEventing).withEventing(authLifecycleEventing).provideMiddlewareContext(…).withTasks(…).provideMiddlewareBindings(…)`, `src/auth.module.ts:26`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Everything the auth module does for a caller: the signed-in browser session, and the signed-out front door that stands before they have one — one interface because it is one module, meeting at the same person.
 
-Peers call these through the token, declared at `../contract/src/auth.api.ts:104`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/auth.api.ts:105`; nothing else in this package is public.
 
 #### `offersPasskeys`
 
@@ -158,6 +158,14 @@ End ONE of this person's sessions, found in their OWN list rather than deleted b
 
 ```typescript
 endBrowserSession(input: { userId: string; sessionId: string; currentSessionId?: string | undefined; }): Promise<{ ended: number }>;
+```
+
+#### `recordPageOpened`
+
+Announces that this person opened an app page, for peers that react to it (§9). Records nothing without a browser session or an organization, or when impersonated; a failure never reaches the caller.
+
+```typescript
+recordPageOpened(input: { userId: string; browserSessionId: string | null; page: AppPage; /** Set when an operator acts as this person; nothing is recorded then. */ impersonatorId?: string | undefined; }): Promise<void>;
 ```
 
 #### `endBrowserSessionsForIdentifier`
@@ -583,20 +591,20 @@ type Response = unknown;
 
 |             |                                        |
 | ----------- | -------------------------------------- |
-| Declared at | `src/transport/auth.rest.ts:91`        |
+| Declared at | `src/transport/auth.rest.ts:89`        |
 | Base URL    | none: each route's path is its address |
 | Addressing  | literal                                |
 | Credential  | project                                |
 
 #### `POST /api/auth/validate` · `validateProjectAuthToken`
 
-Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:96`.
+Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:94`.
 
 Answers at `/api/auth/validate`.
 
 ```typescript
-type Headers = z.infer<typeof VALIDATE_HEADERS>; // src/transport/auth.rest.ts:65
-// Response: inline, src/transport/auth.rest.ts:101
+type Headers = z.infer<typeof VALIDATE_HEADERS>; // src/transport/auth.rest.ts:66
+// Response: inline, src/transport/auth.rest.ts:99
 interface Response {
   projectSlug: string;
 }
@@ -604,46 +612,46 @@ interface Response {
 
 #### `GET /api/auth/session` · `readBrowserAuthSession`
 
-Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:109`.
+Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:105`.
 
 Answers at `/api/auth/session`.
 
 ```typescript
-type Headers = z.infer<typeof COOKIE_HEADERS>; // src/transport/auth.rest.ts:70
-// Response: inline, src/transport/auth.rest.ts:112
+type Headers = z.infer<typeof COOKIE_HEADERS>; // src/transport/auth.rest.ts:68
+// Response: inline, src/transport/auth.rest.ts:108
 type Response = unknown;
 ```
 
 #### `GET /api/auth/logout` · `endBrowserSessionAndRedirect`
 
-Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:117`.
+Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:113`.
 
 Answers at `/api/auth/logout`.
 
 ```typescript
-// Response: inline, src/transport/auth.rest.ts:119
+// Response: inline, src/transport/auth.rest.ts:115
 type Response = unknown;
 ```
 
 #### `POST /api/auth/logout` · `endBrowserSession`
 
-Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:122`.
+Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:118`.
 
 Answers at `/api/auth/logout`.
 
 ```typescript
-// Response: inline, src/transport/auth.rest.ts:126
+// Response: inline, src/transport/auth.rest.ts:122
 type Response = unknown;
 ```
 
 #### `ALL /api/auth/*` · `betterAuthHandshake`
 
-Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:134`.
+Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:130`.
 
 Answers at `/api/auth/*`.
 
 ```typescript
-// Response: inline, src/transport/auth.rest.ts:136
+// Response: inline, src/transport/auth.rest.ts:132
 type Response = unknown;
 ```
 
@@ -651,7 +659,7 @@ type Response = unknown;
 
 ### `auth`
 
-Contract `../contract/src/auth.trpc.ts:41`, router `src/transport/auth.trpc.ts:89`.
+Contract `../contract/src/auth.trpc.ts:42`, router `src/transport/auth.trpc.ts:89`.
 
 | Procedure                        | Kind     | Gate                                                                                                                                                                                                                | Input                              | Output                            |
 | -------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | --------------------------------- |
@@ -666,6 +674,7 @@ Contract `../contract/src/auth.trpc.ts:41`, router `src/transport/auth.trpc.ts:8
 | `auth.deactivate`                | mutation | No permission: self-service for the named account; the application enforces self-or-operator itself, against the platform operator list rather than a tenant                                                        | `userApiUserInputSchema`           | `userApiSuccessSchema`            |
 | `auth.browserSessions`           | query    | No permission: operates on the session user's own account, so no tenant scope applies                                                                                                                               | inline                             | inline                            |
 | `auth.endBrowserSession`         | mutation | No permission: operates on the session user's own account, so no tenant scope applies                                                                                                                               | `endBrowserSessionInputSchema`     | `browserSessionsEndedSchema`      |
+| `auth.recordPageOpened`          | mutation | No permission: operates on the session user's own account, so no tenant scope applies                                                                                                                               | inline                             | inline                            |
 | `auth.setPassword`               | mutation | No permission: operates on the session user's own account, so no tenant scope applies                                                                                                                               | `userApiSetPasswordInputSchema`    | `userApiSuccessSchema`            |
 | `auth.changePassword`            | mutation | No permission: operates on the session user's own account, so no tenant scope applies                                                                                                                               | `userApiChangePasswordInputSchema` | `userApiSuccessSchema`            |
 | `auth.unlinkAccount`             | mutation | No permission: operates on the session user's own account, so no tenant scope applies                                                                                                                               | `userApiUnlinkAccountInputSchema`  | `userApiSuccessSchema`            |
@@ -724,7 +733,7 @@ interface Output {
 }
 
 // auth.myAddressConfirmation
-// Input: inline, ../contract/src/auth.trpc.ts:69
+// Input: inline, ../contract/src/auth.trpc.ts:70
 type Input = unknown;
 // Output: addressConfirmationSchema, ../contract/src/front-door.responses.ts:77
 interface Output {
@@ -745,7 +754,7 @@ interface Output {
 }
 
 // auth.priorSession
-// Input: inline, ../contract/src/auth.trpc.ts:78
+// Input: inline, ../contract/src/auth.trpc.ts:79
 type Input = unknown;
 // Output: priorSessionSchema, ../contract/src/front-door.responses.ts:86
 type Output =
@@ -768,9 +777,9 @@ interface Output {
 }
 
 // auth.browserSessions
-// Input: inline, ../contract/src/auth.trpc.ts:91
+// Input: inline, ../contract/src/auth.trpc.ts:92
 type Input = Record<string, unknown>;
-// Output: browserSessionInventoryEntrySchema.array() (inline, ../contract/src/auth.trpc.ts:92)
+// Output: browserSessionInventoryEntrySchema.array() (inline, ../contract/src/auth.trpc.ts:93)
 
 // auth.endBrowserSession
 // Input: endBrowserSessionInputSchema, ../contract/src/browser-session.ts:126
@@ -781,6 +790,14 @@ interface Input {
 interface Output {
   ended: number;
 }
+
+// auth.recordPageOpened
+// Input: inline, ../contract/src/auth.trpc.ts:101
+interface Input {
+  page: "me_sessions";
+}
+// Output: inline, ../contract/src/auth.trpc.ts:102
+type Output = unknown;
 
 // auth.setPassword
 // Input: userApiSetPasswordInputSchema, ../../user/contract/src/user.schemas.ts:81
@@ -877,13 +894,14 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `auth_lifecycle` (aggregate `user`)
 
-Declared at `src/eventing/auth-lifecycle.pipeline.ts:29`. Events: `sessionStartedEventSchema`, `ssoAutoAddedEventSchema`, `signedUpEventSchema`.
+Declared at `src/eventing/auth-lifecycle.pipeline.ts:31`. Events: `sessionStartedEventSchema`, `ssoAutoAddedEventSchema`, `signedUpEventSchema`, `appPageOpenedEventSchema`.
 
 | Kind    | Name                   | Handles | Declared at                                  |
 | ------- | ---------------------- | ------- | -------------------------------------------- |
-| command | `recordSessionStarted` | –       | `src/eventing/auth-lifecycle.pipeline.ts:34` |
-| command | `recordSsoAutoAdded`   | –       | `src/eventing/auth-lifecycle.pipeline.ts:35` |
-| command | `recordSignedUp`       | –       | `src/eventing/auth-lifecycle.pipeline.ts:36` |
+| command | `recordSessionStarted` | –       | `src/eventing/auth-lifecycle.pipeline.ts:41` |
+| command | `recordSsoAutoAdded`   | –       | `src/eventing/auth-lifecycle.pipeline.ts:42` |
+| command | `recordSignedUp`       | –       | `src/eventing/auth-lifecycle.pipeline.ts:43` |
+| command | `recordAppPageOpened`  | –       | `src/eventing/auth-lifecycle.pipeline.ts:44` |
 
 ### Pipeline `sign_in_lock_maintenance` (aggregate `global`)
 
@@ -900,12 +918,13 @@ Run by the tasks process, before serve.
 | Task                            | Class                           | Declared at                                          |
 | ------------------------------- | ------------------------------- | ---------------------------------------------------- |
 | `clear-stale-pending-sso-setup` | `ClearStalePendingSsoSetupTask` | `src/tasks/clear-stale-pending-sso-setup.task.ts:11` |
+| `require-password-reset`        | `RequirePasswordResetTask`      | `src/tasks/require-password-reset.task.ts:67`        |
 
 ## Configuration
 
 | Kind   | Leaf                          | Environment variable                      | Declared at                                          |
 | ------ | ----------------------------- | ----------------------------------------- | ---------------------------------------------------- |
-| secret | `session`                     | `NEXTAUTH_SECRET`                         | `src/app/auth.app.ts:269`                            |
+| secret | `session`                     | `NEXTAUTH_SECRET`                         | `src/app/auth.app.ts:276`                            |
 | secret | `googleClientSecret`          | `GOOGLE_CLIENT_SECRET`                    | `../../../packages/secrets/src/shared-secrets.ts:52` |
 | secret | `githubClientSecret`          | `GITHUB_CLIENT_SECRET`                    | `../../../packages/secrets/src/shared-secrets.ts:53` |
 | secret | `gitlabClientSecret`          | `GITLAB_CLIENT_SECRET`                    | `../../../packages/secrets/src/shared-secrets.ts:54` |
@@ -915,7 +934,7 @@ Run by the tasks process, before serve.
 | secret | `cognitoClientSecret`         | `COGNITO_CLIENT_SECRET`                   | `../../../packages/secrets/src/shared-secrets.ts:58` |
 | secret | `oneLoginClientSecret`        | `ONELOGIN_CLIENT_SECRET`                  | `../../../packages/secrets/src/shared-secrets.ts:59` |
 | secret | `oidcClientSecret`            | `OIDC_CLIENT_SECRET`                      | `../../../packages/secrets/src/shared-secrets.ts:60` |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`                   | `src/app/auth.app.ts:272`                            |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`                   | `src/app/auth.app.ts:279`                            |
 | config | `sessionUrl`                  | `NEXTAUTH_URL`                            | `../contract/src/auth.config.ts:40`                  |
 | config | `mfaEnrollmentOpen`           | `MFA_ENROLLMENT_OPEN`                     | `../contract/src/auth.config.ts:42`                  |
 | config | `passkeysEnabled`             | `PASSKEYS_ENABLED`                        | `../contract/src/auth.config.ts:43`                  |

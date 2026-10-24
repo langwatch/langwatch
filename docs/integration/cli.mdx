@@ -300,6 +300,8 @@ langwatch agent run <id> --input '{"message": "where is my order?"}'
 langwatch agent delete <id>
 ```
 
+`langwatch agent run` sends one input to the agent and does not call its [setup and teardown hooks](/agent-testing/setup-and-teardown-hooks), which run only on scenario runs.
+
 ### Point an HTTP agent at your machine
 
 `langwatch agent tunnel` (alias `langwatch agent dev`) fronts a local port with a public tunnel, points a registered HTTP agent's URL at it, and restores the previous URL on Ctrl-C.

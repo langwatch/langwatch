@@ -2470,6 +2470,10 @@ export const LWQL_CLICKHOUSE_CATALOGUE = defineLwqlCatalog({
       StartedAt: "inherit",
       CompletedAt: "inherit",
       CostId: "omit",
+      Attempts: "omit",
+      LastAttemptAt: "omit",
+      LastAttemptError: "omit",
+      NextAttemptAt: "omit",
       LastProcessedEventId: "omit",
       LastEventOccurredAt: "omit",
       _retention_days: "omit",
@@ -2840,6 +2844,7 @@ export const LWQL_CLICKHOUSE_CATALOGUE = defineLwqlCatalog({
       RepositoryOwner: "inherit",
       RepositoryName: "inherit",
       Branch: "inherit",
+      AiUnits: "omit",
     },
   }),
   coding_tool_results: defineTableCatalogue({

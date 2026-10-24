@@ -2427,6 +2427,17 @@
               "null"
             ]
           },
+          "attempts": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "last_attempt_error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "timestamps": {
             "$ref": "#/components/schemas/EvaluationTimestamps"
           }
@@ -2470,6 +2481,30 @@
             "type": [
               "number",
               "null"
+            ]
+          },
+          "last_attempt_at": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "next_attempt_at": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
             ]
           }
         }
@@ -28645,6 +28680,12 @@
                           },
                           "tokensKnown": {
                             "type": "boolean"
+                          },
+                          "aiUnits": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
                           }
                         },
                         "required": [
@@ -28655,7 +28696,8 @@
                           "cacheCreationTokens",
                           "totalTokens",
                           "costUsd",
-                          "tokensKnown"
+                          "tokensKnown",
+                          "aiUnits"
                         ],
                         "additionalProperties": false
                       }
@@ -29046,6 +29088,12 @@
                           },
                           "tokensKnown": {
                             "type": "boolean"
+                          },
+                          "aiUnits": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
                           }
                         },
                         "required": [
@@ -29056,7 +29104,8 @@
                           "cacheCreationTokens",
                           "totalTokens",
                           "costUsd",
-                          "tokensKnown"
+                          "tokensKnown",
+                          "aiUnits"
                         ],
                         "additionalProperties": false
                       }
@@ -76460,12 +76509,43 @@
                               "type": "null"
                             }
                           ]
+                        },
+                        "INSTANT_EVALS": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "model": {
+                                  "type": "string"
+                                },
+                                "source": {
+                                  "type": "string"
+                                },
+                                "scope": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "model",
+                                "source",
+                                "scope"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
                         "DEFAULT",
                         "FAST",
-                        "EMBEDDINGS"
+                        "EMBEDDINGS",
+                        "INSTANT_EVALS"
                       ],
                       "additionalProperties": false
                     },
@@ -76750,7 +76830,7 @@
             }
           }
         },
-        "description": "Create a default-model config attached to one or more scopes. JSON keys may be roles (DEFAULT, FAST, LANGY, EMBEDDINGS) or registered feature keys; missing keys inherit from a higher scope.",
+        "description": "Create a default-model config attached to one or more scopes. JSON keys may be roles (DEFAULT, FAST, LANGY, EMBEDDINGS, INSTANT_EVALS) or registered feature keys; missing keys inherit from a higher scope.",
         "security": [
           {
             "project_api_key": []

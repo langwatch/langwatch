@@ -18,6 +18,22 @@ name: publish-docker-ecr
 #     matrix to produce a manifest nothing ever pulled. Docker Hub still ships
 #     both arches for the community — that flow is untouched.
 #
+# Two shapes of image:
+#   - Service images (app, nlp-service, langevals, gateway, langy-agent): the
+#     bare tag is a one-entry image index over a `-arm64` manifest, written last
+#     by create-manifest.
+#   - Lambda images (langwatch-nlp-lambda and the seven langwatch-eval-<pkg>
+#     evaluator functions): the bare tag is a plain single-platform manifest,
+#     because a Lambda function image cannot be an index. They have no `-arm64`
+#     child. A consumer must not read a Lambda tag until this workflow's run for
+#     the commit has completed successfully.
+#
+# Not signed. The Docker Hub release images are signed keyless through Sigstore,
+# and every keyless signature is written to the public transparency log with
+# the image reference in it. For these images that reference names the private
+# registry, which this file keeps out of the public record (see the ECR login
+# step).
+#
 # If a consumer of these ECR images is ever added on x86, restore the amd64 rows
 # in the build table and add `-amd64` back to `sources` in `publish`. Both
 # carry a pointer to this note.
@@ -33,6 +49,10 @@ name: publish-docker-ecr
 # deliberately no `pull_request` trigger — a PR-ref assume-role is denied by that
 # trust policy, so a PR-triggered run could only ever fail. End-to-end
 # verification happens on the first merge to main.
+#
+# The role's push policy names every repository written here. An image added to
+# this workflow needs its repository added to that policy first, or its push is
+# denied.
 
 on:
   release:
@@ -49,10 +69,9 @@ on:
 permissions:
   contents: read
 
-# Never cancel in flight. A superseded run may already have pushed some of the
-# per-arch layers, and every commit that lands on main needs its own `git-<sha>`
-# published rather than being voided by the commit after it — the same rule
-# code-scanners.yml and langwatch-app-ci.yml apply to main.
+# Never cancel in flight: a superseded run may already have pushed per-arch layers.
+# Merges that land while one builds wait as one: each newer commit replaces the
+# waiting one, so a burst builds its first and its newest commit. A release has its own group.
 concurrency:
   group: publish-docker-ecr-${{ github.ref }}
   cancel-in-progress: false
@@ -141,7 +160,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
   # On push:[main], skip the images a commit cannot have affected so a docs-only
-  # merge does not pay for four multi-arch builds. Release and dispatch always
+  # merge does not pay for every image build. Release and dispatch always
   # build everything — those are the runs someone is waiting on a complete set
   # from.
   changes:
@@ -149,13 +168,14 @@ jobs:
     needs: meta
     outputs:
       # A JSON `include:` list, one entry per (image, arch) worth rebuilding, and
-      # the matching list of image names. A matrix rather than four booleans
+      # the matching list of image names. A matrix rather than one boolean per image
       # because `jobs.<job_id>.if` cannot read the `matrix` context, so a
       # per-image gate has to be applied before the matrix is expanded.
       #
       # `built` is NOT the set of images that get a tag this run — every image
       # gets one, see create-manifest. It is only the set that needs rebuilding.
       build-matrix: ${{ steps.select.outputs.build-matrix }}
+      lambda-matrix: ${{ steps.select.outputs.lambda-matrix }}
       built: ${{ steps.select.outputs.built }}
     steps:
       - name: Checkout code
@@ -222,13 +242,64 @@ jobs:
               - 'pkg/**'
               - 'services/**'
               - 'sdks/go/**'
+              - 'sdks/python/**'
+              - 'packages/ksuid-python/**'
               - '*/go.mod'
               - '*/go.sum'
+              - '.dockerignore'
+              - '.github/workflows/publish-docker-ecr.yml'
+            langwatch-nlp-lambda:
+              - 'infra/docker/Dockerfile.langwatch_nlp.lambda'
+              - 'go.work'
+              - 'go.work.sum'
+              - 'cmd/**'
+              - 'pkg/**'
+              - 'services/**'
+              - 'tools/go.*'
+              - 'sdks/go/**'
+              - 'sdks/python/**'
+              - 'packages/ksuid-python/**'
+              - 'infra/clickhouse-serverless/go.*'
+              - '.dockerignore'
+              - '.github/workflows/publish-docker-ecr.yml'
+            langwatch-langy-agent:
+              - 'infra/docker/Dockerfile.langyagent'
+              - 'go.work'
+              - 'go.work.sum'
+              - 'cmd/**'
+              - 'pkg/**'
+              - 'services/**'
+              - 'tools/go.*'
+              - 'sdks/go/**'
+              - 'sdks/typescript/**'
+              - 'infra/clickhouse-serverless/go.*'
+              - 'skills/**'
+              - 'modules/**'
+              - 'packages/**'
+              - 'patches/**'
+              - 'apps/server/package.json'
+              - 'mcp/typescript/package.json'
+              - 'dev/tests/agentic-e2e/package.json'
+              - 'feature-map.json'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - '.npmrc'
+              - '.dockerignore'
+              - '.github/workflows/publish-docker-ecr.yml'
+            # The seven evaluator Lambda images share one Dockerfile and one
+            # source tree, so they rebuild together.
+            langwatch-eval:
+              - 'infra/docker/Dockerfile.langevals.lambda'
+              - 'services/langevals/**'
+              - 'modules/model-provider/contract/src/catalog/model-catalog*.json'
+              - '.dockerignore'
               - '.github/workflows/publish-docker-ecr.yml'
             langwatch-langevals:
               - 'infra/docker/Dockerfile.langevals'
               - 'services/langevals/**'
               - 'modules/model-provider/contract/src/catalog/model-catalog*.json'
+              - '.dockerignore'
               - '.github/workflows/publish-docker-ecr.yml'
             langwatch-gateway:
               - 'infra/docker/Dockerfile.go_service'
@@ -238,6 +309,7 @@ jobs:
               - 'sdks/go/**'
               - '*/go.mod'
               - '*/go.sum'
+              - '.dockerignore'
               - '.github/workflows/publish-docker-ecr.yml'
 
       - name: Select the images to build
@@ -248,6 +320,9 @@ jobs:
           LANGWATCH_NLP_SERVICE: ${{ steps.filter.outputs.langwatch-nlp-service }}
           LANGWATCH_LANGEVALS: ${{ steps.filter.outputs.langwatch-langevals }}
           LANGWATCH_GATEWAY: ${{ steps.filter.outputs.langwatch-gateway }}
+          LANGWATCH_NLP_LAMBDA: ${{ steps.filter.outputs.langwatch-nlp-lambda }}
+          LANGWATCH_LANGY_AGENT: ${{ steps.filter.outputs.langwatch-langy-agent }}
+          LANGWATCH_EVAL: ${{ steps.filter.outputs.langwatch-eval }}
         run: |
           set -euo pipefail
 
@@ -265,7 +340,25 @@ jobs:
             {"image":"langwatch-app",         "dockerfile":"infra/docker/Dockerfile",              "arch":"arm64","platform":"linux/arm64/v8","runner":"arm64-runner-32gb"},
             {"image":"langwatch-nlp-service", "dockerfile":"infra/docker/Dockerfile.langwatch_nlp","arch":"arm64","platform":"linux/arm64/v8","runner":"ubuntu-24.04-arm"},
             {"image":"langwatch-langevals",   "dockerfile":"infra/docker/Dockerfile.langevals",    "arch":"arm64","platform":"linux/arm64/v8","runner":"ubuntu-24.04-arm"},
-            {"image":"langwatch-gateway",     "dockerfile":"infra/docker/Dockerfile.go_service",   "arch":"arm64","platform":"linux/arm64/v8","runner":"ubuntu-24.04-arm"}
+            {"image":"langwatch-gateway",     "dockerfile":"infra/docker/Dockerfile.go_service",   "arch":"arm64","platform":"linux/arm64/v8","runner":"ubuntu-24.04-arm"},
+            {"image":"langwatch-langy-agent", "dockerfile":"infra/docker/Dockerfile.langyagent",   "arch":"arm64","platform":"linux/arm64/v8","runner":"ubuntu-24.04-arm"}
+          ]
+          JSON
+          )
+
+          # Lambda function images: pushed as plain manifests, never wrapped in
+          # an index (see the header). `evaluator` is the langevals extra the
+          # evaluator Dockerfile installs; empty for the NLP function.
+          LAMBDAS=$(cat <<'JSON'
+          [
+            {"image":"langwatch-nlp-lambda",          "dockerfile":"infra/docker/Dockerfile.langwatch_nlp.lambda","evaluator":""},
+            {"image":"langwatch-eval-azure",            "dockerfile":"infra/docker/Dockerfile.langevals.lambda",    "evaluator":"azure"},
+            {"image":"langwatch-eval-langevals",        "dockerfile":"infra/docker/Dockerfile.langevals.lambda",    "evaluator":"langevals"},
+            {"image":"langwatch-eval-lingua",           "dockerfile":"infra/docker/Dockerfile.langevals.lambda",    "evaluator":"lingua"},
+            {"image":"langwatch-eval-openai",           "dockerfile":"infra/docker/Dockerfile.langevals.lambda",    "evaluator":"openai"},
+            {"image":"langwatch-eval-presidio",         "dockerfile":"infra/docker/Dockerfile.langevals.lambda",    "evaluator":"presidio"},
+            {"image":"langwatch-eval-ragas",            "dockerfile":"infra/docker/Dockerfile.langevals.lambda",    "evaluator":"ragas"},
+            {"image":"langwatch-eval-topic_clustering", "dockerfile":"infra/docker/Dockerfile.langevals.lambda",    "evaluator":"topic_clustering"}
           ]
           JSON
           )
@@ -276,21 +369,34 @@ jobs:
               --arg nlp "${LANGWATCH_NLP_SERVICE}" \
               --arg evals "${LANGWATCH_LANGEVALS}" \
               --arg gateway "${LANGWATCH_GATEWAY}" \
+              --arg nlplambda "${LANGWATCH_NLP_LAMBDA}" \
+              --arg langy "${LANGWATCH_LANGY_AGENT}" \
+              --arg eval "${LANGWATCH_EVAL}" \
+              --argjson lambdas "${LAMBDAS}" \
               '[{"langwatch-app": $app,
                  "langwatch-nlp-service": $nlp,
                  "langwatch-langevals": $evals,
-                 "langwatch-gateway": $gateway}
-                | to_entries[] | select(.value == "true") | .key]')
+                 "langwatch-gateway": $gateway,
+                 "langwatch-langy-agent": $langy,
+                 "langwatch-nlp-lambda": $nlplambda}
+                | to_entries[] | select(.value == "true") | .key]
+               + (if $eval == "true"
+                  then [$lambdas[] | select(.evaluator != "") | .image]
+                  else [] end)')
           else
-            BUILT=$(printf '%s' "${ALL}" | jq -c '[.[].image] | unique')
+            BUILT=$(jq -cn --argjson all "${ALL}" --argjson lambdas "${LAMBDAS}" \
+              '[$all[].image, $lambdas[].image] | unique')
           fi
 
           MATRIX=$(printf '%s' "${ALL}" | jq -c --argjson built "${BUILT}" \
+            '[.[] | select(.image as $i | $built | index($i))]')
+          LAMBDA_MATRIX=$(printf '%s' "${LAMBDAS}" | jq -c --argjson built "${BUILT}" \
             '[.[] | select(.image as $i | $built | index($i))]')
 
           {
             echo "built=${BUILT}"
             echo "build-matrix=${MATRIX}"
+            echo "lambda-matrix=${LAMBDA_MATRIX}"
           } >> "$GITHUB_OUTPUT"
 
           echo "Images to rebuild: ${BUILT}" >> "$GITHUB_STEP_SUMMARY"
@@ -368,6 +474,7 @@ jobs:
           # the OTel resource report; the other images ignore it.
           build-args: |
             VERSION=${{ needs.meta.outputs.version || needs.meta.outputs.image_tag }}
+            SERVICE_VERSION=${{ needs.meta.outputs.version || needs.meta.outputs.image_tag }}
             LANGWATCH_BUILD_COMMIT=${{ github.sha }}
           tags: |
             ${{ steps.ecr.outputs.registry }}/${{ matrix.image }}:${{ needs.meta.outputs.image_tag }}-${{ matrix.arch }}
@@ -444,23 +551,114 @@ jobs:
             --cache-control "no-cache"
           echo "Uploaded \`${IMAGE_TAG}\` frontend assets to the CDN bucket" >> "$GITHUB_STEP_SUMMARY"
 
+  # Lambda function images. One plain arm64 manifest per image, pushed straight
+  # to the bare tag: a function image cannot be an index, so there is no
+  # `-arm64` child to wrap. The bare tag therefore appears before the rest of
+  # the run has finished, which is why a consumer waits for the whole run to
+  # succeed before it reads one (see the header).
+  build-and-push-lambda:
+    needs: [meta, changes]
+    if: needs.changes.outputs.lambda-matrix != '[]'
+    permissions:
+      contents: read
+      id-token: write # OIDC assume-role into the artifacts account
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.changes.outputs.lambda-matrix) }}
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+        with:
+          cleanup: false
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ secrets.ARTIFACTS_ECR_OIDC_ROLE_ARN }}
+          role-session-name: publish-docker-ecr-lambda-${{ github.run_id }}
+
+      # See the note on the same step in build-and-push.
+      - name: Log in to Amazon ECR
+        id: ecr
+        env:
+          ROLE_ARN: ${{ secrets.ARTIFACTS_ECR_OIDC_ROLE_ARN }}
+        run: |
+          set -euo pipefail
+          ACCOUNT_ID="$(printf '%s' "${ROLE_ARN}" | cut -d: -f5)"
+          echo "::add-mask::${ACCOUNT_ID}"
+          REGISTRY="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+          echo "registry=${REGISTRY}" >> "$GITHUB_OUTPUT"
+          aws ecr get-login-password --region "${AWS_REGION}" \
+            | docker login --username AWS --password-stdin "${REGISTRY}"
+
+      # `provenance: false` keeps the push a plain manifest; with it on, buildx
+      # pushes an index carrying an attestation, which Lambda refuses.
+      - name: Build and push ${{ matrix.image }}
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          platforms: linux/arm64
+          provenance: false
+          sbom: false
+          cache-from: type=gha,scope=ecr-${{ matrix.image }}-arm64
+          cache-to: type=gha,mode=max,ignore-error=true,scope=ecr-${{ matrix.image }}-arm64
+          build-args: |
+            VERSION=${{ needs.meta.outputs.version || needs.meta.outputs.image_tag }}
+            EVALUATOR=${{ matrix.evaluator }}
+          tags: |
+            ${{ steps.ecr.outputs.registry }}/${{ matrix.image }}:${{ needs.meta.outputs.image_tag }}
+
+      - name: Check the pushed manifest is not an index
+        env:
+          IMAGE: ${{ matrix.image }}
+          IMAGE_TAG: ${{ needs.meta.outputs.image_tag }}
+        run: |
+          set -euo pipefail
+          MEDIA_TYPE=$(aws ecr describe-images --repository-name "${IMAGE}" \
+            --image-ids imageTag="${IMAGE_TAG}" \
+            --query 'imageDetails[0].imageManifestMediaType' --output text)
+          case "${MEDIA_TYPE}" in
+            application/vnd.oci.image.manifest.v1+json | application/vnd.docker.distribution.manifest.v2+json)
+              echo "Published \`${IMAGE}:${IMAGE_TAG}\` (${MEDIA_TYPE})" >> "$GITHUB_STEP_SUMMARY" ;;
+            *)
+              echo "::error::${IMAGE}:${IMAGE_TAG} is ${MEDIA_TYPE}; a Lambda function image must be a single manifest"
+              exit 1 ;;
+          esac
+
   # EVERY image gets this commit's tag, including the ones the path filter
   # skipped. The point of the whole workflow is that SaaS can pin one `git-<sha>`
   # across the whole deployment; if a docs-plus-gateway commit published
   # `langwatch-gateway:git-abc` and nothing else, that pin would fail to resolve
-  # for the other three. A skipped image is re-tagged from the manifest it
+  # for the others. A skipped image is re-tagged from the manifest it
   # already has, which costs a manifest PUT and no build.
   #
-  # One job looping over the four images rather than a four-way matrix: each
-  # image is a few seconds of manifest writes, and four runners queued and booted
-  # one after another added over a minute to the end of every run. A failure on
+  # One job looping over the images rather than a matrix: each image is a few
+  # seconds of manifest writes, and a runner per image queued and booted one
+  # after another added over a minute to the end of every run. A failure on
   # one image still lets the others publish; the job fails at the end.
   #
+  # A failed Lambda build does not hold back the service images: their
+  # consumers read the bare index tag, not the run's result. The Lambda image
+  # that failed is reported below and fails this job, so the run ends red and
+  # its Lambda consumers stop waiting.
+  #
   # `!cancelled()` because build-and-push reports `skipped` when nothing needed
-  # rebuilding, and this job still has four tags to write in that case. It brings
+  # rebuilding, and this job still has every tag to write in that case. It brings
   # the implicit "all needs succeeded" check with it, hence the explicit results.
   create-manifest:
-    needs: [meta, changes, build-and-push]
+    needs: [meta, changes, build-and-push, build-and-push-lambda]
     if: >-
       ${{ !cancelled()
           && needs.meta.result == 'success'
@@ -471,6 +669,17 @@ jobs:
       contents: read
       id-token: write # OIDC assume-role into the artifacts account
     steps:
+      # Only the publish scripts are read from the tree. The full commit
+      # history (without file contents) lets them re-tag only images built from
+      # the nearest ancestor of this commit.
+      - name: Checkout the publish scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+          fetch-depth: 0
+          filter: blob:none
+
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
         with:
@@ -539,20 +748,21 @@ jobs:
               # rebuilt this run or re-tagged below.
               sources=("${repo}:${IMAGE_TAG}-arm64")
             else
-              # Not rebuilt: copy the index of the newest bare `git-<sha>` tag, never
-              # an `-arm64` manifest (a different media type). The lookup and the
-              # match are separate statements so a failed `describe-images` still
-              # trips `set -e`. awk reads to the end: exiting early SIGPIPEs `tr`.
+              # Not rebuilt: copy the index of the bare `git-<sha>` tag of the
+              # nearest ancestor of this commit (nearest-ancestor-tag.sh), never
+              # an `-arm64` manifest (a different media type) and never an image
+              # built from another line of history. The lookup and the choice are
+              # separate statements so a failed `describe-images` still trips
+              # `set -e`.
               local candidates
               candidates=$(aws ecr describe-images --repository-name "${image}" \
-                --query 'reverse(sort_by(imageDetails, &imagePushedAt))[].imageTags[]' \
-                --output text)
-              previous=$(printf '%s' "${candidates}" | tr '\t' '\n' \
-                | awk '/^git-[0-9a-f]+$/ && !found { print; found=1 }')
+                --query 'imageDetails[].imageTags[]' --output text)
+              previous=$(printf '%s\n' "${candidates}" | tr '\t' '\n' \
+                | HEAD_COMMIT="${GITHUB_SHA}" .github/scripts/nearest-ancestor-tag.sh)
 
               if [ -z "${previous}" ]; then
                 # Expected until every image has been published once. A dispatch
-                # run builds all four and seeds them.
+                # run builds every image and seeds them.
                 echo "::warning::${image} has no previous git-* manifest to re-tag as ${IMAGE_TAG}; run this workflow via workflow_dispatch to seed it"
                 return 0
               fi
@@ -578,12 +788,25 @@ jobs:
           }
 
           FAILED=()
-          for IMAGE in langwatch-app langwatch-nlp-service langwatch-langevals langwatch-gateway; do
+          for IMAGE in langwatch-app langwatch-nlp-service langwatch-langevals langwatch-gateway langwatch-langy-agent \
+              langwatch-nlp-lambda langwatch-eval-azure langwatch-eval-langevals langwatch-eval-lingua \
+              langwatch-eval-openai langwatch-eval-presidio langwatch-eval-ragas langwatch-eval-topic_clustering; do
             echo "::group::${IMAGE}"
             # Not `if ! ( ... )`: bash ignores `set -e` inside a subshell whose
             # status a condition tests, so a failed command would not stop it.
             set +e
-            ( set -euo pipefail; publish "${IMAGE}" )
+            case "${IMAGE}" in
+              # Single manifests: see .github/scripts/publish-lambda-tag.sh.
+              langwatch-nlp-lambda | langwatch-eval-*)
+                if printf '%s' "${BUILT}" | jq -e --arg i "${IMAGE}" 'index($i)' >/dev/null; then
+                  LAMBDA_BUILT=true
+                else
+                  LAMBDA_BUILT=false
+                fi
+                IMAGE_WAS_BUILT="${LAMBDA_BUILT}" bash .github/scripts/publish-lambda-tag.sh "${IMAGE}" ;;
+              *)
+                ( set -euo pipefail; publish "${IMAGE}" ) ;;
+            esac
             STATUS=$?
             set -e
             if [ "${STATUS}" -ne 0 ]; then

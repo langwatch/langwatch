@@ -3,6 +3,7 @@ import { delimiter, join } from "node:path";
 
 import { nowInstant } from "@langwatch/time";
 
+import { DEFAULT_LOG_LEVEL } from "../shared/log-level.ts";
 import type { RuntimeContext } from "../shared/runtime-contract.ts";
 import type { EventBus } from "./event-bus.ts";
 import { monobinaryOffers } from "./go-services.ts";
@@ -72,6 +73,7 @@ export async function startLangyagent(
         // through), which is how their tool calls resolve.
         PATH: [ctx.paths.bin, process.env.PATH ?? ""].filter(Boolean).join(delimiter),
         LOG_FORMAT: "pretty",
+        LOG_LEVEL: ctx.logLevel ?? DEFAULT_LOG_LEVEL,
       },
     },
     paths: sp,

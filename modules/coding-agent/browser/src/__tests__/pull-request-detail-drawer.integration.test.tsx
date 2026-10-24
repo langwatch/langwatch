@@ -6,7 +6,7 @@
  * @see specs/coding-agent/pull-request-linkage.feature
  */
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -426,6 +426,72 @@ describe("the pull request detail drawer", () => {
     });
   });
 
+  describe("given a model whose figures are not known beside one whose figures are", () => {
+    /** @scenario "The detail marks a model whose figures are not known" */
+    it("says that model's figures are not known, and why on hover", async () => {
+      pinDetail(
+        detailPayload({
+          modelBreakdown: [
+            {
+              model: "gpt-6-luna",
+              inputTokens: 13,
+              outputTokens: 50,
+              cacheReadTokens: 0,
+              cacheCreationTokens: 0,
+              totalTokens: 63,
+              costUsd: 0.01,
+              tokensKnown: true,
+              aiUnits: 1,
+            },
+            { model: "gpt-6-sol", tokensKnown: false, costUsd: null, aiUnits: null },
+          ],
+        }),
+      );
+      const user = userEvent.setup();
+
+      renderDrawer();
+
+      const line = screen.getByText("gpt-6-sol").parentElement!;
+      expect(line).toHaveTextContent("Not known");
+      expect(screen.getByText("gpt-6-luna").parentElement).not.toHaveTextContent("Not known");
+      await user.hover(within(line).getByText("Not known"));
+      expect(await screen.findByText(/without recording per-model figures/)).toBeInTheDocument();
+    });
+  });
+
+  describe("given a Copilot model that consumed AI units and has no price", () => {
+    /** @scenario "AI units are their own count and never enter the dollar total" */
+    /** @scenario "A model with no price shows its tokens and an unknown cost" */
+    it("shows its tokens and AI units, and a missing cost rather than zero dollars", () => {
+      pinDetail(
+        detailPayload({
+          modelBreakdown: [
+            {
+              model: "oswe-vscode-prime",
+              inputTokens: 13,
+              outputTokens: 50,
+              cacheReadTokens: 0,
+              cacheCreationTokens: 0,
+              totalTokens: 63,
+              costUsd: null,
+              tokensKnown: true,
+              aiUnits: 5,
+            },
+          ],
+        }),
+      );
+
+      renderDrawer();
+
+      const modelName = screen.getByText("oswe-vscode-prime");
+      const line = modelName.parentElement!;
+      expect(line).toHaveTextContent("63 tokens");
+      expect(line).toHaveTextContent("5 AI units");
+      expect(line).toHaveTextContent("—");
+      expect(line).not.toHaveTextContent("$0");
+    });
+  });
+
   describe("given the read is still in flight", () => {
     it("shows placeholders rather than an empty drawer", () => {
       queryImpls["codingAgents.pullRequestDetail"] = () => ({
@@ -574,6 +640,7 @@ describe("the pull request detail drawer", () => {
           sessions: [
             sessionFact({
               sessionId: "session-a",
+              projectId: "proj-personal",
               title: "Teach the fold about branches",
             }),
           ],
@@ -720,6 +787,97 @@ describe("the pull request detail drawer", () => {
           projectId: "proj-personal",
           conversationId: "session-a",
         });
+      });
+    });
+  });
+
+  describe("given a group project's pull request detail listing a member project's session", () => {
+    beforeEach(() => {
+      pinDetail(
+        detailPayload({
+          sessions: [
+            sessionFact({
+              sessionId: "session-a",
+              projectId: "member-b",
+              title: "Teach the fold about branches",
+            }),
+          ],
+        }),
+      );
+    });
+
+    /**
+     * @see specs/governance/aggregate-project.feature
+     * @scenario "Opening a member project's session replays that member's conversation"
+     */
+    it("reads the session under the member project that recorded it", async () => {
+      utils.traces.conversationContext.fetch.mockResolvedValue({
+        turns: [{ traceId: "trace-last", timestamp: 2_000 }],
+      });
+      const user = userEvent.setup();
+      renderDrawer();
+
+      await user.click(screen.getByText("Teach the fold about branches"));
+
+      await waitFor(() =>
+        expect(host.recording.queries.map((write) => write.next)).toEqual([
+          {
+            "drawer.open": "traceV2Details",
+            "drawer.traceId": "trace-last",
+            "drawer.t": "2000",
+            "drawer.mode": "terminal",
+            "drawer.projectId": "proj-personal",
+            "drawer.tenantId": "member-b",
+          },
+        ]),
+      );
+      expect(utils.traces.conversationContext.fetch).toHaveBeenCalledWith({
+        projectId: "proj-personal",
+        conversationId: "session-a",
+        tenantId: "member-b",
+      });
+    });
+  });
+
+  describe("given a personal workspace's pull request detail listing a session another project recorded", () => {
+    beforeEach(() => {
+      pinDetail(
+        detailPayload({
+          sessions: [
+            sessionFact({
+              sessionId: "session-a",
+              projectId: "proj-shared",
+              title: "Ran in the shared project",
+            }),
+          ],
+        }),
+      );
+    });
+
+    describe("when the reader chooses it and the read refuses a project no grant names", () => {
+      it("names that project to the read, reports the refusal and opens no replay", async () => {
+        utils.traces.conversationContext.fetch.mockRejectedValue(
+          new Error("You do not have access to this project"),
+        );
+        const user = userEvent.setup();
+        renderDrawer();
+
+        await user.click(screen.getByText("Ran in the shared project"));
+
+        await waitFor(() =>
+          expect(host.recording.failures).toContainEqual(
+            expect.objectContaining({
+              fallbackTitle: "Couldn't open the terminal replay",
+            }),
+          ),
+        );
+        expect(utils.traces.conversationContext.fetch).toHaveBeenCalledWith({
+          projectId: "proj-personal",
+          conversationId: "session-a",
+          tenantId: "proj-shared",
+        });
+        expect(host.recording.infos).toEqual([]);
+        expect(host.recording.queries).toEqual([]);
       });
     });
   });

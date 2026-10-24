@@ -181,8 +181,8 @@ or drops it. Each patch has one owning module and a test there that runs the pat
 
 **Build stamp** (Alex, 2026-10-09). `isReleaseBuild` in `packages/config/src/release-build.ts` is a
 committed `false`; the release image build sets it `true` in its builder stage (`infra/docker/Dockerfile`,
-build arg `LANGWATCH_RELEASE_BUILD`, default `true`) and `dev/scripts/pack-npm.sh` sets it on the npx
-staged copy. Runtime env cannot change it, only a rebuild can. A release build verifies licences
+build arg `LANGWATCH_RELEASE_BUILD`, default `true`) and `dev/scripts/build-app-archive.sh` sets it on
+the npx app archive's staged copy (ADR-180). Runtime env cannot change it, only a rebuild can. A release build verifies licences
 against the embedded LangWatch key only and logs once, by name, that the public-key override is ignored.
 
 ---
@@ -343,7 +343,8 @@ document, is the authority on filenames):
   their format and stay accepted, since clients hold them as opaque strings (Alex, 2026-09-27).
   The prefix is the owning subject's name without hyphens: `slackintegration` (Alex, 2026-09-30).
 - No `utils/`, `ports/`, `adapters/`, `composition/`, `lib/`, `helpers/`,
-  `domain/`.
+  `domain/`, in a module or a framework package (Alex, 2026-10-19,
+  [ADR-181](adr/181-framework-packages-are-layered-like-a-process-half.md); §3.4).
 
 **A value is parsed once, where it enters untyped** (a transport, a channel's inbound message, a
 fold's stored payload) and travels as its `z.infer` type after that: a service does not re-parse what
@@ -493,7 +494,7 @@ A folder over 30 source files is grouped into features, not left flat; a process
 way, `process/src/features/<concern>/` holding that concern's services, rules and the rest
 (Alex, 2026-10-01).
 
-**Process and contract nest the same way** (Alex, 2026-10-01): a folder past 30 source files is grouped into concern features of small, single-responsibility classes, never a pile of loose root-level functions. `process/src/features/<concern>/` repeats `services/`, `rules/`, `repositories/` and `eventing/`; `contract/src/features/<concern>/` holds that concern's schemas, events and commands. What every concern shares stays at the top level; a concern's pieces move together. A lint budget on files per folder and lines per file keeps it from growing back. Nesting is one level: a module takes as many concerns as keep each folder at 30 or under, never `features/<a>/features/<b>/`. A framework package groups its files into plain folders behind unchanged `package.json` export subpaths.
+**Process and contract nest the same way** (Alex, 2026-10-01): a folder past 30 source files is grouped into concern features of small, single-responsibility classes, never a pile of loose root-level functions. `process/src/features/<concern>/` repeats `services/`, `rules/`, `repositories/` and `eventing/`; `contract/src/features/<concern>/` holds that concern's schemas, events and commands. What every concern shares stays at the top level; a concern's pieces move together. A lint budget on files per folder and lines per file keeps it from growing back. Nesting is one level: a module takes as many concerns as keep each folder at 30 or under, never `features/<a>/features/<b>/`. A framework package nests the same way (Alex, 2026-10-19; [ADR-181](adr/181-framework-packages-are-layered-like-a-process-half.md)): its `src/` holds `features/<concern>/` folders of `vocabulary/`, `services/`, `repositories/` and `channels/` (each with tier folders and memory twins, the Lua keyspace repositories excepted), `rules/` and `eventing/`; what every concern shares sits at the top in `vocabulary/`, `rules/`, `repositories/`, `channels/` and `telemetry/`; its public runtime classes are in `app/`, and its `package.json` entry files are `export … from` lines only. Export subpaths, public names and their signatures do not change. A package opts in with `"langwatch": { "layout": "features" }` in its own `package.json` when it moves; until then it keeps its plain folders.
 
 The fragment-file budget never reports a module contract's `<id>.config.ts` (§6) or a file its own `package.json` publishes through `exports`, a deliberate public entry point (ruling SF-2; Alex, 2026-10-08).
 
@@ -1502,7 +1503,7 @@ step's per-tenant state lives in one framework-owned table beside the ledger,
 tenant steps as a framework input, as it hands a migration binder its `replayer`; the api builds tenant
 steps only, for ops' targeted run, and ops builds the state repository in its own registry. Worker boot
 accepts a tenant step and the background runner skips it; its ledger row is `done` when a pass leaves no
-tenant held or parked and reopens when one appears (Alex, 2026-10-09, S6-WIRE). A step that reports `migrated` on every pass by design declares `migratedIsSteady`: its migrated tenants are kept in step, never held, and Ops lists only its parked ones as needing attention (Alex, 2026-10-12, SWB-F5). A finished upgrade run asks ops for one
+tenant held or parked and reopens when one appears (Alex, 2026-10-09, S6-WIRE). A step that reports `migrated` on every pass by design declares `migratedIsSteady`: its migrated tenants are kept in step, never held, and Ops lists only its parked ones as needing attention (Alex, 2026-10-12, SWB-F5). A single outcome takes the same form with `heldReason: "person"`, held until a person acts (the user proves the account, an operator lifts a pin): it never reads as failed, leaves its step settled, and Ops counts it apart from the tenants needing attention (2026-10-21). A finished upgrade run asks ops for one
 system-migrations pass, so tenant steps settle at upgrade rather than at the hourly re-drive (Alex,
 2026-10-09, UPG-008 D2); the request's queue jobs run ahead of any backlog (Alex, 2026-10-11). A step that must read every tenant reads through its owner's repository with
 raw SQL that interpolates `skipTenantCheck({ SKIP_TENANT_CHECK: true })` under a comment giving the reason, as the trigger claim does (Alex, 2026-10-09, UPG-008 D1; the flag replaced the `-- @tenancy:` comment, Alex, 2026-10-10). Stored-object's ClickHouse import is a `project` tenant step with
@@ -1910,7 +1911,7 @@ office deactivates only through user, so it keeps no picked date (Alex, 2026-10-
 - The CLI token door hands a handler `session` beside `actor` (Alex, 2026-10-01): the route declares
   `.withCredential("cli_token", { session: schema })`, the framework parses it (a mismatch answers 401) and types
   the handler by `z.output`. The actor carries authz vocabulary only; logs redact `session.tokenKey` at a fixed path.
-- A legacy project key still authenticates but is never returned or displayed: no read, no rotation, no handout. Keys created on main keep main's access and new projects get no legacy key (Alex, 2026-10-09): a legacy project key or an ownerless API key reads its own project's traces on an own-only proof the door mints as the internal actor `api.rest.ownerless-project-key`; an unattended run key on a proof-bearing route answers 403.
+- A legacy project key still authenticates but is never returned or displayed: no read, no rotation, no handout. New projects get no legacy key (Alex, 2026-10-09). A legacy key is ingestion-only (`traces:create`) plus the routes that name a scope flag listing its project (`withLegacyKeyScope`, `LEGACY_PROJECT_KEY_SCOPE_FLAGS`); beyond that it is report-only by default, refused with 403 on a project in `legacy_project_key_scope_enforced`, and unrestricted on a project in `legacy_project_key_full_access` (spec: modules/auth/specs/legacy-project-key-scope.feature). A legacy project key or an ownerless API key reads its own project's traces on an own-only proof the door mints as the internal actor `api.rest.ownerless-project-key`; an unattended run key on a proof-bearing route answers 403.
   It migrates to an `ApiKey` row, hashed and valid until revoked, listed masked and revoke-only under a
   replace-by-deadline banner. The CLI and MCP mint a fresh key instead, a CLI login replacing that device's previous
   one, and a new project gets no customer-facing project key (Alex, 2026-09-30). No engine and no internal caller
@@ -2127,7 +2128,7 @@ each owner's events, which carry ids and the non-personal, point-in-time facts; 
 personal data: where a signal needs some it carries the id (and a revision), and nurturing reads the value from
 `UserApi` at delivery and never stores it. Only the email and name leave, to Customer.io, once at sign-up; each
 identify sends only the traits that signal changes, once per source event.
-With no owner-to-nurturing edges, its `nurturing -> user` read closes no construction or package-import cycle, and the ratchet baseline
+With no owner-to-nurturing edges, its `nurturing -> user` and `nurturing -> organization` reads close no construction or package-import cycle, and the ratchet baseline
 carries no exception for it (Alex, 2026-09-29).
 
 The framework's public types carry typed parameters or `unknown`, never `any`: an event, command or
@@ -2985,6 +2986,15 @@ naming only the organization; on set, gateway pulls `{ baseUrl, token, instanceI
 `LicensingApi.findConnectUpstream` and seals the token itself; licensing alone derives the token, including the
 instance-wide `LANGWATCH_LICENSE_KEY` fallback (Alex, 2026-10-10, PC-G2-CONNECT-TOKEN; supersedes C3b D2).
 
+**Self-hosted notices ride the usage report reply** (Alex, 2026-10-21/22). Licensing owns the
+`SelfHostedNotice` table and its `*Api` operations; staff write, publish and withdraw them through
+enterprise-ops (`ops:view` reads, `ops:manage` writes, audited like the license registry); saas adds the
+published, unexpired notices to its usage report reply, only when there are some. The install's ops keeps
+them beside the latest release, hides one its running release fixes, and `DISABLE_LANGWATCH_NOTICES` opts
+out. Notices are public text: any install that reports receives them, so none is gated on a known
+instance. Specs: `enterprise/modules/licensing/specs/self-hosted-notices.feature`,
+`modules/ops/specs/self-hosted-notices.feature`.
+
 **Seat limits are organization's to answer** (Alex, 2026-09-28).
 `licenseEnforcement.checkLimit`, `checkAllLimits` and `reportLimitBlocked`
 keep their wire path, but the contract and transport are organization's: it
@@ -3094,6 +3104,8 @@ with its reason, in the stand-in-cast rule's audited boundaries (Alex, 2026-09-2
 A stand-in a test needs is a real fixture or builder, never a new contract type: types do not change
 for tests (Alex, 2026-09-29). A test never `vi.spyOn`s a real service; it drives memory twins and
 fixtures instead (Alex, 2026-09-29).
+group-queue's `processClaimedJob` characterization harness stays pinned until the processor
+carve-up ends (Alex, 2026-10-19; ADR-181).
 A module exports no `./testing` subpath: a fixture another module's tests need lives in that consumer
 (Alex, 2026-10-06, round 4, Q208; §3).
 A scenario bound from a package's tests counts toward feature parity like one bound from a module's
@@ -3111,6 +3123,8 @@ A product that disagrees with its scenario is a behaviour question for the coord
 bind and never a rewording. The `spec-binding-review` skill keeps the detail.
 Every repository has a real memory twin, gateway's included, and unit tests build over the memory
 registry; there is no refusing stand-in tier (coordinator, members wave, 2026-10-05).
+The Lua keyspace repositories of an opted-in framework package are the exception; the Redis
+integration suites are their proof (Alex, 2026-10-19; ADR-181).
 The "New Experiment" button stays solid primary; its e2e expectation is updated (Alex, 2026-10-05).
 
 The installation test boots the installed list over memory stores, with no server
@@ -3350,6 +3364,11 @@ multi-line why (Alex, 2026-10-05). The `feature-configuration` policy demands no
 `modules/<name>/client` and `enterprise/modules/<name>/client` have the `client` role in the enforcer
 (`manifests`, `application-boundaries`, `browser-node-leak`) and in `langwatch/package-boundaries`
 (`clientRuntime`, `clientConsumer`), not the portable library's (Alex, 2026-10-06, round 4, Q208).
+`packages/eventing` and `packages/group-queue` have the `framework` role. One that opts into the
+feature layout (§3.4) also has a strict source and a layer (`packages/oxlint-rules/src/classify.mjs`):
+the grammar's `FRAMEWORK_PATTERNS` and the entry files its `exports` names are its homes, the layer
+tables add `vocabulary` and `telemetry` rows, and `service-ceilings` measures its services. The
+`process`-gated rules take the role too (Alex, 2026-10-19; ADR-181).
 
 **House rules are strict; a disable is very rare** (Alex, 2026-10-05). Most `langwatch/*` rules must not be
 ignored: a disable directive naming one is itself an error (`langwatch/suppression-states-why`). Only a few

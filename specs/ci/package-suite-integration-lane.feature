@@ -186,3 +186,17 @@ Feature: A package's integration suite runs in CI when it declares one
       Given PACKAGE_SUITES_CONCURRENCY is not a positive whole number
       When the package suites job starts
       Then it fails instead of guessing how many suites to run at once
+
+  Rule: An unchanged suite replays its pass instead of running again
+
+    @unit
+    Scenario: A suite Nx caches runs through Nx
+      Given a package whose suite script is one nx.json caches
+      When the package suites job runs it
+      Then it runs through Nx, so an unchanged suite replays its recorded pass
+
+    @unit
+    Scenario: An integration or browser suite runs uncached
+      Given a package's integration or browser script
+      When the package suites job runs it
+      Then it runs through pnpm, every time
