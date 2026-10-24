@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.3.0](https://github.com/langwatch/langwatch/compare/mcp-server@v2.2.0...mcp-server@v2.3.0) (2026-10-24)
+
+
+### Features
+
+* **auth:** log which credential and client each API request used ([#9003](https://github.com/langwatch/langwatch/issues/9003)) ([c55dc6e](https://github.com/langwatch/langwatch/commit/c55dc6e6e22aa2a6563b4be7d3e93d7f40c7f23b))
+
+
+### Bug Fixes
+
+* **security:** close 148 of 150 alerts across the python locks ([#7634](https://github.com/langwatch/langwatch/issues/7634)) ([c0837d1](https://github.com/langwatch/langwatch/commit/c0837d164d28f15ba179fc6f1c1f0516be32cfa3))
+* **security:** close the nine alerts raised on 2026-10-22 ([#8982](https://github.com/langwatch/langwatch/issues/8982)) ([7eca2c2](https://github.com/langwatch/langwatch/commit/7eca2c24ccba4b38a1636048ea18801a2fd1d2b1))
+
 ## [2.2.0](https://github.com/langwatch/langwatch/compare/mcp-server@v2.1.0...mcp-server@v2.2.0) (2026-10-21)
 
 
