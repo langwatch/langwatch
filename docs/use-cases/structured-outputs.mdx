@@ -8,7 +8,7 @@ An evaluation script measures how well the LLM behind a taxi booking chatbot ext
 
 We'll use LangWatch to create a simple, repeatable evaluation script to measure and track the model's accuracy.
 
-### **1. The Problem**
+## **1. The Problem**
 
 Our LLM's job is to interpret short chat messages and extract key details for a ride booking.
 
@@ -17,7 +17,7 @@ Our LLM's job is to interpret short chat messages and extract key details for a 
 
 We need to evaluate how accurately our model can extract fields like `pickup_address`, `airport_found`, and `passenger_count`, even when the input is incomplete.
 
-### **2. Setup and Data Preparation**
+## **2. Setup and Data Preparation**
 
 First, let's set up our environment and create a simple dataset for the evaluation. Our dataset will be a pandas DataFrame with the `user_message` and a `ground_truth` column containing the expected JSON output.
 
@@ -50,7 +50,7 @@ df = pd.DataFrame(data)
 print(df)
 ```
 
-### **3. Define the Extraction Logic**
+## **3. Define the Extraction Logic**
 
 Next, we'll define a placeholder function, `extract_booking_details()`, that simulates our LLM pipeline. This function takes a user message and returns a JSON object with the extracted details.
 
@@ -79,7 +79,7 @@ def extract_booking_details(message: str) -> BookingDetails:
     return response.output
 ```
 
-### **4. Implementing the Evaluation Script**
+## **4. Implementing the Evaluation Script**
 
 Now, let's tie it all together with LangWatch. We'll initialize an evaluation, loop through our dataset, call our model, and log custom metrics to track the accuracy of each extracted field.
 
@@ -152,7 +152,7 @@ for idx, row in evaluation.loop(df.iterrows()):
 print("Evaluation complete! Check your results in the LangWatch dashboard.")
 ```
 
-### **5. Analyzing the Results**
+## **5. Analyzing the Results**
 
 After running the script, you can navigate to the LangWatch dashboard to see your results. You'll get:
 
@@ -162,10 +162,10 @@ After running the script, you can navigate to the LangWatch dashboard to see you
 
 For example, you could quickly filter for all samples where `hallucination_check` failed to debug why your model is inventing a destination_address. This level of detail is crucial for iterating on your prompts and improving model reliability.
 
-### **6. Conclusion**
+## **6. Conclusion**
 
 By implementing this evaluation-driven approach with LangWatch, you can systematically measure and improve the accuracy of your structured data extraction for your chatbot. The detailed field-by-field analysis helps identify specific areas for improvement, whether it's handling incomplete addresses, detecting airport mentions, or preventing hallucinations. With continuous monitoring, you can ensure your booking system remains reliable as it processes real-world, unstructured user messages.
 
-### **7. Optimizing Your Extraction**
+## **7. Optimizing Your Extraction**
 
 Now that you've set up evaluation for your structured data extraction, you can use [Workflows](/workflows/overview) to improve your extraction pipeline. Put the extraction prompt in an LLM node, attach the dataset, evaluate each prompt variation on the same rows and compare the results run by run.

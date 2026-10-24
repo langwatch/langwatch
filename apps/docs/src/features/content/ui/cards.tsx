@@ -23,6 +23,8 @@ type CardProps = {
   href?: string;
   horizontal?: boolean;
   arrow?: boolean | string;
+  /** "2" before the page's first h2 (set at compile time), so no heading level is skipped. */
+  titleLevel?: string;
   children?: ReactNode;
 };
 
@@ -38,7 +40,7 @@ function CardIcon({ icon, compact }: { icon: string; compact: boolean }) {
 }
 
 /** MDX supplies content and destinations; the shared card owns its surface and interaction. */
-export function Card({ title, description, icon, href, arrow, children }: CardProps) {
+export function Card({ title, description, icon, href, arrow, titleLevel, children }: CardProps) {
   const compact = Boolean(icon && !description && !Children.toArray(children).length);
   const linked = Boolean(href && title && !containsLink({ node: children }));
   const Direction = href && /^https?:/.test(href) ? ArrowUpRight : ArrowRight;
@@ -48,7 +50,7 @@ export function Card({ title, description, icon, href, arrow, children }: CardPr
       <SurfaceCard
         variant="panel-fill"
         padding={compact ? "sm" : "md"}
-        titleLevel={3}
+        titleLevel={titleLevel === "2" ? 2 : 3}
         title={
           title && href && !linked ? <Link href={sitePath({ path: href })}>{title}</Link> : title
         }

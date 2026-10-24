@@ -39,17 +39,34 @@ function estreeOf({ value }: { value: Literal }): object {
   return { type: "Literal", value };
 }
 
+const isJsx = ({ node }: { node: TreeNode }) =>
+  node.type === "mdxJsxFlowElement" || node.type === "mdxJsxTextElement";
+
+function stringAttribute({ node, name }: { node: TreeNode; name: string }) {
+  const value = node.attributes?.find((attr) => attr.name === name)?.value;
+  return typeof value === "string" ? value : undefined;
+}
+
+/* Components whose title is a heading: the prop naming its level, and the h2 value. */
+const TITLED = new Map([
+  ["Step", { prop: "titleSize", value: "h2" }],
+  ["Card", { prop: "titleLevel", value: "2" }],
+  ["SkillCard", { prop: "titleLevel", value: "2" }],
+]);
+
+/** Before the page's first h2 a component title is an h2, so it never skips a heading level. */
+function levelTitle({ node, state }: { node: TreeNode; state: HeadingState }) {
+  const titled = isJsx({ node }) && !state.sawH2 ? TITLED.get(node.name ?? "") : undefined;
+  if (!titled || node.attributes?.some((attr) => attr.name === titled.prop)) return;
+  node.attributes?.push({ type: "mdxJsxAttribute", name: titled.prop, value: titled.value });
+}
+
 /** A titled `<Step>` is a contents entry: h2 depth until the page's first h2, then h3. */
 function collectStep({ node, state }: { node: TreeNode; state: HeadingState }) {
-  if (!["mdxJsxFlowElement", "mdxJsxTextElement"].includes(node.type) || node.name !== "Step")
-    return;
-  const attribute = (name: string) => {
-    const value = node.attributes?.find((attr) => attr.name === name)?.value;
-    return typeof value === "string" ? value : undefined;
-  };
-  const title = attribute("title");
+  if (!isJsx({ node }) || node.name !== "Step") return;
+  const title = stringAttribute({ node, name: "title" });
   if (title === undefined) return;
-  let id = attribute("id");
+  let id = stringAttribute({ node, name: "id" });
   if (!id) {
     id = slugOf({ text: title, used: state.used });
     node.attributes?.push({ type: "mdxJsxAttribute", name: "id", value: id });
@@ -64,6 +81,7 @@ function collectHeading({ node, state }: { node: TreeNode; state: HeadingState }
     if (depth === 2) state.sawH2 = true;
     state.headings.push({ depth, text: textOf({ node }).trim(), id });
   }
+  levelTitle({ node, state });
   collectStep({ node, state });
 }
 

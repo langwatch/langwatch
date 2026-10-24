@@ -78,18 +78,21 @@ export function SkillCard({
   install,
   command,
   prompt,
+  titleLevel,
   children,
 }: {
   title: string;
   install: string;
   command: string;
   prompt: string;
+  /** "2" before the page's first h2 (set at compile time), so no heading level is skipped. */
+  titleLevel?: string;
   children?: ReactNode;
 }) {
   return (
     <Box className="docs-skill-card" data-install={install ? "true" : "false"}>
       <Box className="docs-skill-head">
-        <Text as="h3" className="docs-skill-title">
+        <Text as={titleLevel === "2" ? "h2" : "h3"} className="docs-skill-title">
           {title}
         </Text>
         <Text className="docs-skill-caption">{caption({ command })}</Text>

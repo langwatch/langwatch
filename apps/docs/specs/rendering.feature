@@ -118,6 +118,13 @@ Feature: Read and navigate the generated documentation
     Then each step title is a heading of that level, or plain text for "p"
     And steps without a size keep third-level titles
 
+  @unit
+  Scenario: Component titles before the first section never skip a heading level
+    Given an MDX page with steps, cards or skill cards before its first second-level heading
+    When the page is compiled
+    Then those titles are second-level headings, unless the author set their level
+    And the same components after the first second-level heading keep third-level titles
+
   @integration
   Scenario: Tab panels are named by ids without spaces
     Given authored tabs or a code group whose labels contain spaces

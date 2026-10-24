@@ -1077,7 +1077,7 @@ figure > .docs-shot {
   background: #ffffff;
   box-shadow: inset 0 0 0 1px var(--chakra-colors-border);
 }
-.docs-shell .docs-card[data-compact="false"] h3 {
+.docs-shell .docs-card[data-compact="false"] :is(h2, h3) {
   font-size: 15px;
   line-height: 22px;
   font-weight: 600;
