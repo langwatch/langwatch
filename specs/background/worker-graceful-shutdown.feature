@@ -369,6 +369,13 @@ Feature: Worker graceful shutdown does not sever in-flight ClickHouse work
     And app.preStopSleepSeconds of zero renders no preStop
 
   @regression @helm-grace-period
+  Scenario: An unset preStop sleep fits a grace period an install pinned before the default rose
+    Given an install that pins app.terminationGracePeriodSeconds and leaves app.preStopSleepSeconds unset
+    When the app Deployment is rendered
+    Then the preStop sleep is fifteen seconds, shortened to the room the pinned grace period leaves
+    And a preStop sleep the install sets itself still refuses to render when it does not fit
+
+  @regression @helm-grace-period
   Scenario: The process is told the same drain budget the pod is sized for
     Given the app and workers Deployments are rendered
     Then the workers Deployment sets PROCESS_SHUTDOWN_DEADLINE_MS to workers.shutdownDrainSeconds plus twenty seconds

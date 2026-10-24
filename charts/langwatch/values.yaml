@@ -217,8 +217,10 @@ app:
   # process stops accepting requests. A cloud load balancer can keep routing to
   # a pod for over 10s after its endpoint goes. Spent inside
   # terminationGracePeriodSeconds. 0 turns it off; an extraLifecycle.preStop replaces it.
-  ## @param app.preStopSleepSeconds [default: 15] Seconds to sleep before SIGTERM so endpoint removal propagates.
-  preStopSleepSeconds: 15
+  # Left unset it is 15, shortened to whatever a pinned terminationGracePeriodSeconds
+  # has room for; a value set here must fit, or the chart refuses to render.
+  ## @param app.preStopSleepSeconds [nullable, default: 15] Seconds to sleep before SIGTERM so endpoint removal propagates. Unset, shortened to fit a pinned grace period.
+  preStopSleepSeconds: null
 
   # Kubernetes service configuration
   # See: https://kubespec.dev/v1/Service
