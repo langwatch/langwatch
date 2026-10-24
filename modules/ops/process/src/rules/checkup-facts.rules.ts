@@ -83,7 +83,10 @@ export interface CheckupFacts {
   readonly clickhouse: {
     readonly configured: boolean;
     readonly ping: () => Promise<void>;
-    /** Empty where ClickHouse did not answer the settings the provisioning probe reads. */
+    /**
+     * Empty where ClickHouse did not answer the reads the provisioning probe makes
+     * (system.replicas, system.zookeeper, system.clusters, system.functions).
+     */
     readonly findAppFunctionsProvisionable: () => Promise<boolean[]>;
   };
   readonly redis: {

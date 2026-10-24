@@ -397,10 +397,114 @@ Feature: LangWatchQL app-side extraction functions — projection UDFs plus a po
 
   @unit
   Scenario: A multi-replica server without a shared function store is provisioned without the functions
-    Given a self-hosted ClickHouse with three replicas and no user_defined_zookeeper_path
+    Given a self-hosted ClickHouse with three replicas and no function store in Keeper at /clickhouse/user_defined
     When self-provisioning runs
-    Then the app functions are left out and the log names the setting to declare
+    Then the app functions are left out and the log names the setting and the path to declare
     And the rest of the access model is provisioned
+
+  # ClickHouse 25.10 lists user_defined_zookeeper_path nowhere in system.server_settings,
+  # so the probe compares the Keeper store with the SQL functions every replica knows,
+  # read through clusterAllReplicas. A local store holding the same names as Keeper, or
+  # an empty store beside empty replicas, cannot be told apart by name; the check after
+  # the create catches the first function that does not reach Keeper and every replica.
+  @unit
+  Scenario: A replicated server whose function store is in Keeper is provisioned with the functions
+    Given a ClickHouse 25.10 with three replicas and the function store at /clickhouse/user_defined in Keeper
+    And system.server_settings does not list user_defined_zookeeper_path
+    When self-provisioning probes every replica for where a CREATE FUNCTION would land
+    Then the app functions are provisionable
+    And every app function, one missing from the store included, is created with CREATE OR REPLACE
+
+  @unit
+  Scenario: A replicated server with Keeper but no function store in it is not provisionable
+    Given a ClickHouse with three replicas and Keeper but no node at /clickhouse/user_defined
+    When the function store probe runs
+    Then the app functions are not provisionable
+
+  # A cross-replica read needs inter-server auth, the REMOTE grant and every replica up.
+  # Where it fails, the probe compares the server the creates run on with Keeper, as it
+  # did before it read every replica, and warns that other replicas went unchecked.
+  @unit
+  Scenario: A replicated server whose replicas refuse the cross-replica read still gets the functions
+    Given a ClickHouse with three replicas and the function store in Keeper
+    And clusterAllReplicas fails with AUTHENTICATION_FAILED for user default
+    When the function store probe runs
+    Then it compares this server's SQL functions with the Keeper store
+    And the app functions are provisionable
+    And the log warns that the other replicas were not checked
+
+  @unit
+  Scenario: A replicated server whose replicas refuse the cross-replica read still refuses a local store on this server
+    Given a ClickHouse with three replicas where clusterAllReplicas fails
+    And this server holds a SQL function the Keeper store lacks
+    When the function store probe runs
+    Then the app functions are not provisionable
+
+  @unit
+  Scenario: A replicated server with an unreachable replica is checked on this server
+    Given a ClickHouse with three replicas where clusterAllReplicas cannot reach one
+    When the function store probe runs
+    Then it compares this server's SQL functions with the Keeper store, so the app functions are provisionable
+
+  @unit
+  Scenario: A created app function missing on one replica fails the provisioning step
+    Given the app functions were created
+    And after a short wait for the Keeper watch one replica still does not list one of them
+    When self-provisioning checks every replica after the create
+    Then it logs an error with the stable code lwql_app_functions_split and the hosts missing it
+    And the provisioning step fails as a failed create does, without crashing the deploy
+
+  @integration
+  Scenario: The probe finds the function store in Keeper on every replica of a real replicated ClickHouse
+    Given two ClickHouse 25.10 replicas sharing Keeper, both with user_defined_zookeeper_path at /clickhouse/user_defined
+    When the function store probe runs through one replica
+    Then the app functions are provisionable
+
+  @integration
+  Scenario: A function created on a real replicated ClickHouse reaches Keeper and every replica
+    Given two ClickHouse 25.10 replicas sharing Keeper, both with user_defined_zookeeper_path at /clickhouse/user_defined
+    When the catalogue's CREATE OR REPLACE FUNCTION for llm_readable_thread runs on the other replica
+    Then Keeper lists function_llm_readable_thread.sql under /clickhouse/user_defined
+    And the check after the create finds it on every replica
+
+  @integration
+  Scenario: A real replicated ClickHouse that refuses the cross-replica login still gets the functions
+    Given two ClickHouse 25.10 replicas sharing Keeper, both with user_defined_zookeeper_path at /clickhouse/user_defined
+    And their cluster carries the secret as the chart renders it, so clusterAllReplicas fails with AUTHENTICATION_FAILED
+    When the function store probe runs through one replica
+    Then the app functions are provisionable
+    And a function created on the other replica passes the check after the create on this server
+
+  @integration
+  Scenario: A function created through a replica on local disk is reported missing from the other replicas
+    Given two ClickHouse 25.10 replicas sharing Keeper, the second with no user_defined_zookeeper_path
+    When a function is created through the second replica
+    Then the check after the create reports it missing from the first replica and from Keeper
+    And the provisioning step fails with the stable code lwql_app_functions_split
+
+  @integration
+  Scenario: The probe refuses a real replicated ClickHouse where one replica keeps its functions on local disk
+    Given two ClickHouse 25.10 replicas sharing Keeper, the second with no user_defined_zookeeper_path
+    And the second replica holds a function the Keeper store lacks
+    When the function store probe runs
+    Then the app functions are not provisionable
+
+  @integration
+  Scenario: A replace through a replica on local disk that matched the store by name is caught after the create
+    Given two ClickHouse 25.10 replicas sharing Keeper, the second with no user_defined_zookeeper_path
+    And both replicas hold a function of the same name, the first through Keeper and the second on local disk
+    When the function store probe runs
+    Then the app functions are provisionable, since names alone cannot tell the stores apart
+    When CREATE OR REPLACE changes that function through the second replica
+    Then the check after the create reports that the replicas hold different definitions
+    And the next probe refuses the app functions rather than retrying the create
+
+  @unit
+  Scenario: A replicated server whose replicas hold one function with different definitions is not provisionable
+    Given two replicas that each hold a function of the same name, with different create_query text
+    And the Keeper store holds that function's entry
+    When the function store probe runs
+    Then the app functions are not provisionable, so the next deploy does not retry a create that would split again
 
   @unit
   Scenario: A single-node server is provisioned with the functions
