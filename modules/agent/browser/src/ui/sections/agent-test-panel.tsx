@@ -13,7 +13,8 @@ import {
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { explainAnyError } from "@langwatch/handled-error/presentation";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
-import { scenarioClient, ParameterLineField } from "@langwatch/scenario-client";
+import { scenarioClient } from "@langwatch/scenario-client";
+import { ParameterLineField } from "@langwatch/scenario-client/lent";
 import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
 import { Play } from "lucide-react";
 import { useState } from "react";

@@ -859,12 +859,6 @@ export {
   SSO_CONNECTION_AGGREGATE_TYPE,
   SSO_CONNECTION_PIPELINE_NAME,
 } from "./features/sso-connection/sso-connection-events.ts";
-export {
-  CONNECTION_REGISTERED_V1_EVENT_TYPE,
-  type ConnectionRegisteredV1PayloadSchema,
-  connectionRegisteredV1PayloadSchema,
-  registrationFromV1,
-} from "./features/sso-connection/sso-connection-registration-v1.ts";
 export * from "./features/signin/signin-callback.errors.ts";
 export {
   domainClaimRetryAfterSeconds,

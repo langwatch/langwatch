@@ -1,4 +1,4 @@
-import { MediaPart as LentMediaPart } from "@langwatch/scenario-client";
+import { MediaPart as LentMediaPart } from "@langwatch/scenario-client/lent";
 import type { MediaPartProps, MediaProbeResult } from "@langwatch/scenario-contract";
 import { useEffect, useState } from "react";
 

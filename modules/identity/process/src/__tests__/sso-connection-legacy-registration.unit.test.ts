@@ -5,9 +5,9 @@
  */
 import {
   CONNECTION_REGISTERED_EVENT_TYPE,
-  CONNECTION_REGISTERED_V1_EVENT_TYPE,
   SSO_CONNECTION_AGGREGATE_TYPE,
 } from "@langwatch/identity-contract";
+import { CONNECTION_REGISTERED_V1_EVENT_TYPE } from "@langwatch/identity-contract/sso-connection-registration-v1";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";

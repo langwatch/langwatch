@@ -17,9 +17,8 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", ".."
 /**
  * 1,540 with `pnpm ensure:built` (#8795) once ops imports system-migrations types only.
  * A ceiling, not a target. Lower it when earned; never raise it without saying why.
- * 1,562: main's legacy project key scopes (#8962) brought the graph to 1,561.
  */
-const CEILING = 1_562;
+const CEILING = 1_560;
 
 /** Every browser file that declares a module's typed procedures through `createModuleApi`. */
 function moduleApiDeclarations(): string[] {

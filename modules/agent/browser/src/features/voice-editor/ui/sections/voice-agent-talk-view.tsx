@@ -1,5 +1,5 @@
 import { Button, VStack } from "@langwatch/design-system/primitives";
-import { TalkToItPanel } from "@langwatch/scenario-client";
+import { TalkToItPanel } from "@langwatch/scenario-client/lent";
 import { ArrowLeft } from "lucide-react";
 
 import type { VoiceAgentEditor } from "../../behavior/use-voice-agent-editor.ts";

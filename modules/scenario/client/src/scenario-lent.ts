@@ -1,6 +1,5 @@
 /** Scenario UI lent by token to the modules that test an agent (§10.1). */
 
-import { lentComponent } from "@langwatch/browser-host/lent";
 import { uiTokens } from "@langwatch/module";
 import type { MediaPartProps, ScenarioParameterDefinition } from "@langwatch/scenario-contract";
 
@@ -30,8 +29,3 @@ export const TalkToItPanelToken =
   uiTokens("scenario").component<TalkToItPanelProps>("talkToItPanel");
 /** Scenario's media renderer, lent to the modules that show media parts (§10, §10.1). */
 export const MediaPartToken = uiTokens("scenario").component<MediaPartProps>("mediaPart");
-
-/** The tokens above as ready components: a borrower imports these and writes no wrapper (§10.1). */
-export const MediaPart = lentComponent(MediaPartToken);
-export const ParameterLineField = lentComponent(ParameterLineFieldToken);
-export const TalkToItPanel = lentComponent(TalkToItPanelToken);

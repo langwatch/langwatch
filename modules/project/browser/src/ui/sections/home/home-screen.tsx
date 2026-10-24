@@ -9,7 +9,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { UpgradeActionNeeded } from "@langwatch/ops-client";
-import { PendingJoinRequests } from "@langwatch/organization-client";
+import { PendingJoinRequests } from "@langwatch/organization-client/lent";
 import { projectEntryPath, projectNavigation } from "@langwatch/project-contract";
 import { useEffect } from "react";
 import { LuCalendarClock } from "react-icons/lu";

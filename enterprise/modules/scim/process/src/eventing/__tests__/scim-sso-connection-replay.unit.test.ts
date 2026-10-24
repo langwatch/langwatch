@@ -25,11 +25,13 @@ import { testEventSchema } from "@langwatch/eventing/testing";
 import {
   CONNECTION_ACTIVATED_EVENT_TYPE,
   CONNECTION_REGISTERED_EVENT_TYPE,
-  CONNECTION_REGISTERED_V1_EVENT_TYPE,
-  registrationFromV1,
   SSO_CONNECTION_AGGREGATE_TYPE,
   SSO_CONNECTION_PIPELINE_NAME,
 } from "@langwatch/identity-contract";
+import {
+  CONNECTION_REGISTERED_V1_EVENT_TYPE,
+  registrationFromV1,
+} from "@langwatch/identity-contract/sso-connection-registration-v1";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { bootInstalledProcess } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";

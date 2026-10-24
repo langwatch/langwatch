@@ -25,7 +25,7 @@ import {
 import { SettingsSection } from "@langwatch/design-system/settings-section";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { FrontendFlags, NOT_TARGETED } from "@langwatch/feature-flag-contract";
-import { ProjectDepartmentField } from "@langwatch/organization-client";
+import { ProjectDepartmentField } from "@langwatch/organization-client/lent";
 import isEqual from "lodash-es/isEqual";
 import { Building2, FolderCog, Lock } from "lucide-react";
 import { useState } from "react";

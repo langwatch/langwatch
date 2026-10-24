@@ -8,7 +8,8 @@ import {
 } from "@langwatch/annotation-client";
 import type { AnnotationFormState } from "@langwatch/annotation-contract";
 import { uiDeclarations, type UiDeclarations } from "@langwatch/browser-host/declarations";
-import { MediaPartToken, MediaPart as LentMediaPart } from "@langwatch/scenario-client";
+import { MediaPartToken } from "@langwatch/scenario-client";
+import { MediaPart as LentMediaPart } from "@langwatch/scenario-client/lent";
 import type { MediaPartProps } from "@langwatch/scenario-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";

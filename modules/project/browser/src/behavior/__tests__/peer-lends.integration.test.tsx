@@ -8,9 +8,8 @@ import { UpgradeActionNeededToken, UpgradeActionNeeded } from "@langwatch/ops-cl
 import {
   PendingJoinRequestsToken,
   ProjectDepartmentFieldToken,
-  PendingJoinRequests,
-  ProjectDepartmentField,
 } from "@langwatch/organization-client";
+import { PendingJoinRequests, ProjectDepartmentField } from "@langwatch/organization-client/lent";
 import { AgentActionsMenuToken, AgentActionsMenu } from "@langwatch/trace-client";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
