@@ -1,5 +1,3 @@
-import { DocsSessionError } from "../../session/model/token-provider.ts";
-
 export type Outcome =
   | { kind: "idle" }
   | { kind: "sending" }
@@ -14,15 +12,7 @@ export type Outcome =
     }
   | { kind: "error"; message: string; retry: boolean };
 
-export function requestErrorOutcome({
-  error,
-  signal,
-}: {
-  error: unknown;
-  signal: AbortSignal;
-}): Outcome {
-  if (error instanceof DocsSessionError)
-    return { kind: "error", message: error.message, retry: false };
+export function requestErrorOutcome({ signal }: { signal: AbortSignal }): Outcome {
   if (signal.aborted)
     return {
       kind: "error",

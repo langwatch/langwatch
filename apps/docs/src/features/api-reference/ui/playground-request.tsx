@@ -14,9 +14,6 @@ import { Eye, EyeOff } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 
-import type { SessionView } from "../../session/model/session-controller.ts";
-import { SessionSlot } from "../../session/ui/session-slot.tsx";
-import { useDocsSession } from "../../session/ui/use-docs-session.ts";
 import type { RequestState } from "../model/codegen.ts";
 import { liveRequest, paramKey } from "../model/codegen.ts";
 import type { Operation, Parameter, Scheme } from "../model/operation.ts";
@@ -212,7 +209,6 @@ function AuthField({
 }
 function SendActions({
   outcome,
-  unavailable,
   mutating,
   jsonOnly,
   host,
@@ -220,7 +216,6 @@ function SendActions({
   onCancel,
 }: {
   outcome: Outcome;
-  unavailable: boolean;
   mutating: boolean;
   jsonOnly: boolean;
   host: string;
@@ -246,7 +241,7 @@ function SendActions({
             bg="fg"
             color="fg.inverted"
             _hover={{ bg: "docs.body" }}
-            disabled={unavailable || outcome.kind === "sending"}
+            disabled={outcome.kind === "sending"}
             id="pg-send"
             onClick={onSend}
           >
@@ -403,7 +398,6 @@ export function PlaygroundRequest({
   const [outcome, setOutcome] = useState<Outcome>({ kind: "idle" });
   const [key, setKey] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const session = useDocsSession();
   const controller = useRef<AbortController | null>(null);
   const formRef = useRef<HTMLDivElement>(null);
   const { tryOpen, setTryOpen } = useEndpointState();
@@ -413,13 +407,6 @@ export function PlaygroundRequest({
   const mutating = operation.method !== "GET";
   const host = operation.origin.replace(/^https?:\/\//, "");
   useEffect(() => () => controller.current?.abort(), []);
-
-  useEffect(() => {
-    if (session.selected && session.view.kind !== "ready") {
-      controller.current?.abort();
-      setOutcome({ kind: "idle" });
-    }
-  }, [session.selected, session.view.kind]);
 
   useEffect(() => {
     if (!tryOpen) return;
@@ -433,7 +420,7 @@ export function PlaygroundRequest({
   };
 
   const send = async () => {
-    const nextErrors = validateRequest({ operation, state, key, hasSession: session.selected });
+    const nextErrors = validateRequest({ operation, state, key });
     setErrors(nextErrors);
     const [first] = Object.keys(nextErrors);
     if (first !== undefined) {
@@ -448,15 +435,12 @@ export function PlaygroundRequest({
     setOutcome({ kind: "sending" });
     const started = performance.now();
     try {
-      const response =
-        session.selected && session.controller
-          ? await session.controller.send({ operation, state, signal: abort.signal })
-          : await fetch(request.url, {
-              method: operation.method,
-              headers: request.headers,
-              body: request.body,
-              signal: abort.signal,
-            });
+      const response = await fetch(request.url, {
+        method: operation.method,
+        headers: request.headers,
+        body: request.body,
+        signal: abort.signal,
+      });
       const text = await response.text();
       if (abort.signal.aborted) return;
       setOutcome({
@@ -468,8 +452,8 @@ export function PlaygroundRequest({
         body: text,
         headers: [...response.headers.entries()],
       });
-    } catch (error) {
-      setOutcome(requestErrorOutcome({ error, signal: abort.signal }));
+    } catch {
+      setOutcome(requestErrorOutcome({ signal: abort.signal }));
     } finally {
       window.clearTimeout(timeout);
     }
@@ -504,27 +488,7 @@ export function PlaygroundRequest({
             <Text margin="0" fontSize="12px" color="fg.muted">
               {host}
             </Text>
-            <PlaygroundAuthentication
-              scheme={scheme}
-              value={key}
-              error={errors.auth}
-              enabled={Boolean(session.controller)}
-              selected={session.selected}
-              view={session.view}
-              onKeyChange={setKey}
-              onConnect={() => {
-                controller.current?.abort();
-                setKey("");
-                setErrors({});
-                setOutcome({ kind: "idle" });
-                void session.connect();
-              }}
-              onDisconnect={() => {
-                controller.current?.abort();
-                setOutcome({ kind: "idle" });
-                void session.disconnect();
-              }}
-            />
+            <AuthField scheme={scheme} value={key} error={errors.auth} onChange={setKey} />
 
             <ParameterFields
               parameters={operation.parameters}
@@ -546,8 +510,7 @@ export function PlaygroundRequest({
 
             <SendActions
               outcome={outcome}
-              unavailable={session.selected && session.view.kind !== "ready"}
-              mutating={mutating && !session.selected}
+              mutating={mutating}
               jsonOnly={jsonOnly}
               host={host}
               onSend={send}
@@ -563,44 +526,6 @@ export function PlaygroundRequest({
             <ResponseArea outcome={outcome} onRetry={send} curl={curl} />
           </Box>
         </Panel>
-      ) : null}
-    </>
-  );
-}
-
-function PlaygroundAuthentication({
-  scheme,
-  value,
-  error,
-  enabled,
-  selected,
-  view,
-  onKeyChange,
-  onConnect,
-  onDisconnect,
-}: {
-  scheme?: Scheme;
-  value: string;
-  error?: string;
-  enabled: boolean;
-  selected: boolean;
-  view: SessionView;
-  onKeyChange: (value: string) => void;
-  onConnect: () => void;
-  onDisconnect: () => void;
-}) {
-  return (
-    <>
-      {enabled && scheme ? (
-        <SessionSlot
-          view={view}
-          selected={selected}
-          onConnect={onConnect}
-          onDisconnect={onDisconnect}
-        />
-      ) : null}
-      {!selected ? (
-        <AuthField scheme={scheme} value={value} error={error} onChange={onKeyChange} />
       ) : null}
     </>
   );

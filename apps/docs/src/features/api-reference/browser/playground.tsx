@@ -1,11 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { createRoot } from "react-dom/client";
 import type { Root } from "react-dom/client";
 import { z } from "zod/mini";
 
-import { SessionViewContent } from "../../session/browser/session-view.tsx";
-import { useDocsSession } from "../../session/ui/use-docs-session.ts";
 import { generateExample, liveRequest } from "../model/codegen.ts";
 import { operationSchema } from "../model/operation-schema.ts";
 import type { Operation } from "../model/operation.ts";
@@ -23,11 +20,8 @@ import {
 import { ResponseView } from "./response-view.tsx";
 
 function PlaygroundRuntime({ operation }: { operation: Operation }) {
-  const session = useDocsSession();
   const [outcome, setOutcome] = useState<Outcome>({ kind: "idle" });
   const pending = useRef<AbortController | null>(null);
-  const slot = document.querySelector("[data-docs-session]");
-  const manualAuth = useRef(document.getElementById("pg-auth")?.closest("details") ?? null);
   useEffect(
     () => () => {
       pending.current?.abort();
@@ -38,7 +32,7 @@ function PlaygroundRuntime({ operation }: { operation: Operation }) {
   const send = async () => {
     const state = requestState({ operation });
     const key = fieldValue({ id: "pg-auth" });
-    const errors = validateRequest({ operation, state, key, hasSession: session.selected });
+    const errors = validateRequest({ operation, state, key });
     showErrors({ errors });
     if (Object.keys(errors).length) return;
     const request = liveRequest({ operation, state, key });
@@ -49,18 +43,15 @@ function PlaygroundRuntime({ operation }: { operation: Operation }) {
     const started = performance.now();
     setOutcome({ kind: "sending" });
     try {
-      const response =
-        session.selected && session.controller
-          ? await session.controller.send({ operation, state, signal: abort.signal })
-          : await fetch(request.url, {
-              method: operation.method,
-              headers: request.headers,
-              body: request.body,
-              signal: abort.signal,
-              credentials: "omit",
-              redirect: "error",
-              cache: "no-store",
-            });
+      const response = await fetch(request.url, {
+        method: operation.method,
+        headers: request.headers,
+        body: request.body,
+        signal: abort.signal,
+        credentials: "omit",
+        redirect: "error",
+        cache: "no-store",
+      });
       const body = await response.text();
       if (abort.signal.aborted) return;
       setOutcome({
@@ -72,60 +63,26 @@ function PlaygroundRuntime({ operation }: { operation: Operation }) {
         body,
         headers: [...response.headers.entries()],
       });
-    } catch (error) {
-      if (pending.current === abort)
-        setOutcome(requestErrorOutcome({ error, signal: abort.signal }));
+    } catch {
+      if (pending.current === abort) setOutcome(requestErrorOutcome({ signal: abort.signal }));
     } finally {
       window.clearTimeout(timer);
     }
   };
   useEffect(() => {
-    if (session.selected) manualAuth.current?.remove();
-    else if (manualAuth.current && slot) slot.insertAdjacentElement("afterend", manualAuth.current);
     const button = document.getElementById("pg-send");
-    if (button instanceof HTMLButtonElement)
-      button.disabled =
-        outcome.kind === "sending" || (session.selected && session.view.kind !== "ready");
-    if (session.selected && session.view.kind !== "ready") {
-      pending.current?.abort();
-      setOutcome({ kind: "idle" });
-    }
-  }, [session.selected, session.view.kind, outcome.kind, slot]);
+    if (button instanceof HTMLButtonElement) button.disabled = outcome.kind === "sending";
+  }, [outcome.kind]);
   useEffect(() => {
     return bindRequestForm({ operation, onSend: send });
   });
-  const connect = () => {
-    pending.current?.abort();
-    editManualKey({ action: "Clear" });
-    showErrors({ errors: {} });
-    setOutcome({ kind: "idle" });
-    void session.connect();
-  };
-  const disconnect = () => {
-    pending.current?.abort();
-    setOutcome({ kind: "idle" });
-    void session.disconnect();
-  };
   return (
-    <>
-      {slot && session.controller
-        ? createPortal(
-            <SessionViewContent
-              view={session.view}
-              selected={session.selected}
-              connect={connect}
-              disconnect={disconnect}
-            />,
-            slot,
-          )
-        : null}
-      <ResponseView
-        outcome={outcome}
-        retry={() => void send()}
-        cancel={() => pending.current?.abort("cancel")}
-        curl={generateExample({ operation, state: requestState({ operation }), language: "curl" })}
-      />
-    </>
+    <ResponseView
+      outcome={outcome}
+      retry={() => void send()}
+      cancel={() => pending.current?.abort("cancel")}
+      curl={generateExample({ operation, state: requestState({ operation }), language: "curl" })}
+    />
   );
 }
 
@@ -138,7 +95,6 @@ function activate() {
     const container = document.createElement("div");
     container.dataset.docsRuntime = "";
     document.querySelector("[data-docs-playground]")?.append(container);
-    document.querySelector("[data-docs-session]")?.replaceChildren();
     root = createRoot(container);
     root.render(<PlaygroundRuntime operation={data.operation} />);
   }

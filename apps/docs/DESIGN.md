@@ -33,7 +33,7 @@ and contents tracking. They enhance the existing semantic HTML. Search and the
 API playground mount isolated React roots only on explicit interaction. Their
 API elements use extracted design-system variables; static control markup is
 not recreated in the browser. The API uses the existing request generator,
-validation and session-provider seam. No automatic request is sent on mount.
+and validation. No automatic request is sent on mount.
 Navigation disposes the API root, aborts pending work and clears credentials.
 
 Stateful islands run on `preact/compat` in the browser build, about a tenth of
@@ -100,7 +100,7 @@ request. `test:layout` checks 1280/1440/1670/390 widths in both themes, and touc
 360/390/768: no sideways scroll, text at least 11px (article text 16px), and a 44px target on
 every control outside running text. On a coarse pointer an invisible layer centred on each small
 control grows its hit area to 44px without changing how it looks, and the announcement strips
-grow to 44px tall. Existing smoke and mock-session tests continue to cover the interactive surface.
+grow to 44px tall. Existing smoke tests continue to cover the interactive surface.
 
 `test:audit` reads a `/docs` build (`build --base-path /docs`; it refuses a build made for another
 mount) and runs Lighthouse with the default mobile emulation and throttling and the desktop

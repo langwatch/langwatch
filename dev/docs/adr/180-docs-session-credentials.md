@@ -126,10 +126,7 @@ operator consent and browser network reachability; it is not enabled by default.
 Langy gets a separately approved capability/audience and consent prompt later;
 the trace preset must not silently grow into agent execution or write access.
 
-## Implemented docs seam
+## Docs prototype
 
-The default flag is off. `VITE_DOCS_SESSION_AUTH=mock` exposes the provider slot,
-connection, expiry and disconnect states with a demo project and simulated trace
-response. The mock credential lasts one minute and cannot authorise a real API
-request. No popup adapter, message listener or real server operation is implemented.
-See [docs feature scenarios](../../../apps/docs/specs/shared-auth.feature).
+The mock session prototype was removed from the docs site while the feature is
+switched off; it returns with the feature, together with its scenarios and tests.

@@ -26,7 +26,7 @@ const fingerprint = renderCache
       appRoot,
       docsRoot,
       outDir,
-      /* The public VITE_ settings (such as the session mode) a client build inlines. */
+      /* The public VITE_ settings a client build inlines. */
       options: { basePath, environment: loadEnv("production", appRoot, "VITE_") },
     })
   : null;

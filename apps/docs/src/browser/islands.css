@@ -96,33 +96,6 @@
 .docs-button-ghost {
   border-color: transparent;
 }
-.docs-session-title {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 600;
-}
-.docs-session-description {
-  font-size: 13px;
-  line-height: 22px;
-  color: var(--chakra-colors-docs-lede);
-  margin: 4px 0 12px;
-}
-.docs-session-status {
-  display: block;
-  font-size: 13px;
-  line-height: 22px;
-}
-.docs-session-status[data-selected="true"] {
-  margin-bottom: 12px;
-}
-.docs-session-status :is(strong, span) {
-  display: block;
-}
-.docs-session-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
 .docs-response-panel {
   border: 1px solid var(--chakra-colors-border);
   border-radius: var(--chakra-radii-showcase);

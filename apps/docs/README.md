@@ -111,7 +111,7 @@ Stop either local server with Ctrl+C.
 ## Source ownership
 
 `src/app/` composes pages, theme and the reading shell. `src/features/` owns
-content, code, navigation, API reference, discovery, search, releases, session
+content, code, navigation, API reference, discovery, search, releases
 and shell behavior. A feature uses `compile/` for Node build work, `model/` for
 portable values, `ui/` for React and `browser/` for client enhancements as needed.
 There is no module installer or dependency injection pipeline.
@@ -228,50 +228,6 @@ videos as AV1 WebM and H.264 MP4 with a WebP poster (ffmpeg, cached in
 their names, with a short cache lifetime. These are hosting requirements, not cloud
 configuration emitted by the compiler. The existing Mintlify release workflow
 and DNS cutover remain separate decisions.
-
-## Shared session prototype
-
-[ADR-180](../../dev/docs/adr/180-docs-session-credentials.md) is a draft requiring
-product-owner approval. No app endpoint, credential mint, popup exchange or
-production session adapter is implemented. The default build has no session
-control. Manual API-key entry continues to work as before.
-
-Set `VITE_DOCS_SESSION_AUTH=mock` at build or dev startup to expose **Use my
-LangWatch session** in the API playground. Only `off` (the default) and `mock`
-are accepted. This is public build configuration, never a secret. The demo uses
-one fixed project and one-minute credentials held only in memory. It simulates
-`GET /api/v1/traces/{traceId}` locally, refuses other scopes and never sends the
-mock credential to a network endpoint. Connection clears manual-key input;
-expiry, disconnect and leaving the page clear session access. Switching back to
-a manual key is explicit. Examples and copied code keep environment placeholders.
-
-The docs-local `DocsTokenProvider` interface in `src/features/session/model/token-provider.ts`
-separates acquisition and revocation from the playground. The controller validates
-provider responses, rejects late connections and enforces expiry and scope. A
-future app adapter requires approval and additional origin/source/state checks;
-setting a flag cannot enable an unimplemented live provider. The mock does not
-sign anyone into or out of their real LangWatch account.
-
-```sh
-VITE_DOCS_SESSION_AUTH=mock pnpm --filter @langwatch/docs-site dev
-VITE_DOCS_SESSION_AUTH=mock pnpm --filter @langwatch/docs-site build --out-dir "$TMPDIR/docs-session-dist"
-```
-
-For a haven review in this worktree:
-
-```sh
-VITE_DOCS_SESSION_AUTH=mock .bin/haven/haven up --only docs --agent -d
-.bin/haven/haven browser open https://app.feat-docs-site.langwatch.localhost:1355/docs/api-reference/traces/get-trace --lane docs
-.bin/haven/haven browser close --lane docs
-.bin/haven/haven down
-```
-
-Restart dev without the flag to hide the prototype. Production CI never sets it.
-The session smoke runner requires a mock-enabled build and checks both themes
-at 1440 and 390 pixels, including expiry, disconnect, clipboard redaction and
-zero API calls. Unit tests cover the default flag, cancelled acquisition, invalid
-credentials and restricted operations. Real popup, CSRF, CORS, server revocation
-and self-hosted behaviour remain proposed scenarios, explicitly unimplemented.
 
 ## Static-first performance
 

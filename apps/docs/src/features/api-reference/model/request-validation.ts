@@ -6,12 +6,10 @@ export function validateRequest({
   operation,
   state,
   key,
-  hasSession,
 }: {
   operation: Operation;
   state: RequestState;
   key: string;
-  hasSession: boolean;
 }) {
   const { values, body } = state;
   const required = operation.parameters.filter((param) => param.required);
@@ -21,7 +19,7 @@ export function validateRequest({
     if (!values[paramKey({ location: param.in, name: param.name })]?.trim())
       nextErrors[paramKey({ location: param.in, name: param.name })] = `${param.name} is required.`;
   }
-  if (scheme && !key.trim() && !hasSession) nextErrors.auth = "Enter an API key.";
+  if (scheme && !key.trim()) nextErrors.auth = "Enter an API key.";
   if (operation.body?.required && !body.trim()) nextErrors.body = "Enter a request body.";
   if (body.trim()) {
     try {

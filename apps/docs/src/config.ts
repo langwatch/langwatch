@@ -1,6 +1,5 @@
 /* The one seam over Vite's build-time env; optional so plain Node (the compiler) can import it. */
 export const isProduction = import.meta.env?.PROD ?? false;
-export const docsSessionMode = import.meta.env?.VITE_DOCS_SESSION_AUTH;
 /* createViteConfig defines the build's base path as a constant, so a root build folds it away. */
 declare const __DOCS_BASE_PATH__: string | undefined;
 /** "" at the production root or "/docs" under a prefix; "" in plain Node. */
