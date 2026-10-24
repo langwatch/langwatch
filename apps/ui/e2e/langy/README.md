@@ -409,6 +409,63 @@ Each file's header links here rather than repeating its narrative.
   the wording is pinned and the number is read from this machine rather than
   hard-coded to a version that only holds until Homebrew moves.
 
+## Dashboards and Insights helpers (issue 8573)
+
+The building blocks for the Dashboards and Insights suite. Each scenario checks
+the saved board and the numbers with code first, then the reply with a judge.
+
+- `cost-meter.ts`: `createCostMeter()` wraps the simulator and judge models
+  (`meter.wrap(model, "judge")`) in an AI SDK middleware that counts tokens per
+  role. `meter.watchLangy({ organizationId })` adds Langy's own spend: its
+  per-project "Langy" gateway key lives in the project's organization, and the
+  meter reads `gatewayUsage.summary` before and after the run (dollars and
+  requests; the summary carries no tokens). Pass `cost: meter` to
+  `runScenarioAndLog` and the transcript gets one `**Cost:**` line.
+- `dashboards-fixture.ts`: `seedDashboardsProject({ label })` signs a fresh
+  account up and points the whole process at a new organization and project
+  (`seed-organization.ts` and `seed-provider.ts`, shared with the guided fixture), including the key
+  `langwatch-api.ts` sends (`useApiKey`). One project per file. `createBoard`
+  and `addWidget` go through `POST /api/dashboards` and the widget routes. It
+  attaches no model provider; `setupWorld` below does.
+- `traffic-pattern.ts` plans now-relative traffic in the last full UTC day and
+  the day before, UTC midnight to midnight, the windows the daily insights run
+  reads (`dailyRunWindows` in `modules/insight`) only while it also uses UTC: a flat baseline per hour, an
+  optional spike hour, optional injected text on the last day.
+  `expectedTotals(plan)` is what a correct chart or finding reports.
+  `seedTraffic({ plan })` in `langwatch-api.ts` sends it and waits until every
+  trace is queryable.
+- `board-state.ts`: `readBoard` lists a dashboard's widgets and saved charts,
+  `diffBoards` compares two reads by id, and `runBoardQueries` runs every
+  item's statement through `POST /api/v1/query` over a time window.
+- `dashboards-world.ts` follows `docs/agent-testing/check-the-world.mdx`.
+  `setupWorld({ label, params })` builds the case from one parameters object
+  (role, traces per day, days, board and decoy names): the project, the
+  OpenAI provider as Langy's model (`attachProvider`), the traffic, the board
+  and a decoy board with one widget of its own. The scenario's description
+  and criteria interpolate the same object. `reportWorldStateEachTurn` wraps
+  the adapter so a `world state` tool span is emitted when a conversation
+  starts and after every turn, with five flat facts the judge reads in the
+  trace: `widgets_on_board`, `project_widget_count`, `decoy_widgets`,
+  `chart_total` (the newest board item's count over the seeded days) and
+  `chart_days` (how many rows that count comes in, one per day for a per-day
+  chart). Each seeded trace carries two model calls, so only a trace count
+  lands on the seeded total. A
+  saved chart counts as a widget. After the run, the test reads the world
+  again and asserts the same conditions in code.
+
+`langy-dashboards.scenario.test.ts` holds D1: one chart on the attached board,
+none on the decoy. Results go to the scenario set `langy-dashboards-insights`.
+The scenario library sends its results and the harness's spans (the world
+state span included) where `LANGWATCH_ENDPOINT` and `LANGWATCH_API_KEY` point.
+A run's own `langwatch` option moves the results alone, while the spans stay
+where the first run's environment sent them, so the suite moves both through
+the environment. By default both land on the seeded local project. Set
+`LANGY_REPORT_API_KEY` together with `LANGY_REPORT_ENDPOINT` (required with
+it, no default) to send both to a stable project instead, while
+Langy still runs on the local stack. Without a real OpenAI key,
+`OPENAI_API_KEY` may be a LangWatch gateway virtual key with `OPENAI_BASE_URL`
+set to its gateway; the harness and the seeded provider both use it.
+
 ## Red team
 
 `langy-redteam.scenario.test.ts` uses `@langwatch/scenario`'s `redTeamCrescendo()`
@@ -1097,7 +1154,7 @@ all address the new project without being told. See
   it and send the kickoff first. The scenario library reports every
   simulation to the platform, and the folder fixture's demo application
   needs a key too — both take the same user key bound to this project.
-- **`attachProvider`**: the provider the takeover connects — its row at
+- **`attachProvider`** (in `seed-provider.ts`; it forwards `OPENAI_BASE_URL` only when a caller passes `openaiBaseUrl`, which `dashboards-world.ts` does): the provider the takeover connects — its row at
   organization scope with the checkout's own credentials, then the Langy
   role pointed at it, then the organization's guided state told about it
   (`useGuidedProviderConnect`). Everything that is not Langy runs on the
@@ -1163,9 +1220,9 @@ Drives Langy through the REAL product surface: the same
 `langy.onTurnStream` SSE subscription the browser panel uses
 (`modules/langy/browser/src/features/langy/behavior/logic/langy-chat-transport.ts`).
 Authenticates once as the seeded local-dev admin, reuses the session
-cookie. Wire format is plain JSON (POST body `input`, response
-`{"result":{"data": output}}`, SSE frames `data: entry`); the old
-`{"json": ...}` envelope is refused with `client_outdated`.
+cookie. Wire format is plain JSON with no transformer envelope (POST body
+`input`, response `{"result":{"data": output}}`, SSE frames `data: entry`);
+the server refuses the old `{"json": input}` envelope as `client_outdated`.
 
 - `trpcMutateWithTurnLockRetry`'s 15s×8 retry budget on
   `langy_turn_in_progress`: that code fires from two checks in
@@ -1327,8 +1384,8 @@ act as a signed-in user rather than as an API key.
   `experiments.getEvaluationsV3BySlug` and `POST /api/experiments/execute`;
   `X-Auth-Token` (`workbench-rest.ts`) carries the `/workbench-state` and
   runs/experiments REST surface; `POST /api/v1/langy/ui/actions` uses the agent
-  worker's own session key, never the suite's. Wire format is plain JSON
-  (`input` in, `{"result":{"data": output}}` out).
+  worker's own session key, never the suite's. The tRPC wire is plain JSON
+  (see "langy-agent.ts").
 - `signInOnce`: a loaded stack answers the sign-in in tens of seconds,
   and the whole run is lost if this one call gives up, so it allows a
   minute and tries again twice before failing the seed. Every vitest run

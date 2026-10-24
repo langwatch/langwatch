@@ -3,10 +3,12 @@
 // project API key, so a passing call here proves the entity actually
 // landed in the backend regardless of what Langy claimed.
 
-import { LANGWATCH_API_KEY, LW_BASE_URL } from "./config";
+import { randomUUID } from "node:crypto";
+
+import { API_CREDENTIALS, LW_BASE_URL } from "./config";
+import { type PlannedTrace, planTraffic, type TrafficPlan } from "./traffic-pattern";
 
 const LW_BASE = LW_BASE_URL;
-const LW_KEY = LANGWATCH_API_KEY;
 
 /** How long seeded traces get to become queryable before the suite gives up. */
 const INGESTION_VISIBILITY_TIMEOUT_MS = 60_000;
@@ -50,16 +52,18 @@ async function lwFetch({ path, init }: { path: string; init: RequestInit }): Pro
   throw lastError;
 }
 
-async function lwGet(path: string): Promise<any> {
-  return lwFetch({ path, init: { headers: { "X-Auth-Token": LW_KEY } } });
+/** A GET with the current project key, retried on a stall, throwing on an error status. */
+export async function lwGet(path: string): Promise<any> {
+  return lwFetch({ path, init: { headers: { "X-Auth-Token": API_CREDENTIALS.KEY } } });
 }
 
-async function lwPost({ path, body }: { path: string; body: unknown }): Promise<any> {
+/** A JSON POST with the current project key, under the same retry as `lwGet`. */
+export async function lwPost({ path, body }: { path: string; body: unknown }): Promise<any> {
   return lwFetch({
     path,
     init: {
       method: "POST",
-      headers: { "X-Auth-Token": LW_KEY, "Content-Type": "application/json" },
+      headers: { "X-Auth-Token": API_CREDENTIALS.KEY, "Content-Type": "application/json" },
       body: JSON.stringify(body),
     },
   });
@@ -126,7 +130,7 @@ export async function ensureEvaluator({
 export async function deleteEvaluator(id: string): Promise<void> {
   const response = await fetch(`${LW_BASE}/api/evaluators/${id}`, {
     method: "DELETE",
-    headers: { "X-Auth-Token": LW_KEY },
+    headers: { "X-Auth-Token": API_CREDENTIALS.KEY },
     signal: AbortSignal.timeout(15_000),
   });
   if (response.ok || response.status === 404) return;
@@ -242,7 +246,7 @@ export async function getMonitor(
 export async function deleteMonitor(id: string): Promise<void> {
   const response = await fetch(`${LW_BASE}/api/monitors/${id}`, {
     method: "DELETE",
-    headers: { "X-Auth-Token": LW_KEY },
+    headers: { "X-Auth-Token": API_CREDENTIALS.KEY },
     signal: AbortSignal.timeout(15_000),
   });
   if (response.ok || response.status === 404) return;
@@ -357,33 +361,121 @@ export async function seedApplicationTraces(count = 8): Promise<void> {
     });
   });
   await Promise.all(posts);
+  await waitUntilQueryable({ traceIds, timeoutMs: INGESTION_VISIBILITY_TIMEOUT_MS });
+}
 
-  await awaitTracesQueryable({ traceIds, what: "Seeded traces" });
+/** Requests in flight at once while seeding and polling, so a loaded stack is not flooded. */
+const SEED_CONCURRENCY = 16;
+
+/** A pattern takes two days of traffic, so it gets longer than a handful of traces to land. */
+const PATTERN_VISIBILITY_TIMEOUT_MS = 150_000;
+
+/**
+ * Seeds a planned two-day pattern (traffic-pattern.ts) into the current project
+ * and waits until every trace is queryable. Returns what was sent, so a
+ * scenario asserts against the plan rather than against what it reads back.
+ */
+export async function seedTraffic({
+  plan,
+  now = Date.now(),
+}: {
+  plan: TrafficPlan;
+  now?: number;
+}): Promise<PlannedTrace[]> {
+  const traces = planTraffic({
+    now,
+    plan,
+    runId: `${now.toString(36)}${randomUUID().slice(0, 8)}`,
+  });
+  await inBatches(traces, (trace) =>
+    lwPost({
+      path: "/api/collector",
+      body: {
+        spans: modelCallsOf(trace),
+        metadata: { labels: ["e2e-seed"] },
+      },
+    }),
+  );
+  await waitUntilQueryable({
+    traceIds: traces.map((trace) => trace.traceId),
+    timeoutMs: PATTERN_VISIBILITY_TIMEOUT_MS,
+  });
+  return traces;
+}
+
+/** A trace's two model calls, splitting its duration: a lookup, then the answer. */
+function modelCallsOf(trace: PlannedTrace) {
+  const half = Math.floor(trace.durationMs / 2);
+  const [lookup, answer] = trace.spanIds;
+  const call = ({
+    spanId,
+    start,
+    end,
+    output,
+  }: {
+    spanId: string;
+    start: number;
+    end: number;
+    output: string;
+  }) => ({
+    trace_id: trace.traceId,
+    span_id: spanId,
+    type: "llm",
+    model: "gpt-5-mini",
+    input: { type: "text", value: trace.input },
+    output: { type: "text", value: output },
+    timestamps: { started_at: start, finished_at: end },
+  });
+  return [
+    call({
+      spanId: lookup,
+      start: trace.startedAt,
+      end: trace.startedAt + half,
+      output: "Looking up the order.",
+    }),
+    call({
+      spanId: answer,
+      start: trace.startedAt + half,
+      end: trace.startedAt + trace.durationMs,
+      output: trace.output,
+    }),
+  ];
+}
+
+async function inBatches<T, R>(items: readonly T[], run: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = [];
+  for (let i = 0; i < items.length; i += SEED_CONCURRENCY) {
+    results.push(...(await Promise.all(items.slice(i, i + SEED_CONCURRENCY).map(run))));
+  }
+  return results;
 }
 
 /**
- * Polls every id, not a first/last bracket: posts go out concurrently, so a
- * middle trace can still be missing while both ends are queryable.
+ * Polls every seeded id, not a first/last bracket: the posts go out
+ * concurrently, so both ends can be queryable while one in the middle is
+ * still missing, and a data scenario would grade a short batch as truth.
  */
-async function awaitTracesQueryable({
+async function waitUntilQueryable({
   traceIds,
-  what,
+  timeoutMs,
 }: {
-  traceIds: string[];
-  what: string;
+  traceIds: readonly string[];
+  timeoutMs: number;
 }): Promise<void> {
-  const deadline = Date.now() + INGESTION_VISIBILITY_TIMEOUT_MS;
+  let pending = [...traceIds];
+  const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    const visible = await Promise.all(traceIds.map(traceExists));
-    if (visible.every(Boolean)) return;
+    const visible = await inBatches(pending, traceExists);
+    pending = pending.filter((_, i) => !visible[i]);
+    if (pending.length === 0) return;
     await new Promise((resolve) => setTimeout(resolve, 1_000));
   }
 
   throw new Error(
-    `${what} were still not queryable after ${
-      INGESTION_VISIBILITY_TIMEOUT_MS / 1_000
-    }s. This is ingestion lag in the environment, NOT a Langy defect: the ` +
-      "scenarios would have graded an empty index as a wrong answer.",
+    `${pending.length} of ${traceIds.length} seeded traces were still not queryable after ${
+      timeoutMs / 1_000
+    }s. This is ingestion lag in the environment, NOT a Langy defect; the ` +
+      "data scenarios would have graded an empty index as a wrong answer.",
   );
 }
 
@@ -426,5 +518,5 @@ export async function seedStaleTraces({
     }),
   );
 
-  await awaitTracesQueryable({ traceIds, what: `Stale traces labelled ${label}` });
+  await waitUntilQueryable({ traceIds, timeoutMs: INGESTION_VISIBILITY_TIMEOUT_MS });
 }
