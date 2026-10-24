@@ -93,6 +93,7 @@ const SPECS_ROOTS = [
   ...discoverPackageSpecRoots(resolve(REPO_ROOT, "packages")),
   ...discoverPackageSpecRoots(resolve(REPO_ROOT, "modules")),
   ...discoverPackageSpecRoots(resolve(REPO_ROOT, "enterprise")),
+  ...discoverPackageSpecRoots(resolve(REPO_ROOT, "apps")),
   resolve(REPO_ROOT, "sdks/typescript/specs"),
 ] as const;
 
@@ -267,6 +268,8 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // The CLI half of the same tool: the verdict-to-exit-code step is the part
   // CI gates on, so the "check fails" / "check passes" scenarios bind here.
   "cmd/linkcheck",
+  // The docs structure check loads pages from disk; which files count as pages binds here.
+  "tools/docscheck",
   // The mono-binary's own dispatch, including the combined Go development
   // process (`service combined`). Which services it hosts, what telemetry
   // identity each keeps and which address variable each binds are asserted

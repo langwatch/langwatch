@@ -1,0 +1,321 @@
+# Always-run workflow with internal path gating and one aggregator (see #3223).
+# Branch protection can require `docs-site-complete` as a single check: it
+# runs on every event, and passes when the docs jobs passed or were skipped
+# because nothing they cover changed.
+#
+# Shape: `changes` gates; `verify` (typecheck, unit tests) and `build` (the
+# site at the root and under /docs, uploaded once) run in parallel; the
+# browser and link checks, and the audit, download the build instead of
+# rebuilding it.
+name: docs-site
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    # ready_for_review is not a default activity type; without it taking a PR
+    # out of draft fires no event at all.
+    types: [opened, synchronize, reopened, ready_for_review]
+  merge_group:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-site-${{ github.ref }}
+  # Never on main: every merged commit keeps its own audit run.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      relevant: ${{ steps.detect.outputs.relevant }}
+      docs-image: ${{ steps.detect.outputs.docs-image }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          sparse-checkout: .github
+      - uses: ./.github/actions/detect-changes
+        id: detect
+        with:
+          filters: |
+            relevant:
+              - 'docs/**'
+              - 'apps/docs/**'
+              - 'packages/design-system/**'
+              - 'packages/time/**'
+              - 'CHANGELOG.md'
+              - '.gitattributes'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - '.github/workflows/docs-site.yml'
+              - 'infra/docker/Dockerfile.docs'
+              - '.dockerignore'
+              - '.github/actions/setup-pnpm-node/**'
+              - '.github/actions/nx-cache/**'
+              - '.github/actions/detect-changes/**'
+            docs-image:
+              - 'infra/docker/Dockerfile.docs'
+              - '.dockerignore'
+              - '.github/workflows/publish-docker-ecr.yml'
+
+  verify:
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-pnpm-node
+        with:
+          install: "@langwatch/docs-site... @langwatch/workspace"
+      # The typecheck's references reach observability, which imports the built
+      # SDK, so build it first (the workspace root install brings Nx).
+      - uses: ./.github/actions/nx-cache
+        with:
+          suffix: docs-site
+      - name: Build the TypeScript SDK
+        run: pnpm exec nx run langwatch:build --outputStyle=static
+      - name: Typecheck the docs app
+        run: pnpm --filter @langwatch/docs-site typecheck
+      - name: Test docs generation and local routing
+        run: VITEST_MAX_WORKERS=2 pnpm --filter @langwatch/docs-site test
+
+  build:
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
+    runs-on: ubuntu-latest
+    # A cold media cache encodes every image and video (about 8 minutes), then the
+    # 340 MB artifact uploads; warm runs finish well inside this.
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Root: what the browser, performance and link checks read.
+          - mount: root
+            build-args: ""
+            artifact: docs-site
+          # Under /docs: the production address, which the audit reads.
+          - mount: docs
+            build-args: --base-path /docs
+            artifact: docs-site-mounted
+    name: build (${{ matrix.mount }})
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-pnpm-node
+        with:
+          install: "@langwatch/docs-site..."
+      - name: Restore content-addressed docs caches
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: apps/docs/node_modules/.cache/docs-site
+          key: docs-site-${{ matrix.mount }}-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            docs-site-${{ matrix.mount }}-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
+      # Encoded images and videos, keyed on the media and the encoders' settings alone, so a
+      # docs-only change never re-encodes; the build prunes entries it no longer uses.
+      - name: Restore the encoded docs media
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: apps/docs/node_modules/.cache/docs-media
+          key: docs-media-${{ runner.os }}-${{ hashFiles('docs/images/**', 'docs/media/**', 'apps/docs/src/site/image-variants.ts', 'apps/docs/src/site/video-variants.ts') }}
+          restore-keys: |
+            docs-media-${{ runner.os }}-
+      # The build transcodes the docs videos to AV1 and H.264 (src/site/video-variants.ts).
+      - name: Install ffmpeg
+        run: command -v ffmpeg || { sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg; }
+      - name: Read the Playwright version
+        id: playwright
+        run: |
+          version=$(grep -m1 -oE '^  playwright@[0-9][^:]*' pnpm-lock.yaml | cut -d@ -f2)
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Cache the Playwright browser
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.playwright.outputs.version }}
+      - name: Install build browser
+        run: pnpm --filter @langwatch/docs-site exec playwright install --with-deps chromium
+      - name: Build the documentation
+        run: pnpm --filter @langwatch/docs-site build ${{ matrix.build-args }}
+      - name: Enforce the browser size budget
+        if: matrix.mount == 'root'
+        run: pnpm --filter @langwatch/docs-site size
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ matrix.artifact }}
+          path: apps/docs/dist
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+
+  check:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - check: smoke
+            name: Test the built site
+            script: test:smoke
+            artifact: docs-site
+            browser: true
+          - check: performance
+            name: Test static reading and navigation
+            script: test:performance
+            artifact: docs-site
+            browser: true
+          - check: assets
+            name: Test font swaps, preloads and drawn wheel names
+            script: test:assets
+            artifact: docs-site
+            browser: true
+          - check: agent-controls
+            name: Test agent setup controls, skill actions and the agent wheel
+            script: test:agent-controls
+            artifact: docs-site
+            browser: true
+          - check: code-preference
+            name: Test code language choice, filenames and theme images
+            script: test:code-preference
+            artifact: docs-site
+            browser: true
+          - check: links
+            name: Check internal links
+            # The production mount, so the URL ledger is checked at /docs.
+            script: test:links --base-path /docs
+            artifact: docs-site-mounted
+            browser: false
+    name: check (${{ matrix.check }})
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-pnpm-node
+        with:
+          install: "@langwatch/docs-site..."
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ${{ matrix.artifact }}
+          path: apps/docs/dist
+      - name: Read the Playwright version
+        if: matrix.browser
+        id: playwright
+        run: |
+          version=$(grep -m1 -oE '^  playwright@[0-9][^:]*' pnpm-lock.yaml | cut -d@ -f2)
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Cache the Playwright browser
+        if: matrix.browser
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.playwright.outputs.version }}
+      - name: Install the test browser
+        if: matrix.browser
+        run: pnpm --filter @langwatch/docs-site exec playwright install --with-deps chromium
+      - name: ${{ matrix.name }}
+        run: pnpm --filter @langwatch/docs-site ${{ matrix.script }}
+
+  # Lighthouse on representative pages against budgets, one device per runner
+  # so the two never share a CPU; static search and agent checks run once.
+  audit:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - form-factor: mobile
+            extra-args: ""
+          - form-factor: desktop
+            extra-args: --skip-static
+    name: audit (${{ matrix.form-factor }})
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-pnpm-node
+        with:
+          install: "@langwatch/docs-site..."
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: docs-site-mounted
+          path: apps/docs/dist
+      - name: Read the Playwright version
+        id: playwright
+        run: |
+          version=$(grep -m1 -oE '^  playwright@[0-9][^:]*' pnpm-lock.yaml | cut -d@ -f2)
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Cache the Playwright browser
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.playwright.outputs.version }}
+      - name: Install the audit browser
+        run: pnpm --filter @langwatch/docs-site exec playwright install --with-deps chromium
+      # Three runs per page, judged on the median, at two at a time on the
+      # runner's four cores: one slow run neither passes nor fails a page.
+      - name: Audit performance, accessibility, search and agent readiness
+        run: >-
+          pnpm --filter @langwatch/docs-site test:audit
+          --out-dir dist --base-path /docs
+          --form-factors ${{ matrix.form-factor }} --runs 3 --concurrency 2
+          --report-dir "$RUNNER_TEMP/docs-audit" --summary "$GITHUB_STEP_SUMMARY"
+          --lhr ${{ matrix.extra-args }}
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: docs-audit-${{ matrix.form-factor }}
+          path: ${{ runner.temp }}/docs-audit
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # The image publish-docker-ecr.yml pushes on main, built without a push so a
+  # broken Dockerfile fails here first; only when its recipe changes (30 minutes).
+  # Full history: the build checks sitemap dates.
+  image:
+    needs: changes
+    if: needs.changes.outputs.docs-image == 'true'
+    runs-on: ubuntu-24.04-arm
+    # Encodes every image and video from scratch: no BuildKit cache survives runners.
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+        with:
+          cleanup: false
+      - uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: infra/docker/Dockerfile.docs
+          push: false
+          platforms: linux/arm64/v8
+          provenance: false
+          cache-from: type=gha,scope=ecr-langwatch-docs-arm64
+
+  docs-site-complete:
+    needs: [changes, verify, build, check, audit, image]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2
+        with:
+          jobs: ${{ toJSON(needs) }}
+          allowed-skips: verify, build, check, audit, image

@@ -134,6 +134,12 @@ The `@langwatch.trace()` decorator creates a parent trace for your graph executi
 
 A callback attached only to the model call inside one node produces LLM spans alone. The tool nodes and the plain function nodes never appear, so the trace does not show which step the graph ran.
 
+## Check it worked
+
+Run the example. Then open your project in LangWatch: a new trace named "LangGraph - Calculator Agent" appears in the traces list within a few seconds. Open it to see the graph's nodes, tool calls and LLM calls nested inside it.
+
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
+
 ## Related
 
 - [Capturing RAG](/integration/python/tutorials/capturing-rag) - Learn how to capture RAG data from LangChain retrievers and tools

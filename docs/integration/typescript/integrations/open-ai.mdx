@@ -74,6 +74,12 @@ import TypeScriptSharedSpanExcepEval from "/snippets/typescript-shared-span-exce
 
 <TypeScriptSharedSpanExcepEval />
 
+## Check it worked
+
+Run the example. The SDK flushes pending spans when the process exits. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds. Open it to see the `main` span with the OpenAI call nested inside it.
+
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the process runs in.
+
 ## Related
 
 - [Capturing RAG](/integration/typescript/tutorials/capturing-rag) - Learn how to capture RAG data from retrievers and tools
