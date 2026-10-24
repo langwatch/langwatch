@@ -11,7 +11,7 @@ import type {
   McpDoorRequest,
   McpSessionRunner,
 } from "@langwatch/hosted-mcp-contract";
-import { createLogger } from "@langwatch/observability";
+import { createLogger, type Logger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
 import { MCP_METADATA_SUBTREES, MCP_ROOT_PATHS } from "../rules/mcp-routes.rules.ts";
@@ -47,8 +47,10 @@ export function answerMcpExchange(input: {
   runner: McpSessionRunner;
   request: IncomingMessage;
   response: ServerResponse;
+  /** Where the access log line goes; the door's own logger unless a test hands one in. */
+  accessLogger?: Pick<Logger, "info">;
 }): void {
-  const { endpoint, runner, request, response } = input;
+  const { endpoint, runner, request, response, accessLogger = logger } = input;
   const startedAt = nowInstant().epochMilliseconds;
   // Listened for at once: a client that leaves before the answer is decided still gets its line.
   const closedAt = new Promise<number>((resolve) => {
@@ -57,7 +59,7 @@ export function answerMcpExchange(input: {
   const exchange = mcpDoorRequest(request);
 
   void endpoint.answer(exchange).then(({ answer, accessLog, onClosed }) => {
-    logOnClose({ accessLog, onClosed, response, startedAt, closedAt });
+    logOnClose({ accessLog, onClosed, response, startedAt, closedAt, accessLogger });
     return writeAnswer({ answer, runner, request, response }).catch((error: unknown) => {
       const failure = endpoint.answerFailure({ error, url: exchange.url });
       // A stream failing after its head was written has nothing left to answer.
@@ -111,13 +113,14 @@ function logOnClose(input: {
   response: ServerResponse;
   startedAt: number;
   closedAt: Promise<number>;
+  accessLogger: Pick<Logger, "info">;
 }): void {
-  const { accessLog, onClosed, response, startedAt, closedAt } = input;
+  const { accessLog, onClosed, response, startedAt, closedAt, accessLogger } = input;
   void closedAt.then((closedAtMs) => {
     onClosed(response.statusCode);
     try {
       const durationMs = closedAtMs - startedAt;
-      logger.info({ ...accessLog, status: response.statusCode, durationMs }, "MCP request");
+      accessLogger.info({ ...accessLog, status: response.statusCode, durationMs }, "MCP request");
     } catch {
       // Logging must not break request handling.
     }

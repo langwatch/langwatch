@@ -412,7 +412,7 @@ const stripJsonc = (text: string): string => {
   return out;
 };
 
-export const parseJsonc = (text: string): unknown => {
+const parseJsonc = (text: string): unknown => {
   try {
     return JSON.parse(stripJsonc(text));
   } catch {
@@ -694,7 +694,7 @@ const lintConfigTriggers = ({
  * lint rules' tests. Making one skippable, or changing what it runs, switches
  * those checks off without deleting a line of them.
  */
-export const GATE_STEPS = [
+const GATE_STEPS = [
   "Architecture lint (blocking)",
   "Architecture policy tests (blocking)",
   "Oxlint rule tests (blocking)",

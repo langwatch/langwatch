@@ -2,27 +2,8 @@ import { IncomingMessage, ServerResponse } from "node:http";
 import { Socket } from "node:net";
 
 import type { McpDoorReply } from "@langwatch/hosted-mcp-contract";
+import { createTestLogger } from "@langwatch/test-harness";
 import { describe, expect, it, vi } from "vitest";
-
-const { infoLines } = vi.hoisted(() => {
-  const lines: { fields: Record<string, unknown>; message: string }[] = [];
-  return { infoLines: lines };
-});
-
-vi.mock("@langwatch/observability", async (importOriginal) => {
-  const actual = await importOriginal<Record<string, unknown>>();
-  const record = (fields: Record<string, unknown>, message: string) => {
-    infoLines.push({ fields, message });
-  };
-  const stub: Record<string, unknown> = {
-    info: record,
-    debug: () => undefined,
-    warn: () => undefined,
-    error: () => undefined,
-  };
-  stub.child = () => stub;
-  return { ...actual, createLogger: () => stub };
-});
 
 import { answerMcpExchange } from "../mcp-endpoint.rest.ts";
 
@@ -42,6 +23,7 @@ describe("the hosted MCP door", () => {
     /** @scenario A client that leaves before its answer is decided is still logged */
     it("writes the access log line once the answer resolves", async () => {
       const { request, response } = fakeExchange();
+      const { logger, lines } = createTestLogger();
       let decide: (reply: McpDoorReply) => void = () => undefined;
       const reply = new Promise<McpDoorReply>((resolve) => {
         decide = resolve;
@@ -55,6 +37,7 @@ describe("the hosted MCP door", () => {
         runner: { runAs: (_apiKey, work) => work() },
         request,
         response,
+        accessLogger: logger,
       });
       response.emit("close");
       decide({
@@ -64,7 +47,7 @@ describe("the hosted MCP door", () => {
       });
 
       await vi.waitFor(() => {
-        expect(infoLines.find((line) => line.message === "MCP request")?.fields).toMatchObject({
+        expect(lines.findLine("info", "MCP request")).toMatchObject({
           path: "/mcp",
           status: 499,
         });
