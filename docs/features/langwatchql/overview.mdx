@@ -1,0 +1,92 @@
+---
+title: LangWatchQL
+sidebarTitle: Overview
+keywords: langwatch, langwatchql, lwql, sql, clickhouse, query api, analytics sql, mcp, cli, run_query
+description: Read-only SQL over your traces, spans, evaluations, simulations and coding-agent sessions, from the REST API, the CLI or an MCP client.
+---
+
+## What is LangWatchQL
+
+LangWatchQL is the ClickHouse SQL dialect that LangWatch accepts over its analytics views. You send one `SELECT` statement, optionally with a `WITH` clause, and you get back columns and rows. The database runs it with `readonly = 1`, so a statement cannot change your data.
+
+On LangWatch Cloud the views are in the `langwatch` database, for example `langwatch.traces` or `langwatch.trace_metrics_by_minute`, and the examples in this guide use that name.
+
+A self-hosted deployment uses the database named in its `CLICKHOUSE_URL`. That is `langwatch` in the shipped Helm chart and in `.env.example`. LangWatchQL is unavailable when `CLICKHOUSE_URL` names no database. The full list, with every column and the permission it needs, is in the [Query API reference](/api-reference/query/overview#queryable-views), and `GET /api/v1/query/schema` returns the list your key can query today.
+
+## What is LangWatchQL for
+
+Use LangWatchQL for a join across views, a percentile on one group of traces, rows exported to a file, or a question an agent asks from code. [Dashboards](/features/dashboards#how-the-data-is-read) read their data with LangWatchQL too: each widget runs named LangWatchQL statements.
+
+For finding individual traces with their spans and evaluations, use the trace filter instead. [Querying your data](/features/querying-your-data) compares the two languages.
+
+## How do I run a query
+
+You can send the same statement three ways. All three need the `analytics:view` permission. REST and the CLI use an API key. The hosted MCP server accepts OAuth sign-in or a personal API key, see [MCP](/integration/mcp).
+
+<Tabs>
+  <Tab title="REST">
+    `POST /api/v1/query` takes the statement in the `sql` field and answers with `columns`, `rows`, `statistics` and `diagnostics`.
+
+    ```bash
+    curl -X POST https://app.langwatch.ai/api/v1/query \
+      -H "X-Auth-Token: $LANGWATCH_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"sql": "SELECT TraceId, TraceName, OccurredAt, TotalDurationMs FROM langwatch.traces WHERE OccurredAt >= subtractDays(now(), 1) AND ContainsErrorStatus ORDER BY OccurredAt DESC LIMIT 100"}'
+    ```
+
+    Send `projectId` in the body to read one project only. Request fields, auth headers and status codes are in [Run a LangWatchQL query](/api-reference/query/run-a-langwatchql-query).
+  </Tab>
+  <Tab title="CLI">
+    `langwatch query` runs a statement and prints a table. Add `--format json`, `jsonl` or `csv` for other formats, and `--out` to write a file.
+
+    ```bash
+    npm install -g langwatch
+    langwatch login
+    langwatch query "SELECT TraceId, TraceName, OccurredAt, TotalDurationMs
+    FROM langwatch.traces
+    WHERE OccurredAt >= subtractDays(now(), 1)
+      AND ContainsErrorStatus
+    ORDER BY OccurredAt DESC
+    LIMIT 100"
+    ```
+
+    | Command | What it does |
+    | --- | --- |
+    | `langwatch query --sql-file <path>` | Reads the statement from a file |
+    | `langwatch query --param key=value` | Binds a `{key:Type}` parameter; repeat it for each one |
+    | `langwatch query --start <datetime> --end <datetime>` | Fills the reserved period parameters |
+    | `langwatch query --page-by keyset` | Pages through a large result, see [Limits and cost](/features/langwatchql/limits-and-cost#how-do-i-get-more-than-10000-rows) |
+    | `langwatch query schema` | Lists the views and columns your key can query |
+    | `langwatch query examples` | Prints the worked examples, filter them with `--tag` |
+    | `langwatch query reference` | Prints the full language reference |
+
+    `langwatch analytics query` is a different command for timeseries charts. It does not take LangWatchQL.
+  </Tab>
+  <Tab title="MCP">
+    The [LangWatch MCP server](/integration/mcp) gives your coding agent two tools for LangWatchQL:
+
+    | Tool | What it does |
+    | --- | --- |
+    | `discover_schema` | With `category: "lwql"`, returns the views, columns and functions as markdown |
+    | `run_query` | Runs a statement, with optional `parameters`, and renders up to 50 rows as a table with the real row count, the time it took and any diagnostics |
+
+    Ask your agent a question such as "which model cost the most last week" and it can look up the schema, write the statement and run it.
+  </Tab>
+</Tabs>
+
+## Where to go next
+
+<CardGroup cols={2}>
+  <Card title="Your first queries" icon="play" href="/features/langwatchql/first-query">
+    One worked query for each main view
+  </Card>
+  <Card title="Read and judge conversations" icon="message-lines" href="/features/langwatchql/extraction-functions">
+    Pull transcripts and model calls into a result, and ask a question of each one
+  </Card>
+  <Card title="Limits and cost" icon="gauge" href="/features/langwatchql/limits-and-cost">
+    Row cap, timeouts, rate limits per plan and what is charged
+  </Card>
+  <Card title="Common questions" icon="circle-question" href="/features/langwatchql/common-questions">
+    The error messages you can get and how to fix each one
+  </Card>
+</CardGroup>

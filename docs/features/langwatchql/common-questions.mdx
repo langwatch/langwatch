@@ -1,0 +1,103 @@
+---
+title: "LangWatchQL common questions: error messages and fixes"
+sidebarTitle: Common questions
+keywords: langwatch, langwatchql, lwql, error, cannot be used here, not available to you, wildcard, limit, select only, timeout, rate limited
+description: The messages LangWatchQL returns when it refuses or stops a query, and what to change in each case.
+---
+
+When a statement is refused, the error lists each problem in `meta.violations`, often with the names you can use instead.
+
+## The function cannot be used here
+
+```text
+The function "<f>" cannot be used here. Rewrite the expression using one of the supported functions, listed under `functions` on GET /api/v1/query/schema...
+```
+
+LangWatchQL accepts a fixed list of ClickHouse functions. Rewrite the expression with one from the `allowedFunctions` list in the error, or from `langwatch query schema`. The [supported functions](/api-reference/query/overview#supported-functions) are also listed in the reference.
+
+## The view is not available to you
+
+```text
+The view "<v>" is not available to you. Use one of the views from the schema endpoint.
+```
+
+Check the spelling and the database prefix: `langwatch.` on LangWatch Cloud. On a self-hosted deployment the prefix is the database named in `CLICKHOUSE_URL`, which is `langwatch` in the shipped chart and `.env.example`. Pick a view from the `availableViews` list in the violation, or from `langwatch query schema`. There is no `conversations` or `threads` view: group `langwatch.trace_metrics` by `ConversationId` instead.
+
+## The field is not available to you
+
+```text
+The field "<c>" is not available to you. Remove it from the query.
+```
+
+The column needs a permission your key does not have: `input` or `output` for message text, `cost:view` for cost columns. Remove the column, or use a key with that permission. The error lists the columns you can read in `availableColumns`.
+
+## A wildcard cannot be used here
+
+```text
+List the fields you need by name
+```
+
+The message goes on to say that a wildcard cannot be used, because some fields are not available to you.
+
+Replace `SELECT *` with the column names. `langwatch query schema` lists them.
+
+## The LIMIT is above the maximum
+
+```text
+The LIMIT of N rows is above the maximum of 10,000 rows this API returns per request. Lower it and page the rest with LIMIT/OFFSET and an ORDER BY.
+```
+
+Set `LIMIT 10000` or lower and page through the rest, as in [How do I get more than 10,000 rows](/features/langwatchql/limits-and-cost#how-do-i-get-more-than-10000-rows).
+
+## Only a single SELECT statement can be submitted
+
+```text
+Only a single SELECT statement, optionally with a WITH clause, can be submitted here.
+Only one statement can be submitted at a time. Send a single SELECT statement.
+```
+
+LangWatchQL is read-only. Send one `SELECT`, with no `INSERT`, `ALTER` or second statement after a `;`. `FORMAT`, `INTO OUTFILE`, table functions and system databases are refused too.
+
+## This is not valid ClickHouse SQL
+
+```text
+This is not valid ClickHouse SQL. Check the syntax and try again.
+```
+
+Check quotes, commas and brackets. Parameters are written `{name:Type}`, for example `{days:UInt32}`.
+
+## A SETTINGS clause cannot be used here
+
+```text
+A SETTINGS clause cannot be used here.
+```
+
+The message goes on to say that execution settings are fixed by the API.
+
+Remove the `SETTINGS` clause. Run time, memory and the other server limits are the same for every query, see [Limits and cost](/features/langwatchql/limits-and-cost#limits).
+
+## The query names a column that does not exist
+
+```text
+The query names a column that does not exist: X.
+```
+
+Check the column against `langwatch query schema`. Columns differ between views: for example, `HasError` is on `trace_metrics`, while `traces` has `ContainsErrorStatus`.
+
+## The query timed out or read too much data
+
+```text
+Query timed out (X.Xs)
+Query would read more data than its scan limit allows and was aborted
+```
+
+Narrow the time filter, filter on the view's time column if the query does not yet, or move a count or sum over time to `trace_metrics_by_minute` or `model_usage_by_minute`, which hold data already summed per minute.
+
+## Too many queries
+
+```text
+Too many LangWatchQL queries for this project.
+Too many LangWatchQL queries are running right now.
+```
+
+The first is the per-minute rate limit (429): wait the number of seconds in `meta.retryAfterSeconds`. The second means too many queries are running at once (503): retry after the running ones finish. Plan limits are in [Limits and cost](/features/langwatchql/limits-and-cost#how-many-queries-can-i-run-per-minute).
