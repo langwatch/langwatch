@@ -4,13 +4,13 @@
  * not see keeps its place and title and offers neither, since both would read its data.
  */
 
+import type { BoardTemplateWidget } from "@langwatch/analytics-catalogue";
 import { useState } from "react";
 
 import type { WidgetFace } from "../../../../model/dashboard-widget/widget-completeness.ts";
 import { DashboardWidgetFrameOverWindow } from "../../../dashboard-widget/ui/sections/dashboard-widget-frame.tsx";
 import { useWidgetCsvExport } from "../../behavior/use-widget-csv-export.ts";
 import type { BoardPeriod } from "../../model/board-period.ts";
-import type { BoardTemplateWidget } from "../../templates/index.ts";
 import { AskLangyButton } from "../blocks/ask-langy-button.tsx";
 import { WidgetCardShell, widgetBodyHeightPx } from "../blocks/widget-card-shell.tsx";
 import { WidgetExportMenu } from "../blocks/widget-export-menu.tsx";

@@ -3,7 +3,8 @@
  * widgets all have code is laid out; the rest say how far along they are.
  */
 
-import { CHART_GRID_COLUMNS } from "../../../../model/chart-grid.ts";
+import { CHART_GRID_COLUMNS } from "@langwatch/analytics-contract/chart-grid";
+
 import type { BoardTemplate, BoardTemplateWidget } from "../../templates/model/board-template.ts";
 import { CATALOGUE_TEMPLATES, type CatalogueTemplate } from "./catalogue-templates.ts";
 import { implementedWidget } from "./widget-implementations.ts";

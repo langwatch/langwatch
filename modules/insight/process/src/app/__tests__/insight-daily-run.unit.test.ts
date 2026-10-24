@@ -6,6 +6,7 @@
  * @see modules/insight/specs/insight-daily-run.feature
  */
 
+import { curatedBoardDefinitionById } from "@langwatch/analytics-catalogue";
 import {
   deriveInsightInbox,
   INSIGHT_DAILY_RUN_EVENT_TYPES,
@@ -40,7 +41,7 @@ import {
 } from "./insight-daily-run.fixture.ts";
 import { OTHER_PROJECT, PROJECT } from "./insight.fixture.ts";
 
-const { RUN_REQUESTED, RUN_STARTED, RUN_SETTLED } = INSIGHT_DAILY_RUN_EVENT_TYPES;
+const { RUN_REQUESTED, RUN_STARTED, RUN_SETTLED, TURNED_OFF } = INSIGHT_DAILY_RUN_EVENT_TYPES;
 const TWO_FINDINGS = answerWith([
   finding(),
   finding({ title: "Errors fell by half", tone: "good" }),
@@ -392,6 +393,20 @@ describe("given the board a run is asked for", () => {
     },
   );
 
+  /** @scenario "A board that cannot be read in the project skips the run" */
+  it("skips a From LangWatch board while custom charts are off for the project", async () => {
+    const template: InsightRunBoard = { kind: "template", id: "data", name: "Data" };
+    installed.world.boardReadError = refusal("custom_chart_playground_not_enabled");
+
+    await run({ board: template });
+
+    expect(await lastRunOf({ board: template })).toMatchObject({
+      outcome: "skipped",
+      reason: "board_unreadable",
+    });
+    expect(installed.langy.starts).toEqual([]);
+  });
+
   /** @scenario "A board with no widgets skips the run" */
   it("skips a board with no widgets", async () => {
     installed.world.boards.set(BOARD.id, { name: "Costs", widgets: [] });
@@ -402,21 +417,40 @@ describe("given the board a run is asked for", () => {
     expect(installed.langy.starts).toEqual([]);
   });
 
-  /** @scenario "A From LangWatch board is skipped with its own reason" */
-  it("skips a From LangWatch board with its own reason, and names it on the run's row", async () => {
-    const template: InsightRunBoard = { kind: "template", id: "llm-costs", name: "LLM costs" };
+  /** @scenario "A From LangWatch board is read from the catalogue" */
+  it("briefs Langy on a From LangWatch board's widgets in reading order, and names it on the run's row", async () => {
+    const template: InsightRunBoard = { kind: "template", id: "data", name: "Data" };
+    const curated = curatedBoardDefinitionById("data");
+    if (!curated) throw new Error("No From LangWatch board named data ships");
 
     await run({ board: template });
 
+    const [{ text } = { text: "" }] = installed.langy.starts;
+    const listed = [...text.matchAll(/^- "(template:data:[^"]+)"/gm)].map((match) => match[1]);
+    expect(text).toContain(`Dashboard: "${curated.name}"`);
+    expect(listed).toEqual(curated.widgets.map(({ key }) => `template:data:${key}`));
     expect(await runsOf()).toEqual([
       {
         id: installed.scheduleIdOf({ board: template }),
-        board: template,
-        lastRun: expect.objectContaining({ outcome: "skipped", reason: "template_board" }),
+        board: { ...template, name: curated.name },
+        lastRun: expect.objectContaining({ outcome: "nothing" }),
       },
     ]);
-    expect(installed.langy.starts).toEqual([]);
     expect(installed.boardReads).toEqual([]);
+  });
+
+  /** @scenario "A From LangWatch board no longer offered reads as unreadable" */
+  it("skips a From LangWatch board the catalogue no longer offers as board_unreadable", async () => {
+    const gone: InsightRunBoard = { kind: "template", id: "llm-costs", name: "LLM costs" };
+
+    await run({ board: gone });
+
+    expect(await lastRunOf({ board: gone })).toMatchObject({
+      outcome: "skipped",
+      reason: "board_unreadable",
+    });
+    expect(await installed.runEventsOf({ board: gone })).not.toContain(TURNED_OFF);
+    expect(installed.langy.starts).toEqual([]);
   });
 
   /** @scenario "The board is read as the person the run is for" */

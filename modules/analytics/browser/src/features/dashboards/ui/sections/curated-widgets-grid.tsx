@@ -4,6 +4,7 @@
  * board's period.
  */
 
+import type { BoardTemplateWidget } from "@langwatch/analytics-catalogue";
 import { useMemo } from "react";
 
 import { ChartGrid } from "../../../../ui/sections/chart-grid.tsx";
@@ -13,7 +14,6 @@ import {
   BOARD_MIN_ROW_SPAN,
 } from "../../model/board-grid.ts";
 import type { BoardQueryContext } from "../../model/board-period.ts";
-import type { BoardTemplateWidget } from "../../templates/index.ts";
 import { CuratedWidgetCard } from "./curated-widget-card.tsx";
 
 export function CuratedWidgetsGrid({

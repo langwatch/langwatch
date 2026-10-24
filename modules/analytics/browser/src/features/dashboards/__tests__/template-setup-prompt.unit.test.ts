@@ -4,15 +4,15 @@
  * @see modules/dashboard/specs/dashboards-v2.feature
  */
 
-import { describe, expect, it } from "vitest";
-
-import { MAX_WIDGET_DRAFT_LENGTH } from "../../langy/model/board-langy.ts";
 import {
   CATALOGUE_TEMPLATES,
   CATALOGUE_WIDGETS,
   templateSetupNeeds,
   templateWidgetGaps,
-} from "../index.ts";
+} from "@langwatch/analytics-catalogue";
+import { describe, expect, it } from "vitest";
+
+import { MAX_WIDGET_DRAFT_LENGTH } from "../langy/model/board-langy.ts";
 
 describe("given every template's report prompt", () => {
   /** @scenario "Template prompt: Langy also checks what the template needs that is not set up yet" */

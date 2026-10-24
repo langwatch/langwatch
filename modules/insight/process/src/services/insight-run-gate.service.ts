@@ -4,6 +4,7 @@
  * ORDER IS THE CONTRACT: the project, the flag, the person, their access, then the board.
  */
 
+import { curatedBoardDefinitionById, templateWidgetId } from "@langwatch/analytics-catalogue";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { InsightRunBoard, InsightRunSkipReason } from "@langwatch/insight-contract";
@@ -34,6 +35,7 @@ type RunBoardWidget = Readonly<{
  * dashboard module's own scope rules answer both: an Only me board is its author's alone.
  */
 type RunBoardReader = {
+  assertDashboardWidgetsEnabled(input: { projectId: string }): Promise<void>;
   getBoard(input: {
     projectId: string;
     dashboardId: string;
@@ -83,6 +85,45 @@ function inReadingOrder(a: RunBoardWidget, b: RunBoardWidget): number {
   return a.gridRow - b.gridRow || a.gridColumn - b.gridColumn || a.id.localeCompare(b.id);
 }
 
+/** The board and its widgets in reading order, each with its queries; a bare board is skipped. */
+function readBoardWith({
+  board,
+  onBoard,
+}: {
+  board: { id: string; name: string };
+  onBoard: readonly RunBoardWidget[];
+}): RunGateResult {
+  const widgets = onBoard.toSorted(inReadingOrder).map(({ id, name, definition }) => ({
+    id,
+    name: pointerName({ name, fallback: id }),
+    queries: definition.queries.map((query) => query.sql),
+  }));
+  if (widgets.length === 0) return skipped("board_empty");
+  return {
+    ok: true,
+    board: { id: board.id, name: pointerName({ name: board.name, fallback: board.id }) },
+    widgets,
+  };
+}
+
+/**
+ * A From LangWatch board, read from the catalogue. One no longer offered is unreadable, not
+ * deleted: a renamed or retired template turns the schedule off only after the skipped days.
+ */
+function templateBoardOf({ templateId }: { templateId: string }): RunGateResult {
+  const curated = curatedBoardDefinitionById(templateId);
+  if (!curated) return skipped("board_unreadable");
+  const onBoard = curated.widgets.map(({ key, name, definition, layout }) => ({
+    id: templateWidgetId({ templateId, key }),
+    name,
+    definition,
+    dashboardId: null,
+    gridColumn: layout.gridColumn,
+    gridRow: layout.gridRow,
+  }));
+  return readBoardWith({ board: { id: templateId, name: curated.name }, onBoard });
+}
+
 export class InsightRunGateService {
   private constructor(private readonly members: InsightRunGateMembers) {}
 
@@ -101,9 +142,10 @@ export class InsightRunGateService {
   }): Promise<RunGateResult> {
     const refusal = await this.refusalOf({ projectId, userId });
     if (refusal) return skipped(refusal);
-    // A From LangWatch board is defined in the browser alone: no server can read its widgets.
-    if (board.kind === "template") return skipped("template_board");
     try {
+      if (board.kind === "template") {
+        return await this.readTemplateBoard({ projectId, templateId: board.id });
+      }
       return await this.readBoard({ projectId, dashboardId: board.id, viewer: { userId } });
     } catch (error) {
       const reason = BOARD_REFUSALS[HandledError.isHandled(error) ? error.code : ""];
@@ -143,6 +185,18 @@ export class InsightRunGateService {
     return mayAsk ? void 0 : "langy_off";
   }
 
+  /** Read as a stored board's widgets are: refused alike while widgets are off for the project. */
+  private async readTemplateBoard({
+    projectId,
+    templateId,
+  }: {
+    projectId: string;
+    templateId: string;
+  }): Promise<RunGateResult> {
+    await this.members.dashboards.assertDashboardWidgetsEnabled({ projectId });
+    return templateBoardOf({ templateId });
+  }
+
   private async readBoard({
     projectId,
     dashboardId,
@@ -160,19 +214,9 @@ export class InsightRunGateService {
       dashboardId: stored.id,
       viewer,
     });
-    const widgets = onBoard
-      .filter((widget) => widget.dashboardId === stored.id)
-      .toSorted(inReadingOrder)
-      .map(({ id, name, definition }) => ({
-        id,
-        name: pointerName({ name, fallback: id }),
-        queries: definition.queries.map((query) => query.sql),
-      }));
-    if (widgets.length === 0) return skipped("board_empty");
-    return {
-      ok: true,
-      board: { id: stored.id, name: pointerName({ name: stored.name, fallback: stored.id }) },
-      widgets,
-    };
+    return readBoardWith({
+      board: stored,
+      onBoard: onBoard.filter((widget) => widget.dashboardId === stored.id),
+    });
   }
 }

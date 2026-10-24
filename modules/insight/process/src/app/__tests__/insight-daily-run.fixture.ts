@@ -391,6 +391,9 @@ function scriptedDashboard(world: RunWorld) {
       widget({ boardId: found.id, projectId: found.projectId, at, scripted }),
     );
   const dashboard = createApiFixture<DashboardApi>({
+    assertDashboardWidgetsEnabled: async () => {
+      if (world.boardReadError) throw world.boardReadError;
+    },
     getBoard: async ({ projectId, dashboardId, viewer }) => {
       boardReads.push({ read: "board", viewer });
       if (world.boardReadError) throw world.boardReadError;

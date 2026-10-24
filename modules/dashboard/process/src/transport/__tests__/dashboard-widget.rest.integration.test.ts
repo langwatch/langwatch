@@ -4,11 +4,13 @@
  * @see modules/dashboard/specs/dashboard-widget-validation.feature
  * @vitest-environment node
  */
+import { CURATED_BOARD_DEFINITIONS, templateWidgetId } from "@langwatch/analytics-catalogue";
 import {
   bindMiddlewareContext,
   canonicalErrorResponse,
   createRestRuntime,
 } from "@langwatch/api/rest";
+import { PermissionDeniedError } from "@langwatch/authorization";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
@@ -26,7 +28,8 @@ function queryDeclaring(parameter: { name: string; type: string; default?: unkno
   return [{ name: "traces", sql: SQL, parameters: [parameter] }];
 }
 
-function mountKey() {
+/** A project key; `held` names its permissions, and without it the key holds every one. */
+function mountKey({ held }: { held?: readonly string[] } = {}) {
   const app = createDashboardTestApp();
   const caller = {
     actor: { type: "api_key" as const, id: "key-of-project-1" },
@@ -35,7 +38,20 @@ function mountKey() {
   const runtime = createRestRuntime({
     audit: { record: () => {} },
     authorization: restTestAuthorization(),
-    identity: { authenticate: () => caller, identify: () => caller },
+    identity: {
+      // A project-tier route asks its permission of the door itself.
+      authenticate: ({ permission }) => {
+        if (held && !held.includes(permission)) {
+          throw new PermissionDeniedError({
+            permission,
+            scope: { type: "project", id: "project-1" },
+            denialReason: "no-grant",
+          });
+        }
+        return caller;
+      },
+      identify: () => caller,
+    },
   });
   const hono = runtime.mount(dashboardWidgetRest.router(), {
     app: () => app,
@@ -65,6 +81,7 @@ function mountKey() {
     read: (id: string) => send({ path: `/${id}` }),
     create: (body: unknown) => send({ method: "POST", body }),
     update: (id: string, body: unknown) => send({ path: `/${id}`, method: "PATCH", body }),
+    remove: (id: string) => send({ path: `/${id}`, method: "DELETE" }),
   };
 }
 
@@ -129,6 +146,46 @@ describe("given the dashboard widget REST family", () => {
       expect(updated.status).toBe(422);
       expect(updated.json.code).toBe("validation_error");
       expect(read.json.definition.queries).toEqual(queries);
+    });
+  });
+});
+
+describe("given a From LangWatch board's widget", () => {
+  const [board] = CURATED_BOARD_DEFINITIONS;
+  const [widget] = board?.widgets ?? [];
+  if (!board || !widget) throw new Error("No From LangWatch board ships a widget");
+  const id = templateWidgetId({ templateId: board.templateId, key: widget.key });
+
+  describe("when a key with analytics:view gets it by its template widget id", () => {
+    /** @scenario "A From LangWatch widget is read over the API by its template widget id" */
+    it("answers its name and queries from the catalogue, and refuses to change it", async () => {
+      const key = mountKey({ held: ["analytics:view"] });
+      const fullKey = mountKey();
+
+      const read = await key.read(id);
+      const updated = await fullKey.update(id, { name: "Mine now" });
+      const removed = await fullKey.remove(id);
+
+      expect(read.status).toBe(200);
+      expect(read.json).toMatchObject({
+        id,
+        name: widget.name,
+        definition: { queries: widget.definition.queries },
+        dashboardId: null,
+      });
+      expect(updated.status).toBe(404);
+      expect(removed.status).toBe(404);
+    });
+  });
+
+  describe("when a key without analytics:view gets it", () => {
+    /** @scenario "A From LangWatch widget is refused without analytics:view" */
+    it("refuses the request as forbidden", async () => {
+      const key = mountKey({ held: ["analytics:create", "analytics:update"] });
+
+      const read = await key.read(id);
+
+      expect(read.status).toBe(403);
     });
   });
 });

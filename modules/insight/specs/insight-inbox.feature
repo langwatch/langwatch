@@ -158,6 +158,13 @@ Feature: The insights inbox
       When a member reads the row
       Then the board's name and the widget's name each link to the board
 
+    @unit
+    Scenario: An insight a daily run filed on a From LangWatch board links to its live widget
+      Given an insight a daily run filed on a From LangWatch board that still ships
+      And it keeps the template id and the widget's template:<templateId>:<key> id
+      When a member reads the row
+      Then the board's name and the widget's name each link to the live board
+
     @integration
     Scenario: A deleted board leaves plain names on the row
       Given an insight that came from a widget on a board

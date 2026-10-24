@@ -191,10 +191,10 @@ describe("given a board that is on", () => {
       );
     });
 
-    /** @scenario "A From LangWatch board takes the control and is named by its template id" */
-    it("says calmly that Langy cannot read a From LangWatch board yet", () => {
+    /** @scenario "The dropdown says how the last run ended" */
+    it("says only that nothing was filed for a run skipped with a retired reason", () => {
       expect(words({ outcome: "skipped", reason: "template_board" })).toBe(
-        "Did not run 12:34 · Langy cannot read From LangWatch boards yet",
+        "Did not run 12:34 · nothing was filed",
       );
     });
   });
