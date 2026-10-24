@@ -305,6 +305,7 @@ def run(
     dataset_id: Optional[str] = None,
     parameters: Optional[Dict[str, Any]] = None,
     row_indices: Optional[List[int]] = None,
+    concurrency: Optional[int] = None,
     poll_interval: float = 2.0,
     timeout: float = 600.0,
     on_progress: Optional[Callable[[int, int], None]] = None,
@@ -325,6 +326,10 @@ def run(
             exclusive with ``data``.
         parameters: Optional constants applied to every row (e.g. ``{"model": ...}``).
         row_indices: Optional subset of row indices to evaluate.
+        concurrency: Optional number of cells (one row against one target) to
+            run at once (1 to 24), for this run only; the experiment's saved
+            setting is untouched. Defaults to the server's setting. Use ``1`` to
+            run them one at a time, in order.
         poll_interval: Seconds between status checks (default: 2.0)
         timeout: Maximum seconds to wait for completion (default: 600.0 = 10 minutes)
         on_progress: Optional callback for progress updates (completed, total)
@@ -371,6 +376,7 @@ def run(
         dataset_id=dataset_id,
         parameters=parameters,
         row_indices=row_indices,
+        concurrency=concurrency,
     )
 
     # Start the run
@@ -405,6 +411,7 @@ def _build_run_body(
     dataset_id: Optional[str] = None,
     parameters: Optional[Dict[str, Any]] = None,
     row_indices: Optional[List[int]] = None,
+    concurrency: Optional[int] = None,
 ) -> Dict[str, Any]:
     """Assemble the JSON body for a run request, including only provided keys."""
     body: Dict[str, Any] = {}
@@ -419,6 +426,8 @@ def _build_run_body(
         body["parameters"] = parameters
     if row_indices is not None:
         body["row_indices"] = row_indices
+    if concurrency is not None:
+        body["concurrency"] = concurrency
     return body
 
 
