@@ -8,6 +8,7 @@ package main
 import (
 	"archive/zip"
 	"bytes"
+	"context"
 	"encoding/binary"
 	"encoding/json"
 	"flag"
@@ -52,7 +53,7 @@ func run(src, out string) error {
 		return err
 	}
 	tmp := out + ".tmp"
-	if err := os.WriteFile(tmp, blob, 0o644); err != nil {
+	if err := os.WriteFile(tmp, blob, 0o644); err != nil { //nolint:gosec // the nlp image reads models.bin as a non-root user
 		return err
 	}
 	if err := os.Rename(tmp, out); err != nil {
@@ -70,7 +71,7 @@ func upstreamDir() (string, error) {
 		return "", err
 	}
 	defer func() { _ = os.RemoveAll(tmp) }()
-	cmd := exec.Command("go", "mod", "download", "-json", upstream)
+	cmd := exec.CommandContext(context.Background(), "go", "mod", "download", "-json", upstream)
 	cmd.Dir = tmp
 	cmd.Env = append(os.Environ(), "GOWORK=off", "GOFLAGS=")
 	cmd.Stderr = os.Stderr

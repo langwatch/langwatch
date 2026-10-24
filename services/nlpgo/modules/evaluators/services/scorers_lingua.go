@@ -10,9 +10,9 @@ import (
 )
 
 // linguaPrepares is lingua/language_detection once nlpgo has loaded the models
-// (NLPGO_LINGUA_MODELS): without them the slug stays evaluator_not_found and
-// TS keeps it on langevals. The detector is built once and shared; it is safe
-// for concurrent use and reads the mapped models in place.
+// (NLPGO_LINGUA_MODELS): without them the slug answers evaluator_not_found,
+// which TS raises as EvaluatorNotFoundError; an engine override keeps it on
+// langevals. The detector is built once, shared and safe for concurrent use.
 func linguaPrepares() map[string]func(json.RawMessage) (Score, error) {
 	if !lingua.ModelsAvailable() {
 		return map[string]func(json.RawMessage) (Score, error){}

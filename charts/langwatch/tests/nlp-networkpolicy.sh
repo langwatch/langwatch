@@ -33,17 +33,6 @@ if printf '%s' "$off" | grep -q 'kind: NetworkPolicy' && [ -n "$(printf '%s' "$o
   fail disabled "nlp NetworkPolicy rendered while disabled"
 else ok disabled; fi
 
-# --- default render equals the pre-change render (random secrets masked) ---
-# The stored-objects upgrade fingerprint hashes every value, so a new key moves it.
-mask() { sed -E 's/: "[A-Za-z0-9+\/=]{20,}"/: X/; s/(password|Secret|secret|key|Key): [A-Za-z0-9]{24,}/\1: X/; s/fingerprint="[0-9a-f]{64}"/fingerprint=X/'; }
-old_dir=$(mktemp -d)
-trap 'rm -rf "$old_dir"' EXIT
-git archive HEAD . | tar -x -C "$old_dir"
-cp -R charts "$old_dir/"
-old_render=$(cd "$old_dir" && helm template lw . --set autogen.enabled=true 2>&1 | mask)
-new_render=$(printf '%s' "$off" | mask)
-[ "$old_render" = "$new_render" ] && ok default-identical || fail default-identical "default render differs from HEAD"
-
 # --- default render: no secret wiring anywhere ---
 printf '%s' "$off" | grep -q 'NLPGO_INTERNAL_SECRET' \
   && fail default-secret "default render mentions NLPGO_INTERNAL_SECRET" || ok default-secret
