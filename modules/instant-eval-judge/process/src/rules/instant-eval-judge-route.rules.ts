@@ -11,7 +11,6 @@ import {
   INSTANT_EVAL_JUDGE_ARITHMETIC_SLOT,
   INSTANT_EVAL_JUDGE_MODES,
   instantEvalJudgeEntryBackends,
-  type InstantEvalBooleanQuestion,
   type InstantEvalJudgeInputView,
   type InstantEvalJudgeJob,
   type InstantEvalJudgeMode,
@@ -20,17 +19,24 @@ import {
   type InstantEvalJudgeRouteSlot,
   type InstantEvalJudgeRouteTable,
   type InstantEvalQuestion,
+  type InstantEvalQuestionKind,
   type InstantEvalSkipReason,
+  type InstantEvalJudgeSurenessRule,
+  type InstantEvalVerdict,
 } from "@langwatch/instant-eval-judge-contract";
 
 import type { InstantEvalPermit } from "../channels/instant-eval-classifier.channel.ts";
 
 export interface InstantEvalJudgeRoutePlan {
   readonly job: InstantEvalJudgeJob;
+  /** The kind every question of the plan asks; one plan never mixes kinds. */
+  readonly kind: InstantEvalQuestionKind;
+  /** How a score or category answer's sureness is read; yes or no is always |2p - 1|. */
+  readonly sureness?: InstantEvalJudgeSurenessRule;
   readonly modeRequested: InstantEvalJudgeMode;
   readonly mode: InstantEvalJudgeMode;
   readonly bucket: string;
-  /** The bucket, or the arithmetic slot. */
+  /** The bucket or the arithmetic slot; `default` when a score or category took its kind's. */
   readonly slot: string;
   readonly tokens: number;
   readonly arithmetic: boolean;
@@ -53,17 +59,22 @@ export interface InstantEvalJudgeRoutePlan {
   readonly fallbacks: Readonly<Record<string, readonly string[]>>;
 }
 
-/** The plan for one routed call. Its questions are yes-or-no; the caller checked. */
+/**
+ * The plan for one routed call. Its questions share one kind, and a score or category kind is
+ * one the table routes; the caller checked both.
+ */
 export function instantEvalJudgeRoutePlanOf({
   route,
   text,
   questions,
   table,
+  kind = "boolean",
 }: {
   route: InstantEvalJudgeRoute;
   text: string;
-  questions: readonly InstantEvalBooleanQuestion[];
+  questions: readonly InstantEvalQuestion[];
   table: InstantEvalJudgeRouteTable;
+  kind?: InstantEvalQuestionKind;
 }): InstantEvalJudgeRoutePlan {
   const asked = instantEvalJudgeInputViewOf({ route, table });
   const fullPlan = () =>
@@ -72,12 +83,13 @@ export function instantEvalJudgeRoutePlanOf({
       text,
       questions,
       table,
+      kind,
       inputView: "full",
     });
   if (asked === "tools" && !isToolsViewShorter({ route, text })) {
     return { ...fullPlan(), longerView: asked };
   }
-  const plan = planForView({ route, text, questions, table, inputView: asked });
+  const plan = planForView({ route, text, questions, table, kind, inputView: asked });
   if (asked === "full" || isViewAllowed({ plan, table })) return plan;
   // A backend kind the table does not allow on the partial view gets the full one.
   return { ...fullPlan(), refusedView: asked };
@@ -112,12 +124,14 @@ function planForView({
   text,
   questions,
   table,
+  kind,
   inputView,
 }: {
   route: InstantEvalJudgeRoute;
   text: string;
-  questions: readonly InstantEvalBooleanQuestion[];
+  questions: readonly InstantEvalQuestion[];
   table: InstantEvalJudgeRouteTable;
+  kind: InstantEvalQuestionKind;
   inputView: InstantEvalJudgeInputView;
 }): InstantEvalJudgeRoutePlan {
   const rendered = inputView === "full" ? text : route.views?.[inputView];
@@ -127,16 +141,23 @@ function planForView({
   const tokens = route.tokens ?? estimateJudgedTextTokens({ text: judged });
   const bucket = bucketOf({ tokens, table });
   const arithmetic = isArithmeticCall({ route, questions, table });
-  const slot =
+  const wanted =
     arithmetic && tokens <= table.arithmetic.maxTokens
       ? INSTANT_EVAL_JUDGE_ARITHMETIC_SLOT
       : bucket;
   const modeRequested = route.mode ?? table.defaultMode[route.job];
-  const routeSlot = table.routes[route.job][slot];
-  if (!routeSlot) throw new Error(`the route table has no slot ${route.job} / ${slot}`);
+  const { slot, routeSlot, sureness } = routeSlotOf({
+    table,
+    job: route.job,
+    kind,
+    wanted,
+    bucket,
+  });
   const { mode, entry } = usableEntryOf({ slot: routeSlot, requested: modeRequested, table });
   return {
     job: route.job,
+    kind,
+    ...(sureness ? { sureness } : {}),
     modeRequested,
     mode,
     bucket,
@@ -170,20 +191,42 @@ function instantEvalJudgeInputViewOf({
   return byCategory ?? table.inputViews.default;
 }
 
-/** Unsure when |2p - 1| is below the threshold; no probability is always unsure. */
-export function isUnsureVerdict({
-  probability,
-  threshold,
+/**
+ * A yes-or-no question's slot from the job's routes. A score or category question's from its
+ * kind's routes: the job's slot, then (for an arithmetic call the kind does not route apart) the
+ * length bucket's, then the kind's default.
+ */
+function routeSlotOf({
+  table,
+  job,
+  kind,
+  wanted,
+  bucket,
 }: {
-  probability: number | undefined;
-  threshold: number;
-}): boolean {
-  return probability === undefined || Math.abs(2 * probability - 1) < threshold;
-}
-
-/** How far an answer is from a coin toss; -1 for no answer, so any answer beats none. */
-export function instantEvalVerdictConfidence(probability: number | undefined): number {
-  return probability === undefined ? -1 : Math.abs(2 * probability - 1);
+  table: InstantEvalJudgeRouteTable;
+  job: InstantEvalJudgeJob;
+  kind: InstantEvalQuestionKind;
+  wanted: string;
+  bucket: string;
+}): {
+  slot: string;
+  routeSlot: InstantEvalJudgeRouteSlot;
+  sureness?: InstantEvalJudgeSurenessRule;
+} {
+  if (kind === "boolean") {
+    const routeSlot = table.routes[job][wanted];
+    if (!routeSlot) throw new Error(`the route table has no slot ${job} / ${wanted}`);
+    return { slot: wanted, routeSlot };
+  }
+  const routing = table.kinds[kind];
+  if (!routing) throw new Error(`the route table does not route ${kind} questions`);
+  const routes = routing.routes[job] ?? {};
+  const { sureness } = routing;
+  for (const key of [wanted, bucket]) {
+    const routeSlot = routes[key];
+    if (routeSlot) return { slot: key, routeSlot, sureness };
+  }
+  return { slot: "default", routeSlot: routing.default, sureness };
 }
 
 function bucketOf({ tokens, table }: { tokens: number; table: InstantEvalJudgeRouteTable }) {
@@ -198,7 +241,7 @@ function isArithmeticCall({
   table,
 }: {
   route: InstantEvalJudgeRoute;
-  questions: readonly InstantEvalBooleanQuestion[];
+  questions: readonly InstantEvalQuestion[];
   table: InstantEvalJudgeRouteTable;
 }): boolean {
   const source = table.arithmetic.source[route.job];
@@ -270,12 +313,18 @@ export function isArithmeticQuestion(instructions: string): boolean {
   return ARITHMETIC_PATTERN.test(instructions);
 }
 
-/** P(yes) per question one backend answered, or why it could not. */
+/** One question's answer from one backend, with how sure it is, from 0 to 1. */
+export interface InstantEvalJudgeRoutedAnswer {
+  readonly verdict: InstantEvalVerdict;
+  readonly sureness: number;
+}
+
+/** The answer per question one backend gave, or why it could not. */
 export type InstantEvalJudgeLeg =
   | Readonly<{
       outcome: "answered";
       backend: string;
-      probabilities: ReadonlyMap<string, number>;
+      answers: ReadonlyMap<string, InstantEvalJudgeRoutedAnswer>;
       isTextTruncated: boolean;
       limiterWaitMs: number;
     }>
@@ -289,33 +338,26 @@ export function isInstantEvalJudgeLegAnswered(
   return leg.outcome === "answered";
 }
 
-/** Only yes-or-no questions are routed. */
-export function isInstantEvalBooleanQuestion(
-  question: InstantEvalQuestion,
-): question is InstantEvalBooleanQuestion {
-  return question.kind === "boolean";
-}
-
 /** Per question the first leg (or `pick`) holding an answer supplies the verdict. */
 export function instantEvalRoutedVerdictsOf({
   questions,
   legs,
   pick,
 }: {
-  questions: readonly InstantEvalBooleanQuestion[];
+  questions: readonly InstantEvalQuestion[];
   legs: readonly InstantEvalJudgeAnsweredLeg[];
   pick?: ((questionId: string) => InstantEvalJudgeAnsweredLeg | undefined) | undefined;
 }): {
-  verdicts: { questionId: string; probability: number }[];
+  verdicts: InstantEvalVerdict[];
   answeredBy: Record<string, number>;
 } {
   const answeredBy: Record<string, number> = {};
-  const verdicts: { questionId: string; probability: number }[] = [];
+  const verdicts: InstantEvalVerdict[] = [];
   for (const question of questions) {
-    const leg = pick?.(question.id) ?? legs.find((l) => l.probabilities.has(question.id));
-    const probability = leg?.probabilities.get(question.id);
-    if (!leg || probability === undefined) continue;
-    verdicts.push({ questionId: question.id, probability });
+    const leg = pick?.(question.id) ?? legs.find((l) => l.answers.has(question.id));
+    const answer = leg?.answers.get(question.id);
+    if (!leg || !answer) continue;
+    verdicts.push(answer.verdict);
     answeredBy[leg.backend] = (answeredBy[leg.backend] ?? 0) + 1;
   }
   return { verdicts, answeredBy };
@@ -330,7 +372,7 @@ export function instantEvalJudgeLegPermitOf({
   projectId: string;
   pool: "decisions" | "llm";
   text: string;
-  questions: readonly InstantEvalBooleanQuestion[];
+  questions: readonly InstantEvalQuestion[];
 }): InstantEvalPermit {
   return {
     tokens: estimateJudgedTextTokens({ text }) + instantEvalQuestionTokens(questions),

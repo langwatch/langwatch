@@ -4,6 +4,9 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
   I want a judge call that carries a route to be answered by the model its slot names
   So that cheap decision models answer what they are sure of and an LLM answers the rest
 
+  Yes-or-no questions are always routed; score and category questions only when the table routes
+  their kind (each kind reads an answer's sureness its own way), else they take today's call.
+
   The router is a synchronous step inside the judge leaf (ROUTER-PLACEMENT option a). A call with
   no route takes today's single hosted classifier call. The public route table sends every slot
   to the hosted classifier; the real table and prices are deploy-time configuration.
@@ -112,6 +115,42 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     Given a plan that pairs two decision models in parallel
     When both answer
     Then the verdict further from one half is kept, the primary on a tie, and both calls are paid
+    And for a score or category the surer answer by its kind's sureness rule is kept
+
+  @unit
+  Scenario: A kind the table does not route takes today's classifier call
+    Given a route table with no routes for score or category questions, as the public one ships
+    When a routed call asks a score or category question, alone or beside yes-or-no questions
+    Then those questions take today's single classifier call together, priced at the routed rate
+    And the yes-or-no questions are still routed, and the routing flags the unrouted kind
+
+  @unit
+  Scenario: A score or category question takes its kind's slot, else the kind's default
+    Given a route table with score and category routes
+    When a score or category question is routed
+    Then the plan takes the job's slot the kind names for the bucket or arithmetic call
+    And an arithmetic call the kind does not route apart takes its length bucket's slot
+    And any slot the kind leaves out takes the kind's default, with the kind's sureness rule
+
+  @unit
+  Scenario: A sure score or category answer stays, by its kind's sureness rule
+    Given a plan that escalates unsure score or category answers to an LLM
+    When a score's spread is small against half its range, or a category's top option is well ahead of the runner-up
+    Then the decision model's verdict is kept and the LLM is not called
+
+  @unit
+  Scenario: An unsure score or category answer escalates to the LLM leg
+    Given a plan that escalates when an answer's sureness is below the threshold
+    When a score is widely spread or has no distribution, or a category's top two options are close
+    Then the LLM answers with a score in the range or one offered label, taken as sure
+    And when the LLM answers nothing readable the decision model's verdict is kept, flagged
+
+  @unit
+  Scenario: Questions of several kinds in one call are routed per kind and merged in order
+    Given a routed call asking yes-or-no, score and category questions
+    When it is judged
+    Then each kind is planned and judged on its own, side by side
+    And the verdicts come back in the order asked with tokens and cost summed and each flag naming its kind
 
   @unit
   Scenario: A backend that is down falls back to its configured fallback
@@ -161,6 +200,20 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     Then each request forces the evaluation tool, and the answer is read from its result
     And a refused key, a rate limit and an outage map to the platform's skip reasons
 
+
+  @unit
+  Scenario: The LLM legs send one forced score or category tool call and read it back
+    Given a score or category question on an Anthropic Messages or OpenAI Responses leg
+    When it is asked
+    Then the forced evaluation tool takes a number bounded by the range, or a label from the offered names
+    And a number outside the range, or a name never offered, is no answer rather than a guess
+
+  @unit
+  Scenario: A scenario criterion is one yes-or-no question in the measured wording
+    Given a Scenario run's criteria, description and conversation
+    When they are turned into a routed call
+    Then each criterion is one yes-or-no question with the measured instructions and both sides spelled out
+    And the text is the scenario description then the conversation, and an unanswered criterion reads as null, never as not met
   @unit
   Scenario: A routed judgement is priced from the summed cost of every call
     Given a routed judge call whose legs cost a known amount

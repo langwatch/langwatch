@@ -6,9 +6,9 @@
  */
 
 import {
-  INSTANT_EVAL_JUDGE_JOBS,
   INSTANT_EVAL_JUDGE_MODES,
   instantEvalJudgeEntryBackends,
+  instantEvalJudgeRouteSlotsOf,
   type InstantEvalJudgeBackendKind,
   type InstantEvalJudgeRouteEntry,
   type InstantEvalJudgeRoutePricing,
@@ -40,10 +40,9 @@ export function instantEvalJudgeRouteBootIssues({
 /** Every enabled backend a usable entry may call, with its enabled fallbacks. */
 function reachableBackendsOf(table: InstantEvalJudgeRouteTable): Set<string> {
   const reachable = new Set<string>();
-  const entries = INSTANT_EVAL_JUDGE_JOBS.flatMap((job) =>
-    Object.values(table.routes[job]).flatMap((slot) =>
-      INSTANT_EVAL_JUDGE_MODES.flatMap((mode) => slot[mode] ?? []),
-    ),
+  // Score and category slots too: an LLM only a score route names must be billable as well.
+  const entries = instantEvalJudgeRouteSlotsOf(table).flatMap((slot) =>
+    INSTANT_EVAL_JUDGE_MODES.flatMap((mode) => slot[mode] ?? []),
   );
   for (const entry of entries) {
     for (const name of usableEntryBackendsOf({ table, entry })) reachable.add(name);

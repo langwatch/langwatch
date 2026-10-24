@@ -1,16 +1,17 @@
 /**
- * The router's LLM legs, on LangWatch's keys: one yes-or-no question per call. It never throws
+ * The router's LLM legs, on LangWatch's keys: one question per call, of any kind. It never throws
  * for a provider failure: each one is a skip naming the platform's reason, never the provider's
  * text. @see modules/instant-eval-judge/specs/instant-eval-judge-router.feature
  */
 
 import type {
-  InstantEvalBooleanQuestion,
   InstantEvalJudgeJob,
+  InstantEvalQuestion,
   InstantEvalSkipReason,
 } from "@langwatch/instant-eval-judge-contract";
 import { Secret } from "@langwatch/secrets";
 
+import type { InstantEvalLlmJudgeValue } from "../rules/instant-eval-judge-sureness.rules.ts";
 import type { InstantEvalLlmJudgeWire } from "../rules/instant-eval-llm-judge-wire.rules.ts";
 
 /** LangWatch's Anthropic key for the router's Anthropic legs; read on LangWatch Cloud only. */
@@ -26,14 +27,18 @@ export interface InstantEvalLlmJudgeRequest {
   /** The provider's model id, from the route table; there is no default. */
   readonly model: string;
   readonly job: InstantEvalJudgeJob;
-  readonly question: InstantEvalBooleanQuestion;
+  readonly question: InstantEvalQuestion;
   readonly text: string;
   readonly timeoutMs: number;
 }
 
-/** A verdict with the tokens it billed, or a skip; a skip after a send still bills its tokens. */
+/**
+ * The question's answer (`verdict` for yes or no, `score`, or `label`) with the tokens it billed,
+ * or a skip; a skip after a send still bills its tokens.
+ */
 export type InstantEvalLlmJudgeAnswer =
-  | Readonly<{ outcome: "answered"; verdict: boolean; inputTokens: number; outputTokens: number }>
+  | (Readonly<{ outcome: "answered"; inputTokens: number; outputTokens: number }> &
+      InstantEvalLlmJudgeValue)
   | Readonly<{
       outcome: "skipped";
       reason: InstantEvalSkipReason;

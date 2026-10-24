@@ -1,6 +1,8 @@
 import {
   instantEvalJudgeRouteTableSchema,
   type InstantEvalBooleanQuestion,
+  type InstantEvalCategoryQuestion,
+  type InstantEvalScoreQuestion,
   type InstantEvalJudgeRouteTable,
 } from "@langwatch/instant-eval-judge-contract";
 
@@ -9,7 +11,7 @@ import {
  * picks, so a suite never carries a deployment's table.
  */
 export function syntheticRouteTable(
-  overrides: { backends?: Record<string, unknown>; inputViews?: unknown } = {},
+  overrides: { backends?: Record<string, unknown>; inputViews?: unknown; kinds?: unknown } = {},
 ): InstantEvalJudgeRouteTable {
   const escalating = {
     instant: { primary: "decision-a", pairWith: "decision-b" },
@@ -60,7 +62,57 @@ export function syntheticRouteTable(
       },
     },
     ...(overrides.inputViews ? { inputViews: overrides.inputViews } : {}),
+    ...(overrides.kinds ? { kinds: overrides.kinds } : {}),
   });
+}
+
+/**
+ * Made-up score and category routes: a score escalates past a made-up sureness, a category pairs
+ * on short llm_judge calls and escalates elsewhere, and every other slot takes the default.
+ */
+export const SYNTHETIC_KINDS = {
+  score: {
+    sureness: "spread",
+    default: {
+      instant: { primary: "decision-a" },
+      balanced: { primary: "decision-a", escalateTo: "llm-a", threshold: 0.5 },
+      accurate: { primary: "llm-a" },
+    },
+    routes: {
+      search: { long: { instant: { primary: "decision-b" }, balanced: { primary: "llm-b" } } },
+    },
+  },
+  category: {
+    sureness: "margin",
+    default: {
+      instant: { primary: "decision-a" },
+      balanced: { primary: "decision-a", escalateTo: "llm-b", threshold: 0.4 },
+    },
+    routes: {
+      llm_judge: { short: { instant: { primary: "decision-a", pairWith: "decision-b" } } },
+    },
+  },
+} as const;
+
+export function rating(
+  id: string,
+  instructions: string,
+  range = { min: 1, max: 5 },
+): InstantEvalScoreQuestion {
+  return { id, kind: "score", instructions, range };
+}
+
+export function choiceOf(
+  id: string,
+  instructions: string,
+  names: readonly string[],
+): InstantEvalCategoryQuestion {
+  return {
+    id,
+    kind: "category",
+    instructions,
+    options: names.map((name) => ({ name, description: `the ${name} case` })),
+  };
 }
 
 export function yesNo(id: string, instructions: string): InstantEvalBooleanQuestion {

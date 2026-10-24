@@ -4,7 +4,11 @@
  * @see modules/instant-eval-judge/specs/instant-eval-judge-router.feature
  */
 
-import type { InstantEvalBooleanQuestion } from "@langwatch/instant-eval-judge-contract";
+import type {
+  InstantEvalBooleanQuestion,
+  InstantEvalCategoryQuestion,
+  InstantEvalScoreQuestion,
+} from "@langwatch/instant-eval-judge-contract";
 import { MockAgent } from "undici";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -156,6 +160,122 @@ describe("HttpInstantEvalLlmJudgeChannel", () => {
     const answer = await llm().judge(request("openai_responses"));
 
     expect(answer).toMatchObject({ outcome: "skipped", reason: "classifier_provider_unavailable" });
+  });
+});
+
+const POLITE: InstantEvalScoreQuestion = {
+  id: "polite",
+  kind: "score",
+  instructions: "Rate how polite the reply is.",
+  range: { min: 1, max: 5 },
+};
+
+const TOPIC: InstantEvalCategoryQuestion = {
+  id: "topic",
+  kind: "category",
+  instructions: "Which topic does the user ask about?",
+  options: [
+    { name: "billing", description: "invoices and charges" },
+    { name: "shipping", description: "" },
+  ],
+};
+
+function anthropicAnswering(
+  input: Record<string, unknown>,
+  sent: { body?: Record<string, unknown> },
+) {
+  agent
+    .get("https://api.anthropic.com")
+    .intercept({ path: "/v1/messages", method: "POST" })
+    .reply(200, (options) => {
+      sent.body = JSON.parse(sentText(options.body)) as Record<string, unknown>;
+      return {
+        content: [{ type: "tool_use", name: "evaluation", input: { reasoning: "r", ...input } }],
+        usage: { input_tokens: 300, output_tokens: 40 },
+      };
+    });
+}
+
+describe("HttpInstantEvalLlmJudgeChannel, given a score or category question", () => {
+  /** @scenario "The LLM legs send one forced score or category tool call and read it back" */
+  it("asks an evaluator's score on its range and reads the number back", async () => {
+    const sent: { body?: Record<string, unknown> } = {};
+    anthropicAnswering({ score: 4 }, sent);
+
+    const answer = await llm().judge({
+      ...request("anthropic_messages"),
+      job: "llm_judge",
+      question: POLITE,
+    });
+
+    expect(answer).toEqual({ outcome: "answered", score: 4, inputTokens: 300, outputTokens: 40 });
+    const [tool] = (sent.body?.tools ?? []) as {
+      input_schema: { properties: Record<string, unknown> };
+    }[];
+    expect(tool?.input_schema.properties.score).toEqual({
+      type: "number",
+      minimum: 1,
+      maximum: 5,
+      description: "The score on the instructions' scale, from 1 to 5.",
+    });
+    expect(String(sent.body?.system)).toContain("on their scale from 1 to 5");
+    expect(JSON.stringify(sent.body?.messages)).toContain("Score from 1 to 5.");
+  });
+
+  /** @scenario "The LLM legs send one forced score or category tool call and read it back" */
+  it.each([[9], ["high"], [null]])(
+    "reads a score of %j, outside the range or not a number, as no answer",
+    async (score) => {
+      anthropicAnswering({ score }, {});
+
+      const answer = await llm().judge({ ...request("anthropic_messages"), question: POLITE });
+
+      expect(answer).toMatchObject({
+        outcome: "skipped",
+        reason: "classifier_failed",
+        inputTokens: 300,
+      });
+    },
+  );
+
+  /** @scenario "The LLM legs send one forced score or category tool call and read it back" */
+  it("asks a search category from the offered names and reads a label, ignoring case", async () => {
+    let sent: Record<string, unknown> = {};
+    agent
+      .get("https://api.openai.com")
+      .intercept({ path: "/v1/responses", method: "POST" })
+      .reply(200, (options) => {
+        sent = JSON.parse(sentText(options.body)) as Record<string, unknown>;
+        return {
+          output: [
+            {
+              type: "function_call",
+              name: "evaluation",
+              arguments: JSON.stringify({ reasoning: "r", label: " Shipping " }),
+            },
+          ],
+          usage: { input_tokens: 500, output_tokens: 50 },
+        };
+      });
+
+    const answer = await llm().judge({ ...request("openai_responses"), question: TOPIC });
+
+    expect(answer).toMatchObject({ outcome: "answered", label: "shipping" });
+    const [tool] = sent.tools as { parameters: { properties: { label: { enum: string[] } } } }[];
+    expect(tool?.parameters.properties.label.enum).toEqual(["billing", "shipping"]);
+    const [, user] = sent.input as { content: string }[];
+    expect(user?.content).toContain(
+      "Answer this question about the text above with one of the categories below: Which topic does the user ask about?\n\n# Categories\n- billing: invoices and charges\n- shipping",
+    );
+  });
+
+  /** @scenario "The LLM legs send one forced score or category tool call and read it back" */
+  it("reads a label the question never offered as no answer", async () => {
+    anthropicAnswering({ label: "refunds" }, {});
+
+    const answer = await llm().judge({ ...request("anthropic_messages"), question: TOPIC });
+
+    expect(answer).toMatchObject({ outcome: "skipped", reason: "classifier_failed" });
   });
 });
 

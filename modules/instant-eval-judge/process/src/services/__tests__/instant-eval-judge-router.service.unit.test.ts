@@ -18,6 +18,9 @@ import { describe, expect, it } from "vitest";
 
 import { MemoryInstantEvalClassifierChannel } from "../../__tests__/support/instant-eval-classifier.test-fakes.ts";
 import {
+  choiceOf,
+  rating,
+  SYNTHETIC_KINDS,
   syntheticRouteTable,
   yesNo,
 } from "../../__tests__/support/instant-eval-judge-route.test-fakes.ts";
@@ -400,18 +403,33 @@ describe("InstantEvalJudgeRouterService", () => {
     });
   });
 
-  it("sends a call with a score question to the hosted classifier unrouted", async () => {
-    const { classify, hostedDecisions, jevCalls } = harness({ jev: () => judged(0.5) });
+  /** @scenario "A kind the table does not route takes today's classifier call" */
+  it("routes the yes-or-no questions and sends a score the table does not route to the classifier", async () => {
     const score: InstantEvalQuestion = {
       id: "s",
       kind: "score",
       instructions: "how polite",
       range: { min: 1, max: 5 },
     };
-    const judgement = await classify(SHORT, [Q, score]);
+    const { classify, hostedDecisions, jevCalls } = harness({
+      decisions: () => judged(0.05),
+      jev: () => ({
+        verdicts: [{ questionId: "s", score: 4 }],
+        inputTokens: 500,
+        isTextTruncated: false,
+      }),
+    });
+    const judgement = await classify(SHORT, [score, Q]);
     expect(jevCalls()).toBe(1);
-    expect(hostedDecisions.requests).toHaveLength(0);
-    expect(judgement.routing).toBeUndefined();
+    expect(hostedDecisions.requests).toHaveLength(1);
+    expect(hostedDecisions.requests[0]?.questions.map((q) => q.id)).toEqual(["q"]);
+    expect(judgement.verdicts).toEqual([
+      { questionId: "s", score: 4 },
+      { questionId: "q", probability: 0.05 },
+    ]);
+    expect(judgement.routing?.answeredBy).toEqual({ "decision-a": 1 });
+    expect(judgement.routing?.flags).toContain("score:unrouted");
+    expect(judgement.inputTokens).toBe(1500);
   });
 
   /** @scenario "Every judgement a routed call returns carries its cost" */
@@ -426,5 +444,124 @@ describe("InstantEvalJudgeRouterService", () => {
     const judgement = await classify(SHORT, [score]);
     // decision-b is the table's hosted-classifier backend: 2000 tokens x 0.05
     expect(judgement.costNanoUsd).toBe(100_000);
+  });
+
+  describe("given score and category questions the table routes", () => {
+    const table = syntheticRouteTable({ kinds: SYNTHETIC_KINDS });
+    const POLITE = rating("polite", "how polite is the reply, 1 to 5");
+    const TOPIC = choiceOf("topic", "which topic is this", ["billing", "shipping", "other"]);
+    const scored = (spread?: number): InstantEvalJudgement => ({
+      verdicts: [{ questionId: "polite", score: 4.1, ...(spread === undefined ? {} : { spread }) }],
+      inputTokens: 1000,
+      isTextTruncated: false,
+    });
+    const labelled = (probabilities: Record<string, number>): InstantEvalJudgement => ({
+      verdicts: [{ questionId: "topic", label: "billing", probabilities }],
+      inputTokens: 1000,
+      isTextTruncated: false,
+    });
+
+    /** @scenario "A sure score or category answer stays, by its kind's sureness rule" */
+    it("keeps a score whose spread is small against the range, from the kind's default slot", async () => {
+      const { classify, llmJudge } = harness({ table, decisions: () => scored(0.3) });
+      const judgement = await classify({ job: "llm_judge", tokens: 500 }, [POLITE]);
+      expect(judgement.verdicts).toEqual([{ questionId: "polite", score: 4.1, spread: 0.3 }]);
+      expect(judgement.routing).toMatchObject({ slot: "default", escalated: 0 });
+      expect(llmJudge.requests).toHaveLength(0);
+    });
+
+    /** @scenario "An unsure score or category answer escalates to the LLM leg" */
+    it("escalates a widely spread score, or one with no distribution, to the LLM's score", async () => {
+      for (const spread of [1.5, undefined]) {
+        const { classify, llmJudge } = harness({
+          table,
+          decisions: () => scored(spread),
+          llm: () => ({ outcome: "answered", score: 2, inputTokens: 900, outputTokens: 80 }),
+        });
+        const judgement = await classify({ job: "llm_judge", tokens: 500 }, [POLITE]);
+        expect(judgement.verdicts).toEqual([{ questionId: "polite", score: 2 }]);
+        expect(judgement.routing).toMatchObject({ answeredBy: { "llm-a": 1 }, escalated: 1 });
+        expect(llmJudge.requests[0]?.question).toEqual(POLITE);
+      }
+    });
+
+    /** @scenario "An unsure score or category answer escalates to the LLM leg" */
+    it("escalates a category whose top two options are close, keeping the LLM's label as certain", async () => {
+      const { classify } = harness({
+        table,
+        decisions: () => labelled({ billing: 0.5, shipping: 0.4, other: 0.1 }),
+        llm: () => ({ outcome: "answered", label: "shipping", inputTokens: 900, outputTokens: 80 }),
+      });
+      const judgement = await classify({ job: "search", tokens: 500 }, [TOPIC]);
+      expect(judgement.verdicts).toEqual([
+        {
+          questionId: "topic",
+          label: "shipping",
+          probabilities: { billing: 0, shipping: 1, other: 0 },
+        },
+      ]);
+      expect(judgement.routing).toMatchObject({ answeredBy: { "llm-b": 1 }, escalated: 1 });
+    });
+
+    /** @scenario "The confident pair keeps the more confident answer" */
+    it("keeps the category answer with the wider margin from a pair", async () => {
+      const { classify } = harness({
+        table,
+        decisions: () => labelled({ billing: 0.55, shipping: 0.45 }),
+        jev: () => ({
+          verdicts: [
+            { questionId: "topic", label: "other", probabilities: { other: 0.9, billing: 0.1 } },
+          ],
+          inputTokens: 1000,
+          isTextTruncated: false,
+        }),
+      });
+      const judgement = await classify({ job: "llm_judge", tokens: 500, mode: "instant" }, [TOPIC]);
+      expect(judgement.verdicts[0]?.label).toBe("other");
+      expect(judgement.routing).toMatchObject({ slot: "short", answeredBy: { "decision-b": 1 } });
+    });
+
+    /** @scenario "Questions of several kinds in one call are routed per kind and merged in order" */
+    it("plans each kind on its own and merges the verdicts in the order asked", async () => {
+      const { classify, hostedDecisions } = harness({
+        table,
+        decisions: () => {
+          const asked = hostedDecisions.requests.at(-1)?.questions[0]?.id;
+          if (asked === "polite") return scored(0.2);
+          if (asked === "topic") return labelled({ billing: 0.9, other: 0.1 });
+          return judged(0.05);
+        },
+      });
+      const judgement = await classify({ job: "llm_judge", tokens: 500 }, [TOPIC, Q, POLITE]);
+      expect(judgement.verdicts.map((verdict) => verdict.questionId)).toEqual([
+        "topic",
+        "q",
+        "polite",
+      ]);
+      const kindsAsked = hostedDecisions.requests.map((request) =>
+        request.questions.map((q) => q.kind).join(","),
+      );
+      expect(kindsAsked.toSorted()).toEqual(["boolean", "category", "score"]);
+      // The category's short llm_judge slot pairs with the classifier, paid but not answering it.
+      expect(judgement.inputTokens).toBe(4000);
+      expect(judgement.routing?.answeredBy).toEqual({ "decision-a": 3 });
+    });
+
+    /** @scenario "An LLM leg that fails keeps the primary verdict, flagged" */
+    it("keeps an unsure score when the LLM answers nothing readable", async () => {
+      const { classify } = harness({
+        table,
+        decisions: () => scored(1.8),
+        llm: () => ({
+          outcome: "skipped",
+          reason: "classifier_failed",
+          inputTokens: 900,
+          outputTokens: 80,
+        }),
+      });
+      const judgement = await classify({ job: "llm_judge", tokens: 500 }, [POLITE]);
+      expect(judgement.verdicts).toEqual([{ questionId: "polite", score: 4.1, spread: 1.8 }]);
+      expect(judgement.routing?.flags).toContain("escalation_failed");
+    });
   });
 });

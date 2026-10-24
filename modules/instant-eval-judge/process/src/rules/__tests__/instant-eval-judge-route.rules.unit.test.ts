@@ -16,9 +16,11 @@ import { instantEvalJudgeCallCostOf } from "../instant-eval-judge-route-cost.rul
 import {
   instantEvalJudgeRoutePlanOf,
   isArithmeticQuestion,
-  instantEvalVerdictConfidence,
-  isUnsureVerdict,
 } from "../instant-eval-judge-route.rules.ts";
+import {
+  instantEvalVerdictSurenessOf,
+  isUnsureAnswer,
+} from "../instant-eval-judge-sureness.rules.ts";
 
 const table = syntheticRouteTable();
 const UPSET = yesNo("q", "is the user upset");
@@ -28,6 +30,22 @@ function plan(route: InstantEvalJudgeRoute, question = UPSET, text = "x") {
 }
 
 describe("the unsure rule", () => {
+  const isUnsureVerdict = ({
+    probability,
+    threshold,
+  }: {
+    probability?: number;
+    threshold: number;
+  }) =>
+    isUnsureAnswer({
+      sureness: instantEvalVerdictSurenessOf({
+        question: UPSET,
+        verdict: { questionId: UPSET.id, ...(probability === undefined ? {} : { probability }) },
+        rule: undefined,
+      }),
+      threshold,
+    });
+
   /** @scenario "An unsure decision-model answer escalates to the LLM leg" */
   it("is |2p - 1| below the threshold, and no probability is unsure", () => {
     expect(isUnsureVerdict({ probability: 0.15, threshold: 0.7 })).toBe(false);
@@ -37,8 +55,7 @@ describe("the unsure rule", () => {
     }
     expect(isUnsureVerdict({ probability: 0, threshold: 0.7 })).toBe(false);
     expect(isUnsureVerdict({ probability: 1, threshold: 0.7 })).toBe(false);
-    expect(isUnsureVerdict({ probability: undefined, threshold: 0.7 })).toBe(true);
-    expect(instantEvalVerdictConfidence(undefined)).toBe(-1);
+    expect(isUnsureVerdict({ threshold: 0.7 })).toBe(true);
   });
 });
 

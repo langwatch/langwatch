@@ -1,5 +1,6 @@
 /**
- * The router's LLM legs over HTTP, on LangWatch's keys: one forced tool call per question, no
+ * The router's LLM legs over HTTP, on LangWatch's keys: one forced tool call per question of any
+ * kind, no
  * retry (the router decides what a failure means). Only the status is read from a refusal.
  * @see modules/instant-eval-judge/specs/instant-eval-judge-router.feature
  */
@@ -12,7 +13,7 @@ import { prepareInstantEvalText } from "../../rules/instant-eval-classifier-text
 import { decisionFailureOf } from "../../rules/instant-eval-decision-wire.rules.ts";
 import {
   instantEvalLlmJudgeBodyOf,
-  instantEvalLlmJudgeMessagesOf,
+  instantEvalLlmJudgePromptOf,
   readInstantEvalLlmJudgeAnswer,
   type InstantEvalLlmJudgeWire,
 } from "../../rules/instant-eval-llm-judge-wire.rules.ts";
@@ -64,8 +65,8 @@ export class HttpInstantEvalLlmJudgeChannel implements InstantEvalLlmJudgeChanne
     const apiKey = this.keys[wire];
     if (!apiKey || !model) return skipped("classifier_not_configured");
     const fitted = prepareInstantEvalText({ text, budgetTokens: LLM_CONTENT_BUDGET_TOKENS });
-    const { system, user } = instantEvalLlmJudgeMessagesOf({ job, question, text: fitted.text });
-    const body = JSON.stringify(instantEvalLlmJudgeBodyOf({ wire, model, system, user }));
+    const prompt = instantEvalLlmJudgePromptOf({ job, question, text: fitted.text });
+    const body = JSON.stringify(instantEvalLlmJudgeBodyOf({ wire, model, prompt }));
     let response: Awaited<ReturnType<typeof undiciFetch>>;
     try {
       response = await undiciFetch(ENDPOINTS[wire], {
@@ -85,13 +86,16 @@ export class HttpInstantEvalLlmJudgeChannel implements InstantEvalLlmJudgeChanne
       return this.skip({ wire, reason, status: response.status });
     }
     const parsed: unknown = await response.json().catch(() => undefined);
-    const reading = readInstantEvalLlmJudgeAnswer({ wire, body: parsed });
+    const reading = readInstantEvalLlmJudgeAnswer({ wire, body: parsed, question });
     const { inputTokens, outputTokens } = reading;
     if (reading.outcome === "none") {
-      logger.warn({ wire }, "Instant Evals LLM leg answered without an evaluation call");
+      logger.warn(
+        { wire, kind: question.kind },
+        "Instant Evals LLM leg answered without a readable evaluation call",
+      );
       return { outcome: "skipped", reason: "classifier_failed", inputTokens, outputTokens };
     }
-    return { outcome: "answered", verdict: reading.verdict, inputTokens, outputTokens };
+    return { outcome: "answered", ...reading.value, inputTokens, outputTokens };
   }
 
   private skip({
