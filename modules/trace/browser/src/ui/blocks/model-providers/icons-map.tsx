@@ -28,6 +28,7 @@ export const modelProviderIcons: Record<ProviderIconKey, React.ReactNode> = {
   custom: designSystemIcons.custom,
   xai: designSystemIcons.xai,
   cerebras: designSystemIcons.cerebras,
+  doubleword: designSystemIcons.doubleword,
   voyage: designSystemIcons.voyage,
   azure_safety: <Azure />,
   inception: designSystemIcons.inception,

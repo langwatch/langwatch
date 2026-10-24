@@ -857,6 +857,7 @@ export const prismaModelFieldCatalogue = {
     "name",
     "slug",
     "apiKey",
+    "legacyApiKeyLastUsedAt",
     "lwqlKey",
     "teamId",
     "team",

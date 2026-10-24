@@ -1,0 +1,210 @@
+#!/usr/bin/env bash
+#
+# Renders the standalone langyagent chart and asserts the values that let an
+# install take over existing agent objects in place: selectorLabels, podLabels,
+# extraEnvs, extraConfig, service.annotations, progressDeadlineSeconds and an
+# uncapped scratch volume. See specs/langy/langyagent-chart-takeover.feature.
+#
+# The selector matters most: a Deployment's spec.selector is immutable, so a
+# chart that cannot render an existing Deployment's selector can only replace
+# it, never adopt it.
+#
+# Scenario bindings use the same `@scenario` token as the bats suites,
+# expressed as a hash-comment above the test function it verifies — the next
+# line that is neither blank nor a comment must be that function.
+#
+# Usage (from charts/langwatch):
+#   ./tests/langyagent-takeover.sh
+
+# `check && pass || fail` is intended: pass only echoes and cannot fail.
+# shellcheck disable=SC2015
+
+set -euo pipefail
+
+cd "$(dirname "$0")/../../langyagent"
+
+failures=0
+fail() {
+  echo "FAIL [$1] $2"
+  failures=$((failures + 1))
+}
+pass() { echo "ok   [$1]"; }
+
+# Every filter here reads its whole input: under pipefail, a reader that exits
+# early (head, grep -q, awk exit) kills the writer with SIGPIPE and fails the
+# test for no reason.
+
+# Prints one kind's document from a render.
+doc_of() {
+  awk -v kind="$1" '
+    /^---/ { if (grab) done = 1; grab = 0; next }
+    !done && $0 == "kind: " kind { grab = 1 }
+    grab { print }
+  '
+}
+
+# Prints the indented block under the first line matching $1, up to the next
+# line at the same or a shallower indent.
+block_after() {
+  awk -v key="$1" '
+    done { next }
+    !found && index($0, key) { found = 1; match($0, /^ */); ind = RLENGTH; next }
+    found { match($0, /^ */); if (RLENGTH <= ind && $0 !~ /^ *$/) { done = 1; next }; print }
+  '
+}
+
+render() { helm template takeover . "$@"; }
+
+# The tmp entry under the pod's volumes (8-space indent), not the container's
+# volumeMounts entry of the same name.
+scratch_volume() { awk 'done { next } /^        - name: tmp$/ { grab = 1; next } grab && /^        - / { done = 1; next } grab { print }'; }
+
+TAKEOVER=(
+  --set-json 'selectorLabels={"app":"existing-agent"}'
+  --set-json 'podLabels={"team":"agents","app":"other"}'
+  --set-json 'extraEnvs=[{"name":"EXTRA_FROM_SECRET","valueFrom":{"secretKeyRef":{"name":"agent-extra","key":"EXTRA"}}}]'
+  --set-json 'extraConfig={"LOG_FORMAT":"json"}'
+  --set-json 'service.annotations={"service.kubernetes.io/topology-mode":"Auto","prometheus.io/scrape":true}'
+  --set progressDeadlineSeconds=1800
+  --set scratchSizeLimit=
+)
+
+# @scenario "A fresh install renders the default selector"
+test_default_selector() {
+  local out
+  out="$(render)"
+  local sel
+  sel="$(doc_of Deployment <<<"$out" | block_after 'matchLabels:' | awk 'NR<=2' | sort | tr -d ' ')"
+  if [[ "$sel" == $'app.kubernetes.io/instance:takeover\napp.kubernetes.io/name:langwatch-langyagent' ]]; then
+    pass "default Deployment selector"
+  else
+    fail "default Deployment selector" "got: $sel"
+  fi
+  if doc_of Service <<<"$out" | block_after 'selector:' | grep 'app.kubernetes.io/name: langwatch-langyagent' >/dev/null &&
+     doc_of NetworkPolicy <<<"$out" | block_after 'podSelector:' | grep 'app.kubernetes.io/name: langwatch-langyagent' >/dev/null; then
+    pass "default Service and NetworkPolicy selectors"
+  else
+    fail "default Service and NetworkPolicy selectors" "do not select the chart labels"
+  fi
+}
+
+# @scenario "Custom selector labels reach every selector"
+test_custom_selector_everywhere() {
+  local out dep
+  out="$(render "${TAKEOVER[@]}")"
+  dep="$(doc_of Deployment <<<"$out")"
+  local sel
+  sel="$(block_after 'selector:' <<<"$dep" | block_after 'matchLabels:' | tr -d ' ')"
+  [[ "$sel" == "app:existing-agent" ]] && pass "Deployment selector" || fail "Deployment selector" "got: $sel"
+  block_after 'template:' <<<"$dep" | block_after 'labels:' | grep 'app: existing-agent' >/dev/null &&
+    pass "pod template carries the selector" || fail "pod template carries the selector" "label missing"
+  [[ "$(doc_of Service <<<"$out" | block_after 'selector:' | tr -d ' ')" == "app:existing-agent" ]] &&
+    pass "Service selector" || fail "Service selector" "not the custom labels"
+  doc_of NetworkPolicy <<<"$out" | block_after 'podSelector:' | grep 'app: existing-agent' >/dev/null &&
+    pass "NetworkPolicy podSelector" || fail "NetworkPolicy podSelector" "not the custom labels"
+}
+
+# @scenario "Pod labels never displace a selector label"
+test_pod_labels_keep_selector() {
+  local labels
+  labels="$(render "${TAKEOVER[@]}" | doc_of Deployment | block_after 'template:' | block_after 'labels:')"
+  if grep -q 'app: existing-agent' <<<"$labels" && grep -q 'team: agents' <<<"$labels" && ! grep -q 'app: other' <<<"$labels"; then
+    pass "selector label wins over podLabels"
+  else
+    fail "selector label wins over podLabels" "got: $(tr '\n' ' ' <<<"$labels")"
+  fi
+}
+
+# @scenario "A numeric label value renders as a string"
+test_numeric_label_values_quoted() {
+  local dep
+  dep="$(render --set selectorLabels.tier=1 --set podLabels.version=2 | doc_of Deployment)"
+  block_after 'selector:' <<<"$dep" | grep -F 'tier: "1"' >/dev/null &&
+    pass "numeric selector label quoted" || fail "numeric selector label quoted" "tier is not a string"
+  block_after 'template:' <<<"$dep" | block_after 'labels:' | grep -F 'version: "2"' >/dev/null &&
+    pass "numeric pod label quoted" || fail "numeric pod label quoted" "version is not a string"
+}
+
+# @scenario "Extra environment entries are appended to the agent container"
+test_extra_env_appended() {
+  local env
+  env="$(render "${TAKEOVER[@]}" | doc_of Deployment | block_after '          env:' | grep -E '^ *- name:' | sed 's/.*name: //')"
+  if [[ "$(head -1 <<<"$env")" == "LANGY_INTERNAL_SECRET" && "$(tail -1 <<<"$env")" == "EXTRA_FROM_SECRET" ]]; then
+    pass "extraEnvs appended"
+  else
+    fail "extraEnvs appended" "env order: $(tr '\n' ' ' <<<"$env")"
+  fi
+}
+
+# @scenario "Extra config adds keys to the agent ConfigMap"
+test_extra_config_added() {
+  render "${TAKEOVER[@]}" | doc_of ConfigMap | grep '^  LOG_FORMAT: "json"$' >/dev/null &&
+    pass "extraConfig key" || fail "extraConfig key" "LOG_FORMAT missing from the ConfigMap"
+}
+
+# @scenario "Extra config cannot replace a key the chart writes"
+test_extra_config_refuses_owned_key() {
+  local out
+  if out="$(render --set extraConfig.ENVIRONMENT=local 2>&1)"; then
+    fail "owned key refused" "render succeeded"
+  elif grep -q 'extraConfig.ENVIRONMENT is set by the chart itself' <<<"$out"; then
+    pass "owned key refused"
+  else
+    fail "owned key refused" "failed for another reason: $(tr '\n' ' ' <<<"$out" | cut -c1-200)"
+  fi
+}
+
+# @scenario "Extra environment entries cannot replace a variable the chart sets"
+test_extra_env_refuses_owned_name() {
+  local out
+  # A container's env entries win over its envFrom, so this pair would turn
+  # worker isolation off in a production pod if it rendered.
+  if out="$(render --set-json 'extraEnvs=[{"name":"ENVIRONMENT","value":"local"},{"name":"LANGY_UNSAFE_DEV_DISABLE_ISOLATION","value":"true"}]' 2>&1)"; then
+    fail "owned env name refused" "render succeeded"
+  elif grep -q 'extraEnvs sets ENVIRONMENT, which the chart sets itself' <<<"$out"; then
+    pass "owned env name refused"
+  else
+    fail "owned env name refused" "failed for another reason: $(tr '\n' ' ' <<<"$out" | cut -c1-200)"
+  fi
+}
+
+# @scenario "Service annotations and the rollout deadline are rendered when set"
+test_annotations_and_deadline() {
+  local out
+  out="$(render "${TAKEOVER[@]}")"
+  doc_of Service <<<"$out" | grep 'service.kubernetes.io/topology-mode: "Auto"' >/dev/null &&
+    pass "Service annotations" || fail "Service annotations" "missing"
+  doc_of Service <<<"$out" | grep 'prometheus.io/scrape: "true"' >/dev/null &&
+    pass "Service annotation values are strings" ||
+    fail "Service annotation values are strings" "a boolean value was not quoted"
+  doc_of Deployment <<<"$out" | grep '^  progressDeadlineSeconds: 1800$' >/dev/null &&
+    pass "progressDeadlineSeconds" || fail "progressDeadlineSeconds" "missing"
+  render | doc_of Deployment | grep 'progressDeadlineSeconds' >/dev/null &&
+    fail "no deadline by default" "rendered without being set" || pass "no deadline by default"
+}
+
+# @scenario "The scratch volume can be uncapped"
+test_scratch_uncapped() {
+  local tmp
+  tmp="$(render "${TAKEOVER[@]}" | doc_of Deployment | scratch_volume | tr -d ' \n')"
+  [[ "$tmp" == "emptyDir:{}" ]] && pass "uncapped scratch" || fail "uncapped scratch" "got: $tmp"
+  render | doc_of Deployment | scratch_volume | grep 'sizeLimit: 1Gi' >/dev/null &&
+    pass "default scratch cap kept" || fail "default scratch cap kept" "1Gi cap missing by default"
+}
+
+test_default_selector
+test_custom_selector_everywhere
+test_pod_labels_keep_selector
+test_numeric_label_values_quoted
+test_extra_env_appended
+test_extra_config_added
+test_extra_config_refuses_owned_key
+test_extra_env_refuses_owned_name
+test_annotations_and_deadline
+test_scratch_uncapped
+
+if [[ "$failures" -gt 0 ]]; then
+  echo "$failures assertion(s) failed"
+  exit 1
+fi
+echo "all langyagent takeover assertions passed"

@@ -11,6 +11,12 @@ import { loadWorkspaceEnv } from "./workspace-env";
 const STACK_PORT = Number(process.env.E2E_STACK_PORT ?? "5610");
 
 /**
+ * The seeded key is a legacy project key, which may only ingest unless its project keeps full
+ * access (modules/auth/specs/legacy-project-key-scope.feature). These suites call every family.
+ */
+const LEGACY_KEY_FULL_ACCESS = { LEGACY_PROJECT_KEY_FULL_ACCESS: "1" } as const;
+
+/**
  * A stack already answering is only reused when it is this machine's. A
  * `LANGWATCH_ENDPOINT` left pointing at a hosted platform must never become
  * the thing an end-to-end suite writes to.
@@ -49,6 +55,7 @@ export default async function setup(): Promise<() => Promise<void>> {
   const stack: RunningStack = await startStack({
     port: STACK_PORT,
     baseUrlHint: localHint(),
+    env: LEGACY_KEY_FULL_ACCESS,
   });
   console.log(`Stack (${stack.source}): ${stack.baseUrl}`);
 
@@ -58,7 +65,8 @@ export default async function setup(): Promise<() => Promise<void>> {
       await stack.stop();
       throw new Error(
         `the seeded project key is refused at ${stack.baseUrl} even after seeding; ` +
-          `the stack and the seed must share one CREDENTIALS_SECRET`,
+          `the stack and the seed must share one CREDENTIALS_SECRET, and the stack needs ` +
+          `LEGACY_PROJECT_KEY_FULL_ACCESS=1 for the seeded legacy key to reach prompts`,
       );
     }
   }

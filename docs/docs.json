@@ -720,6 +720,7 @@
               "ai-gateway/providers/groq",
               "ai-gateway/providers/cerebras",
               "ai-gateway/providers/deepseek",
+              "ai-gateway/providers/doubleword",
               "ai-gateway/providers/voyage",
               "ai-gateway/providers/elevenlabs",
               "ai-gateway/providers/openai-account",
@@ -1781,7 +1782,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1792758192",
+      "source": "/ci/cache/busted/1792866928",
       "destination": "/introduction"
     },
     {
