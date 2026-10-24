@@ -127,6 +127,18 @@ function modalityOf({
   return supportsImageInput ? "text+image->text" : "text->text";
 }
 
+/** Whether the tariff carries a usable rate: an input rate, and an output rate unless it embeds. */
+function isPriced({
+  tariff,
+  isEmbedding,
+}: {
+  tariff: DoublewordTariff;
+  isEmbedding: boolean;
+}): boolean {
+  if (parsePrice(tariff.input_price_per_token) <= 0) return false;
+  return isEmbedding || parsePrice(tariff.output_price_per_token) > 0;
+}
+
 /**
  * Maps one Doubleword model to a catalog entry, or undefined when the model
  * has no realtime price or is a type the catalog does not cover.
@@ -144,6 +156,7 @@ export function mapDoublewordModel({
   const type = model.model_type.toUpperCase();
   if (type !== "CHAT" && type !== "EMBEDDINGS") return undefined;
   const isEmbedding = type === "EMBEDDINGS";
+  if (!isPriced({ tariff, isEmbedding })) return undefined;
   const capabilities = model.capabilities ?? [];
   const supportsImageInput = !isEmbedding && capabilities.includes("vision");
   const chatParameters = capabilities.includes("reasoning")
@@ -188,9 +201,9 @@ export function mapDoublewordModels({
 }
 
 /**
- * The Doubleword entries a sync run writes. When this run read no list, or a list with no priced
- * model (an inference key lists models without prices), the entries already on disk are kept,
- * so a bad run does not delete them. `excludeIds` always wins over both.
+ * The Doubleword entries a sync run writes. With no list, a list with no priced model (an
+ * inference key lists no prices), or a listed model whose realtime tariff has no price, the
+ * entries already on disk are kept, so a bad run does not delete them. `excludeIds` always wins.
  */
 export function resolveDoublewordEntries({
   fetched,
@@ -204,7 +217,17 @@ export function resolveDoublewordEntries({
   now: Instant;
 }): LLMModelEntry[] {
   const mapped = fetched ? mapDoublewordModels({ models: fetched, excludeIds, now }) : [];
-  if (mapped.length > 0) return mapped;
+  if (mapped.length > 0) {
+    const mappedIds = new Set(mapped.map((entry) => entry.id));
+    const unpricedKept = (fetched ?? [])
+      .filter((model) => pickRealtimeTariff({ model, now }))
+      .map((model) => previousModels[`${DOUBLEWORD_PROVIDER}/${model.model_name}`])
+      .filter(
+        (entry): entry is LLMModelEntry =>
+          entry !== undefined && !mappedIds.has(entry.id) && !excludeIds.has(entry.id),
+      );
+    return [...mapped, ...unpricedKept];
+  }
   return Object.values(previousModels).filter(
     (model) => model.provider === DOUBLEWORD_PROVIDER && !excludeIds.has(model.id),
   );

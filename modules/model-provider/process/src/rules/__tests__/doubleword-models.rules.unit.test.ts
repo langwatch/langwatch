@@ -180,6 +180,33 @@ describe("mapDoublewordModels", () => {
   });
 });
 
+const UNPRICED_REALTIME: DoublewordModel = {
+  ...VISION_NO_CACHE,
+  tariffs: [
+    {
+      name: "Realtime",
+      input_price_per_token: null,
+      output_price_per_token: "0.00000058",
+      api_key_purpose: "realtime",
+      is_active: true,
+    },
+  ],
+};
+
+describe("mapDoublewordModel with an unpriced realtime tariff", () => {
+  it("leaves the model out instead of pricing it at zero", () => {
+    expect(mapDoublewordModel({ model: UNPRICED_REALTIME, now: NOW })).toBeUndefined();
+  });
+
+  it("leaves out a chat model with no output rate", () => {
+    const noOutput: DoublewordModel = {
+      ...VISION_NO_CACHE,
+      tariffs: [{ ...VISION_NO_CACHE.tariffs![0]!, output_price_per_token: "0" }],
+    };
+    expect(mapDoublewordModel({ model: noOutput, now: NOW })).toBeUndefined();
+  });
+});
+
 describe("resolveDoublewordEntries", () => {
   const previousModels: Record<string, LLMModelEntry> = {
     "doubleword/kept/Model": {
@@ -206,6 +233,23 @@ describe("resolveDoublewordEntries", () => {
         now: NOW,
       });
       expect(entries.map((e) => e.id)).toEqual(["doubleword/deepseek-ai/DeepSeek-V4.1-Flash"]);
+    });
+  });
+
+  describe("when a listed model's realtime tariff has no price", () => {
+    it("keeps that model's entry already in the catalog", () => {
+      const previousHy3 = mapDoublewordModel({ model: VISION_NO_CACHE, now: NOW })!;
+      const entries = resolveDoublewordEntries({
+        fetched: [FLASH, UNPRICED_REALTIME],
+        previousModels: { ...previousModels, [previousHy3.id]: previousHy3 },
+        excludeIds: new Set(),
+        now: NOW,
+      });
+      expect(entries.map((e) => e.id)).toEqual([
+        "doubleword/deepseek-ai/DeepSeek-V4.1-Flash",
+        "doubleword/tencent/Hy3-FP8",
+      ]);
+      expect(entries[1]!.pricing.inputCostPerToken).toBe(0.00000014);
     });
   });
 

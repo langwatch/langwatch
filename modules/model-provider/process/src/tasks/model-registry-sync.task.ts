@@ -18,10 +18,7 @@ import type {
 } from "../channels/doubleword-model.channel.ts";
 import { HttpDoublewordModelChannel } from "../channels/http/http.doubleword-model.channel.ts";
 import { HttpLitellmPriceChannel } from "../channels/http/http.litellm-price.channel.ts";
-import type {
-  LitellmPriceChannel,
-  LitellmPriceRegistry,
-} from "../channels/litellm-price.channel.ts";
+import type { LitellmPriceChannel } from "../channels/litellm-price.channel.ts";
 import {
   auditCatalog,
   blockingFindings,
@@ -282,6 +279,18 @@ async function mergeDoublewordModels({
   );
 }
 
+function preferLitellmRates({
+  models,
+  litellmById,
+}: {
+  models: Record<string, LLMModelEntry>;
+  litellmById: Record<string, LLMModelPricing> | undefined;
+}): void {
+  if (!litellmById) return;
+  const preferred = applyLitellmPreference({ models, litellmById });
+  logger.info({ ids: preferred }, "Took litellm's rates for the preferred models");
+}
+
 /**
  * Audits the catalog this run produced against litellm, writes the report,
  * and logs every blocking finding. litellm is independent of OpenRouter,
@@ -290,18 +299,17 @@ async function mergeDoublewordModels({
 function auditAndReport({
   generated,
   overlay,
-  litellmPrices,
+  litellmById,
   unrepresentable,
 }: {
   generated: Record<string, LLMModelEntry>;
   overlay: Record<string, LLMModelEntry>;
-  litellmPrices: LitellmPriceRegistry;
+  /** litellm's pricing by catalog id; undefined when this run could not fetch it. */
+  litellmById: Record<string, LLMModelPricing> | undefined;
   unrepresentable: UnrepresentableModel[];
 }): AuditReport {
   const upstream: Record<string, Record<string, LLMModelPricing>> = {};
-  if (litellmPrices.outcome === "fetched") {
-    upstream.litellm = litellmPricingById(litellmPrices.prices);
-  }
+  if (litellmById) upstream.litellm = litellmById;
 
   const baseline = readAuditBaseline();
   const report = withoutAcceptedCrossSource(
@@ -453,18 +461,14 @@ export async function syncModelRegistry({
 
   // Where a person decided litellm is the right side of a price disagreement,
   // its rates are taken before the audit runs, so the audit checks what is written.
-  if (litellmPrices.outcome === "fetched") {
-    const preferred = applyLitellmPreference({
-      models: transformedModels,
-      litellmById: litellmPricingById(litellmPrices.prices),
-    });
-    logger.info({ ids: preferred }, "Took litellm's rates for the preferred models");
-  }
+  const litellmById =
+    litellmPrices.outcome === "fetched" ? litellmPricingById(litellmPrices.prices) : undefined;
+  preferLitellmRates({ models: transformedModels, litellmById });
 
   auditAndReport({
     generated: transformedModels,
     overlay: overlayModels,
-    litellmPrices,
+    litellmById,
     unrepresentable,
   });
 
