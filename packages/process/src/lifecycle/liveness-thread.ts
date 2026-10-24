@@ -7,6 +7,7 @@ import {
   redactedRequestHead,
   REFUSED_BEFORE_ROUTING,
 } from "./client-error.ts";
+import { NOT_HANDLED_DRAINING, NOT_HANDLED_HEADER } from "./not-handled.ts";
 
 /** The kubelet's path; answered in the thread from the heartbeat, never proxied. */
 export const LIVENESS_PATH = "/healthz";
@@ -292,7 +293,12 @@ const proxy = (req, res) => {
   });
   upstream.on("response", (reply) => {
     clearInterval(timer);
-    res.writeHead(reply.statusCode ?? 502, endToEnd(reply.headers));
+    const headers = endToEnd(reply.headers);
+    // A draining main thread takes no new work: close this connection so the proxy goes elsewhere.
+    if (reply.headers[workerData.notHandledHeader] === workerData.notHandledDraining) {
+      headers.connection = "close";
+    }
+    res.writeHead(reply.statusCode ?? 502, headers);
     reply.pipe(res);
   });
   upstream.on("error", () => {
@@ -460,6 +466,8 @@ export async function startLivenessThread({
       clientErrorStatusLines: CLIENT_ERROR_STATUS_LINES,
       quietClientErrors: QUIET_CLIENT_ERROR_CODES,
       hopByHopHeaders: HOP_BY_HOP_HEADERS,
+      notHandledHeader: NOT_HANDLED_HEADER,
+      notHandledDraining: NOT_HANDLED_DRAINING,
     },
   });
   // The main loop keeps its own loopback listener, which is what holds the process open.
