@@ -93,6 +93,31 @@ function queryParams(request: QueryRequest): Record<string, unknown> {
 }
 
 /**
+ * The largest result a buffered read may receive, in ClickHouse's uncompressed bytes. The
+ * server's memory cap protects the server, not this process, and parsed rows take several
+ * times their size in the heap. See specs/clickhouse/bounded-reads.feature, "The result ceiling".
+ */
+export const BUFFERED_READ_MAX_RESULT_BYTES = 256 * 1024 * 1024;
+
+/**
+ * Adds the default ceiling with `throw`, since `break` would pass a partial result off as whole.
+ * A read naming its own `max_result_bytes`, or asking for `break`, keeps exactly what it sent;
+ * one naming only a row limit keeps it and gains the ceiling.
+ */
+function bufferedReadSettings(
+  settings: Record<string, string | number> | undefined,
+): Record<string, string | number> | undefined {
+  const overflowMode = settings?.result_overflow_mode;
+  if (settings?.max_result_bytes !== undefined) return settings;
+  if (overflowMode !== undefined && overflowMode !== "throw") return settings;
+  return {
+    ...settings,
+    max_result_bytes: String(BUFFERED_READ_MAX_RESULT_BYTES),
+    result_overflow_mode: "throw",
+  };
+}
+
+/**
  * A server before 25.11 that fails after its 200 writes the failure as a last `{"exception"}`
  * row, which the vendor client hands over as data; read it as the failure it is, with the
  * server's code, as VendorClientResilience does (specs/clickhouse/single-client-access.feature).
@@ -179,7 +204,10 @@ export function routingDriver<Client extends RoutableStatementClient>(
 
       const started = nowInstant().epochMilliseconds;
       const rows = await onTarget(connection, vendor, async () => {
-        const resultSet = await vendor.query({ ...queryParams(request), format: "JSONEachRow" });
+        const resultSet = await vendor.query({
+          ...queryParams({ ...request, settings: bufferedReadSettings(request.settings) }),
+          format: "JSONEachRow",
+        });
         const read = (await resultSet.json()) as Row[];
         refuseInbandException(read);
         return read;

@@ -2544,7 +2544,12 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
         try {
           return await this.readJoinedTraceBatch({ ...batchRead, batchTraceIds: traceIds });
         } catch (error) {
-          if (!TraceLegacyReadClickHouseRepository.isClickHouseMemoryLimitError(error)) {
+          // A result too large to buffer is refused by the client's default result ceiling;
+          // it is the same over-large read a memory refusal is, so it gets the same budget.
+          if (
+            !TraceLegacyReadClickHouseRepository.isClickHouseMemoryLimitError(error) &&
+            !TraceLegacyReadClickHouseRepository.isClickHouseResultOverflowError(error)
+          ) {
             throw error;
           }
           return this.readJoinedTracesInBatches({ ...batchRead, traceIds });
@@ -2605,13 +2610,15 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
 
     const merged = new Map<string, TraceLegacyRow>();
     let mergedSpanCount = 0;
+    const pending: string[][] = [];
     for (
       let i = 0;
       i < traceIds.length;
       i += TraceLegacyReadClickHouseRepository.SUMMARY_BATCH_SIZE
     ) {
-      const batch = traceIds.slice(i, i + TraceLegacyReadClickHouseRepository.SUMMARY_BATCH_SIZE);
-
+      pending.push(traceIds.slice(i, i + TraceLegacyReadClickHouseRepository.SUMMARY_BATCH_SIZE));
+    }
+    for (let batch = pending.shift(); batch !== undefined; batch = pending.shift()) {
       // Batching caps ClickHouse's peak memory, not ours — the merge rebuilds the whole
       // result here. The budget goes into the read so an over-budget batch is refused by
       // ClickHouse instead of arriving in this process first. See
@@ -2625,15 +2632,17 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           maxSpanRows: remainingSpanBudget,
         });
       } catch (batchError) {
-        if (!TraceLegacyReadClickHouseRepository.isClickHouseResultOverflowError(batchError))
-          throw batchError;
-        throw new Error(
-          `Traces-with-spans join fallback exceeded ${MAX_SPANS_PER_JOINED_FALLBACK} spans ` +
-            `(${mergedSpanCount} already merged across ${merged.size} of ${traceIds.length} traces, ` +
-            `and the next batch of ${batch.length} overran the remaining ${remainingSpanBudget}); ` +
-            `refusing to materialise the rest`,
-          { cause: batchError },
+        pending.unshift(
+          ...TraceLegacyReadClickHouseRepository.smallerBatchesAfterRefusal({
+            batchError,
+            batch,
+            mergedSpanCount,
+            mergedTraceCount: merged.size,
+            totalTraceCount: traceIds.length,
+            remainingSpanBudget,
+          }),
         );
+        continue;
       }
 
       for (const [traceId, value] of batchMap) {
@@ -2653,6 +2662,50 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
       }
     }
     return merged;
+  }
+
+  /**
+   * A batch refused for its size is halved and read again; a single trace that still does not
+   * fit, a batch refused for its span count, or any other failure is thrown, naming its limit.
+   */
+  private static smallerBatchesAfterRefusal({
+    batchError,
+    batch,
+    mergedSpanCount,
+    mergedTraceCount,
+    totalTraceCount,
+    remainingSpanBudget,
+  }: {
+    batchError: unknown;
+    batch: string[];
+    mergedSpanCount: number;
+    mergedTraceCount: number;
+    totalTraceCount: number;
+    remainingSpanBudget: number;
+  }): string[][] {
+    if (!TraceLegacyReadClickHouseRepository.isClickHouseResultOverflowError(batchError))
+      throw batchError;
+    const isBytes =
+      TraceLegacyReadClickHouseRepository.isClickHouseResultBytesOverflowError(batchError);
+    if (isBytes && batch.length > 1) {
+      const half = Math.ceil(batch.length / 2);
+      return [batch.slice(0, half), batch.slice(half)];
+    }
+    if (isBytes) {
+      throw new Error(
+        `Traces-with-spans join fallback: trace ${batch[0]} alone exceeds the result size ` +
+          `ceiling (${mergedTraceCount} of ${totalTraceCount} traces already merged); ` +
+          `refusing to materialise it`,
+        { cause: batchError },
+      );
+    }
+    throw new Error(
+      `Traces-with-spans join fallback exceeded ${MAX_SPANS_PER_JOINED_FALLBACK} spans ` +
+        `(${mergedSpanCount} already merged across ${mergedTraceCount} of ${totalTraceCount} traces, ` +
+        `and the next batch of ${batch.length} overran the remaining ${remainingSpanBudget}); ` +
+        `refusing to materialise the rest`,
+      { cause: batchError },
+    );
   }
 
   private async readJoinedTraceBatch({
@@ -3116,6 +3169,24 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
       (error as { code?: string | number }).code === 396 ||
       (error as { code?: string | number }).code === "396"
     );
+  }
+
+  /**
+   * A result overflow refused on its size (`max_result_bytes`) rather than its row count:
+   * ClickHouse names the limit that fired ("max bytes" or "max rows") in the message.
+   */
+  static isClickHouseResultBytesOverflowError(error: unknown): boolean {
+    if (!TraceLegacyReadClickHouseRepository.isClickHouseResultOverflowError(error)) return false;
+    const messages: string[] = [];
+    const collect = (current: unknown): void => {
+      if (!(current instanceof Error)) return;
+      messages.push(current.message);
+      if (HandledError.isHandled(current))
+        for (const reason of current.reasons ?? []) collect(reason);
+      collect(current.cause);
+    };
+    collect(error);
+    return messages.some((message) => /max bytes/i.test(message));
   }
 
   static isClickHouseMemoryLimitError(error: unknown): boolean {
